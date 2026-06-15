@@ -114,6 +114,43 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 
 ---
 
+### Privacy no-go commercial ethics events (DEC-030 HMAC-chained · COST_MODEL §39.8.4 · CC1.4/CC9.2)
+
+> Defined in `docs/COST_MODEL.md §39.8.4`. One DEC-030 HMAC-chained event recording each instance where FORM's commercial no-go criteria are operationally applied to reject a prospective enterprise customer. This is an ethical commitment event, not a privacy breach event — it provides auditors and investors with immutable evidence that FORM's stated no-go criteria (insurance risk scoring, government backdoors, wellness-as-punishment) are operationally enforced and not merely policy text. **Auto-companion invariant:** `privacy.no_go_criteria_applied` is always emitted as an atomic companion to `enterprise.deal_closed_lost` when `no_go_criteria_triggered = true` — it is never emitted standalone. The Worker appends it as the second event in the same array payload; missing companion on a `no_go = true` lost event is a chain anomaly detected by the weekly audit. **Privacy floor:** No prospect company name, contact email, or individual `user_id` in payload. `criteria_triggered` is a structured enum — no free-text rationale in the chain. Verbatim documentation of the rejection decision remains in CRM only. `review_confirmed_by` is the founder UUID (FORM-internal — not a prospect contact). Cross-ref: `docs/ENTERPRISE.md §"No-go customers"` (four criteria: insurance risk scoring, government backdoor requests, wellness-as-punishment, other no-go); `enterprise.deal_closed_lost` (§Enterprise Deal Close — predecessor event, same `deal_id`); `docs/COST_MODEL.md §39.9` (WIN-E-003 SOC 2 evidence — quarterly export, zero-count quarters filed as affirmative attestation); SOC 2 CC1.4 (commitment to integrity and ethical values — operationally enforced), CC9.2 (customer selection governance).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `privacy.no_go_criteria_applied` | STANDARD | 3 yr | Automated companion — appended immediately after `enterprise.deal_closed_lost` in the same Worker request when `no_go_criteria_triggered = true`; emitter: `form_system` (auto) | `deal_id` (UUID — matches `enterprise.deal_closed_lost.deal_id`), `criteria_triggered` (enum: `insurance_risk_scoring`\|`government_backdoor_request`\|`wellness_as_punishment_use_case`\|`other_no_go`), `review_confirmed_by` (UUID — founder UUID; FORM-internal; not a prospect contact) |
+
+**Chain ordering:** `privacy.no_go_criteria_applied` is always the second event in a two-event atomic array payload: `[enterprise.deal_closed_lost, privacy.no_go_criteria_applied]`. Both events share the same `prev_hash` anchor. The `emit-audit-event` Worker enforces this ordering — it cannot be emitted without a preceding `enterprise.deal_closed_lost` in the same request.
+
+**Zero-count quarterly filing:** Even in quarters where no no-go criteria are triggered, compliance-officer files a signed attestation (`n = 0`) as WIN-E-003. This positive attestation is SOC 2 CC1.4 evidence that no applicable prospect was presented with a no-go use case during the quarter.
+
+**3-year retention rationale:** No health data; minimal financial sensitivity. 3 years covers two SOC 2 observation windows. Competitive sensitivity (which criteria are triggered) degrades as market conditions evolve.
+
+**Zod v2 schema (canonical source: `docs/COST_MODEL.md §39.8.4`):**
+
+```typescript
+const PrivacyNoGoCriteriaAppliedSchema = z.object({
+  deal_id:             z.string().uuid(),
+  criteria_triggered:  z.enum([
+    'insurance_risk_scoring',
+    'government_backdoor_request',
+    'wellness_as_punishment_use_case',
+    'other_no_go',
+  ]),
+  review_confirmed_by: z.string().uuid(),
+});
+```
+
+**SOC 2 evidence artefact:**
+
+| Artefact | SOC 2 criterion | Source | Retention |
+|---|---|---|---|
+| **WIN-E-003** | CC1.4 (commitment to integrity and ethical values — operationally enforced) / CC9.2 (customer selection governance) | Quarterly export of `privacy.no_go_criteria_applied` chain events; zero-count quarters filed as a signed zero-event attestation; `compliance/evidence/winloss/WIN-E-003_<YYYY-QN>.csv` | 3 yr |
+
+---
+
 ### Billing & GDPR erasure events (DEC-030 HMAC-chained · DATA_MODEL §30)
 
 > Defined in `docs/DATA_MODEL.md §30` (OQ-BILL-05 resolution). One event covering the GDPR Art. 17 erasure record for `subscription_events` — the immutable audit trail that a billing row was pseudonymized during an erasure run. **Privacy invariant:** the event payload never contains the original `user_id` UUID — only the `erased_user_reference` keyed HMAC pseudonym (`[ERASED-{sha256(user_id + ERASURE_PSEUDONYM_SALT)}]`). The pseudonym is linkable only by an actor in possession of `ERASURE_PSEUDONYM_SALT` (write-once Cloudflare Workers Secret — see `docs/CRYPTOGRAPHY_POLICY.md §5/§6`). Cross-ref: SOC 2 P5.2 (pseudonymization evidence ERA-E-001), P8.0 (financial retention with `retention_basis` — ERA-E-002), CC8.1 (migration + erasure chain — ERA-E-003); GDPR Art. 17; DATA_MODEL §12 (Art. 17 erasure protocol step SUB-1); DATA_MODEL §30.7 items 3–5 (P0 M4 implementation checklist). Closes DATA_MODEL §30.7 item 4 (P0 M4 — patch `billing.user_erased` Zod schema in AUDIT_LOG_SCHEMA.md and deploy).
@@ -1772,6 +1809,92 @@ const WearableStaleDataCoachingContextSchema = z.object({
 
 ---
 
+### Enterprise Deal Close Governance events (DEC-030 HMAC-chained · COST_MODEL §39 · CC1.4/CC5.2/CC9.2)
+
+> Defined in `docs/COST_MODEL.md §39.8`. Four DEC-030 HMAC-chained events covering the enterprise deal close lifecycle — individual deal-level close events (won and lost), competitive intelligence capture, and OQ-PIPE-01 recalibration. Three events in the `enterprise.*` namespace are registered here; the companion `privacy.no_go_criteria_applied` is registered in §Privacy. **Privacy floor (all four events):** No prospect company name, contact email, or individual employee `user_id` in any payload. `deal_id` is a FORM-internal UUID from `enterprise_pipeline_stages` — never shared externally or linked to individual health data. `competitor_category` and `criteria_triggered` are structured enums only; verbatim loss-call notes remain in CRM. `acv_usd` and `contracted_seats` are aggregate financial metadata with no link to individual health data. **WIN-CHAIN-01 (warning-level, non-blocking):** `enterprise.deal_closed_won` should be preceded by `enterprise.implementation_kickoff_completed` (§36.10) for the same `tenant_id` within 72 hours; missing predecessor logged to Better Stack. Not HTTP 422 — kickoff scheduling may legitimately lag the contract signature. **PIPE-CHAIN-02 (blocking):** `enterprise.win_loss_analysis_recalibrated` is rejected HTTP 422 (`PIPE_CHAIN_02_MISSING_DECISION_REF`) if `decision_log_ref` is null or empty — mirrors PIPE-CHAIN-01 on `enterprise.pipeline_conversion_model_recalibrated` (§37). Cross-ref: `docs/COST_MODEL.md §37` (pipeline stage model — `closed_lost` added to `enterprise_pipeline_stage_enum` via migration 0074 Step 1); `§37.3` (conversion rate table — §39.7 recalibration protocol); `§39.6` (analytics SQL — OQ-PIPE-01 resolution); `§31.5` (price floors — `floor_respected: true` invariant); `§31.8` (`enterprise.pricing_exception_approved` — `pricing_exception_event_id` soft-ref); `§36.10` (`enterprise.implementation_kickoff_completed` — WIN-CHAIN-01 predecessor); `docs/ENTERPRISE.md §"No-go customers"` (insurance risk scoring, gov backdoors, wellness-as-punishment); `docs/DECISION_LOG.md DEC-06X` (OQ-PIPE-01 closure record). **Closes COST_MODEL.md §39.10 checklist item 1 (P0, M9 — register all four §39.8 DEC-030 events before first S5 deal close).**
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `enterprise.deal_closed_won` | STANDARD | 7 yr | `enterprise_pipeline_stages.stage` set to `'S5'`; `enterprise_deal_outcomes` row inserted simultaneously; emitter: `customer-success` or `founder` (manual via Admin Console "Close Deal" modal; OQ-WIN-01 evaluates automation after Deal 5) | `deal_id` (FORM-internal UUID), `deal_sequence` (int positive), `tier` (`starter`\|`growth`\|`enterprise`), `contracted_seats` (int positive), `acv_usd` (int positive), `contract_years` (1\|2\|3), `floor_respected: true` (literal — enforced by Zod), `win_primary_reason` (enum: `cv_demo_differentiation`\|`privacy_floor_compliance`\|`soc2_roadmap_credibility`\|`competitive_price_per_seat`\|`product_velocity`\|`champion_pull`\|`pilot_conversion`\|`bundle_package`), `won_vs_competitor_category` (enum nullable: 6 values), `attributed_to_partner_id` (UUID nullable), `pricing_exception_event_id` (UUID nullable — soft-ref to §31.8 chain), `sales_cycle_days` (int positive), `first_payment_due_date` (YYYY-MM-DD) |
+| `enterprise.deal_closed_lost` | STANDARD | 3 yr | Founder/AE marks deal lost; `enterprise_pipeline_stages.stage` set to `'closed_lost'`; `enterprise_deal_outcomes` row inserted; emitter: `customer-success` or `founder` (manual); when `no_go_criteria_triggered = true`, Worker auto-emits `privacy.no_go_criteria_applied` as atomic companion event immediately after in the same request | `deal_id` (UUID), `loss_primary_reason` (enum: `price_too_high`\|`feature_gap_ios_only`\|`soc2_not_yet_certified`\|`competitor_won`\|`champion_departed`\|`no_budget_owner`\|`no_go_criteria_triggered`\|`procurement_stall`\|`pilot_no_convert`\|`deferred_not_lost`), `competitor_category` (enum nullable: 6 values — required when `loss_primary_reason = 'competitor_won'`), `no_go_criteria_triggered` (boolean), `last_stage_reached` (S0\|S1\|S2\|S3\|S4), `sales_cycle_days` (int non-negative), `attributed_to_partner_id` (UUID nullable) |
+| `enterprise.win_loss_analysis_recalibrated` | STANDARD | 7 yr | OQ-PIPE-01 calibration threshold met: `COUNT(*) FROM enterprise_deal_outcomes WHERE outcome IN ('closed_won','closed_lost') AND NOT no_go_criteria_triggered` ≥ 10; §37.3 updated; DECISION_LOG entry created; emitter: `founder` or `data-engineer` (manual via Admin Console — **PIPE-CHAIN-02: `decision_log_ref` required**) | `deals_analysed` (int ≥ 10), `no_go_excluded_count` (int ≥ 0), `s0_to_s1_actual_pct`\|`s1_to_s2_actual_pct`\|`s2_to_s3_actual_pct`\|`s3_to_s4_actual_pct`\|`s4_to_s5_actual_pct` (five floats 0–100), `overall_win_rate_pct` (float 0–100), `decision_log_ref` (non-empty string — HTTP 422 `PIPE_CHAIN_02_MISSING_DECISION_REF` if absent or empty), `cost_model_section_updated: '§37.3'` (literal), `calibration_date` (YYYY-MM-DD) |
+
+**HMAC chain invariants:**
+- **WIN-CHAIN-01 (warning-level):** `enterprise.deal_closed_won` should be preceded by `enterprise.implementation_kickoff_completed` (§36.10) for the same `tenant_id` within 72 hours. Worker logs to Better Stack on missing predecessor; does not return HTTP 422.
+- **PIPE-CHAIN-02 (blocking):** `enterprise.win_loss_analysis_recalibrated` → HTTP 422 `PIPE_CHAIN_02_MISSING_DECISION_REF` if `decision_log_ref` is null or empty string. Enforced by `emit-audit-event` Worker before chain-append.
+- **no_go companion invariant:** when `enterprise.deal_closed_lost.no_go_criteria_triggered = true`, the Worker appends `privacy.no_go_criteria_applied` in the same atomic array payload (both events share the same `prev_hash` anchor; companion appended second in chain order). Missing companion on a `no_go = true` lost event constitutes a chain anomaly detected by the weekly audit.
+
+**no_go_criteria_triggered exclusion note:** `no_go_criteria_triggered` deals are excluded from OQ-PIPE-01 funnel conversion rate calculations (§39.6.1 WHERE clause) — ethical rejection is not a sales failure. They are counted separately via `privacy.no_go_criteria_applied` events (WIN-E-003 SOC 2 evidence).
+
+**3-year retention rationale for `enterprise.deal_closed_lost`:** Closed-lost deals carry no health data and minimal financial sensitivity. 3 years covers two SOC 2 observation windows; competitive intelligence value degrades after 24 months.
+
+**Zod v2 schemas (canonical source: `docs/COST_MODEL.md §39.8` — update COST_MODEL.md first on any schema change):**
+
+```typescript
+const EnterpriseDealClosedWonSchema = z.object({
+  deal_id:                    z.string().uuid(),
+  deal_sequence:              z.number().int().positive(),
+  tier:                       z.enum(['starter', 'growth', 'enterprise']),
+  contracted_seats:           z.number().int().positive(),
+  acv_usd:                    z.number().int().positive(),
+  contract_years:             z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  floor_respected:            z.literal(true),
+  win_primary_reason:         z.enum([
+    'cv_demo_differentiation', 'privacy_floor_compliance', 'soc2_roadmap_credibility',
+    'competitive_price_per_seat', 'product_velocity', 'champion_pull',
+    'pilot_conversion', 'bundle_package',
+  ]),
+  won_vs_competitor_category: z.enum([
+    'enterprise_wellness_platform', 'point_solution_fitness', 'employee_assistance_program',
+    'in_house_hr_initiative', 'no_decision', 'unknown',
+  ]).nullable(),
+  attributed_to_partner_id:   z.string().uuid().nullable(),
+  pricing_exception_event_id: z.string().uuid().nullable(),
+  sales_cycle_days:           z.number().int().positive(),
+  first_payment_due_date:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+const EnterpriseDealClosedLostSchema = z.object({
+  deal_id:                  z.string().uuid(),
+  loss_primary_reason:      z.enum([
+    'price_too_high', 'feature_gap_ios_only', 'soc2_not_yet_certified',
+    'competitor_won', 'champion_departed', 'no_budget_owner',
+    'no_go_criteria_triggered', 'procurement_stall', 'pilot_no_convert', 'deferred_not_lost',
+  ]),
+  competitor_category:      z.enum([
+    'enterprise_wellness_platform', 'point_solution_fitness', 'employee_assistance_program',
+    'in_house_hr_initiative', 'no_decision', 'unknown',
+  ]).nullable(),
+  no_go_criteria_triggered: z.boolean(),
+  last_stage_reached:       z.enum(['S0', 'S1', 'S2', 'S3', 'S4']),
+  sales_cycle_days:         z.number().int().nonnegative(),
+  attributed_to_partner_id: z.string().uuid().nullable(),
+});
+
+const EnterpriseWinLossAnalysisRecalibratedSchema = z.object({
+  deals_analysed:             z.number().int().min(10),
+  no_go_excluded_count:       z.number().int().nonnegative(),
+  s0_to_s1_actual_pct:        z.number().min(0).max(100),
+  s1_to_s2_actual_pct:        z.number().min(0).max(100),
+  s2_to_s3_actual_pct:        z.number().min(0).max(100),
+  s3_to_s4_actual_pct:        z.number().min(0).max(100),
+  s4_to_s5_actual_pct:        z.number().min(0).max(100),
+  overall_win_rate_pct:       z.number().min(0).max(100),
+  decision_log_ref:           z.string().min(1),
+  cost_model_section_updated: z.literal('§37.3'),
+  calibration_date:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+```
+
+**SOC 2 evidence artefacts (stored at `compliance/evidence/winloss/` with `MANIFEST.sha256`):**
+
+| Artefact | SOC 2 criterion | Source | Retention |
+|---|---|---|---|
+| **WIN-E-001** | CC5.2 (business risk assessed through deal-level close events) / CC1.4 (pricing floor integrity at close) | Annual export of `enterprise.deal_closed_won` chain events; verify `floor_respected: true` in all records; `compliance/evidence/winloss/WIN-E-001_<YYYY>.csv` | 7 yr |
+| **WIN-E-002** | CC5.2 (monitoring of commercial risk) / CC4.1 (financial model governance with DECISION_LOG anchor) | Export of `enterprise.win_loss_analysis_recalibrated` event(s) at Deal 10/20/50 calibration thresholds; `compliance/evidence/winloss/WIN-E-002_<YYYY>.csv` | 7 yr |
+
+---
+
 ### White-label custom domain & SSL certificate events (DEC-030 HMAC-chained · OBSERVABILITY §42 · A1.1/CC7.2)
 
 > Defined in `docs/OBSERVABILITY.md §42.10`. Six DEC-030 HMAC-chained events covering the white-label custom domain and SSL certificate lifecycle for enterprise tenants (available ≥ $50k ARR per `docs/ENTERPRISE.md §Branding`). One additional high-volume operational event (`system.white_label_cert_checked`, STANDARD, 1yr — emitted per polled domain by pg_cron job 32 nightly) is excluded from this DEC-030 evidence set and from the weekly chain integrity audit. **Privacy floor (all six events):** Custom domain hostnames are commercially sensitive enterprise-customer identifiers — not GDPR Art. 4(1) personal data, but excluded from all cross-tenant exports, aggregated dashboards visible to other tenants, and SIEM streams beyond the affected tenant's own endpoint. `custom_domain_hash` = SHA-256(`custom_domain`) — plaintext custom domain does not appear in any DEC-030 payload pending OQ-WL-OBS-01 resolution (OBSERVABILITY §42.14, P1, before first white-label tenant goes live). `form_api` role has no access to `tenant_white_label_domains` (REVOKE ALL enforced in migration 0072). Cross-ref: `docs/OBSERVABILITY.md §42.4` (WL-SLO-01 through WL-SLO-04); `docs/ENTERPRISE.md §Branding`; `docs/OBSERVABILITY.md §23` (SLA credit engine — WL-SLO-01 breach triggers credit calculation via `sla_incident_id` FK); `docs/SSO_SCIM_IMPLEMENTATION.md §20` (SAML cert lifecycle — analogous expiry alert escalation ladder, different cert class). **Closes OBSERVABILITY.md §42.14 checklist item 1 (P0, M10 — register all six DEC-030 events in AUDIT_LOG_SCHEMA.md before first white-label tenant goes live).**
@@ -1937,6 +2060,11 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Log latency: **P95 < 50ms** added to request
 - Chain integrity verification: **weekly batch**, no in-band cost
 - Export latency: webhook delivery **P95 < 5s** after event
+
+---
+
+**v2.9 · 2026-06-15 · owner: compliance-officer + enterprise-architect + customer-success**
+*v2.9 (2026-06-15): +4 DEC-030 HMAC-chained events from COST_MODEL.md §39 Enterprise Deal Close Governance — closes COST_MODEL.md §39.10 checklist item 1 (P0, M9 — register all four §39.8 events before first S5 deal close). New section `### Enterprise Deal Close Governance events (DEC-030 HMAC-chained · COST_MODEL §39 · CC1.4/CC5.2/CC9.2)` inserted after `### Enterprise Pipeline & ARR Forecasting events`. New section `### Privacy no-go commercial ethics events (DEC-030 HMAC-chained · COST_MODEL §39.8.4 · CC1.4/CC9.2)` inserted in §Privacy after `### Privacy Incident Lifecycle events`. (1) `enterprise.deal_closed_won` (STANDARD, 7yr): emitted by `customer-success` or `founder` (manual via Admin Console "Close Deal" modal) when `enterprise_pipeline_stages.stage` transitions to `'S5'` and `enterprise_deal_outcomes` row is inserted; payload: `deal_id` (FORM-internal UUID — no prospect name or email), `deal_sequence` (positive int), `tier` (3-value enum: starter/growth/enterprise), `contracted_seats`, `acv_usd`, `contract_years` (1|2|3), `floor_respected: true` (literal — Zod z.literal(true)), `win_primary_reason` (8-value enum: cv_demo_differentiation/privacy_floor_compliance/soc2_roadmap_credibility/competitive_price_per_seat/product_velocity/champion_pull/pilot_conversion/bundle_package), `won_vs_competitor_category` (6-value nullable enum: enterprise_wellness_platform/point_solution_fitness/employee_assistance_program/in_house_hr_initiative/no_decision/unknown), `attributed_to_partner_id` (UUID nullable — FK to `enterprise_partners.id`), `pricing_exception_event_id` (UUID nullable — soft-ref to §31.8 chain), `sales_cycle_days` (positive int), `first_payment_due_date` (YYYY-MM-DD). WIN-CHAIN-01 (warning-level, non-blocking): should be preceded by `enterprise.implementation_kickoff_completed` (§36.10) for same `tenant_id` within 72h; missing predecessor logged to Better Stack; not HTTP 422 (kickoff scheduling may legitimately lag). (2) `enterprise.deal_closed_lost` (STANDARD, 3yr): emitted by `customer-success` or `founder` (manual) when deal marked lost; `enterprise_pipeline_stages.stage` set to `'closed_lost'` (added to `enterprise_pipeline_stage_enum` via migration 0074 Step 1); payload: `deal_id`, `loss_primary_reason` (10-value enum: price_too_high/feature_gap_ios_only/soc2_not_yet_certified/competitor_won/champion_departed/no_budget_owner/no_go_criteria_triggered/procurement_stall/pilot_no_convert/deferred_not_lost), `competitor_category` (6-value nullable enum — required when `loss_primary_reason = 'competitor_won'`), `no_go_criteria_triggered` (boolean), `last_stage_reached` (S0–S4 enum), `sales_cycle_days` (non-negative int), `attributed_to_partner_id` (UUID nullable); when `no_go_criteria_triggered = true`, Worker atomically appends `privacy.no_go_criteria_applied` as second event in same array payload (both events share same `prev_hash` anchor). 3yr retention: no health data, covers two SOC 2 observation windows. (3) `enterprise.win_loss_analysis_recalibrated` (STANDARD, 7yr): emitted by `founder` or `data-engineer` (manual via Admin Console) at OQ-PIPE-01 calibration threshold — `COUNT(*) FROM enterprise_deal_outcomes WHERE outcome IN ('closed_won','closed_lost') AND NOT no_go_criteria_triggered` ≥ 10; PIPE-CHAIN-02 (blocking): HTTP 422 `PIPE_CHAIN_02_MISSING_DECISION_REF` if `decision_log_ref` null or empty string; payload: `deals_analysed` (int ≥ 10), `no_go_excluded_count` (non-negative int), five stage conversion rate fields (s0→s1…s4→s5, each float 0–100), `overall_win_rate_pct` (float 0–100), `decision_log_ref` (required non-empty string), `cost_model_section_updated: '§37.3'` (literal), `calibration_date` (YYYY-MM-DD). (4) `privacy.no_go_criteria_applied` (STANDARD, 3yr): auto-companion to `enterprise.deal_closed_lost` when `no_go_criteria_triggered = true`; emitter: `form_system` (automated — never emitted standalone); payload: `deal_id`, `criteria_triggered` (4-value enum: insurance_risk_scoring/government_backdoor_request/wellness_as_punishment_use_case/other_no_go), `review_confirmed_by` (founder UUID — FORM-internal, not prospect contact). Zero-count quarterly filing (WIN-E-003) is affirmative CC1.4 attestation. `no_go_criteria_triggered` deals excluded from OQ-PIPE-01 funnel conversion calculations — ethical rejection is not a sales failure. Three SOC 2 evidence artefacts: WIN-E-001 (CC5.2/CC1.4 — annual `deal_closed_won` export, `floor_respected: true` verification, 7yr; `compliance/evidence/winloss/WIN-E-001_<YYYY>.csv`), WIN-E-002 (CC5.2/CC4.1 — `win_loss_analysis_recalibrated` event at Deal 10/20/50, 7yr; `compliance/evidence/winloss/WIN-E-002_<YYYY>.csv`), WIN-E-003 (CC1.4/CC9.2 — quarterly `no_go_criteria_applied` export + zero-count attestation, 3yr; `compliance/evidence/winloss/WIN-E-003_<YYYY-QN>.csv`). All four Zod v2 schemas provided in new §Enterprise section (canonical source: COST_MODEL.md §39.8 — update COST_MODEL.md first on any schema change). Privacy floor (all four events): no prospect company name, contact email, or individual employee `user_id`; `deal_id` is FORM-internal UUID; `competitor_category` and `criteria_triggered` are structured enums; verbatim loss-call notes remain in CRM only; `form_api` REVOKED from `enterprise_deal_outcomes` (migration 0074 RLS). Cross-ref: COST_MODEL.md §39.8 (canonical Zod schemas), §37.3 (conversion rate table — recalibrated by `win_loss_analysis_recalibrated`), §31.5 (price floors), §31.8 (`pricing_exception_approved` soft-ref), §36.10 (`implementation_kickoff_completed` — WIN-CHAIN-01 predecessor), §38.7 (`enterprise_partners` — `attributed_to_partner_id` FK), §39.9 (WIN-E-001/002/003 evidence paths and filing cadence); ENTERPRISE.md §"No-go customers" (four rejection criteria); DECISION_LOG.md DEC-06X (OQ-PIPE-01 closure — created after Deal 10 calibration); SOC2_READINESS.md CC1.4/CC5.2/CC9.2. Owner: compliance-officer + enterprise-architect + customer-success.*
 
 ---
 

@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.25.1] — 2026-06-15
+
+### Changed
+
+- `docs/AUDIT_LOG_SCHEMA.md` v2.9 — §Enterprise Deal Close Governance events (DEC-030 HMAC-chained · COST_MODEL §39 · CC1.4/CC5.2/CC9.2) + §Privacy no-go commercial ethics events (DEC-030 HMAC-chained · COST_MODEL §39.8.4 · CC1.4/CC9.2) added. Closes COST_MODEL.md §39.10 checklist item 1 (P0, M9 — register all four §39.8 DEC-030 events before first S5 deal close). Four new events registered: `enterprise.deal_closed_won` (STANDARD, 7yr — full Zod schema with `floor_respected: true` literal, 8-value `win_primary_reason` enum, 6-value `won_vs_competitor_category` nullable enum, WIN-CHAIN-01 warning-level check for `implementation_kickoff_completed` predecessor within 72h); `enterprise.deal_closed_lost` (STANDARD, 3yr — 10-value `loss_primary_reason` enum, `no_go_criteria_triggered` boolean, last_stage_reached S0–S4, auto-companion `privacy.no_go_criteria_applied` emitted atomically when no_go flag true; 3yr retention rationale: no health data, two SOC 2 observation windows); `enterprise.win_loss_analysis_recalibrated` (STANDARD, 7yr — PIPE-CHAIN-02 blocking: HTTP 422 `PIPE_CHAIN_02_MISSING_DECISION_REF` if `decision_log_ref` null or empty; five stage conversion rate fields; `cost_model_section_updated: '§37.3'` literal; mirrors PIPE-CHAIN-01 on §37 `pipeline_conversion_model_recalibrated`); `privacy.no_go_criteria_applied` (STANDARD, 3yr — auto-companion only, never emitted standalone; `criteria_triggered` 4-value enum: insurance_risk_scoring/government_backdoor_request/wellness_as_punishment_use_case/other_no_go; `review_confirmed_by` founder UUID; zero-count quarterly filing affirmative CC1.4 attestation). Three SOC 2 evidence artefacts: WIN-E-001 (CC5.2/CC1.4 — annual `deal_closed_won` chain export with `floor_respected: true` verification, 7yr), WIN-E-002 (CC5.2/CC4.1 — `win_loss_analysis_recalibrated` at Deal 10/20/50, 7yr), WIN-E-003 (CC1.4/CC9.2 — quarterly `no_go_criteria_applied` export + zero-count attestation, 3yr). Privacy floor (all four events): no prospect company name, contact email, or individual employee `user_id`; `deal_id` FORM-internal UUID; `competitor_category` and `criteria_triggered` structured enums only; verbatim loss-call notes remain in CRM; `form_api` REVOKED from `enterprise_deal_outcomes`. Cross-references: COST_MODEL.md §39.8 (canonical Zod schemas — source of truth), §39.9 (WIN-E-001/002/003 evidence paths), §39.10 (P0 checklist item 1 — now closed); ENTERPRISE.md §"No-go customers"; DECISION_LOG.md DEC-06X (OQ-PIPE-01 closure at Deal 10).
+- `VERSION` — 5.25.0 → 5.25.1.
+
+---
+
 ## [5.25.0] — 2026-06-15
 
 ### Added
