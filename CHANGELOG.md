@@ -5,11 +5,15 @@
 ### Added
 
 - `content/post-871-strength-asymmetry.md` — Block 851–900 post 21/50. Асиметрія сили між сторонами: коли це проблема, коли — варіативність. 15% threshold as practical guide (not medical verdict), unilateral work as diagnostic vs. corrective tool, decision tree for programming response, common errors (single snapshot, aggressive correction). clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-872-adding-fourth-training-day.md` — Block 851–900 post 22/50. Коли додавати четверте тренування: критерії готовності. Why 3→4 days is harder than 4→5, recovery capacity as the actual constraint, 9-point readiness checklist, two structural variants for the 4th day, what NOT to count as a reason. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-873-programming-over-40.md` — Block 851–900 post 23/50. Програмування для атлета 40+: що реально змінюється. What actually changes (recovery rate, connective tissue adaptation, anabolic response); what doesn't (progressive overload, specificity); practical adjustments without conceding to progress. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-874-mid-block-plateau.md` — Block 851–900 post 24/50. Плато в середині блоку: три причини і три рішення. Distinguishing real stall from fatigue masking fitness; three causes (fatigue accumulation, wrong intensity zone, insufficient volume); three targeted responses; what to check before changing the program. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-875-accumulated-fatigue-response.md` — Block 851–900 post 25/50. Накопичена втома всередині блоку: ознаки і оперативна відповідь. How in-block fatigue differs from overtraining; real-time markers to monitor; operational responses without abandoning the block. clinical-safety: PASS. review_pending: sports-scientist.
 
 ### Changed
 
 - `README.md` — Block 851–900 table updated: actual titles for posts 856–870 replacing planned-topic placeholders; post-871 added; block status updated to in progress · 21/50 · v5.22.0; proposed topics 872–880 added to block table.
-- `blog.html` — post-871 entry prepended to article list (total 170 entries).
+- `blog.html` — posts 871–875 entries prepended to article list (total 174 entries).
 
 ---
 

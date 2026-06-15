@@ -106,7 +106,7 @@
 - PostHog DPA review (compliance-officer) — **REVIEW COMPLETE**; click-through execution pending (founder action — PostHog Dashboard → Organization → Privacy & DPA); PIA-2026-001 filed
 - Block 601–650: **COMPLETE** — всі пости написані (639 blocked HARD VETO); sports-scientist review needed перед publish
 - Block 651–700: **COMPLETE** — all 50 posts written; 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish
-- Block 851–900: **IN PROGRESS 21/50** — posts 851–871 written (post-871 v5.22.0); blog.html caught up to post-871; proposed topics 872–880 queued; review_pending: sports-scientist for all posts in block
+- Block 851–900: **IN PROGRESS 25/50** — posts 851–875 written (posts 871–875 v5.22.0); blog.html caught up to post-875; proposed topics 876–880 in queue; review_pending: sports-scientist for all posts in block
 - Block 1001–1050 proposed: Training literacy: reading your own data (added to README roadmap v4.66.0)
 
 ---
