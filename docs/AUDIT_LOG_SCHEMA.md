@@ -484,10 +484,70 @@ const IntegrationWebhookReactivatedSchema = z.object({
 
 ---
 
-#### Other integration events (stub — full schemas TBD)
+#### Notification connector events (DEC-030 HMAC-chained · CC9.2)
 
-- `integration.connector_added` — Slack, MS Teams, or other team-notification connector activated by `tenant_admin`; STANDARD severity, 7yr retention; payload: `{connector_type, tenant_id, activated_by}`
-- `integration.api_call` — sampled outbound API call record (1-in-10 volume management); STANDARD severity, 30-day retention per §retention table; not HMAC-chained (sampled, not an evidence-class event)
+> Covers the lifecycle of team-notification connectors (Slack incoming webhook, MS Teams connector, generic HTTP channel) that `tenant_admin` or `tenant_owner` activates to receive FORM wellness-signal digests in their communication platform. **Scope:** Growth and Enterprise tier only — connectors surface only opt-in aggregate signals; no individual employee data ever flows through them. **Privacy floor (both events):** `endpoint_url` is tenant-sensitive commercial information — only `endpoint_url_hash` = SHA-256(`endpoint_url`) appears in DEC-030 chain payloads, per the DEC-054 hash-only pattern (`docs/OBSERVABILITY.md §42.13`). No GDPR Art. 9 health data in payloads. `tenant_manager` (HR role) has no access to connector configuration; `form_api` REVOKED from the `tenant_connectors` table. Cross-ref: `docs/ENTERPRISE_ADMIN_API.md §10` (connector API spec); `docs/DATA_MODEL.md §27` (tenant_connectors table); DEC-030; DEC-054.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `integration.connector_added` | STANDARD | 7 yr | `tenant_admin` or `tenant_owner` activates a notification connector via Admin Dashboard → Integrations → Add connector; `tenant_connectors` row inserted with `status = 'active'` | `connector_id` (UUID), `connector_type` (enum: `slack` \| `ms_teams` \| `generic_http`), `tenant_id` (UUID), `activated_by` (user UUID of `tenant_admin` or `tenant_owner` who submitted the form), `endpoint_url_hash` (SHA-256 of incoming webhook URL — URL never in chain) |
+| `integration.connector_removed` | STANDARD | 7 yr | `tenant_admin` or `tenant_owner` removes a connector via Admin Dashboard; `tenant_connectors` row hard-deleted | `connector_id` (UUID), `connector_type` (enum: `slack` \| `ms_teams` \| `generic_http`), `tenant_id` (UUID), `removed_by` (UUID), `endpoint_url_hash` (SHA-256) |
+
+**HMAC chain requirement:** Both events are STANDARD severity and emitted synchronously inside the Workers API middleware that handles connector create/delete. Failure aborts the HTTP response (fail-closed). `integration.connector_added` must precede `integration.connector_removed` for the same `connector_id` — the `emit-audit-event` Worker returns HTTP 422 on a `connector_removed` event with no prior `connector_added` for the same UUID.
+
+**Emitter assignments:** Both events — Workers API middleware (`form_system`, on behalf of the authenticated `tenant_admin` or `tenant_owner` request). No pg_cron involvement; connectors do not have an auto-suspend lifecycle (unlike webhooks).
+
+**Zod v2 schemas (canonical source for `emit-audit-event` Worker validation):**
+
+```typescript
+const ConnectorTypeSchema = z.enum(['slack', 'ms_teams', 'generic_http']);
+
+const IntegrationConnectorAddedSchema = z.object({
+  connector_id:       z.string().uuid(),
+  connector_type:     ConnectorTypeSchema,
+  tenant_id:          z.string().uuid(),
+  activated_by:       z.string().uuid(),  // tenant_admin or tenant_owner user UUID
+  endpoint_url_hash:  z.string().regex(/^[a-f0-9]{64}$/),  // SHA-256(endpoint_url) — URL never in chain
+});
+
+const IntegrationConnectorRemovedSchema = z.object({
+  connector_id:       z.string().uuid(),
+  connector_type:     ConnectorTypeSchema,
+  tenant_id:          z.string().uuid(),
+  removed_by:         z.string().uuid(),  // tenant_admin or tenant_owner user UUID
+  endpoint_url_hash:  z.string().regex(/^[a-f0-9]{64}$/),
+});
+```
+
+**SOC 2 mapping:** CC9.2 — monitoring of third-party notification channel lifecycle. `integration.connector_added` + `integration.connector_removed` provide a chain-evidenced record of every external notification endpoint activated in a tenant's account, satisfying auditor requests for proof that team-notification integrations are controlled and logged.
+
+---
+
+#### API call sampling events (volume management · not HMAC-chained)
+
+> `integration.api_call` is a **sampled** operational telemetry record — 1-in-10 sampling rate applied at the `api-gateway` Cloudflare Worker before the record is written. Because the event set is intentionally incomplete by design (sampling), it is **not HMAC-chained** and is not an evidence-class event. It serves volume management and p95 latency baselining only. **Retention: 30 days** (partition-drop; not archived to R2). **Privacy floor:** no `user_id` in sampled records — sampling applied at the session level prevents reconstruction of individual activity patterns from the sampled set; `tenant_id` is included (quota monitoring, not individual attribution). No GDPR Art. 9 health data. Cross-ref: `docs/OBSERVABILITY.md §Retention table` (30-day partition drop); `docs/DATA_MODEL.md §28` (api_quota_usage — the authoritative quota ledger; this event is a monitoring supplement, not the ledger itself).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `integration.api_call` | STANDARD | 30 days | `api-gateway` Worker samples 1 in 10 inbound API requests and writes a record; sampling decision is per-request random (not per-tenant or per-user) | `tenant_id` (UUID), `endpoint_category` (enum: `coaching` \| `cv` \| `analytics` \| `admin` \| `enterprise`), `method` (enum: `GET` \| `POST` \| `PATCH` \| `DELETE`), `http_status` (int 100–599), `latency_ms` (int ≥ 0), `sampled` (literal `true`), `sample_rate` (literal `0.1`) |
+
+**Not HMAC-chained:** Sampled records are inherently incomplete; including them in the HMAC chain would produce unprovable gaps (a verifier cannot distinguish a legitimate 9-in-10 absence from a tampered deletion). The chain covers only events where completeness can be guaranteed.
+
+**Zod v2 schema:**
+
+```typescript
+const IntegrationApiCallSchema = z.object({
+  tenant_id:         z.string().uuid(),
+  endpoint_category: z.enum(['coaching', 'cv', 'analytics', 'admin', 'enterprise']),
+  method:            z.enum(['GET', 'POST', 'PATCH', 'DELETE']),
+  http_status:       z.number().int().min(100).max(599),
+  latency_ms:        z.number().int().nonnegative(),
+  sampled:           z.literal(true),    // always true — unsampled calls are not written
+  sample_rate:       z.literal(0.1),     // documents sampling policy at record level
+});
+```
+
+**Operational note:** p95 latency derived from `integration.api_call` is used as a leading indicator in `docs/OBSERVABILITY.md §6.2` alert AL-API-02. The 30-day partition-drop retention means this event set **cannot** be used for SOC 2 evidence or GDPR Art. 30 records — use `security.quota_95pct_warning` (STANDARD, 3yr, HMAC-chained) and `admin.access_review_completed` (STANDARD, 7yr, HMAC-chained) for compliance purposes.
 
 ### System
 - `system.backup_completed` / `system.backup_restored` — full Zod schema + retention in **§ Backup & DR Observability events** below

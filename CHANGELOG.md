@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.18.1] — 2026-06-15
+
+### Changed
+
+- `docs/AUDIT_LOG_SCHEMA.md §Integration` — Expanded "Other integration events" stub into full event schemas. Added `integration.connector_added` and `integration.connector_removed` (STANDARD, 7yr retention, DEC-030 HMAC-chained) covering Slack/MS Teams/generic-HTTP notification connector lifecycle; Zod v2 schemas, privacy floor (`endpoint_url_hash` SHA-256 only, per DEC-054), SOC 2 CC9.2 mapping, ordering invariant. Added `integration.api_call` full spec (STANDARD, 30d retention, NOT HMAC-chained — sampled 1-in-10; explains why sampling disqualifies it from the evidence chain; Zod v2 schema; operational note for AL-API-02). Owner: compliance-officer + security-engineer.
+- `VERSION` — 5.18.0 → 5.18.1.
+
+---
+
 ## [5.18.0] — 2026-06-15
 
 ### Added
