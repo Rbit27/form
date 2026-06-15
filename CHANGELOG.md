@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [5.32.0] — 2026-06-15
+
+### Added
+- `content/post-941-neural-adaptations-strength.md` — Block 901–950 post 41/50. Нейральні адаптації: рекрутування, rate coding, координація. Програмні імплікації для початківців і досвідчених. Таймлайн адаптацій.
+- `content/post-942-tendon-connective-tissue-programming.md` — Block 901–950 post 42/50. Структурний лаг сухожилків vs. м'язи. Ізометрія як специфічний стимул. Протокол повернення після перерви з урахуванням сухожилкового фактора.
+- `content/post-943-training-age-response-rate.md` — Block 901–950 post 43/50. Тренувальний вік ≠ хронологічний. Novice/intermediate/advanced: адаптаційна логіка, провідний механізм, одиниця прогресу. Практична матриця.
+- `content/post-944-advanced-rpe-programming.md` — Block 901–950 post 44/50. RPE-дрейф як індикатор адаптації. RIR-based прогресія. Хвиля RPE через мезоцикл. Autoregulation між сесіями.
+- `content/post-945-fatigue-management-training-year.md` — Block 901–950 post 45/50. Три горизонти втоми. Модель Fitness-Fatigue. Квартальне планування. Ознаки накопиченої втоми і типові помилки управління.
+- `content/post-946-training-for-longevity.md` — Block 901–950 post 46/50. VO2max, м'язова маса і баланс як longevity-предиктори. Максимум vs. оптимум. Програмні корективи за декадами.
+- `content/post-947-hormonal-responses-training.md` — Block 901–950 post 47/50. Тестостерон, кортизол, GH, IGF-1 і тренування. Чому локальний IGF-1 важливіший за системні гормональні піки. Деміфологізація «анаболічного вікна».
+- `content/post-948-sleep-training-quality.md` — Block 901–950 post 48/50. Кількісні дані дефіциту сну (-20% жим після 4 ночей 6 год). GH-секреція, ЦНС-відновлення, глімфатична система. Денний сон як інструмент.
+- `content/post-949-cognitive-fatigue-training-decisions.md` — Block 901–950 post 49/50. Когнітивна втома і фізична продуктивність (Marcora et al.). Чому RPE ненадійний після важкого когнітивного дня. Заздалегідь прийняті рішення для «важких» днів.
+- `content/post-950-minimum-effective-dose-synthesis.md` — Block 901–950 post 50/50. MED: концепція і практика. Синтез 50 статей блоку через призму MED. Як знайти особистий MED і будувати програму навколо нього. Блок COMPLETE.
+- `blog.html` — додано картки для постів 941–950.
+
+### Changed
+- `VERSION` — 5.31.0 → 5.32.0.
+- `STATUS.md` — Block 901–950: BLOCK COMPLETE 50/50; Total posts: 950; next: Block 951–1000 proposed.
+
+---
+
 ## [5.31.0] — 2026-06-15
 
 ### Added
