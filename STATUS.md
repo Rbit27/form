@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.35.0** — 2026-06-15
+**v5.38.0** — 2026-06-15
 
 ---
 
@@ -32,7 +32,7 @@
 
 | 851–900 | Applied programming deep dives | 50 | **BLOCK COMPLETE v5.24.0** — all 50 posts written; blog.html caught up to post-900; sports-scientist review required for all 50 before publish |
 | 901–950 | Advanced programming systems | 50/50 | **BLOCK COMPLETE v5.32.0** — all 50 posts written. 901–930: (see v5.29.0). 931–940: advanced deload variations, block vs. DUP periodization, autoregulation tools (RPE/RIR/VBT/APRE), training around soreness (DOMS), exercise selection advanced (3-level hierarchy), progressive overload beyond weight (7 vectors), accumulation vs. intensification, taper for non-competitive athletes, advanced warm-up protocols (PAP), training log analysis. 941–950: neural adaptations (programming implications), tendon/connective tissue programming, training age and response rate, advanced RPE programming, fatigue management across a training year, training for longevity, hormonal responses to training, sleep and training quality, cognitive fatigue and training decisions, MED and block synthesis. clinical-safety NOT REQUIRED for all. sports-scientist review required before publish. blog.html updated to post-950. |
-| 951–1000 | Training environment & context | 16/50 | **IN PROGRESS v5.37.0** — 951–961 written: traveling, home dumbbells, home gym vs commercial, heat, cold, altitude, gym environment, flexible schedule, morning vs evening, relocation, time-constrained (30 хв). **962–966 written v5.37.0:** no squat rack (Romanian DL + Bulgarian split + floor press структура), machine-only training (Upper/Lower program + карта тренажерів), resistance bands as primary (зростаючий профіль опору, програма 3 дні), no bench available (floor press + push-up варіації), equipment occupied (заміни по патернах + 3 тактики). clinical-safety NOT REQUIRED for all 16. sports-scientist review required before publish. blog.html updated to post-966. |
+| 951–1000 | Training environment & context | 20/50 | **IN PROGRESS v5.38.0** — 951–961 written: traveling, home dumbbells, home gym vs commercial, heat, cold, altitude, gym environment, flexible schedule, morning vs evening, relocation, time-constrained (30 хв). **962–966 written v5.37.0:** no squat rack, machine-only training, resistance bands as primary, no bench available, equipment occupied. **967–970 written v5.38.0:** kettlebell-focused training (балістика vs. гринд, програма 3 дні, де гиря програє штанзі), limited weight selection (7 векторів прогресії без нової ваги, 4-тижневий план переходу), no cable machines (карта замін, face pull як найскладніша заміна, Upper/Lower без cable), training without spotter (safeties tax, RPE management, чеклист безпеки — clinical-safety CONDITIONAL PASS). clinical-safety NOT REQUIRED for 967–969. post-970 clinical-safety CONDITIONAL PASS. sports-scientist review required before publish. blog.html updated to post-970. |
 
 **Total posts: 966**
 
@@ -112,9 +112,9 @@
 - Block 651–700: **COMPLETE** — all 50 posts written; 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish
 - Block 851–900: **COMPLETE 50/50** — all posts written (v5.24.0); blog.html caught up to post-900; sports-scientist review pending for all 50 posts before publish
 - Block 901–950: **COMPLETE 50/50 · v5.32.0** — all posts written. blog.html updated to post-950. sports-scientist review required before publish.
-- Block 951–1000: **IN PROGRESS v5.37.0** — posts 951–966 written (16/50). Next: posts 967–970 (equipment constraints continued: kettlebell-focused, limited weight selection, no cable machines, no spotter). blog.html updated to post-966. sports-scientist review required before publish.
+- Block 951–1000: **IN PROGRESS v5.38.0** — posts 951–970 written (20/50). Next: posts 971–975 (barbell-only gym, no mirrors, outdoor training, gym anxiety/first-time, training while sick). blog.html updated to post-970. sports-scientist review required before publish.
 - Block 1001–1050 proposed: Training literacy: reading your own data (added to README roadmap v4.66.0)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v5.32.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v5.38.0**

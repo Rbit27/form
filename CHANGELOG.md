@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.38.0] — 2026-06-15
+
+### Added
+- `content/post-967-kettlebell-focused-training.md` — Block 951–1000 post 17/50. Equipment constraints: гирі як основний інструмент. Фізична різниця гирі від гантелі (зміщений центр мас, профіль балістичного руху). Балістичні vs. гриндові вправи (swing/snatch/clean vs. press/TGU/RDL). Де гиря виграє (балістика, малий простір, кондиціонування) і де програє (максимальна сила ніг, ізоляція, точна прогресія). Мінімальний та функціональний набір гирь. Техніка swing і rack position. Програма 3 дні (A: сила+балістика, B: кондиціонування+задня ланцюг, C: комплекс). 7 векторів прогресії без нової гирі. clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+- `content/post-968-limited-weight-selection.md` — Block 951–1000 post 18/50. Equipment constraints: обмежений вибір ваг. Чому стрибок +5 кг на гантелях занадто великий (20–25% приріст за одне тренування — понад межу нервово-м'язової адаптації). 7 векторів прогресії: об'єм (double progression), темп (3-1-1-0 запис), пауза (нижня точка), зменшення відпочинку, складніша варіація, більше підходів, методи інтенсифікації (drop set, rest-pause, cluster set). 4-тижневий план переходу між недоступними кроками ваги. Мікроблін і саморобні рішення. Таблиця «що робити при обмеженому наборі». clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+- `content/post-969-no-cable-machines.md` — Block 951–1000 post 19/50. Equipment constraints: тренування без cable-тренажерів. Три унікальні властивості cable (постійний натяг, регульований кут, уніполярні рухи). Де cable критично (face pull, rear delt fly, lat pulldown без перекладини) і де добре компенсується (row, curl, tri extension). Повна карта замін для грудей, спини, плечей, рук, нижньої частини тіла. Детальний розбір face pull: чотири альтернативи (band face pull, dumbbell rear delt fly лежачи, W-raise, Powell raise). Lateral raise без cable — три тактики компенсації. Upper/Lower програма 4 дні без cable-stack. clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+- `content/post-970-training-without-spotter.md` — Block 951–1000 post 20/50. Equipment constraints: тренування без страховника. Класифікація: де страховник критичний (bench/squat зі штангою до відмови без safeties) і де не потрібен (гантелі, тренажери, тяга, ізоляція). Bench press без страховника: 4 варіанти (safeties у rack, floor press, dump гантелей, RIR management). Squat без страховника: safeties, goblet/front squat, Bulgarian split squat. Загальні принципи: RIR 1 як ліміт без страховника у вільноваговних, чеклист обладнання, відеозапис. Таблиця «безпечна вправа без страховника». clinical-safety CONDITIONAL PASS — пост акцентує профілактику, описує всі ризики, не заохочує до ігнорування безпеки. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — додано картки для posts 967–970 на чолі списку.
+- `STATUS.md` — Block 951–1000 оновлено: 16/50 → 20/50; версія v5.37.0 → v5.38.0; наступний пріоритет: posts 971–975.
+- `VERSION` — bump to 5.38.0.
+
+---
+
 ## [5.37.0] — 2026-06-15
 
 ### Added
