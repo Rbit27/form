@@ -1,5 +1,23 @@
 # Changelog · FORM
 
+## [5.54.0] — 2026-06-15
+
+### Added
+- `content/post-1022-warmup-sets-readiness-signal.md` — Block 1001–1050 cluster 3 post 1/9. Warm-up sets як термометр готовності: три маркери (bar speed, технічне зусилля, суб'єктивний RPE), порівняння з HRV як різних вимірювань різних речей, протокол фіксації, реакція на жовтий/червоний прапор, патерн накопиченої втоми через warm-up динаміку. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1023-progressive-overload-primary-metric.md` — Cluster 3 post 2/9. Чотири леверидж-метрики прогресивного перевантаження (інтенсивність, обсяг, тоннаж, щільність), логіка вибору первинної залежно від цілі, часові горизонти змін, помилка відстежування всього без ієрархії. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1024-technical-regression-in-data.md` — Cluster 3 post 3/9. Технічна регресія у даних: п'ять маркерів (RPE creep, аномалії в повторах, нотатки якості, асиметрії, зміна темпу), різниця від накопиченої втоми (тест deload), небезпечне поєднання «вага росте + техніка деградує», три рівні реакції. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1025-muscle-group-asymmetry-data.md` — Cluster 3 post 4/9. Асиметрія між сторонами: нормальна (≤15%, стабільна) vs. проблемна (прогресуюча, впливає на механіку), три джерела прогресії асиметрії, протокол вимірювання кожні 6–8 тижнів, білатеральний дефіцит, правило «починати зі слабшої сторони». clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1026-volume-adaptation-training-status.md` — Cluster 3 post 5/9. Адаптація до обсягу залежно від тренувального стажу: три стадії і різна логіка (початківець/середній/просунутий), різне читання однакових даних, MEV→MAV framework, пастка загальних нормативів без особистого контексту. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1027-real-plateau-vs-poor-analysis.md` — Cluster 3 post 6/9. Справжнє плато vs. поганий аналіз: шість типових хибних «плато», чеклист 6 пунктів перед діагнозом, ознаки справжнього адаптаційного плато, три правильних втручання (зміна стимулу / нарощення обсягу / deload reset), пастка «зміна програми кожні 6 тижнів». clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1028-training-age-data-interpretation.md` — Cluster 3 post 7/9. Тренувальний вік і інтерпретація даних: визначення (не роки в залі, а якісне програмоване тренування), нелінійна крива адаптації, таблиця орієнтирів (темп прогресу / горизонт діагностики / точність RPE / значущість відхилення / відновлення), три питання для самовизначення рівня. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1029-peak-planning-data-before-test.md` — Cluster 3 post 8/9. Планування піку через журнальні дані: визначення піку (мінімальна втома + збережена адаптація), tapering терміни за рівнем (7–21 день), сигнали зниження втоми і збереженої адаптації, протокол tapering (обсяг −40–60%, інтенсивність зберігається), читання сигналів в процесі, помилка «повний спокій», фіксація тесту. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1030-signal-hierarchy-when-data-conflicts.md` — Cluster 3 post 9/9 · synthesis. Ієрархія сигналів при конфлікті: чому конфлікт нормальний (різні інструменти = різні виміри), чотири конкретних сценарії з рішеннями, загальна ієрархія (warm-up > RPE тенденція > HRV тенденція > одиничні виміри > суб'єктивне відчуття), метасигнал часу аналізу. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — картки posts 1022–1030 додані на початок сітки (9 нових карток).
+- `STATUS.md` — block 1001–1050 оновлено до 30/50; кластер 3 COMPLETE; total posts → 1030; VERSION 5.53.0 → 5.54.0.
+- `VERSION` — bump 5.53.0 → 5.54.0.
+
 ## [5.53.0] — 2026-06-15
 
 ### Added
