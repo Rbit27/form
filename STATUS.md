@@ -1,4 +1,4 @@
-# FORM · Project Status v5.24.0
+# FORM · Project Status v5.26.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.24.0** — 2026-06-15
+**v5.26.0** — 2026-06-15
 
 ---
 
@@ -30,7 +30,10 @@
 | 751–800 | Athlete lifecycle & context | 50 | **BLOCK COMPLETE** — all 50 posts written v5.1.0: posts 791 (athletes with movement limitations · clinical-safety CONDITIONAL PASS), 793 (sustained high stress training · clinical-safety CONDITIONAL PASS), 794 (medically-restricted diet · clinical-safety CONDITIONAL PASS) now written with embedded guard rails. Blog cards added for posts 785–800. sports-scientist review required for all 50 before publish |
 | 801–850 | Evidence-based deep dives | 50 | **BLOCK COMPLETE v5.14.0** — all 50 posts written. Posts 801–840 (prev batches). **Batch 841–850 COMPLETE v5.14.0:** post-841 electrolytes performance science (PASS), post-842 nitrate/beetroot (PASS — guard rail: drug interactions with nitroglycerin), post-843 sodium bicarbonate buffering (PASS), post-844 adaptogen comparison (PASS), post-845 rhodiola rosea (CONDITIONAL PASS — guard rail: SSRI/SNRI/MAOI interactions, serotonin syndrome risk), post-846 tart cherry/recovery (PASS), post-847 glutathione/antioxidant paradox (PASS), post-848 NAC (CONDITIONAL PASS — guard rail: nitroglycerin interaction + antioxidant paradox for trained athletes), post-849 phosphatidylserine/cortisol (PASS), post-850 cordyceps/C.militaris (PASS — block synthesis). All sports-scientist review required before publish. |
 
-**Total posts: 850**
+| 851–900 | Applied programming deep dives | 50 | **BLOCK COMPLETE v5.24.0** — all 50 posts written; blog.html caught up to post-900; sports-scientist review required for all 50 before publish |
+| 901–950 | Advanced programming systems | 10/50 | **IN PROGRESS v5.26.0** — posts 901–910 written: DUP, VBT, autoregulation, concurrent interference, block vs. conjugate, triphasic, HFLV/grease-the-groove, MRV/MEV/MAV, peaking for naturals, program switching cost. clinical-safety NOT REQUIRED (pure programming topics). sports-scientist review required before publish. |
+
+**Total posts: 910**
 
 **Editorial series 11–34, 44–45** — post-45 written v5.24.0: «Прогрес без ваги штанги: що ще рахується і чому» — об'єм навантаження (тоннаж), технічна компетентність, калібрування RIR/RPE, консистентність, швидкість відновлення, кінезіологічна доступність як повноцінні маркери прогресу; чому єдиний показник «вага на штанзі» дає спотворену картину; мінімальний набір відстеження без надмірного аналізу; clinical-safety: PASS. Blog card added. Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
 
@@ -107,9 +110,9 @@
 - Block 601–650: **COMPLETE** — всі пости написані (639 blocked HARD VETO); sports-scientist review needed перед publish
 - Block 651–700: **COMPLETE** — all 50 posts written; 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish
 - Block 851–900: **COMPLETE 50/50** — all posts written (v5.24.0); blog.html caught up to post-900; sports-scientist review pending for all 50 posts before publish
-- Block 901–950: not yet planned — proposed topic: Advanced programming systems (DUP, reactive training, velocity-based programming, concurrent periodization)
+- Block 901–950: **IN PROGRESS 10/50 · v5.26.0** — posts 901–910 written (DUP, VBT, autoregulation, concurrent interference, block vs. conjugate, triphasic, HFLV, MRV/MEV/MAV, peaking for naturals, program switching). blog.html updated to post-910. Next: posts 911–920 (proposed: cluster sets, rest-pause, drop sets advanced, accommodating resistance science, intraset fatigue, periodizing accessories, competition-cycle planning, exercise order effects, unilateral advanced, long-range ROM training)
 - Block 1001–1050 proposed: Training literacy: reading your own data (added to README roadmap v4.66.0)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v5.25.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v5.26.0**
