@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [5.55.1] — 2026-06-15
+
+### Changed
+- `enterprise.html` — White-label showcase section added between Implementation Timeline and Integrations. Covers: eligibility gate (≥ $50k ARR), three-step setup flow (DNS CNAME → logo/colour upload → FORM provisions Cloudflare Custom Hostnames), what's customisable (domain, logo, primary colour, Admin Dashboard Branding panel), what stays the same (RLS isolation, privacy floor, SOC 2 controls, 99.9% SLA), powered-by-FORM footer rule, eligibility card. Cross-refs: `docs/WHITE_LABEL_IMPLEMENTATION.md`, `docs/ENTERPRISE.md §Branding`, DEC-054. enterprise-architect + compliance-officer owners.
+- `VERSION` — bump 5.55.0 → 5.55.1.
+
 ## [5.55.0] — 2026-06-15
 
 ### Added
