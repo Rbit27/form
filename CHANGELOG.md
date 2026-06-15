@@ -1,5 +1,22 @@
 # Changelog · FORM
 
+## [5.12.0] — 2026-06-15
+
+### Added
+
+- `content/post-837-bcaa-eaa-evidence-review.md` — Block 801–850 batch 4, post 7/10. BCAA vs EAA evidence review: mTORC1 substrate problem (Churchward-Venne 2014: 25 g whey > 6.25 g + BCAA for sustained MPS), Wolfe 2017 contextual rehabilitation of BCAA for specific scenarios (fasted training, low total protein, prolonged aerobic work), Moberg 2016 (EAA required for full mTOR activation), Davies 2023 meta-analysis (EAA 10–15 g effective when total protein < 1.2 g/kg; null at adequate intake). Practical algorithm: ≥ 1.6 g/kg/day from quality sources → BCAA/EAA add nothing; specific scenarios → EAA 10–15 g peri-workout. clinical-safety: PASS.
+- `content/post-838-iron-deficiency-athletes.md` — Block 801–850 batch 4, post 8/10. Iron deficiency without anemia (IDNA) in athletes: ferritin as independent marker from Hb, IDNA prevalence 26–52% in female athletes and 7–15% in male endurance athletes, mitochondrial cytochrome iron-dependence (Complexes I–IV degraded before Hb falls), myoglobin and dopamine synthesis pathways, ferritin threshold zones for athletes (< 20 µg/L functional deficiency, 40–60+ optimal for active women), TIBC/transferrin saturation screening, heme vs non-heme bioavailability hierarchy, inhibitors (calcium, phytates, tannins), timeline to recovery (6–12 weeks for VO2max). Guard rails embedded: consult doctor before supplementing; iron toxicity and hemochromatosis contraindication noted. clinical-safety: CONDITIONAL PASS.
+- `content/post-839-zinc-testosterone-evidence.md` — Block 801–850 batch 4, post 9/10. Zinc+testosterone without spin: Prasad 1996 (deficiency → repletion effect, not a booster; T doubled from 9 to 17 nmol/L in deficient elderly), Ananda et al. null in replete subjects, ZMA independent nulls (King 2003, Wilborn 2004 vs. Brilla & Conte 2000 conflict-of-interest). Mechanisms: Cu/Zn-SOD antioxidant, Leydig cell steroidogenesis cofactor, IGF-1 correlation, immune T-cell/NK-cell dependence. Practical algorithm: animal-protein-adequate → low deficit risk; plant-dominant + high training volume → check status, correct if deficient. Glycinate/picolinate forms, 40 mg/day UL, copper depletion risk with excess. clinical-safety: PASS.
+- `content/post-840-berberine-glucose-metabolism.md` — Block 801–850 batch 4, post 10/10. Berberine+glucose for athletes: AMPK/GLUT4 mechanism (also mitochondrial Complex I inhibition, Akkermansia microbiome modulation), Zhang 2008 (500 mg×3, 3 months, T2D: HbA1c −2.0%, TG −35.9%, comparable to metformin), Liang 2019 meta-analysis (27 RCT, n=2569, significant for T2D/pre-diabetes). No RCT in healthy trained athletes. AMPK↑ vs. mTORC1 conflict flagged for strength athletes. CYP3A4/CYP2C9 inhibitor: warfarin, cyclosporin, metformin, tetracycline interactions documented. Contraindications: pregnancy, infants, severe liver disease. Guard rails embedded: consult doctor if on any medications; not a substitute for medical therapy in diabetes/pre-diabetes. clinical-safety: CONDITIONAL PASS.
+
+### Changed
+
+- `README.md` — Block 801–850 table updated: posts 831–840 all marked written (v5.12.0). Batch 4 COMPLETE annotation added.
+- `STATUS.md` — Block 801–850 row updated: 36/50 → 40/50, batch 4 complete summary; total posts 833 → 837; next priorities updated to batch 841–850.
+- `VERSION` — 5.11.2 → 5.12.0.
+
+---
+
 ## [5.11.2] — 2026-06-15
 
 ### Changed
