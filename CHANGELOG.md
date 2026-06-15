@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [5.22.0] — 2026-06-15
+
+### Added
+
+- `content/post-871-strength-asymmetry.md` — Block 851–900 post 21/50. Асиметрія сили між сторонами: коли це проблема, коли — варіативність. 15% threshold as practical guide (not medical verdict), unilateral work as diagnostic vs. corrective tool, decision tree for programming response, common errors (single snapshot, aggressive correction). clinical-safety: PASS. review_pending: sports-scientist.
+
+### Changed
+
+- `README.md` — Block 851–900 table updated: actual titles for posts 856–870 replacing planned-topic placeholders; post-871 added; block status updated to in progress · 21/50 · v5.22.0; proposed topics 872–880 added to block table.
+- `blog.html` — post-871 entry prepended to article list (total 170 entries).
+
+---
+
 ## [5.21.0] — 2026-06-15
 
 ### Added
