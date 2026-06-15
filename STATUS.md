@@ -32,7 +32,7 @@
 
 **Total posts: 848**
 
-**Editorial series 11–32** — post-32 written v5.13.0: «Як читати наукову статтю про тренування і не зробити неправильних висновків» — ієрархія доказів (RCT vs observational vs мета-аналіз), population bias (нетреновані студенти vs тренований атлет), p-value vs effect size (Cohen's d), суррогатні маркери vs прямі результати, publication bias і відтворюваність, практичний фільтр-таблиця; clinical-safety: PASS. Blog card added. Proposed next: posts 33–35 (self-programming vs coach, dropout mechanics, breathing mechanics Valsalva/IAP). Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
+**Editorial series 11–33** — post-33 written v5.15.0: «Самостійне програмування: де воно краще за коуча, де гірше» — зовнішнє спостереження як незамінна перевага тренера, де self-programming виграє (проміжний рівень, нерегулярний графік, дані, автономія), де тренер незамінний (техніка, змагання, accountability), спектр між полюсами (консультаційний тренер, online, AI), практична рамка вибору, honest AI trade-off; clinical-safety: PASS. Blog card added. README editorial table extended to posts 41–50. Proposed next: posts 34–35 (dropout mechanics Valsalva/IAP, breathing mechanics). Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
 
 ---
 

@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.15.0] — 2026-06-15
+
+### Added
+
+- `content/post-33-self-programming-vs-coach.md` — Editorial series post-33. Самостійне програмування vs тренер: зовнішнє спостереження як єдина незамінна перевага тренера, де self-programming виграє (проміжний рівень+, нерегулярний графік, якісні дані, вартість, автономія), де тренер виграє (перші 6-12 місяців, технічний розбір, змагальна підготовка, accountability, складні плато), спектр між полюсами (консультаційний тренер, online, програми, AI), практична рамка вибору з п'ятьма запитаннями, honest AI trade-off. clinical-safety: PASS.
+
+### Changed
+
+- `blog.html` — Blog card for post-33 added (editorial series card before post-32).
+- `README.md` — Editorial series table extended: posts 41–50 added as proposed (RPE calibration, video analysis, training age, progress without weight, force majeure adaptation, first-year self-programming mistakes, technique thresholds, goal vs process, FORM default decisions synthesis).
+- `STATUS.md` — Editorial series row updated: 11–32 → **11–33** v5.15.0; proposed next updated.
+- `VERSION` — 5.14.0 → 5.15.0.
+
+---
+
 ## [5.14.0] — 2026-06-15
 
 ### Added
