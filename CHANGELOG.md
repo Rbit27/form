@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [5.21.0] — 2026-06-15
+
+### Added
+
+- `docs/CHANGE_MANAGEMENT.md` — Standalone CC8.1 change management policy. Covers: change classification (Emergency/Standard/Minor), authorisation workflows, GitHub branch protection requirements (CC8-E-001), CI/CD pipeline state and CC8-GAP-001 compensating control, database schema change controls with mandatory reviewer checklist, rollback procedures for all four production surfaces (Workers/Pages/schema/ML model), separation of duties analysis with solo-founder compensating controls and auditor disclosure language, include-administrators override exception (CC8-E-005), six DEC-030 HMAC-chained audit events for the change lifecycle, full evidence package (CC8-E-001 through CC8-E-006), open gaps register (CC8-GAP-001: no CI yet; CC8-GAP-002: include-administrators off), Appendix A pre-deploy checklist (compensating control), Appendix B post-hire transition checklist. Extracted and formalised from `docs/SOC2_READINESS.md §21`. Owner: compliance-officer + security-engineer + enterprise-architect.
+
 ## [5.20.0] — 2026-06-15
 
 ### Added
