@@ -14048,7 +14048,7 @@ Evidence collection path: `compliance/evidence/dsar/DSAR-E-011_<YYYY-QN>.csv`, `
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 8 | Configure AL-DSAR-05 in PagerDuty `form-compliance` per `docs/OBSERVABILITY.md §37.12` spec; wire `dsar-fulfillment-worker` to increment `enterprise_sla_counters.dsar_slo_misses_this_quarter` on `slo_met = false`; verify P1 routing on counter = 1 and P2 Slack routing on counter > 1 in staging with synthetic missed-SLO event. | devops-lead + platform-engineer | **P1** | M6 | [ ] |
-| 9 | Update `docs/SOC2_READINESS.md §32.8` to mark OQ-DSAR-03 and OQ-DSAR-04 as 🟢 Resolved (DEC-052); add DSAR-E-011 and DSAR-E-012 to P8.0 and CC7.2 evidence tables respectively. | compliance-officer | **P1** | M6 | [ ] |
+| 9 | Update `docs/SOC2_READINESS.md §32.8` to mark OQ-DSAR-03 and OQ-DSAR-04 as 🟢 Resolved (DEC-052); add DSAR-E-011 and DSAR-E-012 to P8.0 and CC7.2 evidence tables respectively. | compliance-officer | **P1** | M6 | [x] Done — `docs/SOC2_READINESS.md v3.8.3` (2026-06-15): DSAR-E-011 added to P8 control table; DSAR-E-012 added to §25.7 CC7.2 evidence table; Vanta mirror list updated to DSAR-E-007–012 |
 | 10 | After first production Art. 17 erasure: collect DSAR-E-011 artefact (certificate chain export); verify `payload_hash` against R2 object SHA-256; file at `compliance/evidence/dsar/DSAR-E-011_<YYYY-QN>.csv`. | compliance-officer | **P1** | M7 | [ ] |
 
 #### P2 — Before SOC 2 observation period start (M11)

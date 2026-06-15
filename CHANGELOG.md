@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [5.26.1] — 2026-06-15
+
+### Changed
+
+- `docs/SOC2_READINESS.md` v3.8.3 — DSAR-E-011 and DSAR-E-012 cross-reference patch. Closes `docs/DATA_MODEL.md §35.10` checklist item 9 (P1, M6). Two SOC 2 evidence artefacts defined in DATA_MODEL.md §35.9 (DEC-052, 2026-06-14) are now registered in SOC2_READINESS.md: DSAR-E-011 (P8.0 — quarterly `dsar.certificate_issued` DEC-030 chain export with R2 `payload_hash` cross-check; proves Art. 17 disposal communicated to data subject; 7yr; `compliance/evidence/dsar/DSAR-E-011_<YYYY-QN>.csv`) added to the P8 — Monitoring and Enforcement control table (§2); DSAR-E-012 (CC7.2 — AL-DSAR-05 PagerDuty incident history + pg_cron job 33 quarterly SLO miss counter reset audit; demonstrates automated DSAR SLO breach detection; 3yr) added to §25.7 CC7 evidence table after ETF-E-002. Vanta mirror list (§80.4) updated: DSAR-E-007/008/009/010 → DSAR-E-007/008/009/010/011/012. Both artefacts status: 🟡 Authored — pending first Art. 17 production erasure (M7). Privacy floor confirmed on both artefacts: no employee names, emails, or health values; `user_id_hash` SHA-256 only.
+- `docs/DATA_MODEL.md` §35.10 item 9 — marked [x] Done with SOC2_READINESS.md v3.8.3 reference.
+- `VERSION` — 5.26.0 → 5.26.1.
+
+---
+
 ## [5.26.0] — 2026-06-15
 
 ### Added
