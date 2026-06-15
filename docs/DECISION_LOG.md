@@ -13,6 +13,17 @@
 
 ---
 
+## 2026-06-15
+
+### DEC-060 · OQ-SSO-24.1 + OQ-SSO-24.2: `pam-db-proxy` — Supabase Edge Function + direct Postgres session connection (port 5432) adopted
+
+- **Decision:** `pam-db-proxy` is implemented as a **Supabase Edge Function** (OQ-SSO-24.1); it connects to Postgres using the **direct session-mode connection string (port 5432)** — not the PgBouncer transaction-mode pooler (port 6543) — eliminating the `SET ROLE form_admin` session-affinity risk and bypassing PgBouncer entirely (OQ-SSO-24.2). `SUPABASE_PAM_DB_URL` is stored as a Supabase Edge Function secret (distinct from `SUPABASE_SERVICE_ROLE_KEY`). No Supabase plan upgrade is required — max 5–6 concurrent PAM direct connections is well within the Pro plan 60-connection ceiling. Full specification in `docs/SSO_SCIM_IMPLEMENTATION.md §31`. Closes OQ-SSO-24.1 (P1, Before M4 — pam-db-proxy placement) and OQ-SSO-24.2 (P0, Before M4 — PgBouncer session mode); both from §24.9.
+- **Owner:** security-engineer + platform-engineer + enterprise-architect
+- **Why:** (1) **OQ-SSO-24.1 — Supabase Edge Function over Cloudflare Worker + Hyperdrive:** Hyperdrive uses transaction-mode pooling by default; `SET ROLE form_admin` is session-scoped and not guaranteed to persist across connection checkouts in transaction mode — this is a PgBouncer architectural constraint, not a configuration gap. Additionally: `form_admin` credentials stored in Cloudflare Workers Secrets would cross the Supabase trust boundary on every new pool connection; intra-VPC Edge Function → Postgres latency is < 5 ms vs. 20–50 ms for Cloudflare → Hyperdrive → Supabase; no third-party intermediary in the privileged data path. (2) **OQ-SSO-24.2 — Direct port 5432 connection:** Bypasses PgBouncer entirely. `SET ROLE form_admin` is reliable by design. `SUPABASE_PAM_DB_URL` (port 5432) is available on all Supabase paid plans with no additional pool configuration. Connection ceiling analysis: ≤ 5 PAM-eligible engineers (§24.4.1 named list cap), 1 active session per admin (KV enforcement), break-glass uses a separate `BREAK_GLASS_DB_URL` — max simultaneous PAM connections is 5–6, within Pro plan 60-connection limit. `RESET ROLE` + `RESET app.pam_session_id` called in a TypeScript `finally` block; connection closed after each PAM query (not pooled — audit isolation + Edge Function anti-pattern for persistent pools).
+- **Reverse cost:** Low. Changing from Edge Function to Cloudflare Worker + Hyperdrive requires: (a) confirming Hyperdrive session-mode GA availability; (b) moving `form_admin` credential from Supabase secrets to Cloudflare Workers Secrets; (c) security-engineer threat model update for the cross-provider privileged connection; (d) new DECISION_LOG entry. Changing from port 5432 to a dedicated PgBouncer session-mode pool (if team exceeds 10 PAM-eligible engineers) requires: (a) provisioning a Supabase dedicated pooler or standalone PgBouncer instance; (b) updating `SUPABASE_PAM_DB_URL` to the pool endpoint; (c) confirming `SET ROLE` session-affinity with the new pooler. No schema or DEC-030 event changes required for either reversal.
+
+---
+
 ## 2026-06-14
 
 ### DEC-059 · OQ-MOBILE-03: Mobile SSO browser mode — system browser mandated, WebView prohibited

@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.2
+# FORM · SSO/SCIM Implementation v2.3
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -8329,8 +8329,8 @@ All three alert rules are registered in `docs/OBSERVABILITY.md §6` under the `p
 
 | ID | Question | Owner | Priority | Target |
 |---|---|---|---|---|
-| OQ-SSO-24.1 | Should `pam-db-proxy` use a dedicated Supabase Edge Function or a Cloudflare Worker with a direct Postgres connection via Hyperdrive? Hyperdrive would keep the privileged connection pool within the Cloudflare network boundary; Edge Function keeps it in the Supabase trust boundary. Security-engineer to assess mTLS profile of each path. | security-engineer | P1 | Before M4 deploy |
-| OQ-SSO-24.2 | `SET ROLE form_admin` within a Supabase connection pool (PgBouncer transaction mode) is not reliable — `SET ROLE` is session-scoped and PgBouncer in transaction mode does not guarantee session affinity. Decision: use PgBouncer **session mode** for PAM connections (separate pool, not the shared `form_api` pool). Confirm Supabase plan supports a dedicated session-mode pool without impacting existing connection limits. | platform-engineer | P0 | Before M4 deploy |
+| OQ-SSO-24.1 | Should `pam-db-proxy` use a dedicated Supabase Edge Function or a Cloudflare Worker with a direct Postgres connection via Hyperdrive? Hyperdrive would keep the privileged connection pool within the Cloudflare network boundary; Edge Function keeps it in the Supabase trust boundary. Security-engineer to assess mTLS profile of each path. | security-engineer | P1 | Before M4 deploy | 🟢 **Resolved — DEC-060 (2026-06-15)**: Supabase Edge Function adopted. Hyperdrive rejected: SET ROLE incompatible with transaction mode, form_admin credential crosses provider boundary, 20–50 ms latency overhead. See §31.2. |
+| OQ-SSO-24.2 | `SET ROLE form_admin` within a Supabase connection pool (PgBouncer transaction mode) is not reliable — `SET ROLE` is session-scoped and PgBouncer in transaction mode does not guarantee session affinity. Decision: use PgBouncer **session mode** for PAM connections (separate pool, not the shared `form_api` pool). Confirm Supabase plan supports a dedicated session-mode pool without impacting existing connection limits. | platform-engineer | P0 | Before M4 deploy | 🟢 **Resolved — DEC-060 (2026-06-15)**: Direct Postgres session connection (port 5432) adopted — PgBouncer bypassed entirely. No dedicated session-mode pool required. Max 5–6 concurrent PAM connections well within Supabase Pro plan 60-connection ceiling. See §31.3. |
 | OQ-SSO-24.3 | The `form_break_glass` Postgres role (§24.4.2) has identical privilege to `form_admin`. Should they be merged (same role, different connection string) or kept distinct? Distinct roles produce clearer pg_audit attribution. Legal/compliance to advise whether distinct role names are required for audit trail segregation. | compliance-officer | P2 | M5 |
 | OQ-SSO-24.4 | FIDO2 WebAuthn hardware key requirement for `destructive` tier assumes all break-glass-eligible engineers own a FIDO2 key (YubiKey or equivalent). Confirm procurement and enrollment before M4 cutover — if keys are not in hand, `destructive` tier must block entirely rather than fall back to TOTP. | security-engineer + eng-manager | P0 | Before M4 deploy |
 
@@ -8343,13 +8343,13 @@ All three alert rules are registered in `docs/OBSERVABILITY.md §6` under the `p
 | 1 | Scaffold `workers/pam-elevation-service`: Cloudflare Worker with routes `POST /internal/v1/pam/elevate`, `POST /internal/v1/pam/approve/{id}`, `POST /internal/v1/pam/deny/{id}`, `POST /internal/v1/pam/cosign/{id}`. Implement Cloudflare Access JWT validation middleware (reuse pattern from §16 admin dashboard). Wire `PAM_KV` namespace binding. | platform-engineer | **P0** | M4 |
 | 2 | Implement KV schema (§24.5): `pam:session:{id}` primary record + `pam:by_admin:{admin_user_id}:{id}` secondary index. Implement TTL constants per access level. Add `pam:suspended:{admin_user_id}` key write on AL-PAM-02 trigger. | platform-engineer | **P0** | M4 |
 | 3 | Implement approval workflow (§24.3): self-approve path for `read_only`; async Slack webhook + approval deep-link for `read_write`; FIDO2 WebAuthn dual-cosign for `destructive`. Resolve OQ-SSO-24.4 (hardware key procurement) before `destructive` tier goes live. | platform-engineer + security-engineer | **P0** | M4 |
-| 4 | Scaffold `supabase/functions/pam-db-proxy`: validate `pam_session_id` against PAM KV; enforce hard expiry check on `expires_at` (AL-PAM-03); open Postgres connection as `form_system`; `SET ROLE form_admin`; `SET app.pam_session_id`; execute query; `RESET ROLE`. Resolve OQ-SSO-24.2 (PgBouncer session mode) before deploy. | platform-engineer | **P0** | M4 |
+| 4 | Scaffold `supabase/functions/pam-db-proxy`: validate `pam_session_id` against PAM KV; enforce hard expiry check on `expires_at` (AL-PAM-03); open Postgres connection as `form_system` via `SUPABASE_PAM_DB_URL` (port 5432, direct session connection — PgBouncer bypassed per DEC-060); `SET ROLE form_admin`; `SET app.pam_session_id`; execute query; `RESET ROLE`; `RESET app.pam_session_id`; close connection. OQ-SSO-24.2 resolved — see §31. | platform-engineer | **P0** | M4 | 🟢 **DEC-060** — architecture confirmed; implementation pending |
 | 5 | Add `app.pam_session_id` GUC audit triggers to sensitive Postgres tables (`tenant_users`, `tenant_sso_configs`, `enterprise_sessions`, `audit_log`): trigger reads `current_setting('app.pam_session_id', true)` and includes value in the `audit_log` row `metadata` JSONB field. This creates database-layer linkage between privileged queries and PAM sessions. | platform-engineer | **P0** | M4 |
 | 6 | Scaffold `workers/break-glass-notifier`: fires on Cloudflare Access `break-glass` audience JWT receipt; writes PAM KV with `is_break_glass: true`; emits `pam.break_glass_activated` DEC-030 event; triggers PagerDuty P0 via Events API v2; sends compliance email via Cloudflare Email Workers. Configure `cloudflare/access/break-glass-policy.tf` with named identity list (max 5). | devops-lead | **P0** | M4 |
 | 7 | Scaffold `workers/pam-expiry-sweeper`: Cloudflare Workers Cron (every 5 minutes); scan `pam:session:*` keys for `is_break_glass: true` with expired TTL; emit `pam.break_glass_expired` DEC-030 event; scan for `status: pending_approval` or `status: awaiting_second_person` keys with elapsed approval/cosign window; emit `pam.elevation_denied` with appropriate `reason`. | devops-lead | **P1** | M4 |
 | 8 | Register all 6 PAM DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` event registry. Validate HMAC chain in staging: elevation_requested → elevation_approved → session_expired sequence. Validate break-glass chain: break_glass_activated → break_glass_expired. Confirm no PII (email, justification text, query text) appears in any event payload. | platform-engineer + security-engineer | **P0** | M4 |
 | 9 | Configure AL-PAM-01, AL-PAM-02, AL-PAM-03 in PagerDuty. Add all three rules to `docs/OBSERVABILITY.md §6` under `pam_session_health` subsection. Test AL-PAM-01 by triggering a synthetic break-glass activation against staging. Test AL-PAM-02 by submitting 4 denied elevation requests from the same `admin_user_id` within 1 hour in staging. | devops-lead | **P0** | M4 |
-| 10 | Collect CC6-E-PAM-001 through CC6-E-PAM-004 artefacts 30 days after M4 go-live; store in `compliance/evidence/pam/`; create entries in `docs/SOC2_READINESS.md` for CC6.1, CC6.2, CC6.3, CC6.7 mapping to PAM controls. Collect CC6-E-PAM-005 through CC6-E-PAM-008 (Postgres-layer artefacts from DATA_MODEL §29) 30 days after M6 migration deployment. Resolve OQ-SSO-24.3 (role naming decision) and OQ-SSO-24.1 (proxy placement decision) before M5 freeze. | compliance-officer + security-engineer | **P1** | M5 (KV artefacts); M7 (Postgres artefacts) |
+| 10 | Collect CC6-E-PAM-001 through CC6-E-PAM-004 artefacts 30 days after M4 go-live; store in `compliance/evidence/pam/`; create entries in `docs/SOC2_READINESS.md` for CC6.1, CC6.2, CC6.3, CC6.7 mapping to PAM controls. Collect CC6-E-PAM-005 through CC6-E-PAM-008 (Postgres-layer artefacts from DATA_MODEL §29) 30 days after M6 migration deployment. Resolve OQ-SSO-24.3 (role naming decision) before M5 freeze. OQ-SSO-24.1 resolved — DEC-060. CC6-E-PAM-003 updated to include port 5432 screenshot per §31.6. | compliance-officer + security-engineer | **P1** | M5 (KV artefacts); M7 (Postgres artefacts) | OQ-SSO-24.1 🟢 **DEC-060** |
 
 ---
 
@@ -10868,3 +10868,253 @@ Register AL-SSO-WEB-01 in `docs/OBSERVABILITY.md §26.8` `sso_browser_security` 
 *v2.1 additions (2026-06-14): §29 OQ-SSO-28.2 Resolution — `tenant_users_role_history` Retention Period (DEC-051). Closes the sole remaining P1 open question from §28.9 (v2.0, 2026-06-14). Decision: **7-year retention** adopted for `tenant_users_role_history`, effective from `changed_at`. Three grounds documented: (1) audit-chain continuity — `scim.user_updated` DEC-030 events are retained 7yr; purging the table at 3yr creates a verifiable SOC 2 CC6.3 evidence gap where the chain references a role change but the table row has been deleted (DATA_MODEL §33.8 rejection rationale confirmed); (2) legal obligation — Ukrainian Tax Code Art. 44 (7yr business records) and EU audit-record doctrine (access-control records should be retained at least as long as the data they protect access to); (3) SOC 2 CC6.3/CC6.6 evidence continuity across multi-cycle observation windows. GDPR Art. 4(1) analysis: the `user_id` + `changed_at` + role history combination qualifies as personal data because it enables reconstruction of an employee's access history; legal basis for 7yr retention is GDPR Art. 17(3)(b) (legal obligation overrides erasure right); `user_id` is pseudonymised on user erasure per §28.4 / DATA_MODEL §33.7; full hard-delete occurs at 7yr `changed_at` boundary via pg_cron job 32. DPA Annex B update required: enterprise DPA template (§14.3.2) must add a "role change logs: 7yr" row to the retention schedule before DPA execution with any EU enterprise customer. Consumer privacy policy: no change — `tenant_users_role_history` is enterprise-only. New pg_cron job 32 `turh_retention_purge` (04:00 UTC daily): hard-deletes pseudonymised rows past 7yr; safety gate (`user_id IS NULL AND user_id_pseudonym IS NOT NULL`) prevents accidental deletion of active-user records; companion AL-TURH-01 (P2, Slack `#compliance-alerts`) fires when any row with `user_id IS NOT NULL` exceeds the 7yr window (indicates erasure pipeline miss). New SOC 2 evidence artefact TURH-RET-E-001: annual `#turh-retention-purge` cron run log + AL-TURH-01 zero-fire attestation filed to `compliance/evidence/scim-role/`; covers CC6.3 retention-policy-as-evidence and CC4.1 ongoing monitoring. `docs/DATA_MODEL.md §33.8` retention table updated: 7-year row from "Proposed" → 🟢 Resolved. `docs/DATA_MODEL.md §33.10` checklist item 4 updated to 🟢 Done. Header updated v1.9 → v2.1 (v2.0 was §28). Cross-references: `docs/DATA_MODEL.md §33` (canonical DDL and erasure path — §33.7 pseudonymisation path; §33.8 retention table now resolved; §33.10 checklist item 4 closed); `docs/DATA_MODEL.md §34` (DEC-050 `form_role_enum` — column types for `old_role`/`new_role` in `tenant_users_role_history`); `docs/AUDIT_LOG_SCHEMA.md §6.SCIM-Lifecycle` (`scim.user_updated` 7yr retention anchor); `docs/ENTERPRISE.md §Privacy floor for enterprise` (HR never sees individual user data — §29.4 clarifies role history is admin-only, not HR-accessible); `docs/CRYPTOGRAPHY_POLICY.md §5` (ERASURE_PSEUDONYM_SALT — key used in pg_cron job 32 safety gate); `docs/OBSERVABILITY.md §26` (AL-SCIM-05 taxonomy — AL-TURH-01 is a new parallel alert using its own prefix); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break — pg_cron stale-active-user detection escalates to compliance-officer, not P0 IR, because it does not breach the chain itself); `docs/SOC2_READINESS.md §CC6.3` (SCIM-ROLE-E-001 evidence table — TURH-RET-E-001 extends this evidence set); `docs/DECISION_LOG.md DEC-051`. Owner: compliance-officer + enterprise-architect + security-engineer.*
 
 *v1.8 additions (2026-06-04): §26 API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy. Closes OQ-SSO-25.1 (🟡 P1 → 🟢 Resolved) and OQ-SSO-25.3 (🟡 P1 M5 → 🟢 Resolved) from §25.13. TOC updated to add §26. Header updated from v1.7 to v1.8. §26.1 purpose and scope: two P1 open questions from §25 resolved; privacy floor (client_ip_hash via IP_HASH_SALT in all DEC-030 events; no plaintext IP in audit chain). §26.2 credential architecture disambiguation: three credential types (JWT 1h, SCIM bearer long-lived provisioning, tenant API key long-lived integration); §26 covers the two non-JWT types that were not covered by §25 IP enforcement. §26.3 OQ-SSO-25.1 resolution — SCIM IP scope: option (c) selected (separate flag, default off); migration 0052_scim_ip_allowlist.sql adding `scim_ip_enforcement_enabled BOOLEAN DEFAULT false` and `scim_ip_allowlist_config JSONB DEFAULT NULL` to tenant_sso_configs; chk_scim_ip_allowlist_required CHECK constraint; `enforceScimIpAllowlist()` branch in ip-allowlist.ts (SCIM routes bypass general allowlist; use scim_ip_allowlist_config only when scim_ip_enforcement_enabled = true); admin dashboard "Directory Sync IP Restriction" UI (collapsible, Enterprise-gated, import buttons for Okta/Azure pre-populated CIDRs, warning banner about IdP IP range volatility). §26.4 OQ-SSO-25.3 resolution — API key IP enforcement: formalised tenant_api_keys table schema (UUID PK, key_hash HMAC-SHA256, key_preview last-8-chars, label, created_by, last_used_at, expires_at, revoked_at, ip_enforcement_enabled BOOLEAN DEFAULT false, ip_allowlist_config JSONB, scopes TEXT[] DEFAULT '{reporting:read}'; RLS for form_api; partial unique index on key_hash WHERE revoked_at IS NULL); api-key-auth.ts updated to call enforceApiKeyIpAllowlist() using shared checkCidrList() utility from §25 (no new dependency); scope enforcement before route handler; last_used_at updated via waitUntil; error response omits all IP/allowlist detail to prevent enumeration. §26.5 rotation policy: mandatory triggers (age ≥ 365d amber, ≥ 730d red, suspected compromise same-day, offboarding 5 business days, `admin:write` scope quarterly 90d); 24-hour overlap window (same as SCIM token rotation §16.6); admin dashboard age-alert pill states (0–364d none, 365–729d amber, 730d+ red, admin:write >90d amber). §26.6 nine DEC-030 HMAC-chained events (all HIGH, 7yr): api_key.created, api_key.rotated, api_key.revoked, api_key.ip_enforcement_enabled, api_key.ip_enforcement_disabled, api_key.ip_blocked (client_ip_hash only, Queues bulk dedup), scim.ip_enforcement_enabled, scim.ip_enforcement_disabled, scim.ip_blocked (client_ip_hash only); HMAC chain requirement: api_key.rotated must be followed by api_key.revoked (old key) within 26h or AL-APIKEY-02 fires. §26.7 four alerting rules: AL-APIKEY-01 P1 (>10 ip_blocked per key in 10 min → compromise attempt or misconfiguration), AL-APIKEY-02 P1 (rotation overlap not cleaned up within 26h → cron failure), AL-APIKEY-03 P1 (revoked with reason=compromise → trigger R-16), AL-SCIM-IP-01 P2 (SCIM ip_blocked >5 in 15 min AND provisioning success <50% → misconfigured allowlist). §26.8 SOC 2 evidence mapping CC6.1/CC6.2/CC6.4/CC6.8/CC7.2 with five artefacts APIKEY-E-001 through APIKEY-E-005. §26.9 OQ-SSO-25.1 and OQ-SSO-25.3 formally resolved. §26.10 two new open questions: OQ-SSO-26.1 (mandatory IP enforcement for admin:write keys P2, evaluated before first admin:write key issued), OQ-SSO-26.2 (expires_at hard enforcement vs soft alerts P1, decision before SOC 2 observation period start). §26.11 fourteen-item implementation checklist: 8× P0 M5 (tenant_api_keys migration, scim_ip_allowlist migration, api-key-auth.ts update, ip-allowlist.ts SCIM branch, DEC-030 event registry, admin dashboard panels, API_KEY_HASH_SECRET rotation schedule, pg_cron overlap cleanup), 4× P1 M5-M6 (alerting, evidence collection, OQ-SSO-26.2 decision, DATA_MODEL cross-reference), 2× P2 M6. Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*
+
+---
+
+## §31 OQ-SSO-24.1 + OQ-SSO-24.2 Resolution — `pam-db-proxy` Architecture: Supabase Edge Function & Direct Postgres Session Connection (DEC-060)
+
+**Owner:** security-engineer + platform-engineer + enterprise-architect
+**SOC 2 scope:** CC6.1, CC6.7
+**Last updated:** 2026-06-15
+**Closes:** OQ-SSO-24.1 (P1, Before M4 deploy — proxy placement: Hyperdrive vs. Edge Function) and OQ-SSO-24.2 (P0, Before M4 deploy — PgBouncer session mode for PAM pool)
+**Decision:** DEC-060 — Supabase Edge Function adopted for `pam-db-proxy`; direct Postgres session connection (port 5432) adopted for PAM operations — PgBouncer bypassed entirely.
+
+---
+
+### 31.1 Purpose and Scope
+
+§24 introduced the Privileged Access Management (PAM) architecture and specified `pam-db-proxy` as the sole path through which `form_admin` Postgres privilege is exercised. §24 left two implementation questions open:
+
+- **OQ-SSO-24.1** (P1): Should `pam-db-proxy` be implemented as a Supabase Edge Function or as a Cloudflare Worker using Hyperdrive for its Postgres connection? The original design diagram in §24.2 shows "Supabase Edge Function" but the choice was not formally analysed or decided.
+- **OQ-SSO-24.2** (P0): The `SET ROLE form_admin` + `RESET ROLE` pattern in §24.2 is session-scoped and incompatible with PgBouncer transaction mode (port 6543), which is the default Supabase connection pooler. The OQ asked whether a dedicated PgBouncer session-mode pool is required, and whether the Supabase plan supports it without impacting shared pool limits.
+
+This section formally resolves both questions, documents the security analysis, and updates the relevant §24 checklist items.
+
+**Out of scope:** The `pam-elevation-service` Cloudflare Worker (§24.2 — manages approval workflow, KV sessions, DEC-030 events) is unaffected by either decision. Break-glass connection handling (§24.4.2 `BREAK_GLASS_DB_URL`) is a separate secret; the decision here applies to normal PAM sessions only. No new DEC-030 event types are introduced by this section — the §24.6 event taxonomy covers the PAM session lifecycle completely.
+
+**Privacy floor:** No employee user_id, name, email, or health data appears in any PAM database connection variable, Postgres GUC, or audit log row beyond what §24.6 already defines. The `pam_session_id` UUID field is the only FORM-internal identifier in the connection context.
+
+---
+
+### 31.2 OQ-SSO-24.1 Resolution — `pam-db-proxy` Host: Supabase Edge Function Adopted
+
+#### 31.2.1 Options Analysis
+
+| Dimension | Supabase Edge Function | Cloudflare Worker + Hyperdrive |
+|---|---|---|
+| **Network path for privileged connection** | Intra-VPC: Edge Function → Postgres within Supabase's managed infrastructure. No network traversal outside Supabase's boundary for the privileged connection. | Cross-provider: Cloudflare Worker → Hyperdrive (Cloudflare) → Supabase Postgres public endpoint. Two provider boundaries crossed for every privileged query. |
+| **Trust boundary for `form_admin`** | `form_admin` credentials exist only within Supabase's trust boundary (Postgres + Edge Function runtime). The credential never crosses a provider boundary. | `form_admin` credentials must be stored as a Cloudflare Workers Secret and transmitted from Cloudflare infrastructure to Supabase's public Postgres endpoint on every PAM query. |
+| **`SET ROLE form_admin` compatibility** | Edge Function opens a direct Postgres connection (port 5432, session mode). `SET ROLE` is session-scoped and fully reliable. | Hyperdrive's default pooling mode is transaction mode (equivalent to PgBouncer transaction mode). `SET ROLE` in transaction mode is NOT session-sticky — the role may not be the same across connection checkout boundaries. Hyperdrive does not expose a session-mode configuration option as of June 2026. |
+| **Connection latency** | Edge Function → Postgres: intra-VPC, typically < 5 ms round-trip within Supabase's managed compute boundary. | Worker → Hyperdrive → Postgres: Cloudflare PoP → Hyperdrive cluster → Supabase Postgres public endpoint. Two external hops add 20–50 ms per query under typical EU-West conditions. For a PAM session that may execute 5–20 queries, cumulative overhead is 100–1,000 ms vs. < 100 ms for Edge Function. |
+| **Third-party intermediary in privileged path** | None — two components (Edge Function + Postgres) both operated by Supabase. | Hyperdrive is a third Cloudflare-managed component in the privileged data path, increasing attack surface for compromise or misconfiguration. |
+| **mTLS profile** | See §31.2.2 | See §31.2.2 |
+| **Operational complexity** | `pam-db-proxy` is a single Supabase Edge Function with one environment variable: the direct Postgres session connection string. | `pam-db-proxy` would require a Cloudflare Worker, Hyperdrive binding configuration, Hyperdrive-specific connection pool settings, and cross-provider secret management for `form_admin` credentials. |
+| **Session-mode availability** | Direct Postgres connection (port 5432) is available on all Supabase paid plans and bypasses PgBouncer entirely. | Session mode is not a native Hyperdrive feature; workarounds (e.g., Hyperdrive `disableCache: true` + server-reset-query) do not guarantee `SET ROLE` session affinity under concurrent load. |
+
+#### 31.2.2 mTLS Profile Comparison
+
+**Supabase Edge Function path:**
+
+1. `pam-elevation-service` (Cloudflare Worker) → `pam-db-proxy` endpoint: Cloudflare Access mTLS service-to-service (Cloudflare mTLS with a client certificate scoped to the `internal-tools` audience). This hop is already specified in §24.2 and §24.8 CC6.7 evidence. The Edge Function URL is not on the public API surface — it is only accessible via the Cloudflare Access audience.
+2. `pam-db-proxy` (Edge Function) → Postgres: TLS enforced by `sslmode=require` in the Supabase connection string. This is an intra-VPC connection within Supabase's managed infrastructure; the TLS protects against any potential lateral movement within the VPC. Supabase issues the server certificate; FORM trusts Supabase's PKI for this connection. There is no external CA cross-validation to manage.
+
+**Cloudflare Worker + Hyperdrive path (rejected):**
+
+1. `pam-elevation-service` → `pam-db-proxy` (Worker): standard Cloudflare Worker-to-Worker communication; no mTLS between Workers in Cloudflare's runtime.
+2. Worker → Hyperdrive: Cloudflare internal connection (Cloudflare-managed TLS); FORM has no visibility into the Hyperdrive ↔ Postgres TLS negotiation.
+3. Hyperdrive → Postgres: Hyperdrive connects to Supabase's public Postgres endpoint using the connection string stored in Hyperdrive's configuration. Supabase enforces `sslmode=require`; however, the TLS termination occurs at Supabase's public boundary rather than at an intra-VPC endpoint. The `form_admin` credential is transmitted from Cloudflare's infrastructure to Supabase's network on every new Hyperdrive pool connection — a higher exposure surface than the intra-VPC Supabase Edge Function path.
+
+**Assessment:** The Supabase Edge Function path provides an equivalent or superior mTLS posture for the cross-provider segment (Cloudflare Access mTLS on the `pam-elevation-service` → Edge Function call) while eliminating the Hyperdrive-as-intermediary exposure for the privileged Postgres connection.
+
+#### 31.2.3 Decision: Supabase Edge Function Adopted
+
+**DEC-060 resolution for OQ-SSO-24.1:** `pam-db-proxy` is implemented as a Supabase Edge Function. The Cloudflare Worker + Hyperdrive option is rejected on four independently sufficient grounds:
+
+1. **`SET ROLE` incompatibility.** Hyperdrive uses transaction-mode pooling. `SET ROLE form_admin` is session-scoped; its effect is not guaranteed to persist across connection checkouts in a transaction-mode pool. This is not a configuration gap — it is a fundamental PgBouncer transaction-mode constraint. No documented Hyperdrive workaround eliminates this risk for FORM's PAM pattern.
+2. **`form_admin` credential exposure.** Hyperdrive requires the `form_admin` Postgres credential to be stored in Cloudflare Workers Secrets and transmitted from Cloudflare's infrastructure to Supabase's network on every new pool connection. The Supabase Edge Function keeps this credential within Supabase's trust boundary — the provider that already holds the database and manages its PKI.
+3. **Cross-provider network hop for privileged queries.** Every query in a PAM session traverses the Cloudflare → Supabase public network boundary with Hyperdrive. The Supabase Edge Function executes queries intra-VPC, minimising exposure time and reducing latency for multi-query PAM sessions.
+4. **Operational surface.** The Edge Function requires one environment variable (the direct Postgres session connection string). The Hyperdrive option requires: Cloudflare Worker scaffolding, Hyperdrive binding, Hyperdrive configuration, Workers Secret for `form_admin`, and per-PAM-session connection lifecycle management — all without `SET ROLE` session-affinity guarantees.
+
+The §24.2 architecture diagram already shows "Supabase Edge Function" — this section formally confirms that design and documents the analysis behind it.
+
+---
+
+### 31.3 OQ-SSO-24.2 Resolution — PAM Postgres Connection Mode: Direct Session Connection (Port 5432) Adopted
+
+#### 31.3.1 The PgBouncer Transaction Mode Problem
+
+Supabase exposes two connection endpoints:
+
+| Endpoint | Port | Mode | `SET ROLE` support |
+|---|---|---|---|
+| PgBouncer pooler (shared) | 6543 | **Transaction mode** | ❌ Not safe — `SET ROLE` is session-scoped; different transactions in the same logical "session" may execute on different Postgres backend connections |
+| Direct Postgres (session) | 5432 | **Session mode** (native Postgres connection) | ✅ Reliable — the connection maintains full Postgres session state, including `SET ROLE form_admin` and `SET app.pam_session_id` GUC |
+
+The `form_api` Supabase service-role connection (used by Cloudflare Workers for all normal application queries) uses the port 6543 PgBouncer pooler in transaction mode — this is correct for stateless application queries. The PAM design in §24.2 requires `SET ROLE form_admin` followed by one or more privileged queries followed by `RESET ROLE`, which is inherently session-scoped. Using the port 6543 pooler for this pattern creates a silent data integrity risk: `RESET ROLE` may execute on a different Postgres backend than `SET ROLE`, leaving an elevated-privilege connection in the pool that another application request could inadvertently acquire.
+
+#### 31.3.2 Direct Connection (Port 5432) Analysis
+
+The direct Postgres connection string uses Supabase's session-mode endpoint:
+
+```
+SUPABASE_PAM_DB_URL=postgresql://postgres.[project-ref]:[password]@aws-0-eu-west-2.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+Properties of the direct connection:
+
+- **Native session semantics.** Every `pam-db-proxy` invocation opens one dedicated Postgres connection. `SET ROLE form_admin` is guaranteed to persist for the life of that connection. `RESET ROLE` is guaranteed to execute on the same backend.
+- **No PgBouncer.** The connection bypasses port 6543 entirely. There is no `server_reset_query` dependency — `RESET ROLE` is called explicitly by the Edge Function before closing the connection (belt-and-suspenders; the `server_reset_query = RESET ROLE; RESET app.pam_session_id;` note in §24.2 invariant #4 is retained as a defensive check for any future connection pooler layer, but is not relied upon for correctness in the Edge Function path).
+- **`sslmode=require`.** Supabase enforces TLS on the session endpoint; no plaintext connection is possible.
+- **`form_system` base role.** The Edge Function authenticates to Postgres as `form_system` (the application service role with least-privilege access) and executes `SET ROLE form_admin` only after validating the PAM session. On `RESET ROLE`, access returns to `form_system` level automatically. The `form_admin` role is never the connection's login role.
+
+#### 31.3.3 Connection Limit Analysis
+
+A common concern with direct Postgres connections (vs. PgBouncer) is connection count exhaustion. This analysis confirms the concern does not apply to the PAM use case.
+
+**Supabase connection capacity:** The Supabase Pro plan (FORM's current plan) supports up to 60 direct Postgres connections. The Supabase Pro Plus / Team plan supports up to 200. The shared `form_api` application uses the port 6543 PgBouncer pooler and does not consume direct connections.
+
+**PAM connection ceiling:**
+
+| Factor | Limit | Basis |
+|---|---|---|
+| PAM-eligible engineers | ≤ 5 (founder + max 4 senior engineers per `cloudflare/access/break-glass-policy.tf` named list cap) | §24.4.1 named identity list max 5 |
+| Concurrent `read_only` sessions per admin | 1 (enforced by `pam:by_admin:{id}` secondary KV index — `pam-elevation-service` blocks a second elevation if an active session exists for the same admin) | §24.5 KV schema |
+| Concurrent `read_write` / `destructive` sessions | 1 system-wide (dual-person approval for `destructive` ensures only one `destructive` session exists at a time; `read_write` is per-admin) | §24.3.2 |
+| Maximum concurrent direct PAM connections | **≤ 5** (one per PAM-eligible engineer, all simultaneously elevated — an extreme scenario not expected during normal operations) | Combined constraint |
+| Break-glass direct connections | 1 (non-renewable 2h session; separate `BREAK_GLASS_DB_URL`) | §24.4.2 |
+
+**Conclusion:** At FORM's current team scale, PAM consumes at most 5–6 direct Postgres connections simultaneously, out of a 60-connection pool. The remaining 54+ connections are available for Supabase Edge Functions and any future direct-connection consumers. No Supabase plan upgrade is required. If FORM scales to a team where > 10 PAM-eligible engineers exist, the PAM direct-connection ceiling should be re-evaluated against the Supabase plan in effect at that time.
+
+#### 31.3.4 Decision: Direct Postgres Session Connection (Port 5432) Adopted
+
+**DEC-060 resolution for OQ-SSO-24.2:** `pam-db-proxy` connects to Postgres using the direct session-mode endpoint (port 5432), not the PgBouncer transaction-mode pooler (port 6543). This eliminates the `SET ROLE` session-affinity risk and requires no dedicated PgBouncer session-mode pool — the question of whether Supabase supports a separate session-mode PgBouncer pool is moot because the direct connection bypasses PgBouncer entirely.
+
+The `SUPABASE_PAM_DB_URL` environment variable (Supabase Edge Function secret) is distinct from `SUPABASE_SERVICE_ROLE_KEY` (used by Cloudflare Workers for application queries via port 6543). The two secrets serve different purposes and must not be conflated:
+
+| Secret | Used By | Port | Mode | Role |
+|---|---|---|---|---|
+| `SUPABASE_SERVICE_ROLE_KEY` | Cloudflare Workers (application tier) | 6543 | Transaction (PgBouncer) | `form_api` / `form_system` |
+| `SUPABASE_PAM_DB_URL` | `pam-db-proxy` Edge Function | 5432 | Session (direct Postgres) | `form_system` → `SET ROLE form_admin` |
+| `BREAK_GLASS_DB_URL` | Break-glass Worker (§24.4.2) | 5432 | Session (direct Postgres) | `form_break_glass` (direct login role) |
+
+---
+
+### 31.4 Updated `pam-db-proxy` Connection Specification
+
+The §24.2 step-3 annotation "Open Postgres connection as form_system (connection pool)" is amended. The parenthetical "(connection pool)" referred to a future PgBouncer session-mode pool that this section eliminates. The authoritative specification is:
+
+```
+Step 3:  Open direct Postgres session connection using SUPABASE_PAM_DB_URL
+         (port 5432, sslmode=require, login role: form_system)
+Step 4:  SET ROLE form_admin;
+Step 5:  SET app.pam_session_id = '<pam_session_id>';
+Step 6:  Execute requested query (tenant_id injected for all cross-tenant ops)
+Step 7:  RESET ROLE;         -- explicit, in finally block
+Step 8:  RESET app.pam_session_id;  -- explicit, in finally block
+Step 9:  Close connection    -- do not return to pool; each PAM session gets a fresh connection
+```
+
+**Why Step 9 closes rather than pools:** The `pam-db-proxy` Edge Function opens one connection per invocation and closes it when the PAM query completes. Connection reuse across PAM sessions is not implemented. This is intentional:
+
+1. **Audit isolation.** Each PAM session starts with a clean Postgres connection that has no residual session state from a previous PAM session. `app.pam_session_id` GUC cannot leak between sessions.
+2. **PAM session TTL alignment.** PAM sessions range from 15 minutes to 4 hours. A "warm" connection pool would hold open Postgres connections for this duration with no queries — wasteful and unnecessary given the ≤ 5 concurrent connection ceiling.
+3. **Simplicity.** Edge Functions are serverless and designed for short-lived execution; managing a persistent connection pool within an Edge Function is an anti-pattern.
+
+The §24.2 design invariant #4 now reads: `RESET ROLE` and `RESET app.pam_session_id` are called explicitly in a `finally` block before the Edge Function returns. The `server_reset_query` annotation is retained as defensive documentation only — it describes the pattern that *would* be required if a connection pool were introduced in the future.
+
+---
+
+### 31.5 Environment Variable Specification
+
+No new environment variables are introduced beyond what §24 already references. The canonical `SUPABASE_PAM_DB_URL` secret is specified here for implementation clarity:
+
+**Supabase Edge Function secret: `SUPABASE_PAM_DB_URL`**
+
+```
+Format:  postgresql://postgres.[PROJECT_REF]:[FORM_SYSTEM_PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres?sslmode=require
+Port:    5432  (direct session mode — NOT 6543 which is PgBouncer)
+Role:    form_system (least-privilege application role; SET ROLE form_admin applied after PAM session validation)
+SSL:     sslmode=require (Supabase enforces this; connection rejected if server presents no certificate)
+```
+
+**Rotation:** `SUPABASE_PAM_DB_URL` follows the same rotation policy as `SUPABASE_SERVICE_ROLE_KEY` per `docs/CRYPTOGRAPHY_POLICY.md §5`: annual rotation scheduled, immediate rotation on suspected compromise. The password component is the `form_system` Postgres role password; rotation requires a `\password form_system` operation in a `form_admin` session (via break-glass or a new `read_write` PAM session by the compliance-officer) followed by updating the Supabase Edge Function secret.
+
+**CRYPTOGRAPHY_POLICY.md §5 update required (P0, M4):** Add `SUPABASE_PAM_DB_URL` to the key inventory table with:
+- Type: Postgres connection string (session credential)
+- Rotation policy: Annual; immediate on suspected compromise
+- Owner: devops-lead
+- Storage: Supabase Edge Function Secrets (encrypted at rest by Supabase)
+
+---
+
+### 31.6 SOC 2 Evidence Update
+
+§24.8 CC6.7 evidence states: "The `pam-db-proxy` Supabase Edge Function communicates with Postgres over TLS (Supabase enforces `sslmode=require`)." This section confirms and extends that statement:
+
+| SOC 2 Criterion | Updated Control Statement | Evidence |
+|---|---|---|
+| **CC6.7 — Transmission confidentiality** | `pam-db-proxy` connects to Postgres via the direct session endpoint (port 5432, `sslmode=require`). The connection uses a native Postgres TLS channel within Supabase's managed infrastructure. No privileged connection traverses the public internet without TLS. The `SUPABASE_PAM_DB_URL` secret is stored in Supabase Edge Function Secrets (encrypted at rest; no plaintext in version control or Cloudflare environment). | Existing CC6-E-PAM-003 (Supabase TLS connection logs) updated: include screenshot of `SUPABASE_PAM_DB_URL` in Supabase Edge Function Secrets console (confirming port 5432 and `sslmode=require`); no new artefact required. |
+| **CC6.1 — Logical access controls** | `form_admin` Postgres credentials exist only within Supabase's trust boundary (`SUPABASE_PAM_DB_URL` stored in Supabase Edge Function Secrets; never in Cloudflare Workers Secrets or any cross-provider store). The privileged connection does not traverse any third-party intermediary (Hyperdrive rejected). | Existing CC6-E-PAM-001 + CC6-E-PAM-003 unchanged in scope; this section provides the architectural basis for the CC6.7 narrative that was implicit in §24. |
+
+**No new evidence artefacts are required.** The existing CC6-E-PAM-001 through CC6-E-PAM-008 taxonomy from §24.8 remains complete. §31 provides the architectural rationale that auditors may request when reviewing the `pam-db-proxy` trust boundary and connection mode.
+
+---
+
+### 31.7 §24.9 / §24.10 Cross-Updates
+
+**§24.9 open question table:**
+
+| ID | Previous Status | New Status |
+|---|---|---|
+| OQ-SSO-24.1 | 🟡 P1 Open — pam-db-proxy: Hyperdrive vs. Edge Function | 🟢 **Resolved — DEC-060 (2026-06-15)**: Supabase Edge Function adopted. §31.2. |
+| OQ-SSO-24.2 | 🟡 P0 Open — PgBouncer session mode for PAM pool | 🟢 **Resolved — DEC-060 (2026-06-15)**: Direct Postgres session connection (port 5432) adopted; PgBouncer bypassed entirely. No dedicated session-mode pool required. §31.3. |
+
+**§24.10 checklist cross-updates:**
+
+- **Item 4** (P0, M4): "Resolve OQ-SSO-24.2 (PgBouncer session mode) before deploy" — **🟢 Done (DEC-060, 2026-06-15).** Scaffold `pam-db-proxy` using `SUPABASE_PAM_DB_URL` (port 5432, direct session connection). No PgBouncer session pool configuration needed.
+- **Item 10** (P1, M5): "Resolve OQ-SSO-24.1 (proxy placement decision) before M5 freeze" — **🟢 Done (DEC-060, 2026-06-15).** Supabase Edge Function confirmed as the host; M5 freeze action is to verify that `pam-db-proxy` is deployed and CC6-E-PAM-003 evidence updated to show port 5432 connection.
+
+---
+
+### 31.8 OQ-SSO-24.1 + OQ-SSO-24.2 Status
+
+| Status | 🟢 **Resolved — DEC-060 (2026-06-15)** |
+|---|---|
+| **OQ-SSO-24.1 Decision** | Supabase Edge Function adopted for `pam-db-proxy`; Cloudflare Worker + Hyperdrive rejected |
+| **OQ-SSO-24.1 Key grounds** | `SET ROLE` incompatibility in Hyperdrive transaction mode; `form_admin` credential stays within Supabase trust boundary; intra-VPC network path eliminates cross-provider hop for privileged connection; mTLS profile equivalent or superior |
+| **OQ-SSO-24.2 Decision** | Direct Postgres session connection (port 5432) via `SUPABASE_PAM_DB_URL`; PgBouncer bypassed entirely; no dedicated session-mode pool required |
+| **OQ-SSO-24.2 Key grounds** | Session-mode semantics guaranteed natively; max 5–6 concurrent direct PAM connections well within Supabase Pro plan capacity (60 direct connections); `form_system` login role + `SET ROLE form_admin` pattern fully reliable |
+| **§24.2 annotation update** | "(connection pool)" parenthetical removed; "direct Postgres session connection" is the authoritative term |
+| **§24.10 checklist updates** | Items 4 and 10 marked 🟢 Done |
+
+---
+
+### 31.9 Implementation Checklist
+
+#### P0 — Before `pam-db-proxy` M4 deploy
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Provision `SUPABASE_PAM_DB_URL` as a Supabase Edge Function secret: construct the direct session connection string (port 5432, `sslmode=require`, `form_system` role). Confirm the string uses port 5432 (not 6543). Test connectivity from the Edge Function runtime with a `SELECT 1` query using `form_system` privileges (no `SET ROLE` at this step). | devops-lead | **P0** | M4 | [ ] |
+| 2 | Add `SUPABASE_PAM_DB_URL` to `docs/CRYPTOGRAPHY_POLICY.md §5` key inventory table per §31.5 specification: type, rotation policy (annual + immediate on compromise), owner (devops-lead), storage location (Supabase Edge Function Secrets). | devops-lead + compliance-officer | **P0** | M4 | [ ] |
+| 3 | Implement `supabase/functions/pam-db-proxy/index.ts`: open connection using `SUPABASE_PAM_DB_URL`; validate `pam_session_id` against `PAM_KV` (Cloudflare Access JWT passed as caller credential); enforce hard expiry check on `expires_at`; execute `SET ROLE form_admin` + `SET app.pam_session_id`; run query; call `RESET ROLE` and `RESET app.pam_session_id` in `finally` block; close connection. Do NOT return the connection to any pool. | platform-engineer | **P0** | M4 | [ ] |
+| 4 | Integration test in staging: (a) elevate via `pam-elevation-service` to `read_only`; (b) execute a `SELECT` via `pam-db-proxy`; (c) verify `pg_audit` logs show `role: form_admin` and `application_name: pam-db-proxy`; (d) verify `app.pam_session_id` appears in the `audit_log_events` row emitted by the audit trigger (§24.2 invariant #3); (e) verify connection is closed after the query (no lingering `form_admin` sessions in `pg_stat_activity`). | platform-engineer + security-engineer | **P0** | M4 | [ ] |
+| 5 | Update CC6-E-PAM-003 evidence artefact spec (§24.8): include screenshot of `SUPABASE_PAM_DB_URL` in Supabase Edge Function Secrets console showing port 5432 in the connection string. File at `compliance/evidence/pam/CC6-E-PAM-003_v2.md` (versioned update to existing artefact; both v1 and v2 retained). | compliance-officer | **P0** | M5 (30 days post M4 go-live) | [ ] |
+
+#### P1 — Before M5 architecture freeze
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Confirm Supabase plan direct connection capacity: run `SELECT count(*) FROM pg_stat_activity WHERE backend_type = 'client backend'` in staging under simulated PAM load (3 concurrent PAM sessions). Confirm total connection count remains below 20 (well under Pro plan 60-connection ceiling). Document result in `compliance/evidence/pam/PAM-CONN-E-001_M5.md`. | devops-lead | **P1** | M5 | [ ] |
+| 7 | Implement `RESET ROLE` + `RESET app.pam_session_id` in a TypeScript `finally` block within `pam-db-proxy`. Write a chaos test that intentionally throws an exception mid-query and confirms that (a) `RESET ROLE` fires before connection closure; (b) the abandoned connection shows `role: form_system` (not `form_admin`) in `pg_stat_activity`. | platform-engineer | **P1** | M5 | [ ] |
+
+#### P2 — Ongoing governance
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | If FORM's engineering team grows beyond 10 PAM-eligible engineers, re-evaluate the 5–6 concurrent PAM connection ceiling per §31.3.3. If a dedicated connection pool becomes necessary, evaluate Supabase's dedicated pooler option (available on Team plan) or a lightweight PgBouncer instance in session mode. Document decision in `docs/DECISION_LOG.md`. | devops-lead + enterprise-architect | **P2** | When engineering team > 10 | [ ] |
+| 9 | Annual review: confirm that Hyperdrive has not introduced a native session-mode option that would change the OQ-SSO-24.1 analysis. If it has, re-evaluate against the four rejection grounds in §31.2.3 and open a new DECISION_LOG entry if the conclusion changes. | security-engineer + platform-engineer | **P2** | Annual (M12, M24, …) | [ ] |
+
+---
+
+*v2.3 additions (2026-06-15): §31 OQ-SSO-24.1 + OQ-SSO-24.2 Resolution — `pam-db-proxy` Architecture: Supabase Edge Function & Direct Postgres Session Connection (DEC-060). Closes OQ-SSO-24.1 (P1, Before M4 deploy — pam-db-proxy host: Hyperdrive vs. Edge Function) and OQ-SSO-24.2 (P0, Before M4 deploy — PgBouncer session mode for PAM pool). Both from §24.9. §31.1 scopes to pam-db-proxy connection architecture only; pam-elevation-service Worker, break-glass protocol (§24.4), and §24.6 DEC-030 event taxonomy are all unchanged. §31.2 OQ-SSO-24.1 resolution: Supabase Edge Function adopted over Cloudflare Worker + Hyperdrive. Six-row options analysis: network path (intra-VPC vs. cross-provider), trust boundary for form_admin credential, SET ROLE compatibility (transaction mode ❌ vs. session mode ✅), connection latency (< 5 ms intra-VPC vs. 20–50 ms cross-provider), third-party intermediary, operational complexity. §31.2.2 mTLS profile comparison: Supabase path (Cloudflare Access mTLS for Worker → Edge Function; Supabase-managed TLS for Edge Function → Postgres intra-VPC); Hyperdrive path (no Worker-to-Worker mTLS; Hyperdrive-managed TLS to Supabase public endpoint — form_admin credential crosses provider boundary on every new pool connection). §31.2.3 four rejection grounds for Hyperdrive: (1) SET ROLE incompatibility in transaction mode — not a configuration gap but a PgBouncer architectural constraint; (2) form_admin credential must leave Supabase trust boundary if stored in Cloudflare Workers Secrets; (3) cross-provider network hop adds 20–50 ms latency per query; (4) operational complexity disproportionate to PAM access frequency. §31.3 OQ-SSO-24.2 resolution: direct Postgres session connection (port 5432) adopted; PgBouncer transaction mode (port 6543) bypassed entirely. §31.3.1 problem: PgBouncer transaction mode does not guarantee session affinity for SET ROLE — a silent data integrity risk if RESET ROLE executes on a different backend than SET ROLE. §31.3.2 direct connection properties: native session semantics, sslmode=require, form_system login role + SET ROLE form_admin after PAM validation. §31.3.3 connection limit analysis: ≤ 5 concurrent PAM-eligible engineers (§24.4.1 named list cap); 1 active session per admin (KV secondary index enforcement); max 5–6 direct PAM connections simultaneously; Supabase Pro plan supports 60 direct connections — no plan upgrade required; break-glass uses a separate BREAK_GLASS_DB_URL. §31.4 updated pam-db-proxy connection specification: nine-step sequence (open session connection → SET ROLE form_admin → SET app.pam_session_id → execute query → RESET ROLE → RESET app.pam_session_id → close connection; do not pool); rationale for "close rather than pool" (audit isolation, TTL alignment, Edge Function anti-pattern for persistent pools); §24.2 invariant #4 server_reset_query annotation retained as defensive documentation only. §31.5 SUPABASE_PAM_DB_URL secret specification: three-row credential disambiguation table (SUPABASE_SERVICE_ROLE_KEY port 6543 transaction mode form_api/form_system; SUPABASE_PAM_DB_URL port 5432 session mode form_system → SET ROLE form_admin; BREAK_GLASS_DB_URL port 5432 session mode form_break_glass); CRYPTOGRAPHY_POLICY.md §5 update required (annual rotation, devops-lead owner, Supabase Edge Function Secrets storage). §31.6 SOC 2 evidence update: CC6.7 narrative extended (no new artefacts — CC6-E-PAM-003 updated to include port 5432 screenshot); CC6.1 note on form_admin credential staying within Supabase trust boundary. §31.7 §24.9/§24.10 cross-updates: OQ-SSO-24.1 🟡 P1 → 🟢 Resolved; OQ-SSO-24.2 🟡 P0 → 🟢 Resolved; §24.10 checklist items 4 and 10 marked 🟢 Done. §31.8 status table. §31.9 nine-item implementation checklist: 5× P0/M4-M5 (SUPABASE_PAM_DB_URL provisioning, CRYPTOGRAPHY_POLICY update, Edge Function implementation, integration test, CC6-E-PAM-003 artefact update), 2× P1/M5 (connection capacity confirmation + PAM-CONN-E-001 doc, RESET ROLE chaos test), 2× P2/Annual-governance (team growth re-evaluation gate, annual Hyperdrive session-mode review). No new DEC-030 event types — §24.6 event taxonomy unchanged. Cross-references: §24.2 (pam-db-proxy step-3 annotation updated — "(connection pool)" → "direct Postgres session connection"); §24.4.2 (BREAK_GLASS_DB_URL — separate credential, unchanged); §24.5 (PAM KV schema — unchanged); §24.6 (DEC-030 events — unchanged); §24.8 (CC6-E-PAM-003 artefact — updated scope per §31.6); §24.9 (OQ-SSO-24.1/24.2 — both now 🟢 Resolved); §24.10 (items 4 and 10 — both 🟢 Done); `docs/CRYPTOGRAPHY_POLICY.md §5` (SUPABASE_PAM_DB_URL key inventory entry — P0 checklist item 2); `docs/OBSERVABILITY.md §29` (AL-PAM-BG-01 — unchanged, break-glass audit); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain — no chain events change); `docs/DECISION_LOG.md DEC-060`. Privacy floor: no employee user_id, name, email, or health data in any PAM connection variable or audit GUC; pam_session_id is a FORM-internal UUID with no personal data mapping. Owner: security-engineer + platform-engineer + enterprise-architect.*

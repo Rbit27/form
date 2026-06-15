@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.13.1] — 2026-06-15
+
+### Added
+
+- `docs/SSO_SCIM_IMPLEMENTATION.md §31` — OQ-SSO-24.1 + OQ-SSO-24.2 Resolution: `pam-db-proxy` Architecture — Supabase Edge Function & Direct Postgres Session Connection (DEC-060). Formally resolves two PAM open questions from §24.9 (P0 + P1, Before M4 deploy). OQ-SSO-24.1: Supabase Edge Function adopted over Cloudflare Worker + Hyperdrive — four rejection grounds for Hyperdrive: SET ROLE incompatibility in transaction mode, form_admin credential crossing provider trust boundary, cross-provider network latency (20–50 ms vs. < 5 ms intra-VPC), operational complexity. mTLS profile comparison: Cloudflare Access mTLS for Worker → Edge Function; Supabase-managed TLS for Edge Function → Postgres intra-VPC. OQ-SSO-24.2: Direct Postgres session connection (port 5432, `SUPABASE_PAM_DB_URL`) adopted; PgBouncer transaction mode (port 6543) bypassed entirely — SET ROLE form_admin is session-scoped and unreliable in PgBouncer transaction mode; direct connection provides native session semantics with no additional pool configuration. Connection ceiling analysis: ≤ 5–6 concurrent PAM direct connections vs. Supabase Pro plan 60-connection capacity — no plan upgrade required. Nine-step pam-db-proxy connection spec: open → SET ROLE form_admin → SET app.pam_session_id → execute → RESET ROLE → RESET app.pam_session_id → close (not pooled). CC6-E-PAM-003 evidence artefact updated scope. SUPABASE_PAM_DB_URL credential disambiguation table (vs. SUPABASE_SERVICE_ROLE_KEY and BREAK_GLASS_DB_URL). CRYPTOGRAPHY_POLICY.md §5 key inventory update required (P0, M4). Nine-item implementation checklist: 5× P0/M4-M5, 2× P1/M5, 2× P2/Annual.
+- `docs/DECISION_LOG.md DEC-060` — pam-db-proxy architecture decision: Supabase Edge Function + direct port 5432 session connection adopted; Hyperdrive rejected.
+
+### Changed
+
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — header v2.2 → v2.3; §24.9 OQ-SSO-24.1/24.2 marked 🟢 Resolved; §24.10 items 4 and 10 marked 🟢 Done.
+- `VERSION` — 5.13.0 → 5.13.1.
+
+---
+
 ## [5.13.0] — 2026-06-15
 
 ### Added
