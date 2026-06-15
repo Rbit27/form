@@ -4,13 +4,22 @@
 
 ### Added
 
-- `content/post-921-wave-loading.md` — Block 901–950 post 21/50. Хвильове навантаження (wave loading): механізм постактиваційної потенціації (PAP), фосфорилювання міозинових легких ланцюгів, вікно потенціація-втома. Варіації хвиль 3-2-1, 5-3-1, 2-1. Порівняння з прямими підходами і rampingом. Протоколи дозування (2–3 хвилі, 3–5 хв відпочинок). Типові помилки впровадження. clinical-safety NOT REQUIRED.
-- `README.md` — Block 1301–1350 «Mental models for physical training» (proposed): 10 нових тем про когнітивні моделі атлета (sunk cost, гіперболічне дисконтування, confirmation bias у журналі, ілюзія контролю, принцип зворотного мислення та ін.).
+- `content/post-921-wave-loading.md` — Block 901–950 post 21/50. Хвильове навантаження (wave loading): механізм PAP, фосфорилювання міозинових легких ланцюгів, вікно потенціація-втома. Варіації 3-2-1, 5-3-1, 2-1. Порівняння з прямими підходами і ramping. Протоколи дозування. Типові помилки. clinical-safety NOT REQUIRED.
+- `content/post-922-contrast-sets-conjugate.md` — Block 901–950, post 22/50. Контрастні сети і спряжений метод: PAP-вікно. Contrast training vs. conjugate (сесія vs. мікроцикл). Dynamic Effort day і крива сила-швидкість. clinical-safety NOT REQUIRED.
+- `content/post-923-deload-methods-compared.md` — Block 901–950, post 23/50. Методи делоаду: зниження об'єму vs. інтенсивності vs. частоти. Активний vs. пасивний. Планований vs. авторегуляторний. clinical-safety NOT REQUIRED.
+- `content/post-924-rm-testing-protocols.md` — Block 901–950, post 24/50. Протоколи тестування 1ПМ: розминка, структура спроб, альтернативи (3–5ПМ, VBT). Технічний vs. абсолютний 1ПМ. clinical-safety NOT REQUIRED.
+- `content/post-925-strength-endurance-continuum.md` — Block 901–950, post 25/50. Континуум сила–витривалість: карта зон, волокна I/IIa/IIx, ефект інтерференції (Wilson 2012, Murach & Bagley 2016). clinical-safety NOT REQUIRED.
+- `content/post-926-rep-range-myths.md` — Block 901–950, post 26/50. Діапазони повторень: міти vs. наука. Schoenfeld 2017, Morton 2016. Механічне напруження, метаболічний стрес, м'язове пошкодження. clinical-safety NOT REQUIRED.
+- `content/post-927-tempo-training-science.md` — Block 901–950, post 27/50. Темп повторення: нотація, TUT і докази. Суперповільний тренінг — без підтримки. Практичний темп для сили і гіпертрофії. clinical-safety NOT REQUIRED.
+- `content/post-928-intraset-rest-hypertrophy.md` — Block 901–950, post 28/50. Внутрішньосетовий відпочинок і гіпертрофія: rest-pause і myo-reps. Ефективні повторення і логіка накопичення стимулу. clinical-safety NOT REQUIRED.
+- `content/post-929-supersets-science.md` — Block 901–950, post 29/50. Суперсети: антагоністичні, агоністичні, перехресні. PAP-ефект (Robbins 2010). Час (Weakley et al.). clinical-safety NOT REQUIRED.
+- `content/post-930-fatigue-indicators-real-training.md` — Block 901–950, post 30/50. Індикатори втоми: чотири компоненти, практичні сигнали, HRV межі, хронічні сигнали перевантаження. clinical-safety NOT REQUIRED.
+- `README.md` — Block 1301–1350 «Mental models for physical training» (proposed) — додано до roadmap upstream.
 
 ### Changed
 
-- `blog.html` — додано картку post-921 (wave loading) на початок стрічки.
-- `STATUS.md` — Block 901–950: 20/50 → 21/50 · IN PROGRESS v5.29.0; Total posts: 920 → 921.
+- `blog.html` — posts 921–930 додано (10 карток); блок 901–950 оновлено до post-930.
+- `STATUS.md` — Block 901–950: 30/50; next priorities оновлено до posts 931–940.
 - `VERSION` — 5.28.0 → 5.29.0.
 
 ---
