@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [5.42.0] — 2026-06-15
+
+### Added
+- `content/post-981-limited-mobility-training.md` — Block 951–1000 post 31/50. Тренування з обмеженою рухливістю: два типи обмежень (структурне vs. функціональне), таблиця замінників за 5 патернами руху (knee-dominant, hip hinge, horizontal push, vertical pull/push), адаптації при обмеженій дорсифлексії гомілковостопа, зовнішній ротації плеча і флексії кульшового суглоба, принцип «замінюй вправу не категорію руху», 5-кроковий аудит програми. clinical-safety: CONDITIONAL PASS (ROM adaptation, not pain management; physiotherapy disclaimer included). sports-scientist review pending.
+- `content/post-982-programming-over-50.md` — Block 951–1000 post 32/50. Програмування після 50: гормональні зміни (тестостерон, естроген після менопаузи), саркопенія (~3–8%/декаду, зупиняється силовим тренінгом), сповільнення відновлення ЦНС і сполучної тканини. Адаптації: вища частота при меншому об'ємі на сесію (full body 3×/тижд. vs. PPL), збереження інтенсивності при зниженні об'єму, 2–3 RIR на складених рухах, 12–15 хв розминка, хвилеподібна прогресія (4-тижневий цикл), deload кожні 4–6 тижнів, пріоритет unilateral і loaded carries. clinical-safety NOT REQUIRED. sports-scientist review pending.
+- `content/post-983-training-after-long-break.md` — Block 951–1000 post 33/50. Повернення після тривалої перерви: деадаптація по фазах (нейром'язова за 2–4 тижні, м'язова за 4–8+ тижнів), механізм м'язової пам'яті (збереження міонуклеусів → швидше відновлення vs. первинне набирання), темп відновлення (1–2 тижні нейром'язово, 2–4 тижні м'язово при перервах до 8 тижнів), програмування повернення (60–70% об'єму при збереженій інтенсивності → +10%/тиждень), шаблон першого тижня, управління DOMS. clinical-safety NOT REQUIRED. sports-scientist review pending.
+- `content/post-984-periodization-non-competitive.md` — Block 951–1000 post 34/50. Periodization для атлетів без змагань: три проблеми одноманітного тренінгу (акомодація, накопичення втоми без розвантаження, відсутність вектору), порівняння linear/block/DUP periodization з таблицею рекомендацій за ситуацією, функція deload як профілактика (не реакція на симптоми), авторегуляція (RPE/RIR/HRV) як доповнення до структури, 12-тижневий шаблон циклу (accumulation → transmutation → synthesis). clinical-safety NOT REQUIRED. sports-scientist review pending.
+- `content/post-985-womens-programming.md` — Block 951–1000 post 35/50. Жіноче програмування: спільні механізми (гіпертрофія, специфічність, відносний відгук), реальні відмінності (рівень тестостерону, частка волокон типу I, менструальний цикл — фолікулярна/лютеїнова фаза), практичні адаптації (вищий rep range як опція, авторегуляція через RPE), поширені перекоси у «жіночих програмах» (надмірна ізоляція замість складених рухів). clinical-safety: CONDITIONAL PASS (фізіологія і програмування без body image, нейтральний науковий тон щодо циклу). sports-scientist review pending.
+
+### Changed
+- `blog.html` — 5 нових blog cards (posts 981–985) додано першими у grid; оновлено до post-985.
+- `STATUS.md` — Block 951–1000 row updated: 29/50 → 34/50; Next priorities оновлено (posts 986–990 як наступний батч); Total posts 970 → 975; version v5.41.0 → v5.42.0.
+- `VERSION` — bump 5.41.0 → 5.42.0.
+
+---
+
 ## [5.41.0] — 2026-06-15
 
 ### Added
