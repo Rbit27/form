@@ -112,9 +112,9 @@
 - Block 651–700: **COMPLETE** — all 50 posts written; 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish
 - Block 851–900: **COMPLETE 50/50** — all posts written (v5.24.0); blog.html caught up to post-900; sports-scientist review pending for all 50 posts before publish
 - Block 901–950: **COMPLETE 50/50 · v5.32.0** — all posts written. blog.html updated to post-950. sports-scientist review required before publish.
-- Block 951–1000: **IN PROGRESS v5.38.0** — posts 951–970 written (20/50). Next: posts 971–975 (barbell-only gym, no mirrors, outdoor training, gym anxiety/first-time, training while sick). blog.html updated to post-970. sports-scientist review required before publish.
+- Block 951–1000: **IN PROGRESS v5.39.0** — posts 951–975 written (25/50). Next: posts 976–980 (propose: minimalist home gym setup, training in hotels, programming for shift workers, training <45 min, training with chronic joint pain — last item requires clinical-safety gate). blog.html updated to post-975. posts 974–975 clinical-safety CONDITIONAL PASS. sports-scientist review required before publish.
 - Block 1001–1050 proposed: Training literacy: reading your own data (added to README roadmap v4.66.0)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v5.38.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v5.39.0**

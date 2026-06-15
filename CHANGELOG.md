@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.39.0] — 2026-06-15
+
+### Added
+- `content/post-971-barbell-only-gym.md` — Block 951–1000 post 21/50. Barbell-only gym: що покриває штанга по кожній групі м'язів (quad/glute, hamstring, back/upper, chest, shoulder, triceps, biceps, calf, core), чого реально бракує без кабельної рами і ізоляції та як компенсувати. Повна 4-денна Upper/Lower програма (День A/B/C/D). Лінійна і хвилеподібна прогресія в barbell-only умовах. clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+- `content/post-972-training-without-mirrors.md` — Block 951–1000 post 22/50. Тренування без дзеркал: зовнішня vs. внутрішня зворотна лінія (proprioception). Що втрачається і що ні без візуального контролю. Чотири компенсаційні методи: відео, тактильні орієнтири, партнер, тренування з закритими очима. Класифікація вправ де відсутність дзеркала критична vs. некритична. clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+- `content/post-973-outdoor-training.md` — Block 951–1000 post 23/50. Тренування на вулиці: що покривають перекладина і підлога, що відкривають петлі/резинки/гиря. Три методи прогресії без ваги (ladder варіацій, density training, паузи і темп). Програма 3 дні (Upper push / Upper pull + core / Lower). Погодні і сезонні фактори. Чого не варто очікувати від outdoor-тренінгу. clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+- `content/post-974-gym-anxiety-first-time.md` — Block 951–1000 post 24/50. Тривога в залі: spotlight effect (Gilovich et al., 2000), що думають про новачків досвідчені атлети, 5 практичних стратегій (непіковий час, план заздалегідь, прості вправи, навушники, соціальний якір), timeline першого місяця, що робити якщо дискомфорт не зменшується. GUARD RAIL: пост адресує нормальний ситуативний дискомфорт, не клінічну тривогу. clinical-safety CONDITIONAL PASS. sports-scientist review required before publish.
+- `content/post-975-training-while-sick.md` — Block 951–1000 post 25/50. Тренування під час хвороби: above-the-neck rule, чому лихоманка — тверде ні (ризик міокардиту, стресової кардіоміопатії), матриця рішень за симптомами (6 рядків), терміни повернення (легка ГРВІ vs. лихоманка vs. грип/COVID), вплив 1–14+ днів пропуску на тренувальні адаптації, етика в залі при симптомах. GUARD RAIL: не замінює лікаря. clinical-safety CONDITIONAL PASS. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — 5 нових карток: пости 971–975 додані вище post-970.
+- `VERSION` — bump 5.38.1 → 5.39.0.
+
+---
+
 ## [5.38.1] — 2026-06-15
 
 ### Changed
