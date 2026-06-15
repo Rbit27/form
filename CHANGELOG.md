@@ -1,5 +1,23 @@
 # Changelog · FORM
 
+## [5.17.0] — 2026-06-15
+
+### Added
+
+- `content/post-851-lab-data-for-self-coached.md` — Block 851–900 post 1/20. Як читати і переносити лабораторні дані у тренінг: VO₂max (лаб vs гаджет), лактатний поріг як якір тренувальних зон, DEXA в контексті програмування, феритин/тестостерон/кортизол як контекст а не приписи. Проблема популяційних референсів для тренованих аматорів. clinical-safety PASS. review_pending: sports-scientist.
+- `content/post-852-minimum-effective-stimulus-maintenance.md` — Block 851–900 post 2/20. Мінімальний ефективний стимул підтримки: differential decay нейром'язових vs структурних адаптацій, Issurin residual training effect, дослідження мінімальної частоти (Ralston 2017, Schoenfeld 2016, Bickel 2011, Moran 2019), інтенсивність vs об'єм у підтримці, вибір однієї вправи з максимальним carryover, реалістичні таймлайни утримання адаптацій. clinical-safety PASS. review_pending: sports-scientist.
+- `content/post-853-strength-cardio-heart-rate-zones.md` — Block 851–900 post 3/20. Сила і зони ЧСС: деміфікація ефекту інтерференції (Hickson 1980, Murach & Bagley 2016), аеробна база як відновлювальний актив, 3-зонна модель для силовиків (не endurance), LISS vs HIIT за вартістю відновлення, операційні правила додавання кардіо. clinical-safety PASS. review_pending: sports-scientist.
+- `content/post-854-training-log-diagnostic-tool.md` — Block 851–900 post 4/20. Тренувальний щоденник як dataset: RPE-trend аналіз як сигнал ранньої втоми, 4-тижнева таблиця патернів, 4–8 тижневий ретроспективний аналіз, 4 ключові патерни (адаптація → стаґнація, нерівний прогрес між рухами, кращі результати при нижчому об'ємі, кластеризація за часом доби), 3-рівневий протокол перегляду (тижневий/місячний/блоковий). clinical-safety PASS. review_pending: sports-scientist.
+- `content/post-855-program-review-6-months.md` — Block 851–900 post 5/20. Перегляд програми після 6 місяців: 5 структурованих питань, розрізнення структурної помилки vs помилки виконання, концепція accumulated stimulus, правило мінімально необхідних змін, дерево рішень continue/modify/replace. clinical-safety PASS. review_pending: sports-scientist.
+
+### Changed
+
+- `README.md` — Block 851–900 table updated: topics → posts with numbered rows and status; 5/20 written (851–855).
+- `STATUS.md` — Block 851–900 status updated: in progress 5/20.
+- `VERSION` — 5.16.0 → 5.17.0.
+
+---
+
 ## [5.16.0] — 2026-06-15
 
 ### Added
