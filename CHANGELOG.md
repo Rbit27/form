@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [5.35.0] — 2026-06-15
+
+### Added
+- `content/post-961-training-time-pressure.md` — Block 951–1000 post 11/50. Тренування при нестачі часу: 30 хв замість 60. Правила пріоритетів (рівень 1–3 вправ), три готові шаблони (нижня, верхня push, верхня pull), оптимальне скорочення відпочинку, коли суперсети допомагають, а коли шкодять. clinical-safety NOT REQUIRED.
+- `blog.html` — post-961 картка додана.
+
+### Changed
+- `STATUS.md` — Block 951–1000 IN PROGRESS (11/50 written).
+- `VERSION` — bump to 5.35.0.
+
 ## [5.34.0] — 2026-06-15
 
 ### Added

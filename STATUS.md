@@ -1,4 +1,4 @@
-# FORM · Project Status v5.26.0
+# FORM · Project Status v5.35.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.32.0** — 2026-06-15
+**v5.35.0** — 2026-06-15
 
 ---
 
@@ -32,9 +32,9 @@
 
 | 851–900 | Applied programming deep dives | 50 | **BLOCK COMPLETE v5.24.0** — all 50 posts written; blog.html caught up to post-900; sports-scientist review required for all 50 before publish |
 | 901–950 | Advanced programming systems | 50/50 | **BLOCK COMPLETE v5.32.0** — all 50 posts written. 901–930: (see v5.29.0). 931–940: advanced deload variations, block vs. DUP periodization, autoregulation tools (RPE/RIR/VBT/APRE), training around soreness (DOMS), exercise selection advanced (3-level hierarchy), progressive overload beyond weight (7 vectors), accumulation vs. intensification, taper for non-competitive athletes, advanced warm-up protocols (PAP), training log analysis. 941–950: neural adaptations (programming implications), tendon/connective tissue programming, training age and response rate, advanced RPE programming, fatigue management across a training year, training for longevity, hormonal responses to training, sleep and training quality, cognitive fatigue and training decisions, MED and block synthesis. clinical-safety NOT REQUIRED for all. sports-scientist review required before publish. blog.html updated to post-950. |
-| 951–1000 | Training environment & context | 10/50 | **IN PROGRESS v5.34.0** — 951–960 written: traveling (MED без залу), home dumbbells (можливості та обмеження), home gym vs commercial (матриця рішення), heat training (cardiovascular drift + акліматизація), cold training (нервова провідність + розминка), altitude (парціальний О₂ + акліматизація), gym environment (музика/освітлення/social facilitation), flexible schedule (3 системи), morning vs evening (циркадний ритм + хронотип), relocation (організаційний виклик + fresh start). clinical-safety NOT REQUIRED for all 10. sports-scientist review required before publish. blog.html updated to post-960. |
+| 951–1000 | Training environment & context | 11/50 | **IN PROGRESS v5.35.0** — 951–961 written: traveling (MED без залу), home dumbbells (можливості та обмеження), home gym vs commercial (матриця рішення), heat training, cold training, altitude, gym environment (музика/освітлення/social facilitation), flexible schedule (3 системи), morning vs evening (циркадний ритм + хронотип), relocation (організаційний виклик + fresh start), time-constrained training (30 хв замість 60 — пріоритети вправ + шаблони). clinical-safety NOT REQUIRED for all 11. sports-scientist review required before publish. blog.html updated to post-961. |
 
-**Total posts: 960**
+**Total posts: 961**
 
 **Editorial series 11–34, 44–46** — post-46 written v5.26.0: «Форс-мажор у тренуванні: адаптація без паніки і без нульового місяця» — мінімальний ефективний доз при порушенні режиму; деталізований розбір по 4 сценаріях (робочий дедлайн, відрядження, легке нездоров'я, виснаженість); таймлайн детренування без паніки; протокол повернення після паузи 60-70-80-90-100%; clinical-safety: PASS. Blog card added. Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
 
@@ -112,7 +112,7 @@
 - Block 651–700: **COMPLETE** — all 50 posts written; 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish
 - Block 851–900: **COMPLETE 50/50** — all posts written (v5.24.0); blog.html caught up to post-900; sports-scientist review pending for all 50 posts before publish
 - Block 901–950: **COMPLETE 50/50 · v5.32.0** — all posts written. blog.html updated to post-950. sports-scientist review required before publish.
-- Block 951–1000: **IN PROGRESS v5.34.0** — posts 951–960 written (10/50). Next: posts 961–970 (equipment constraints context). blog.html updated to post-960. sports-scientist review required before publish.
+- Block 951–1000: **IN PROGRESS v5.35.0** — posts 951–961 written (11/50). Next: posts 962–970 (equipment constraints context). blog.html updated to post-961. sports-scientist review required before publish.
 - Block 1001–1050 proposed: Training literacy: reading your own data (added to README roadmap v4.66.0)
 
 ---
