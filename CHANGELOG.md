@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.11.1] — 2026-06-15
+
+### Added
+
+- `content/post-31-mobility-vs-flexibility.md` — Editorial series post 31. «Мобільність або гнучкість — де та межа, яка важлива для силового атлета». Covers the structural distinction between passive ROM (flexibility) and active neuromuscular control (mobility). Three constraint types: structural (joint morphology — unchangeable via stretching), tissue (viscoelastic — real but overestimated), neuromuscular (most common actual limiter in strength athletes). Static stretching pre-lift evidence: Behm & Chaouachi (2011) — 23-study review, ≥60 s static stretching reduces explosive and maximal force 5–8% for 30–60 min via tendon stiffness reduction and neural inhibition. Dynamic warmup rationale. Practical assessment criteria for squat depth, deadlift hinge, overhead position, bench press. Efficient weekly integration framework: 5–10 min specific dynamic pre-lift + pause in bottom position + 15 min dedicated mobility day. clinical-safety: PASS. Blog card added.
+
+### Changed
+
+- `README.md` — Editorial series heading updated (11–31 drafted, proposed 32–40); post-31 marked draft · v5.11.1; new proposed topics 36–40 added to roadmap.
+- `STATUS.md` — Total posts 832 → 833; editorial series 11–30 → 11–31 entry updated with post-31 summary.
+- `VERSION` — 5.11.0 → 5.11.1.
+
+---
+
 ## [5.11.0] — 2026-06-15
 
 ### Added

@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–30 drafted · proposed next (31–35)
+### Editorial series: 11–31 drafted · proposed next (32–40)
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -27,11 +27,16 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 28 | Прогресивне перевантаження — механізм адаптації, а не мотиваційна мантра | draft · v5.8.2 |
 | 29 | Зв'язок «розум-м'яз» — наука, бро-наука, або щось посередині? | draft · v5.8.2 |
 | 30 | Що таке «довгострокові результати» — і чому більшість не думає в цьому горизонті | draft · v5.8.3 |
-| 31 | Мобільність або гнучкість — де та межа, яка важлива для силового атлета | proposed |
+| 31 | Мобільність або гнучкість — де та межа, яка важлива для силового атлета | draft · v5.11.1 |
 | 32 | Як читати наукову статтю про тренування і не зробити неправильних висновків | proposed |
 | 33 | Самостійне програмування: де воно краще за коуча, де гірше | proposed |
 | 34 | Чому більшість людей кидають тренування — і що з цим робити без self-help риторики | proposed |
 | 35 | Breathing mechanics під час підйому ваги — Valsalva, внутрішньочеревний тиск, core stability | proposed |
+| 36 | Як будувати тренувальний тиждень навколо реального розкладу, а не ідеального | proposed |
+| 37 | Що таке «чиста техніка» і чому вона залежить від цілі, а не від естетики | proposed |
+| 38 | Overreaching vs overtraining: як розрізнити функціональне перевантаження і справжній перебір | proposed |
+| 39 | Тренування з партнером — де воно підсилює прогрес, де заважає | proposed |
+| 40 | Як оцінити власну програму: 5 ознак, що вона більше не працює для тебе | proposed |
 
 > **Open question OQ-EDITORIAL-01:** Числові файли `post-22-periodization.md` — `post-25-breathing-mechanics.md` (написані 2026-05-17) конфліктують за номером з editorial series posts 22-25. Рішення: ці May-файли потрібно або перенумерувати в діапазон 200+ (де вони логічно входять у «Exercise physiology deep dives»), або зберегти як окремий контент-бібліотечний пост без editorial-серійного номера. Рішення потребує founder review. **OQ-EDITORIAL-01 status: 🟡 Unresolved**
 
