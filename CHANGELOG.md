@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.11.0] — 2026-06-15
+
+### Added
+
+- `content/post-835-zma-zinc-magnesium-evidence.md` — Block 801–850 evidence-based deep dives, post 35/50. ZMA (zinc + magnesium aspartate + B6): testosterone booster marketing vs. independent evidence. Covers the Brilla & Conte (2000) founding study and its critical flaw (author is ZMA patent holder / BALCO founder). Independent replications: King et al. (2003) — no testosterone, IGF-1, body composition, or strength effect; Wilborn et al. (2004) — same null result. Zinc-testosterone link explained in deficiency context (Hamalainen 1984/1985): real mechanism, not applicable to replete athletes. Magnesium and sleep: Abbasi et al. (2012) evidence for deficient individuals vs. no effect in replete young athletes. Patented "aspartate" form: no absorption advantage over citrate/glycinate. Practical framework: test zinc/magnesium blood levels before supplementing; isolated minerals are cheaper and as effective if deficiency is confirmed. Sponsor-bias archetype: same pattern as HMB (post-832) and glutamine (post-834). clinical-safety: PASS.
+- `content/post-836-collagen-peptides-connective-tissue.md` — Block 801–850 evidence-based deep dives, post 36/50. Collagen peptides: the rare supplement with a narrow but real evidence base for connective tissue. Covers glycine/proline/hydroxyproline substrate rationale (collagen matrix vs. myofibrillar protein turnover). Key studies: Shaw et al. (2017, AJCN) — 15 g gelatin + 48 mg vitamin C pre-exercise increased engineered-ligament collagen synthesis 50% vs. placebo (surrogate endpoint, n=8, crossover); Dressler et al. (2018, Nutrients) — 5 g collagen peptides + eccentric protocol in chronic Achilles tendinopathy: +26 vs. +15 VISA-A score at 6 months (functional RCT); Clark et al. (2008) — joint pain reduction in student athletes, 10 g/day for 24 weeks (subjective; industry-funded). Vitamin C cofactor mechanism (prolyl hydroxylase) explained — why co-ingestion with ~50 mg vitamin C is mechanistically required. Timing: 30–60 min pre-exercise for amino acid peak to coincide with mechanical stimulus. Who benefits: tendon/ligament rehab, masters athletes (40+), symptomatic joint pain under load. Who does not benefit: healthy young athletes seeking muscle mass or strength. Clinical-safety: CONDITIONAL PASS — guard rail embedded (chronic joint pain → physician consult before supplementation).
+
+### Changed
+
+- `STATUS.md` — Block 801–850 updated: 36/50 written, posts 835–836 entries added; total posts 830 → 832; next batch 837–840 updated.
+- `VERSION` — 5.10.1 → 5.11.0.
+
+---
+
 ## [5.10.1] — 2026-06-14
 
 ### Changed
