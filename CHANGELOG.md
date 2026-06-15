@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.56.0] — 2026-06-15
+
+### Added
+- `content/post-1032-anchoring-effect-training-baselines.md` — Block 1001–1050 cluster 4 post 2/6. Ефект якоря у тренуванні: перший блок або перший PR як фіксована точка відліку. Чому «я раніше присідав X» читає поточні дані гірше ніж вони є. Плато адаптації як ефект якоря (не невдача). Протокол рекалібрації кожні 12–16 тижнів. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1033-sunk-cost-fallacy-program-switching.md` — Block 1001–1050 cluster 4 post 3/6. Sunk cost fallacy у перемиканні програм: реальна ціна відстроченого рішення у тижнях адаптації. Різниця між «програма не працює» та «програмі не дали часу». П'ять-питань decision framework. Pre-block commitment statement. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1034-attribution-error-training-variables.md` — Block 1001–1050 cluster 4 post 4/6. Attribution error: приписування прогресу не тій змінній. Три класичні патерни хибної атрибуції. Вісім конфундуючих змінних що системно ховаються за очевидним. П'яти-кроковий протокол ізоляції змінних включно з реверсною перевіркою. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1035-selection-bias-training-tracking.md` — Block 1001–1050 cluster 4 post 5/6. Selection bias у тренувальному журналі: три форми упередженого логування. Феномен «хорошого дня» з числовим прикладом. Аудит-чекліст на ознаки selection bias. Pre-committed logging protocol: 5 полів, 5-хвилинне правило. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1036-anti-bias-review-protocols.md` — Block 1001–1050 cluster 4 post 6/6 (cluster synthesis). Двоярусна anti-bias система: місячний 20-хв огляд (3 фіксованих питання) + блоковий пост-мортем (6-секційний шаблон). Pre-mortem перед блоком. Чотири кількісних порогових значення що запускають обов'язковий перегляд: RPE +1.0 за 2 тижні, нульовий приріст за 3 тижні, 25% пропущених сесій, 70% compliance. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — картки post-1032 через post-1036 додані на початок сітки.
+- `STATUS.md` — Block 1001–1050: 31/50 → 36/50; Cluster 4 COMPLETE.
+- `VERSION` — bump 5.55.1 → 5.56.0.
+
 ## [5.55.1] — 2026-06-15
 
 ### Changed
