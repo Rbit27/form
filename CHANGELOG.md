@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.23.0] — 2026-06-15
+
+### Added
+
+- `content/post-44-training-age-identity.md` — Editorial series post-44. «Тренувальний вік: ким ти є як атлет — насправді» — чому рахунок «у роках» не відображає тренувальний рівень; три рівні (beginner/intermediate/advanced) і що вони означають для частоти, об'єму, інтенсивності і деловантаження; пастка «просунутого початківця» і як хибна самоідентифікація руйнує програмування; практичні маркери для чесної оцінки рівня; editorial-brutalist tone, 13 хв. clinical-safety: PASS. review_pending: sports-scientist.
+
+### Changed
+
+- `README.md` — Editorial roadmap розширено: пости 51–60 додано як proposed topics (як читати тренувальні дані, сила vs. маса, відпочинок між підходами, коли міняти програму, резерв на завершення тренування, warm-up для конкретного атлета, overreaching vs. overtraining, цілі що вимірюються, деадаптація, синтез блоку).
+- `blog.html` — post-44 card prepended before post-34 (total 178 entries).
+- `STATUS.md` — editorial series оновлено до 11–34 + 44; total posts 849; footer версія v5.23.0.
+- `VERSION` — 5.22.0 → 5.23.0.
+
+---
+
 ## [5.22.0] — 2026-06-15
 
 ### Added

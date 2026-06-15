@@ -1,4 +1,4 @@
-# FORM · Project Status v5.19.0
+# FORM · Project Status v5.23.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.18.0** — 2026-06-15
+**v5.23.0** — 2026-06-15
 
 ---
 
@@ -30,9 +30,9 @@
 | 751–800 | Athlete lifecycle & context | 50 | **BLOCK COMPLETE** — all 50 posts written v5.1.0: posts 791 (athletes with movement limitations · clinical-safety CONDITIONAL PASS), 793 (sustained high stress training · clinical-safety CONDITIONAL PASS), 794 (medically-restricted diet · clinical-safety CONDITIONAL PASS) now written with embedded guard rails. Blog cards added for posts 785–800. sports-scientist review required for all 50 before publish |
 | 801–850 | Evidence-based deep dives | 50 | **BLOCK COMPLETE v5.14.0** — all 50 posts written. Posts 801–840 (prev batches). **Batch 841–850 COMPLETE v5.14.0:** post-841 electrolytes performance science (PASS), post-842 nitrate/beetroot (PASS — guard rail: drug interactions with nitroglycerin), post-843 sodium bicarbonate buffering (PASS), post-844 adaptogen comparison (PASS), post-845 rhodiola rosea (CONDITIONAL PASS — guard rail: SSRI/SNRI/MAOI interactions, serotonin syndrome risk), post-846 tart cherry/recovery (PASS), post-847 glutathione/antioxidant paradox (PASS), post-848 NAC (CONDITIONAL PASS — guard rail: nitroglycerin interaction + antioxidant paradox for trained athletes), post-849 phosphatidylserine/cortisol (PASS), post-850 cordyceps/C.militaris (PASS — block synthesis). All sports-scientist review required before publish. |
 
-**Total posts: 848**
+**Total posts: 849**
 
-**Editorial series 11–34** — post-34 written v5.18.0: «Чому більшість людей кидають тренування — і що з цим робити без self-help риторики» — структурний аналіз adherence failure (пастка ідеального тижня, крепатура як хибний компас, об'єм як доказ зусилля, відсутність адаптивності), кореляти стійкості (фіксований часовий слот, мінімальна транзакційна вартість, адаптивна програма), чому «більше сили волі» не вирішує структурну проблему; clinical-safety: PASS. Blog card added. Proposed next: post-35 (breathing mechanics / Valsalva / IAP). Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
+**Editorial series 11–34, 44** — post-44 written v5.23.0: «Тренувальний вік: ким ти є як атлет — насправді» — чому рахунок «у роках» не відображає тренувальний рівень; три рівні адаптації і що вони означають для програмування; пастка «просунутого початківця»; практичні маркери для чесної самооцінки; що змінюється у частоті, об'ємі, інтенсивності, деловантаженні залежно від рівня; clinical-safety: PASS. Blog card added. Roadmap розширено до постів 51–60 v5.23.0. Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
 
 ---
 
@@ -111,4 +111,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v5.22.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v5.23.0**
