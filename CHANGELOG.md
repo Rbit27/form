@@ -13,11 +13,12 @@
 - `content/post-877-return-after-illness.md` — Block 851–900 post 27/50. Повернення після хвороби: перший тиждень без регресу. Why jumping to pre-illness loads causes setbacks; volume-first protocol (50–60% volume, maintain intensity); readiness signals for full resumption. clinical-safety: PASS. review_pending: sports-scientist.
 - `content/post-878-rpe-vs-percentage.md` — Block 851–900 post 28/50. RPE vs. %1RM: коли авторегуляція переважає. Case for percentages (beginner predictability, peaking blocks); case for RPE (daily readiness variation, intermediate+); hybrid approach: percentages as anchor, RPE as real-time adjustment. clinical-safety: PASS. review_pending: sports-scientist.
 - `content/post-879-bad-session-real-time-decisions.md` — Block 851–900 post 29/50. Погана сесія: рішення в залі в реальному часі. Distinguishing bad day / bad program / bad recovery; 3-tier warm-up-set decision tree; when to reduce, push, or leave. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-880-five-year-horizon.md` — Block 851–900 post 30/50. П'ятирічний горизонт: чому він змінює щоденні рішення. Injury avoidance ROI at 5-year horizon, volume accumulation compounding, how modest-consistent beats aggressive-and-injured. clinical-safety: PASS. review_pending: sports-scientist.
 
 ### Changed
 
 - `README.md` — Block 851–900 table updated: actual titles for posts 856–870 replacing planned-topic placeholders; post-871 added; block status updated to in progress · 21/50 · v5.22.0; proposed topics 872–880 added to block table.
-- `blog.html` — posts 871–879 entries prepended to article list (total 178 entries).
+- `blog.html` — posts 871–880 entries prepended to article list (total 179 entries).
 
 ---
 

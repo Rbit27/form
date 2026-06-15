@@ -298,7 +298,7 @@ Planned — posts 764–800:
 | 839 | Цинк, тестостерон і тренування — доказова база без маркетингового spin | draft · v5.12.0 |
 | 840 | Берберин і глюкозний метаболізм для атлетів (clinical-safety CONDITIONAL PASS) | draft · v5.12.0 |
 
-### Block 851–900 — Applied programming deep dives (in progress · 29/50 · v5.22.0)
+### Block 851–900 — Applied programming deep dives (in progress · 30/50 · v5.22.0)
 
 Практичне застосування принципів програмування в реальних контекстах. Не теорія — операційні рішення.
 
@@ -333,7 +333,7 @@ Planned — posts 764–800:
 | 877 | Повернення після хвороби: перший тиждень без регресу | draft · v5.22.0 · review_pending: sports-scientist |
 | 878 | RPE vs. %1RM: коли авторегуляція переважає | draft · v5.22.0 · review_pending: sports-scientist |
 | 879 | Погана сесія: рішення в залі в реальному часі | draft · v5.22.0 · review_pending: sports-scientist |
-| 880 | П'ятирічний горизонт: чому він змінює щоденні рішення | proposed |
+| 880 | П'ятирічний горизонт: чому він змінює щоденні рішення | draft · v5.22.0 · review_pending: sports-scientist |
 
 ### Block 901–950 — Practical athlete intelligence (proposed · v4.57.0)
 
