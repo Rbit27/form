@@ -5,11 +5,13 @@
 ### Added
 
 - `content/post-901` through `content/post-910` — Block 901–950 «Advanced programming systems» opened (10/50). Posts written: post-901 Daily Undulating Periodization (DUP — Rhea 2002 evidence, 3-zone structure, weekly progression); post-902 Velocity-Based Training (MCV zones, load-velocity profile, velocity loss thresholds 10/20/25%, device comparison); post-903 Autoregulation beyond RPE (4 levels: RIR vs RPE, morning calibration, Range Scheme, floating deload triggers); post-904 Concurrent training interference (Wilson 2012 meta-analysis, mTOR/AMPK mechanism, moderators: cardio type/timing/order, 3 scheduling templates); post-905 Block vs. Conjugate periodization (Issurin vs. Westside, sequential vs. parallel adaptation, evidence base, decision matrix); post-906 Triphasic training — Cal Dietz (SSC physiology, eccentric/isometric/concentric block structure, evidence review, amateur adaptation); post-907 High-frequency low-volume / Grease the Groove (Schoenfeld freq meta-analysis, motor learning rationale, HFLV structures, GTG protocol); post-908 Fatigue management MRV/MEV/MAV (RP-model thresholds, dynamic MRV modifiers, two deload types, MEV during deficit); post-909 Peaking for natural lifters (2–3 week taper rationale, 48–72 h supercompensation window, weekly taper scheme, common errors); post-910 Program switching real cost (SRA cycle, DOMS ≠ efficacy, 4-level change cost hierarchy, decision checklist). All posts: clinical_safety NOT REQUIRED (pure programming topics, no food/body/pain/mental content); sports-scientist review required before publish; editorial-brutalist tone per DEC-007.
-- `blog.html` — posts 901–910 cards added to top of post list.
+- `content/post-46-force-majeure.md` — Editorial series post № 46: «Форс-мажор у тренуванні: адаптація без паніки і без нульового місяця». Тема: мінімальний ефективний доз при порушенні режиму; фізіологія детренування (1–2 тижні, 2–4 тижні, 4+ тижнів); чотири сценарії з конкретними протоколами (робочий дедлайн, відрядження, легке нездоров'я, виснаженість); neck check rule; протокол повернення 60-70-80-90-100%. Мова: UA. Тон: editorial-brutalist. Clinical-safety: PASS. Pending: sports-scientist review.
+- `blog.html` — posts 901–910 cards added to top of post list; картка post-46 додана.
+- `README.md` — editorial series table: post-46 позначено draft · v5.26.0; додано нові proposed теми 61–75 (блок 61–75 «FORM editorial compass»).
 
 ### Changed
 
-- `STATUS.md` — content table: block 851–900 row added (COMPLETE), block 901–950 row added (10/50 IN PROGRESS); total posts 900 → 910; next priorities updated.
+- `STATUS.md` — content table: block 851–900 row added (COMPLETE), block 901–950 row added (10/50 IN PROGRESS); total posts 910; editorial series рядок 11–34, 44–45 → 11–34, 44–46; next priorities updated.
 - `VERSION` — 5.25.1 → 5.26.0.
 
 ---

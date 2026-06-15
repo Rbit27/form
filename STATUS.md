@@ -35,7 +35,7 @@
 
 **Total posts: 910**
 
-**Editorial series 11–34, 44–45** — post-45 written v5.24.0: «Прогрес без ваги штанги: що ще рахується і чому» — об'єм навантаження (тоннаж), технічна компетентність, калібрування RIR/RPE, консистентність, швидкість відновлення, кінезіологічна доступність як повноцінні маркери прогресу; чому єдиний показник «вага на штанзі» дає спотворену картину; мінімальний набір відстеження без надмірного аналізу; clinical-safety: PASS. Blog card added. Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
+**Editorial series 11–34, 44–46** — post-46 written v5.26.0: «Форс-мажор у тренуванні: адаптація без паніки і без нульового місяця» — мінімальний ефективний доз при порушенні режиму; деталізований розбір по 4 сценаріях (робочий дедлайн, відрядження, легке нездоров'я, виснаженість); таймлайн детренування без паніки; протокол повернення після паузи 60-70-80-90-100%; clinical-safety: PASS. Blog card added. Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
 
 ---
 
