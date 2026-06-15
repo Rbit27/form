@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [5.41.0] — 2026-06-15
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md` v2.11 — +12 Enterprise Tenant Offboarding & Data Egress events (DEC-030 HMAC-chained · DATA_MODEL §25 + DEC-061). Closes DATA_MODEL §25.13 checklist item 9 (P0, M4) and DATA_MODEL §36.9 checklist item 5 (P0, M8 — DEC-061 EU-routing payload extension). All 12 events registered: `enterprise.offboarding_initiated` / `enterprise.offboarding_on_hold` / `enterprise.offboarding_hold_released` / `enterprise.sso_scim_revoked` / `enterprise.data_export_started` / `enterprise.data_export_completed` (extended with `data_region`, `r2_bucket`, `is_eu_region`, `package_size_bytes` per DEC-061) / `enterprise.data_deletion_started` / `enterprise.data_deletion_completed` / `enterprise.financial_pseudonymized` / `enterprise.deletion_attestation_issued` / `enterprise.offboarding_completed` / `enterprise.offboarding_step_failed`. OFB-REGION-01 chain invariant for `enterprise.data_export_completed` (EU `is_eu_region=true` → `r2_bucket='form-offboarding-exports-eu'`; HTTP 422 + P1 PagerDuty on violation). Five Zod v2 schemas. Six SOC 2 evidence artefacts: OFB-E-001 (C1.2), OFB-E-002 (P8.0), OFB-E-003 (CC6.3), OFB-E-004 (CC9.1), OFB-E-005 (C1.1/P4.0/CC6.1 — quarterly EU chain export), OFB-E-006 (C1.1/CC6.1 — annual R2 jurisdiction screenshot). Two retention table rows added. `form_api` REVOKED; `compliance_reviewer` SELECT all documented.
+
+### Changed
+- `STATUS.md` — AUDIT_LOG_SCHEMA.md row added to Enterprise documentation table; version v5.40.0 → v5.41.0.
+- `VERSION` — bump 5.40.0 → 5.41.0.
+
+---
+
 ## [5.40.0] — 2026-06-15
 
 ### Added

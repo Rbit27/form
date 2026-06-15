@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.40.0** — 2026-06-15
+**v5.41.0** — 2026-06-15
 
 ---
 
@@ -50,6 +50,7 @@
 | DATA_MODEL.md | Complete — 12 618 lines | v4.x |
 | OBSERVABILITY.md | Complete — v4.0, §43 Webhook Delivery Observability added (WH-SLO-01–04, AL-WH-01–05, DDL 0074/0074b, pg_cron job 34) · OQ-WL-OBS-01 resolved DEC-054 | v5.1.1 |
 | COST_MODEL.md | Complete — 8 341 lines | v4.x |
+| AUDIT_LOG_SCHEMA.md | Complete — v2.11 · +12 enterprise offboarding events (DATA_MODEL §25 + DEC-061 EU routing) · OFB-E-001–006 evidence artefacts | v5.41.0 |
 | SHARED_RESPONSIBILITY_MODEL.md | Complete — v1.0 | v4.18.0 |
 
 ---
@@ -117,4 +118,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v5.40.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v5.41.0**

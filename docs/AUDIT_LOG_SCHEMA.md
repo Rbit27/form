@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.10
+# FORM · Audit Log Schema v2.11
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -983,6 +983,8 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `support.unauthorized_nuke_attempt` | 7 years | Internal safety control violation record |
 | `integration.api_call` (sampled) | 30 days | Volume management |
 | `data.read_aggregate` | 90 days | Investigation but not unlimited |
+| `enterprise.offboarding_initiated` / `enterprise.sso_scim_revoked` / `enterprise.data_deletion_started` / `enterprise.data_deletion_completed` / `enterprise.financial_pseudonymized` / `enterprise.deletion_attestation_issued` / `enterprise.offboarding_on_hold` / `enterprise.offboarding_hold_released` / `enterprise.offboarding_step_failed` | 7 years | Enterprise tenant off-boarding lifecycle — irreversible or legally consequential operations; SOC 2 C1.2 (disposal — OFB-E-001), P8.0 (privacy in disposal — OFB-E-002), CC6.3 (access removal — OFB-E-003), CC9.1 (business continuity — OFB-E-004); 7yr matches Ukrainian Tax Code Art. 44 + EU VAT Directive Art. 245 financial retention floor and SOC 2 multi-cycle evidence requirement; `docs/DATA_MODEL.md §25` |
+| `enterprise.data_export_started` / `enterprise.data_export_completed` / `enterprise.offboarding_completed` | 7 years | Data export and attestation lifecycle — reversible package generation is STANDARD severity but 7yr retention required: these events are part of the off-boarding HMAC chain and must outlive OFB-E-001–E-006 evidence collection; `enterprise.data_export_completed` carries OFB-REGION-01 EU routing invariant (DEC-061 — `is_eu_region`, `r2_bucket`); `docs/DATA_MODEL.md §25` + `docs/DATA_MODEL.md §36` |
 | `user.account_deletion_initiated` / `user.data_erasure_completed` | 7 years | GDPR Art. 17 erasure chain-of-custody record; SOC 2 P4/P5.2/P6; `user.data_erasure_completed.slo_met` is GDPR-SLO-01 evidence; 7yr matches FORM's general compliance-record floor — individual user data is absent from payloads so retention does not conflict with the erasure itself |
 | `user.art9_data_hard_deleted` | 7 years | GDPR Art. 9 enterprise off-boarding deletion record; GDPR-E-005/E-006 evidence artefacts; SOC 2 CC6.5/P6; `latency_seconds` field is GDPR-SLO-03 evidence; 7yr is the DEC-030 HIGH event standard and matches FORM's compliance record floor |
 | `data.workout_data_purged` | 1 year | GDPR Art. 5(1)(e) storage-limitation enforcement; GDPR-E-002 evidence artefact (SOC 2 PI1.2); 1yr sufficient — operational purge log, not a contract or financial record; daily cadence means 365 events/yr; older runs add no compliance value |
@@ -2079,6 +2081,164 @@ const DsarCertificateDeliveredSchema = z.object({
 
 ---
 
+### Enterprise Tenant Offboarding & Data Egress events (DEC-030 HMAC-chained · DATA_MODEL §25 + DEC-061 · C1.2/P8.0/CC6.3/CC9.1)
+
+> Defined in `docs/DATA_MODEL.md §25` (off-boarding state machine, package generation, GDPR Art. 17 deletion sequence) and `docs/DATA_MODEL.md §36` (DEC-061 — EU-region R2 bucket routing). Twelve events covering the full tenant off-boarding lifecycle — from contract end through access revocation, data export, deletion, financial pseudonymisation, and attestation issuance. **Privacy floor (all twelve events):** no individual employee `user_id`, name, email, or health values in any payload. `delivered_to_email` in `enterprise.data_export_completed` records the employer's administrative contact (organisation email, not an individual's personal data under GDPR Art. 4(1)); if a named individual's work address is used, the field must be nulled after 2 years per operational log retention. **State machine:** `pending → access_revoked → export_in_progress → export_delivered → deletion_in_progress → financial_pseudonymized → attestation_issued → completed`; plus `on_hold` (legal hold) and `failed` (unrecoverable Worker error) lateral states. A chain break on any off-boarding event is a P0 incident (→ R-05). **Two-person authorisation gate:** the `export_delivered → deletion_in_progress` transition requires two distinct FORM engineers (`authorised_by_1` and `authorised_by_2` on `tenant_offboarding_jobs`); no automated path bypasses this gate. `form_api` is REVOKED from all three off-boarding tables. Cross-ref: `docs/DATA_MODEL.md §25.9` (canonical event table), `docs/DATA_MODEL.md §36.6` (DEC-061 payload extension), `docs/DATA_MODEL.md §25.12` (OFB-E-001–004 evidence definitions), `docs/DATA_MODEL.md §36.7` (OFB-E-005–006 evidence definitions), `docs/SSO_SCIM_IMPLEMENTATION.md §22` (`nukeTenantSessions()` — called on `access_revoked` transition), `docs/INCIDENT_RESPONSE.md R-05` (chain break response), `docs/INCIDENT_RESPONSE.md R-25` (Art. 9 off-boarding overdue), `docs/SOC2_READINESS.md §C1.2` (disposal), `docs/SOC2_READINESS.md §P8.0` (privacy-in-disposal), `docs/SOC2_READINESS.md §CC6.3` (logical access removal), `docs/SOC2_READINESS.md §CC9.1` (business continuity at contract end). **Closes `docs/DATA_MODEL.md §25.13` checklist item 9 (P0, M4 — register all enterprise.offboarding_* DEC-030 events in AUDIT_LOG_SCHEMA.md) and `docs/DATA_MODEL.md §36.9` checklist item 5 (P0, M8 — extend enterprise.data_export_completed payload spec in AUDIT_LOG_SCHEMA.md §6.Enterprise-Offboarding).**
+
+**Event table:**
+
+| Event type | Severity | Retention | Trigger | Mandatory payload fields |
+|---|---|---|---|---|
+| `enterprise.offboarding_initiated` | **HIGH** | 7 yr | `tenant_offboarding_jobs` row created; `tenants.lifecycle_status → 'churned'` | `tenant_id`, `offboarding_job_id`, `trigger_type` (`contract_expired_no_renewal`\|`early_termination`\|`pilot_lapsed`), `contract_id` or `pilot_id` |
+| `enterprise.offboarding_on_hold` | **HIGH** | 7 yr | Legal or compliance hold placed; job blocked from advancing | `tenant_id`, `offboarding_job_id`, `hold_reason` (string ≤ 256 chars), `placed_by_pam_session` (UUID) |
+| `enterprise.offboarding_hold_released` | **HIGH** | 7 yr | Hold released by compliance officer; job re-queued for state advance | `tenant_id`, `offboarding_job_id`, `released_by_pam_session` (UUID), `hold_duration_hours` (integer ≥ 0) |
+| `enterprise.sso_scim_revoked` | **HIGH** | 7 yr | `nukeTenantSessions()` called; `tenant_sso_configs` deactivated; SCIM tokens revoked; `status → 'access_revoked'` | `tenant_id`, `offboarding_job_id`, `sessions_nuked` (bool), `sso_config_count` (int), `scim_tokens_revoked_count` (int) |
+| `enterprise.data_export_started` | STANDARD | 7 yr | Package generation begins; `status → 'export_in_progress'` | `tenant_id`, `offboarding_job_id`, `package_types` (array of `egress_package_type_enum` values) |
+| `enterprise.data_export_completed` | STANDARD | 7 yr | All packages generated; signed URLs delivered to employer; `status → 'export_delivered'` | `tenant_id`, `offboarding_job_id`, `package_type`, `package_id`, `sha256_manifest`, `delivered_to_email`, **`data_region`** (DEC-061), **`r2_bucket`** (DEC-061), **`is_eu_region`** (DEC-061), **`package_size_bytes`** (DEC-061) |
+| `enterprise.data_deletion_started` | **HIGH** | 7 yr | Two-person authorisation confirmed; deletion worker invoked; `status → 'deletion_in_progress'` | `tenant_id`, `offboarding_job_id`, `authorised_by` (two-element array of FORM engineer UUIDs), `art9_tables` (array of table names to be hard-deleted) |
+| `enterprise.data_deletion_completed` | **HIGH** | 7 yr | All personal data hard-deletes and user anonymizations verified | `tenant_id`, `offboarding_job_id`, `users_anonymized_count` (int), `art9_rows_deleted_count` (int), `standard_rows_deleted_count` (int) |
+| `enterprise.financial_pseudonymized` | **HIGH** | 7 yr | Billing records pseudonymized per §24.10; `status → 'financial_pseudonymized'` | `tenant_id`, `offboarding_job_id`, `financial_rows_pseudonymized` (int), `retention_basis` (literal `"Art17(3)(b)"`), `legal_reference` (string — cites Ukrainian Tax Code Art. 44 + EU VAT Directive Art. 245) |
+| `enterprise.deletion_attestation_issued` | **HIGH** | 7 yr | `tenant_deletion_attestations` row created and HMAC-SHA256 signed; `status → 'attestation_issued'` | `tenant_id`, `offboarding_job_id`, `attestation_id` (UUID), `signing_key_version` (string — key rotation label), `issued_to_email` (employer administrative contact) |
+| `enterprise.offboarding_completed` | STANDARD | 7 yr | Compliance officer marks job complete; terminal state | `tenant_id`, `offboarding_job_id`, `total_duration_hours` (int) |
+| `enterprise.offboarding_step_failed` | **HIGH** | 7 yr | Worker step throws unrecoverable error; job → `failed` state | `tenant_id`, `offboarding_job_id`, `failed_step` (string — Worker function name), `error_class` (string ≤ 64), `recovery_action` (`retry`\|`manual_intervention_required`) |
+
+**Severity rationale.** `enterprise.data_export_started`, `enterprise.data_export_completed`, and `enterprise.offboarding_completed` are STANDARD — package generation is reversible and attestation issuance is the irreversible milestone. All others are HIGH — access revocation, deletion, pseudonymization, and attestation events are irreversible or legally consequential operations.
+
+---
+
+**`enterprise.data_export_completed` — DEC-061 Payload Extension (EU-region routing)**
+
+DEC-061 (2026-06-15) adds four fields to the existing `enterprise.data_export_completed` event. These fields provide chain-level evidence that EU packages were routed to the EU bucket without requiring a Postgres query:
+
+```typescript
+// Extends enterprise.data_export_completed (DATA_MODEL.md §36.6)
+// Zod v2 schema — canonical source: DATA_MODEL.md §36.6
+// (update DATA_MODEL.md first on any schema change)
+
+const DataRegion = z.enum(['us-east-1', 'eu-central-1', 'eu-west-1']);
+type DataRegion = z.infer<typeof DataRegion>;
+
+const DataExportCompletedSchema = z.object({
+  // Existing fields (unchanged):
+  tenant_id:           z.string().min(1).max(128),
+  offboarding_job_id:  z.string().uuid(),
+  package_type:        z.enum([
+    'aggregate_adoption_report',
+    'audit_log_export',
+    'contract_documents',
+    'scim_provisioning_summary',
+  ]),
+  package_id:          z.string().uuid(),
+  sha256_manifest:     z.string().regex(/^[0-9a-f]{64}$/),
+  delivered_to_email:  z.string().email().nullable(),   // null if role-address unknown at delivery time
+
+  // Added in DEC-061 — EU-region routing evidence:
+  data_region:         DataRegion,
+  r2_bucket:           z.enum([
+                         'form-offboarding-exports',
+                         'form-offboarding-exports-eu',
+                       ]),
+  is_eu_region:        z.boolean(),
+  package_size_bytes:  z.number().int().nonnegative(),
+});
+```
+
+**OFB-REGION-01 chain invariant:** For any `enterprise.data_export_completed` event where `is_eu_region = true`, `r2_bucket` MUST equal `'form-offboarding-exports-eu'`. The `emit-audit-event` Worker's payload validator enforces this at emission time:
+- Violation → HTTP 422 (event rejected)
+- Violation → P1 PagerDuty to `form-platform` + `form-compliance`
+- Violation → chain-integrity incident (investigate per `docs/INCIDENT_RESPONSE.md R-05`)
+
+---
+
+**Zod schemas for key events:**
+
+```typescript
+// enterprise.offboarding_initiated
+const OffboardingInitiatedSchema = z.object({
+  tenant_id:           z.string().min(1).max(128),
+  offboarding_job_id:  z.string().uuid(),
+  trigger_type:        z.enum([
+                         'contract_expired_no_renewal',
+                         'early_termination',
+                         'pilot_lapsed',
+                       ]),
+  contract_id:         z.string().uuid().optional(),
+  pilot_id:            z.string().uuid().optional(),
+}).refine(d => d.contract_id != null || d.pilot_id != null, {
+  message: 'Either contract_id or pilot_id is required',
+});
+
+// enterprise.sso_scim_revoked
+const SsoScimRevokedSchema = z.object({
+  tenant_id:                   z.string().min(1).max(128),
+  offboarding_job_id:          z.string().uuid(),
+  sessions_nuked:              z.boolean(),
+  sso_config_count:            z.number().int().nonnegative(),
+  scim_tokens_revoked_count:   z.number().int().nonnegative(),
+});
+
+// enterprise.data_deletion_started
+const DataDeletionStartedSchema = z.object({
+  tenant_id:           z.string().min(1).max(128),
+  offboarding_job_id:  z.string().uuid(),
+  authorised_by:       z.tuple([z.string().uuid(), z.string().uuid()]),
+  art9_tables:         z.array(z.string().min(1)).min(1),
+});
+
+// enterprise.deletion_attestation_issued
+const DeletionAttestationIssuedSchema = z.object({
+  tenant_id:            z.string().min(1).max(128),
+  offboarding_job_id:   z.string().uuid(),
+  attestation_id:       z.string().uuid(),
+  signing_key_version:  z.string().min(1).max(64),
+  issued_to_email:      z.string().email(),
+});
+```
+
+**Emitter assignments:** All twelve events are emitted by `form_system` (automated off-boarding Workers) running within the same database transaction as the state-transition UPDATE on `tenant_offboarding_jobs`. The sole exception: `enterprise.offboarding_on_hold` and `enterprise.offboarding_hold_released` are emitted by a compliance officer or security engineer via the Admin Console (PAM session required). `enterprise.offboarding_completed` requires a compliance-officer action in the Admin Console to advance from `attestation_issued`; the event is emitted atomically with that status update.
+
+**`form_api` access:** REVOKED from `tenant_offboarding_jobs`, `tenant_data_egress_packages`, and `tenant_deletion_attestations`. `tenant_admin`/`tenant_owner` may SELECT their own job status and packages (read-only, application layer excludes sensitive fields such as `authorised_by_1/2`, `r2_object_key`, and per-table deletion counts). `compliance_reviewer` SELECT all rows (audit and SOC 2 evidence collection). `form_system` full write.
+
+---
+
+**SOC 2 evidence artefacts:**
+
+| Artefact | SOC 2 criterion | Source | Collection cadence | Retention |
+|---|---|---|---|---|
+| **OFB-E-001** | C1.2 — Confidential disposal | `SELECT * FROM tenant_deletion_attestations WHERE tenant_id = $1`; `signature` verified against `/.well-known/offboarding-signing-key.pub` | Per churned tenant at attestation issuance | 7 yr |
+| **OFB-E-002** | P8.0 — Privacy-in-disposal | Export of `enterprise.data_deletion_completed` + `enterprise.financial_pseudonymized` chain events; `retention_basis` + `legal_reference` fields confirm Art. 17(3)(b) basis for pseudonymized financial records | Per churned tenant / observation period | 7 yr |
+| **OFB-E-003** | CC6.3 — Timely logical access removal | Export of `enterprise.sso_scim_revoked` chain events + `tenant_offboarding_jobs.access_revoked_at`; demonstrates revocation within off-boarding SLA window | Per churned tenant / observation period | 7 yr |
+| **OFB-E-004** | CC9.1 — Business continuity at contract end | `SELECT trigger_type, status, COUNT(*) FROM tenant_offboarding_jobs WHERE created_at BETWEEN $obs_start AND $obs_end GROUP BY 1, 2`; confirms no job stuck in non-terminal state without recorded `on_hold` reason | Observation-period end | 7 yr |
+| **OFB-E-005** | C1.1, P4.0, CC6.1 — EU data residency | Quarterly export of `enterprise.data_export_completed` chain events where `is_eu_region = true`; confirms `r2_bucket = 'form-offboarding-exports-eu'`; zero-event quarters filed as affirmative OFB-REGION-01 attestation; `compliance/evidence/ofb/OFB-E-005_<YYYY-QN>.csv` | Quarterly | 7 yr |
+| **OFB-E-006** | C1.1, CC6.1 — EU jurisdiction configuration | Annual Cloudflare R2 console screenshot of `form-offboarding-exports-eu` confirming EU jurisdiction; IAM policy export confirming `form-api` NO ACCESS; `compliance/evidence/ofb/OFB-E-006_<YYYY>.md` | Annual | 7 yr |
+
+**SQL for OFB-E-005 collection (`compliance_reviewer` role):**
+
+```sql
+-- OFB-E-005: EU egress packages — DEC-030 chain evidence for OFB-REGION-01
+SELECT
+  event_id,
+  created_at,
+  payload->>'tenant_id'            AS tenant_id,
+  payload->>'offboarding_job_id'   AS offboarding_job_id,
+  payload->>'package_type'         AS package_type,
+  payload->>'package_id'           AS package_id,
+  payload->>'data_region'          AS data_region,
+  payload->>'r2_bucket'            AS r2_bucket,
+  (payload->>'is_eu_region')::bool AS is_eu_region,
+  payload->>'package_size_bytes'   AS package_size_bytes
+FROM audit_log_events
+WHERE event_type = 'enterprise.data_export_completed'
+  AND (payload->>'is_eu_region')::bool = true
+  AND created_at >= date_trunc('quarter', now()) - INTERVAL '1 quarter'
+  AND created_at <  date_trunc('quarter', now())
+ORDER BY created_at;
+-- PASS: every row has r2_bucket = 'form-offboarding-exports-eu'.
+-- FAIL: any row with a different r2_bucket → escalate to R-05 + P1 PagerDuty.
+```
+
+---
+
 ## Export & delivery
 
 Enterprise tenants can:
@@ -2118,6 +2278,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.11 · 2026-06-15 · owner: compliance-officer + enterprise-architect + platform-engineer**
+*v2.11 (2026-06-15): +12 Enterprise Tenant Offboarding & Data Egress events — closes `docs/DATA_MODEL.md §25.13` checklist item 9 (P0, M4 — register all 8+ `enterprise.offboarding_*` DEC-030 event types) and `docs/DATA_MODEL.md §36.9` checklist item 5 (P0, M8 — extend `enterprise.data_export_completed` payload spec with DEC-061 EU-routing fields). New section `### Enterprise Tenant Offboarding & Data Egress events (DEC-030 HMAC-chained · DATA_MODEL §25 + DEC-061 · C1.2/P8.0/CC6.3/CC9.1)` inserted before `## Export & delivery`. Twelve events registered: (1) `enterprise.offboarding_initiated` (HIGH, 7yr — `trigger_type` enum: contract_expired_no_renewal/early_termination/pilot_lapsed; `contract_id` or `pilot_id` required); (2) `enterprise.offboarding_on_hold` (HIGH, 7yr — legal hold; `hold_reason` ≤ 256 chars; PAM session); (3) `enterprise.offboarding_hold_released` (HIGH, 7yr — `hold_duration_hours`; PAM session); (4) `enterprise.sso_scim_revoked` (HIGH, 7yr — `sessions_nuked` bool; `sso_config_count`; `scim_tokens_revoked_count`); (5) `enterprise.data_export_started` (STANDARD, 7yr — `package_types` array); (6) `enterprise.data_export_completed` (STANDARD, 7yr — **DEC-061 extension**: `data_region` (`us-east-1`\|`eu-central-1`\|`eu-west-1`), `r2_bucket` (`form-offboarding-exports`\|`form-offboarding-exports-eu`), `is_eu_region` bool, `package_size_bytes` int; OFB-REGION-01 chain invariant: EU `is_eu_region=true` → `r2_bucket` must be EU bucket; HTTP 422 + P1 PagerDuty on violation → R-05); (7) `enterprise.data_deletion_started` (HIGH, 7yr — `authorised_by` two-element tuple; two-person gate); (8) `enterprise.data_deletion_completed` (HIGH, 7yr — `users_anonymized_count`, `art9_rows_deleted_count`, `standard_rows_deleted_count`); (9) `enterprise.financial_pseudonymized` (HIGH, 7yr — `retention_basis: literal("Art17(3)(b)")`; `legal_reference`); (10) `enterprise.deletion_attestation_issued` (HIGH, 7yr — `attestation_id`, `signing_key_version`, `issued_to_email`); (11) `enterprise.offboarding_completed` (STANDARD, 7yr — terminal state; compliance-officer Admin Console action); (12) `enterprise.offboarding_step_failed` (HIGH, 7yr — `failed_step`, `error_class`, `recovery_action` enum). Five Zod v2 schemas provided (canonical source: DATA_MODEL.md §25.9 and §36.6 — update DATA_MODEL.md first on any schema change). Six SOC 2 evidence artefacts: OFB-E-001 (C1.2 — `tenant_deletion_attestations` query + signature verification), OFB-E-002 (P8.0 — `data_deletion_completed` + `financial_pseudonymized` chain export), OFB-E-003 (CC6.3 — `sso_scim_revoked` + `access_revoked_at` cross-reference), OFB-E-004 (CC9.1 — distribution query on `tenant_offboarding_jobs`), OFB-E-005 (C1.1/P4.0/CC6.1 — quarterly EU `data_export_completed` chain export; OFB-REGION-01 verification; `compliance/evidence/ofb/OFB-E-005_<YYYY-QN>.csv`; zero-event quarters are affirmative attestation; SQL provided), OFB-E-006 (C1.1/CC6.1 — annual R2 EU jurisdiction screenshot + IAM export; `compliance/evidence/ofb/OFB-E-006_<YYYY>.md`). Retention table: +2 rows (all 12 events split by severity class — HIGH/STANDARD distinction noted, all 7yr because off-boarding events are part of the HMAC chain that must outlive OFB-E-001–006 evidence collection). `form_api` REVOKED from all three off-boarding tables. `compliance_reviewer` SELECT all. Two-person authorisation gate documented: `enterprise.data_deletion_started` `authorised_by` must contain two distinct FORM engineer UUIDs — no automated path bypasses this gate. Cross-ref: `docs/DATA_MODEL.md §25` (canonical event definitions), `docs/DATA_MODEL.md §36.6` (DEC-061 payload extension — canonical Zod schema), `docs/DATA_MODEL.md §36.7` (OFB-E-005/006 evidence definitions), `docs/DATA_MODEL.md §25.12` (OFB-E-001–004 evidence definitions), `docs/DATA_MODEL.md §25.13` item 9 (🟢 closed by this patch), `docs/DATA_MODEL.md §36.9` item 5 (🟢 closed by this patch), `docs/SSO_SCIM_IMPLEMENTATION.md §22` (`nukeTenantSessions()` — `enterprise.sso_scim_revoked` companion action), `docs/INCIDENT_RESPONSE.md R-05` (OFB-REGION-01 violation and any chain break), `docs/INCIDENT_RESPONSE.md R-25` (Art. 9 off-boarding GDPR-SLO-03 overdue — companion runbook to `enterprise.data_deletion_completed`), `docs/SOC2_READINESS.md §C1.2` (disposal criteria — OFB-E-001 primary evidence), `docs/SOC2_READINESS.md §P8.0` (privacy in disposal — OFB-E-002), `docs/SOC2_READINESS.md §CC6.3` (access removal — OFB-E-003), `docs/SOC2_READINESS.md §CC9.1` (third-party risk at contract end — OFB-E-004), `docs/DECISION_LOG.md DEC-061` (EU-region R2 routing decision — OFB-REGION-01 origin). Privacy floor (all 12 events): no individual employee `user_id`, name, email, or health values; `delivered_to_email` is employer administrative contact (organisation address, not GDPR Art. 4(1) personal data; must be nulled after 2yr if named individual's work address used); `authorised_by` contains FORM-internal engineer UUIDs, not tenant employee identifiers; aggregate counts only in deletion events; `form_api` REVOKED. Owner: compliance-officer + enterprise-architect + platform-engineer.*
 
 **v2.10 · 2026-06-15 · owner: compliance-officer + security-engineer + platform-engineer**
 *v2.10 (2026-06-15): +2 `sso.mobile_*` Mobile SSO Browser Mode events — closes SSO_SCIM_IMPLEMENTATION.md §30.13 checklist item 4 (P0, M8 — register both DEC-030 events before first enterprise mobile SSO tenant goes live). New section `### Mobile SSO Browser Mode events (DEC-030 HMAC-chained · SSO §30 · SOC 2 CC6.1/CC6.2/CC8.1)` inserted after `### SSO authentication policy events`. (1) `sso.mobile_browser_mode_set` (STANDARD, 7yr): emitted by API Workers middleware (`form_system`) when tenant enables or disables mobile SSO via `PATCH /enterprise/sso/mobile-mode`; payload: `tenant_id`, `mobile_sso_enabled` (bool), `callback_scheme` (3-value enum: universal_link/app_link/custom_scheme), `idp_type` (9-value enum matching `tenant_sso_configs.idp_type`), `sso_protocol` (saml/oidc), `changed_by_user_id` (tenant_admin or tenant_owner UUID — not the end-user); no employee PII, no health data. (2) `sso.mobile_webview_blocked` (HIGH, 7yr): emitted by React Native runtime guard in `apps/mobile/src/auth/sso-browser.ts` (`form_system`) if any code path attempts a WebView open matching an SSO endpoint pattern; payload: `tenant_id`, `attempted_url_hash` (SHA-256[:32] of IdP auth URL — plaintext never stored), `source_module` (string ≤ 100 chars), `blocked_at` (ISO 8601); **zero-fire expected in production — any emission triggers AL-SSO-WEB-01 (P1, PagerDuty `form-security`, `docs/OBSERVABILITY.md §26.8`) and constitutes a security incident**. MOBILE-CHAIN-01 ordering invariant: `sso.mobile_webview_blocked` must follow `sso.mobile_browser_mode_set` with `mobile_sso_enabled: true` for the same `tenant_id`; inversion → R-05 (HMAC chain integrity, `docs/INCIDENT_RESPONSE.md R-05`). Retention table: +2 rows (`sso.mobile_browser_mode_set` 7yr CC6.1/CC6.2; `sso.mobile_webview_blocked` 7yr CC6.1/CC6.2/CC8.1). SOC 2 evidence: SSO-WEB-E-001 (CC6.1/CC6.2 — annual `sso.mobile_browser_mode_set` chain export for all mobile SSO tenants; auditor proof that system-browser mandate was active throughout the observation period; 7yr; `compliance/evidence/sso/SSO-WEB-E-001_<YYYY>.csv`); SSO-WEB-E-002 remains defined in `docs/SSO_SCIM_IMPLEMENTATION.md §30.11` (CC6.2 + CC8.1 — AASA/assetlinks.json snapshots + CI test log + AL-SSO-WEB-01 zero-fire PagerDuty attestation; 3yr). Zod v2 schemas for both events provided in-line (canonical source: `docs/SSO_SCIM_IMPLEMENTATION.md §30.9` — update SSO_SCIM first on any schema change). Privacy floor (both events): no employee `user_id`, name, email, or health data; `attempted_url_hash` is SHA-256[:32] — plaintext URL never stored; HR (`tenant_manager`) has no access to `tenant_sso_configs` or mobile SSO configuration; `form_api` REVOKED. Cross-ref: `docs/SSO_SCIM_IMPLEMENTATION.md §30.9` (canonical Zod schemas + MOBILE-CHAIN-01); `docs/SSO_SCIM_IMPLEMENTATION.md §30.10` (AL-SSO-WEB-01 alert spec + triage tree); `docs/OBSERVABILITY.md §26.8` (AL-SSO-WEB-01 registered as `sso_browser_security` subsection — v4.2, 2026-06-15); `docs/INCIDENT_RESPONSE.md R-05` (chain violation response); `docs/INCIDENT_RESPONSE.md R-08` (supply-chain attack vector if AL-SSO-WEB-01 fires via SDK injection); `docs/DECISION_LOG.md DEC-059` (Mobile SSO system-browser mandate). Owner: compliance-officer + security-engineer + platform-engineer.*
