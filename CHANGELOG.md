@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [5.46.0] — 2026-06-15
+
+### Added
+- `content/post-991-training-partner-vs-solo.md` — Block 951–1000 post 41/50. Партнер по тренуванню vs. самостійне тренування. Barbalho et al. (2017) — систематично нижче навантаження без страхувальника. Carron et al. (2004) coactive effect і його змінність. Операційні витрати партнерства (розклад, темп). Технічні рішення для безпеки без партнера (стійки з безпеками, відео). clinical-safety: PASS. sports-scientist review pending.
+- `content/post-992-training-jet-lag-travel.md` — Block 951–1000 post 42/50. Тренування при міжнародних перельотах і джетлагу. SCN-десинхронізація, темпи адаптації (1 год/добу захід vs. 0.5 год/добу схід). Wright et al. (2002) і Drust et al. (2005) — циркадний пік о 16–19 год. Herxheimer & Petrie Cochrane (2002) — мелатонін 0.5–3 мг. Покроковий протокол від вильоту до 4-го дня. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-993-overreaching-vs-underrecovery.md` — Block 951–1000 post 43/50. Перетренованість vs. недовідновлення. FOR/NFOR/OTS таксономія (Kreher & Schwartz 2012, Meeusen et al. 2013 ECSS/ACSM консенсус). Об'єктивні маркери: HRV (Plews et al. 2013), силовий тренд, POMS/DALDA. Алгоритм реакції за тривалістю симптомів. clinical-safety: CONDITIONAL PASS — guard rail: стійка втома і зміни настрою 2+ тижні потребують медичної консультації. sports-scientist review pending.
+- `content/post-994-training-without-gym-access.md` — Block 951–1000 post 44/50. Тренування без доступу до спортзалу. Mujika & Padilla (2000) — темпи детренування. Egner et al. (2013, FASEB) — м'язова пам'ять. Ефективні вправи без обладнання. Мінімальне обладнання (турнік → гиря → стрічки). clinical-safety: PASS. sports-scientist review pending.
+- `content/post-995-inconsistent-schedule-programming.md` — Block 951–1000 post 45/50. Прогрес при непостійному доступі. Ralston et al. (2017) і Schoenfeld et al. (2017) — частотний мета-аналіз і мінімальна доза. Full body як надійніший режим. Блочне мислення (10 тренувань, не 10 тижнів). RPE-авторегуляція. clinical-safety: PASS. sports-scientist review pending.
+
+### Changed
+- `blog.html` — картки додано для постів 986–995 (10 карток).
+- `VERSION` — bump 5.45.0 → 5.46.0.
+- `STATUS.md` — Block 951–1000 count 39 → 44/50; Total posts 980 → 985; next priorities updated.
+
+---
+
 ## [5.45.0] — 2026-06-15
 
 ### Added
