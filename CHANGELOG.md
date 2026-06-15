@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.11.2] — 2026-06-15
+
+### Changed
+
+- `docs/OBSERVABILITY.md` — v4.1 → v4.2. Three cross-reference patches completing obligations from §30 (SSO_SCIM v2.2, 2026-06-14) and §44 (DEC-056/057, v4.1, 2026-06-14). **§26.8 `sso_browser_security` subsection added** — registers AL-SSO-WEB-01 (P1, PagerDuty `form-security`) for `sso.mobile_webview_blocked` DEC-030 HIGH events in the §6.2 condensed alert table; closes `docs/SSO_SCIM_IMPLEMENTATION.md §30.13` checklist item 6 (P0/M8); privacy floor: `attempted_url_hash` SHA-256[:32] only in payload — no plaintext IdP URL, no `user_id`, no health data; zero-fire is the expected production state. **§27.7 AL-SIEM-06 dual-phase patch** — replaces single P1 row with graduated-activation spec per §44.2.4 (DEC-056): shadow-mode row (P3 Slack `#devops-alerts`, 30-day calibration window, next-business-day SLA) + full-mode row (P1 PagerDuty HIGH `form-devops`, < 30 min SLA) + AL-SIEM-06-SHADOW-END informational row (transition trigger: `auth_event_avg_per_30min > 5` OR 30 calendar days; emits `system.siem_alert_activated` STANDARD 3yr DEC-030 event; files CALIB-E-001 SOC 2 CC4.1 artefact); closes §44.6 checklist item 5 (P0/M5). **§43.15 checklist item 1 marked `[x]`** — `docs/AUDIT_LOG_SCHEMA.md §Integration` confirmed updated (CHANGELOG v5.10.1): all six webhook DEC-030 events registered (`integration.webhook_delivery_failed`, `integration.webhook_suspended`, `integration.webhook_reactivated` NEW; plus `endpoint_url_hash` payload extension on `webhook_created`, `webhook_deleted`, `webhook_fired` per DEC-054; WH-CHAIN-01 ordering invariant documented).
+- `VERSION` — 5.11.1 → 5.11.2.
+
+---
+
 ## [5.11.1] — 2026-06-15
 
 ### Added
