@@ -41,7 +41,7 @@
 | Document | Status | Last updated |
 |---|---|---|
 | SOC2_READINESS.md | Complete — 25 674 lines | v4.x |
-| SSO_SCIM_IMPLEMENTATION.md | Complete — 9 283 lines | v4.x |
+| SSO_SCIM_IMPLEMENTATION.md | Complete — §31 added (OQ-SSO-24.1+24.2 resolved DEC-060, pam-db-proxy architecture) · v2.3 | v5.13.1 |
 | INCIDENT_RESPONSE.md | Complete — 9 575 lines | v4.x |
 | DATA_MODEL.md | Complete — 12 618 lines | v4.x |
 | OBSERVABILITY.md | Complete — v4.0, §43 Webhook Delivery Observability added (WH-SLO-01–04, AL-WH-01–05, DDL 0074/0074b, pg_cron job 34) · OQ-WL-OBS-01 resolved DEC-054 | v5.1.1 |
@@ -54,6 +54,7 @@
 
 | ID | Summary | Status |
 |---|---|---|
+| DEC-060 | OQ-SSO-24.1+24.2: pam-db-proxy — Supabase Edge Function + port 5432 direct session connection | Closed |
 | DEC-054 | OQ-WL-OBS-01: `custom_domain_hash` SHA-256 for white_label DEC-030 payloads | Closed |
 | DEC-051 | OQ-SSO-28.2: tenant_users_role_history retention 7yr | Closed |
 | DEC-050 | OQ-TURH-01+02: form_role_enum & role_change_source_enum ENUM types | Closed |
