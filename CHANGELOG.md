@@ -1,5 +1,27 @@
 # Changelog · FORM
 
+## [5.14.0] — 2026-06-15
+
+### Added
+
+- `content/post-841-electrolytes-performance-science.md` — Block 801–850 batch 5/5, post 1/10. Електроліти і спортивна продуктивність: натрій/калій/магній/кальцій втрати при навантаженні, debunk cramping-electrolyte myth (Schwellnus et al., Miller et al. neurogenic theory), гіпонатріємія ризик (Noakes 2012), когда ізотоніки потрібні vs. marketing. clinical-safety: PASS.
+- `content/post-842-nitrate-beetroot-performance.md` — Нітрати і буряковий сік: нітрат→нітрит→NO механізм (Larsen 2007, Lansley 2011), Bailey et al. 2009/2010 landmark, Senefeld 2020 meta-analysis (80 RCT, SMD=0.33), 3–7% O₂ cost reduction, де ефект найсильніший (нетреновані, субмаксимальні навантаження < 30 хв), 5–9 ммоль NO₃⁻ дозування, guard rail: взаємодія з нітрогліцерином/PDE5-інгібіторами. clinical-safety: PASS.
+- `content/post-843-sodium-bicarbonate-buffering.md` — Бікарбонат натрію: H⁺ буферизація і механізм втоми, Carr 2011 meta-analysis (29 досліджень, ES=0.44), 0.2–0.3 г/кг дозування, навантаження 1–7 хв і повторні спринти як основна ніша, ШКТ-дискомфорт та протоколи мінімізації, бета-аланін синергія (Hobson 2013). clinical-safety: PASS.
+- `content/post-844-adaptogen-comparison.md` — Порівняльна таблиця адаптогенів: ашваганда/родіола/женьшень/елеутерокок — активні компоненти, доказовий рейтинг, стандартизація. Ашваганда KSM-66/Sensoril як найбільш доказово підтверджений. clinical-safety: PASS.
+- `content/post-845-rhodiola-rosea-evidence.md` — Родіола рожева: розавін/сарозидин стандартизація SHR-5, Darbinyan 2000 і Shevtsov 2003 розумова втома, De Bock 2004 гострий прийом, RPE як найбільш послідовний фізичний ефект, порівняння з ашвагандою. clinical-safety: CONDITIONAL PASS — guard rail: SSRI/SNRI/MAOI взаємодії, ризик серотонінового синдрому.
+- `content/post-846-tart-cherry-recovery.md` — Терпкий вишневий сік: Montmorency антоціани/кверцетин/мелатонін, Connolly 2006 (DOMS -40% сила втрата), Howatson 2010 (марафонці, ↓CRP/IL-6), Howatson 2012 (сон +34 хв), антиоксидантний парадокс discussion, протокол за 4–7 днів до важкого навантаження. clinical-safety: PASS.
+- `content/post-847-glutathione-athletes.md` — Глутатіон і тренування: Ristow 2009 (антиоксиданти блокують адаптацію), ROS як редокс-сигнали (PGC-1α, Nrf2, MAPK), низька оральна біодоступність нативного GSH, як підвищити GSH природно. clinical-safety: PASS.
+- `content/post-848-nac-athletes.md` — N-ацетилцистеїн (NAC): Merry 2010 (NAC блокує мітохондріальну адаптацію), Michailidis 2013 (↓p38 MAPK), парентеральний vs. оральний NAC розрив, коли NAC виправданий (змагальний пік, хвороба), коли контрпродуктивний (тренувальний блок). clinical-safety: CONDITIONAL PASS — guard rail: нітрогліцерин взаємодія, антиоксидантний парадокс для здорових атлетів.
+- `content/post-849-phosphatidylserine-athletes.md` — Фосфатидилсерин: HPA-вісь механізм, Monteleone 1990/1992 (↓АКТГ/кортизол при фізстресі), Fahey&Pearl 1998 (↓20% кортизол після тренування), Starks 2008, соєвий vs. бичачий ФС, 400–800 мг дозування, порівняння з ашвагандою для кортизол-зниження. clinical-safety: PASS.
+- `content/post-850-cordyceps-performance.md` — Кордицепс і аеробна продуктивність: C. sinensis vs. C. militaris практична різниця (ціна, доступність, кордицепін), Hirsch 2017 (VO₂max +7%), Brown 2019 (C. militaris 4 г/добу), Zheng 2021 meta-analysis (8 RCT, I²=73%), AMPK/PGC-1α механізм, стандартизація і якість ринку, block synthesis. clinical-safety: PASS.
+
+### Changed
+
+- `STATUS.md` — Block 801–850 row: 40/50 → **BLOCK COMPLETE** 50/50; total posts 838 → 848; next priorities updated; version header v5.11.1 → v5.14.0.
+- `VERSION` — 5.13.1 → 5.14.0.
+
+---
+
 ## [5.13.1] — 2026-06-15
 
 ### Added

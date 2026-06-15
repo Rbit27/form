@@ -1,4 +1,4 @@
-# FORM · Project Status v5.11.1
+# FORM · Project Status v5.14.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.11.1** — 2026-06-15
+**v5.14.0** — 2026-06-15
 
 ---
 
@@ -28,9 +28,9 @@
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
 | 751–800 | Athlete lifecycle & context | 50 | **BLOCK COMPLETE** — all 50 posts written v5.1.0: posts 791 (athletes with movement limitations · clinical-safety CONDITIONAL PASS), 793 (sustained high stress training · clinical-safety CONDITIONAL PASS), 794 (medically-restricted diet · clinical-safety CONDITIONAL PASS) now written with embedded guard rails. Blog cards added for posts 785–800. sports-scientist review required for all 50 before publish |
-| 801–850 | Evidence-based deep dives | 40 | **40/50 written · Batch 831–840 COMPLETE v5.12.0** — posts 801–810: creatine, protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, myofibrillar vs. sarcoplasmic, steroids/research interpretation, genetic ceiling, fat as endocrine organ. Posts 811–820: sleep & performance, deload science, training age, volume landmarks (MEV/MAV/MRV), inter-set rest, rate of force development, concurrent training interference, heat/cold exposure, altitude training, evidence-based stretching. Posts 821–830 (v5.8.0): protein timing, creatine loading revisited, beta-alanine, citrulline/nitrates, magnesium, omega-3 + training, Vitamin D + athletes, ashwagandha (CONDITIONAL PASS), sleep supplements melatonin/glycine (CONDITIONAL PASS), CBD & recovery (CONDITIONAL PASS). Post 831 (v5.8.1): antioxidants & ROS-sигналізація. Post 832 (v5.9.0): HMB conflict-of-interest analysis. Post 833 (v5.9.0): caffeine tolerance/cycling. Post 834 (v5.10.0): glutamine evidence. Post 835 (v5.11.0): ZMA Brilla&Conte 2000 conflict-of-interest. Post 836 (v5.11.0): collagen peptides (CONDITIONAL PASS). **Post 837 (v5.12.0):** BCAA vs EAA — Churchward-Venne 2014 mTORC1 substrate problem, Wolfe 2017 contextual analysis, Moberg 2016, Davies 2023 EAA meta-analysis; practical algorithm (≥1.6 g/kg protein → no benefit; specific scenarios: fasted training, vegan diet, prolonged aerobic work); clinical-safety: PASS. **Post 838 (v5.12.0):** Iron deficiency without anemia (IDNA) — ferritin as key marker distinct from Hb, IDNA prevalence 20–52% in female athletes, mitochondrial complex I/IV iron dependence, myoglobin synthesis, dopamine synthesis cofactor; TIBC/transferrin saturation screening protocol; heme vs non-heme iron bioavailability; inhibitors (calcium, phytates, tannins); clinical-safety: CONDITIONAL PASS (embedded guard rails: consult doctor before supplementing, iron toxicity/hemochromatosis risk). **Post 839 (v5.12.0):** Zinc+testosterone — Prasad 1996 (deficiency → repletion doubles T; not a booster), Ananda replication (no effect in replete athletes), ZMA independent nulls (King 2003, Wilborn 2004), SOD antioxidant role, immune function data; practical algorithm (animal protein adequate → low risk; plant-dominant → check status); clinical-safety: PASS. **Post 840 (v5.12.0):** Berberine+glucose — AMPK/GLUT4 mechanism, Zhang 2008 (T2D, metformin-comparable), Liang 2019 meta-analysis (27 RCT, n=2569, significant for T2D/IGF); no RCT in healthy trained athletes; AMPK↑ vs. mTORC1 conflict for strength athletes; CYP3A4/CYP2C9 inhibitor — warfarin, metformin, cyclosporin interactions; clinical-safety: CONDITIONAL PASS (guard rails: consult doctor if on any medications; does not replace medical therapy). **Next batch (841–850):** electrolyte performance science, nitrate/beetroot, sodium bicarbonate buffering, adaptogen comparison, rhodiola rosea, tart cherry, glutathione, NAC, phosphatidylserine, cordyceps. All sports-scientist review required before publish. |
+| 801–850 | Evidence-based deep dives | 50 | **BLOCK COMPLETE v5.14.0** — all 50 posts written. Posts 801–840 (prev batches). **Batch 841–850 COMPLETE v5.14.0:** post-841 electrolytes performance science (PASS), post-842 nitrate/beetroot (PASS — guard rail: drug interactions with nitroglycerin), post-843 sodium bicarbonate buffering (PASS), post-844 adaptogen comparison (PASS), post-845 rhodiola rosea (CONDITIONAL PASS — guard rail: SSRI/SNRI/MAOI interactions, serotonin syndrome risk), post-846 tart cherry/recovery (PASS), post-847 glutathione/antioxidant paradox (PASS), post-848 NAC (CONDITIONAL PASS — guard rail: nitroglycerin interaction + antioxidant paradox for trained athletes), post-849 phosphatidylserine/cortisol (PASS), post-850 cordyceps/C.militaris (PASS — block synthesis). All sports-scientist review required before publish. |
 
-**Total posts: 838**
+**Total posts: 848**
 
 **Editorial series 11–32** — post-32 written v5.13.0: «Як читати наукову статтю про тренування і не зробити неправильних висновків» — ієрархія доказів (RCT vs observational vs мета-аналіз), population bias (нетреновані студенти vs тренований атлет), p-value vs effect size (Cohen's d), суррогатні маркери vs прямі результати, publication bias і відтворюваність, практичний фільтр-таблиця; clinical-safety: PASS. Blog card added. Proposed next: posts 33–35 (self-programming vs coach, dropout mechanics, breathing mechanics Valsalva/IAP). Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
 
@@ -99,7 +99,7 @@
 ## Next priorities
 
 - **Block 751–800: COMPLETE** — all 50/50 posts written; posts 791, 793, 794 clinical-safety CONDITIONAL PASS (guard rails embedded); sports-scientist review required for all 50 before publish
-- **Block 801–850 ACTIVE** — Evidence-based deep dives: 40/50 written. Batches 1–4 (801–840) COMPLETE. **Batch 4 (831–840) COMPLETE v5.12.0:** antioxidants/ROS paradox, HMB conflict-of-interest, caffeine cycling, glutamine, ZMA, collagen peptides (CONDITIONAL PASS), BCAA/EAA, iron deficiency without anemia (CONDITIONAL PASS), zinc/testosterone, berberine/glucose (CONDITIONAL PASS). **Next batch (841–850):** electrolyte performance science, nitrate/beetroot, sodium bicarbonate buffering, adaptogen comparison, rhodiola rosea, tart cherry, glutathione, NAC, phosphatidylserine, cordyceps
+- **Block 801–850: COMPLETE v5.14.0** — all 50/50 written. Batch 841–850 complete: electrolytes, nitrate/beetroot, sodium bicarb, adaptogen comparison, rhodiola (CONDITIONAL PASS), tart cherry, glutathione, NAC (CONDITIONAL PASS), phosphatidylserine, cordyceps. Sports-scientist review required for all 50 before publish
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
@@ -111,4 +111,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v5.3.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v5.14.0**
