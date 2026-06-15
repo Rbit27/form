@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.20.0] — 2026-06-15
+
+### Added
+
+- `content/post-866-compound-vs-isolation.md` — Block 851–900 post 16/20. Ізоляція vs. базові вправи: практичний баланс. Ієрархія вправ у сесії, розподіл 60/40 гіпертрофія vs. 80/20 сила, де ізоляція незамінна (задня дельта, медіальна голівка трицепса, ротаторна манжета). clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-867-failed-set-protocol.md` — Block 851–900 post 17/20. Провалений підхід: протокол дій. Три типи провалу (технічний розпад, репетиційний дефіцит, силовий відказ), покроковий протокол реакції, діагностика системних причин. Провал як інформація, а не катастрофа. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-868-amrap-as-diagnostic.md` — Block 851–900 post 18/20. AMRAP як діагностика прогресу. e1RM через формулу Epley і Brzycki, стандартизовані умови тестування, два способи застосування в циклі, тренд за кількома блоками. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-869-supersets-myo-reps.md` — Block 851–900 post 19/20. Суперсети і myo-reps: механіка і показання. Агоніст-антагоніст суперсети (-30–40% часу без компромісу якості), NC суперсети, pre-exhaustion (спірна ефективність). Myo-reps: активаційний сет + 4–5 мінікластерів з 20–30 с паузами. Показання і обмеження. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-870-block-review-protocol.md` — Block 851–900 post 20/20. Підбиття підсумків тренувального блоку: протокол після деліту. AMRAP-тест для порівняння e1RM, контрольні питання, дерево рішень для наступного циклу, шаблон 15-хвилинного огляду. clinical-safety: PASS. review_pending: sports-scientist.
+
+### Changed
+
+- `blog.html` — картки додані для постів 835–870 (36 карток); blog.html наздогнано з content/ directory; останній пост у grid: post-870.
+- `STATUS.md` — Block 851–900: COMPLETE 20/20; blog.html caught up to post-870 (v5.20.0).
+
 ## [5.19.0] — 2026-06-15
 
 ### Added
