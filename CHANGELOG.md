@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.38.1] — 2026-06-15
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.9.1: OFB-E-005 + OFB-E-006 registered in §67.8 evidence table (EU off-boarding egress artefacts, DEC-061); CC6.1/C1.1 EU data residency row added to §67.9 criteria mapping; header corrected v3.8.3 → v3.9.1 (v3.9.0 was §83 SIEM calibration, header inadvertently not bumped at that time). Closes DATA_MODEL §36.9 P1/M11 checklist item.
+- `docs/INCIDENT_RESPONSE.md` — v2.7: R-05 trigger extended with OFB-REGION-01 chain invariant violation (EU tenant off-boarding routed to wrong R2 bucket region → treat as potential data breach, investigate per R-05 forensic protocol, source: DATA_MODEL §36.6, DEC-061).
+- `VERSION` — bump to 5.38.1.
+
+---
+
 ## [5.38.0] — 2026-06-15
 
 ### Added
