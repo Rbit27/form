@@ -1,4 +1,4 @@
-# FORM · Master Service Agreement · Template v0.1
+# FORM · Master Service Agreement · Template v0.3
 
 > **Internal use only — PRE-LEGAL-REVIEW DRAFT.**
 > This template must be reviewed and approved by outside counsel before execution with any customer.
@@ -560,7 +560,7 @@ Key elements (per `docs/SOC2_READINESS.md §13` DPA requirements):
 - Audit rights: FORM responds to written audit requests within 10 business days.
 - Data deletion: on termination per §12 of this Agreement.
 - Breach notification: ≤ 72 hours to Customer (FORM notifies supervisory authority independently).
-- Standard Contractual Clauses (SCCs): Module 2 (controller→processor) incorporated for EU→US transfers.
+- Standard Contractual Clauses (SCCs): Module 2 (controller→processor) incorporated for EU→US transfers for active service processing (real-time API, AI coaching, Auth, SSO/SCIM). For EU-region Customers (`data_region IN ('eu-central-1', 'eu-west-1')`): off-boarding export packages stored exclusively in Cloudflare R2 EU jurisdiction — no Chapter V GDPR transfer mechanism required for that processing activity. See Addendum 3 (EU Data Residency Terms).
 
 ---
 
@@ -614,6 +614,86 @@ Executed separately. Governs: CCPA service-provider obligations; prohibition on 
 
 ---
 
+## ADDENDUM 3 — EU DATA RESIDENCY TERMS
+
+*(Applicable for EU enterprise customers where Order Form specifies `data_region` as `eu-central-1` (Frankfurt) or `eu-west-1` (Dublin).)*
+
+> **PRE-LEGAL-REVIEW DRAFT.** Outside counsel review required before execution with any EU enterprise Customer — see Addendum 3.6.
+
+Execute in the same DocuSign envelope as Exhibit C (DPA).
+
+---
+
+### Addendum 3.1 Applicability
+
+This Addendum applies where Customer's Order Form specifies a European Union data residency region (`eu-central-1` or `eu-west-1`). It supplements Exhibit C and, for the specific processing activities listed in §3.3, supersedes the Standard Contractual Clauses (SCCs) statement in Exhibit C.
+
+For US-region Customers (`data_region: us-east-1`): this Addendum does not apply; SCC Module 2 governs all processing including off-boarding export packages.
+
+---
+
+### Addendum 3.2 EU Data Residency Commitment
+
+FORM commits to the following data-residency controls for EU-region Customers:
+
+1. **Off-boarding export packages.** Customer Data export packages generated during tenant off-boarding are stored exclusively in Cloudflare R2 EU jurisdiction (`form-offboarding-exports-eu`). Technical enforcement: routing function `resolveEgressBucket()` maps `eu-central-1` and `eu-west-1` to the EU bucket without exception. Chain invariant OFB-REGION-01 (DEC-061, 2026-06-15; see `docs/DATA_MODEL.md §36.6`) is enforced at emission time in the `emit-audit-event` Worker: any event where `is_eu_region: true` and `r2_bucket ≠ 'form-offboarding-exports-eu'` is rejected with HTTP 422, triggers P1 PagerDuty `form-platform`, and is investigated as a potential data-residency breach per `docs/INCIDENT_RESPONSE.md R-05`.
+
+2. **Health data (GDPR Art. 9).** Authorized User health data — workout history, biometric data, AI coaching transcripts, CV pose estimation keypoints — is stored in Supabase Postgres (EU region per Order Form). No Art. 9 data is included in any off-boarding export package; this is enforced structurally by `egress_package_type_enum` — no enum value produces an individual health-data export path. Privacy Floor (`docs/ENTERPRISE.md §8`) applies without exception.
+
+3. **Audit log.** The HMAC-chained audit log (DEC-030; `docs/AUDIT_LOG_SCHEMA.md`) is stored in Supabase Postgres (EU region). Quarterly chain exports confirming OFB-REGION-01 compliance are filed as evidence artefact OFB-E-005 and available under Exhibit C audit rights.
+
+---
+
+### Addendum 3.3 DPA Annex B — Data Transfer Mechanism Declaration
+
+For EU-region Customers, the following table constitutes DPA Annex B and replaces the single SCC statement in Exhibit C on a per-activity basis:
+
+| Processing Activity | Data Location | Transfer Mechanism (GDPR Chapter V) | Notes |
+|---|---|---|---|
+| **Off-boarding export packages** (`enterprise.data_export_completed`) | Cloudflare R2 EU jurisdiction (`form-offboarding-exports-eu`) | **None required.** Data stored and processed within EU/EEA; no transfer to third countries for this activity. | Enforcement: OFB-REGION-01 chain invariant. Annual confirmation: OFB-E-006. |
+| **Active service processing** (real-time API, AI coaching via Victor, SSO/SCIM, Admin Dashboard) | Cloudflare Workers (global edge) + Supabase Postgres (EU region) | **SCC Module 2** (controller → processor). FORM Inc. (Delaware, US) as processor; Cloudflare Ireland Ltd (EU) as sub-processor with Cloudflare DPA EU addendum. | SCCs signed and on file per `docs/SUBPROCESSORS.md §5`. |
+| **Analytics** (PostHog — aggregate, pseudonymised) | PostHog EU Cloud (`eu.posthog.com`) | **None required** for PostHog EU Cloud deployment. | Aggregate data only; individual health-category data prohibited per `docs/OBSERVABILITY.md §25.9`; k ≥ 5 pseudonymisation floor. |
+| **Error monitoring** (Sentry) | Sentry EU region | **SCC Module 2** if applicable. | Sentry processes technical error metadata only; no Customer Data content. |
+
+**Outside counsel review note:** The "None required" declaration for off-boarding packages depends on Cloudflare R2 EU jurisdiction constituting intra-EEA storage with no onward transfer to Cloudflare US entities under current Cloudflare DPA arrangements. FORM must retain annual OFB-E-006 evidence (Cloudflare R2 EU jurisdiction screenshot) confirming this. If Cloudflare modifies its R2 EU data-processing terms, FORM must re-evaluate and attach SCCs until a replacement mechanism is confirmed.
+
+---
+
+### Addendum 3.4 Evidence Commitments
+
+FORM will maintain and make available on written request under Exhibit C audit rights:
+
+| Artefact | Description | Cadence | Path |
+|---|---|---|---|
+| **OFB-E-005** | Export of `enterprise.data_export_completed` HMAC-chained events confirming `is_eu_region: true` and `r2_bucket = 'form-offboarding-exports-eu'` for all Customer off-boarding operations. Zero-event periods filed as affirmative attestation. SOC 2 criteria: C1.1/P4.0/CC6.1. | Quarterly | `compliance/evidence/offboarding/OFB-E-005_<YYYY-QN>.csv` |
+| **OFB-E-006** | Cloudflare R2 EU jurisdiction configuration screenshot + `wrangler r2 bucket get form-offboarding-exports-eu --json` output confirming `location: "eu"`. IAM policy export confirming `form-api` has no read access. SOC 2 criteria: C1.1/CC6.1. | Annual | `compliance/evidence/offboarding/OFB-E-006_<YYYY>.md` |
+
+Source definitions: `docs/DATA_MODEL.md §36.7` (DEC-061, 2026-06-15).
+
+---
+
+### Addendum 3.5 Governing Law and Conflict
+
+Governing law for this Addendum: Ireland (EU-region Customers), same as Exhibit C (DPA). In the event of conflict between this Addendum and Exhibit C, this Addendum prevails on the specific processing activities listed in §3.3.
+
+Cross-references: `docs/DATA_MODEL.md §36` (DEC-061 — EU routing architecture); `docs/GDPR_DPIA.md §10.3` (k-anonymity floor open question); `docs/SOC2_READINESS.md §67.9` (CC6.1/C1.1 criteria mapping).
+
+---
+
+### Addendum 3.6 Outside Counsel Review Requirement
+
+This Addendum **must** be reviewed by outside counsel before execution with any EU enterprise Customer. Review points:
+
+1. Confirm "None required" Chapter V declaration for Cloudflare R2 EU is correct under current Cloudflare DPA and GDPR Chapter V.
+2. Confirm Schrems II Transfer Impact Assessment (TIA) is not required for Cloudflare Ireland Ltd processing.
+3. Confirm SCC Module 2 coverage is adequate for active-service processing (Cloudflare Workers global edge).
+4. Confirm k ≥ 5 pseudonymisation floor satisfies EDPB guidance on Art. 9 health-category analytics.
+5. Confirm EU governing law (Ireland) is enforceable against FORM Inc. (Delaware).
+
+Filing: outside counsel sign-off memo to `compliance/contracts/{CUSTOMER_SLUG}/eu-dpa-annex-b-counsel-signoff-v{N}.pdf` before DocuSign execution.
+
+---
+
 ## INTERNAL NOTES (REMOVE BEFORE SENDING TO CUSTOMER)
 
 | Topic | Guidance |
@@ -629,8 +709,13 @@ Executed separately. Governs: CCPA service-provider obligations; prohibition on 
 | SOC 2 attestation timing | SOC 2 Type II target is Month 12 after enterprise launch. For early customers signed before attestation: offer SOC 2 bridge letter + pentest summary + DPIA as interim evidence package. |
 | Art. 9 zero-grace-period | §12.2 health data deletion zero grace period is per DEC-036. Cannot be modified by contract. Confirm customer-success has briefed IT contact on offboarding flow. |
 | Redline limits | Standard-term self-service redline ≤ ±10% on commercial terms only. Any redline touching §8 (Privacy Floor), §9 (AUP), §5.3 (AI training), or §12.2 (health data deletion) requires compliance-officer approval regardless of deal size. |
+| EU DPA Annex B | **Addendum 3 is required for all EU-region Customers (`eu-central-1` / `eu-west-1`).** Outside counsel review MANDATORY before execution (see Addendum 3.6). Confirm Cloudflare R2 EU jurisdiction annually (OFB-E-006). Do NOT sign EU enterprise DPA without Addendum 3 + counsel sign-off filed at `compliance/contracts/{CUSTOMER_SLUG}/eu-dpa-annex-b-counsel-signoff-v{N}.pdf`. |
 
 ---
+
+*v0.3 · 2026-06-15 · owners: compliance-officer, enterprise-architect, founder · next review: before first EU enterprise DPA execution (outside counsel required per Addendum 3.6) and before first enterprise multi-year contract (M10 per §11.4) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35`, `docs/DATA_MODEL.md §36` (DEC-061)*
+
+*v0.3 (2026-06-15): Addendum 3 — EU Data Residency Terms (DPA Annex B). Closes `docs/DATA_MODEL.md §36.9` checklist item 6 (P0, before first EU enterprise DPA — "Update DPA Annex B template transfer mechanism row"). (1) Header corrected v0.1 → v0.3 (v0.2 note was present in footer but header line not updated at time of v0.2 commit). (2) Exhibit C SCC bullet made conditional: SCC Module 2 applies to active-service processing; for EU-region Customers (`data_region IN ('eu-central-1', 'eu-west-1')`), off-boarding export packages stored in Cloudflare R2 EU — no Chapter V GDPR transfer mechanism required for that activity; reference to Addendum 3 added. (3) Addendum 3 — EU Data Residency Terms: §3.1 Applicability (eu-central-1 / eu-west-1 Order Form regions); §3.2 EU Data Residency Commitment — off-boarding packages to `form-offboarding-exports-eu` (OFB-REGION-01 chain invariant enforcement; HTTP 422 on violation; R-05 escalation), Art. 9 health data structural prohibition (egress_package_type_enum), HMAC audit log EU storage; §3.3 DPA Annex B four-row transfer mechanism table — (a) off-boarding packages: None required (EU R2, intra-EEA), (b) active service processing: SCC Module 2 (Cloudflare Ireland Ltd sub-processor with EU addendum), (c) PostHog EU Cloud analytics: None required (k ≥ 5 floor), (d) Sentry EU: SCC Module 2 (technical metadata only); outside counsel note on R2 EU jurisdiction dependency; (4) §3.4 Evidence commitments: OFB-E-005 (quarterly chain export confirming OFB-REGION-01; C1.1/P4.0/CC6.1) + OFB-E-006 (annual R2 EU jurisdiction screenshot; C1.1/CC6.1); both from `docs/DATA_MODEL.md §36.7` (DEC-061). (5) §3.5 Governing law: Ireland for EU Customers; Addendum 3 prevails on §3.3 activities. (6) §3.6 Outside counsel requirement: five review points (R2 EU Chapter V declaration, TIA, SCC Module 2 coverage, k ≥ 5 EDPB, governing law enforceability); filing path `compliance/contracts/{CUSTOMER_SLUG}/eu-dpa-annex-b-counsel-signoff-v{N}.pdf`. (7) Internal Notes: EU DPA Annex B row added (Addendum 3 mandatory for EU Customers, outside counsel required, OFB-E-006 annual confirmation). Privacy floor: no individual employee `user_id`, health data, or Art. 9 category in any artefact specified by this Addendum; `tenant_id` slug only in OFB-E-005; OFB-E-006 is infrastructure screenshot with no personal data. Cross-references: `docs/DATA_MODEL.md §36.6` (OFB-REGION-01 spec); `docs/DATA_MODEL.md §36.7` (OFB-E-005/006 source); `docs/DATA_MODEL.md §36.9` (checklist item 6 — now [x] Done); `docs/SOC2_READINESS.md §67.8` (OFB-E-005/006 evidence table); `docs/SOC2_READINESS.md §67.9` (CC6.1/C1.1 EU residency criteria); `docs/INCIDENT_RESPONSE.md R-05` (OFB-REGION-01 violation response); `docs/GDPR_DPIA.md §10.3` (k-anonymity open question); `docs/SUBPROCESSORS.md §5` (DPA template reference); `docs/DECISION_LOG.md DEC-061`. Owner: compliance-officer + enterprise-architect + legal.*
 
 *v0.2 · 2026-06-12 · owners: compliance-officer, enterprise-architect, founder · next review: before first enterprise multi-year contract execution (M10 — outside counsel review required per §11.4 §8.7) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35`*
 

@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.43.1] — 2026-06-15
+
+### Changed
+- `docs/MSA_TEMPLATE.md` — Addendum 3 (EU Data Residency Terms / DPA Annex B) authored; Exhibit C SCC bullet made conditional for EU-region Customers; header corrected v0.1 → v0.3. Closes `docs/DATA_MODEL.md §36.9` checklist item 6 (P0, before first EU enterprise DPA). compliance-officer + enterprise-architect owners.
+- `docs/DATA_MODEL.md` — §36.9 checklist item 6 marked [x] Done with MSA_TEMPLATE v0.3 reference.
+- `VERSION` — bump 5.43.0 → 5.43.1.
+
+---
+
 ## [5.43.0] — 2026-06-15
 
 ### Added
