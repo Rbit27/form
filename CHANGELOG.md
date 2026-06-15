@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [5.49.0] — 2026-06-15
+
+### Added
+- `content/post-1002-establishing-your-personal-baseline.md` — Block 1001–1050 post 2/50. Особистий «норм»: популяційні vs. індивідуальні норми, стабільна базова лінія, мінімум 4 вимірювань у контрольованих умовах, відрізняти «нижче норми» від «зовнішнє збурення». clinical-safety: PASS. sports-scientist review pending.
+- `content/post-1003-trendline-over-single-datapoint.md` — Block 1001–1050 post 3/50. Трендова лінія vs. окрема точка: шум vs. сигнал у тренувальних даних, мінімальне вікно спостереження 4–6 тижнів, коефіцієнт варіації як поріг, практичні правила без складних інструментів. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-1004-errors-interpreting-your-progress.md` — Block 1001–1050 post 4/50. Помилки інтерпретації власного прогресу: recency bias, cherry-picking PR-ів, ігнорування контексту (сон, стрес), confirmation bias, плутанина варіації з регресом. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-1005-rpe-as-data-calibration.md` — Block 1001–1050 post 5/50. RPE як дані: калібрування суб'єктивного відчуття навантаження. Чому суб'єктивність ≠ ненадійність. Drift у RPE-перцепції. Перехресна перевірка RPE з реальним навантаженням для виявлення патернів. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-1006-hrv-heart-rate-real-signal.md` — Block 1001–1050 post 6/50. ЧСС і HRV: RMSSD та автономна НС, фактори що знижують HRV поза відновленням (таблиця), PPG vs. ECG точність, 7–14-денний тренд протокол, поріг для рішень. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-1007-sleep-as-training-variable.md` — Block 1001–1050 post 7/50. Сон як тренувальна змінна: SWS/N3 фізіологія (GH-секреція, ресинтез глікогену), зниження 1ПМ на 3–8% після <6 год сну, ефект на RPE, таблиця метрик за цінністю для тренінгу. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-1008-energy-during-training-signal-or-noise.md` — Block 1001–1050 post 8/50. «Енергія»: arousal (НС-активація) vs. readiness (реальне відновлення). Таблиця false-signal сценаріїв, протокол рішення. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-1009-real-adaptation-vs-temporary-adaptation.md` — Block 1001–1050 post 9/50. Реальна vs. тимчасова адаптація: три рівні (нейральна 2–8тиж, гіпертрофічна 2–6+ міс, сполучнотканинна місяці–роки), ознаки в журналі, три найпоширеніших помилки читання. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-1010-plateau-diagnosis-or-normal-process.md` — Block 1001–1050 post 10/50. Плато: чотири умови реального плато vs. нормальне сповільнення. Чотири сценарії псевдо-плато, діагностична послідовність питань, таблиця рішень. clinical-safety: PASS. sports-scientist review pending.
+
+### Changed
+- `blog.html` — картки додані для post-1010, 1009, 1008, 1007, 1006, 1005, 1004, 1003, 1002. blog.html тепер охоплює post-1010.
+- `STATUS.md` — block 1001–1050 оновлено до 10/50; total posts 992 → 1001; next priorities оновлено.
+- `VERSION` — bump 5.48.0 → 5.49.0.
+
+---
+
 ## [5.48.0] — 2026-06-15
 
 ### Added
