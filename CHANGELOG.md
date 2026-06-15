@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.25.0] — 2026-06-15
+
+### Added
+
+- `content/post-881` through `content/post-900` — Block 851–900 «Applied programming deep dives» complete (50/50). Posts 881–900 written: concurrent strength/hypertrophy programming (881), 1RM testing protocol (882), exercise order within session (883), HRV as programming tool (884), volume tolerance across training career (885), shift work programming (886), specialization phases (887), technique vs strength plateau diagnosis (888), accessory work purpose and volume (889), long-break return protocol (890), training environment effects (891), equipment decisions for programming (892), annual training plan structure (893), sleep and strength training (894), strength standards for serious amateurs (895), movement pattern balance (896), beginner-to-intermediate transition (897), evaluating program effectiveness (898), competition prep for recreational athletes (899), self-coached decision framework (900). All posts: sports-scientist review pending, clinical_safety_status: PASS, UA language, editorial-brutalist tone per DEC-007.
+- `blog.html` — posts 881–900 added to top of post list.
+
+### Changed
+
+- `STATUS.md` — Block 851–900 marked COMPLETE 50/50; Block 901–950 proposed; next content horizon updated.
+- `VERSION` — 5.24.0 → 5.25.0.
+
+---
+
 ## [5.24.0] — 2026-06-15
 
 ### Added
