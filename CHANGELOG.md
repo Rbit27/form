@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.13.0] — 2026-06-15
+
+### Added
+
+- `content/post-32-how-to-read-research.md` — Editorial series post-32. «Як читати наукову статтю про тренування і не зробити неправильних висновків» — ієрархія доказів (RCT vs observational vs мета-аналіз), population bias (нетреновані студенти vs тренований атлет), різниця між p-value і effect size (Cohen's d), суррогатні маркери vs прямі результати, publication bias і відтворюваність, практичний фільтр-таблиця для оцінки тверджень. Editorial-brutalist tone. clinical-safety: PASS. 13 хв.
+- blog.html card for post-32.
+
+### Changed
+
+- `VERSION` — 5.12.0 → 5.13.0.
+- `STATUS.md` — Editorial series row updated: post-32 written v5.13.0.
+
+---
+
 ## [5.12.0] — 2026-06-15
 
 ### Added
