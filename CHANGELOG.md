@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [5.51.0] — 2026-06-15
+
+### Added
+- `content/post-1012-e1rm-as-metric.md` — Block 1001–1050 post 12/50. Estimated 1RM як метрика: формули Epley/Brzycki/O'Conner, чому e1RM — інструмент тренду а не абсолютна цифра, RPE-контекст обов'язковий, системний запис контрольного підходу (зона 3–8 повт.), чотири комбінації e1RM+RPE і що вони означають, типові помилки, коли e1RM замінює реальний тест. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — картка post-1012 додана на початок сітки.
+- `STATUS.md` — block 1001–1050 оновлено до 12/50; version 5.50.0 → 5.51.0.
+- `VERSION` — bump 5.50.0 → 5.51.0.
+
 ## [5.50.0] — 2026-06-15
 
 ### Added
