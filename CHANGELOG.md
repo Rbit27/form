@@ -1,5 +1,27 @@
 # Changelog · FORM
 
+## [5.19.0] — 2026-06-15
+
+### Added
+
+- `content/post-856-autoregulation-rpe-rir.md` — Block 851–900 post 6/20. Авторегуляція: RPE і RIR як точний інструмент підтримки тренувального стимулу. Що вимірює шкала, як калібрувати RPE, практичні правила корекції навантаження при відхиленні ±2 пункти від цільового. Помилки: RPE-інфляція, sandbagging. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-857-peak-week-testing.md` — Block 851–900 post 7/20. Тейпер і пік для тестового тижня. Фізіологія тейперу (стомлення знижується швидше за фітнес), тривалість за тренувальним стажем (3–7 днів), протокол зниження об'єму 40–50% зі збереженням інтенсивності, феномен «taper tantrum», протокол розминки в день тесту. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-858-travel-minimal-equipment.md` — Block 851–900 post 8/20. Підтримчий тренінг без залу (2–4 тижні). Мінімальний ефективний стимул для підтримки (2 сесії/тиждень, 2–3 важкі підходи, ≥60% інтенсивності). Bodyweight-замінники з компенсацією через RIR. Протокол повернення після перерви. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-859-unilateral-training-integration.md` — Block 851–900 post 9/20. Інтеграція однобічних вправ. Білатеральний дефіцит, контралатеральний перенос, оцінка асиметрії. Однобічний рух як основний vs. допоміжний. Рекомендований об'єм, помилки (недооцінка як реабілітаційної роботи). clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-860-push-pull-ratio.md` — Block 851–900 post 10/20. Дисбаланс push:pull у self-coached атлетів. Мінімальне співвідношення 1:1, оптимальне 1:1.2–1.5 для горизонтальних рухів. Аудит програми. Практичний алгоритм виправлення без переписування. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-861-weekly-volume-distribution.md` — Block 851–900 post 11/20. Розподіл об'єму по тижню. Частота vs. об'єм на сесію, «junk volume» концепція, шаблони для 3- і 4-денних сплітів. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-862-rest-intervals.md` — Block 851–900 post 12/20. Паузи між підходами: PCr-відновлення, 3–5 хв для сили, 60–90 с для метаболічної роботи, 2–3 хв для гіпертрофії. Міф «коротший відпочинок = більший ріст». Масштабування пауз до інтенсивності. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-863-warm-up-protocol.md` — Block 851–900 post 13/20. Розминка: мінімально ефективний протокол. Загальна vs. специфічна розминка, формула прогресивного навантаження (50%×8 → 70%×3 → 85%×1 → робочі ваги), роль мобільності і foam rolling. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-864-irregular-schedule-programming.md` — Block 851–900 post 14/20. Програмування при нерегулярному графіку. Квотова модель (тижневі підходи) vs. фіксований розклад. Мінімум 2 сесії/тиждень. Пріоритет скорочень при стисненому тижні. Full body vs. split при нестабільному графіку. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-865-offseason-inseason-periodization.md` — Block 851–900 post 15/20. Periodization для атлетів без змагань. Визначення особистого offseason/inseason. Моделі: лінійна, хвильова (3:1), блокова. Накопичення–інтенсифікація–реалізація спрощено. Деліт як структурний елемент (не реактивний). Приклад річного планування. clinical-safety: PASS. review_pending: sports-scientist.
+
+### Changed
+
+- `STATUS.md` — content block 851–900 updated: 15/20 posts written (posts 856–865 added); posts 866–870 as next horizon.
+- `VERSION` — 5.18.1 → 5.19.0.
+
+---
+
 ## [5.18.1] — 2026-06-15
 
 ### Changed

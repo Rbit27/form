@@ -1,4 +1,4 @@
-# FORM · Project Status v5.18.0
+# FORM · Project Status v5.19.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -106,7 +106,7 @@
 - PostHog DPA review (compliance-officer) — **REVIEW COMPLETE**; click-through execution pending (founder action — PostHog Dashboard → Organization → Privacy & DPA); PIA-2026-001 filed
 - Block 601–650: **COMPLETE** — всі пости написані (639 blocked HARD VETO); sports-scientist review needed перед publish
 - Block 651–700: **COMPLETE** — all 50 posts written; 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish
-- Block 851–900: **IN PROGRESS 5/20** — posts 851–855 written (v5.17.0); review_pending: sports-scientist; posts 856–870 proposed
+- Block 851–900: **IN PROGRESS 15/20** — posts 851–865 written (v5.19.0); review_pending: sports-scientist; posts 866–870 as next horizon
 - Block 1001–1050 proposed: Training literacy: reading your own data (added to README roadmap v4.66.0)
 
 ---
