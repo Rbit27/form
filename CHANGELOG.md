@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.16.0] — 2026-06-15
+
+### Added
+
+- `docs/COMPLIANCE_MATRIX.md` — Cross-framework compliance control matrix v1.0. 93 controls mapped across SOC 2 Type II (AICPA 2022), ISO 27001:2022 (Annex A), GDPR (Art. 5–89, emphasis on Art. 9 special-category health data), and HIPAA adjacency. Twelve domains: organisational controls, access control & identity, cryptography & data protection, physical & environmental, operations security, communications & network, supplier management, incident management, business continuity & DR, compliance & audit, privacy controls. Gap analysis per framework with P0/P1/P2 prioritisation. Evidence artifact cross-reference (15 artifacts, NDA-gated). Certification roadmap through 2028-Q1 (SOC 2 Type II → ISO 27001). Owner: compliance-officer + security-engineer + enterprise-architect. CM-E-001.
+
+### Changed
+
+- `VERSION` — 5.15.0 → 5.16.0.
+
+---
+
 ## [5.15.0] — 2026-06-15
 
 ### Added
