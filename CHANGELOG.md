@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.45.0] — 2026-06-15
+
+### Added
+- `content/post-987-training-heat-humidity.md` — Block 951–1000 post 37/50. Тренування в спеку та вологість: серцево-судинний дрейф і down-регуляція рекрутування моторних одиниць при підвищеній температурі ядра (Gonzalez-Alonso et al. 2008). Вплив дегідратації 2–3% на силові показники (Judelson et al. 2007, JSCR). WBGT як точніший метр ніж повітряна температура. Акліматизація 10–14 днів (Armstrong & Maresh 1991, Periard et al. 2016). Decision tree: перші 7 днів −20–30% об'єму, після 14 — повернення до норми. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-988-altitude-training-strength.md` — Block 951–1000 post 38/50. Тренування на висоті для силових атлетів: чесний огляд доказової бази. Hamlin et al. (2010) і Scott et al. (2003/2006) — непереконливі результати гіпоксичного силового тренування. Altitude маска — розвінчаний міф. Поріг 2000–2500 м для помітних ефектів. Акліматизація: дні 1–3 (падіння продуктивності), тиждень 2 (стабілізація), 3–4 тижні (повне пристосування). Найгірший момент для змагань — 3–10 день після прильоту. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-989-training-psychological-stress.md` — Block 951–1000 post 39/50. Тренування при підвищеному психологічному стресі: виключно фізіологічне фреймування. HPA-вісь і кортизол: конфлікт з mTORC1/MPS (McEwen 1998 алостатичне навантаження). Kiely et al. (2012, Sports Medicine) — нетренувальні стресори і адаптація. HRV як практичний біомаркер: decision tree на основі SD-смуг від базової лінії. Рекомендація: знизити об'єм (не до нуля, не частоту), зберегти основні рухи, уникнути максимальних зусиль. Footer disclaimer — спрямування до фахівця при ментальних труднощах. clinical-safety: CONDITIONAL PASS. sports-scientist review pending.
+- `content/post-990-training-log-analysis.md` — Block 951–1000 post 40/50. Аналіз тренувального щоденника для самопрограмування: n-of-1 методологія. Hubal et al. (2005, JAP) — варіабельність відповіді −2% до +59% при однаковому протоколі. Мінімум 8–12 тижнів даних для виявлення паттерну. Що логувати (вага/повторення/RPE/сон/нотатки). Чотири типових помилки інтерпретації. Протокол виявлення особистого rep-range preference через контрольний порівняльний блок. clinical-safety: PASS. sports-scientist review pending.
+
+### Changed
+- `VERSION` — bump 5.44.0 → 5.45.0.
+- `STATUS.md` — Block 951–1000 count 35 → 39/50; next priorities updated.
+
+---
+
 ## [5.44.0] — 2026-06-15
 
 ### Added
