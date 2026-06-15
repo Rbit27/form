@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [5.30.0] — 2026-06-15
+
+### Added
+- `content/post-922-contrast-sets-conjugate.md` — Block 901–950, post 22/50.
+- `content/post-923-deload-methods-compared.md` — Block 901–950, post 23/50.
+- `content/post-924-rm-testing-protocols.md` — Block 901–950, post 24/50.
+- `content/post-925-strength-endurance-continuum.md` — Block 901–950, post 25/50.
+- `content/post-926-rep-range-myths.md` — Block 901–950, post 26/50.
+- `content/post-927-tempo-training-science.md` — Block 901–950, post 27/50.
+- `content/post-928-intraset-rest-hypertrophy.md` — Block 901–950, post 28/50.
+- `content/post-929-supersets-science.md` — Block 901–950, post 29/50.
+- `content/post-930-fatigue-indicators-real-training.md` — Block 901–950, post 30/50.
+
+### Changed
+- `blog.html` — posts 922–930 додано; блок 901–950 оновлено до post-930.
+- `STATUS.md` — Block 901–950: 30/50; Total posts: 930.
+- `VERSION` — 5.29.0 → 5.30.0.
+
+---
+
 ## [5.29.0] — 2026-06-15
 
 ### Added
