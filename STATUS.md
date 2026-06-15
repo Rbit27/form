@@ -1,4 +1,4 @@
-# FORM · Project Status v5.14.0
+# FORM · Project Status v5.18.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.14.0** — 2026-06-15
+**v5.18.0** — 2026-06-15
 
 ---
 
@@ -32,7 +32,7 @@
 
 **Total posts: 848**
 
-**Editorial series 11–33** — post-33 written v5.15.0: «Самостійне програмування: де воно краще за коуча, де гірше» — зовнішнє спостереження як незамінна перевага тренера, де self-programming виграє (проміжний рівень, нерегулярний графік, дані, автономія), де тренер незамінний (техніка, змагання, accountability), спектр між полюсами (консультаційний тренер, online, AI), практична рамка вибору, honest AI trade-off; clinical-safety: PASS. Blog card added. README editorial table extended to posts 41–50. Proposed next: posts 34–35 (dropout mechanics Valsalva/IAP, breathing mechanics). Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
+**Editorial series 11–34** — post-34 written v5.18.0: «Чому більшість людей кидають тренування — і що з цим робити без self-help риторики» — структурний аналіз adherence failure (пастка ідеального тижня, крепатура як хибний компас, об'єм як доказ зусилля, відсутність адаптивності), кореляти стійкості (фіксований часовий слот, мінімальна транзакційна вартість, адаптивна програма), чому «більше сили волі» не вирішує структурну проблему; clinical-safety: PASS. Blog card added. Proposed next: post-35 (breathing mechanics / Valsalva / IAP). Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
 
 ---
 

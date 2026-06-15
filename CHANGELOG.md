@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.18.0] — 2026-06-15
+
+### Added
+
+- `content/post-34-why-people-quit-training.md` — Editorial series post 34/50. Чому більшість людей кидають тренування — і що з цим робити без self-help риторики. Структурний аналіз adherence failure: пастка ідеального тижня, крепатура як хибний компас, об'єм як доказ зусилля, відсутність адаптивності програми. Кореляти стійкості (фіксований часовий слот, транзакційна вартість, адаптивність). Без self-help риторики, без «сили волі». clinical-safety PASS. review_pending: sports-scientist.
+
+### Changed
+
+- `blog.html` — Blog card added for post-34.
+- `STATUS.md` — Editorial series updated: 11–34 drafted.
+- `VERSION` — 5.17.0 → 5.18.0.
+
+---
+
 ## [5.17.0] — 2026-06-15
 
 ### Added
