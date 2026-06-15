@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.13
+# FORM · Multi-Tenant Data Model v1.15
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -42,6 +42,8 @@
 32. [Enterprise DSAR Extensions — Employer-Side Data Lifecycle & Offboarding Export Schema](#32-enterprise-dsar-extensions--employer-side-data-lifecycle--offboarding-export-schema)
 33. [`tenant_users_role_history` — SCIM Role Change Audit Trail Schema](#33-tenant_users_role_history--scim-role-change-audit-trail-schema)
 34. [FORM Role ENUM Types: `form_role_enum` & `role_change_source_enum`](#34-form-role-enum-types-form_role_enum--role_change_source_enum)
+35. [DSAR Deletion Certificate Schema & SLO Breach Response](#35-dsar-deletion-certificate-schema--slo-breach-response--oq-dsar-03--oq-dsar-04-resolution-dec-052)
+36. [EU-Region R2 Bucket Routing for Enterprise Off-boarding Data Egress](#36-oq-ofb-02-resolution--eu-region-r2-bucket-routing-for-enterprise-off-boarding-data-egress-dec-061)
 
 ---
 
@@ -9932,7 +9934,7 @@ export async function runDeletionWorker(job: OffboardingJob, env: Env): Promise<
 | ID | Question | Owner | Priority |
 |---|---|---|---|
 | OQ-OFB-01 | **Self-service off-boarding portal vs. CSM-mediated initiation.** Should tenant admins be able to initiate off-boarding self-service (a "Close our account" action in the admin dashboard) or must all off-boarding be initiated by a FORM CSM via internal tooling? Self-service reduces CSM cost and improves the employer experience at contract end; CSM-mediated allows a retention conversation and reduces the risk of an accidental or coerced off-boarding action by a misconfigured admin. If self-service is chosen: the initiation endpoint must require a re-authentication challenge (SAML `ForceAuthn=true` or OIDC `prompt=login`), a 48-hour cancellation window before `access_revoked` is triggered, and confirmation by two distinct `tenant_owner` accounts. | `enterprise-architect` + `product-strategist` | **P1 — before enterprise GA** |
-| OQ-OFB-02 | **EU-region R2 bucket for EU-domiciled tenants.** Egress packages for EU-domiciled tenants should be generated and stored in an EU-region Cloudflare R2 bucket to avoid GDPR Chapter V transfer concerns. The current schema stores a single default `r2_bucket = 'form-offboarding-exports'` without region routing. If EU-region R2 is required by DPA or by Art. 46 transfer mechanism constraints, `r2_bucket` must be computed from `tenants.data_region` at job creation time and the EU bucket must be provisioned and tested before any EU-domiciled tenant reaches the off-boarding flow. Resolution requires legal sign-off on the transfer mechanism and devops provisioning of the EU R2 bucket. | `enterprise-architect` + `legal` + `devops-lead` | **P0 — before any EU enterprise tenant off-boards** |
+| ~~OQ-OFB-02~~ **🟢 Resolved — DEC-061 (2026-06-15)** | ~~**EU-region R2 bucket for EU-domiciled tenants.**~~ **Resolved: EU-region R2 routing adopted.** `r2_bucket` is now computed from `tenants.data_region` at job creation time via `resolveEgressBucket()` in `apps/offboarding-worker`; EU tenants (`eu-central-1`, `eu-west-1`) route to `form-offboarding-exports-eu` (Cloudflare R2 EU jurisdiction); US tenants (`us-east-1`) route to `form-offboarding-exports`. Migration `0075_offboarding_r2_routing.sql` adds `data_region` column and `chk_r2_bucket_region_consistency` CHECK constraint. See §36. | `enterprise-architect` + `legal` + `devops-lead` | **🟢 Closed — DEC-061** |
 | ~~OQ-OFB-03~~ **🟢 Resolved — DEC-036 (2026-06-09)** | ~~**Art. 9 no-grace-period as an absolute invariant.**~~ **Resolved: absolute invariant.** §25.7 hard-delete of Art. 9 data with no grace period is confirmed as an unconditional rule. Enterprise MSA clauses requesting a health-data recovery window must be refused at contract review stage. Individual users must exercise data portability (§12.5) independently before the off-boarding trigger date. See `docs/DECISION_LOG.md` DEC-036. | `compliance-officer` + `legal` | **🟢 Closed** |
 
 ---
@@ -14070,4 +14072,300 @@ OQ-DSAR-03 and OQ-DSAR-04 are closed. One forward-looking item:
 
 ---
 
-*v1.0 (2026-06-14): §35 DSAR Deletion Certificate Schema & SLO Breach Response — resolves OQ-DSAR-03 (P1) and OQ-DSAR-04 (P2) from §32.8 (v1.1, 2026-06-13) via DEC-052. OQ-DSAR-03: two-tier escalation policy for `dsar.data_provided` SLO breaches — P1 auto-alert (PagerDuty `form-compliance` + `form-customer-success`) for first miss per tenant per calendar quarter; P2 Slack alert for subsequent misses; quarterly counter reset via pg_cron job 33 (`dsar_slo_miss_counter_reset`, `0 0 1 1,4,7,10 *`) on `enterprise_sla_counters.dsar_slo_misses_this_quarter` column (migration `0070b`); AL-DSAR-05 authoritative definition remains `docs/OBSERVABILITY.md §37.12`. OQ-DSAR-04: deletion certificate format = HMAC-SHA256-signed JSON (ERASURE_CERT_SECRET, 256-bit, annual rotation per CRYPTOGRAPHY_POLICY.md §5); delivery = admin dashboard download (immediate, primary) + Resend `dsar-deletion-cert` email to data subject (0h delay) or employer HR contact (48h delay per GDPR Art. 34 ordering); storage = R2 `form-dsar-certs/<tenant_id>/<certificate_id>.json` (primary) + `dsar_deletion_certificates` Postgres table (metadata + payload_hash only, no payload). `dsar_deletion_certificates` DDL (§35.4): UUID PK (`certificate_id`), `dsar_id` UUID soft-ref, `tenant_id` FK RESTRICT, `user_id_hash` TEXT SHA-256, `deletion_type` CHECK enum (three values), `tables_erased` TEXT[] MIN 1, `rows_deleted_total` INT ≥ 0, `erased_at` TIMESTAMPTZ, `payload_hash` TEXT SHA-256, `r2_object_key` TEXT UNIQUE, `delivered_to_hash` TEXT nullable, `dashboard_available_at`, `email_sent_at`, `email_error`; two CHECK constraints (erased ≤ issued + 5 min; R2 key format); two indexes (tenant + issued DESC; dsar_id); RLS: compliance_reviewer SELECT all, tenant_admin SELECT own-tenant, form_system INSERT + UPDATE; form_api REVOKED. Two new DEC-030 events (§35.6): `dsar.certificate_issued` (HIGH, 7yr — certificate_id, dsar_id, tenant_id, user_id_hash, deletion_type, payload_hash, r2_object_key; no payload); `dsar.certificate_delivered` (STANDARD, 7yr — certificate_id, tenant_id, delivery_channel enum, delivered_to_hash nullable, resend_message_id nullable). CERT-CHAIN-01 ordering invariant: `dsar.deletion_soft → dsar.deletion_confirmed → dsar.certificate_issued → dsar.certificate_delivered`; chain break triggers R-05. Admin Dashboard "DSAR & Erasure" panel (§35.8): tenant_admin + tenant_owner only; HR (`tenant_manager`) blocked; columns: DSAR ID (truncated), type, status, fulfilled_at, certificate download (presigned R2 URL, 7-day TTL), SLO met; `user_id_hash` displayed as "Employee [first 8 chars]" — no names or emails. Two new SOC 2 evidence artefacts: DSAR-E-011 (P8.0 — quarterly `dsar.certificate_issued` chain export with R2 payload_hash cross-check); DSAR-E-012 (CC7.2 — AL-DSAR-05 PagerDuty history + pg_cron job 33 reset run log). Twelve-item implementation checklist: 7× P0/M5–M6 (0070 DDL migration, 0070b counter migration + job 33 registration, ERASURE_CERT_SECRET provisioning, `generateDeletionCertificate()` implementation, DEC-030 event registration + CERT-CHAIN-01 integration test, Resend template + 48h delay hook, Admin Dashboard panel), 3× P1/M6–M7 (AL-DSAR-05 PagerDuty configuration, SOC2_READINESS.md OQ updates, DSAR-E-011 first collection), 2× P2/M11–M13 (DSAR-E-012 evidence, OQ-CERT-01 evaluation). One new open question OQ-CERT-01 (P2 — QES upgrade for FinServ/government customers; evaluate at first pilot). §32.8 OQ-DSAR-03 and OQ-DSAR-04 updated to 🟢 Resolved below. TOC updated to add §35 entry. Header updated v1.13 → v1.14. Cross-references: `docs/DATA_MODEL.md §32` (OQ-DSAR-03/04 source — §32.8 both marked 🟢 Resolved); `docs/DATA_MODEL.md §12` (Art. 17 two-phase erasure — §35 adds the certificate generation step after Phase 2 verification); `docs/DATA_MODEL.md §31` (consumer DSAR schema — `dsar_requests` table soft-referenced via `dsar_id`); `docs/OBSERVABILITY.md §37.12` (AL-DSAR-05 authoritative definition — AL-DSAR-05 is the alert wired to `enterprise_sla_counters.dsar_slo_misses_this_quarter`); `docs/ENTERPRISE_SLA.md §19.5` (24-hour employer-side Art. 15 SLO source); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break — CERT-CHAIN-01 violation triggers R-05); `docs/CRYPTOGRAPHY_POLICY.md §5` (ERASURE_CERT_SECRET key inventory + annual rotation); `docs/KEY_ROTATION.md` (ERASURE_CERT_SECRET rotation schedule); `docs/AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise` (two new events to register — P0 before M5); `docs/SOC2_READINESS.md §P8.0` (DSAR-E-011 extends evidence table); `docs/SOC2_READINESS.md §CC7.2` (DSAR-E-012 adds to monitoring evidence). Privacy floor: no certificate payload in Postgres; no raw user_id or email in any DEC-030 event; HR role blocked from Admin Dashboard panel; `delivered_to_hash` is SHA-256(email + PSEUDONYM_SALT) — plaintext never stored. `docs/DECISION_LOG.md DEC-052`. Owner: compliance-officer + platform-engineer + security-engineer.*
+*v1.14 (2026-06-14): §35 DSAR Deletion Certificate Schema & SLO Breach Response — resolves OQ-DSAR-03 (P1) and OQ-DSAR-04 (P2) from §32.8 (v1.1, 2026-06-13) via DEC-052. OQ-DSAR-03: two-tier escalation policy for `dsar.data_provided` SLO breaches — P1 auto-alert (PagerDuty `form-compliance` + `form-customer-success`) for first miss per tenant per calendar quarter; P2 Slack alert for subsequent misses; quarterly counter reset via pg_cron job 33 (`dsar_slo_miss_counter_reset`, `0 0 1 1,4,7,10 *`) on `enterprise_sla_counters.dsar_slo_misses_this_quarter` column (migration `0070b`); AL-DSAR-05 authoritative definition remains `docs/OBSERVABILITY.md §37.12`. OQ-DSAR-04: deletion certificate format = HMAC-SHA256-signed JSON (ERASURE_CERT_SECRET, 256-bit, annual rotation per CRYPTOGRAPHY_POLICY.md §5); delivery = admin dashboard download (immediate, primary) + Resend `dsar-deletion-cert` email to data subject (0h delay) or employer HR contact (48h delay per GDPR Art. 34 ordering); storage = R2 `form-dsar-certs/<tenant_id>/<certificate_id>.json` (primary) + `dsar_deletion_certificates` Postgres table (metadata + payload_hash only, no payload). `dsar_deletion_certificates` DDL (§35.4): UUID PK (`certificate_id`), `dsar_id` UUID soft-ref, `tenant_id` FK RESTRICT, `user_id_hash` TEXT SHA-256, `deletion_type` CHECK enum (three values), `tables_erased` TEXT[] MIN 1, `rows_deleted_total` INT ≥ 0, `erased_at` TIMESTAMPTZ, `payload_hash` TEXT SHA-256, `r2_object_key` TEXT UNIQUE, `delivered_to_hash` TEXT nullable, `dashboard_available_at`, `email_sent_at`, `email_error`; two CHECK constraints (erased ≤ issued + 5 min; R2 key format); two indexes (tenant + issued DESC; dsar_id); RLS: compliance_reviewer SELECT all, tenant_admin SELECT own-tenant, form_system INSERT + UPDATE; form_api REVOKED. Two new DEC-030 events (§35.6): `dsar.certificate_issued` (HIGH, 7yr — certificate_id, dsar_id, tenant_id, user_id_hash, deletion_type, payload_hash, r2_object_key; no payload); `dsar.certificate_delivered` (STANDARD, 7yr — certificate_id, tenant_id, delivery_channel enum, delivered_to_hash nullable, resend_message_id nullable). CERT-CHAIN-01 ordering invariant: `dsar.deletion_soft → dsar.deletion_confirmed → dsar.certificate_issued → dsar.certificate_delivered`; chain break triggers R-05. Admin Dashboard "DSAR & Erasure" panel (§35.8): tenant_admin + tenant_owner only; HR (`tenant_manager`) blocked; columns: DSAR ID (truncated), type, status, fulfilled_at, certificate download (presigned R2 URL, 7-day TTL), SLO met; `user_id_hash` displayed as "Employee [first 8 chars]" — no names or emails. Two new SOC 2 evidence artefacts: DSAR-E-011 (P8.0 — quarterly `dsar.certificate_issued` chain export with R2 payload_hash cross-check); DSAR-E-012 (CC7.2 — AL-DSAR-05 PagerDuty history + pg_cron job 33 reset run log). Twelve-item implementation checklist: 7× P0/M5–M6 (0070 DDL migration, 0070b counter migration + job 33 registration, ERASURE_CERT_SECRET provisioning, `generateDeletionCertificate()` implementation, DEC-030 event registration + CERT-CHAIN-01 integration test, Resend template + 48h delay hook, Admin Dashboard panel), 3× P1/M6–M7 (AL-DSAR-05 PagerDuty configuration, SOC2_READINESS.md OQ updates, DSAR-E-011 first collection), 2× P2/M11–M13 (DSAR-E-012 evidence, OQ-CERT-01 evaluation). One new open question OQ-CERT-01 (P2 — QES upgrade for FinServ/government customers; evaluate at first pilot). §32.8 OQ-DSAR-03 and OQ-DSAR-04 updated to 🟢 Resolved below. TOC updated to add §35 entry. Header updated v1.13 → v1.14. Cross-references: `docs/DATA_MODEL.md §32` (OQ-DSAR-03/04 source — §32.8 both marked 🟢 Resolved); `docs/DATA_MODEL.md §12` (Art. 17 two-phase erasure — §35 adds the certificate generation step after Phase 2 verification); `docs/DATA_MODEL.md §31` (consumer DSAR schema — `dsar_requests` table soft-referenced via `dsar_id`); `docs/OBSERVABILITY.md §37.12` (AL-DSAR-05 authoritative definition — AL-DSAR-05 is the alert wired to `enterprise_sla_counters.dsar_slo_misses_this_quarter`); `docs/ENTERPRISE_SLA.md §19.5` (24-hour employer-side Art. 15 SLO source); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break — CERT-CHAIN-01 violation triggers R-05); `docs/CRYPTOGRAPHY_POLICY.md §5` (ERASURE_CERT_SECRET key inventory + annual rotation); `docs/KEY_ROTATION.md` (ERASURE_CERT_SECRET rotation schedule); `docs/AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise` (two new events to register — P0 before M5); `docs/SOC2_READINESS.md §P8.0` (DSAR-E-011 extends evidence table); `docs/SOC2_READINESS.md §CC7.2` (DSAR-E-012 adds to monitoring evidence). Privacy floor: no certificate payload in Postgres; no raw user_id or email in any DEC-030 event; HR role blocked from Admin Dashboard panel; `delivered_to_hash` is SHA-256(email + PSEUDONYM_SALT) — plaintext never stored. `docs/DECISION_LOG.md DEC-052`. Owner: compliance-officer + platform-engineer + security-engineer.*
+
+---
+
+## 36. OQ-OFB-02 Resolution — EU-Region R2 Bucket Routing for Enterprise Off-boarding Data Egress (DEC-061)
+
+> **Closes:** OQ-OFB-02 (🟡 P0 → 🟢, DEC-061, 2026-06-15) from §25.9 — before any EU enterprise tenant off-boards.
+> Owner: enterprise-architect + compliance-officer + devops-lead + legal. Review: annually or on any Cloudflare R2 jurisdiction policy change.
+> DEC: **DEC-061** — EU-region R2 bucket routing for enterprise off-boarding egress packages.
+
+---
+
+### 36.1 Purpose and Decision
+
+§25.4 (`tenant_data_egress_packages`) hardcodes `r2_bucket DEFAULT 'form-offboarding-exports'` — a US-resident Cloudflare R2 bucket — for all tenants regardless of their contracted `data_region`. OQ-OFB-02 (§25.9, P0) identified this as a GDPR Chapter V transfer concern: a tenant domiciled in `eu-central-1` or `eu-west-1` whose egress package is stored in a US bucket triggers a data transfer from the EU to a third country, requiring either an adequacy decision, Standard Contractual Clauses (SCCs), or another Art. 46 mechanism.
+
+**Decision (DEC-061):** EU-region R2 routing is adopted. Egress packages for tenants whose `data_region` is `'eu-central-1'` or `'eu-west-1'` are stored in `form-offboarding-exports-eu` — a Cloudflare R2 bucket with EU jurisdiction selected. US tenants (`data_region = 'us-east-1'`) continue to use `form-offboarding-exports`. The routing is computed at row-creation time and enforced by a Postgres CHECK constraint, making incorrect routing a hard schema error rather than an application-layer risk.
+
+---
+
+### 36.2 Options Analysis
+
+| Option | Description | Assessment |
+|---|---|---|
+| **A — EU-region R2 routing** | Route by `tenants.data_region`; EU tenants → `form-offboarding-exports-eu` (Cloudflare R2 EU jurisdiction) | **Adopted** |
+| B — SCCs + single US bucket | Keep US-only bucket; execute Commission Decision 2021/914 Module 2 SCCs with EU enterprise customers | Rejected — see §36.2.1 |
+| C — EU bucket + SCCs as belt-and-suspenders | Combine Option A routing with SCC attachment in DPA | Rejected — creates legal ambiguity (§36.2.2) |
+
+#### 36.2.1 Rejection of Option B (SCCs + single US bucket)
+
+Four independently sufficient grounds:
+
+1. **Transfer Impact Assessment (TIA) maintenance burden.** Post-Schrems II (CJEU C-311/18, 2020), SCCs require an active TIA demonstrating that US law does not impair the practical effectiveness of the SCC safeguards. Off-boarding packages contain audit log exports limited to administrative actions — not Art. 9 health data (excluded by the exhaustive `egress_package_type_enum` in §25.4). Nonetheless, even non-Art.9 SCC transfers require documented TIAs at each transfer, and the TIA must be updated whenever US surveillance law changes. This is ongoing legal overhead disproportionate to a short-lived data transfer (30-day TTL after download).
+
+2. **EU enterprise customer DPO friction.** FORM's target EU enterprise customers require DPO sign-off on DPA Annex B. DPOs reviewing FORM's off-boarding procedure expect in-EU storage for off-boarding packages as the default, not SCC mitigation. SCC-only off-boarding is a documented deal-blocker in EU regulated sectors (FinServ, healthcare-adjacent, public sector).
+
+3. **GDPR Art. 46(2)(c) uncertainty under FISA §702.** Cloudflare R2's US-East bucket is operated under US jurisdiction. FISA §702 national security access orders cannot be disclosed to data subjects and may not be challenged in advance. Cloudflare US is subject to CLOUD Act requests. EU-jurisdiction R2 (`form-offboarding-exports-eu`) is operated by Cloudflare Ireland Ltd and subject exclusively to EU law, removing the FISA §702 concern entirely.
+
+4. **DPA Annex B simplification.** With EU-region routing, the DPA Annex B transfer mechanism row for EU tenants reads: "Data stored in EU (Cloudflare R2 EU jurisdiction); no Chapter V transfer mechanism required for off-boarding packages." This eliminates the SCC attachment from the DPA, reducing negotiation friction and legal review time for both parties.
+
+#### 36.2.2 Rejection of Option C (EU bucket + SCCs)
+
+Running SCCs alongside EU-region routing is legally redundant and creates ambiguity about which mechanism governs. If a supervisory authority investigates, FORM must explain why SCCs were attached when the data never left the EU. The cleaner position — and the one that eliminates interpretive ambiguity — is Option A without SCC augmentation.
+
+---
+
+### 36.3 EU-Region R2 Bucket Specification
+
+| Property | Value |
+|---|---|
+| **Bucket name** | `form-offboarding-exports-eu` |
+| **Cloudflare R2 jurisdiction** | EU (data stored exclusively within EU/EEA member states) |
+| **Managed by** | `devops-lead` |
+| **Access** | Signed-URL delivery only; no public access; same IAM policy as US bucket (`form_system` service token; `form_api` REVOKED) |
+| **Object lifecycle** | 30-day auto-delete post `signed_url_expires_at` (matching US bucket lifecycle rule) |
+| **Encryption at rest** | Cloudflare-managed AES-256 (same as US bucket) |
+| **DPA sub-processor entry** | Cloudflare Ireland Ltd — existing `docs/SUBPROCESSORS.md` entry; no new entry needed (same entity as other R2 usage; jurisdiction change is a configuration note, not a new processor) |
+
+---
+
+### 36.4 Routing Logic (TypeScript)
+
+```typescript
+// apps/offboarding-worker/src/routing.ts
+
+export type DataRegion = 'us-east-1' | 'eu-central-1' | 'eu-west-1';
+
+/** Canonical R2 bucket per data_region. Must stay in sync with §36.5 chk_r2_bucket_region_consistency. */
+const R2_BUCKET_BY_REGION: Record<DataRegion, string> = {
+  'us-east-1':    'form-offboarding-exports',
+  'eu-central-1': 'form-offboarding-exports-eu',
+  'eu-west-1':    'form-offboarding-exports-eu',
+} as const;
+
+/**
+ * Resolves the Cloudflare R2 bucket name for an off-boarding egress package.
+ * Called once at tenant_data_egress_packages row creation; result is persisted
+ * to r2_bucket so the egress Worker never re-derives routing from the tenant.
+ */
+export function resolveEgressBucket(dataRegion: DataRegion): string {
+  return R2_BUCKET_BY_REGION[dataRegion];
+}
+
+export function isEuRegion(dataRegion: DataRegion): boolean {
+  return dataRegion.startsWith('eu-');
+}
+
+// Unit test surface (apps/offboarding-worker/src/routing.test.ts):
+// expect(resolveEgressBucket('eu-central-1')).toBe('form-offboarding-exports-eu');
+// expect(resolveEgressBucket('eu-west-1')).toBe('form-offboarding-exports-eu');
+// expect(resolveEgressBucket('us-east-1')).toBe('form-offboarding-exports');
+// expect(isEuRegion('eu-central-1')).toBe(true);
+// expect(isEuRegion('us-east-1')).toBe(false);
+```
+
+`resolveEgressBucket()` is called at `tenant_data_egress_packages` INSERT time. The result is persisted to `r2_bucket`; the egress Worker reads `r2_bucket` from the row and never re-derives routing from the tenant at delivery time. This immutability ensures the package always goes to the bucket that was decided at job creation, regardless of any subsequent `tenants.data_region` change.
+
+---
+
+### 36.5 Migration 0075 — `tenant_data_egress_packages` Schema Update
+
+Two structural changes:
+
+1. **Add `data_region` column** (denormalized from `tenants.data_region` at job creation time). Provides a self-contained audit record of which region governed this package — auditors can verify the routing without joining to `tenants`.
+2. **Add `chk_r2_bucket_region_consistency` CHECK constraint** enforcing that EU data regions always use the EU bucket and vice versa. Makes incorrect routing a hard constraint violation at INSERT/UPDATE time.
+3. **Drop the hardcoded DEFAULT** from `r2_bucket`. The Worker now sets `r2_bucket` explicitly; a missing value fails NOT NULL and surfaces routing bugs immediately.
+
+```sql
+-- Migration: 0075_offboarding_r2_routing.sql
+-- Resolves: OQ-OFB-02 (DEC-061, 2026-06-15)
+-- Adds data_region denormalisation + bucket-region consistency enforcement
+-- to tenant_data_egress_packages.
+
+BEGIN;
+
+-- Step 1: Add data_region column (denormalized from tenants at job creation time)
+ALTER TABLE tenant_data_egress_packages
+  ADD COLUMN data_region TEXT NOT NULL DEFAULT 'us-east-1'
+    CHECK (data_region IN ('us-east-1', 'eu-central-1', 'eu-west-1'));
+
+COMMENT ON COLUMN tenant_data_egress_packages.data_region
+  IS 'Copied from tenants.data_region at offboarding job creation time. '
+     'Determines r2_bucket via resolveEgressBucket(). Immutable after row creation. '
+     'Denormalized here so evidence queries (§36.7) are self-contained without joining tenants.';
+
+-- Step 2: Backfill existing rows — all pre-migration packages used the US bucket
+UPDATE tenant_data_egress_packages
+  SET data_region = 'us-east-1'
+  WHERE data_region = 'us-east-1';  -- no-op; included for explicit audit trail
+
+-- Step 3: Enforce bucket-region consistency
+-- Prevents any row where an EU data_region maps to the US bucket (or vice versa).
+-- If the Worker calls resolveEgressBucket() correctly, this constraint never fires.
+-- If it fires, it surfaces a routing bug at INSERT time rather than silently mislabelling the package.
+ALTER TABLE tenant_data_egress_packages
+  ADD CONSTRAINT chk_r2_bucket_region_consistency CHECK (
+    (data_region = 'us-east-1'
+      AND r2_bucket = 'form-offboarding-exports')
+    OR
+    (data_region IN ('eu-central-1', 'eu-west-1')
+      AND r2_bucket = 'form-offboarding-exports-eu')
+  );
+
+-- Step 4: Drop the hardcoded DEFAULT from r2_bucket
+-- The Worker must now supply r2_bucket explicitly at INSERT time.
+-- A missing value triggers NOT NULL and makes the bug immediately visible in staging.
+ALTER TABLE tenant_data_egress_packages
+  ALTER COLUMN r2_bucket DROP DEFAULT;
+
+-- Step 5: Partial index for OFB-E-005 evidence collection (EU packages only)
+CREATE INDEX idx_egress_packages_eu_region
+  ON tenant_data_egress_packages (tenant_id, created_at DESC)
+  WHERE data_region IN ('eu-central-1', 'eu-west-1');
+
+-- Step 6: Verification queries
+SELECT
+  data_region,
+  r2_bucket,
+  COUNT(*) AS row_count
+FROM tenant_data_egress_packages
+GROUP BY data_region, r2_bucket
+ORDER BY data_region;
+-- Expected (pre-EU-tenant era): exactly one row — ('us-east-1', 'form-offboarding-exports', N).
+-- After first EU off-boarding: a second row ('eu-central-1' or 'eu-west-1', 'form-offboarding-exports-eu', M).
+
+-- Confirm chk_r2_bucket_region_consistency rejects an EU-region + US-bucket combination:
+-- (Run on staging only — will fail as expected)
+-- INSERT INTO tenant_data_egress_packages (... data_region, r2_bucket ...)
+--   VALUES (... 'eu-central-1', 'form-offboarding-exports' ...);
+-- Expected: ERROR 23514 check_violation on chk_r2_bucket_region_consistency.
+
+COMMIT;
+```
+
+---
+
+### 36.6 `enterprise.data_export_completed` Payload Extension
+
+The existing DEC-030 event `enterprise.data_export_completed` (CRITICAL, 7yr — §25.12) records package delivery. Adding three fields provides chain-level evidence that EU packages were routed to the EU bucket — without querying Postgres.
+
+```typescript
+// Extends the existing enterprise.data_export_completed payload
+// (registered in docs/AUDIT_LOG_SCHEMA.md §6.Enterprise-Offboarding)
+
+interface DataExportCompletedPayload {
+  // Existing fields (unchanged):
+  tenant_id:           string;   // tenant slug — no UUID per DEC-030 §3
+  offboarding_job_id:  string;
+  package_type:        EgressPackageType;
+  package_id:          string;   // tenant_data_egress_packages.id (UUID)
+  sha256_manifest:     string;   // hex-encoded SHA-256 of the ZIP archive
+
+  // New in DEC-061:
+  data_region:         DataRegion;   // 'us-east-1' | 'eu-central-1' | 'eu-west-1'
+  r2_bucket:           string;       // 'form-offboarding-exports' | 'form-offboarding-exports-eu'
+  is_eu_region:        boolean;      // true if data_region.startsWith('eu-')
+  package_size_bytes:  number;       // tenant_data_egress_packages.package_size_bytes
+}
+```
+
+**Chain invariant OFB-REGION-01:** For any `enterprise.data_export_completed` event where `is_eu_region = true`, the `r2_bucket` field MUST equal `'form-offboarding-exports-eu'`. The `emit-audit-event` Worker's payload validator enforces this at emission time; a violation:
+- Returns HTTP 422 (rejects the event)
+- Emits a P1 PagerDuty alert to `form-platform` + `form-compliance`
+- Is logged as a chain-integrity incident (investigate per R-05 protocol)
+
+**Registration:** `docs/AUDIT_LOG_SCHEMA.md §6.Enterprise-Offboarding` — existing `enterprise.data_export_completed` entry — payload spec extended with `data_region`, `r2_bucket`, `is_eu_region`, `package_size_bytes`. No new event type created; this is a backwards-compatible payload extension (existing consumers that do not read these fields are unaffected).
+
+---
+
+### 36.7 SOC 2 Evidence Mapping
+
+| Artefact | Criteria | Collection | Contents | Retention |
+|---|---|---|---|---|
+| **OFB-E-005** | C1.1, P4.0, CC6.1 | Quarterly — `compliance/evidence/ofb/OFB-E-005_<YYYY-QN>.csv` | Export of all `enterprise.data_export_completed` chain events for EU-region tenants; confirm every row has `is_eu_region: true` and `r2_bucket: 'form-offboarding-exports-eu'`; zero-event attestation if no EU off-boardings in the quarter (zero-event is itself affirmative evidence that OFB-REGION-01 has never been violated) | 7 years |
+| **OFB-E-006** | C1.1, CC6.1 | Annual — `compliance/evidence/ofb/OFB-E-006_<YYYY>.md` | Screenshot of `form-offboarding-exports-eu` Cloudflare R2 console confirming EU jurisdiction selected; IAM policy export confirming no public access; Cloudflare DPA / data processing addendum confirming EU jurisdiction for `form-offboarding-exports-eu` bucket | 7 years |
+
+**SQL for OFB-E-005 collection (compliance_reviewer role):**
+
+```sql
+-- OFB-E-005: EU egress packages — DEC-030 chain evidence for OFB-REGION-01
+SELECT
+  event_id,
+  created_at,
+  payload->>'tenant_id'          AS tenant_id,
+  payload->>'offboarding_job_id' AS offboarding_job_id,
+  payload->>'package_type'       AS package_type,
+  payload->>'package_id'         AS package_id,
+  payload->>'data_region'        AS data_region,
+  payload->>'r2_bucket'          AS r2_bucket,
+  (payload->>'is_eu_region')::boolean  AS is_eu_region,
+  payload->>'package_size_bytes' AS package_size_bytes
+FROM audit_log_events
+WHERE event_type = 'enterprise.data_export_completed'
+  AND (payload->>'is_eu_region')::boolean = true
+  AND created_at >= date_trunc('quarter', now()) - INTERVAL '1 quarter'
+  AND created_at <  date_trunc('quarter', now())
+ORDER BY created_at;
+
+-- PASS: every row has r2_bucket = 'form-offboarding-exports-eu'.
+-- FAIL: any row with r2_bucket = 'form-offboarding-exports' — escalate to R-05 + P1 alert.
+```
+
+**Auditor narrative for C1.1 (Confidentiality):** FORM's enterprise off-boarding egress Worker resolves the R2 bucket at package-row creation time using `resolveEgressBucket(tenants.data_region)`, enforced by the Postgres `chk_r2_bucket_region_consistency` CHECK constraint (migration 0075). EU-domiciled tenants (`eu-central-1`, `eu-west-1`) receive packages stored exclusively in `form-offboarding-exports-eu`, a Cloudflare R2 bucket with EU jurisdiction — no Chapter V GDPR transfer occurs. The OFB-REGION-01 chain invariant, enforced in the `emit-audit-event` Worker, independently confirms correct routing in every `enterprise.data_export_completed` event. Quarterly OFB-E-005 exports provide auditor-verifiable evidence that no EU tenant's package was misrouted to the US bucket.
+
+---
+
+### 36.8 §25.9 OQ-OFB-02 Status
+
+| Status | 🟢 **Resolved — DEC-061 (2026-06-15)** |
+|---|---|
+| **Decision** | EU-region R2 routing adopted; `form-offboarding-exports-eu` (Cloudflare R2 EU jurisdiction) for EU-domiciled tenants |
+| **Option B (SCCs) rejected on** | TIA maintenance burden; EU DPO friction; FISA §702 exposure; DPA Annex B complexity |
+| **Enforcement** | `chk_r2_bucket_region_consistency` Postgres CHECK (migration 0075) + OFB-REGION-01 chain invariant (§36.6) |
+| **§25.9 cross-update** | OQ-OFB-02 updated to 🟢 Resolved |
+
+---
+
+### 36.9 Implementation Checklist
+
+#### P0 — Before any EU enterprise tenant off-boards (M7–M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Provision `form-offboarding-exports-eu` in Cloudflare dashboard: select **EU** as the R2 jurisdiction (not US or Automatic); configure IAM — `form_system` service token only, same policy as US bucket; enable 30-day object lifecycle rule. Capture and file a screenshot of the jurisdiction setting as the baseline OFB-E-006 evidence. | devops-lead | **P0** | M7 | [ ] |
+| 2 | Run migration `0075_offboarding_r2_routing.sql` on staging; verify: (a) all existing rows show `data_region='us-east-1'`, `r2_bucket='form-offboarding-exports'`; (b) an INSERT with `(data_region='eu-central-1', r2_bucket='form-offboarding-exports')` raises ERROR 23514; (c) `ALTER COLUMN r2_bucket DROP DEFAULT` was applied (confirm via `\d tenant_data_egress_packages`). Apply to production after staging validation. | platform-engineer | **P0** | M8 | [ ] |
+| 3 | Implement `resolveEgressBucket()` in `apps/offboarding-worker/src/routing.ts` per §36.4. Replace all hardcoded `'form-offboarding-exports'` literals in the Worker with calls to this function. Add unit test file `apps/offboarding-worker/src/routing.test.ts` covering all three `DataRegion` values and the `isEuRegion()` helper. | platform-engineer | **P0** | M8 | [ ] |
+| 4 | Register OFB-REGION-01 payload invariant in `emit-audit-event` Worker: on `enterprise.data_export_completed`, validate that `is_eu_region === true` implies `r2_bucket === 'form-offboarding-exports-eu'`; return HTTP 422 + emit P1 PagerDuty alert to `form-platform` + `form-compliance` on violation. Add integration test confirming the 422 path fires on a synthetic violation payload. | platform-engineer + compliance-officer | **P0** | M8 | [ ] |
+| 5 | Extend `enterprise.data_export_completed` payload spec in `docs/AUDIT_LOG_SCHEMA.md §6.Enterprise-Offboarding` with `data_region`, `r2_bucket`, `is_eu_region`, `package_size_bytes` per §36.6. Deploy updated event schema to `emit-audit-event` Worker registry. | platform-engineer + compliance-officer | **P0** | M8 | [ ] |
+| 6 | Update DPA Annex B template (`docs/MSA_TEMPLATE.md §DPA-Annex-B`) transfer mechanism row: add a conditional clause — for tenants with `data_region IN ('eu-central-1', 'eu-west-1')`, off-boarding egress packages are "stored in EU (Cloudflare R2 EU jurisdiction); no Chapter V transfer mechanism required." Confirm with outside counsel before first EU enterprise DPA execution. | compliance-officer + legal | **P0** | Before first EU DPA | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Add OFB-E-005 to `docs/SOC2_READINESS.md §C1.1` evidence table (quarterly; references OFB-REGION-01 chain invariant). Add OFB-E-006 to `docs/SOC2_READINESS.md §CC6.1` evidence table (annual; Cloudflare R2 jurisdiction screenshot). | compliance-officer | **P1** | M11 | [ ] |
+| 8 | Add `idx_egress_packages_eu_region` to `docs/OBSERVABILITY.md §12.3` index hygiene monitoring table. Confirm the index is used in the OFB-E-005 collection SQL via `EXPLAIN ANALYZE` on staging with representative EU-tenant rows. | devops-lead | **P1** | M11 | [ ] |
+
+#### P2 — Annual governance
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | Annual review: confirm Cloudflare has not deprecated or modified the EU jurisdiction commitment for `form-offboarding-exports-eu`. Check Cloudflare's Data Processing Addendum for any changes to the R2 EU jurisdiction definition. If jurisdiction guarantees weaken, evaluate migration to an alternative EU-resident object store and document the decision in `docs/DECISION_LOG.md`. | devops-lead + compliance-officer | **P2** | Annual (M12, M24, …) | [ ] |
+| 10 | Collect OFB-E-005 baseline artefact after the first EU-tenant off-boarding completes; collect OFB-E-006 annual artefact in January each year. File both with the SOC 2 auditor at observation period end. | compliance-officer | **P2** | M13 | [ ] |
+
+---
+
+### 36.10 Open Questions
+
+OQ-OFB-02 is closed. One forward-looking question opened by this section:
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-R2-01** | **Should `data_region` expand to cover APAC or LATAM jurisdictions?** Current CHECK is `('us-east-1', 'eu-central-1', 'eu-west-1')`. Cloudflare R2 does not yet offer APAC or LATAM jurisdiction-level buckets (as of 2026-Q2). If a customer in Australia (Privacy Act APP 8), Singapore (PDPA), or Brazil (LGPD Art. 33) requires in-country storage, a new `data_region` value and corresponding R2 bucket must be added. `ALTER TABLE tenant_data_egress_packages ALTER COLUMN data_region DROP CONSTRAINT ...` followed by a new CHECK is forward-compatible; no existing rows are affected. `tenants.data_region` requires the same TEXT CHECK update. `resolveEgressBucket()` and `chk_r2_bucket_region_consistency` must be updated simultaneously. | P2 | enterprise-architect + devops-lead + legal | Evaluate at first APAC or LATAM enterprise LOI; document in `docs/DECISION_LOG.md` before provisioning a new bucket. |
+
+---
+
+*v1.15 (2026-06-15): §36 OQ-OFB-02 Resolution — EU-Region R2 Bucket Routing for Enterprise Off-boarding Data Egress (DEC-061). Note: document header was inadvertently not updated when §35 was added (v1.14 note is present but the header line retained v1.13); this commit updates the header to v1.15 to account for both §35 (v1.14) and §36 (v1.15). Closes OQ-OFB-02 (P0, before any EU enterprise tenant off-boards) from §25.9. Decision: Option A adopted — EU-region R2 bucket routing based on `tenants.data_region`. Options B (SCCs + single US bucket) and C (EU bucket + SCCs) rejected on four grounds: TIA maintenance burden under Schrems II, EU enterprise customer DPO friction, FISA §702 / CLOUD Act exposure of Cloudflare US-East, and DPA Annex B complexity. §36.3 `form-offboarding-exports-eu` bucket specification: Cloudflare R2 EU jurisdiction; same IAM policy as US bucket; 30-day object lifecycle; Cloudflare Ireland Ltd — existing SUBPROCESSORS.md entry covers this (no new processor). §36.4 `resolveEgressBucket()` TypeScript routing function: R2_BUCKET_BY_REGION constant (`us-east-1` → `form-offboarding-exports`; `eu-central-1`/`eu-west-1` → `form-offboarding-exports-eu`); `isEuRegion()` helper; six unit test assertions. §36.5 migration `0075_offboarding_r2_routing.sql`: (1) ADD COLUMN `data_region TEXT NOT NULL DEFAULT 'us-east-1' CHECK (...)` to `tenant_data_egress_packages`; (2) ADD CONSTRAINT `chk_r2_bucket_region_consistency` — EU data_region implies EU r2_bucket, US data_region implies US r2_bucket; (3) DROP DEFAULT from `r2_bucket` — Worker must supply value explicitly; (4) CREATE partial INDEX `idx_egress_packages_eu_region` on `(tenant_id, created_at DESC) WHERE data_region IN ('eu-central-1', 'eu-west-1')` for OFB-E-005 evidence query performance; (5) verification SELECT GROUP BY data_region, r2_bucket. §36.6 `enterprise.data_export_completed` payload extension: three new fields added to existing DEC-030 CRITICAL 7yr event — `data_region`, `r2_bucket`, `is_eu_region`; chain invariant OFB-REGION-01 (EU `is_eu_region: true` → `r2_bucket` must equal `'form-offboarding-exports-eu'`; HTTP 422 + P1 PagerDuty on violation; investigate per R-05); registered in `docs/AUDIT_LOG_SCHEMA.md §6.Enterprise-Offboarding` (backwards-compatible payload extension — no new event type). §36.7 two SOC 2 evidence artefacts: OFB-E-005 (C1.1/P4.0/CC6.1 — quarterly `enterprise.data_export_completed` chain export for EU tenants confirming OFB-REGION-01; zero-event quarters filed as affirmative attestation; 7yr); OFB-E-006 (C1.1/CC6.1 — annual Cloudflare R2 EU jurisdiction screenshot + IAM export; 7yr); SQL for OFB-E-005 collection provided; C1.1 auditor narrative. §36.8 OQ-OFB-02 status table: 🟢 Resolved DEC-061. §36.9 ten-item implementation checklist: 6× P0/M7–Before-first-EU-DPA (EU R2 bucket provisioning + OFB-E-006 baseline, migration 0075, routing.ts + unit tests, OFB-REGION-01 validator + integration test, AUDIT_LOG_SCHEMA payload extension, MSA_TEMPLATE DPA Annex B clause), 2× P1/M11 (SOC2_READINESS evidence table updates, idx_egress_packages_eu_region EXPLAIN ANALYZE), 2× P2/Annual (Cloudflare jurisdiction policy review, OFB-E-005/OFB-E-006 evidence collection). §36.10 one new open question OQ-R2-01 (P2 — APAC/LATAM data_region expansion; evaluate at first APAC/LATAM enterprise LOI; forward-compatible ALTER TABLE path described). §25.9 OQ-OFB-02 updated to 🟢 Resolved. TOC updated to add §35 and §36 entries. Privacy floor: no individual employee user_id, health data, or Art. 9 category in any field added by this section; `data_region` is a technical routing label, not a personal data element; `tenant_id` in DEC-030 events is a slug, never a UUID; `form_api` REVOKED from `tenant_data_egress_packages` (inherited from §25.4 RLS). Cross-references: `docs/DATA_MODEL.md §25` (`tenant_data_egress_packages` DDL — `r2_bucket` DEFAULT dropped; `data_region` + `chk_r2_bucket_region_consistency` added via migration 0075; §25.9 OQ-OFB-02 updated to 🟢 Resolved; §25.12 `enterprise.data_export_completed` payload extended); `docs/AUDIT_LOG_SCHEMA.md §6.Enterprise-Offboarding` (payload extension — P0 before M8); `docs/MSA_TEMPLATE.md §DPA-Annex-B` (transfer mechanism row update for EU tenants — P0 before first EU DPA); `docs/SOC2_READINESS.md §C1.1` (OFB-E-005 to add — P1/M11); `docs/SOC2_READINESS.md §CC6.1` (OFB-E-006 to add — P1/M11); `docs/OBSERVABILITY.md §12.3` (idx_egress_packages_eu_region to add — P1/M11); `docs/INCIDENT_RESPONSE.md R-05` (OFB-REGION-01 violation → R-05 chain investigation); `docs/SUBPROCESSORS.md` (Cloudflare Ireland Ltd — existing entry; EU R2 jurisdiction is a configuration change, not a new processor); `docs/CRYPTOGRAPHY_POLICY.md §5` (no new secrets introduced; existing `EGRESS_PACKAGE_SIGNING_KEY` covers both buckets); `docs/DECISION_LOG.md DEC-061`. Owner: enterprise-architect + compliance-officer + devops-lead + legal.*

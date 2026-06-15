@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [5.33.0] — 2026-06-15
+
+### Added
+- `docs/DATA_MODEL.md §36` — OQ-OFB-02 Resolution: EU-Region R2 Bucket Routing for Enterprise Off-boarding Data Egress (DEC-061). EU-domiciled enterprise tenants (`eu-central-1`, `eu-west-1`) now route off-boarding egress packages to `form-offboarding-exports-eu` (Cloudflare R2 EU jurisdiction), eliminating GDPR Chapter V transfer concerns. Includes migration `0075_offboarding_r2_routing.sql` (`data_region` column + `chk_r2_bucket_region_consistency` CHECK), `resolveEgressBucket()` TypeScript routing function, OFB-REGION-01 chain invariant in `enterprise.data_export_completed`, two SOC 2 evidence artefacts (OFB-E-005 / OFB-E-006), and DPA Annex B clause update. Closes §25.9 OQ-OFB-02 (P0).
+
+### Changed
+- `docs/DATA_MODEL.md` — header v1.13 → v1.15 (v1.14 header update was omitted when §35 was added; both §35 and §36 credited in v1.15); TOC updated to add §35 and §36 entries; §25.9 OQ-OFB-02 updated to 🟢 Resolved (DEC-061).
+- `VERSION` — 5.32.0 → 5.33.0.
+
+---
+
 ## [5.32.0] — 2026-06-15
 
 ### Added
