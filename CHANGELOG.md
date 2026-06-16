@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [5.66.0] — 2026-06-16
+
+### Added
+- `content/post-1061-hip-flexors-anatomy.md` — Block 1051–1100 cluster 3, post 1/5. Флексори стегна: iliopsoas (psoas major + iliacus) і rectus femoris. Бімартикулярність rectus femoris і механізм active insufficiency при присіданні. Пряме тренування флексорів: виправдане при спортивній специфіці або вираженому дефіциті. clinical-safety: NOT_REQUIRED.
+- `content/post-1062-hamstrings-functional-anatomy.md` — Block 1051–1100 cluster 3, post 2/5. Задня поверхня стегна: biceps femoris (довга і коротка голова), semitendinosus, semimembranosus. Дві функції: розгинання стегна (довга голова) і згинання коліна (всі голови). Leg curl vs. RDL — різні вектори, не взаємозамінні. Nordic curl як ексцентрична добавка. clinical-safety: NOT_REQUIRED.
+- `content/post-1063-triceps-three-heads.md` — Block 1051–1100 cluster 3, post 3/5. Трицепс: довга голова (бімартикулярна, починається від лопатки), медіальна і латеральна (мономартикулярні). Overhead extension → максимальний стимул для довгої голови у stretched position. Програма без overhead-роботи системно пропускає найбільший компонент трицепсу. clinical-safety: NOT_REQUIRED.
+- `content/post-1064-biceps-brachii-anatomy.md` — Block 1051–1100 cluster 3, post 4/5. Biceps brachii: довга голова (supraglenoid tubercle) і коротка (coracoid process). Супінація передпліччя — основна функція, недооцінена при програмуванні. Incline curl → довга голова у stretched position. Hammer curl → brachialis, не biceps brachii. clinical-safety: NOT_REQUIRED.
+- `content/post-1065-forearm-anatomy.md` — Block 1051–1100 cluster 3, post 5/5. Передпліччя: flexor digitorum profundus (основа сили хвату), extensor carpi radialis (стабілізатор зап'ястя при жимах). Crushing vs. support vs. pinch grip. Баланс флексорів і екстензорів. Farmer's carry і dead hang як функціональний підхід до хвату. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — додано картки для постів 1061–1065. blog.html updated to post-1065.
+- `STATUS.md` — Block 1051–1100 оновлено: 10/50 → 15/50, cluster 3 COMPLETE. Total posts: 1060 → 1065.
+- `VERSION` → 5.66.0
+
+---
+
 ## [5.65.1] — 2026-06-16
 
 ### Added
