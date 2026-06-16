@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.76.0] — 2026-06-16
+
+### Added
+- `content/post-112-training-and-life-stress.md` — Editorial series post 112. «Тренування і стрес поза залом: як системне навантаження складається і чому програма це не враховує». HPA-вісь і алостатичне навантаження (McEwen); Stults-Kolehmainen & Sinha 2014 (психологічний стрес → знижені силові адаптації); Bartholomew 2008 (гострий стрес → підвищений RPE); Martin 2009 (ментальна втома → зниження витривалості); Leproult & Van Cauter 1999 (сон → кортизол); практичний алгоритм check-in + таблиця рішень; HRV як інтегральний маркер. clinical-safety: CONDITIONAL PASS. sports-scientist review pending.
+
+### Changed
+- `blog.html` — blog card для post-112 додана у верхню частину сітки.
+- `STATUS.md` — Total posts 1089 → 1090; Editorial series 106–111 → 106–112; post-112 записано в history рядку.
+- `VERSION` — 5.75.0 → 5.76.0.
+
+---
+
 ## [5.75.0] — 2026-06-16
 
 ### Added
