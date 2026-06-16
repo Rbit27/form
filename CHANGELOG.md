@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.62.0] — 2026-06-16
+
+### Added
+- `content/post-1051-gluteal-anatomy-layers.md` — Block 1051–1100 post 1/50. М'язова специфіка: сідничні м'язи — анатомія трьох шарів (gluteus maximus, medius, minimus), функції у розгинанні стегна і стабілізації таза, типова прогалина у програмах (фронтальна площина), EMG-дані по куту стегна та активації, аргумент на користь довгої м'язової довжини для гіпертрофії. clinical-safety: NOT_REQUIRED.
+- `content/post-1052-biceps-femoris-vs-semitendinosus.md` — Block 1051–1100 post 2/50. Підколінні сухожилля: biceps femoris (довга і коротка голова) vs. semitendinosus/semimembranosus — різні ротаторні функції, односуглобова природа короткої голови, проксимальна vs. дистальна гіпертрофія, чому RDL і leg curl є взаємодоповненнями, а не альтернативами. clinical-safety: NOT_REQUIRED.
+- `content/post-1053-quadriceps-vmo-myth.md` — Block 1051–1100 post 3/50. VMO-міф: чому вибіркова активація VMO не підтверджена EMG; rectus femoris як двосуглобовий і найчастіше недотренований; реальні відмінності в активації голів залежно від нахилу і глибини; leg extension як єдиний спосіб навантажити коротку голову без двосуглобового компромісу. clinical-safety: NOT_REQUIRED.
+- `content/post-1054-latissimus-dorsi-function.md` — Block 1051–1100 post 4/50. Latissimus dorsi: три функції (приведення, розгинання, внутрішня ротація), чому pulldown і row дають різний механічний стимул, EMG-порівняння, teres major як синергіст, аргумент для максимального розтягнення у верхній точці тяги. clinical-safety: NOT_REQUIRED.
+- `content/post-1055-pectoralis-major-heads.md` — Block 1051–1100 post 5/50. Pectoralis major: клавікулярна і стернальна голови — різні точки початку, різна механічна перевага; оптимальний нахил 30–45° для клавікулярної; чому зведення не замінює жим; суб'єктивне «відчуття» не є індикатором механічного стимулу. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — картки posts 1051–1055 додані до сітки перед post-1050.
+- `VERSION` — bump 5.61.0 → 5.62.0.
+
+---
+
 ## [5.61.0] — 2026-06-16
 
 ### Added
