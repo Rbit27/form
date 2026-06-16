@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [5.67.0] — 2026-06-16
+
+### Added
+- `content/post-108-training-cognitive-performance.md` — Editorial series post 108. «Тренування і когнітивна продуктивність — що спортивна наука реально показує». Гострий ефект аеробного навантаження на виконавчі функції (Lambourne & Tomporowski 2010), BDNF і хронічні структурні зміни (Erickson 2011), перевернута J-крива при overtrained стані (Meeusen 2013), тайминг, силове тренування і когніція (Liu-Ambrose 2010), сон як медіатор. 13-хв читання. clinical-safety: PASS.
+
+### Changed
+- `blog.html` — додано картку для post-108 (Editorial series). blog.html updated to post-108.
+- `STATUS.md` — Editorial series оновлено 106–107 → 106–108. Total posts: 1065 → 1066.
+- `README.md` — post-108 статус: proposed → draft · v5.67.0.
+- `VERSION` → 5.67.0
+
+---
+
 ## [5.66.0] — 2026-06-16
 
 ### Added
