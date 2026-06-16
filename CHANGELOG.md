@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [5.60.0] — 2026-06-16
+
+### Added
+- `content/post-1042-personal-benchmark-sessions.md` — Block 1001–1050 cluster 5, post 6/9. Персональні контрольні точки: що таке benchmark-сесія, чотири критерії вибору вправи, субмаксимальний протокол 5×3, коли проводити, дві типові помилки. clinical-safety: NOT_REQUIRED.
+- `content/post-1043-long-term-training-trends.md` — Block 1001–1050 cluster 5, post 7/9. Довгострокові тренди: чому короткі вікна обманюють, три рівні читання (тижневий/квартальний/річний), що шукати у річному архіві, хроніка vs. архів. clinical-safety: NOT_REQUIRED.
+- `content/post-1044-autoregulation-data-based-deviations.md` — Block 1001–1050 cluster 5, post 8/9. Autoregulation на основі даних: чотири рівні відхилення (0–3) з RPE-порогами і діями, як визначити базовий RPE розминки, autoregulation і обсяг. clinical-safety: NOT_REQUIRED.
+- `content/post-1045-data-for-coach-feedback.md` — Block 1001–1050 cluster 5, post 9/9. Що давати тренеру: три рівні звіту (мінімальний/стандартний/блоковий), як формулювати конкретні питання, що не надсилати. clinical-safety: NOT_REQUIRED.
+- `content/post-1046-training-log-format.md` — Block 1001–1050 cluster 6, post 1/5. Формат журналу: три функції, мінімальні поля, паперовий vs. цифровий, що не фіксувати, консистентність термінології. clinical-safety: NOT_REQUIRED.
+- `content/post-1047-recovery-deficit-signals.md` — Block 1001–1050 cluster 6, post 2/5. Сигнали відновлення в даних: чотири ранні сигнали накопиченої втоми, що не є надійним сигналом, три рівні реакції, деload vs. відпочинок. clinical-safety: NOT_REQUIRED.
+- `content/post-1048-block-retrospective-protocol.md` — Block 1001–1050 cluster 6, post 3/5. Ретроспектива блоку: 8-крокова процедура (план/факт, контрольна точка, добре/погано, паттерн, обсяг, урок, 3 рішення). clinical-safety: NOT_REQUIRED.
+- `content/post-1049-reading-annual-archive.md` — Block 1001–1050 cluster 6, post 4/5. Річний перегляд: шість секцій, умови достатнього архіву, шаблон підсумкової сторінки. clinical-safety: NOT_REQUIRED.
+- `content/post-1050-training-literacy-block-close.md` — Block 1001–1050 CLOSER. П'ять зсувів у мисленні, що закриває блок: від даних до сигналів, від тренування до трендів, від жорсткого плану до обґрунтованої гнучкості, від читання до комунікації, від поточного до архівного мислення. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — posts 1042–1050 added (9 entries before post-1041).
+- `STATUS.md` — Block 1001–1050 marked COMPLETE 50/50.
+- `VERSION` — bump 5.59.1 → 5.60.0.
+
+---
+
 ## [5.59.1] — 2026-06-16
 
 ### Changed
