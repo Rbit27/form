@@ -18,6 +18,7 @@
 | File | Description | SOC 2 Criteria | Collection Cadence |
 |---|---|---|---|
 | `change-management-policy.md` | Change Management & SDLC Policy v1.0 (POL-011) | CC8.1 | Annual review; update on architecture change |
+| `staging-data-anonymisation-procedure.md` | Staging Data Anonymisation Procedure v1.0 (POL-CC8-ANON-01) — four-step quarterly staging refresh before k6 Cloud EU-West load-test runs; ANON-01–ANON-05 invariants; clinical-safety sign-off gate; PERF-STAGING-E-001 evidence artefact | CC4.1, A1.1, CC8.1 | Quarterly (before each PERF-SLO-06 run); annual policy review |
 | `change-log.csv` | _(create at M4 deploy)_ Log of all production changes tagged `system.deploy` per DEC-030 | CC8.1 | Continuous; export quarterly |
 | `emergency-change-log.csv` | _(create at M4 deploy)_ Log of all emergency changes with retroactive approval records | CC8.1 | On each emergency change; export quarterly |
 | `branch-protection-screenshot.png` | _(collect at M3 hardening)_ Screenshot of GitHub branch protection rules for `main` | CC8.1 | At each rule change |

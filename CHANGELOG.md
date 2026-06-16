@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [5.74.0] — 2026-06-16
+
+### Added
+- `compliance/cc8/staging-data-anonymisation-procedure.md` v1.0 — POL-CC8-ANON-01. Standalone extraction of `docs/OBSERVABILITY.md §45.3` per §45.8 checklist item 3 (P0/M6 · DEC-058). Four-step quarterly staging refresh procedure for FORM's shared staging Supabase project before k6 Cloud EU-West load-test runs: (1) schema-only dump from production + COPY/INSERT grep gate enforcing ANON-02; (2) `test-data-factory` seed (`lt-synthetic-*` tenants, `@test.form.coach` users, `skip_art9_tables: true`) + Art. 9 zero-row SQL verification; (3) clinical-safety attestation message template + Slack `:white_check_mark:` sign-off gate + PERF-STAGING-E-001 evidence filing within 30 min; (4) post-run `supabase db reset` cleanup. Five non-negotiable anonymisation invariants: ANON-01 (`gen_random_uuid()` user_ids only), ANON-02 (schema-only dump — zero COPY/INSERT), ANON-03 (`lt-synthetic-` tenant prefix), ANON-04 (`@test.form.coach` emails), ANON-05 (physically separate Supabase project). Includes quick-reference operator checklist, failure procedures for four edge cases, SOC 2 evidence mapping (PERF-STAGING-E-001 → CC4.1/A1.1), and privacy floor (seven non-negotiable constraints). clinical-safety VETO: any ANON invariant failure blocks the k6 Cloud run. Owner: platform-engineer + compliance-officer + clinical-safety.
+
+### Changed
+- `compliance/cc8/README.md` — `staging-data-anonymisation-procedure.md` entry added to evidence files table (POL-CC8-ANON-01 · CC4.1, A1.1, CC8.1 · quarterly cadence).
+- `docs/OBSERVABILITY.md §45.8` — checklist item 3 (P0/M6) marked [x] Done: `compliance/cc8/staging-data-anonymisation-procedure.md` v1.0 authored (2026-06-16); clinical-safety sign-off + baseline PERF-STAGING-E-001 pending first quarterly run.
+- `VERSION` → 5.74.0
+
 ## [5.73.0] — 2026-06-16
 
 ### Added
