@@ -14346,8 +14346,8 @@ ORDER BY created_at;
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 7 | Add OFB-E-005 to `docs/SOC2_READINESS.md §C1.1` evidence table (quarterly; references OFB-REGION-01 chain invariant). Add OFB-E-006 to `docs/SOC2_READINESS.md §CC6.1` evidence table (annual; Cloudflare R2 jurisdiction screenshot). | compliance-officer | **P1** | M11 | [ ] |
-| 8 | Add `idx_egress_packages_eu_region` to `docs/OBSERVABILITY.md §12.3` index hygiene monitoring table. Confirm the index is used in the OFB-E-005 collection SQL via `EXPLAIN ANALYZE` on staging with representative EU-tenant rows. | devops-lead | **P1** | M11 | [ ] |
+| 7 | Add OFB-E-005 to `docs/SOC2_READINESS.md §C1.1` evidence table (quarterly; references OFB-REGION-01 chain invariant). Add OFB-E-006 to `docs/SOC2_READINESS.md §CC6.1` evidence table (annual; Cloudflare R2 jurisdiction screenshot). | compliance-officer | **P1** | M11 | [x] **Done — SOC2_READINESS.md v3.9.1 (2026-06-15):** OFB-E-005 added to §67.8 (C1.1/P4.0/CC6.1; 🟡 Authored); OFB-E-006 added to §67.8 (C1.1/CC6.1; 🟡 Authored); §67.9 extended with CC6.1/C1.1 EU data-residency row. |
+| 8 | Add `idx_egress_packages_eu_region` to `docs/OBSERVABILITY.md §12.7` index hygiene monitoring table (note: original cross-reference said §12.3, but §12.3 is OTel OTLP content; correct section is §12.7 added in v4.2.1). Confirm the index is used in the OFB-E-005 companion spot-check SQL via `EXPLAIN ANALYZE` on staging with representative EU-tenant rows; file output at `compliance/evidence/ofb/OFB-IDX-VERIFY-001.txt`. | devops-lead | **P1** | M11 | [x] **Done — OBSERVABILITY.md §12.7 (v4.2.1, 2026-06-16):** Index registry table, AL-IDX-01 sentinel query, and EXPLAIN ANALYZE requirement documented. EXPLAIN ANALYZE execution itself deferred to M11 when migration 0075 is on staging. |
 
 #### P2 — Annual governance
 

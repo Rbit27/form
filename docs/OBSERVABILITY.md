@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v4.2
+# FORM · Observability & Monitoring Taxonomy v4.2.1
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -1170,6 +1170,40 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 **Review: quarterly or on architecture change. Next scheduled review: August 2026.**
 **SOC 2 evidence: CC7.2 (system monitoring). See also INCIDENT_RESPONSE.md for CC7.3–CC7.5.**
 *v0.3 patch (2026-06-12): Added jobs 26 (`workout_data_purge`) and 27 (`audit_log_retention_purge`) to the canonical registry — these were specified in §37.7 when v3.3 shipped but were not physically inserted into this table at the time.*
+
+---
+
+### 12.7 Postgres Index Hygiene Monitoring
+
+Tracks partial and composite indexes created specifically to support compliance-evidence collection query performance. An index belongs in this table when: (a) it was authored to support a named evidence-collection query (OFB-E-xxx, SIEM-E-xxx, etc.); (b) its absence would cause a sequential scan on a table expected to hold > 10,000 rows at first evidence collection; or (c) its WHERE clause makes it invisible to routine application paths (partial indexes).
+
+**Owner:** devops-lead · **SOC 2 scope:** A1.1 (evidence queries must complete without timeout), C1.1 (correct data-residency routing verified by index-backed spot-check)
+
+| Index name | Table | Partial-key WHERE | Evidence query | SOC 2 | EXPLAIN ANALYZE requirement | Status |
+|---|---|---|---|---|---|---|
+| `idx_egress_packages_eu_region` | `tenant_data_egress_packages` | `data_region IN ('eu-central-1', 'eu-west-1')` | Companion spot-check for OFB-E-005: confirms every EU-region package row routes to `r2_bucket = 'form-offboarding-exports-eu'` (OFB-REGION-01 invariant). Query (compliance_reviewer): `SELECT tenant_id, r2_bucket, created_at FROM tenant_data_egress_packages WHERE data_region IN ('eu-central-1', 'eu-west-1') ORDER BY tenant_id, created_at DESC` | C1.1, P4.0, CC6.1 | After applying migration 0075 on staging with ≥ 10 synthetic EU-tenant rows: run `EXPLAIN (ANALYZE, BUFFERS)` and confirm `Index Scan on idx_egress_packages_eu_region`; file output at `compliance/evidence/ofb/OFB-IDX-VERIFY-001.txt` (DATA_MODEL §36.9 P1/M11 item 8) | 🟡 Authored — pending migration 0075 on staging (DATA_MODEL §36.9 P0/M8); EXPLAIN ANALYZE to be filed at M11 |
+
+**Unused-index sentinel (AL-IDX-01):** Run the query below monthly, or whenever `slow_query_log` surfaces a full-table scan on any table in this registry:
+
+```sql
+SELECT
+  indexrelname                                  AS index_name,
+  pg_size_pretty(pg_relation_size(indexrelid))  AS index_size,
+  idx_scan                                      AS scans_since_reset,
+  idx_tup_read,
+  idx_tup_fetch
+FROM pg_stat_user_indexes
+WHERE schemaname = 'public'
+  AND indexrelname IN (
+    'idx_egress_packages_eu_region'
+    -- append additional compliance-evidence indexes here as they are created
+  )
+ORDER BY index_name;
+```
+
+If `idx_scan = 0` for any entry after the SOC 2 observation period starts (M11), file a Linear P2 ticket. Zero scans is expected pre-observation-start; zero scans after the first EU off-boarding event would indicate the index was dropped or the OFB-REGION-01 spot-check query was never executed.
+
+**Cross-references:** `docs/DATA_MODEL.md §36.5` (migration 0075 DDL — `idx_egress_packages_eu_region` definition on `tenant_data_egress_packages (tenant_id, created_at DESC) WHERE data_region IN ('eu-central-1', 'eu-west-1')`); `docs/DATA_MODEL.md §36.7` (OFB-E-005 primary evidence SQL on `audit_log_events`; §36.9 P1/M11 item 8 closed by this section); `docs/SOC2_READINESS.md §67.8` (OFB-E-005 and OFB-E-006 evidence artefact specifications added in v3.9.1, 2026-06-15). Owner: devops-lead + compliance-officer.
 
 ---
 
@@ -12443,6 +12477,8 @@ No new DEC-030 events required — the policy is a process-level decision with n
 | 9 | Annual OQ-PERF-03 threshold check: query `SELECT MAX(daily_session_count) FROM analytics.tenant_daily_sessions` and total contracted seats; if threshold met (10k sessions/day or 5,000 fleet seats), evaluate per-tenant vs. fleet-wide VU scaling per §45.5; document decision in `docs/DECISION_LOG.md`. | devops-lead + platform-engineer | **P2** | Annual | [ ] |
 
 ---
+
+*v4.2.1 (2026-06-16): §12.7 Postgres Index Hygiene Monitoring — closes `docs/DATA_MODEL.md §36.9` checklist item 8 (P1/M11 — "Add idx_egress_packages_eu_region to OBSERVABILITY.md index hygiene monitoring table"). New subsection §12.7 added after §12.6 pg_cron registry: (1) Purpose and scope — tracks partial/composite indexes created for compliance-evidence collection query performance; three registration criteria defined. (2) Index registry table — `idx_egress_packages_eu_region` on `tenant_data_egress_packages (tenant_id, created_at DESC) WHERE data_region IN ('eu-central-1', 'eu-west-1')`; companion spot-check query for OFB-E-005 (C1.1/P4.0/CC6.1); EXPLAIN ANALYZE requirement on staging post-migration-0075 with ≥ 10 EU-tenant rows; evidence filed at `compliance/evidence/ofb/OFB-IDX-VERIFY-001.txt`; status 🟡 Authored pending M8 staging run. (3) AL-IDX-01 unused-index sentinel query against `pg_stat_user_indexes`; Linear P2 ticket procedure if `idx_scan = 0` post-M11. Note: DATA_MODEL.md §36.9 originally referenced "§12.3 index hygiene monitoring table" — the correct section is now §12.7 (§12.3 was already occupied by OTel OTLP content added in v0.4; this patch resolves the forward reference). DATA_MODEL.md §36.9 item 8 marked [x] Done; item 7 (OFB-E-005/OFB-E-006 to SOC2_READINESS.md) also marked [x] Done — SOC2_READINESS.md v3.9.1 (2026-06-15) completed that task. Document header: v4.2 → v4.2.1. Cross-references: `docs/DATA_MODEL.md §36.5` (migration 0075 DDL); `docs/DATA_MODEL.md §36.7` (OFB-E-005 primary evidence SQL on `audit_log_events`); `docs/DATA_MODEL.md §36.9` (P1/M11 items 7 and 8 — both closed); `docs/SOC2_READINESS.md §67.8` (OFB-E-005/OFB-E-006 artefacts — v3.9.1). Owner: devops-lead + compliance-officer.*
 
 *v4.2 (2026-06-15): Three cross-reference patches completing obligations from §30 (SSO_SCIM v2.2, 2026-06-14) and §44 (DEC-056/057, v4.1, 2026-06-14). (1) §26.8 `sso_browser_security` subsection added — registers AL-SSO-WEB-01 (P1, PagerDuty `form-security`) for `sso.mobile_webview_blocked` DEC-030 HIGH events; closes SSO_SCIM_IMPLEMENTATION.md §30.13 checklist item 6 (P0/M8); privacy floor documented (`attempted_url_hash` SHA-256[:32] only — no plaintext IdP URL, no user_id, no health data; zero-fire is the expected production state). (2) §27.7 AL-SIEM-06 row replaced with dual-phase specification per §44.2.4 (DEC-056): shadow-mode row (P3 Slack `#devops-alerts`, next-business-day SLA, diagnostic-accumulation instructions) + full-mode row (P1 PagerDuty HIGH `form-devops`, < 30 min SLA, standard SIEM triage) + AL-SIEM-06-SHADOW-END informational row (transition trigger: `auth_event_avg_per_30min > 5` OR 30 calendar days; emits `system.siem_alert_activated` DEC-030 STANDARD 3yr; files CALIB-E-001); graduated-activation note added citing DEC-056; closes §44.6 checklist item 5 (P0/M5). (3) §43.15 checklist item 1 marked [x] Done — `docs/AUDIT_LOG_SCHEMA.md §Integration` updated (CHANGELOG v5.10.1, 2026-06-15): six DEC-030 events registered (`integration.webhook_delivery_failed` HIGH 7yr, `integration.webhook_suspended` HIGH 7yr, `integration.webhook_reactivated` HIGH 7yr — new; `integration.webhook_created`, `integration.webhook_deleted`, `integration.webhook_fired` payload specs extended with `endpoint_url_hash` SHA-256 per DEC-054); WH-CHAIN-01 ordering invariant documented. No new evidence artefacts opened in this patch — all three items close pre-existing checklist obligations. Privacy floor: AL-SSO-WEB-01 payload constraints carried verbatim from SSO_SCIM §30.9; §27.7 dual-phase change does not alter the AL-SIEM-06 trigger threshold or the privacy-floor constraint (no user_id, no health data, no plaintext IP in any SIEM pipeline signal). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §30.10` (AL-SSO-WEB-01 authoritative spec — triage tree and SOC 2 mapping); `docs/SSO_SCIM_IMPLEMENTATION.md §30.13` (checklist item 6 — now closed by this patch); `docs/OBSERVABILITY.md §44.2.4` (dual-phase AL-SIEM-06 spec source); `docs/OBSERVABILITY.md §44.5` (CALIB-E-001 evidence artefact — filed on AL-SIEM-06-SHADOW-END transition); `docs/OBSERVABILITY.md §44.6` (checklist item 5 — now closed by this patch); `docs/AUDIT_LOG_SCHEMA.md §Integration` (six webhook DEC-030 events registered — CHANGELOG v5.10.1); `docs/OBSERVABILITY.md §43.15` (checklist item 1 now [x] Done). Owner: devops-lead + security-engineer + compliance-officer.*
 

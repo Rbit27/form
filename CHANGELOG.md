@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.67.1] — 2026-06-16
+
+### Added
+- `docs/OBSERVABILITY.md §12.7` — Postgres Index Hygiene Monitoring. New subsection after the pg_cron registry (§12.6). Canonical registry for compliance-evidence Postgres indexes: entry table with index name, table, partial-key WHERE, evidence query, SOC 2 mapping, EXPLAIN ANALYZE requirement, and status. First entry: `idx_egress_packages_eu_region` on `tenant_data_egress_packages` (migration 0075, DEC-061) — companion spot-check for OFB-E-005 (C1.1/P4.0/CC6.1). AL-IDX-01 unused-index sentinel `pg_stat_user_indexes` query included.
+
+### Changed
+- `docs/OBSERVABILITY.md` — header v4.2 → v4.2.1.
+- `docs/DATA_MODEL.md §36.9` — checklist items 7 and 8 marked `[x]` Done. Item 7: SOC2_READINESS.md v3.9.1 (2026-06-15) completed OFB-E-005/OFB-E-006 registration. Item 8: OBSERVABILITY.md §12.7 added (corrects erroneous §12.3 cross-reference — §12.3 was occupied by OTel OTLP content).
+- `VERSION` → 5.67.1
+
+---
+
 ## [5.67.0] — 2026-06-16
 
 ### Added
