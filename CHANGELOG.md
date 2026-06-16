@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [5.69.0] — 2026-06-16
+
+### Added
+- `content/post-109-minimum-effective-dose.md` — Editorial series post 109. Мінімальна ефективна доза для тренованого атлета: MEV vs. MV vs. MAV, дослідження Bickel (2011), Ralston (2017), Androulakis-Korakakis (2020). Один важкий підхід на м'яз на тиждень підтримує силу у тренованого атлета. Практична логіка підтримуючих протоколів і несприятливих тижнів. clinical-safety PASS.
+- `blog.html` — додано картку post-109.
+- `README.md` — editorial series розширено: теми 112–120 proposed. Block 1351–1400 «Programming for real life: constraints, transitions, longevity» додано до roadmap.
+
+### Changed
+- `STATUS.md` — editorial series оновлено: post-109 draft · v5.69.0.
+- `VERSION` → 5.69.0
+
+---
+
 ## [5.68.0] — 2026-06-16
 
 ### Added
