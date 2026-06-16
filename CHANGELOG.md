@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [5.68.0] — 2026-06-16
+
+### Added
+- `content/post-1066-rhomboids-anatomy.md` — Block 1051–1100 cluster 4, post 1/5. Ромбоїди: ретракція лопатки та downward rotation. Чому «слабкі ромбоїди» — рідко ізольована проблема; дисбаланс жим/тяга як справжня причина. Практичне місце face pull.
+- `content/post-1067-serratus-anterior-anatomy.md` — Block 1051–1100 cluster 4, post 2/5. Serratus anterior: upward rotation і протракція лопатки. Push-up plus як специфічний інструмент. Зв'язок з overhead pressing і winging лопатки.
+- `content/post-1068-subscapularis-anatomy.md` — Block 1051–1100 cluster 4, post 3/5. Subscapularis: єдиний внутрішній ротатор манжети. ER/IR дисбаланс — чому пряме тренування subscapularis рідко виправдане для силових атлетів; акцент на зовнішніх ротаторах.
+- `content/post-1069-teres-major-minor-anatomy.md` — Block 1051–1100 cluster 4, post 4/5. Teres major і minor: протилежні функції, схожі назви. Teres minor — член манжети, зовнішній ротатор. Teres major — «little lat», внутрішній ротатор, синергіст latissimus dorsi.
+- `content/post-1070-infraspinatus-anatomy.md` — Block 1051–1100 cluster 4, post 5/5. Infraspinatus: головний зовнішній ротатор, що системно недонавантажений у стандартних програмах. ER/IR дисбаланс при жимовому домінуванні. Cable ER і face pull як мінімальна профілактика.
+- `blog.html` — додано картки posts 1066–1070.
+
+### Changed
+- `VERSION` → 5.68.0
+- `STATUS.md` — Block 1051–1100 progress: 20/50; next cluster 1071–1075 (суpraspinatus, середній та передній дельтоїди, pec minor, coracobrachialis).
+
+---
+
 ## [5.67.1] — 2026-06-16
 
 ### Added
