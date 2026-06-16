@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.69.1] — 2026-06-16
+
+### Changed
+- `docs/SOC2_READINESS.md` — §84 Evidence Artefact Cross-Reference Patch: registers nine evidence artefacts (ENGAGE-E-001/002/003, SSO-OBS-E-005/006, WS-E-001/002/003, CONC-E-001) from OBSERVABILITY §§26/33/41 and INCIDENT_RESPONSE §18 that were defined in their source docs but never cross-referenced in SOC2_READINESS. Closes OBSERVABILITY §33.12 item 13 (P1/M14). Nine criterion rows extended: C1.1/C1.2/CC2.2/CC6.1/CC7.2/CC4.1/CC7.4/A1.1/P3.2. Doc version v3.9.1 → v3.10.0.
+- `docs/OBSERVABILITY.md` — §33.12 item 13 marked [x] Done with reference to SOC2_READINESS §84.2.
+- `VERSION` → 5.69.1
+
+---
+
 ## [5.69.0] — 2026-06-16
 
 ### Added

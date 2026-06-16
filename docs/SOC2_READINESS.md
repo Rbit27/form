@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.9.1
+# FORM · SOC 2 Type II Readiness v3.10.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -27751,5 +27751,256 @@ File both to `compliance/evidence/cc7/siem-calibration/`; register in MASTER-IND
 *v3.8.2 (2026-06-14): §82 OQ-CTOOL-01 Resolution — Cloudflare WAF Evidence Collection Method (DEC-055). Closes the sole remaining P1 open question from §78.11 (v3.7.2, 2026-06-13). Question: should Cloudflare WAF rule exports (PRE-25-E-001) be auto-collected via Terraform state output or via Vanta's manual evidence upload? Decision: **Option A (Terraform state export) adopted**. Four grounds: (1) tamper-evidence — Terraform state is the authoritative deployment record, verifiable against GitHub history under CC8.1 change management; dashboard screenshots have no equivalent provenance linkage; (2) structured JSON — machine-parseable, SHA-256 hashable per §79.7 checksum discipline; screenshot checksums capture file identity but not rule-content integrity; (3) §79.7 consistency — MASTER-INDEX checksum protocol requires hashing before upload; JSON file authored locally before upload satisfies this cleanly; (4) operational simplicity — FORM already uses Terraform for Cloudflare WAF deployment; extraction is a single CLI pipeline requiring no additional tooling. Option B (dashboard screenshot) retained as documented fallback for Terraform unavailability only; requires compliance memo note. §82.1 scopes to WAF evidence collection method (WAF rule content → SECURITY.md; infrastructure management → DEPLOYMENT.md). §82.2 full four-ground rationale with option B rejection. §82.3 extraction command: `terraform refresh` then `terraform show -json | jq '[.values.root_module.resources[] | select(.type == "cloudflare_ruleset") | {name, address, zone_id, phase, rules: [.values.rules[] | {action, expression, enabled, description, action_parameters}]}]'` → `compliance/evidence/cc6/waf-rules-YYYY-QN.json`; `sha256sum` appended to MASTER-INDEX.csv; GNU `%q` note + macOS alternative provided; zone_id privacy note (Cloudflare UUID, no user health data in WAF expressions). §82.4 five-step quarterly upload procedure aligned with §79.5 compliance calendar (Month O+3/O+6/O+9/O+12): devops-lead extracts + hashes + uploads to R2; compliance-officer uploads to Vanta manual tab with MASTER-INDEX SHA-256 comment; Option B fallback procedure documented. §82.5 CTOOL-WAF-E-001 evidence artefact: CC6.8 (transmission/configuration integrity) + CC6.6 (network access controls); quarterly cadence; 3yr retention; auditor CC6.8 narrative: end-to-end chain from CC8.1 PR review → Terraform deploy → quarterly state export + MASTER-INDEX checksum proves rule-content integrity throughout observation year. §82.6 gap tracker: OQ-CTOOL-01 🟡 P1 → 🟢 Resolved (DEC-055); PRE-25 WAF evidence gap 🟡 Partial → 🟢 Resolved; +0.1 pp readiness on first CTOOL-WAF-E-001 filing. §82.7 seven-item implementation checklist: 5× P0/Month-O-1 (staging dry-run + note to `pre-obs/`; R2 `cc6/` folder creation with `form-api` NO ACCESS invariant verified; §79.4 master evidence table CTOOL-WAF-E-001 row; §79.5 calendar entries at O+3/O+6/O+9/O+12; §78.10 item 14 updated to reference §82.3 command explicitly), 2× P1/Month-O+3 (first CTOOL-WAF-E-001 filing + CC8.1 cross-reference confirming all Terraform WAF changes in quarter have merged PRs with reviewer approval). §82.8 OQ-CTOOL-01 status table: 🟢 Resolved DEC-055; decision Option A; fallback Option B; artefact CTOOL-WAF-E-001; SOC 2 CC6.8 + CC6.6; first filing Month O+3. §78.11 OQ-CTOOL-01 row updated to 🟢 Resolved (DEC-055, 2026-06-14). Cross-references: §78.10 item 14 (quarterly Vanta upload task — §82.3 replaces implicit WAF placeholder); §78.11 (OQ-CTOOL-01 source — updated 🟢); §79.4 (master evidence table — CTOOL-WAF-E-001 row to add); §79.5 (compliance calendar — O+3/O+6/O+9/O+12 WAF entries); §79.7 (SHA-256 checksum discipline — JSON output compatible with `sha256sum`); §80.3 (R2 `cc6/` folder; `form-api` NO ACCESS invariant); `docs/DEPLOYMENT.md` (Terraform WAF deployment — §82 treats state as authoritative); `docs/SECURITY.md` (WAF rule content — out of scope); `docs/DECISION_LOG.md DEC-055`. Privacy floor: no individual employee health data in CTOOL-WAF-E-001; `zone_id` is Cloudflare-internal UUID; WAF rule expressions operate on HTTP metadata only; no tenant PII in any rule expression. Owner: devops-lead + compliance-officer.*
 
 *v3.8.1 (2026-06-14): §81 Monthly Evidence Collection Automation — Cloudflare Cron Worker & MASTER-INDEX Reconciler. Closes OQ-EC-03 (🟡 Unblocked → 🟡 Authored): §79.10 OQ-EC-03 stated the target bucket and paths were unknown; §80.3 (DEC-052) resolved that blocker; §81 delivers the full Worker spec. §81.1 scopes to three monthly automation tasks (HMAC chain integrity check CC7-E-001, monthly SLA report A1-E-001, MASTER-INDEX reconciliation); quarterly evidence tasks, Vanta mirror uploads, and R2 setup remain out of scope. §81.2 architecture decision: Cloudflare Cron Worker selected over pg_cron because evidence collection spans Supabase REST, Analytics Engine, and R2 — all inaccessible from pg_cron; pg_cron job 33 retained as dead-man's switch. §81.3 full `wrangler.toml` additions (R2 binding `EVIDENCE_VAULT`, AE binding `SLA_EVENTS`, cron `0 1 1 * *`); five-step Worker execution (chain check → SLA report → chain result file → MASTER-INDEX reconcile → DEC-030 emit + mirror-log append); four Worker Secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AUDIT_EMIT_URL, AUDIT_EMIT_SECRET); `form_api` REVOKED note; chain-abort path (no `system.evidence_collection_automated` emitted on violation). §81.4 HMAC integrity SQL (§79.7 canonical query via Supabase REST `/rpc/run_chain_check`; zero rows = intact; rows present = emit `audit.chain_integrity_violation` + abort). §81.5 `MonthlySLAReport` TypeScript interface (period_start/end, slo_results keyed by slo_id with target/achieved/slo_met/error_budget, p0/p1 incident counts, credits_issued_usd, chain_integrity_ok, generated_at); data sources: `sla_monthly_snapshots` §23 + Analytics Engine `sla_events` + `audit_log` `sla.credit_approved` events. §81.6 DEC-030 event `system.evidence_collection_automated` (STANDARD, 7yr — elevated from STANDARD 3yr because event constitutes SOC 2 A1-E-001 chain evidence; payload: period YYYY-MM, artifacts_written R2 paths, chain_integrity_ok literal true, slo_all_met bool, master_index_hash SHA-256, run_duration_ms int; EVD-CHAIN-01 ordering invariant: must follow `system.evidence_vault_configured` from §80.6); companion event `system.evidence_cron_stale` (HIGH, 3yr, emitted by pg_cron job 33). §81.7 atomic MASTER-INDEX reconciliation via R2 conditional put with `If-Match` ETag; conflict on 2 retries emits `system.evidence_cron_conflict` (MEDIUM, 1yr) and aborts. §81.8 four alert rules AL-EVD-01 through AL-EVD-04 (P2/P0/P1/P2 respectively): AL-EVD-01 dead-man's switch (Slack, monthly dedup, pg_cron job 33 trigger), AL-EVD-02 chain violation (PagerDuty `form-security` HIGH urgency, no auto-resolve, R-05 activation), AL-EVD-03 R2 write failure (PagerDuty `form-platform`), AL-EVD-04 MASTER-INDEX ETag conflict (Slack); pg_cron job 33 SQL included. §81.9 two SOC 2 evidence artefacts: AUTO-E-001 (CC4.2/CC7.1 — annual 12-event DEC-030 chain export with master_index_hash, 7yr) and AUTO-E-002 (CC4.1/CC7.2 — AL-EVD config + 90d incident history, 3yr); auditor narratives for CC4.2 and CC7.1 included. §81.10 gap tracker: OQ-EC-03 🟡 Unblocked → 🟡 Authored (🟢 on Month O+1 first run); CC4.2 🟡 Partial → 🟢 on AUTO-E-001 first annual filing; ~+0.1 pp readiness on filing. §81.11 eleven-item implementation checklist: 6× P0/Month-O-1 (Worker deploy + dry-run validation, three DEC-030 event registrations, pg_cron job 33, four AL-EVD alert rules), 3× P1/Month-O+1 (first run confirmation, MASTER-INDEX verification, AUTO-E-002 filing), 2× P2/annual (AUTO-E-001 collection, OQ-EVD-01 MASTER-INDEX mode decision). §81.12 two open questions: OQ-EVD-01 (P2 — full-rewrite vs. delta-log; recommended: full-rewrite with ETag guard at Year 1; revisit if conflict events > 3), OQ-EVD-02 (P2 — 3-consecutive-miss escalation to P1 + R-27 runbook in INCIDENT_RESPONSE.md). §80.10 OQ-EC-03 row updated to 🟡 Authored — §81. Cross-references: §79 (evidence collection plan — three monthly tasks being automated); §79.5 (compliance calendar — monthly recurring actions now covered by this Worker); §79.7 (chain integrity SQL — canonical query re-used verbatim in §81.4); §80.3 (R2 folder structure and bucket name `form-soc2-evidence` — target paths for `artifacts_written`); §80.4 (Vanta mirror protocol — Worker appends to `mirror-log/YYYY-MM.jsonl` as the trigger for manual Vanta sync); §80.6 (EVD-CHAIN-01 — `system.evidence_vault_configured` as ordering prerequisite); §15 (compliance calendar — monthly cron replaces three manual calendar entries for chain check + SLA report + MASTER-INDEX update); `docs/AUDIT_LOG_SCHEMA.md §6` (register three new DEC-030 events: `system.evidence_collection_automated` / `system.evidence_cron_stale` / `system.evidence_cron_conflict`); `docs/OBSERVABILITY.md §12.6` (pg_cron job registry — add job 33 `evidence_cron_freshness_check`); `docs/INCIDENT_RESPONSE.md R-05` (chain violation response on AL-EVD-02 trigger); `docs/INCIDENT_RESPONSE.md R-27` (evidence automation failure recovery — proposed in OQ-EVD-02); `docs/AUDIT_LOG_SCHEMA.md` (`audit.chain_integrity_violation` — existing HIGH event re-used in §81.4 abort path). Privacy floor: no individual employee health data in any §81 DEC-030 event; `artifacts_written` R2 path strings only; `master_index_hash` is a SHA-256 of path + status columns, never of evidence content; `form_api` REVOKED from all compliance evidence paths. Owner: devops-lead + compliance-officer.*
+
+---
+
+## §84 Evidence Artefact Cross-Reference Patch: OBSERVABILITY §§26/33/41 + INCIDENT_RESPONSE §18
+
+### §84.1 Purpose
+
+Four FORM sub-systems defined SOC 2 evidence artefacts in their own documentation but never registered those artefacts in this readiness tracker. This patch closes that gap for nine artefacts spanning four source sections:
+
+| Source | Section | Artefacts registered here |
+|---|---|---|
+| `docs/OBSERVABILITY.md §33` | Enterprise Tenant Engagement Health | ENGAGE-E-001, ENGAGE-E-002, ENGAGE-E-003 |
+| `docs/OBSERVABILITY.md §26.7a` | SCIM Mass Deprovisioning Observability | SSO-OBS-E-005 |
+| `docs/OBSERVABILITY.md §26.7b` | SCIM Endpoint Operations Alerts | SSO-OBS-E-006 |
+| `docs/OBSERVABILITY.md §41` | Wearable Integration Observability | WS-E-001, WS-E-002, WS-E-003 |
+| `docs/INCIDENT_RESPONSE.md §18` | Concurrent Incident Sub-Chain | CONC-E-001 |
+
+This section fulfils the explicit P1 mandate in `docs/OBSERVABILITY.md §33.12 item 13` (M14): *"Add ENGAGE-E-001, ENGAGE-E-002, ENGAGE-E-003 evidence artefact references to `docs/SOC2_READINESS.md` C1.1, CC2.2, CC7.2, A1.1 control evidence rows."* It simultaneously registers SSO-OBS-E-006 as promised in the OBSERVABILITY v1.3.2 cross-reference note (*"`docs/SOC2_READINESS.md §CC6.1/CC6.3` will reference … SSO-OBS-E-006 post-observation"*), and closes the equivalent gap for WS-E-001/002/003 (OBSERVABILITY §41.11 item 8) and CONC-E-001 (INCIDENT_RESPONSE §18.7 item 2).
+
+Privacy floor applies to all nine artefacts: no individual employee health data, no `user_id`, no plaintext employee names. See per-artefact notes below.
+
+Owners: compliance-officer + security-engineer + enterprise-architect.
+
+---
+
+### §84.2 Engagement Health Evidence (OBSERVABILITY §33)
+
+Source of truth for artefact definitions: `docs/OBSERVABILITY.md §33.11`.
+
+#### ENGAGE-E-001
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | ENGAGE-E-001 |
+| **SOC 2 Criteria** | C1.1 (confidential information protected from disclosure); C1.2 (confidential information disposed of appropriately) |
+| **Description** | `tenant_engagement_snapshots` DDL export + RLS policy list + negative-privilege test log: `SET ROLE tenant_admin; SELECT * FROM tenant_engagement_snapshots` returns 0 rows (HR-never-sees-individual invariant enforced at DDL level); `SET ROLE form_analytics; SELECT email FROM user_profiles` returns permission error (column-level privilege). Also includes pg_cron `tenant_engagement_cleanup` schedule export demonstrating 36-month rolling retention. |
+| **Collection method** | `\d tenant_engagement_snapshots` in psql; `SELECT * FROM pg_policies WHERE tablename = 'tenant_engagement_snapshots'`; re-run negative-privilege CI test; export pg_cron schedule. |
+| **Cadence** | Annual (or on DDL/RLS change) |
+| **Retention** | 3 years |
+| **Storage path** | `compliance/evidence/engagement/ENGAGE-E-001_<YYYY>.md` |
+| **R2 bucket** | `form-soc2-evidence/engagement/` |
+| **Privacy floor** | No `user_id`, no employee name, no health values in any policy export; `tenant_admin` zero-row test is the privacy-floor proof |
+| **Status** | 🟡 Authored — pending M13 migration 0057 deploy |
+
+**Auditor narrative (C1.1):** FORM restricts enterprise engagement behavioural data to `form_analytics` and `customer_success` roles at the DDL level. The `tenant_admin` role (held by the HR/admin contact at the enterprise customer) has zero RLS policy on `tenant_engagement_snapshots`, verified by negative-privilege test. This is the technical enforcement of the privacy floor: HR never sees individual user data.
+
+---
+
+#### ENGAGE-E-002
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | ENGAGE-E-002 |
+| **SOC 2 Criteria** | CC2.2 (internal and external communications about commitments and requirements) |
+| **Description** | One anonymised QBR package per quarter (tenant_id redacted) demonstrating approved metric list adherence; compliance-officer spot-check sign-off in Linear. The `tenant.qbr_report_generated` DEC-030 event payload includes the approved metric list — auditor can confirm content policy was enforced at generation time. |
+| **Collection method** | Export from `tenant_qbr_report_generate` Edge Function output; retrieve `tenant.qbr_report_generated` DEC-030 event for the quarter; compliance-officer signs off Linear task. |
+| **Cadence** | Quarterly |
+| **Retention** | 3 years |
+| **Storage path** | `compliance/evidence/engagement/ENGAGE-E-002_<YYYY-QN>.pdf` |
+| **R2 bucket** | `form-soc2-evidence/engagement/` |
+| **Privacy floor** | `tenant_id` redacted in filed copy; no individual user data, no CHS score, no health data in QBR package by content policy |
+| **Status** | 🟡 Authored — pending M13 first QBR generation |
+
+---
+
+#### ENGAGE-E-003
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | ENGAGE-E-003 |
+| **SOC 2 Criteria** | CC7.2 (monitoring for anomalies and security events); A1.1 (capacity and performance objectives) |
+| **Description** | PagerDuty "FORM Customer Success" alert history for AL-ENGAGE-01 through AL-ENGAGE-06 over the observation window; plus `tenant.churn_risk_flagged` DEC-030 event export. AL-ENGAGE-01/02 seat-utilisation alerts serve as A1.1 capacity leading indicators. |
+| **Collection method** | PagerDuty → Incidents → filter service "FORM Customer Success" → export CSV for observation period; `SELECT * FROM audit_log_events WHERE event_type = 'tenant.churn_risk_flagged' AND created_at BETWEEN $obs_start AND $obs_end`. |
+| **Cadence** | Annual (alert history export); DEC-030 export per quarter |
+| **Retention** | 3 years |
+| **Storage path** | `compliance/evidence/engagement/ENGAGE-E-003_<YYYY>.csv` |
+| **R2 bucket** | `form-soc2-evidence/engagement/` |
+| **Privacy floor** | Alert payloads contain tenant slug + aggregate metrics only — no individual `user_id` or employee name; DEC-030 event export filtered to event_type only |
+| **Status** | 🟡 Authored — pending M13 AL-ENGAGE alert deployment |
+
+---
+
+### §84.3 SCIM Observability Evidence (OBSERVABILITY §26.7a / §26.7b)
+
+Source of truth for artefact definitions: `docs/OBSERVABILITY.md §26.11`.
+
+#### SSO-OBS-E-005
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | SSO-OBS-E-005 |
+| **SOC 2 Criteria** | A1.1 (capacity and performance objectives for availability); CC7.2 (monitoring for anomalies) |
+| **Description** | PagerDuty incident log for AL-SCIM-MASS-01: any `scim.mass_deprovision_detected` events fired during the observation period. **Zero-count is positive evidence** — it confirms no mass deprovisioning event occurred; automated detection was armed throughout the period. Cross-reference: `SELECT * FROM audit_log_events WHERE event_type = 'scim.mass_deprovision_detected' AND created_at BETWEEN $obs_start AND $obs_end`. |
+| **Collection method** | PagerDuty → Incidents → filter service "FORM Customer Success" + alert key prefix `scim-mass-deprovision-*` → export CSV; pg_cron `scim_mass_deprovision_check` (job 24) run log showing continuous operation. |
+| **Cadence** | Quarterly |
+| **Retention** | 3 years |
+| **Storage path** | `compliance/evidence/sso/SSO-OBS-E-005_<YYYY-QN>.csv` |
+| **R2 bucket** | `form-soc2-evidence/sso/` |
+| **Privacy floor** | PagerDuty export contains tenant slug + aggregate deprovisioned_count only — no employee `user_id` or name |
+| **Status** | 🟡 Authored — pending M5 AL-SCIM-MASS-01 PagerDuty deployment (OBSERVABILITY §26.12 P0) |
+
+**Auditor narrative (A1.1):** Mass deprovisioning (e.g., accidental SCIM DELETE sweep by a misconfigured IdP) is a direct availability threat: affected employees lose FORM access. AL-SCIM-MASS-01 detects bursts ≥ 10% of seat_count / 10-min window with < 5-min PagerDuty acknowledgement SLA. SSO-OBS-E-005 demonstrates the detection control was armed for the full observation period.
+
+---
+
+#### SSO-OBS-E-006
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | SSO-OBS-E-006 |
+| **SOC 2 Criteria** | CC7.2 (monitoring for anomalies); CC6.1 (logical access controls) |
+| **Description** | PagerDuty incident log for AL-SCIM-01 through AL-SCIM-04 (SCIM endpoint operations): sensitive attribute rejection events, 5xx error spikes, sync stall notifications, and SCIM-CHAIN-01 ordering invariant violations. **Zero AL-SCIM-04 count is positive chain-ordering integrity evidence** — no deprovision-without-prior-provision ordering violation occurred. |
+| **Collection method** | PagerDuty → Incidents → filter service "FORM Platform" + alert key prefixes `scim-rejected-attr-*`, `scim-5xx-*`, `scim-sync-stall-*`, `scim-chain-*` → export CSV; `SELECT * FROM audit_log_events WHERE event_type = 'scim.rejected_sensitive_attribute' AND created_at BETWEEN $obs_start AND $obs_end`. |
+| **Cadence** | Quarterly |
+| **Retention** | 3 years |
+| **Storage path** | `compliance/evidence/sso/SSO-OBS-E-006_<YYYY-QN>.csv` |
+| **R2 bucket** | `form-soc2-evidence/sso/` |
+| **Privacy floor** | No `user_id` or employee name in any signal; rejected attribute type logged without value |
+| **Status** | 🟡 Authored — pending M5 AL-SCIM-01..04 PagerDuty deployment (OBSERVABILITY §26.12 P0) |
+
+---
+
+### §84.4 Wearable Integration Evidence (OBSERVABILITY §41)
+
+Source of truth for artefact definitions: `docs/OBSERVABILITY.md §41.9`.
+
+#### WS-E-001
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | WS-E-001 |
+| **SOC 2 Criteria** | A1.1 (capacity and performance objectives for availability) |
+| **Description** | Quarterly export of `wearable.sync_completed` DEC-030 HMAC-chained events per source (HealthKit, Health Connect, Whoop, Oura; Garmin excluded pending OQ-WS-OBS-01 / Garmin Health API SLA confirmation). Demonstrates data collection pipeline available as promised to enterprise customers. |
+| **Collection method** | `SELECT * FROM audit_log_events WHERE event_type = 'wearable.sync_completed' AND created_at BETWEEN $quarter_start AND $quarter_end ORDER BY created_at` — aggregate counts by `payload->>'source'`; no per-user rows. |
+| **Cadence** | Quarterly |
+| **Retention** | 5 years |
+| **Storage path** | `compliance/evidence/wearable/WS-E-001_<YYYY-QN>.csv` |
+| **R2 bucket** | `form-soc2-evidence/wearable/` |
+| **Privacy floor** | No `user_id`; `tenant_id` nullable (consumer tier null); aggregate reading_count integer per source per quarter |
+| **Open question** | OQ-WS-OBS-01 (P1/M10): Garmin Health API SLA — exclude Garmin from WS-E-001 scope until first successful production quarter and SLA confirmed in DECISION_LOG |
+| **Status** | 🟡 Authored — pending M9 first quarterly evidence collection (OBSERVABILITY §41.11 item 8) |
+
+**Auditor narrative (A1.1):** FORM commits to wearable data availability as a product capability. WS-E-001 provides DEC-030 chain evidence that `wearable-ingestion-worker` processed syncs across all in-scope sources during the observation quarter. Combined with §28 (mobile client performance) and §33 (enterprise engagement), this spans the full data-collection → coaching → reporting availability chain.
+
+---
+
+#### WS-E-002
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | WS-E-002 |
+| **SOC 2 Criteria** | P3.2 (personal information collected from specified sources per privacy notice) |
+| **Description** | Quarterly fleet freshness report: `wearable.fleet_freshness_assessed` DEC-030 events for the quarter with `slo_met` trend — demonstrates data is collected from specified wearable sources per FORM's privacy notice. No per-user data; fleet percentages only. K-anonymity gate: per-source breakdown suppressed if any source N < 5 across fleet. |
+| **Collection method** | `SELECT * FROM audit_log_events WHERE event_type = 'wearable.fleet_freshness_assessed' AND created_at BETWEEN $quarter_start AND $quarter_end` — emitted by pg_cron job 31 (`wearable_sync_freshness_check`, daily 07:05 UTC). |
+| **Cadence** | Quarterly |
+| **Retention** | 5 years |
+| **Storage path** | `compliance/evidence/wearable/WS-E-002_<YYYY-QN>.csv` |
+| **R2 bucket** | `form-soc2-evidence/wearable/` |
+| **Privacy floor** | `fresh_pct` aggregate float + `slo_met` boolean per event; no `user_id`; k-anonymity gate enforced by pg_cron job 31 at emission time |
+| **Status** | 🟡 Authored — pending M9 first quarterly evidence collection |
+
+---
+
+#### WS-E-003
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | WS-E-003 |
+| **SOC 2 Criteria** | CC7.2 (proactive anomaly detection for data collection pipeline) |
+| **Description** | AL-WS-01 through AL-WS-07 rule configuration screenshots from Better Stack / PagerDuty confirming all seven wearable alert rules are deployed and routing correctly. Filed annually or on any alert-rule change. |
+| **Collection method** | Better Stack → Monitors → export WS-SLO-01..06 configuration; PagerDuty → Services → "FORM Platform" / "FORM Customer Success" → Rules → screenshot AL-WS-01/02/04/06/07. |
+| **Cadence** | Annual (or on rule change) |
+| **Retention** | 3 years |
+| **Storage path** | `compliance/evidence/wearable/WS-E-003_<YYYY>.md` |
+| **R2 bucket** | `form-soc2-evidence/wearable/` |
+| **Privacy floor** | Alert rule configuration only — no user data |
+| **Status** | 🟡 Authored — pending M7 AL-WS alert deployment (OBSERVABILITY §41.11 item 8) |
+
+---
+
+### §84.5 Concurrent Incident Chain Evidence (INCIDENT_RESPONSE §18)
+
+Source of truth for artefact definition: `docs/INCIDENT_RESPONSE.md §18.6`.
+
+#### CONC-E-001
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CONC-E-001 |
+| **SOC 2 Criteria** | CC7.4 (response to identified security events); CC4.1 (performance evaluations of controls) |
+| **Description** | Per-incident §18.3.1 query output for any concurrent-incident period in the observation quarter, plus the §18.3.3 CONC-CHAIN-01 zero-row cross-contamination check. **Filed even on zero concurrent-incident quarters** as a zero-event attestation (run the detection query; zero rows confirms the invariant held throughout). |
+| **Collection method** | §18.3.1 canonical SQL: `SELECT id, event_type, created_at, payload->>'incident_id' AS incident_id, ROW_NUMBER() OVER (PARTITION BY payload->>'incident_id' ORDER BY created_at) AS sub_chain_seq FROM audit_log_events WHERE event_type LIKE 'incident.%' AND created_at BETWEEN $quarter_start AND $quarter_end ORDER BY payload->>'incident_id', created_at`. §18.3.3 CONC-CHAIN-01 cross-contamination query: zero rows = invariant intact; any rows = escalate to security-engineer before filing. |
+| **Cadence** | Quarterly |
+| **Retention** | 7 years |
+| **Storage path** | `compliance/evidence/ir-chain/CONC-E-001_<YYYY-QN>.md` |
+| **R2 bucket** | `form-soc2-evidence/ir-chain/` |
+| **Privacy floor** | Queries filter by `incident_id` (FORM-internal `INC-YYYYMMDD-XXXXXX` format only); no `user_id`, no employee name, no Art. 9 health data in any exported row; `compliance_reviewer` Supabase role governs access |
+| **Status** | 🟡 Authored — P1 baseline attestation due M7 (INCIDENT_RESPONSE §18.7 item 2) |
+
+**Auditor narrative (CC7.4):** FORM's incident DEC-030 events share a single HMAC chain. When two incidents are concurrent, their `incident.*` events are timestamp-interleaved. CONC-E-001 demonstrates (a) that per-incident event sequences are extractable for individual auditor review via the §18.3.1 skip-and-verify SQL, and (b) that no cross-contamination of `incident_id` namespaces occurred (CONC-CHAIN-01 zero-row result). This is the CC7.4 evidence that security events were correctly managed even under concurrent load.
+
+---
+
+### §84.6 SOC 2 Criteria Mapping — Patch Summary
+
+The following rows extend the control evidence tables established in earlier sections of this document:
+
+| Criterion | Control | Evidence added by §84 |
+|---|---|---|
+| **C1.1** | Confidential info protected from disclosure | ENGAGE-E-001 (tenant_engagement_snapshots zero tenant_admin RLS + negative-privilege test) |
+| **C1.2** | Confidential info disposed of appropriately | ENGAGE-E-001 (pg_cron 36-month rolling cleanup schedule) |
+| **CC2.2** | Internal/external communications about commitments | ENGAGE-E-002 (QBR package content-policy compliance; compliance-officer quarterly sign-off) |
+| **CC6.1** | Logical access controls | SSO-OBS-E-006 (AL-SCIM-01 sensitive attribute rejection enforcement; AL-SCIM-04 zero-count chain-ordering integrity) |
+| **CC7.2** | Monitoring for anomalies | ENGAGE-E-003 (AL-ENGAGE-01..06 PagerDuty/Slack history + churn_risk_flagged DEC-030); SSO-OBS-E-005 (AL-SCIM-MASS-01 log); SSO-OBS-E-006 (AL-SCIM-01..04 log); WS-E-003 (AL-WS-01..07 config screenshots) |
+| **CC4.1** | Performance evaluations of controls | CONC-E-001 (§18.3.3 CONC-CHAIN-01 quarterly zero-row result proves concurrent-incident control operated correctly) |
+| **CC7.4** | Response to identified security events | CONC-E-001 (§18.3.1 per-incident chain extraction demonstrates events are auditable even under concurrent load) |
+| **A1.1** | Capacity and performance objectives | ENGAGE-E-003 (seat utilisation leading indicator: AL-ENGAGE-01/02); SSO-OBS-E-005 (AL-SCIM-MASS-01 availability-threat detection); WS-E-001 (wearable sync pipeline availability chain) |
+| **P3.2** | Personal information from specified sources | WS-E-002 (fleet freshness report: data collected from privacy-notice-specified wearable sources only) |
+
+---
+
+### §84.7 Cross-Reference Obligations Closed by §84
+
+| Obligation | Source | Status |
+|---|---|---|
+| OBSERVABILITY §33.12 item 13 (P1/M14): register ENGAGE-E-001/002/003 in SOC2_READINESS | `docs/OBSERVABILITY.md §33.12` | **🟢 Closed — §84.2** |
+| OBSERVABILITY v1.3.2 cross-ref note: SOC2_READINESS §CC6.1/CC6.3 to reference SSO-OBS-E-006 | `docs/OBSERVABILITY.md §26.11` changelog | **🟢 Closed — §84.3** |
+| OBSERVABILITY §26.12 P1: file SSO-OBS-E-005 in `compliance/evidence/sso/` (SOC2 cross-ref implied) | `docs/OBSERVABILITY.md §26.12` | **🟢 Closed — §84.3** |
+| OBSERVABILITY §41.11 item 8 (P2/M9): collect WS-E-001/002 — SOC2_READINESS registration implied | `docs/OBSERVABILITY.md §41.11` | **🟢 Closed — §84.4** |
+| INCIDENT_RESPONSE §18.7 item 2 (P1/M7): baseline CONC-E-001 — SOC2_READINESS registration implied | `docs/INCIDENT_RESPONSE.md §18.7` | **🟢 Closed — §84.5** |
+
+---
+
+### §84.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update `docs/OBSERVABILITY.md §33.12 item 13` from `[ ]` to `[x] Done` — references §84.2. | compliance-officer | **P1** | M14 | [x] Done — §84 (2026-06-16) |
+| 2 | At M13 migration 0057 deploy: collect ENGAGE-E-001 (DDL + RLS + negative-privilege test); file to `compliance/evidence/engagement/ENGAGE-E-001_2026.md`; append to MASTER-INDEX with SHA-256. | compliance-officer | **P1** | M13 | [ ] |
+| 3 | After first QBR generated: collect ENGAGE-E-002 (one anonymised QBR package + compliance-officer sign-off); file to `compliance/evidence/engagement/ENGAGE-E-002_<YYYY-QN>.pdf`; append to MASTER-INDEX. | compliance-officer | **P1** | M14 | [ ] |
+| 4 | After AL-ENGAGE alerts deployed (M13): schedule quarterly ENGAGE-E-003 collection in §15.1 compliance calendar. | compliance-officer | **P1** | M14 then quarterly | [ ] |
+| 5 | At M5 SCIM alert deployment: verify AL-SCIM-MASS-01 and AL-SCIM-01..04 PagerDuty routing operational (OBSERVABILITY §26.12 P0 items); then file SSO-OBS-E-005 + SSO-OBS-E-006 at observation period open — zero-count PagerDuty export is valid if no events triggered. | compliance-officer + devops-lead | **P1** | M5 + observation period open | [ ] |
+| 6 | At M7 wearable alert deployment: verify AL-WS-01..07 deployed per OBSERVABILITY §41.11; collect WS-E-003 configuration screenshots; file to `compliance/evidence/wearable/WS-E-003_2026.md`; append to MASTER-INDEX. | compliance-officer + devops-lead | **P1** | M7 | [ ] |
+| 7 | At M7: run §18.3.3 CONC-CHAIN-01 baseline check on all existing `incident.*` events; confirm zero rows; file as CONC-E-001 pre-observation attestation (`compliance/evidence/ir-chain/CONC-E-001_2026-pre-obs.md`); append to MASTER-INDEX. | compliance-officer | **P1** | M7 | [ ] |
+| 8 | At M9: collect WS-E-001 (first quarterly `wearable.sync_completed` chain excerpt) and WS-E-002 (first fleet freshness report); file to `compliance/evidence/wearable/`; append to MASTER-INDEX. | compliance-officer | **P2** | M9 | [ ] |
+| 9 | Add `compliance/evidence/engagement/`, `compliance/evidence/wearable/`, and `compliance/evidence/ir-chain/` folders to §80.3 R2 folder structure and confirm `form-api` NO ACCESS invariant applies to all three paths. | devops-lead | **P1** | M7 | [ ] |
+| 10 | Add §84.6 criterion rows to §79.4 master evidence table (C1.1, C1.2, CC2.2, CC6.1, CC7.2, CC4.1, CC7.4, A1.1, P3.2 rows): ensure ENGAGE-E-001/002/003, SSO-OBS-E-005/006, WS-E-001/002/003, CONC-E-001 appear in Vanta mirror list alongside existing artefacts. | compliance-officer | **P1** | M14 | [ ] |
+
+---
+
+*v3.10.0 (2026-06-16): §84 Evidence Artefact Cross-Reference Patch — registers nine evidence artefacts from four source documents that were defined but never cross-referenced in SOC2_READINESS.md. (1) **ENGAGE-E-001** (C1.1/C1.2): `tenant_engagement_snapshots` RLS zero-access + negative-privilege test + pg_cron 36-month cleanup; annual; 3yr; `compliance/evidence/engagement/ENGAGE-E-001_<YYYY>.md`. (2) **ENGAGE-E-002** (CC2.2): anonymised QBR package + compliance-officer spot-check + `tenant.qbr_report_generated` DEC-030 content-policy payload; quarterly; 3yr; `compliance/evidence/engagement/ENGAGE-E-002_<YYYY-QN>.pdf`. (3) **ENGAGE-E-003** (CC7.2/A1.1): AL-ENGAGE-01..06 PagerDuty/Slack alert history + `tenant.churn_risk_flagged` DEC-030 export + seat utilisation leading indicators; annual/quarterly; 3yr; `compliance/evidence/engagement/ENGAGE-E-003_<YYYY>.csv`. Closes OBSERVABILITY §33.12 item 13 (P1/M14). (4) **SSO-OBS-E-005** (A1.1/CC7.2): AL-SCIM-MASS-01 PagerDuty log; zero-count is positive non-occurrence evidence; quarterly; 3yr; `compliance/evidence/sso/SSO-OBS-E-005_<YYYY-QN>.csv`. (5) **SSO-OBS-E-006** (CC7.2/CC6.1): AL-SCIM-01..04 PagerDuty log; AL-SCIM-04 zero-count = SCIM-CHAIN-01 ordering integrity; quarterly; 3yr; `compliance/evidence/sso/SSO-OBS-E-006_<YYYY-QN>.csv`. Closes OBSERVABILITY v1.3.2 cross-reference promise. (6) **WS-E-001** (A1.1): quarterly `wearable.sync_completed` DEC-030 chain excerpt per source; Garmin excluded pending OQ-WS-OBS-01; 5yr; `compliance/evidence/wearable/WS-E-001_<YYYY-QN>.csv`. (7) **WS-E-002** (P3.2): quarterly fleet freshness `wearable.fleet_freshness_assessed` DEC-030 events; k-anonymity gate per pg_cron job 31; 5yr; `compliance/evidence/wearable/WS-E-002_<YYYY-QN>.csv`. (8) **WS-E-003** (CC7.2): AL-WS-01..07 Better Stack / PagerDuty configuration screenshots; annual; 3yr; `compliance/evidence/wearable/WS-E-003_<YYYY>.md`. (9) **CONC-E-001** (CC7.4/CC4.1): §18.3.1 per-incident skip-and-verify SQL output + §18.3.3 CONC-CHAIN-01 zero-row cross-contamination check; filed quarterly including zero-concurrent-incident quarters as zero-event attestation; 7yr; `compliance/evidence/ir-chain/CONC-E-001_<YYYY-QN>.md`. §84.6 extends nine SOC 2 criterion rows (C1.1/C1.2/CC2.2/CC6.1/CC7.2/CC4.1/CC7.4/A1.1/P3.2) with new evidence references. §84.7 closes five explicit cross-reference obligations from source docs. §84.8 ten-item implementation checklist: 7× P1 (OBSERVABILITY §33.12 item 13 update, M13 ENGAGE-E-001 filing, M14 ENGAGE-E-002/003 scheduling, M5 SSO-OBS-E-005/006 deployment + filing, M7 WS-E-003 filing, M7 CONC-E-001 baseline, M7 R2 folder structure + form-api REVOKE, M14 §79.4 master evidence table update), 1× P2 (M9 WS-E-001/002 collection). No new gaps opened. No gap score change — all nine artefacts 🟡 Authored pending first observation-period filing; readiness fraction unaffected until first filing at each milestone. Privacy floor: no individual employee health data in any of the nine artefacts; all involve aggregate metrics, chain event metadata, or configuration exports only; k-anonymity gate enforced at emission for ENGAGE-E-001 (RLS test is negative-privilege, not user-data export) and WS-E-002 (pg_cron job 31 suppresses per-source breakdown when N < 5). Cross-references: `docs/OBSERVABILITY.md §33.11` (ENGAGE-E-001/002/003 source definitions); `docs/OBSERVABILITY.md §33.12 item 13` (P1/M14 obligation — now [x] Done); `docs/OBSERVABILITY.md §26.11` (SSO-OBS-E-005/006 source definitions); `docs/OBSERVABILITY.md §41.9` (WS-E-001/002/003 source definitions); `docs/INCIDENT_RESPONSE.md §18.6` (CONC-E-001 source definition); `docs/INCIDENT_RESPONSE.md §18.7 item 2` (P1/M7 baseline attestation obligation); §79.4 (master evidence table — nine new artefact rows to add per §84.8 item 10); §80.3 (R2 folder structure — three new paths per §84.8 item 9); §80.4 (Vanta mirror list — nine new artefacts per §84.8 item 10). Owner: compliance-officer + security-engineer + enterprise-architect.*
 
 ---

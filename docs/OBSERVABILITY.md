@@ -8706,7 +8706,7 @@ const TenantChurnRiskFlaggedPayload = z.object({
 | 10 | Implement `tenant_qbr_report_generate` Edge Function (§33.8): authenticated POST `/admin/tenants/:id/qbr`; reads last 90 days from `tenant_engagement_snapshots` + §13.3 SLA API; approved metric list hardcoded; emits `tenant.qbr_report_generated` DEC-030 event; review by compliance-officer before first production use. | platform-engineer + compliance-officer | **P1** | M14 | [ ] |
 | 11 | Collect ENGAGE-E-001 (RLS tests) immediately after P0 migration; collect ENGAGE-E-002 after first QBR (anonymised package); schedule quarterly ENGAGE-E-003 collection in compliance calendar (§15.1). | compliance-officer | **P1** | M14 then quarterly | [ ] |
 | 12 | Add `engagement_health` subsection to §6.2 alert rules table (six rows per §33.5). | devops-lead + compliance-officer | **P1** | M14 | [ ] |
-| 13 | Add ENGAGE-E-001, ENGAGE-E-002, ENGAGE-E-003 evidence artefact references to `docs/SOC2_READINESS.md` C1.1, CC2.2, CC7.2, A1.1 control evidence rows. | compliance-officer | **P1** | M14 | [ ] |
+| 13 | Add ENGAGE-E-001, ENGAGE-E-002, ENGAGE-E-003 evidence artefact references to `docs/SOC2_READINESS.md` C1.1, CC2.2, CC7.2, A1.1 control evidence rows. | compliance-officer | **P1** | M14 | [x] Done — `docs/SOC2_READINESS.md §84.2` (v3.10.0, 2026-06-16) |
 
 #### P2 — Ongoing
 
