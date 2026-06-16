@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [5.71.0] — 2026-06-16
+
+### Added
+- `content/post-110-training-response-variability.md` — Editorial series post-110. «Варіабельність тренувального відгуку: чому ти і твій знайомий отримують різне від тієї ж програми». Hubal 2005 (-2%→+59% м'язовий об'єм, 0%→+250% сила); ACTN3/ACE поліморфізми; практично значущі чинники: тренувальний вік, сон, стрес HPA-вісь, харчовий статус, профіль волокон; нон-респондер = нон-респондер до протоколу (Nordin 2019); n-of-1 принцип. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — post-110 картка додана у сітку (Training science, 2026-06-16, draft).
+- `README.md` — post-110 статус: proposed → draft · v5.71.0; editorial 121–130 proposals added.
+- `STATUS.md` — editorial series 106–109 → 106–110; total posts 1077 → 1078.
+- `VERSION` → 5.71.0
+
+---
+
 ## [5.70.0] — 2026-06-16
 
 ### Added
