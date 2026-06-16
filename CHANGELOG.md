@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.65.0] — 2026-06-16
+
+### Added
+- `content/post-107-bad-day-vs-bad-block.md` — Editorial series post 107. Як відрізнити «поганий день» від «поганого блоку»: горизонт як єдиний інструмент, RPE-тренд, HRV rolling average, суб'єктивний аудит. Алгоритм 4 кроки для self-coached атлета. Kreher & Schwartz (2012) + Hooper et al. + Haff/Zourdos RPE-варіабельність. clinical-safety: PASS.
+
+### Changed
+- `blog.html` — картка post-107 додана перед post-106.
+- `STATUS.md` — editorial series оновлено: post-107 written v5.65.0.
+- `VERSION` → 5.65.0
+
+---
+
 ## [5.64.0] — 2026-06-16
 
 ### Added
