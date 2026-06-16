@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.79.0] — 2026-06-16
+
+### Added
+- `content/post-16-overtraining-underrecovery.md` — Editorial series post 16. «Перетренованість або недовідновлення: як self-coached атлет читає сигнали тіла». Спектр accumulated fatigue → functional overreaching → non-functional overreaching → OTS (Meeusen et al. 2013 ECSS/ACSM consensus; Halson & Jeukendrup 2004); time-to-recovery як діагностичний ключ; диференційний чекліст 4 рівні; HRV rolling average; RPE-дрейф. clinical-safety CONDITIONAL PASS (guard rail: OTS clinical symptoms redirected to physician). sports-scientist review required before publish. Blog card exists at blog.html.
+
+### Changed
+- `README.md` — editorial roadmap extended: proposed topics 141–150 added.
+- `STATUS.md` — post-16 added to editorial series note; Total posts 1095 → 1096; current version v5.79.0.
+- `VERSION` — 5.77.0 → 5.79.0 (5.78.0 was logged in CHANGELOG but VERSION was not updated in prior commit; this catch-up bump resolves the gap).
+
+---
+
 ## [5.78.0] — 2026-06-16
 
 ### Added
