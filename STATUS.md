@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.60.0** — 2026-06-16
+**v5.61.0** — 2026-06-16
 
 ---
 
@@ -36,9 +36,9 @@
 
 | 1001–1050 | Training literacy: reading your own data | **50/50** | **BLOCK COMPLETE v5.60.0** — post-1001 «Від запису до читання» (PASS). **posts 1002–1005 v5.49.0:** особистий «норм» і базова лінія; трендова лінія vs. точка; помилки інтерпретації прогресу; RPE як дані. **posts 1006–1010 v5.49.0:** ЧСС і HRV; сон як тренувальна змінна; «енергія на тренуванні»; реальна vs. тимчасова адаптація; плато. **posts 1011–1012 v5.50.0–5.51.0:** технічний дрейф, estimated 1RM. **posts 1013–1020 v5.52.0 (cluster 2 COMPLETE).** **post-1021 + posts 1022–1030 v5.52.1–5.54.0 (cluster 3 COMPLETE).** **posts 1031–1036 v5.56.0 (cluster 4 COMPLETE): когнітивні ухили.** **posts 1037–1041 v5.58.0 (cluster 5):** ієрархія сигналів, мінімальна система, ритм огляду, алгоритми рішень, протокол запису. **posts 1042–1050 v5.60.0 (clusters 5–6 COMPLETE):** персональні benchmark-сесії (1042); довгострокові тренди (1043); autoregulation на основі даних (1044); дані для тренера (1045); формат журналу (1046); сигнали відновлення в даних (1047); ретроспектива блоку 8 кроків (1048); річний архів (1049); block closer — 5 зсувів мислення (1050). Всі: NOT_REQUIRED. blog.html updated to post-1050. sports-scientist review required for all before publish. |
 
-**Total posts: 1047** (includes posts 1001–1050; post-980 and post-639 HARD VETO skipped)
+**Total posts: 1048** (includes posts 1001–1050; post-980 and post-639 HARD VETO skipped)
 
-**Editorial series 11–34, 44–49** — post-49 written v5.59.0: «Мета або процес: чому спортивні цілі часто підводять» — структурні дефекти цілі як системи управління тренуванням (бінарний результат без зворотного зв'язку, довільний дедлайн, відсутність методу); нелінійна природа адаптації і конфлікт із фіксованим дедлайном; що робить процес корисним (зворотний зв'язок на кожному кроці, не зупиняється після успіху, розрізняє помилку від збою); де ціль залишається корисною (орієнтир напрямку, точка перевірки, тижневий маркер); практичний 5-кроковий алгоритм. clinical-safety: PASS. Blog card added. README roadmap розширено до post-105 (блок 96–105). Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts — status: 🟡 Unresolved.
+**Editorial series 11–34, 44–50** — post-50 written v5.61.0: «Синтез: як FORM думає про рішення за замовчуванням для self-coached атлета» — десять рішень за замовчуванням (частота 3–4x/тиж, структура сесії, прогресивне перевантаження, RPE 7–8, деload кожні 4–6 тижнів, реакція на тренди а не точки, техніка без перфекціонізму, «поганий день» протокол, відпочинок 2–3 хв, 8-тижневий блок); чесне обмеження дефолтів; synthesis Editorial series 11–50. clinical-safety: NOT_REQUIRED. Blog card added. Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts — status: 🟡 Unresolved.
 
 ---
 
