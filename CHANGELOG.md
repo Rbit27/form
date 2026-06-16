@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.75.0] — 2026-06-16
+
+### Added
+- `content/post-1081-ecrb-ecrl-anatomy.md` — Block 1051–1100 Cluster 7, post 1/5. ECRB і ECRL: анатомія, функція, відмінності (довжина, початок, іннервація). Механізм lateral epicondylitis (tennis elbow): патомеханіка тендинопатії ECRB, ризикові grip-паттерни у тренінгу (row-об'єм, reverse curl, зміна хвату), захисні фактори. Практичне програмування: непряме навантаження через compound pulls, відсутність потреби у прямій ізоляції. sports-scientist review pending.
+- `content/post-1082-flexor-carpi-ulnaris-anatomy.md` — Block 1051–1100 Cluster 7, post 2/5. FCU: двохголовий початок (humeral + ulnar heads), прикріплення через pisiform, іннервація ульнарним нервом (єдиний згинач зап'ястя не на median nerve). Medial epicondylitis: FCU у складі common flexor tendon, диференціація від кубітального тунельного синдрому (ульнарний нерв між головками FCU). Стабілізуюча роль у grip. sports-scientist review pending.
+- `content/post-1083-palmaris-longus-anatomy.md` — Block 1051–1100 Cluster 7, post 3/5. Palmaris Longus: рудиментарний флексор зап'ястя, відсутній у ~10–15% людей. Thompson test. Еволюційний контекст (повноцінний у приматів, редукований у людини). Донорський сухожилок у реконструктивній хірургії (UCL, сухожилки пальців, ligament grafts). Відсутність не впливає на grip, силу або рухливість. sports-scientist review pending.
+- `content/post-1084-flexor-digitorum-superficialis-anatomy.md` — Block 1051–1100 Cluster 7, post 4/5. FDS: трьохголовий початок, chiasma tendinum Камперa, іннервація median nerve. Дев'ять сухожилків через carpal tunnel (4 FDS + 4 FDP + FPL + median nerve). Carpal tunnel syndrome: анатомічний зв'язок і контекст для атлетів. Trigger finger механіка. Grip failure як FDS/FDP втома. sports-scientist review pending.
+- `content/post-1085-lumbricales-anatomy.md` — Block 1051–1100 Cluster 7, post 5/5. Lumbricales: унікальний початок від сухожилків FDP, прикріплення до extensor expansion. Подвійна іннервація (median 1–2, ulnar 3–4). Парадокс флексора-розгинача: флексія MCP + розгинання PIP/DIP = intrinsic plus позиція. Chiasma tendinum. Intrinsic minus (ульнарний кіготь) при ушкодженні ульнарного нерва. Lumbricales як координатори grip, а не силові генератори. sports-scientist review pending.
+
+### Changed
+- `blog.html` — posts 1081–1085 додані у верхню частину сітки (Cluster 7: wrist extensors/flexors + intrinsic hand). blog.html оновлений до post-1085.
+- `STATUS.md` — Block 1051–1100 прогрес оновлено до 35/50; Cluster 7 (posts 1081–1085) позначено COMPLETE; наступний: Cluster 8 (posts 1086–1090).
+
+---
+
 ## [5.74.0] — 2026-06-16
 
 ### Added
