@@ -28004,3 +28004,122 @@ The following rows extend the control evidence tables established in earlier sec
 *v3.10.0 (2026-06-16): §84 Evidence Artefact Cross-Reference Patch — registers nine evidence artefacts from four source documents that were defined but never cross-referenced in SOC2_READINESS.md. (1) **ENGAGE-E-001** (C1.1/C1.2): `tenant_engagement_snapshots` RLS zero-access + negative-privilege test + pg_cron 36-month cleanup; annual; 3yr; `compliance/evidence/engagement/ENGAGE-E-001_<YYYY>.md`. (2) **ENGAGE-E-002** (CC2.2): anonymised QBR package + compliance-officer spot-check + `tenant.qbr_report_generated` DEC-030 content-policy payload; quarterly; 3yr; `compliance/evidence/engagement/ENGAGE-E-002_<YYYY-QN>.pdf`. (3) **ENGAGE-E-003** (CC7.2/A1.1): AL-ENGAGE-01..06 PagerDuty/Slack alert history + `tenant.churn_risk_flagged` DEC-030 export + seat utilisation leading indicators; annual/quarterly; 3yr; `compliance/evidence/engagement/ENGAGE-E-003_<YYYY>.csv`. Closes OBSERVABILITY §33.12 item 13 (P1/M14). (4) **SSO-OBS-E-005** (A1.1/CC7.2): AL-SCIM-MASS-01 PagerDuty log; zero-count is positive non-occurrence evidence; quarterly; 3yr; `compliance/evidence/sso/SSO-OBS-E-005_<YYYY-QN>.csv`. (5) **SSO-OBS-E-006** (CC7.2/CC6.1): AL-SCIM-01..04 PagerDuty log; AL-SCIM-04 zero-count = SCIM-CHAIN-01 ordering integrity; quarterly; 3yr; `compliance/evidence/sso/SSO-OBS-E-006_<YYYY-QN>.csv`. Closes OBSERVABILITY v1.3.2 cross-reference promise. (6) **WS-E-001** (A1.1): quarterly `wearable.sync_completed` DEC-030 chain excerpt per source; Garmin excluded pending OQ-WS-OBS-01; 5yr; `compliance/evidence/wearable/WS-E-001_<YYYY-QN>.csv`. (7) **WS-E-002** (P3.2): quarterly fleet freshness `wearable.fleet_freshness_assessed` DEC-030 events; k-anonymity gate per pg_cron job 31; 5yr; `compliance/evidence/wearable/WS-E-002_<YYYY-QN>.csv`. (8) **WS-E-003** (CC7.2): AL-WS-01..07 Better Stack / PagerDuty configuration screenshots; annual; 3yr; `compliance/evidence/wearable/WS-E-003_<YYYY>.md`. (9) **CONC-E-001** (CC7.4/CC4.1): §18.3.1 per-incident skip-and-verify SQL output + §18.3.3 CONC-CHAIN-01 zero-row cross-contamination check; filed quarterly including zero-concurrent-incident quarters as zero-event attestation; 7yr; `compliance/evidence/ir-chain/CONC-E-001_<YYYY-QN>.md`. §84.6 extends nine SOC 2 criterion rows (C1.1/C1.2/CC2.2/CC6.1/CC7.2/CC4.1/CC7.4/A1.1/P3.2) with new evidence references. §84.7 closes five explicit cross-reference obligations from source docs. §84.8 ten-item implementation checklist: 7× P1 (OBSERVABILITY §33.12 item 13 update, M13 ENGAGE-E-001 filing, M14 ENGAGE-E-002/003 scheduling, M5 SSO-OBS-E-005/006 deployment + filing, M7 WS-E-003 filing, M7 CONC-E-001 baseline, M7 R2 folder structure + form-api REVOKE, M14 §79.4 master evidence table update), 1× P2 (M9 WS-E-001/002 collection). No new gaps opened. No gap score change — all nine artefacts 🟡 Authored pending first observation-period filing; readiness fraction unaffected until first filing at each milestone. Privacy floor: no individual employee health data in any of the nine artefacts; all involve aggregate metrics, chain event metadata, or configuration exports only; k-anonymity gate enforced at emission for ENGAGE-E-001 (RLS test is negative-privilege, not user-data export) and WS-E-002 (pg_cron job 31 suppresses per-source breakdown when N < 5). Cross-references: `docs/OBSERVABILITY.md §33.11` (ENGAGE-E-001/002/003 source definitions); `docs/OBSERVABILITY.md §33.12 item 13` (P1/M14 obligation — now [x] Done); `docs/OBSERVABILITY.md §26.11` (SSO-OBS-E-005/006 source definitions); `docs/OBSERVABILITY.md §41.9` (WS-E-001/002/003 source definitions); `docs/INCIDENT_RESPONSE.md §18.6` (CONC-E-001 source definition); `docs/INCIDENT_RESPONSE.md §18.7 item 2` (P1/M7 baseline attestation obligation); §79.4 (master evidence table — nine new artefact rows to add per §84.8 item 10); §80.3 (R2 folder structure — three new paths per §84.8 item 9); §80.4 (Vanta mirror list — nine new artefacts per §84.8 item 10). Owner: compliance-officer + security-engineer + enterprise-architect.*
 
 ---
+
+## §85 Evidence Artefact Cross-Reference Patch: SSO_SCIM_IMPLEMENTATION §32 (DEC-062)
+
+### §85.1 Purpose
+
+`docs/SSO_SCIM_IMPLEMENTATION.md §32.6` (v2.4, 2026-06-16 — DEC-062) defined three SOC 2 evidence artefacts as part of the OQ-SSO-23.2 / OQ-SSO-25.1 / OQ-SSO-25.3 resolution: **CC6-E-ML-001** (CC6.3 — magic-link CAEP session revocation integration test), **CC6-E-SCIM-IP-001** (CC6.1 — migration 0076 default-false confirmation), and **CC6-E-APIKEY-IP-001** (CC6.1/CC6.3 — monthly API key IP block DEC-030 export). All three were marked "to be added to SOC2_READINESS.md at M4/M5 observation filing" but were not registered in this document at that time.
+
+This section closes that gap: each artefact is registered with its collection method, cadence, retention, storage path, and auditor narrative aligned to the criteria it satisfies. Status is 🟡 Authored (pending milestone filing) for all three.
+
+**Privacy floor (applies to all artefacts in §85):** No `user_id`, no employee name, no Art. 9 health or body-composition data in any exported row or screenshot. `client_ip_hash` fields are SHA-256(ip + `IP_HASH_SALT`) — the raw IP is never logged. `tenant_id` is the organisation slug, not a personal data identifier. `form_api` Supabase role has NO ACCESS to `compliance/evidence/sso/` (R2 invariant per §80.3).
+
+---
+
+### §85.2 Magic-Link CAEP Session Revocation Evidence (SSO_SCIM §32.2)
+
+Source of truth for artefact definition: `docs/SSO_SCIM_IMPLEMENTATION.md §32.6` (CC6-E-ML-001).
+
+#### CC6-E-ML-001
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CC6-E-ML-001 |
+| **SOC 2 Criteria** | CC6.3 (access revocation is complete and timely — includes all credential types) |
+| **Description** | CI test pass log for `src/tests/auth/magic-link-revocation.test.ts` — two integration test cases confirming that `revoke:user:{tenant_id}:{user_id}` and `account_suspended:{tenant_id}:{user_id}` KV writes block magic-link JWT authentication within the same sub-second KV TTL window as SSO JWTs. Filed as evidence that FORM's access revocation architecture applies uniformly to all credential types, including the enterprise fallback path (magic-link) used when SSO is temporarily unavailable. **One-time artefact:** collected at M4 deploy gate; not refreshed quarterly unless magic-link session logic is materially changed. |
+| **Collection method** | Run `src/tests/auth/magic-link-revocation.test.ts` in the M4 staging environment immediately before the M4 deploy approval. Export CI test runner output (pass/fail per test case, timing). Screenshot the green CI status for the `magic-link-revocation` suite. File as `compliance/evidence/sso/CC6-E-ML-001_M4.md` with: (a) the CI run URL, (b) the test output, (c) a one-paragraph operator attestation confirming the staging environment is representative of production (same KV namespace bindings, same `authenticate()` middleware version). |
+| **Cadence** | One-time (M4 deploy gate) — re-file on any major change to magic-link session architecture or KV revocation key patterns |
+| **Retention** | 7 years |
+| **Storage path** | `compliance/evidence/sso/CC6-E-ML-001_M4.md` |
+| **R2 bucket** | `form-soc2-evidence/sso/` |
+| **Privacy floor** | Test output contains no `user_id` PII; staging test users are synthetic; no health data; `tenant_id` in test fixtures is a non-production slug (`test-magic-link-tenant`) |
+| **Status** | 🟡 Authored — pending M4 deploy gate (SSO_SCIM_IMPLEMENTATION.md §32.8 item 1, P0/M4) |
+
+**Auditor narrative (CC6.3):** CC6.3 requires that access revocation is complete — meaning it covers all access paths, not just the primary SSO flow. FORM's enterprise session model includes magic-link JWTs as a fallback authentication credential when the enterprise IdP is unavailable (SSO §10). CC6-E-ML-001 provides empirical evidence, captured in a reproducible integration test, that the `isRevoked()` call in `authenticate()` middleware (§22 KV revocation layer) intercepts magic-link JWTs under both a `revoke:user` signal (administrator-initiated) and an `account_suspended` signal (CAEP account-disabled event from the IdP). The test is run in staging — identical KV namespace and `authenticate()` middleware version to production — before each M4 deploy. Zero tolerance for test failure: any failing test case blocks the M4 deploy until the issue is resolved and the test suite is green.
+
+---
+
+### §85.3 SCIM IP Enforcement Migration Evidence (SSO_SCIM §32.3)
+
+Source of truth for artefact definition: `docs/SSO_SCIM_IMPLEMENTATION.md §32.6` (CC6-E-SCIM-IP-001).
+
+#### CC6-E-SCIM-IP-001
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CC6-E-SCIM-IP-001 |
+| **SOC 2 Criteria** | CC6.1 (logical access controls — safe default for IP enforcement flag prevents misconfiguration-induced access denial) |
+| **Description** | Screenshot or `psql` query output taken in staging immediately after running migration `0076_scim_ip_enforcement_flag.sql`. Confirms that `scim_ip_enforcement_enabled` defaults to `false` for all existing `tenant_sso_configs` rows — meaning that existing SCIM tenants are not affected by the new flag-gated enforcement logic introduced in DEC-062 §32.3. This is positive evidence that a safe default was implemented, preventing a scenario where a flag migration would inadvertently enable IP enforcement for tenants who have not opted in and may use cloud IdPs (Okta, Azure AD) with dynamic IP ranges. **One-time artefact:** specific to migration 0076; not refreshed quarterly. |
+| **Collection method** | In the M5 staging environment, immediately after `0076_scim_ip_enforcement_flag.sql` is confirmed applied: run `SELECT COUNT(*) FROM tenant_sso_configs WHERE scim_ip_enforcement_enabled IS NULL` (must return 0) and `SELECT tenant_id, scim_ip_enforcement_enabled FROM tenant_sso_configs ORDER BY created_at LIMIT 10` (all rows must show `false`). Screenshot both query results with the database host, timestamp, and migration log visible. File as `compliance/evidence/sso/CC6-E-SCIM-IP-001_M5.md` with: (a) both screenshots, (b) the migration log excerpt confirming `0076` ran successfully, (c) one-paragraph operator attestation. |
+| **Cadence** | One-time (migration 0076 deploy / M5) |
+| **Retention** | 7 years |
+| **Storage path** | `compliance/evidence/sso/CC6-E-SCIM-IP-001_M5.md` |
+| **R2 bucket** | `form-soc2-evidence/sso/` |
+| **Privacy floor** | Query output contains `tenant_id` slugs only — no employee data, no SCIM payload content, no IP addresses |
+| **Status** | 🟡 Authored — pending M5 migration 0076 deploy (SSO_SCIM_IMPLEMENTATION.md §32.8 item 3, P0/before first SCIM enterprise go-live) |
+
+**Auditor narrative (CC6.1):** CC6.1 requires that logical access controls are implemented. The `scim_ip_enforcement_enabled` flag (§32.3) is a logical access control that restricts SCIM provisioning requests to allowlisted CIDRs. Its default-off design reflects an explicit security-engineering decision: most enterprise IdPs use shared cloud SCIM infrastructure with dynamic IP ranges, so a default-on flag would break provisioning for any SCIM tenant not previously informed of the change. CC6-E-SCIM-IP-001 demonstrates that FORM's migration practice honours the principle of least surprise — controls default to the safe configuration for existing tenants, and opt-in is available for tenants who operate self-hosted SCIM proxies with stable CIDRs. The positive evidence here is the zero-NULL-count confirming the `DEFAULT FALSE` constraint was correctly applied by the migration to all existing rows.
+
+---
+
+### §85.4 API Key IP Allowlist Monthly Evidence (SSO_SCIM §32.4)
+
+Source of truth for artefact definition: `docs/SSO_SCIM_IMPLEMENTATION.md §32.6` (CC6-E-APIKEY-IP-001).
+
+#### CC6-E-APIKEY-IP-001
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CC6-E-APIKEY-IP-001 |
+| **SOC 2 Criteria** | CC6.1 (logical access controls — IP allowlist enforced on API key auth path); CC6.3 (access revocation / restriction is complete across all authentication paths) |
+| **Description** | Monthly export of `sso.ip_allowlist_blocked` DEC-030 events filtered to `auth_path = 'api_key'`, covering the 30-day period from M5 go-live onward. Demonstrates that IP allowlist enforcement is active on the API key authentication path (`api-key-auth.ts`) for tenants that have configured `tenant_sso_configs.ip_allowlist`. A zero-row export for a given month is **positive evidence** (no tenants with allowlists had API key IP blocks — either enforcement is operating correctly with no violations, or no tenants have yet enabled IP allowlists); a non-zero export is evidence that the control detected and blocked an out-of-allowlist request, which is also the intended behaviour. The `auth_path` field (added in DEC-062 §32.4 to the `sso.ip_allowlist_blocked` payload) makes these exports filterable by authentication pathway — SSO path blocks and API key path blocks are separately auditable from the same event stream. |
+| **Collection method** | `SELECT id, event_type, created_at, payload->>'tenant_id' AS tenant_id, payload->>'auth_path' AS auth_path, payload->>'client_ip_hash' AS client_ip_hash FROM audit_log_events WHERE event_type = 'sso.ip_allowlist_blocked' AND payload->>'auth_path' = 'api_key' AND created_at BETWEEN $month_start AND $month_end ORDER BY created_at`. Export as CSV. Remove any duplicate rows (same `tenant_id` + `client_ip_hash` within 1-minute window = likely retry). File at `compliance/evidence/sso/CC6-E-APIKEY-IP-001_<YYYY-MM>.csv`. |
+| **Cadence** | Monthly from M5 go-live |
+| **Retention** | 3 years |
+| **Storage path** | `compliance/evidence/sso/CC6-E-APIKEY-IP-001_<YYYY-MM>.csv` |
+| **R2 bucket** | `form-soc2-evidence/sso/` |
+| **Privacy floor** | `client_ip_hash` is SHA-256(ip + `IP_HASH_SALT`) — raw IP never logged; `tenant_id` is org slug; no `user_id`, no employee name, no API key material, no request body content |
+| **Status** | 🟡 Authored — pending M5 go-live (SSO_SCIM_IMPLEMENTATION.md §32.8 item 10, P1/M6 first collection) |
+
+**Auditor narrative (CC6.1 + CC6.3):** CC6.1 and CC6.3 together require that logical access controls operate on all authentication paths. Prior to DEC-062, FORM's IP allowlist enforcement (§25.5) was scoped to SSO session flows and refresh endpoints. CC6-E-APIKEY-IP-001 provides monthly evidence that the enforcement was extended to long-lived API keys in `api-key-auth.ts`, closing the gap where an exfiltrated API key could bypass the IP allowlist control that a tenant administrator had intentionally configured. The `auth_path = 'api_key'` filter on the `sso.ip_allowlist_blocked` event stream makes the API-key path independently auditable — enabling an auditor to distinguish SSO-path enforcement events from API-key-path enforcement events and confirm both paths are active. The first 30 days of M5 export (CC6-E-APIKEY-IP-001_<first-month>) is the primary evidence for the SOC 2 observation period; subsequent monthly exports maintain the continuous control record.
+
+---
+
+### §85.5 SOC 2 Criteria Mapping — Patch Summary
+
+The following rows extend the control evidence tables established in earlier sections of this document:
+
+| Criterion | Control | Evidence added by §85 |
+|---|---|---|
+| **CC6.1** | Logical access controls — IP enforcement applies to all auth paths and defaults to safe state | CC6-E-SCIM-IP-001 (migration 0076 default-false confirmation); CC6-E-APIKEY-IP-001 (monthly API key path IP block export) |
+| **CC6.3** | Access revocation / restriction complete across all credential types | CC6-E-ML-001 (magic-link CAEP revocation integration test); CC6-E-APIKEY-IP-001 (API key path IP enforcement active — restriction applies to all authentication paths, not only SSO) |
+
+---
+
+### §85.6 Cross-Reference Obligations Closed by §85
+
+| Obligation | Source | Status |
+|---|---|---|
+| SSO_SCIM_IMPLEMENTATION.md §32.6 cross-ref note: "CC6-E-ML-001 — to be added to SOC2_READINESS.md §CC6.3 at M4 observation filing" | `docs/SSO_SCIM_IMPLEMENTATION.md §32.6` (v2.4, DEC-062) | **🟢 Closed — §85.2** |
+| SSO_SCIM_IMPLEMENTATION.md §32.6 cross-ref note: "CC6-E-SCIM-IP-001 — to be added to SOC2_READINESS.md §CC6.1 at M5 observation filing" | `docs/SSO_SCIM_IMPLEMENTATION.md §32.6` (v2.4, DEC-062) | **🟢 Closed — §85.3** |
+| SSO_SCIM_IMPLEMENTATION.md §32.6 cross-ref note: "CC6-E-APIKEY-IP-001 — to be added to SOC2_READINESS.md §CC6.1/CC6.3 at M5 observation filing" | `docs/SSO_SCIM_IMPLEMENTATION.md §32.6` (v2.4, DEC-062) | **🟢 Closed — §85.4** |
+
+---
+
+### §85.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | At M4 deploy gate: run `src/tests/auth/magic-link-revocation.test.ts` in staging; confirm both test cases pass; file CC6-E-ML-001 at `compliance/evidence/sso/CC6-E-ML-001_M4.md`; append SHA-256 to MASTER-INDEX. This is a P0 M4 deploy gate — do not approve the M4 deploy without a green test result. | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+| 2 | Confirm SSO_SCIM §32.8 item 1 (magic-link integration test implementation) is complete before attempting CC6-E-ML-001 collection. If tests do not yet exist, create them per §32.2.4 before the M4 deploy. | platform-engineer | **P0** | M4 | [ ] |
+| 3 | At M5 migration 0076 deploy: run the two validation queries per §85.3 in staging; screenshot results; file CC6-E-SCIM-IP-001 at `compliance/evidence/sso/CC6-E-SCIM-IP-001_M5.md`; append SHA-256 to MASTER-INDEX. | compliance-officer + devops-lead | **P0** | M5 (before first SCIM enterprise go-live) | [ ] |
+| 4 | At M5 go-live + 30 days: run the CC6-E-APIKEY-IP-001 collection query for the first full calendar month; export CSV; file at `compliance/evidence/sso/CC6-E-APIKEY-IP-001_<YYYY-MM>.csv`; append SHA-256 to MASTER-INDEX. Schedule monthly recurring collection in §15.1 compliance calendar. | compliance-officer | **P1** | M6 (first collection) then monthly | [ ] |
+| 5 | Add §85.5 criterion rows (CC6.1 × 2, CC6.3 × 2) to §79.4 master evidence table: ensure CC6-E-ML-001, CC6-E-SCIM-IP-001, CC6-E-APIKEY-IP-001 appear in Vanta mirror list alongside existing CC6 artefacts. | compliance-officer | **P1** | M5 | [ ] |
+| 6 | Add `compliance/evidence/sso/CC6-E-ML-001_M4.md`, `CC6-E-SCIM-IP-001_M5.md`, and `CC6-E-APIKEY-IP-001_<YYYY-MM>.csv` path patterns to §80.3 R2 folder structure note. Confirm `form-api` NO ACCESS invariant covers these paths. | devops-lead | **P1** | M5 | [ ] |
+
+---
+
+*v3.11.0 (2026-06-16): §85 Evidence Artefact Cross-Reference Patch — SSO_SCIM_IMPLEMENTATION §32 (DEC-062). Registers three SOC 2 evidence artefacts defined in `docs/SSO_SCIM_IMPLEMENTATION.md §32.6` (v2.4, 2026-06-16) that were not cross-referenced in SOC2_READINESS.md at the time of authoring. (1) **CC6-E-ML-001** (CC6.3 — one-time/M4): CI pass log for `magic-link-revocation.test.ts` integration tests; confirms `isRevoked()` middleware covers magic-link JWTs under both `revoke:user` and `account_suspended` KV signals; M4 deploy gate (zero tolerance — no green test, no deploy); 7yr; `compliance/evidence/sso/CC6-E-ML-001_M4.md`. (2) **CC6-E-SCIM-IP-001** (CC6.1 — one-time/M5): `psql` screenshot of zero-NULL-count and `DEFAULT FALSE` for all `tenant_sso_configs.scim_ip_enforcement_enabled` rows post-migration 0076; demonstrates safe-default implementation preventing misconfiguration-induced provisioning denial for existing SCIM tenants; 7yr; `compliance/evidence/sso/CC6-E-SCIM-IP-001_M5.md`. (3) **CC6-E-APIKEY-IP-001** (CC6.1/CC6.3 — monthly from M5): monthly export of `sso.ip_allowlist_blocked` DEC-030 events filtered to `auth_path = 'api_key'`; zero-row months are positive evidence (no violations or no tenants with allowlists); non-zero rows evidence the control detected an out-of-allowlist API key request; `auth_path` field (DEC-062 §32.4) enables per-pathway audit separation; 3yr; `compliance/evidence/sso/CC6-E-APIKEY-IP-001_<YYYY-MM>.csv`. §85.5 extends two SOC 2 criterion rows (CC6.1 × 2 new artefacts, CC6.3 × 2 new artefacts). §85.6 closes three explicit cross-reference obligations from `docs/SSO_SCIM_IMPLEMENTATION.md §32.6`. §85.7 six-item implementation checklist: 2× P0/M4 (magic-link test implementation confirmation + CC6-E-ML-001 filing as deploy gate), 1× P0/M5 (CC6-E-SCIM-IP-001 filing at migration 0076 deploy), 3× P1/M5–M6 (CC6-E-APIKEY-IP-001 monthly schedule, §79.4 master evidence table update, §80.3 R2 path confirmation). No new gaps opened. No gap score change — all three artefacts 🟡 Authored pending milestone filing; readiness fraction unaffected until first filing. Privacy floor (all three artefacts): no `user_id`, no employee name, no Art. 9 health data; `client_ip_hash` is SHA-256(ip + salt); `tenant_id` is org slug; staging test fixtures use synthetic non-production tenant slugs; `form_api` NO ACCESS to `compliance/evidence/sso/`. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §32.2` (magic-link revocation call-graph — CC6-E-ML-001 source); `docs/SSO_SCIM_IMPLEMENTATION.md §32.3` (SCIM IP flag design — CC6-E-SCIM-IP-001 source); `docs/SSO_SCIM_IMPLEMENTATION.md §32.4` (API key IP enforcement — CC6-E-APIKEY-IP-001 source); `docs/SSO_SCIM_IMPLEMENTATION.md §32.6` (evidence artefact table — all three defined here); `docs/SSO_SCIM_IMPLEMENTATION.md §32.8 items 1, 3, 10` (implementation checklist obligations); `docs/AUDIT_LOG_SCHEMA.md §SSO` (`sso.ip_allowlist_blocked` event with `auth_path` field — CC6-E-APIKEY-IP-001 collection query source); `docs/AUDIT_LOG_SCHEMA.md v2.14` (both DEC-030 changes cross-referenced here); `docs/DATA_MODEL.md §4.2` (`tenant_sso_configs.scim_ip_enforcement_enabled` — migration 0076 — CC6-E-SCIM-IP-001 schema source); §79.4 (master evidence table — three new artefact rows to add per §85.7 item 5); §80.3 (R2 folder structure — three new path patterns per §85.7 item 6); `docs/DECISION_LOG.md DEC-062`. Owner: compliance-officer + security-engineer + enterprise-architect.*
+
+---

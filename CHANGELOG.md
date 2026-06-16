@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [5.79.1] — 2026-06-16
+
+### Changed
+- `docs/SOC2_READINESS.md §85` — Evidence Artefact Cross-Reference Patch: SSO_SCIM §32 (DEC-062). Registers CC6-E-ML-001 (CC6.3 — magic-link CAEP revocation integration test, M4 deploy gate, 7yr), CC6-E-SCIM-IP-001 (CC6.1 — migration 0076 `scim_ip_enforcement_enabled DEFAULT FALSE` confirmation, M5, 7yr), CC6-E-APIKEY-IP-001 (CC6.1/CC6.3 — monthly `sso.ip_allowlist_blocked` export filtered to `auth_path = 'api_key'`, from M5, 3yr). Closes three cross-reference obligations from `docs/SSO_SCIM_IMPLEMENTATION.md §32.6` (v2.4, DEC-062). SOC2_READINESS.md header v3.10.0 → v3.11.0.
+
+---
+
 ## [5.79.0] — 2026-06-16
 
 ### Added
