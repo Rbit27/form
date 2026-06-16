@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.78.0] — 2026-06-16
+
+### Added
+- `content/post-1086-dorsal-interossei-anatomy.md` — Block 1051–1100 cluster 8 post 1/5. Dorsal interossei: four bipennate intrinsic hand muscles (DAB = Dorsal ABduct). Bipennate origin from adjacent metacarpals, deep branch of ulnar nerve innervation. 1st DI as largest and pinch stabiliser; clinical marker for ulnar neuropathy atrophy. Fat grip training and DI loading in compound pulls.
+- `content/post-1087-palmar-interossei-anatomy.md` — Block 1051–1100 cluster 8 post 2/5. Palmar interossei: three unipennate intrinsic muscles (PAD = Palmar ADduct). Co-activation with DI during cylinder grip — not antagonists but a stiffness system. Card test for adduction weakness; ulnar neuropathy clinical picture. Pinch and climbing as specific stressors.
+- `content/post-1088-thenar-complex-anatomy.md` — Block 1051–1100 cluster 8 post 3/5. Thenar eminence complex: APB (palmar abduction), opponens pollicis (opposition/metacarpal rotation), FPB (MCP flexion, dual innervation median + ulnar). Opposition mechanics: 3D movement of 1st metacarpal. APB atrophy as classic CTS marker; recurrent branch of median nerve anatomy. Pinch grip and climbing as primary stressors.
+- `content/post-1089-hypothenar-complex-anatomy.md` — Block 1051–1100 cluster 8 post 4/5. Hypothenar eminence: ADM, FDMB, ODM — all deep branch of ulnar nerve. ODM and opponens pollicis as the "cupping" system of the palm. Guyon's canal (ulnar tunnel syndrome) with zone 1/2/3 differentiation; cyclist's palsy; hook of hamate fracture risk in grip training. Cubital tunnel vs. Guyon's canal differential.
+- `content/post-1090-adductor-pollicis-anatomy.md` — Block 1051–1100 cluster 8 post 5/5. Adductor pollicis: oblique + transverse heads, deep branch of ulnar nerve, largest intrinsic thumb muscle. Primary force generator for lateral (key) pinch. Froment's sign: IP flexion compensation via FPL when AP is weak — clinical test for ulnar neuropathy. Jeanne's sign. 1st web space atrophy as visible marker. Plate pinch, blob lifting, climbing pinch holds as AP-specific training.
+- `blog.html` — posts 1086–1090 added at top of feed.
+
+### Changed
+- `STATUS.md` — Block 1051–1100 progress updated to 40/50; next: posts 1091–1095 (extensor indicis proprius, extensor digiti minimi, extensor digitorum communis architecture, sagittal band, retinacular system of digits).
+
+---
+
 ## [5.77.0] — 2026-06-16
 
 ### Added
