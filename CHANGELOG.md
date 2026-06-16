@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.72.0] — 2026-06-16
+
+### Added
+- `content/post-1076-posterior-deltoid-anatomy.md` — Block 1051–1100 cluster 6, post 1/5. Задній дельтоїд: горизонтальне відведення плеча як основна функція, конкуренція синергістів (ромбоподібні, трапеція) як причина систематичного недонавантаження, техніка ізоляції (фіксована лопатка + рух у горизонтальній площині), постуральний зв'язок з upper crossed syndrome. clinical_safety_review: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1077-triceps-long-head-anatomy.md` — Block 1051–1100 cluster 6, post 2/5. Довга головка трицепса: єдина двосуглобова головка (починається від лопатки), механіка пасивного подовження в overhead-позиції, EMG-обґрунтування переваги overhead extension над pushdown для акценту на довгу головку. clinical_safety_review: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1078-brachialis-anatomy.md` — Block 1051–1100 cluster 6, post 3/5. Brachialis: «чистий» флексор ліктя незалежно від пронації/супінації, анатомічне положення під biceps, чому hammer curl і reverse curl є самостійними вправами, роль у боковій товщині плеча, подвійна іннервація (musculocutaneous + radial). clinical_safety_review: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1079-pronator-teres-anatomy.md` — Block 1051–1100 cluster 6, post 4/5. Pronator teres: дві головки (humeral і ulnar), серединний нерв між головками (pronator syndrome), зв'язок з common flexor tendon і медіальною епікондилопатією. Вказівка: медіальний ліктьовий біль при навантаженні потребує клінічної оцінки. clinical_safety_review: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1080-anconeus-anatomy.md` — Block 1051–1100 cluster 6, post 5/5. Anconeus: трикутний стабілізатор задньо-латерального ліктьового суглоба, допоміжний розгинач, EMG-активація при швидких розгинаннях і пронованих положеннях. Пряме ізольоване тренування не потрібне. Диференціація бічного ліктьового болю. clinical_safety_review: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — posts 1076–1080 додані на початок сторінки (cluster 6 · Block 1051–1100).
+- `VERSION` → 5.72.0
+
+---
+
 ## [5.71.1] — 2026-06-16
 
 ### Changed
