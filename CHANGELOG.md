@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [5.64.0] — 2026-06-16
+
+### Added
+- `content/post-1056-deltoid-three-heads.md` — Block 1051–1100 cluster 2, post 1/5. Дельтоподібний м'яз: три голови (передня/середня/задня), анатомія SITS і механічна відмінність. Чому overhead press переважно навантажує передню голову; lateral raise — для середньої; rear delt fly / face pull — для задньої. EMG-дані і типовий дисбаланс. clinical-safety: NOT_REQUIRED.
+- `content/post-1057-rotator-cuff-function.md` — Block 1051–1100 cluster 2, post 2/5. Ротаторна манжета: SITS (supraspinatus, infraspinatus, teres minor, subscapularis). Механізм force coupling при абдукції; стабілізуюча роль при жимі і тягах; ER:IR баланс (норма 0.65–0.75); практичні наслідки для програмування (face pull, ER-вправи). clinical-safety: NOT_REQUIRED.
+- `content/post-1058-trapezius-three-zones.md` — Block 1051–1100 cluster 2, post 3/5. Трапецієподібний м'яз: верхня (елевація лопатки), середня (ретракція), нижня (депресія і ротація вниз) зони. Ротаційний force couple лопатки. Типова диспропорція: верхня перетренована, нижня в дефіциті. Y-raise і pulldown з депресією як корекція. clinical-safety: NOT_REQUIRED.
+- `content/post-1059-deep-spinal-stabilizers.md` — Block 1051–1100 cluster 2, post 4/5. Глибокі стабілізатори хребта: multifidus (сегментарна стабілізація, превентивна активація), erector spinae (три колони: iliocostalis, longissimus, spinalis), transversus abdominis. Force coupling при deadlift і присіданні. Bird dog, dead bug, Pallof press як специфічне доповнення. clinical-safety: NOT_REQUIRED.
+- `content/post-1060-calves-gastrocnemius-soleus.md` — Block 1051–1100 cluster 2, post 5/5. Литкові м'язи: gastrocnemius (бімартикулярний, type II, standing calf raise) vs. soleus (мономартикулярний, type I, seated calf raise). Чому кут коліна визначає, який м'яз навантажується. Ахіллове сухожилля як повільно-адаптуючий фактор. Повний ROM — пріоритет над вагою. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — картки posts 1056–1060 додані до сітки перед post-1055.
+- `STATUS.md` — Block 1051–1100 оновлено: 10/50 написано (кластер 2 complete); next: posts 1061–1065.
+- `VERSION` → 5.64.0
+
+---
+
 ## [5.63.0] — 2026-06-16
 
 ### Added
