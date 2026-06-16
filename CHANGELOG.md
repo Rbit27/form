@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.65.1] — 2026-06-16
+
+### Added
+- `docs/DECISION_LOG.md` — DEC-058 backfilled: k6 hybrid load test platform architecture (k6 Cloud EU-West quarterly PERF-SLO-06 reference + k6 OSS CI gate unchanged). Closes OQ-PERF-01 🟢 and OQ-PERF-02 🟢 from `docs/OBSERVABILITY.md §40.9`. Entry was referenced in OBSERVABILITY v4.1 (2026-06-14) but missing from the log.
+- `docs/AUDIT_LOG_SCHEMA.md` — `system.quarterly_perf_reference_initiated` and `system.quarterly_perf_reference_completed` registered in System namespace (STANDARD, 3yr, HMAC-chained, DEC-058). PERF-CLOUD-CHAIN-01 ordering invariant documented. Retention table row added. Closes `docs/OBSERVABILITY.md §45.8` checklist item 2 (P0, M6).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — version v2.11 → v2.12.
+- `VERSION` → 5.65.1
+
+---
+
 ## [5.65.0] — 2026-06-16
 
 ### Added
