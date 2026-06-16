@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [5.59.1] — 2026-06-16
+
+### Changed
+- `docs/DECISION_LOG.md` — DEC-061 entry added (was referenced in `docs/DATA_MODEL.md §36` and `docs/SOC2_READINESS.md §67.8/§67.9` but never recorded here). EU-region R2 bucket routing for enterprise off-boarding data egress: `resolveEgressBucket()` routes EU tenants (`eu-central-1`, `eu-west-1`) to `form-offboarding-exports-eu`; US tenants to `form-offboarding-exports`; enforced by `chk_r2_bucket_region_consistency` CHECK constraint (migration 0075) and OFB-REGION-01 HMAC-chain invariant in `enterprise.data_export_completed`. Options B (SCCs + single US bucket) and C (EU bucket + SCCs) rejected: TIA maintenance burden under Schrems II, FISA §702 / CLOUD Act exposure, EU DPO friction. Closes OQ-OFB-02 (P0). Owners: enterprise-architect + compliance-officer + devops-lead + legal.
+- `VERSION` — bump 5.59.0 → 5.59.1.
+
+---
+
 ## [5.59.0] — 2026-06-16
 
 ### Added
