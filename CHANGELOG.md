@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.73.0] — 2026-06-16
+
+### Added
+- `content/post-111-synthesis-six-frameworks.md` — Editorial series post-111. «Синтез 106–111: шість рамок мислення для self-coached атлета». Синтез постів 106–110: мікроцикл як одиниця аналізу (post-106), горизонт як діагностика «поганий день vs. поганий блок» (post-107), тренування і когнітивна продуктивність дозозалежно (post-108), МЕД і різниця між MV і MEV (post-109), варіабельність відгуку і n-of-1 (post-110). Плюс мета-рамка: як перемикатись між п'ятьма залежно від питання. clinical-safety: NOT_REQUIRED. Targeted: Дмитро (self-coached intermediate).
+
+### Changed
+- `blog.html` — post-111 card added (editorial series synthesis · 6 mental frameworks).
+- `README.md` — editorial roadmap розширено: posts 131–140 proposed (cluster «Advanced self-coaching intelligence»: від мотивації до оптимальності, від новачка до intermediate, продуктивна vs. важка сесія, кілька цілей одночасно, синтез 131–140).
+- `VERSION` → 5.73.0
+
+---
+
 ## [5.72.0] — 2026-06-16
 
 ### Added
