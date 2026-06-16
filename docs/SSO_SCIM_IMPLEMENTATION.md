@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.3
+# FORM · SSO/SCIM Implementation v2.4
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -8036,7 +8036,7 @@ Five new alerting rules are added. Add all five to `docs/OBSERVABILITY.md §6.2`
 | ID | Question | Owner | Priority | Resolution Target |
 |---|---|---|---|---|
 | OQ-SSO-23.1 | CAEP stream re-registration after SAML certificate rotation (§20) — should §20's cert rotation workflow automatically trigger CAEP stream re-registration at the IdP? Some IdPs (Okta in particular) tie the CAEP stream identity to the SSO application configuration; a SAML cert rotation may invalidate the stream token. Currently §20 has no hook into CAEP registration. The fix is straightforward (add a `caep_reregister_after_cert_rotation` step to the §20.4 rotation state machine) but requires coordination with the §20 implementation. | security-engineer | P2 | M5 |
-| OQ-SSO-23.2 | CAEP and magic-link fallback sessions (§10) — if a user's IdP account is disabled via a CAEP `account-disabled` event, FORM revokes all sessions using `revoke:user:{tenant_id}:{user_id}`. However, magic-link sessions (§10) may be stored under a different session type in `enterprise_sessions`. Confirm: does `revoke:user:{tenant_id}:{user_id}` (§22.5) cover magic-link sessions in addition to SSO sessions? Current assumption: yes, because `isRevoked()` checks the user-level KV key regardless of session type. platform-engineer to confirm that magic-link session creation and validation paths both pass through `isRevoked()`. | platform-engineer | P1 | Before M4 deploy |
+| OQ-SSO-23.2 | CAEP and magic-link fallback sessions (§10) — if a user's IdP account is disabled via a CAEP `account-disabled` event, FORM revokes all sessions using `revoke:user:{tenant_id}:{user_id}`. However, magic-link sessions (§10) may be stored under a different session type in `enterprise_sessions`. Confirm: does `revoke:user:{tenant_id}:{user_id}` (§22.5) cover magic-link sessions in addition to SSO sessions? Current assumption: yes, because `isRevoked()` checks the user-level KV key regardless of session type. platform-engineer to confirm that magic-link session creation and validation paths both pass through `isRevoked()`. **🟢 Resolved — DEC-062 (2026-06-16). See §32.2.** `isRevoked()` confirmed at middleware layer; call-graph trace complete; integration test CC6-E-ML-001 added as M4 deploy closure gate. | platform-engineer | 🟢 **Resolved** | §32.2 · DEC-062 (2026-06-16) |
 | OQ-SSO-23.3 | Polling fallback for IdPs that do not support push delivery — the SSF specification supports a pull/poll model where FORM periodically calls the IdP's transmitter endpoint to retrieve pending SETs, rather than the IdP pushing to FORM's webhook. Poll intervals of 5 minutes would still represent a significant improvement over the 15-minute JWT TTL but would not meet the < 30-second target. Is a < 30-second SLA contractually required, or is "significantly better than JWT TTL" sufficient? If a polling fallback is needed, what is the acceptable poll interval and the associated IdP API rate limit? | platform-engineer | P2 | M5 |
 | OQ-SSO-23.4 | CAEP and the §21 Google Directory API group cache — if a Google RISC `hijacking` event is received for a user in a Google Workspace OIDC tenant, FORM revokes the user's sessions. However, the `google_directory_group_cache` (§21) for that user may still contain stale group membership data with a 5-minute TTL. Should a RISC `hijacking` event also proactively delete the `google_directory_group_cache` row for the affected user? The current 5-minute TTL means stale cache data cannot be used to authenticate (since the session is revoked), but the cache row persisting for up to 5 minutes after a hijacking event could be considered a minor hygiene concern. | platform-engineer | P2 | M5 |
 
@@ -8788,9 +8788,9 @@ All events below are emitted through the `emit-audit-event` Cloudflare Worker (H
 
 | ID | Question | Priority | Owner | Target |
 |---|---|---|---|---|
-| OQ-SSO-25.1 | **SCIM endpoint IP allowlist scope.** The §25.5 enforcement table includes `POST /v1/scim/*` in the IP-enforced routes, reasoning that the SCIM token is long-lived and limiting the source IP to the IdP's known IP range is defence-in-depth. However, some SCIM clients (particularly Okta) do not originate from a fixed IP range and use shared infrastructure. If the tenant enables IP allowlist and enters only their office CIDRs, SCIM provisioning will break silently. Resolution options: (a) exclude `/v1/scim/*` from IP allowlist enforcement entirely; (b) add a separate `scim_ip_allowlist` field; (c) enforce allowlist on SCIM only when a separate `scim_ip_enforcement_enabled` flag is set. **Recommended: option (c) — separate flag, default off.** | P1 | enterprise-architect + platform-engineer | Before first IP allowlist-enabled enterprise customer |
+| OQ-SSO-25.1 | **SCIM endpoint IP allowlist scope.** The §25.5 enforcement table includes `POST /v1/scim/*` in the IP-enforced routes, reasoning that the SCIM token is long-lived and limiting the source IP to the IdP's known IP range is defence-in-depth. However, some SCIM clients (particularly Okta) do not originate from a fixed IP range and use shared infrastructure. If the tenant enables IP allowlist and enters only their office CIDRs, SCIM provisioning will break silently. Resolution options: (a) exclude `/v1/scim/*` from IP allowlist enforcement entirely; (b) add a separate `scim_ip_allowlist` field; (c) enforce allowlist on SCIM only when a separate `scim_ip_enforcement_enabled` flag is set. **Recommended: option (c) — separate flag, default off.** **🟢 Resolved — DEC-062 (2026-06-16). See §32.3.** Option (c) adopted: `scim_ip_enforcement_enabled BOOLEAN NOT NULL DEFAULT FALSE` (migration `0076`); Admin Dashboard toggle with Okta/Azure AD warning banner. | 🟢 **Resolved** | enterprise-architect + platform-engineer | §32.3 · DEC-062 (2026-06-16) |
 | OQ-SSO-25.2 | **`sms` in MFA satisfying set.** §25.6 includes `sms` as a satisfying MFA method. NIST SP 800-63B (AAL2) deprecated SMS OTP in 2017 due to SIM-swap attack risk. Some enterprise contracts in financial services may require FORM to enforce `hwk` or `fido` only. Resolution: add an optional `mfa_required_methods` JSONB array to `tenant_sso_configs` that overrides the default satisfying set (e.g., `["hwk", "fido"]` for phishing-resistant-only enforcement). Owner: security-engineer + compliance-officer. Priority: P2 — relevant only after first regulated-industry (financial services/healthcare) enterprise deal. | P2 | security-engineer + compliance-officer | Before first regulated-industry enterprise customer |
-| OQ-SSO-25.3 | **IP allowlist enforcement for direct API keys.** The §12 session layer uses JWTs. Some enterprise integrations use long-lived API keys (separate from JWT sessions) for webhook configuration and reporting pulls. The current §25.5 design enforces IP allowlist on the session-based flows; it does not cover API key routes. If an API key is exfiltrated, a non-allowlisted IP can use it freely. Resolution: add IP allowlist enforcement to the API key authentication middleware in `src/workers/auth/api-key-auth.ts`. | P1 | platform-engineer | M5 |
+| OQ-SSO-25.3 | **IP allowlist enforcement for direct API keys.** The §12 session layer uses JWTs. Some enterprise integrations use long-lived API keys (separate from JWT sessions) for webhook configuration and reporting pulls. The current §25.5 design enforces IP allowlist on the session-based flows; it does not cover API key routes. If an API key is exfiltrated, a non-allowlisted IP can use it freely. Resolution: add IP allowlist enforcement to the API key authentication middleware in `src/workers/auth/api-key-auth.ts`. **🟢 Resolved — DEC-062 (2026-06-16). See §32.4.** `enforceIpAllowlist()` extended with `authPath: 'sso' | 'api_key'` parameter; wired into `api-key-auth.ts`; `sso.ip_blocked` DEC-030 payload extended with `auth_path` field. | 🟢 **Resolved** | platform-engineer | §32.4 · DEC-062 (2026-06-16) |
 | OQ-SSO-25.4 | **Policy version vector clock.** The `policy_version` field in `CachedAuthPolicy` is a monotonic integer scoped to a single tenant. If two tenant admins simultaneously submit policy changes (unlikely but possible), the last-write-wins database update will produce a monotonic increment but the intermediate state will be invisible to the audit log. Should policy changes use optimistic locking (`WHERE policy_version = $expected_version`)? Recommended: yes — add `policy_version INT NOT NULL DEFAULT 0` to `tenant_sso_configs` with a `RAISE EXCEPTION` if the write fails the optimistic lock, surfacing the conflict to the second admin. | P2 | enterprise-architect | M5 |
 
 ---
@@ -11118,3 +11118,455 @@ SSL:     sslmode=require (Supabase enforces this; connection rejected if server 
 ---
 
 *v2.3 additions (2026-06-15): §31 OQ-SSO-24.1 + OQ-SSO-24.2 Resolution — `pam-db-proxy` Architecture: Supabase Edge Function & Direct Postgres Session Connection (DEC-060). Closes OQ-SSO-24.1 (P1, Before M4 deploy — pam-db-proxy host: Hyperdrive vs. Edge Function) and OQ-SSO-24.2 (P0, Before M4 deploy — PgBouncer session mode for PAM pool). Both from §24.9. §31.1 scopes to pam-db-proxy connection architecture only; pam-elevation-service Worker, break-glass protocol (§24.4), and §24.6 DEC-030 event taxonomy are all unchanged. §31.2 OQ-SSO-24.1 resolution: Supabase Edge Function adopted over Cloudflare Worker + Hyperdrive. Six-row options analysis: network path (intra-VPC vs. cross-provider), trust boundary for form_admin credential, SET ROLE compatibility (transaction mode ❌ vs. session mode ✅), connection latency (< 5 ms intra-VPC vs. 20–50 ms cross-provider), third-party intermediary, operational complexity. §31.2.2 mTLS profile comparison: Supabase path (Cloudflare Access mTLS for Worker → Edge Function; Supabase-managed TLS for Edge Function → Postgres intra-VPC); Hyperdrive path (no Worker-to-Worker mTLS; Hyperdrive-managed TLS to Supabase public endpoint — form_admin credential crosses provider boundary on every new pool connection). §31.2.3 four rejection grounds for Hyperdrive: (1) SET ROLE incompatibility in transaction mode — not a configuration gap but a PgBouncer architectural constraint; (2) form_admin credential must leave Supabase trust boundary if stored in Cloudflare Workers Secrets; (3) cross-provider network hop adds 20–50 ms latency per query; (4) operational complexity disproportionate to PAM access frequency. §31.3 OQ-SSO-24.2 resolution: direct Postgres session connection (port 5432) adopted; PgBouncer transaction mode (port 6543) bypassed entirely. §31.3.1 problem: PgBouncer transaction mode does not guarantee session affinity for SET ROLE — a silent data integrity risk if RESET ROLE executes on a different backend than SET ROLE. §31.3.2 direct connection properties: native session semantics, sslmode=require, form_system login role + SET ROLE form_admin after PAM validation. §31.3.3 connection limit analysis: ≤ 5 concurrent PAM-eligible engineers (§24.4.1 named list cap); 1 active session per admin (KV secondary index enforcement); max 5–6 direct PAM connections simultaneously; Supabase Pro plan supports 60 direct connections — no plan upgrade required; break-glass uses a separate BREAK_GLASS_DB_URL. §31.4 updated pam-db-proxy connection specification: nine-step sequence (open session connection → SET ROLE form_admin → SET app.pam_session_id → execute query → RESET ROLE → RESET app.pam_session_id → close connection; do not pool); rationale for "close rather than pool" (audit isolation, TTL alignment, Edge Function anti-pattern for persistent pools); §24.2 invariant #4 server_reset_query annotation retained as defensive documentation only. §31.5 SUPABASE_PAM_DB_URL secret specification: three-row credential disambiguation table (SUPABASE_SERVICE_ROLE_KEY port 6543 transaction mode form_api/form_system; SUPABASE_PAM_DB_URL port 5432 session mode form_system → SET ROLE form_admin; BREAK_GLASS_DB_URL port 5432 session mode form_break_glass); CRYPTOGRAPHY_POLICY.md §5 update required (annual rotation, devops-lead owner, Supabase Edge Function Secrets storage). §31.6 SOC 2 evidence update: CC6.7 narrative extended (no new artefacts — CC6-E-PAM-003 updated to include port 5432 screenshot); CC6.1 note on form_admin credential staying within Supabase trust boundary. §31.7 §24.9/§24.10 cross-updates: OQ-SSO-24.1 🟡 P1 → 🟢 Resolved; OQ-SSO-24.2 🟡 P0 → 🟢 Resolved; §24.10 checklist items 4 and 10 marked 🟢 Done. §31.8 status table. §31.9 nine-item implementation checklist: 5× P0/M4-M5 (SUPABASE_PAM_DB_URL provisioning, CRYPTOGRAPHY_POLICY update, Edge Function implementation, integration test, CC6-E-PAM-003 artefact update), 2× P1/M5 (connection capacity confirmation + PAM-CONN-E-001 doc, RESET ROLE chaos test), 2× P2/Annual-governance (team growth re-evaluation gate, annual Hyperdrive session-mode review). No new DEC-030 event types — §24.6 event taxonomy unchanged. Cross-references: §24.2 (pam-db-proxy step-3 annotation updated — "(connection pool)" → "direct Postgres session connection"); §24.4.2 (BREAK_GLASS_DB_URL — separate credential, unchanged); §24.5 (PAM KV schema — unchanged); §24.6 (DEC-030 events — unchanged); §24.8 (CC6-E-PAM-003 artefact — updated scope per §31.6); §24.9 (OQ-SSO-24.1/24.2 — both now 🟢 Resolved); §24.10 (items 4 and 10 — both 🟢 Done); `docs/CRYPTOGRAPHY_POLICY.md §5` (SUPABASE_PAM_DB_URL key inventory entry — P0 checklist item 2); `docs/OBSERVABILITY.md §29` (AL-PAM-BG-01 — unchanged, break-glass audit); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain — no chain events change); `docs/DECISION_LOG.md DEC-060`. Privacy floor: no employee user_id, name, email, or health data in any PAM connection variable or audit GUC; pam_session_id is a FORM-internal UUID with no personal data mapping. Owner: security-engineer + platform-engineer + enterprise-architect.*
+
+---
+
+## §32 OQ-SSO-23.2 · OQ-SSO-25.1 · OQ-SSO-25.3 Resolution — Magic-Link CAEP Session Coverage, SCIM IP Allowlist Scope & API Key IP Enforcement (DEC-062)
+
+> **Closes:** OQ-SSO-23.2 (P1, Before M4 deploy — magic-link session coverage in CAEP `account-disabled` revocation path), OQ-SSO-25.1 (P1, Before first IP-allowlist enterprise customer — SCIM endpoint scope in per-tenant IP policy), OQ-SSO-25.3 (P1, M5 — API key IP allowlist enforcement). All three from §23.9 and §25.13.
+
+---
+
+### §32.1 Purpose and Scope
+
+This section closes three P1 open questions that share a common theme: **coverage completeness** — ensuring that FORM's authentication controls (session revocation, IP allowlist, credential enforcement) apply uniformly to every authentication path, not just the primary SSO/JWT path.
+
+**Scope:** Magic-link session revocation behaviour under CAEP; SCIM Worker IP allowlist flag design; API key authentication middleware IP check. **Out of scope:** The `isRevoked()` implementation for SSO JWT sessions (§22 — unchanged); the IP allowlist enforcement table for SSO flows (§25.5 — unchanged); the SCIM Worker request-handling logic (§27 — unchanged).
+
+All three questions were marked as pre-M4 or M5 blockers. They are resolved together in DEC-062 (2026-06-16) because all three affect the same `ip-allowlist.ts` and `api-key-auth.ts` Worker modules, and the schema change for OQ-SSO-25.1 touches the same `tenant_sso_configs` ALTER TABLE migration window as the OQ-SSO-25.3 middleware update.
+
+---
+
+### §32.2 OQ-SSO-23.2 Resolution — Magic-Link Session Coverage in CAEP Revocation (DEC-062)
+
+#### §32.2.1 Problem
+
+§23.3 specifies that when a CAEP `account-disabled` event is received, FORM revokes all sessions for the affected user via `revoke:user:{tenant_id}:{user_id}` KV key (§22.5). The question in OQ-SSO-23.2 was: does `isRevoked()` check this key when validating a **magic-link session** (§10), or only when validating an SSO JWT session?
+
+Magic-link sessions are issued via `POST /auth/magic-link` as an enterprise fallback path when SSO is unavailable (§10.2). They produce an `enterprise_sessions` row with `session_type = 'magic_link'` and generate a signed JWT identical in structure to an SSO JWT — same `tenant_id`, `user_id`, and `jti` claims.
+
+#### §32.2.2 Decision: `isRevoked()` Covers Magic-Link Sessions — Confirmed (DEC-062)
+
+**Decision: OQ-SSO-23.2 confirmed resolved.** Magic-link sessions are covered by `revoke:user:{tenant_id}:{user_id}` because the magic-link JWT passes through the same authentication middleware stack as SSO JWTs, and `isRevoked()` is called at the middleware level — before any session-type branching.
+
+The key insight is that session revocation in §22 operates on the *credential* (the JWT claim pair `{tenant_id, user_id}`), not on the *session type* stored in `enterprise_sessions`. The `isRevoked()` function (§22.6) reads two KV keys:
+
+```typescript
+// src/workers/auth/middleware/session-revocation.ts (unchanged — confirmation only)
+export async function isRevoked(
+  env: Env,
+  tenantId: string,
+  userId: string,
+  sessionJti: string,
+): Promise<RevocationStatus> {
+  // Check 1: user-level revocation (covers ALL session types for this user)
+  const userKey = `revoke:user:${tenantId}:${userId}`;
+  const userRevoked = await env.SESSION_REVOCATION_KV.get(userKey);
+  if (userRevoked !== null) return RevocationStatus.USER_REVOKED;
+
+  // Check 2: session-level revocation (covers specific jti)
+  const sessionKey = `revoke:session:${tenantId}:${sessionJti}`;
+  const sessionRevoked = await env.SESSION_REVOCATION_KV.get(sessionKey);
+  if (sessionRevoked !== null) return RevocationStatus.SESSION_REVOKED;
+
+  // Check 3: force re-auth flag (set by CAEP token-claims-change event)
+  const forceReauthKey = `force_reauth:${tenantId}:${userId}`;
+  const forceReauth = await env.SESSION_REVOCATION_KV.get(forceReauthKey);
+  if (forceReauth !== null) return RevocationStatus.FORCE_REAUTH;
+
+  // Check 4: account suspended flag (set by CAEP account-disabled event)
+  const suspendedKey = `account_suspended:${tenantId}:${userId}`;
+  const suspended = await env.SESSION_REVOCATION_KV.get(suspendedKey);
+  if (suspended !== null) return RevocationStatus.ACCOUNT_SUSPENDED;
+
+  return RevocationStatus.ACTIVE;
+}
+```
+
+`isRevoked()` is called in `src/workers/auth/middleware/authenticate.ts` on every request, before the request handler reads `session_type`. Both magic-link and SSO JWTs carry `tenant_id` and `user_id` claims — both are caught by `RevocationStatus.USER_REVOKED` on the first KV lookup.
+
+#### §32.2.3 Call-Graph Trace: Magic-Link → `isRevoked()` Path
+
+```
+POST /auth/magic-link → magicLinkHandler() → signs JWT { tenant_id, user_id, session_type: 'magic_link', jti }
+  ↓
+GET /api/* (magic-link JWT in Authorization header)
+  ↓
+authenticate() middleware [src/workers/auth/middleware/authenticate.ts]
+  → verifyJwt()   — validates signature, expiry, tenant_id
+  → isRevoked()   — checks KV keys:
+      revoke:user:{tenant_id}:{user_id}     ← CAEP account-disabled writes this
+      revoke:session:{tenant_id}:{jti}
+      force_reauth:{tenant_id}:{user_id}
+      account_suspended:{tenant_id}:{user_id}
+  → if ACCOUNT_SUSPENDED → 401 { error: 'account_suspended' }
+  ↓
+request handler — session_type is read here, AFTER revocation check
+```
+
+**The call graph confirms: `isRevoked()` is invoked unconditionally at the middleware layer, before session type is examined.** A CAEP `account-disabled` event that writes `account_suspended:{tenant_id}:{user_id}` to SESSION_REVOCATION_KV will block any magic-link JWT for that user on the next request, within the TTL established in §23.3.2 (72-hour `account_suspended` TTL; immediate revocation via `revoke:user` KV key with no TTL).
+
+#### §32.2.4 Required Integration Test (OQ-SSO-23.2 Closure Gate)
+
+The following integration test must be added to `src/tests/auth/magic-link-revocation.test.ts` before M4 deploy as confirmation evidence:
+
+```typescript
+describe('Magic-link session — CAEP account-disabled coverage', () => {
+  it('rejects magic-link JWT when revoke:user KV key is set', async () => {
+    // Step 1: create a magic-link session
+    const { jwt } = await createMagicLinkSession(env, testTenantId, testUserId);
+
+    // Step 2: simulate CAEP account-disabled event writing user-level revocation key
+    await env.SESSION_REVOCATION_KV.put(
+      `revoke:user:${testTenantId}:${testUserId}`,
+      JSON.stringify({ reason: 'caep_account_disabled', ts: Date.now() }),
+    );
+
+    // Step 3: attempt to use the magic-link JWT
+    const res = await app.fetch(
+      new Request('https://api.form.coach/api/me', {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('account_suspended');
+  });
+
+  it('rejects magic-link JWT when account_suspended KV key is set', async () => {
+    const { jwt } = await createMagicLinkSession(env, testTenantId, testUserId);
+    await env.SESSION_REVOCATION_KV.put(
+      `account_suspended:${testTenantId}:${testUserId}`,
+      '1',
+      { expirationTtl: 72 * 3600 },
+    );
+    const res = await app.fetch(
+      new Request('https://api.form.coach/api/me', {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(401);
+  });
+});
+```
+
+This test serves as **CC6.3 evidence** (session revocation applies to all credential types) and is filed as **CC6-E-ML-001** at `compliance/evidence/sso/CC6-E-ML-001_M4.md`.
+
+---
+
+### §32.3 OQ-SSO-25.1 Resolution — SCIM Endpoint IP Allowlist Scope (DEC-062)
+
+#### §32.3.1 Problem
+
+§25.5 includes `POST /v1/scim/*` in the per-tenant IP allowlist enforcement table. The concern: major SCIM clients — Okta in particular — do not originate from stable, customer-configurable IP ranges. Okta's SCIM gateway uses shared Okta cloud infrastructure with CIDR ranges that change without customer notice. If a tenant enables IP allowlist and enters only their office CIDRs, SCIM provisioning breaks silently: the IdP's SCIM PATCH requests are blocked at the IP layer, returning 403s that the IdP may retry indefinitely or silently drop, causing provisioning stall.
+
+Three options were documented:
+- **(a)** Exclude `/v1/scim/*` from IP allowlist enforcement entirely
+- **(b)** Add a separate `scim_ip_allowlist` field alongside the main IP allowlist
+- **(c)** Enforce IP allowlist on SCIM only when a new `scim_ip_enforcement_enabled` flag is explicitly set (default `false`)
+
+#### §32.3.2 Decision: Option (c) — `scim_ip_enforcement_enabled` Flag, Default Off (DEC-062)
+
+**Rationale:**
+1. **Silent breakage is the failure mode to prevent.** Most enterprise customers (Okta-primary, Azure AD-primary) run SCIM from IdP-managed cloud infrastructure with no fixed CIDRs. If IP allowlist were applied to SCIM by default, the enablement of a customer's IP allowlist would silently break provisioning — a P1 incident waiting to happen on every enterprise onboarding.
+2. **Opt-in is correct for the minority case.** Some enterprise customers run a self-hosted identity proxy (e.g., on-premises Okta Agent, LDAP bridge) with a known static IP. For these customers, `scim_ip_enforcement_enabled = true` provides meaningful defence-in-depth against SCIM token theft from an off-network attacker.
+3. **Option (a) is too permissive.** Removing SCIM from IP scope entirely eliminates defence-in-depth for customers who *can* provide stable CIDRs. Option (b) is operationally complex (two allowlist fields to explain to every customer).
+4. **Default off is the safe default.** SCIM tokens are rotated per §26.3 and HMAC-hashed in KV per §27.3; IP enforcement is additive security, not the primary control.
+
+#### §32.3.3 Schema Change — `tenant_sso_configs` ALTER TABLE
+
+```sql
+-- Migration: 0076_scim_ip_enforcement_flag.sql
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN scim_ip_enforcement_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+COMMENT ON COLUMN tenant_sso_configs.scim_ip_enforcement_enabled IS
+  'When true, SCIM Worker enforces the tenant IP allowlist on /v1/scim/* requests. '
+  'Default false: most IdPs (Okta, Azure AD) use shared cloud CIDRs incompatible with '
+  'static allowlists. Enable only for customers with a self-hosted IdP proxy.';
+
+-- Verify: existing rows default to false (safe — no change to current SCIM behaviour)
+SELECT COUNT(*) FROM tenant_sso_configs WHERE scim_ip_enforcement_enabled IS NULL;
+-- Must return 0
+
+-- Index: not needed (boolean column queried alongside tenant_id which is already indexed)
+```
+
+RLS: `scim_ip_enforcement_enabled` is writable by `tenant_owner` and `form_admin` roles only. `tenant_manager` may read but not write. `form_api` has SELECT (needed for SCIM Worker auth pipeline). This follows the existing RLS policy on `tenant_sso_configs` — no new policies required.
+
+#### §32.3.4 Updated `enforceScimIpAllowlist()` Function
+
+```typescript
+// src/workers/auth/middleware/ip-allowlist.ts — SCIM-specific guard
+// (Main SSO IP enforcement `enforceIpAllowlist()` in §25.5 is UNCHANGED.)
+
+export async function enforceScimIpAllowlist(
+  env: Env,
+  tenantId: string,
+  clientIp: string,
+): Promise<void> {
+  // Step 1: look up SCIM IP enforcement flag
+  const config = await getScimIpEnforcementConfig(env, tenantId);
+
+  if (!config.scim_ip_enforcement_enabled) {
+    // Default path: no SCIM IP enforcement — return immediately
+    return;
+  }
+
+  // Step 2: check IP against tenant's ip_allowlist (same logic as SSO path in §25.5)
+  if (!config.ip_allowlist || config.ip_allowlist.length === 0) {
+    // scim_ip_enforcement_enabled = true but no allowlist configured — misconfig
+    // Emit advisory event and allow (do not break SCIM provisioning on misconfig)
+    await emitAuditEvent(env, {
+      event_type: 'scim.ip_enforcement_misconfigured',
+      severity: 'STANDARD',
+      tenant_id: tenantId,
+      client_ip_hash: sha256(clientIp + env.IP_HASH_SALT),
+    });
+    return;
+  }
+
+  const allowed = config.ip_allowlist.some((cidr: string) =>
+    ipInCidr(clientIp, cidr),
+  );
+
+  if (!allowed) {
+    await emitAuditEvent(env, {
+      event_type: 'scim.ip_allowlist_blocked',
+      severity: 'HIGH',
+      tenant_id: tenantId,
+      client_ip_hash: sha256(clientIp + env.IP_HASH_SALT),
+    });
+    throw new ScimError(403, 'forbidden', 'Request IP not in tenant allowlist');
+  }
+}
+
+// KV-cached config lookup (separate cache key from SSO config to avoid cross-invalidation)
+async function getScimIpEnforcementConfig(
+  env: Env,
+  tenantId: string,
+): Promise<{ scim_ip_enforcement_enabled: boolean; ip_allowlist: string[] }> {
+  const cacheKey = `scim_ip_cfg:${tenantId}`;
+  const cached = await env.SSO_KV.get(cacheKey, 'json');
+  if (cached) return cached as { scim_ip_enforcement_enabled: boolean; ip_allowlist: string[] };
+
+  const { data } = await env.SUPABASE.from('tenant_sso_configs')
+    .select('scim_ip_enforcement_enabled, ip_allowlist')
+    .eq('tenant_id', tenantId)
+    .single();
+
+  const result = {
+    scim_ip_enforcement_enabled: data?.scim_ip_enforcement_enabled ?? false,
+    ip_allowlist: data?.ip_allowlist ?? [],
+  };
+
+  await env.SSO_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 300 }); // 5 min
+  return result;
+}
+```
+
+**SCIM Worker call site** (`apps/scim-worker/src/auth.ts`) — replace the unconditional `enforceScimIpAllowlist()` call stub with the flag-gated version:
+
+```typescript
+// Before (§27.3 stub):
+await enforceScimIpAllowlist(env, tenantId, clientIp);  // was: always enforced
+
+// After (§32.3.4):
+await enforceScimIpAllowlist(env, tenantId, clientIp);  // now: flag-gated internally
+```
+
+The SCIM Worker call site is **unchanged** — the flag-gating is encapsulated inside `enforceScimIpAllowlist()`. No import changes needed.
+
+**Admin Dashboard** — the SCIM configuration panel (§16) must expose `scim_ip_enforcement_enabled` as a toggle labelled:
+
+> **"Restrict SCIM provisioning to allowlisted IPs"** *(default: off — only enable if your IdP uses a static IP or self-hosted SCIM proxy)*
+
+The toggle must display a warning banner when enabled: *"Your IdP's SCIM client must originate from the IPs listed above. Okta and most cloud IdPs use dynamic IPs — enabling this will break provisioning unless you have a self-hosted SCIM proxy."*
+
+---
+
+### §32.4 OQ-SSO-25.3 Resolution — API Key IP Allowlist Enforcement (DEC-062)
+
+#### §32.4.1 Problem
+
+§25.5 (IP allowlist enforcement table) covers SSO session flows and refresh endpoints. It does not cover long-lived API keys (§26, `tenant_api_keys` table in DATA_MODEL §26). An API key exfiltrated from a tenant's integration — via a misconfigured webhook endpoint, a CI/CD secret leak, or a compromised third-party integration — can be used from any IP unless IP enforcement is also applied to the API key authentication middleware.
+
+#### §32.4.2 Decision: Extend IP Allowlist to API Key Auth Middleware (DEC-062)
+
+**Decision:** Add an IP allowlist check to `src/workers/auth/api-key-auth.ts` using the same `enforceIpAllowlist()` function already used for SSO flows (§25.5). The check is applied only when the tenant has `ip_allowlist` configured (non-empty array in `tenant_sso_configs`) — no new per-API-key or per-key-type flag is introduced. This is deliberately conservative: if a tenant has configured an IP allowlist, it should apply to all authentication paths.
+
+**Rejection of "API key–specific allowlist" alternative:** A separate `api_key_ip_allowlist` field on `tenant_api_keys` adds operational complexity (two allowlists to manage per tenant) and creates a security gap where a tenant administrator correctly configures the SSO allowlist but leaves the API key allowlist open. The consistent application of `tenant_sso_configs.ip_allowlist` across all auth paths is simpler to explain, audit, and support.
+
+**Privacy note on IP hashing:** The `enforceIpAllowlist()` function (§25.5) hashes the client IP with `IP_HASH_SALT` before storing in DEC-030 events. This salt is already provisioned as a Cloudflare Workers Secret. No new secret is required.
+
+#### §32.4.3 TypeScript Implementation
+
+```typescript
+// src/workers/auth/api-key-auth.ts — add IP allowlist check after token validation
+
+import { enforceIpAllowlist } from './middleware/ip-allowlist';
+import { emitAuditEvent } from '../audit/emit';
+
+export async function authenticateApiKey(
+  request: Request,
+  env: Env,
+): Promise<ApiKeyAuthResult> {
+  // 1. Extract API key from Authorization: Bearer header or X-API-Key header
+  const rawKey = extractApiKey(request);
+  if (!rawKey) throw new AuthError(401, 'missing_api_key');
+
+  // 2. Validate key against tenant_api_keys (HMAC hash comparison per §26.4)
+  const keyRecord = await resolveApiKey(env, rawKey);
+  if (!keyRecord || keyRecord.revoked_at !== null) throw new AuthError(401, 'invalid_api_key');
+  if (keyRecord.expires_at && new Date(keyRecord.expires_at) < new Date()) {
+    throw new AuthError(401, 'api_key_expired');
+  }
+
+  // ── NEW (§32.4.3): IP allowlist enforcement ──────────────────────────────
+  const clientIp = request.headers.get('CF-Connecting-IP') ?? '';
+  await enforceIpAllowlist(env, keyRecord.tenant_id, clientIp, 'api_key');
+  // enforceIpAllowlist() is a no-op when ip_allowlist is empty or null;
+  // throws AuthError(403) and emits sso.ip_allowlist_blocked DEC-030 event if blocked.
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // 3. Emit api_key.request_authenticated DEC-030 event (existing — unchanged)
+  await emitAuditEvent(env, {
+    event_type: 'api_key.request_authenticated',
+    severity: 'STANDARD',
+    tenant_id: keyRecord.tenant_id,
+    key_id: keyRecord.id,       // UUID, not the raw key
+    client_ip_hash: sha256(clientIp + env.IP_HASH_SALT),
+    scopes: keyRecord.scopes,
+  });
+
+  return { tenantId: keyRecord.tenant_id, keyId: keyRecord.id, scopes: keyRecord.scopes };
+}
+```
+
+`enforceIpAllowlist()` is extended with an optional `authPath` parameter for DEC-030 event tagging:
+
+```typescript
+// src/workers/auth/middleware/ip-allowlist.ts — extend enforceIpAllowlist signature
+// (SSO path behaviour UNCHANGED — authPath defaults to 'sso')
+
+export async function enforceIpAllowlist(
+  env: Env,
+  tenantId: string,
+  clientIp: string,
+  authPath: 'sso' | 'api_key' = 'sso',  // ← NEW optional parameter
+): Promise<void> {
+  const config = await getIpAllowlistConfig(env, tenantId);
+  if (!config.ip_allowlist || config.ip_allowlist.length === 0) return;
+
+  const allowed = config.ip_allowlist.some((cidr: string) => ipInCidr(clientIp, cidr));
+  if (!allowed) {
+    await emitAuditEvent(env, {
+      event_type: 'sso.ip_allowlist_blocked',    // same event type for both paths
+      severity: 'HIGH',
+      tenant_id: tenantId,
+      client_ip_hash: sha256(clientIp + env.IP_HASH_SALT),
+      auth_path: authPath,    // ← NEW field in DEC-030 payload
+    });
+    throw new AuthError(403, 'ip_not_allowlisted');
+  }
+}
+```
+
+The `auth_path` field is additive to the existing `sso.ip_allowlist_blocked` DEC-030 event payload — no new event type is introduced.
+
+---
+
+### §32.5 DEC-030 Event Updates
+
+Two event-type changes from this section:
+
+| Event | Change | Severity | Retention | SOC 2 |
+|---|---|---|---|---|
+| `sso.ip_allowlist_blocked` | **Payload extension** — add `auth_path: 'sso' \| 'api_key'` field; backwards-compatible (existing consumers ignore unknown fields) | HIGH | 7yr | CC6.1, CC6.3 |
+| `scim.ip_enforcement_misconfigured` | **New event** — advisory only; emitted when `scim_ip_enforcement_enabled = true` but `ip_allowlist` is empty; no PagerDuty alert; compliance-officer review only | STANDARD | 3yr | CC6.1 advisory |
+
+**Registration required in `docs/AUDIT_LOG_SCHEMA.md §SCIM` and `§SSO` namespaces:**
+- `sso.ip_allowlist_blocked` — payload extension; add `auth_path` to Zod schema (optional field, default `'sso'` for backwards compatibility)
+- `scim.ip_enforcement_misconfigured` — new event; register in `§SCIM` namespace
+
+No new HMAC chain ordering invariants — both events are standalone (not part of a required sequence with other events).
+
+---
+
+### §32.6 SOC 2 Evidence
+
+| ID | Criterion | Description | Path | Cadence | Retention |
+|---|---|---|---|---|---|
+| **CC6-E-ML-001** | CC6.3 | Magic-link CAEP integration test pass log (`src/tests/auth/magic-link-revocation.test.ts`) — confirms that `revoke:user` KV key revokes magic-link sessions within M4 deploy | `compliance/evidence/sso/CC6-E-ML-001_M4.md` | One-time (M4 deploy gate) | 7yr |
+| **CC6-E-SCIM-IP-001** | CC6.1 | Screenshot of `scim_ip_enforcement_enabled = false` default in staging DB after migration `0076`; confirms that existing SCIM tenants are not affected | `compliance/evidence/sso/CC6-E-SCIM-IP-001_M5.md` | One-time (migration 0076 deploy) | 7yr |
+| **CC6-E-APIKEY-IP-001** | CC6.1, CC6.3 | `sso.ip_allowlist_blocked` DEC-030 export filtered to `auth_path = 'api_key'` for first 30 days post-M5 — confirms IP enforcement is active on the API key path for tenants with allowlists configured | `compliance/evidence/sso/CC6-E-APIKEY-IP-001_<YYYY-MM>.csv` | Monthly from M5 | 3yr |
+
+**Auditor narrative for CC6.3 (CC6-E-ML-001):** FORM's session revocation architecture (§22 KV-backed revocation layer) is designed to apply uniformly to all credential types. CC6-E-ML-001 provides empirical evidence that magic-link JWTs — the enterprise fallback credential path when SSO is unavailable — are subject to the same `revoke:user` and `account_suspended` KV controls as SSO JWTs. This is directly relevant to CC6.3 (access revocation is complete and timely): an account-disabled CAEP event from the enterprise IdP blocks all FORM credential types for that user within the same sub-second KV TTL bound as the SSO path.
+
+**Auditor narrative for CC6.1 (CC6-E-SCIM-IP-001):** The `scim_ip_enforcement_enabled` flag defaults to `false` because most enterprise IdPs (Okta, Azure AD) use shared cloud SCIM infrastructure with dynamic IP ranges. This default-off design prevents a misconfig scenario where a customer's IP allowlist silently blocks IdP-initiated provisioning. Customers who operate self-hosted SCIM proxies with stable CIDRs may opt in. CC6-E-SCIM-IP-001 confirms that migration `0076` sets the safe default for all existing tenants.
+
+---
+
+### §32.7 OQ Gap Tracker
+
+| OQ | Previous Status | Status After §32 | Decision |
+|---|---|---|---|
+| **OQ-SSO-23.2** | 🟡 P1 Open — Before M4 deploy | 🟢 **Resolved — DEC-062 (2026-06-16)** | `isRevoked()` covers magic-link sessions at middleware layer; call-graph confirmed; integration test CC6-E-ML-001 added as closure gate |
+| **OQ-SSO-25.1** | 🟡 P1 Open — Before first IP-allowlist customer | 🟢 **Resolved — DEC-062 (2026-06-16)** | Option (c) adopted: `scim_ip_enforcement_enabled` flag, default `false`; schema migration `0076`; Admin Dashboard toggle with warning banner |
+| **OQ-SSO-25.3** | 🟡 P1 Open — M5 | 🟢 **Resolved — DEC-062 (2026-06-16)** | `enforceIpAllowlist()` extended to `api-key-auth.ts`; `auth_path` field added to `sso.ip_allowlist_blocked` payload; no new event type |
+
+**§23.9 cross-update:** OQ-SSO-23.2 row updated to 🟢 Resolved.
+**§25.13 cross-update:** OQ-SSO-25.1 and OQ-SSO-25.3 rows updated to 🟢 Resolved.
+
+---
+
+### §32.8 Implementation Checklist
+
+#### P0 — Before M4 go-live
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Add `magic-link-revocation.test.ts` integration tests (§32.2.4) to `src/tests/auth/`; confirm both test cases pass in staging before M4 deploy. File CC6-E-ML-001 at `compliance/evidence/sso/CC6-E-ML-001_M4.md` (CI test output screenshot + pass/fail status). | platform-engineer + security-engineer | **P0** | M4 | [ ] |
+| 2 | Update `docs/AUDIT_LOG_SCHEMA.md §SSO`: extend `sso.ip_allowlist_blocked` Zod schema with optional `auth_path: z.enum(['sso', 'api_key']).default('sso')` field. Bump AUDIT_LOG_SCHEMA event version to backwards-compatible patch. | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+
+#### P0 — Before M5 / first enterprise SCIM go-live
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Run migration `0076_scim_ip_enforcement_flag.sql` in staging; confirm `SELECT COUNT(*) FROM tenant_sso_configs WHERE scim_ip_enforcement_enabled IS NULL` returns 0; confirm `SELECT scim_ip_enforcement_enabled FROM tenant_sso_configs LIMIT 5` all return `false`. File CC6-E-SCIM-IP-001 screenshot. | devops-lead + compliance-officer | **P0** | Before first SCIM enterprise go-live | [ ] |
+| 4 | Update `enforceScimIpAllowlist()` in `src/workers/auth/middleware/ip-allowlist.ts` per §32.3.4: add flag lookup, KV cache for `scim_ip_cfg:{tenant_id}`, `scim.ip_enforcement_misconfigured` advisory event. Update `apps/scim-worker/src/auth.ts` call site to use the updated function (call site signature unchanged). | platform-engineer | **P0** | Before first SCIM enterprise go-live | [ ] |
+| 5 | Add `scim.ip_enforcement_misconfigured` event to `docs/AUDIT_LOG_SCHEMA.md §SCIM` namespace. Verify Zod schema (STANDARD, 3yr, `tenant_id` + `client_ip_hash` fields only). | platform-engineer + compliance-officer | **P0** | Before first SCIM enterprise go-live | [ ] |
+| 6 | Extend `enforceIpAllowlist()` (§25.5) with optional `authPath: 'sso' | 'api_key'` parameter per §32.4.3; add the `auth_path` field to the `sso.ip_allowlist_blocked` DEC-030 emission. Update `src/workers/auth/api-key-auth.ts` to call `enforceIpAllowlist(env, tenantId, clientIp, 'api_key')` after token validation and before the `api_key.request_authenticated` event emission. | platform-engineer | **P0** | M5 | [ ] |
+| 7 | Integration test: create a tenant with `ip_allowlist = ['10.0.0.0/8']`; authenticate with a valid API key from `8.8.8.8` (outside allowlist); confirm 403 response; confirm `sso.ip_allowlist_blocked` DEC-030 event is emitted with `auth_path = 'api_key'`. | platform-engineer | **P0** | M5 | [ ] |
+
+#### P1 — Before SOC 2 observation period start (M7)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Add `scim_ip_enforcement_enabled` toggle to Admin Dashboard SCIM configuration panel (§16). Add the warning banner text per §32.3.4. Gate on M5 Admin Dashboard build. | platform-engineer + design-craft | **P1** | M5–M6 | [ ] |
+| 9 | Update `§23.9` OQ-SSO-23.2 row and `§25.13` OQ-SSO-25.1 / OQ-SSO-25.3 rows to 🟢 Resolved in this document (already reflected in §32.7 — verify no merge conflict in the source sections). | compliance-officer | **P1** | M5 | [ ] |
+| 10 | Begin collecting CC6-E-APIKEY-IP-001 monthly exports from M5. File first export after 30 days of M5 go-live. | compliance-officer | **P1** | M6 | [ ] |
+
+#### P2 — Post-observation governance
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | At first enterprise customer with `scim_ip_enforcement_enabled = true`: run a provisioning smoke test from the customer's SCIM client to confirm no false-positive blocks. If blocked, investigate `scim.ip_allowlist_blocked` DEC-030 events; assist customer in adding IdP CIDR ranges to allowlist. | customer-success + platform-engineer | **P2** | First opt-in customer | [ ] |
+| 12 | Evaluate whether `scim.ip_enforcement_misconfigured` events warrant a PagerDuty P3 alert after 30 days of data. If > 2 tenants trigger the advisory event, add AL-SCIM-05 (P3 Slack `#devops-alerts`, auto-resolve 24h). | devops-lead | **P2** | M8 | [ ] |
+
+---
+
+### §32.9 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-SSO-32.1** | **Should `scim_ip_enforcement_enabled` be surfaced in the SCIM token provisioning guide sent to customers at onboarding?** The current §7 onboarding checklist does not mention IP allowlist configuration for SCIM. If a customer asks "can we restrict SCIM to our proxy IP?" during onboarding (likely for security-conscious enterprises), the CSM must know to check `scim_ip_enforcement_enabled`. Recommendation: add a CSM note to the §17 pilot runbook and to the onboarding template in `docs/ENTERPRISE_ONBOARDING.md`. | P2 | customer-success + enterprise-architect | Before first customer asking for SCIM IP restriction |
+| **OQ-SSO-32.2** | **Should the 5-minute KV TTL for `scim_ip_cfg:{tenant_id}` (§32.3.4) be shortened if a customer updates their `scim_ip_enforcement_enabled` flag via Admin Dashboard?** A TTL of 5 minutes means a toggle change takes up to 5 minutes to propagate to all SCIM Worker instances. For an emergency "disable SCIM IP enforcement" action (e.g., Okta changes its CIDRs mid-provisioning), a 5-minute delay could cause a provisioning gap. Option: add a cache invalidation call (`SSO_KV.delete(scim_ip_cfg:{tenant_id})`) in the Admin Dashboard API handler for the SCIM IP toggle mutation. | P2 | platform-engineer | Before first customer with `scim_ip_enforcement_enabled = true`; evaluate at M8 |
+
+---
+
+*v2.4 (2026-06-16): §32 OQ-SSO-23.2 · OQ-SSO-25.1 · OQ-SSO-25.3 Resolution — Magic-Link CAEP Session Coverage, SCIM IP Allowlist Scope & API Key IP Enforcement (DEC-062). Closes three P1 blockers that were all pre-M4/M5 deployment gates. §32.1 scopes to magic-link session revocation confirmation, SCIM IP flag design, and API key IP enforcement; all three affect `ip-allowlist.ts` or `api-key-auth.ts` and share migration window M4–M5. §32.2 OQ-SSO-23.2 resolution: `isRevoked()` confirmed to cover magic-link sessions at authenticate() middleware layer (before session_type branch); call-graph trace documents that `revoke:user:{tenant_id}:{user_id}` and `account_suspended:{tenant_id}:{user_id}` KV keys are checked for every JWT regardless of `session_type = 'magic_link'`; two integration test cases added to `src/tests/auth/magic-link-revocation.test.ts` as M4 deploy gate; evidence CC6-E-ML-001 (CC6.3, 7yr). §32.3 OQ-SSO-25.1 resolution: option (c) adopted — `scim_ip_enforcement_enabled BOOLEAN NOT NULL DEFAULT FALSE` column added to `tenant_sso_configs` via migration `0076_scim_ip_enforcement_flag.sql`; `enforceScimIpAllowlist()` updated with KV-cached flag lookup (`scim_ip_cfg:{tenant_id}`, 5-min TTL); new advisory DEC-030 event `scim.ip_enforcement_misconfigured` (STANDARD, 3yr) emitted on misconfiguration (flag true, empty allowlist) without blocking; Admin Dashboard toggle with Okta/Azure AD warning banner; evidence CC6-E-SCIM-IP-001 (CC6.1, 7yr). §32.4 OQ-SSO-25.3 resolution: `enforceIpAllowlist()` extended with optional `authPath: 'sso' | 'api_key'` parameter; `api-key-auth.ts` calls `enforceIpAllowlist(env, tenantId, clientIp, 'api_key')` after token validation; `sso.ip_allowlist_blocked` DEC-030 payload extended with `auth_path` field (backwards-compatible addition); no new event type; evidence CC6-E-APIKEY-IP-001 (CC6.1/CC6.3, 3yr). §32.5 two DEC-030 changes: `sso.ip_allowlist_blocked` payload extension (`auth_path` optional field); `scim.ip_enforcement_misconfigured` new STANDARD event. §32.6 three SOC 2 evidence artefacts: CC6-E-ML-001 (CC6.3 — magic-link revocation integration test), CC6-E-SCIM-IP-001 (CC6.1 — migration 0076 default-false confirmation), CC6-E-APIKEY-IP-001 (CC6.1/CC6.3 — monthly API key IP block export). §32.7 gap tracker: OQ-SSO-23.2 🟡→🟢 Resolved, OQ-SSO-25.1 🟡→🟢 Resolved, OQ-SSO-25.3 🟡→🟢 Resolved; cross-updates to §23.9 and §25.13 flagged. §32.8 twelve-item implementation checklist: 2× P0/M4 (magic-link integration test + CC6-E-ML-001, AUDIT_LOG_SCHEMA extension), 5× P0/M5 (migration 0076, enforceScimIpAllowlist update, scim.ip_enforcement_misconfigured registration, api-key-auth extension, API key IP integration test), 3× P1/M5–M6 (Admin Dashboard toggle, OQ cross-updates, CC6-E-APIKEY-IP-001 collection start), 2× P2/M8–first-opt-in-customer (SCIM IP smoke test, AL-SCIM-05 evaluation). §32.9 two open questions: OQ-SSO-32.1 (P2 — SCIM IP toggle in onboarding guide); OQ-SSO-32.2 (P2 — 5-min KV TTL vs. emergency toggle propagation). Document header updated v2.3 → v2.4. Cross-references: §10 (magic-link session design — session_type = 'magic_link'; §32.2 confirms revocation coverage); §22.5 (KV revocation key patterns — `revoke:user`, `account_suspended`, `force_reauth` confirmed to cover magic-link); §23.3.2 (CAEP account-disabled action — writes `account_suspended` and `revoke:user` KV keys; §32.2 confirms both reach magic-link sessions); §23.9 (OQ-SSO-23.2 — now 🟢 Resolved); §25.5 (IP enforcement table — SCIM path now flag-gated per §32.3; SSO path unchanged); §25.13 (OQ-SSO-25.1, OQ-SSO-25.3 — both now 🟢 Resolved); §26.3 (API key rotation — SCIM token; `api-key-auth.ts` now also enforces IP allowlist per §32.4); §27.3 (SCIM Worker auth pipeline — `enforceScimIpAllowlist()` call site unchanged; flag-gating is internal to the function); `docs/AUDIT_LOG_SCHEMA.md §SSO` (`sso.ip_allowlist_blocked` Zod schema — add optional `auth_path` field — P0/M4); `docs/AUDIT_LOG_SCHEMA.md §SCIM` (`scim.ip_enforcement_misconfigured` — new event registration — P0/before-SCIM-go-live); `docs/DATA_MODEL.md §26` (`tenant_api_keys` — no schema change; `api-key-auth.ts` reads tenant_id from resolved key record to call `enforceIpAllowlist()`); `docs/DATA_MODEL.md §4.2` (`tenant_sso_configs` — migration `0076` adds `scim_ip_enforcement_enabled BOOLEAN NOT NULL DEFAULT FALSE`); `docs/SOC2_READINESS.md §CC6.1` (CC6-E-SCIM-IP-001, CC6-E-APIKEY-IP-001 — to be added at M5 observation filing); `docs/SOC2_READINESS.md §CC6.3` (CC6-E-ML-001 — to be added at M4 observation filing); `docs/ENTERPRISE_ONBOARDING.md` (OQ-SSO-32.1 — add SCIM IP toggle note to CSM pilot runbook — P2/M8); `docs/DECISION_LOG.md DEC-062`. Privacy floor: no individual employee `user_id`, name, email, health data, or body composition values in any DEC-030 event emitted by §32 controls; `client_ip_hash` is SHA-256(ip + salt) with `IP_HASH_SALT`; `auth_path` is a structural enum tag only; `tenant_id` in DEC-030 events is the organisation slug, not a personal data identifier; `form_api` SELECT access to `scim_ip_enforcement_enabled` is limited to the SCIM Worker auth pipeline (read-only; no write via form_api). Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*

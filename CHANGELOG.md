@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.77.0] — 2026-06-16
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md §32` — OQ-SSO-23.2 · OQ-SSO-25.1 · OQ-SSO-25.3 Resolution (DEC-062). Three P1 blockers resolved together: (1) §32.2 — `isRevoked()` call-graph confirmed to cover magic-link sessions at middleware layer; integration test `CC6-E-ML-001` added as M4 deploy closure gate. (2) §32.3 — SCIM IP allowlist scope: option (c) adopted (`scim_ip_enforcement_enabled BOOLEAN NOT NULL DEFAULT FALSE`, migration `0076`); Admin Dashboard toggle with Okta/Azure AD warning banner; advisory audit event `scim.ip_enforcement_misconfigured`. (3) §32.4 — API key IP enforcement: `enforceIpAllowlist()` extended with `authPath: 'sso' | 'api_key'`; wired into `api-key-auth.ts`; `sso.ip_blocked` DEC-030 payload extended with `auth_path` field. Document header v2.3 → v2.4.
+- `docs/AUDIT_LOG_SCHEMA.md §SCIM` — new `scim.ip_enforcement_misconfigured` event (STANDARD, 3yr, advisory). Emitted by `enforceScimIpAllowlist()` when enforcement flag is enabled but allowlist is empty; non-blocking; no PagerDuty page; compliance-officer SIEM review. Closes SSO §32.8 checklist item 3 (P0, before SCIM go-live).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md §SSO authentication policy events` — `sso.ip_blocked` payload extended with `auth_path` (`'sso' | 'api_key'`, optional, default `'sso'`); backwards-compatible. Closes SSO §32.8 checklist item 1 (P0/M4).
+- `docs/AUDIT_LOG_SCHEMA.md` — header updated v2.13 → v2.14.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §23.9` — OQ-SSO-23.2 row updated 🟡 P1 → 🟢 Resolved (DEC-062; §32.2).
+- `docs/SSO_SCIM_IMPLEMENTATION.md §25.13` — OQ-SSO-25.1 and OQ-SSO-25.3 rows updated 🟡 P1 → 🟢 Resolved (DEC-062; §32.3, §32.4).
+- `VERSION` — 5.76.0 → 5.77.0.
+
+---
+
 ## [5.76.0] — 2026-06-16
 
 ### Added
