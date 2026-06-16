@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.71.1] — 2026-06-16
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.13: +6 enterprise seat invitation DEC-030 events (`tenant.invite_sent`, `tenant.invite_accepted`, `tenant.invite_expired`, `tenant.invite_revoked`, `tenant.bulk_invite_started`, `tenant.bulk_invite_completed`) registered in new "Enterprise seat invitation events" section. INVITE-BULK-CHAIN-01 ordering invariant. Six Zod v2 schemas. Five SOC 2 evidence artefacts (INV-E-001 CC6.1 · INV-E-002 CC6.2 · INV-E-003 CC6.3 · INV-E-004 P4.2 · INV-E-005 P5.2). Retention table +2 rows (7yr invite_sent/accepted/revoked; 3yr invite_expired/bulk_started/completed). Closes `docs/DATA_MODEL.md §27.15` P0 checklist item 7 (M5).
+- `docs/DATA_MODEL.md` — §27.15 checklist item 7 marked [x] Done · AUDIT_LOG_SCHEMA.md v2.13 (2026-06-16).
+- `VERSION` → 5.71.1
+
+---
+
 ## [5.71.0] — 2026-06-16
 
 ### Added

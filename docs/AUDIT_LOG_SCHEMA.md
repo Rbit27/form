@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.12
+# FORM · Audit Log Schema v2.13
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -987,6 +987,8 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `data.read_aggregate` | 90 days | Investigation but not unlimited |
 | `enterprise.offboarding_initiated` / `enterprise.sso_scim_revoked` / `enterprise.data_deletion_started` / `enterprise.data_deletion_completed` / `enterprise.financial_pseudonymized` / `enterprise.deletion_attestation_issued` / `enterprise.offboarding_on_hold` / `enterprise.offboarding_hold_released` / `enterprise.offboarding_step_failed` | 7 years | Enterprise tenant off-boarding lifecycle — irreversible or legally consequential operations; SOC 2 C1.2 (disposal — OFB-E-001), P8.0 (privacy in disposal — OFB-E-002), CC6.3 (access removal — OFB-E-003), CC9.1 (business continuity — OFB-E-004); 7yr matches Ukrainian Tax Code Art. 44 + EU VAT Directive Art. 245 financial retention floor and SOC 2 multi-cycle evidence requirement; `docs/DATA_MODEL.md §25` |
 | `enterprise.data_export_started` / `enterprise.data_export_completed` / `enterprise.offboarding_completed` | 7 years | Data export and attestation lifecycle — reversible package generation is STANDARD severity but 7yr retention required: these events are part of the off-boarding HMAC chain and must outlive OFB-E-001–E-006 evidence collection; `enterprise.data_export_completed` carries OFB-REGION-01 EU routing invariant (DEC-061 — `is_eu_region`, `r2_bucket`); `docs/DATA_MODEL.md §25` + `docs/DATA_MODEL.md §36` |
+| `tenant.invite_sent` / `tenant.invite_accepted` / `tenant.invite_revoked` | 7 years | SOC 2 CC6.2 (INV-E-002 — every seat grant has a named `invited_by` authoriser; `tenant.invite_sent`), CC6.3 (INV-E-003 — timely reserved-seat release; `tenant.invite_revoked` HIGH = irreversible compliance action); `tenant.invite_accepted.linked_via` distinguishes SCIM auto-link from manual registration for access-review fieldwork; `email_hash` only — no plaintext `invited_email` in any payload; `docs/DATA_MODEL.md §27.11` |
+| `tenant.invite_expired` / `tenant.bulk_invite_started` / `tenant.bulk_invite_completed` | 3 years | Enterprise seat invitation operational lifecycle: invite expiry sweep (pg_cron `invite_expiry_sweep` daily 02:30 UTC), bulk CSV-import batch framing (INVITE-BULK-CHAIN-01 open/close events); 3yr sufficient — access-grant evidence (INV-E-002/003) is covered by the 7yr `tenant.invite_sent` + `tenant.invite_revoked` rows above; `docs/DATA_MODEL.md §27.11` |
 | `system.quarterly_perf_reference_initiated` / `system.quarterly_perf_reference_completed` | 3 years | SOC 2 A1.1 — k6 Cloud EU-West quarterly PERF-SLO-06 reference run evidence; PERF-CLOUD-CHAIN-01 ordering evidence (initiated → completed per `cloud_run_id`); `cloud_run_id` in `completed` event provides independent third-party k6 Cloud portal corroboration for LT-E-001 availability testing artefact; 3yr sufficient (operational performance evidence; not a financial or contract record); `docs/OBSERVABILITY.md §45.4` (DEC-058) |
 | `user.account_deletion_initiated` / `user.data_erasure_completed` | 7 years | GDPR Art. 17 erasure chain-of-custody record; SOC 2 P4/P5.2/P6; `user.data_erasure_completed.slo_met` is GDPR-SLO-01 evidence; 7yr matches FORM's general compliance-record floor — individual user data is absent from payloads so retention does not conflict with the erasure itself |
 | `user.art9_data_hard_deleted` | 7 years | GDPR Art. 9 enterprise off-boarding deletion record; GDPR-E-005/E-006 evidence artefacts; SOC 2 CC6.5/P6; `latency_seconds` field is GDPR-SLO-03 evidence; 7yr is the DEC-030 HIGH event standard and matches FORM's compliance record floor |
@@ -2035,6 +2037,93 @@ const SystemWhiteLabelCertCheckStaleSchema = z.object({
 
 ---
 
+### Enterprise seat invitation events (DEC-030 HMAC-chained · DATA_MODEL §27 · CC6.1/CC6.2/CC6.3/P4.2/P5.2)
+
+> Defined in `docs/DATA_MODEL.md §27.11` (v1.0, 2026-06-13). Six DEC-030 HMAC-chained events covering the full enterprise seat invitation lifecycle: individual invitations (sent, accepted, expired, revoked) and bulk CSV-import batch framing (started, completed). These events provide the access-authorisation audit trail that SOC 2 CC6.2 requires for every new enterprise seat granted, and the access-removal trail that CC6.3 requires when invitations lapse or are revoked before acceptance. **Privacy invariant (all six events):** `invited_email` never appears in any event payload. `email_hash` = HMAC-SHA256(`invited_email`, `INVITE_HASH_SALT`) — the same hash used in `tenant_invitations.invited_email_hash`; auditors can verify event-to-row linkage by recomputing the hash without accessing any plaintext email. No health data, no coaching data, no individual employee personal data beyond pseudonymous `invitation_id` and role UUIDs. HR (`tenant_manager`) has no access to invitation data — `form_api` read on `tenant_invitations` is gated to `tenant_admin` / `tenant_owner` only. **Emitter (all six events):** `form_system` (automated — invite Workers and pg_cron; no human emitter for any lifecycle event). **SOC 2 criteria:** CC6.1 (seat ceiling enforced via `assertSeatAvailable()` before INSERT — INV-E-001), CC6.2 (`tenant.invite_sent.invited_by` — every access grant has a named authoriser — INV-E-002), CC6.3 (`tenant.invite_revoked` — timely seat release — INV-E-003), P4.2 (privacy notice in invite email before account creation — INV-E-004), P5.2 (`invite_email_expiry_cleanup` pg_cron erasure evidence — INV-E-005). **Closes `docs/DATA_MODEL.md §27.15` checklist item 7 (P0, M5 — register all six DEC-030 events in AUDIT_LOG_SCHEMA.md §6 before invite feature ships to any tenant).**
+
+**INVITE-BULK-CHAIN-01 ordering invariant:** For any CSV bulk import (`bulk_import_job_id`), `tenant.bulk_invite_started` MUST be the first event emitted; all `tenant.invite_sent` events referencing the same `bulk_import_job_id` MUST follow it in chain order; `tenant.bulk_invite_completed` MUST be the last event for that `bulk_import_job_id`. The `emit-audit-event` Worker validates: (a) HTTP 422 if `tenant.invite_sent` with a non-null `bulk_import_job_id` arrives without a preceding `tenant.bulk_invite_started` for that ID; (b) HTTP 422 if `tenant.bulk_invite_completed` arrives without a preceding `tenant.bulk_invite_started`. Inversion → P1 PagerDuty `form-platform` (not R-05 — compliance-signal ordering, not audit-chain tamper). Individual invitations (`source: 'manual'`, `bulk_import_job_id: null`) are exempt from this invariant.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `tenant.invite_sent` | STANDARD | 7 yr | `workers/invitations/create-invite.ts` after `tenant_invitations` INSERT and Resend email dispatch confirmed; also emitted on resend (extends `expires_at`, rotates `token_hash` — OQ-INV-03 option a adopted) | `tenant_id`, `invitation_id` (UUID), `email_hash` (HMAC-SHA256, 64-char hex), `invited_by` (UUID — `tenant_owner` or `tenant_admin`), `source` (`manual`\|`csv_import`), `allocation_id` (UUID — FK `enterprise_seat_allocations`), `expires_at` (ISO 8601 — default 7 days), `bulk_import_job_id` (UUID or null) |
+| `tenant.invite_accepted` | STANDARD | 7 yr | `workers/invitations/accept-invite.ts` on token verification + user registration; or SCIM auto-link path in `workers/scim/users/create.ts` when `email_hash` matches a pending invite row | `tenant_id`, `invitation_id` (UUID), `accepted_by` (UUID — newly created FORM user), `assignment_id` (UUID — `enterprise_seat_assignments.id`), `source` (`manual`\|`csv_import`), `linked_via` (`registration`\|`scim`) |
+| `tenant.invite_expired` | STANDARD | 3 yr | pg_cron `invite_expiry_sweep` (daily 02:30 UTC — DATA_MODEL §27.15 item 8) sets `tenant_invitations.status = 'expired'` for rows past `expires_at`; emitted per expired invite (batch HMAC-chained); `enterprise_seat_assignments.revoked_at` set concurrently to release the reserved seat | `tenant_id`, `invitation_id` (UUID), `source` (`manual`\|`csv_import`), `bulk_import_job_id` (UUID or null) |
+| `tenant.invite_revoked` | HIGH | 7 yr | Manual admin revocation via `DELETE /enterprise/invitations/{id}` with `revoked_by = admin UUID` and `reason = 'admin_action'` or `'seat_reduction'`; or §25 offboarding pipeline on `access_revoked` transition, which revokes all pending invitations for the departing tenant (`revoked_by = null`, `reason = 'offboarding'`) | `tenant_id`, `invitation_id` (UUID), `revoked_by` (UUID or null — null for automated offboarding revocation), `reason` (`admin_action`\|`offboarding`\|`seat_reduction`), `source` (`manual`\|`csv_import`) |
+| `tenant.bulk_invite_started` | STANDARD | 3 yr | CSV import Worker begins row processing immediately after `bulk_seat_import_jobs` INSERT; opens the INVITE-BULK-CHAIN-01 chain window | `tenant_id`, `bulk_import_job_id` (UUID), `total_rows` (positive int), `initiated_by` (UUID — `tenant_owner` or `tenant_admin`), `allocation_id` (UUID) |
+| `tenant.bulk_invite_completed` | STANDARD | 3 yr | CSV import Worker finishes processing all rows; `bulk_seat_import_jobs.status` updated; closes the INVITE-BULK-CHAIN-01 chain window | `tenant_id`, `bulk_import_job_id` (UUID), `invited_count` (int ≥ 0), `skipped_count` (int ≥ 0), `failed_count` (int ≥ 0), `status` (`completed`\|`partially_failed`\|`failed`) |
+
+**Severity rationale.** `tenant.invite_sent` and `tenant.invite_accepted` are STANDARD — invitations are reversible access grants; their issuance is not a security-consequential event. `tenant.invite_revoked` is HIGH — removing a reserved seat is an irreversible compliance action requiring the full 7-year CC6.3 evidence window. `tenant.invite_expired`, `tenant.bulk_invite_started`, and `tenant.bulk_invite_completed` are STANDARD 3yr — operational lifecycle records sufficient for two SOC 2 observation windows; not required as long-term financial or contract evidence.
+
+**Emitter assignments:** All six events — `form_system` (automated; no human emitter). `tenant.invite_sent` — `workers/invitations/create-invite.ts` (create and resend paths). `tenant.invite_accepted` — `workers/invitations/accept-invite.ts` (registration path) or `workers/scim/users/create.ts` (SCIM auto-link, `linked_via: 'scim'`). `tenant.invite_expired` — pg_cron `invite_expiry_sweep` (job 10, daily 02:30 UTC — DATA_MODEL §27.15 item 8; registered in `docs/OBSERVABILITY.md §12.6`). `tenant.invite_revoked` — `workers/invitations/revoke.ts` (manual, `reason: 'admin_action'`\|`'seat_reduction'`) or the §25 offboarding Worker (`reason: 'offboarding'`). `tenant.bulk_invite_started` + `tenant.bulk_invite_completed` — CSV import Worker.
+
+**Zod v2 schemas (canonical source: `docs/DATA_MODEL.md §27.11` — update DATA_MODEL.md §27 first on any schema change; schemas below are authoritative copies for the `emit-audit-event` Worker registry):**
+
+```typescript
+const TenantInviteSentSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  invitation_id:      z.string().uuid(),
+  email_hash:         z.string().regex(/^[a-f0-9]{64}$/),
+  invited_by:         z.string().uuid(),
+  source:             z.enum(['manual', 'csv_import']),
+  allocation_id:      z.string().uuid(),
+  expires_at:         z.string().datetime(),
+  bulk_import_job_id: z.string().uuid().nullable(),
+});
+
+const TenantInviteAcceptedSchema = z.object({
+  tenant_id:     z.string().uuid(),
+  invitation_id: z.string().uuid(),
+  accepted_by:   z.string().uuid(),
+  assignment_id: z.string().uuid(),
+  source:        z.enum(['manual', 'csv_import']),
+  linked_via:    z.enum(['registration', 'scim']),
+});
+
+const TenantInviteExpiredSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  invitation_id:      z.string().uuid(),
+  source:             z.enum(['manual', 'csv_import']),
+  bulk_import_job_id: z.string().uuid().nullable(),
+});
+
+const TenantInviteRevokedSchema = z.object({
+  tenant_id:     z.string().uuid(),
+  invitation_id: z.string().uuid(),
+  revoked_by:    z.string().uuid().nullable(),
+  reason:        z.enum(['admin_action', 'offboarding', 'seat_reduction']),
+  source:        z.enum(['manual', 'csv_import']),
+});
+
+const TenantBulkInviteStartedSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  bulk_import_job_id: z.string().uuid(),
+  total_rows:         z.number().int().positive(),
+  initiated_by:       z.string().uuid(),
+  allocation_id:      z.string().uuid(),
+});
+
+const TenantBulkInviteCompletedSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  bulk_import_job_id: z.string().uuid(),
+  invited_count:      z.number().int().min(0),
+  skipped_count:      z.number().int().min(0),
+  failed_count:       z.number().int().min(0),
+  status:             z.enum(['completed', 'partially_failed', 'failed']),
+});
+```
+
+**SOC 2 evidence artefacts:**
+
+| Artefact | SOC 2 criterion | Source | Retention |
+|---|---|---|---|
+| **INV-E-001** | CC6.1 — Seat ceiling enforced; `assertSeatAvailable()` includes pending (`user_id IS NULL`) assignments | Semi-annual export of `enterprise_seat_allocations JOIN enterprise_seat_assignments WHERE user_id IS NULL OR user_id IS NOT NULL` for all active tenants; confirms no tenant exceeded `contracted_seats` at any point during the period; `compliance/evidence/invitations/INV-E-001_<YYYY-HN>.csv` | 7 yr |
+| **INV-E-002** | CC6.2 — Every new enterprise seat access grant is authorised by a named actor | Annual export of `tenant.invite_sent` DEC-030 events for the observation period; every row carries `invited_by` UUID confirming no anonymous access grants; `compliance/evidence/invitations/INV-E-002_<YYYY>.csv` | 7 yr |
+| **INV-E-003** | CC6.3 — Reserved seat access removed promptly when invitation is revoked | Annual export of `tenant.invite_revoked` DEC-030 events; cross-checked against `enterprise_seat_assignments.revoked_at` within 60 seconds of event `created_at`; `compliance/evidence/invitations/INV-E-003_<YYYY>.csv` | 7 yr |
+| **INV-E-004** | P4.2 — Privacy notice provided to data subject before account creation | Version-controlled invite email HTML template at `compliance/evidence/invitations/invite-email-template-v{N}.html`; annotated to show the Privacy Policy hyperlink and one-sentence data-processing summary visible before the "Accept Invitation" CTA button | 7 yr |
+| **INV-E-005** | P5.2 — Invited email addresses disposed per retention policy (30-day post-expiry) | pg_cron `invite_email_expiry_cleanup` (daily 04:00 UTC — DATA_MODEL §27.15 item 9) execution log over the observation period; confirms scheduled nullification of `tenant_invitations.invited_email` 30 days post-expiry or post-revocation is operational; `compliance/evidence/invitations/INV-E-005_<YYYY>.csv` | 3 yr |
+
+---
+
 ### Enterprise DSAR deletion certificate events (DEC-030 HMAC-chained · DATA_MODEL §35 · P8.0/CC7.2)
 
 > Defined in `docs/DATA_MODEL.md §35.6`. Two DEC-030 HMAC-chained events covering the GDPR Art. 17 deletion certificate issuance and delivery lifecycle for enterprise tenants. Deletion certificates prove to the data subject (employee) and employer HR contact that a two-phase hard-delete has been completed — the certificate is HMAC-SHA256-signed with `ERASURE_CERT_SECRET` (256-bit, annual rotation per `docs/CRYPTOGRAPHY_POLICY.md §5`) and stored durably at R2 `form-dsar-certs/<tenant_id>/<certificate_id>.json`. **Privacy floor (both events):** No plaintext user email, name, or health data in any payload. `user_id_hash` = SHA-256(user_id + PSEUDONYM_SALT); `delivered_to_hash` = SHA-256(email + PSEUDONYM_SALT). Certificate payload (signed JSON) is never stored in Postgres — only `payload_hash` (SHA-256 of the signed certificate) is recorded in the DEC-030 chain and in `dsar_deletion_certificates`. The Admin Dashboard "DSAR & Erasure" panel (`docs/DATA_MODEL.md §35.8`) is accessible to `tenant_admin` and `tenant_owner` only — `tenant_manager` (HR role) is explicitly blocked. Cross-ref: `docs/DATA_MODEL.md §35` (canonical event definitions, Zod schemas, CERT-CHAIN-01 invariant); `docs/DATA_MODEL.md §31` (consumer DSAR `dsar_requests` table — `dsar_id` soft-ref); `docs/DATA_MODEL.md §12` (Art. 17 two-phase erasure — §35 adds the certificate step after Phase 2 verification); `docs/INCIDENT_RESPONSE.md R-05` (CERT-CHAIN-01 chain break → R-05 activation); `docs/OBSERVABILITY.md §37.12` (AL-DSAR-05 — authoritative SLO breach alert, `enterprise_sla_counters.dsar_slo_misses_this_quarter`). **Closes DATA_MODEL.md §35.10 checklist item 5 (P0, M5 — register `dsar.certificate_issued` and `dsar.certificate_delivered` in AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise with Zod schemas).**
@@ -2281,6 +2370,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.13 · 2026-06-16 · owner: compliance-officer + platform-engineer**
+*v2.13 (2026-06-16): +6 `tenant.invite_*` / `tenant.bulk_invite_*` Enterprise seat invitation events — closes `docs/DATA_MODEL.md §27.15` checklist item 7 (P0, M5 — register all six DEC-030 events in AUDIT_LOG_SCHEMA.md §6 before invite feature ships to any tenant). New section `### Enterprise seat invitation events (DEC-030 HMAC-chained · DATA_MODEL §27 · CC6.1/CC6.2/CC6.3/P4.2/P5.2)` inserted before `### Enterprise DSAR deletion certificate events`. Six events registered: (1) `tenant.invite_sent` (STANDARD, 7yr — `email_hash` HMAC-SHA256 only; `invited_by` UUID per CC6.2; `bulk_import_job_id` nullable; emitted on create and resend); (2) `tenant.invite_accepted` (STANDARD, 7yr — `accepted_by` new user UUID; `linked_via` enum `registration`\|`scim` distinguishes auto-link path); (3) `tenant.invite_expired` (STANDARD, 3yr — pg_cron `invite_expiry_sweep` daily 02:30 UTC; `bulk_import_job_id` nullable); (4) `tenant.invite_revoked` (HIGH, 7yr — `revoked_by` nullable for automated offboarding revocation; `reason` 3-value enum: `admin_action`\|`offboarding`\|`seat_reduction`; CC6.3 irreversible compliance action); (5) `tenant.bulk_invite_started` (STANDARD, 3yr — INVITE-BULK-CHAIN-01 window open; `total_rows` positive int); (6) `tenant.bulk_invite_completed` (STANDARD, 3yr — INVITE-BULK-CHAIN-01 window close; 3-count summary + `status` enum). INVITE-BULK-CHAIN-01 ordering invariant: for any `bulk_import_job_id`, `tenant.bulk_invite_started` must precede all `tenant.invite_sent` events for that ID, and `tenant.bulk_invite_completed` must follow all of them; `emit-audit-event` Worker returns HTTP 422 on violation; P1 PagerDuty `form-platform` (not R-05 — compliance-signal ordering, not chain tamper). Six Zod v2 schemas provided (canonical source: `docs/DATA_MODEL.md §27.11`). Five SOC 2 evidence artefacts: INV-E-001 (CC6.1 — seat ceiling enforcement; semi-annual seat assignment export), INV-E-002 (CC6.2 — annual `tenant.invite_sent` chain export confirming `invited_by` for every access grant), INV-E-003 (CC6.3 — annual `tenant.invite_revoked` chain export + `revoked_at` cross-check ≤ 60 seconds), INV-E-004 (P4.2 — version-controlled invite email template with Privacy Policy link before CTA), INV-E-005 (P5.2 — pg_cron `invite_email_expiry_cleanup` execution log confirming 30-day post-expiry `invited_email` nullification). Retention table: +2 rows (7yr for `tenant.invite_sent` / `tenant.invite_accepted` / `tenant.invite_revoked`; 3yr for `tenant.invite_expired` / `tenant.bulk_invite_started` / `tenant.bulk_invite_completed`). Privacy floor (all six events): `invited_email` never in any payload; `email_hash` = HMAC-SHA256 with `INVITE_HASH_SALT`; HR (`tenant_manager`) blocked from invitation data; no health data, no coaching data. Cross-ref: `docs/DATA_MODEL.md §27.11` (canonical event spec and payload fields), `docs/DATA_MODEL.md §27.12` (INV-E-001–005 SOC 2 evidence artefact definitions), `docs/DATA_MODEL.md §27.15` item 7 (P0 checklist — 🟢 closed by this patch), `docs/DATA_MODEL.md §25` (§25 offboarding pipeline emits `tenant.invite_revoked` with `reason: 'offboarding'`), `docs/OBSERVABILITY.md §12.6` (pg_cron job 10 `invite_expiry_sweep` registry), `docs/SOC2_READINESS.md §CC6.2` (INV-E-002 evidence row), `docs/SOC2_READINESS.md §CC6.3` (INV-E-003 evidence row), `docs/INCIDENT_RESPONSE.md R-05` (INVITE-BULK-CHAIN-01 invariant violations — chain integrity escalation). Owner: compliance-officer + platform-engineer.*
 
 **v2.12 · 2026-06-16 · owner: compliance-officer + devops-lead + platform-engineer**
 *v2.12 (2026-06-16): +2 `system.quarterly_perf_reference_initiated` / `system.quarterly_perf_reference_completed` events (both STANDARD severity, 3yr retention, HMAC-chained) — closes `docs/OBSERVABILITY.md §45.8` checklist item 2 (P0, M6 — register both DEC-030 events in AUDIT_LOG_SCHEMA.md §6 System namespace before first quarterly PERF-SLO-06 reference run). Events added to the System namespace section after `system.siem_calibration_verified` (DEC-057). PERF-CLOUD-CHAIN-01 ordering invariant: `system.quarterly_perf_reference_initiated` must precede `system.quarterly_perf_reference_completed` for the same `cloud_run_id`; `emit-audit-event` Worker returns HTTP 422 on ordering violation; inversion → P1 PagerDuty `form-platform` (not R-05 — compliance-signal ordering, not audit-chain tamper). Privacy invariant (both events): no `user_id`, no real `tenant_id`, no health data; `staging_refresh_date` is date only; `cloud_run_id` is k6-Cloud-assigned UUID with no FORM user or tenant mapping; `clinical_safety_sign_off: z.literal(true)` in `initiated` event attests ANON-01–ANON-05 verified before dispatch. SOC 2 A1.1 evidence: `system.quarterly_perf_reference_completed.cloud_run_id` is the primary LT-E-001 anchor providing independent third-party k6 Cloud portal corroboration (`compliance/evidence/a1/lt-e-001-YYYY-QN.csv`). Retention table: +1 row (`system.quarterly_perf_reference_*` 3yr, A1.1). Also backfills missing `docs/DECISION_LOG.md DEC-058` entry (k6 hybrid load test platform — OQ-PERF-01 + OQ-PERF-02 resolution, 2026-06-14) which was referenced by `docs/OBSERVABILITY.md §45` but absent from the log. Cross-ref: `docs/OBSERVABILITY.md §45.4` (canonical event specs and Zod schemas), `docs/OBSERVABILITY.md §45.6` (LT-E-001 updated scope — k6 Cloud EU-West as evidence source), `docs/OBSERVABILITY.md §45.8` (implementation checklist item 2 — now 🟢 closed), `docs/DECISION_LOG.md DEC-058` (now filed — OQ-PERF-01/02 resolution), DEC-030. Owner: compliance-officer + devops-lead + platform-engineer.*

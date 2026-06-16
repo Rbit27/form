@@ -11157,7 +11157,7 @@ export interface CreateInviteResponse {
 | 4 | Implement `workers/invitations/create-invite.ts`: role check (`tenant_owner`/`tenant_admin`); `assertSeatAvailable()`; compute `invited_email_hash` + `token_hash`; INSERT `tenant_invitations` + INSERT `enterprise_seat_assignments` (pending); dispatch invite email; emit `tenant.invite_sent` DEC-030. | platform-engineer | **P0** | M5 | [ ] |
 | 5 | Implement `workers/invitations/accept-invite.ts`: token hash verification; user registration; UPDATE `tenant_invitations` (`status = 'accepted'`) + UPDATE `enterprise_seat_assignments` (`user_id = $new_user_id`); emit `tenant.invite_accepted` DEC-030 (`linked_via: 'registration'`). Idempotency: already-accepted token → HTTP 200 "already accepted". | platform-engineer | **P0** | M5 | [ ] |
 | 6 | Add SCIM auto-link path to `workers/scim/users/create.ts` (§27.7): email hash lookup; auto-accept on match; emit `tenant.invite_accepted` (`linked_via: 'scim'`). Staging test: create pending invite → SCIM POST /Users for same email → verify `assignment_id.user_id` set + invite `status = 'accepted'`. | platform-engineer | **P0** | M5 | [ ] |
-| 7 | Register all six DEC-030 events (§27.11) in `docs/AUDIT_LOG_SCHEMA.md` under new "Enterprise seat invitation events" subsection with severity, retention, and payload fields. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 7 | Register all six DEC-030 events (§27.11) in `docs/AUDIT_LOG_SCHEMA.md` under new "Enterprise seat invitation events" subsection with severity, retention, and payload fields. | platform-engineer + compliance-officer | **P0** | M5 | [x] **🟢 Done — AUDIT_LOG_SCHEMA.md v2.13 (2026-06-16)** |
 
 #### P1 — Before first enterprise pilot with invitations enabled
 
