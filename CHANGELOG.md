@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [5.70.0] — 2026-06-16
+
+### Added
+- `content/post-1071-supraspinatus-anatomy.md` — Block 1051–1100 cluster 5, post 1/5. Supraspinatus: ініціатор відведення і найуразливіший м'яз ротаторної манжети. Анатомія субакроміального проходу, механізм iniціації відведення до 30° і депресія голівки плечової кістки, чому supraspinatus є найчастішим місцем розривів ротаторної манжети. Практичний акцент: три питання для оцінки стану субакроміального середовища в програмі (face pull/cable ER, площина lateral raise, жимово/тяговий баланс). clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1072-middle-deltoid-anatomy.md` — Block 1051–1100 cluster 5, post 2/5. Середній дельтоїд: геометрія відведення і чому lateral raise — найвибагливіша проста вправа. Пероподібна архітектура і її силово-амплітудний компроміс. Нерівномірна крива навантаження гантельного lateral raise vs. кабельного. Лопаткова площина (scaption) як більш функціональна альтернатива фронтальній. Компенсація верхньою трапецією і як її усвідомити. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1073-anterior-deltoid-anatomy.md` — Block 1051–1100 cluster 5, post 3/5. Передній дельтоїд: чому він вже натренований і коли пряме тренування є надлишковим. ЕМГ-порівняльна таблиця активації по вправах. Оцінка: 20–30+ ефективних підходів на тиждень через компаунди. Front raise у типовій пресовій програмі — надлишковий і посилює anterior/posterior дисбаланс. Три сценарії, де пряма робота виправдана. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1074-pec-minor-anatomy.md` — Block 1051–1100 cluster 5, post 4/5. Pectoralis minor: прихований контролер лопатки і чому його тісність стримує силу. Антеверсія лопатки як наслідок укорочення pec minor: два механізми — субакроміальне звуження і обмежена ретракція у тягах. Позиційний тест. Управління довжиною через стречинг і активацію lower trap/serratus як системний підхід, а не реабілітаційний. Coracoid impingement як рідкісний, але важливий варіант. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1075-coracobrachialis-anatomy.md` — Block 1051–1100 cluster 5, post 5/5. Coracobrachialis: найменший з клювоподібних прикріплень. Функції: флексія і приведення плеча як синергіст. Ключова клінічна деталь: musculocutaneous nerve пронизує coracobrachialis → нейропраксія впливає на biceps і brachialis нижче. «Coracoid cluster» — pec minor + coracobrachialis + biceps short head: спільна точка прикріплення, взаємовплив через лопаткову механіку. Пряме тренування не виправдане для загального силового тренінгу. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — posts 1071–1075 додані у верхівку сітки (Muscle anatomy, dates 2026-06-16, draft status). Total blog entries updated to post-1075.
+- `STATUS.md` — Block 1051–1100 оновлено: 20/50 → 25/50, cluster 5 COMPLETE; total posts 1072 → 1077; next priorities оновлено на cluster 6 (posts 1076–1080).
+- `VERSION` → 5.70.0
+
+---
+
 ## [5.69.1] — 2026-06-16
 
 ### Changed
