@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.80.2] — 2026-06-17
+
+### Changed
+- `docs/SOC2_READINESS.md §86` — Evidence Artefact Cross-Reference Patch: OBSERVABILITY §46 (DEC-063). Registers three SOC 2 evidence artefacts defined in OBSERVABILITY §46.9 (v4.3.0, DEC-063) that were flagged for addition here in §46.11 item 9 (P1/M8). REPLAY-E-001 (CC6.7 — on-demand enterprise debug session authorisation record: Sentry session list + `mobile.replay_config_updated` DEC-030 chain + zero-violation confirmation; 3yr; per debug window). REPLAY-E-002 (CC6.7 — `replay-allowlist.test.ts` CI pass log: asserts prohibited route-name patterns, `maskAllText`/`maskAllInputs` invariants, consumer-tier zero sample rates; 3yr; per `sentry-replay-config.ts` change; clinical-safety sign-off required for allowlist changes). REPLAY-E-003 (CC7.2 + P1.1 — quarterly `mobile.replay_tier_violation` DEC-030 export; zero-event quarters filed as affirmative attestation; route_name SHA-256 hashed; 7yr). §86.5 extends CC6.7 × 2, CC7.2 × 1, P1.1 × 1 criterion rows. §86.6 closes four cross-reference obligations from OBSERVABILITY §46.9/§46.11. §86.7 seven-item checklist: 2× P0/M5, 5× P1/M5–M8. SOC2_READINESS.md v3.11.0 → v3.11.1.
+- `docs/OBSERVABILITY.md §46.11` — Item 9 marked [x] Done (2026-06-17): SOC2_READINESS.md §86 closes the obligation.
+- `VERSION` — 5.80.1 → 5.80.2.
+
+---
+
 ## [5.80.1] — 2026-06-17
 
 ### Changed

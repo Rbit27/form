@@ -12662,7 +12662,7 @@ If `mobile.replay_tier_violation` fires in production (non-zero event count):
 | 6 | Obtain clinical-safety written sign-off (Slack `#compliance-review`) for the §46.3 Tier S allowlist as the initial approved list; file sign-off screenshot as the baseline REPLAY-E-002 at `compliance/evidence/replay/REPLAY-E-002_baseline.md`. This sign-off is the prerequisite for any enterprise debug session using session replay. | clinical-safety + compliance-officer | **P1** | M5 | [ ] |
 | 7 | Conduct first enterprise replay debug session per §46.5 protocol; file REPLAY-E-001; confirm zero `mobile.replay_tier_violation` events in the session window; file REPLAY-E-003 Q2-2026 (or Q3-2026) baseline as a zero-event attestation if no violations occurred before the first replay session. | devops-lead + compliance-officer | **P1** | First enterprise debug session | [ ] |
 | 8 | Add `REPLAY-E-003` quarterly collection to the §81 evidence automation cron (`evidence-cron.ts`): query `audit_log_events WHERE event_type = 'mobile.replay_tier_violation' AND created_at >= <quarter_start> AND created_at < <quarter_end>`; emit a zero-event attestation JSON if count = 0; file to `compliance/evidence/replay/REPLAY-E-003_<YYYY-QN>.csv`. | devops-lead + compliance-officer | **P1** | M8 | [ ] |
-| 9 | Add REPLAY-E-001, REPLAY-E-002, and REPLAY-E-003 to `docs/SOC2_READINESS.md` CC6.7 evidence table (3yr / 3yr / 7yr retention respectively). | compliance-officer | **P1** | M8 | [ ] |
+| 9 | Add REPLAY-E-001, REPLAY-E-002, and REPLAY-E-003 to `docs/SOC2_READINESS.md` CC6.7 evidence table (3yr / 3yr / 7yr retention respectively). | compliance-officer | **P1** | M8 | [x] **Done — §86 (2026-06-17)** |
 
 #### P2 — Annual governance
 
