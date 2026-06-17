@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.80.1] — 2026-06-17
+
+### Changed
+- `docs/OBSERVABILITY.md §46` — OQ-MOBILE-02 Resolution: Sentry Session Replay Screen Allowlist & Clinical-Safety Review Protocol (DEC-063). Closes OQ-MOBILE-02 (P1 — before M4 deploy, from §28.13). Tier S screen allowlist adopted (14 routes: SsoLogin, SsoCallback, OnboardingStep1–4, Subscription, BillingConfirmation, AdminDashboard, AdminDashboardTeamActivity, AppError, NetworkError, Settings, SsoSettings). Session replay remains disabled by default; enterprise 5% error-session sample on Tier S only; on-demand 10% CSM-initiated protocol (§46.5). `maskAllText: true` + `maskAllInputs: true` mandatory. Four-layer privacy model: Tier S architectural exclusion → `isReplayPermitted()` runtime gate in `beforeSend` → text masking → §28.3 breadcrumb deny-list. Two new DEC-030 events: `mobile.replay_config_updated` (STANDARD, 3yr) + `mobile.replay_tier_violation` (HIGH, 7yr; expected zero in steady state). REPLAY-CHAIN-01 ordering invariant. Three SOC 2 evidence artefacts: REPLAY-E-001 (CC6.7, on-demand), REPLAY-E-002 (CC6.7, per allowlist change), REPLAY-E-003 (CC7.2/P1.1, quarterly; zero-event attestation). Clinical-safety gate: sign-off + compliance-officer approval + new DEC entry required for any allowlist change; CI enforcement via `replay-allowlist.test.ts`. Two open questions: OQ-REPLAY-01 (P2 — error sample rate 5% → 20% after 90 days M5 data), OQ-REPLAY-02 (P2 — Admin Dashboard conditional classification on k-anonymity floor CI enforcement). §28.13 OQ-MOBILE-02 row updated to 🟢 Resolved DEC-063. OBSERVABILITY.md header v4.2.1 → v4.3.0.
+- `docs/DECISION_LOG.md` — DEC-063 (OQ-MOBILE-02 — Sentry session replay Tier S allowlist, 2026-06-17) and DEC-062 (OQ-SSO-23.2/25.1/25.3 — magic-link CAEP session coverage, SCIM IP flag, API key IP enforcement, 2026-06-16) added. DEC-062 was referenced in SSO_SCIM §32 (v5.79.1) but not yet registered in the DECISION_LOG; both entries added in this commit.
+- `VERSION` — 5.80.0 → 5.80.1.
+
+---
+
 ## [5.80.0] — 2026-06-17
 
 ### Added

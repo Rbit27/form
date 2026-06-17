@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v4.2.1
+# FORM · Observability & Monitoring Taxonomy v4.3.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -7105,7 +7105,7 @@ Mobile performance events are emitted at fleet level. Individual crash reports l
 | OQ | Question | Owner | Resolution Target | Priority |
 |---|---|---|---|---|
 | OQ-MOBILE-01 | **EAS OTA adoption rate vs. enterprise MDM change windows.** MOBILE-SLO-06 (≥ 95% adoption within 48 h) may be unachievable for enterprise tenants whose IT teams enforce MDM change control windows (Intune, Jamf) that block OTA installs outside approved maintenance windows. Options: (a) make MOBILE-SLO-06 a FORM-internal SLO only, exclude from enterprise DPA; (b) define a per-tenant SLO exception flag in `tenants.ota_change_window_enabled`; (c) negotiate a 7-day adoption window for enterprise tenants on the Premium SLO tier. Decision needed before enterprise GA so CSM onboarding script is correct. | platform-engineer + customer-success | Before enterprise GA (M13) | **P2** |
-| OQ-MOBILE-02 | **Sentry session replay for enterprise UX debugging.** Sentry's React Native session replay captures screen recordings that could accelerate debugging of enterprise fleet issues (e.g., SSO login flow failures). However, session replay may capture health-adjacent UI elements (workout plan screens, progress screens). Proposal: enable replay only on explicitly approved screens (SSO login, onboarding flow, admin dashboard) with a screen allowlist, and disable globally elsewhere. Clinical-safety must review the allowlist before any replay config ships to production. | clinical-safety + security-engineer | M4 | **P1** |
+| OQ-MOBILE-02 | **🟢 Resolved — DEC-063 (2026-06-17). See §46.** Tier S screen allowlist adopted (14 routes: SsoLogin, SsoCallback, OnboardingStep1–4, Subscription, BillingConfirmation, AdminDashboard, AdminDashboardTeamActivity, AppError, NetworkError, Settings, SsoSettings); `maskAllText: true` + `maskAllInputs: true` mandatory; enterprise on-demand replay via §46.5 CSM protocol; `mobile.replay_config_updated` + `mobile.replay_tier_violation` DEC-030 events; REPLAY-CHAIN-01 ordering invariant; clinical-safety sign-off gate for all allowlist changes. | clinical-safety + security-engineer | 🟢 **Resolved — DEC-063 (2026-06-17)** | **🟢 Closed** |
 | OQ-MOBILE-03 | **🟢 Resolved — DEC-059 (2026-06-14).** System browser mandated (`expo-web-browser openAuthSessionAsync` → `ASWebAuthenticationSession` on iOS / Chrome Custom Tabs on Android); embedded WebView prohibited. Security rationale: RFC 9700 §4.1 non-compliance, process-isolation failure, TLS-bypass risk, credential-manager incompatibility. All supported IdPs (Okta, Entra, Google, PingFederate, generic SAML) are compatible with system browser. Azure AD B2C SAML tenants must migrate to OIDC PKCE mode before mobile SSO enablement. Universal Links (iOS) / App Links (Android) preferred callback scheme over `form://` custom scheme. Two DEC-030 events: `sso.mobile_browser_mode_set` (STANDARD, 7yr) and `sso.mobile_webview_blocked` (HIGH, 7yr). Alert AL-SSO-WEB-01 (P1) fires on any WebView attempt in production. Full specification in `docs/SSO_SCIM_IMPLEMENTATION.md §30`. | security-engineer + platform-engineer | 🟢 **Resolved — DEC-059 (2026-06-14)** | **🟢 Closed** |
 
 ---
@@ -12450,6 +12450,238 @@ No new DEC-030 events required — the policy is a process-level decision with n
 
 ---
 
+## §46 OQ-MOBILE-02 Resolution — Sentry Session Replay Screen Allowlist & Clinical-Safety Review Protocol (DEC-063)
+
+> **Closes:** OQ-MOBILE-02 from `§28.13` (P1 — before M4 deploy — Sentry session replay screen allowlist for enterprise UX debugging; clinical-safety sign-off required).
+
+### §46.1 Purpose and Decision Context
+
+OQ-MOBILE-02 (`§28.13`) asked whether Sentry React Native session replay — disabled unconditionally since §28 was authored (v1.5, 2026-06-01) — could be enabled selectively on screens that do not present health-adjacent content. The use case is enterprise fleet UX debugging, particularly SSO login flow failures which are the highest-frequency enterprise support request. The constraint is FORM's clinical-safety and GDPR Art. 9 privacy floors: session replay that captures health-adjacent UI creates a verbatim multi-second recording of sensitive data for which FORM does not hold explicit consent for debugging purposes.
+
+**DEC-063 Decision (2026-06-17): Option A — Screen Allowlist with Mandatory Clinical-Safety Gate adopted.**
+
+Session replay is NOT globally enabled. It remains disabled by default for all tiers. A strictly-gated Tier S screen allowlist permits replay only on screens that are architecturally incapable of displaying Art. 9 health data, body-image-adjacent content, or clinical-safety-relevant information. Any expansion of the allowlist requires a new clinical-safety sign-off before the change is merged.
+
+**What is NOT changed:** The §28.3 `beforeSend` breadcrumb deny-list (11 keys: `weight`, `heartRate`, `cvKeypoints`, `mood`, `recovery.*`, and six others) continues to apply to all sessions regardless of tier classification. This deny-list is a second-layer defence; the Tier S gate is the first.
+
+**What this section does NOT cover:** §28.3 Sentry init configuration (unchanged), §28.8 alert rules (unchanged), §28.6 enterprise fleet panels (unchanged). Those sections remain authoritative for their respective areas.
+
+---
+
+### §46.2 Screen Classification Framework
+
+Screens are assigned one of three tiers. Classification is per React Navigation route name. Any route not explicitly in the Tier S list is treated as Tier R until clinical-safety formally classifies it.
+
+| Tier | Definition | Replay |
+|---|---|---|
+| **Tier S — Safe** | Screen cannot display Art. 9 data, body-composition data, health metrics, coaching content, or clinical-safety-relevant UI at any point in its lifecycle. User identity is limited to pseudonymous UUID. Confirmed by clinical-safety sign-off. | **Permitted** (with §46.4 controls) |
+| **Tier R — Restricted** | Screen may display health-adjacent data depending on user state or navigation path. Incidental capture of Art. 9 fields cannot be excluded by static analysis alone. | **Prohibited** |
+| **Tier H — Health** | Screen's primary content is Art. 9 health data, coaching interaction, biometric display, or clinical-safety-relevant output. Replay would create a verbatim record requiring GDPR Art. 9 explicit consent for debugging that FORM does not hold. Clinical-safety VETO applies unconditionally. | **Prohibited; clinical-safety VETO** |
+
+**Prohibited route-name patterns (auto-excluded regardless of Tier S list):** Any route whose name contains `Workout`, `Coach`, `Victor`, `Nutrition`, `Meal`, `Wearable`, `HRV`, `Progress`, `Body`, `Weight`, `CV`, `Biometric`, `Achievement`, `Health`, `Recovery`, or `Session` is treated as Tier H without individual review. This pattern block is enforced in `replay-allowlist.test.ts` (§46.8).
+
+---
+
+### §46.3 Tier S Screen Allowlist (Effective DEC-063, 2026-06-17)
+
+This list is the authoritative source. `apps/mobile/src/observability/sentry-replay-config.ts` must match it exactly. Clinical-safety has reviewed and approved each route for Tier S classification (see §46.8 for the review gate).
+
+| Route name | Screen description | Clinical-safety rationale |
+|---|---|---|
+| `SsoLogin` | Enterprise SSO entry point — IdP selection, SAML/OIDC redirect initiation | No user health data displayed; primary enterprise debugging value (SSO flow failures are the top CSM escalation type) |
+| `SsoCallback` | Deep-link return from IdP; success/error state display | No health data; SSO callback errors are critical for enterprise fleet diagnosis |
+| `OnboardingStep1` | Name and preferred name entry | Text fields only; no health data collected at this step |
+| `OnboardingStep2` | Fitness goal selection (general fitness / sport performance / rehabilitation — UI category, not clinical diagnosis) | Goal selection is a UI preference; category labels are not Art. 9 health data |
+| `OnboardingStep3` | Training experience level selection | Non-clinical UI preference; no health data collected |
+| `OnboardingStep4` | Notification permission request screen | System UI prompt wrapper; no health data |
+| `Subscription` | Subscription plan selection and upgrade UI | Billing UI only; no health data; relevant for enterprise seat-billing support cases |
+| `BillingConfirmation` | Stripe payment confirmation | Receipt/confirmation UI only; no health data |
+| `AdminDashboard` | Enterprise admin aggregate reporting root | Privacy floor enforced by `docs/DATA_MODEL.md §17` — individual user data structurally absent; all metrics are k-anonymity n ≥ 5 aggregates; `form_api` cannot return individual-level data from the Admin Reporting Schema regardless of query |
+| `AdminDashboardTeamActivity` | Aggregate team activity panel | Same DATA_MODEL §17 structural guarantee as AdminDashboard; aggregate-only by schema design |
+| `AppError` | Unhandled exception full-screen error state | Error code + stack trace only; no health data in error boundary render path |
+| `NetworkError` | Offline / network failure screen | No health data |
+| `Settings` | App preferences (notifications, language, theme) | UI preferences only; no health data fields |
+| `SsoSettings` | SSO configuration display for enterprise users | SSO domain/IdP type display; no health data; relevant for SSO misconfiguration support |
+
+**Routes NOT in this list are Tier R or Tier H and MUST NOT have replay enabled,** regardless of whether they appear non-sensitive. The burden of proof is on adding to the list (requiring sign-off), not on removing.
+
+---
+
+### §46.4 Privacy Controls for All Tier S Screens
+
+Even on Tier S screens, the following controls apply unconditionally and cannot be overridden per-screen:
+
+**1. Text masking:** `maskAllText: true` and `maskAllInputs: true` are set at Sentry `init()` level. All visible text content is replaced with `***` in replay frames. SSO domain names, user-entered names, tenant names, and any incidental UI text are masked.
+
+**2. Screen-level gate in `beforeSend`:** The existing `beforeSend` callback is extended with a call to `isReplayPermitted(currentRoute)`. Replay frames captured on any non-Tier-S route are dropped before transmission.
+
+```typescript
+// apps/mobile/src/observability/sentry-replay-config.ts
+// DEC-063 — Tier S screen allowlist (2026-06-17)
+// NEVER add Tier R/H routes here without clinical-safety sign-off + new DEC entry.
+
+export const REPLAY_ALLOWED_ROUTES = new Set([
+  'SsoLogin',
+  'SsoCallback',
+  'OnboardingStep1',
+  'OnboardingStep2',
+  'OnboardingStep3',
+  'OnboardingStep4',
+  'Subscription',
+  'BillingConfirmation',
+  'AdminDashboard',
+  'AdminDashboardTeamActivity',
+  'AppError',
+  'NetworkError',
+  'Settings',
+  'SsoSettings',
+] as const);
+
+export type ReplayAllowedRoute = typeof REPLAY_ALLOWED_ROUTES extends Set<infer T> ? T : never;
+
+export function isReplayPermitted(routeName: string): boolean {
+  return REPLAY_ALLOWED_ROUTES.has(routeName as ReplayAllowedRoute);
+}
+```
+
+**3. No real user identification:** `Sentry.setUser()` is called with `{ id: pseudonymousUuid }` only — identical to the §28.3 constraint. Real user ID, email, name, or tenant name are never set on Sentry user context.
+
+**4. Sample rates — conservative defaults, enterprise-only:**
+
+| Context | `replaysSessionSampleRate` | `replaysOnErrorSampleRate` |
+|---|---|---|
+| Consumer tier | `0` (permanently disabled) | `0` (permanently disabled) |
+| Enterprise tier (default) | `0` | `0.05` (5% of error sessions on Tier S only) |
+| Enterprise tier — active on-demand debug window (§46.5) | `0.1` | `0.10` |
+
+Consumer replay is permanently off. Enterprise error-session rate (5%) is the minimum useful for pattern detection on low-frequency SSO failures; it does not create a material replay corpus under normal fleet conditions.
+
+**5. §28.3 breadcrumb deny-list:** All 11 deny-list keys continue to apply. No modification in this section.
+
+**6. Sentry EU data residency:** All replay data is sent to Sentry's EU cloud (existing sub-processor entry in `docs/SUBPROCESSORS.md`). No new processor relationship is introduced.
+
+---
+
+### §46.5 Enterprise On-Demand Replay Enablement Protocol
+
+Enterprise replay is off by default. CSMs may request a time-limited higher-rate window for active debugging engagements.
+
+| Step | Actor | Action | SLA |
+|---|---|---|---|
+| 1 | CSM | Creates a Linear ticket in `[FLEET] Replay Debug Request` with: tenant_id slug, symptom description, requested duration (max 72h), affected screen(s) from §46.3 Tier S list only | — |
+| 2 | security-engineer | Reviews ticket — confirms all named screens are Tier S; rejects if any Tier R/H route is cited | ≤ 4h business hours |
+| 3 | devops-lead | Applies `REPLAY_ENTERPRISE_ENABLED=true` + `REPLAY_SESSION_RATE_10PCT=true` feature flags for the tenant with TTL matching requested duration; emits `mobile.replay_config_updated` DEC-030 event with `action: 'enabled'` | ≤ 1h post security-engineer approval |
+| 4 | devops-lead | Disables flags at TTL expiry (or manually); emits closing `mobile.replay_config_updated` with `action: 'disabled'` | At duration end |
+| 5 | compliance-officer | Exports Sentry replay session list for the window; confirms zero `mobile.replay_tier_violation` events in the window; files REPLAY-E-001 | ≤ 5 business days post-session |
+
+Sentry retains replay data for 30 days maximum. If compliance-officer identifies any Tier R/H content in a replay session, escalate per §46.7 immediately.
+
+---
+
+### §46.6 DEC-030 HMAC-Chained Events
+
+| Event | Severity | Retention | Trigger | Key Payload Fields |
+|---|---|---|---|---|
+| `mobile.replay_config_updated` | STANDARD | 3yr | Any change to `REPLAY_ENTERPRISE_ENABLED` or `REPLAY_SESSION_RATE_10PCT` feature flags for a tenant | `tenant_id` (slug), `action: 'enabled' \| 'disabled' \| 'rate_changed'`, `new_session_rate_pct`, `new_error_rate_pct`, `changed_by` (devops-lead UUID), `linear_ticket_ref`, `duration_hours_requested` (nullable — omit on disable), `clinical_safety_sign_off_at` (ISO date — required only on first enable for a new screen scope) |
+| `mobile.replay_tier_violation` | HIGH | 7yr | Emitted by `beforeSend` route gate when a replay frame is captured for a non-Tier-S route and dropped before Sentry egress | `route_name_hash` (SHA-256 of route name — prevents enumeration of protected routes), `tenant_id` (slug), `frame_dropped: true`, `violation_type: 'tier_r' \| 'tier_h'` |
+
+**REPLAY-CHAIN-01 ordering invariant:** A `mobile.replay_config_updated` event with `action: 'enabled'` must precede any replay session data reaching Sentry for the affected tenant. If Sentry's session creation timestamp predates the DEC-030 chain record by > 5 minutes, emit a P1 PagerDuty alert to `form-compliance` + `form-devops`. This is NOT an R-05 event (no chain tamper); it is a process-compliance signal that §46.5 was not followed.
+
+**Privacy floor:** No real user_id, employee name, health data, coaching content, or biometric values in either event. `route_name_hash` uses SHA-256 to prevent an observer with chain read access from mapping back to protected route names. `tenant_id` is always a slug, never a UUID.
+
+---
+
+### §46.7 Inadvertent Tier R/H Capture Escalation Protocol
+
+If `mobile.replay_tier_violation` fires in production (non-zero event count):
+
+1. **`beforeSend` dropped the frame** — confirm by checking whether the `session_id` has any replay data in Sentry from before the `frame_dropped: true` timestamp. If no data reached Sentry: file a `mobile.replay_tier_violation` DEC-030 event and create a P2 Linear ticket to diagnose the routing leak in `isReplayPermitted()`.
+2. **If the frame reached Sentry despite the gate** (code bug in `isReplayPermitted()`): Raise a P1 incident. If content is health-adjacent, activate R-22 (privacy floor breach) in parallel. If Art. 9 data is confirmed present, activate R-01. Disable all enterprise replay immediately via devops-lead (`action: 'disabled'`, TTL 0). Notify clinical-safety within 15 minutes.
+3. **Delete from Sentry:** `DELETE /api/0/projects/{org_slug}/{project_slug}/replays/{replay_id}/`. Confirm deletion and file confirmation as PIR evidence.
+4. **Evidence:** File the DEC-030 chain record, Sentry deletion confirmation, and a PIR entry at `compliance/evidence/replay/REPLAY-TIER-VIOL-<incident_id>.md`.
+
+---
+
+### §46.8 Clinical-Safety Review Gate
+
+**Any change to `REPLAY_ALLOWED_ROUTES`** (adding or removing a route) requires all four of the following before the PR can be merged:
+
+1. A PR to `apps/mobile/src/observability/sentry-replay-config.ts` with a comment block describing the proposed route, what data it can display, and what user inputs it accepts.
+2. A clinical-safety `:white_check_mark:` or written approval in Slack `#compliance-review` confirming the route cannot display Art. 9 health data, body-image-adjacent content, or clinical-safety-relevant output.
+3. A compliance-officer written approval confirming the route is outside GDPR Art. 9 processing scope.
+4. A new DEC entry in `docs/DECISION_LOG.md` documenting the classification change (cannot be batched with other decisions).
+
+**CI enforcement — `src/tests/observability/replay-allowlist.test.ts`** runs on every PR touching `sentry-replay-config.ts`:
+
+- Prohibited pattern check: asserts no route in `REPLAY_ALLOWED_ROUTES` matches the regex `Workout|Coach|Victor|Nutrition|Meal|Wearable|HRV|Progress|Body|Weight|CV|Biometric|Achievement|Health|Recovery|Session` (case-sensitive).
+- Masking assertion: reads `apps/mobile/src/observability/sentry-init.ts` and asserts `maskAllText: true` and `maskAllInputs: true` are present and not overridden.
+- Consumer rate assertion: asserts `replaysSessionSampleRate === 0` for the non-enterprise build target.
+- Fails the build on any violation — no suppression mechanism.
+
+---
+
+### §46.9 SOC 2 Evidence Mapping
+
+| Artefact | Criteria | Description | Location | Cadence | Retention |
+|---|---|---|---|---|---|
+| **REPLAY-E-001** | CC6.7 | Sentry replay session list for an enterprise on-demand debug window; includes `mobile.replay_config_updated` DEC-030 chain records confirming §46.5 protocol was followed; confirms zero `mobile.replay_tier_violation` events in the window | `compliance/evidence/replay/REPLAY-E-001_<tenant_id>_<YYYY-MM-DD>.csv` | On-demand (after each enterprise debug window) | 3yr |
+| **REPLAY-E-002** | CC6.7 | CI test pass log for `replay-allowlist.test.ts` from the PR that last modified `sentry-replay-config.ts`; confirms prohibited route-name patterns enforced and masking options verified | `compliance/evidence/replay/REPLAY-E-002_<YYYY-MM-DD>.md` | On each `sentry-replay-config.ts` change | 3yr |
+| **REPLAY-E-003** | CC7.2, P1.1 | Quarterly export of `mobile.replay_tier_violation` DEC-030 events; zero-event quarters filed as affirmative attestation (zero violations = screen-level gate operating correctly) | `compliance/evidence/replay/REPLAY-E-003_<YYYY-QN>.csv` | Quarterly | 7yr |
+
+**Auditor narrative for CC6.7:** FORM's Sentry session replay controls implement a four-layer defence-in-depth model. Layer 1: architectural exclusion — only Tier S screens (structurally incapable of Art. 9 data display) appear in `REPLAY_ALLOWED_ROUTES`, with a clinical-safety sign-off gate for any change. Layer 2: runtime gate — `isReplayPermitted()` in `beforeSend` drops any replay frame from a non-Tier-S route before it reaches the Sentry relay. Layer 3: masking — `maskAllText: true` + `maskAllInputs: true` ensures that even allowlisted screens produce masked recordings where all visible text is replaced with `***`. Layer 4: chain evidence — `mobile.replay_config_updated` events record every enablement and disable action with Linear ticket traceability; `mobile.replay_tier_violation` events (expected steady-state count: zero) provide an auditable monitoring signal for any gate-bypass attempt. This four-layer model satisfies CC6.7 (logical and physical access controls that restrict information assets to authorized individuals).
+
+---
+
+### §46.10 §28.13 OQ Gap Tracker Update
+
+| OQ | Previous Status | Status After §46 | Decision |
+|---|---|---|---|
+| **OQ-MOBILE-01** | 🟡 P2 Open — Before M13 | 🟡 P2 Open (unchanged) | MDM change window vs. MOBILE-SLO-06; deferred |
+| **OQ-MOBILE-02** | 🟡 P1 Open — Before M4 deploy | 🟢 **Resolved — DEC-063 (2026-06-17)** | Tier S screen allowlist (14 routes, §46.3) + mandatory clinical-safety gate; `maskAllText` + `maskAllInputs` mandatory; enterprise on-demand protocol (§46.5); `mobile.replay_config_updated` + `mobile.replay_tier_violation` DEC-030 events; REPLAY-CHAIN-01 ordering invariant |
+
+**§28.13 source cross-update:** OQ-MOBILE-02 row in §28.13 has been updated to 🟢 Resolved (DEC-063, 2026-06-17) in this document version.
+
+---
+
+### §46.11 Implementation Checklist
+
+#### P0 — Before any enterprise debug session using replay (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `apps/mobile/src/observability/sentry-replay-config.ts` with `REPLAY_ALLOWED_ROUTES` set (14 routes, §46.3) and `isReplayPermitted()` function. Extend `apps/mobile/src/observability/sentry-init.ts`: wire `isReplayPermitted()` into the `beforeSend` callback before any existing checks; set `maskAllText: true`, `maskAllInputs: true` in Sentry `init()` options; set `replaysSessionSampleRate: 0` and `replaysOnErrorSampleRate: 0` as universal defaults; add enterprise feature-flag branch for 5% error-session rate on Tier S (enabled only when `REPLAY_ENTERPRISE_ENABLED` flag is active for the tenant). | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Create `src/tests/observability/replay-allowlist.test.ts` CI gate per §46.8: (a) prohibited-pattern regex test against all members of `REPLAY_ALLOWED_ROUTES`; (b) `maskAllText: true` + `maskAllInputs: true` assertion in Sentry init; (c) `replaysSessionSampleRate === 0` for non-enterprise build target. Register this test as a required CI check for PRs touching `sentry-replay-config.ts` or `sentry-init.ts`. | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Register `mobile.replay_config_updated` and `mobile.replay_tier_violation` DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Mobile` namespace with full payload schemas and retention periods (STANDARD/3yr and HIGH/7yr respectively); deploy to `emit-audit-event` Worker event registry; write integration test confirming `mobile.replay_tier_violation` is emitted (not just the frame dropped) when `isReplayPermitted()` returns false on a sample Tier R route name in the test harness. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 4 | Implement `mobile.replay_config_updated` emission in the feature-flag Worker on REPLAY flag changes; wire REPLAY-CHAIN-01 ordering check into the compliance-monitoring pg_cron batch (P1 PagerDuty `form-compliance` + `form-devops` if Sentry ingestion predates chain record by > 5 min). | platform-engineer + devops-lead | **P0** | M5 | [ ] |
+| 5 | Update `docs/OBSERVABILITY.md §28.13` OQ-MOBILE-02 row in the section source text from `🟡 P1 Open — Before M4` to `🟢 Resolved — DEC-063 (2026-06-17). See §46.` | compliance-officer | **P0** | M5 | [x] **Done — §28.13 OQ-MOBILE-02 row updated in this document version.** |
+
+#### P1 — Before SOC 2 observation period start (M8)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Obtain clinical-safety written sign-off (Slack `#compliance-review`) for the §46.3 Tier S allowlist as the initial approved list; file sign-off screenshot as the baseline REPLAY-E-002 at `compliance/evidence/replay/REPLAY-E-002_baseline.md`. This sign-off is the prerequisite for any enterprise debug session using session replay. | clinical-safety + compliance-officer | **P1** | M5 | [ ] |
+| 7 | Conduct first enterprise replay debug session per §46.5 protocol; file REPLAY-E-001; confirm zero `mobile.replay_tier_violation` events in the session window; file REPLAY-E-003 Q2-2026 (or Q3-2026) baseline as a zero-event attestation if no violations occurred before the first replay session. | devops-lead + compliance-officer | **P1** | First enterprise debug session | [ ] |
+| 8 | Add `REPLAY-E-003` quarterly collection to the §81 evidence automation cron (`evidence-cron.ts`): query `audit_log_events WHERE event_type = 'mobile.replay_tier_violation' AND created_at >= <quarter_start> AND created_at < <quarter_end>`; emit a zero-event attestation JSON if count = 0; file to `compliance/evidence/replay/REPLAY-E-003_<YYYY-QN>.csv`. | devops-lead + compliance-officer | **P1** | M8 | [ ] |
+| 9 | Add REPLAY-E-001, REPLAY-E-002, and REPLAY-E-003 to `docs/SOC2_READINESS.md` CC6.7 evidence table (3yr / 3yr / 7yr retention respectively). | compliance-officer | **P1** | M8 | [ ] |
+
+#### P2 — Annual governance
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | Annual Tier S review: clinical-safety + compliance-officer walk through `REPLAY_ALLOWED_ROUTES`; confirm all routes remain non-Art.9; add any new onboarding or admin screens introduced since last review; remove any routes renamed or deprecated; update DEC-063 in `docs/DECISION_LOG.md` with an amendment note if allowlist changes. | clinical-safety + compliance-officer | **P2** | Annual | [ ] |
+| 11 | Annual Sentry DPA review: confirm Sentry EU cloud DPA still covers replay data; confirm `maskAllText` remains a supported Sentry feature (not deprecated); confirm no Sentry pricing or infrastructure change shifted EU replay data to US infrastructure. | devops-lead + compliance-officer | **P2** | Annual | [ ] |
+
+---
+
+### §46.12 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-REPLAY-01** | **Should `replaysOnErrorSampleRate` on enterprise be raised from 5% to 20% after the first 90 days of M5 data?** A 5% error sample means statistically only 1 in 20 SSO failures produces a replay session. For low-frequency enterprise bugs (e.g., a specific IdP certificate timing edge case affecting one tenant), this may not generate enough replay sessions to diagnose within a reasonable support SLA. The risk of raising to 20%: a proportionally larger replay corpus on Tier S screens — increasing the REPLAY-E-001 evidence review burden. Recommendation: evaluate after first 90 days of M5 enterprise SSO go-live using REPLAY-E-003 zero-violation data as the safety gate; if no tier violations, raise to 20% with clinical-safety written confirmation. | P2 | devops-lead + clinical-safety | After first 90 days of M5 enterprise SSO go-live; document decision in `docs/DECISION_LOG.md` |
+| **OQ-REPLAY-02** | **Should `AdminDashboard` and `AdminDashboardTeamActivity` be conditionally removed from the Tier S allowlist if an enterprise feature ever allows lower-granularity admin reporting?** Current Tier S inclusion is conditioned on `docs/DATA_MODEL.md §17` k-anonymity floor (n ≥ 5) being enforced at the API layer — a hard architectural guarantee today. If a future product decision introduces per-user admin reporting (a no-go under `docs/ENTERPRISE.md §Privacy floor for enterprise` rule 2), the Admin Dashboard classification must be revoked before the feature ships. Recommendation: add a CI lint rule confirming that `GET /v1/admin/*/reports` API handlers enforce the k-anonymity floor; make this a precondition for retaining Admin Dashboard in the Tier S list at each annual review. | P2 | enterprise-architect + clinical-safety | Evaluate before any Admin Dashboard API granularity change; no action required today |
+
+---
+
 ### 45.8 Implementation Checklist
 
 #### P0 — Before first quarterly PERF-SLO-06 reference run (M6)
@@ -12482,4 +12714,6 @@ No new DEC-030 events required — the policy is a process-level decision with n
 
 *v4.2 (2026-06-15): Three cross-reference patches completing obligations from §30 (SSO_SCIM v2.2, 2026-06-14) and §44 (DEC-056/057, v4.1, 2026-06-14). (1) §26.8 `sso_browser_security` subsection added — registers AL-SSO-WEB-01 (P1, PagerDuty `form-security`) for `sso.mobile_webview_blocked` DEC-030 HIGH events; closes SSO_SCIM_IMPLEMENTATION.md §30.13 checklist item 6 (P0/M8); privacy floor documented (`attempted_url_hash` SHA-256[:32] only — no plaintext IdP URL, no user_id, no health data; zero-fire is the expected production state). (2) §27.7 AL-SIEM-06 row replaced with dual-phase specification per §44.2.4 (DEC-056): shadow-mode row (P3 Slack `#devops-alerts`, next-business-day SLA, diagnostic-accumulation instructions) + full-mode row (P1 PagerDuty HIGH `form-devops`, < 30 min SLA, standard SIEM triage) + AL-SIEM-06-SHADOW-END informational row (transition trigger: `auth_event_avg_per_30min > 5` OR 30 calendar days; emits `system.siem_alert_activated` DEC-030 STANDARD 3yr; files CALIB-E-001); graduated-activation note added citing DEC-056; closes §44.6 checklist item 5 (P0/M5). (3) §43.15 checklist item 1 marked [x] Done — `docs/AUDIT_LOG_SCHEMA.md §Integration` updated (CHANGELOG v5.10.1, 2026-06-15): six DEC-030 events registered (`integration.webhook_delivery_failed` HIGH 7yr, `integration.webhook_suspended` HIGH 7yr, `integration.webhook_reactivated` HIGH 7yr — new; `integration.webhook_created`, `integration.webhook_deleted`, `integration.webhook_fired` payload specs extended with `endpoint_url_hash` SHA-256 per DEC-054); WH-CHAIN-01 ordering invariant documented. No new evidence artefacts opened in this patch — all three items close pre-existing checklist obligations. Privacy floor: AL-SSO-WEB-01 payload constraints carried verbatim from SSO_SCIM §30.9; §27.7 dual-phase change does not alter the AL-SIEM-06 trigger threshold or the privacy-floor constraint (no user_id, no health data, no plaintext IP in any SIEM pipeline signal). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §30.10` (AL-SSO-WEB-01 authoritative spec — triage tree and SOC 2 mapping); `docs/SSO_SCIM_IMPLEMENTATION.md §30.13` (checklist item 6 — now closed by this patch); `docs/OBSERVABILITY.md §44.2.4` (dual-phase AL-SIEM-06 spec source); `docs/OBSERVABILITY.md §44.5` (CALIB-E-001 evidence artefact — filed on AL-SIEM-06-SHADOW-END transition); `docs/OBSERVABILITY.md §44.6` (checklist item 5 — now closed by this patch); `docs/AUDIT_LOG_SCHEMA.md §Integration` (six webhook DEC-030 events registered — CHANGELOG v5.10.1); `docs/OBSERVABILITY.md §43.15` (checklist item 1 now [x] Done). Owner: devops-lead + security-engineer + compliance-officer.*
 
-*v4.1 (2026-06-14): §45 OQ-PERF-01 + OQ-PERF-02 Resolution — k6 Platform Selection & Staging Data Governance (DEC-058). Closes two P1 open questions from §40.9 (v3.7, 2026-06-13): OQ-PERF-01 → 🟢 Resolved; OQ-PERF-02 → 🟢 Resolved. OQ-PERF-03 → 🟢 Deferred with threshold. §45.1 scopes to k6 platform selection, quarterly k6 Cloud workflow, staging refresh procedure, two DEC-030 events, one new SOC 2 artefact (PERF-STAGING-E-001); explicitly out of scope: §33.3 VU scenario parameters, §40.4 production alerts, §40.2 merge-gate logic (all unchanged). §45.2 DEC-058 decision — hybrid architecture: k6 OSS (GitHub Actions, US-East) for daily CI gate (no change); k6 Cloud EU-West (Amsterdam) for quarterly PERF-SLO-06 reference only. Four grounds: (1) geographic accuracy — US-East inflates EU-primary latency 40–80 ms vs. ENTERPRISE_SLA.md §3 p95 < 300 ms EU commitment; k6 Cloud EU-West eliminates transatlantic RTT bias from LT-E-001 evidence; (2) cost proportionality — Team plan ~$89/month; 4 quarterly runs fit within included VU-hour budget at zero metered overage; daily k6 Cloud gate requires Business plan $299+/month with no additional compliance benefit; (3) third-party corroboration — cloud_run_id is immutable k6 Cloud portal record providing A1.1 auditor attestation anchor unavailable from self-hosted artifacts; (4) DEC-043/DEC-044/DEC-051 pattern — simpler tool for high-frequency gates, higher-fidelity for low-frequency evidence. Reverse cost low: static RTT correction offset approach available if k6 Cloud deprecated; no schema/event-type changes. Re-evaluation: annual k6 Cloud renewal or > 20 ms divergence from §16 SYNTH-SLO-01. §45.3 OQ-PERF-02 — quarterly schema-only refresh: Step 1 `supabase db dump --schema-only` + grep check (zero COPY/INSERT) + `db reset` + DDL apply; Step 2 `test-data-factory` seed (lt-synthetic-{1,2,3} tenants, 500 users each, lt-user-{N}@test.form.coach, skip_art9_tables: true); Step 3 clinical-safety Slack attestation + `:white_check_mark:` confirmation → PERF-STAGING-E-001; Step 4 post-run `db reset` cleanup. Five ANON invariants: ANON-01 gen_random_uuid for user_id; ANON-02 schema-only dump no Art. 9 data; ANON-03 lt-synthetic- tenant prefix; ANON-04 @test.form.coach email; ANON-05 physically separate Supabase project. Post-seed SQL verification (Art. 9 tables must all = 0). §45.3.3 constitutes `compliance/cc8/staging-data-anonymisation-procedure.md` v1.0. §45.4 two new DEC-030 STANDARD 3yr events: `system.quarterly_perf_reference_initiated` (cloud_run_id, node_region: eu-west, test_suite, staging_refresh_date date-only, clinical_safety_sign_off: true, quarter) and `system.quarterly_perf_reference_completed` (cloud_run_id, node_region, slo_results object with PERF-SLO-01–05, p95_ms, p99_ms, error_rate_pct, commit_sha, quarter, run_duration_s); PERF-CLOUD-CHAIN-01 ordering invariant (initiated before completed per cloud_run_id; inversion → P1 PagerDuty; not R-05). §45.5 OQ-PERF-03 deferred: per-tenant VU profile maintained through GA; re-evaluation trigger at 10k daily sessions for single tenant or 5,000 fleet seats; no new DEC-030 events. §45.6 two SOC 2 artefacts: PERF-STAGING-E-001 (CC4.1/A1.1 — clinical-safety sign-off screenshot; quarterly; 7yr; compliance/evidence/a1/); LT-E-001 updated scope (A1.1 — now k6 Cloud EU-West cloud_run_id provides third-party anchor). §45.7 OQ gap tracker: OQ-PERF-01 🟡→🟢 DEC-058; OQ-PERF-02 🟡→🟢 DEC-058; OQ-PERF-03 🟡→🟢 Deferred with threshold. §45.8 nine-item implementation checklist: 5× P0/M6 (k6 Cloud account + EU-West token, two DEC-030 event registrations + PERF-CLOUD-CHAIN-01 test, compliance/cc8/ procedure extraction + clinical-safety sign-off, .github/workflows/load-test-quarterly.yml workflow with manual Slack gate, §40.9/§40.10 OQ tracker update [already done in this version]), 2× P1/M8 (first quarterly run execution + LT-E-001 + PERF-STAGING-E-001 filing, p95 > 250 ms investigation gate), 2× P2/Annual (k6 Cloud plan renewal, OQ-PERF-03 threshold annual check). Document header: v3.9 → v4.1. Cross-references: §40.2 (merge-gate trigger matrix — unchanged; k6 OSS CI gate continues); §40.4 (production alert rules — unchanged); §40.5 (existing system.load_test_* DEC-030 events — §45 adds two parallel events in system.* namespace); §40.6 (pg_cron job 30 quarterly_perf_regression_check — §45 provides the k6 Cloud evidence input); §40.8 (LT-E-001 updated: k6 Cloud as source; LT-E-002 unchanged); §40.9 (OQ-PERF-01/02/03 — all three now resolved/deferred; §40.9 OQ table updated in this document version); §40.10 (checklist items 8 and 9 marked [x] Done with DEC-058 reference); `docs/SOC2_READINESS.md §33.3` (k6 VU scenario parameters — unchanged; §45 adds Cloud execution wrapper not scenario content); `docs/ENTERPRISE_SLA.md §3` (99.9% uptime + p95 < 300 ms EU commitment — the SLA §45 validates geographically); §16 (synthetic monitoring — Better Stack EU-West probes provide continuous p95 baseline; k6 Cloud quarterly run validates under synthetic load); `docs/AUDIT_LOG_SCHEMA.md §6/§System` (two new DEC-030 events to register — P0 before M6); `docs/CLINICAL_SAFETY.md` (clinical-safety sign-off authority for ANON invariant verification — §45.3.3 Step 3); `docs/DECISION_LOG.md DEC-058`. Privacy floor: no individual employee user_id, health data, coaching content, or biometric values in either DEC-030 event; staging_refresh_date date-only; cloud_run_id k6-Cloud UUID with no FORM user mapping; form_api REVOKED from audit_log_events and compliance evidence paths. Owner: devops-lead + platform-engineer + compliance-officer.*
+*v4.3.0 (2026-06-17): §46 OQ-MOBILE-02 Resolution — Sentry Session Replay Screen Allowlist & Clinical-Safety Review Protocol (DEC-063). Closes OQ-MOBILE-02 from §28.13 (P1 — before M4 deploy — Sentry session replay screen allowlist; clinical-safety sign-off required; authored 2026-06-01). Decision (DEC-063, 2026-06-17): Option A adopted — Tier S screen allowlist with mandatory clinical-safety gate. Session replay remains disabled by default (`replaysSessionSampleRate: 0`) for all tiers; enterprise tenants receive a 5% error-session sample rate on Tier S screens only; on-demand 10% session rate available via §46.5 CSM-initiated protocol with security-engineer approval and DEC-030 chain record. §46.2 three-tier screen classification framework: Tier S (Safe — structurally incapable of Art. 9 data display; replay permitted), Tier R (Restricted — may display health-adjacent data by navigation state; replay prohibited), Tier H (Health — primary content is Art. 9 data, clinical-safety VETO applies; replay prohibited). Route-name prohibition: any route matching `Workout|Coach|Victor|Nutrition|Meal|Wearable|HRV|Progress|Body|Weight|CV|Biometric|Achievement|Health|Recovery|Session` is automatically excluded regardless of Tier S list. §46.3 authoritative Tier S allowlist (14 routes): SsoLogin, SsoCallback, OnboardingStep1–4, Subscription, BillingConfirmation, AdminDashboard, AdminDashboardTeamActivity (k-anonymity floor enforced by DATA_MODEL §17 — individual data structurally absent), AppError, NetworkError, Settings, SsoSettings. §46.4 four-layer privacy control model: (1) Tier S architectural exclusion; (2) `isReplayPermitted()` runtime gate in `beforeSend` (drops non-Tier-S frames before Sentry egress); (3) `maskAllText: true` + `maskAllInputs: true` at Sentry init; (4) §28.3 breadcrumb deny-list continues to apply. Sample rates: consumer tier 0/0; enterprise default 0/0.05; enterprise on-demand debug 0.1/0.10. §46.5 enterprise on-demand replay enablement: six-step CSM → security-engineer → devops-lead protocol; feature-flag enablement with TTL; 30-day Sentry retention cap; post-session REPLAY-E-001 evidence review. §46.6 two DEC-030 events: `mobile.replay_config_updated` (STANDARD, 3yr — tenant_id slug, action enum, rate fields, linear_ticket_ref, clinical_safety_sign_off_at nullable); `mobile.replay_tier_violation` (HIGH, 7yr — route_name_hash SHA-256, tenant_id, frame_dropped: true, violation_type enum); REPLAY-CHAIN-01 ordering invariant (config_updated action: 'enabled' must precede Sentry ingestion by ≤ 5 min; violation → P1 PagerDuty). §46.7 inadvertent Tier R/H capture escalation: `beforeSend` drop as first layer; if frame reaches Sentry, P1 incident + R-22/R-01 activation + immediate disable + Sentry API deletion + PIR entry. §46.8 clinical-safety review gate: any `REPLAY_ALLOWED_ROUTES` change requires PR + clinical-safety Slack sign-off + compliance-officer sign-off + new DEC entry; `replay-allowlist.test.ts` CI test enforces prohibited route-name patterns + `maskAllText`/`maskAllInputs` constraints. §46.9 three SOC 2 artefacts: REPLAY-E-001 (CC6.7 — on-demand per enterprise debug window; 3yr); REPLAY-E-002 (CC6.7 — allowlist CI test pass log; 3yr); REPLAY-E-003 (CC7.2 + P1.1 — quarterly `mobile.replay_tier_violation` chain export; zero-event attestation; 7yr). §46.10 OQ gap tracker: OQ-MOBILE-02 🟡 P1 → 🟢 Resolved DEC-063; OQ-MOBILE-01 unchanged. §46.11 eleven-item implementation checklist: 5× P0/M5 (sentry-replay-config.ts + beforeSend gate, CI test replay-allowlist.test.ts, DEC-030 event registration + integration test, REPLAY-CHAIN-01 cron monitor, §28.13 cross-update [x Done in this version]), 4× P1/M5–M8 (clinical-safety sign-off for baseline Tier S, first enterprise debug session + REPLAY-E-001, REPLAY-E-003 quarterly automation, SOC2_READINESS §CC6.7 table update), 2× P2/Annual (annual Tier S review, annual Sentry DPA review). §46.12 two open questions: OQ-REPLAY-01 (P2 — raise error sample rate 5% → 20% after 90 days M5 data); OQ-REPLAY-02 (P2 — Admin Dashboard conditional classification based on k-anonymity floor CI enforcement). Document header: v4.2.1 → v4.3.0. §28.13 OQ-MOBILE-02 row updated to 🟢 Resolved (DEC-063, 2026-06-17). Cross-references: `docs/OBSERVABILITY.md §28.3` (beforeSend breadcrumb deny-list — unchanged; §46.4 adds screen-level gate as first layer); `docs/OBSERVABILITY.md §28.13` (OQ-MOBILE-02 — updated to 🟢 Resolved DEC-063); `docs/DATA_MODEL.md §17` (Enterprise Admin Reporting Schema — k-anonymity floor qualifying AdminDashboard for Tier S); `docs/ENTERPRISE.md §Privacy floor for enterprise` (rule 2 — no individual employee data in admin reporting); `docs/INCIDENT_RESPONSE.md R-22` (privacy floor breach escalation path); `docs/INCIDENT_RESPONSE.md R-01` (data breach escalation if Art. 9 confirmed in replay); `docs/CLINICAL_SAFETY.md` (clinical-safety VETO + sign-off gate); `docs/AUDIT_LOG_SCHEMA.md §Mobile` (two new DEC-030 events to register — P0 before M5); `docs/SOC2_READINESS.md §CC6.7` (REPLAY-E-001/002/003 to add — P1 before M8); `docs/SUBPROCESSORS.md §Sentry` (existing EU cloud DPA covers replay); `docs/DECISION_LOG.md DEC-063`. Privacy floor: no real user_id, employee name, health data, coaching content, biometric values, or Art. 9 category in any DEC-030 event; `route_name` in `mobile.replay_tier_violation` is SHA-256 hashed; `maskAllText`/`maskAllInputs` applied universally on Tier S screens; consumer tier replay permanently 0/0; enterprise replay requires explicit enablement; Sentry EU cloud (existing sub-processor). Owner: platform-engineer + clinical-safety + security-engineer + compliance-officer.*
+
+*v4.2.1 (2026-06-16): §12.7 Postgres Index Hygiene Monitoring. Closes two P1 open questions from §40.9 (v3.7, 2026-06-13): OQ-PERF-01 → 🟢 Resolved; OQ-PERF-02 → 🟢 Resolved. OQ-PERF-03 → 🟢 Deferred with threshold. §45.1 scopes to k6 platform selection, quarterly k6 Cloud workflow, staging refresh procedure, two DEC-030 events, one new SOC 2 artefact (PERF-STAGING-E-001); explicitly out of scope: §33.3 VU scenario parameters, §40.4 production alerts, §40.2 merge-gate logic (all unchanged). §45.2 DEC-058 decision — hybrid architecture: k6 OSS (GitHub Actions, US-East) for daily CI gate (no change); k6 Cloud EU-West (Amsterdam) for quarterly PERF-SLO-06 reference only. Four grounds: (1) geographic accuracy — US-East inflates EU-primary latency 40–80 ms vs. ENTERPRISE_SLA.md §3 p95 < 300 ms EU commitment; k6 Cloud EU-West eliminates transatlantic RTT bias from LT-E-001 evidence; (2) cost proportionality — Team plan ~$89/month; 4 quarterly runs fit within included VU-hour budget at zero metered overage; daily k6 Cloud gate requires Business plan $299+/month with no additional compliance benefit; (3) third-party corroboration — cloud_run_id is immutable k6 Cloud portal record providing A1.1 auditor attestation anchor unavailable from self-hosted artifacts; (4) DEC-043/DEC-044/DEC-051 pattern — simpler tool for high-frequency gates, higher-fidelity for low-frequency evidence. Reverse cost low: static RTT correction offset approach available if k6 Cloud deprecated; no schema/event-type changes. Re-evaluation: annual k6 Cloud renewal or > 20 ms divergence from §16 SYNTH-SLO-01. §45.3 OQ-PERF-02 — quarterly schema-only refresh: Step 1 `supabase db dump --schema-only` + grep check (zero COPY/INSERT) + `db reset` + DDL apply; Step 2 `test-data-factory` seed (lt-synthetic-{1,2,3} tenants, 500 users each, lt-user-{N}@test.form.coach, skip_art9_tables: true); Step 3 clinical-safety Slack attestation + `:white_check_mark:` confirmation → PERF-STAGING-E-001; Step 4 post-run `db reset` cleanup. Five ANON invariants: ANON-01 gen_random_uuid for user_id; ANON-02 schema-only dump no Art. 9 data; ANON-03 lt-synthetic- tenant prefix; ANON-04 @test.form.coach email; ANON-05 physically separate Supabase project. Post-seed SQL verification (Art. 9 tables must all = 0). §45.3.3 constitutes `compliance/cc8/staging-data-anonymisation-procedure.md` v1.0. §45.4 two new DEC-030 STANDARD 3yr events: `system.quarterly_perf_reference_initiated` (cloud_run_id, node_region: eu-west, test_suite, staging_refresh_date date-only, clinical_safety_sign_off: true, quarter) and `system.quarterly_perf_reference_completed` (cloud_run_id, node_region, slo_results object with PERF-SLO-01–05, p95_ms, p99_ms, error_rate_pct, commit_sha, quarter, run_duration_s); PERF-CLOUD-CHAIN-01 ordering invariant (initiated before completed per cloud_run_id; inversion → P1 PagerDuty; not R-05). §45.5 OQ-PERF-03 deferred: per-tenant VU profile maintained through GA; re-evaluation trigger at 10k daily sessions for single tenant or 5,000 fleet seats; no new DEC-030 events. §45.6 two SOC 2 artefacts: PERF-STAGING-E-001 (CC4.1/A1.1 — clinical-safety sign-off screenshot; quarterly; 7yr; compliance/evidence/a1/); LT-E-001 updated scope (A1.1 — now k6 Cloud EU-West cloud_run_id provides third-party anchor). §45.7 OQ gap tracker: OQ-PERF-01 🟡→🟢 DEC-058; OQ-PERF-02 🟡→🟢 DEC-058; OQ-PERF-03 🟡→🟢 Deferred with threshold. §45.8 nine-item implementation checklist: 5× P0/M6 (k6 Cloud account + EU-West token, two DEC-030 event registrations + PERF-CLOUD-CHAIN-01 test, compliance/cc8/ procedure extraction + clinical-safety sign-off, .github/workflows/load-test-quarterly.yml workflow with manual Slack gate, §40.9/§40.10 OQ tracker update [already done in this version]), 2× P1/M8 (first quarterly run execution + LT-E-001 + PERF-STAGING-E-001 filing, p95 > 250 ms investigation gate), 2× P2/Annual (k6 Cloud plan renewal, OQ-PERF-03 threshold annual check). Document header: v3.9 → v4.1. Cross-references: §40.2 (merge-gate trigger matrix — unchanged; k6 OSS CI gate continues); §40.4 (production alert rules — unchanged); §40.5 (existing system.load_test_* DEC-030 events — §45 adds two parallel events in system.* namespace); §40.6 (pg_cron job 30 quarterly_perf_regression_check — §45 provides the k6 Cloud evidence input); §40.8 (LT-E-001 updated: k6 Cloud as source; LT-E-002 unchanged); §40.9 (OQ-PERF-01/02/03 — all three now resolved/deferred; §40.9 OQ table updated in this document version); §40.10 (checklist items 8 and 9 marked [x] Done with DEC-058 reference); `docs/SOC2_READINESS.md §33.3` (k6 VU scenario parameters — unchanged; §45 adds Cloud execution wrapper not scenario content); `docs/ENTERPRISE_SLA.md §3` (99.9% uptime + p95 < 300 ms EU commitment — the SLA §45 validates geographically); §16 (synthetic monitoring — Better Stack EU-West probes provide continuous p95 baseline; k6 Cloud quarterly run validates under synthetic load); `docs/AUDIT_LOG_SCHEMA.md §6/§System` (two new DEC-030 events to register — P0 before M6); `docs/CLINICAL_SAFETY.md` (clinical-safety sign-off authority for ANON invariant verification — §45.3.3 Step 3); `docs/DECISION_LOG.md DEC-058`. Privacy floor: no individual employee user_id, health data, coaching content, or biometric values in either DEC-030 event; staging_refresh_date date-only; cloud_run_id k6-Cloud UUID with no FORM user mapping; form_api REVOKED from audit_log_events and compliance evidence paths. Owner: devops-lead + platform-engineer + compliance-officer.*
