@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [5.86.0] — 2026-06-17
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §SCIM IP KV Cache Invalidation Error events` — v2.16. New advisory STANDARD/3yr event `scim.ip_kv_invalidation_error`: emitted by Admin Dashboard API when `SSO_KV.delete('scim_ip_cfg:{tenant_id}')` throws after a successful `update_scim_ip_enforcement_flag()` RPC write; non-blocking (HTTP 200 returned); payload: `tenant_id`, `kv_error_class`, `new_enforcement_value` (bool), `fallback_propagation_ttl_s: 300`. No PagerDuty — compliance-officer weekly SIEM review. Retention table +1 row (3yr, CC7.2). Closes SSO_SCIM_IMPLEMENTATION.md §33.7 item 3 (P0/M8).
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §33.7 item 3 marked [x] Done; cross-reference to AUDIT_LOG_SCHEMA.md v2.16 added.
+- `VERSION` — 5.85.0 → 5.86.0.
+
+---
+
 ## [5.85.0] — 2026-06-17
 
 ### Added
