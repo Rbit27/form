@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [5.85.0] — 2026-06-17
+
+### Added
+- `content/post-1101-hip-hinge-pelvis-spine-mechanics.md` — Block 1101–1150 Biomechanics, Cluster 1 post 1/10. Hip hinge fundamentals: lumbopelvic rhythm, pelvis-spine relationship, moment arm mechanics, neutral lumbar range, three assessment tests. Opens Block 1101–1150 Біомеханіка рухових патернів і силова передача.
+- `content/post-1102-hamstring-length-vs-hip-mobility.md` — Cluster 1 post 2/10. Two distinct hip hinge limitations: passive SLR vs. knee-to-chest protocol to distinguish hamstring length from hip joint restriction. Motor control as third scenario. Practical 4-step assessment.
+- `content/post-1103-deadlift-bar-path-analysis.md` — Cluster 1 post 3/10. Deadlift bar path: vertical projection as the goal, contact with shin as geometric necessity (not style), knee bypass mechanics, conventional vs. sumo bar path difference, three-line video analysis protocol.
+- `content/post-1104-posterior-chain-glutes-hamstrings-hip-angle.md` — Cluster 1 post 4/10. Posterior chain load distribution by hip angle: gluteus maximus as upper-phase driver, hamstrings dual role (hip extensor + knee stabilizer), why "tuck under" in lockout = incomplete hip extension. Identifying weak link by failure phase.
+- `content/post-1105-conventional-vs-sumo-deadlift-anatomy.md` — Cluster 1 post 5/10. Conventional vs. sumo as anatomical decision: femur length, acetabular morphology, femoral anteversion. Load distribution table. Practical selection algorithm. Debunking "sumo is cheating."
+- `content/post-1106-rdl-mechanics-eccentric-hamstring.md` — Cluster 1 post 6/10. RDL eccentric phase mechanics: fascicle length adaptation, 3–4s eccentric tempo rationale, technical criteria for bottom position, RDL vs. leg curl comparison, programming guidelines (40–60% 1RM deadlift, 3–4×6–10).
+- `content/post-1107-sldl-vs-rdl-tissue-loading.md` — Cluster 1 post 7/10. SLDL vs. RDL tissue loading comparison: knee angle determines hamstring tension; SLDL increases erector demand via lift-from-floor; RDL provides constant eccentric tension. Programming placement and prerequisites for SLDL.
+- `content/post-1108-single-leg-hip-hinge-stability-mechanics.md` — Cluster 1 post 8/10. Single-leg hip hinge as a distinct skill: Trendelenburg and gluteus medius, anti-rotation demand, three-step learning progression (assisted → contralateral → ipsilateral), common errors (pelvic rotation, valgus), rationale for unilateral work in bilateral sport.
+- `content/post-1109-hip-hinge-olympic-lifting-pull-mechanics.md` — Cluster 1 post 9/10. Hip hinge in Olympic lifting: first pull as controlled deadlift, transition ("lag") position, second pull as explosive hip extension, triple extension sequencing, rate of force development (RFD), derivatives (power clean, KB swing) for strength athletes.
+- `content/post-1110-hip-hinge-cluster-synthesis.md` — Cluster 1 post 10/10. Cluster synthesis 1101–1110: five applied principles from the cluster (pattern over exercise, angle determines load, anatomy as factor not excuse, undervalued eccentric, stability ≠ strength), gaps identified, preview of Cluster 2 (squat pattern).
+
+### Changed
+- `blog.html` — 10 new post cards added (posts 1101–1110, category Biomechanics/Synthesis), inserted before post-1100.
+- `STATUS.md` — Block 1101–1150 Cluster 1 COMPLETE (10/50); next priorities updated; total posts 1101 → 1111; version header 5.84.0 → 5.85.0.
+- `VERSION` — 5.84.1 → 5.85.0.
+
+---
+
 ## [5.84.1] — 2026-06-17
 
 ### Changed
