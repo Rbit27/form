@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.82.0] — 2026-06-17
+
+### Added
+- `content/post-1096-apl-epb-first-compartment-dequervain.md` — Block 1051–1100 М'язова специфіка, cluster 10 (тема: великий палець і зап'ясткова стабільність), post 1/5. Abductor pollicis longus (APL) і extensor pollicis brevis (EPB) — перший дорзальний компартмент зап'ястка. APL: початок — пост. radius + ulna + IOM, прикріплення — основа 1-ї п'ясткової, функція — радіальна абдукція CMC-1 + розгинання CMC-1 + радіальна девіація зап'ястка. EPB: початок — пост. radius + IOM, прикріплення — проксимальна фаланга I, функція — розгинання MCP великого пальця. Обидва: іннервація PIN (C7–C8). Septa у першому компартменті у 34–67% — критично для хірургічного лікування. De Quervain's tenosynovitis: механізм стенозуючого тендовагініту, провокуючі рухи у силовому тренуванні (стандартний хват + ульнарна девіація). Finkelstein test (оригінальний 1930) vs. Eichhoff modification: різна специфічність. Intersection syndrome — диференціація. Hook grip як практична зміна хвату для зниження навантаження на 1-й компартмент. Консервативне (thumb spica, ін'єкція) і хірургічне лікування. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — додана картка post-1096 вгорі блоку.
+- `STATUS.md` — Block 1051–1100 оновлено: 45→46/50; cluster 10 IN PROGRESS; поточна версія v5.82.0.
+- `VERSION` — 5.81.0 → 5.82.0.
+
+---
+
 ## [5.81.0] — 2026-06-17
 
 ### Added
