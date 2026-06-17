@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.81.0] — 2026-06-17
+
+### Added
+- `content/post-1092-extensor-digiti-minimi-anatomy.md` — Block 1051–1100 М'язова специфіка, cluster 9, post 2/5. Extensor digiti minimi (EDM): єдиний власний розгинач мізинця у поверхневому шарі posterior compartment, спільний common extensor origin з EDC, два сухожилки у більшості людей, іннервація PIN (C7–C8). Функція: ізольоване розгинання 5-го пальця при зігнутих 2–4 — механізм обходу juncturae tendinum аналогічний до EIP і вказівного. Варіабельність: відсутність EDC до мізинця у частини людей → EDM є єдиним розгиначем. PIN palsy дає повну втрату функції EDM разом із EDC. Тест ізольованої функції мізинця. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1093-extensor-digitorum-communis-architecture.md` — Block 1051–1100, cluster 9, post 3/5. Extensor digitorum communis (EDC): найбільший м'яз поверхневого шару posterior compartment, чотири сухожилки до пальців 2–5 з'єднані juncturae tendinum. Архітектура extensor expansion: sagittal bands, central slip (PIP), lateral bands → terminal tendon (DIP). Функційні межі EDC без intrinsic м'язів (intrinsic minus hand, claw). Клінічна роль juncturae tendinum у маскуванні розривів. Зони ушкодження розгинача I–VIII з клінічною прив'язкою. Lateral epicondylitis: Maudsley test специфічний для EDC-компоненту. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1094-sagittal-band-anatomy.md` — Block 1051–1100, cluster 9, post 4/5. Sagittal band: парна фіброзна структура над MCP, що утримує EDC по центру при всіх положеннях пальця. Класифікація Rayan-Murray (I–III). Boxer's knuckle: механізм, клінічна картина, тест нестабільності EDC при флексії. Ульнарна сльоза 3-го пальця як найпоширеніший варіант. Ревматоїдний артрит: ерозія sagittal band → прогресуюча ульнарна девіація. Консервативне (4–6 тижнів іммобілізації) і хірургічне лікування. Протокол повернення атлета до навантажень. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-1095-retinacular-system-digits-anatomy.md` — Block 1051–1100, cluster 9, post 5/5. Retinacular system of digits: ORL (зв'язок Landsmeer), TRL і lateral bands. PIP–DIP coupling: розгинання PIP → натяг ORL → пасивне розгинання DIP. Boutonnière деформація: розрив central slip → lateral bands вентральніше від осі PIP → PIP згинання + DIP гіперекстензія. Swan-neck деформація: ослаблення volar plate → lateral bands дорзально → PIP гіперекстензія + DIP згинання. Bunnell test: intrinsic tightness vs joint capsule contracture. Mallet finger → нелікований → swan-neck cascade. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — додані картки post-1092, post-1093, post-1094, post-1095 вгорі блоку.
+- `STATUS.md` — Block 1051–1100 cluster 9 оновлено: 41→45/50; наступний: posts 1096–1100 (cluster 10, тема TBD).
+- `VERSION` — 5.80.2 → 5.81.0.
+
+---
+
 ## [5.80.2] — 2026-06-17
 
 ### Changed
