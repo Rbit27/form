@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [5.82.1] — 2026-06-17
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — bumped to v2.5; appended §33 (OQ-SSO-32.1 & OQ-SSO-32.2 Resolution). OQ-SSO-32.1: documents CSM onboarding protocol for `scim_ip_enforcement_enabled` toggle, restricted to self-hosted SCIM proxy customers; cloud-hosted IdP tenants explicitly excluded due to dynamic IP range incompatibility. OQ-SSO-32.2: adopts active push KV cache invalidation (`SSO_KV.delete('scim_ip_cfg:{tenantId}')`) on every toggle, mirroring §25.4 pattern; includes TypeScript handler (`handleScimIpEnforcementToggle`), Postgres RPC (`update_scim_ip_enforcement_flag` — migration `0077_scim_ip_enforcement_toggle_rpc.sql`), advisory-only audit event on KV error (`scim.ip_kv_invalidation_error`, STANDARD severity, non-blocking), and SOC 2 evidence mapping (CC6.1, CC6.3).
+- `VERSION` — 5.82.0 → 5.82.1.
+
+---
+
 ## [5.82.0] — 2026-06-17
 
 ### Added

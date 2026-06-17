@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.4
+# FORM · SSO/SCIM Implementation v2.5
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -38,6 +38,7 @@
 28. [SCIM Role Change Audit Trail & Session Revocation Fallback Design](#28-scim-role-change-audit-trail--session-revocation-fallback-design)
 29. [OQ-SSO-28.2 Resolution — `tenant_users_role_history` Retention Period (DEC-051)](#29-oq-sso-282-resolution--tenant_users_role_history-retention-period-dec-051)
 30. [OQ-MOBILE-03 Resolution — Mobile SSO Browser Mode & Deep-Link Security (DEC-059)](#30-oq-mobile-03-resolution--mobile-sso-browser-mode--deep-link-security-dec-059)
+31. [OQ-SSO-32.1 & OQ-SSO-32.2 Resolution — SCIM IP Enforcement Onboarding Visibility & KV Cache Invalidation](#33-oq-sso-321--oq-sso-322-resolution--scim-ip-enforcement-onboarding-visibility--kv-cache-invalidation)
 
 ---
 
@@ -11570,3 +11571,294 @@ No new HMAC chain ordering invariants — both events are standalone (not part o
 ---
 
 *v2.4 (2026-06-16): §32 OQ-SSO-23.2 · OQ-SSO-25.1 · OQ-SSO-25.3 Resolution — Magic-Link CAEP Session Coverage, SCIM IP Allowlist Scope & API Key IP Enforcement (DEC-062). Closes three P1 blockers that were all pre-M4/M5 deployment gates. §32.1 scopes to magic-link session revocation confirmation, SCIM IP flag design, and API key IP enforcement; all three affect `ip-allowlist.ts` or `api-key-auth.ts` and share migration window M4–M5. §32.2 OQ-SSO-23.2 resolution: `isRevoked()` confirmed to cover magic-link sessions at authenticate() middleware layer (before session_type branch); call-graph trace documents that `revoke:user:{tenant_id}:{user_id}` and `account_suspended:{tenant_id}:{user_id}` KV keys are checked for every JWT regardless of `session_type = 'magic_link'`; two integration test cases added to `src/tests/auth/magic-link-revocation.test.ts` as M4 deploy gate; evidence CC6-E-ML-001 (CC6.3, 7yr). §32.3 OQ-SSO-25.1 resolution: option (c) adopted — `scim_ip_enforcement_enabled BOOLEAN NOT NULL DEFAULT FALSE` column added to `tenant_sso_configs` via migration `0076_scim_ip_enforcement_flag.sql`; `enforceScimIpAllowlist()` updated with KV-cached flag lookup (`scim_ip_cfg:{tenant_id}`, 5-min TTL); new advisory DEC-030 event `scim.ip_enforcement_misconfigured` (STANDARD, 3yr) emitted on misconfiguration (flag true, empty allowlist) without blocking; Admin Dashboard toggle with Okta/Azure AD warning banner; evidence CC6-E-SCIM-IP-001 (CC6.1, 7yr). §32.4 OQ-SSO-25.3 resolution: `enforceIpAllowlist()` extended with optional `authPath: 'sso' | 'api_key'` parameter; `api-key-auth.ts` calls `enforceIpAllowlist(env, tenantId, clientIp, 'api_key')` after token validation; `sso.ip_allowlist_blocked` DEC-030 payload extended with `auth_path` field (backwards-compatible addition); no new event type; evidence CC6-E-APIKEY-IP-001 (CC6.1/CC6.3, 3yr). §32.5 two DEC-030 changes: `sso.ip_allowlist_blocked` payload extension (`auth_path` optional field); `scim.ip_enforcement_misconfigured` new STANDARD event. §32.6 three SOC 2 evidence artefacts: CC6-E-ML-001 (CC6.3 — magic-link revocation integration test), CC6-E-SCIM-IP-001 (CC6.1 — migration 0076 default-false confirmation), CC6-E-APIKEY-IP-001 (CC6.1/CC6.3 — monthly API key IP block export). §32.7 gap tracker: OQ-SSO-23.2 🟡→🟢 Resolved, OQ-SSO-25.1 🟡→🟢 Resolved, OQ-SSO-25.3 🟡→🟢 Resolved; cross-updates to §23.9 and §25.13 flagged. §32.8 twelve-item implementation checklist: 2× P0/M4 (magic-link integration test + CC6-E-ML-001, AUDIT_LOG_SCHEMA extension), 5× P0/M5 (migration 0076, enforceScimIpAllowlist update, scim.ip_enforcement_misconfigured registration, api-key-auth extension, API key IP integration test), 3× P1/M5–M6 (Admin Dashboard toggle, OQ cross-updates, CC6-E-APIKEY-IP-001 collection start), 2× P2/M8–first-opt-in-customer (SCIM IP smoke test, AL-SCIM-05 evaluation). §32.9 two open questions: OQ-SSO-32.1 (P2 — SCIM IP toggle in onboarding guide); OQ-SSO-32.2 (P2 — 5-min KV TTL vs. emergency toggle propagation). Document header updated v2.3 → v2.4. Cross-references: §10 (magic-link session design — session_type = 'magic_link'; §32.2 confirms revocation coverage); §22.5 (KV revocation key patterns — `revoke:user`, `account_suspended`, `force_reauth` confirmed to cover magic-link); §23.3.2 (CAEP account-disabled action — writes `account_suspended` and `revoke:user` KV keys; §32.2 confirms both reach magic-link sessions); §23.9 (OQ-SSO-23.2 — now 🟢 Resolved); §25.5 (IP enforcement table — SCIM path now flag-gated per §32.3; SSO path unchanged); §25.13 (OQ-SSO-25.1, OQ-SSO-25.3 — both now 🟢 Resolved); §26.3 (API key rotation — SCIM token; `api-key-auth.ts` now also enforces IP allowlist per §32.4); §27.3 (SCIM Worker auth pipeline — `enforceScimIpAllowlist()` call site unchanged; flag-gating is internal to the function); `docs/AUDIT_LOG_SCHEMA.md §SSO` (`sso.ip_allowlist_blocked` Zod schema — add optional `auth_path` field — P0/M4); `docs/AUDIT_LOG_SCHEMA.md §SCIM` (`scim.ip_enforcement_misconfigured` — new event registration — P0/before-SCIM-go-live); `docs/DATA_MODEL.md §26` (`tenant_api_keys` — no schema change; `api-key-auth.ts` reads tenant_id from resolved key record to call `enforceIpAllowlist()`); `docs/DATA_MODEL.md §4.2` (`tenant_sso_configs` — migration `0076` adds `scim_ip_enforcement_enabled BOOLEAN NOT NULL DEFAULT FALSE`); `docs/SOC2_READINESS.md §CC6.1` (CC6-E-SCIM-IP-001, CC6-E-APIKEY-IP-001 — to be added at M5 observation filing); `docs/SOC2_READINESS.md §CC6.3` (CC6-E-ML-001 — to be added at M4 observation filing); `docs/ENTERPRISE_ONBOARDING.md` (OQ-SSO-32.1 — add SCIM IP toggle note to CSM pilot runbook — P2/M8); `docs/DECISION_LOG.md DEC-062`. Privacy floor: no individual employee `user_id`, name, email, health data, or body composition values in any DEC-030 event emitted by §32 controls; `client_ip_hash` is SHA-256(ip + salt) with `IP_HASH_SALT`; `auth_path` is a structural enum tag only; `tenant_id` in DEC-030 events is the organisation slug, not a personal data identifier; `form_api` SELECT access to `scim_ip_enforcement_enabled` is limited to the SCIM Worker auth pipeline (read-only; no write via form_api). Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*
+
+---
+
+## 33. OQ-SSO-32.1 & OQ-SSO-32.2 Resolution — SCIM IP Enforcement Onboarding Visibility & KV Cache Invalidation
+
+### §33.1 Scope and Rationale
+
+Two open questions from §32.9 are resolved here. Both concern the operational lifecycle of the `scim_ip_enforcement_enabled` flag introduced in §32.3 (DEC-062):
+
+- **OQ-SSO-32.1** (P2) — The feature is invisible to customers at onboarding: §17.2 (Pre-Pilot Technical Qualification) and `docs/ENTERPRISE_ONBOARDING.md §3.3` do not mention the SCIM IP enforcement capability. Security-conscious customers running self-hosted SCIM proxies with stable CIDR ranges cannot discover or enable this protection without an engineering escalation.
+
+- **OQ-SSO-32.2** (P2) — The `scim_ip_cfg:{tenant_id}` KV cache has a 5-minute TTL with no active push invalidation. For a "disable IP enforcement" emergency action (e.g., Okta changes its SCIM server's IP ranges mid-provisioning), an admin's toggle in Admin Dashboard takes up to 5 minutes to propagate to all SCIM Worker instances, creating a provisioning gap during an already-stressful incident.
+
+Both resolutions are additive. No schema migrations. No new DEC-030 event types beyond the single advisory event in §33.4.
+
+---
+
+### §33.2 OQ-SSO-32.1 Resolution: SCIM IP Enforcement in the Onboarding Guide
+
+#### §33.2.1 Decision
+
+**Option adopted:** Add a CSM-facing note to §17.2 Q-05 and §17.3 Step 3 (SCIM configuration), and add a parallel note to `docs/ENTERPRISE_ONBOARDING.md §3.3`.
+
+**When to surface the feature:** Only for customers who:
+- Run a **self-hosted SCIM proxy** (e.g., Okta SCIM Connector Agent, Azure AD App Proxy) with stable, known CIDR ranges.
+- Have expressed a requirement to restrict SCIM inbound connections to a specific IP range (common in financial-sector and healthcare enterprises).
+
+For customers using **cloud-hosted IdP SCIM** (Okta SaaS, Azure AD managed tenants, Google Workspace), `scim_ip_enforcement_enabled` should **not** be recommended — cloud IdPs use dynamic IP ranges and enabling enforcement without first confirming static CIDR support will silently block provisioning.
+
+#### §33.2.2 §17.2 Q-05 Checklist Extension
+
+The following replaces the Q-05 row in §17.2 Pre-Pilot Technical Qualification:
+
+| # | Item | Owner | Verification |
+|---|---|---|---|
+| Q-05 | Network: no firewall rule that would block outbound requests from `{slug}-staging.form.coach` to IdP metadata endpoints. **If the customer operates a self-hosted SCIM proxy (e.g., Okta SCIM Connector Agent, Azure AD App Proxy) and wants to restrict inbound SCIM connections to that proxy's IP range: capture the stable CIDR block(s) during this qualification call. `scim_ip_enforcement_enabled` is available at Admin Dashboard → SSO Settings → SCIM → IP Restriction and defaults to `false`. Enable it only after SCIM is confirmed working — at least one successful full-directory sync with > 0 users provisioned.** | Customer IT/security + CS | If IP enforcement desired: proxy CIDR block(s) on file before pilot go-live; enablement deferred until post-sync confirmation (§17.3 Step 3 note) |
+
+#### §33.2.3 §17.3 SCIM Configuration Step Extension
+
+In §17.3 Step 3 (SCIM provisioning), after the bearer token generation step, add:
+
+> **SCIM IP restriction (optional — self-hosted SCIM proxies only):** If CIDR blocks were captured in Q-05, enable Admin Dashboard → SSO Settings → SCIM → IP Restriction **after** the first successful full-directory SCIM sync (> 0 users provisioned). Enter the proxy's CIDR block(s) and save. The Admin Dashboard shows an Okta/Azure AD warning banner (§32.3.4) reminding the admin to test provisioning immediately after enabling. Do **not** enable for cloud-hosted IdP tenants (Okta cloud, Azure AD SaaS) without first confirming the IdP's outbound SCIM IP ranges are static and documented.
+>
+> If the customer enables the flag and SCIM provisioning stops, the fastest recovery is: Admin Dashboard → disable `scim_ip_enforcement_enabled` → wait up to 5 seconds for KV cache to refresh (§33.3.3 active invalidation) → verify provisioning resumes → re-enable with the corrected CIDR list.
+
+#### §33.2.4 `docs/ENTERPRISE_ONBOARDING.md §3.3` Extension Note
+
+The following text should be added to `docs/ENTERPRISE_ONBOARDING.md §3.3` after the SCIM audit events table:
+
+> **SCIM IP enforcement (self-hosted proxy customers only):** Customers running a self-hosted SCIM proxy with stable IP ranges may enable `scim_ip_enforcement_enabled` at Admin Dashboard → SSO Settings → SCIM → IP Restriction. This restricts inbound SCIM provisioning to the specified CIDRs; calls from other IPs are rejected (403) and logged as `scim.ip_allowlist_blocked` DEC-030 events. Enable only after a successful full-directory sync and only for tenants with confirmed static proxy IPs. Cloud-hosted IdP tenants (Okta SaaS, Azure AD) should not use this control without confirming static CIDR support with their IdP.
+>
+> Implementation reference: `docs/SSO_SCIM_IMPLEMENTATION.md §32.3` (DEC-062) and `§33.2` (onboarding protocol).
+
+#### §33.2.5 CSM Script Fragment
+
+When a customer asks **"Can we restrict SCIM to only our SCIM proxy's IP?"** during onboarding:
+
+> "Yes — FORM supports SCIM IP allowlisting via a toggle in the Admin Dashboard. Once your SCIM provisioning is confirmed working — meaning you've seen users sync successfully — we can restrict inbound SCIM calls to your proxy server's IP range at Admin Dashboard → SSO Settings → SCIM → IP Restriction. Before we do that, can you share the IP address or CIDR block your SCIM proxy server uses? We'll want to test provisioning immediately after enabling to make sure nothing is blocked."
+
+**Avoid:** Do not enable before at least one successful full-directory sync. If the CIDR is incomplete, provisioning will block silently — the SCIM Worker returns 403 to the IdP, which retries and eventually alarms. Start with SCIM working, then layer on IP restriction.
+
+---
+
+### §33.3 OQ-SSO-32.2 Resolution: KV Cache Invalidation on `scim_ip_enforcement_enabled` Toggle
+
+#### §33.3.1 Decision
+
+**Option adopted:** Add active push invalidation — `env.SSO_KV.delete('scim_ip_cfg:' + tenantId)` — to the Admin Dashboard API handler for the SCIM IP toggle mutation, immediately after the Supabase write succeeds.
+
+This mirrors the established §25.4 pattern for `SSO_KV:auth_policy:{tenant_id}`, where the auth policy cache is immediately deleted on any `PATCH /v1/admin/sso/policy` mutation, eliminating the 60-second TTL lag on security-relevant policy changes.
+
+#### §33.3.2 Problem Statement: The 5-Minute Disable Gap
+
+The `scim_ip_cfg:{tenant_id}` KV entry (§32.3.4) has a 5-minute TTL (300 s) and **no active invalidation**. The 5-minute TTL is acceptable for the **enable** path — enabling enforcement is deliberate, tested, and done once. It is not acceptable for the **disable** path:
+
+When Okta rotates its SCIM server IPs during a region migration (an observed real-world event), the customer's IT admin:
+1. Gets paged on a SCIM provisioning failure (new-hire onboarding blocking).
+2. Disables `scim_ip_enforcement_enabled` in Admin Dashboard.
+3. Expects provisioning to resume immediately.
+4. Instead, the SCIM Worker continues enforcing the old `enabled: true` KV entry for up to 5 minutes.
+5. Provisioning remains blocked; the incident drags; the customer loses confidence.
+
+The `scim.ip_allowlist_blocked` DEC-030 events fire in the background but the customer sees 403s from their IdP until the KV TTL expires. Active invalidation reduces this from 5 minutes to sub-second.
+
+#### §33.3.3 Implementation
+
+Extend `PATCH /v1/admin/scim/ip-enforcement` in the Admin Dashboard API:
+
+```typescript
+// apps/admin-dashboard-api/src/routes/scim-ip-enforcement.ts
+
+import { z } from 'zod';
+import type { Env } from '../types';
+
+const BodySchema = z.object({
+  scim_ip_enforcement_enabled: z.boolean(),
+});
+
+export async function handleScimIpEnforcementToggle(
+  req: Request,
+  env: Env,
+  tenantId: string,
+  actorId: string,
+): Promise<Response> {
+  // 1. Validate body
+  const body = BodySchema.safeParse(await req.json());
+  if (!body.success) {
+    return Response.json({ error: 'invalid_body', details: body.error.issues }, { status: 400 });
+  }
+
+  // 2. Write to Supabase + emit sso.policy_updated DEC-030 event (atomic via RPC)
+  const { error } = await env.SUPABASE.rpc('update_scim_ip_enforcement_flag', {
+    p_tenant_id: tenantId,
+    p_enabled:   body.data.scim_ip_enforcement_enabled,
+    p_actor_id:  actorId,
+  });
+  if (error) {
+    return Response.json({ error: 'supabase_error', message: error.message }, { status: 502 });
+  }
+
+  // 3. Immediate KV cache invalidation — prevents up to 5-min propagation lag on
+  //    the disable path (e.g., IdP CIDR rotation forcing an emergency toggle-off).
+  //    On the next SCIM request, enforceScimIpAllowlist() cache-misses and
+  //    re-fetches from Supabase, picking up the new value immediately.
+  //    Pattern: §25.4 SSO_KV:auth_policy:{tenant_id} invalidation.
+  try {
+    await env.SSO_KV.delete(`scim_ip_cfg:${tenantId}`);
+  } catch (kvErr: unknown) {
+    // KV delete failure: log advisory event; do NOT roll back the Supabase write.
+    // Fallback: the 5-minute TTL will propagate the change within 5 minutes.
+    await emitAdvisoryAuditEvent(env, {
+      event_type: 'scim.ip_kv_invalidation_error',
+      severity:   'STANDARD',
+      tenant_id:  tenantId,
+      actor_id:   actorId,
+      kv_key:     'scim_ip_cfg',
+      error_code: kvErr instanceof Error ? kvErr.message : 'unknown',
+    });
+  }
+
+  return Response.json({
+    ok: true,
+    scim_ip_enforcement_enabled: body.data.scim_ip_enforcement_enabled,
+  });
+}
+```
+
+**Supabase RPC `update_scim_ip_enforcement_flag` (migration `0077_scim_ip_enforcement_toggle_rpc.sql`):**
+
+```sql
+CREATE OR REPLACE FUNCTION update_scim_ip_enforcement_flag(
+  p_tenant_id UUID,
+  p_enabled   BOOLEAN,
+  p_actor_id  UUID
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_previous BOOLEAN;
+BEGIN
+  SELECT scim_ip_enforcement_enabled
+    INTO v_previous
+    FROM tenant_sso_configs
+   WHERE tenant_id = p_tenant_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'tenant_not_found: %', p_tenant_id;
+  END IF;
+
+  UPDATE tenant_sso_configs
+     SET scim_ip_enforcement_enabled = p_enabled,
+         updated_at = now()
+   WHERE tenant_id = p_tenant_id;
+
+  -- Reuse sso.policy_updated event (§25.9) — no new event type required.
+  INSERT INTO audit_log_events (
+    tenant_id, actor_id, actor_type,
+    event_type, severity, payload
+  ) VALUES (
+    p_tenant_id, p_actor_id, 'user',
+    'sso.policy_updated', 'STANDARD',
+    jsonb_build_object(
+      'policy_type',   'scim_ip_enforcement',
+      'previous_value', v_previous,
+      'new_value',      p_enabled,
+      'change_source', 'admin_dashboard'
+    )
+  );
+END;
+$$;
+```
+
+#### §33.3.4 Behaviour After §33
+
+| Scenario | Before §33 | After §33 |
+|---|---|---|
+| Admin disables `scim_ip_enforcement_enabled` (emergency — IdP CIDR rotated) | SCIM Worker enforces for up to 5 min (stale KV entry) | KV entry immediately deleted; next SCIM call cache-misses → Supabase fetch → `enabled: false`; provisioning resumes in < 1 s |
+| Admin enables `scim_ip_enforcement_enabled` | Enforcement begins at next KV cache miss (≤ 5 min) | Same: KV delete forces immediate cache-miss, enforcement starts in < 1 s — minor improvement; the enable path is not an emergency |
+| KV delete fails (transient Cloudflare KV error) | N/A | Supabase write succeeded; `scim.ip_kv_invalidation_error` advisory event emitted; Supabase response is 200; 5-min TTL fallback active |
+| SCIM Worker receives provisioning call 500 ms after disable toggle | Stale KV: 403 returned to IdP | Cache miss → Supabase read (~15 ms overhead); `enabled: false` found; provisioning proceeds |
+
+#### §33.3.5 Why Retain the 5-Minute Base TTL?
+
+Shortening the base TTL (e.g., to 30 s) was evaluated and rejected:
+
+1. **Supabase read amplification:** SCIM syncs during initial onboarding can generate 1–5 requests/second per tenant. At a 30-second TTL, a 1,000-seat sync would hit Supabase 2–10× per minute on the `scim_ip_cfg` path vs. once per 5 minutes — a 10–50× read amplification for a control that changes at most a few times per customer lifetime.
+2. **KV cost is not the constraint:** At Cloudflare Workers Paid KV pricing ($0.50/10M reads), the cost difference between 30-second and 5-minute TTLs is negligible. The Supabase connection budget is the real concern.
+3. **Active invalidation is strictly targeted:** The `SSO_KV.delete()` call in §33.3.3 triggers only on Admin Dashboard toggle mutations — not per-SCIM-request. Normal provisioning traffic is unaffected.
+
+Decision: 5-minute base TTL retained; active push invalidation added. Consistent with §25.4 (60-second TTL + active invalidation for `auth_policy:{tenant_id}`).
+
+---
+
+### §33.4 DEC-030 Events
+
+| Event | Type | Rationale |
+|---|---|---|
+| `sso.policy_updated` | **Payload reuse** — emitted by `update_scim_ip_enforcement_flag()` with `policy_type: 'scim_ip_enforcement'`, `previous_value`, `new_value`. No new event type; `policy_type` is an open enum per §25.9. | CC6.1 requires that security policy changes are logged. The existing `sso.policy_updated` event covers this; the toggle appears in existing monthly CC6.1 evidence exports. |
+| `scim.ip_kv_invalidation_error` | **New advisory STANDARD 3yr event** — emitted if `SSO_KV.delete()` throws in the §33.3.3 handler. Non-blocking (Supabase write succeeded; 5-min TTL fallback remains). | Operational visibility: systematic KV delete failures are otherwise invisible until a customer reports a provisioning gap after a disable toggle. |
+
+**`scim.ip_kv_invalidation_error` Zod schema:**
+
+```typescript
+z.object({
+  tenant_id:  z.string().uuid(),
+  actor_id:   z.string().uuid(),
+  kv_key:     z.literal('scim_ip_cfg'),
+  error_code: z.string(),
+})
+```
+
+**Registration required:** `docs/AUDIT_LOG_SCHEMA.md §SCIM` — add `scim.ip_kv_invalidation_error` as STANDARD, 3yr, advisory (same pattern as `scim.ip_enforcement_misconfigured` from §32.5).
+
+---
+
+### §33.5 SOC 2 Impact
+
+No new evidence artefacts. No gap score change.
+
+| Criterion | Impact |
+|---|---|
+| CC6.1 | The `scim_ip_enforcement_enabled` toggle is recorded via `sso.policy_updated` with `policy_type: 'scim_ip_enforcement'`. This already appears in the existing §25.9 monthly CC6.1 evidence export — no new artefact required. |
+| CC6.3 | Active invalidation reduces the worst-case propagation lag for the disable path from 5 minutes to < 1 second. This strengthens the CC6.3 narrative ("logical access controls operate in a timely manner") without requiring a new evidence artefact. |
+
+---
+
+### §33.6 OQ Gap Tracker
+
+| OQ | Previous Status | Status After §33 | Decision |
+|---|---|---|---|
+| **OQ-SSO-32.1** | 🟡 P2 Open — before first customer asking for SCIM IP restriction | 🟢 **Resolved — 2026-06-17** | CSM note added to §17.2 Q-05, §17.3 Step 3, and `docs/ENTERPRISE_ONBOARDING.md §3.3` reference text (§33.2). CSM script fragment (§33.2.5) covers the live-onboarding scenario. |
+| **OQ-SSO-32.2** | 🟡 P2 Open — before first customer with `scim_ip_enforcement_enabled = true` | 🟢 **Resolved — 2026-06-17** | Active KV invalidation adopted per §33.3.3; 5-minute base TTL retained; `scim.ip_kv_invalidation_error` advisory event added (§33.4) for KV delete failure visibility. |
+
+**§32.9 cross-update:** OQ-SSO-32.1 and OQ-SSO-32.2 rows updated to 🟢 Resolved.
+
+---
+
+### §33.7 Implementation Checklist
+
+#### P0 — Before first enterprise customer enabling `scim_ip_enforcement_enabled = true` (M8–M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy migration `0077_scim_ip_enforcement_toggle_rpc.sql`: CREATE OR REPLACE FUNCTION `update_scim_ip_enforcement_flag()` per §33.3.3. Verify in staging: (a) flag updated correctly for `true` and `false`; (b) `sso.policy_updated` DEC-030 event emitted with `policy_type: 'scim_ip_enforcement'`, `previous_value`, and `new_value`; (c) `tenant_not_found` exception raised on unknown `p_tenant_id`. | platform-engineer | **P0** | M8 | [ ] |
+| 2 | Update `apps/admin-dashboard-api/src/routes/scim-ip-enforcement.ts` per §33.3.3: add `env.SSO_KV.delete('scim_ip_cfg:' + tenantId)` after Supabase RPC call; wrap in try/catch and emit `scim.ip_kv_invalidation_error` on failure without blocking the 200 response. | platform-engineer | **P0** | M8 | [ ] |
+| 3 | Register `scim.ip_kv_invalidation_error` in `docs/AUDIT_LOG_SCHEMA.md §SCIM` (STANDARD, 3yr, advisory — same pattern as `scim.ip_enforcement_misconfigured` per §32.5). Deploy updated event type to `emit-audit-event` Worker registry. | platform-engineer + compliance-officer | **P0** | M8 | [ ] |
+| 4 | Integration test (`src/tests/sso/scim-ip-kv-invalidation.test.ts`): (a) Set `scim_ip_enforcement_enabled = true` in staging `tenant_sso_configs`; populate `scim_ip_cfg:{tenant_id}` KV entry with `enabled: true`; call `handleScimIpEnforcementToggle` with `{ scim_ip_enforcement_enabled: false }`; assert KV entry is deleted (GET returns `null`); assert next `enforceScimIpAllowlist()` call fetches from Supabase and returns `enabled: false`. (b) Simulate KV delete error; assert `scim.ip_kv_invalidation_error` advisory event is emitted and 200 is still returned. | platform-engineer | **P0** | M8 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Update `docs/ENTERPRISE_ONBOARDING.md §3.3` with the SCIM IP enforcement note per §33.2.4. Review with customer-success for CSM script accuracy; confirm the cloud-IdP exclusion is explicit. | customer-success + compliance-officer | **P1** | M9 | [ ] |
+| 6 | Verify §17.2 Q-05 row in this document reflects the extended text from §33.2.2. Cross-check against the onboarding call checklist used by customer-success. | customer-success | **P1** | M9 | [ ] |
+
+#### P2 — After first opt-in customer
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | After the first customer enables `scim_ip_enforcement_enabled = true`: validate the end-to-end flow (enable → SCIM test → disable → SCIM test within 5 seconds). File a short note in the customer's onboarding record confirming the OQ-SSO-32.2 fix behaved as expected (disable propagation < 1 s). | customer-success + platform-engineer | **P2** | First opt-in customer | [ ] |
+
+---
+
+### §33.8 Open Questions
+
+OQ-SSO-32.1 and OQ-SSO-32.2 are closed. No new open questions are introduced by this section.
+
+---
+
+*v2.5 (2026-06-17): §33 OQ-SSO-32.1 & OQ-SSO-32.2 Resolution — SCIM IP Enforcement Onboarding Visibility & KV Cache Invalidation. Closes both P2 open questions from §32.9 (v2.4, 2026-06-16). §33.1 scopes: OQ-SSO-32.1 is an operational visibility gap (onboarding guide omits `scim_ip_enforcement_enabled` feature); OQ-SSO-32.2 is a propagation lag risk on the disable path (5-min KV TTL, no active invalidation). §33.2 OQ-SSO-32.1 resolution: feature surfaced only for self-hosted SCIM proxy customers (cloud-hosted IdP tenants explicitly excluded due to dynamic IP ranges); §17.2 Q-05 row extended with CIDR capture step for self-hosted proxy customers; §17.3 Step 3 SCIM config note added (enable only after first successful full-directory sync; disable recovery path documented — < 5 s with §33.3.3 active invalidation); `docs/ENTERPRISE_ONBOARDING.md §3.3` extension note referenced; CSM script fragment (§33.2.5) for the live-call scenario. §33.3 OQ-SSO-32.2 resolution: active push invalidation adopted — `env.SSO_KV.delete('scim_ip_cfg:' + tenantId)` added to `PATCH /v1/admin/scim/ip-enforcement` handler after Supabase RPC; mirrors §25.4 pattern for `SSO_KV:auth_policy:{tenant_id}`; 5-minute base TTL retained (10–50× Supabase read amplification at 30 s TTL rejected); Postgres RPC `update_scim_ip_enforcement_flag()` (migration `0077`) handles UPDATE + `sso.policy_updated` DEC-030 emit atomically; KV delete wrapped in try/catch — failure emits `scim.ip_kv_invalidation_error` advisory event without rolling back the Supabase write; §33.3.4 before/after behaviour matrix: disable path reduces from ≤ 5 min to < 1 s; enable path also immediate (minor improvement); KV-failure fallback = original 5-min TTL. §33.4 two DEC-030 changes: `sso.policy_updated` reused (payload: `policy_type: 'scim_ip_enforcement'`, `previous_value`, `new_value`, `change_source: 'admin_dashboard'`); `scim.ip_kv_invalidation_error` new advisory STANDARD 3yr event (non-blocking; same registration pattern as `scim.ip_enforcement_misconfigured`). §33.5 SOC 2: no new evidence artefacts; CC6.1 toggle covered by existing `sso.policy_updated` monthly export; CC6.3 narrative strengthened but no new artefact. §33.6 gap tracker: OQ-SSO-32.1 🟡→🟢 Resolved; OQ-SSO-32.2 🟡→🟢 Resolved; §32.9 cross-update noted. §33.7 seven-item checklist: 4× P0/M8 (RPC migration 0077, KV delete handler, AUDIT_LOG_SCHEMA registration, integration tests × 2 scenarios), 2× P1/M9 (ENTERPRISE_ONBOARDING.md update, §17.2 Q-05 cross-check), 1× P2/first-opt-in (end-to-end smoke test). §33.8 no new open questions. TOC entry §33 added. Document header v2.4 → v2.5. Privacy floor: no `user_id`, name, email, health data, or body composition values in any event or implementation artefact in §33; `actor_id` in DEC-030 is the Admin Dashboard operator (tenant admin/owner), not an employee or SCIM-provisioned user; `tenant_id` is org slug in audit events; `form_api` NO ACCESS to `scim_ip_cfg` KV key. Cross-references: §17.2 (Q-05 row extended per §33.2.2); §17.3 (Step 3 SCIM config note per §33.2.3); §25.4 (KV-backed policy cache — `SSO_KV:auth_policy:{tenant_id}` invalidation pattern mirrored here); §25.9 (`sso.policy_updated` event schema — reused with `policy_type: 'scim_ip_enforcement'`); §32.3.4 (`scim_ip_cfg:{tenant_id}` KV key + 5-min TTL — unchanged; active invalidation is additive); §32.5 (`scim.ip_enforcement_misconfigured` — `scim.ip_kv_invalidation_error` follows same advisory registration pattern); §32.9 (OQ-SSO-32.1, OQ-SSO-32.2 — both 🟢 Resolved); `docs/ENTERPRISE_ONBOARDING.md §3.3` (SCIM IP enforcement note — P1/M9); `docs/AUDIT_LOG_SCHEMA.md §SCIM` (`scim.ip_kv_invalidation_error` advisory event — P0/M8); `docs/DATA_MODEL.md §4.2` (`tenant_sso_configs.scim_ip_enforcement_enabled` — read + updated by `update_scim_ip_enforcement_flag()`). Owner: enterprise-architect + customer-success + platform-engineer + compliance-officer.*
