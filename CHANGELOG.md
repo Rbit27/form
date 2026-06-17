@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.84.0] — 2026-06-17
+
+### Added
+- `content/post-113-reading-training-variability.md` — Editorial series post-113. «Як атлет читає власну варіабельність: коли «не той день» — норма, а коли — сигнал». Шум vs. системний сигнал; RPE-тренд rolling 2–3 тижні; HRV rolling average (Nordin 2019); горизонт 48–72 год; алгоритм 3 кроки; правило трьох поганих сесій. clinical-safety: PASS. sports-scientist review required.
+- README.md — editorial roadmap розширено: теми 151–165 proposed (content-engine routine · 2026-06-17).
+
+### Changed
+- `STATUS.md` — editorial series оновлено до 106–113; v5.84.0.
+- `VERSION` — 5.83.0 → 5.84.0.
+
+---
+
 ## [5.83.0] — 2026-06-17
 
 ### Added
