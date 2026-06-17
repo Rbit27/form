@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [5.84.1] — 2026-06-17
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.15 — `### Mobile Session Replay events` section added: registers `mobile.replay_config_updated` (STANDARD, 3yr) and `mobile.replay_tier_violation` (HIGH, 7yr) DEC-030 HMAC-chained events per OBSERVABILITY §46.6 (DEC-063). Full Zod schemas, REPLAY-CHAIN-01 ordering invariant, SOC 2 evidence table (REPLAY-E-001 CC6.7; REPLAY-E-003 CC7.2/P1.1). Retention table +2 rows. Closes OBSERVABILITY §46.11 item 3 (P0/M5) and SOC2_READINESS §86.7 item 3 (P0/M5) — documentation portion complete; Worker registry + integration test remain implementation tasks.
+- `docs/OBSERVABILITY.md` — §46.11 item 3 marked [x] Done (docs); implementation remainder noted.
+- `docs/SOC2_READINESS.md` — §86.7 item 3 marked [x] Done; cross-reference to AUDIT_LOG_SCHEMA v2.15.
+- `VERSION` — 5.84.0 → 5.84.1.
+
+---
+
 ## [5.84.0] — 2026-06-17
 
 ### Added
