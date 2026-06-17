@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.80.0] — 2026-06-17
+
+### Added
+- `content/post-1091-extensor-indicis-proprius-anatomy.md` — Block 1051–1100 cluster 9 post 1/5. Extensor indicis proprius (EIP): глибокий posterior compartment forearm, походить від дистальної третини ulna і posterior interosseous membrane, прикріплюється до extensor expansion вказівного (ульнарніше EDC). Іннервація: posterior interosseous nerve (PIN, C7–C8). Єдина функція — незалежне розгинання вказівного пальця (pointing sign). EIP → EPL tendon transfer як найпоширеніша реконструкція при ревматоїдному або посттравматичному розриві EPL. PIN palsy: слабкість розгиначів пальців і великого пальця при збереженні зап'ястного розгинання і відсутньому сенсорному дефіциті. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `blog.html` — post-1091 card added at top of feed.
+
+### Changed
+- `STATUS.md` — Block 1051–1100 updated: 40/50 → 41/50; cluster 9 IN PROGRESS; blog.html updated to post-1091; Total posts 1096 → 1097; version v5.80.0.
+- `VERSION` — 5.79.1 → 5.80.0.
+
+---
+
 ## [5.79.1] — 2026-06-16
 
 ### Changed
