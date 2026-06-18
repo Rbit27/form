@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.88.0] — 2026-06-18
+
+### Added
+- `content/post-114-frequency-vs-volume-self-coached.md` — Editorial series post 114. «Частота vs. обсяг: практичне рішення для self-coached атлета без нескінченного часу». Обсяг як первинна змінна, частота як механізм розподілу. Schoenfeld et al. 2016 мета-аналіз; Brigatto et al. 2019 equated volume; MPS вікна; стеля обсягу за сесію; три сценарії; алгоритм: планувати обсяг → виводити частоту. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+
+### Changed
+- `blog.html` — blog cards added for post-113 (відсутня) та post-114 (нова); вставлені перед post-112.
+- `STATUS.md` — Editorial series рядок оновлено: 106–113 → 106–114; post-114 і blog card пост-113 задокументовані.
+- `VERSION` — 5.87.0 → 5.88.0.
+
+---
+
 ## [5.87.0] — 2026-06-18
 
 ### Added
