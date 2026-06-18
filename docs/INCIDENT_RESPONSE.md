@@ -10235,7 +10235,7 @@ Evidence artefacts:
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 6 | Document auditor fieldwork protocol (§17.3.6) at `compliance/fieldwork/incident-reason-verification.md`; include in auditor onboarding package alongside existing break-glass and DSAR fieldwork procedures. | compliance-officer | **P1** | M5 | [ ] |
+| 6 | Document auditor fieldwork protocol (§17.3.6) at `compliance/fieldwork/incident-reason-verification.md`; include in auditor onboarding package alongside existing break-glass and DSAR fieldwork procedures. | compliance-officer | **P1** | M5 | [x] **Done (2026-06-18):** `compliance/fieldwork/incident-reason-verification.md` v1.0 authored; five-step retrieval procedure, hash verification formula, salt version retrieval from 1Password Operations vault, P3.2/CC2.2 SOC 2 mapping. Listed in `compliance/evidence/auditor-onboarding/README.md`. |
 | 7 | Collect IR-AUTO-E-001 for first month of production `incident.opened` events; confirm P95 T+0 latency < 3 seconds; confirm zero incidents with `linear_ticket_url: "PENDING-LINEAR-UNAVAILABLE"` unresolved for > 1 hour. | compliance-officer | **P1** | M5 | [ ] |
 | 8 | Add Tabletop Scenario O: "Linear API unavailable during active P0 — IC manually links ticket via amendment endpoint" to §9.4 tabletop catalog; schedule in Q3 2026 drill set. | security-engineer | **P1** | M5 | [ ] |
 
@@ -10456,7 +10456,7 @@ This document must be authored per §18.7 item 1 and included in the auditor onb
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Author `compliance/fieldwork/concurrent-incident-chain-verification.md` per §18.5 spec; include worked example using synthetic IDs from Tabletop Scenario P (§18.7 item 4). Include document in auditor onboarding package index at `compliance/evidence/auditor-onboarding/README.md`. | compliance-officer | **P1** | M7 | [ ] |
+| 1 | Author `compliance/fieldwork/concurrent-incident-chain-verification.md` per §18.5 spec; include worked example using synthetic IDs from Tabletop Scenario P (§18.7 item 4). Include document in auditor onboarding package index at `compliance/evidence/auditor-onboarding/README.md`. | compliance-officer | **P1** | M7 | [x] **Done (2026-06-18):** `compliance/fieldwork/concurrent-incident-chain-verification.md` v1.0 authored per all five §18.5 spec items: (1) timestamp-interleaved design explanation with DEC-053 rationale; (2) §18.3.1 canonical SQL with annotated column table; (3) §18.3.2 four-step HMAC spot-verification procedure; (4) §18.3.3 CONC-CHAIN-01 detection query with interpretation guide; (5) Tabletop Scenario P worked example (INC-20260618-a1b2c3 P0 breach + INC-20260618-d4e5f6 P1 SIEM false-positive) with §18.3.1 per-incident outputs and §18.3.3 zero-row confirmation. `compliance/evidence/auditor-onboarding/README.md` v1.0 created; both fieldwork docs indexed. |
 | 2 | Run §18.3.3 CONC-CHAIN-01 violation detection query on all existing `incident.*` events in `audit_log_events`; confirm zero rows; file result as baseline CONC-E-001 zero-event attestation for the pre-observation period (`compliance/evidence/ir-chain/CONC-E-001_2026-pre-obs.md`). | compliance-officer | **P1** | M7 | [ ] |
 | 3 | Add §18.4 concurrent incident coordination protocol to the §1 IC Quick-Start checklist as a two-line addendum: "Two active incidents? Confirm distinct IDs in #incidents. Separate channels, separate ICs for ≥ P1." | security-engineer | **P1** | M7 | [ ] |
 

@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [5.97.0] — 2026-06-18
+
+### Added
+- `compliance/fieldwork/incident-reason-verification.md` v1.0 — Auditor fieldwork protocol for `incident.severity_changed` reason hash retrieval (DEC-044). Five-step procedure: (1) locate `incident.severity_changed` chain record via `compliance_reviewer` SQL; (2) retrieve `incident.linear_ticket_linked` URL; (3) access Linear ticket via read-only guest credentials; (4) read `reason_plaintext` from ticket description/log; (5) independent SHA-256 hash verification against stored `reason_hash` using `INCIDENT_REASON_HASH_SALT` from 1Password Operations vault. Hash formula: `SHA-256(incident_id + '|' + reason_plaintext + '|' + INCIDENT_REASON_HASH_SALT)`. Privacy constraints on fieldwork artefacts documented. SOC 2: P3.2, CC2.2. Closes `docs/INCIDENT_RESPONSE.md §17.7 checklist item 6` (P1/M5).
+- `compliance/fieldwork/concurrent-incident-chain-verification.md` v1.0 — Auditor fieldwork protocol for concurrent incident sub-chain ordering (DEC-053). All five §18.5 spec items: (1) timestamp-interleaved master chain design rationale (single-list HMAC invariant; sub-chain fork rejected on five grounds); (2) §18.3.1 canonical SQL with annotated column table (`sub_chain_seq`, `master_chain_prev_event_id`, non-INC predecessor interpretation); (3) §18.3.2 four-step HMAC spot-verification (primary: SOC2_READINESS §79.7 master check; optional per-incident path with 1Password salt lookup); (4) §18.3.3 CONC-CHAIN-01 detection query with zero-row/any-row interpretation guide; (5) Tabletop Scenario P worked example — INC-20260618-a1b2c3 (P0 breach) + INC-20260618-d4e5f6 (P1 SIEM false-positive) — showing §18.3.1 outputs for each incident, non-INC predecessor entries annotated as correct/expected, §18.3.3 zero-row CONC-E-001 attestation. SOC 2: CC7.4, CC4.1. Closes `docs/INCIDENT_RESPONSE.md §18.7 checklist item 1` (P1/M7).
+- `compliance/evidence/auditor-onboarding/README.md` v1.0 — Auditor onboarding package index. Lists access grants (compliance_reviewer DB role, Linear read-only credentials, 1Password vault share, R2 pre-signed URLs), indexes both fieldwork protocol documents with SOC 2 TSC mapping, links to MASTER-INDEX (`docs/SOC2_READINESS.md §79`). Satisfies `docs/INCIDENT_RESPONSE.md §18.7 item 1` requirement to include the concurrent-incident fieldwork doc in the onboarding package index.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — §17.7 checklist item 6 marked [x] Done (2026-06-18): `compliance/fieldwork/incident-reason-verification.md` v1.0 authored. §18.7 checklist item 1 marked [x] Done (2026-06-18): `compliance/fieldwork/concurrent-incident-chain-verification.md` v1.0 authored with worked example; `compliance/evidence/auditor-onboarding/README.md` v1.0 created.
+- `VERSION` — 5.96.0 → 5.97.0.
+
 ## [5.96.0] — 2026-06-18
 
 ### Added
