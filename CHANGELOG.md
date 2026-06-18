@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [5.95.0] — 2026-06-18
+
+### Added
+- `content/post-117-microcycle-load-placement.md` — Editorial series post 117. «Як ставити вагу у мікроцикл: не «коли вільно», а за логікою відновлення» — мікроцикл як функціональна одиниця (Bompa & Haff 2009); ЦНС-відновлення 48-72 год, MPS-вікно 24-48 год, сполучна тканина; High-Low принцип (Charlie Francis 1992); три помилки розміщення; алгоритм 5 кроків для 3-4 днів/тиждень. clinical-safety: PASS. 13-min read.
+
+### Changed
+- `blog.html` — blog card added for post-117 (inserted before post-116).
+- `STATUS.md` — editorial series 11–34, 44–50, 106–117; Total posts 1133 → 1134; editorial 191–200 proposed.
+- `README.md` — post-117 status updated to draft; editorial topics 191–200 added to roadmap.
+- `VERSION` — 5.94.0 → 5.95.0.
+
 ## [5.94.0] — 2026-06-18
 
 ### Added
