@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [5.98.0] — 2026-06-18
+
+### Added
+- `content/post-1161-motor-programs-schemas.md` — Block 1151–1200 Cluster 2, post 1/10. Generalized Motor Program і Schema Theory (Schmidt, 1975). Де зберігаються моторні програми: M1, SMA, мозочок, базальні ганглії. Три процеси при «виучуванні» важкого руху. Парадокс Бека: надмірна увага до техніки у досвідчених атлетів знижує якість виконання.
+- `content/post-1162-feedback-feedforward-motor-control.md` — Block 1151–1200 Cluster 2, post 2/10. Feedback (реактивний) vs feedforward (прогностичний) управління рухом. Forward і inverse models мозочка (Wolpert & Kawato, 1998). Тренований атлет = точніші внутрішні моделі. Помилки передбачення як навчальний сигнал. Ексцентрик — feedback-інтенсивна фаза.
+- `content/post-1163-stages-motor-learning-fitts-posner.md` — Block 1151–1200 Cluster 2, post 3/10. Три стадії моторного навчання (Fitts & Posner, 1967): когнітивна → асоціативна → автономна. fMRI-відбиток кожної стадії. Reinvestment phenomenon. Регрес при технічній переробці. Різний тип підказок для кожної стадії.
+- `content/post-1164-focus-attention-motor-learning-wulf.md` — Block 1151–1200 Cluster 2, post 4/10. Constrained Action Hypothesis (Wulf). Зовнішній фокус → нижча ЕМГ при рівному або вищому силовому виході. OPTIMAL Theory (Wulf & Lewthwaite, 2016). Практичний фреймінг підказок. Відеоаналіз: ефективний лише за конкретного питання-фокусу.
+- `content/post-1165-variability-practice-contextual-interference.md` — Block 1151–1200 Cluster 2, post 5/10. Contextual Interference Effect (Battig & Shea). Рандомна практика гірша під час навчання, краща у ретенції. Schema Theory у дії. Desirable Difficulties (Bjork). Модель прогресії варіативності від нової вправи до освоєної.
+- `content/post-1166-motor-learning-plateau.md` — Block 1151–1200 Cluster 2, post 6/10. Нейронна динаміка плато. Deliberate Practice (Ericsson, 1993): завдання трохи за межею, зворотний зв'язок, когнітивна залученість. Offline consolidation через сон (Walker et al., 2002). Механізми «застрявання» і стратегії виходу.
+- `content/post-1167-skill-transfer-specificity.md` — Block 1151–1200 Cluster 2, post 7/10. Трансфер визначається координаційним паттерном і вектором зусилля, а не м'язами. Чотири рівні перенесення. Жим лежачи і жим стоячи — різні нейронні навички. Нейронне обґрунтування вибору допоміжних вправ.
+- `content/post-1168-fatigue-motor-learning.md` — Block 1151–1200 Cluster 2, post 8/10. Втома змінює нейромоторний паттерн: компенсаторна рекрутація «записується» у схему. Чому нові рухи — на початку сесії. State-dependent learning. Виняток: специфічна підготовка до виконання навички під втомою.
+- `content/post-1169-motor-imagery-mental-rehearsal.md` — Block 1151–1200 Cluster 2, post 9/10. fMRI і TMS: уявне виконання активує ті ж нейронні мережі. Yue & Cole (1992): +22% сили від уявних скорочень. PETTLEP-модель. Кінестетична > зорової уяви для моторного навчання. Clark et al. (2014): уявне тренування уповільнює атрофію при іммобілізації.
+- `content/post-1170-cluster-synthesis-motor-adaptation.md` — Block 1151–1200 Cluster 2, post 10/10. Синтез Кластера 2. Три операційні принципи: навчання vs тренінг — різні режими; помилки передбачення є навчальним сигналом; час між сесіями є частиною навчання. П'ять поширених помилок. Анонс Кластера 3: нейронна регуляція силового розвитку (PAP, деловантаження, нейронна готовність).
+
+### Changed
+- `blog.html` — posts 1161–1170 added (Cluster 2 complete); total blog entries updated to post-1170.
+- `VERSION` — 5.97.0 → 5.98.0.
+
+---
+
 ## [5.97.0] — 2026-06-18
 
 ### Added
