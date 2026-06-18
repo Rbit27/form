@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.4.0] — 2026-06-18
+
+### Added
+- `content/post-121-exercise-order-neural-fatigue.md` — Editorial series post 121. «Порядок вправ у тренуванні: не звичка, а рішення» — нейром'язова специфічність втоми, технічна деградація під навантаженням, адаптаційний пріоритет першої вправи, pre-exhaust як навмисний інструмент, три питання для визначення порядку в сесії. clinical-safety: PASS. sports-scientist review required before publish.
+- `README.md` — Block 1451–1500 «Athlete decision-making under uncertainty» додано як нові proposed теми (15 топіків · v6.4.0). Включає: ієрархія тренувальних доказів, помилка надмірної оптимізації, рішення при неповних сигналах, асиметрія ризику, порядок вправ, RPE-калібрування через час, confirmation bias, та синтез.
+
+### Changed
+- `blog.html` — картка post-121 додана перед post-120.
+- `STATUS.md` — Editorial series 106–120 → 106–121; Total posts: 1157 → 1158; Block 1451–1500 в roadmap.
+- `VERSION` — 6.3.0 → 6.4.0.
+
+---
+
 ## [6.3.0] — 2026-06-18
 
 ### Added
