@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [5.96.0] — 2026-06-18
+
+### Added
+- `content/post-118-valsalva-iap-core-bracing.md` — Editorial series post 118. «Valsalva і внутрішньочеревний тиск: чому «тримай повітря» — це не забобони». IAP як активна кінетична ланка (McGill et al. 1990); bracing vs. hollowing (Kavcic et al. 2004); Valsalva до 200 мм рт. ст. (Harman et al. 1988); чотири стінки IAP-системи; серцево-судинна безпека у здорових атлетів (Lentini et al. 1999); коли Valsalva, коли дихання через повторення; п'ять помилок. clinical-safety: PASS. 13-min read.
+- `content/post-1151-rukhovi-odynytsi-fundamentalna-odynytsia-syly.md` — Block 1151–1200 Cluster 1, post 1 of 10. Рухові одиниці: альфа-мотонейрон і закон «все або нічого»; типи I/IIa/IIx (Burke 1967); гіпертрофія змінює потужність «пострілу», а не структуру іннервації (Narici et al. 1989); чому IIx потребує proximity to failure (Schoenfeld et al. 2017). clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
+- `content/post-1152-pryntsyp-rozmiru-henneman-rekrutuvannia.md` — Block 1151–1200 Cluster 1, post 2 of 10. Принцип розміру Геннемана (1965): порядок рекрутування детермінований біофізикою мотонейрону; компенсаторне рекрутування при стомленні; Del Vecchio et al. 2019 (intramuscular EMG); proximity to failure як ключовий параметр гіпертрофії; Schoenfeld et al. 2017 meta-analysis. clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
+- `content/post-1153-rate-coding-chastota-rozriadiv-moduliatsiia-syly.md` — Block 1151–1200 Cluster 1, post 3 of 10. Rate coding: від twitch до тетанусу; дублетні розряди (Burke et al. 1976; Van Cutsem et al. 1998); "намір рухатися швидко" як нейральний стимул (Behm & Sale 1993); адаптація rate coding через 2–4 тижні тренування. clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
+- `content/post-1154-neuralnyi-draiv-maksymalna-syla-1pm.md` — Block 1151–1200 Cluster 1, post 4 of 10. Нейральний драйв і voluntary activation: twitch interpolation (Merton 1954; Belanger & McComas 1981); VA 85–95% у нетренованих vs. 95–99% у тренованих (Kent-Braun & Le Blanc 1996); кортикоспінальний шлях і TMS (Todd et al. 2003); клітини Реншоу і Ia гальмування; психологічна мобілізація +5–12% сили (Behm 2004). clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
+- `content/post-1155-ranni-sylovi-adaptatsii-neuralni-mekhanizmy.md` — Block 1151–1200 Cluster 1, post 5 of 10. Ранні нейральні адаптації: Moritani & deVries 1979; Häkkinen 1985 (квадрицепс, ЕМГ vs. біопсія); п'ять механізмів (рекрутування IIx, rate coding, зниження ко-контракції антагоніста, зменшення білатерального дефіциту, міжм'язова координація); гіпертрофія за МРТ не раніше 6–8 тижнів. clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
+- `content/post-1156-intermuscular-coordination.md` — Block 1151–1200 Cluster 1, post 6 of 10. Міжм'язова координація: внутрішньом'язова vs. міжм'язова; синхронізація рухових одиниць (Milner-Brown et al. 1975); зниження ко-контракції антагоніста (Carolan & Cafarelli 1992); специфічність нейральної адаптації (Sale & MacDougall 1981). clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
+- `content/post-1157-muscle-spindles-gto.md` — Block 1151–1200 Cluster 1, post 7 of 10. М'язові веретена і GTO: Ia аференти і стретч-рефлекс; γ-мотонейронна регуляція і PAP; SSC нейральний внесок до 30–40% (Komi 2000); GTO і Ib гальмування; адаптація порогу GTO у тренованих (Aagaard et al. 2000). clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
+- `content/post-1158-inhibition-disinhibition.md` — Block 1151–1200 Cluster 1, post 8 of 10. Гальмування і розгальмування: клітини Реншоу, Ia реципрокне, Ib автогенне; тренування знижує Ia інгібіцію (Aagaard et al. 2002); VA 85–92% нетреновані → 95–99% тренованих; "надлюдська сила" при адреналіновому розгальмуванні — частковий ефект, не повний. clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
+- `content/post-1159-central-peripheral-fatigue.md` — Block 1151–1200 Cluster 1, post 9 of 10. Центральна і периферична втома: периферична — Pi, pH, збій Ca²⁺ трансієнту (Allen, Lamb & Westerblad 2008); центральна — знижений VA, серотонін/допамін (Newsholme), аференти III/IV групи; RPE як активний регулятор (Marcora et al. 2009); асиметричні часові шкали відновлення і їх програмувальні наслідки. clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
+- `content/post-1160-cluster-synthesis.md` — Block 1151–1200 Cluster 1, post 10 of 10. Синтез кластеру 1151–1160: дистиляція кожного з 9 постів, три інтегруючих принципи (нейральна адаптація як передумова гіпертрофії; специфічність нейрального навчання; відновлення як нейральний процес), п'ять розвінчаних міфів про "нейральне тренування". Teaser: Cluster 2 — рухова адаптація і моторна пам'ять. clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
+
+### Changed
+- `blog.html` — 11 нових карток додано: post-1160 (synthesis) → post-1151 (motor units) + post-118 (editorial Valsalva/IAP). blog.html updated to post-1160.
+- `docs/DECISION_LOG.md` — DEC-064: Block 1151–1200 тема «Нейром'язовий контроль та рухова адаптація» затверджена.
+- `STATUS.md` — Block 1151–1200 row додано; total posts 1134 → 1145; editorial series оновлено до post-118; next priorities оновлено.
+- `VERSION` — 5.95.1 → 5.96.0.
+
 ## [5.95.1] — 2026-06-18
 
 ### Changed
