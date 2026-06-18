@@ -901,13 +901,13 @@
 
     <div class="feature-card">
       <div class="label mb-5">SIEM &amp; audit export</div>
-      <p class="text-mute text-xs mb-5 leading-relaxed">Tamper-evident HMAC-SHA256 chain (DEC-030). Stream to your SIEM or pull on schedule.</p>
+      <p class="text-mute text-xs mb-5 leading-relaxed">Tamper-evident HMAC-SHA256 chain (DEC-030). Activation requires a signed SIEM Data Processing Addendum (Addendum 4) — your security team controls when the integration goes live.</p>
       <div class="space-y-4">
         <div class="check-item">
           <span class="icon">▸</span>
           <div>
-            <div class="text-paper text-sm font-medium mb-0.5">Datadog · Splunk · Sumo Logic</div>
-            <div class="text-mute text-xs">Native log forwarder. Events include <span class="font-mono text-acid" style="font-size:11px;">tenant_id</span>, actor, resource, and HMAC digest.</div>
+            <div class="text-paper text-sm font-medium mb-0.5">Datadog · Splunk · Microsoft Sentinel · IBM QRadar</div>
+            <div class="text-mute text-xs">Native log forwarder per destination. Events carry <span class="font-mono text-acid" style="font-size:11px;">tenant_id</span>, actor, resource, severity, and HMAC digest — ready for your SIEM alert rules out of the box.</div>
           </div>
         </div>
         <div class="check-item">
@@ -1148,6 +1148,16 @@
         </button>
         <div class="faq-body" id="efaq9">
           Yes, self-serve, no IT ticket required. Any employee can request a machine-readable JSON export from Settings → Privacy → Export. This is a GDPR Art. 20 data portability right exercisable regardless of employment status. Export includes workout history, CV session keypoints, AI coaching transcripts, biometric trends, and connected wearable data. Typical fulfilment: under 24 hours; legal maximum: 30 days. The company has no visibility into whether an individual has made this request.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq10')">
+          <span>How does SIEM integration work, and what's the Addendum 4?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq10">
+          FORM supports native log forwarding to Datadog, Splunk, Microsoft Sentinel, and IBM QRadar, plus webhook delivery and REST pull API. Events are HMAC-SHA256 chained (DEC-030) — each event includes a digest of the previous, so your SIEM can verify the chain hasn't been tampered with. Before the integration activates, your designated security representative signs a SIEM Data Processing Addendum (Addendum 4 to the MSA). This is a one-time step; the signed addendum version is recorded in the audit log. If you later revoke SIEM access, a new Addendum 4 is required before re-activation. Your endpoint URL is never stored in plaintext — FORM retains only the first half of its SHA-256 hash.
         </div>
       </div>
 

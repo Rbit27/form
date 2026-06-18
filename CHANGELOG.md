@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [6.6.2] — 2026-06-18
+
+### Changed
+- `enterprise.html` — SIEM integration section updated: Sumo Logic removed (not in `siem_destination_type_enum`); Microsoft Sentinel and IBM QRadar added to match v6.5.0 schema (`tenant_siem_configs`). Addendum 4 (SIEM Data Processing) consent requirement noted in integration card description. New FAQ item `efaq10` added: SIEM setup, Addendum 4 workflow, endpoint URL hashing privacy floor.
+- `pricing-enterprise.html` — SIEM feature label updated in both the calculator add-ons panel and the feature comparison table: (Datadog, Splunk, Sumo Logic) → (Datadog, Splunk, Sentinel, QRadar). Cross-references: `docs/DATA_MODEL.md §40`, `docs/OBSERVABILITY.md §47`, DEC-065.
+- `VERSION` — 6.6.1 → 6.6.2.
+
 ## [6.6.1] — 2026-06-18
 
 ### Added
