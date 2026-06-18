@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [5.92.0] — 2026-06-18
+
+### Added
+- `content/post-116-training-feedback-partner-mirror-camera.md` — Editorial series post 116. «Тренувальний партнер, дзеркало, камера: три типи зворотного зв'язку і що кожен не бачить». proprioception як система з похибкою (Proske & Gandevia 2012); KR vs. KP (Schmidt & Lee 2011); concurrent vs. terminal feedback (Salmoni 1984); партнер: Zajonc 1965, bias, підтверджуюча хвала; дзеркало: Miall & Wolpert 1996, зниження proprioception accuracy, 2D один кут; камера: terminal KP, порівняння в часі, confirmation bias; інтегральна таблиця трьох інструментів; мінімальна система feedback для self-coached атлета. clinical-safety: PASS.
+
+### Changed
+- `blog.html` — blog card added for post-116 (inserted before post-115).
+- `README.md` — post-115 status → draft · v5.90.0; post-116 status → draft · v5.92.0; editorial 181–190 proposed.
+- `STATUS.md` — Editorial series updated to 11–34, 44–50, 106–116; post-116 entry added; Total posts: 1122 → 1123.
+- `VERSION` — 5.91.0 → 5.92.0.
+
+---
+
 ## [5.91.0] — 2026-06-18
 
 ### Added
