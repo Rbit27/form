@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.6.1] — 2026-06-18
+
+### Added
+- `content/post-37-clean-technique-goal-specific.md` — Editorial series post 37. «Що таке «чиста техніка» — і чому вона залежить від цілі, а не від естетики». Три різні «чисті техніки» для одного руху (пауерліфтер / бодібілдер / recreational атлет); техніка як принцип (рух виконаний + адаптаційний ефект + прийнятний ризик), а не позиція; анатомія як вето — вертлюжні западини і дорсифлексія; демонтаж правила «коліна за носком» (Fry et al. 2003); технічний мінімум vs. ідеальне виконання; техніка під втомою — чотири сигнали критичного дрейфу; три кроки: мета руху → анатомічне вікно → встановлення мінімуму. clinical-safety PASS. sports-scientist review required before publish. 13 хв.
+
+### Changed
+- `blog.html` — post-37 card added. Total coverage includes posts 1–1230 + editorial post-37.
+- `README.md` — post-37 status: proposed → draft · v6.6.1. Block 1466–1480 «Технічна компетентність і рухова якість» added as proposed (15 topics).
+- `STATUS.md` — Editorial series updated: post-37 written v6.6.1.
+- `VERSION` — 6.6.0 → 6.6.1.
+
 ## [6.6.0] — 2026-06-18
 
 ### Added
