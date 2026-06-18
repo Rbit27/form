@@ -1,5 +1,10 @@
 # Changelog · FORM
 
+## [6.7.2] — 2026-06-18
+
+### Changed
+- `docs/COST_MODEL.md` — §40 Enterprise Customer Adoption Economics & Seat Utilization Health Model appended (v2.5 → v2.6). Closes the documentation gap between §39 (deal close) and §34 (renewal risk). Covers: three-stage adoption funnel (S1 Activation / S2 Weekly-Active / S3 Habitual); health bands (Green/Amber/Red) with ARR-at-risk and expansion probability per tier; QBR aggregate-only framework (privacy floor: no `user_id` in any artefact); `enterprise_adoption_snapshots` Postgres DDL (migration 0078, RLS, k-anon n ≥ 5); four DEC-030 HMAC-chained events; three SOC 2 evidence artefacts (ADO-E-001/002/003); 10-item implementation checklist; three open questions (OQ-ADO-01/02/03).
+
 ## [6.7.1] — 2026-06-18
 
 ### Added

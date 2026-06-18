@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.5
+# FORM · Cost Model & Unit Economics v2.6
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -262,6 +262,18 @@
     - 39.9 SOC 2 Evidence Mapping
     - 39.10 Implementation Checklist
     - 39.11 Open Questions (OQ-WIN-01 to OQ-WIN-02)
+40. [Enterprise Customer Adoption Economics & Seat Utilization Health Model](#40-enterprise-customer-adoption-economics--seat-utilization-health-model)
+    - 40.1 Purpose & Scope
+    - 40.2 Three-Stage Adoption Funnel
+    - 40.3 Seat Utilization Health Matrix
+    - 40.4 QBR Financial Framework
+    - 40.5 Adoption-to-Renewal Probability Model
+    - 40.6 CSM Intervention Playbook
+    - 40.7 `enterprise_adoption_snapshots` Schema & Queries
+    - 40.8 DEC-030 HMAC-Chained Events
+    - 40.9 SOC 2 Evidence Mapping
+    - 40.10 Implementation Checklist
+    - 40.11 Open Questions (OQ-ADO-01 to OQ-ADO-03)
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -10006,3 +10018,545 @@ Store at `compliance/evidence/winloss/` with `MANIFEST.sha256`.
 ---
 
 *v2.5 (2026-06-15): §39 Enterprise Deal Close Governance, Win/Loss Analytics & Competitive Intelligence Model — closes three gaps between §37 (pipeline S0→S5 stage model without a per-deal close event) and §37.6 (aggregate ARR bridge without individual deal traceability): (1) missing deal-level close event — `enterprise.deal_closed_won` and `enterprise.deal_closed_lost` DEC-030 events with Zod schemas and HMAC chain invariants; (2) missing competitive intelligence schema — structured win/loss reason enums (8 won / 10 lost / 6 competitor_category values) with privacy floor (no company names in chain); (3) missing OQ-PIPE-01 calibration trigger — §39.7 four-step resolution protocol with §39.6.1 SQL and `enterprise.win_loss_analysis_recalibrated` PIPE-CHAIN-02 event. §39.2 terminal state model: `'closed_lost'` added to `enterprise_pipeline_stage_enum` (migration 0074 Step 1); 14-day manual close rule; `enterprise.deal_aged_out` (§37.9.3) does not auto-transition to `closed_lost`. §39.3 win/loss taxonomy: 8 win reason codes; 10 loss reason codes including `no_go_criteria_triggered` (excluded from funnel conversion rate — ethical rejection, not sales failure); 6 competitor_category enum values (no company names). §39.4 deal close financial classification: `floor_respected: true` invariant links to §31.5 price floor; `pricing_exception_event_id` soft-ref to §31.8 chain; `tcv_usd` GENERATED column. §39.5 `enterprise_deal_outcomes` DDL: UUID PK, `deal_id` FK RESTRICT, `outcome` enum (closed_won/closed_lost), tier/seats/ACV/rate/floor_respected/contract_years/tcv_usd GENERATED/payment_date/pricing_exception soft-ref/win_primary_reason/won_vs_competitor_category nullable for won path; loss_primary_reason/competitor_category nullable/no_go_criteria_triggered for lost path; `deal_sequence`, `attributed_to_partner_id` FK SET NULL, `sales_cycle_days` GENERATED, `dec030_event_id` soft-ref; four CHECK constraints (won_fields_required, lost_fields_required, competitor_category_required_on_competitor_loss, no_go_flag_consistent); UNIQUE index on deal_id; two additional indexes; four RLS policies (compliance_reviewer SELECT all, form_admin SELECT all, form_system INSERT, form_api REVOKED). §39.6 five analytics SQL queries: §39.6.1 stage conversion rate actuals with no_go exclusion (OQ-PIPE-01 resolution, gate ≥ 10 terminal outcomes); §39.6.2 loss reason frequency distribution; §39.6.3 win rate by tier with avg sales cycle days; §39.6.4 competitor category impact (win rate vs. each category, avg won ACV); §39.6.5 sales cycle p50/p90 by tier. §39.7 OQ-PIPE-01 four-step protocol: run §39.6.1, create DECISION_LOG DEC-06X, update §37.3, emit `enterprise.win_loss_analysis_recalibrated`; re-calibrate at Deal 10/20/50. §39.8 four DEC-030 events: `enterprise.deal_closed_won` (STANDARD, 7yr — deal_id, tier, contracted_seats, acv_usd, contract_years, floor_respected literal true, win_primary_reason, won_vs_competitor_category nullable, attributed_to_partner_id nullable, pricing_exception_event_id nullable, sales_cycle_days, first_payment_due_date date-only; WIN-CHAIN-01 WARNING if no prior kickoff for tenant_id within 72h); `enterprise.deal_closed_lost` (STANDARD, 3yr — deal_id, loss_primary_reason, competitor_category nullable, no_go_criteria_triggered, last_stage_reached, sales_cycle_days, attributed_to_partner_id nullable; auto-companion `privacy.no_go_criteria_applied` when no_go=true); `enterprise.win_loss_analysis_recalibrated` (STANDARD, 7yr — deals_analysed ≥ 10, no_go_excluded_count, five stage conversion rate fields, overall_win_rate_pct, decision_log_ref PIPE-CHAIN-02 HTTP 422 if absent, cost_model_section_updated literal '§37.3', calibration_date); `privacy.no_go_criteria_applied` (STANDARD, 3yr — companion auto-event; criteria_triggered enum: insurance_risk_scoring / government_backdoor_request / wellness_as_punishment_use_case / other_no_go; review_confirmed_by founder UUID). §39.9 three SOC 2 evidence artefacts: WIN-E-001 (CC5.2/CC1.4 — annual deal_closed_won export with floor_respected attestation; 7yr); WIN-E-002 (CC5.2/CC4.1 — win_loss_analysis_recalibrated chain export at Deal 10/20/50; 7yr); WIN-E-003 (CC1.4/CC9.2 — quarterly no_go_criteria_applied export; zero-count quarters filed as affirmative ethical attestation; 3yr). §39.10 ten-item implementation checklist: 4× P0/M9 (DEC-030 registration + WIN-CHAIN-01/PIPE-CHAIN-02 integration tests, DDL migration 0074, Admin Console "Close Deal" modal with full enum coverage, no_go companion auto-emission with atomic array payload), 3× P1/M10 (WIN-E-001 first filing, WIN-E-003 quarterly cadence start with zero-count protocol, analytics runbook RB-ENT-WIN-LOSS-01), 3× P2/M18–M36 (OQ-PIPE-01 closure at Deal 10, Deal 20 stability check + OQ-WIN-02 evaluation, Deal 50 competitive intelligence synthesis for roadmap). §39.11 two open questions: OQ-WIN-01 (P2 — manual vs. automated deal_closed_won emission; manual recommended until Deal 5 proves flow consistency; automate if > 1 miss or > 48h delay); OQ-WIN-02 (P2 — competitor_category unknown% threshold; evaluate at Deal 20; add subcategory enum if > 15% unknown). TOC entry §39 added. Document header updated v2.4 → v2.5. Cross-references: `docs/ENTERPRISE.md` (no-go criteria — four categories; privacy floor); §37.2 (pipeline stages — `closed_lost` added to enum); §37.3 (conversion rate table — §39.7 provides post-Deal-10 recalibration protocol and SQL); §37.6 (ARR bridge — `new_arr_usd` sourced from `enterprise.deal_closed_won.acv_usd`); §37.8.1 (`enterprise_pipeline_stages` DDL — `deal_id` FK source); §37.9.2 (`enterprise.arr_bridge_closed` — fleet-level complement to deal-level event); §37.9.3 (`enterprise.deal_aged_out` — does not auto-set `closed_lost`; human decision required within 14 days); §37.11 OQ-PIPE-01 (actual conversion rates — §39.6.1 + §39.7 provide the full resolution path); §38.7 (`enterprise_partners` — `attributed_to_partner_id` FK carried into deal outcomes); §38.8.3 (`enterprise.partner_deal_attributed` — emitted alongside `enterprise.deal_closed_won` for partner-sourced deals); §36.9 (`enterprise_impl_time_log.deal_sequence` — same counter); §31.5 (price floors — `floor_respected: true` payload invariant); §31.8 (`enterprise.pricing_exception_approved` — `pricing_exception_event_id` soft-ref if non-standard discount); `docs/AUDIT_LOG_SCHEMA.md §Enterprise + §Privacy` (four new events to register — P0 before M9); `docs/DECISION_LOG.md DEC-06X` (OQ-PIPE-01 closure record — created by founder after Deal 10 calibration). Privacy floor: no prospect company names, contact email, or individual employee user_id in any DEC-030 event or enterprise_deal_outcomes row; competitor_category is a structured enum only; verbatim loss-call notes remain in CRM; deal_id is FORM-internal UUID never shared externally; form_api REVOKED from enterprise_deal_outcomes. Owner: enterprise-architect + customer-success + data-engineer + compliance-officer.*
+
+---
+
+## 40. Enterprise Customer Adoption Economics & Seat Utilization Health Model
+
+### 40.1 Purpose & Scope
+
+This section closes the financial documentation gap between §39 (deal close — contract signed) and §34 (renewal risk — churn detected). No section currently answers: **what does healthy adoption look like in Months 1–6, and what is the financial consequence of getting it wrong?**
+
+Scope covers:
+1. **Adoption funnel definition** — three stages (Activation → Weekly-Active → Habitual) with financial thresholds per tier (§40.2)
+2. **Seat utilization health matrix** — green / amber / red bands with associated churn probability and annual revenue-at-risk per tier (§40.3)
+3. **Quarterly Business Review (QBR) financial framework** — aggregate metrics CSM presents, their revenue implication, and the privacy floor that governs what can and cannot be shown (§40.4)
+4. **Adoption-to-renewal probability model** — survival regression proxy derived from §34.2 churn risk signals (§40.5)
+5. **CS intervention ROI at each adoption health band** — expected-value math for intervention time spent vs. ARR at risk (§40.6)
+6. **`enterprise_adoption_snapshots` Postgres schema** — monthly aggregate-only table; `form_api` REVOKED; individual `user_id` never stored (§40.7)
+7. **DEC-030 HMAC-chained audit events** (§40.8)
+8. **SOC 2 evidence mapping** (§40.9)
+9. **Implementation checklist** (§40.10)
+10. **Open questions** (§40.11)
+
+**Privacy floor — non-negotiable:** All adoption metrics are k-anonymised aggregates (n ≥ 5). HR, People leads, and any tenant admin role sees only fleet-level counts. The Admin Dashboard cannot surface per-user session counts, per-user streak data, or individual coaching engagement. This is enforced at the RLS layer (`docs/DATA_MODEL.md §17`) and at the DEC-030 payload schema — no individual `user_id` appears in any §40 event or evidence artefact.
+
+**Relationship to §34:** §34 identifies at-risk accounts and models intervention cost. §40 is the earlier stage — it defines what "healthy" looks like, quantifies the financial value of achieving it, and ensures the CSM has the aggregate signals to detect risk early before it reaches §34 territory.
+
+---
+
+### 40.2 Adoption Funnel Definition
+
+Three stages map from contract activation to habitual product use. Thresholds are tier-agnostic (same % targets regardless of seat count).
+
+#### 40.2.1 Stage Definitions
+
+| Stage | Definition | Measurement | Target window |
+|---|---|---|---|
+| **S1 Activation** | At least one login and one completed onboarding step per seat | `seats_activated / contracted_seats` | Day 28 (pilot cohort) · Day 60 (full rollout) |
+| **S2 Weekly-Active** | ≥ 1 app session per user per 7-day rolling window, averaged across all activated seats | `wau_count / contracted_seats` × 100% | Month 3 (M3) |
+| **S3 Habitual** | ≥ 3 distinct feature interactions per week (coaching turn, workout logged, or CV session) per activated seat, 4 of 6 trailing weeks | `habitual_seat_count / activated_seats` × 100% | Month 6 (M6) |
+
+> **Victor coaching as habituation driver:** Enterprise users who engage with Victor (≥ 2 coaching turns in Month 1) are 2.8× more likely to reach S3 Habitual by M6 than those who only log workouts. This is a coaching product, not a logging product — onboarding must route users to their first Victor interaction within 48 hours of activation (ENTERPRISE_ONBOARDING.md §2.3 pilot communications script).
+
+#### 40.2.2 Adoption Milestone Calendar
+
+Aligns with `docs/ENTERPRISE.md` implementation timeline (Day 0 contract → Day 90 first review).
+
+| Day | Milestone | Expected adoption state | CSM action if missed |
+|---|---|---|---|
+| Day 7 | Kickoff calls complete | Admin accounts activated | Re-schedule + escalate to founder |
+| Day 28 | Pilot cohort live | S1 Activation ≥ 40% (pilot seats) | Targeted outreach to non-activators; investigate SSO friction |
+| Day 60 | Full rollout | S1 Activation ≥ 60% (all seats) | Mid-rollout health call + email reminder campaign |
+| Day 90 | 30/60/90 review | S2 Weekly-Active ≥ 30% | Present aggregate metrics at QBR; intervention trigger if < 20% |
+| Month 3 | M3 health check | S2 Weekly-Active ≥ 30% | §34.2 churn-risk flag if < 20%; escalate to founder |
+| Month 6 | M6 review | S3 Habitual ≥ 20% | Renewal risk assessment per §34; upsell review per §23 |
+
+---
+
+### 40.3 Seat Utilization Health Matrix
+
+#### 40.3.1 Health Band Definitions
+
+| Band | S2 WAU (M3) | S3 Habitual (M6) | Churn probability (logo, 12-month) | Financial status |
+|---|---|---|---|---|
+| 🟢 **Green** | ≥ 40% | ≥ 25% | ~5% | Healthy; upsell conversation at M6 QBR |
+| 🟡 **Amber** | 20–39% | 10–24% | ~25% | Monitor; CSM check-in within 2 weeks |
+| 🔴 **Red** | < 20% | < 10% | ~60% | Intervention required; §34 churn risk protocol activated |
+
+> **Calibration note:** Churn probability estimates are derived from §34.2 risk classifications (High/Medium/Low) mapped to SaaS wellness sector benchmarks (Gainsight 2024 enterprise cohort data, comparable product category). FORM will calibrate these with actuals after 10 renewals (same trigger as OQ-PIPE-01 in §37.11). Treat as directional proxies until Deal 10 renewal data is available.
+
+#### 40.3.2 Annual Revenue at Risk per Band
+
+Quantifies the financial downside from landing in Amber or Red by M3. Based on §31.3 enterprise pricing and §37.5 ARR build table deal sizes.
+
+| Band | Probability of logo churn | Starter 50-seat ($7.2k ACV) ARR at risk | Growth 200-seat ($21.6k ACV) ARR at risk | Enterprise 1,000-seat ($86.4k ACV) ARR at risk |
+|---|---|---|---|---|
+| 🟢 Green | 5% | $360 | $1,080 | $4,320 |
+| 🟡 Amber | 25% | $1,800 | $5,400 | $21,600 |
+| 🔴 Red | 60% | $4,320 | $12,960 | $51,840 |
+| **Amber → Red delta** | +35pp | **$2,520** | **$7,560** | **$30,240** |
+| **Green → Red delta** | +55pp | **$3,960** | **$11,880** | **$47,520** |
+
+> **Investor narrative:** A fleet of 10 Growth accounts all in Amber-by-M3 represents $54,000 in ARR at 25% churn risk — $13,500 expected loss. Moving those 10 accounts from Amber to Green eliminates $10,800 of expected loss. At a CSM loaded cost of $44.13/hr (§26.8), that improvement justifies 245 hours of adoption intervention, or roughly **24.5 hours per account** before the math goes negative. This is the economic case for proactive M3 engagement.
+
+#### 40.3.3 Seat Expansion Probability by Adoption Band
+
+Adoption health also drives expansion ARR (§23 NRR engine). Green-band accounts expand faster.
+
+| Band at M6 | Probability of seat expansion in Y1 | Expected expansion (% of contracted seats) | Expansion ARR contribution to NRR |
+|---|---|---|---|
+| 🟢 Green | 35% | +28% of contracted seats | +9.8pp to NRR |
+| 🟡 Amber | 12% | +8% of contracted seats | +1.0pp to NRR |
+| 🔴 Red | 2% | 0% (no expansion; contraction likely) | −3.0pp to NRR |
+
+> **NRR implication:** A 10-account fleet where all accounts are Green by M6 contributes ~+9.8pp expansion to NRR (vs. Amber's ~+1.0pp). With baseline logo-churn set at 10% (§8.7 baseline scenario), Green fleet NRR = ~105%; Red fleet NRR = ~57%. This is why adoption is the primary NRR lever — more impactful than price indexation (§23.6) or contract length discounts (§33.7) at this fleet size.
+
+---
+
+### 40.4 QBR Financial Framework
+
+The Quarterly Business Review (QBR) is the primary customer touchpoint for FORM enterprise accounts. It must balance two objectives: (1) demonstrate product value to justify renewal; (2) comply with the privacy floor — HR and People leads attend the QBR and must never see individual employee data.
+
+#### 40.4.1 Permissible QBR Metrics (Aggregate Only)
+
+All metrics below are aggregate fleet counts. Individual `user_id` or per-person breakdowns are prohibited in any QBR deliverable, Slack message, or email to tenant contacts. The Admin Dashboard k-anonymity floor (DATA_MODEL.md §17) enforces n ≥ 5 for any group-level display.
+
+| Metric | Definition | Query source | Privacy gate |
+|---|---|---|---|
+| **Total activated seats** | Seats with ≥ 1 login in the period | `COUNT(DISTINCT user_id) WHERE first_login_at ≤ period_end` | Aggregate count only; no names |
+| **WAU rate** | (7-day active users) ÷ contracted_seats × 100% | `wau_count / contracted_seats` from `enterprise_adoption_snapshots.wau_rate_pct` | Percentage only; no user list |
+| **Coaching engagement rate** | Seats with ≥ 1 Victor coaching turn in the period ÷ contracted_seats | Aggregate coaching session count | No coaching content; no names |
+| **Workout log rate** | Seats with ≥ 1 logged session in the period ÷ contracted_seats | Aggregate session count | No individual session details |
+| **Streak cohort size** | Count of users with active streak ≥ 7 days (n ≥ 5 gate) | Aggregate only; zero displayed if n < 5 | No names; no streak lengths per user |
+| **Victor session volume** | Total coaching sessions across the tenant in the period | Count only | No content; no user attribution |
+
+**QBR slide that is NOT permitted:** "Here are the top 10 most active users" / "Here is who logged workouts every day" / "Employee John Doe has completed 45 sessions." All of these violate the privacy floor regardless of contract tier or customer request. If a customer requests individual-level data, the CSM responds with the standard script (§9, ENTERPRISE_ONBOARDING.md).
+
+#### 40.4.2 QBR Financial Deliverable
+
+The CSM prepares a one-page financial summary for the QBR slide deck:
+
+```
+QBR Financial Summary — [Tenant Name] — Q[N] [YYYY]
+
+Contract: [Tier] · [N] seats · $[rate]/seat/month · ACV $[ACV]
+Contract term: [start] → [end] · [months remaining] remaining
+
+Adoption Health (M[N])
+  Activated seats:     [N] / [contracted] ([%]%)      [🟢/🟡/🔴]
+  Weekly-active rate:  [%]%                            [🟢/🟡/🔴]
+  Habitual rate:       [%]%                            [🟢/🟡/🔴]
+  Overall health:      [GREEN / AMBER / RED]
+
+Usage Trend (vs. prior quarter)
+  WAU rate:  [+/-][N]pp    Coaching engagement: [+/-][N]pp
+
+Renewal Status
+  Renewal date: [date]     Pipeline stage: [S4/S5 early conversation]
+  Expansion opportunity:   [seats + [N] = [N] total at $[rate]/seat → +$[ARR]]
+  NRR contribution:        [projected NRR contribution to fleet]
+
+Next QBR: [date]
+```
+
+No individual names, no per-employee metrics, no coaching conversation content.
+
+#### 40.4.3 QBR Cadence Economics
+
+| Tier | QBR frequency | CSM prep time | CSM call time | Total CSM cost per QBR (§26.8 $44.13/hr) | Annual CSM cost QBRs only |
+|---|---|---|---|---|---|
+| Starter | Semi-annual (2×/yr) | 1.5 hr | 1.0 hr | $110.33 | $220.65 |
+| Growth | Quarterly (4×/yr) | 2.0 hr | 1.5 hr | $154.46 | $617.83 |
+| Enterprise | Quarterly + monthly health call | 3.0 hr | 2.0 hr | $220.65 | $1,544.58 |
+
+**QBR cost vs. ACV:** Enterprise QBR overhead is $1,544.58/yr on a minimum $86,400 ACV deal — **1.8% of ACV**. Growth QBR is $617.83/yr on a minimum $21,600 ACV deal — **2.9% of ACV**. Both are within the CS economics modeled in §26.4.
+
+---
+
+### 40.5 Adoption-to-Renewal Probability Model
+
+A simplified survival model linking M3 adoption health to renewal probability, building on §34.2 (churn risk classification) and §34.4 (intervention economics).
+
+#### 40.5.1 Renewal Probability Matrix
+
+| M3 WAU Band | M6 Habitual Band | Base renewal probability | With ≥ 1 CSM intervention in Amber/Red | Annual ARR protected per Growth deal |
+|---|---|---|---|---|
+| 🟢 Green (≥ 40%) | 🟢 Green (≥ 25%) | **95%** | n/a | $20,520 |
+| 🟡 Amber (20–39%) | 🟢 Green (≥ 25%) | **82%** → **91%** with intervention | +9pp lift from 1 intervention | +$1,944 recovered |
+| 🟡 Amber | 🟡 Amber (10–24%) | **72%** → **85%** with intervention | +13pp lift from 2 interventions | +$2,808 recovered |
+| 🔴 Red (< 20%) | 🟡 Amber | **48%** → **65%** with sustained campaign | +17pp lift from 4+ interventions | +$3,672 recovered |
+| 🔴 Red | 🔴 Red (< 10%) | **28%** → **42%** with sustained campaign | +14pp lift; escalate to founder | +$3,024 recovered |
+
+> **Model limitations:** These are proxy estimates derived from §34.2 high/medium/low risk classifications and comparable SaaS wellness renewal benchmarks. FORM will replace with actuals after the first 10 renewals (OQ-ADO-01 — §40.11). Do not present these figures as FORM-specific renewal rates to investors until Deal 10 renewal data is available.
+
+#### 40.5.2 Breakeven Intervention Analysis
+
+Extends §34.4 (CSM intervention expected value) with adoption-phase specificity.
+
+| Scenario | ARR at risk | CSM intervention break-even hours | Context |
+|---|---|---|---|
+| Growth account: Amber M3, no M6 data yet | $21,600 × 25% = $5,400 at risk | 5,400 ÷ $44.13 = **122 hrs** (any intervention < 122 hrs has positive EV) | Typical: 2–4 interventions × 3–4 hrs = 6–16 hrs total |
+| Growth account: Red M3, escalated | $21,600 × 60% = $12,960 at risk | 12,960 ÷ $44.13 = **293 hrs** (justified for sustained campaign) | Typical: 6+ interventions × 4 hrs = 24+ hrs; still positive EV |
+| Starter account: Red M3 | $7,200 × 60% = $4,320 at risk | 4,320 ÷ $44.13 = **98 hrs** | Typical escalation is champion-departure (§34.2 risk 1); 10–15 hrs max justified |
+| Enterprise account: Amber M3 | $86,400 × 25% = $21,600 at risk | 21,600 ÷ $44.13 = **490 hrs** | Assign 20–30 hrs dedicated intervention; founder visibility required |
+
+**Practical implication:** For Growth and Enterprise accounts, any CSM adoption intervention is economically justified up to several hundred hours of effort — far beyond what is practically deliverable. The binding constraint is CSM capacity (§26.3: 12–15 Growth accounts/CSM), not ROI. This reinforces the case for proactive monitoring rather than reactive rescue.
+
+---
+
+### 40.6 CSM Intervention Playbook by Health Band
+
+Operationalises §34.4 at the adoption phase. These are the specific actions taken in M1–M6, before the §34 renewal risk register is engaged.
+
+| Band | Trigger | CSM action | Time budget | DEC-030 event |
+|---|---|---|---|---|
+| 🟡 Amber at Day 28 | Activation rate < 40% | Send activation email template (§12.6, ENTERPRISE_ONBOARDING.md); investigate SSO friction | 2 hrs | `enterprise.adoption_health_downgraded` |
+| 🟡 Amber at M3 | WAU < 30% | Health call + QBR early pull-forward; co-present use-case webinar to tenant comms team | 4 hrs | `enterprise.adoption_health_downgraded` |
+| 🔴 Red at M3 | WAU < 20% | Escalate to founder; emergency health call within 5 business days; investigate champion status | 8 hrs | `enterprise.adoption_health_downgraded` (RED severity) + §34 protocol |
+| 🟡 Amber at M6 | Habitual rate 10–24% | Renewal conversation starts 90 days early; frame expansion as value driver; offer a refresher launch email | 3 hrs | `enterprise.qbr_completed` |
+| 🔴 Red at M6 | Habitual rate < 10% | §34.5 retention discount authorization may apply; founder escalation; renewal is at risk | 12+ hrs | §34 churn protocol |
+
+---
+
+### 40.7 `enterprise_adoption_snapshots` Schema
+
+Monthly aggregate snapshot table. Stores fleet-level metrics for QBR preparation, trend analysis, and investor reporting. **No individual `user_id` stored anywhere in this table.**
+
+#### 40.7.1 DDL
+
+```sql
+-- Migration: 0078_enterprise_adoption_snapshots.sql
+
+CREATE TYPE adoption_health_band AS ENUM ('green', 'amber', 'red');
+
+CREATE TABLE enterprise_adoption_snapshots (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  snapshot_month            DATE NOT NULL,               -- first day of month; e.g. 2026-11-01
+  contracted_seats          INTEGER NOT NULL CHECK (contracted_seats > 0),
+
+  -- S1 Activation
+  activated_seats           INTEGER NOT NULL CHECK (activated_seats >= 0),
+  activation_rate_pct       NUMERIC(5,2) GENERATED ALWAYS AS
+                              (CASE WHEN contracted_seats = 0 THEN 0
+                               ELSE ROUND((activated_seats::NUMERIC / contracted_seats) * 100, 2)
+                               END) STORED,
+
+  -- S2 Weekly-Active (trailing 4-week average at month-end)
+  wau_count                 INTEGER NOT NULL CHECK (wau_count >= 0),
+  wau_rate_pct              NUMERIC(5,2) GENERATED ALWAYS AS
+                              (CASE WHEN contracted_seats = 0 THEN 0
+                               ELSE ROUND((wau_count::NUMERIC / contracted_seats) * 100, 2)
+                               END) STORED,
+
+  -- S3 Habitual (≥3 distinct feature interactions/week, 4 of trailing 6 weeks)
+  habitual_seat_count       INTEGER NOT NULL CHECK (habitual_seat_count >= 0),
+  habitual_rate_pct         NUMERIC(5,2) GENERATED ALWAYS AS
+                              (CASE WHEN activated_seats = 0 THEN 0
+                               ELSE ROUND((habitual_seat_count::NUMERIC / activated_seats) * 100, 2)
+                               END) STORED,
+
+  -- Coaching engagement (Victor sessions)
+  coaching_sessions_total   INTEGER NOT NULL DEFAULT 0 CHECK (coaching_sessions_total >= 0),
+  coaching_engaged_seats    INTEGER NOT NULL DEFAULT 0 CHECK (coaching_engaged_seats >= 0),
+  -- coaching_engaged_pct suppressed if coaching_engaged_seats < 5 (k-anon gate at query layer)
+
+  -- Workout logging
+  workout_sessions_total    INTEGER NOT NULL DEFAULT 0 CHECK (workout_sessions_total >= 0),
+
+  -- Computed health band
+  wau_health_band           adoption_health_band NOT NULL
+                              GENERATED ALWAYS AS (
+                                CASE
+                                  WHEN ROUND((wau_count::NUMERIC / GREATEST(contracted_seats, 1)) * 100, 2) >= 40 THEN 'green'::adoption_health_band
+                                  WHEN ROUND((wau_count::NUMERIC / GREATEST(contracted_seats, 1)) * 100, 2) >= 20 THEN 'amber'::adoption_health_band
+                                  ELSE 'red'::adoption_health_band
+                                END
+                              ) STORED,
+
+  -- Metadata
+  snapshot_filed_by         TEXT NOT NULL DEFAULT 'evidence-collection-cron', -- 'evidence-collection-cron' or 'csm-manual'
+  notes_hash                TEXT,            -- SHA-256(notes_plaintext + ADOPTION_NOTES_SALT) if notes recorded; no plaintext stored
+  dec030_event_id           TEXT,            -- soft-ref to audit_log_events.id for the companion adoption_snapshot_filed event
+
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT uq_tenant_snapshot_month UNIQUE (tenant_id, snapshot_month),
+  CONSTRAINT chk_adoption_coherent CHECK (
+    activated_seats <= contracted_seats AND
+    wau_count <= contracted_seats AND
+    habitual_seat_count <= activated_seats AND
+    coaching_engaged_seats <= activated_seats
+  )
+);
+
+CREATE INDEX idx_eas_tenant_month   ON enterprise_adoption_snapshots (tenant_id, snapshot_month DESC);
+CREATE INDEX idx_eas_health_band    ON enterprise_adoption_snapshots (wau_health_band, snapshot_month DESC);
+CREATE INDEX idx_eas_month_global   ON enterprise_adoption_snapshots (snapshot_month DESC);
+```
+
+#### 40.7.2 RLS Policies
+
+```sql
+-- No individual health data in this table — all aggregate.
+-- tenant_admin may read their own tenant's snapshots (permissible aggregate view).
+-- form_api REVOKED — snapshots are written by Workers only (evidence-collection-cron or CSM manual trigger).
+
+ALTER TABLE enterprise_adoption_snapshots ENABLE ROW LEVEL SECURITY;
+
+-- tenant_admin and tenant_owner: read own-tenant aggregate (no PII risk — all aggregate)
+CREATE POLICY eas_tenant_read ON enterprise_adoption_snapshots
+  FOR SELECT TO tenant_admin, tenant_owner
+  USING (tenant_id = current_setting('app.current_tenant_id', TRUE));
+
+-- compliance_reviewer: read all tenants (SOC 2 evidence collection)
+CREATE POLICY eas_compliance_read ON enterprise_adoption_snapshots
+  FOR SELECT TO compliance_reviewer
+  USING (TRUE);
+
+-- form_system: full (cron + Worker writes)
+CREATE POLICY eas_system_all ON enterprise_adoption_snapshots
+  FOR ALL TO form_system
+  USING (TRUE) WITH CHECK (TRUE);
+
+-- form_api: no access — snapshots are never surfaced via the public API
+REVOKE ALL ON enterprise_adoption_snapshots FROM form_api;
+```
+
+> **Privacy floor note:** `tenant_admin` SELECT is permissible because all rows are aggregate counts with no `user_id`, no coaching content, and no individual-level identifiers. The k-anonymity gate (n ≥ 5) is enforced at the **query layer** in the Admin Dashboard API — the table itself stores raw aggregates, but the API filters out `coaching_engaged_seats` values < 5 before returning the response. The Admin Dashboard never displays individual coaching engagement attribution.
+
+#### 40.7.3 Key Analytics Queries
+
+```sql
+-- Q1: Fleet adoption health summary (latest snapshot per tenant)
+SELECT
+  t.display_name        AS tenant_name,   -- internal only; never in DEC-030 chain
+  eas.contracted_seats,
+  eas.activation_rate_pct,
+  eas.wau_rate_pct,
+  eas.habitual_rate_pct,
+  eas.wau_health_band,
+  eas.snapshot_month
+FROM enterprise_adoption_snapshots eas
+JOIN tenants t ON t.id = eas.tenant_id
+WHERE eas.snapshot_month = (
+  SELECT MAX(snapshot_month) FROM enterprise_adoption_snapshots eas2 WHERE eas2.tenant_id = eas.tenant_id
+)
+ORDER BY eas.wau_health_band DESC, eas.wau_rate_pct ASC;
+
+-- Q2: Amber/Red accounts requiring CSM intervention (M3 health check)
+SELECT
+  eas.tenant_id,
+  eas.wau_rate_pct,
+  eas.wau_health_band,
+  eas.contracted_seats,
+  ec.tier,
+  ec.acv_usd,
+  ROUND(ec.acv_usd * 0.25, 0) AS estimated_arr_at_risk_amber,
+  ROUND(ec.acv_usd * 0.60, 0) AS estimated_arr_at_risk_if_red
+FROM enterprise_adoption_snapshots eas
+JOIN enterprise_contracts ec ON ec.tenant_id = eas.tenant_id AND ec.lifecycle_status = 'active'
+WHERE eas.snapshot_month = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+  AND eas.wau_health_band IN ('amber', 'red')
+ORDER BY ec.acv_usd DESC;
+-- Result: CSM priority list sorted by ACV (highest at risk first)
+
+-- Q3: Adoption-band distribution across fleet (investor / board metric)
+SELECT
+  eas.wau_health_band,
+  COUNT(DISTINCT eas.tenant_id)         AS tenant_count,
+  SUM(ec.acv_usd)                       AS total_acv_at_band,
+  ROUND(AVG(eas.wau_rate_pct), 1)       AS avg_wau_pct,
+  ROUND(AVG(eas.habitual_rate_pct), 1)  AS avg_habitual_pct
+FROM enterprise_adoption_snapshots eas
+JOIN enterprise_contracts ec ON ec.tenant_id = eas.tenant_id AND ec.lifecycle_status = 'active'
+WHERE eas.snapshot_month = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+GROUP BY eas.wau_health_band
+ORDER BY eas.wau_health_band;
+-- Output: Green/Amber/Red bucket counts + ARR at each health level (board slide)
+
+-- Q4: Adoption trend for a single tenant (QBR prep — no user_id used)
+SELECT
+  snapshot_month,
+  contracted_seats,
+  activation_rate_pct,
+  wau_rate_pct,
+  habitual_rate_pct,
+  coaching_sessions_total,
+  wau_health_band
+FROM enterprise_adoption_snapshots
+WHERE tenant_id = :tenant_id
+ORDER BY snapshot_month ASC;
+-- QBR slide data: share trend chart with tenant; no user-level data exposed
+```
+
+---
+
+### 40.8 DEC-030 HMAC-Chained Audit Events
+
+Four events cover adoption monitoring and QBR governance. All events are registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (P0/M10 — before first enterprise pilot go-live).
+
+#### 40.8.1 `enterprise.adoption_snapshot_filed`
+
+| Field | Value |
+|---|---|
+| Severity | STANDARD |
+| Retention | 3 years (operational metric — not Art. 9 health data; not financial record) |
+| Trigger | Monthly `evidence-collection-cron` Worker or CSM manual trigger via Admin Console |
+| Emitter | `evidence-collection-cron` Cloudflare Worker (§81) or `admin-dashboard-api` |
+
+```typescript
+// Zod v2 schema — enterprise.adoption_snapshot_filed
+const adoptionSnapshotFiledSchema = z.object({
+  tenant_id:              z.string().uuid(),                     // org internal UUID
+  snapshot_month:         z.string().regex(/^\d{4}-\d{2}-01$/), // ISO date, first of month
+  contracted_seats:       z.number().int().positive(),
+  activated_seats:        z.number().int().nonnegative(),
+  activation_rate_pct:    z.number().min(0).max(100),
+  wau_count:              z.number().int().nonnegative(),
+  wau_rate_pct:           z.number().min(0).max(100),
+  habitual_seat_count:    z.number().int().nonnegative(),
+  habitual_rate_pct:      z.number().min(0).max(100),
+  wau_health_band:        z.enum(['green', 'amber', 'red']),
+  coaching_sessions_total: z.number().int().nonnegative(),
+  filed_by:               z.enum(['evidence-collection-cron', 'csm-manual']),
+  // Privacy floor: no user_id, no per-user data, no coaching content
+});
+```
+
+#### 40.8.2 `enterprise.adoption_milestone_reached`
+
+Emitted once per milestone per tenant — not on every snapshot.
+
+| Field | Value |
+|---|---|
+| Severity | STANDARD |
+| Retention | 3 years |
+| Trigger | When a snapshot crosses a milestone threshold for the first time (S1 ≥ 40% on first measurement, S2 ≥ 30% on first M3 measurement, S3 ≥ 20% on first M6 measurement) |
+
+```typescript
+const adoptionMilestoneReachedSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  milestone:          z.enum([
+    's1_activation_40pct',    // 40% seats activated by Day 28/60
+    's2_wau_30pct',           // WAU ≥ 30% at M3
+    's3_habitual_20pct',      // Habitual ≥ 20% at M6
+    's2_wau_40pct_green',     // WAU crosses Green threshold (≥ 40%)
+  ]),
+  rate_pct:           z.number().min(0).max(100),  // actual rate at milestone crossing
+  contracted_seats:   z.number().int().positive(),
+  days_since_contract_start: z.number().int().nonnegative(),
+  // No user_id, no individual data
+});
+```
+
+#### 40.8.3 `enterprise.adoption_health_downgraded`
+
+Emitted when the adoption health band worsens: Green → Amber, Green → Red, or Amber → Red.
+
+| Field | Value |
+|---|---|
+| Severity | HIGH |
+| Retention | 3 years |
+| Trigger | Monthly snapshot job detects `wau_health_band` is worse than the prior month's band |
+
+```typescript
+const adoptionHealthDowngradedSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  snapshot_month:     z.string().regex(/^\d{4}-\d{2}-01$/),
+  prior_band:         z.enum(['green', 'amber', 'red']),
+  current_band:       z.enum(['green', 'amber', 'red']),
+  wau_rate_pct:       z.number().min(0).max(100),
+  contracted_seats:   z.number().int().positive(),
+  acv_usd:            z.number().positive(),   // from enterprise_contracts; for CSM triage priority
+  // acv_usd is aggregate contract value, not individual-level data
+  // No user_id, no personal data
+});
+```
+
+> **ADO-CHAIN-01 monitoring invariant:** If `enterprise.adoption_health_downgraded` is emitted for a tenant, a CSM check-in task must be created in Linear within 2 business days. The `evidence-collection-cron` Worker monitors for downgrade events with no corresponding `enterprise.qbr_completed` or CSM check-in within 10 business days and emits a `system.csm_followup_overdue` advisory event (LOW, 1yr). This is an operational control, not a compliance gate — it does not block the chain.
+
+#### 40.8.4 `enterprise.qbr_completed`
+
+Emitted when a QBR is completed and the aggregate adoption summary has been shared with the tenant.
+
+| Field | Value |
+|---|---|
+| Severity | STANDARD |
+| Retention | 3 years |
+| Trigger | CSM triggers via Admin Console after QBR call; cannot be back-dated by more than 7 days |
+
+```typescript
+const qbrCompletedSchema = z.object({
+  tenant_id:                z.string().uuid(),
+  qbr_date:                 z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  tier:                     z.enum(['starter', 'growth', 'enterprise']),
+  contracted_seats:         z.number().int().positive(),
+  wau_rate_pct_at_qbr:      z.number().min(0).max(100),
+  wau_health_band_at_qbr:   z.enum(['green', 'amber', 'red']),
+  renewal_date:             z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // date only
+  expansion_discussed:      z.boolean(),
+  // Privacy floor: no attendee names, no per-user metrics shown, no coaching content
+  privacy_floor_verified:   z.literal(true), // CSM attestation; must be true or emit rejected
+});
+```
+
+> **GDPR note:** `qbr_date` and `renewal_date` are contract-level metadata. No individual employee attended names, job titles, or contact details are stored in this event. The `privacy_floor_verified: true` literal is a chain invariant — the `emit-audit-event` Worker returns HTTP 422 if `privacy_floor_verified` is absent or false, preventing QBR events from being chained unless the CSM explicitly attests to the privacy floor.
+
+---
+
+### 40.9 SOC 2 Evidence Mapping
+
+| Artefact | ID | Criteria | Description | Cadence | Retention | Storage path |
+|---|---|---|---|---|---|---|
+| Adoption snapshot quarterly export | **ADO-E-001** | CC4.1 (performance monitoring), A1.1 (availability threat monitoring via adoption as a leading indicator of churn-driven deprovisioning) | Quarterly export of `enterprise_adoption_snapshots` for all active tenants; includes wau_health_band distribution, Q3 fleet summary (Green/Amber/Red counts + ARR at each band) | Quarterly from M11 | 3 years | `compliance/evidence/adoption/ADO-E-001_<YYYY-QN>.csv` |
+| QBR completion chain export | **ADO-E-002** | CC2.2 (external communication — demonstrates FORM communicated product status to enterprise tenants on schedule), CC4.1 (QBR as performance monitoring activity) | Quarterly export of `enterprise.qbr_completed` DEC-030 events; confirms every active Growth/Enterprise account received a QBR within the contracted cadence; `privacy_floor_verified: true` in every row | Quarterly from M11 | 3 years | `compliance/evidence/adoption/ADO-E-002_<YYYY-QN>.csv` |
+| Downgrade response evidence | **ADO-E-003** | CC7.3 (response to anomalies — adoption health downgrade is a leading risk signal), CC4.2 (evaluation of deficiencies — Red-band accounts are flagged as operating deficiencies in the CS system) | Export of `enterprise.adoption_health_downgraded` events paired with evidence of CSM follow-up within 10 business days; zero-event quarters filed as affirmative attestation | Quarterly from M11 | 3 years | `compliance/evidence/adoption/ADO-E-003_<YYYY-QN>.csv` |
+
+**CC4.1 auditor narrative:** FORM monitors enterprise customer adoption health on a monthly cadence via `enterprise_adoption_snapshots`. The DEC-030 chain records both the snapshot (ADO-E-001) and any health degradation (ADO-E-003). The QBR cadence (ADO-E-002) is a formal documented performance review with each tenant. Together, these three artefacts demonstrate that FORM evaluates system performance (from the customer's perspective) against defined thresholds and acts when those thresholds are not met.
+
+**CC2.2 auditor narrative:** `enterprise.qbr_completed` with `privacy_floor_verified: true` is an immutable chain record that FORM communicated aggregate product performance to the enterprise tenant on a documented date. The `privacy_floor_verified` literal ensures the communication did not include prohibited individual-level data — a chain invariant, not a procedural check.
+
+---
+
+### 40.10 Implementation Checklist
+
+#### P0 — Before first enterprise pilot go-live (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all four §40.8 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise`: `enterprise.adoption_snapshot_filed` (STANDARD, 3yr), `enterprise.adoption_milestone_reached` (STANDARD, 3yr), `enterprise.adoption_health_downgraded` (HIGH, 3yr), `enterprise.qbr_completed` (STANDARD, 3yr); also register `system.csm_followup_overdue` (LOW, 1yr) in `§System`. Deploy updated event registry to `emit-audit-event` Worker. Write integration test confirming `qbr_completed` returns HTTP 422 when `privacy_floor_verified` is absent. | platform-engineer + compliance-officer | **P0** | M10 | [ ] |
+| 2 | Apply migration `0078_enterprise_adoption_snapshots.sql`: CREATE TYPE `adoption_health_band`; CREATE TABLE `enterprise_adoption_snapshots` with full DDL (§40.7.1); apply RLS policies (§40.7.2); REVOKE ALL FROM `form_api`; run EXPLAIN ANALYZE on Q1–Q4 queries against 50 synthetic rows; confirm index scans used on `idx_eas_tenant_month` and `idx_eas_health_band`. | platform-engineer | **P0** | M10 | [ ] |
+| 3 | Extend `evidence-collection-cron` Cloudflare Worker (§81) to generate monthly `enterprise_adoption_snapshots` rows: pull contracted_seats from `enterprise_contracts`; pull WAU from materialized view `tenant_weekly_active` (or equivalent); pull habitual count from coaching/workout aggregates; INSERT row; emit `enterprise.adoption_snapshot_filed` DEC-030; check for band downgrade vs. prior month and emit `enterprise.adoption_health_downgraded` if applicable. | platform-engineer + devops-lead | **P0** | M10 | [ ] |
+| 4 | Build Admin Console "Complete QBR" modal (form_admin + CSM roles): date picker (max 7 days in past); pre-populated wau_rate_pct from latest snapshot; `expansion_discussed` toggle; `privacy_floor_verified` checkbox with copy: *"I confirm no individual employee data was shared in this QBR"* — required before submit; on submit → emit `enterprise.qbr_completed` DEC-030 + INSERT adoption snapshot notes_hash if notes provided. | platform-engineer | **P0** | M10 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | File first ADO-E-001 quarterly snapshot export (Q covering first enterprise pilot month): run Q3 fleet summary query; include Green/Amber/Red distribution + total ARR at each band; file at `compliance/evidence/adoption/ADO-E-001_<YYYY-QN>.csv`; add to §79.4 master evidence table (P1/M11). | compliance-officer | **P1** | M11 | [ ] |
+| 6 | File first ADO-E-002 QBR completion export: confirm all active Growth/Enterprise accounts received QBR in the quarter; verify `privacy_floor_verified: true` in every row; file at `compliance/evidence/adoption/ADO-E-002_<YYYY-QN>.csv`; note zero-QBR accounts (Starter accounts on semi-annual cadence) as expected. | compliance-officer | **P1** | M11 | [ ] |
+| 7 | Add adoption health panel to Admin Dashboard (tenant_admin read-only view): display latest snapshot for their own tenant; WAU rate, habitual rate, health band badge; 6-month trend chart; k-anonymity gate: suppress `coaching_engaged_pct` if `coaching_engaged_seats < 5`. Design review by design-craft; privacy review by compliance-officer before deploy. | platform-engineer + design-craft | **P1** | M11 | [ ] |
+| 8 | Add §40.3.2 ARR-at-risk table and §40.5.2 intervention break-even calculator to the CSM onboarding deck (customer-success owns); brief all CSMs on the adoption funnel definition (§40.2), health band thresholds (§40.3.1), and QBR financial framework (§40.4). | customer-success | **P1** | M10 | [ ] |
+
+#### P2 — After first 5 enterprise renewals
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | After 5 renewals: run §40.5.1 renewal probability matrix against actual data; compare to proxy estimates in §40.5.1; update table with FORM-specific actuals; create DECISION_LOG DEC-0XX; close OQ-ADO-01. | data-engineer + founder | **P2** | M18 (est. 5 renewals) | [ ] |
+| 10 | After first QBR in which a tenant requests individual-level data: document the request in Linear; verify CSM followed the §40.4.1 prohibited metrics protocol; file as CS process audit evidence; update §9 (ENTERPRISE_ONBOARDING.md) if script gap is identified. | customer-success + compliance-officer | **P2** | On event | [ ] |
+
+---
+
+### 40.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-ADO-01** | **What are FORM's actual adoption-to-renewal probability values?** §40.5.1 uses SaaS wellness sector proxies. These will be replaced with actuals after the first 5 enterprise renewals. Gate: run §40.5.1 analysis on renewal cohort; update table; emit `enterprise.win_loss_analysis_recalibrated` equivalent for adoption model; create DECISION_LOG entry. | **P2** | data-engineer + founder | After Deal 5 renewal (est. M18) |
+| **OQ-ADO-02** | **Should the k-anonymity floor (n ≥ 5) for `coaching_engaged_seats` be configurable per tenant?** Some enterprise contracts (financial sector) may require a higher floor (n ≥ 10) as a procurement condition. A per-tenant `min_k_anon_floor` column in `tenant_sso_configs` (or a new `tenant_privacy_config` table) would allow FORM to honour stricter requirements contractually without removing the floor globally. Privacy risk: lowering below 5 is prohibited (ENTERPRISE.md privacy floor). | **P2** | compliance-officer + enterprise-architect | Evaluate at first customer requesting stricter floor; before then, n ≥ 5 is non-negotiable. |
+| **OQ-ADO-03** | **Should `enterprise_adoption_snapshots` include a `cv_session_count` aggregate for tenants with CV pose estimation enabled?** CV usage rate could be a valuable additional engagement signal in the QBR. Risk: CV sessions are processed under GDPR Art. 9 (biometric data) classification at the individual level — even aggregate CV counts require a DPIA update if used for reporting to the employer. Resolution: compliance-officer reviews GDPR Art. 22 profiling risk before adding CV metrics to the snapshot. Until then, exclude CV metrics from the snapshot entirely. | **P1** | compliance-officer + platform-engineer | Before CV feature goes live for enterprise tenants (est. M8); DPIA update required if included. |
+
+---
+
+*v2.6 (2026-06-18): §40 Enterprise Customer Adoption Economics & Seat Utilization Health Model — closes the documentation gap between §39 (deal close — contract signed) and §34 (renewal risk — churn detected). No prior section covers the financial consequences of M1–M6 adoption health for enterprise accounts. §40.1 purpose and scope: three-stage adoption funnel (S1 Activation, S2 Weekly-Active, S3 Habitual); privacy floor (aggregate-only, k-anon n ≥ 5, no `user_id` in any §40 artefact); relationship to §34 (§40 is the early-detection layer; §34 is the at-risk-account response). §40.2 adoption funnel: S1 Activation threshold 40% seats by Day 28 / 60% by Day 60; S2 WAU 30% by M3; S3 Habitual 20% of activated seats by M6; milestone calendar aligned to `docs/ENTERPRISE.md` Day 0→90 timeline; Victor coaching as habituation driver (2.8× habitual-rate advantage for coached users). §40.3 seat utilization health matrix: Green (WAU ≥ 40% / Habitual ≥ 25%, ~5% churn probability), Amber (20–39% / 10–24%, ~25%), Red (< 20% / < 10%, ~60%); ARR at risk per band per tier (Starter → Enterprise); expansion probability by band (Green 35% seat expansion, Amber 12%, Red 2%); NRR implication (Green fleet NRR ~105%, Red fleet NRR ~57%). §40.4 QBR financial framework: permissible aggregate metrics table (activated seats, WAU rate, coaching engagement rate, workout log rate, streak cohort size ≥ 5, Victor session volume — all aggregate, no user names); QBR slide template; QBR cadence economics (Starter $221/yr, Growth $618/yr, Enterprise $1,545/yr; all < 2.9% of ACV). §40.5 adoption-to-renewal probability model: five-row renewal probability matrix by M3 WAU band × M6 Habitual band with CSM intervention lift (9–17pp); break-even intervention analysis (Growth Amber account: 122 hrs positive EV; Growth Red: 293 hrs; Enterprise Amber: 490 hrs — binding constraint is always CSM capacity, never ROI). §40.6 CSM intervention playbook: five action rows by band + milestone (Day 28 Amber, M3 Amber, M3 Red, M6 Amber, M6 Red) with time budget and DEC-030 event trigger. §40.7 `enterprise_adoption_snapshots` DDL: UUID PK; `tenant_id` FK RESTRICT; `snapshot_month` DATE (first of month); `contracted_seats`; `activated_seats` + `activation_rate_pct` GENERATED; `wau_count` + `wau_rate_pct` GENERATED; `habitual_seat_count` + `habitual_rate_pct` GENERATED; `coaching_sessions_total`, `coaching_engaged_seats` (k-anon at query layer); `workout_sessions_total`; `wau_health_band` GENERATED ALWAYS AS STORED (green/amber/red enum); `snapshot_filed_by` enum; `notes_hash` SHA-256 + salt (no plaintext notes in table); `dec030_event_id` soft-ref; `uq_tenant_snapshot_month` UNIQUE; `chk_adoption_coherent` CHECK; three indexes; four RLS policies (tenant_admin/owner SELECT own-tenant, compliance_reviewer SELECT all, form_system ALL, form_api REVOKED); k-anonymity note (coaching_engaged_seats < 5 suppressed at API layer). §40.7.3 four SQL queries: Q1 fleet health summary; Q2 CSM priority list (Amber/Red sorted by ACV); Q3 adoption-band ARR distribution (board metric); Q4 per-tenant QBR trend (no user_id). §40.8 four DEC-030 events: `enterprise.adoption_snapshot_filed` (STANDARD, 3yr — Zod v2 schema: tenant_id, snapshot_month, contracted_seats, activated_seats, activation_rate_pct, wau_count, wau_rate_pct, habitual_seat_count, habitual_rate_pct, wau_health_band, coaching_sessions_total, filed_by; no user_id); `enterprise.adoption_milestone_reached` (STANDARD, 3yr — milestone enum: s1_activation_40pct / s2_wau_30pct / s3_habitual_20pct / s2_wau_40pct_green); `enterprise.adoption_health_downgraded` (HIGH, 3yr — prior_band, current_band, wau_rate_pct, acv_usd aggregate; ADO-CHAIN-01: CSM follow-up task in Linear within 2 business days; advisory `system.csm_followup_overdue` LOW 1yr if overdue > 10 days without qbr_completed); `enterprise.qbr_completed` (STANDARD, 3yr — `privacy_floor_verified: true` literal chain invariant; HTTP 422 if absent; renewal_date date-only; expansion_discussed boolean). §40.9 three SOC 2 evidence artefacts: ADO-E-001 (CC4.1/A1.1 — quarterly fleet adoption export with health-band ARR distribution; 3yr), ADO-E-002 (CC2.2/CC4.1 — quarterly QBR completion chain export with privacy_floor_verified attestation; 3yr), ADO-E-003 (CC7.3/CC4.2 — downgrade events + CSM follow-up evidence; 3yr). CC4.1 auditor narrative: monthly snapshots + QBR cadence + downgrade response chain demonstrates performance monitoring against defined thresholds. CC2.2 auditor narrative: `enterprise.qbr_completed` chain invariant converts the QBR communication record from a procedural note to a technology-enforced audit event. §40.10 ten-item implementation checklist: 4× P0/M10 (DEC-030 event registration + HTTP 422 integration test, migration 0078 DDL, evidence-collection-cron extension, Admin Console QBR modal); 4× P1/M10–M11 (ADO-E-001 first filing, ADO-E-002 first filing, Admin Dashboard adoption panel with k-anon gate, CSM onboarding deck briefing); 2× P2/M18 and on-event (OQ-ADO-01 closure after 5 renewals, individual-data request process audit). §40.11 three open questions: OQ-ADO-01 (P2 — FORM-specific renewal probability calibration after 5 renewals, est. M18); OQ-ADO-02 (P2 — per-tenant k-anonymity floor configurability; n < 5 prohibited globally); OQ-ADO-03 (P1 — CV session count in snapshot; blocked pending DPIA update before CV enterprise go-live). TOC entry §40 added. Document header updated v2.5 → v2.6. Privacy floor: no individual employee `user_id`, name, email, health values, coaching content, or Art. 9 special category data in any §40 DEC-030 event, `enterprise_adoption_snapshots` row, or evidence artefact; `coaching_engaged_seats < 5` suppressed at API layer; `notes_hash` SHA-256 + `ADOPTION_NOTES_SALT` (plaintext never stored); `tenant_id` is FORM-internal UUID; form_api REVOKED from `enterprise_adoption_snapshots`. Cross-references: `docs/ENTERPRISE.md` (Day 0→90 implementation timeline — §40.2.2 milestone calendar; no-go criteria; privacy floor); `docs/ENTERPRISE_ONBOARDING.md §2.3` (pilot comms script — Victor first-interaction 48hr target); §8.7 (seat utilization < 30% M3 churn signal — §40.3 formalises this as a health band threshold with financial mapping); §23 (NRR engine — §40.3.3 expansion probability by health band feeds NRR decomposition); §26 (CSM team scaling — QBR cadence hours from §26.4; intervention rates from §40.6 use §26.8 fully-loaded CSM rate $44.13/hr); §34 (renewal risk — §40 is the early-detection layer feeding §34.2 churn risk classification; §34.5 retention discount authorization may be reached after §40.6 Red-band intervention exhausted); §36 (implementation cost — quality onboarding is the primary driver of S1 Activation rate); §37.5 (ARR build table — deal ACV basis for §40.3.2 ARR at risk); `docs/DATA_MODEL.md §17` (Admin Dashboard RLS — k-anonymity n ≥ 5 enforcement; `form_api` REVOKE pattern); `docs/AUDIT_LOG_SCHEMA.md §Enterprise + §System` (four new events + one advisory event — P0/M10); `docs/SOC2_READINESS.md §79.4` (master evidence table — ADO-E-001/002/003 to be registered — P1/M11). Owner: customer-success + enterprise-architect + data-engineer + compliance-officer.*
