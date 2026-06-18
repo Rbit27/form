@@ -1,4 +1,4 @@
-# FORM · Project Status v6.4.0
+# FORM · Project Status v6.6.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v6.4.0** — 2026-06-18
+**v6.6.0** — 2026-06-18
 
 ---
 
@@ -136,7 +136,7 @@
 - Block 1051–1100: **COMPLETE 50/50 · v5.83.0** — тема: М'язова специфіка та функціональна анатомія. Всі 10 кластерів COMPLETE. Cluster 10 COMPLETE (posts 1096–1100): APL+EPB/De Quervain's (1096), EPL/Lister's tubercle/відстрочений розрив (1097), FPL/AIN syndrome/OK sign (1098), TFCC/Palmer class/ulnar variance (1099), block synthesis (1100). blog.html updated to post-1100. sports-scientist review required before publish.
 - Block 1101–1150: **COMPLETE 50/50 · v5.94.0** — тема: Біомеханіка рухових патернів і силова передача. Clusters 1–5 COMPLETE. blog.html updated to post-1150. sports-scientist review required before publish.
 - Block 1151–1200: **COMPLETE 50/50 · v6.1.0** — тема: Нейром'язовий контроль та рухова адаптація (DEC-064). Cluster 1 COMPLETE (posts 1151–1160). Cluster 2 COMPLETE (posts 1161–1170). Cluster 3 COMPLETE v5.99.0 (posts 1171–1180). Cluster 4 COMPLETE v6.0.0 (posts 1181–1190). **Cluster 5 COMPLETE v6.1.0** (posts 1191–1200 · індивідуальна варіативність, генетичні фактори, тип волокон, тренувальний вік, нейронне плато, рухова еволюція, статеві відмінності, вікова динаміка 35–55, генетичне тестування, синтез блоку). blog.html updated to post-1200. sports-scientist review required before publish.
-- Block 1201–1250: **IN PROGRESS 20/50 · v6.3.0** — тема: Coaching intelligence & external feedback. **Cluster 1 COMPLETE** (posts 1201–1210 · самооцінка без тренера): система vs. інтуїція, межі відеоаналізу, overanalysis trap, кінематичні маркери, журнал як feedback, RPE-калібрування, порівняльний аналіз, тижневий самоаудит, прогрес у техніці, кластер-синтез. **Cluster 2 COMPLETE v6.3.0** (posts 1211–1220 · робота з тренером): перша сесія, feedback протокол, дистанційний коучинг, коли змінювати тренера, критичне читання рекомендацій, автономія vs. compliance, інтеграція feedback, між-сесійний коучинг, конфлікт атлет-тренер, кластер-синтез. blog.html updated to post-1220. sports-scientist review required before publish. **Next: Cluster 3 posts 1221–1230 (тренувальний партнер як джерело feedback).**
+- Block 1201–1250: **IN PROGRESS 30/50 · v6.6.0** — тема: Coaching intelligence & external feedback. **Cluster 1 COMPLETE** (posts 1201–1210 · самооцінка без тренера): система vs. інтуїція, межі відеоаналізу, overanalysis trap, кінематичні маркери, журнал як feedback, RPE-калібрування, порівняльний аналіз, тижневий самоаудит, прогрес у техніці, кластер-синтез. **Cluster 2 COMPLETE v6.3.0** (posts 1211–1220 · робота з тренером): перша сесія, feedback протокол, дистанційний коучинг, коли змінювати тренера, критичне читання рекомендацій, автономія vs. compliance, інтеграція feedback, між-сесійний коучинг, конфлікт атлет-тренер, кластер-синтез. **Cluster 3 COMPLETE v6.6.0** (posts 1221–1230 · тренувальний партнер): третій тип feedback, зовнішній погляд без авторитету, протокол feedback партнеру, синхронізація темпу, конкурентна динаміка, різниця рівнів, спот як спостережницька позиція, відеоаналіз у парі, коли партнер деградує якість, кластер-синтез. blog.html updated to post-1230. sports-scientist review required before publish. **Next: Cluster 4 posts 1231–1240 (зовнішній feedback у конкурентному середовищі).**
 
 ---
 
