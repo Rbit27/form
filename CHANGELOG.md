@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.2.1] — 2026-06-18
+
+### Added
+- `content/post-1211-first-session-with-coach.md` — Block 1201–1250 Cluster 2 post 1/10 (Cluster 2: робота з тренером). «Перша сесія з тренером: що взяти, що показати, що запитати» — що тренер будує в перші 20 хвилин (модель атлета); тренувальний журнал для тренера (4–6 тижнів, ключові ваги + RPE, де прогрес зупинився); відео техніки (бічний кут, робочий підхід, 4–5 повторів, стабільна камера); 3 питання для оцінки тренера (програмування, відстеження прогресу, основне обмеження); технічна консультація vs. постійний коучинг; 4 критерії якості першої сесії; коли не варто звертатись до тренера зараз. clinical-safety: PASS. sports-scientist review required before publish.
+- `README.md` — Block 1401–1450 «Programme design principles: structure, logic, decision-making» додано як нові proposed теми (15 топіків · v6.2.1).
+
+### Changed
+- `blog.html` — додано картку для post-1211 (Coaching Intelligence · 13 хв) перед post-1210.
+- `STATUS.md` — block 1201–1250: 10/50 → 11/50, Cluster 2 STARTED. Total posts: 1156 → 1157. Версія → v6.2.1.
+- `VERSION` — 6.2.0 → 6.2.1.
+
+---
+
 ## [6.2.0] — 2026-06-18
 
 ### Added
