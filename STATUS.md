@@ -1,4 +1,4 @@
-# FORM · Project Status v5.88.1
+# FORM · Project Status v5.89.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.88.1** — 2026-06-18
+**v5.89.0** — 2026-06-18
 
 ---
 
@@ -120,7 +120,7 @@
 - Block 951–1000: **COMPLETE 50/50 · v5.47.0** — all posts written. post-980 HARD VETO (chronic joint pain). blog.html updated to post-1000. sports-scientist review required before publish.
 - Block 1001–1050: **COMPLETE 50/50 · v5.60.0** — всі пости написані. blog.html updated to post-1050. sports-scientist review required before publish. Наступний: Block 1051–1100 (тема TBD — на розсуд product-strategist + sports-scientist).
 - Block 1051–1100: **COMPLETE 50/50 · v5.83.0** — тема: М'язова специфіка та функціональна анатомія. Всі 10 кластерів COMPLETE. Cluster 10 COMPLETE (posts 1096–1100): APL+EPB/De Quervain's (1096), EPL/Lister's tubercle/відстрочений розрив (1097), FPL/AIN syndrome/OK sign (1098), TFCC/Palmer class/ulnar variance (1099), block synthesis (1100). blog.html updated to post-1100. sports-scientist review required before publish.
-- Block 1101–1150: **IN PROGRESS · v5.88.1** — тема: Біомеханіка рухових патернів і силова передача. **Cluster 1 COMPLETE 10/10** (posts 1101–1110): hip hinge fundamentals, hamstring vs. hip mobility, bar path, posterior chain, conv/sumo anatomy, RDL ексцентрика, SLDL vs. RDL, single-leg, Olympic lifting pull, cluster synthesis. **Cluster 2 COMPLETE 10/10 · v5.87.0** (posts 1111–1120): squat three joints, depth + ATG, torso angle, load distribution, ankle dorsiflexion, knee valgus, high-bar vs. low-bar, front squat + goblet squat, unilateral variants, cluster synthesis. blog.html updated to post-1120. sports-scientist review required before publish. **Cluster 3 IN PROGRESS 3/10 · v5.88.1** (posts 1121–1130 push pattern biomechanics): 1121 push pattern system + scapula axes DONE, 1122 scapulohumeral rhythm + serratus + trapezius DONE, 1126 overhead press + thoracic + rib + pelvis DONE; posts 1123–1125 + 1127–1130 pending.
+- Block 1101–1150: **IN PROGRESS · v5.89.0** — тема: Біомеханіка рухових патернів і силова передача. **Cluster 1 COMPLETE 10/10** (posts 1101–1110): hip hinge fundamentals, hamstring vs. hip mobility, bar path, posterior chain, conv/sumo anatomy, RDL ексцентрика, SLDL vs. RDL, single-leg, Olympic lifting pull, cluster synthesis. **Cluster 2 COMPLETE 10/10 · v5.87.0** (posts 1111–1120): squat three joints, depth + ATG, torso angle, load distribution, ankle dorsiflexion, knee valgus, high-bar vs. low-bar, front squat + goblet squat, unilateral variants, cluster synthesis. **Cluster 3 COMPLETE 10/10 · v5.89.0** (posts 1121–1130 push pattern biomechanics): push pattern system + scapula axes, scapulohumeral rhythm + serratus + trapezius, glenohumeral joint + impingement zone, bench press bar path + touch point, shoulder impingement + grip + elbow, overhead press + thoracic + rib + pelvis, horizontal vs. incline + pec fibers + anterior deltoid, unilateral push + dumbbell + stabilization, triceps + elbow mechanics + lockout, cluster synthesis. blog.html updated to post-1130. sports-scientist review required before publish. **Cluster 4 next: pull pattern biomechanics (posts 1131–1140).**
 
 ---
 

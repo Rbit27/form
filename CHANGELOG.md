@@ -1,5 +1,23 @@
 # Changelog · FORM
 
+## [5.89.0] — 2026-06-18
+
+### Added
+- `content/post-1123-glenohumeral-joint-flexion-abduction-impingement.md` — Block 1101–1150 Cluster 3, post 3/10. Glenohumeral joint: ball-and-socket з найбільшим діапазоном і найменшою кістковою стабільністю. Subacromial простір: що проходить і що відбувається при внутрішній ротації вище 90°. Ротаторна манжета як центрователь головки. Кут відведення 75–80° при bench. clinical-safety: NOT_REQUIRED.
+- `content/post-1124-bench-press-bar-path-touch-point-mechanics.md` — Cluster 3, post 4/10. Bench press: J-curve як фізичний наслідок моменту сили, не стилістичний вибір. Оптимальна точка торкання і антропометрія. Ширина хвату і кут відведення ліктя. Arch: пауерліфтинг vs. гіпертрофія — різна логіка. Leg drive і лопатки. clinical-safety: NOT_REQUIRED.
+- `content/post-1125-shoulder-impingement-pressing-grip-elbow-mechanics.md` — Cluster 3, post 5/10. Shoulder impingement як механічний феномен: три параметри ризику (кут відведення, внутрішня ротація, upward rotation якість). Ширина хвату і elbows flared — контекст важливіший за правило. Neutral grip vs. straight bar vs. Swiss bar. clinical-safety: NOT_REQUIRED.
+- `content/post-1127-horizontal-vs-incline-press-pec-fibers-anterior-deltoid.md` — Cluster 3, post 7/10. Pectoralis major: clavicular/sternal/costal волокна. Як кут нахилу лави змінює силові лінії. EMG-дані (Rodríguez-Ridao 2020): clavicular більше при incline, але anterior deltoid також суттєво зростає. Практична шкала 30°/45°/60°. clinical-safety: NOT_REQUIRED.
+- `content/post-1128-unilateral-push-pattern-dumbbell-press-stabilization.md` — Cluster 3, post 8/10. Dumbbell press ≠ barbell з більшим ROM. Bilateral deficit і контрлатеральне інгібування. One-arm press: anti-rotation вимога. Landmine press. Serratus anterior при широкій амплітуді протракції. Floor press і ексцентрична амплітуда. clinical-safety: NOT_REQUIRED.
+- `content/post-1129-triceps-pressing-elbow-extension-long-head-lockout.md` — Cluster 3, post 9/10. Трицепс як primary driver верхньої третини жиму. Три голівки: lateral, medial, long — різні умови роботи. Long head: двосуглобова механіка і залежність від позиції плеча. Sticking point в bench: де і чому. Close-grip bench нюанс. clinical-safety: NOT_REQUIRED.
+- `content/post-1130-push-pattern-cluster-synthesis-1121-1130.md` — Cluster 3, post 10/10. Синтез: дев'ять механічних висновків з постів 1121–1129, три інтегруючих принципи (кінематичний ланцюг, mobility/stability sequencing, context-specific selection), чотири myth-busters. Наступний кластер: pull pattern (1131–1140). clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — blog cards added for posts 1121–1130 (10 cards, inserted before post-1120).
+- `STATUS.md` — Block 1101–1150 Cluster 3 COMPLETE 10/10.
+- `VERSION` — 5.88.1 → 5.89.0.
+
+---
+
 ## [5.88.1] — 2026-06-18
 
 ### Added
