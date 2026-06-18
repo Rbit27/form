@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [6.1.0] — 2026-06-18
+
+### Added
+- `content/post-1191-individual-variability-neural-adaptation.md` — Block 1151–1200 Cluster 5, post 1/10. Індивідуальна варіативність нейронної адаптації: Hubal et al. (2005) дані, базовий VA, архітектура MU, нейронна пластичність, катехоламінова система. Non-responders як mismatched responders. Поведінкові ознаки нейронного профілю.
+- `content/post-1192-genetic-factors-neural-adaptation.md` — Cluster 5, post 2/10. Генетичні фактори: ACTN3 R577X, BDNF Val66Met, MSTN, IGF-1. Доказова база і реальний ефект-розмір. Що генетика не визначає для аматорів.
+- `content/post-1193-fiber-type-neural-adaptation.md` — Cluster 5, post 3/10. Тип волокон і нейронна адаптація: тип I/IIA/IIX, принцип Ханнемана, rate coding, конверсія IIX→IIA при силовому тренуванні. Практичний тест без біопсії. Програмні висновки.
+- `content/post-1194-training-age-neural-adaptation.md` — Cluster 5, post 4/10. Тренувальний вік: три стадії нейронного розвитку (0–12 міс / 1–3 роки / 3+ роки). Нейронний «кредит». Діагностика: плато від нейронної стелі vs. помилки програмування.
+- `content/post-1195-neural-plateau-mechanisms-strategies.md` — Cluster 5, post 5/10. Нейронне плато: три механізми (habituation, VA-максимум, накопичена втома). Діагностичне деловантаження як діагностичний протокол. Чотири стратегії виходу.
+- `content/post-1196-long-term-motor-development.md` — Cluster 5, post 6/10. Довгострокова рухова еволюція: когнітивна → асоціативна → автономна стадія (Fitts і Posner, 1967). Мієлінізація і кортикальна реорганізація. Переучування автоматизованих паттернів: механізм і протокол.
+- `content/post-1197-sex-differences-neural-adaptation.md` — Cluster 5, post 7/10. Статеві відмінності: VA, нейронна стійкість до втоми (Hunter 2009 мета-аналіз), циклічність нейронної готовності. Що однакове. Програмні висновки.
+- `content/post-1198-age-neural-dynamics.md` — Cluster 5, post 8/10. Вікова нейронна динаміка 35–55: втрата MU, уповільнення провідності, зниження corticospinal excitability. Тренований 55-річний vs. нетренований. MED-стратегія. Чому підтримка інтенсивності важливіша за обсяг з віком.
+- `content/post-1199-genetic-testing-training.md` — Cluster 5, post 9/10. Генетичне тестування: що вимірюється, де докази є (ACTN3, ACE), де ринок перебільшує (відсутність RCT «ген → програма», полігенна природа). BASEM і ACSM позиція. Порівняння ДНК-тесту і поведінкового моніторингу.
+- `content/post-1200-block-1151-1200-synthesis.md` — Cluster 5, post 10/10 + Block 1151–1200 synthesis. П'ять кластерів, п'ять операційних принципів блоку. Що змінилося після блоку. Можливі напрямки Блоку 1201–1250.
+- `blog.html` — posts 1191–1200 added to the top of the feed.
+
+### Changed
+- `VERSION` — 6.0.2 → 6.1.0 (Block 1151–1200 COMPLETE).
+- `STATUS.md` — Block 1151–1200 status updated to COMPLETE 50/50.
+
+---
+
 ## [6.0.2] — 2026-06-18
 
 ### Changed
