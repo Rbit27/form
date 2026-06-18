@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [5.94.0] — 2026-06-18
+
+### Added
+- `content/post-1141-kinetic-chain-force-transmission-intro.md` — Block 1101–1150 Cluster 5, post 1/10. Кінетичний ланцюг: вступ. Відкритий і закритий кінетичний ланцюг. Проксимо-дистальний принцип послідовності активації. Тулуб як активна кінетична ланка передачі між нижньою і верхньою кінцівкою. Ground reaction force і вектор зусилля. Слабка ланка, компенсація і системна адаптація. clinical-safety: NOT_REQUIRED.
+- `content/post-1142-thoracolumbar-fascia-posterior-oblique-sling.md` — Block 1101–1150 Cluster 5, post 2/10. TLF і posterior oblique sling: анатомія TLF (posterior/middle/anterior layers). Posterior oblique sling: lat + TLF + contralateral glute max. Механізм при deadlift: lat натягує TLF, а не тягне гриф. EMG і cadaveric дані. «Lat в штані» як механічний ефект. Contralateral training і задіяння POS. clinical-safety: NOT_REQUIRED.
+- `content/post-1143-anterior-oblique-sling-push-pattern.md` — Block 1101–1150 Cluster 5, post 3/10. Anterior oblique sling і push: pec major + contralateral external oblique + hip adductors. Leg drive в bench press через AOS. Ротаційні рухи і AOS (удар, кидок, swing). AOS vs POS реципрокний стосунок. Асиметрія AOS і rotation bias. Програмування однобічних push і ротаційних вправ. clinical-safety: NOT_REQUIRED.
+- `content/post-1144-intra-abdominal-pressure-core-kinetic-link.md` — Block 1101–1150 Cluster 5, post 4/10. IAP і core як кінетична ланка. IAP при силовому навантаженні (5–8 → 200+ mmHg). Bracing vs. hollowing: Grenier & McGill 2007, Vera-Garcia 2007. Valsalva при максимальних підходах. Core як активний передавач зусилля між кінцівками. Чотирибічна IAP система: діафрагма, тазове дно, черевна стінка, TLF. Практичний протокол sub-max і max підходів. clinical-safety: NOT_REQUIRED.
+- `content/post-1145-lumbopelvic-hip-complex-force-transmission.md` — Block 1101–1150 Cluster 5, post 5/10. LPHC і glute max. Lumbopelvic-hip complex: рух в одній ланці змінює дві інших. Glute max як передавач через hip extension і TLF. SIJ force closure (form closure vs. force closure, Snijders 1993). «Gluteal amnesia» і компенсаторні ланки. APT і PPT під навантаженням. Glute max activation перед важкими підходами. clinical-safety: NOT_REQUIRED.
+- `content/post-1146-foot-ground-reaction-force-kinetic-chain.md` — Block 1101–1150 Cluster 5, post 6/10. Стопа і GRF. Tripod foot: три точки контакту і наслідки відхилення. GRF три компоненти (vertical/AP/ML). Pronation/supination: механіка і наслідки надлишку. Дорсифлексія як обмежувач кінетичного ланцюга. Стопа як proprioceptive система. Взуття і transfer GRF. clinical-safety: NOT_REQUIRED.
+- `content/post-1147-muscle-stiffness-stretch-shortening-cycle.md` — Block 1101–1150 Cluster 5, post 7/10. М'язова жорсткість і SSC. Stiffness як механічна властивість (k = F/Δx). Сухожилля як пружний резервуар. SSC три механізми: пружна енергія, рефлекторна активація, моторна готовність. Fast vs. slow SSC. Rate of force development (RFD) і tendon stiffness (Bojsen-Møller 2005). Тренування жорсткості і SSC: важкий тренінг, plyometrics, isometric при довгих довжинах. clinical-safety: NOT_REQUIRED.
+- `content/post-1148-bilateral-deficit-asymmetry-kinetic-chain.md` — Block 1101–1150 Cluster 5, post 8/10. Bilateral deficit і асиметрії. BLD визначення і типова величина (5–15% у нетренованих). Нейром'язові механізми: cortical inhibition, symmetry constraint. Symmetry constraint маскує асиметрії при двобічних рухах. Cross-education effect (Carroll 2006, ~7–8% transfer). Унілатеральне тестування: split squat, single-leg press, hop test. Програмування при значних асиметріях (>15%). clinical-safety: NOT_REQUIRED.
+- `content/post-1149-programming-kinetic-chain-awareness.md` — Block 1101–1150 Cluster 5, post 9/10. Програмування з урахуванням кінетичного ланцюга. Warm-up як послідовна активація: стопа → glute → core → pattern → progressive loading. Pattern sequencing у сесії: hinge перед squat, pull перед push. Transfer training через виявлення слабкої ланки. Підрахунок об'єму через патерни замість «м'язів». Блокова модель через призму кінетичного ланцюга. Щоденний checklist перед важким підходом. clinical-safety: NOT_REQUIRED.
+- `content/post-1150-kinetic-chain-cluster-synthesis-1141-1150.md` — Block 1101–1150 Cluster 5, post 10/10. **BLOCK COMPLETE.** Cluster synthesis: ключові положення постів 1141–1149. Три інтегруючих принципи: (1) зусилля передається через систему, (2) жорсткість кожної ланки визначає ефективність, (3) асиметрії компенсуються і маскуються двобічним навантаженням. П'ять myth-busters. Огляд усіх п'яти кластерів блоку 1101–1150. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — blog cards added for posts 1141–1150 (inserted before post-1140).
+- `STATUS.md` — Block 1101–1150 COMPLETE 50/50; Cluster 5 COMPLETE; blog.html updated to post-1150; Total posts 1123 → 1133; Next: Block 1151–1200 тема TBD (product-strategist + sports-scientist).
+- `VERSION` — 5.93.0 → 5.94.0.
+
+---
+
 ## [5.93.0] — 2026-06-18
 
 ### Added
