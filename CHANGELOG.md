@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.99.2] — 2026-06-18
+
+### Changed
+- `docs/MSA_TEMPLATE.md` v0.3 → v0.4 — Addendum 4 (SIEM Data Processing Addendum v1.0) authored. Five-clause structure (Scope & Activation with SIEM-CONSENT-01 invariant reference; Documented Instructions per GDPR Art. 28(3)(a); Customer Obligations incl. no-reidentification warranty; FORM Obligations incl. privacy floor warranty + 72h breach notification + DEC-030 chain record; Revocation via Admin Dashboard). §4.6 SOC 2 evidence cross-reference (SIEM-CONSENT-E-001, CC9.2/CC1.1). §4.7 governing law. §4.8 five-point outside-counsel review requirement. Order Form updated with SIEM Addendum checkbox. Internal Notes updated with SIEM Addendum 4 guidance row. Closes `docs/OBSERVABILITY.md §47.11` checklist item 5 (P1/M5). References: DEC-065, `docs/OBSERVABILITY.md §47`.
+- `docs/OBSERVABILITY.md` — §47.11 checklist item 5 marked [x] Done (2026-06-18): Addendum 4 authored.
+- `VERSION` — 5.99.1 → 5.99.2.
+
+---
+
 ## [5.99.1] — 2026-06-18
 
 ### Added

@@ -13023,7 +13023,7 @@ Violation (`SIEM_CONSENT_01_NO_ADDENDUM`) → HTTP 422, P1 PagerDuty alert `form
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 5 | Author `docs/MSA_TEMPLATE.md §Addendum 4` (SIEM Data Processing Addendum v1.0) using the five-clause template in §47.4; send for legal review; store signed version at `compliance/contracts/msa-addendum-4-v1.0-template.pdf`; configure DocuSign envelope template. | compliance-officer + legal | **P1** | M5 | [ ] |
+| 5 | Author `docs/MSA_TEMPLATE.md §Addendum 4` (SIEM Data Processing Addendum v1.0) using the five-clause template in §47.4; send for legal review; store signed version at `compliance/contracts/msa-addendum-4-v1.0-template.pdf`; configure DocuSign envelope template. | compliance-officer + legal | **P1** | M5 | [x] Done — 2026-06-18. Five-clause Addendum 4 authored in `docs/MSA_TEMPLATE.md §Addendum 4` (v0.4). Outside counsel review required before first production signing — see §4.8. |
 | 6 | Add P1 PagerDuty alert rule for HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` responses from `emit-audit-event` Worker: alert name `AL-SIEM-CONSENT-01`, service `form-security`, severity P1, SLA < 30 min. Update §27.7 alert rules table to include AL-SIEM-CONSENT-01. | devops-lead + security-engineer | **P1** | M5 | [ ] |
 
 #### P1 — Before SOC 2 observation period start (M8)

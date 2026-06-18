@@ -509,6 +509,7 @@ Upfront discount:    □ 10% (annual upfront) □ None
 Data Residency:      □ EU (Frankfurt)  □ US (us-east-1)  □ Other: ______
 White-label:         □ Yes (Addendum 1 required)  □ No
 CCPA Addendum:       □ Yes (for CA/US customers)  □ No
+SIEM Addendum:       □ Yes (Addendum 4 required if SIEM export enabled)  □ No
 Support Tier:        □ Standard (email 24h)  □ Growth (Slack 4h)  □ Enterprise (phone + Slack 24×7)
 
 Exhibits incorporated:
@@ -518,6 +519,7 @@ Exhibits incorporated:
   □ Exhibit E — Acceptable Use Policy
   □ Addendum 1 — White-Label (if applicable)
   □ Addendum 2 — US Privacy / CCPA SPA (if applicable)
+  □ Addendum 4 — SIEM Data Processing (if SIEM export enabled)
 
 FORM signatory:      _________________________ Date: _________
                      [NAME], [TITLE]
@@ -694,6 +696,110 @@ Filing: outside counsel sign-off memo to `compliance/contracts/{CUSTOMER_SLUG}/e
 
 ---
 
+## ADDENDUM 4 — SIEM DATA PROCESSING ADDENDUM
+
+*(Applicable only if Customer enables SIEM export via the FORM Admin Dashboard. Must be signed before FORM may transmit DEC-030 HMAC-chained audit events to a Customer-designated endpoint.)*
+
+> **PRE-LEGAL-REVIEW DRAFT.** Outside counsel review required before first production execution. Signing mechanism: DocuSign envelope initiated from Admin Dashboard consent capture UI gate (`docs/OBSERVABILITY.md §47.6`). Template version: v1.0 (2026-06-18).
+
+---
+
+**Addendum 4 — SIEM Data Processing Addendum v1.0**
+
+This Addendum is incorporated into and forms part of the Master Subscription Agreement ("MSA") between FORM Health Ltd ("FORM") and the enterprise tenant identified in the Order Form ("Customer"). Capitalised terms not defined here have the meaning given in the MSA.
+
+---
+
+### Addendum 4.1 Clause 1 — Scope and Activation
+
+This Addendum supplements the Master Subscription Agreement ("MSA") between FORM Health Ltd ("FORM") and the enterprise tenant ("Customer"). This Addendum governs FORM's transmission of DEC-030 HMAC-chained audit log events ("Audit Events") from FORM's `emit-audit-event` infrastructure to Customer's designated SIEM endpoint ("Designated Endpoint"). This Addendum becomes effective on the date Customer's authorised representative (as defined in the MSA) accepts it through the FORM Admin Dashboard in-product consent flow ("Effective Date"). FORM will not activate the Audit Event transmission pipeline until the Effective Date.
+
+**SIEM-CONSENT-01 chain invariant:** FORM's `emit-audit-event` Worker will not emit `siem.tenant_export_enabled` for Customer's tenant unless a valid `siem.consent_addendum_signed` DEC-030 HMAC-chained event has been recorded for Customer's `tenant_id`. Any attempt to activate export without a prior signed Addendum 4 will be rejected with HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM`.
+
+---
+
+### Addendum 4.2 Clause 2 — Documented Instructions (GDPR Art. 28(3)(a))
+
+Customer, acting as data controller for the Audit Event stream it receives through the Designated Endpoint, hereby provides FORM with written documented instructions to transmit Audit Events to the Designated Endpoint. These instructions are effective from the Effective Date and remain in force until revoked by Customer through the FORM Admin Dashboard "Revoke SIEM Addendum" action or until termination of the MSA. FORM shall not transmit Audit Events to any endpoint other than the Designated Endpoint specified at acceptance time without Customer providing updated documented instructions through the same mechanism.
+
+**Legal basis:** These documented written instructions satisfy GDPR Art. 28(3)(a), which requires that FORM as processor act only on documented instructions from Customer as controller. A UI click alone does not constitute documented instructions; this signed Addendum is the required written record.
+
+---
+
+### Addendum 4.3 Clause 3 — Customer Obligations
+
+Customer warrants that:
+
+(a) it has an adequate legal basis under applicable data protection law (including GDPR Art. 6(1) or an equivalent provision) for processing the Audit Events received at the Designated Endpoint;
+
+(b) the Designated Endpoint is operated under an appropriate data processing agreement or sub-processing arrangement where required by applicable law;
+
+(c) Customer will not attempt to re-identify individual FORM users from pseudonymised fields in Audit Events (including `actor_hash`, `user_sha256`, `endpoint_url_hash`, or IP subnet fields);
+
+(d) Customer will retain Audit Events received at the Designated Endpoint for no longer than the period permitted by applicable law and Customer's internal data retention policy;
+
+(e) Customer will notify FORM immediately if Customer becomes aware that Audit Events have been accessed by an unauthorised party.
+
+---
+
+### Addendum 4.4 Clause 4 — FORM Obligations
+
+FORM warrants that:
+
+(a) Audit Events transmitted to the Designated Endpoint are processed in accordance with FORM's privacy floor — no plaintext `user_id`, no Art. 9 special category health data, no body composition values, no coaching content, and no plaintext SIEM endpoint URL are included in any transmitted event;
+
+(b) each transmitted event is HMAC-chained and includes `chain_hash` and `prev_hash` fields enabling Customer to verify chain integrity;
+
+(c) FORM will notify Customer within 72 hours of becoming aware of a breach affecting Audit Events in transit to the Designated Endpoint;
+
+(d) FORM maintains a DEC-030 chain record of this Addendum acceptance (`siem.consent_addendum_signed` HIGH 7yr) and any subsequent revocation (`siem.consent_addendum_revoked` HIGH 7yr) to support Customer's audit and compliance obligations.
+
+---
+
+### Addendum 4.5 Clause 5 — Revocation
+
+Customer may revoke this Addendum at any time by clicking "Revoke SIEM Addendum" in the FORM Admin Dashboard. Revocation takes effect within 5 minutes of the Customer action (one DEC-030 event cycle). Upon revocation:
+
+(a) FORM will cease transmission to the Designated Endpoint within 5 minutes;
+
+(b) FORM will emit a `siem.consent_addendum_revoked` DEC-030 event (HIGH, 7yr) recording the revocation;
+
+(c) Customer acknowledges that events already transmitted to the Designated Endpoint before revocation remain subject to Customer's data retention obligations under Clause 3(d);
+
+(d) Customer may re-activate transmission by accepting a new Addendum 4 through the Admin Dashboard — a new `siem.consent_addendum_signed` chain record will be emitted before re-activation.
+
+---
+
+### Addendum 4.6 Evidence and Audit Record
+
+FORM maintains quarterly SOC 2 evidence artefact **SIEM-CONSENT-E-001** (CC9.2/CC1.1): a DEC-030 export of all `siem.consent_addendum_signed` and `siem.consent_addendum_revoked` events per tenant, confirming that no tenant SIEM export was activated without a prior signed Addendum 4. Cross-check query: `SELECT COUNT(*) FROM tenant_siem_configs WHERE export_enabled = true AND addendum_signed_at IS NULL` must return zero. Filed quarterly to `compliance/evidence/siem-consent/SIEM-CONSENT-E-001_<YYYY-QN>.csv`; available to Customer under Exhibit C audit rights.
+
+**Privacy floor on artefact:** No individual employee `user_id`, health data, or Art. 9 special category data in any artefact. `endpoint_url_hash` is SHA-256[:32] truncated. `signed_by_email_hash` is SHA-256 of the authorised representative email — no plaintext email stored in the chain record. `tenant_id` is org slug only.
+
+Full specification: `docs/OBSERVABILITY.md §47` (DEC-065, 2026-06-18).
+
+---
+
+### Addendum 4.7 Governing Law and Conflict
+
+Governing law for this Addendum follows the MSA: Delaware (US Customers); Ireland (EU Customers per Addendum 3). In the event of conflict between this Addendum and the MSA or Exhibit C (DPA), this Addendum prevails on the specific processing activities it governs (Audit Event transmission to the Designated Endpoint).
+
+---
+
+### Addendum 4.8 Outside Counsel Review Requirement
+
+This Addendum must be reviewed by outside counsel before first production execution. Review points:
+
+1. Confirm Clause 2 satisfies GDPR Art. 28(3)(a) documented-instruction requirement for this data flow pattern (FORM-as-processor transmitting to tenant-designated third-party endpoint operated by tenant-as-controller).
+2. Confirm Clause 3(a) customer warranty is adequate — or whether FORM should require evidence of Customer's legal basis rather than a warranty alone.
+3. Confirm 72-hour breach notification in Clause 4(c) is consistent with MSA §14 and GDPR Art. 33/34 timelines.
+4. Confirm Clause 5 revocation mechanism satisfies GDPR Art. 28(3)(a) instruction-withdrawal requirements.
+5. Confirm DocuSign electronic acceptance constitutes valid "written" instruction under applicable GDPR supervisory authority guidance.
+
+Filing: outside counsel sign-off memo to `compliance/contracts/msa-addendum-4-v1.0-counsel-signoff.pdf` before first production execution.
+
+---
+
 ## INTERNAL NOTES (REMOVE BEFORE SENDING TO CUSTOMER)
 
 | Topic | Guidance |
@@ -710,10 +816,13 @@ Filing: outside counsel sign-off memo to `compliance/contracts/{CUSTOMER_SLUG}/e
 | Art. 9 zero-grace-period | §12.2 health data deletion zero grace period is per DEC-036. Cannot be modified by contract. Confirm customer-success has briefed IT contact on offboarding flow. |
 | Redline limits | Standard-term self-service redline ≤ ±10% on commercial terms only. Any redline touching §8 (Privacy Floor), §9 (AUP), §5.3 (AI training), or §12.2 (health data deletion) requires compliance-officer approval regardless of deal size. |
 | EU DPA Annex B | **Addendum 3 is required for all EU-region Customers (`eu-central-1` / `eu-west-1`).** Outside counsel review MANDATORY before execution (see Addendum 3.6). Confirm Cloudflare R2 EU jurisdiction annually (OFB-E-006). Do NOT sign EU enterprise DPA without Addendum 3 + counsel sign-off filed at `compliance/contracts/{CUSTOMER_SLUG}/eu-dpa-annex-b-counsel-signoff-v{N}.pdf`. |
+| SIEM Addendum 4 | **Addendum 4 is required before any SIEM export is activated.** SIEM-CONSENT-01 chain invariant enforces this at the Worker layer (HTTP 422 rejection if no prior signed addendum). Outside counsel review required before first production execution (see §4.8). Do NOT activate SIEM export without Addendum 4 signed and `siem.consent_addendum_signed` DEC-030 event emitted. Evidence: SIEM-CONSENT-E-001 quarterly. Full spec: `docs/OBSERVABILITY.md §47` (DEC-065). |
 
 ---
 
-*v0.3 · 2026-06-15 · owners: compliance-officer, enterprise-architect, founder · next review: before first EU enterprise DPA execution (outside counsel required per Addendum 3.6) and before first enterprise multi-year contract (M10 per §11.4) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35`, `docs/DATA_MODEL.md §36` (DEC-061)*
+*v0.4 · 2026-06-18 · owners: compliance-officer, enterprise-architect, founder · next review: before first EU enterprise DPA execution (outside counsel required per Addendum 3.6), before first SIEM export goes live (outside counsel required per §4.8), and before first enterprise multi-year contract (M10 per §11.4) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35`, `docs/DATA_MODEL.md §36` (DEC-061), `docs/OBSERVABILITY.md §47` (DEC-065)*
+
+*v0.4 (2026-06-18): Addendum 4 — SIEM Data Processing Addendum v1.0. Closes `docs/OBSERVABILITY.md §47.11` checklist item 5 (P1/M5 — "Author `docs/MSA_TEMPLATE.md §Addendum 4`"). Decision: DEC-065 (2026-06-18). Five-clause structure per §47.4: (1) Clause 1 — Scope and Activation (SIEM-CONSENT-01 chain invariant reference; Designated Endpoint designation; no-activation-before-Effective-Date commitment); (2) Clause 2 — Documented Instructions (GDPR Art. 28(3)(a) written-instruction compliance; instruction scope and duration; endpoint constraint); (3) Clause 3 — Customer Obligations (five sub-clauses: adequate legal basis; Designated Endpoint DPA coverage; no-reidentification warranty on pseudonymised fields; retention-policy compliance; breach notification to FORM); (4) Clause 4 — FORM Obligations (privacy floor warranty — no user_id/Art. 9/body composition/coaching content/plaintext endpoint URL in transmitted events; HMAC-chain integrity fields; 72h breach notification; DEC-030 chain record of acceptance and revocation); (5) Clause 5 — Revocation (Admin Dashboard "Revoke SIEM Addendum" action; 5-minute effect; DEC-030 `siem.consent_addendum_revoked` HIGH 7yr record; re-acceptance protocol). §4.6 SOC 2 evidence: SIEM-CONSENT-E-001 (CC9.2/CC1.1 — quarterly DEC-030 export; cross-check query returns zero); privacy floor on artefact (SHA-256[:32] endpoint_url_hash; SHA-256 signed_by_email_hash; no individual health data). §4.7 Governing law (Delaware/Ireland per MSA; Addendum 4 prevails on SIEM data flow activities). §4.8 Outside counsel review requirement (five review points: Art. 28(3)(a) documented-instruction sufficiency; customer warranty vs. evidence-of-basis; 72h breach notification alignment; revocation-as-instruction-withdrawal; DocuSign electronic acceptance validity; filing path `compliance/contracts/msa-addendum-4-v1.0-counsel-signoff.pdf`). Order Form updated: SIEM Addendum checkbox added; Exhibits incorporated list updated with Addendum 4. Internal Notes: SIEM Addendum 4 guidance row added. Privacy floor: no individual employee user_id, health data, Art. 9 special category, body composition, or coaching content in any Audit Event transmitted under this Addendum; endpoint_url_hash SHA-256[:32]; signed_by_email_hash SHA-256(lowercase(email)); tenant_id org slug only; form_api REVOKED from tenant_siem_configs. Cross-references: `docs/OBSERVABILITY.md §47` (DEC-065 — SIEM consent architecture, SIEM-CONSENT-01 invariant, Admin Dashboard gate, DEC-030 events, SIEM-CONSENT-E-001 artefact); `docs/OBSERVABILITY.md §47.11 item 5` (checklist obligation — now [x] Done); `docs/AUDIT_LOG_SCHEMA.md §SIEM` (siem.consent_addendum_signed HIGH 7yr + siem.consent_addendum_revoked HIGH 7yr — to be registered P0/M5); `docs/DATA_MODEL.md §SIEM` (tenant_siem_configs addendum_signed_at + addendum_version columns — migration 0076, P0/M5); `docs/SOC2_READINESS.md §88` (SIEM-CONSENT-E-001 SOC 2 evidence registration); `docs/ENTERPRISE.md §8` (Privacy Floor — non-negotiable; applies to all Audit Events transmitted under this Addendum); `docs/DECISION_LOG.md DEC-065` (decision rationale). Owner: compliance-officer + enterprise-architect + legal.*
 
 *v0.3 (2026-06-15): Addendum 3 — EU Data Residency Terms (DPA Annex B). Closes `docs/DATA_MODEL.md §36.9` checklist item 6 (P0, before first EU enterprise DPA — "Update DPA Annex B template transfer mechanism row"). (1) Header corrected v0.1 → v0.3 (v0.2 note was present in footer but header line not updated at time of v0.2 commit). (2) Exhibit C SCC bullet made conditional: SCC Module 2 applies to active-service processing; for EU-region Customers (`data_region IN ('eu-central-1', 'eu-west-1')`), off-boarding export packages stored in Cloudflare R2 EU — no Chapter V GDPR transfer mechanism required for that activity; reference to Addendum 3 added. (3) Addendum 3 — EU Data Residency Terms: §3.1 Applicability (eu-central-1 / eu-west-1 Order Form regions); §3.2 EU Data Residency Commitment — off-boarding packages to `form-offboarding-exports-eu` (OFB-REGION-01 chain invariant enforcement; HTTP 422 on violation; R-05 escalation), Art. 9 health data structural prohibition (egress_package_type_enum), HMAC audit log EU storage; §3.3 DPA Annex B four-row transfer mechanism table — (a) off-boarding packages: None required (EU R2, intra-EEA), (b) active service processing: SCC Module 2 (Cloudflare Ireland Ltd sub-processor with EU addendum), (c) PostHog EU Cloud analytics: None required (k ≥ 5 floor), (d) Sentry EU: SCC Module 2 (technical metadata only); outside counsel note on R2 EU jurisdiction dependency; (4) §3.4 Evidence commitments: OFB-E-005 (quarterly chain export confirming OFB-REGION-01; C1.1/P4.0/CC6.1) + OFB-E-006 (annual R2 EU jurisdiction screenshot; C1.1/CC6.1); both from `docs/DATA_MODEL.md §36.7` (DEC-061). (5) §3.5 Governing law: Ireland for EU Customers; Addendum 3 prevails on §3.3 activities. (6) §3.6 Outside counsel requirement: five review points (R2 EU Chapter V declaration, TIA, SCC Module 2 coverage, k ≥ 5 EDPB, governing law enforceability); filing path `compliance/contracts/{CUSTOMER_SLUG}/eu-dpa-annex-b-counsel-signoff-v{N}.pdf`. (7) Internal Notes: EU DPA Annex B row added (Addendum 3 mandatory for EU Customers, outside counsel required, OFB-E-006 annual confirmation). Privacy floor: no individual employee `user_id`, health data, or Art. 9 category in any artefact specified by this Addendum; `tenant_id` slug only in OFB-E-005; OFB-E-006 is infrastructure screenshot with no personal data. Cross-references: `docs/DATA_MODEL.md §36.6` (OFB-REGION-01 spec); `docs/DATA_MODEL.md §36.7` (OFB-E-005/006 source); `docs/DATA_MODEL.md §36.9` (checklist item 6 — now [x] Done); `docs/SOC2_READINESS.md §67.8` (OFB-E-005/006 evidence table); `docs/SOC2_READINESS.md §67.9` (CC6.1/C1.1 EU residency criteria); `docs/INCIDENT_RESPONSE.md R-05` (OFB-REGION-01 violation response); `docs/GDPR_DPIA.md §10.3` (k-anonymity open question); `docs/SUBPROCESSORS.md §5` (DPA template reference); `docs/DECISION_LOG.md DEC-061`. Owner: compliance-officer + enterprise-architect + legal.*
 
