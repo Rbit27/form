@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.5.0] — 2026-06-18
+
+### Added
+- `docs/DATA_MODEL.md §40` — `tenant_siem_configs` SIEM Integration Configuration Schema (v1.19). Full DDL in two-migration design: migration 0063 (base table with `siem_destination_type_enum`, `export_enabled`, `endpoint_url_hash` SHA-256[:32], `filter_rules`, `filter_compliance_approved`, `chk_siem_export_requires_endpoint` CHECK) and migration 0076 (additive: `addendum_signed_at`, `addendum_version`, `signed_by_email_hash`, `chk_siem_addendum_consistency` CHECK, `idx_tsc_addendum_signed` partial index). Includes RLS matrix (`form_api` REVOKED, `form_system` tenant-isolated, `security_reviewer` unrestricted read), four DEC-030 events, export activation state machine, SOC 2 CC9.2/C1.1/CC1.1/CC7.2 cross-references, and SIEM-CONSENT-E-001 cross-check query.
+
+### Changed
+- `docs/OBSERVABILITY.md §47.11 item 3` — status updated from `[ ]` to `[x] Closed by DATA_MODEL §40 (v1.19, 2026-06-18)`.
+- `VERSION` — 6.4.0 → 6.5.0.
+
+---
+
 ## [6.4.0] — 2026-06-18
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.18
+# FORM · Multi-Tenant Data Model v1.19
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -15028,3 +15028,222 @@ See `docs/SOC2_READINESS.md §87` for full auditor narratives, collection method
 ---
 
 *v1.18 (2026-06-18): §39 Enterprise Deal Outcomes Schema — closes the forward reference `docs/DATA_MODEL.md §39.5` cited in `docs/COST_MODEL.md §39` cross-references. `enterprise_deal_outcomes` DDL (migration 0074: Step 1 extend `enterprise_pipeline_stage_enum` with `'closed_lost'`; Step 2 CREATE TABLE with `won_fields_required` + `lost_fields_required` + `competitor_category_required_on_competitor_loss` + `no_go_flag_consistent` CHECK constraints; Step 3 three indexes — `idx_deal_outcomes_deal_id` UNIQUE, `idx_deal_outcomes_outcome_closed`, `idx_deal_outcomes_tier_reason`; Step 4 RLS compliance_reviewer+form_admin SELECT, form_system INSERT, form_api REVOKED; `tcv_usd` and `sales_cycle_days` GENERATED ALWAYS columns). §39.1 purpose: bridges §37 stage-level tracking and ARR bridge; records financial profile of closed-won deals; structured win/loss attribution with eight win codes, ten loss codes, six competitor_category enum values. §39.3 win/loss reason taxonomy (full table). §39.4 financial classification for closed_won deals (`floor_respected = TRUE` invariant; `pricing_exception_event_id` soft-ref; `tcv_usd` GENERATED column). §39.5 DDL (cross-referenced from `docs/COST_MODEL.md §39.5`). §39.6 analytics queries deferred to COST_MODEL §39.6.1–39.6.5 and runbook RB-ENT-WIN-LOSS-01. §39.7 four DEC-030 events: `enterprise.deal_closed_won` (WIN-CHAIN-01 WARNING; `floor_respected: true` invariant); `enterprise.deal_closed_lost` (auto-companion `privacy.no_go_criteria_applied` when `no_go_criteria_triggered = true`); `enterprise.win_loss_analysis_recalibrated` (PIPE-CHAIN-02 HTTP 422 if `decision_log_ref` null); `privacy.no_go_criteria_applied` (auto-companion only; never standalone). §39.8 three SOC 2 evidence artefacts: WIN-E-001 (CC5.2/CC1.4 annual closed-won export + `floor_respected` attestation); WIN-E-002 (CC5.2/CC4.1 recalibration export at Deal 10/20/50); WIN-E-003 (CC1.4/CC9.2 quarterly no-go export; zero-count quarters as affirmative attestation). §39.9 seven-item implementation checklist: 3× P0/M9 (DDL migration 0074, DEC-030 event registration + WIN-CHAIN-01/PIPE-CHAIN-02 integration tests + two-event array test, Admin Console "Close Deal" modal), 2× P1/M10 (WIN-E-001 first filing, WIN-E-003 quarterly cadence start), 2× P2/M18–M24 (OQ-PIPE-01 closure at Deal 10, OQ-WIN-02 evaluation at Deal 20). §39.10 three open questions (OQ-PIPE-01, OQ-WIN-01, OQ-WIN-02). Privacy floor: no prospect company names, contact emails, or individual employee `user_id` in any table column used in DEC-030 payloads; `competitor_category` is structured enum only; verbatim loss-call notes stay in CRM; `deal_id` is FORM-internal UUID never shared externally; `form_api` REVOKED. Cross-references: `docs/COST_MODEL.md §39` (authoritative source for DDL, analytics queries, DEC-030 event schemas, and implementation checklist); `docs/SOC2_READINESS.md §87` (WIN-E-001/002/003 evidence artefacts + auditor narratives); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Deal Close Events` (four DEC-030 events to register); `docs/runbooks/RB-ENT-WIN-LOSS-01.md` (quarterly win/loss review + OQ-PIPE-01 calibration protocol); §37 (`enterprise_pipeline_stages.id` — `deal_id` FK source; `enterprise_pipeline_stages.created_at` — `sales_cycle_days` GENERATED computation base); §38 (`enterprise_partners.id` — `attributed_to_partner_id` FK ON DELETE SET NULL); `docs/DECISION_LOG.md` (DEC-06X — OQ-PIPE-01 closure record at Deal 10; required for `win_loss_analysis_recalibrated` `decision_log_ref`); `docs/ENTERPRISE.md §"No-go customers"` (four criteria: insurance risk scoring, government backdoors, wellness-as-punishment, other). Owner: enterprise-architect + compliance-officer + customer-success.*
+
+---
+
+## §40 SIEM Integration Configuration Schema — `tenant_siem_configs`
+
+> Cross-reference: `docs/OBSERVABILITY.md §47.5` (migration spec), `docs/OBSERVABILITY.md §47.7` (SIEM-CONSENT-01 chain invariant), `docs/OBSERVABILITY.md §47.8` (DEC-030 events), `docs/OBSERVABILITY.md §47.9` (evidence artefact SIEM-CONSENT-E-001). Closes cross-reference obligation from §47.11 item 3 (P0/M5).
+
+### §40.1 Purpose
+
+`tenant_siem_configs` stores per-tenant SIEM export configuration: the destination type, a privacy-safe hash of the endpoint URL, filter rules, and — critically — the consent addendum state that gates export activation.
+
+One row per tenant. `export_enabled = TRUE` is only permitted after `addendum_signed_at IS NOT NULL` (enforced at both the CHECK constraint layer and the SIEM-CONSENT-01 Worker layer — see §40.7).
+
+### §40.2 DDL — Base Table (migration 0063)
+
+```sql
+CREATE TYPE siem_destination_type_enum AS ENUM (
+  'splunk', 'sentinel', 'datadog', 'qradar', 'webhook'
+);
+
+CREATE TABLE tenant_siem_configs (
+  id                         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                  UUID        NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
+  export_enabled             BOOLEAN     NOT NULL DEFAULT FALSE,
+  destination_type           siem_destination_type_enum,
+  endpoint_url_hash          TEXT        CHECK (endpoint_url_hash IS NULL OR length(endpoint_url_hash) = 32),
+  filter_rules               JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  filter_compliance_approved BOOLEAN     NOT NULL DEFAULT FALSE,
+  created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT chk_siem_export_requires_endpoint
+    CHECK (NOT export_enabled
+           OR (destination_type IS NOT NULL AND endpoint_url_hash IS NOT NULL))
+);
+```
+
+> **Privacy floor**: The `endpoint_url_hash` column stores SHA-256(endpoint_url)[:32] — the first 32 hex characters only. Full endpoint URLs are never persisted in Postgres. This satisfies C1.1 (Confidentiality) and prevents leakage of third-party SIEM hostnames via SQL dump or audit export.
+
+### §40.3 DDL Extension — Consent Addendum Columns (migration 0076)
+
+Migration 0076 (`0076_siem_consent_addendum.sql`) adds three columns required by DEC-065 (SIEM Data Processing Addendum). Applied as `IF NOT EXISTS` to be idempotent on environments where the columns were pre-migrated.
+
+```sql
+-- Migration: 0076_siem_consent_addendum.sql
+-- Decision: DEC-065 (2026-06-18)
+-- Cross-ref: docs/OBSERVABILITY.md §47.5, docs/DATA_MODEL.md §40.3
+
+ALTER TABLE tenant_siem_configs
+  ADD COLUMN IF NOT EXISTS addendum_signed_at   TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS addendum_version      TEXT,
+  ADD COLUMN IF NOT EXISTS signed_by_email_hash  TEXT
+    CHECK (signed_by_email_hash IS NULL
+           OR length(signed_by_email_hash) = 64);
+
+ALTER TABLE tenant_siem_configs
+  ADD CONSTRAINT chk_siem_addendum_consistency CHECK (
+    (addendum_signed_at IS NULL
+     AND addendum_version IS NULL
+     AND signed_by_email_hash IS NULL)
+    OR
+    (addendum_signed_at IS NOT NULL
+     AND addendum_version IS NOT NULL
+     AND signed_by_email_hash IS NOT NULL)
+  );
+
+CREATE INDEX IF NOT EXISTS idx_tsc_addendum_signed
+  ON tenant_siem_configs (tenant_id, addendum_signed_at)
+  WHERE addendum_signed_at IS NOT NULL;
+
+COMMENT ON COLUMN tenant_siem_configs.addendum_signed_at
+  IS 'Timestamp at which the authorised representative signed MSA Addendum 4 (SIEM Data Processing Addendum). NULL = no signed addendum on file. Required before export_enabled may be set TRUE (SIEM-CONSENT-01).';
+
+COMMENT ON COLUMN tenant_siem_configs.addendum_version
+  IS 'Version string of the MSA Addendum 4 template signed (e.g. "1.0"). Cross-references docs/MSA_TEMPLATE.md §Addendum 4.';
+
+COMMENT ON COLUMN tenant_siem_configs.signed_by_email_hash
+  IS 'SHA-256(lowercase(authorised_rep_email)). 64-char hex. Full email never persisted. Privacy floor: C1.1.';
+```
+
+**Full column summary (post migration 0076):**
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | UUID | NOT NULL | `gen_random_uuid()` | PK |
+| `tenant_id` | UUID | NOT NULL | — | FK → `tenants(id)` ON DELETE CASCADE; UNIQUE |
+| `export_enabled` | BOOLEAN | NOT NULL | FALSE | Must remain FALSE until addendum signed |
+| `destination_type` | siem_destination_type_enum | NULL | — | Required when `export_enabled = TRUE` |
+| `endpoint_url_hash` | TEXT | NULL | — | SHA-256(url)[:32] — 32 hex chars; required when `export_enabled = TRUE` |
+| `filter_rules` | JSONB | NOT NULL | `'[]'` | Approved filter expression array |
+| `filter_compliance_approved` | BOOLEAN | NOT NULL | FALSE | Set TRUE by compliance-officer only |
+| `addendum_signed_at` | TIMESTAMPTZ | NULL | — | NULL = no consent on file (added migration 0076) |
+| `addendum_version` | TEXT | NULL | — | e.g. `"1.0"` (added migration 0076) |
+| `signed_by_email_hash` | TEXT | NULL | — | SHA-256(lowercase(email)) — 64 hex chars (added migration 0076) |
+| `created_at` | TIMESTAMPTZ | NOT NULL | `now()` | |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | `now()` | Updated by trigger |
+
+**CHECK constraints:**
+
+| Constraint | Definition |
+|-----------|-----------|
+| `chk_siem_export_requires_endpoint` | `NOT export_enabled OR (destination_type IS NOT NULL AND endpoint_url_hash IS NOT NULL)` |
+| `chk_siem_addendum_consistency` | All three addendum columns NULL together, OR all three NOT NULL |
+
+### §40.4 Indexes
+
+| Index | Columns | Condition | Used by |
+|-------|---------|-----------|---------|
+| `tenant_siem_configs_pkey` | `id` | — | PK lookups |
+| `tenant_siem_configs_tenant_id_key` | `tenant_id` | — | Per-tenant config fetch |
+| `idx_tsc_addendum_signed` | `(tenant_id, addendum_signed_at)` | `WHERE addendum_signed_at IS NOT NULL` | SIEM-CONSENT-E-001 quarterly query; SIEM-CONSENT-01 Worker check |
+
+### §40.5 Row-Level Security (RLS)
+
+```sql
+ALTER TABLE tenant_siem_configs ENABLE ROW LEVEL SECURITY;
+
+-- form_api: REVOKED entirely. All writes go through admin-dashboard → Worker → form_system.
+REVOKE ALL ON tenant_siem_configs FROM form_api;
+
+-- form_system: full access, scoped to current tenant via app.current_tenant_id
+GRANT SELECT, INSERT, UPDATE ON tenant_siem_configs TO form_system;
+
+CREATE POLICY siem_configs_tenant_isolation
+  ON tenant_siem_configs
+  FOR ALL
+  TO form_system
+  USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+
+-- security_reviewer: unrestricted SELECT (SOC 2 audits, SIEM-CONSENT-E-001 quarterly export)
+GRANT SELECT ON tenant_siem_configs TO security_reviewer;
+
+CREATE POLICY siem_configs_reviewer_read
+  ON tenant_siem_configs
+  FOR SELECT
+  TO security_reviewer
+  USING (TRUE);
+```
+
+**RLS matrix:**
+
+| Role | SELECT | INSERT | UPDATE | DELETE |
+|------|--------|--------|--------|--------|
+| `form_api` | ✗ REVOKED | ✗ REVOKED | ✗ REVOKED | ✗ REVOKED |
+| `form_system` | ✓ own tenant | ✓ own tenant | ✓ own tenant | ✗ |
+| `security_reviewer` | ✓ all tenants | ✗ | ✗ | ✗ |
+
+### §40.6 DEC-030 Audit Events
+
+All state transitions on `tenant_siem_configs` emit HMAC-chained DEC-030 events via the `emit-audit-event` Cloudflare Worker. Four events are registered (full Zod v2 schemas: `docs/OBSERVABILITY.md §47.8`):
+
+| Event name | Severity | Retention | Trigger |
+|-----------|---------|-----------|---------|
+| `siem.tenant_export_enabled` | HIGH | 3 yr | `export_enabled` set TRUE; requires prior consent event in chain (SIEM-CONSENT-01) |
+| `siem.tenant_export_disabled` | HIGH | 3 yr | `export_enabled` set FALSE |
+| `siem.consent_addendum_signed` | HIGH | 7 yr | Addendum 4 signed; addendum columns written |
+| `siem.consent_addendum_revoked` | HIGH | 7 yr | Addendum revoked; addendum columns cleared; `export_enabled` forced FALSE |
+
+**SIEM-CONSENT-01 chain invariant:** For any tenant T, if `siem.tenant_export_enabled` appears at chain position N, then `siem.consent_addendum_signed` must appear at some M < N with matching `tenant_id`. Violation → HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM`. Full formal statement and Worker enforcement pseudo-code: `docs/OBSERVABILITY.md §47.7`.
+
+### §40.7 Export Activation State Machine
+
+```
+NOT_CONFIGURED
+  │  INSERT row (export_enabled=FALSE, all addendum columns NULL)
+  ▼
+CONFIGURED_UNSIGNED
+  │  Admin signs Addendum 4 via Admin Dashboard consent gate (§47.6)
+  │  → emit siem.consent_addendum_signed (DEC-030, HIGH, 7yr)
+  │  → write addendum_signed_at, addendum_version, signed_by_email_hash
+  ▼
+CONSENT_PENDING_ACTIVATION
+  │  Admin enables export
+  │  → SIEM-CONSENT-01 passes (consent event in HMAC chain)
+  │  → emit siem.tenant_export_enabled (DEC-030, HIGH, 3yr)
+  │  → set export_enabled = TRUE
+  ▼
+ACTIVE ◄────────────────────────────────────────────────────────────┐
+  │  Disable export                  │  Revoke consent               │
+  ▼                                  ▼                               │
+CONFIGURED_UNSIGNED              NOT_CONFIGURED                      │
+  │  (export_enabled=FALSE;         (emit siem.consent_addendum_     │
+  │   addendum still valid)          revoked; clear addendum cols;   │
+  │                                  export_enabled=FALSE)           │
+  └── re-enable ──────────────────────────────────────────────────────┘
+                                      │
+                                      └── new Addendum 4 signing required
+```
+
+### §40.8 SOC 2 Cross-References
+
+| Control | Criterion | How `tenant_siem_configs` satisfies it |
+|---------|-----------|---------------------------------------|
+| SIEM-CONSENT-01 | CC9.2 (Vendor Contracts) | `addendum_signed_at IS NOT NULL` guarantees a signed DPA on file before any export is activated |
+| Confidentiality | C1.1 | `endpoint_url_hash` SHA-256[:32] — no plaintext SIEM URL in Postgres; `signed_by_email_hash` SHA-256(lowercase(email)) |
+| Processor instruction | CC1.1 (COSO Principle 1) | `addendum_version` links to the specific MSA Addendum 4 revision that authorises FORM to act as processor for audit event transmission; satisfies GDPR Art. 28(3)(a) |
+| Incident monitoring | CC7.2 | SIEM-CONSENT-E-001 quarterly cross-check — zero rows expected |
+
+**SIEM-CONSENT-E-001 cross-check query** (must return 0 rows every quarter; any row = P0 evidence gap):
+
+```sql
+SELECT tenant_id
+FROM   tenant_siem_configs
+WHERE  export_enabled = TRUE
+  AND  addendum_signed_at IS NULL;
+-- Expected: 0 rows. Any result requires immediate investigation.
+```
+
+Evidence artefact: `compliance/evidence/siem-consent/SIEM-CONSENT-E-001_<YYYY-QN>.csv`. Registered in `docs/SOC2_READINESS.md §88`.
+
+### §40.9 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-SIEM-03** | Should FORM provide an HMAC chain verification library to tenants so they can independently verify the integrity of their exported audit events? Currently tenants must trust FORM's chain export without tooling to self-verify. | P2 | security-engineer + enterprise-architect | Evaluate after first enterprise SIEM export goes live; create DEC-0XX decision record when ≥ 3 tenants request verification capability. Until then, `docs/OBSERVABILITY.md §47.10` tracks as 🟡 Open P2. |
+
+---
+
+*v1.19 (2026-06-18): §40 SIEM Integration Configuration Schema — `tenant_siem_configs`. Closes cross-reference obligation from `docs/OBSERVABILITY.md §47.5` and `§47.11 item 3` (P0/M5 — obligation to document `addendum_signed_at` and `addendum_version` in DATA_MODEL §SIEM). DDL delivered in two-migration design: migration 0063 (base table — `siem_destination_type_enum`, `export_enabled`, `endpoint_url_hash` SHA-256[:32], `filter_rules`, `filter_compliance_approved`, timestamps, `chk_siem_export_requires_endpoint` CHECK) and migration 0076 (additive: `addendum_signed_at TIMESTAMPTZ`, `addendum_version TEXT`, `signed_by_email_hash TEXT(64)`, `chk_siem_addendum_consistency` CHECK, `idx_tsc_addendum_signed` partial index, three COMMENT annotations). §40.2 base DDL with privacy-floor note. §40.3 migration 0076 extension with idempotent `IF NOT EXISTS`, `chk_siem_addendum_consistency` (all three addendum fields all-NULL or all-NOT-NULL), and three COMMENT ON COLUMN annotations. §40.4 three-index summary. §40.5 RLS: `form_api` REVOKED entirely; `form_system` SELECT/INSERT/UPDATE on own tenant via `app.current_tenant_id` row policy; `security_reviewer` unrestricted SELECT for SOC 2 audit and SIEM-CONSENT-E-001 quarterly queries. §40.6 four DEC-030 events: `siem.tenant_export_enabled` (HIGH, 3yr), `siem.tenant_export_disabled` (HIGH, 3yr), `siem.consent_addendum_signed` (HIGH, 7yr), `siem.consent_addendum_revoked` (HIGH, 7yr); SIEM-CONSENT-01 chain invariant summary (full spec in OBSERVABILITY §47.7). §40.7 export activation state machine (NOT_CONFIGURED → CONFIGURED_UNSIGNED → CONSENT_PENDING_ACTIVATION → ACTIVE; disable and revoke transitions; new Addendum 4 signing required after revocation). §40.8 SOC 2 cross-references (CC9.2/SIEM-CONSENT-01, C1.1 endpoint hash, CC1.1/GDPR Art. 28(3)(a)/addendum_version, CC7.2/SIEM-CONSENT-E-001 cross-check query). §40.9 OQ-SIEM-03 P2 open question (HMAC chain verification library for tenant consumers). Privacy floor: endpoint_url_hash SHA-256(url)[:32] (32 hex chars, first half of full digest — SIEM hostname never in Postgres); signed_by_email_hash SHA-256(lowercase(email)) (64 hex chars, full digest — authorised rep email never in Postgres); form_api REVOKED from table. Cross-references: `docs/OBSERVABILITY.md §47.5` (migration 0076 DDL spec — cross-reference confirmed complete); `docs/OBSERVABILITY.md §47.7` (SIEM-CONSENT-01 chain invariant); `docs/OBSERVABILITY.md §47.8` (four DEC-030 Zod v2 schemas); `docs/OBSERVABILITY.md §47.9` (SIEM-CONSENT-E-001 evidence artefact); `docs/OBSERVABILITY.md §47.11 item 3` (P0/M5 obligation — closed by this §40); `docs/SOC2_READINESS.md §88` (SIEM-CONSENT-E-001 registered; cross-check query); `docs/DECISION_LOG.md DEC-065` (MSA Addendum 4 decision rationale); `docs/MSA_TEMPLATE.md §Addendum 4` (addendum_version reference); `docs/AUDIT_LOG_SCHEMA.md §SIEM` (four DEC-030 events to register — P0/M5). Owner: enterprise-architect + compliance-officer + security-engineer.*
