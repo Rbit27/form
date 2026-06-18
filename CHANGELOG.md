@@ -1,5 +1,23 @@
 # Changelog · FORM
 
+## [5.99.0] — 2026-06-18
+
+### Added
+- `content/post-1171-pap-mechanism-myosin-phosphorylation.md` — Block 1151–1200 Cluster 3 post 1/10. Постактиваційна потенціація: механізм фосфорилювання регуляторних легких ланцюгів міозину (MLCK), підвищена Ca²⁺-чутливість міофібрил, H-рефлекторна потенціація. Двофазна відповідь: втома (1–3 хв) → PAP домінує (4–10 хв). Sale (2002), Hamada et al. (2000).
+- `content/post-1172-pap-complex-training-protocol.md` — Cluster 3 post 2/10. PAP на практиці: complex training (85–90% 1RM → 4–8 хв → вибухова робота), contrast sets. Залежність від тренувального статусу: +3–8% у тренованих. Wilson et al. (2013) мета-аналіз, Seitz & Haff (2016). Ключова змінна — інтервал відпочинку.
+- `content/post-1173-deload-neural-mechanism-central-fatigue.md` — Cluster 3 post 3/10. Деловантаження як нейронний інструмент: VA знижується до 91–95% після мезоциклу, нейромедіаторний дисбаланс, підвищена кортикальна витрата. Відновлення VA за 5–7 днів при -40–60% об'єму + збережена інтенсивність ≥80% 1RM. Meeusen et al. (2010), Gandevia (2001).
+- `content/post-1174-stress-hpa-axis-strength-neural-readiness.md` — Cluster 3 post 4/10. Стрес і HPA-вісь: кортизол змінює збудливість моторних нейронів. Marcora (2009): ментальна втома знижує час до відмови на 15.1% при ідентичних периферичних маркерах. Хронічний стрес і overtraining syndrome мають перекриваючі нейроендокринні маркери.
+- `content/post-1175-sleep-strength-performance-neural-readiness.md` — Cluster 3 post 5/10. Сон і максимальна сила: ≤6 год → grip strength -5–8%, час до відмови -10–11%. Знижена кортикоспінальна збудливість, підвищений аденозин. Blumert et al. (2007) — важкоатлети після депривації сну. Mah et al. (2011) — подовжений сон +5%.
+- `content/post-1176-rate-coding-strength-adaptation-firing-rate.md` — Cluster 3 post 6/10. Rate coding: після повного рекрутування сила зростає через частоту розряду. Carroll et al. (2002): тренована група — вищі пікові частоти. Специфічний стимул — 85–97% 1RM. Cluster sets, балістична робота. Межі GtG для пікового rate coding.
+- `content/post-1177-deload-supercompensation-voluntary-activation.md` — Cluster 3 post 7/10. Суперкомпенсація VA: twitch interpolation, VA 96–99% після тапера. Bosquet et al. (2007): 8–14-денний тапер -41–60% об'єму → +3–6% результату. Пік нейронного виразу через 7–14 днів. Атлети без деловантажень — хронічно пригнічена VA.
+- `content/post-1178-neural-plateau-strength-development-diagnosis.md` — Cluster 3 post 8/10. Нейронне плато: два типи (структурне vs нейронне VA/rate coding). Діагностика через тапер-тест і RPE-динаміку. Рішення: важка робота 90%+, contrast sets, систематичний тапер. Помилка — додавати об'єм при нейронному плато.
+- `content/post-1179-day-of-neural-readiness-heavy-attempt.md` — Cluster 3 post 9/10. П'ять керованих факторів готовності в день підходу: циркадний ритм (Drust 2005, пік 16–19:00, +3–8%), PAP-розминка (90–95% 1RM → 4–8 хв), кофеїн 3–6 мг/кг (Grgic et al. 2020 мета-аналіз), збудження (Єркес–Додсон), зовнішній фокус (Wulf & Lewthwaite 2016).
+- `content/post-1180-cluster-1171-1180-neural-strength-regulation-synthesis.md` — Cluster 3 post 10/10. Synthesis: 9 ключових знахідок по одній на пост, три операційні принципи (нейронна система — керований обмежувач; структура деловантаження має значення; максимальна сила потребує нейронних умов), п'ять помилок, програмні наслідки, preview Кластера 4.
+- `blog.html` — оновлено: додано 10 записів Кластера 3 (пости 1171–1180) у верхній частині списку.
+
+### Changed
+- `STATUS.md` — Block 1151–1200 оновлено до 30/50; Cluster 3 COMPLETE; Next: Cluster 4 (1181–1190).
+
 ## [5.98.1] — 2026-06-18
 
 ### Added
