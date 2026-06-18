@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.0.2] — 2026-06-18
+
+### Changed
+- `docs/SOC2_READINESS.md` v3.13.0 → v3.13.1 — §79.4 master evidence table patch: four artefact rows added (WIN-E-001 CC5.2/CC1.4, WIN-E-002 CC5.2/CC4.1, WIN-E-003 CC1.4/CC9.2, SIEM-CONSENT-E-001 CC9.2/CC1.1). §80.3 R2 folder structure extended with `winloss/` (WIN-E-001/002/003; form-api NO ACCESS) and `siem-consent/` (SIEM-CONSENT-E-001; form-api NO ACCESS). Closes §87.7 item 4 (P1/M10) and §88.5 item 1 (P1/M8). Document header corrected v3.10.0 → v3.13.1.
+- `VERSION` — 6.0.1 → 6.0.2.
+
+---
+
 ## [6.0.1] — 2026-06-18
 
 ### Added
