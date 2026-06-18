@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [5.91.0] — 2026-06-18
+
+### Added
+- `content/post-1131-pull-pattern-horizontal-vertical-system.md` — Block 1101–1150 Cluster 4, post 1/10. Pull pattern як система: дві осі (горизонтальна і вертикальна), кінематичний ланцюг від стопи/тазу до хвату. Три рухи лопатки в тязі: ретракція, депресія, downward rotation у фінальній фазі. Роль SC/AC суглобів. Чому «тягни ліктями» — корисна, але неповна кю. Вхідна точка до кластеру. clinical-safety: NOT_REQUIRED.
+- `content/post-1132-scapular-retraction-depression-trapezius-rhomboids.md` — Cluster 4, post 2/10. Ретракція vs депресія лопатки — різні м'язи, різні функції. Середня трапеція (горизонтальна ретракція), нижня трапеція (депресія + ретракція — ключова для обох осей тяги), rhomboids (ретракція + легка елевація). Serratus anterior як ексцентричний контролер у тязі. «Pack your scapulae» механічно визначено. Scapular SET перед тягою vs рух під час тяги. clinical-safety: NOT_REQUIRED.
+- `content/post-1133-latissimus-dorsi-mechanics-shoulder-extension-adduction.md` — Cluster 4, post 3/10. Анатомія lat: origin (thoracolumbar fascia, iliac crest, нижні 6 ребер), insertion (intertubercular groove). Три дії: розгинання, приведення, внутрішня ротація плеча. Thoracolumbar fascia і чому lat є «м'язом стегна». Умови повного розтягнення широчайшого. Tight lat і overhead mobility. Пронований vs супінований хват і активація. clinical-safety: NOT_REQUIRED.
+- `content/post-1134-vertical-pull-mechanics-pullup-lat-pulldown-grip-torso.md` — Cluster 4, post 4/10. Pull-up vs lat pulldown: одна механіка, різна стабілізаційна вимога. Траєкторія в pull-up — не вертикальна. Нахил тулуба в lat pulldown як нормальна механіка. Вплив ширини хвату: horizontal adduction vs extension vs ROM. Overhand/underhand/neutral grip механічні відмінності. Behind-the-neck pulldown ризики. Три чинники кінцевого діапазону. clinical-safety: NOT_REQUIRED.
+- `content/post-1135-horizontal-pull-mechanics-row-variations-lumbar.md` — Cluster 4, post 5/10. Горизонтальна тяга як противага push-домінантним програмам. Bent-over row: hip hinge. Кут тулуба 45° vs 90° (Pendlay). Момент сили на хребті. Iniціація лопаткою vs ліктем. Seated cable row і chest-supported row — коли. Як далеко тягнути. Програмні рекомендації. clinical-safety: NOT_REQUIRED.
+- `content/post-1136-elbow-flexors-biceps-brachialis-grip-pulling.md` — Cluster 4, post 6/10. Три згиначі ліктя: biceps (залежний від супінації moment arm — chin-up сильніший за pull-up), brachialis (grip-independent pure flexor), brachioradialis (neutral grip specialist). «Elbow dominance» пастка в lat pulldown. Fatigue sequencing. Практичне програмування ротації хватів. clinical-safety: NOT_REQUIRED.
+- `content/post-1137-grip-width-angle-muscle-recruitment-pulldown-rows.md` — Cluster 4, post 7/10. EMG-аналіз ширини хвату у lat pulldown: wide pronated vs medium neutral vs close supinated. ROM і розтягнення lat при вузькому хваті. Overhand vs underhand у bent-over row. Neutral grip cable row як benchmark лопаткової механіки. Хват як інструмент рекрутменту, не стилістичний вибір. clinical-safety: NOT_REQUIRED.
+- `content/post-1138-unilateral-pull-single-arm-row-anti-rotation.md` — Cluster 4, post 8/10. Чому однобічна тяга ≠ половина двобічної. Anti-rotation вимога тулуба. Three-point DB row, standing single-arm cable row, Meadows row, single-arm lat pulldown. Bilateral deficit у тязі (менш виражений ніж у push). Асиметрії як діагностика. Програмування як акцесорного або діагностичного інструменту. clinical-safety: NOT_REQUIRED.
+- `content/post-1139-rear-deltoid-external-rotation-face-pull-horizontal-abduction.md` — Cluster 4, post 9/10. Задня дельта як prime mover у горизонтальному відведенні, систематично недотренована при push-домінантних програмах. Механіка face pull: ретракція + horizontal abduction + external rotation. Infraspinatus і teres minor як центрататори glenohumeral head. Чому «більше рядків» не замінює face pull повністю. Модель push:pull + external rotation. clinical-safety: NOT_REQUIRED.
+- `content/post-1140-pull-pattern-cluster-synthesis-1131-1140.md` — Cluster 4, post 10/10. Синтез: дев'ять механічних висновків з постів 1131–1139, три інтегруючих принципи (кінетичний ланцюг у тязі, ретракція/депресія лопатки як основа, grip + кут + тулуб як важелі рекрутменту), чотири myth-busters. Наступний кластер: силова передача і кінетичний ланцюг (1141–1150). clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — blog cards added for posts 1131–1140 (10 cards, inserted before post-1130).
+- `STATUS.md` — Block 1101–1150 Cluster 4 COMPLETE 10/10; Cluster 5 next noted.
+- `VERSION` — 5.90.0 → 5.91.0.
+
+---
+
 ## [5.90.0] — 2026-06-18
 
 ### Added
