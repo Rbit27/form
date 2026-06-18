@@ -28456,3 +28456,105 @@ The following rows extend the control evidence tables established in earlier sec
 *v3.13.0 (2026-06-18): §88 Evidence Artefact Cross-Reference Patch — OBSERVABILITY §47 (DEC-065, OQ-SIEM-02 Resolution). Registers one SOC 2 evidence artefact defined in `docs/OBSERVABILITY.md §47.9` (v4.4.0, 2026-06-18 — DEC-065 OQ-SIEM-02 Resolution — Tenant SIEM Export Consent, Per-Tenant DPA Addendum Design & SIEM-CONSENT-01 Chain Invariant) that was flagged for addition to this document in OBSERVABILITY §47.9 cross-reference obligation (P1/M8). **SIEM-CONSENT-E-001** (CC9.2/CC1.1 — quarterly export of `siem.consent_addendum_signed` and `siem.consent_addendum_revoked` DEC-030 HMAC-chained events; zero-event attestation for quarters with no consent activity; cross-check query confirming zero unconsented active SIEM exports at collection time; 7yr retention; `compliance/evidence/siem-consent/SIEM-CONSENT-E-001_<YYYY-QN>.csv`). §88.3 extends two SOC 2 criterion rows (CC9.2 × 1 — SIEM-CONSENT-01 technology-layer enforcement of per-tenant Addendum 4 requirement; CC1.1 × 1 — GDPR Art. 28(3)(a) documented-instruction requirement met by signed addendum before any transmission). §88.4 closes two cross-reference obligations from `docs/OBSERVABILITY.md §47.9`. §88.5 two-item implementation checklist: 1× P1/M8 (SIEM-CONSENT-E-001 addition to §79.4 master evidence table + §80.3 R2 path note); 1× P1/Q3 2026 (first quarterly filing after consent gate deployment). No new gaps opened. Artefact status 🟡 Authored pending first SIEM export with signed Addendum 4 (§47.11 item 4, P0/M5). Privacy floor (SIEM-CONSENT-E-001): `endpoint_url_hash` SHA-256[:32] truncated (no plaintext SIEM URL, no full hash); `signed_by_email_hash` SHA-256 of lowercase email (no plaintext email); `tenant_id` org slug only; no individual employee `user_id`, health data, coaching content, biometric values, or Art. 9 category in any field; `form_api` REVOKED from `tenant_siem_configs`; zero-event attestation JSON contains no tenant identifiers. Cross-references: `docs/OBSERVABILITY.md §47.9` (SIEM-CONSENT-E-001 primary definition — source of truth for collection query, privacy floor, and artefact format); `docs/OBSERVABILITY.md §47.11 item 4` (P0/M5 — Admin Dashboard consent gate deployment: prerequisite for first SIEM-CONSENT-E-001 collection); `docs/OBSERVABILITY.md §27.12` (OQ-SIEM-02 — now 🟢 Resolved DEC-065); `docs/DECISION_LOG.md DEC-065` (decision rationale — four grounds for Addendum 4 requirement: GDPR Art. 28(3)(a) gap, enterprise IT expectation, reverse-cost analysis, SIEM-CONSENT-01 technology-layer enforcement pattern); §79.4 (master evidence table — SIEM-CONSENT-E-001 row per §88.5 item 1); §80.3 (R2 folder structure — `form-soc2-evidence/siem-consent/` path per §88.5 item 1); §81 (evidence cron — SIEM-CONSENT-E-001 quarterly automation per §47.11 item 7 + §88.5 item 2); `docs/MSA_TEMPLATE.md` (Addendum 4 SIEM Data Processing Addendum placeholder — per §47.11 item 6, P1/M5). Owner: compliance-officer + enterprise-architect.*
 
 ---
+
+## §89 Evidence Artefact Cross-Reference Patch: MSA_TEMPLATE Addendum 5 (Partner Agreement — CC9.2 / CC4.1 / CC7.4)
+
+### §89.1 Purpose
+
+`docs/MSA_TEMPLATE.md Addendum 5` (v1.0, 2026-06-18 — Partner Agreement Addendum) closes `docs/DATA_MODEL.md §38.8` checklist item 3 (P0 — "Add partner privacy floor section to Partner Agreement template with three non-waivable clauses and PART-CHAIN-01 escalation path"). Three SOC 2 evidence artefacts are defined in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events` (v2.9) and referenced in Addendum 5 §5.6: **PART-E-001** (CC9.2 — annual partner agreement execution record), **PART-E-002** (CC9.2/CC4.1 — annual partner revenue share payment governance), **PART-E-003** (CC9.2/CC7.4 — quarterly partner offboarding with PART-CHAIN-01 evidence). These were listed in §79.4 and §80.4 but lacked a dedicated cross-reference section confirming collection protocol and CC mapping. This section closes that obligation.
+
+**Privacy floor (all three artefacts):** No individual employee `user_id`, health values, coaching content, prospect company name, prospect contact email, deal free-text notes, or Art. 9 category data in any row. `partner_id` is a FORM-internal UUID. `deal_id` is the same FORM-internal UUID from `enterprise_pipeline_stages`. `partner_name` is stored in `enterprise_partners` for FORM-internal operations only — never in DEC-030 chain payloads or any exported artefact. `form_api` is REVOKED from `enterprise_partners` at RLS level (migration 0073).
+
+---
+
+### §89.2 Evidence Artefacts
+
+**Primary definitions:** `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events` (canonical Zod schemas, event payloads, PART-CHAIN-01 specification). This section registers collection protocol and auditor narratives only; AUDIT_LOG_SCHEMA.md is the source of truth on payload structure.
+
+#### PART-E-001 — Annual Partner Agreement Execution Record
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | PART-E-001 |
+| **SOC 2 Criteria** | CC9.2 (vendor and business partner agreements in place — demonstrated by chain record of agreement execution and DPA status per partner category) |
+| **Description** | Annual export of all `enterprise.partner_agreement_signed` DEC-030 HMAC-chained events for the calendar year. Every Reseller and Integration partner row must carry `dpa_signed: true` — the `emit-audit-event` Worker enforces this at chain-append time (HTTP 422 if `dpa_signed = false` for those categories). Referral partners without personal-data transfer may carry `dpa_signed: false` with no constraint violation. A year with zero `enterprise.partner_agreement_signed` events is filed as a zero-event attestation confirming the Worker validation gate is active and no new partners were onboarded — the absence of rows is not a gap. |
+| **Collection method** | Annual (Q1 of the following year). Query: `SELECT id, sequence_number, chain_hash, prev_hash, created_at, payload->>'partner_id' AS partner_id, payload->>'partner_category' AS partner_category, payload->>'revenue_share_pct' AS revenue_share_pct, payload->>'agreement_doc_ref' AS agreement_doc_ref, payload->>'dpa_signed' AS dpa_signed FROM audit_log_events WHERE event_type = 'enterprise.partner_agreement_signed' AND created_at >= '<year_start>' AND created_at < '<year_end>' ORDER BY created_at`. Cross-check: `SELECT COUNT(*) FROM enterprise_partners WHERE status = 'active' AND partner_category IN ('reseller','integration','white_label') AND dpa_signed_at IS NULL` must return zero. |
+| **Cadence** | Annual — first collection: January following the year of first partner agreement execution (M10 or later) |
+| **Retention** | 7 years |
+| **Storage path** | `compliance/evidence/partners/PART-E-001_<YYYY>.csv` |
+
+#### PART-E-002 — Annual Partner Revenue Share Payment Governance Record
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | PART-E-002 |
+| **SOC 2 Criteria** | CC9.2 (vendor financial controls — demonstrates structured governance of third-party commercial obligations) / CC4.1 (control activities over financial commitments — `privacy_floor_check_passed: true` Zod literal gate is a documented control activity) |
+| **Description** | Annual export of all `enterprise.partner_revenue_share_paid` DEC-030 HMAC-chained events for the calendar year. Every row must carry `privacy_floor_check_passed: true` — the `emit-audit-event` Worker enforces this at chain-append time (HTTP 422 `PART_PAY_FLOOR_CHECK` if `false` or absent; payment is operationally blocked). The artefact provides auditors with evidence that FORM's quarterly privacy floor attestation is not merely procedural but is enforced at the infrastructure layer: no payment can be recorded in the DEC-030 chain without a prior compliance-officer attestation. |
+| **Collection method** | Annual. Query: `SELECT id, sequence_number, chain_hash, prev_hash, created_at, payload->>'partner_id' AS partner_id, payload->>'period_start' AS period_start, payload->>'period_end' AS period_end, payload->>'attributed_arr_usd' AS attributed_arr_usd, payload->>'share_amount_usd' AS share_amount_usd, payload->>'payment_method' AS payment_method, payload->>'privacy_floor_check_passed' AS floor_check FROM audit_log_events WHERE event_type = 'enterprise.partner_revenue_share_paid' AND created_at >= '<year_start>' AND created_at < '<year_end>' ORDER BY created_at`. Verify: `floor_check = 'true'` for all rows. |
+| **Cadence** | Annual — first collection: January following the year of first revenue share payment |
+| **Retention** | 7 years |
+| **Storage path** | `compliance/evidence/partners/PART-E-002_<YYYY>.csv` |
+
+#### PART-E-003 — Quarterly Partner Offboarding and PART-CHAIN-01 Record
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | PART-E-003 |
+| **SOC 2 Criteria** | CC9.2 (vendor offboarding — demonstrates formal partner termination governance) / CC7.4 (incident response activated on partner privacy breach — PART-CHAIN-01 predecessor requirement proves R-22 was initiated before offboarding event was chain-recorded) |
+| **Description** | Quarterly export of all `enterprise.partner_offboarded` DEC-030 HMAC-chained events. For any row with `termination_reason = 'privacy_floor_breach'` or `'no_go_criteria_violation'`, the PART-CHAIN-01 invariant guarantees a preceding `privacy.floor_breach_detected` event exists in the HMAC chain for the affected `tenant_id` within the 12 months prior — the Worker enforces this at chain-append (HTTP 422 `PART_CHAIN_01_VIOLATION` on absence). The artefact provides auditors with evidence that partner privacy floor breaches were not silently terminated but were accompanied by a chain-level incident record. **Zero-event quarters** are filed as affirmative attestations confirming no partner was offboarded during the quarter — not an omission. |
+| **Collection method** | Quarterly (Q1: Jan–Mar, Q2: Apr–Jun, Q3: Jul–Sep, Q4: Oct–Dec). Query: `SELECT id, sequence_number, chain_hash, prev_hash, created_at, payload->>'partner_id' AS partner_id, payload->>'termination_reason' AS reason, payload->>'outstanding_share_usd' AS outstanding_share, payload->>'dispute_open' AS dispute_open, payload->>'privacy_incident_ref' AS incident_ref FROM audit_log_events WHERE event_type = 'enterprise.partner_offboarded' AND created_at >= '<quarter_start>' AND created_at < '<quarter_end>' ORDER BY created_at`. For any row with `reason IN ('privacy_floor_breach','no_go_criteria_violation')`, verify `incident_ref IS NOT NULL` and that a `privacy.floor_breach_detected` event exists for the same `tenant_id` in the prior 12 months. Zero-event case: file attestation JSON per §89.3 zero-event template. |
+| **Cadence** | Quarterly from M10 (or from first partner agreement execution, whichever is later) |
+| **Retention** | 7 years |
+| **Storage path** | `compliance/evidence/partners/PART-E-003_<YYYY-QN>.csv` (or `.json` for zero-event attestation) |
+
+---
+
+### §89.3 Zero-Event Attestation Template
+
+For quarters where no partner offboarding occurred:
+
+```json
+{
+  "artefact": "PART-E-003",
+  "quarter": "<YYYY-QN>",
+  "query_run_at": "<ISO-8601>",
+  "offboarded_count": 0,
+  "attestation": "PART-CHAIN-01 invariant operational. No partner offboarding events in this quarter. Zero-event filing is affirmative evidence of partner governance continuity, not an omission."
+}
+```
+
+---
+
+### §89.4 SOC 2 Criteria Mapping
+
+| Criterion | Control | Evidence added by §89 |
+|---|---|---|
+| **CC9.2** | Partner agreements executed and DPA-gated before any data or commissions flow; `enterprise.partner_agreement_signed` DEC-030 `dpa_signed: true` enforced at Worker layer for Reseller/Integration/White-Label categories | PART-E-001 (annual agreement execution record); PART-E-002 (annual payment governance); PART-E-003 (quarterly offboarding — formal termination documented) |
+| **CC4.1** | `privacy_floor_check_passed: true` Zod literal gate on `enterprise.partner_revenue_share_paid` is a documented control activity over financial obligations to third parties; HTTP 422 `PART_PAY_FLOOR_CHECK` makes it an enforcement control, not a policy commitment | PART-E-002 (every row carries `privacy_floor_check_passed: true` — confirms gate operated throughout the year) |
+| **CC7.4** | PART-CHAIN-01 invariant ensures that a privacy floor breach incident (`privacy.floor_breach_detected`) was initiated before any `enterprise.partner_offboarded` with `termination_reason = 'privacy_floor_breach'` is chain-recorded; connects incident response to partner offboarding governance | PART-E-003 (cross-check for breach-related terminations: `privacy_incident_ref IS NOT NULL` + predecessor event verification) |
+
+---
+
+### §89.5 Cross-Reference Obligations Closed by §89
+
+| Obligation | Source | Status |
+|---|---|---|
+| DATA_MODEL §38.8 item 3: "Add partner privacy floor section to Partner Agreement template (`docs/MSA_TEMPLATE.md §38.6.2`): three non-waivable clauses; PART-CHAIN-01 escalation path" | `docs/DATA_MODEL.md §38.8` (P0 — before first partner agreement) | **🟢 Closed — `docs/MSA_TEMPLATE.md` Addendum 5 (v1.0, 2026-06-18)** |
+| MSA_TEMPLATE.md Addendum 5 §5.6 cross-reference: "Three evidence artefacts registered in `docs/SOC2_READINESS.md §89`" | `docs/MSA_TEMPLATE.md` Addendum 5 §5.6 (2026-06-18) | **🟢 Closed — this section (§89)** |
+
+---
+
+### §89.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Confirm PART-E-001/002/003 paths (`compliance/evidence/partners/`) are added to §80.3 R2 folder structure and `form-api NO ACCESS` note appended. | compliance-officer | **P1** | M10 (before first partner agreement) | [ ] |
+| 2 | After first partner agreement executed: run PART-E-001 query; verify `dpa_signed: true` for all Reseller/Integration/White-Label partners; file at `compliance/evidence/partners/PART-E-001_<YYYY>.csv`. | compliance-officer | **P1** | January following first partner agreement year | [ ] |
+| 3 | After first quarterly revenue share payment: run PART-E-002 query; verify `floor_check = 'true'` for all rows; file at `compliance/evidence/partners/PART-E-002_<YYYY>.csv`. | compliance-officer | **P1** | January following first payment year | [ ] |
+| 4 | At end of first quarter after M10: run PART-E-003 query; if zero events, file zero-event attestation JSON per §89.3; if non-zero, verify PART-CHAIN-01 predecessor for any breach-related terminations; file at `compliance/evidence/partners/PART-E-003_<YYYY-QN>.csv`. | compliance-officer | **P1** | Q1 2027 (or first quarter after M10, whichever is later) | [ ] |
+
+---
+
+*v3.14.0 (2026-06-18): §89 Evidence Artefact Cross-Reference Patch — MSA_TEMPLATE Addendum 5 (Partner Agreement, v1.0, 2026-06-18). Closes `docs/DATA_MODEL.md §38.8` checklist item 3 (P0 — partner privacy floor clauses in MSA_TEMPLATE). Formally registers three SOC 2 artefacts already listed in §79.4 and §80.4: **PART-E-001** (CC9.2 — annual `enterprise.partner_agreement_signed` export; `dpa_signed: true` for Reseller/Integration/White-Label; zero-event affirmative attestation; `compliance/evidence/partners/PART-E-001_<YYYY>.csv`; 7yr), **PART-E-002** (CC9.2/CC4.1 — annual `enterprise.partner_revenue_share_paid` export; `privacy_floor_check_passed: true` in every row; HTTP 422 `PART_PAY_FLOOR_CHECK` gate is CC4.1 enforcement control; `PART-E-002_<YYYY>.csv`; 7yr), **PART-E-003** (CC9.2/CC7.4 — quarterly `enterprise.partner_offboarded` export; PART-CHAIN-01 predecessor verification for breach-related terminations; zero-event quarters filed as affirmative attestation; `PART-E-003_<YYYY-QN>.csv`; 7yr). §89.3 zero-event attestation JSON template for PART-E-003. §89.4 three criterion rows (CC9.2 × 3 artefacts, CC4.1 × PART-E-002, CC7.4 × PART-E-003). §89.5 closes two cross-reference obligations: DATA_MODEL §38.8 item 3 (🟢) and MSA_TEMPLATE Addendum 5 §5.6 (🟢). §89.6 four-item P1 implementation checklist (M10 / January / January / Q1 2027). SOC 2 version bumped v3.13.1 → v3.14.0. Privacy floor (all artefacts): no individual employee `user_id`, health values, coaching content, prospect name, prospect email, or Art. 9 category data; `partner_id` and `deal_id` are FORM-internal UUIDs only; `partner_name` never in DEC-030 chain; `form_api` REVOKED from `enterprise_partners`. Cross-references: `docs/MSA_TEMPLATE.md Addendum 5` (v1.0, 2026-06-18 — partner agreement legal template with §5.2 non-waivable clauses and §5.7 DEC-030 event reference); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events` (canonical Zod schemas and PART-CHAIN-01 specification — primary source of truth); `docs/DATA_MODEL.md §38` (enterprise_partners DDL, PART-CHAIN-01, four DEC-030 events); `docs/COST_MODEL.md §38.6` (partner governance — Bronze/Silver/Gold tiers, revenue share models, §38.6.2 privacy floor clauses); `docs/INCIDENT_RESPONSE.md R-22` (Privacy Floor Breach protocol — PART-CHAIN-01 predecessor); §79.4 (master evidence table — PART-E-001/002/003 rows); §80.4 (Vanta mirror list — PART-E-001/002/003 listed). Owner: compliance-officer + enterprise-architect.*
+
+---

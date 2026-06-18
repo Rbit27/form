@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.2.2] — 2026-06-18
+
+### Added
+- `docs/MSA_TEMPLATE.md` Addendum 5 — PARTNER AGREEMENT ADDENDUM (v1.0). Closes `docs/DATA_MODEL.md §38.8` checklist item 3 (P0 — partner privacy floor in MSA_TEMPLATE). Eight-clause addendum: §5.1 four partner categories (referral/reseller/integration/white_label) with DPA requirement matrix; §5.2 four non-waivable privacy floor clauses (individual health data prohibition, no misrepresentation of data access, no-go criteria compliance, Partner DPA requirement); §5.3 three explicit no-go criteria (insurance risk scoring, government backdoors, wellness-as-punishment) with enforcement specificity; §5.4 revenue share governance (quarterly, privacy_floor_check_passed gate, Bronze/Silver/Gold tier benefits, 12-month inactive policy); §5.5 enforcement and PART-CHAIN-01 (four termination grounds, R-22 escalation, revenue share forfeiture and set-off); §5.6 three SOC 2 evidence artefacts (PART-E-001/002/003; paths `compliance/evidence/partners/`); §5.7 four DEC-030 events (`enterprise.partner_agreement_signed/deal_attributed/revenue_share_paid/offboarded`, all 7yr, PAM session required); §5.8 eight-point outside counsel review requirement. MSA_TEMPLATE version bumped v0.3 → v0.4.
+- `docs/SOC2_READINESS.md §89` — Evidence Artefact Cross-Reference Patch: MSA_TEMPLATE Addendum 5 (Partner Agreement). Formally registers PART-E-001 (CC9.2 — annual partner agreement execution, `dpa_signed: true` gate), PART-E-002 (CC9.2/CC4.1 — annual revenue share payment governance, `privacy_floor_check_passed: true` gate), PART-E-003 (CC9.2/CC7.4 — quarterly partner offboarding, PART-CHAIN-01 predecessor verification). §89.3 zero-event attestation JSON template. §89.4 CC9.2/CC4.1/CC7.4 criterion rows. §89.5 closes two cross-reference obligations (DATA_MODEL §38.8 item 3, MSA_TEMPLATE Addendum 5 §5.6). §89.6 four-item P1 checklist. SOC2_READINESS version bumped v3.13.1 → v3.14.0.
+
+### Changed
+- `VERSION` — 6.2.1 → 6.2.2.
+
+---
+
 ## [6.2.1] — 2026-06-18
 
 ### Added

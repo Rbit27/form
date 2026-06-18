@@ -1,4 +1,4 @@
-# FORM · Master Service Agreement · Template v0.3
+# FORM · Master Service Agreement · Template v0.4
 
 > **Internal use only — PRE-LEGAL-REVIEW DRAFT.**
 > This template must be reviewed and approved by outside counsel before execution with any customer.
@@ -797,6 +797,161 @@ This Addendum must be reviewed by outside counsel before first production execut
 5. Confirm DocuSign electronic acceptance constitutes valid "written" instruction under applicable GDPR supervisory authority guidance.
 
 Filing: outside counsel sign-off memo to `compliance/contracts/msa-addendum-4-v1.0-counsel-signoff.pdf` before first production execution.
+
+---
+
+## ADDENDUM 5 — PARTNER AGREEMENT ADDENDUM
+
+*(Applicable only where FORM and Partner have executed a Partner Agreement pursuant to `docs/COST_MODEL.md §38`. This Addendum supplements the MSA where the MSA exists; for standalone partner relationships it constitutes the governing agreement together with the Order Form and Exhibit C. Partner categories: Referral, Reseller, Integration, White-Label — as defined in §5.1 below.)*
+
+> **PRE-LEGAL-REVIEW DRAFT.** Outside counsel review required before execution with any Partner — see Addendum 5.8.
+
+---
+
+### Addendum 5.1 — Partner Categories and Scope
+
+This Addendum governs the commercial and data-governance relationship between FORM and the entity named as Partner on the Order Form ("Partner"). Four Partner categories are recognised:
+
+| Category | Definition | DPA Required | Revenue Share Model |
+|---|---|---|---|
+| **Referral** | Introduces qualified enterprise prospects; no active sales management; no data access beyond contact coordination. | Optional (only if incidental personal data transferred) | One-time referral fee per §5.5.2 |
+| **Reseller / Co-sell** | Active in sales process; may appear on customer purchase order; handles pilot logistics. | **Mandatory** before any data or lead-contact details flow | Ongoing: 20–25% of ACV for contracted term (max 3 years) |
+| **Integration** | Operates a native technical integration (wearable API, benefits admin SSO federation) that creates a data-layer advantage. | **Mandatory** before API credentials or any personal data are shared | Attribution-based: 15% of ACV for deals where integration is cited as selection driver; capped 3 years |
+| **White-Label Reseller** | Sells FORM under their own brand to their own enterprise clients; FORM is the underlying platform. | **Mandatory** (joint DPA — partner is a controller for their clients' data); separate white-label MSA addendum required | Gross revenue share: 30–40% of ACV; minimum deal ACV $50,000 |
+
+**DPA enforcement:** For Reseller, Integration, and White-Label Partners, `enterprise.partner_agreement_signed` DEC-030 event (Addendum 5.7) is rejected with HTTP 422 if `dpa_signed = false` — no data flows and no revenue share accrues before DPA execution. Referral Partners without personal-data transfer may execute on `dpa_signed = false`; a DPA addendum is required the moment any contact email or lead detail is shared.
+
+---
+
+### Addendum 5.2 — Privacy Floor Obligations (Non-Waivable)
+
+The following four clauses apply to all Partner categories at all revenue share levels and cannot be waived, amended, or negotiated away:
+
+**Clause A — Individual Employee Health Data Prohibition**
+
+Partner may not request, receive, process, transmit, store, or sub-process individual employee health data on behalf of any FORM enterprise customer. This prohibition covers: raw biometric measurements, AI coaching transcripts, CV pose-estimation keypoints, workout logs, nutrition data, recovery scores, HRV readings, and any data capable of identifying an individual's physical or mental health status. Aggregate-only metrics (fleet-level activation rate, anonymised engagement quartile bands with k ≥ 10) are permissible solely where Partner acts as the customer's authorised representative under a documented DPA addendum explicitly authorising that specific aggregation.
+
+**Clause B — No Misrepresentation of Data Access**
+
+Partner may not represent to any prospect or existing FORM enterprise customer that FORM will provide employer-level access to individual Authorised User health data, biometric measurements, AI coaching content, or fitness metrics as part of any commercial arrangement. If a prospect's procurement questions suggest an expectation of individual-level data access, Partner must immediately notify FORM's compliance-officer before proceeding with any further commercial discussion.
+
+**Clause C — No-Go Criteria Compliance**
+
+Partner agrees that FORM operates binding no-go criteria governing which customers FORM will and will not serve (§5.3). Partner will not propose FORM to any prospect whose intended use case triggers one or more of FORM's no-go criteria. Partner must review §5.3 before each new prospect introduction and disclose to FORM any known or suspected no-go-criteria risk before submitting a qualified lead.
+
+**Clause D — Partner Data Processing Agreement**
+
+All Partners that receive personal data incidental to deal management — including contact names and email addresses of customer employees used in pilot coordination, onboarding logistics, or account management — must execute FORM's standard Partner DPA before any such data is transferred. "Personal data" includes any information that identifies or could identify a natural person under applicable data-protection law. The Partner DPA incorporates Standard Contractual Clauses (SCC Module 2 or Module 3 as applicable) for any data transfers from the EU/EEA to non-EEA jurisdictions.
+
+---
+
+### Addendum 5.3 — No-Go Customer Criteria
+
+The following three no-go criteria are unconditional. FORM will not serve any prospect or customer whose use case, as stated or reasonably inferred from disclosed commercial intent, falls within these categories. Partner's obligation under Clause C of §5.2 is to screen each prospect against these criteria before introduction:
+
+1. **Insurance Risk Scoring.** Any prospect whose intended use of FORM's platform — aggregate wellness metrics, individual coaching data, engagement analytics, or any combination thereof — includes, or is reasonably likely to include, pricing insurance products, determining insurance eligibility, adjusting insurance premiums, underwriting life or health insurance, or providing wellness-programme data to actuarial processes. This no-go criterion applies regardless of whether the prospect is itself an insurer or acts as a data intermediary.
+
+2. **Government Backdoors.** Any prospect that requests, requires as a contract condition, or is under a legal obligation to provide, a direct or indirect data pathway enabling any government agency, law-enforcement body, intelligence service, or regulatory body to access FORM user data without (a) a lawful compulsion process served on FORM directly and (b) FORM's prior notification of the affected user where permitted by law. Lawful data requests served directly on FORM and handled per `docs/INCIDENT_RESPONSE.md R-18` do not trigger this criterion.
+
+3. **Wellness-as-Punishment.** Any prospect that intends to use FORM's aggregate engagement metrics, activation rates, participation data, or any derived wellness scoring to adversely affect individual Authorised Users' employment terms, compensation, benefits eligibility, performance reviews, disciplinary processes, or any other employment-related outcome. This criterion applies whether the adverse use is explicit in the contract or is a reasonably foreseeable downstream outcome of the data flows being requested.
+
+**Identification obligation:** If during the sales cycle Partner learns of facts suggesting a prospect's intended use case may trigger any no-go criterion, Partner must immediately cease commercial discussions with the prospect and notify FORM's compliance-officer at `legal@form.coach` before any further engagement. FORM reserves the right to reject any qualified lead on no-go-criteria grounds without liability to Partner.
+
+---
+
+### Addendum 5.4 — Revenue Share Governance
+
+**Quarterly payment cadence:** Revenue share is paid 30 days after each calendar quarter close, subject to the following gate conditions:
+
+1. Partner invoice submitted to `legal@form.coach` within 15 days of quarter close.
+2. FORM internal reconciliation: `enterprise_partners.attributed_arr_usd` (per `docs/DATA_MODEL.md §38.3`) reconciled against Partner's invoice amount; discrepancies resolved per §5.4.2.
+3. **Privacy Floor Attestation:** compliance-officer confirms no privacy floor violation was reported, investigated, or pending resolution for Partner during the quarter. `enterprise.partner_revenue_share_paid` DEC-030 event (Addendum 5.7) requires `privacy_floor_check_passed: true` — the `emit-audit-event` Worker returns HTTP 422 (`PART_PAY_FLOOR_CHECK`) if this field is `false` or absent; payment is operationally blocked until attestation is confirmed.
+4. `enterprise.partner_revenue_share_paid` DEC-030 event emitted before payment is released.
+5. Payment via Stripe Payout or wire transfer per Order Form.
+
+**Revenue share disputes (§5.4.2):** The `enterprise_partners.deal_attribution_log` JSONB field is the authoritative attribution record. `enterprise.partner_deal_attributed` DEC-030 events constitute the tamper-evident audit trail. Disputes must be raised within 30 days of the quarterly statement; after 30 days, FORM's reconciliation is final.
+
+**Revenue share caps by category:** Ongoing revenue share does not accrue beyond the contracted term maximum (3 years for Reseller and Integration; separate White-Label agreement governs White-Label Resellers). On renewal after cap, FORM and Partner renegotiate or transition the customer to a direct FORM relationship.
+
+**Partner Tier Benefits:**
+
+| Tier | Qualification | Benefits | Review Cadence |
+|---|---|---|---|
+| **Bronze** | 1 closed-won deal attributed to Partner | Named in FORM partner directory (internal); access to FORM sales collateral portal | Semi-annual |
+| **Silver** | ≥ 3 closed-won deals OR ≥ $100,000 ARR attributed | Priority CSM escalation path; joint co-marketing (anonymised case study with partner logo — no individual customer data) | Quarterly |
+| **Gold** | ≥ $500,000 ARR attributed OR White-Label agreement in force | Dedicated Partner Success Manager; product roadmap input sessions (NDA-gated); monthly QBR | Monthly |
+
+Tier status is reviewed at each revenue share cadence. Tier downgrade does not affect accrued or pending revenue share; it affects only access to tier-specific benefits going forward.
+
+**Inactive status:** A Partner that fails to introduce a qualified deal within 12 months of signing enters "inactive" status. Revenue share accruals pause; Partner may re-activate by introducing a qualified deal. `enterprise_partners.status = 'inactive'` is recorded without a DEC-030 event (operational state change only).
+
+---
+
+### Addendum 5.5 — Enforcement, Termination, and PART-CHAIN-01
+
+**Grounds for immediate termination:** FORM may terminate this Addendum immediately, without liability to Partner and with no revenue share payment for the current quarter, upon:
+
+(a) Violation of any clause in §5.2 (Privacy Floor Obligations);
+(b) Misrepresentation of FORM's capabilities to a prospect or customer contrary to Clause B (§5.2);
+(c) Introduction of a prospect that triggered a no-go criterion that Partner knew or ought reasonably to have known applied;
+(d) Any act or omission that causes FORM to suffer a Privacy Floor Breach as defined in `docs/INCIDENT_RESPONSE.md R-22`.
+
+**PART-CHAIN-01 invariant:** When `enterprise.partner_offboarded` is emitted with `termination_reason = 'privacy_floor_breach'` or `'no_go_criteria_violation'`, the `emit-audit-event` Worker requires a preceding `privacy.floor_breach_detected` event for the affected `tenant_id` in the HMAC chain within the 12 months prior. Absence of the predecessor returns HTTP 422 (`PART_CHAIN_01_VIOLATION`) and triggers R-05 (HMAC Chain Integrity Failure, `docs/INCIDENT_RESPONSE.md §R-05`). The `enterprise.partner_offboarded` event cannot be emitted without this predecessor when the termination reason involves a privacy floor breach.
+
+**R-22 escalation:** If termination arises from a breach involving individual employee health data exposure, FORM initiates `docs/INCIDENT_RESPONSE.md R-22` (Privacy Floor Breach protocol) alongside the partner offboarding. The `enterprise.partner_offboarded` DEC-030 event includes `privacy_incident_ref` (non-null, required on privacy breach termination) linking to the R-22 incident record. The Worker returns HTTP 422 if `privacy_incident_ref` is null when `termination_reason = 'privacy_floor_breach'`.
+
+**Termination effect on revenue share:** Revenue share for the quarter in which a privacy floor breach is discovered is forfeited. Outstanding revenue share accrued in prior quarters is settled within 30 days unless the breach gives rise to a FORM damages claim, in which case FORM may set off damages against the outstanding amount pending final dispute resolution.
+
+---
+
+### Addendum 5.6 — SOC 2 Evidence Artefacts
+
+Three evidence artefacts are registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events` and `docs/SOC2_READINESS.md §89`:
+
+| Artefact | SOC 2 Criteria | Description | Cadence | Path |
+|---|---|---|---|---|
+| **PART-E-001** | CC9.2 | Annual export of `enterprise.partner_agreement_signed` chain events — demonstrates executed agreements and DPA status for all active Partners. `dpa_signed: true` confirmed for all Reseller, Integration, and White-Label partners. | Annual | `compliance/evidence/partners/PART-E-001_<YYYY>.csv` |
+| **PART-E-002** | CC9.2 / CC4.1 | Annual export of `enterprise.partner_revenue_share_paid` chain events — demonstrates financial governance; every row must carry `privacy_floor_check_passed: true`. Confirms operational enforcement of the §5.4 payment gate. | Annual | `compliance/evidence/partners/PART-E-002_<YYYY>.csv` |
+| **PART-E-003** | CC9.2 / CC7.4 | Export of `enterprise.partner_offboarded` events for the SOC 2 observation period — PART-CHAIN-01 evidence. Zero-event periods filed as affirmative attestation that no Partner was offboarded during the period. | Quarterly from M10 | `compliance/evidence/partners/PART-E-003_<YYYY-QN>.csv` |
+
+**Privacy floor on artefacts:** No individual employee `user_id`, health values, coaching content, prospect company name, prospect contact email, or deal free-text notes appear in any artefact. `partner_id` is a FORM-internal UUID. `deal_id` is the same FORM-internal UUID used in `enterprise_pipeline_stages`. `partner_name` is stored in `enterprise_partners` for FORM-internal operations only — it is never included in DEC-030 event payloads or exported artefacts visible outside FORM.
+
+---
+
+### Addendum 5.7 — DEC-030 Audit Record
+
+Four HMAC-chained events (DEC-030; `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events`) are emitted over the partner relationship lifecycle:
+
+| Event | Trigger | Emitter | Retention |
+|---|---|---|---|
+| `enterprise.partner_agreement_signed` | Partner Agreement executed; `enterprise_partners` row created with `status = 'active'` | `compliance-officer` or `founder` (manual via admin console, PAM session required) | 7 yr |
+| `enterprise.partner_deal_attributed` | Enterprise deal closes at stage S5 with `attributed_to_partner_id` FK set | `customer-success` or `founder` (manual at deal close) or `form_system` (automated on S5 transition with non-null attribution) | 7 yr |
+| `enterprise.partner_revenue_share_paid` | Quarterly revenue share payment released after §5.4 gate conditions met | `compliance-officer` (manual, quarterly; no automated path — human attestation is the compliance control) | 7 yr |
+| `enterprise.partner_offboarded` | Partner agreement terminated | `compliance-officer` (manual only; always requires PAM session and PART-CHAIN-01 predecessor if privacy breach) | 7 yr |
+
+All four events are registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events`. Canonical Zod schemas are maintained in that document as the single source of truth; MSA_TEMPLATE references only the event names and retention periods.
+
+**Privacy invariant (all four events):** No individual employee `user_id`, no health values, no coaching content, no partner contact names or company names in any chain payload. `deal_id` and `partner_id` are FORM-internal UUIDs never shared externally. Revenue share percentages and ACV values are aggregate financial metadata only.
+
+---
+
+### Addendum 5.8 — Outside Counsel Review Requirement
+
+This Addendum **must** be reviewed by outside counsel before execution with any Partner. Review points:
+
+1. Confirm Clause A (individual health data prohibition) is sufficiently precise to be enforceable as a contractual warranty against a partner claiming incidental health-data access was permitted.
+2. Confirm Clause C (no-go criteria) does not inadvertently create liability for FORM if Partner introduces a prospect whose no-go-criteria status was not known to Partner at the time of introduction.
+3. Confirm §5.3 no-go criteria definitions are not so broad as to preclude legitimate use cases (e.g., a wellness programme that is part of a benefits package where the benefits broker is a reseller partner).
+4. Confirm PART-CHAIN-01 enforcement mechanism (HTTP 422 blocking offboarding event without a predecessor privacy breach event) constitutes adequate internal control for SOC 2 CC9.2 purposes.
+5. Confirm `privacy_floor_check_passed: true` payment gate constitutes adequate evidence of a compliance review for CC4.1 purposes, or whether additional documented procedures are required.
+6. Confirm revenue share forfeiture on privacy breach (§5.5) is enforceable as a liquidated-remedy clause and does not constitute an unenforceable penalty under applicable law.
+7. Confirm Partner DPA template referenced in Clause D is adequate for GDPR Art. 28 and does not require a separate DPA execution ceremony before the first lead introduction for referral partners who may incidentally share contact data.
+
+Filing: outside counsel sign-off memo to `compliance/contracts/msa-addendum-5-v1.0-counsel-signoff.pdf` before first Partner Agreement execution.
+
+---
+
+*v1.0 (2026-06-18): ADDENDUM 5 — PARTNER AGREEMENT ADDENDUM. Closes `docs/DATA_MODEL.md §38.8` checklist item 3 (P0 — "Add partner privacy floor section to Partner Agreement template (`docs/MSA_TEMPLATE.md §38.6.2`): three non-waivable clauses (no insurance risk scoring, no government backdoors, no wellness-as-punishment); PART-CHAIN-01 escalation path if violated"). Four partner categories (referral/reseller/integration/white_label) with DPA requirement matrix (mandatory for reseller/integration/white_label at chain-append; optional for referral without data transfer). §5.2 four non-waivable privacy floor clauses: (A) individual employee health data prohibition (k ≥ 10 aggregate floor); (B) no misrepresentation of data access to prospects; (C) no-go criteria compliance obligation; (D) Partner DPA requirement for any incidental personal data transfer. §5.3 three explicit no-go criteria: insurance risk scoring, government backdoors, wellness-as-punishment — each with specificity sufficient for contractual enforcement (insurer/actuarial use, lawful-process vs. backdoor distinction, employment-outcome adverse use). §5.4 revenue share governance: quarterly payment cycle with five-step gate (invoice → reconciliation → privacy floor attestation → DEC-030 emission → payment); dispute resolution via `deal_attribution_log` JSONB; Bronze/Silver/Gold tier benefits table (1 deal / 3+ deals or $100k ARR / $500k+ ARR); 12-month inactive policy. §5.5 enforcement and PART-CHAIN-01: four grounds for immediate termination with quarter revenue share forfeiture; PART-CHAIN-01 invariant (`privacy_floor_breach` offboarding requires predecessor `privacy.floor_breach_detected` within 12 months — HTTP 422 `PART_CHAIN_01_VIOLATION` on absence → R-05); R-22 Privacy Floor Breach escalation with `privacy_incident_ref` required on breach termination — HTTP 422 if null; termination effect on outstanding revenue share (set-off right). §5.6 three SOC 2 evidence artefacts: PART-E-001 (CC9.2 — annual `partner_agreement_signed` export + DPA status; `compliance/evidence/partners/PART-E-001_<YYYY>.csv`), PART-E-002 (CC9.2/CC4.1 — annual `partner_revenue_share_paid` export; `floor_respected: true` in every row; PART-E-002_<YYYY>.csv), PART-E-003 (CC9.2/CC7.4 — quarterly `partner_offboarded` export + zero-count attestation; PART-E-003_<YYYY-QN>.csv). §5.7 DEC-030 audit record: four events (`enterprise.partner_agreement_signed` 7yr, `enterprise.partner_deal_attributed` 7yr, `enterprise.partner_revenue_share_paid` 7yr, `enterprise.partner_offboarded` 7yr); PAM session required for all write events; no partner name or employee user_id in any payload. §5.8 eight-point outside counsel review requirement. Privacy floor (all clauses): no individual employee `user_id`, no health values, no coaching content, no partner company name in DEC-030 chain. Cross-references: `docs/DATA_MODEL.md §38` (enterprise_partners DDL, PART-CHAIN-01, DEC-030 events); `docs/COST_MODEL.md §38.6` (partner governance, revenue share models, Bronze/Silver/Gold tiers); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events` (four DEC-030 events — canonical Zod schemas); `docs/SOC2_READINESS.md §89` (PART-E-001/002/003 evidence registration); `docs/INCIDENT_RESPONSE.md R-22` (Privacy Floor Breach protocol — PART-CHAIN-01 prerequisite); `docs/ENTERPRISE.md §No-go customers` (three no-go criteria source). Owner: compliance-officer + enterprise-architect + founder.*
 
 ---
 
