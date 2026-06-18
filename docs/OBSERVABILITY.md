@@ -11814,7 +11814,7 @@ Store at `compliance/evidence/cc7/siem-calibration/` with `MANIFEST.sha256`.
 | 4 | Deploy AL-SIEM-06 in **shadow mode** (P3 Slack `#devops-alerts` only): configure Better Stack alert rule with P3 severity and Slack-only routing; record `shadow_mode_activated_at` timestamp in `#devops-alerts`; emit `system.siem_alert_activated` with `activation_mode: 'shadow'` and `shadow_period_start`. | devops-lead | **P0** | M5 | [ ] |
 | 5 | Update `docs/OBSERVABILITY.md §27.7` AL-SIEM-06 alert rule table row with the dual-phase specification from §44.2.4; add AL-SIEM-06-SHADOW-END informational rule; update `docs/OBSERVABILITY.md §6.2` master alert table accordingly. | devops-lead + compliance-officer | **P0** | M5 | [ ] |
 | 6 | Update `docs/SOC2_READINESS.md §76.11`: mark OQ-ANOM-01 and OQ-ANOM-02 as 🟢 Resolved (DEC-057 and DEC-056 respectively, 2026-06-14). Update §76.9 gap tracker: CC4.1 monitoring-of-monitoring → 🟡 Partial (→ 🟢 on CALIB-E-001 filing). | compliance-officer | **P0** | M5 | [ ] |
-| 7 | Add CALIB-E-001 and CALIB-E-002 to `docs/SOC2_READINESS.md §76.7` evidence artefact table under CC4.1 and CC7.2 criteria rows respectively. | compliance-officer | **P0** | M5 | [ ] |
+| 7 | Add CALIB-E-001 and CALIB-E-002 to `docs/SOC2_READINESS.md §76.7` evidence artefact table under CC4.1 and CC7.2 criteria rows respectively. | compliance-officer | **P0** | M5 | [x] Done — SOC2_READINESS.md v3.12.1 (2026-06-18) |
 
 #### P1 — Shadow-mode exit (30 days after AL-SIEM-06 production deployment)
 

@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [5.95.1] — 2026-06-18
+
+### Changed
+- `docs/SOC2_READINESS.md` — §76.7/§76.8 CALIB-E cross-reference patch (v3.12.1): registers CALIB-E-001 and CALIB-E-002 (defined in §83.5, v3.9.0, 2026-06-15) in the §76 canonical CC7.2/CC4.1 evidence artefact table. Closes OBSERVABILITY.md §44.6 item 7 (P0/M5).
+- `docs/OBSERVABILITY.md` — §44.6 item 7 marked [x] Done (2026-06-18).
+- `VERSION` — 5.95.0 → 5.95.1.
+
 ## [5.95.0] — 2026-06-18
 
 ### Added
