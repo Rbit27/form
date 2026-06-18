@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.7.1] — 2026-06-18
+
+### Added
+- `content/post-122-progression-algorithm.md` — Editorial №122. «Коли додавати вагу, а коли — ні: алгоритм прогресії без шаблонів і без прогресофобії». Три сигнали готовності (RPE-дрейф, RIR-зростання, технічна стабільність); чотири сценарії з алгоритмом рішень; операційний чеклист на сесію; форми прогресії крім ваги. clinical-safety NOT_REQUIRED. sports-scientist review required before publish.
+- Blog card for post-122 added to `blog.html`.
+- `README.md`: Block 1481–1495 «Вимірювання і діагностика тренованості без лабораторії» added as proposed.
+- `STATUS.md`: editorial series updated to 11–122; total posts 1159.
+
 ## [6.7.0] — 2026-06-18
 
 ### Added
