@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [5.87.0] — 2026-06-18
+
+### Added
+- `content/post-1111-squat-pattern-three-joints-mechanics.md` — Block 1101–1150 Cluster 2, post 1/10. Squat as a closed kinetic chain across three joints: ankle dorsiflexion, knee flexion, hip flexion + external rotation. Kinematic chain logic: why a problem in one joint presents as a symptom in another. Frontal and transverse plane control. Neutral spine in squat. Why squat is not the «opposite» of hip hinge.
+- `content/post-1112-squat-depth-anatomy-atg-parallel.md` — post 2/10. Three different constraints on squat depth: ankle dorsiflexion, hip mobility, and bone morphology of the hip socket. Butt wink — three causes, three different solutions. Why ATG is a ceiling for some and simply unavailable for others. Activation research: depth and glute EMG.
+- `content/post-1113-squat-torso-angle-trunk-inclination.md` — post 3/10. Why trunk forward lean in squat is physics, not a fault. How femur length and bar position determine «natural» trunk angle. High-bar vs. low-bar torso mechanics. When excessive forward lean is an actual problem vs. a morphology consequence.
+- `content/post-1114-squat-load-distribution-quads-glutes.md` — post 4/10. How variant, depth and trunk angle shift load between quadriceps, glutes and hamstrings. Quadriceps peak in front squat and high-bar. Glutes peak with low-bar and depth. Hamstrings as stabilisers, not prime movers, in squat. Comparative table of variants.
+- `content/post-1115-ankle-mobility-dorsiflexion-squat.md` — post 5/10. Dorsiflexion as one of the most common hidden constraints in squat. Gastrocnemius vs. soleus vs. capsular restriction — how to differentiate. Compensatory patterns: heel rise, excessive forward lean, valgus as three outputs of one limitation. Short-term (heel elevation) and long-term (stretching, mobilisation) solutions.
+- `content/post-1116-knee-valgus-squat-structural-vs-motor.md` — post 6/10. Valgus in squat as a symptom, not a diagnosis. Four causes: gluteus medius weakness, limited hip external rotation, foot pronation, quadriceps failure under load. Why the same cue «push your knees out» does not fix different internal problems. Diagnostic algorithm.
+- `content/post-1117-high-bar-low-bar-squat-mechanics-comparison.md` — post 7/10. How bar position changes moment arm and load distribution. High-bar: more knee-dominant, suits olympic lifting and shorter-femur athletes. Low-bar: greater posterior chain contribution, mechanical advantage for maximum load, standard in powerlifting. Mobility requirements differ. Neither is objectively «better».
+- `content/post-1118-front-squat-goblet-squat-vertical-torso-mechanics.md` — post 8/10. Anterior load placement forces vertical torso through physics, not coaching cue. Maximum quadriceps stimulus of all barbell squat variants. Stricter dorsiflexion and thoracic extension demands. Goblet squat as a teaching tool and standalone hypertrophy exercise. Front squat and knee health: not a universal claim.
+- `content/post-1119-unilateral-squat-bulgarian-lunge-step-up.md` — post 9/10. Why unilateral squat variants are a different motor task, not simplified bilateral squat. Frontal plane stabilisation (gluteus medius), anti-rotation control, asymmetry detection. Bulgarian split squat mechanics: torso angle shifts emphasis between quad and hip. Lunge variants. Step-up for load dosing in rehab. Why bilateral and unilateral cannot fully replace each other.
+- `content/post-1120-squat-cluster-synthesis-1111-1120.md` — post 10/10. Cluster synthesis: five applied principles from squat pattern biomechanics. Kinematic chain as diagnostic key. «Correct technique» is a function of the body, not a standard. Depth and variant under goal. Mobility as investment. Bilateral and unilateral as different adaptations.
+
+### Changed
+- `blog.html` — 10 new post entries added (posts 1111–1120); updated to post-1120.
+- `STATUS.md` — Block 1101–1150 row: Cluster 2 COMPLETE 10/10; total posts 1111 → 1121; next priorities updated to Cluster 3 push pattern.
+- `VERSION` — 5.86.0 → 5.87.0.
+
+---
+
 ## [5.86.0] — 2026-06-17
 
 ### Added
