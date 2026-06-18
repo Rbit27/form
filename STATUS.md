@@ -1,4 +1,4 @@
-# FORM · Project Status v5.99.0
+# FORM · Project Status v5.99.1
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.99.0** — 2026-06-18
+**v5.99.1** — 2026-06-18
 
 ---
 
@@ -15,7 +15,7 @@
 | Range | Theme | Posts | Status |
 |---|---|---|---|
 | 01–10 | Foundational / brand | 10 | Published |
-| 11–50 | Core sport science | 40 | Published |
+| 11–50 | Core sport science | 40 | Published — post-11 (deload weeks) added v5.98.2; sports-scientist review pending |
 | 51–99 | Applied training science | 49 | Published |
 | 100–200 | Exercise physiology deep dives | 101 | Published |
 | 201–350 | Training methodology & programming | 150 | Published |

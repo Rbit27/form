@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.99.1] — 2026-06-18
+
+### Added
+- `content/post-11-deload-weeks.md` — Post 11 (content-engine): «Діловий тиждень: чому деловантаження — це тренування, а не капітуляція». Supercompensation механізм, fitness-fatigue model, ритміка делоадів (4–6 тижнів), шість ознак потреби, практика для Upper/Lower split. Clinical-safety PASS (training science); sports-scientist review pending.
+- `blog.html` — картка post-11 додана у топ grid.
+
+### Changed
+- `STATUS.md` — 11–50 row: post-11 (deload weeks) відмічено як додано; version → v5.99.1.
+- `VERSION` — 5.99.0 → 5.99.1.
+
+---
+
 ## [5.99.0] — 2026-06-18
 
 ### Added
