@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.1.1] — 2026-06-18
+
+### Added
+- `content/post-120-synthesis-nine-frameworks.md` — Editorial series, post 120. «Синтез 112–120: дев'ять рамок для self-coached атлета другого і третього року» — синтез дев'яти постів 112–119 у зв'язану систему рамок: (1) зовнішній стрес як параметр тренування (HPA-вісь, Stults-Kolehmainen & Sinha 2014, Bartholomew 2008); (2) ситуативний шум vs. системний сигнал (RPE-тренд, HRV rolling average, горизонт); (3) обсяг первинний, частота — механізм розподілу (Schoenfeld et al. 2016, Brigatto et al. 2019, 4–6 підходів/сесія стеля); (4) техніка під втомою як маркер якості підходу (Bradford 2023, Refalo 2022, 4 маркери breakdown); (5) зовнішній зворотний зв'язок — партнер/дзеркало/камера (Miall & Wolpert 1996, Zajonc 1965, сліпі зони); (6) мікроцикл як відновна логіка (High-Low принцип, Charlie Francis 1992, 3 типові помилки розміщення); (7) дихальна механіка — IAP і Valsalva як техніка (McGill et al. 1990, Harman 1988, Kavcic et al. 2004); (8) річний горизонт — periodization для аматора (Bickel et al. 2011, 4 блоки, 130–140 сесій/рік); (9) програма має термін придатності — 5 операційних сигналів (Hubal 2005, Meeusen 2013). Мета-секція: діагностичний сценарій з послідовним застосуванням 9 рамок. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — додано картку для post-120 перед post-119.
+- `README.md` — post-120 статус: proposed → draft · v6.1.1.
+- `STATUS.md` — Editorial series оновлено: 11–119 → 11–120; рядок Editorial 120 додано до таблиці. Версія → v6.1.1.
+- `VERSION` — 6.1.0 → 6.1.1.
+
+---
+
 ## [6.1.0] — 2026-06-18
 
 ### Added

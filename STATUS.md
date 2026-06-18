@@ -1,4 +1,4 @@
-# FORM · Project Status v6.0.1
+# FORM · Project Status v6.1.1
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v6.0.1** — 2026-06-18
+**v6.1.1** — 2026-06-18
 
 ---
 
@@ -17,6 +17,7 @@
 | 01–10 | Foundational / brand | 10 | Published |
 | 11–50 | Core sport science | 40 | Published — post-11 (deload weeks) added v5.98.2; sports-scientist review pending |
 | Editorial 119 | Programme expiry signals | 1 | draft — post-119 (program-signs-stopped-working) added v6.0.1; clinical-safety PASS; sports-scientist review pending |
+| Editorial 120 | Nine frameworks synthesis (112–120) | 1 | draft — post-120 (synthesis-nine-frameworks) added v6.1.1; clinical-safety NOT_REQUIRED; sports-scientist review pending |
 | 51–99 | Applied training science | 49 | Published |
 | 100–200 | Exercise physiology deep dives | 101 | Published |
 | 201–350 | Training methodology & programming | 150 | Published |
@@ -42,7 +43,7 @@
 
 **Total posts: 1156** (includes posts 1001–1170, post-106, post-107, post-108, post-109, post-110, post-111, post-112, post-116, post-117, post-118-valsalva, post-118-longterm; post-980 and post-639 HARD VETO skipped)
 
-**Editorial series 11–34, 44–50, 106–119** — **post-119 written v6.0.1:** «Ознаки того, що твоя програма перестала підходити — і що з цим робити» — три причини зупинки прогресу (шум/функціональне перевантаження/програмна невідповідність); 5 операційних сигналів: RPE-дрейф 2+ тижні, нульовий прогрес 4+ тижнів, змінений патерн відновлення, технічна регресія на свіжому стані, системне зниження включення; що НЕ є сигналом; три відповіді (мікроадаптація/деловантаження+переоцінка/перебудова) і алгоритм діагностики; Hubal 2005, Meeusen 2013, Halson & Jeukendrup 2004, Krieger 2010, McEwen 2007. clinical-safety: PASS. sports-scientist review required before publish. Blog card added. README roadmap: editorial 119 added; editorial 120 proposed (next).
+**Editorial series 11–34, 44–50, 106–120** — **post-120 written v6.1.1:** «Синтез 112–120: дев'ять рамок для self-coached атлета другого і третього року» — дев'ять рамок з постів 112–119: зовнішній стрес як параметр тренування (post-112); шум vs. системний сигнал у варіабельності (post-113); обсяг первинний, частота — механізм розподілу (post-114); техніка під втомою — маркер якості підходу (post-115); зовнішній зворотний зв'язок — корисний але неповний (post-116); мікроцикл — відновна логіка а не розклад (post-117); дихання як техніка — IAP і Valsalva (post-118a); річний горизонт як рівень де periodization має сенс (post-118b); програма має термін придатності — 5 операційних сигналів (post-119). Мета-секція: як 9 рамок взаємодіють при конкретному діагностичному сценарії. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. Blog card added. README: post-120 → draft · v6.1.1. **post-119 written v6.0.1:** «Ознаки того, що твоя програма перестала підходити — і що з цим робити» — три причини зупинки прогресу (шум/функціональне перевантаження/програмна невідповідність); 5 операційних сигналів: RPE-дрейф 2+ тижні, нульовий прогрес 4+ тижнів, змінений патерн відновлення, технічна регресія на свіжому стані, системне зниження включення; що НЕ є сигналом; три відповіді (мікроадаптація/деловантаження+переоцінка/перебудова) і алгоритм діагностики; Hubal 2005, Meeusen 2013, Halson & Jeukendrup 2004, Krieger 2010, McEwen 2007. clinical-safety: PASS. sports-scientist review required before publish. Blog card added. README roadmap: editorial 119 added; editorial 120 proposed (next).
 
 **post-118 written v5.96.0(a):** «Valsalva і внутрішньочеревний тиск: чому «тримай повітря» — це не забобони» — IAP як активна кінетична ланка (McGill et al. 1990); Valsalva механізм: IAP до 150–200 мм рт. ст. при максимальних зусиллях (Harman et al. 1988); bracing vs. hollowing (Kavcic et al. 2004: bracing > hollowing для функціональних рухів); чотири стінки IAP-системи (діафрагма, тазове дно, черевна стінка, TLF); серцево-судинний аспект (Lentini et al. 1999: без клінічно значущих подій у здорових атлетів); коли Valsalva і коли дихання через повторення; 5 поширених помилок. clinical-safety: PASS. sports-scientist review required before publish. Blog card added. README roadmap: editorial 191–200 proposed (content-engine routine · 2026-06-18). **post-118 written v5.96.0(b) — supplementary editorial (content-engine routine, concurrent):** «Довгострокова програма без тренера: що треба мати у голові на рік вперед» — річний горизонт vs. 12-тижневий блок; часові константи адаптацій (нейром'язова/структурна/сполучна тканина); periodization для аматора — три фази; базова річна структура 4 блоків; математика послідовності 130-140 сесій; Bickel et al. 2011 (підтримка 1/9 обсягу); Hubal et al. 2005; 4 питання перед річним горизонтом. clinical-safety: PASS. sports-scientist review required before publish. Blog card added. README roadmap: editorial 201–210 proposed (content-engine routine · 2026-06-18).
 
