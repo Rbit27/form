@@ -4,6 +4,7 @@
 
 ### Added
 - `content/post-118-valsalva-iap-core-bracing.md` — Editorial series post 118. «Valsalva і внутрішньочеревний тиск: чому «тримай повітря» — це не забобони». IAP як активна кінетична ланка (McGill et al. 1990); bracing vs. hollowing (Kavcic et al. 2004); Valsalva до 200 мм рт. ст. (Harman et al. 1988); чотири стінки IAP-системи; серцево-судинна безпека у здорових атлетів (Lentini et al. 1999); коли Valsalva, коли дихання через повторення; п'ять помилок. clinical-safety: PASS. 13-min read.
+- `content/post-118-longterm-self-coached-planning.md` — Editorial supplementary (concurrent with 118). «Довгострокова програма без тренера: що треба мати у голові на рік вперед» — річний горизонт як системна рамка; часові константи адаптацій (нейром'язова/структурна/сполучна тканина); periodization для аматора — три фази; базова річна структура 4 блоків; математика послідовності 130-140 сесій; Bickel 2011, Hubal 2005; 4 питання перед річним горизонтом. clinical-safety: PASS. 13-min read.
 - `content/post-1151-rukhovi-odynytsi-fundamentalna-odynytsia-syly.md` — Block 1151–1200 Cluster 1, post 1 of 10. Рухові одиниці: альфа-мотонейрон і закон «все або нічого»; типи I/IIa/IIx (Burke 1967); гіпертрофія змінює потужність «пострілу», а не структуру іннервації (Narici et al. 1989); чому IIx потребує proximity to failure (Schoenfeld et al. 2017). clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
 - `content/post-1152-pryntsyp-rozmiru-henneman-rekrutuvannia.md` — Block 1151–1200 Cluster 1, post 2 of 10. Принцип розміру Геннемана (1965): порядок рекрутування детермінований біофізикою мотонейрону; компенсаторне рекрутування при стомленні; Del Vecchio et al. 2019 (intramuscular EMG); proximity to failure як ключовий параметр гіпертрофії; Schoenfeld et al. 2017 meta-analysis. clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
 - `content/post-1153-rate-coding-chastota-rozriadiv-moduliatsiia-syly.md` — Block 1151–1200 Cluster 1, post 3 of 10. Rate coding: від twitch до тетанусу; дублетні розряди (Burke et al. 1976; Van Cutsem et al. 1998); "намір рухатися швидко" як нейральний стимул (Behm & Sale 1993); адаптація rate coding через 2–4 тижні тренування. clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
@@ -16,9 +17,10 @@
 - `content/post-1160-cluster-synthesis.md` — Block 1151–1200 Cluster 1, post 10 of 10. Синтез кластеру 1151–1160: дистиляція кожного з 9 постів, три інтегруючих принципи (нейральна адаптація як передумова гіпертрофії; специфічність нейрального навчання; відновлення як нейральний процес), п'ять розвінчаних міфів про "нейральне тренування". Teaser: Cluster 2 — рухова адаптація і моторна пам'ять. clinical-safety: NOT_REQUIRED. review_pending: sports-scientist.
 
 ### Changed
-- `blog.html` — 11 нових карток додано: post-1160 (synthesis) → post-1151 (motor units) + post-118 (editorial Valsalva/IAP). blog.html updated to post-1160.
+- `blog.html` — 12 нових карток: post-1160 (synthesis) → post-1151 (motor units) + post-118 Valsalva/IAP + post-118 Longterm planning (content-engine). blog.html updated to post-1160.
 - `docs/DECISION_LOG.md` — DEC-064: Block 1151–1200 тема «Нейром'язовий контроль та рухова адаптація» затверджена.
-- `STATUS.md` — Block 1151–1200 row додано; total posts 1134 → 1145; editorial series оновлено до post-118; next priorities оновлено.
+- `STATUS.md` — Block 1151–1200 row додано; total posts 1145 → 1146; editorial 201–210 proposed; README roadmap оновлено.
+- `README.md` — post-118 status updated to draft · v5.96.0; editorial topics 201–210 added to roadmap.
 - `VERSION` — 5.95.1 → 5.96.0.
 
 ## [5.95.1] — 2026-06-18
