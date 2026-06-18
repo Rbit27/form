@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.0.1] — 2026-06-18
+
+### Added
+- `content/post-119-program-signs-stopped-working.md` — Editorial series, post 119. «Ознаки того, що твоя програма перестала підходити — і що з цим робити» — три причини зупинки прогресу (шум / функціональне перевантаження / програмна невідповідність); 5 операційних сигналів: RPE-дрейф на незмінних навантаженнях, нульовий прогрес 4+ тижнів, змінений патерн відновлення, технічна регресія на свіжому стані, системне зниження включення; що НЕ є сигналом; три відповіді (мікроадаптація / деловантаження+переоцінка / перебудова програми) і 5-кроковий алгоритм діагностики. Джерела: Hubal et al. 2005 (variability in muscle response); Meeusen et al. 2013 (ECSS/ACSM overreaching consensus); Halson & Jeukendrup 2004 (overtraining analysis); Krieger 2010 (volume meta-analysis); McEwen 2007 (allostatic load). clinical-safety: PASS. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — додано картку для post-119 перед post-118.
+- `STATUS.md` — Editorial series оновлено: 11–118 → 11–119; рядок контент-таблиці Editorial 119 додано. Версія → v6.0.1.
+- `VERSION` — 6.0.0 → 6.0.1.
+
+---
+
 ## [6.0.0] — 2026-06-18
 
 ### Added

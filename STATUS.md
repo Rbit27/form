@@ -1,4 +1,4 @@
-# FORM · Project Status v6.0.0
+# FORM · Project Status v6.0.1
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v6.0.0** — 2026-06-18
+**v6.0.1** — 2026-06-18
 
 ---
 
@@ -16,6 +16,7 @@
 |---|---|---|---|
 | 01–10 | Foundational / brand | 10 | Published |
 | 11–50 | Core sport science | 40 | Published — post-11 (deload weeks) added v5.98.2; sports-scientist review pending |
+| Editorial 119 | Programme expiry signals | 1 | draft — post-119 (program-signs-stopped-working) added v6.0.1; clinical-safety PASS; sports-scientist review pending |
 | 51–99 | Applied training science | 49 | Published |
 | 100–200 | Exercise physiology deep dives | 101 | Published |
 | 201–350 | Training methodology & programming | 150 | Published |
@@ -41,7 +42,9 @@
 
 **Total posts: 1156** (includes posts 1001–1170, post-106, post-107, post-108, post-109, post-110, post-111, post-112, post-116, post-117, post-118-valsalva, post-118-longterm; post-980 and post-639 HARD VETO skipped)
 
-**Editorial series 11–34, 44–50, 106–118** — **post-118 written v5.96.0(a):** «Valsalva і внутрішньочеревний тиск: чому «тримай повітря» — це не забобони» — IAP як активна кінетична ланка (McGill et al. 1990); Valsalva механізм: IAP до 150–200 мм рт. ст. при максимальних зусиллях (Harman et al. 1988); bracing vs. hollowing (Kavcic et al. 2004: bracing > hollowing для функціональних рухів); чотири стінки IAP-системи (діафрагма, тазове дно, черевна стінка, TLF); серцево-судинний аспект (Lentini et al. 1999: без клінічно значущих подій у здорових атлетів); коли Valsalva і коли дихання через повторення; 5 поширених помилок. clinical-safety: PASS. sports-scientist review required before publish. Blog card added. README roadmap: editorial 191–200 proposed (content-engine routine · 2026-06-18). **post-118 written v5.96.0(b) — supplementary editorial (content-engine routine, concurrent):** «Довгострокова програма без тренера: що треба мати у голові на рік вперед» — річний горизонт vs. 12-тижневий блок; часові константи адаптацій (нейром'язова/структурна/сполучна тканина); periodization для аматора — три фази; базова річна структура 4 блоків; математика послідовності 130-140 сесій; Bickel et al. 2011 (підтримка 1/9 обсягу); Hubal et al. 2005; 4 питання перед річним горизонтом. clinical-safety: PASS. sports-scientist review required before publish. Blog card added. README roadmap: editorial 201–210 proposed (content-engine routine · 2026-06-18).
+**Editorial series 11–34, 44–50, 106–119** — **post-119 written v6.0.1:** «Ознаки того, що твоя програма перестала підходити — і що з цим робити» — три причини зупинки прогресу (шум/функціональне перевантаження/програмна невідповідність); 5 операційних сигналів: RPE-дрейф 2+ тижні, нульовий прогрес 4+ тижнів, змінений патерн відновлення, технічна регресія на свіжому стані, системне зниження включення; що НЕ є сигналом; три відповіді (мікроадаптація/деловантаження+переоцінка/перебудова) і алгоритм діагностики; Hubal 2005, Meeusen 2013, Halson & Jeukendrup 2004, Krieger 2010, McEwen 2007. clinical-safety: PASS. sports-scientist review required before publish. Blog card added. README roadmap: editorial 119 added; editorial 120 proposed (next).
+
+**post-118 written v5.96.0(a):** «Valsalva і внутрішньочеревний тиск: чому «тримай повітря» — це не забобони» — IAP як активна кінетична ланка (McGill et al. 1990); Valsalva механізм: IAP до 150–200 мм рт. ст. при максимальних зусиллях (Harman et al. 1988); bracing vs. hollowing (Kavcic et al. 2004: bracing > hollowing для функціональних рухів); чотири стінки IAP-системи (діафрагма, тазове дно, черевна стінка, TLF); серцево-судинний аспект (Lentini et al. 1999: без клінічно значущих подій у здорових атлетів); коли Valsalva і коли дихання через повторення; 5 поширених помилок. clinical-safety: PASS. sports-scientist review required before publish. Blog card added. README roadmap: editorial 191–200 proposed (content-engine routine · 2026-06-18). **post-118 written v5.96.0(b) — supplementary editorial (content-engine routine, concurrent):** «Довгострокова програма без тренера: що треба мати у голові на рік вперед» — річний горизонт vs. 12-тижневий блок; часові константи адаптацій (нейром'язова/структурна/сполучна тканина); periodization для аматора — три фази; базова річна структура 4 блоків; математика послідовності 130-140 сесій; Bickel et al. 2011 (підтримка 1/9 обсягу); Hubal et al. 2005; 4 питання перед річним горизонтом. clinical-safety: PASS. sports-scientist review required before publish. Blog card added. README roadmap: editorial 201–210 proposed (content-engine routine · 2026-06-18).
 
 **post-117 written v5.95.0:** «Як ставити вагу у мікроцикл: не «коли вільно», а за логікою відновлення» — мікроцикл як функціональна одиниця (Bompa & Haff 2009); ЦНС-відновлення 48-72 год, MPS-вікно 24-48 год, сполучна тканина повільніше (Halson 2014; Zatsiorsky & Kraemer 2006); High-Low принцип (Charlie Francis 1992); три помилки розміщення: back-to-back heavy на схожих патернах, важка сесія перед тривалим вільним вікном, відсутність Low між двома Heavy; практичний алгоритм 5 кроків для 3-4 днів/тиждень; мінімальне правило для хаотичних тижнів — ніколи два максимальних поспіль. clinical-safety: PASS. sports-scientist review required before publish. Blog card added. README roadmap: editorial 191–200 proposed (content-engine routine · 2026-06-18).
 
