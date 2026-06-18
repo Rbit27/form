@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.88.1] — 2026-06-18
+
+### Added
+- `content/post-1121-push-pattern-horizontal-vertical-mechanics.md` — Block 1101–1150 Cluster 3, post 1/10. Push pattern як система: горизонтальна і вертикальна вісь, кінематичний ланцюг плечового поясу, три ступені свободи лопатки (протракція/ретракція, elevation/depression, upward/downward rotation), sternoclavicular joint, практична логіка системного погляду на push.
+- `content/post-1122-scapulohumeral-rhythm-serratus-trapezius.md` — Cluster 3, post 2/10. Scapulohumeral rhythm: класичне співвідношення 2:1, serratus anterior (upward rotation через нижній кут лопатки), три частини трапецієподібного (верхня — elevation, нижня — depression + upward rotation, середня — ретракція), force couple serratus + lower trap, winging лопатки механічно, різниця ритму між горизонтальним і вертикальним жимом.
+- `content/post-1126-overhead-press-thoracic-spine-rib-pelvis.md` — Cluster 3, post 6/10. Overhead press як тест всього тіла: thoracic extension як необхідна умова, rib flare механічно, нейтральний таз під навантаженням вгору, взаємозв'язок грудного відділу, поперека і тазу, push press і force transfer, практичний чек-лист перед OHP сесією.
+
+### Changed
+- `VERSION` — 5.88.0 → 5.88.1 (Cluster 3 posts 1121, 1122, 1126 — partial; 1123–1125, 1127–1130 in progress)
+
+---
+
 ## [5.88.0] — 2026-06-18
 
 ### Added
