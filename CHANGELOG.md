@@ -1,5 +1,32 @@
 # Changelog · FORM
 
+## [6.7.0] — 2026-06-18
+
+### Added
+- `content/post-1231-competitive-environment-feedback-context.md` — Block 1201–1250 Cluster 4, post 1/10. Вступ: чому конкурентне середовище — окремий контекст feedback. Три механізми спотворення: соціальне порівняння, захист его, ефект аудиторії. Груповий клас, змагання, лідерборди — всі вони змінюють структуру зворотного зв'язку принципово, а не просто «додають тиск». clinical-safety PASS.
+- `content/post-1232-public-training-audience-effect-feedback.md` — Cluster 4 post 2/10. Ефект аудиторії у тренуванні: два напрями спотворення (ті хто дають feedback пом'якшують критику; ті хто отримують стають захисними). Заяц соціальна фасилітація як теоретичний контекст. Протокол: технічні розмови — після тренування, приватно. clinical-safety PASS.
+- `content/post-1233-judge-feedback-powerlifting-weightlifting.md` — Cluster 4 post 3/10. Суддівський feedback у пауерліфтингу (IPF/USAPL/WRPF): специфіка білих/червоних прапорів як вбудованого технічного сигналу. Як витягнути корисний сигнал: позиція судді, порівняння між спробами, пост-міт розмова. Три типові помилки при читанні суддівського feedback. clinical-safety PASS.
+- `content/post-1234-group-training-hidden-competition-feedback.md` — Cluster 4 post 4/10. Прихована конкуренція у груповому тренуванні (CrossFit, командні програми, семінари): два феномени — інфляція позитивного feedback і порівняльне якоріння. Протокол відокремлення пост-сесійного самоаналізу від групової динаміки. clinical-safety PASS.
+- `content/post-1235-coach-competition-vs-training-functions.md` — Cluster 4 post 5/10. Тренер на змаганнях vs. тренер на тренуванні — принципово різні функції. Тренувальна: розвиток, методологія. Змагальна: тактичні рішення, психологічне заземлення, реальночасові cue. Правило реконтекстуалізації: не повертати змагальний coaching feedback у тренувальний блок без переосмислення. clinical-safety PASS.
+- `content/post-1236-video-analysis-competition-attempts.md` — Cluster 4 post 6/10. Відеоаналіз змагальних спроб ≠ відеоаналіз тренувального процесу. Технічний розпад на максимальних зусиллях — не системна проблема техніки, а перевищення поточної технічної ємності. Чотирикроковий протокол перегляду. Правило 48 годин перед технічними висновками. clinical-safety PASS.
+- `content/post-1237-competitor-feedback-conflict-of-interest.md` — Cluster 4 post 7/10. Feedback від конкурента: конфлікт інтересів що майже ніколи не визнається. Чотирикатегорійний фільтр. Ключове запитання: чия вигода від цієї поради? clinical-safety PASS.
+- `content/post-1238-ego-protection-feedback-reception.md` — Cluster 4 post 8/10. Три прояви захисту его у конкурентному контексті: екстерналізація, селективна пам'ять, відторгнення feedback. Адаптивні короткостроково — контрпродуктивні довгостроково. Правило 48 годин: жодних технічних висновків у день змагань. Поведінкова психологія продуктивності, без клінічного контенту. clinical-safety PASS.
+- `content/post-1239-competitive-environment-feedback-degradation.md` — Cluster 4 post 9/10. П'ять сигналів деградації feedback-якості у конкурентному середовищі. Рішення: розділити конкурентні виступи і цикли технічного розвитку. Пост-змагальна сесія 48–72 год як основний механізм технічного оновлення. clinical-safety PASS.
+- `content/post-1240-cluster-4-synthesis-competitive-feedback.md` — Cluster 4 post 10/10. Синтез: 7 принципів кластера. Контекстна карта блоку 1201–1250 (Cluster 1–4). Прев'ю Cluster 5: Victor як feedback-інфраструктура що зв'язує всі чотири джерела. clinical-safety PASS.
+
+### Changed
+- `blog.html` — 10 нових карток постів 1231–1240 додано. Загальне покриття: пости 1–1240 + editorial серія.
+- `STATUS.md` — Block 1201–1250: IN PROGRESS 30/50 → 40/50; Cluster 4 COMPLETE v6.7.0; next: Cluster 5 (1241–1250).
+- `VERSION` — 6.6.3 → 6.7.0.
+
+## [6.6.3] — 2026-06-18
+
+### Added
+- `content/post-1231-competitive-environment-feedback-context.md` — partial (committed separately during session)
+- `content/post-1232-public-training-audience-effect-feedback.md` — partial
+- `content/post-1236-video-analysis-competition-attempts.md` — partial
+- `content/post-1237-competitor-feedback-conflict-of-interest.md` — partial
+
 ## [6.6.2] — 2026-06-18
 
 ### Changed
