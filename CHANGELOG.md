@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [5.90.0] — 2026-06-18
+
+### Added
+- `content/post-115-technique-under-fatigue.md` — Editorial series post 115. «Техніка під втомою: що змінюється, чому це важливо і коли зупинятись». Диференційна втома стабілізаторів і прайм-муверів; компенсаторний рекрутмент у трьох ключових рухах (squat/press/hinge); чотири маркери technical breakdown; три сценарії зупинки; failure vs. non-failure (Bradford 2023, Refalo 2022); програмні рішення для стійкості техніки. clinical-safety: PASS.
+
+### Changed
+- `blog.html` — blog card added for post-115 (inserted before post-114).
+- `STATUS.md` — Editorial series оновлено до 106–115; total posts 1121 → 1122.
+- `README.md` — editorial roadmap розширено: теми 171–180 додано.
+- `VERSION` — 5.89.0 → 5.90.0.
+
+---
+
 ## [5.89.0] — 2026-06-18
 
 ### Added
