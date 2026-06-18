@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.15
+# FORM · Multi-Tenant Data Model v1.18
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -44,6 +44,9 @@
 34. [FORM Role ENUM Types: `form_role_enum` & `role_change_source_enum`](#34-form-role-enum-types-form_role_enum--role_change_source_enum)
 35. [DSAR Deletion Certificate Schema & SLO Breach Response](#35-dsar-deletion-certificate-schema--slo-breach-response--oq-dsar-03--oq-dsar-04-resolution-dec-052)
 36. [EU-Region R2 Bucket Routing for Enterprise Off-boarding Data Egress](#36-oq-ofb-02-resolution--eu-region-r2-bucket-routing-for-enterprise-off-boarding-data-egress-dec-061)
+37. [Enterprise Pipeline Tracking Schema — `enterprise_pipeline_stages` + `enterprise_impl_time_log`](#37-enterprise-pipeline-tracking-schema--enterprise_pipeline_stages--enterprise_impl_time_log)
+38. [Enterprise Partner Channel Schema — `enterprise_partners`](#38-enterprise-partner-channel-schema--enterprise_partners)
+39. [Enterprise Deal Outcomes Schema — `enterprise_deal_outcomes`](#39-enterprise-deal-outcomes-schema--enterprise_deal_outcomes)
 
 ---
 
@@ -14369,3 +14372,659 @@ OQ-OFB-02 is closed. One forward-looking question opened by this section:
 ---
 
 *v1.15 (2026-06-15): §36 OQ-OFB-02 Resolution — EU-Region R2 Bucket Routing for Enterprise Off-boarding Data Egress (DEC-061). Note: document header was inadvertently not updated when §35 was added (v1.14 note is present but the header line retained v1.13); this commit updates the header to v1.15 to account for both §35 (v1.14) and §36 (v1.15). Closes OQ-OFB-02 (P0, before any EU enterprise tenant off-boards) from §25.9. Decision: Option A adopted — EU-region R2 bucket routing based on `tenants.data_region`. Options B (SCCs + single US bucket) and C (EU bucket + SCCs) rejected on four grounds: TIA maintenance burden under Schrems II, EU enterprise customer DPO friction, FISA §702 / CLOUD Act exposure of Cloudflare US-East, and DPA Annex B complexity. §36.3 `form-offboarding-exports-eu` bucket specification: Cloudflare R2 EU jurisdiction; same IAM policy as US bucket; 30-day object lifecycle; Cloudflare Ireland Ltd — existing SUBPROCESSORS.md entry covers this (no new processor). §36.4 `resolveEgressBucket()` TypeScript routing function: R2_BUCKET_BY_REGION constant (`us-east-1` → `form-offboarding-exports`; `eu-central-1`/`eu-west-1` → `form-offboarding-exports-eu`); `isEuRegion()` helper; six unit test assertions. §36.5 migration `0075_offboarding_r2_routing.sql`: (1) ADD COLUMN `data_region TEXT NOT NULL DEFAULT 'us-east-1' CHECK (...)` to `tenant_data_egress_packages`; (2) ADD CONSTRAINT `chk_r2_bucket_region_consistency` — EU data_region implies EU r2_bucket, US data_region implies US r2_bucket; (3) DROP DEFAULT from `r2_bucket` — Worker must supply value explicitly; (4) CREATE partial INDEX `idx_egress_packages_eu_region` on `(tenant_id, created_at DESC) WHERE data_region IN ('eu-central-1', 'eu-west-1')` for OFB-E-005 evidence query performance; (5) verification SELECT GROUP BY data_region, r2_bucket. §36.6 `enterprise.data_export_completed` payload extension: three new fields added to existing DEC-030 CRITICAL 7yr event — `data_region`, `r2_bucket`, `is_eu_region`; chain invariant OFB-REGION-01 (EU `is_eu_region: true` → `r2_bucket` must equal `'form-offboarding-exports-eu'`; HTTP 422 + P1 PagerDuty on violation; investigate per R-05); registered in `docs/AUDIT_LOG_SCHEMA.md §6.Enterprise-Offboarding` (backwards-compatible payload extension — no new event type). §36.7 two SOC 2 evidence artefacts: OFB-E-005 (C1.1/P4.0/CC6.1 — quarterly `enterprise.data_export_completed` chain export for EU tenants confirming OFB-REGION-01; zero-event quarters filed as affirmative attestation; 7yr); OFB-E-006 (C1.1/CC6.1 — annual Cloudflare R2 EU jurisdiction screenshot + IAM export; 7yr); SQL for OFB-E-005 collection provided; C1.1 auditor narrative. §36.8 OQ-OFB-02 status table: 🟢 Resolved DEC-061. §36.9 ten-item implementation checklist: 6× P0/M7–Before-first-EU-DPA (EU R2 bucket provisioning + OFB-E-006 baseline, migration 0075, routing.ts + unit tests, OFB-REGION-01 validator + integration test, AUDIT_LOG_SCHEMA payload extension, MSA_TEMPLATE DPA Annex B clause), 2× P1/M11 (SOC2_READINESS evidence table updates, idx_egress_packages_eu_region EXPLAIN ANALYZE), 2× P2/Annual (Cloudflare jurisdiction policy review, OFB-E-005/OFB-E-006 evidence collection). §36.10 one new open question OQ-R2-01 (P2 — APAC/LATAM data_region expansion; evaluate at first APAC/LATAM enterprise LOI; forward-compatible ALTER TABLE path described). §25.9 OQ-OFB-02 updated to 🟢 Resolved. TOC updated to add §35 and §36 entries. Privacy floor: no individual employee user_id, health data, or Art. 9 category in any field added by this section; `data_region` is a technical routing label, not a personal data element; `tenant_id` in DEC-030 events is a slug, never a UUID; `form_api` REVOKED from `tenant_data_egress_packages` (inherited from §25.4 RLS). Cross-references: `docs/DATA_MODEL.md §25` (`tenant_data_egress_packages` DDL — `r2_bucket` DEFAULT dropped; `data_region` + `chk_r2_bucket_region_consistency` added via migration 0075; §25.9 OQ-OFB-02 updated to 🟢 Resolved; §25.12 `enterprise.data_export_completed` payload extended); `docs/AUDIT_LOG_SCHEMA.md §6.Enterprise-Offboarding` (payload extension — P0 before M8); `docs/MSA_TEMPLATE.md §DPA-Annex-B` (transfer mechanism row update for EU tenants — P0 before first EU DPA); `docs/SOC2_READINESS.md §C1.1` (OFB-E-005 to add — P1/M11); `docs/SOC2_READINESS.md §CC6.1` (OFB-E-006 to add — P1/M11); `docs/OBSERVABILITY.md §12.3` (idx_egress_packages_eu_region to add — P1/M11); `docs/INCIDENT_RESPONSE.md R-05` (OFB-REGION-01 violation → R-05 chain investigation); `docs/SUBPROCESSORS.md` (Cloudflare Ireland Ltd — existing entry; EU R2 jurisdiction is a configuration change, not a new processor); `docs/CRYPTOGRAPHY_POLICY.md §5` (no new secrets introduced; existing `EGRESS_PACKAGE_SIGNING_KEY` covers both buckets); `docs/DECISION_LOG.md DEC-061`. Owner: enterprise-architect + compliance-officer + devops-lead + legal.*
+
+---
+
+## 37. Enterprise Pipeline Tracking Schema — `enterprise_pipeline_stages` + `enterprise_impl_time_log`
+
+> Owner: `enterprise-architect` + `data-engineer` + `compliance-officer`. Review: before first enterprise pilot (M7), on any change to pipeline stage definition, and quarterly.
+> Scope: enterprise tier only. Pre-CRM pipeline tracking for S0–S5 deal stages and per-deal implementation cost logging. Both tables are designed for CRM-replacement at Series A — `enterprise_pipeline_stages` becomes a read-only archive when a CRM is adopted (OQ-PIPE-02, `docs/COST_MODEL.md §37.11`).
+> References: `docs/COST_MODEL.md §37` (pipeline health model, ARR forecasting, stage conversion rate governance); `docs/COST_MODEL.md §36.9` (implementation time tracking, OQ-08 closure protocol); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pipeline Events` (four DEC-030 events: `enterprise.pipeline_reviewed`, `enterprise.arr_bridge_closed`, `enterprise.deal_aged_out`, `enterprise.pipeline_conversion_model_recalibrated`); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Implementation Events` (three DEC-030 events: `enterprise.implementation_kicked_off`, `enterprise.sso_scim_setup_verified`, `enterprise.implementation_cost_model_calibrated`); DEC-030 (HMAC-chained audit log); `docs/ENTERPRISE.md` (six-stage pipeline definition and partner attribution).
+
+---
+
+### 37.1 Purpose and Design Principles
+
+FORM tracks its enterprise deal pipeline in `enterprise_pipeline_stages` before a CRM is adopted (target: M7–M20). The schema uses an **immutable audit pattern** — one row per stage transition per deal, never an UPDATE to an existing row. This means:
+
+- A deal entering S0 creates one row with `stage = 'S0_inbound'` and `exited_at = NULL`.
+- When it advances to S1, the S0 row is closed (`exited_at` set) and a new S1 row is inserted.
+- Every transition is a permanent record. No deal history is overwritten.
+
+This pattern makes `enterprise_pipeline_stages` an auditable source of truth for stage conversion rate actuals (resolved by OQ-PIPE-01 at Deal 10, `docs/COST_MODEL.md §37.11`) and satisfies SOC 2 CC5.2 (business risk assessed through deal-level monitoring) via the `enterprise.pipeline_reviewed` DEC-030 event.
+
+**Privacy floor (pipeline tables):** No prospect company names, contact emails, or individual `user_id` values appear in either table or in any DEC-030 pipeline event. `deal_id` is a FORM-internal UUID generated by the founder at S0 entry. `champion_name` in `enterprise_pipeline_stages` is for FORM's internal CRM use only — it is not included in any DEC-030 payload or any evidence artefact exported to auditors. `tenant_id` is NULL until a contract is signed and a tenant is provisioned. `form_api` has no access to either table.
+
+---
+
+### 37.2 `enterprise_pipeline_stages` Table
+
+**Authoritative reference:** `docs/COST_MODEL.md §37.8.1`
+
+**Migration:** `0072_enterprise_pipeline_stages.sql`
+
+```sql
+-- Tracks each pipeline stage entry/exit event per deal.
+-- One row per stage transition, not per deal (immutable audit pattern).
+CREATE TABLE enterprise_pipeline_stages (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id        UUID REFERENCES tenants(id) ON DELETE SET NULL,
+                   -- NULL for pre-contract deals (no tenant provisioned yet)
+  deal_id          UUID NOT NULL,
+                   -- Stable identifier for the deal across stage transitions.
+                   -- Generated by founder at S0 entry; persists through Closed-Won.
+  stage            TEXT NOT NULL CHECK (stage IN (
+                     'S0_inbound',
+                     'S1_qualified',
+                     'S2_pilot',
+                     'S3_proposal',
+                     'S4_legal_review',
+                     'S5_closed_won',
+                     'stale',         -- deal aged out and removed from pipeline
+                     'closed_lost'    -- deal explicitly lost (with reason)
+                   )),
+  acv_estimate_usd NUMERIC(12,2) CHECK (acv_estimate_usd > 0),
+  seat_estimate    INTEGER CHECK (seat_estimate >= 50),
+  tier_estimate    TEXT CHECK (tier_estimate IN ('starter','growth','enterprise')),
+  entered_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  exited_at        TIMESTAMPTZ,       -- NULL = currently in this stage
+  exit_reason      TEXT,              -- for 'stale' or 'closed_lost': required
+  source           TEXT CHECK (source IN (
+                     'inbound_email', 'inbound_form', 'inbound_referral',
+                     'outbound_founder', 'outbound_partner', 'conference', 'other'
+                   )),
+  champion_name    TEXT,              -- internal champion at prospect; never in DEC-030 payloads
+  notes            TEXT,
+  created_by       UUID NOT NULL      -- founder or CSM UUID (FORM team, not tenant employee)
+);
+
+-- RLS: form_admin and compliance_reviewer read; form_system write only
+ALTER TABLE enterprise_pipeline_stages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY pipeline_read  ON enterprise_pipeline_stages
+  FOR SELECT USING (auth.role() IN ('form_admin', 'compliance_reviewer'));
+CREATE POLICY pipeline_write ON enterprise_pipeline_stages
+  FOR INSERT WITH CHECK (auth.role() = 'form_system');
+
+-- form_api: NO ACCESS (deal data must never be exposed via the public API)
+REVOKE ALL ON enterprise_pipeline_stages FROM form_api;
+
+-- Indexes
+CREATE INDEX ON enterprise_pipeline_stages (deal_id);
+CREATE INDEX ON enterprise_pipeline_stages (stage) WHERE exited_at IS NULL;
+CREATE INDEX ON enterprise_pipeline_stages (entered_at);
+```
+
+**Stage definitions and maximum age:** See `docs/COST_MODEL.md §37.2` for entry/exit criteria per stage and `max_stage_age_days` thresholds. When a deal exceeds `max_stage_age_days`, pg_cron job 31 (`deal_aging_alert`, daily 07:00 UTC) emits `enterprise.deal_aged_out` and triggers the `action_required` field in the DEC-030 payload.
+
+---
+
+### 37.3 `enterprise_impl_time_log` Table
+
+**Authoritative reference:** `docs/COST_MODEL.md §36.9.1`
+
+**Migration:** `0060_enterprise_impl_time_log.sql`
+
+This table is the time-tracking instrument for OQ-08 (true implementation cost per enterprise deal). It is populated by the founder and CSM during onboarding activities. After three deals are logged, the data-engineer runs the OQ-08 cost extraction query (`docs/COST_MODEL.md §36.9.2`) and formally closes OQ-08 by creating a DECISION_LOG entry.
+
+```sql
+CREATE TABLE enterprise_impl_time_log (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  deal_sequence   INTEGER NOT NULL,          -- 1 = first ever, 2 = second, etc.
+  role            TEXT NOT NULL CHECK (role IN (
+                    'founder', 'engineer', 'csm', 'compliance_officer', 'counsel'
+                  )),
+  activity_code   TEXT NOT NULL CHECK (activity_code IN (
+                    'sso_scim_setup',
+                    'tenant_provisioning',
+                    'white_label_config',
+                    'admin_training',
+                    'pilot_management',
+                    'adoption_report',
+                    'msa_negotiation',
+                    'dpa_execution',
+                    'isq_response',
+                    'security_review_call',
+                    'eu_data_residency_check',
+                    'other'
+                  )),
+  hours_spent     NUMERIC(5,2) NOT NULL CHECK (hours_spent > 0 AND hours_spent <= 40),
+  hourly_rate_usd NUMERIC(8,2) NOT NULL,     -- actual fully-loaded rate at time of deal
+  notes           TEXT,
+  logged_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  logged_by       UUID NOT NULL              -- founder or CSM UUID (FORM team only)
+);
+
+-- Indexes
+CREATE INDEX ON enterprise_impl_time_log (tenant_id);
+CREATE INDEX ON enterprise_impl_time_log (deal_sequence, activity_code);
+
+-- RLS: compliance_reviewer and form_admin read; form_system write only
+ALTER TABLE enterprise_impl_time_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY impl_log_read ON enterprise_impl_time_log
+  FOR SELECT USING (auth.role() IN ('compliance_reviewer', 'form_admin'));
+CREATE POLICY impl_log_write ON enterprise_impl_time_log
+  FOR INSERT WITH CHECK (auth.role() = 'form_system');
+
+-- form_api: NO ACCESS
+REVOKE ALL ON enterprise_impl_time_log FROM form_api;
+```
+
+---
+
+### 37.4 DEC-030 HMAC-Chained Events
+
+Four pipeline governance events and three implementation events are registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pipeline Events` and `§Enterprise Implementation Events` respectively. All are HMAC-chained per DEC-030.
+
+**Pipeline events:**
+| Event type | Severity | Retention | Trigger |
+|---|---|---|---|
+| `enterprise.pipeline_reviewed` | STANDARD | 3 yr | Weekly Monday pipeline review; aggregate metrics only — no prospect names |
+| `enterprise.arr_bridge_closed` | STANDARD | 7 yr | Monthly ARR bridge reconciled; investor-grade financial record (Ukrainian Tax Code Art. 44) |
+| `enterprise.deal_aged_out` | STANDARD | 3 yr | pg_cron job 31 daily — deal exceeds `max_stage_age_days`; `deal_id` UUID only |
+| `enterprise.pipeline_conversion_model_recalibrated` | STANDARD | 7 yr | ≥ 10pp stage deviation after Deal 10; `decision_log_ref` required (PIPE-CHAIN-01: HTTP 422 if absent) |
+
+**Implementation events:**
+| Event type | Severity | Retention | Trigger |
+|---|---|---|---|
+| `enterprise.implementation_kicked_off` | STANDARD | 7 yr | CSM confirms onboarding call scheduled; `tenant_id` + `deal_sequence` |
+| `enterprise.sso_scim_setup_verified` | STANDARD | 7 yr | SSO/SCIM smoke-test passed per `docs/SSO_SCIM_IMPLEMENTATION.md §7.4` |
+| `enterprise.implementation_cost_model_calibrated` | STANDARD | 7 yr | OQ-08 closure: `decision_log_ref` required; aggregate cost data only |
+
+---
+
+### 37.5 SOC 2 Evidence Artefacts
+
+| Artefact ID | Description | TSC | Retention |
+|---|---|---|---|
+| PIPE-E-001 | Weekly export of `enterprise.pipeline_reviewed` chain events — demonstrates systematic pipeline monitoring | CC5.2 | 3 yr |
+| PIPE-E-002 | Annual export of `enterprise.arr_bridge_closed` events — investor-grade ARR bridge record | CC5.2 / CC4.1 | 7 yr |
+| PIPE-E-003 | Export of `enterprise.pipeline_conversion_model_recalibrated` events at Deal 10/20/50 with `decision_log_ref` — demonstrates governed model recalibration | CC5.2 / CC4.1 | 7 yr |
+
+---
+
+### 37.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all seven DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pipeline Events` and `§Enterprise Implementation Events`; deploy event types to `emit-audit-event` Worker; write integration test for PIPE-CHAIN-01 (HTTP 422 on missing `decision_log_ref` in `pipeline_conversion_model_recalibrated`). | platform-engineer + compliance-officer | **P0** | M7 | [ ] |
+| 2 | Create `enterprise_pipeline_stages` table (migration `0072_enterprise_pipeline_stages.sql`) with RLS and `form_api` REVOKE; create all three indexes; verify in staging. | platform-engineer | **P0** | M7 | [ ] |
+| 3 | Create `enterprise_impl_time_log` table (migration `0060_enterprise_impl_time_log.sql`) with RLS; create two indexes; add to Admin Console as a read-only log view for compliance-officer. | platform-engineer | **P0** | M8 | [ ] |
+| 4 | Configure pg_cron job 31 (`deal_aging_alert`, daily 07:00 UTC) to emit `enterprise.deal_aged_out` for any deal where `EXTRACT(DAY FROM NOW() - entered_at)` exceeds `max_stage_age_days` for the current stage. | platform-engineer | **P1** | M8 | [ ] |
+| 5 | After Deal 3: run OQ-08 cost extraction query (`docs/COST_MODEL.md §36.9.2`); create DECISION_LOG entry DEC-0XX; update `docs/COST_MODEL.md §8.2` with actual midpoint; emit `enterprise.implementation_cost_model_calibrated`. Closes OQ-08. | founder + data-engineer | **P2** | M18 (est. Deal 3) | [ ] |
+
+---
+
+### 37.7 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-PIPE-02** | Which CRM tool should FORM adopt, and when? `enterprise_pipeline_stages` is sufficient for ≤ 10 active deals; CRM (HubSpot Starter, Attio, Salesforce Starter) reduces cognitive load at 10+ active deals. Evaluate at M12; adopt before M18. CRM must support bi-directional webhook to keep DEC-030 pipeline events current. | P2 | founder | Evaluate M12; adopt M18 |
+| **OQ-PIPE-03** | Should partner-sourced deals be tracked separately in the pipeline with a `source_partner_id` column on `enterprise_pipeline_stages`? Defer until first partner deal; add column at that point (backward-compatible). | P2 | founder | On first partner deal |
+
+---
+
+*v1.16 (2026-06-18): §37 Enterprise Pipeline Tracking Schema — `enterprise_pipeline_stages` (migration 0072, immutable audit pattern, eight-value stage enum including `'stale'` and `'closed_lost'`, RLS form_admin/compliance_reviewer read + form_system write, `form_api` REVOKED, three indexes) + `enterprise_impl_time_log` (migration 0060, OQ-08 cost tracking, five role codes, twelve activity codes, RLS, `form_api` REVOKED). Four pipeline DEC-030 events (PIPE-CHAIN-01 invariant on `pipeline_conversion_model_recalibrated`); three implementation DEC-030 events. Three SOC 2 evidence artefacts (PIPE-E-001/002/003; CC5.2/CC4.1). Five-item implementation checklist (3× P0/M7–M8, 1× P1/M8, 1× P2/M18). Two open questions (OQ-PIPE-02 CRM adoption, OQ-PIPE-03 partner attribution column). Privacy floor: no prospect company names, contact emails, or individual `user_id` in any table column used in DEC-030 payloads or evidence artefacts; `champion_name` is FORM-internal only; `form_api` REVOKED from both tables. Cross-references: `docs/COST_MODEL.md §36.9` (`enterprise_impl_time_log` DDL + OQ-08 protocol); `docs/COST_MODEL.md §37.8` (`enterprise_pipeline_stages` DDL + SQL queries); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pipeline Events` + `§Enterprise Implementation Events`; `docs/ENTERPRISE.md` (pipeline stage definitions); `docs/SSO_SCIM_IMPLEMENTATION.md §7.4` (SSO/SCIM smoke-test — trigger for `enterprise.sso_scim_setup_verified`); §38 (`enterprise_partners.id` — `attributed_to_partner_id` FK in `enterprise_pipeline_stages`); §39 (`enterprise_deal_outcomes.deal_id` references `enterprise_pipeline_stages.id` ON DELETE RESTRICT). Owner: enterprise-architect + data-engineer + compliance-officer.*
+
+---
+
+## 38. Enterprise Partner Channel Schema — `enterprise_partners`
+
+> Owner: `enterprise-architect` + `compliance-officer`. Review: before first partner agreement is signed (M10), on any change to partner tier definitions or revenue share governance.
+> Scope: enterprise tier only. Tracks active partner agreements, attribution state, and revenue share accounting before a CRM is adopted (OQ-PIPE-02).
+> References: `docs/COST_MODEL.md §38` (partner channel economics — Bronze/Silver/Gold tiers, CAC comparison, revenue share model); `docs/COST_MODEL.md §38.7` (authoritative DDL reference); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events` (four DEC-030 events); `docs/ENTERPRISE.md` (partner no-go criteria and privacy floor); `docs/MSA_TEMPLATE.md` (Partner Agreement template with §38.6.2 non-waivable privacy floor clauses); DEC-030 (HMAC-chained audit log).
+
+---
+
+### 38.1 Purpose and Design Principles
+
+`enterprise_partners` is the pre-CRM record of FORM's partner channel. It is populated by the compliance-officer under PAM escalation (`form_admin` role required — SCIM/API cannot write to this table). It serves three purposes:
+
+1. **Agreement governance** — records executed Partner Agreements and DPA status; SOC 2 CC9.2 evidence.
+2. **Attribution accounting** — tracks `deal_attribution_log` JSONB for each deal where a partner was involved; source for `enterprise.partner_deal_attributed` DEC-030 events.
+3. **Revenue share accounting** — tracks `total_share_paid_usd` and `next_payment_due_at`; gates the quarterly `enterprise.partner_revenue_share_paid` event.
+
+**Privacy floor (partner table):**
+- No partner employee names, contact emails, or company-representative identifiers appear in any DEC-030 payload. `partner_id` (UUID) is the sole cross-reference identifier.
+- `deal_attribution_log` JSONB elements contain FORM-internal `deal_id` UUIDs and aggregate financial data only — no prospect company names.
+- `enterprise_partners.partner_name` is stored in the table for FORM's internal reference but is **never included in any DEC-030 event payload** (enforced at the `emit-audit-event` Worker layer).
+- `form_api` has no access to this table (`REVOKE ALL ON enterprise_partners FROM form_api`).
+
+---
+
+### 38.2 ENUMs
+
+```sql
+-- Migration: 0073_enterprise_partners.sql
+
+CREATE TYPE partner_category_enum AS ENUM (
+  'referral',
+  'reseller',
+  'integration',
+  'white_label'
+);
+
+CREATE TYPE partner_status_enum AS ENUM (
+  'active',
+  'inactive',       -- No deal introduced in last 12 months
+  'suspended',      -- Privacy floor violation under investigation
+  'terminated'      -- Agreement terminated; no future revenue share
+);
+```
+
+---
+
+### 38.3 `enterprise_partners` Table
+
+**Authoritative reference:** `docs/COST_MODEL.md §38.7`
+
+```sql
+CREATE TABLE enterprise_partners (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_name              TEXT NOT NULL,
+  partner_category          partner_category_enum NOT NULL,
+  status                    partner_status_enum NOT NULL DEFAULT 'active',
+
+  -- Agreement terms
+  revenue_share_pct         NUMERIC(5,2) NOT NULL CHECK (revenue_share_pct BETWEEN 0 AND 45),
+  agreement_signed_at       TIMESTAMPTZ NOT NULL,
+  agreement_expires_at      TIMESTAMPTZ,           -- NULL = open-ended (referral only)
+  agreement_doc_ref         TEXT NOT NULL,         -- internal doc ref; never a partner company name
+  dpa_signed_at             TIMESTAMPTZ,           -- NULL for referral partners with zero PII transfer
+  dpa_doc_ref               TEXT,
+
+  -- Attribution tracking
+  attributed_arr_usd        NUMERIC(12,2) NOT NULL DEFAULT 0,
+  attributed_deal_count     INTEGER NOT NULL DEFAULT 0,
+  deal_attribution_log      JSONB NOT NULL DEFAULT '[]',
+                             -- [{deal_id UUID, partner_pipeline_stage_id UUID,
+                             --   signed_at ISO8601, acv_usd numeric,
+                             --   tier text, referral_fee_paid_at ISO8601|null,
+                             --   revenue_share_active boolean}]
+
+  -- Revenue share accounting
+  total_share_paid_usd      NUMERIC(12,2) NOT NULL DEFAULT 0,
+  last_payment_at           TIMESTAMPTZ,
+  next_payment_due_at       TIMESTAMPTZ,
+
+  -- Privacy floor compliance
+  privacy_floor_violation_at  TIMESTAMPTZ,         -- SET if termination_reason = 'privacy_floor_breach'
+  termination_reason          TEXT,
+
+  -- Audit
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by                UUID NOT NULL           -- PAM session ID; compliance-officer or founder
+);
+
+-- Prevent revenue share payment after termination
+ALTER TABLE enterprise_partners
+  ADD CONSTRAINT chk_ep_no_payment_after_termination
+  CHECK (
+    status != 'terminated'
+    OR last_payment_at < agreement_expires_at
+    OR agreement_expires_at IS NULL
+  );
+
+-- Partial index: active partners with upcoming payment
+CREATE INDEX idx_ep_active_payment_due
+  ON enterprise_partners (next_payment_due_at)
+  WHERE status = 'active';
+
+-- RLS
+ALTER TABLE enterprise_partners ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY ep_compliance_read ON enterprise_partners
+  FOR SELECT TO compliance_reviewer USING (true);
+
+CREATE POLICY ep_admin_read ON enterprise_partners
+  FOR SELECT TO form_admin USING (true);
+
+CREATE POLICY ep_system_write ON enterprise_partners
+  FOR ALL TO form_system USING (true);
+
+REVOKE ALL ON enterprise_partners FROM form_api;
+```
+
+**`deal_attribution_log` write discipline:** The `form_system` role appends elements to this JSONB array atomically with the `enterprise.partner_deal_attributed` DEC-030 event emission. An element is appended when `enterprise_pipeline_stages.stage` transitions to `'S5_closed_won'` and `attributed_to_partner_id IS NOT NULL`. No element is ever deleted — the log is append-only (same immutable pattern as `enterprise_pipeline_stages`).
+
+---
+
+### 38.4 DPΑ Requirement by Partner Category
+
+| `partner_category` | DPA required? | Rationale |
+|---|---|---|
+| `referral` | No (if zero PII transfer) | Referral partners receive no FORM user data; relationship is lead-introduction only |
+| `reseller` | **Yes** | Resellers have contractual access to tenant configuration data during onboarding |
+| `integration` | **Yes** | Integration partners exchange data via API; GDPR Art. 28 processor chain |
+| `white_label` | **Yes** | White-label partners host the product under their brand; broad data access |
+
+`dpa_signed = true` is enforced at chain-append time for `enterprise.partner_agreement_signed` events where `partner_category ∈ {'reseller', 'integration', 'white_label'}`. Worker returns HTTP 422 if `dpa_signed = false` for those categories.
+
+---
+
+### 38.5 DEC-030 HMAC-Chained Events
+
+All four events are registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events`. Chain invariant **PART-CHAIN-01**: `enterprise.partner_offboarded` with `termination_reason = 'privacy_floor_breach'` requires a preceding `privacy.floor_breach_detected` event for the `tenant_id` within the 12 months prior; HTTP 422 `PART_CHAIN_01_VIOLATION` on absence → R-05 escalation.
+
+| Event type | Severity | Retention | Trigger |
+|---|---|---|---|
+| `enterprise.partner_agreement_signed` | STANDARD | 7 yr | Partner agreement executed; compliance-officer or founder; PAM session required |
+| `enterprise.partner_revenue_share_paid` | HIGH | 7 yr | Quarterly payment released; `privacy_floor_check_passed: true` required (z.literal(true); HTTP 422 if false or absent) |
+| `enterprise.partner_deal_attributed` | STANDARD | 7 yr | Deal closes at S5 with `attributed_to_partner_id` set |
+| `enterprise.partner_offboarded` | HIGH | 7 yr | Partner terminated; compliance-officer only; PART-CHAIN-01 enforced on `privacy_floor_breach` reason |
+
+---
+
+### 38.6 SOC 2 Evidence Artefacts
+
+| Artefact ID | Description | TSC | Retention |
+|---|---|---|---|
+| PART-E-001 | Annual export of `enterprise.partner_agreement_signed` chain events — executed agreements + DPA status | CC9.2 | 7 yr |
+| PART-E-002 | Annual export of `enterprise.partner_revenue_share_paid` events — every row `privacy_floor_check_passed: true` | CC9.2 / CC4.1 | 7 yr |
+| PART-E-003 | `enterprise.partner_offboarded` export for SOC 2 observation period — PART-CHAIN-01 evidence | CC9.2 / CC7.4 | 7 yr |
+
+---
+
+### 38.7 No-Go Partner Criteria
+
+`enterprise_partners` must never include a partner whose primary service is:
+- **Insurance risk scoring** — any partner that would use FORM aggregate data to price insurance or determine insurance eligibility.
+- **Government backdoors** — any partner that creates a data pathway to law enforcement or government agencies without a lawful basis and user notification.
+- **Wellness-as-punishment** — any partner that uses aggregate or individual metrics to adversely affect employment terms, compensation, or benefits.
+
+A partner found to have engaged in any of these activities after agreement execution triggers the `privacy_floor_breach` termination reason, PART-CHAIN-01, and an R-22 incident (`docs/INCIDENT_RESPONSE.md`). The `privacy_floor_violation_at` timestamp is SET and `status` → `'terminated'`.
+
+---
+
+### 38.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0073_enterprise_partners.sql`; register all four DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events`; deploy to `emit-audit-event` Worker; write integration test for PART-CHAIN-01 (HTTP 422 `PART_CHAIN_01_VIOLATION` on offboarding without predecessor `privacy.floor_breach_detected`) and for `privacy_floor_check_passed` gate (HTTP 422 `PART_PAY_FLOOR_CHECK` on payment with `false`). | platform-engineer + compliance-officer | **P0** | M10 (before first partner agreement) | [ ] |
+| 2 | Add `enterprise_partners` read view to Admin Console (compliance-officer + form_admin roles only); confirm `partner_name` field is masked in any export to DEC-030 audit log. | platform-engineer | **P0** | M10 | [ ] |
+| 3 | Add partner privacy floor section to Partner Agreement template (`docs/MSA_TEMPLATE.md §38.6.2`): three non-waivable clauses (no insurance risk scoring, no government backdoors, no wellness-as-punishment); PART-CHAIN-01 escalation path if violated. Confirm with outside counsel before first execution. | compliance-officer + legal | **P0** | Before first partner agreement | [ ] |
+
+---
+
+*v1.17 (2026-06-18): §38 Enterprise Partner Channel Schema — `partner_category_enum` (referral/reseller/integration/white_label); `partner_status_enum` (active/inactive/suspended/terminated); `enterprise_partners` table (migration 0073: agreement terms, attribution tracking via `deal_attribution_log` JSONB, revenue share accounting, privacy floor violation columns, `chk_ep_no_payment_after_termination` CHECK, `idx_ep_active_payment_due` partial index, RLS compliance_reviewer+form_admin read/form_system write, `form_api` REVOKED). §38.4 DPA requirement matrix by partner_category (referral=optional; reseller/integration/white_label=mandatory; enforced at chain-append). §38.5 four DEC-030 events with PART-CHAIN-01 invariant (`privacy_floor_breach` termination requires predecessor `privacy.floor_breach_detected`; HTTP 422 `PART_CHAIN_01_VIOLATION`; R-05 escalation); `privacy_floor_check_passed z.literal(true)` gate on `partner_revenue_share_paid` (HTTP 422 `PART_PAY_FLOOR_CHECK`). §38.6 three SOC 2 artefacts (PART-E-001/002/003; CC9.2/CC4.1/CC7.4). §38.7 three no-go partner criteria (insurance risk scoring, government backdoors, wellness-as-punishment) with R-22 incident escalation path. §38.8 three-item P0 implementation checklist. Privacy floor: `partner_name` stored in table for FORM-internal use only — never in any DEC-030 payload; `deal_attribution_log` JSONB elements contain `deal_id` UUID and aggregate financial data only; no individual employee identifiers; `form_api` REVOKED. Cross-references: `docs/COST_MODEL.md §38.7` (authoritative DDL); `docs/COST_MODEL.md §38.6` (partner governance — Bronze/Silver/Gold tiers; quarterly revenue share gate); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Partner Events` (four DEC-030 events); `docs/INCIDENT_RESPONSE.md R-22` (privacy floor breach escalation — PART-CHAIN-01); `docs/MSA_TEMPLATE.md` (Partner Agreement §38.6.2 clauses); §37 (`enterprise_pipeline_stages.attributed_to_partner_id` FK → `enterprise_partners.id`); §39 (`enterprise_deal_outcomes.attributed_to_partner_id` FK → `enterprise_partners.id` ON DELETE SET NULL). Owner: enterprise-architect + compliance-officer.*
+
+---
+
+## 39. Enterprise Deal Outcomes Schema — `enterprise_deal_outcomes`
+
+> Owner: `enterprise-architect` + `compliance-officer` + `customer-success`. Review: before first enterprise deal closes (M9), on any change to win/loss taxonomy, and annually.
+> Scope: enterprise tier only. One row per closed deal (Closed-Won or Closed-Lost). Forms the foundation for OQ-PIPE-01 win/loss analytics (`docs/COST_MODEL.md §39.6`), competitive intelligence (`docs/COST_MODEL.md §39.6.3–39.6.4`), and SOC 2 evidence artefacts WIN-E-001 through WIN-E-003 (`docs/SOC2_READINESS.md §87`).
+> References: `docs/COST_MODEL.md §39` (authoritative source for DDL, analytics queries, DEC-030 events, and implementation checklist); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Deal Close Events` (four DEC-030 events: `enterprise.deal_closed_won`, `enterprise.deal_closed_lost`, `enterprise.win_loss_analysis_recalibrated`, `privacy.no_go_criteria_applied`); `docs/SOC2_READINESS.md §87` (WIN-E-001/002/003 evidence artefacts); DEC-030 (HMAC-chained audit log); `docs/ENTERPRISE.md §"No-go customers"` (four no-go criteria).
+
+---
+
+### 39.1 Purpose and Design Principles
+
+`enterprise_deal_outcomes` closes the gap between stage-level pipeline tracking (`enterprise_pipeline_stages`, §37) and fleet-level ARR accounting (`enterprise.arr_bridge_closed`). It records:
+
+- **Full financial profile** of every closed-won deal: tier, contracted seats, ACV, effective rate, price floor attestation, contract years, and payment date.
+- **Structured win/loss attribution**: eight win reason codes, ten loss reason codes, six competitor category values — all structured enums, never free text.
+- **Ethical rejection tracking**: `no_go_criteria_triggered` boolean + `privacy.no_go_criteria_applied` companion event for deals rejected on FORM's no-go criteria.
+- **OQ-PIPE-01 data source**: once ≥ 10 terminal outcomes are recorded (excluding `no_go_criteria_triggered = true` deals), the win/loss analytics queries resolve OQ-PIPE-01 by comparing actual stage conversion rates to the `docs/COST_MODEL.md §37.3` benchmark table.
+
+**Privacy floor:** No prospect company names, contact emails, or individual `user_id` values appear in this table or in any DEC-030 deal close event. `deal_id` is a FORM-internal UUID. `competitor_category` is a structured enum — verbatim loss-call notes and competitor names remain in CRM only and are never in the DEC-030 chain. `form_api` has no access.
+
+---
+
+### 39.2 Migration Dependency Chain
+
+```sql
+-- Migration order (must be applied sequentially):
+-- 0072_enterprise_pipeline_stages.sql     (§37.2 — deal_id FK source)
+-- 0073_enterprise_partners.sql            (§38.3 — attributed_to_partner_id FK source)
+-- 0073b_pipeline_partner_attribution.sql  (adds attributed_to_partner_id FK to enterprise_pipeline_stages)
+-- 0074_enterprise_deal_outcomes.sql       (this section)
+
+-- Step 1: extend stage enum to include 'closed_lost'
+ALTER TYPE enterprise_pipeline_stage_enum ADD VALUE IF NOT EXISTS 'closed_lost';
+```
+
+---
+
+### 39.3 Win/Loss Reason ENUMs
+
+| Category | Code | Meaning |
+|---|---|---|
+| **Win** | `cv_demo_differentiation` | Real-time pose analysis demo was the decisive differentiator |
+| **Win** | `privacy_floor_compliance` | Privacy floor guarantees won the DPO / legal sign-off |
+| **Win** | `soc2_roadmap_credibility` | SOC 2 roadmap (Type II in 12 months) convinced procurement |
+| **Win** | `competitive_price_per_seat` | Effective rate was lower than comparable alternatives |
+| **Win** | `product_velocity` | Rapid feature iteration during pilot converted the champion |
+| **Win** | `champion_pull` | Internal champion drove adoption decision top-down |
+| **Win** | `pilot_conversion` | Pilot engagement metrics exceeded prospect's threshold |
+| **Win** | `bundle_package` | Combination of features + CSM + white-label tipped decision |
+| **Loss** | `price_too_high` | Effective rate exceeded prospect's per-seat budget |
+| **Loss** | `feature_gap_ios_only` | iOS-only constraint was a blocking requirement |
+| **Loss** | `soc2_not_yet_certified` | SOC 2 Type II certification required before procurement approval |
+| **Loss** | `competitor_won` | Prospect chose an identified competitor category |
+| **Loss** | `champion_departed` | Internal champion left; no succession buyer |
+| **Loss** | `no_budget_owner` | Wellness budget owner could not be identified or engaged |
+| **Loss** | `no_go_criteria_triggered` | FORM's ethical rejection (excluded from conversion rate calculations) |
+| **Loss** | `procurement_stall` | Procurement process stalled with no resolution path |
+| **Loss** | `pilot_no_convert` | Pilot completed with insufficient engagement to proceed |
+| **Loss** | `deferred_not_lost` | Explicitly deferred to next budget cycle; re-enter at S1 |
+
+**Competitor categories (enum values for `competitor_category` and `won_vs_competitor_category`):**
+
+| Code | Description |
+|---|---|
+| `enterprise_wellness_platform` | Broad enterprise wellness platform (Virgin Pulse, Gympass, Wellhub) |
+| `point_solution_fitness` | Single-function fitness app with B2B tier |
+| `employee_assistance_program` | EAP that expanded into fitness/wellness |
+| `in_house_hr_initiative` | Prospect built or manages their own program |
+| `no_decision` | Prospect chose status quo (no purchase) |
+| `unknown` | Competitor not identified; if > 15% at Deal 20, evaluate OQ-WIN-02 |
+
+---
+
+### 39.4 Deal Close Financial Classification
+
+When a deal closes as `'closed_won'`, the full financial profile is recorded:
+
+| Field | Source | Invariant |
+|---|---|---|
+| `tier` | `enterprise_pipeline_stages.tier_estimate` at close | Required for `closed_won` (CHECK constraint) |
+| `contracted_seats` | MSA / order form | Required; `>0` |
+| `acv_usd` | `contracted_seats × effective_rate_per_seat × 12` | Required; source of `new_arr_usd` in next `enterprise.arr_bridge_closed` |
+| `effective_rate_per_seat` | Signed rate post-discount | Must be ≥ price floor (`docs/COST_MODEL.md §31.5`); `floor_respected = TRUE` invariant |
+| `pricing_exception_event_id` | UUID soft-ref to `enterprise.pricing_exception_approved` | Non-null only when non-standard discount was pre-approved (§31.8 ordering rule) |
+| `contract_years` | MSA | `IN (1, 2, 3)` |
+| `tcv_usd` | GENERATED: `acv_usd × contract_years` | Computed column; never manually set |
+| `first_payment_due_date` | MSA | Triggers ARR bridge inclusion; ISO 8601 date |
+| `attributed_to_partner_id` | `enterprise_pipeline_stages.attributed_to_partner_id` | FK to `enterprise_partners.id` ON DELETE SET NULL |
+
+---
+
+### 39.5 `enterprise_deal_outcomes` DDL
+
+**Authoritative reference cross-referenced from:** `docs/COST_MODEL.md §39.5`
+
+```sql
+-- Migration: 0074_enterprise_deal_outcomes.sql
+-- Depends on: 0072_enterprise_pipeline_stages.sql (§37.2)
+--             0073_enterprise_partners.sql (§38.3)
+--             0073b_pipeline_partner_attribution.sql
+
+CREATE TABLE enterprise_deal_outcomes (
+  id                          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  deal_id                     UUID         NOT NULL
+                                REFERENCES enterprise_pipeline_stages(id)
+                                ON DELETE RESTRICT,
+  tenant_id                   UUID         REFERENCES tenants(id) ON DELETE SET NULL,
+  outcome                     TEXT         NOT NULL
+                                CHECK (outcome IN ('closed_won', 'closed_lost')),
+  closed_at                   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+
+  -- Closed-Won fields
+  tier                        TEXT         CHECK (tier IN ('starter', 'growth', 'enterprise')),
+  contracted_seats             INTEGER      CHECK (contracted_seats > 0),
+  acv_usd                     INTEGER      CHECK (acv_usd > 0),
+  effective_rate_per_seat     NUMERIC(8,2) CHECK (effective_rate_per_seat >= 0),
+  floor_respected             BOOLEAN,
+  contract_years              SMALLINT     CHECK (contract_years IN (1, 2, 3)),
+  tcv_usd                     INTEGER      GENERATED ALWAYS AS (acv_usd * contract_years) STORED,
+  first_payment_due_date      DATE,
+  pricing_exception_event_id  UUID,        -- soft-ref to enterprise.pricing_exception_approved
+  win_primary_reason          TEXT         CHECK (win_primary_reason IN (
+    'cv_demo_differentiation', 'privacy_floor_compliance', 'soc2_roadmap_credibility',
+    'competitive_price_per_seat', 'product_velocity', 'champion_pull',
+    'pilot_conversion', 'bundle_package'
+  )),
+  won_vs_competitor_category  TEXT         CHECK (won_vs_competitor_category IN (
+    'enterprise_wellness_platform', 'point_solution_fitness', 'employee_assistance_program',
+    'in_house_hr_initiative', 'no_decision', 'unknown'
+  )),
+
+  -- Closed-Lost fields
+  loss_primary_reason         TEXT         CHECK (loss_primary_reason IN (
+    'price_too_high', 'feature_gap_ios_only', 'soc2_not_yet_certified',
+    'competitor_won', 'champion_departed', 'no_budget_owner',
+    'no_go_criteria_triggered', 'procurement_stall', 'pilot_no_convert', 'deferred_not_lost'
+  )),
+  competitor_category         TEXT         CHECK (competitor_category IN (
+    'enterprise_wellness_platform', 'point_solution_fitness', 'employee_assistance_program',
+    'in_house_hr_initiative', 'no_decision', 'unknown'
+  )),
+  no_go_criteria_triggered    BOOLEAN      NOT NULL DEFAULT false,
+
+  -- Common fields
+  deal_sequence               INTEGER,
+  attributed_to_partner_id    UUID         REFERENCES enterprise_partners(id) ON DELETE SET NULL,
+  sales_cycle_days            INTEGER      GENERATED ALWAYS AS (
+                                EXTRACT(DAY FROM closed_at - (
+                                  SELECT created_at FROM enterprise_pipeline_stages
+                                  WHERE id = deal_id
+                                ))::INTEGER
+                              ) STORED,
+  dec030_event_id             UUID,        -- soft-ref to enterprise.deal_closed_won/lost event
+
+  -- Completeness constraints
+  CONSTRAINT won_fields_required CHECK (
+    outcome <> 'closed_won' OR (
+      tier IS NOT NULL AND contracted_seats IS NOT NULL AND acv_usd IS NOT NULL
+      AND effective_rate_per_seat IS NOT NULL AND floor_respected = TRUE
+      AND contract_years IS NOT NULL AND first_payment_due_date IS NOT NULL
+      AND win_primary_reason IS NOT NULL
+    )
+  ),
+  CONSTRAINT lost_fields_required CHECK (
+    outcome <> 'closed_lost' OR loss_primary_reason IS NOT NULL
+  ),
+  CONSTRAINT competitor_category_required_on_competitor_loss CHECK (
+    loss_primary_reason <> 'competitor_won' OR competitor_category IS NOT NULL
+  ),
+  CONSTRAINT no_go_flag_consistent CHECK (
+    (loss_primary_reason = 'no_go_criteria_triggered') = no_go_criteria_triggered
+  )
+);
+
+CREATE UNIQUE INDEX idx_deal_outcomes_deal_id
+  ON enterprise_deal_outcomes(deal_id);
+CREATE INDEX idx_deal_outcomes_outcome_closed
+  ON enterprise_deal_outcomes(outcome, closed_at DESC);
+CREATE INDEX idx_deal_outcomes_tier_reason
+  ON enterprise_deal_outcomes(tier, win_primary_reason, loss_primary_reason);
+```
+
+**RLS policies:**
+```sql
+ALTER TABLE enterprise_deal_outcomes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY edo_compliance_select ON enterprise_deal_outcomes
+  FOR SELECT TO compliance_reviewer USING (true);
+
+CREATE POLICY edo_admin_select ON enterprise_deal_outcomes
+  FOR SELECT TO form_admin USING (true);
+
+CREATE POLICY edo_system_insert ON enterprise_deal_outcomes
+  FOR INSERT TO form_system WITH CHECK (true);
+
+REVOKE ALL ON enterprise_deal_outcomes FROM form_api;
+```
+
+**Why REVOKE on `form_api`:** `enterprise_deal_outcomes` contains FORM's commercial deal data (ACV, effective rates, win/loss reasons). Tenant admin users access the product via `form_api` — they must never see FORM's pipeline data. All tenant-facing financial data is in `tenant_contracts` (§16) and `tenant_billing_snapshots` (§24).
+
+---
+
+### 39.6 Win/Loss Analytics Queries
+
+The five analytics queries for OQ-PIPE-01 resolution, loss reason distribution, win rate by tier, competitor impact, and sales cycle p50/p90 are defined in `docs/COST_MODEL.md §39.6.1–39.6.5` and executed via the quarterly win/loss review runbook at `docs/runbooks/RB-ENT-WIN-LOSS-01.md`.
+
+Run the stage conversion rate actuals query (`docs/COST_MODEL.md §39.6.1`) only when `COUNT(*) FROM enterprise_deal_outcomes WHERE outcome IN ('closed_won','closed_lost') AND NOT no_go_criteria_triggered` ≥ 10. The `no_go_criteria_triggered` exclusion prevents FORM's own ethical rejections from distorting the pipeline conversion rate.
+
+---
+
+### 39.7 DEC-030 HMAC-Chained Events
+
+All four events are registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Deal Close Events`. Two chain invariants apply:
+
+**WIN-CHAIN-01** (WARNING): `enterprise.deal_closed_won` should be preceded by `enterprise.implementation_kicked_off` for the same `tenant_id` within the prior 72 hours. If no kickoff event is found, the Worker emits a WARNING log (not HTTP 422 — the deal close is not blocked, but the anomaly is flagged for `customer-success` review).
+
+**PIPE-CHAIN-02** (HTTP 422): `enterprise.win_loss_analysis_recalibrated` requires a non-null `decision_log_ref` (DEC-06X slug). Missing `decision_log_ref` → HTTP 422 `PIPE_CHAIN_02_VIOLATION`. The recalibration event cannot be emitted without a corresponding DECISION_LOG entry.
+
+| Event type | Severity | Retention | Trigger |
+|---|---|---|---|
+| `enterprise.deal_closed_won` | STANDARD | 7 yr | Deal closed at S5; Admin Console "Close Deal" modal (form_admin + founder only); `floor_respected: true` payload invariant |
+| `enterprise.deal_closed_lost` | STANDARD | 3 yr | Deal explicitly lost; Admin Console; auto-companion `privacy.no_go_criteria_applied` when `no_go_criteria_triggered = true` |
+| `enterprise.win_loss_analysis_recalibrated` | STANDARD | 7 yr | OQ-PIPE-01 closure at Deal 10/20/50; `decision_log_ref` required (PIPE-CHAIN-02) |
+| `privacy.no_go_criteria_applied` | STANDARD | 3 yr | Auto-companion to `enterprise.deal_closed_lost` when `no_go_criteria_triggered = true`; never emitted standalone |
+
+**`privacy.no_go_criteria_applied` companion invariant:** Always emitted as the second event in a two-event atomic array payload: `[enterprise.deal_closed_lost, privacy.no_go_criteria_applied]`. Both events share the same `prev_hash` anchor. The Worker enforces this ordering — the companion cannot be emitted without the preceding `deal_closed_lost` in the same request.
+
+---
+
+### 39.8 SOC 2 Evidence Artefacts
+
+See `docs/SOC2_READINESS.md §87` for full auditor narratives, collection methods, and evidence vault paths.
+
+| Artefact ID | Description | TSC | Retention |
+|---|---|---|---|
+| WIN-E-001 | Annual export of `enterprise.deal_closed_won` chain events — every row `floor_respected: true`; demonstrates pricing discipline and contract execution governance | CC5.2 / CC1.4 | 7 yr |
+| WIN-E-002 | Export of `enterprise.win_loss_analysis_recalibrated` events at Deal 10/20/50 with `decision_log_ref` — demonstrates systematic commercial model governance | CC5.2 / CC4.1 | 7 yr |
+| WIN-E-003 | Quarterly export of `privacy.no_go_criteria_applied` chain events — zero-count quarters filed as affirmative attestation; demonstrates ethical rejection criteria are operationally enforced | CC1.4 / CC9.2 | 3 yr |
+
+---
+
+### 39.9 Implementation Checklist
+
+#### P0 — Before first deal close (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0074_enterprise_deal_outcomes.sql` (Step 1: `ALTER TYPE enterprise_pipeline_stage_enum ADD VALUE IF NOT EXISTS 'closed_lost'`; Step 2: CREATE TABLE with all constraints; Step 3: three indexes; Step 4: RLS + REVOKE). Run `EXPLAIN (ANALYZE, BUFFERS)` on `idx_deal_outcomes_tier_reason` with 50 synthetic rows on staging; confirm index scan. | platform-engineer | **P0** | M9 | [ ] |
+| 2 | Register all four DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Deal Close Events`; deploy to `emit-audit-event` Worker; write integration tests for WIN-CHAIN-01 WARNING and PIPE-CHAIN-02 HTTP 422 on missing `decision_log_ref`; test atomic two-event array for `no_go_criteria_triggered = true` path. | platform-engineer + compliance-officer | **P0** | M9 | [ ] |
+| 3 | Implement Admin Console "Close Deal" modal (form_admin + founder roles only): two-option outcome toggle; won-path required fields; lost-path required fields; `no_go_criteria` enum shown when `no_go_criteria_triggered` checkbox is active; on submit → INSERT `enterprise_deal_outcomes` + emit DEC-030 event + update `enterprise_pipeline_stages.stage`. | platform-engineer | **P0** | M9 | [ ] |
+
+#### P1 — Before first enterprise renewal (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | After first closed-won deal: file WIN-E-001 artefact (`compliance/evidence/winloss/WIN-E-001_<YYYY-QN>.csv`); verify `floor_respected: true` in all records. | compliance-officer | **P1** | M10 | [ ] |
+| 5 | Start quarterly WIN-E-003 cadence from M10; file `compliance/evidence/winloss/WIN-E-003_<YYYY-QN>.csv` each quarter; if zero no-go events, file signed zero-count attestation. | compliance-officer | **P1** | Quarterly from M10 | [ ] |
+
+#### P2 — OQ-PIPE-01 calibration (est. M18)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | When `COUNT(*) ≥ 10` terminal non-no-go outcomes: run `docs/COST_MODEL.md §39.6.1` query; compare to `§37.3` benchmark; create DECISION_LOG entry DEC-06X; update `§37.3`; emit `enterprise.win_loss_analysis_recalibrated` with `decision_log_ref`; file WIN-E-002. Closes OQ-PIPE-01. | founder + data-engineer | **P2** | M18 (est. Deal 10) | [ ] |
+| 7 | At Deal 20: repeat OQ-PIPE-01 calibration; evaluate OQ-WIN-02 (`competitor_category unknown%` threshold — if > 15%, add subcategory enum). | data-engineer | **P2** | M24 (est. Deal 20) | [ ] |
+
+---
+
+### 39.10 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-PIPE-01** | What are FORM's actual stage conversion rates? Benchmark table (`docs/COST_MODEL.md §37.3`) uses industry proxies. Resolved when `COUNT(*) ≥ 10` terminal non-no-go outcomes; run §39.6.1 query; create DECISION_LOG DEC-06X; update §37.3. | P2 | founder + data-engineer | Deal 10 (est. M18) |
+| **OQ-WIN-01** | Should `enterprise.deal_closed_won` be emitted automatically when `enterprise_pipeline_stages.stage` transitions to `'S5'`, or only manually via Admin Console? Recommendation: manual at launch; evaluate automation after Deal 5. | P2 | platform-engineer + enterprise-architect | After Deal 5 |
+| **OQ-WIN-02** | If `competitor_category = 'unknown'` share exceeds 15% at Deal 20, should a `competitor_subcategory` secondary enum be added? Evaluate at Deal 20 via `docs/COST_MODEL.md §39.6.4` query. | P2 | data-engineer | Deal 20 (est. M24) |
+
+---
+
+*v1.18 (2026-06-18): §39 Enterprise Deal Outcomes Schema — closes the forward reference `docs/DATA_MODEL.md §39.5` cited in `docs/COST_MODEL.md §39` cross-references. `enterprise_deal_outcomes` DDL (migration 0074: Step 1 extend `enterprise_pipeline_stage_enum` with `'closed_lost'`; Step 2 CREATE TABLE with `won_fields_required` + `lost_fields_required` + `competitor_category_required_on_competitor_loss` + `no_go_flag_consistent` CHECK constraints; Step 3 three indexes — `idx_deal_outcomes_deal_id` UNIQUE, `idx_deal_outcomes_outcome_closed`, `idx_deal_outcomes_tier_reason`; Step 4 RLS compliance_reviewer+form_admin SELECT, form_system INSERT, form_api REVOKED; `tcv_usd` and `sales_cycle_days` GENERATED ALWAYS columns). §39.1 purpose: bridges §37 stage-level tracking and ARR bridge; records financial profile of closed-won deals; structured win/loss attribution with eight win codes, ten loss codes, six competitor_category enum values. §39.3 win/loss reason taxonomy (full table). §39.4 financial classification for closed_won deals (`floor_respected = TRUE` invariant; `pricing_exception_event_id` soft-ref; `tcv_usd` GENERATED column). §39.5 DDL (cross-referenced from `docs/COST_MODEL.md §39.5`). §39.6 analytics queries deferred to COST_MODEL §39.6.1–39.6.5 and runbook RB-ENT-WIN-LOSS-01. §39.7 four DEC-030 events: `enterprise.deal_closed_won` (WIN-CHAIN-01 WARNING; `floor_respected: true` invariant); `enterprise.deal_closed_lost` (auto-companion `privacy.no_go_criteria_applied` when `no_go_criteria_triggered = true`); `enterprise.win_loss_analysis_recalibrated` (PIPE-CHAIN-02 HTTP 422 if `decision_log_ref` null); `privacy.no_go_criteria_applied` (auto-companion only; never standalone). §39.8 three SOC 2 evidence artefacts: WIN-E-001 (CC5.2/CC1.4 annual closed-won export + `floor_respected` attestation); WIN-E-002 (CC5.2/CC4.1 recalibration export at Deal 10/20/50); WIN-E-003 (CC1.4/CC9.2 quarterly no-go export; zero-count quarters as affirmative attestation). §39.9 seven-item implementation checklist: 3× P0/M9 (DDL migration 0074, DEC-030 event registration + WIN-CHAIN-01/PIPE-CHAIN-02 integration tests + two-event array test, Admin Console "Close Deal" modal), 2× P1/M10 (WIN-E-001 first filing, WIN-E-003 quarterly cadence start), 2× P2/M18–M24 (OQ-PIPE-01 closure at Deal 10, OQ-WIN-02 evaluation at Deal 20). §39.10 three open questions (OQ-PIPE-01, OQ-WIN-01, OQ-WIN-02). Privacy floor: no prospect company names, contact emails, or individual employee `user_id` in any table column used in DEC-030 payloads; `competitor_category` is structured enum only; verbatim loss-call notes stay in CRM; `deal_id` is FORM-internal UUID never shared externally; `form_api` REVOKED. Cross-references: `docs/COST_MODEL.md §39` (authoritative source for DDL, analytics queries, DEC-030 event schemas, and implementation checklist); `docs/SOC2_READINESS.md §87` (WIN-E-001/002/003 evidence artefacts + auditor narratives); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Deal Close Events` (four DEC-030 events to register); `docs/runbooks/RB-ENT-WIN-LOSS-01.md` (quarterly win/loss review + OQ-PIPE-01 calibration protocol); §37 (`enterprise_pipeline_stages.id` — `deal_id` FK source; `enterprise_pipeline_stages.created_at` — `sales_cycle_days` GENERATED computation base); §38 (`enterprise_partners.id` — `attributed_to_partner_id` FK ON DELETE SET NULL); `docs/DECISION_LOG.md` (DEC-06X — OQ-PIPE-01 closure record at Deal 10; required for `win_loss_analysis_recalibrated` `decision_log_ref`); `docs/ENTERPRISE.md §"No-go customers"` (four criteria: insurance risk scoring, government backdoors, wellness-as-punishment, other). Owner: enterprise-architect + compliance-officer + customer-success.*

@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.1.2] — 2026-06-18
+
+### Changed
+- `docs/DATA_MODEL.md` — extended v1.15 → v1.18: added §37 Enterprise Pipeline Tracking Schema (`enterprise_pipeline_stages` migration 0072 + `enterprise_impl_time_log` migration 0060), §38 Enterprise Partner Channel Schema (`enterprise_partners` migration 0073 with `partner_category_enum` + `partner_status_enum`), §39 Enterprise Deal Outcomes Schema (`enterprise_deal_outcomes` migration 0074 — closes forward reference `docs/DATA_MODEL.md §39.5` cited in `docs/COST_MODEL.md §39`). Three new TOC entries. Full DDL, RLS, DEC-030 event registry cross-references, SOC 2 evidence artefact tables, implementation checklists, and open questions for each section. Covers: `enterprise_pipeline_stages` (immutable audit pattern, eight-value stage enum, PIPE-CHAIN-01/PIPE-CHAIN-02 invariants, three pipeline DEC-030 events + three implementation DEC-030 events, PIPE-E-001/002/003 artefacts); `enterprise_impl_time_log` (OQ-08 cost tracking, twelve activity codes, five role codes); `enterprise_partners` (PART-CHAIN-01 invariant, DPA requirement matrix, no-go partner criteria, four partner DEC-030 events, PART-E-001/002/003 artefacts); `enterprise_deal_outcomes` (eight win reason codes, ten loss reason codes, six competitor_category values, four CHECK constraints, WIN-CHAIN-01/PIPE-CHAIN-02 DEC-030 invariants, `privacy.no_go_criteria_applied` auto-companion, WIN-E-001/002/003 artefacts). Privacy floor enforced across all sections: no prospect company names, no individual `user_id`, `form_api` REVOKED on all three tables.
+- `VERSION` — 6.1.1 → 6.1.2.
+
+---
+
 ## [6.1.1] — 2026-06-18
 
 ### Added
