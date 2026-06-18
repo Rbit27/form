@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [5.93.0] — 2026-06-18
+
+### Added
+- `docs/SOC2_READINESS.md §87` — Evidence Artefact Cross-Reference Patch: COST_MODEL §39 (Deal Close Governance, Win/Loss Analytics & Competitive Intelligence). Registers three SOC 2 artefacts from COST_MODEL §39.9 (v2.5, 2026-06-15) into SOC2_READINESS: WIN-E-001 (CC5.2/CC1.4 — annual `enterprise.deal_closed_won` export with `floor_respected: true` attestation; 7yr; `compliance/evidence/winloss/WIN-E-001_<YYYY>.csv`), WIN-E-002 (CC5.2/CC4.1 — `enterprise.win_loss_analysis_recalibrated` chain export with PIPE-CHAIN-02 verification; 7yr; `compliance/evidence/winloss/WIN-E-002_deal<N>.json`), WIN-E-003 (CC1.4/CC9.2 — quarterly `privacy.no_go_criteria_applied` export; zero-count quarters filed as affirmative ethics attestation; 3yr; `compliance/evidence/winloss/WIN-E-003_<YYYY-QN>.csv`). Six SOC 2 criterion rows extended (CC5.2 × 2, CC1.4 × 2, CC4.1 × 1, CC9.2 × 1). Closes five cross-reference obligations from COST_MODEL §39.9 and §39.10 items 5 and 6 (both now [x] Done). Five-item implementation checklist: 1× P0/M9 (Admin Console modal prerequisite), 3× P1/M10 (WIN-E-001 first annual filing, WIN-E-003 quarterly cadence, §79.4 master evidence table), 1× P2/Deal 10 (WIN-E-002 at OQ-PIPE-01 threshold). SOC2_READINESS.md v3.11.1 → v3.12.0.
+
+### Changed
+- `docs/COST_MODEL.md §39.10` — checklist items 5 (WIN-E-001) and 6 (WIN-E-003) marked [x] Done (documentation); implementation gates tracked in SOC2_READINESS.md §87.7.
+- `VERSION` — 5.92.0 → 5.93.0.
+
+---
+
 ## [5.92.0] — 2026-06-18
 
 ### Added
