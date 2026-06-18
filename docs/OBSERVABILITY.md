@@ -6712,7 +6712,7 @@ The SIEM pipeline itself emits DEC-030 events to make the pipeline observable wi
 | OQ | Question | Owner | Resolution Target | Priority |
 |---|---|---|---|---|
 | **OQ-SIEM-01** | **🟢 Resolved** — §34 (2026-06-10). Decision: hybrid bridge approach. CR-01 (brute force) and CR-04 (bulk data access) via **Cloudflare Analytics Engine** (real-time, < 10 s detection lag — pure aggregation, no JOIN required). CR-02 (impossible travel) and CR-03 (privilege escalation) via **Supabase pg_cron bridge** every 5 minutes (≤ 5 min detection lag — LAG() window + self-JOIN not available in Analytics Engine). Full migration to ClickHouse MergeTree at M9. Interim detection-lag SLO SIEM-SLO-BRIDGE-01 accepted for M4–M8 as a bounded, documented constraint. See §34 for full implementation: DDL (`0059_siem_bridge.sql`), pg_cron jobs 22–23, Analytics Engine queries, M9 migration plan, evidence artefacts SIEM-BRIDGE-E-001 through SIEM-BRIDGE-E-003. | platform-engineer + devops-lead | **🟢 Resolved — §34** | ~~P0~~ |
-| OQ-SIEM-02 | **Tenant SIEM export consent and DPA scope.** The current design treats any enterprise tenant as eligible to enable SIEM export once they have an API key. However, GDPR and some enterprise DPAs require explicit written consent before FORM transmits audit data (even redacted) to a third-party endpoint specified by the tenant. It is unclear whether the existing enterprise DPA template in `docs/SUBPROCESSORS.md` covers tenant-specified SIEM endpoints as downstream controllers. Legal must review whether the Admin Dashboard "enable SIEM export" UI action constitutes sufficient consent or whether a separate DPA addendum signature is required per tenant. | compliance-officer + legal | Before first enterprise SIEM export goes live (M5) | **P1** |
+| OQ-SIEM-02 | **🟢 Resolved — DEC-065 (2026-06-18).** Per-tenant signed MSA Addendum 4 (SIEM Data Processing Addendum) is required before FORM may transmit DEC-030 audit events to a tenant-specified endpoint. The Admin Dashboard "Enable SIEM Export" button is gated behind an Addendum 4 in-product acceptance flow. SIEM-CONSENT-01 chain invariant enforces this at the `emit-audit-event` Worker layer (HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` if no prior `siem.consent_addendum_signed` in the chain). Two new DEC-030 events registered: `siem.consent_addendum_signed` (HIGH, 7yr), `siem.consent_addendum_revoked` (HIGH, 7yr). SOC 2 artefact SIEM-CONSENT-E-001 (CC9.2/CC1.1) defined. Full specification in §47. | compliance-officer + legal | **🟢 Resolved — §47** | ~~P1~~ |
 | OQ-SIEM-03 | **HMAC chain verification responsibility for tenant SIEM consumers.** The pull API includes `X-FORM-HMAC-Verify` response headers and each event includes its `hmac_signature`. The push webhook batch also includes a batch-level `X-FORM-Signature`. However, the per-event HMAC chain (where each event's signature includes a hash of the preceding event) requires tenants to reconstruct the chain across multiple API calls to verify it. This is a non-trivial implementation burden for a Splunk or Sentinel operator. Should FORM provide an open-source chain-verification library (Python + Go), or is it sufficient to document the verification algorithm and let enterprise tenants implement their own? If a library is not provided, the "HMAC chain integrity" claim in marketing materials may be challenged. | security-engineer + devops-lead | Before enterprise GA (M13) | **P2** |
 
 ---
@@ -12717,3 +12717,322 @@ If `mobile.replay_tier_violation` fires in production (non-zero event count):
 *v4.3.0 (2026-06-17): §46 OQ-MOBILE-02 Resolution — Sentry Session Replay Screen Allowlist & Clinical-Safety Review Protocol (DEC-063). Closes OQ-MOBILE-02 from §28.13 (P1 — before M4 deploy — Sentry session replay screen allowlist; clinical-safety sign-off required; authored 2026-06-01). Decision (DEC-063, 2026-06-17): Option A adopted — Tier S screen allowlist with mandatory clinical-safety gate. Session replay remains disabled by default (`replaysSessionSampleRate: 0`) for all tiers; enterprise tenants receive a 5% error-session sample rate on Tier S screens only; on-demand 10% session rate available via §46.5 CSM-initiated protocol with security-engineer approval and DEC-030 chain record. §46.2 three-tier screen classification framework: Tier S (Safe — structurally incapable of Art. 9 data display; replay permitted), Tier R (Restricted — may display health-adjacent data by navigation state; replay prohibited), Tier H (Health — primary content is Art. 9 data, clinical-safety VETO applies; replay prohibited). Route-name prohibition: any route matching `Workout|Coach|Victor|Nutrition|Meal|Wearable|HRV|Progress|Body|Weight|CV|Biometric|Achievement|Health|Recovery|Session` is automatically excluded regardless of Tier S list. §46.3 authoritative Tier S allowlist (14 routes): SsoLogin, SsoCallback, OnboardingStep1–4, Subscription, BillingConfirmation, AdminDashboard, AdminDashboardTeamActivity (k-anonymity floor enforced by DATA_MODEL §17 — individual data structurally absent), AppError, NetworkError, Settings, SsoSettings. §46.4 four-layer privacy control model: (1) Tier S architectural exclusion; (2) `isReplayPermitted()` runtime gate in `beforeSend` (drops non-Tier-S frames before Sentry egress); (3) `maskAllText: true` + `maskAllInputs: true` at Sentry init; (4) §28.3 breadcrumb deny-list continues to apply. Sample rates: consumer tier 0/0; enterprise default 0/0.05; enterprise on-demand debug 0.1/0.10. §46.5 enterprise on-demand replay enablement: six-step CSM → security-engineer → devops-lead protocol; feature-flag enablement with TTL; 30-day Sentry retention cap; post-session REPLAY-E-001 evidence review. §46.6 two DEC-030 events: `mobile.replay_config_updated` (STANDARD, 3yr — tenant_id slug, action enum, rate fields, linear_ticket_ref, clinical_safety_sign_off_at nullable); `mobile.replay_tier_violation` (HIGH, 7yr — route_name_hash SHA-256, tenant_id, frame_dropped: true, violation_type enum); REPLAY-CHAIN-01 ordering invariant (config_updated action: 'enabled' must precede Sentry ingestion by ≤ 5 min; violation → P1 PagerDuty). §46.7 inadvertent Tier R/H capture escalation: `beforeSend` drop as first layer; if frame reaches Sentry, P1 incident + R-22/R-01 activation + immediate disable + Sentry API deletion + PIR entry. §46.8 clinical-safety review gate: any `REPLAY_ALLOWED_ROUTES` change requires PR + clinical-safety Slack sign-off + compliance-officer sign-off + new DEC entry; `replay-allowlist.test.ts` CI test enforces prohibited route-name patterns + `maskAllText`/`maskAllInputs` constraints. §46.9 three SOC 2 artefacts: REPLAY-E-001 (CC6.7 — on-demand per enterprise debug window; 3yr); REPLAY-E-002 (CC6.7 — allowlist CI test pass log; 3yr); REPLAY-E-003 (CC7.2 + P1.1 — quarterly `mobile.replay_tier_violation` chain export; zero-event attestation; 7yr). §46.10 OQ gap tracker: OQ-MOBILE-02 🟡 P1 → 🟢 Resolved DEC-063; OQ-MOBILE-01 unchanged. §46.11 eleven-item implementation checklist: 5× P0/M5 (sentry-replay-config.ts + beforeSend gate, CI test replay-allowlist.test.ts, DEC-030 event registration + integration test, REPLAY-CHAIN-01 cron monitor, §28.13 cross-update [x Done in this version]), 4× P1/M5–M8 (clinical-safety sign-off for baseline Tier S, first enterprise debug session + REPLAY-E-001, REPLAY-E-003 quarterly automation, SOC2_READINESS §CC6.7 table update), 2× P2/Annual (annual Tier S review, annual Sentry DPA review). §46.12 two open questions: OQ-REPLAY-01 (P2 — raise error sample rate 5% → 20% after 90 days M5 data); OQ-REPLAY-02 (P2 — Admin Dashboard conditional classification based on k-anonymity floor CI enforcement). Document header: v4.2.1 → v4.3.0. §28.13 OQ-MOBILE-02 row updated to 🟢 Resolved (DEC-063, 2026-06-17). Cross-references: `docs/OBSERVABILITY.md §28.3` (beforeSend breadcrumb deny-list — unchanged; §46.4 adds screen-level gate as first layer); `docs/OBSERVABILITY.md §28.13` (OQ-MOBILE-02 — updated to 🟢 Resolved DEC-063); `docs/DATA_MODEL.md §17` (Enterprise Admin Reporting Schema — k-anonymity floor qualifying AdminDashboard for Tier S); `docs/ENTERPRISE.md §Privacy floor for enterprise` (rule 2 — no individual employee data in admin reporting); `docs/INCIDENT_RESPONSE.md R-22` (privacy floor breach escalation path); `docs/INCIDENT_RESPONSE.md R-01` (data breach escalation if Art. 9 confirmed in replay); `docs/CLINICAL_SAFETY.md` (clinical-safety VETO + sign-off gate); `docs/AUDIT_LOG_SCHEMA.md §Mobile` (two new DEC-030 events to register — P0 before M5); `docs/SOC2_READINESS.md §CC6.7` (REPLAY-E-001/002/003 to add — P1 before M8); `docs/SUBPROCESSORS.md §Sentry` (existing EU cloud DPA covers replay); `docs/DECISION_LOG.md DEC-063`. Privacy floor: no real user_id, employee name, health data, coaching content, biometric values, or Art. 9 category in any DEC-030 event; `route_name` in `mobile.replay_tier_violation` is SHA-256 hashed; `maskAllText`/`maskAllInputs` applied universally on Tier S screens; consumer tier replay permanently 0/0; enterprise replay requires explicit enablement; Sentry EU cloud (existing sub-processor). Owner: platform-engineer + clinical-safety + security-engineer + compliance-officer.*
 
 *v4.2.1 (2026-06-16): §12.7 Postgres Index Hygiene Monitoring. Closes two P1 open questions from §40.9 (v3.7, 2026-06-13): OQ-PERF-01 → 🟢 Resolved; OQ-PERF-02 → 🟢 Resolved. OQ-PERF-03 → 🟢 Deferred with threshold. §45.1 scopes to k6 platform selection, quarterly k6 Cloud workflow, staging refresh procedure, two DEC-030 events, one new SOC 2 artefact (PERF-STAGING-E-001); explicitly out of scope: §33.3 VU scenario parameters, §40.4 production alerts, §40.2 merge-gate logic (all unchanged). §45.2 DEC-058 decision — hybrid architecture: k6 OSS (GitHub Actions, US-East) for daily CI gate (no change); k6 Cloud EU-West (Amsterdam) for quarterly PERF-SLO-06 reference only. Four grounds: (1) geographic accuracy — US-East inflates EU-primary latency 40–80 ms vs. ENTERPRISE_SLA.md §3 p95 < 300 ms EU commitment; k6 Cloud EU-West eliminates transatlantic RTT bias from LT-E-001 evidence; (2) cost proportionality — Team plan ~$89/month; 4 quarterly runs fit within included VU-hour budget at zero metered overage; daily k6 Cloud gate requires Business plan $299+/month with no additional compliance benefit; (3) third-party corroboration — cloud_run_id is immutable k6 Cloud portal record providing A1.1 auditor attestation anchor unavailable from self-hosted artifacts; (4) DEC-043/DEC-044/DEC-051 pattern — simpler tool for high-frequency gates, higher-fidelity for low-frequency evidence. Reverse cost low: static RTT correction offset approach available if k6 Cloud deprecated; no schema/event-type changes. Re-evaluation: annual k6 Cloud renewal or > 20 ms divergence from §16 SYNTH-SLO-01. §45.3 OQ-PERF-02 — quarterly schema-only refresh: Step 1 `supabase db dump --schema-only` + grep check (zero COPY/INSERT) + `db reset` + DDL apply; Step 2 `test-data-factory` seed (lt-synthetic-{1,2,3} tenants, 500 users each, lt-user-{N}@test.form.coach, skip_art9_tables: true); Step 3 clinical-safety Slack attestation + `:white_check_mark:` confirmation → PERF-STAGING-E-001; Step 4 post-run `db reset` cleanup. Five ANON invariants: ANON-01 gen_random_uuid for user_id; ANON-02 schema-only dump no Art. 9 data; ANON-03 lt-synthetic- tenant prefix; ANON-04 @test.form.coach email; ANON-05 physically separate Supabase project. Post-seed SQL verification (Art. 9 tables must all = 0). §45.3.3 constitutes `compliance/cc8/staging-data-anonymisation-procedure.md` v1.0. §45.4 two new DEC-030 STANDARD 3yr events: `system.quarterly_perf_reference_initiated` (cloud_run_id, node_region: eu-west, test_suite, staging_refresh_date date-only, clinical_safety_sign_off: true, quarter) and `system.quarterly_perf_reference_completed` (cloud_run_id, node_region, slo_results object with PERF-SLO-01–05, p95_ms, p99_ms, error_rate_pct, commit_sha, quarter, run_duration_s); PERF-CLOUD-CHAIN-01 ordering invariant (initiated before completed per cloud_run_id; inversion → P1 PagerDuty; not R-05). §45.5 OQ-PERF-03 deferred: per-tenant VU profile maintained through GA; re-evaluation trigger at 10k daily sessions for single tenant or 5,000 fleet seats; no new DEC-030 events. §45.6 two SOC 2 artefacts: PERF-STAGING-E-001 (CC4.1/A1.1 — clinical-safety sign-off screenshot; quarterly; 7yr; compliance/evidence/a1/); LT-E-001 updated scope (A1.1 — now k6 Cloud EU-West cloud_run_id provides third-party anchor). §45.7 OQ gap tracker: OQ-PERF-01 🟡→🟢 DEC-058; OQ-PERF-02 🟡→🟢 DEC-058; OQ-PERF-03 🟡→🟢 Deferred with threshold. §45.8 nine-item implementation checklist: 5× P0/M6 (k6 Cloud account + EU-West token, two DEC-030 event registrations + PERF-CLOUD-CHAIN-01 test, compliance/cc8/ procedure extraction + clinical-safety sign-off, .github/workflows/load-test-quarterly.yml workflow with manual Slack gate, §40.9/§40.10 OQ tracker update [already done in this version]), 2× P1/M8 (first quarterly run execution + LT-E-001 + PERF-STAGING-E-001 filing, p95 > 250 ms investigation gate), 2× P2/Annual (k6 Cloud plan renewal, OQ-PERF-03 threshold annual check). Document header: v3.9 → v4.1. Cross-references: §40.2 (merge-gate trigger matrix — unchanged; k6 OSS CI gate continues); §40.4 (production alert rules — unchanged); §40.5 (existing system.load_test_* DEC-030 events — §45 adds two parallel events in system.* namespace); §40.6 (pg_cron job 30 quarterly_perf_regression_check — §45 provides the k6 Cloud evidence input); §40.8 (LT-E-001 updated: k6 Cloud as source; LT-E-002 unchanged); §40.9 (OQ-PERF-01/02/03 — all three now resolved/deferred; §40.9 OQ table updated in this document version); §40.10 (checklist items 8 and 9 marked [x] Done with DEC-058 reference); `docs/SOC2_READINESS.md §33.3` (k6 VU scenario parameters — unchanged; §45 adds Cloud execution wrapper not scenario content); `docs/ENTERPRISE_SLA.md §3` (99.9% uptime + p95 < 300 ms EU commitment — the SLA §45 validates geographically); §16 (synthetic monitoring — Better Stack EU-West probes provide continuous p95 baseline; k6 Cloud quarterly run validates under synthetic load); `docs/AUDIT_LOG_SCHEMA.md §6/§System` (two new DEC-030 events to register — P0 before M6); `docs/CLINICAL_SAFETY.md` (clinical-safety sign-off authority for ANON invariant verification — §45.3.3 Step 3); `docs/DECISION_LOG.md DEC-058`. Privacy floor: no individual employee user_id, health data, coaching content, or biometric values in either DEC-030 event; staging_refresh_date date-only; cloud_run_id k6-Cloud UUID with no FORM user mapping; form_api REVOKED from audit_log_events and compliance evidence paths. Owner: devops-lead + platform-engineer + compliance-officer.*
+
+---
+
+## §47 OQ-SIEM-02 Resolution — Tenant SIEM Export Consent, Per-Tenant DPA Addendum Design & SIEM-CONSENT-01 Chain Invariant (DEC-065)
+
+> Owner: compliance-officer + security-engineer + enterprise-architect. Review: on any change to SIEM export feature, MSA Addendum 4 template, or `emit-audit-event` Worker chain-invariant logic. SOC 2 evidence: CC9.2, CC1.1. References: `docs/DECISION_LOG.md DEC-065`, `docs/AUDIT_LOG_SCHEMA.md §SIEM`, `docs/ENTERPRISE.md §Privacy floor for enterprise`, GDPR Art. 28(3)(a).
+
+### §47.1 Purpose and Scope
+
+This section resolves **OQ-SIEM-02** (from §27.12, v1.4, 2026-06-01): *"Does the Admin Dashboard 'enable SIEM export' UI action constitute sufficient GDPR consent, or is a separate DPA addendum signature required per tenant before FORM transmits audit data to a tenant-specified SIEM endpoint?"*
+
+**Scope:** This section covers the legal basis determination for tenant SIEM export, the MSA Addendum 4 (SIEM Data Processing Addendum) template, the `tenant_siem_configs` DDL extension required to record addendum acceptance, the Admin Dashboard consent capture UI gate, the SIEM-CONSENT-01 chain invariant enforced at the `emit-audit-event` Worker layer, two new DEC-030 events, the SOC 2 evidence artefact SIEM-CONSENT-E-001, and an eight-item implementation checklist with milestone assignments.
+
+**Out of scope:** The existing §27 SIEM push/pull architecture (unchanged), the §34 correlation-rule bridge (unchanged), SIEM-SLO-01 through SIEM-SLO-04 (unchanged), alert rules AL-SIEM-01 through AL-SIEM-06 (unchanged).
+
+**Privacy floor (applies to all content in §47):** No individual employee `user_id`, health data, body composition values, coaching content, or Art. 9 special category data in any event payload or evidence artefact. `endpoint_url_hash` is `SHA-256(endpoint_url)[:32]` truncated (32 hex chars) — not the full 64-char hash, not the plaintext SIEM endpoint URL (which may reveal internal network topology). `signed_by_email_hash` is `SHA-256(lowercase(email))` (64 hex chars) — no plaintext email. `tenant_id` is org slug (non-identifying for individual employees). `form_api` is REVOKED from `tenant_siem_configs` at Supabase RLS level.
+
+---
+
+### §47.2 Decision (DEC-065)
+
+**Decision:** A per-tenant signed **MSA Addendum 4 (SIEM Data Processing Addendum)** is required before FORM may transmit DEC-030 HMAC-chained audit events to any tenant-specified SIEM endpoint. A UI click on the Admin Dashboard "Enable SIEM Export" toggle alone does **not** satisfy this requirement.
+
+**Four grounds:**
+
+1. **GDPR Art. 28(3)(a) gap.** FORM acts as a data processor for enterprise tenants. GDPR Art. 28(3)(a) requires that processing occurs "only on documented instructions from the controller." Enabling a SIEM export pipeline transmits DEC-030 events — which may contain pseudonymised identity fields (auth actor hashes, IP subnet, timestamp sequences attributable to an individual) — to an endpoint designated by the tenant. An in-product UI click does not constitute a "documented instruction" within the meaning of Art. 28(3)(a); a written instrument (the addendum) does. This gap was identified by compliance-officer in OQ-SIEM-02 and confirmed by legal review on 2026-06-17.
+
+2. **Enterprise IT expectation.** Security teams deploying SIEM integrations (Splunk, Sentinel, Datadog, QRadar) expect a data processing agreement or addendum to exist before any third-party audit pipeline is authorised. The absence of a signed addendum has been cited in enterprise prospect security reviews as a blocker. Addendum 4 aligns FORM's process with industry standard practice.
+
+3. **Reverse-cost analysis.** The cost of issuing Addendum 4 per tenant (template-based, DocuSign-automated, estimated < 10 min per tenant) is lower than the cost of a GDPR-enforcement action or enterprise security review failure arising from the absence of documented instructions. The addendum also creates a contractual obligation on the tenant's side to designate FORM as processor for their SIEM pipeline under an adequate legal basis — reducing FORM's downstream liability if a tenant misuses the export stream.
+
+4. **Technology-layer enforcement pattern.** The HMAC-chained audit log (DEC-030) enforces ordering invariants at the `emit-audit-event` Worker layer, not at the application layer (UI). This pattern is established precedent in the FORM architecture (see DEC-030 HMAC chain, DEC-056 graduated SIEM activation). The SIEM-CONSENT-01 invariant follows the same pattern: the Worker rejects `siem.tenant_export_enabled` with HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` if no prior `siem.consent_addendum_signed` chain record exists for the tenant. This converts the consent requirement from a procedural control into a technology control.
+
+**Reverse cost:** Moderate. If future legal analysis determines a lighter-weight consent mechanism suffices (e.g., an in-MSA DPA clause covering all tenants), Addendum 4 can be deprecated and the SIEM-CONSENT-01 invariant relaxed by removing the `siem.consent_addendum_signed` prerequisite check in the Worker. The `tenant_siem_configs.addendum_signed_at` column becomes nullable and the Admin Dashboard consent gate is removed. Estimated reversal cost: 1 sprint (Worker update, Admin Dashboard update, tenant migration to opt-out of re-signing). **Re-evaluation trigger:** any change to GDPR Art. 28 regulatory guidance or enterprise customer feedback indicating the addendum flow is a commercial barrier.
+
+**Decision record:** `docs/DECISION_LOG.md DEC-065` (2026-06-18).
+
+---
+
+### §47.3 GDPR Art. 6 & Art. 28 Lawful Basis Analysis
+
+| Layer | Question | Analysis | Conclusion |
+|---|---|---|---|
+| **FORM → DEC-030 event storage** | What is FORM's lawful basis for storing DEC-030 events in `audit_log_events`? | Legitimate interest (GDPR Art. 6(1)(f)) — security monitoring, incident response, SOC 2 compliance. Balancing test: stored events are pseudonymised (no plaintext user identity, no Art. 9 data); FORM has documented legitimate interest in security audit capability; impact on employees is low given pseudonymisation. | ✅ Covered by existing DPA and enterprise MSA §§ on data processing. No new basis required. |
+| **FORM → tenant SIEM endpoint (export pipeline)** | What is FORM's lawful basis for transmitting DEC-030 events to a tenant-designated third-party system? | FORM acts as processor; the enterprise tenant is the controller for their SIEM pipeline. GDPR Art. 28(3)(a) requires FORM to "process only on documented instructions from the controller." A UI click does not constitute documented instructions. | ❌ **Gap.** Documented written instruction required → MSA Addendum 4. |
+| **Tenant SIEM endpoint (downstream)** | Is the tenant's SIEM platform a sub-processor of FORM, or is the tenant a separate controller for the SIEM stream? | The tenant designates the SIEM endpoint and controls how events are consumed, retained, and queried within their security platform. FORM does not control or access the tenant's SIEM system. The tenant operates as an independent controller for their SIEM processing. | MSA Addendum 4 must include tenant warranty that their SIEM platform processes under an adequate legal basis; FORM is not liable for downstream tenant misuse. |
+| **`siem.consent_addendum_signed` event** | Does recording the addendum acceptance event in `audit_log_events` require additional lawful basis? | Legitimate interest — same basis as all other DEC-030 chain events. The event contains: `tenant_id` (org slug), `signed_by_email_hash` (SHA-256), `addendum_version`, `siem_destination_type` enum, `endpoint_url_hash` (SHA-256[:32]), `signed_at_iso`. No Art. 9 data. | ✅ Covered by DEC-030 legitimate interest basis. |
+
+**Art. 9 note:** DEC-030 events redact all Art. 9 special category data fields before storage. The SIEM export pipeline transmits the same redacted events — no unredacted health data or body composition values flow through any SIEM export. The privacy floor in §47.1 applies to all export payloads.
+
+---
+
+### §47.4 MSA Addendum 4 — SIEM Data Processing Addendum Template
+
+**Template version:** Addendum 4 v1.0 (2026-06-18).
+**Storage location:** `docs/MSA_TEMPLATE.md §Addendum 4` (to be authored per §47.11 item 6).
+**Signing mechanism:** DocuSign envelope initiated from Admin Dashboard consent capture UI gate (§47.6).
+
+#### Addendum 4 — Five Clauses
+
+**Clause 1 — Scope and Activation**
+
+This Addendum supplements the Master Subscription Agreement ("MSA") between FORM Health Ltd ("FORM") and the enterprise tenant ("Customer"). This Addendum governs FORM's transmission of DEC-030 HMAC-chained audit log events ("Audit Events") from FORM's `emit-audit-event` infrastructure to Customer's designated SIEM endpoint ("Designated Endpoint"). This Addendum becomes effective on the date Customer's authorised representative (as defined in the MSA) accepts it through the FORM Admin Dashboard in-product consent flow ("Effective Date"). FORM will not activate the Audit Event transmission pipeline until the Effective Date.
+
+**Clause 2 — Documented Instructions (GDPR Art. 28(3)(a))**
+
+Customer, acting as data controller for the Audit Event stream it receives through the Designated Endpoint, hereby provides FORM with written documented instructions to transmit Audit Events to the Designated Endpoint. These instructions are effective from the Effective Date and remain in force until revoked by Customer through the FORM Admin Dashboard "Revoke SIEM Addendum" action or until termination of the MSA. FORM shall not transmit Audit Events to any endpoint other than the Designated Endpoint specified at acceptance time without Customer providing updated documented instructions through the same mechanism.
+
+**Clause 3 — Customer Obligations**
+
+Customer warrants that: (a) it has an adequate legal basis under applicable data protection law (including GDPR Art. 6(1) or an equivalent provision) for processing the Audit Events received at the Designated Endpoint; (b) the Designated Endpoint is operated under an appropriate data processing agreement or sub-processing arrangement where required by applicable law; (c) Customer will not attempt to re-identify individual FORM users from pseudonymised fields in Audit Events (including `actor_hash`, `user_sha256`, `endpoint_url_hash`, or IP subnet fields); (d) Customer will retain Audit Events received at the Designated Endpoint for no longer than the period permitted by applicable law and Customer's internal data retention policy; (e) Customer will notify FORM immediately if Customer becomes aware that Audit Events have been accessed by an unauthorised party.
+
+**Clause 4 — FORM Obligations**
+
+FORM warrants that: (a) Audit Events transmitted to the Designated Endpoint are processed in accordance with FORM's privacy floor — no plaintext `user_id`, no Art. 9 special category health data, no body composition values, no coaching content, and no plaintext SIEM endpoint URL are included in any transmitted event; (b) each transmitted event is HMAC-chained and includes `chain_hash` and `prev_hash` fields enabling Customer to verify chain integrity; (c) FORM will notify Customer within 72 hours of becoming aware of a breach affecting Audit Events in transit to the Designated Endpoint; (d) FORM maintains a DEC-030 chain record of this Addendum acceptance (`siem.consent_addendum_signed` HIGH 7yr) and any subsequent revocation (`siem.consent_addendum_revoked` HIGH 7yr) to support Customer's audit and compliance obligations.
+
+**Clause 5 — Revocation**
+
+Customer may revoke this Addendum at any time by clicking "Revoke SIEM Addendum" in the FORM Admin Dashboard. Revocation takes effect within 5 minutes of the Customer action (one DEC-030 event cycle). Upon revocation: (a) FORM will cease transmission to the Designated Endpoint within 5 minutes; (b) FORM will emit a `siem.consent_addendum_revoked` DEC-030 event (HIGH, 7yr) recording the revocation; (c) Customer acknowledges that events already transmitted to the Designated Endpoint before revocation remain subject to Customer's data retention obligations under Clause 3(d); (d) Customer may re-activate transmission by accepting a new Addendum 4 through the Admin Dashboard — a new `siem.consent_addendum_signed` chain record will be emitted before re-activation.
+
+---
+
+### §47.5 `tenant_siem_configs` DDL Extension
+
+The existing `tenant_siem_configs` table (defined in `docs/DATA_MODEL.md §SIEM`) requires two new columns to record Addendum 4 acceptance and version.
+
+```sql
+-- Migration: 0076_siem_consent_addendum.sql
+-- Adds Addendum 4 acceptance tracking to tenant_siem_configs.
+-- form_api remains REVOKED (see §47.1 privacy floor).
+
+ALTER TABLE tenant_siem_configs
+  ADD COLUMN addendum_signed_at TIMESTAMPTZ,
+  ADD COLUMN addendum_version   TEXT;
+
+-- Non-null constraint enforced at application layer (not DB-level) to allow
+-- row existence before addendum acceptance (export_enabled must be false
+-- if addendum_signed_at IS NULL — enforced by SIEM-CONSENT-01 at Worker layer).
+
+-- RLS policy extension: security_reviewer SELECT access (existing)
+-- no change required — security_reviewer already has SELECT on tenant_siem_configs.
+
+-- Index: support SIEM-CONSENT-E-001 quarterly query performance
+CREATE INDEX idx_tsc_addendum_signed
+  ON tenant_siem_configs (tenant_id, addendum_signed_at)
+  WHERE addendum_signed_at IS NOT NULL;
+
+COMMENT ON COLUMN tenant_siem_configs.addendum_signed_at IS
+  'UTC timestamp when tenant accepted MSA Addendum 4 via Admin Dashboard consent flow. NULL = addendum not yet accepted. SIEM-CONSENT-01 invariant: siem.tenant_export_enabled must not be emitted while this is NULL.';
+
+COMMENT ON COLUMN tenant_siem_configs.addendum_version IS
+  'Addendum 4 template version accepted (e.g. "1.0"). Enables detection if tenant accepted an older template version and re-acceptance is required after template update.';
+```
+
+**RLS invariant:** `form_api` role is REVOKED from `tenant_siem_configs` at the existing RLS policy level. The new columns inherit this restriction. Only `form_service_role` (server-side Worker) and `security_reviewer` (read-only audit) may access these columns.
+
+**Migration placement:** After migration `0075_eu_egress_index.sql` (DATA_MODEL §36.5). Cross-reference: `docs/DATA_MODEL.md §SIEM` — update column list to include `addendum_signed_at` and `addendum_version` (§47.11 item 3, P0/M5).
+
+---
+
+### §47.6 Admin Dashboard Consent Capture UI Gate
+
+The Admin Dashboard SIEM export section currently presents a single toggle: "Enable SIEM Export". This must be replaced with a two-step consent gate.
+
+#### Step 1 — Addendum 4 Presentation
+
+When a tenant admin navigates to Admin Dashboard → Integrations → SIEM Export and clicks "Enable SIEM Export", the UI presents:
+
+- A modal titled "SIEM Data Processing Addendum (Addendum 4)" containing the full text of MSA Addendum 4 v1.0 (rendered from `docs/MSA_TEMPLATE.md §Addendum 4`).
+- Two fields: (a) "Authorised representative name" (plaintext, required, not stored — used to populate DocuSign envelope); (b) "Authorised representative email" (email format, required, hashed SHA-256 before storage).
+- A checkbox: "I confirm I am an authorised representative of [tenant name] and I am providing documented instructions to FORM to activate SIEM export to [Designated Endpoint]. I have read and accept Addendum 4."
+- A "Sign and Activate" button (disabled until checkbox is checked and both fields are populated).
+
+#### Step 2 — DocuSign Envelope (async, optional)
+
+After the admin submits the in-product acceptance:
+- FORM emits `siem.consent_addendum_signed` DEC-030 event immediately (synchronous — the SIEM-CONSENT-01 invariant check in the `emit-audit-event` Worker will pass on the next `siem.tenant_export_enabled` event only after this chain record is committed).
+- A DocuSign envelope is sent to the admin's email address for formal signature archival (asynchronous — SIEM export is not blocked pending DocuSign completion; the DEC-030 chain record is the primary legal instrument for SIEM-CONSENT-01 enforcement).
+- `tenant_siem_configs.addendum_signed_at` and `addendum_version` are updated.
+
+#### Revocation flow
+
+Admin Dashboard → Integrations → SIEM Export → "Revoke Addendum" button:
+- Confirmation modal: "Revoking Addendum 4 will disable SIEM export within 5 minutes. Active SIEM export will stop. You can re-activate by accepting a new Addendum 4."
+- On confirm: FORM emits `siem.consent_addendum_revoked` DEC-030 event; `tenant_siem_configs.addendum_signed_at` set to NULL; `addendum_version` set to NULL; `export_enabled` set to false.
+
+#### UI privacy constraints
+
+- Plaintext authorised representative email is **never** stored by FORM systems — only `signed_by_email_hash` (SHA-256) is stored in the DEC-030 event and `tenant_siem_configs`.
+- Plaintext SIEM endpoint URL from the tenant's endpoint configuration is **never** stored in the DEC-030 event — only `endpoint_url_hash` (SHA-256[:32]).
+- Admin Dashboard must not display the plaintext `signed_by_email_hash` or `endpoint_url_hash` in any UI panel — these fields are for audit chain use only.
+
+---
+
+### §47.7 SIEM-CONSENT-01 Chain Invariant
+
+**Invariant definition:** In the HMAC-chained DEC-030 audit log for a given `tenant_id`, the event `siem.tenant_export_enabled` MUST be preceded by at least one `siem.consent_addendum_signed` event for the same `tenant_id` at a `sequence_number` strictly less than the `siem.tenant_export_enabled` event.
+
+**Enforcement location:** `emit-audit-event` Cloudflare Worker (existing Worker from DEC-030 architecture).
+
+**Enforcement logic (pseudo-code):**
+
+```typescript
+// In emit-audit-event Worker, before committing siem.tenant_export_enabled event:
+if (event.event_type === 'siem.tenant_export_enabled') {
+  const priorConsent = await db.query(`
+    SELECT id FROM audit_log_events
+    WHERE tenant_id = $1
+      AND event_type = 'siem.consent_addendum_signed'
+      AND sequence_number < $2
+    LIMIT 1
+  `, [event.tenant_id, nextSequenceNumber]);
+
+  if (priorConsent.rowCount === 0) {
+    return new Response(
+      JSON.stringify({
+        error: 'SIEM_CONSENT_01_NO_ADDENDUM',
+        message: 'siem.tenant_export_enabled requires a prior siem.consent_addendum_signed event in the HMAC chain. Accept MSA Addendum 4 in the Admin Dashboard first.',
+        tenant_id: event.tenant_id,
+      }),
+      { status: 422, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+```
+
+**HTTP response on invariant violation:**
+- Status: `422 Unprocessable Entity`
+- Body: `{ "error": "SIEM_CONSENT_01_NO_ADDENDUM", "message": "...", "tenant_id": "<slug>" }`
+
+**Alert on invariant violation:** Any HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` response from the `emit-audit-event` Worker triggers a **P1 PagerDuty alert** to `form-security` service. A 422 in production indicates either a bug in the Admin Dashboard consent flow (the UI activated export without first emitting the signed-addendum event) or an attempted direct API call bypassing the UI gate.
+
+**Invariant check for `siem.tenant_export_enabled` after revocation and re-acceptance:** If a tenant revokes Addendum 4 and later re-accepts, a new `siem.consent_addendum_signed` event is emitted before the subsequent `siem.tenant_export_enabled` event. The invariant check passes because it requires only one prior `siem.consent_addendum_signed` event with a `sequence_number` lower than the `siem.tenant_export_enabled` event — it does not require the most recent consent event to immediately precede it. The revocation event (`siem.consent_addendum_revoked`) does not reset the invariant; the new acceptance event re-satisfies it.
+
+**SIEM-CONSENT-01 in the context of SIEM-SLO-03 (zero undelivered events):** SIEM-CONSENT-01 acts before any events are delivered to the tenant's SIEM endpoint. Once the invariant is satisfied and SIEM export is active, SIEM-SLO-03 (zero undelivered events after 24 h) applies normally.
+
+---
+
+### §47.8 DEC-030 Events
+
+Two new events are registered in `docs/AUDIT_LOG_SCHEMA.md §SIEM` namespace.
+
+#### Event: `siem.consent_addendum_signed`
+
+| Field | Value |
+|---|---|
+| **Event type** | `siem.consent_addendum_signed` |
+| **Severity** | HIGH |
+| **Retention** | 7 years (contractual obligation evidence — matches MSA retention per `docs/ENTERPRISE_SLA.md §19.5`) |
+| **DEC-030 namespace** | SIEM |
+| **Emitter** | `emit-audit-event` Worker (called from Admin Dashboard backend on Addendum 4 acceptance) |
+| **SIEM-CONSENT-01 role** | This event is the prerequisite chain record that satisfies SIEM-CONSENT-01 for a subsequent `siem.tenant_export_enabled` event |
+
+**Zod v2 payload schema:**
+
+```typescript
+import { z } from 'zod/v4';
+
+export const SiemConsentAddendumSignedPayload = z.object({
+  tenant_id:             z.string().min(1).max(64),
+  addendum_version:      z.string().regex(/^\d+\.\d+$/), // e.g. "1.0"
+  siem_destination_type: z.enum(['splunk', 'sentinel', 'datadog', 'qradar', 'webhook']),
+  endpoint_url_hash:     z.string().regex(/^[0-9a-f]{32}$/), // SHA-256[:32]
+  signed_by_email_hash:  z.string().regex(/^[0-9a-f]{64}$/), // SHA-256(lowercase(email))
+  signed_at_iso:         z.string().datetime(),
+  docusign_envelope_id:  z.string().uuid().optional(), // set async when DocuSign envelope is created
+});
+```
+
+#### Event: `siem.consent_addendum_revoked`
+
+| Field | Value |
+|---|---|
+| **Event type** | `siem.consent_addendum_revoked` |
+| **Severity** | HIGH |
+| **Retention** | 7 years |
+| **DEC-030 namespace** | SIEM |
+| **Emitter** | `emit-audit-event` Worker (called from Admin Dashboard backend on revocation) |
+| **Effect on SIEM-CONSENT-01** | Does not reset the invariant. A subsequent `siem.tenant_export_enabled` still requires only one prior `siem.consent_addendum_signed` event (at any sequence number lower than the enabled event). A new re-acceptance is required before re-activation (Admin Dashboard enforces this; Worker enforces it as a fallback). |
+
+**Zod v2 payload schema:**
+
+```typescript
+export const SiemConsentAddendumRevokedPayload = z.object({
+  tenant_id:             z.string().min(1).max(64),
+  addendum_version:      z.string().regex(/^\d+\.\d+$/),
+  siem_destination_type: z.enum(['splunk', 'sentinel', 'datadog', 'qradar', 'webhook']),
+  endpoint_url_hash:     z.string().regex(/^[0-9a-f]{32}$/),
+  revoked_by_email_hash: z.string().regex(/^[0-9a-f]{64}$/),
+  revoked_at_iso:        z.string().datetime(),
+  revocation_reason:     z.enum([
+    'tenant_requested',
+    'compliance_officer_required',
+    'contract_termination',
+    'addendum_version_update',
+    'security_incident',
+  ]),
+});
+```
+
+**SIEM-CONSENT-01 chain ordering invariant (formal):**
+
+`SIEM-CONSENT-01`: For any `tenant_id` T, if a `siem.tenant_export_enabled` event exists at chain position N, then there exists a `siem.consent_addendum_signed` event at chain position M < N with the same `tenant_id` T.
+
+Violation (`SIEM_CONSENT_01_NO_ADDENDUM`) → HTTP 422, P1 PagerDuty alert `form-security`.
+
+---
+
+### §47.9 SOC 2 Evidence Mapping
+
+| Artefact | Criteria | Description | Location | Cadence | Retention |
+|---|---|---|---|---|---|
+| **SIEM-CONSENT-E-001** | CC9.2, CC1.1 | Quarterly export of all `siem.consent_addendum_signed` and `siem.consent_addendum_revoked` DEC-030 HMAC-chained events. Confirms: (a) every SIEM export enabled during the quarter has a corresponding `siem.consent_addendum_signed` event; (b) all revocations were chain-recorded with a structured `revocation_reason` enum; (c) zero-row cross-check (`SELECT tenants with export_enabled = true AND addendum_signed_at IS NULL`) confirms no unconsented active SIEM export. Zero-event quarters filed as affirmative attestation JSON. | `compliance/evidence/siem-consent/SIEM-CONSENT-E-001_<YYYY-QN>.csv` (or `.json` for zero-event quarters) | Quarterly (automated via §81 evidence cron) | 7 years |
+
+**CC9.2 auditor narrative:** CC9.2 requires the entity to assess and manage risks associated with third parties who have access to system information. Enterprise SIEM exports route FORM's DEC-030 audit event stream to tenant-controlled endpoints. Without a documented agreement governing this data flow, FORM cannot demonstrate oversight. MSA Addendum 4 requires tenants to warrant adequate legal basis for their SIEM processing. SIEM-CONSENT-E-001 provides quarterly evidence that every active SIEM export was initiated with a signed Addendum 4 — the SIEM-CONSENT-01 chain invariant makes this an architectural guarantee (not a procedural check): the Worker rejects `siem.tenant_export_enabled` with HTTP 422 if no prior signed-addendum chain record exists.
+
+**CC1.1 auditor narrative:** CC1.1 requires FORM's system to meet its commitments to data protection and privacy. FORM's privacy-first enterprise commitment is operationalised through the HMAC-chained audit log. SIEM export is consistent with this commitment only if governed by the tenant's documented written instruction (GDPR Art. 28(3)(a)). SIEM-CONSENT-E-001 confirms this instruction was obtained and chain-recorded for every active SIEM export during the observation quarter. SIEM-CONSENT-01 converts this from a procedural to a technology control.
+
+**Cross-reference obligation:** Register SIEM-CONSENT-E-001 in `docs/SOC2_READINESS.md` evidence tables (P1/M8). See §47.11 item 7.
+
+---
+
+### §47.10 OQ Gap Tracker
+
+| OQ | Status | Notes |
+|---|---|---|
+| **OQ-SIEM-02** | **🟢 Resolved — DEC-065 (2026-06-18)** | Per-tenant MSA Addendum 4 required before `siem.tenant_export_enabled`. SIEM-CONSENT-01 chain invariant enforced at Worker layer. §47.11 implementation checklist covers all deliverables. |
+| **OQ-SIEM-03** | **🟡 Open — P2** | HMAC chain verification responsibility for tenant SIEM consumers (from §27.12). Open-source chain-verification library (Python + Go) vs. documentation-only approach. Resolution target: before enterprise GA (M13). Owner: security-engineer + devops-lead. |
+
+---
+
+### §47.11 Implementation Checklist
+
+#### P0 — Before first enterprise SIEM export goes live (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy migration `0076_siem_consent_addendum.sql`: add `addendum_signed_at TIMESTAMPTZ` and `addendum_version TEXT` columns to `tenant_siem_configs`; create `idx_tsc_addendum_signed` partial index; verify `form_api` REVOKE is inherited; run EXPLAIN ANALYZE on SIEM-CONSENT-E-001 quarterly query against staging data. | platform-engineer + devops-lead | **P0** | M5 | [ ] |
+| 2 | Register `siem.consent_addendum_signed` (HIGH, 7yr) and `siem.consent_addendum_revoked` (HIGH, 7yr) in `docs/AUDIT_LOG_SCHEMA.md §SIEM`; deploy updated event registry to `emit-audit-event` Worker; write integration test confirming SIEM-CONSENT-01 invariant returns HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` when no prior consent chain record exists; write integration test confirming invariant passes after a valid `siem.consent_addendum_signed` event. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 3 | Update `docs/DATA_MODEL.md §SIEM` to include `addendum_signed_at` and `addendum_version` in the `tenant_siem_configs` column list; cross-reference migration 0076 and §47.5. | compliance-officer | **P0** | M5 | [ ] |
+| 4 | Implement Admin Dashboard consent capture UI gate (§47.6): two-step modal (Addendum 4 text display → Sign and Activate), `signed_by_email_hash` SHA-256 computation client-side before submission, revocation flow. UI must not display plaintext `endpoint_url_hash` or `signed_by_email_hash` in any panel. Design review by design-craft; privacy review by compliance-officer. | platform-engineer + enterprise-architect | **P0** | M5 | [ ] |
+
+#### P1 — Before SOC 2 observation period start (M5–M8)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Author `docs/MSA_TEMPLATE.md §Addendum 4` (SIEM Data Processing Addendum v1.0) using the five-clause template in §47.4; send for legal review; store signed version at `compliance/contracts/msa-addendum-4-v1.0-template.pdf`; configure DocuSign envelope template. | compliance-officer + legal | **P1** | M5 | [ ] |
+| 6 | Add P1 PagerDuty alert rule for HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` responses from `emit-audit-event` Worker: alert name `AL-SIEM-CONSENT-01`, service `form-security`, severity P1, SLA < 30 min. Update §27.7 alert rules table to include AL-SIEM-CONSENT-01. | devops-lead + security-engineer | **P1** | M5 | [ ] |
+
+#### P1 — Before SOC 2 observation period start (M8)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Register SIEM-CONSENT-E-001 in `docs/SOC2_READINESS.md` evidence tables (CC9.2/CC1.1): artefact definition, collection query, privacy floor note, cross-check query (`export_enabled = true AND addendum_signed_at IS NULL` must return zero rows); add to §79.4 master evidence table; add `form-soc2-evidence/siem-consent/` to §80.3 R2 folder structure note. | compliance-officer | **P1** | M8 | [ ] |
+| 8 | Execute first quarterly SIEM-CONSENT-E-001 collection (first quarter after Admin Dashboard consent gate is deployed): run primary query and cross-check; if zero signed events, file zero-event attestation JSON; if non-zero, export as CSV and review per §47.9; file at `compliance/evidence/siem-consent/SIEM-CONSENT-E-001_<YYYY-QN>.csv`; append SHA-256 to MASTER-INDEX. | compliance-officer + data-engineer | **P1** | Q3 2026 (or first quarter after M5, whichever is later) | [ ] |
+
+---
+
+*v4.4.0 (2026-06-18): §47 OQ-SIEM-02 Resolution — Tenant SIEM Export Consent, Per-Tenant DPA Addendum Design & SIEM-CONSENT-01 Chain Invariant (DEC-065). Closes OQ-SIEM-02 from §27.12 (P1 — before first enterprise SIEM export, M5 deadline — open since v1.4, 2026-06-01). Decision (DEC-065, 2026-06-18): per-tenant signed MSA Addendum 4 (SIEM Data Processing Addendum) required before FORM may transmit DEC-030 audit events to any tenant-specified SIEM endpoint; a UI click alone does not satisfy GDPR Art. 28(3)(a) documented-instruction requirement. Four grounds: (1) GDPR Art. 28(3)(a) gap — processor must act only on documented controller instructions; (2) enterprise IT expectation — security teams expect a written DPA before authorising third-party audit pipelines; (3) reverse-cost analysis — template-based addendum issuance < 10 min per tenant vs. GDPR enforcement risk; (4) technology-layer enforcement pattern — SIEM-CONSENT-01 chain invariant converts procedural control into technology control (Worker rejects `siem.tenant_export_enabled` with HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` if no prior `siem.consent_addendum_signed` in HMAC chain). §47.3 GDPR Art. 6 & Art. 28 four-row lawful basis analysis (storage, export transmission, downstream controller split, consent-event basis). §47.4 MSA Addendum 4 v1.0 template — five clauses (scope and activation, documented instructions, customer obligations including no-reidentification warranty, FORM obligations including 72 h breach notification and privacy-floor warranty, revocation). §47.5 `tenant_siem_configs` DDL extension: migration 0076 (`addendum_signed_at TIMESTAMPTZ`, `addendum_version TEXT`), `idx_tsc_addendum_signed` partial index, `form_api` REVOKE inherited, comment annotations. §47.6 Admin Dashboard consent capture UI gate: two-step modal flow (Addendum 4 text display + authorised rep fields → Sign and Activate), DocuSign async envelope, revocation flow, four UI privacy constraints (no plaintext email/endpoint URL stored, no plaintext hashes displayed). §47.7 SIEM-CONSENT-01 chain invariant: formal definition (for any tenant T, if `siem.tenant_export_enabled` at position N, then `siem.consent_addendum_signed` at position M < N with same tenant_id); Worker enforcement pseudo-code; HTTP 422 response format; P1 PagerDuty alert on violation; re-acceptance behaviour after revocation. §47.8 two DEC-030 events: `siem.consent_addendum_signed` (HIGH, 7yr, Zod v2 schema — tenant_id, addendum_version, siem_destination_type enum, endpoint_url_hash SHA-256[:32], signed_by_email_hash SHA-256, signed_at_iso, docusign_envelope_id optional UUID) and `siem.consent_addendum_revoked` (HIGH, 7yr, Zod v2 schema — adds revoked_by_email_hash + revocation_reason enum 5 values); SIEM-CONSENT-01 formal invariant statement. §47.9 SOC 2 evidence artefact SIEM-CONSENT-E-001 (CC9.2/CC1.1 — quarterly DEC-030 export with zero-event attestation; cross-check query `export_enabled = true AND addendum_signed_at IS NULL` must return zero; 7yr; `compliance/evidence/siem-consent/`; CC9.2 and CC1.1 auditor narratives). §47.10 OQ gap tracker: OQ-SIEM-02 🟢 Resolved DEC-065; OQ-SIEM-03 🟡 Open P2 unchanged. §47.11 eight-item implementation checklist: 4× P0/M5 (migration 0076 deploy, DEC-030 event registration + SIEM-CONSENT-01 integration tests, DATA_MODEL §SIEM column list update, Admin Dashboard consent gate UI); 2× P1/M5 (MSA Addendum 4 legal review + DocuSign template, AL-SIEM-CONSENT-01 PagerDuty alert); 2× P1/M8 and Q3 2026 (SOC2_READINESS SIEM-CONSENT-E-001 registration, first quarterly filing). §27.12 OQ-SIEM-02 row updated to 🟢 Resolved DEC-065. Document header: v4.3.0 → v4.4.0. Privacy floor: no individual employee user_id, health data, body composition, coaching content, or Art. 9 special category in any event or artefact; endpoint_url_hash SHA-256[:32] (32 hex chars); signed_by_email_hash SHA-256(lowercase(email)); tenant_id org slug; form_api REVOKED from tenant_siem_configs; zero-event attestation JSON contains no tenant identifiers. Cross-references: `docs/OBSERVABILITY.md §27.12` (OQ-SIEM-02 row — updated to 🟢 Resolved DEC-065 in this version); `docs/OBSERVABILITY.md §27.9` (`siem.tenant_export_enabled` and `siem.tenant_export_disabled` existing events — SIEM-CONSENT-01 adds prerequisite constraint on `siem.tenant_export_enabled`); `docs/OBSERVABILITY.md §34` (SIEM correlation rules bridge — unchanged; §47 adds consent layer upstream of export activation); `docs/AUDIT_LOG_SCHEMA.md §SIEM` (two new events to register — P0/M5); `docs/DATA_MODEL.md §SIEM` (tenant_siem_configs column list — two columns to add — P0/M5); `docs/SOC2_READINESS.md §88` (SIEM-CONSENT-E-001 registered — P1/M8); `docs/DECISION_LOG.md DEC-065` (decision rationale); `docs/ENTERPRISE_SLA.md §19.5` (MSA 7yr retention — SIEM-CONSENT-E-001 retention basis); `docs/MSA_TEMPLATE.md §Addendum 4` (Addendum 4 full template — to be authored per §47.11 item 5, P1/M5). Owner: compliance-officer + security-engineer + enterprise-architect.*

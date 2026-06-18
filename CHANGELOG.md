@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.98.1] — 2026-06-18
+
+### Added
+- `docs/OBSERVABILITY.md §47` — OQ-SIEM-02 Resolution: Tenant SIEM Export Consent, Per-Tenant DPA Addendum Design & SIEM-CONSENT-01 Chain Invariant (DEC-065). Decision: per-tenant signed MSA Addendum 4 required before `siem.tenant_export_enabled`; Admin Dashboard consent capture UI gate; SIEM-CONSENT-01 chain invariant (HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` if no prior `siem.consent_addendum_signed` in chain); two new DEC-030 events (`siem.consent_addendum_signed` HIGH 7yr, `siem.consent_addendum_revoked` HIGH 7yr); MSA Addendum 4 template (five clauses); `tenant_siem_configs` DDL extension (addendum_signed_at, addendum_version); one SOC 2 artefact SIEM-CONSENT-E-001 (CC9.2/CC1.1 — quarterly signed-addendum roster); eight-item implementation checklist (4× P0/M5, 2× P1/M5, 2× P1/M8). Closes OQ-SIEM-02 from §27.12 (P1 — before M5). Cross-ref: `docs/DECISION_LOG.md DEC-065`.
+- `docs/SOC2_READINESS.md §88` — Evidence Artefact Cross-Reference Patch: OBSERVABILITY §47 (DEC-065). Registers SIEM-CONSENT-E-001 (CC9.2/CC1.1) in SOC2_READINESS evidence tables; extends CC9.2 and CC1.1 criterion rows; closes OBSERVABILITY §47.9 cross-reference obligation.
+- `docs/DECISION_LOG.md DEC-065` — OQ-SIEM-02: Per-tenant MSA Addendum 4 (SIEM Data Processing Addendum) required before `siem.tenant_export_enabled`. Four grounds: GDPR Art. 28(3)(a) written instruction gap; enterprise IT expectation; reverse cost of non-compliance higher; SIEM-CONSENT-01 technology enforcement consistent with FORM's data-layer compliance principle.
+
+### Changed
+- `VERSION` — 5.98.0 → 5.98.1.
+
+---
+
 ## [5.98.0] — 2026-06-18
 
 ### Added
