@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.39.0] — 2026-06-19
+
+### Added
+- `content/post-1556-progress-evaluation-framework.md` — Block 1556–1570 · Cluster 1 opener · пост 1/15. «Як читати власний тренувальний прогрес: рамка без зовнішнього тренера» — п'ять каналів оцінки (e1RM/об'єм, RPE-тренд, технічна якість, відновлення між сесіями, суб'єктивна готовність); baseline-протокол на початку блоку; горизонти аналізу (сесія/тиждень/блок/рік); три систематичні помилки (короткий горизонт, один вимір, confirmation bias); різниця між «прогресу немає» і «прогресу не видно»; протокол 5-крокової ретроспективи блоку. Kenttä & Hassmén 1998, Moritani & deVries 1979, Hubal et al. 2005. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `README.md` — додано Block 1556–1570 «Практична оцінка тренувального прогресу без тренера» як нову proposed секцію (15 тем).
+- `blog.html` — додано картку post-1556; blog.html updated to post-1556.
+- `STATUS.md` — Block 1556–1570 додано: IN PROGRESS 1/15; v6.39.0 footer.
+- `VERSION` — 6.38.0 → 6.39.0.
+
+---
+
 ## [6.38.0] — 2026-06-19
 
 ### Added
