@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.15.0] — 2026-06-19
+
+### Added
+- `content/post-52-rpe-calibration.md` — Editorial series Block 51–100, post 2/50. «RPE як мова: чому «8 з 10» значить різне для кожного — і що з цим робити»: три типи калібраційних помилок (занижена, завищена, непослідовна RPE), чому досвід/страх відмови/маскування втоми спотворюють шкалу, протокол рекалібрування (підхід до відмови раз на блок, дебрефінг, якірні точки), коли RPE-авторегуляція перевершує %1RM і коли ні, як Victor відстежує RPE-вагові траєкторії в часі. Посилання: Zourdos et al. 2016 (RIR-based RPE), Colado et al. 2012 (RPE overestimation у новачків). clinical-safety PASS.
+
+### Changed
+- `blog.html` — post-52 card added (Editorial series · Training science · before post-51).
+- `README.md` — posts 886–890 added to Block 851–900 roadmap table (proposed · v6.15.0): RPE-calibration, mobility as training variable, exercise selection without coach, when difficulty = adaptation vs. programming error, athlete maturity markers.
+- `STATUS.md` — row 51–99 updated: post-52 added v6.15.0, clinical-safety PASS, sports-scientist review pending; count 49 → 50.
+- `VERSION` — 6.14.1 → 6.15.0.
+
 ## [6.14.1] — 2026-06-19
 
 ### Changed
