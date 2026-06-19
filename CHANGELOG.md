@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [6.43.0] — 2026-06-19
+
+### Added
+- `content/post-1481-training-age-as-programming-variable.md` — Block 1451–1500 Cluster 4 post 1/10. Тренувальний вік як змінна програмування: хронологічний vs. ефективний тренувальний вік, поріг адаптаційного стимулу, відновлювальна ємність, чому лінійна прогресія руйнується (Kraemer & Ratamess 2004, Fleck & Kraemer 2004, Stone et al. 2007). clinical-safety: NOT_REQUIRED.
+- `content/post-1482-novice-intermediate-advanced-adaptation-differences.md` — Block 1451–1500 Cluster 4 post 2/10. Нейральна фаза → структурна фаза (Moritani & deVries 1979, Häkkinen et al. 1985, 1988, Enoka 1988). Якісні відмінності між тренажними рівнями і їх програмні наслідки. clinical-safety: NOT_REQUIRED.
+- `content/post-1483-individual-variability-hypertrophy-response.md` — Block 1451–1500 Cluster 4 post 3/10. Hubal et al. 2005 (n=585, 5–59% CSA gain). ACTN3, IGF-1, андрогенні рецептори, міостатин, сателітні клітини (Bamman et al. 2007). N-of-1 підхід для калібрування власної кривої доза-відповідь. clinical-safety: NOT_REQUIRED.
+- `content/post-1484-individual-variability-strength-response.md` — Block 1451–1500 Cluster 4 post 4/10. Склад м'язових волокон, жорсткість сухожиль (Magnusson et al. 2008), нейронний стеля (Häkkinen et al. 2003), ричажна механіка. Hubal et al. 2005 силова варіантність 0–250%. Практична рамка: власні дані понад популяційні норми. clinical-safety: NOT_REQUIRED.
+- `content/post-1485-recovery-integration-in-programming.md` — Block 1451–1500 Cluster 4 post 5/10. Реактивне vs. структурне відновлення. Суперкомпенсаційна модель (Selye 1950, Zatsiorsky & Kraemer 2006). Типи deload: об'ємний, інтенсивний, частотний. Блокова переодизація (Issurin 2008) як вбудована структура відновлення. clinical-safety: NOT_REQUIRED.
+- `content/post-1486-sleep-and-training-adaptation.md` — Block 1451–1500 Cluster 4 post 6/10. GH під час SWS (Van Cauter et al. 2000), T:C-ratio при депривації (Leproult & Van Cauter 2011), ризик травми (Milewski et al. 2014 — 1.7× при <8h), Mah et al. 2011 sleep extension. Регулярність > тривалість. clinical-safety: NOT_REQUIRED (performance framing only).
+- `content/post-1487-load-management-acwr.md` — Block 1451–1500 Cluster 4 post 7/10. ACWR (Gabbett 2016), Foster session RPE (Foster 1998), монотонія і Strain (Foster et al. 2001), суб'єктивна готовність (Hooper et al. 1995). Мінімальна система моніторингу для self-coached атлета. clinical-safety: NOT_REQUIRED.
+- `content/post-1488-deload-supercompensation-timing.md` — Block 1451–1500 Cluster 4 post 8/10. Суперкомпенсаційна модель (Яковлєв / Zatsiorsky & Kraemer 2006). Диференційований час відновлення за системами. Три типи deload. Тайминг за тренажним віком (3+1, 4+1). Помилка «deload по відчуттях». clinical-safety: NOT_REQUIRED.
+- `content/post-1489-individualizing-program-from-template.md` — Block 1451–1500 Cluster 4 post 9/10. Шаблони (5/3/1, Sheiko) як популяційний оптимум (Dankel et al. 2017). Три причини відхилення від шаблону. Трикроковий процес індивідуалізації. RPE-based авторегуляція (Helms et al. 2018, Zourdos et al. 2016). clinical-safety: NOT_REQUIRED.
+- `content/post-1490-cluster-4-synthesis-training-age-variability-recovery.md` — Block 1451–1500 Cluster 4 post 10/10. Синтез: три осі (тренавальний вік / варіативність / відновлення) в єдиній матриці рішень. Таблиця всіх 10 постів кластеру з ключовим висновком. Прикладна рамка для self-coached intermediate. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — оновлено до post-1490: додано 10 нових записів для постів 1481–1490.
+- `VERSION` — 6.42.0 → 6.43.0.
+- `STATUS.md` — Block 1451–1500 Cluster 4 COMPLETE; next: Cluster 5 (posts 1491–1500).
+
+---
+
 ## [6.42.0] — 2026-06-19
 
 ### Added
