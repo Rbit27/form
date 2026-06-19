@@ -1,5 +1,22 @@
 # Changelog · FORM
 
+## [6.9.0] — 2026-06-19
+
+### Added
+- `content/post-1252-hrv-7day-baseline-protocol.md` — Block 1251–1300 Cluster 1 post 2/10. 7-денний rolling baseline HRV: операційний посібник. Формула rolling average, механіка ковзного вікна, мінімальний горизонт калібрування 4 тижні (Nordin et al. 2019). П'ять ситуацій для перерахунку baseline. Три умови оптимального протоколу. Readiness score vs. прямий rolling average. Практична таблиця рішень. clinical-safety: NOT_REQUIRED.
+- `content/post-1253-hrv-accumulation-block-normal.md` — Block 1251–1300 Cluster 1 post 3/10. HRV під час накопичувального блоку: функціональне перенакопичення vs. нефункціональне перетренування. U-curve HRV накопичення → deload → суперкомпенсація. Три стани таблицею. Коли «жовтий» стає справжнім сигналом. Buchheit 2014; Plews et al. 2013; Meeusen et al. 2013. clinical-safety: NOT_REQUIRED.
+- `content/post-1254-sleep-score-vs-hrv.md` — Block 1251–1300 Cluster 1 post 4/10. Sleep score і HRV: різні виміри різних речей. PSG-порівняння точності (Van den Berg et al. 2019). Три сценарії дисоціації. Ієрархія метрик сну для спортивних рішень: тривалість → стабільність → суб'єктивна оцінка → HRV → sleep score. clinical-safety: NOT_REQUIRED.
+- `content/post-1255-hrv-measurement-protocol.md` — Block 1251–1300 Cluster 1 post 5/10. Протокол вимірювання HRV: шість джерел артефактів, п'ятикроковий оптимальний протокол, ієрархія точності пристроїв (ECG → пальцевий PPG → Oura Ring → зап'ясний PPG). Esco & Flatt 2014. clinical-safety: NOT_REQUIRED.
+- `content/post-1256-hrv-strength-vs-metabolic.md` — Block 1251–1300 Cluster 1 post 6/10. HRV у силових тренуваннях vs. метаболічна робота: периферійна vs. центральна втома, специфіка нейром'язового сигналу, де HRV корисний для силовика (системний моніторинг, deload). Flatt et al. 2017; Bosquet et al. 2008. clinical-safety: NOT_REQUIRED.
+- `content/post-1257-when-to-ignore-hrv.md` — Block 1251–1300 Cluster 1 post 7/10. Коли ігнорувати HRV і тренуватись: 4 ситуації «можна ігнорувати», 2 ситуації серйозного сигналу. Матриця HRV × суб'єктивна готовність. HRV-тривога як реальний ризик. Hooper et al. 1995; Meeusen et al. 2013. clinical-safety: NOT_REQUIRED.
+- `content/post-1258-hrv-women-menstrual-cycle.md` — Block 1251–1300 Cluster 1 post 8/10. HRV у жінок: менструальний цикл як вбудована змінна. Фолікулярна (вищий HRV) vs. лютеїнова (10–20% нижче) фаза. Окремі baseline по фазах. Гормональні контрацептиви і зміна профілю. Межі доказової бази. Nakamura et al. 2019; Wikström-Frisén et al. 2017. clinical-safety: CONDITIONAL PASS — освітній нейтральний тон.
+- `content/post-1259-hrv-confounders-alcohol-stress-travel.md` — Block 1251–1300 Cluster 1 post 9/10. Конфаундери HRV: алкоголь (-10–25%, 24–48 год), хронічний стрес, гострий стрес перед виміром, хвороба (ранній маркер -15–30%), jet lag (3–7 днів), дегідратація, кофеїн до виміру. Таблиця конфаундерів з тривалістю і діями. Kreutzer et al. 2019; Thayer et al. 2012. clinical-safety: NOT_REQUIRED.
+- `content/post-1260-hrv-cluster-1-synthesis.md` — Block 1251–1300 Cluster 1 post 10/10 (синтез). Десять ключових висновків кластеру. Трирівнева практична модель: ранок (rolling average + конфаундери) → зал (перші підходи) → тижневий огляд. Чим HRV є і чим не є. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — posts 1252–1260 added (Cluster 1 complete, Block 1251–1300 «Wearables, data & the self-coached athlete»). Total: 1260 posts in blog.
+- `STATUS.md` — Block 1251–1300 Cluster 1 COMPLETE (posts 1251–1260, HRV deep dive). Next: Cluster 2 (posts 1261–1270, тема: ЧСС у спокої та під час тренування).
+
 ## [6.8.2] — 2026-06-19
 
 ### Changed
