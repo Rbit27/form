@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.16.1] — 2026-06-19
+
+### Changed
+- `docs/ENTERPRISE_ONBOARDING.md` — §3.3 SCIM provisioning: added SCIM IP enforcement note (self-hosted proxy customers only) after the audit events table, per `docs/SSO_SCIM_IMPLEMENTATION.md §33.2.4` (DEC-062). Covers `scim_ip_enforcement_enabled` toggle path, `scim.ip_allowlist_blocked` DEC-030 events, enable-only-after-first-sync gate, and explicit cloud-IdP exclusion. Closes SSO §33.7 item 5 (P1/M9).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §17.2 Q-05 row extended with SCIM IP enforcement discovery step per §33.2.2: self-hosted SCIM proxy identification, `scim_ip_enforcement_enabled` Admin Dashboard path, enablement-deferred-until-post-sync gate. §33.7 items 5 and 6 marked [x] Done (2026-06-19). Document header v2.5 unchanged (patch-level cross-reference closure).
+- `docs/OBSERVABILITY.md` — §47.11 item 7 marked [x] Done: SIEM-CONSENT-E-001 was registered in `docs/SOC2_READINESS.md §88` (v3.13.0, 2026-06-18) and §79.4/§80.3 (v3.13.1, 2026-06-18); checklist status now reflects the completed work. Document version v4.4.0 unchanged (patch-level status update).
+- `VERSION` — 6.16.0 → 6.16.1.
+
 ## [6.16.0] — 2026-06-19
 
 ### Added

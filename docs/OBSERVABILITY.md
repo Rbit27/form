@@ -13030,7 +13030,7 @@ Violation (`SIEM_CONSENT_01_NO_ADDENDUM`) → HTTP 422, P1 PagerDuty alert `form
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 7 | Register SIEM-CONSENT-E-001 in `docs/SOC2_READINESS.md` evidence tables (CC9.2/CC1.1): artefact definition, collection query, privacy floor note, cross-check query (`export_enabled = true AND addendum_signed_at IS NULL` must return zero rows); add to §79.4 master evidence table; add `form-soc2-evidence/siem-consent/` to §80.3 R2 folder structure note. | compliance-officer | **P1** | M8 | [ ] |
+| 7 | Register SIEM-CONSENT-E-001 in `docs/SOC2_READINESS.md` evidence tables (CC9.2/CC1.1): artefact definition, collection query, privacy floor note, cross-check query (`export_enabled = true AND addendum_signed_at IS NULL` must return zero rows); add to §79.4 master evidence table; add `form-soc2-evidence/siem-consent/` to §80.3 R2 folder structure note. | compliance-officer | **P1** | M8 | [x] Done — `docs/SOC2_READINESS.md §88` (v3.13.0, 2026-06-18): SIEM-CONSENT-E-001 artefact definition, CC9.2/CC1.1 auditor narratives, SIEM-CONSENT-01 chain invariant narrative (§88.2), cross-check query registered. §79.4 master evidence table row and §80.3 `siem-consent/` R2 path added (v3.13.1, 2026-06-18). |
 | 8 | Execute first quarterly SIEM-CONSENT-E-001 collection (first quarter after Admin Dashboard consent gate is deployed): run primary query and cross-check; if zero signed events, file zero-event attestation JSON; if non-zero, export as CSV and review per §47.9; file at `compliance/evidence/siem-consent/SIEM-CONSENT-E-001_<YYYY-QN>.csv`; append SHA-256 to MASTER-INDEX. | compliance-officer + data-engineer | **P1** | Q3 2026 (or first quarter after M5, whichever is later) | [ ] |
 
 ---

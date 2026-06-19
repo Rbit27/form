@@ -164,6 +164,10 @@ Reference: `docs/SSO_SCIM_IMPLEMENTATION.md §8`.
 
 SCIM deprovisioning sets `status = 'inactive'` and revokes all active sessions within 30 seconds (session KV TTL). Health and coaching data are retained for the contractual data retention period unless a deletion request is filed under the DPA.
 
+> **SCIM IP enforcement (self-hosted proxy customers only):** Customers running a self-hosted SCIM proxy with stable IP ranges may enable `scim_ip_enforcement_enabled` at Admin Dashboard → SSO Settings → SCIM → IP Restriction. This restricts inbound SCIM provisioning to the specified CIDRs; calls from other IPs are rejected (403) and logged as `scim.ip_allowlist_blocked` DEC-030 events. Enable only after a successful full-directory sync and only for tenants with confirmed static proxy IPs. Cloud-hosted IdP tenants (Okta SaaS, Azure AD) should not use this control without confirming static CIDR support with their IdP.
+>
+> Implementation reference: `docs/SSO_SCIM_IMPLEMENTATION.md §32.3` (DEC-062) and `§33.2` (onboarding protocol).
+
 ### 3.4 Initial admin accounts
 
 After SSO is live:

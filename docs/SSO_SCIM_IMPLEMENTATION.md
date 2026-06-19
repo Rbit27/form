@@ -4284,7 +4284,7 @@ The following checklist must be fully complete before a staging tenant is provis
 | Q-02 | SCIM 2.0 support confirmed — customer IdP can send `POST /Users`, `PATCH /Users`, `DELETE /Users` | Customer IT admin | SCIM version documented |
 | Q-03 | At minimum 10 pilot users with real work email addresses in the IdP identified (for SSO test) | Customer IT admin | User list (names + emails) on file via secure form |
 | Q-04 | Customer IT admin with IdP admin rights identified; available for Day 7–14 technical setup window | Customer + CS | Named contact + calendar hold confirmed |
-| Q-05 | Network: no firewall rule that would block outbound requests from `{slug}-staging.form.coach` to IdP metadata endpoints | Customer IT/security | If IP allowlist needed — provided to CS before provisioning |
+| Q-05 | Network: no firewall rule that would block outbound requests from `{slug}-staging.form.coach` to IdP metadata endpoints. **If the customer operates a self-hosted SCIM proxy (e.g., Okta SCIM Connector Agent, Azure AD App Proxy) and wants to restrict inbound SCIM connections to that proxy's IP range: capture the stable CIDR block(s) during this qualification call. `scim_ip_enforcement_enabled` is available at Admin Dashboard → SSO Settings → SCIM → IP Restriction and defaults to `false`. Enable it only after SCIM is confirmed working — at least one successful full-directory sync with > 0 users provisioned.** | Customer IT/security + CS | If IP enforcement desired: proxy CIDR block(s) on file before pilot go-live; enablement deferred until post-sync confirmation (§17.3 Step 3 note) |
 | Q-06 | DPA (`docs/GDPR_DPIA.md §5`) signed and filed | compliance-officer | DPA receipt in `compliance/dpas/{slug}-pilot.pdf` |
 | Q-07 | Enterprise pilot contract executed (SOW + Master Services Agreement or equivalent) | Founder | Contract signed copy on file |
 | Q-08 | Billing contact and billing instrument on file (post-pilot invoicing) | Customer finance | |
@@ -11844,8 +11844,8 @@ No new evidence artefacts. No gap score change.
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 5 | Update `docs/ENTERPRISE_ONBOARDING.md §3.3` with the SCIM IP enforcement note per §33.2.4. Review with customer-success for CSM script accuracy; confirm the cloud-IdP exclusion is explicit. | customer-success + compliance-officer | **P1** | M9 | [ ] |
-| 6 | Verify §17.2 Q-05 row in this document reflects the extended text from §33.2.2. Cross-check against the onboarding call checklist used by customer-success. | customer-success | **P1** | M9 | [ ] |
+| 5 | Update `docs/ENTERPRISE_ONBOARDING.md §3.3` with the SCIM IP enforcement note per §33.2.4. Review with customer-success for CSM script accuracy; confirm the cloud-IdP exclusion is explicit. | customer-success + compliance-officer | **P1** | M9 | [x] Done — 2026-06-19. Note added after SCIM audit events table in `docs/ENTERPRISE_ONBOARDING.md §3.3`: self-hosted proxy use case, `scim_ip_enforcement_enabled` toggle path, 403/`scim.ip_allowlist_blocked` behaviour, cloud-IdP exclusion explicit. |
+| 6 | Verify §17.2 Q-05 row in this document reflects the extended text from §33.2.2. Cross-check against the onboarding call checklist used by customer-success. | customer-success | **P1** | M9 | [x] Done — 2026-06-19. §17.2 Q-05 row updated with full CIDR-capture extension: self-hosted SCIM proxy identification, `scim_ip_enforcement_enabled` toggle path, enablement-after-first-sync gate. Cloud-IdP exclusion explicit. |
 
 #### P2 — After first opt-in customer
 
