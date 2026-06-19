@@ -1,5 +1,27 @@
 # Changelog · FORM
 
+## [6.36.0] — 2026-06-19
+
+### Added
+- `content/post-1451-periodization-what-it-is-and-is-not.md` — Block 1451–1500 opener, Cluster 1 post 1/10. Що таке переодизація і що вона точно не є: Матвєєв (1965) і джерело поняття, робоче визначення (систематична зміна тренувальних змінних у часі), чим переодизація не є (ротація вправ, muscle confusion, надмірна складність), три рівні планування (макро/мезо/мікро), мінімальний поріг для recreational атлета. clinical-safety: NOT_REQUIRED.
+- `content/post-1452-linear-periodization-mechanics-limits.md` — Cluster 1 post 2/10. Лінійна переодизація: механіка LP (об'єм→інтенсивність), чому ефективна для початківців, три точки де LP ламається (акомодація, стеля об'єму, однодиректаційність), варіації що продовжують корисність (хвильова LP, 3-тижнева хвиля, розгалужена), коли LP залишається першим вибором навіть для advanced. clinical-safety: NOT_REQUIRED.
+- `content/post-1453-nonlinear-periodization-dup-wup.md` — Cluster 1 post 3/10. DUP vs. WUP: що робить переодизацію нелінійною, Daily Undulating Periodization (Rhea 2002, Miranda 2011, Colquhoun 2017), Weekly Undulating Periodization, порівняльна таблиця, переваги для intermediate, де нелінійність не вирішує проблему. clinical-safety: NOT_REQUIRED.
+- `content/post-1454-block-periodization-accumulation-transmutation-realization.md` — Cluster 1 post 4/10. Блокова переодизація: модель Ісуріна (2008, 2010), принцип концентрації якостей, три типи блоків (акумуляція/трансмутація/реалізація), залишкові тренувальні ефекти, для кого актуально, спрощена 2-блокова версія для self-coached. clinical-safety: NOT_REQUIRED.
+- `content/post-1455-conjugate-method-self-coached-athlete.md` — Cluster 1 post 5/10. Спряжений метод: походження у Верхошанського, адаптація Simmons (Westside), ME+DE дні, критичне питання перенесення без accommodating resistance і поза equipped пауерліфтингом, що реально запозичити принцип а не шаблон. clinical-safety: NOT_REQUIRED.
+- `content/post-1456-autoregulation-rpe-vbt-overlay.md` — Cluster 1 post 6/10. Авторегуляція як overlay: RPE (Zourdos 2016) і VBT (González-Badillo 2010) як дві форми, чому «за відчуттями» ≠ авторегуляція, RPE-DUP практичний приклад, калібровка RPE, авторегуляція над системою а не замість. clinical-safety: NOT_REQUIRED.
+- `content/post-1457-macrocycle-long-term-planning.md` — Cluster 1 post 7/10. Макроцикл: чому горизонт необхідний (фізіологічно і психологічно), штучний горизонт для non-competitive атлета (тест/бенчмарк), структура макроциклу (акумуляція→пікування→перехід→оцінка), 2 макроцикли/рік, backward planning. clinical-safety: NOT_REQUIRED.
+- `content/post-1458-mesocycle-3-8-weeks-working-unit.md` — Cluster 1 post 8/10. Мезоцикл: логіка акумуляції втоми і суперкомпенсації, хвиля 4-тижневого мезоциклу (70–80/85–90/95–100/40–60%), чому атлети завершують мезоцикл занадто рано (стагнація = нормальна фаза), деловантаження: що є і що не є, мезоцикл і вік 35+. clinical-safety: NOT_REQUIRED.
+- `content/post-1459-microcycle-weekly-structure.md` — Cluster 1 post 9/10. Мікроцикл: частота тренувань (2–3x/тиждень на групу — Schoenfeld et al. 2016), ієрархія Heavy/Medium/Light, секвенсування синергістів і антагоністів, інтерференційний ефект (Hickson 1980, Wilson et al. 2012), практичний 3-денний full body мікроцикл. clinical-safety: NOT_REQUIRED.
+- `content/post-1460-synthesis-choosing-periodization-system.md` — Cluster 1 post 10/10, synthesis. П'ять запитань для вибору системи: тренувальний статус/ціль/дні/горизонт/фаза. Матриця рішень LP/DUP/блокова. Авторегуляція як overlay завжди. Прагматичний принцип FORM: найкраща система — та яку можна зрозуміти, виконувати і підтримувати. clinical-safety: NOT_REQUIRED.
+- `docs/DECISION_LOG.md DEC-073` — Block 1451–1500 тема: Переодизація та довгострокове програмування. П'ять кластерів. Клінічна безпека: NOT_REQUIRED all. sports-scientist review required перед publish.
+
+### Changed
+- `blog.html` — 10 нових blog cards додано (posts 1451–1460 · Periodization block Cluster 1) на початку списку.
+- `STATUS.md` — Block 1451–1500 рядок додано в content table (10/50 · IN PROGRESS · v6.36.0); Next priorities оновлено.
+- `VERSION` — 6.35.0 → 6.36.0.
+
+---
+
 ## [6.35.0] — 2026-06-19
 
 ### Added
