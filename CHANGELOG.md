@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.44.0] — 2026-06-19
+
+### Added
+- `docs/SOC2_READINESS.md §93` — Evidence Artefact Cross-Reference Patch for OBSERVABILITY §50 (HMAC Chain Verification Algorithm · DEC-071 · OQ-SIEM-03 · CC1.1 / C1.1 / CC7.4). Closes the gap where OBSERVABILITY §50.8 (v4.7.0) assigned CC1.1/C1.1 SOC 2 criteria to artefact HMAC-VERIFY-ALGO-001 without any formal registration in SOC2_READINESS. §93.1: evidence artefact registration (documentation artefact, one-time authoring, permanent retention, storage `compliance/docs/hmac-chain-verification-algorithm.md`, Vanta mirror via SHA-256 hash). §93.2: three-audience verification protocol — Audience A (7-step SOC 2 auditor independent `verify_chain()` run on 90-day SIEM export + AL-SIEM-05 cross-check), Audience B (3-step enterprise customer: obtain per-tenant key from Admin Dashboard → run `verify_chain()` on 7-day SIEM export → confirm zero errors), Audience C (4-step FORM security-engineer on DEC-030 schema change: identify field change → recompute test vectors → bump API header version → notify tenant SIEM integrators). §93.3: three-criterion SOC 2 mapping — CC1.1 (artefact existence as independently-testable commitment to control environment integrity), C1.1 (test vector proving `SIGNATURE_MISMATCH` + `CHAIN_POINTER_MISMATCH` propagation for confidentiality tamper-detection), CC7.4 (Audience A independent auditor evaluation without FORM operational involvement). §93.4: cross-reference obligations — OBSERVABILITY §50.8 🟢 Closed; §50.10 item 2 (DATA_ROOM exhibit entry) 🟡 Open P1/M10. §93.5: 8-item implementation checklist (3×P0/M9–M10, 5×P1/M10). SOC2_READINESS header v3.15.0 → v3.18.0.
+
+### Changed
+- `docs/SOC2_READINESS.md` — header v3.15.0 → v3.18.0; §93 appended.
+- `VERSION` — 6.43.0 → 6.44.0.
+
+---
+
 ## [6.43.0] — 2026-06-19
 
 ### Added
