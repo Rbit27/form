@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [6.12.0] — 2026-06-19
+
+### Changed
+- `content/post-11-deload-weeks.md` — rewritten (v2) to match updated blog card title. «Діловий тиждень: чому деловантаження — це тренування, а не капітуляція» — модель суперкомпенсації і fitness–fatigue (Meeusen et al. 2013 ECSS/ACSM; Zatsiorsky & Kraemer 2006); ритміка 4–6 тижнів (Halson 2014); 6 ознак потреби в деловантаженні; чому знижувати обсяг а не інтенсивність (Bickel et al. 2011); Upper/Lower деловантажний тиждень — конкретика; taper vs. регулярне деловантаження; психологія. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `STATUS.md` — post-11 editorial entry updated v6.12.0.
+- `VERSION` — 6.11.0 → 6.12.0.
+
 ## [6.11.0] — 2026-06-19
 
 ### Added
