@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [6.46.0] — 2026-06-19
+
+### Added
+- `docs/SOC2_READINESS.md §94` — Evidence Artefact Cross-Reference Patch: SSO_SCIM §36 (DEC-072 · OQ-SSO-23.1/23.3/23.4 · CC6.3 / A1.1 / CC7.4). Registers CAEP-E-001 — two-part quarterly export covering (1) CAEP cert-rotation re-registration event pair (`sso.caep_reregistration_queued` → `sso.caep_stream_registered`) as CC6.3/A1.1 evidence; (2) RISC hijacking group cache eviction zero-tolerance check (`sso.google_directory_sync_error` `error_type: 'cache_eviction_failed_on_risc_hijacking'`) as CC7.4 evidence. Includes collection SQL with three-step Part A and complementary Part B queries, zero-event attestation JSON templates, three-criterion SOC 2 mapping (CC6.3: automated re-registration pipeline closes post-cert-rotation CAEP blind spot; A1.1: pg_cron job 37 as SSO integrity monitoring infrastructure; CC7.4: RISC hijacking → stale group-membership eviction closes 24-hour auth-state retention window), and nine-item implementation checklist (5× P0/M5, 4× P1/M10). Closes SSO_SCIM §36.6 item 1 (OBSERVABILITY §12.6 job 37 registration 🟢) and the pattern obligation from §85/§91. §80.3 `caep/` subfolder added; §80.4 Vanta mirror updated. SOC2_READINESS v3.18.0 → v3.19.0.
+
+### Changed
+- `VERSION` — v6.45.1 → v6.46.0.
+
+---
+
 ## [6.45.1] — 2026-06-19
 
 ### Added

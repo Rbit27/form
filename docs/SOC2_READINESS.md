@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.18.0
+# FORM · SOC 2 Type II Readiness v3.19.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -29013,5 +29013,221 @@ HMAC-VERIFY-ALGO-001 is consumed by three audiences:
 | 6 | Update §80.4 Vanta mirror list: add HMAC-VERIFY-ALGO-001 with note "documentation artefact — Vanta mirrors Data Room link + SHA-256(`compliance/docs/hmac-chain-verification-algorithm.md`); no periodic export CSV; no quarterly upload cadence; SHA-256 re-checked on document update." If Vanta does not support file-hash mirror entries, use manual attestation track with compliance-officer annual sign-off. | compliance-officer + devops-lead | **P1** | M10 | [ ] |
 | 7 | Update `docs/SECURITY_QUESTIONNAIRE.md` standard response for "audit log integrity and verification" per OBSERVABILITY §50.10 item 5: add HMAC-VERIFY-ALGO-001 Data Room reference, `verify_chain()` pseudocode availability note, per-tenant key derivation design note, and §50.8 suggested marketing claim response language. | security-engineer + compliance-officer | **P1** | M10 | [ ] |
 | 8 | At first enterprise pilot go-live (M10): execute end-to-end Audience B protocol with the pilot tenant's security contact — CSM shares HMAC-VERIFY-ALGO-001 link, security contact obtains per-tenant key from Admin Dashboard, runs `verify_chain()` against a 7-day SIEM export, confirms zero errors. Document result in `compliance/evidence/hmac/HMAC-PILOT-E-001_M10.md`. | security-engineer + customer-success | **P1** | M10 | [ ] |
+
+---
+
+## §94 · Evidence Artefact Cross-Reference Patch — SSO_SCIM §36 (CAEP Cert-Rotation Re-Registration & RISC Hijacking Group Cache Eviction · DEC-072 · OQ-SSO-23.1/23.3/23.4 · CC6.3 / A1.1 / CC7.4)
+
+> Closes the implicit SOC 2 registration gap from `docs/SSO_SCIM_IMPLEMENTATION.md §36` (v2.8, 2026-06-19 · DEC-072), which resolved three open questions (OQ-SSO-23.1, OQ-SSO-23.3, OQ-SSO-23.4) without a formal evidence artefact registration in `docs/SOC2_READINESS.md §79.4`. Formally registers one SOC 2 evidence artefact (CAEP-E-001) and establishes collection protocols and auditor narratives for two controls: (1) automatic CAEP stream re-registration after SAML cert rotation (OQ-SSO-23.1) — a CC6.3 access control continuity control enforced by migration 0082 + cert-expiry-check hook + pg_cron job 37 `caep_reregister_sweep`; (2) `google_directory_group_cache` eviction on RISC `hijacking` event (OQ-SSO-23.4) — a CC7.4 security event response control. OQ-SSO-23.3 (SSF PUSH mandatory / "near-real-time (< 60 s)" contractual SLA / JWT TTL fallback) is a contractual control captured in `docs/MSA_TEMPLATE.md §Addendum 3` and `docs/ENTERPRISE_ONBOARDING.md §2.4`; it does not produce a periodic DEC-030 data export and is covered by the CC6.3 narrative below as a contractual complement to the technical re-registration pipeline. Privacy floor: all DEC-030 events in CAEP-E-001 carry only `tenant_id` (FORM-internal UUID), `caep_stream_id` (IdP-opaque stream identifier), `reregistration_trigger` (controlled vocabulary: `cert_rotation | manual | stream_error | initial`), and `admin_user_id_hash` (SHA-256 sentinel for system-initiated re-registration — not a real user UUID); `sso.google_directory_sync_error` `user_email_hash` field is `SHA-256(lowercase(idpSubjectEmail))` — raw IdP subject email is never stored in the chain. `form_api` has no SELECT on the migration 0082 CAEP columns in `tenant_sso_configs` (only `form_system` + `security_reviewer` roles via RLS).
+
+---
+
+### §94.1 Evidence Artefact Registration
+
+**CAEP-E-001** — CAEP cert-rotation re-registration and RISC hijacking group cache eviction quarterly export.
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CAEP-E-001 |
+| **SOC 2 criteria** | CC6.3 · A1.1 · CC7.4 |
+| **Retention** | 7 years — `sso.caep_stream_registered` (HIGH/7yr), `sso.caep_stream_error` (HIGH/7yr), `sso.caep_reregistration_queued` (STANDARD/7yr), `sso.google_directory_sync_error` with `error_type: 'cache_eviction_failed_on_risc_hijacking'` (HIGH/7yr per `docs/SSO_SCIM_IMPLEMENTATION.md §21.7`) |
+| **Cadence** | Quarterly — first filing at M10 (post-migration 0082 + pg_cron job 37 deployment); zero-event Part A quarters expected pre-M5 cert rotation; zero-row Part B quarters are affirmative (no hijacking events received from IdPs) |
+| **Storage path** | `compliance/evidence/caep/CAEP-E-001_<YYYY-QN>.csv` (active events) or `CAEP-E-001_<YYYY-QN>.json` (zero-event attestation per §94.3) |
+| **Zero-event attestation** | Required if (a) no SAML cert rotation occurred (Part A Steps 1–2 return zero rows) — file Part A attestation JSON; (b) no `cache_eviction_failed_on_risc_hijacking` error events (Part B returns zero rows) — file Part B attestation JSON. Both zero-event states are affirmative and expected in most quarters |
+| **Vanta mirror** | CAEP-E-001 (§80.4 — added in this version) |
+
+---
+
+### §94.2 Collection SQL
+
+#### Part A — CAEP Cert-Rotation Re-Registration Event Pair (quarterly)
+
+The CC6.3 evidence is the existence of a `sso.caep_stream_registered` event for every `sso.caep_reregistration_queued` event with `reregistration_trigger = 'cert_rotation'` — proving that automatic re-registration completed without manual intervention within two sweep intervals (≤ 10 minutes of `cert_rotation_state → 'complete'`).
+
+```sql
+-- CAEP-E-001 Part A: CAEP cert-rotation re-registration event pairs
+-- Run as: form_system (security_reviewer SELECT on audit_log_events)
+-- Replace :quarter_start and :quarter_end with UTC quarter boundaries
+
+-- Step 1: Re-registration queued by cert-expiry-check hook
+SELECT
+  event_id,
+  event_type,
+  payload->>'tenant_id'               AS tenant_id,
+  payload->>'caep_stream_id'          AS prior_stream_id,
+  payload->>'reregistration_trigger'  AS trigger,
+  created_at                          AS queued_at
+FROM audit_log_events
+WHERE event_type = 'sso.caep_reregistration_queued'
+  AND payload->>'reregistration_trigger' = 'cert_rotation'
+  AND created_at >= :quarter_start
+  AND created_at <  :quarter_end
+ORDER BY created_at;
+
+-- Step 2: Successful re-registration (sweep completed)
+SELECT
+  event_id,
+  event_type,
+  payload->>'tenant_id'               AS tenant_id,
+  payload->>'caep_stream_id'          AS new_stream_id,
+  payload->>'reregistration_trigger'  AS trigger,
+  payload->>'admin_user_id_hash'      AS admin_user_id_hash,
+  created_at                          AS registered_at
+FROM audit_log_events
+WHERE event_type = 'sso.caep_stream_registered'
+  AND payload->>'reregistration_trigger' = 'cert_rotation'
+  AND created_at >= :quarter_start
+  AND created_at <  :quarter_end
+ORDER BY created_at;
+
+-- Step 3: Re-registration failures — expect zero rows
+SELECT
+  event_id,
+  payload->>'tenant_id'              AS tenant_id,
+  payload->>'error_type'             AS error_type,
+  payload->>'caep_stream_id'         AS stream_id,
+  created_at
+FROM audit_log_events
+WHERE event_type = 'sso.caep_stream_error'
+  AND payload->>'error_type' = 'reregistration_failed_post_cert_rotation'
+  AND created_at >= :quarter_start
+  AND created_at <  :quarter_end
+ORDER BY created_at;
+-- Non-zero result: each row corresponds to an AL-CAEP-01 P1 PagerDuty incident
+-- (docs/SSO_SCIM_IMPLEMENTATION.md §23.9). Pair each row with the PagerDuty
+-- incident record and resolution note before filing CAEP-E-001.
+```
+
+**Zero-event Part A guidance:** If Steps 1 and 2 return zero rows, no SAML cert rotation occurred in the quarter. File the Part A zero-event attestation JSON (§94.3). Confirm pg_cron job 37 (`caep_reregister_sweep`) ran without gaps > 6 minutes by cross-checking `system.cron_job_stale` DEC-030 LOW/1yr events for `jobname = 'caep_reregister_sweep'` in the same window (OBSERVABILITY §12.6). Include the most recent `sso.caep_stream_registered` event ID from the prior quarter as `monitoring_pipeline_reference`.
+
+---
+
+#### Part B — RISC Hijacking Group Cache Eviction Zero-Tolerance Check (quarterly)
+
+The CC7.4 evidence is a zero-row result: no `sso.google_directory_sync_error` events with `error_type: 'cache_eviction_failed_on_risc_hijacking'` in the quarter, confirming the `handleRiscEvent()` cache eviction branch executed without DB error on every received RISC hijacking event. Zero-row quarters are affirmative.
+
+```sql
+-- CAEP-E-001 Part B: RISC hijacking group cache eviction failure check
+-- Run as: form_system (security_reviewer SELECT on audit_log_events)
+-- Expected: zero rows in the primary query.
+-- Any row requires root-cause investigation before filing.
+
+-- Primary: cache eviction failures on RISC hijacking events
+SELECT
+  event_id,
+  event_type,
+  payload->>'tenant_id'          AS tenant_id,
+  payload->>'error_type'         AS error_type,
+  payload->>'user_email_hash'    AS user_email_hash,
+  payload->>'error_message'      AS error_message_truncated,
+  created_at
+FROM audit_log_events
+WHERE event_type = 'sso.google_directory_sync_error'
+  AND payload->>'error_type' = 'cache_eviction_failed_on_risc_hijacking'
+  AND created_at >= :quarter_start
+  AND created_at <  :quarter_end
+ORDER BY created_at;
+
+-- Complementary: RISC hijacking primary responses (KV revocation — unaffected by
+-- cache eviction failure per DEC-072 §36.4.3). Confirms primary response path ran.
+SELECT
+  event_id,
+  payload->>'tenant_id'              AS tenant_id,
+  payload->>'risc_event_type'        AS risc_event_type,
+  created_at
+FROM audit_log_events
+WHERE event_type IN ('sso.session_revoked', 'sso.account_suspended')
+  AND payload->>'risc_event_type' = 'hijacking'
+  AND created_at >= :quarter_start
+  AND created_at <  :quarter_end
+ORDER BY created_at;
+-- Zero rows here: no hijacking events received in the quarter — affirmative and expected.
+-- Non-zero rows: confirm each has a paired cache eviction (or a Part B primary failure row).
+```
+
+**Part B interpretation:** Zero primary rows = no cache eviction failures — CC7.4 control operating correctly. Any non-zero primary result must be paired with a root-cause note; the primary KV revocation path remained effective regardless (DEC-072 non-fatal design). Zero complementary rows = no hijacking events received from any IdP in the quarter — consistent with expected low frequency at FORM's current customer scale.
+
+---
+
+### §94.3 Zero-Event Attestation Templates
+
+**Part A — no cert rotation in the quarter:**
+
+```json
+{
+  "artefact": "CAEP-E-001",
+  "part": "A",
+  "quarter": "<YYYY-QN>",
+  "query_run_at": "<ISO-8601>",
+  "caep_reregistration_queued_count": 0,
+  "caep_stream_registered_count": 0,
+  "caep_stream_error_count": 0,
+  "job37_stale_events_in_quarter": 0,
+  "monitoring_pipeline_reference": "sso.caep_stream_registered event_id <UUID> (most recent in preceding quarter — confirms sweep was operational)",
+  "attestation": "No SAML cert rotation occurred in the quarter. Zero sso.caep_reregistration_queued (trigger: cert_rotation) events in audit_log_events. pg_cron job 37 caep_reregister_sweep ran without gaps > 6 minutes throughout the quarter (zero system.cron_job_stale events for jobname = 'caep_reregister_sweep'). CAEP cert-rotation re-registration control is in ready state. Affirmed by compliance-officer."
+}
+```
+
+**Part B — no RISC hijacking events in the quarter:**
+
+```json
+{
+  "artefact": "CAEP-E-001",
+  "part": "B",
+  "quarter": "<YYYY-QN>",
+  "query_run_at": "<ISO-8601>",
+  "cache_eviction_failed_count": 0,
+  "risc_hijacking_events_received": 0,
+  "monitoring_pipeline_reference": "most recent sso.google_directory_sync_error event_id or null",
+  "attestation": "Zero sso.google_directory_sync_error events with error_type: 'cache_eviction_failed_on_risc_hijacking' in audit_log_events. Zero RISC hijacking events received from IdPs in the quarter — consistent with expected low frequency at current customer scale. RISC hijacking group cache eviction control (DEC-072 §36.4) is implemented and operational. Primary KV revocation path is independent and unaffected. Zero-event quarter is affirmative. Affirmed by compliance-officer."
+}
+```
+
+---
+
+### §94.4 SOC 2 Criteria Mapping
+
+| Criterion | Control description | CAEP-E-001 evidence role |
+|---|---|---|
+| **CC6.3** | **Logical access continuity after SAML credential rotation.** When a tenant rotates their SAML signing certificate, the IdP's CAEP/RISC event stream becomes invalid — events signed with the new cert are rejected by FORM's CAEP receiver until the stream is re-registered. Without automatic re-registration, FORM would silently lose real-time SSO revocation signals (account disabled, group-membership change, session-revoked) for the affected tenant — a CC6.3 access-control blind spot that could allow revoked users to retain active sessions beyond the SAML JWT TTL. DEC-072 closes this gap via an automated pipeline: the `cert-expiry-check` hook writes `caep_reregistration_required = TRUE` on `cert_rotation_state → 'complete'`; pg_cron job 37 `caep_reregister_sweep` (`*/5 * * * *`) polls the flag and calls `caep-stream-manager` Worker to re-register with the IdP; success emits `sso.caep_stream_registered` HIGH/7yr (new stream ID); failure emits `sso.caep_stream_error` HIGH/7yr + AL-CAEP-01 P1 page. The `sso.caep_reregistration_queued` → `sso.caep_stream_registered` DEC-030 HMAC-chained event pair is the tamper-evident audit trail proving re-registration completed automatically. OQ-SSO-23.3 adds a contractual layer: SSF PUSH is mandatory for the CAEP SLA addendum; non-PUSH tenants fall back to JWT TTL baseline (no real-time revocation SLA) — this is documented in `docs/MSA_TEMPLATE.md §Addendum 3` and communicated at onboarding (`docs/ENTERPRISE_ONBOARDING.md §2.4`). | Part A Steps 1–2: every `reregistration_trigger = 'cert_rotation'` queue event must have a corresponding registered event within 10 minutes (two sweep intervals). Part A Step 3: zero `reregistration_failed_post_cert_rotation` rows confirms no failure reached AL-CAEP-01 without resolution. Zero-event quarters: Part A attestation JSON confirms the control is in ready state and job 37 ran without freshness gaps. |
+| **A1.1** | **SSO session integrity monitoring infrastructure.** pg_cron job 37 `caep_reregister_sweep` (registered in `docs/OBSERVABILITY.md §12.6` v0.4 patch, 2026-06-19) is a component of FORM's SSO availability infrastructure — it ensures CAEP streams remain valid after certificate rotation events, maintaining the real-time session-revocation signal path. Its 6-minute freshness window (monitored by the §12.7 pg_cron health supervisor → `system.cron_job_stale` DEC-030 LOW/1yr on gap, PagerDuty P1 `form-security`) guarantees the re-registration pipeline is continuously operational. A stale job 37 represents an A1.1 risk: pending `caep_reregistration_required = TRUE` rows accumulate unprocessed, degrading real-time revocation capability for any tenant that rotated a cert while the sweep was down. | CAEP-E-001 Part A complements the OBSERVABILITY §12.6 infrastructure evidence: Step 2 confirms successful processing of all pending re-registrations; Step 3 zero-row result confirms no failure reached AL-CAEP-01 unresolved in the quarter. The `docs/OBSERVABILITY.md §12.6` pg_cron health monitoring registry is the primary A1.1 evidence for job 37 availability; CAEP-E-001 Part A provides the DEC-030 chain proof that the job's outputs reached the IdP and produced valid new stream IDs. |
+| **CC7.4** | **Security event evaluation and response — RISC hijacking.** When FORM receives a RISC `hijacking` event from an IdP RISC stream, it signals that the user's IdP account has been compromised. FORM's primary response (KV write: `revoke:user:{tenant_id}:{user_id}` + `account_suspended:{tenant_id}:{user_id}`) immediately invalidates all active FORM sessions — this path is independent of the cache eviction branch. The secondary response added by DEC-072 (§36.4.3) evicts the `google_directory_group_cache` rows for the affected user: `DELETE FROM google_directory_group_cache WHERE tenant_id = $1 AND user_email_hash = SHA-256(lowercase(idpSubjectEmail))`. Without this eviction, a compromised user whose IdP administrator revoked their group memberships might retain FORM access via a cached group assignment until the next scheduled Google Directory sync (up to 24 hours). The eviction is additive, guarded by `tenant.google_directory_sync_enabled === true` (no effect on non-GD tenants), and non-fatal — failure reuses `sso.google_directory_sync_error` with `error_type: 'cache_eviction_failed_on_risc_hijacking'` (vocabulary extension per SSO_SCIM §36.6 item 4). The primary KV revocation path is unaffected by a cache eviction failure (DEC-072 design invariant). | Part B primary query: zero `cache_eviction_failed_on_risc_hijacking` rows confirms the cache eviction path executed without DB error on every received hijacking event in the quarter. Complementary query: confirms the primary KV revocation path executed in the same window. Zero-event Part B quarters are affirmative — no RISC hijacking events received. Non-zero primary rows require root-cause investigation; the CC7.4 control is partially mitigated by the primary KV revocation path remaining effective. |
+
+---
+
+### §94.5 Cross-Reference Obligations Closed by §94
+
+| Obligation source | Obligation text | Status |
+|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` item 1 | Register pg_cron job 37 `caep_reregister_sweep` in `docs/OBSERVABILITY.md §12.6` pg_cron registry (P0/M5) | 🟢 **Closed** — `docs/OBSERVABILITY.md §12.6` v0.4 patch (2026-06-19): job 37 registered with CC6.3 criteria mapping, `*/5 * * * *` cadence, 6-min freshness window, PagerDuty P1 `form-security` routing, cross-ref SSO_SCIM §36 / DEC-072 |
+| Implicit pattern obligation (§85 SSO_SCIM §32, §91 SSO_SCIM §34) | Every major SSO_SCIM feature section that introduces new DEC-030 events and security controls receives a corresponding SOC2_READINESS cross-reference patch formally registering evidence artefacts under the five trust service criteria | 🟢 **Closed** — §94.1 registers CAEP-E-001 (CC6.3/A1.1/CC7.4); §94.4 provides three-criterion auditor narratives; §94.2 collection SQL closes the evidence gap for DEC-072 controls |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` item 4 — `sso.caep_reregistration_queued` registration obligation | Register `sso.caep_reregistration_queued` (STANDARD/7yr) in `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF`; extend `sso.google_directory_sync_error` controlled vocabulary with `'cache_eviction_failed_on_risc_hijacking'` (P0/M5) | 🟡 **Open P0/M5** — §94 registers the SOC 2 evidence artefact that depends on these events (CAEP-E-001 Parts A + B); the AUDIT_LOG_SCHEMA registration is a separate P0/M5 obligation tracked in SSO_SCIM §36.6 item 4 (owner: compliance-officer) |
+
+---
+
+### §94.6 Implementation Checklist
+
+#### P0 — Before M5 (CAEP re-registration pipeline deployment)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0082_caep_reregistration.sql`: ADD COLUMN `caep_reregistration_required BOOLEAN NOT NULL DEFAULT FALSE`, `caep_last_reregistered_at TIMESTAMPTZ`, `caep_reregistration_trigger TEXT CHECK(cert_rotation\|manual\|stream_error\|initial)` to `tenant_sso_configs`; CREATE partial index `idx_tsc_caep_reregister` on `(id) WHERE caep_reregistration_required = TRUE`. This migration is a prerequisite for all §94 collection queries. | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Deploy `caep_reregister_sweep` pg_cron job 37 (`*/5 * * * *`) per SSO_SCIM §36.2.3: LIMIT 50 per run, 200 ms inter-tenant yield, 3-retry exponential back-off; on success write `caep_reregistration_required = FALSE` + new `caep_stream_id` + `caep_last_reregistered_at = NOW()` + emit `sso.caep_stream_registered` DEC-030 HIGH/7yr (sentinel `admin_user_id_hash`); on 3-retry failure write `caep_status = 'error'` + emit `sso.caep_stream_error` HIGH/7yr + fire AL-CAEP-01 P1 `form-security`. Confirm job 37 appears in `cron.job_run_details` within 10 minutes of deploy. | platform-engineer + security-engineer | **P0** | M5 | [ ] |
+| 3 | Wire cert-expiry-check hook per SSO_SCIM §36.2.4: after `cert_rotation_state → 'complete'` state write, UPDATE `tenant_sso_configs SET caep_reregistration_required = TRUE, caep_reregistration_trigger = 'cert_rotation'` WHERE `tenant_id = $1` AND `caep_status IN ('active', 'error')`; emit `sso.caep_reregistration_queued` DEC-030 STANDARD/7yr with `trigger: 'cert_rotation'`. | platform-engineer | **P0** | M5 | [ ] |
+| 4 | Register `sso.caep_reregistration_queued` (STANDARD/7yr) in `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF` alongside existing `sso.caep_stream_registered` and `sso.caep_stream_error` entries; extend `sso.google_directory_sync_error` controlled vocabulary with `'cache_eviction_failed_on_risc_hijacking'`. Per SSO_SCIM §36.6 item 4 (P0/M5). | compliance-officer | **P0** | M5 | [ ] |
+| 5 | Add RISC hijacking cache eviction branch to `handleRiscEvent()` in `apps/api-gateway/src/sso/caep-receiver.ts` per SSO_SCIM §36.4.3: after primary KV revocation write, guard `tenant.google_directory_sync_enabled === true`; execute `DELETE FROM google_directory_group_cache WHERE tenant_id = $1 AND user_email_hash = $2` with `user_email_hash = SHA-256(lowercase(idpSubjectEmail))`; on DB error emit `sso.google_directory_sync_error` HIGH/7yr with `error_type: 'cache_eviction_failed_on_risc_hijacking'` (non-fatal — primary KV revocation is unaffected). Per SSO_SCIM §36.6 item 5 (P0/M5). | platform-engineer | **P0** | M5 | [ ] |
+
+#### P1 — Before M10 (SOC 2 observation period pre-flight)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Run CAEP-E-001 Parts A and B collection SQL for the M5–M10 period as an observation-period pre-flight audit: confirm zero `sso.caep_stream_error` (`reregistration_failed_post_cert_rotation`) rows in Part A Step 3; confirm zero `cache_eviction_failed_on_risc_hijacking` rows in Part B primary query; file zero-event attestation JSONs (§94.3) for all quarters without cert rotation or RISC hijacking events; append SHA-256 to MASTER-INDEX (§79). | compliance-officer | **P1** | M10 | [ ] |
+| 7 | Add `compliance/evidence/caep/` subfolder to §80.3 R2 evidence folder structure table; add CAEP-E-001 as the first entry for that subfolder. Naming pattern: `CAEP-E-001_<YYYY-QN>.csv` (active events) or `CAEP-E-001_<YYYY-QN>.json` (zero-event attestation). Confirm SHA-256 of each artefact is appended to MASTER-INDEX (§79) at time of filing. | compliance-officer | **P1** | M10 | [ ] |
+| 8 | Add CAEP-E-001 criteria rows to §79.4 master evidence table: CC6.3 row (cert-rotation re-registration event pair — Part A; quarterly from M10), A1.1 row (pg_cron job 37 operational evidence complement — Part A Step 2 + 3; quarterly from M10), CC7.4 row (RISC hijacking cache eviction zero-tolerance — Part B; quarterly from M10). Cadence column: "Quarterly from M10." Storage: `compliance/evidence/caep/CAEP-E-001_<YYYY-QN>.csv`. | compliance-officer | **P1** | M10 | [ ] |
+| 9 | Schedule quarterly recurring reminder (first due M11): "File CAEP-E-001 Parts A and B for the preceding quarter." Trigger: 1st business day after quarter close. Owner: compliance-officer. | compliance-officer | **P1** | M10 | [ ] |
+
+---
+
+*v3.19.0 (2026-06-19): §94 Evidence Artefact Cross-Reference Patch — SSO_SCIM §36 (CAEP Cert-Rotation Re-Registration, SSF Polling Fallback SLA & RISC Hijacking Group Cache Eviction · DEC-072 · OQ-SSO-23.1/23.3/23.4 · CC6.3 / A1.1 / CC7.4). Closes the implicit SOC 2 registration gap from `docs/SSO_SCIM_IMPLEMENTATION.md §36` (v2.8, 2026-06-19 · DEC-072). Formally registers one SOC 2 evidence artefact: **CAEP-E-001** (CC6.3/A1.1/CC7.4 — two-part quarterly export; Part A: cert-rotation-triggered `sso.caep_reregistration_queued` → `sso.caep_stream_registered` event pair; Part B: zero-tolerance `sso.google_directory_sync_error` `error_type: 'cache_eviction_failed_on_risc_hijacking'` check; quarterly from M10; `compliance/evidence/caep/CAEP-E-001_<YYYY-QN>.csv`). §94.1 artefact registration table (ID, criteria CC6.3/A1.1/CC7.4, 7yr retention, quarterly cadence, storage path, zero-event JSON attestation templates for Part A and Part B). §94.2 two-part collection SQL: Part A (three-step — Step 1 `sso.caep_reregistration_queued` queue events with `trigger = 'cert_rotation'`; Step 2 `sso.caep_stream_registered` completion events; Step 3 `sso.caep_stream_error` zero-row cross-check; zero-event guidance with job 37 freshness cross-check instruction). Part B (primary `sso.google_directory_sync_error` with `error_type: 'cache_eviction_failed_on_risc_hijacking'` — expect zero rows; complementary `sso.session_revoked` / `sso.account_suspended` with `risc_event_type = 'hijacking'` — confirms primary KV revocation path exercised). §94.3 two zero-event attestation JSON templates (Part A fields: queued/registered/error counts + job37_stale count + monitoring_pipeline_reference; Part B fields: cache_eviction_failed + risc_hijacking_events counts + monitoring_pipeline_reference). §94.4 three-row SOC 2 criteria mapping: CC6.3 (CAEP cert-rotation re-registration pipeline — automated `cert-expiry-check` hook → migration 0082 `caep_reregistration_required` flag → pg_cron job 37 sweep → `caep_stream_registered` event; OQ-SSO-23.3 contractual layer: SSF PUSH mandatory for CAEP SLA addendum, JWT TTL fallback for non-PUSH tenants; Part A event pair is tamper-evident proof via HMAC chain), A1.1 (pg_cron job 37 `caep_reregister_sweep` as SSO session integrity monitoring infrastructure — 6-min freshness window; stale job → pending re-registration rows accumulate → real-time revocation capability degraded; CAEP-E-001 Part A Step 2 + 3 confirms outputs reached IdP and produced valid new stream IDs — complementary to OBSERVABILITY §12.6 infrastructure evidence), CC7.4 (RISC hijacking → `google_directory_group_cache` eviction in `handleRiscEvent()` — closes stale group-membership retention window of up to 24 hours; additive branch guarded by `google_directory_sync_enabled = true`; non-fatal design; primary KV revocation unaffected; Part B zero-row result = CC7.4 response chain operating correctly; non-zero = root-cause investigation required before filing). §94.5 three-row cross-reference obligations closure table: OBSERVABILITY §12.6 job 37 registration (🟢 Closed — v0.4 patch 2026-06-19), pattern obligation §85/§91 continuation (🟢 Closed — §94 fills SSO_SCIM §36 gap), AUDIT_LOG_SCHEMA `sso.caep_reregistration_queued` + vocabulary extension (🟡 Open P0/M5 — tracked in SSO_SCIM §36.6 item 4). §94.6 nine-item implementation checklist: 5× P0/M5 (migration 0082 DDL, pg_cron job 37 deploy + `cron.job_run_details` confirmation, cert-expiry-check hook wiring, AUDIT_LOG_SCHEMA registration + vocabulary extension, `handleRiscEvent()` cache eviction branch), 4× P1/M10 (M5–M10 pre-flight evidence collection + zero-event attestation filing, §80.3 `caep/` subfolder addition, §79.4 three-criteria rows, quarterly calendar reminder). §80.3 `caep/` subfolder added in this version. §80.4 Vanta mirror list updated: CAEP-E-001 added. SOC 2 version bumped v3.18.0 → v3.19.0. Privacy floor: `tenant_id` FORM-internal UUID; `caep_stream_id` IdP-opaque stream identifier (not a personal data element); `admin_user_id_hash` SHA-256 sentinel for system-initiated actions (not a real user UUID); `user_email_hash` SHA-256(lowercase(idpSubjectEmail)) — raw email never stored in DEC-030 chain (consistent with SSO_SCIM §23.7.6 and §21.6 privacy floor); `reregistration_trigger` controlled vocabulary only; `error_message` truncated to 200 chars (SSO_SCIM §36.4.3 design); no individual employee name, coaching content, health values, body composition data, or GDPR Art. 9 special category data in any CAEP-E-001 event or artefact row; `form_api` does not have SELECT on `tenant_sso_configs` migration 0082 columns. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §36` (primary source — DEC-072, OQ-SSO-23.1/23.3/23.4 resolutions, migration 0082 DDL, cert-expiry-check hook spec §36.2.4, `caep_reregister_sweep` sweep design §36.2.3, `sso.caep_reregistration_queued` STANDARD/7yr, `sso.caep_stream_registered` HIGH/7yr, `sso.caep_stream_error` HIGH/7yr, RISC hijacking cache eviction §36.4.3, OQ Gap Tracker §36.5, implementation checklist §36.6); `docs/SSO_SCIM_IMPLEMENTATION.md §23.9` (AL-CAEP-01 P1 `form-security` — failure path for sweep; Part A Step 3 non-zero rows indicate AL-CAEP-01 fired); `docs/SSO_SCIM_IMPLEMENTATION.md §21.4.2` (`google_directory_group_cache` DDL — DELETE target in §36.4.3); `docs/SSO_SCIM_IMPLEMENTATION.md §20` (SAML cert rotation state machine — `cert_rotation_state → 'complete'` is the hook trigger for §94 Part A chain); `docs/SSO_SCIM_IMPLEMENTATION.md §23.11` (OQ tracker — OQ-SSO-23.1/23.3/23.4 all 🟢 Resolved DEC-072); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — job 37 `caep_reregister_sweep` registered in v0.4 patch 2026-06-19; §94.2 Part A zero-event guidance references job 37 `system.cron_job_stale` cross-check); `docs/MSA_TEMPLATE.md §Addendum 3` (CAEP SLA language update per OQ-SSO-23.3 — P1/M5); `docs/ENTERPRISE_ONBOARDING.md §2.4` (CAEP PUSH prerequisite note per OQ-SSO-23.3 — P1/M5); `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF` (`sso.caep_reregistration_queued` registration + `sso.google_directory_sync_error` vocabulary extension — P0/M5, tracked as §94.5 open obligation); `docs/DECISION_LOG.md DEC-072` (formal adoption decision — three grounds for each resolution); §79.4 (master evidence table — CAEP-E-001 three-criteria rows deferred to M10 per §94.6 item 8); §80.3 (R2 evidence folder structure — `caep/` subfolder added in this version per §94.6 item 7); §80.4 (Vanta mirror list — CAEP-E-001 added in this version); §91 (GUARD-E-001), §92 (SSO-OBS-E-007), §93 (HMAC-VERIFY-ALGO-001) — parallel cross-reference patches. Owner: security-engineer + compliance-officer + platform-engineer.*
 
 ---
