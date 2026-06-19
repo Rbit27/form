@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v4.4.0
+# FORM · Observability & Monitoring Taxonomy v4.5.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -6264,7 +6264,7 @@ The identity layer emits a high volume of DEC-030 HMAC-chained events. Monitorin
 | OQ | Question | Owner | Resolution Target | Priority |
 |---|---|---|---|---|
 | OQ-SSO-OBS-01 | **Per-tenant vs. fleet-wide SSO-SLO-01 evaluation.** The current definition evaluates SSO-SLO-01 per tenant. A single tenant with a flaky IdP breaches its own SLO without indicating a systemic FORM platform issue. This is consistent with the per-tenant Enterprise SLA credit model in §23 but requires that PagerDuty alert thresholds in AL-CERT-* and AL-SSO-GDIR-* are also scoped per-tenant (via `tenant_id` label filtering). Confirm this is consistent with enterprise contract language before the first SLA review. | compliance-officer + enterprise-architect | Before first enterprise SLA review (Month 13) | P1 |
-| OQ-SSO-OBS-02 | **DEC-030 event stream vs. Cloudflare Analytics Engine as the signal source for AL-SSO-GDIR-01/02.** Querying Supabase `audit_log` for alert volume works in the observation period but may not scale to fleet-wide alerting once > 50 tenants are active, because each PagerDuty check requires a Supabase query. Cloudflare Analytics Engine data points (one per `sso.google_directory_sync_error` event emission) would enable faster, cheaper aggregation. Decision needed before M4 alert implementation. | platform-engineer + devops-lead | Before AL-SSO-GDIR-01 implementation (M4) | P1 |
+| OQ-SSO-OBS-02 | **DEC-030 event stream vs. Cloudflare Analytics Engine as the signal source for AL-SSO-GDIR-01/02.** Querying Supabase `audit_log` for alert volume works in the observation period but may not scale to fleet-wide alerting once > 50 tenants are active, because each PagerDuty check requires a Supabase query. Cloudflare Analytics Engine data points (one per `sso.google_directory_sync_error` event emission) would enable faster, cheaper aggregation. Decision needed before M4 alert implementation. | platform-engineer + devops-lead | Before AL-SSO-GDIR-01 implementation (M4) | **🟢 Resolved — DEC-067 (2026-06-19). See §48.** DEC-030 Supabase queries adopted for M4. Analytics Engine migration trigger: > 50 active Google Directory tenants (§48.5). |
 
 ---
 
@@ -13032,6 +13032,252 @@ Violation (`SIEM_CONSENT_01_NO_ADDENDUM`) → HTTP 422, P1 PagerDuty alert `form
 |---|---|---|---|---|---|
 | 7 | Register SIEM-CONSENT-E-001 in `docs/SOC2_READINESS.md` evidence tables (CC9.2/CC1.1): artefact definition, collection query, privacy floor note, cross-check query (`export_enabled = true AND addendum_signed_at IS NULL` must return zero rows); add to §79.4 master evidence table; add `form-soc2-evidence/siem-consent/` to §80.3 R2 folder structure note. | compliance-officer | **P1** | M8 | [x] Done — `docs/SOC2_READINESS.md §88` (v3.13.0, 2026-06-18): SIEM-CONSENT-E-001 artefact definition, CC9.2/CC1.1 auditor narratives, SIEM-CONSENT-01 chain invariant narrative (§88.2), cross-check query registered. §79.4 master evidence table row and §80.3 `siem-consent/` R2 path added (v3.13.1, 2026-06-18). |
 | 8 | Execute first quarterly SIEM-CONSENT-E-001 collection (first quarter after Admin Dashboard consent gate is deployed): run primary query and cross-check; if zero signed events, file zero-event attestation JSON; if non-zero, export as CSV and review per §47.9; file at `compliance/evidence/siem-consent/SIEM-CONSENT-E-001_<YYYY-QN>.csv`; append SHA-256 to MASTER-INDEX. | compliance-officer + data-engineer | **P1** | Q3 2026 (or first quarter after M5, whichever is later) | [ ] |
+
+---
+
+---
+
+## §48 OQ-SSO-OBS-02 Resolution — Google Directory Sync Alert Signal Source: DEC-030 Supabase vs. Cloudflare Analytics Engine (DEC-067)
+
+### §48.1 Purpose and Scope
+
+This section closes **OQ-SSO-OBS-02** (P1, `§26.13` — open since v1.3, 2026-06-09; resolution target: before AL-SSO-GDIR-01 implementation, M4).
+
+The question: should alert rules **AL-SSO-GDIR-01** (Google Directory sync error rate > 20% per tenant, P2) and **AL-SSO-GDIR-02** (P95 fetch latency > 3,000 ms per tenant, P3) — defined in `docs/SSO_SCIM_IMPLEMENTATION.md §21.9` and registered in `docs/OBSERVABILITY.md §26.7` — derive their trigger signals from:
+
+- **Option A**: The DEC-030 HMAC-chained audit event stream (`audit_log_events` Supabase table — one row per `sso.google_directory_sync_error` or `sso.google_directory_sync_success` event), queried by a pg_cron job; or
+- **Option B**: Cloudflare Analytics Engine data points — one AE write per `sso.google_directory_sync_error` event emission at the Workers edge, queried via the AE SQL API in a PagerDuty-triggered Worker.
+
+**Decision (DEC-067):** **Option A — DEC-030 Supabase queries for M4.** Cloudflare Analytics Engine migration is deferred until > 50 active Google Directory tenants (§48.5 scale trigger).
+
+**Privacy floor:** All alert payloads and pg_cron query results propagate `tenant_id` (FORM internal UUID) and aggregate counts only. No `user_email`, `user_id`, employee names, or group membership details appear in any alert signal, PagerDuty event, or evidence artefact from this section. User email hashes referenced in `audit_log_events` (`user_email_hash`) are excluded from alert aggregation queries.
+
+---
+
+### §48.2 Option Analysis
+
+#### Option A — DEC-030 Supabase Queries (pg_cron)
+
+| Dimension | Assessment |
+|---|---|
+| **Implementation cost** | Zero marginal cost — DEC-030 events are already emitted and retained in `audit_log_events`. A new pg_cron job (§48.4) is the only addition. |
+| **Signal latency** | pg_cron fires every 5 minutes; maximum alert lag = 5 min + query execution (< 500 ms at < 50 tenants). Within SSO-SLO-01 (99% per-tenant login success) and AL-SSO-GDIR-01 (P2 response SLA: 30 min from PagerDuty page). |
+| **Scale ceiling** | At 50 active Google Directory tenants, the per-tenant aggregation query must evaluate ~ 150 k rows/day × 50 tenants in a 15-minute window. Estimated P95 query duration: 80–120 ms (pg index on `(action, emitted_at)` covered). At 200 tenants: estimated 300–500 ms — approaches the 500 ms freshness-check threshold (§12.6). |
+| **Fleet aggregation** | Cross-tenant error rate (a secondary signal, not a primary SLO) requires a GROUP BY across all tenant rows. At < 50 tenants: fast. At > 50: may require a materialized view. |
+| **Consistency** | AL-CERT-01 through AL-CERT-05 (§26.5), AL-REVOKE-01/02 (§26.6), AL-SSO-GDIR-03/04/05 (§26.7), and CONC-CHAIN-01 (§18.3.3) all use DEC-030 Supabase as their signal source. Keeping AL-SSO-GDIR-01/02 on Option A maintains a single signal-source model for the §26 Enterprise Identity observability layer. |
+| **SOC 2 evidence quality** | DEC-030 events are HMAC-chained and immutable; the audit log is already the primary CC7.2 evidence corpus. Alert queries against `audit_log_events` produce SOC 2-grade evidence: the same immutable record that proves the event happened also proves the alert fired. |
+
+#### Option B — Cloudflare Analytics Engine
+
+| Dimension | Assessment |
+|---|---|
+| **Implementation cost** | Requires: (a) new `GDIR_ANALYTICS` AE binding in the SSO callback Worker; (b) one `writeDataPoint()` call per `sso.google_directory_sync_error` and `sso.google_directory_sync_success` emission; (c) new AE SQL API query function in a PagerDuty Worker; (d) AE dataset schema design and data retention configuration. Estimated: 2 sprint-days of platform-engineer time. |
+| **Signal latency** | AE data points are available for query within 60 seconds of emission (Cloudflare SLA). At high frequency (> 1,000 sync events/day fleet-wide), AE provides significantly lower alert latency than pg_cron. |
+| **Scale ceiling** | No practical ceiling — AE is designed for fleet-wide aggregation. The AE SQL API aggregates across tenants in a single query with sub-second response at any FORM-realistic fleet size. |
+| **Consistency** | Would create a two-tier signal architecture in §26: DEC-030/Supabase for most alerts, AE for AL-SSO-GDIR-01/02. This fragmentation increases operational complexity (two debugging paths, two evidence collection protocols, two data retention audit trails). |
+| **SOC 2 evidence quality** | AE data points are not HMAC-chained; they are not part of the DEC-030 integrity model. Using AE as the sole alert signal source for AL-SSO-GDIR-01/02 would mean the alert evidence is separate from the audit event evidence — auditors must cross-reference two separate systems. |
+
+---
+
+### §48.3 Decision (DEC-067)
+
+**Option A adopted for M4.** Five grounds:
+
+1. **Zero marginal implementation cost.** The `sso.google_directory_sync_error` and `sso.google_directory_sync_success` DEC-030 events are already emitted at the Workers edge per `docs/SSO_SCIM_IMPLEMENTATION.md §21.7`. A pg_cron job (§48.4) querying `audit_log_events` requires no new Workers bindings, no new AE dataset, and no new data pipeline. The M4 implementation sprint should not carry an optional infrastructure addition.
+
+2. **Scale math is adequate for M4.** FORM has zero active Google Directory tenants at M4 (pre-GA). The first enterprise pilot is targeted for M10–M11. By the time there are > 20 active GD tenants, the Option A query performance can be validated against observed data and the migration trigger evaluated (§48.5). Acting on a hypothetical scale concern at M4 with real implementation cost is premature optimisation.
+
+3. **Signal source consistency maintains SOC 2 audit trail coherence.** AL-SSO-GDIR-01/02 firing on DEC-030 Supabase data means the same HMAC-chained record that proves a Google Directory sync error occurred also proves the alert fired. Option B would decouple the audit event (DEC-030/Supabase) from the alert signal (AE), creating a two-system cross-reference burden for SOC 2 fieldwork.
+
+4. **Consistent with FORM's established architecture decision pattern.** DEC-043 (`business_justification` plaintext exclusion), DEC-044 (`bypass_reason_hash` SHA-256), DEC-051 (7-year retention via pg_cron), DEC-053 (skip-and-verify over per-incident sub-chains), DEC-065 (Addendum 4 over UI-click consent) — each adopts the simpler implementation with a documented upgrade path over the complex solution that addresses a hypothetical future scale. DEC-067 continues this pattern.
+
+5. **Analytics Engine migration trigger is concrete and measurable.** §48.5 specifies the exact criterion (> 50 active Google Directory tenants) at which the architecture review must occur. This is a measurable observable, not an open-ended deferral.
+
+**Reverse cost:** Low. Migrating to Option B requires: (a) adding `GDIR_ANALYTICS` AE binding to the SSO callback Worker; (b) adding `writeDataPoint()` alongside existing DEC-030 emission in `resolveGoogleGroups()` (`apps/api-gateway/src/sso/google-directory-groups.ts`); (c) implementing an AE SQL API query function for the AL-SSO-GDIR-01/02 trigger conditions; (d) deprecating pg_cron job 35. No HMAC chain changes — DEC-030 events continue regardless of signal source for alerting. Estimated: 2 sprint-days. **Re-evaluation trigger:** > 50 active Google Directory tenants, or pg_cron job 35 P95 execution duration > 500 ms sustained for 7 consecutive days.
+
+---
+
+### §48.4 pg_cron Implementation — `google_directory_alert_check` (Job 35)
+
+The following pg_cron job implements AL-SSO-GDIR-01 and AL-SSO-GDIR-02 using the DEC-030 event stream. It runs every 5 minutes under the `form_audit` role (read-only access to `audit_log_events`).
+
+**Job registration (§12.6 addition):**
+
+| Job # | Name | Schedule | Freshness window | SOC 2 | PagerDuty |
+|---|---|---|---|---|---|
+| **35** | `google_directory_alert_check` | `*/5 * * * *` | 6 min | CC7.2 — AL-SSO-GDIR-01 (error rate) and AL-SSO-GDIR-02 (latency) via DEC-030 event stream | P2 `form-platform` for AL-SSO-GDIR-01; P3 Slack `#alerts-sso` for AL-SSO-GDIR-02 |
+
+**SQL implementation:**
+
+```sql
+-- pg_cron Job 35: google_directory_alert_check
+-- Schedule: */5 * * * *  Role: form_audit  (read-only)
+-- Closes: OQ-SSO-OBS-02 (DEC-067, 2026-06-19)
+-- Implements: AL-SSO-GDIR-01 (P2 — error rate > 20% / 3 consecutive per tenant)
+--             AL-SSO-GDIR-02 (P3 — P95 fetch latency > 3,000 ms per tenant)
+-- Privacy floor: no user_email, no user_email_hash, no group details in any alert payload.
+
+DO $$
+DECLARE
+  v_window_start   TIMESTAMPTZ := NOW() - INTERVAL '15 minutes';
+  rec              RECORD;
+  v_total          INT;
+  v_errors         INT;
+  v_error_rate_pct NUMERIC;
+  v_p95_ms         NUMERIC;
+  v_payload        JSONB;
+BEGIN
+
+  -- AL-SSO-GDIR-01: Per-tenant Google Directory sync error rate > 20%
+  -- Trigger if: errors / (errors + successes) > 0.20 for any 3 consecutive 5-min windows
+  -- (Approximation: use 15-min rolling window with > 20% error rate AND total >= 3 events)
+  FOR rec IN
+    SELECT
+      payload->>'tenant_id'                       AS tenant_id,
+      COUNT(*) FILTER (WHERE action = 'sso.google_directory_sync_error')   AS error_count,
+      COUNT(*) FILTER (WHERE action = 'sso.google_directory_sync_success') AS success_count,
+      COUNT(*)                                    AS total_count,
+      ROUND(
+        100.0 * COUNT(*) FILTER (WHERE action = 'sso.google_directory_sync_error')
+        / NULLIF(COUNT(*), 0),
+        1
+      )                                           AS error_rate_pct
+    FROM audit_log_events
+    WHERE action IN ('sso.google_directory_sync_error', 'sso.google_directory_sync_success')
+      AND emitted_at >= v_window_start
+      -- Privacy floor: exclude user_email_hash from aggregation key; group only by tenant
+    GROUP BY payload->>'tenant_id'
+    HAVING COUNT(*) >= 3
+       AND ROUND(
+             100.0 * COUNT(*) FILTER (WHERE action = 'sso.google_directory_sync_error')
+             / NULLIF(COUNT(*), 0), 1
+           ) > 20.0
+  LOOP
+    -- Fire PagerDuty P2 via pg_net to form-alert-relay (§46.3)
+    v_payload := jsonb_build_object(
+      'alert_name',     'AL-SSO-GDIR-01',
+      'severity',       'P2',
+      'tenant_id',      rec.tenant_id,
+      'error_count',    rec.error_count,
+      'success_count',  rec.success_count,
+      'total_count',    rec.total_count,
+      'error_rate_pct', rec.error_rate_pct,
+      'window_minutes', 15,
+      'runbook',        'docs/INCIDENT_RESPONSE.md',
+      'signal_source',  'dec030_supabase',
+      'dec067_note',    'DEC-030 Supabase query (DEC-067); migrate to AE at > 50 active GD tenants'
+    );
+    PERFORM net.http_post(
+      url     := current_setting('app.settings.alert_relay_url'),
+      body    := v_payload::TEXT,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                                    'Authorization', 'Bearer ' ||
+                                    current_setting('app.settings.alert_relay_token'))
+    );
+  END LOOP;
+
+  -- AL-SSO-GDIR-02: Per-tenant P95 Google Directory fetch latency > 3,000 ms
+  FOR rec IN
+    SELECT
+      payload->>'tenant_id'                       AS tenant_id,
+      PERCENTILE_CONT(0.95) WITHIN GROUP (
+        ORDER BY (payload->>'fetch_duration_ms')::NUMERIC
+      )                                           AS p95_ms,
+      COUNT(*)                                    AS sample_count
+    FROM audit_log_events
+    WHERE action IN ('sso.google_directory_sync_success', 'sso.google_directory_sync_error')
+      AND emitted_at >= v_window_start
+      AND (payload->>'fetch_duration_ms') IS NOT NULL
+    GROUP BY payload->>'tenant_id'
+    HAVING COUNT(*) >= 5
+       AND PERCENTILE_CONT(0.95) WITHIN GROUP (
+             ORDER BY (payload->>'fetch_duration_ms')::NUMERIC
+           ) > 3000
+  LOOP
+    -- Slack #alerts-sso (P3 — informational, no PagerDuty page)
+    v_payload := jsonb_build_object(
+      'alert_name',    'AL-SSO-GDIR-02',
+      'severity',      'P3',
+      'tenant_id',     rec.tenant_id,
+      'p95_ms',        rec.p95_ms,
+      'sample_count',  rec.sample_count,
+      'window_minutes', 15,
+      'runbook',       'docs/SSO_SCIM_IMPLEMENTATION.md §21.9',
+      'signal_source', 'dec030_supabase'
+    );
+    PERFORM net.http_post(
+      url     := current_setting('app.settings.slack_alerts_sso_url'),
+      body    := v_payload::TEXT,
+      headers := jsonb_build_object('Content-Type', 'application/json')
+    );
+  END LOOP;
+
+END $$;
+```
+
+**Freshness check (§12.6 pattern):** A companion `system.gdir_alert_check_stale` DEC-030 advisory event (LOW, 1yr) is emitted if job 35 has not executed within 6 minutes (monitored by the existing §12.7 pg_cron health supervisor). Advisory does not page; compliance-officer reviews in the next business day.
+
+**Dedup key:** `al-sso-gdir-01-{tenant_id}` with 30-minute cooldown (prevents repeated PagerDuty pages during a sustained IdP issue). Uses the existing `form-alert-relay` dedup mechanism (§46.3).
+
+---
+
+### §48.5 Scale Trigger — Migration to Cloudflare Analytics Engine
+
+The following condition triggers a mandatory architecture review to implement Option B (Analytics Engine):
+
+**Trigger condition:** > **50 active Google Directory tenants** (`google_directory_sync_enabled = true AND status = 'active'` in `tenant_sso_configs`), OR pg_cron job 35 P95 execution duration > 500 ms sustained for **7 consecutive days** (measured from `pg_cron.job_run_details` via §12.7 health supervisor).
+
+**Review protocol:**
+1. compliance-officer + devops-lead + platform-engineer hold an architecture review session.
+2. Evaluate Option B cost (§48.2) against current job 35 P95 duration.
+3. If Option B is adopted: open a DECISION_LOG entry referencing this trigger and DEC-067; author a `§49 AE Migration` section in this document; deprecate job 35 30 days after AE deployment is stable in production.
+4. If Option A remains adequate (P95 < 500 ms with a materialised view or index adjustment): document the capacity extension rationale in `docs/DECISION_LOG.md` as a `DEC-067 Reviewed – Scale Trigger Not Yet Reached` note.
+
+**Current baseline (2026-06-19):** 0 active Google Directory tenants. Scale trigger is not active. First review scheduled at first enterprise pilot go-live (est. M10–M11).
+
+---
+
+### §48.6 SOC 2 Evidence
+
+| Artefact | ID | Criteria | Description | Cadence | Retention | Storage path |
+|---|---|---|---|---|---|---|
+| AL-SSO-GDIR-01/02 PagerDuty/Slack export | **SSO-OBS-E-007** | CC7.2, CC7.3 | Quarterly export of all AL-SSO-GDIR-01 PagerDuty incidents and AL-SSO-GDIR-02 Slack alerts during the observation quarter; includes `tenant_id`, `error_rate_pct` or `p95_ms`, timestamp, and resolution note; zero-event quarters filed as affirmative attestation JSON. Cross-check: confirm job 35 `pg_cron.job_run_details` shows no gap > 6 minutes during the quarter. Privacy floor: no `user_email_hash` or group membership in any exported row. | Quarterly from M11 | 3 years | `compliance/evidence/sso/SSO-OBS-E-007_<YYYY-QN>.csv` |
+
+**CC7.2 auditor narrative:** AL-SSO-GDIR-01 and AL-SSO-GDIR-02 fire on DEC-030 HMAC-chained event data — the same audit records that demonstrate the sync occurred also demonstrate the alerting control is active. SSO-OBS-E-007 provides a direct quarterly link between the DEC-030 chain (CC7.3/CC7.4 corpus) and the anomaly monitoring control (CC7.2).
+
+**CC7.3 auditor narrative:** AL-SSO-GDIR-01 P2 PagerDuty pages `form-platform` within the 30-minute SSO SLA response window. AL-SSO-GDIR-02 P3 Slack notifications surface latency trends before they breach SSO-SLO-02 (P95 < 3,000 ms per `docs/OBSERVABILITY.md §26.3`). SSO-OBS-E-007 confirms the chain: event → alert → on-call response.
+
+---
+
+### §48.7 OQ Gap Tracker
+
+| OQ | Status | Notes |
+|---|---|---|
+| **OQ-SSO-OBS-01** | **🟡 Open — P1** | Per-tenant vs. fleet-wide SSO-SLO-01 evaluation. Resolution target: before first enterprise SLA review (Month 13). Owner: compliance-officer + enterprise-architect. Unchanged. |
+| **OQ-SSO-OBS-02** | **🟢 Resolved — DEC-067 (2026-06-19)** | DEC-030 Supabase queries adopted for AL-SSO-GDIR-01/02 at M4. pg_cron job 35 (`google_directory_alert_check`) implements both alert rules. Analytics Engine migration trigger: > 50 active Google Directory tenants or job 35 P95 > 500 ms for 7 days. See §48.5. |
+
+---
+
+### §48.8 Implementation Checklist
+
+#### P0 — Before AL-SSO-GDIR-01 implementation (M4)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply pg_cron job 35 (`google_directory_alert_check`) to production Supabase project: register the `DO $$` block from §48.4 via Supabase Dashboard → Database → pg_cron; confirm schedule `*/5 * * * *`; confirm role `form_audit`; run `SELECT cron.job_run_details ORDER BY runid DESC LIMIT 1` to verify first successful execution; add to §12.6 pg_cron registry (job 35 row). | platform-engineer + devops-lead | **P0** | M4 | [ ] |
+| 2 | Configure AL-SSO-GDIR-01 PagerDuty alert route in `form-platform` service: dedup key `al-sso-gdir-01-{tenant_id}`, 30-minute cooldown, P2 urgency, routing to on-call platform-engineer; validate with synthetic `sso.google_directory_sync_error` burst in staging (emit ≥ 3 error events within 15 minutes for one tenant; confirm PagerDuty page fires within 5 minutes of job 35 execution). File test result as `compliance/evidence/sso/SSO-OBS-E-007_staging-validation.json`. | devops-lead | **P0** | M4 | [ ] |
+| 3 | Register `system.gdir_alert_check_stale` as a LOW/1yr DEC-030 advisory event type in `docs/AUDIT_LOG_SCHEMA.md §System`; update §12.7 health supervisor to monitor job 35 freshness (6-minute window, same pattern as job 24 `scim_mass_deprovision_check`). | platform-engineer + compliance-officer | **P1** | M4 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Add SSO-OBS-E-007 row to §26.11 SOC 2 evidence table and to `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3). Add `sso/` subfolder reference to `docs/SOC2_READINESS.md §80.3` R2 evidence folder structure. File first SSO-OBS-E-007 artefact at observation period open; if zero alerts fired in the quarter, file zero-event attestation JSON with pg_cron job 35 run history appended. | compliance-officer | **P1** | M11 | [ ] |
+| 5 | Schedule scale trigger review at first enterprise pilot go-live (§48.5): add calendar entry "DEC-067 Scale Trigger Review — check active GD tenant count vs. 50-tenant ceiling and job 35 P95 duration." Owner: devops-lead + platform-engineer. | devops-lead | **P1** | M10 | [ ] |
+
+---
+
+*v4.5.0 (2026-06-19): §48 OQ-SSO-OBS-02 Resolution — Google Directory Sync Alert Signal Source: DEC-030 Supabase vs. Cloudflare Analytics Engine (DEC-067). Closes OQ-SSO-OBS-02 from §26.13 (P1 — before AL-SSO-GDIR-01 implementation, M4 deadline — open since v1.3, 2026-06-09). Decision (DEC-067, 2026-06-19): Option A adopted — DEC-030 Supabase event stream queries via pg_cron job 35 (`google_directory_alert_check`) implement AL-SSO-GDIR-01 (P2, error rate > 20%/15-min per tenant) and AL-SSO-GDIR-02 (P3, P95 latency > 3,000 ms per tenant). Five grounds: (1) zero marginal implementation cost — DEC-030 events already in `audit_log_events`; (2) scale math adequate — 0 active GD tenants at M4, first pilot est. M10–M11; (3) DEC-030 signal source maintains SOC 2 audit trail coherence — alert and underlying event are the same HMAC-chained record; (4) consistent with FORM's "simplest adequate implementation" architecture pattern (DEC-043/044/051/053/065); (5) Analytics Engine migration trigger is concrete and measurable (> 50 active GD tenants or job 35 P95 > 500 ms / 7 days). §48.2 two-option analysis: Option A (Supabase pg_cron) — zero cost, adequate scale, single evidence trail; Option B (Cloudflare Analytics Engine) — required at fleet scale, two-system evidence burden, 2 sprint-days additional cost. §48.4 pg_cron job 35 `google_directory_alert_check` full SQL implementation: AL-SSO-GDIR-01 (15-min rolling window, ≥ 3 events, > 20% error rate → PagerDuty P2 `form-platform` via `form-alert-relay`), AL-SSO-GDIR-02 (15-min window, ≥ 5 samples, PERCENTILE_CONT(0.95) > 3000 ms → Slack `#alerts-sso` P3); dedup key `al-sso-gdir-01-{tenant_id}` 30-min cooldown; `system.gdir_alert_check_stale` LOW/1yr advisory on freshness breach (6-min window). §48.5 scale trigger: > 50 active GD tenants OR job 35 P95 > 500 ms / 7 consecutive days → mandatory architecture review for AE migration; review protocol (four steps). §48.6 SOC 2 evidence artefact SSO-OBS-E-007 (CC7.2/CC7.3 — quarterly PagerDuty/Slack export + pg_cron run-history cross-check; zero-event quarters as affirmative attestation; 3yr; `compliance/evidence/sso/SSO-OBS-E-007_<YYYY-QN>.csv`). §48.7 OQ gap tracker: OQ-SSO-OBS-02 🟢 Resolved DEC-067; OQ-SSO-OBS-01 🟡 Open P1 unchanged. §48.8 five-item implementation checklist: 2× P0/M4 (job 35 deploy + staging validation, AL-SSO-GDIR-01 PagerDuty config), 1× P1/M4 (`system.gdir_alert_check_stale` event registration), 2× P1/M10–M11 (SSO-OBS-E-007 SOC2 evidence registration + first filing, scale trigger calendar entry). §26.13 updated: OQ-SSO-OBS-02 row marked 🟢 Resolved (DEC-067); §26.11 SSO-OBS-E-007 addition deferred to §48.8 item 4. Document header: v4.4.0 → v4.5.0. Privacy floor: `tenant_id` (FORM internal UUID) and aggregate counts only in all alert payloads; no `user_email`, `user_email_hash`, group membership, or Art. 9 data in any pg_cron query result, PagerDuty event body, or SSO-OBS-E-007 artefact row; `PERCENTILE_CONT` is computed over duration integers — no identity data involved. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §21.7` (DEC-030 event emission — `sso.google_directory_sync_error` + `sso.google_directory_sync_success` source); `docs/SSO_SCIM_IMPLEMENTATION.md §21.9` (AL-SSO-GDIR-01 through AL-SSO-GDIR-05 alert rule definitions); `docs/OBSERVABILITY.md §26.7` (canonical OBSERVABILITY registration of AL-SSO-GDIR-01/02 — §48 closes OQ-SSO-OBS-02 from §26.13); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — job 35 to be added per §48.8 item 1); `docs/OBSERVABILITY.md §46.3` (form-alert-relay — job 35 routes AL-SSO-GDIR-01 via existing relay); `docs/AUDIT_LOG_SCHEMA.md §System` (`system.gdir_alert_check_stale` — P1/M4 registration obligation per §48.8 item 3); `docs/SOC2_READINESS.md §79.4` (master evidence table — SSO-OBS-E-007 to be registered per §48.8 item 4); `docs/DECISION_LOG.md DEC-067` (decision rationale and reverse cost). Owner: devops-lead + platform-engineer + compliance-officer.*
 
 ---
 

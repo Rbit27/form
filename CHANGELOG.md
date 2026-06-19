@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.23.1] — 2026-06-19
+
+### Added
+- **`docs/OBSERVABILITY.md §48`** (v4.4.0 → v4.5.0) — OQ-SSO-OBS-02 resolution: Google Directory sync alert signal source adopted as DEC-030 Supabase `audit_log_events` queries (DEC-067). New pg_cron job 35 (`google_directory_alert_check`, `*/5 * * * *`, role `form_audit`) implements AL-SSO-GDIR-01 (error rate >20% per tenant → PagerDuty P2 via form-alert-relay, 30-min dedup cooldown) and AL-SSO-GDIR-02 (P95 latency >3000ms per tenant → Slack #alerts-sso P3). Cloudflare Analytics Engine migration deferred to >50 active GD tenants or job 35 P95 >500ms for 7 consecutive days (four-step review protocol). New SOC 2 evidence artefact SSO-OBS-E-007 (CC7.2/CC7.3, quarterly, `compliance/evidence/sso/SSO-OBS-E-007_<YYYY-QN>.csv`, first filing M11). §48.7 OQ gap tracker: OQ-SSO-OBS-02 🟢 Resolved, OQ-SSO-OBS-01 🟡 Open P1 (unchanged). §48.8 implementation checklist: 5 items (P0/M4 pg_cron deploy, P0/M4 PagerDuty route, P1/M4 AUDIT_LOG_SCHEMA advisory, P1/M11 SOC2_READINESS §79.4 cross-ref, P1/M10 calendar entry).
+- **`docs/DECISION_LOG.md` DEC-067** (2026-06-19) — OQ-SSO-OBS-02 resolution: DEC-030 Supabase queries for AL-SSO-GDIR-01/02 at M4; Analytics Engine deferred (trigger: >50 active GD tenants OR job 35 P95 >500ms for 7 days). Owner: devops-lead + platform-engineer + compliance-officer. Five grounds: zero marginal cost at current scale, adequate scale math, audit trail coherence, pattern consistency with DEC-043/044/051/053/065, concrete measurable migration trigger.
+
+### Changed
+- `docs/OBSERVABILITY.md §26.13` — OQ-SSO-OBS-02 row marked 🟢 Resolved (DEC-067, 2026-06-19); Analytics Engine migration trigger appended inline.
+
+---
+
 ## [6.23.0] — 2026-06-19
 
 ### Added
