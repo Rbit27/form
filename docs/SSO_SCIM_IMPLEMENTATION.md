@@ -40,6 +40,8 @@
 30. [OQ-MOBILE-03 Resolution — Mobile SSO Browser Mode & Deep-Link Security (DEC-059)](#30-oq-mobile-03-resolution--mobile-sso-browser-mode--deep-link-security-dec-059)
 31. [OQ-SSO-32.1 & OQ-SSO-32.2 Resolution — SCIM IP Enforcement Onboarding Visibility & KV Cache Invalidation](#33-oq-sso-321--oq-sso-322-resolution--scim-ip-enforcement-onboarding-visibility--kv-cache-invalidation)
 34. [SCIM Bulk Deprovision Guard — Per-Tenant Configurable Threshold & CSM-Countersigned Override (Closes OQ-R24-01, DEC-066)](#34-scim-bulk-deprovision-guard--per-tenant-configurable-threshold--csm-countersigned-override)
+35. [OQ-SSO-34.2 Resolution — BDG `getGuardConfig()` Seat Source: `enterprise_contracts` with Event-Refreshed 1-Hour KV Cache (DEC-069)](#35-oq-sso-342-resolution--bdg-getguardconfig-seat-source-enterprise_contracts-with-event-refreshed-1-hour-kv-cache-dec-069)
+36. [OQ-SSO-23.1 · OQ-SSO-23.3 · OQ-SSO-23.4 Resolution — CAEP Cert-Rotation Re-Registration, SSF Polling Fallback SLA & RISC Hijacking Group Cache Eviction (DEC-072)](#36-oq-sso-231--oq-sso-233--oq-sso-234-resolution--caep-cert-rotation-re-registration-ssf-polling-fallback-sla--risc-hijacking-group-cache-eviction-dec-072)
 
 ---
 
@@ -8037,10 +8039,10 @@ Five new alerting rules are added. Add all five to `docs/OBSERVABILITY.md §6.2`
 
 | ID | Question | Owner | Priority | Resolution Target |
 |---|---|---|---|---|
-| OQ-SSO-23.1 | CAEP stream re-registration after SAML certificate rotation (§20) — should §20's cert rotation workflow automatically trigger CAEP stream re-registration at the IdP? Some IdPs (Okta in particular) tie the CAEP stream identity to the SSO application configuration; a SAML cert rotation may invalidate the stream token. Currently §20 has no hook into CAEP registration. The fix is straightforward (add a `caep_reregister_after_cert_rotation` step to the §20.4 rotation state machine) but requires coordination with the §20 implementation. | security-engineer | P2 | M5 |
+| OQ-SSO-23.1 | CAEP stream re-registration after SAML certificate rotation (§20) — should §20's cert rotation workflow automatically trigger CAEP stream re-registration at the IdP? Some IdPs (Okta in particular) tie the CAEP stream identity to the SSO application configuration; a SAML cert rotation may invalidate the stream token. Currently §20 has no hook into CAEP registration. The fix is straightforward (add a `caep_reregister_after_cert_rotation` step to the §20.4 rotation state machine) but requires coordination with the §20 implementation. | security-engineer | 🟢 **Resolved** | **DEC-072 (2026-06-19) · §36.2** — automatic re-registration hook adopted; migration 0082 + `caep_reregister_sweep` pg_cron. |
 | OQ-SSO-23.2 | CAEP and magic-link fallback sessions (§10) — if a user's IdP account is disabled via a CAEP `account-disabled` event, FORM revokes all sessions using `revoke:user:{tenant_id}:{user_id}`. However, magic-link sessions (§10) may be stored under a different session type in `enterprise_sessions`. Confirm: does `revoke:user:{tenant_id}:{user_id}` (§22.5) cover magic-link sessions in addition to SSO sessions? Current assumption: yes, because `isRevoked()` checks the user-level KV key regardless of session type. platform-engineer to confirm that magic-link session creation and validation paths both pass through `isRevoked()`. **🟢 Resolved — DEC-062 (2026-06-16). See §32.2.** `isRevoked()` confirmed at middleware layer; call-graph trace complete; integration test CC6-E-ML-001 added as M4 deploy closure gate. | platform-engineer | 🟢 **Resolved** | §32.2 · DEC-062 (2026-06-16) |
-| OQ-SSO-23.3 | Polling fallback for IdPs that do not support push delivery — the SSF specification supports a pull/poll model where FORM periodically calls the IdP's transmitter endpoint to retrieve pending SETs, rather than the IdP pushing to FORM's webhook. Poll intervals of 5 minutes would still represent a significant improvement over the 15-minute JWT TTL but would not meet the < 30-second target. Is a < 30-second SLA contractually required, or is "significantly better than JWT TTL" sufficient? If a polling fallback is needed, what is the acceptable poll interval and the associated IdP API rate limit? | platform-engineer | P2 | M5 |
-| OQ-SSO-23.4 | CAEP and the §21 Google Directory API group cache — if a Google RISC `hijacking` event is received for a user in a Google Workspace OIDC tenant, FORM revokes the user's sessions. However, the `google_directory_group_cache` (§21) for that user may still contain stale group membership data with a 5-minute TTL. Should a RISC `hijacking` event also proactively delete the `google_directory_group_cache` row for the affected user? The current 5-minute TTL means stale cache data cannot be used to authenticate (since the session is revoked), but the cache row persisting for up to 5 minutes after a hijacking event could be considered a minor hygiene concern. | platform-engineer | P2 | M5 |
+| OQ-SSO-23.3 | Polling fallback for IdPs that do not support push delivery — the SSF specification supports a pull/poll model where FORM periodically calls the IdP's transmitter endpoint to retrieve pending SETs, rather than the IdP pushing to FORM's webhook. Poll intervals of 5 minutes would still represent a significant improvement over the 15-minute JWT TTL but would not meet the < 30-second target. Is a < 30-second SLA contractually required, or is "significantly better than JWT TTL" sufficient? If a polling fallback is needed, what is the acceptable poll interval and the associated IdP API rate limit? | platform-engineer | 🟢 **Resolved** | **DEC-072 (2026-06-19) · §36.3** — "near-real-time (< 60 s)" contractual language; PUSH mandatory for CAEP SLA; polling deferred to M7+ on ≥ 2 customer requests (5-min interval if triggered). |
+| OQ-SSO-23.4 | CAEP and the §21 Google Directory API group cache — if a Google RISC `hijacking` event is received for a user in a Google Workspace OIDC tenant, FORM revokes the user's sessions. However, the `google_directory_group_cache` (§21) for that user may still contain stale group membership data with a 5-minute TTL. Should a RISC `hijacking` event also proactively delete the `google_directory_group_cache` row for the affected user? The current 5-minute TTL means stale cache data cannot be used to authenticate (since the session is revoked), but the cache row persisting for up to 5 minutes after a hijacking event could be considered a minor hygiene concern. | platform-engineer | 🟢 **Resolved** | **DEC-072 (2026-06-19) · §36.4** — proactive `google_directory_group_cache` DELETE on RISC `hijacking` event adopted; additive branch in `handleRiscEvent()`; SHA-256 email hash only. |
 
 ### 23.12 Implementation Checklist
 
@@ -12648,3 +12650,259 @@ This three-step protocol is deterministic, requires no point-in-time active-user
 ---
 
 *v2.6 (2026-06-19): §34 SCIM Bulk Deprovision Guard — Per-Tenant Configurable Threshold & CSM-Countersigned Override. Closes OQ-R24-01 (P1, `docs/INCIDENT_RESPONSE.md §R-24.14`, before enterprise GA M13). Decision: DEC-066 (2026-06-19). §34.1 purpose: two-layer defence model — §34 preventive (HTTP 422 before deprovisioning; 5-min window) + R-24 / AL-SCIM-MASS-01 reactive (after deprovisioning; 10-min window). §34.2 decision (DEC-066): Option B adopted (per-tenant configurable threshold, 5-min rolling window, CSM-countersigned time-limited override, auto-revocation after first bulk sync use); Option A (fixed fleet threshold) rejected for inflexibility; Option C (async approval queue) rejected for per-request latency impact. §34.3 migration 0079: three new columns on `tenant_sso_configs` (`bulk_deprovision_threshold_pct` SMALLINT DEFAULT 20, `bulk_deprovision_override_exp` TIMESTAMPTZ, `bulk_deprovision_override_by` UUID FK to auth.users); two constraints (`chk_bdg_threshold` 5–100, `chk_bdg_override_coherent`); partial index `idx_tsc_bdg_override_active`; pg_cron job 33 `bdg_override_expiry_sweep` every 15 min (safety-net expiry sweep; SCIM Worker also auto-revokes on use). §34.4 Worker: `enforceDeprovisionGuard()` in `apps/scim-worker/src/handlers/users.ts`; KV key `scim:deprov_guard:{tenantId}:{epoch5min}` (600s TTL); `scim:guard_cfg:{tenantId}` 60s cache + active invalidation on config change; `getGuardConfig()` JOINs `enterprise_contracts.contracted_seats`; threshold = 100 → guard disabled (fast-path); active override → bypass guard but still increment counter; `revokeActiveOverride()` fires after first over-limit request under override (emits `scim.bulk_deprovision_override_used` → NULLs columns → invalidates KV). §34.5 override protocol: two-person gate (tenant_owner Admin Dashboard request + CSM countersign in internal admin console, 30-min window to countersign); CSM selects 1h/2h/4h TTL; `POST /internal/v1/admin/scim/bulk-override` requires PAM `read_write` session (§24); `reason_hash` SHA-256 of free text (raw never in chain). §34.6 Admin Dashboard: threshold slider 5–100%, guard status badge (active/override/disabled), "Request Bulk Override" modal for `tenant_owner`; Supabase RPC `update_bdg_threshold()` SECURITY DEFINER; override columns NOT directly tenant-settable. §34.7 five events: `scim.bulk_deprovision_blocked` (HIGH, 7yr — GUARD-CHAIN-01 advisory on repeat triggers); `scim.bulk_deprovision_override_issued` (HIGH, 7yr — reason_hash only); `scim.bulk_deprovision_override_used` (HIGH, 7yr — auto-revoke trigger); `scim.bulk_deprovision_threshold_updated` (STANDARD, 7yr — tenant admin/owner actor_id); `system.scim_guard_repeated_trigger` advisory (STANDARD, 1yr — fires at ≥ 3 blocks in one calendar day). §34.8 SOC 2: CC6.3 (structural preventive access control), A1.2 (availability protection), CC7.2 (GUARD-CHAIN-01 repeated-trigger investigation), CC9.2 (IdP treated as untrusted upstream); GUARD-E-001 quarterly export (zero-event quarters as explicit attestation). §34.9 interaction with R-24: guard and AL-SCIM-MASS-01 have complementary thresholds; planned bulk deprovision with override will auto-open R-24 P1 (CSM closes immediately citing override chain event). §34.10 gap tracker: OQ-R24-01 🟡→🟢 Resolved; INCIDENT_RESPONSE.md §R-24.15 item 10 [x] Done; DEC-066 created; AUDIT_LOG_SCHEMA.md v2.19 done. §34.11 checklist: 6× P0/M13 (migration 0079, Worker guard + revoke, override API, RPC + Admin Dashboard, AUDIT_LOG registration [x] done, integration tests); 3× P1/M12–M13+1Q (Admin Dashboard UI, CSM briefing + ENTERPRISE_ONBOARDING note, SOC2 §91 cross-reference); 2× P2/post-GA. §34.12 two open questions: OQ-SSO-34.1 (window alignment, P2); OQ-SSO-34.2 (contracted_seats source, P1). TOC entry §34 added. Document header v2.5 → v2.6. Privacy floor: no `user_id`, no individual employee name, no health data, no coaching content in any §34 DEC-030 event; `reason_hash` is SHA-256 of CSM/tenant_owner free-text reason (raw never enters chain); `csm_admin_id` and `override_issued_by` are FORM-internal operator UUIDs (not tenant employees); `actor_id` in threshold-updated event is the tenant admin/owner UUID; `tenant_id` is FORM-internal org UUID. Cross-references: `docs/INCIDENT_RESPONSE.md §R-24.14` (OQ-R24-01 source — §34.10 resolves); `docs/INCIDENT_RESPONSE.md §R-24.15` (item 10 — [x] Done 2026-06-19); `docs/INCIDENT_RESPONSE.md §R-24.9` (five reactive SCIM mass deprovision events — complementary layer); `docs/AUDIT_LOG_SCHEMA.md §SCIM Bulk Deprovision Guard` (five events registered — §34.11 item 5 [x] Done); `docs/SOC2_READINESS.md §91` (GUARD-E-001 cross-reference patch — P1/M13+1Q); `docs/DATA_MODEL.md §4.2` (`tenant_sso_configs` — three columns added by migration 0079); `docs/SSO_SCIM_IMPLEMENTATION.md §27.5` (SCIM Worker — `enforceDeprovisionGuard()` wired into `handleUserDelete` and `handleUserPatch`); `§33.3.3` (active KV invalidation pattern — mirrored for `scim:guard_cfg` key); `§25.4` (auth policy KV cache — same invalidation idiom); `docs/ENTERPRISE_ONBOARDING.md §3.3` (CSM briefing note — P1/M12); `docs/DECISION_LOG.md DEC-066` (formal adoption decision). Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*
+
+---
+
+## §36 OQ-SSO-23.1 · OQ-SSO-23.3 · OQ-SSO-23.4 Resolution — CAEP Cert-Rotation Re-Registration, SSF Polling Fallback SLA & RISC Hijacking Group Cache Eviction (DEC-072)
+
+### §36.1 Scope
+
+This section resolves three P2 open questions from §23.11 (v1.5, 2026-05-30), all due M5:
+
+- **OQ-SSO-23.1** — Should SAML certificate rotation (§20) automatically trigger CAEP stream re-registration at the IdP?
+- **OQ-SSO-23.3** — Is a < 30-second CAEP SLA contractually required, or is "significantly better than JWT TTL" sufficient? If polling is needed, what interval and rate constraints apply?
+- **OQ-SSO-23.4** — Should a Google RISC `hijacking` event proactively delete the `google_directory_group_cache` row for the affected user?
+
+---
+
+### §36.2 OQ-SSO-23.1 — CAEP Stream Re-Registration After SAML Certificate Rotation
+
+#### §36.2.1 Problem
+
+§20 specifies a five-state rotation machine for the SAML SP and IdP certificate lifecycle (`idle → notified → rotation_in_progress → complete`). CAEP streams (§23) are registered with the IdP's transmitter endpoint and identified by a `caep_stream_id` stored in `tenant_sso_configs`. In Okta, the CAEP stream configuration is associated with the OAuth 2.0 client application — the same application object that holds the SAML metadata. A `saml_sp_cert_pem` rotation triggers an SP metadata update that Okta processes as a change to the application configuration. Okta may respond by:
+
+- Keeping the existing stream active (if the stream is keyed on the webhook URL alone), or
+- Silently invalidating the stream token (documented Okta behaviour for apps with SP-initiated SAML cert rotation that alters the application's `kid` set).
+
+Azure AD (Entra ID) has analogous behaviour: certificate rotation updates the service principal's token-signing credential, which can cause CAEP streams registered against the application's `appId`-scoped service to stop delivering SETs without error.
+
+Without a re-registration hook, a cert rotation can produce a CAEP silent blind spot: `caep_status` remains `'active'` in Supabase, but no SETs are delivered. AL-CAEP-03 (§23.9, P2, 4h threshold during business hours) would eventually surface the failure, but a 4h detection window for a CC6.3 control outage caused by FORM's own scheduled maintenance is unacceptable.
+
+#### §36.2.2 Decision: Automatic Re-Registration Adopted (DEC-072)
+
+After `cert_rotation_state` transitions to `'complete'` for any tenant with `caep_status IN ('active', 'error')`, the `cert-expiry-check` Worker (§20.4) sets a new column `caep_reregistration_required = TRUE` on `tenant_sso_configs`. A dedicated `caep_reregister_sweep` pg_cron job (every 5 minutes) picks up flagged tenants and triggers re-registration via the `caep-stream-manager` Cloudflare Worker.
+
+Three grounds:
+
+1. **FORM-caused blind spot is a CC6.3 control weakness.** The cert rotation is a scheduled FORM-initiated event; the resulting CAEP outage is not an IdP failure, a network anomaly, or customer misconfiguration — it is a predictable consequence of FORM's own maintenance. The 4h AL-CAEP-03 backstop is designed for external failures, not self-inflicted ones.
+
+2. **Implementation cost is additive.** The re-registration flow (§23.6.1 through §23.6.3) is already implemented. This section adds one Boolean column, one pg_cron job, and a Worker endpoint route — no new infrastructure, no schema changes to existing data.
+
+3. **Pattern consistency with DEC-062 (§32).** OQ-SSO-25.1 (SCIM IP allowlist scope) was resolved by adding a separate flag per feature; the same additive-flag idiom applies here. The `caep_reregistration_required` column is independently queryable for SOC 2 evidence without coupling to the cert expiry state machine.
+
+#### §36.2.3 Schema — Migration 0082
+
+```sql
+-- migration 0082: CAEP re-registration flag and sweep infrastructure
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS caep_reregistration_required   BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS caep_last_reregistered_at      TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS caep_reregistration_trigger    TEXT
+    CHECK (caep_reregistration_trigger IN (
+      'cert_rotation', 'manual', 'stream_error', 'initial'
+    ));
+
+COMMENT ON COLUMN tenant_sso_configs.caep_reregistration_required IS
+  'TRUE when a CAEP stream re-registration is pending (cert rotation, error recovery, or manual reset).';
+COMMENT ON COLUMN tenant_sso_configs.caep_reregistration_trigger IS
+  'Controlled vocabulary: cert_rotation (§20 state machine hook) | manual (admin dashboard) | stream_error (AL-CAEP-01 remediation) | initial (first-time setup).';
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tsc_caep_reregister
+  ON tenant_sso_configs (caep_reregistration_required)
+  WHERE caep_reregistration_required = TRUE;
+```
+
+`caep_reregistration_trigger` allows SOC 2 auditors to distinguish FORM-initiated re-registrations (cert rotation) from externally-triggered ones (stream error recovery) and admin-initiated ones (manual reset). The `'cert_rotation'` value is set exclusively by the `cert-expiry-check` cron; `'stream_error'` by the AL-CAEP-01 remediation path; `'manual'` by the Admin Dashboard CAEP Reset button (FORM-internal admin console only, requires PAM `read_write` session); `'initial'` during first-time CAEP provisioning in `caep-stream-manager`.
+
+#### §36.2.4 `cert-expiry-check` Transition Hook
+
+After the `cert_rotation_state` column is written to `'complete'` in the §20.4 rotation flow, insert this step before the transaction commits:
+
+```typescript
+// apps/api-gateway/src/crons/cert-expiry-check.ts
+// After: await db.from('tenant_sso_configs').update({ cert_rotation_state: 'complete' })...
+if (tenant.caep_status === 'active' || tenant.caep_status === 'error') {
+  await db
+    .from('tenant_sso_configs')
+    .update({
+      caep_reregistration_required: true,
+      caep_reregistration_trigger: 'cert_rotation',
+    })
+    .eq('tenant_id', tenant.tenant_id);
+
+  await emitAuditEvent({
+    event_type: 'sso.caep_reregistration_queued',
+    severity: 'STANDARD',
+    retention_years: 7,
+    tenant_id: tenant.tenant_id,
+    payload: {
+      trigger: 'cert_rotation',
+      caep_status_at_queue_time: tenant.caep_status,
+    },
+  });
+}
+```
+
+**Privacy floor:** No `user_id`, email, or Art. 9 health data in this event. `caep_reregistration_required` is a FORM-internal operational state field; it is never surfaced in any tenant-facing API response or Admin Dashboard for tenant users.
+
+#### §36.2.5 `caep_reregister_sweep` pg_cron Job (Job 37)
+
+```sql
+-- migration 0082 (continued)
+SELECT cron.schedule(
+  'caep_reregister_sweep',
+  '*/5 * * * *',
+  $$
+    SELECT pg_net.http_post(
+      url     := current_setting('app.caep_stream_manager_worker_url'),
+      headers := '{"Content-Type": "application/json"}'::jsonb,
+      body    := (
+        SELECT json_build_object(
+          'tenant_ids',
+          json_agg(tenant_id ORDER BY caep_last_reregistered_at NULLS FIRST)
+        )::text
+        FROM tenant_sso_configs
+        WHERE caep_reregistration_required = TRUE
+          AND caep_status IN ('active', 'error')
+        LIMIT 50
+      )
+    )
+    WHERE EXISTS (
+      SELECT 1 FROM tenant_sso_configs
+      WHERE caep_reregistration_required = TRUE
+        AND caep_status IN ('active', 'error')
+    )
+  $$
+);
+```
+
+The LIMIT 50 cap prevents a single sweep from triggering > 50 concurrent stream re-registrations (relevant if FORM ever rotates its SP cert fleet-wide). The `caep-stream-manager` Worker processes tenants serially with a 200ms yield between registrations to avoid IdP API rate-limit exhaustion.
+
+**On successful re-registration:** `caep_reregistration_required = FALSE`, `caep_last_reregistered_at = NOW()`, `caep_stream_id = {new_stream_id}`, emit `sso.caep_stream_registered` (HIGH, 7yr) with `admin_user_id_hash = SHA-256('cert_rotation_hook')` as a sentinel to distinguish automated re-registrations from admin-initiated ones in audit queries.
+
+**On failure after 3 retries:** set `caep_status = 'error'`, emit `sso.caep_stream_error` (HIGH, 7yr) with `error_type: 'reregistration_failed_post_cert_rotation'`, trigger AL-CAEP-01 (P1 PagerDuty).
+
+#### §36.2.6 pg_cron Registry Addition (§12.6)
+
+| Job name | Schedule | Freshness | Purpose | Alert on stale |
+|---|---|---|---|---|
+| `caep_reregister_sweep` | `*/5 * * * *` | 6 min | Picks up `caep_reregistration_required = TRUE` tenants and calls `caep-stream-manager` Worker to re-register CAEP stream; handles cert-rotation, error-recovery, and manual-reset triggers | P1 `form-platform` → platform-engineer; stale = pending re-registrations not processed; check pg_net + `app.caep_stream_manager_worker_url` GUC; verify Worker health in Cloudflare dashboard |
+
+#### §36.2.7 New DEC-030 Audit Event
+
+| Event Type | Severity | Retention | Key Metadata Fields |
+|---|---|---|---|
+| `sso.caep_reregistration_queued` | STANDARD | 7 yr | `tenant_id`, `trigger` (controlled vocabulary), `caep_status_at_queue_time` |
+
+Register in `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF`.
+
+---
+
+### §36.3 OQ-SSO-23.3 — SSF Polling Fallback SLA Framing
+
+#### §36.3.1 Problem
+
+OQ-SSO-23.3 asked whether FORM must support SSF pull/polling for IdPs that cannot deliver SETs via PUSH, and whether the < 30-second revocation SLA is a hard contractual commitment.
+
+#### §36.3.2 Decision: PUSH Mandatory for CAEP SLA; "Near-Real-Time" Language; Polling Deferred to M7+ (DEC-072)
+
+**Part 1 — Contractual SLA language.** The MSA CAEP addendum (`docs/MSA_TEMPLATE.md §Addendum 3`) shall use *"near-real-time"* rather than *"< 30 seconds"*. Definition in addendum: *"FORM revokes access within the IdP's SET delivery latency plus FORM's processing latency. In normal operation this is less than 60 seconds from the IdP emitting the security event. This SLA is contingent on the customer's IdP supporting CAEP/RISC PUSH delivery and the CAEP stream being in `active` status."*
+
+Rationale: P95 end-to-end latency (IdP event dispatch → FORM KV revocation write) is expected well under 30 seconds in normal operation, but contractual exposure to "< 30 seconds" creates unacceptable risk from transient IdP push delays (documented Okta retry delays of 10–45 seconds during high-load windows) and Cloudflare KV write jitter. "Near-real-time (< 60 s)" is accurate, standard in the industry for CAEP-capable SSO implementations, and matches the documented behaviour.
+
+**Part 2 — PUSH as mandatory IdP prerequisite.** `docs/ENTERPRISE_ONBOARDING.md §2.4` (CAEP/SSF prerequisites) shall be updated to state: *"The customer's IdP must support CAEP/RISC PUSH delivery (supported: Okta, Entra ID, Google Workspace OIDC). SSF PULL/poll mode is not supported at M4. Tenants with PUSH-incapable IdPs are onboarded with the baseline JWT TTL (≤ 15 minutes) and do not receive the CAEP SLA addendum."* This is not a regression — the JWT TTL revocation path is the pre-§23 baseline and is SOC 2 CC6.3 compliant.
+
+**Part 3 — Polling deferred to M7+, customer-demand-gated.** SSF pull/poll mode (FORM calls `GET {transmitter_configuration_endpoint}/events`) requires a persistent cursor per tenant in KV, a consumer Worker on a scheduled interval, and per-tenant polling state management. Non-trivial infrastructure for unproven demand. Polling will be implemented in M7+ if and only if ≥ 2 enterprise customers with non-PUSH-capable IdPs formally request it as a contract prerequisite (tracked in `docs/DATA_ROOM.md §Customer-Driven Technical Requirements`, tagged `[caep-poll-request]` in `enterprise_contracts.notes`).
+
+**Polling design if triggered:**
+
+| Dimension | Value | Rationale |
+|---|---|---|
+| Poll interval | 5 minutes | Matches pg_cron SIEM bridge pattern (OBSERVABILITY §34); significant improvement over ≤ 15-min JWT TTL; within SSF recommended ≥ 60s between polls |
+| KV cursor key | `caep:poll_cursor:{tenant_id}:{stream_id}` | Per-tenant; TTL-less (cursor must survive Worker restarts) |
+| Max events per poll | 500 | Prevents response timeout on IdPs with large backlog |
+| Rate limit compliance | 300s between polls | Conservative headroom above SSF minimum 60s; avoids triggering IdP API quotas |
+| SLA contractual language | "Best-effort near-real-time (≤ 5 minutes)" | Distinct from PUSH SLA — poll consumers must accept the bounded latency |
+
+---
+
+### §36.4 OQ-SSO-23.4 — RISC Hijacking: Proactive Google Directory Group Cache Eviction
+
+#### §36.4.1 Problem
+
+OQ-SSO-23.4 asked whether a Google RISC `hijacking` event should proactively delete the `google_directory_group_cache` row for the affected user, in addition to the session revocation already performed by §23.4 row 8.
+
+#### §36.4.2 Decision: Proactive Cache Eviction Adopted (DEC-072)
+
+Two grounds:
+
+1. **Defense-in-depth closes a transient-failure edge case.** Session revocation prevents the stale cache from being used in the normal flow (no valid session = no login path that reads the cache). However, if the `SESSION_REVOCATION_KV` write suffers a transient error during a network partition, a session that was not successfully revoked could re-use the stale group membership within the 5-minute TTL window to complete an OIDC login check. Proactively deleting the cache row eliminates this residual risk path at zero additional infrastructure cost.
+
+2. **Hygiene consistency with the §23.4 action matrix principle.** Row 8 of §23.4 is *"revoke all user sessions"* — the intent is to purge all tenant-associated authentication state for the compromised user. The `google_directory_group_cache` row is authentication-relevant state (it determines FORM role on next login). Evicting it is a natural extension of the "purge all auth state" principle.
+
+#### §36.4.3 Implementation
+
+In `handleRiscEvent()` in `apps/api-gateway/src/sso/caep-receiver.ts`, after the `SESSION_REVOCATION_KV` write (§23.4 step 9), add:
+
+```typescript
+// Proactive group cache eviction on RISC hijacking (OQ-SSO-23.4 / DEC-072)
+if (
+  eventType === 'https://schemas.openid.net/secevent/risc/event-type/hijacking' &&
+  tenant.google_directory_sync_enabled === true
+) {
+  const userEmailHash = await sha256Hex(idpSubjectEmail.toLowerCase());
+  const { error: cacheEvictError } = await db
+    .from('google_directory_group_cache')
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('user_email_hash', userEmailHash);
+
+  if (cacheEvictError) {
+    // Non-fatal: session is already revoked; log and continue processing
+    await emitAuditEvent({
+      event_type: 'sso.google_directory_sync_error',
+      severity: 'HIGH',
+      retention_years: 7,
+      tenant_id: tenantId,
+      payload: {
+        error_type: 'cache_eviction_failed_on_risc_hijacking',
+        user_email_hash: userEmailHash,
+        error_message: cacheEvictError.message.slice(0, 200), // truncate — never full stack trace
+      },
+    });
+  }
+}
+```
+
+**Privacy floor:** `userEmailHash` is `SHA-256(lowercase(idpSubjectEmail))` — consistent with §23.7.6 and §21.6. The raw IdP subject email is never stored in any audit event. The cache row deletion is a FORM-internal operational action; no new DEC-030 event type is required. Cache eviction failures reuse `sso.google_directory_sync_error` with the existing controlled vocabulary extended by `'cache_eviction_failed_on_risc_hijacking'`. This vocabulary extension is registered in `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF` alongside the existing `sso.google_directory_sync_error` entry.
+
+The guard `tenant.google_directory_sync_enabled === true` ensures this branch is a no-op for all non-Google-Directory tenants (Okta SCIM, Entra SCIM, SAML-with-groups-attribute tenants have no `google_directory_group_cache` rows) — zero risk of cross-protocol cache interference.
+
+---
+
+### §36.5 OQ Gap Tracker
+
+| OQ | Prior Status | Resolution |
+|---|---|---|
+| **OQ-SSO-23.1** | P2 Open (§23.11, M5) | 🟢 **Resolved — DEC-072 (2026-06-19).** Automatic CAEP stream re-registration after SAML cert rotation adopted. `caep_reregistration_required` column + `caep_reregistration_trigger` + `caep_last_reregistered_at` (migration 0082); `caep_reregister_sweep` pg_cron (job 37, `*/5 * * * *`); cert-expiry-check hook at `cert_rotation_state → 'complete'`. See §36.2. |
+| **OQ-SSO-23.3** | P2 Open (§23.11, M5) | 🟢 **Resolved — DEC-072 (2026-06-19).** "Near-real-time (< 60 s in normal operation)" contractual language adopted; SSF PUSH mandatory for CAEP SLA addendum; non-PUSH tenants fall back to JWT TTL baseline; polling deferred to M7+ on ≥ 2 customer requests (5-min interval, per-cursor KV state if triggered). See §36.3. |
+| **OQ-SSO-23.4** | P2 Open (§23.11, M5) | 🟢 **Resolved — DEC-072 (2026-06-19).** Proactive `google_directory_group_cache` DELETE on RISC `hijacking` event adopted; additive branch in `handleRiscEvent()` guarded by `google_directory_sync_enabled = true`; SHA-256 email hash only; cache eviction failure reuses `sso.google_directory_sync_error` with extended vocabulary. See §36.4. |
+
+---
+
+### §36.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration 0082: `caep_reregistration_required BOOLEAN NOT NULL DEFAULT FALSE`, `caep_last_reregistered_at TIMESTAMPTZ`, `caep_reregistration_trigger TEXT CHECK(...)` columns on `tenant_sso_configs`; partial index `idx_tsc_caep_reregister`; pg_cron job `caep_reregister_sweep` (`*/5 * * * *`) — register as job 37 in `docs/OBSERVABILITY.md §12.6` | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Add cert-rotation hook to `cert-expiry-check` cron (§36.2.4): after `cert_rotation_state → 'complete'` write, update `caep_reregistration_required = TRUE` + `caep_reregistration_trigger = 'cert_rotation'` for tenants with `caep_status IN ('active', 'error')`; emit `sso.caep_reregistration_queued` (STANDARD, 7yr) | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Implement `POST /internal/v1/caep/reregister` route in `caep-stream-manager` Cloudflare Worker: accepts `{ tenant_ids: string[] }`; processes serially with 200ms yield; on success: `caep_reregistration_required = FALSE`, `caep_last_reregistered_at = NOW()`, `caep_stream_id = {new_stream_id}`, emit `sso.caep_stream_registered` (HIGH, 7yr) with sentinel `admin_user_id_hash`; on 3-retry failure: `caep_status = 'error'`, emit `sso.caep_stream_error` with `error_type: 'reregistration_failed_post_cert_rotation'`, trigger AL-CAEP-01 | platform-engineer + security-engineer | **P0** | M5 | [ ] |
+| 4 | Register `sso.caep_reregistration_queued` (STANDARD, 7yr) in `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF`; extend `sso.google_directory_sync_error` controlled vocabulary with `'cache_eviction_failed_on_risc_hijacking'` | compliance-officer | **P0** | M5 | [ ] |
+| 5 | Add RISC hijacking cache eviction branch (§36.4.3) to `handleRiscEvent()` in `apps/api-gateway/src/sso/caep-receiver.ts`; guard with `tenant.google_directory_sync_enabled === true`; non-fatal error path emits `sso.google_directory_sync_error` with extended vocabulary | platform-engineer | **P0** | M5 | [ ] |
+| 6 | Update MSA CAEP addendum (`docs/MSA_TEMPLATE.md §Addendum 3`) per §36.3.2 Part 1: replace "< 30 seconds" with "near-real-time (< 60 seconds in normal operation)"; add IdP PUSH requirement sentence | compliance-officer + legal | **P1** | M5 | [ ] |
+| 7 | Update `docs/ENTERPRISE_ONBOARDING.md §2.4`: add CAEP PUSH capability as explicit prerequisite; add non-PUSH fallback note (JWT TTL baseline, no CAEP SLA addendum) | customer-success | **P1** | M5 | [ ] |
+| 8 | Integration tests — `src/tests/sso/caep-edge-cases.test.ts`: (a) cert-rotation-state → 'complete' sets `caep_reregistration_required = TRUE` in Supabase; (b) sweep picks up flagged tenant and emits `sso.caep_stream_registered`; (c) 3-retry failure → `caep_status = 'error'` + `sso.caep_stream_error`; (d) RISC hijacking event on `google_directory_sync_enabled = true` tenant → `google_directory_group_cache` row deleted; (e) cache eviction DB error → `sso.google_directory_sync_error` with `error_type: 'cache_eviction_failed_on_risc_hijacking'`; main session revocation path unaffected | qa-lead | **P1** | M5 | [ ] |
+
+---
+
+*v2.8 (2026-06-19): §36 OQ-SSO-23.1 · OQ-SSO-23.3 · OQ-SSO-23.4 Resolution — CAEP Cert-Rotation Re-Registration, SSF Polling Fallback SLA & RISC Hijacking Group Cache Eviction (DEC-072). Closes three P2 open questions from §23.11 (all due M5). OQ-SSO-23.1: automatic CAEP stream re-registration after SAML cert rotation adopted; implementation: `caep_reregistration_required BOOLEAN DEFAULT FALSE` + `caep_reregistration_trigger TEXT CHECK(cert_rotation|manual|stream_error|initial)` + `caep_last_reregistered_at TIMESTAMPTZ` (migration 0082); `cert-expiry-check` hook sets flag on `cert_rotation_state → 'complete'` for `caep_status IN ('active','error')` tenants; `caep_reregister_sweep` pg_cron (job 37, */5 * * * *, LIMIT 50, 200ms yield, 3-retry limit) calls `caep-stream-manager` Worker; success: `caep_reregistration_required = FALSE + caep_stream_id = new + sso.caep_stream_registered` HIGH/7yr; failure: `caep_status = 'error' + sso.caep_stream_error + AL-CAEP-01`; new DEC-030 event `sso.caep_reregistration_queued` STANDARD/7yr; three grounds: CC6.3 blind-spot unacceptable for FORM-caused event, zero new infrastructure, additive-flag pattern consistent with DEC-062. OQ-SSO-23.3: "near-real-time (< 60 s in normal operation)" contractual language adopted; SSF PUSH mandatory for CAEP SLA addendum; non-PUSH tenants fall back to JWT TTL baseline; polling deferred to M7+ on ≥ 2 customer `[caep-poll-request]` tags in `enterprise_contracts.notes`; if triggered: 5-min interval, `caep:poll_cursor:{tenant_id}:{stream_id}` KV cursor, 500 max events/poll, 300s between polls, "best-effort near-real-time (≤ 5 minutes)" SLA language; MSA addendum + ENTERPRISE_ONBOARDING §2.4 updates P1/M5. OQ-SSO-23.4: proactive `google_directory_group_cache` DELETE on RISC `hijacking` event adopted; additive branch in `handleRiscEvent()` after KV revocation write, guarded by `google_directory_sync_enabled = true`; uses `SHA-256(lowercase(idpSubjectEmail))` as `user_email_hash`; cache eviction failure reuses `sso.google_directory_sync_error` with extended controlled vocabulary `cache_eviction_failed_on_risc_hijacking`; non-fatal error path does not disrupt session revocation; two grounds: closes transient-KV-failure edge case at zero infrastructure cost; consistent with §23.4 "purge all auth state" principle. §23.11 OQ tracker patched: OQ-SSO-23.1 🟡 P2 → 🟢 Resolved DEC-072; OQ-SSO-23.3 🟡 P2 → 🟢 Resolved DEC-072; OQ-SSO-23.4 🟡 P2 → 🟢 Resolved DEC-072. TOC entries 35 and 36 added. Document header: v2.7 → v2.8. Eight-item implementation checklist: 5× P0/M5 (migration 0082, cert-expiry-check hook, caep-stream-manager reregister route, AUDIT_LOG_SCHEMA registration + vocabulary extension, handleRiscEvent() cache eviction), 3× P1/M5 (MSA addendum language, ENTERPRISE_ONBOARDING §2.4, integration tests). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §20` (cert rotation state machine — §36.2.4 adds transition hook at 'complete'); `docs/SSO_SCIM_IMPLEMENTATION.md §23.4` (RISC hijacking handler row 8 — §36.4.3 extends); `docs/SSO_SCIM_IMPLEMENTATION.md §23.9` (AL-CAEP-01 — failure path for sweep); `docs/SSO_SCIM_IMPLEMENTATION.md §21.4.2` (`google_directory_group_cache` — DELETE target in §36.4.3); `docs/SSO_SCIM_IMPLEMENTATION.md §23.11` (OQ tracker — three rows patched to 🟢); `docs/MSA_TEMPLATE.md §Addendum 3` (CAEP SLA language — P1 patch); `docs/ENTERPRISE_ONBOARDING.md §2.4` (CAEP PUSH prerequisite — P1 patch); `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF` (`sso.caep_reregistration_queued` registration + `sso.google_directory_sync_error` vocabulary extension — P0/M5); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — job 37 `caep_reregister_sweep` to be appended); `docs/DECISION_LOG.md DEC-072` (formal adoption decision). Owner: platform-engineer + security-engineer + compliance-officer.*

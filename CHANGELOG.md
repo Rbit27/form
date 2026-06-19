@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.35.0] — 2026-06-19
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md §36` — OQ-SSO-23.1 · OQ-SSO-23.3 · OQ-SSO-23.4 Resolution (DEC-072): CAEP cert-rotation re-registration hook, SSF polling fallback SLA framing, RISC hijacking group cache eviction. Migration 0082 spec (`caep_reregistration_required`, `caep_reregistration_trigger`, `caep_last_reregistered_at`), `caep_reregister_sweep` pg_cron (job 37), `sso.caep_reregistration_queued` DEC-030 event, extended `sso.google_directory_sync_error` vocabulary. Closes three P2 open questions from §23.11 (all due M5). v2.7 → v2.8.
+- `docs/DECISION_LOG.md DEC-072` — CAEP cert-rotation re-registration + SSF polling SLA + RISC hijacking cache eviction: three grounds each; reverse cost assessment; cross-references to §36.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §23.11` — OQ-SSO-23.1, OQ-SSO-23.3, OQ-SSO-23.4 tracker rows updated from 🟡 P2 Open → 🟢 Resolved DEC-072 (2026-06-19).
+- `VERSION` — 6.34.0 → 6.35.0.
+
+---
+
 ## [6.34.0] — 2026-06-19
 
 ### Added
