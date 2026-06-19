@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.19
+# FORM · Multi-Tenant Data Model v1.20
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -47,6 +47,8 @@
 37. [Enterprise Pipeline Tracking Schema — `enterprise_pipeline_stages` + `enterprise_impl_time_log`](#37-enterprise-pipeline-tracking-schema--enterprise_pipeline_stages--enterprise_impl_time_log)
 38. [Enterprise Partner Channel Schema — `enterprise_partners`](#38-enterprise-partner-channel-schema--enterprise_partners)
 39. [Enterprise Deal Outcomes Schema — `enterprise_deal_outcomes`](#39-enterprise-deal-outcomes-schema--enterprise_deal_outcomes)
+40. [SIEM Integration Configuration Schema — `tenant_siem_configs`](#40-siem-integration-configuration-schema--tenant_siem_configs)
+41. [Enterprise Customer Adoption Snapshots Schema — `enterprise_adoption_snapshots`](#41-enterprise-customer-adoption-snapshots-schema--enterprise_adoption_snapshots)
 
 ---
 
@@ -15247,3 +15249,278 @@ Evidence artefact: `compliance/evidence/siem-consent/SIEM-CONSENT-E-001_<YYYY-QN
 ---
 
 *v1.19 (2026-06-18): §40 SIEM Integration Configuration Schema — `tenant_siem_configs`. Closes cross-reference obligation from `docs/OBSERVABILITY.md §47.5` and `§47.11 item 3` (P0/M5 — obligation to document `addendum_signed_at` and `addendum_version` in DATA_MODEL §SIEM). DDL delivered in two-migration design: migration 0063 (base table — `siem_destination_type_enum`, `export_enabled`, `endpoint_url_hash` SHA-256[:32], `filter_rules`, `filter_compliance_approved`, timestamps, `chk_siem_export_requires_endpoint` CHECK) and migration 0076 (additive: `addendum_signed_at TIMESTAMPTZ`, `addendum_version TEXT`, `signed_by_email_hash TEXT(64)`, `chk_siem_addendum_consistency` CHECK, `idx_tsc_addendum_signed` partial index, three COMMENT annotations). §40.2 base DDL with privacy-floor note. §40.3 migration 0076 extension with idempotent `IF NOT EXISTS`, `chk_siem_addendum_consistency` (all three addendum fields all-NULL or all-NOT-NULL), and three COMMENT ON COLUMN annotations. §40.4 three-index summary. §40.5 RLS: `form_api` REVOKED entirely; `form_system` SELECT/INSERT/UPDATE on own tenant via `app.current_tenant_id` row policy; `security_reviewer` unrestricted SELECT for SOC 2 audit and SIEM-CONSENT-E-001 quarterly queries. §40.6 four DEC-030 events: `siem.tenant_export_enabled` (HIGH, 3yr), `siem.tenant_export_disabled` (HIGH, 3yr), `siem.consent_addendum_signed` (HIGH, 7yr), `siem.consent_addendum_revoked` (HIGH, 7yr); SIEM-CONSENT-01 chain invariant summary (full spec in OBSERVABILITY §47.7). §40.7 export activation state machine (NOT_CONFIGURED → CONFIGURED_UNSIGNED → CONSENT_PENDING_ACTIVATION → ACTIVE; disable and revoke transitions; new Addendum 4 signing required after revocation). §40.8 SOC 2 cross-references (CC9.2/SIEM-CONSENT-01, C1.1 endpoint hash, CC1.1/GDPR Art. 28(3)(a)/addendum_version, CC7.2/SIEM-CONSENT-E-001 cross-check query). §40.9 OQ-SIEM-03 P2 open question (HMAC chain verification library for tenant consumers). Privacy floor: endpoint_url_hash SHA-256(url)[:32] (32 hex chars, first half of full digest — SIEM hostname never in Postgres); signed_by_email_hash SHA-256(lowercase(email)) (64 hex chars, full digest — authorised rep email never in Postgres); form_api REVOKED from table. Cross-references: `docs/OBSERVABILITY.md §47.5` (migration 0076 DDL spec — cross-reference confirmed complete); `docs/OBSERVABILITY.md §47.7` (SIEM-CONSENT-01 chain invariant); `docs/OBSERVABILITY.md §47.8` (four DEC-030 Zod v2 schemas); `docs/OBSERVABILITY.md §47.9` (SIEM-CONSENT-E-001 evidence artefact); `docs/OBSERVABILITY.md §47.11 item 3` (P0/M5 obligation — closed by this §40); `docs/SOC2_READINESS.md §88` (SIEM-CONSENT-E-001 registered; cross-check query); `docs/DECISION_LOG.md DEC-065` (MSA Addendum 4 decision rationale); `docs/MSA_TEMPLATE.md §Addendum 4` (addendum_version reference); `docs/AUDIT_LOG_SCHEMA.md §SIEM` (four DEC-030 events to register — P0/M5). Owner: enterprise-architect + compliance-officer + security-engineer.*
+
+---
+
+## 41. Enterprise Customer Adoption Snapshots Schema — `enterprise_adoption_snapshots`
+
+> Owner: `enterprise-architect` + `compliance-officer` + `customer-success`. Review: before first enterprise pilot go-live (M10), on any change to adoption metrics definition, and annually.
+> Scope: enterprise tier only. One row per tenant per calendar month. Contains aggregate-only adoption health metrics — no individual `user_id`, no coaching content, no GDPR Art. 9 special category data.
+> References: `docs/COST_MODEL.md §40` (authoritative source for DDL, analytics queries, DEC-030 events, and implementation checklist); `docs/SOC2_READINESS.md §90` (ADO-E-001/ADO-E-002/ADO-E-003 evidence artefacts + auditor narratives); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Adoption Events` (four DEC-030 events); `docs/OBSERVABILITY.md §33` (tenant engagement health — CHS model and `tenant_engagement_snapshots` cross-reference); DEC-030 (HMAC-chained audit log); `docs/ENTERPRISE.md §"Day 0→90 implementation timeline"` (milestone calendar basis for S1/S2/S3 thresholds).
+
+---
+
+### 41.1 Purpose and Design Principles
+
+`enterprise_adoption_snapshots` closes the data model gap between deal close (`enterprise_deal_outcomes`, §39) and renewal risk (`docs/COST_MODEL.md §34`). It records the three-stage adoption funnel health — Activation (S1), Weekly-Active (S2), Habitual (S3) — at monthly granularity for every active enterprise tenant.
+
+**Three design invariants that distinguish this table from all other enterprise tables:**
+
+1. **No `user_id` anywhere.** Every column is a count, rate, or aggregate. Individual employee identity is never stored — not even pseudonymously. This is not a privacy-by-policy control; it is a privacy-by-design structural guarantee enforced by the DDL itself.
+
+2. **`form_api` REVOKED.** The snapshots table is written by `evidence-collection-cron` (Cloudflare Worker) or a CSM manual trigger through the Admin Console API. It is never surfaced via the public `form_api` role that tenant users authenticate against. Reads are restricted to `tenant_admin`, `tenant_owner`, `compliance_reviewer`, and `form_system`.
+
+3. **K-anonymity gate at query layer.** `coaching_engaged_seats` stores a raw integer. When the Admin Dashboard API serves this value to a `tenant_admin`, it suppresses any count < 5 — preventing FORM from surfacing the coaching engagement level of fewer than five employees. Suppression is enforced in the API layer, not the DDL, because the DDL stores what `evidence-collection-cron` computes while the API enforces what can be displayed.
+
+**Privacy floor:** No individual employee `user_id`, name, email, health values (heart rate, body composition, workout load), coaching session content, or GDPR Art. 9 special category data is stored in any row, used in any DEC-030 event payload, or included in any SOC 2 evidence artefact from this table. `tenant_id` is a FORM-internal UUID never shared in marketing or external reports.
+
+---
+
+### 41.2 Migration Dependency Chain
+
+```sql
+-- Migration order (must be applied sequentially):
+-- 0063_tenant_siem_configs.sql              (§40 — establishes form_system write pattern)
+-- 0072_enterprise_pipeline_stages.sql       (§37 — tenants table must exist)
+-- 0073_enterprise_partners.sql             (§38)
+-- 0073b_pipeline_partner_attribution.sql
+-- 0074_enterprise_deal_outcomes.sql        (§39)
+-- 0078_enterprise_adoption_snapshots.sql   (this section — FK to tenants only)
+
+-- Dependency graph: enterprise_adoption_snapshots → tenants (ON DELETE RESTRICT)
+-- No FK to enterprise_deal_outcomes or enterprise_partners —
+-- adoption health is tracked independently of deal attribution.
+```
+
+---
+
+### 41.3 `adoption_health_band` ENUM
+
+```sql
+CREATE TYPE adoption_health_band AS ENUM ('green', 'amber', 'red');
+```
+
+Band assignment is **computed** via `GENERATED ALWAYS AS STORED` — never manually set. Thresholds derive from `docs/COST_MODEL.md §40.3`:
+
+| Band | WAU rate | Est. churn probability | Commercial implication |
+|---|---|---|---|
+| `green` | ≥ 40% | ~5% | Expansion territory; 35% seat-growth probability |
+| `amber` | 20–39% | ~25% | CSM intervention required within 10 business days |
+| `red` | < 20% | ~60% | Immediate escalation; ADO-E-003 evidence path triggered |
+
+---
+
+### 41.4 `enterprise_adoption_snapshots` DDL
+
+**Authoritative source: `docs/COST_MODEL.md §40.7.1`**
+
+```sql
+-- Migration: 0078_enterprise_adoption_snapshots.sql
+
+CREATE TYPE adoption_health_band AS ENUM ('green', 'amber', 'red');
+
+CREATE TABLE enterprise_adoption_snapshots (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  snapshot_month            DATE NOT NULL,
+  -- First day of month, e.g. 2026-11-01. Combined with tenant_id: UNIQUE constraint below.
+
+  contracted_seats          INTEGER NOT NULL CHECK (contracted_seats > 0),
+
+  -- S1 Activation
+  activated_seats           INTEGER NOT NULL CHECK (activated_seats >= 0),
+  activation_rate_pct       NUMERIC(5,2) GENERATED ALWAYS AS
+                              (CASE WHEN contracted_seats = 0 THEN 0
+                               ELSE ROUND((activated_seats::NUMERIC / contracted_seats) * 100, 2)
+                               END) STORED,
+
+  -- S2 Weekly-Active (trailing 4-week average at month-end)
+  wau_count                 INTEGER NOT NULL CHECK (wau_count >= 0),
+  wau_rate_pct              NUMERIC(5,2) GENERATED ALWAYS AS
+                              (CASE WHEN contracted_seats = 0 THEN 0
+                               ELSE ROUND((wau_count::NUMERIC / contracted_seats) * 100, 2)
+                               END) STORED,
+
+  -- S3 Habitual (≥3 distinct feature interactions/week, 4 of trailing 6 weeks)
+  habitual_seat_count       INTEGER NOT NULL CHECK (habitual_seat_count >= 0),
+  habitual_rate_pct         NUMERIC(5,2) GENERATED ALWAYS AS
+                              (CASE WHEN activated_seats = 0 THEN 0
+                               ELSE ROUND((habitual_seat_count::NUMERIC / activated_seats) * 100, 2)
+                               END) STORED,
+
+  -- Coaching engagement (Victor sessions)
+  coaching_sessions_total   INTEGER NOT NULL DEFAULT 0 CHECK (coaching_sessions_total >= 0),
+  coaching_engaged_seats    INTEGER NOT NULL DEFAULT 0 CHECK (coaching_engaged_seats >= 0),
+  -- coaching_engaged_seats < 5: suppressed at API layer (k-anon gate); raw value stored for evidence.
+
+  -- Workout logging
+  workout_sessions_total    INTEGER NOT NULL DEFAULT 0 CHECK (workout_sessions_total >= 0),
+
+  -- Computed health band (NEVER manually set — DDL invariant)
+  wau_health_band           adoption_health_band NOT NULL
+                              GENERATED ALWAYS AS (
+                                CASE
+                                  WHEN ROUND((wau_count::NUMERIC / GREATEST(contracted_seats, 1)) * 100, 2) >= 40
+                                    THEN 'green'::adoption_health_band
+                                  WHEN ROUND((wau_count::NUMERIC / GREATEST(contracted_seats, 1)) * 100, 2) >= 20
+                                    THEN 'amber'::adoption_health_band
+                                  ELSE 'red'::adoption_health_band
+                                END
+                              ) STORED,
+
+  -- Metadata
+  snapshot_filed_by         TEXT NOT NULL DEFAULT 'evidence-collection-cron',
+  -- Permitted: 'evidence-collection-cron' (automated monthly Worker)
+  --            'csm-manual' (CSM via Admin Console; requires form_admin role)
+  notes_hash                TEXT,
+  -- SHA-256(notes_plaintext + ADOPTION_NOTES_SALT) when CSM records a note.
+  -- ADOPTION_NOTES_SALT: 256-bit, docs/CRYPTOGRAPHY_POLICY.md §5, annual rotation.
+  -- Plaintext never stored in Postgres.
+  dec030_event_id           TEXT,
+  -- Soft-ref to audit_log_events.id for the companion enterprise.adoption_snapshot_filed event.
+
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT uq_tenant_snapshot_month UNIQUE (tenant_id, snapshot_month),
+  CONSTRAINT chk_adoption_coherent CHECK (
+    activated_seats    <= contracted_seats AND
+    wau_count          <= contracted_seats AND
+    habitual_seat_count <= activated_seats AND
+    coaching_engaged_seats <= activated_seats
+  )
+);
+
+CREATE INDEX idx_eas_tenant_month  ON enterprise_adoption_snapshots (tenant_id, snapshot_month DESC);
+CREATE INDEX idx_eas_health_band   ON enterprise_adoption_snapshots (wau_health_band, snapshot_month DESC);
+CREATE INDEX idx_eas_month_global  ON enterprise_adoption_snapshots (snapshot_month DESC);
+```
+
+**Column design notes:**
+
+| Decision | Rationale |
+|---|---|
+| `GENERATED ALWAYS AS STORED` for rates | Prevents manual override of computed percentages; rate column is always consistent with the raw count at the DDL level |
+| `GENERATED ALWAYS AS STORED` for `wau_health_band` | Band assignment is deterministic from `wau_count / contracted_seats`; auditor can reconstruct band from raw counts without trusting a manually-entered string |
+| `coaching_engaged_seats` as raw integer | `evidence-collection-cron` stores the actual count; API layer suppresses < 5; raw value is needed for evidence collection without k-anon restriction at write time |
+| `notes_hash` SHA-256 + salt | CSM may attach a context note to a snapshot (e.g. "tenant was offline for migration this month"); hash-only storage prevents any plaintext in Postgres while preserving the evidence record |
+| `ON DELETE RESTRICT` for `tenant_id` | Prevents accidental tenant deletion while adoption history exists; offboarding pipeline must archive snapshots before tenant row deletion (§25) |
+
+---
+
+### 41.5 RLS Policies
+
+```sql
+-- No individual health data in this table — all aggregate counts.
+-- tenant_admin may read their own tenant's snapshots (aggregate view is the intended product surface).
+-- form_api REVOKED — snapshots are written by Workers only, never served via public API.
+
+ALTER TABLE enterprise_adoption_snapshots ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY eas_tenant_read ON enterprise_adoption_snapshots
+  FOR SELECT TO tenant_admin, tenant_owner
+  USING (tenant_id = current_setting('app.current_tenant_id', TRUE));
+
+CREATE POLICY eas_compliance_read ON enterprise_adoption_snapshots
+  FOR SELECT TO compliance_reviewer
+  USING (TRUE);
+
+CREATE POLICY eas_system_all ON enterprise_adoption_snapshots
+  FOR ALL TO form_system
+  USING (TRUE) WITH CHECK (TRUE);
+
+REVOKE ALL ON enterprise_adoption_snapshots FROM form_api;
+```
+
+**Why `tenant_admin` SELECT is permitted:** Unlike `enterprise_deal_outcomes` (§39) and `enterprise_pipeline_stages` (§37) — which contain FORM's commercial pipeline data that tenants must never see — `enterprise_adoption_snapshots` stores a tenant's *own* aggregate product health. Permitting `tenant_admin` to read their own snapshots is the intended product experience (Admin Dashboard "Adoption Health" panel). Individual employee data is structurally absent; the privacy floor is a DDL guarantee, not a policy promise.
+
+**`tenant_manager` (HR role) is explicitly excluded.** HR must never see aggregate health metrics that could allow inference about individual employee behavior. The policy grants SELECT only to `tenant_admin` and `tenant_owner` (IT/People Operations personas), not `tenant_manager`.
+
+---
+
+### 41.6 Key Analytics Queries
+
+The four analytics queries — Q1 fleet health summary, Q2 CSM intervention priority, Q3 ARR-at-band board metric, Q4 per-tenant QBR trend — are defined in `docs/COST_MODEL.md §40.7.3` and executed via:
+- **ADO-E-001 evidence collection:** compliance-officer runs Q1 + Q3 quarterly.
+- **Admin Dashboard "Adoption Health" panel:** runs Q4 per-tenant for QBR preparation.
+- **CSM intervention queue:** runs Q2 before each monthly CSM capacity review.
+
+**K-anonymity enforcement (mandatory):** When serving Q4 data to `tenant_admin` via the Admin Dashboard API, the Worker must set `coaching_engaged_seats` to `null` in the response when the stored value is < 5. No `coaching_engaged_pct` field may be derived from a suppressed denominator. This suppression is a non-waivable privacy floor (OQ-ADO-02 — floor may be lowered, never raised).
+
+---
+
+### 41.7 DEC-030 HMAC-Chained Events
+
+All four events are registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Adoption Events`. Full Zod v2 schemas are in `docs/COST_MODEL.md §40.8`.
+
+| Event type | Severity | Retention | Trigger | Chain constraint |
+|---|---|---|---|---|
+| `enterprise.adoption_snapshot_filed` | STANDARD | 3 yr | Monthly `evidence-collection-cron` (+24h window) or CSM manual trigger via Admin Console | ADO-CHAIN-01: one event per `(tenant_id, snapshot_month)` pair; Worker deduplicates on `uq_tenant_snapshot_month` UNIQUE constraint |
+| `enterprise.adoption_milestone_reached` | STANDARD | 3 yr | Snapshot processing detects first crossing of S1/S2/S3 threshold for a given tenant | Idempotent per `(tenant_id, milestone)` pair; at most once per milestone per tenant lifetime |
+| `enterprise.adoption_health_downgraded` | HIGH | 3 yr | Snapshot job detects `wau_health_band` worse than prior month (Green→Amber, Green→Red, Amber→Red) | ADO-CHAIN-01 follow-up: Linear CSM task created within 24h; `system.csm_followup_overdue` LOW/1yr advisory if no `enterprise.qbr_completed` for same `tenant_id` within 10 business days |
+| `enterprise.qbr_completed` | STANDARD | 3 yr | CSM marks QBR complete via Admin Console | `privacy_floor_verified: true` literal required in payload (Zod `z.literal(true)`); HTTP 422 `QBR_PRIVACY_FLOOR_REQUIRED` if absent or false |
+
+**`enterprise.qbr_completed` privacy floor invariant:** The `privacy_floor_verified: true` field converts a procedural CSM obligation into a technology-enforced chain invariant. The Worker checks the payload schema before appending to the HMAC chain — a UI submit that does not set this field produces an HTTP 422 rather than a chain event. This prevents a QBR from being "completed" in the audit chain without an explicit attestation that no individual-level data was shared.
+
+**`system.csm_followup_overdue` advisory:** LOW severity, 1-year retention. Not an HTTP 422 block. Emitted when `evidence-collection-cron` detects that > 10 business days have elapsed since an `enterprise.adoption_health_downgraded` event for a `tenant_id` with no subsequent `enterprise.qbr_completed` for the same tenant. Routes to CSM team Slack `#alerts-csm` (not PagerDuty) — it is a process reminder, not a production incident.
+
+---
+
+### 41.8 SOC 2 Evidence Artefacts
+
+Full auditor narratives, SQL collection queries, and cadence specifications are in `docs/SOC2_READINESS.md §90`.
+
+| Artefact ID | Description | TSC | Retention |
+|---|---|---|---|
+| ADO-E-001 | Quarterly fleet adoption snapshot export — health band distribution (Green/Amber/Red) by tenant count, average WAU rate per band, and ARR at each band. `wau_health_band GENERATED ALWAYS AS STORED` attestation confirms band is computed deterministically, not manually set. | CC4.1 / A1.1 | 3 yr |
+| ADO-E-002 | Quarterly QBR completion chain export — `enterprise.qbr_completed` events with `privacy_floor_verified: true` field confirming structured communication obligation was met without individual data disclosure. | CC2.2 / CC4.1 | 3 yr |
+| ADO-E-003 | Quarterly adoption health downgrade response evidence — `enterprise.adoption_health_downgraded` events paired with Linear CSM follow-up task IDs, confirming CSM control response within 10 business days. | CC7.3 / CC4.2 | 3 yr |
+
+**Storage paths:**
+- `compliance/evidence/adoption/ADO-E-001_<YYYY-QN>.csv`
+- `compliance/evidence/adoption/ADO-E-002_<YYYY-QN>.csv`
+- `compliance/evidence/adoption/ADO-E-003_<YYYY-QN>.csv`
+
+**Zero-count protocol:** File an empty CSV with a one-paragraph attestation for any quarter before the first active enterprise pilot produces snapshot data. Zero-count quarters are acceptable during the observation period and are filed as affirmative evidence that no undocumented adoption data existed.
+
+---
+
+### 41.9 Implementation Checklist
+
+#### P0 — Before first enterprise pilot go-live (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0078_enterprise_adoption_snapshots.sql`: CREATE TYPE + CREATE TABLE (eleven columns, three GENERATED, two CHECKs) + three indexes + RLS + REVOKE. Validate `GENERATED` columns on staging with five synthetic rows (include a `wau_count = 0` row to confirm `wau_health_band = 'red'`; a `contracted_seats = activated_seats` row to confirm `activation_rate_pct = 100.00`). Run `EXPLAIN (ANALYZE, BUFFERS)` on `idx_eas_health_band` with 100 rows; confirm index scan. | platform-engineer | **P0** | M10 | [ ] |
+| 2 | Register all four DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Adoption Events`; deploy to `emit-audit-event` Worker. Write integration tests: (a) ADO-CHAIN-01 deduplication — second `adoption_snapshot_filed` for same `(tenant_id, snapshot_month)` → 409; (b) `enterprise.qbr_completed` HTTP 422 when `privacy_floor_verified` missing or not `true`; (c) `system.csm_followup_overdue` advisory emission path at 10-business-day deadline. | platform-engineer + compliance-officer | **P0** | M10 | [ ] |
+| 3 | Extend `evidence-collection-cron` Cloudflare Worker: monthly INSERT per active tenant (+24h processing window); per-tenant milestone detection for `enterprise.adoption_milestone_reached`; band-change detection for `enterprise.adoption_health_downgraded` with Linear task creation; deduplication guard on `uq_tenant_snapshot_month`. | platform-engineer + devops-lead | **P0** | M10 | [ ] |
+| 4 | Build Admin Console QBR modal: `tenant_admin` + `tenant_owner` roles only (`tenant_manager` must not access); date picker; `privacy_floor_verified` checkbox (required — disabled Submit until checked); on Submit → emit `enterprise.qbr_completed`; HTTP 422 `QBR_PRIVACY_FLOOR_REQUIRED` if unchecked. | platform-engineer | **P0** | M10 | [ ] |
+
+#### P1 — Within 4 weeks of first snapshot (M10–M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | File ADO-E-001 first quarterly export. Even if zero active tenants, file zero-count CSV with attestation. | compliance-officer | **P1** | M11 | [ ] |
+| 6 | File ADO-E-002 first quarterly export. | compliance-officer | **P1** | M11 | [ ] |
+| 7 | Build Admin Dashboard "Adoption Health" panel: WAU trend time-series; health band badge; k-anon gate (`coaching_engaged_seats` < 5 → `null`; no `coaching_engaged_pct` derived); next QBR due date. `tenant_manager` role must not see this panel. | platform-engineer + design-craft | **P1** | M10 | [ ] |
+| 8 | Update `docs/ENTERPRISE_ONBOARDING.md` Day 0→90 CSM brief to reference S1/S2/S3 milestone calendar and QBR cadence. | customer-success | **P1** | M10 | [ ] |
+
+#### P2 — Post-launch
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | After first 5 enterprise renewals: compare actual renewal rates by health band against `docs/COST_MODEL.md §40.5` proxy estimates. If variance > 15pp in any band, update §40.5 and document calibration in DECISION_LOG. | customer-success + data-engineer | **P2** | M18 | [ ] |
+| 10 | Assess OQ-ADO-02: confirm `coaching_engaged_seats < 5` API suppression is non-waivable; document as a permanent privacy floor clause in MSA. | compliance-officer + enterprise-architect | **P2** | On event | [ ] |
+
+---
+
+### 41.10 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-ADO-01** | Are the `docs/COST_MODEL.md §40.5` renewal probability proxy estimates (Green ~95%, Amber ~75%, Red ~40% post-intervention) accurate for FORM's enterprise customers? Model derives from SaaS wellness benchmarks, not FORM-specific renewal data. | P2 | customer-success + data-engineer | Calibrate after first 5 enterprise renewals (est. M18). If variance > 15pp in any band, update §40.5 and document in DECISION_LOG. |
+| **OQ-ADO-02** | Can the per-tenant k-anonymity floor (`coaching_engaged_seats < 5` suppressed) be configured by tenant size? A 500-seat enterprise might argue the threshold is too conservative. | P2 | compliance-officer + enterprise-architect | Default n ≥ 5 is non-waivable globally; configure only downward (stricter) on customer request. Upward configuration is prohibited. Evaluate formally if > 3 enterprise customers raise this in QBR notes. |
+| **OQ-ADO-03** | Should `coaching_sessions_total` and `coaching_engaged_seats` include CV (computer vision) pose sessions or only Victor text/voice coaching sessions? CV session inclusion requires a DPIA update before CV enterprise go-live. | P1 | platform-engineer + compliance-officer | Blocked pending DPIA update for CV enterprise. Resolve before first tenant with CV enabled is added to `enterprise_adoption_snapshots`. |
+
+---
+
+*v1.20 (2026-06-19): §41 Enterprise Customer Adoption Snapshots Schema — `enterprise_adoption_snapshots`. Closes cross-reference obligation from `docs/COST_MODEL.md §40.7` (v2.6, 2026-06-18): §40.7 defined the DDL, §40.8 defined the DEC-030 events, §40.9 registered ADO-E-001/002/003 — all cross-referencing `docs/DATA_MODEL.md §41` as the canonical DATA_MODEL section. §41.1 purpose + three design invariants (no `user_id` structural guarantee, `form_api` REVOKED, k-anon gate at API layer) + privacy floor. §41.2 migration dependency chain (0078 terminal migration; no FK to deal outcomes or partners). §41.3 `adoption_health_band` ENUM with churn probability and commercial implication table. §41.4 full DDL (cross-referenced from COST_MODEL §40.7.1): eleven columns (three `GENERATED ALWAYS AS STORED` — `activation_rate_pct`, `wau_rate_pct`, `habitual_rate_pct`, `wau_health_band`), `uq_tenant_snapshot_month` UNIQUE + `chk_adoption_coherent` CHECK, three indexes, five-row design notes table. §41.5 RLS: four policies — `eas_tenant_read` (tenant_admin/owner own-tenant SELECT), `eas_compliance_read` (compliance_reviewer all), `eas_system_all` (form_system), `REVOKE ALL` from form_api; `tenant_manager` excluded with explicit rationale (HR must not see aggregate health that could allow employee inference). §41.6 analytics queries deferred to COST_MODEL §40.7.3; k-anon enforcement note (API must suppress `coaching_engaged_seats < 5` → `null`; no derived pct field). §41.7 four DEC-030 events: `enterprise.adoption_snapshot_filed` (STANDARD, 3yr, ADO-CHAIN-01 deduplication invariant), `enterprise.adoption_milestone_reached` (STANDARD, 3yr, idempotent per milestone per tenant), `enterprise.adoption_health_downgraded` (HIGH, 3yr, Linear task + `system.csm_followup_overdue` LOW/1yr advisory at 10-day lapse), `enterprise.qbr_completed` (STANDARD, 3yr, `privacy_floor_verified: z.literal(true)` HTTP 422 invariant); advisory note for `system.csm_followup_overdue` routing (Slack `#alerts-csm`, not PagerDuty). §41.8 three SOC 2 evidence artefacts: ADO-E-001 (CC4.1/A1.1 quarterly fleet health band distribution + GENERATED column attestation), ADO-E-002 (CC2.2/CC4.1 QBR chain export with `privacy_floor_verified` attestation), ADO-E-003 (CC7.3/CC4.2 downgrade response + Linear task pairing); storage paths; zero-count filing protocol. §41.9 ten-item implementation checklist: 4× P0/M10 (migration 0078 + GENERATED column staging validation, DEC-030 registration + three integration tests, `evidence-collection-cron` extension, Admin Console QBR modal), 4× P1/M10–M11 (ADO-E-001 first filing, ADO-E-002 first filing, Admin Dashboard panel with k-anon + tenant_manager block, ENTERPRISE_ONBOARDING update), 2× P2/M18+ (OQ-ADO-01 calibration, OQ-ADO-02 MSA clause). §41.10 three open questions (OQ-ADO-01/02/03 from COST_MODEL §40.11). TOC updated to add §40 and §41 entries. Header updated v1.19 → v1.20. Privacy floor: no individual employee `user_id`, name, email, health values, coaching content, or GDPR Art. 9 special category data in any column, DEC-030 event payload, or SOC 2 evidence artefact; `coaching_engaged_seats < 5` suppressed at API layer (non-waivable); `notes_hash` SHA-256 + ADOPTION_NOTES_SALT (plaintext never stored); `tenant_id` FORM-internal UUID; `form_api` REVOKED; `tenant_manager` excluded from RLS policies. Cross-references: `docs/COST_MODEL.md §40` (authoritative DDL, analytics queries, DEC-030 Zod v2 schemas, implementation checklist, COST_MODEL §40.9 cross-reference obligation — closed by this §41); `docs/SOC2_READINESS.md §90` (ADO-E-001/002/003 artefacts + auditor narratives); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Adoption Events` (four DEC-030 events to register — P0/M10); `docs/OBSERVABILITY.md §33` (CHS model — parallel tenant engagement signal); `docs/ENTERPRISE.md §"Day 0→90 implementation timeline"` (S1/S2/S3 milestone calendar basis); `docs/CRYPTOGRAPHY_POLICY.md §5` (ADOPTION_NOTES_SALT — register at M10; annual rotation schedule); `docs/ENTERPRISE_ONBOARDING.md` (§41.9 item 8 — CSM brief update P1/M10); `docs/DATA_MODEL.md §25` (offboarding pipeline — adoption snapshots archived before tenant row deletion; `ON DELETE RESTRICT` FK boundary). Owner: enterprise-architect + compliance-officer + customer-success.*

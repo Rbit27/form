@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.42.0] — 2026-06-19
+
+### Added
+- `docs/DATA_MODEL.md §41` — Enterprise Customer Adoption Snapshots Schema: canonical DATA_MODEL section for `enterprise_adoption_snapshots` (migration 0078). Closes cross-reference obligation from `docs/COST_MODEL.md §40.7` (v2.6, 2026-06-18). Three design invariants: no `user_id` structural guarantee, `form_api` REVOKED, k-anon gate at API layer. `adoption_health_band` ENUM (green/amber/red) GENERATED ALWAYS AS STORED from `wau_count / contracted_seats`. Full DDL with four GENERATED columns, `uq_tenant_snapshot_month` UNIQUE, `chk_adoption_coherent` CHECK, three indexes. RLS: `tenant_admin/owner` own-tenant SELECT; `tenant_manager` (HR) explicitly excluded; `compliance_reviewer` all; `form_system` write; `form_api` REVOKED. Four DEC-030 events: `enterprise.adoption_snapshot_filed` (STANDARD, 3yr, ADO-CHAIN-01), `enterprise.adoption_milestone_reached` (STANDARD, 3yr), `enterprise.adoption_health_downgraded` (HIGH, 3yr, Linear task + `system.csm_followup_overdue` advisory), `enterprise.qbr_completed` (STANDARD, 3yr, `privacy_floor_verified: z.literal(true)` HTTP 422 invariant). SOC 2 artefacts ADO-E-001/E-002/E-003 (CC4.1/A1.1/CC2.2/CC7.3/CC4.2). Ten-item implementation checklist (4× P0/M10, 4× P1/M10–M11, 2× P2). Three open questions OQ-ADO-01/02/03. TOC updated to add §40 and §41. DATA_MODEL header v1.19 → v1.20.
+
+### Changed
+- `docs/DATA_MODEL.md` — header v1.19 → v1.20; TOC extended with §40 (`tenant_siem_configs`) and §41 (`enterprise_adoption_snapshots`) entries.
+- `VERSION` — 6.41.0 → 6.42.0.
+
+---
+
 ## [6.41.0] — 2026-06-19
 
 ### Added
