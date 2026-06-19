@@ -13,11 +13,12 @@
 - `content/post-1488-deload-supercompensation-timing.md` — Block 1451–1500 Cluster 4 post 8/10. Суперкомпенсаційна модель (Яковлєв / Zatsiorsky & Kraemer 2006). Диференційований час відновлення за системами. Три типи deload. Тайминг за тренажним віком (3+1, 4+1). Помилка «deload по відчуттях». clinical-safety: NOT_REQUIRED.
 - `content/post-1489-individualizing-program-from-template.md` — Block 1451–1500 Cluster 4 post 9/10. Шаблони (5/3/1, Sheiko) як популяційний оптимум (Dankel et al. 2017). Три причини відхилення від шаблону. Трикроковий процес індивідуалізації. RPE-based авторегуляція (Helms et al. 2018, Zourdos et al. 2016). clinical-safety: NOT_REQUIRED.
 - `content/post-1490-cluster-4-synthesis-training-age-variability-recovery.md` — Block 1451–1500 Cluster 4 post 10/10. Синтез: три осі (тренавальний вік / варіативність / відновлення) в єдиній матриці рішень. Таблиця всіх 10 постів кластеру з ключовим висновком. Прикладна рамка для self-coached intermediate. clinical-safety: NOT_REQUIRED.
+- `content/post-1557-e1rm-diagnostic-tool-amrap-protocol.md` — Block 1556–1570 · Post 2 of 15 · «e1RM як діагностичний інструмент: AMRAP-протокол і обмеження формул» — чотири формули e1RM (Еплі 1985, Брзіцкі 1993, Ландер 1985, О'Конер 1989) і числові приклади; систематичне падіння точності при R>10 (Reynolds et al. 2006); вплив профілю м'язових волокон (Chapman et al. 1998, ±10–15% між індивідами); AMRAP-протокол: стандартизація умов (час доби, 48-год відновлення, тестова вага 75–85% e1RM, постійна схема розминки, RPE 9–9.5 після сету); читати e1RM як тренд у часі (три точки = сигнал, одна точка = шум); типові помилок (зміна формули між блоками, тест після важкого тижня, R>10, нестандартизовані умови); де e1RM принципово не підходить (перші 4–6 тижнів нової програми, після перерви, при нестабільній техніці, між рухами). clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
 
 ### Changed
-- `blog.html` — оновлено до post-1490: додано 10 нових записів для постів 1481–1490.
+- `blog.html` — оновлено до post-1490 (Cluster 4 posts 1481–1490) + додано картку post-1557.
+- `STATUS.md` — Block 1451–1500 Cluster 4 COMPLETE; Total posts: 1169 → 1170; content engine row updated with post-1557 entry.
 - `VERSION` — 6.42.0 → 6.43.0.
-- `STATUS.md` — Block 1451–1500 Cluster 4 COMPLETE; next: Cluster 5 (posts 1491–1500).
 
 ---
 
