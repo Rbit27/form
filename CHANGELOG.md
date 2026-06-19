@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.41.0] — 2026-06-19
+
+### Added
+- `content/post-190-synthesis-ten-quarterly-questions.md` — Editorial series Block 181–190 synthesis · «Синтез 181–190: десять питань, які self-coached атлет має ставити щоквартально» — квартальна рамка для self-coached атлета: десять питань за чотирма рівнями (тренувальний вік і горизонт адаптації, відповідність програми реальному тижню і зовнішньому стресу, розвиток навичок і вибір вправ, ретроспективний аналіз трендів); Stults-Kolehmainen & Sinha 2014 (психологічний стрес і силова адаптація); McEwen (HPA-вісь і алостатичне навантаження); горизонти тренувального віку (сесія/мезоцикл/рік); мінімально ефективна кількість вправ; п'ять питань перед власним блоком. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — додано картку post-190 (Editorial Block 181–190 synthesis); blog.html updated to post-190.
+- `STATUS.md` — Editorial series оновлено: post-190 written v6.41.0; Block 181–190 synthesis COMPLETE.
+- `VERSION` — 6.40.0 → 6.41.0.
+
+---
+
 ## [6.40.0] — 2026-06-19
 
 ### Added
