@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [6.26.0] — 2026-06-19
+
+### Added
+- `content/post-1392-hnuchka-arkhitektura-trenuvalnoho-roku.md` — Cluster 5, post 2/10. Гнучка архітектура тренувального року: прив'язані фази (якорі) + гнучке наповнення. Три горизонти планування (рік/блок/тиждень). Ретроспективний аудит для ідентифікації сезонних якорів. Практичний приклад атлета з двома «важкими сезонами». Issurin 2010, Plisk & Stone 2003, Haff & Triplett 2016. clinical-safety: PASS.
+- `content/post-1393-perekhidni-tochky-mizh-blokamy.md` — Cluster 5, post 3/10. Перехідний тиждень між блоками як самостійна фаза з чотирма функціями: фізичне відновлення, оцінка результатів, планування наступного, психологічна декомпресія. Три сценарії між блоками і чому перехідна фаза виграє. Mujika & Padilla 2000, Bickel 2011. clinical-safety: PASS.
+- `content/post-1394-trenuValna-identychnist-na-dovhomu-horyzonti.md` — Cluster 5, post 4/10. Тренувальна ідентичність: через результат vs. через процес. Три сценарії тиску (примусова пауза, хронічна зміна умов, вікова зміна показників). Що підтримує ідентичність через процес. Brewer, Van Raalte & Linder 1993, Androulakis-Korakakis 2020. clinical-safety: PASS.
+- `content/post-1395-piat-meta-navychok-trenovanogo-atleta.md` — Cluster 5, post 5/10. П'ять мета-навичок тренованого атлета: темпування адаптацій, читання власних сигналів та autoregulation, управління програмним переходом, планування на трьох горизонтах, оновлення переконань від власних даних. Hubal 2005, Androulakis-Korakakis 2021, Bompa & Haff 2009. clinical-safety: PASS.
+- `content/post-1396-upravlinnia-prohresom-cherez-roky.md` — Cluster 5, post 6/10. Управління прогресом через роки: поняття «розширення ємності» vs. «збільшення піку». П'ять альтернативних метрик: субмаксимальна ефективність, стабільність якості, час відновлення, adherence rate, порівняння з собою рік тому. Schoenfeld 2010, Zourdos 2016. clinical-safety: PASS.
+- `content/post-1397-chytannia-bahatokhrichnykh-danykh.md` — Cluster 5, post 7/10. Читання власних багаторічних даних: мінімальний набір для ретроспективного аналізу, п'ять сигналів видимих лише на горизонті кількох блоків (сезонні патерни, тренд RPE, тренд відновлення, adherence тренд, циклічні провали), квартальний і річний ретро-протокол. Halson 2014. clinical-safety: PASS.
+- `content/post-1398-koly-perebudovuvaty-systemu.md` — Cluster 5, post 8/10. Коли перебудовувати систему: різниця між блоковою корекцією і системною перебудовою. Чотири ознаки системної зміни. Що НЕ є підставою. Чотири кроки системної перебудови. Issurin 2010, Kiely 2012. clinical-safety: PASS.
+- `content/post-1399-stiykist-i-poslidovnist-yak-holovna-zminna.md` — Cluster 5, post 9/10. Adherence як дизайн системи, не мотивація. П'ять елементів дизайну: фіксований час/місце, мінімальне зобов'язання як підлога, реалістичний план, зниження когнітивних витрат, вбудована варіабельність. Принцип «не пропускати двічі поспіль» як структурний. Wood & Neal 2007, Fogg 2020. clinical-safety: PASS.
+- `content/post-1400-syntez-bloku-1351-1400.md` — **Block synthesis** · Cluster 5, post 10/10. Синтез блоку 1351–1400: огляд п'яти кластерів + десять принципів атлета що тренується роками в реальних умовах. Відкрите питання для наступного блоку (product-strategist + sports-scientist). clinical-safety: PASS.
+
+### Changed
+- `blog.html` — updated to post-1400; nine new entries added (posts 1392–1400) in Long-term Progress category.
+- `STATUS.md` — Block 1351–1400 marked COMPLETE 50/50; Cluster 5 COMPLETE; Block 1401–1450 TBD added to next priorities.
+- `VERSION` — 6.25.1 → 6.26.0.
+
+---
+
 ## [6.25.1] — 2026-06-19
 
 ### Changed
