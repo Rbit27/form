@@ -1,4 +1,4 @@
-# FORM · Project Status v6.28.0
+# FORM · Project Status v6.29.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v6.28.0** — 2026-06-19
+**v6.29.0** — 2026-06-19
 
 ---
 
@@ -19,7 +19,7 @@
 | Block 1251–1300 | Wearables, data & the self-coached athlete | **50/50** | **BLOCK COMPLETE · v6.13.0** — Cluster 1 COMPLETE v6.9.0 (posts 1251–1260 · HRV deep dive). Cluster 2 COMPLETE v6.9.1 (posts 1261–1270 · ЧСС у спокої та під навантаженням). Cluster 3 COMPLETE v6.10.0 (posts 1271–1280 · кроки, Activity Load і некардіо метрики). Cluster 4 COMPLETE v6.11.0 (posts 1281–1290 · сон: трекер vs. реальність). **Cluster 5 COMPLETE v6.13.0** (posts 1291–1300 · інтеграція даних): чому одна метрика не достатня (1291), чотири потоки даних і їх ролі (1292), тренувальний об'єм / ACWR (1293), протокол ранкового рішення (1294), конфлікт сигналів і правила пріоритетів (1295), зелена/жовта/червона зони (1296), тижневий аудит (1297), поширені помилки інтеграції (1298), індивідуальна калібровка (1299), block synthesis (1300). blog.html updated to post-1300. sports-scientist review required before publish. |
 | Block 1301–1350 | Змагальна підготовка та пікування | **50/50** | **BLOCK COMPLETE · v6.16.0** — Cluster 1 COMPLETE (posts 1301–1310 · що таке пікування і навіщо). Cluster 2 COMPLETE (posts 1311–1320 · протоколи тейперу). Cluster 3 COMPLETE (posts 1321–1330 · день змагань; post-1327 clinical-safety CONDITIONAL PASS). Cluster 4 COMPLETE (posts 1331–1340 · ментальна підготовка; posts 1339/1343 CONDITIONAL PASS). Cluster 5 COMPLETE (posts 1341–1350 · після змагань). blog.html updated to post-1350. sports-scientist review required before publish. |
 | Block 1351–1400 | Довгострокова стратегія прогресу та атлетичне довголіття | **50/50** | **BLOCK COMPLETE · v6.26.0** — Cluster 1 COMPLETE v6.17.0 (1351–1360 · Фундамент). Cluster 2 COMPLETE v6.19.0 (1361–1370 · Реальні умови). Cluster 3 COMPLETE v6.22.0 (1371–1380 · Атлетичне довголіття). Cluster 4 COMPLETE v6.24.0 (1381–1390 · Структурні обмеження). **Cluster 5 COMPLETE v6.26.0** (1391–1400 · Від тактики до стратегії — багаторічна перспектива): opener (1391), гнучка архітектура року (1392), перехідний тиждень між блоками (1393), тренувальна ідентичність (1394), п'ять мета-навичок (1395), управління прогресом через роки (1396), читання багаторічних даних (1397), коли перебудовувати систему (1398), adherence як дизайн (1399), **block synthesis (1400)**. blog.html updated to post-1400. sports-scientist review required before publish. |
-| Block 1401–1450 | Тренування 35–55 — фізіологія, адаптація, програмування (DEC-068) | **20/50** | **Cluster 1 COMPLETE · v6.27.0** (posts 1401–1410 · Що змінюється після 35). **Cluster 2 COMPLETE · v6.28.0** (posts 1411–1420 · Програмування для 35+): opener (1411), об'єм МЕД–МАВ (1412), розподіл об'єму (1413), мікроцикл (1414), нестабільний розклад (1415), інтенсивність діапазони (1416), авторегуляція (1417), periodization блоки (1418), деловантаження (1419), cluster synthesis (1420). blog.html updated to post-1420. sports-scientist review required before publish. Наступний: **Cluster 3** (posts 1421–1430 · протоколи для силових рухів після 35). |
+| Block 1401–1450 | Тренування 35–55 — фізіологія, адаптація, програмування (DEC-068) | **21/50** | **Cluster 1 COMPLETE · v6.27.0** (posts 1401–1410 · Що змінюється після 35). **Cluster 2 COMPLETE · v6.28.0** (posts 1411–1420 · Програмування для 35+): opener (1411), об'єм МЕД–МАВ (1412), розподіл об'єму (1413), мікроцикл (1414), нестабільний розклад (1415), інтенсивність діапазони (1416), авторегуляція (1417), periodization блоки (1418), деловантаження (1419), cluster synthesis (1420). **Cluster 3 STARTED · v6.29.0** (posts 1421–1430 · Вибір вправ і рухові пріоритети для 35+): post-1421 (вибір вправ: механічна логіка замість традиції) added. blog.html updated to post-1421. sports-scientist review required before publish. |
 | Editorial 119 | Programme expiry signals | 1 | draft — post-119 (program-signs-stopped-working) added v6.0.1; clinical-safety PASS; sports-scientist review pending |
 | Editorial 120 | Nine frameworks synthesis (112–120) | 1 | draft — post-120 (synthesis-nine-frameworks) added v6.1.1; clinical-safety NOT_REQUIRED; sports-scientist review pending |
 | 51–99 | Applied training science | 50 | Published — **post-52 (RPE calibration · editorial) added v6.15.0 · clinical-safety PASS · sports-scientist review pending** · blog.html updated. post-51 (reading your own training data · editorial) added v6.14.0 · clinical-safety PASS · sports-scientist review pending. |
