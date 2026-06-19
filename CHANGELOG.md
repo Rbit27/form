@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [6.51.0] — 2026-06-19
+
+### Added
+- `content/post-1566-training-stagnation-exit-strategy.md` — Block 1556–1570 Cluster 3, post 1/5. Вихід з тренувальної стагнації: чотири важелі (об'єм, інтенсивність, частота, варіація), принцип «один важіль за раз», таймлайн 4-тижневої перевірки, мезоциклічна реструктуризація коли окремий важіль не достатній. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1567-recovery-stagnation-exit-strategy.md` — Block 1556–1570 Cluster 3, post 2/5. Вихід з відновлювальної стагнації: деловантаж-протокол (-40–60% об'єму, збережена інтенсивність, 1–2 тижні), аудит факторів відновлення (сон, зовнішній стрес, тривалий дефіцит), протокол поступового повернення. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1568-technical-stagnation-exit-strategy.md` — Block 1556–1570 Cluster 3, post 3/5. Вихід з технічної стагнації: локалізація обмежувача через відеоаналіз, три типи (нейром'язова неефективність / мобільнісний дефіцит / м'язовий дисбаланс), корекційний блок (-10–20% навантаження, допоміжна робота, 6–8 тижнів). clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1569-self-coached-protocol-limits.md` — Block 1556–1570 Cluster 3, post 4/5. Межі self-coached протоколу: три граничних сигнали (тривалість 4+ місяці без відповіді, суперечливі діагнози, технічні обмежувачі поза відеоаналізом). Визначення «зовнішня допомога» як цільова консультація, а не постійний тренер. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1570-block-synthesis-progress-evaluation.md` — Block 1556–1570 Cluster 3 synthesis + block synthesis. Повна операційна система трьох рівнів: рівень 1 (тижневий огляд, щотижня), рівень 2 (діагностика плато, аномальний стан 3+ тижні), рівень 3А/Б/В (стратегія виходу за типом). Швидкий довідник в таблиці. BLOCK COMPLETE 15/15. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+
+### Changed
+- `blog.html` — додані картки posts 1566–1570 вище post-1565. blog.html updated to post-1570.
+- `VERSION` → 6.51.0
+
+---
+
 ## [6.50.0] — 2026-06-19
 
 ### Added
