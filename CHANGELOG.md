@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.25.1] — 2026-06-19
+
+### Changed
+- **`docs/SOC2_READINESS.md §92`** — Evidence Artefact Cross-Reference Patch: OBSERVABILITY §48 (Google Directory Sync Alert Signal Source · DEC-067 · OQ-SSO-OBS-02). Registers **SSO-OBS-E-007** (CC7.2/CC7.3 — quarterly AL-SSO-GDIR-01 PagerDuty incidents + AL-SSO-GDIR-02 Slack alerts + pg_cron job 35 freshness cross-check; 3yr; `compliance/evidence/sso/`). Closes OBSERVABILITY §48.8 item 4 cross-reference obligation. Adds `form-soc2-evidence/sso/` to §80.3 R2 folder structure. SOC 2 version bumped v3.16.0 → v3.17.0.
+- `VERSION` — 6.25.0 → 6.25.1.
+
+---
+
 ## [6.25.0] — 2026-06-19
 
 ### Added

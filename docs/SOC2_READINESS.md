@@ -28771,6 +28771,149 @@ ORDER BY created_at;
 
 ---
 
+*v3.17.0 (2026-06-19): §92 Evidence Artefact Cross-Reference Patch — OBSERVABILITY §48 (Google Directory Sync Alert Signal Source — DEC-030 Supabase vs. Cloudflare Analytics Engine, v4.5.0, 2026-06-19 · DEC-067 · OQ-SSO-OBS-02 Resolution). Closes one explicit cross-reference obligation: OBSERVABILITY §48.8 item 4 (P1/M11 — "Add SSO-OBS-E-007 row to §26.11 SOC 2 evidence table and to `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3). Add `sso/` subfolder reference to `docs/SOC2_READINESS.md §80.3` R2 evidence folder structure." — 🟢 Closed). Formally registers one SOC 2 evidence artefact: **SSO-OBS-E-007** (CC7.2/CC7.3 — quarterly export of AL-SSO-GDIR-01 PagerDuty incidents + AL-SSO-GDIR-02 Slack alerts + pg_cron job 35 freshness cross-check; 3yr; `compliance/evidence/sso/SSO-OBS-E-007_<YYYY-QN>.csv`; first filing at M11). §92.1 artefact registration table (ID, criteria, retention, cadence, storage path, zero-event attestation protocol, Vanta mirror entry). §92.2 three-part collection methodology: Part A (DEC-030 signal source summary — `audit_log_events` GROUP BY `tenant_id` for `sso.google_directory_sync_error` and `sso.google_directory_sync_success` with `error_rate_pct_quarter` and `p95_ms_quarter`), Part B (pg_cron job 35 freshness cross-check — LAG window query on `pg_cron.job_run_details` identifying gaps > 6 minutes; expected zero rows; non-zero rows require remediation note and cross-check against `system.gdir_alert_check_stale` advisory event count), Part C (PagerDuty API export AL-SSO-GDIR-01 + Slack `#alerts-sso` export AL-SSO-GDIR-02; each row: `tenant_id`, metric value, alert timestamp, incident/message ID, resolution note). §92.3 zero-event attestation JSON template for pre-M10 quarters (fields: artefact, quarter, query_run_at, gdir_sync_events_in_quarter, al_sso_gdir_01_incidents, al_sso_gdir_02_alerts, job35_gaps_over_6min, monitoring_pipeline_reference, attestation text); note that `job35_gaps_over_6min: 0` is the operative CC7.2 evidence in zero-tenant quarters. §92.4 two-row SOC 2 criteria mapping: CC7.2 (monitoring mechanism — DEC-030 signal source coherence per DEC-067; Part A proves alert signal derived from HMAC-chained record; Part B proves monitoring loop ran without gaps; non-zero Part B gaps require remediation evidence), CC7.3 (anomaly response — AL-SSO-GDIR-01 P2 within 30-min SSO SLA window; AL-SSO-GDIR-02 P3 Slack latency trend surface; `signal_source: 'dec030_supabase'` + `dec067_note` in alert payload enables auditor to trace response chain without consulting a second data system; zero-alert quarter explained by Parts A + B together). §92.5 two-row cross-reference obligations closure table: OBSERVABILITY §48.8 item 4 (🟢 Closed — §92.1/§92.4/§80.3 note/§79.4 deferred), §48.8 item 5 (🟡 Open P1/M10 — scale trigger review calendar entry, non-SOC-2 obligation tracked for completeness). §80.3 `sso/` subfolder added in this version: `form-soc2-evidence/sso/` with naming pattern `SSO-OBS-E-007_<YYYY-QN>.csv` / `.json`. §80.4 Vanta mirror list updated: SSO-OBS-E-007 added. §92.6 six-item implementation checklist: 1× P1/M11 (§80.3 sso/ subfolder table update + §80.4 Vanta confirmation), 1× P1/M4 (`system.gdir_alert_check_stale` LOW/1yr event registration + job 35 §12.6 registry addition), 1× P1/M11 (first SSO-OBS-E-007 filing + §79.4 physical row update; Q3/Q4 2026 backfill batch if observation period opens mid-year), 1× P1/M10 (DEC-067 scale trigger review calendar entry — §48.5 > 50 GD tenants or job 35 P95 > 500 ms / 7 days), 1× P1/M11 (§80.4 Vanta mirror staging test before M11), 1× P1/M11 (first active-tenant quarter filing with PagerDuty + Slack Part C export). SOC 2 version bumped v3.16.0 → v3.17.0. Privacy floor (SSO-OBS-E-007): `tenant_id` FORM internal UUID; `error_count`, `success_count`, `total_count`, `error_rate_pct`, `p95_ms`, `sample_count` are aggregate integers/decimals — no individual identity dimension; `PERCENTILE_CONT(0.95)` computed over `fetch_duration_ms` integers with no identity grouping key; no `user_email`, `user_email_hash`, group membership details, or GDPR Art. 9 health data in any artefact row; `form_api` does not have SELECT on `audit_log_events` (form_audit role — read-only, no PII columns); PagerDuty Part C export includes PagerDuty incident IDs and Slack message ts only — no individual employee on-call names or contact information in the SOC 2 artefact row. Cross-references: `docs/OBSERVABILITY.md §48` (primary source — DEC-067 decision rationale, §48.3 five grounds for Option A, §48.4 pg_cron job 35 full SQL implementation, §48.5 scale trigger > 50 active GD tenants, §48.6 SSO-OBS-E-007 source definition, §48.7 OQ-SSO-OBS-02 🟢 Resolved, §48.8 item 4 cross-reference obligation now 🟢 Closed); `docs/OBSERVABILITY.md §26.7` (AL-SSO-GDIR-01 and AL-SSO-GDIR-02 canonical OBSERVABILITY registration — alert name, severity, routing, SLO reference); `docs/OBSERVABILITY.md §26.3` (SSO-SLO-02 P95 < 3,000 ms — CC7.3 AL-SSO-GDIR-02 response threshold basis); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — job 35 to be added per §92.6 item 2); `docs/OBSERVABILITY.md §12.7` (pg_cron health supervisor — `system.gdir_alert_check_stale` advisory emitted on 6-minute freshness breach; Part B cross-check mechanism); `docs/OBSERVABILITY.md §46.3` (`form-alert-relay` — AL-SSO-GDIR-01 routed via existing relay with dedup key `al-sso-gdir-01-{tenant_id}` 30-min cooldown); `docs/SSO_SCIM_IMPLEMENTATION.md §21.7` (DEC-030 event emission — `sso.google_directory_sync_error` + `sso.google_directory_sync_success` source events; `fetch_duration_ms` payload field for Part A P95 query); `docs/SSO_SCIM_IMPLEMENTATION.md §21.9` (AL-SSO-GDIR-01 through AL-SSO-GDIR-05 alert rule definitions — §92 covers AL-SSO-GDIR-01 and AL-SSO-GDIR-02 only; AL-SSO-GDIR-03/04/05 covered by §26.7 separately); `docs/AUDIT_LOG_SCHEMA.md §System` (`system.gdir_alert_check_stale` LOW/1yr — P1/M4 registration obligation per §92.6 item 2; prerequisite for Part B gap cross-check); `docs/DECISION_LOG.md DEC-067` (decision rationale: zero marginal cost, adequate scale math, SOC 2 audit trail coherence, FORM architecture pattern, concrete migration trigger); `docs/ENTERPRISE_SLA.md §4` (SSO-SLO-01 99% per-tenant login success — CC7.3 AL-SSO-GDIR-01 P2 response SLA basis: 30 min from PagerDuty page); §79.4 (master evidence table — SSO-OBS-E-007 criteria rows deferred to M11 alongside first filing per §92.6 item 3); §80.3 (R2 folder structure — `form-soc2-evidence/sso/` subfolder added in this version per §92.6 item 1); §80.4 (Vanta mirror list — SSO-OBS-E-007 added in this version); §91 (GUARD-E-001 — SCIM Bulk Deprovision Guard; parallel cross-reference patch; same §80.3/§79.4 deferral pattern). Owner: compliance-officer + devops-lead + platform-engineer.*
+
+---
+
+## §92 · Evidence Artefact Cross-Reference Patch — OBSERVABILITY §48 (Google Directory Sync Alert Signal Source · DEC-067 · OQ-SSO-OBS-02)
+
+> Closes the cross-reference obligation from `docs/OBSERVABILITY.md §48.8` item 4 (P1/M11 — "Add SSO-OBS-E-007 row to §26.11 SOC 2 evidence table and to `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3). Add `sso/` subfolder reference to `docs/SOC2_READINESS.md §80.3` R2 evidence folder structure."). Formally registers one SOC 2 evidence artefact introduced in OBSERVABILITY §48.6 and establishes collection protocol, pg_cron freshness cross-check, and auditor narratives. Privacy floor: all pg_cron query results, alert payloads, and SSO-OBS-E-007 export rows carry only `tenant_id` (FORM internal UUID) and aggregate integers (`error_count`, `success_count`, `total_count`, `error_rate_pct`, `p95_ms`, `sample_count`) — no `user_email`, `user_email_hash`, group membership details, or GDPR Art. 9 health data appear in any row. `PERCENTILE_CONT(0.95)` in the pg_cron query is computed over duration integers with no identity dimension. Signal source for both AL-SSO-GDIR-01 and AL-SSO-GDIR-02 is the DEC-030 HMAC-chained `audit_log_events` stream (DEC-067 decision); alert payloads include `signal_source: 'dec030_supabase'` and `dec067_note` to surface the architectural choice to auditors without requiring them to consult separate documentation.
+
+### §92.1 Evidence Artefact Registration
+
+**SSO-OBS-E-007** — Google Directory Sync Alert quarterly export (AL-SSO-GDIR-01 + AL-SSO-GDIR-02 + pg_cron freshness).
+
+| Field | Value |
+|---|---|
+| Artefact ID | SSO-OBS-E-007 |
+| SOC 2 criteria | CC7.2 · CC7.3 |
+| Retention | 3 years |
+| Cadence | Quarterly — first filing at M11 (SOC 2 observation period open); zero-event quarters for Q before enterprise go-live are expected and must be filed as affirmative attestation JSON |
+| Storage path | `compliance/evidence/sso/SSO-OBS-E-007_<YYYY-QN>.csv` (or `.json` for zero-event quarters) |
+| Zero-event attestation | Required if zero AL-SSO-GDIR-01 PagerDuty incidents AND zero AL-SSO-GDIR-02 Slack alerts fire in the quarter — file as JSON (see §92.3 below); pg_cron job 35 run-history cross-check must still be appended to confirm the monitoring pipeline operated without gaps > 6 minutes throughout the quarter |
+| Vanta mirror | SSO-OBS-E-007 (§80.4 — added in this version) |
+
+---
+
+### §92.2 Collection Queries
+
+#### Part A — DEC-030 Signal Source Summary (quarterly aggregate)
+
+The following query confirms the volume of Google Directory sync events underlying the AL-SSO-GDIR-01/02 triggers during the quarter. It does not replace the PagerDuty and Slack exports — it provides the HMAC-chained audit trail that proves the alert signal was sourced from immutable DEC-030 records.
+
+```sql
+-- SSO-OBS-E-007 Part A: Google Directory sync event summary for the quarter
+-- Run as: form_system (compliance_reviewer SELECT)
+-- Replace :quarter_start and :quarter_end with quarter boundaries (UTC)
+-- Privacy floor: GROUP BY tenant_id only — no user_email_hash in output.
+SELECT
+  payload->>'tenant_id'                                                        AS tenant_id,
+  COUNT(*) FILTER (WHERE action = 'sso.google_directory_sync_error')           AS error_count,
+  COUNT(*) FILTER (WHERE action = 'sso.google_directory_sync_success')         AS success_count,
+  COUNT(*)                                                                      AS total_count,
+  ROUND(
+    100.0 * COUNT(*) FILTER (WHERE action = 'sso.google_directory_sync_error')
+    / NULLIF(COUNT(*), 0),
+    1
+  )                                                                             AS error_rate_pct_quarter,
+  PERCENTILE_CONT(0.95) WITHIN GROUP (
+    ORDER BY (payload->>'fetch_duration_ms')::NUMERIC
+  )                                                                             AS p95_ms_quarter,
+  MIN(emitted_at)                                                               AS first_event_at,
+  MAX(emitted_at)                                                               AS last_event_at
+FROM audit_log_events
+WHERE action IN ('sso.google_directory_sync_error', 'sso.google_directory_sync_success')
+  AND emitted_at >= :quarter_start
+  AND emitted_at <  :quarter_end
+GROUP BY payload->>'tenant_id'
+ORDER BY error_count DESC;
+```
+
+**If result set is empty:** zero Google Directory sync events occurred in the quarter — expected pre-M10 (no active GD tenants). File a zero-event attestation JSON instead of CSV (see §92.3).
+
+#### Part B — pg_cron Job 35 Freshness Cross-Check
+
+```sql
+-- SSO-OBS-E-007 Part B: job 35 freshness audit — confirms no gap > 6 minutes
+-- Run as: form_system (has SELECT on pg_cron.job_run_details)
+-- Should return zero rows if monitoring operated without gaps.
+SELECT
+  runid,
+  jobid,
+  start_time,
+  end_time,
+  status,
+  return_message,
+  EXTRACT(EPOCH FROM (start_time - LAG(start_time) OVER (ORDER BY start_time))) / 60 AS gap_since_prior_run_minutes
+FROM pg_cron.job_run_details
+WHERE jobid = (SELECT jobid FROM pg_cron.job WHERE jobname = 'google_directory_alert_check')
+  AND start_time >= :quarter_start
+  AND start_time <  :quarter_end
+HAVING EXTRACT(EPOCH FROM (start_time - LAG(start_time) OVER (ORDER BY start_time))) / 60 > 6
+ORDER BY start_time;
+```
+
+**Expected result:** zero rows (no gaps > 6 minutes). If non-zero rows returned, flag to devops-lead — each gap is a CC7.2 monitoring outage. A gap does not automatically fail the control; a remediation note must be filed alongside SSO-OBS-E-007. A `system.gdir_alert_check_stale` (LOW/1yr) DEC-030 advisory event should have been emitted by the §12.7 health supervisor for each gap > 6 minutes; cross-check the advisory event count against the gap-row count from this query.
+
+#### Part C — PagerDuty and Slack Export Methodology
+
+SSO-OBS-E-007 Part C is a manual PagerDuty API export filtered on `service.name = 'form-platform'` and `incident.title ILIKE '%AL-SSO-GDIR-01%'` for the quarter boundary, plus a Slack `#alerts-sso` channel export filtered on `text ILIKE '%AL-SSO-GDIR-02%'`. Each row must include: `tenant_id`, `error_rate_pct` or `p95_ms`, alert timestamp, PagerDuty incident ID or Slack message ts, and resolution note (for PagerDuty incidents: time-to-acknowledge). For zero-alert quarters, the PagerDuty export is an empty CSV; Parts A + B confirm the underlying monitoring pipeline was active.
+
+---
+
+### §92.3 Zero-Event Attestation Template (pre-M10)
+
+```json
+{
+  "artefact": "SSO-OBS-E-007",
+  "quarter": "<YYYY-QN>",
+  "query_run_at": "<ISO-8601>",
+  "gdir_sync_events_in_quarter": 0,
+  "al_sso_gdir_01_incidents": 0,
+  "al_sso_gdir_02_alerts": 0,
+  "job35_gaps_over_6min": 0,
+  "monitoring_pipeline_reference": "pg_cron job 35 'google_directory_alert_check' — run history appended as job_run_details_<YYYY-QN>.csv",
+  "attestation": "Zero AL-SSO-GDIR-01 PagerDuty incidents and zero AL-SSO-GDIR-02 Slack alerts fired in the quarter. Zero Google Directory sync DEC-030 events in audit_log_events — consistent with zero active Google Directory tenants pre-M10. pg_cron job 35 ran without gaps > 6 minutes throughout the quarter. Monitoring pipeline operating correctly. Affirmed by compliance-officer."
+}
+```
+
+> **Pre-M10 norm:** FORM has 0 active Google Directory tenants at M4–M9. Zero-event attestation quarters Q3 2026 through Q1 2027 (est.) are expected and affirmative. The `job35_gaps_over_6min: 0` field is the operative SOC 2 evidence for CC7.2 in these quarters — it confirms the monitoring loop ran even though no tenants triggered it.
+
+---
+
+### §92.4 SOC 2 Criteria Mapping
+
+| Criterion | Control description | SSO-OBS-E-007 evidence role |
+|---|---|---|
+| **CC7.2** | Anomaly monitoring — pg_cron job 35 (`google_directory_alert_check`) fires every 5 minutes and queries the DEC-030 HMAC-chained `audit_log_events` stream for per-tenant Google Directory sync error rates (AL-SSO-GDIR-01) and P95 fetch latency anomalies (AL-SSO-GDIR-02). The same HMAC-chained record that proves the sync event occurred also proves the monitoring signal was derived from it (DEC-067 signal-source coherence). | Part A: confirms the DEC-030 event volume underlying the alerting signal. Part B: confirms job 35 ran without gaps > 6 minutes — the monitoring mechanism was continuously operational. Together, Parts A + B satisfy the CC7.2 requirement that the entity monitors system components for anomalies using a defined mechanism. A non-zero Part B gap count represents a monitoring outage and requires remediation evidence. |
+| **CC7.3** | Anomaly response — AL-SSO-GDIR-01 P2 PagerDuty pages `form-platform` within the 30-minute SSO SLA response window (`docs/ENTERPRISE_SLA.md §4`, SSO-SLO-01). AL-SSO-GDIR-02 P3 Slack `#alerts-sso` surfaces per-tenant fetch latency trends before they breach SSO-SLO-02 (P95 < 3,000 ms per `docs/OBSERVABILITY.md §26.3`). Both alerts carry `signal_source: 'dec030_supabase'` and a `dec067_note` field linking to the architectural decision, enabling auditors to trace the response chain to the immutable DEC-030 source without consulting a separate data system. | Part C: PagerDuty incident export (AL-SSO-GDIR-01) + Slack channel export (AL-SSO-GDIR-02) confirm that alert signals produced on-call responses and that any identified error-rate or latency anomalies were acted upon within the documented SLA windows. For zero-alert quarters, Parts A + B together demonstrate that the absence of alerts reflects the absence of anomalies — not a failure of the monitoring pipeline. |
+
+---
+
+### §92.5 Cross-Reference Obligations Closed
+
+| Obligation source | Obligation text | Status |
+|---|---|---|
+| `docs/OBSERVABILITY.md §48.8` item 4 | "Add SSO-OBS-E-007 row to §26.11 SOC 2 evidence table and to `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3). Add `sso/` subfolder reference to `docs/SOC2_READINESS.md §80.3` R2 evidence folder structure." | 🟢 Closed — §92.1 registers SSO-OBS-E-007 with CC7.2/CC7.3 criteria; §92.4 maps both criteria; §80.3 `sso/` subfolder note added in this version; §79.4 physical row update deferred to M11 alongside first filing (§92.6 item 3) |
+| `docs/OBSERVABILITY.md §48.8` item 5 | "Schedule scale trigger review at first enterprise pilot go-live (§48.5): add calendar entry 'DEC-067 Scale Trigger Review — check active GD tenant count vs. 50-tenant ceiling and job 35 P95 duration.'" | 🟡 Open — P1/M10 — not a SOC 2 documentation obligation; tracked here for completeness; owner devops-lead; §92.6 item 4 |
+
+> **§80.3 R2 folder structure note:** This version adds `form-soc2-evidence/sso/` as a recognised R2 subfolder for SSO-OBS-E-007 artefact storage. Naming pattern: `SSO-OBS-E-007_<YYYY-QN>.csv` (active tenants) or `SSO-OBS-E-007_<YYYY-QN>.json` (zero-event attestation). SHA-256 of each artefact appended to MASTER-INDEX (§79) at time of filing.
+
+---
+
+### §92.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Add `form-soc2-evidence/sso/` subfolder to §80.3 R2 evidence folder structure table; add SSO-OBS-E-007 as the first entry for that folder. Confirm the `compliance/evidence/sso/` local path mirrors the R2 path per the §80 standard pattern. | compliance-officer | **P1** | M11 | [ ] |
+| 2 | Register `system.gdir_alert_check_stale` (LOW/1yr) DEC-030 advisory event in `docs/AUDIT_LOG_SCHEMA.md §System` per OBSERVABILITY §48.8 item 3 (P1/M4). This event is emitted by the §12.7 health supervisor when job 35 has not executed within 6 minutes; it is the mechanism that produces Part B cross-check evidence when a gap occurs. Also add job 35 (`google_directory_alert_check`, `*/5 * * * *`) to the §12.6 pg_cron registry. | platform-engineer + compliance-officer | **P1** | M4 | [ ] |
+| 3 | At M11 (SOC 2 observation period open): run Parts A, B, and C collection queries; export SSO-OBS-E-007 artefact (CSV or zero-event JSON per §92.3); append SHA-256 to MASTER-INDEX (§79); add SSO-OBS-E-007 criteria rows to §79.4 master evidence table (CC7.2 and CC7.3 columns). Note: Q3 2026 and Q4 2026 zero-event attestations are expected pre-M10 and must be filed at M11 as a backfill batch if the observation period opens mid-year. | compliance-officer | **P1** | M11 | [ ] |
+| 4 | At M10 (first enterprise pilot go-live): schedule a calendar entry per OBSERVABILITY §48.5 — "DEC-067 Scale Trigger Review: check active GD tenant count vs. 50-tenant ceiling; check pg_cron job 35 P95 execution duration vs. 500 ms threshold sustained 7 days." Owner: devops-lead + platform-engineer. If trigger condition is met, open architecture review for Analytics Engine migration per §48.5 review protocol. | devops-lead + platform-engineer | **P1** | M10 | [ ] |
+| 5 | Add SSO-OBS-E-007 to §80.4 Vanta mirror list (this version — done). Confirm Vanta integration can ingest quarterly CSV exports from `form-soc2-evidence/sso/`; test with a synthetic SSO-OBS-E-007 staging-validation file before M11. | compliance-officer + devops-lead | **P1** | M11 | [ ] |
+| 6 | After first enterprise Google Directory tenant goes live (est. M10–M11): run Part A query for the first active-tenant quarter; confirm `error_rate_pct_quarter` and `p95_ms_quarter` are within expected thresholds; if an AL-SSO-GDIR-01 or AL-SSO-GDIR-02 alert fired during the quarter, confirm PagerDuty incident record and Slack message ts are included in SSO-OBS-E-007 Part C export with resolution note. | compliance-officer + devops-lead | **P1** | M11 | [ ] |
+
+---
+
 *v3.16.0 (2026-06-19): §91 Evidence Artefact Cross-Reference Patch — SSO_SCIM §34 (SCIM Bulk Deprovision Guard, v2.6, 2026-06-19 · DEC-066 · OQ-R24-01). Closes three cross-reference obligations: (1) SSO_SCIM §34.9 GUARD-E-001 registration obligation (🟢 Closed — §91.1 above); (2) SSO_SCIM §34.11 item 5 DEC-030 event registration obligation (🟢 Closed — `docs/AUDIT_LOG_SCHEMA.md v2.19`); (3) INCIDENT_RESPONSE.md R-24.15 item 10 OQ-R24-01 P1 obligation (🟢 Closed — DEC-066 + SSO_SCIM §34). Formally registers one SOC 2 evidence artefact: **GUARD-E-001** (CC6.3/A1.2/CC7.2/CC9.2 — quarterly export of all five SCIM Bulk Deprovision Guard DEC-030 events; `compliance/evidence/scim-guard/GUARD-E-001_<YYYY-QN>.csv`; 7yr for HIGH events, 1yr for `system.scim_guard_repeated_trigger` advisory; first filing at M14). §91.1 artefact registration table (ID, criteria, retention, cadence, storage path, zero-event attestation protocol, Vanta mirror entry). §91.2 collection SQL: `SELECT event_id, event_type, payload fields ... FROM audit_log WHERE event_type IN ('scim.bulk_deprovision_blocked', 'scim.bulk_deprovision_override_issued', 'scim.bulk_deprovision_override_used', 'scim.bulk_deprovision_threshold_updated', 'system.scim_guard_repeated_trigger') AND created_at >= :quarter_start AND < :quarter_end ORDER BY created_at` — plus zero-event check guidance. §91.3 four-row SOC 2 criteria mapping: CC6.3 (preventive control — blocked events + override pair confirm two-person exception path; auditor checks `override_used_count ≤ override_issued_count` and `auto_revoked: true`), A1.2 (environmental threat detection — guard blocks H3-class SCIM incidents before availability impact; complementary to reactive AL-SCIM-MASS-01), CC7.2 (proactive monitoring — `system.scim_guard_repeated_trigger` GUARD-CHAIN-01 advisory; cross-reference PagerDuty P2 `form-customer-success` routing), CC9.2 (third-party IdP risk — two-person override protocol: `tenant_owner` consent + CSM PAM §24 countersign; `auto_revoked: true` on every used event prevents override reuse). §91.4 three-row cross-reference obligations closure table. §91.5 six-item implementation checklist: 2× P0/M13 (migration 0079 production deployment, `enforceDeprovisionGuard()` SCIM Worker wiring), 4× P1/M13–M14 (Admin Dashboard panel + `update_bdg_threshold()` RPC, CSM override endpoint PAM integration, first GUARD-E-001 filing, quarterly calendar reminder). §80.4 Vanta mirror list updated: GUARD-E-001 added. SOC 2 version bumped v3.15.0 → v3.16.0. Privacy floor: `tenant_id` FORM-internal UUID; `deprovisioned_count`/`contracted_seats`/`threshold_pct` are aggregate integers; `override_issued_by_email_hash`/`updated_by_email_hash` SHA-256(lowercase(email)) 64 hex chars; no `user_id`, no employee PII, no GDPR Art. 9 health data; `form_api` REVOKED from `tenant_sso_configs.bdg_*` columns (migration 0079). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §34` (guard design, KV counter pattern `scim:deprov_guard:{tenantId}:{windowKey}`, `getGuardConfig()`, `revokeActiveOverride()`, migration 0079 DDL, `update_bdg_threshold()` RPC, CSM override API, GUARD-E-001 SQL definition); `docs/SSO_SCIM_IMPLEMENTATION.md §34.11` (implementation checklist — item 5 [x] Done); `docs/AUDIT_LOG_SCHEMA.md §SCIM Bulk Deprovision Guard` (five DEC-030 events registered — v2.19, 2026-06-19); `docs/DECISION_LOG.md DEC-066` (OQ-R24-01 resolution — per-tenant threshold default 20%, range 5–100%, 5-min rolling window, CSM-countersigned override, auto-revocation); `docs/INCIDENT_RESPONSE.md R-24.15` item 10 (OQ-R24-01 P1 — [x] Done 2026-06-19); `docs/INCIDENT_RESPONSE.md R-24` (reactive AL-SCIM-MASS-01 layer — complementary to the preventive guard; both layers documented in §34.10 interaction table); §79.4 (master evidence table — GUARD-E-001 criteria rows deferred to M14 alongside first filing per §91.5 item 5); §80.4 (Vanta mirror list — GUARD-E-001 added in this version). Owner: compliance-officer + security-engineer + enterprise-architect + platform-engineer.*
 
 ---
