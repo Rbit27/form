@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.10.1] — 2026-06-19
+
+### Added
+- `content/post-38-overreaching-vs-overtraining.md` — Editorial series post-38. «Overreaching vs overtraining: чому ти не зможеш відрізнити одне від одного без даних» — FOR/NFOR/OTS феноменологія однакова в перший тиждень; час і дані перформансу як єдині надійні маркери розрізнення; RPE-дрейф після deload; HRV rolling average (Halson & Jeukendrup 2004); 72-годинний тест; дві помилки self-coached атлета (тренуватись через NFOR; деловантажуватись при FOR); алгоритм для кожного рівня; MD-referral при підозрі на OTS (Meeusen et al. 2013). clinical-safety CONDITIONAL PASS. sports-scientist review required before publish.
+- `blog.html` — карта post-38 додана вгорі каталогу.
+
+### Changed
+- `README.md` — post-38 → draft · v6.10.1.
+- `STATUS.md` — рядок «11–50» оновлено: post-38 editorial додано v6.10.1.
+- `VERSION` — 6.10.0 → 6.10.1.
+
 ## [6.10.0] — 2026-06-19
 
 ### Added

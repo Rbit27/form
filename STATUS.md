@@ -1,4 +1,4 @@
-# FORM · Project Status v6.10.0
+# FORM · Project Status v6.10.1
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v6.10.0** — 2026-06-19
+**v6.10.1** — 2026-06-19
 
 ---
 
@@ -15,7 +15,7 @@
 | Range | Theme | Posts | Status |
 |---|---|---|---|
 | 01–10 | Foundational / brand | 10 | Published |
-| 11–50 | Core sport science | 40 | Published — post-11 (deload weeks) added v5.98.2; sports-scientist review pending |
+| 11–50 | Core sport science | 40 | Published — post-11 (deload weeks) added v5.98.2; sports-scientist review pending. **post-38 (overreaching vs overtraining · editorial) added v6.10.1 · clinical-safety CONDITIONAL PASS · sports-scientist review pending.** |
 | Block 1251–1300 | Wearables, data & the self-coached athlete | 30/50 | **Cluster 1 COMPLETE v6.9.0** (posts 1251–1260 · HRV deep dive). **Cluster 2 COMPLETE v6.9.1** (posts 1261–1270 · ЧСС у спокої та під навантаженням). **Cluster 3 COMPLETE v6.10.0** (posts 1271–1280 · кроки, Activity Load і некардіо метрики): крокомір як NEAT-трекер (1271), похибка активних калорій 30–50% (1272), Garmin/Polar/Whoop алгоритми Training Load (1273), Readiness/Body Battery/Recovery Score (1274), VO2max від трекера ±7–15% (1275), NEAT і крокомір (1276), Intensity Minutes і Active Minutes (1277), Respiratory Rate через PPG (1278), інтеграція метрик — мінімальний набір (1279), cluster synthesis (1280). blog.html updated to post-1280. sports-scientist review required before publish. Next: Cluster 4 (posts 1281–1290 · сон: трекер vs. реальність). |
 | Editorial 119 | Programme expiry signals | 1 | draft — post-119 (program-signs-stopped-working) added v6.0.1; clinical-safety PASS; sports-scientist review pending |
 | Editorial 120 | Nine frameworks synthesis (112–120) | 1 | draft — post-120 (synthesis-nine-frameworks) added v6.1.1; clinical-safety NOT_REQUIRED; sports-scientist review pending |
