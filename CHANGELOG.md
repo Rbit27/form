@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.33.0] — 2026-06-19
+
+### Added
+- `content/post-1441-adherents-35-plus-cluster5-opener.md` — П'ять механізмів, які утримують атлета 35+ у тренуванні: ідентичність як якір, мінімальний тренувальний стандарт (Bickel 2011; Ralston 2017; Androulakis-Korakakis 2020), структура замість рішень (Wood & Neal 2007), пластична програма з трьома рівнями, зворотний зв'язок і автономна мотивація (Teixeira et al. 2012). Cluster 5 opener · Block 1401–1450. clinical-safety: NOT_REQUIRED.
+- `README.md` — Block 1541–1555 «Тренування як система прийняття рішень» додано до роадмапу (15 тем: евристика рішень, пріоритети при обмеженому часі, три рівні рішень, чеклісти, confirmation bias, межа між аналізом і infomania).
+
+### Changed
+- `blog.html` — картка post-1441 додана (Training 35–55 · 13 хв · 2026-06-19). blog.html updated to post-1441.
+- `STATUS.md` — Block 1401–1450: 40/50 → 41/50, Cluster 5 IN PROGRESS (тема: Адгеренс і довгострокова атлетична ідентичність для 35+). Version header updated to v6.33.0.
+- `VERSION` — 6.32.0 → 6.33.0.
+
 ## [6.32.0] — 2026-06-19
 
 ### Added
