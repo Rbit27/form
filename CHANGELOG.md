@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.52.1] — 2026-06-19
+
+### Changed
+- `docs/SOC2_READINESS.md` — §96 Cross-Reference Patch: DATA_MODEL §41 (enterprise_adoption_snapshots · §90 DDL Cross-Reference Update · CC4.1 / CC2.2 / CC7.3 / A1.1 / CC4.2). Closes the implicit pattern obligation established by §89–§95: bidirectional cross-reference between DATA_MODEL §41 (canonical DDL source for `enterprise_adoption_snapshots`, v1.20 2026-06-19) and SOC2_READINESS §90 (ADO-E-001/002/003 evidence artefacts). §90 (v3.15.0) pre-dates §41 and cited DATA_MODEL §17 as k-anonymity pattern precedent; §96 registers §41 as the specific DDL reference and supplements the §90 privacy floor record with two DDL-level invariants: (1) `tenant_manager` RLS exclusion — HR role explicitly barred from all four `enterprise_adoption_snapshots` RLS policies, preventing adoption health from being captured as an employee disciplinary control (wellness-as-punishment no-go alignment); (2) `notes_hash` SHA-256 + ADOPTION_NOTES_SALT — plaintext never stored, artefact rows contain no recoverable CSM notes. §96.4 maps five DDL invariants to TSC criteria reinforcement: CC4.1 (GENERATED ALWAYS AS STORED band + UNIQUE dedup), CC2.2 (z.literal(true) write-time gate vs. post-export assert), CC7.3 (system.csm_followup_overdue in chain makes missed responses detectable), A1.1 (adoption_health_band ENUM churn-probability table is DDL definition of ARR-at-band), CC4.2 (tenant_manager exclusion confirms IT/People Ops ownership of deficiency evaluation). Four-item P0–P1 implementation checklist: migration 0078 ON DELETE RESTRICT staging validation, ADOPTION_NOTES_SALT Cryptography Policy registration, §80.3 R2 adoption/ subfolder cross-tracking, §41.9 item 5 / §90.6 item 3 parallel closure at first ADO-E-001 filing. SOC 2 internal version v3.20.0 → v3.21.0. Owner: compliance-officer + enterprise-architect + platform-engineer.
+- `VERSION` — v6.52.0 → v6.52.1.
+
+---
+
 ## [6.52.0] — 2026-06-19
 
 ### Added
