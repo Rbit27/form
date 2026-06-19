@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.37.0] — 2026-06-19
+
+### Added
+- `content/post-1461-exercise-selection-as-programming-variable.md` — Block 1451–1500, Cluster 2 opener (post 1/10). Вибір вправ як програмна змінна: SAID-принцип (Zatsiorsky & Kraemer), ієрархія ролей (основна/допоміжна/акцесорна, Helms et al. 2015), вибір вправ у фазах переодизації (акумуляція/трансмутація/реалізація), DUP і специфічність руху, п'ять питань для вибору вправи, типові помилки self-coached програмування. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — blog card для post-1461 додано на початку списку.
+- `STATUS.md` — Block 1451–1500 оновлено (11/50 · Cluster 2 IN PROGRESS); Current version → v6.37.0.
+- `README.md` — Block 1451–1500 Cluster 2 теми (posts 1461–1470) додано до roadmap.
+- `VERSION` — 6.36.0 → 6.37.0.
+
+---
+
 ## [6.36.0] — 2026-06-19
 
 ### Added
