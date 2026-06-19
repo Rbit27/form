@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [6.12.1] — 2026-06-19
+
+### Changed
+- `docs/SOC2_READINESS.md` — §90 Evidence Artefact Cross-Reference Patch: COST_MODEL §40 (Enterprise Customer Adoption Economics, v2.6, 2026-06-18). Closes two explicit cross-reference obligations from `docs/COST_MODEL.md §40.10` item 5 and §40.9 (P1/M11). Registers three SOC 2 evidence artefacts: **ADO-E-001** (CC4.1/A1.1 — quarterly `enterprise_adoption_snapshots` fleet health summary export; Q1 fleet-health + Q3 board-ARR-distribution query pair; k-anonymity attestation; 3yr; `compliance/evidence/adoption/ADO-E-001_<YYYY-QN>.csv`); **ADO-E-002** (CC2.2/CC4.1 — quarterly `enterprise.qbr_completed` DEC-030 chain export; `privacy_floor_verified: true` invariant asserted every row; technology control, not procedural; 3yr; `compliance/evidence/adoption/ADO-E-002_<YYYY-QN>.csv`); **ADO-E-003** (CC7.3/CC4.2 — quarterly `enterprise.adoption_health_downgraded` HIGH event export; `system.csm_followup_overdue` advisory cross-check must = 0; zero-event attestation JSON per §90.3; 3yr; `compliance/evidence/adoption/ADO-E-003_<YYYY-QN>.csv`). §80.4 Vanta mirror list updated: ADO-E-001/002/003 added. Document header v3.14.0 → v3.15.0. compliance-officer + customer-success + data-engineer + enterprise-architect.
+- `VERSION` — 6.12.0 → 6.12.1.
+
 ## [6.12.0] — 2026-06-19
 
 ### Changed
