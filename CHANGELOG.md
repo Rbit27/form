@@ -1,5 +1,23 @@
 # Changelog · FORM
 
+## [6.11.0] — 2026-06-19
+
+### Added
+- `content/post-1281-sleep-staging-psg-vs-ppg.md` — Block 1251–1300, Cluster 4, post 1/10. Стадії сну PSG vs. PPG: що вимірює полісомнографія (ЕЕГ + ЕОГ + ЕМГ) і що вимірює споживчий трекер (PPG + акселерометр). Точність стадіальної класифікації ~58–69% (Chinoy et al., Sleep 2021). N1 систематично занижується, N2 завищується. Тренд корисний, абсолютні хвилини по стадіях — умовні. clinical-safety: NOT_REQUIRED.
+- `content/post-1282-sleep-duration-most-reliable-metric.md` — Block 1251–1300, Cluster 4, post 2/10. Тривалість сну — найнадійніша метрика (85–92% точності vs. PSG). Систематичне завищення ~20–40 хв через проблеми з SOL і WASO. Тижневий тренд надійний, щоденна цифра — умовна. clinical-safety: NOT_REQUIRED.
+- `content/post-1283-overnight-hrv-vs-morning-hrv.md` — Block 1251–1300, Cluster 4, post 3/10. Нічний HRV vs. ранковий HRV: динаміка протягом ночі, різні вікна у Oura / Whoop / Garmin / Polar, чому між пристроями порівняння неможливе. Rolling average за 7 ночей — практичний сигнал. clinical-safety: NOT_REQUIRED.
+- `content/post-1284-rem-detection-consumer-devices.md` — Block 1251–1300, Cluster 4, post 4/10. REM-виявлення: PSG потребує ЕЕГ + ЕОГ + ЕМГ — трекер не має жодного. Точність ~50–65%, систематична плутанина N1 і REM. Чому REM важливий для атлетів і чому конкретна цифра від трекера некорисна. clinical-safety: NOT_REQUIRED.
+- `content/post-1285-sleep-score-composite-anatomy.md` — Block 1251–1300, Cluster 4, post 5/10. Анатомія Sleep Score: компоненти і ваги для Oura, Whoop Recovery %, Garmin, Fitbit. Алгоритми тренуються на загальній популяції. «83 від Oura» ≠ «83 від Whoop». Корисно: відхилення від власного базового рівня. clinical-safety: NOT_REQUIRED.
+- `content/post-1286-chronotype-training-timing.md` — Block 1251–1300, Cluster 4, post 6/10. Хронотип (~21% генетичний), пік силової продуктивності через 5–7 год після пробудження, соціальний джетлаг як фоновий стрес. Тривалість і стабільність сну важливіші за оптимізацію часу тренування для більшості атлетів. clinical-safety: NOT_REQUIRED.
+- `content/post-1287-sleep-restriction-training-performance.md` — Block 1251–1300, Cluster 4, post 7/10. Недосип: одна ніч → -2–8% максимальної сили; хронічне обмеження → гормональний ефект і знижений MPS. Суб'єктивна адаптація небезпечна. Три рівні відповіді: одна ніч / 2–3 ночі / системний недосип. clinical-safety: NOT_REQUIRED.
+- `content/post-1288-orthosomnia-sleep-tracking-nocebo.md` — Block 1251–1300, Cluster 4, post 8/10. Ортосомнія (Baron et al., J Clin Sleep Med 2017): тривога через дані трекера як джерело погіршення сну. Поведінкові патерни. Правило 30 хвилин, тижневий огляд. clinical-safety: REQUIRED (review before publish).
+- `content/post-1289-sleep-data-training-decisions.md` — Block 1251–1300, Cluster 4, post 9/10. Протокол: три надійні сигнали (rolling HRV × 7, тижнева тривалість, суб'єктивне при пробудженні). Дворежимна система: конгруентність і розбіжність. Суб'єктивне при розбіжності — пріоритет. Victor як контекстний шар. clinical-safety: NOT_REQUIRED.
+- `content/post-1290-sleep-tracking-cluster-4-synthesis.md` — Block 1251–1300, Cluster 4, post 10/10 (синтез). Десять висновків кластеру. Що вимірює добре, погано, не вимірює зовсім. Мінімальний набір метрик для силовика. clinical-safety: NOT_REQUIRED.
+- `blog.html` — posts 1281–1290 added to blog index (Cluster 4 · Сон — трекер vs. реальність). post-1288 flagged «draft · clinical-safety required» in badge.
+
+### Changed
+- `VERSION` — 6.10.2 → 6.11.0.
+
 ## [6.10.2] — 2026-06-19
 
 ### Changed
