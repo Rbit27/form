@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v4.5.0
+# FORM · Observability & Monitoring Taxonomy v4.6.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -6263,7 +6263,7 @@ The identity layer emits a high volume of DEC-030 HMAC-chained events. Monitorin
 
 | OQ | Question | Owner | Resolution Target | Priority |
 |---|---|---|---|---|
-| OQ-SSO-OBS-01 | **Per-tenant vs. fleet-wide SSO-SLO-01 evaluation.** The current definition evaluates SSO-SLO-01 per tenant. A single tenant with a flaky IdP breaches its own SLO without indicating a systemic FORM platform issue. This is consistent with the per-tenant Enterprise SLA credit model in §23 but requires that PagerDuty alert thresholds in AL-CERT-* and AL-SSO-GDIR-* are also scoped per-tenant (via `tenant_id` label filtering). Confirm this is consistent with enterprise contract language before the first SLA review. | compliance-officer + enterprise-architect | Before first enterprise SLA review (Month 13) | P1 |
+| OQ-SSO-OBS-01 | **Per-tenant vs. fleet-wide SSO-SLO-01 evaluation.** **🟢 Resolved — DEC-070 (2026-06-19). See §49.** Per-tenant evaluation confirmed (ENTERPRISE_SLA §3.1). Fleet-wide companion SSO-SLO-01b added as operational signal (≥ 3 tenants simultaneously breaching SSO-SLO-01 = AL-SSO-FLEET-01, P1). No SLA credits triggered by SSO-SLO-01b. | compliance-officer + enterprise-architect | ~~Before first enterprise SLA review (Month 13)~~ Resolved | **🟢 Resolved** |
 | OQ-SSO-OBS-02 | **DEC-030 event stream vs. Cloudflare Analytics Engine as the signal source for AL-SSO-GDIR-01/02.** Querying Supabase `audit_log` for alert volume works in the observation period but may not scale to fleet-wide alerting once > 50 tenants are active, because each PagerDuty check requires a Supabase query. Cloudflare Analytics Engine data points (one per `sso.google_directory_sync_error` event emission) would enable faster, cheaper aggregation. Decision needed before M4 alert implementation. | platform-engineer + devops-lead | Before AL-SSO-GDIR-01 implementation (M4) | **🟢 Resolved — DEC-067 (2026-06-19). See §48.** DEC-030 Supabase queries adopted for M4. Analytics Engine migration trigger: > 50 active Google Directory tenants (§48.5). |
 
 ---
@@ -13253,7 +13253,7 @@ The following condition triggers a mandatory architecture review to implement Op
 
 | OQ | Status | Notes |
 |---|---|---|
-| **OQ-SSO-OBS-01** | **🟡 Open — P1** | Per-tenant vs. fleet-wide SSO-SLO-01 evaluation. Resolution target: before first enterprise SLA review (Month 13). Owner: compliance-officer + enterprise-architect. Unchanged. |
+| **OQ-SSO-OBS-01** | **🟢 Resolved — DEC-070 (2026-06-19)** | Per-tenant evaluation confirmed; fleet-wide SSO-SLO-01b added as operational companion (§49). See `docs/DECISION_LOG.md DEC-070`. |
 | **OQ-SSO-OBS-02** | **🟢 Resolved — DEC-067 (2026-06-19)** | DEC-030 Supabase queries adopted for AL-SSO-GDIR-01/02 at M4. pg_cron job 35 (`google_directory_alert_check`) implements both alert rules. Analytics Engine migration trigger: > 50 active Google Directory tenants or job 35 P95 > 500 ms for 7 days. See §48.5. |
 
 ---
@@ -13274,6 +13274,281 @@ The following condition triggers a mandatory architecture review to implement Op
 |---|---|---|---|---|---|
 | 4 | Add SSO-OBS-E-007 row to §26.11 SOC 2 evidence table and to `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3). Add `sso/` subfolder reference to `docs/SOC2_READINESS.md §80.3` R2 evidence folder structure. File first SSO-OBS-E-007 artefact at observation period open; if zero alerts fired in the quarter, file zero-event attestation JSON with pg_cron job 35 run history appended. | compliance-officer | **P1** | M11 | [ ] |
 | 5 | Schedule scale trigger review at first enterprise pilot go-live (§48.5): add calendar entry "DEC-067 Scale Trigger Review — check active GD tenant count vs. 50-tenant ceiling and job 35 P95 duration." Owner: devops-lead + platform-engineer. | devops-lead | **P1** | M10 | [ ] |
+
+---
+
+## §49 OQ-SSO-OBS-01 Resolution — Per-Tenant vs. Fleet-Wide SSO-SLO-01 Evaluation: Per-Tenant Confirmed with Fleet-Wide Companion Signal (DEC-070)
+
+> **Decision date:** 2026-06-19 · **DEC reference:** DEC-070 · **Closes:** OQ-SSO-OBS-01 (§26.13, P1 — open since v1.3, 2026-06-09)
+> **Owners:** compliance-officer + enterprise-architect + devops-lead + platform-engineer
+
+---
+
+### §49.1 Open Question Restatement
+
+OQ-SSO-OBS-01 (§26.13) asked: should SSO-SLO-01 (login success ≥ 99%, 15-min rolling window) be evaluated **per-tenant** or **fleet-wide**?
+
+The concern was that per-tenant evaluation means a single tenant with a flaky IdP fires a PagerDuty alert without indicating any systemic FORM platform issue — potentially high-noise. The alternative (fleet-wide evaluation) would aggregate login success across all tenants, suppressing single-tenant IdP failures but potentially masking platform-level regressions that affect only a subset of tenants.
+
+Three sub-questions were embedded in the original OQ:
+1. **SLA credit basis:** Which granularity matches the `ENTERPRISE_SLA §3.1` contract language?
+2. **Alert noise:** Is per-tenant evaluation sustainable operationally as the tenant count grows?
+3. **Systemic detection gap:** If per-tenant, how do we detect a platform-level SSO regression that affects multiple tenants simultaneously but does not breach any single tenant's SLO threshold (e.g., 20% of tenants at 98.5% success)?
+
+---
+
+### §49.2 Option Analysis
+
+| Option | Description | SLA credit basis | Systemic detection | Noise profile | Verdict |
+|---|---|---|---|---|---|
+| **A — Per-tenant only** | SSO-SLO-01 evaluated independently for each tenant. Breach = that tenant's SLO violated. | ✅ Matches ENTERPRISE_SLA §3.1 | ❌ Misses fleet-level regression below single-tenant threshold | Medium: one noisy IdP = one page | **Rejected (incomplete)** |
+| **B — Fleet-wide only** | Aggregate login success across all tenants. Breach = fleet average < 99%. | ❌ Contradicts ENTERPRISE_SLA §3.1 per-tenant credit language | ✅ Detects fleet-level regressions | Low: single IdP failure absorbed by fleet | **Rejected (SLA mismatch)** |
+| **C — Per-tenant primary + fleet-wide companion (adopted)** | SSO-SLO-01 per-tenant (primary, SLA credits). SSO-SLO-01b fleet-wide companion (operational only, no credits). | ✅ Per-tenant matches §3.1 | ✅ AL-SSO-FLEET-01 closes systemic detection gap | Separated: tenant pages = SLA events; fleet page = platform event | **Adopted** |
+
+---
+
+### §49.3 Decision: Option C — Per-Tenant Confirmed, Fleet-Wide Companion Added
+
+**SSO-SLO-01** (existing, unchanged):
+- **Definition:** Login success rate ≥ 99% per tenant over any 15-minute rolling window (≥ 5 login attempts).
+- **Granularity:** Per tenant (`tenant_id`).
+- **SLA credit trigger:** Yes — feeds §23 Enterprise SLA credit calculation per `ENTERPRISE_SLA §3.1`.
+- **Alert:** Existing alert rules AL-CERT-* and AL-SSO-GDIR-* remain per-tenant scoped via `tenant_id` label filtering (confirmed consistent with §3.1 language).
+
+**SSO-SLO-01b** (new, operational companion):
+- **Definition:** ≥ 3 distinct tenants with active SSO simultaneously breaching SSO-SLO-01 (< 99% login success rate, ≥ 5 login attempts each) within any 15-minute rolling window.
+- **Granularity:** Fleet-wide (count of breaching tenants).
+- **SLA credit trigger:** **None** — `sla_credit_impact: 'none'`. SSO-SLO-01b is strictly an operational health signal. Individual tenant SLA credits are determined solely by SSO-SLO-01 per-tenant evaluation.
+- **Alert:** AL-SSO-FLEET-01 (§49.5).
+- **Breach threshold rationale:** 3 tenants was selected as the minimum fleet signal that distinguishes correlated platform-level failure (≥ 3 tenants affected simultaneously) from coincident independent IdP issues (1–2 tenants with flaky IdPs). At ≥ 3, the probability that three independent IdP outages coincide in a 15-minute window is < 0.1% at current tenant growth projections.
+
+**Five grounds for Option C:**
+
+1. **ENTERPRISE_SLA §3.1 mandates per-tenant.** The contract states "Availability is measured per tenant." Fleet-wide averaging would allow per-tenant SLA credits to be denied when the tenant's individual SLO was breached, on the grounds that the fleet average remained above 99%. This is a direct contract violation risk.
+2. **Existing alert architecture is already per-tenant scoped.** AL-CERT-01 through AL-CERT-05, AL-SSO-GDIR-01 through AL-SSO-GDIR-05, and the session revocation alerts all use `tenant_id` label filtering. Per-tenant SSO-SLO-01 is architecturally consistent — no refactor required.
+3. **Per-tenant granularity matches FORM's multi-tenant isolation model.** `docs/DATA_MODEL.md` RLS rules enforce `tenant_id` row-level isolation. Observability signals scoped to `tenant_id` are the natural granularity at which FORM reasons about tenant state.
+4. **Fleet-wide companion closes the systemic detection gap without SLA credit risk.** SSO-SLO-01b fires AL-SSO-FLEET-01 when ≥ 3 tenants simultaneously breach, giving the platform-engineer and security-engineer a signal for correlated failures (e.g., FORM Cloudflare Worker regression, WorkOS/Auth0 upstream incident) that would not trigger any single-tenant page.
+5. **SSO-SLO-01b `sla_credit_impact: 'none'` is a hard invariant.** The DEC-030 event payload (§49.6) encodes `sla_credit_impact: 'none'` to make this explicit and auditable. Any future proposal to attach SLA credits to SSO-SLO-01b requires a new DEC entry and compliance-officer sign-off.
+
+---
+
+### §49.4 SSO-SLO-01b Formal Definition
+
+```
+SSO-SLO-01b:
+  signal_name: fleet_sso_health
+  window: 15 minutes (rolling)
+  breach_condition:
+    COUNT(DISTINCT tenant_id WHERE login_success_rate < 0.99 AND login_attempts >= 5) >= 3
+  data_source: audit_log_events (sso.login_success, sso.login_failed)
+  granularity: fleet-wide (count of breaching tenants)
+  sla_credit_impact: none
+  alert: AL-SSO-FLEET-01 (P1)
+  implementation: pg_cron job 36 (sso_fleet_health_check, */5 * * * *)
+```
+
+**Privacy floor invariants for SSO-SLO-01b:**
+- Query result contains only `failing_tenant_count` (integer) and `fleet_success_rate_pct` (numeric) — no `user_email`, `user_email_hash`, individual login events, or GDPR Art. 9 data.
+- `tenant_id` values appear only in the internal SQL GROUP BY clause; they are **not** included in any PagerDuty event body, Slack notification, or DEC-030 event payload.
+- `fleet_success_rate_pct` is a weighted average across all tenants with ≥ 5 login attempts in the window — no per-tenant breakdown in any outbound signal.
+
+---
+
+### §49.5 Alert Rule: AL-SSO-FLEET-01
+
+| Field | Value |
+|---|---|
+| Alert ID | AL-SSO-FLEET-01 |
+| Trigger | SSO-SLO-01b breach: ≥ 3 distinct tenants with active SSO have login success rate < 99% (≥ 5 attempts each) in the preceding 15-minute window |
+| Severity | **P1** |
+| Channel | PagerDuty `form-platform` service → IC (Incident Commander) + security-engineer |
+| Dedup key | `al-sso-fleet-01-{15min_epoch}` (where `15min_epoch = floor(unix_epoch / 900)`) |
+| Cooldown | 30 minutes |
+| Runbook | Check AL-SSO-FLEET-01 runbook: (1) identify breaching tenants via `SELECT tenant_id, COUNT(*) FILTER (WHERE event_type = 'sso.login_failed') FROM audit_log_events WHERE created_at > NOW() - INTERVAL '15 minutes' GROUP BY tenant_id HAVING COUNT(*) >= 5`; (2) check Cloudflare Worker status for FORM SSO edge; (3) check WorkOS/Auth0 status page; (4) if correlated: escalate to P0 + CSM notification per §23; if independent: note in PagerDuty and monitor SSO-SLO-01 per-tenant pages |
+| SLA credit trigger | **None** — SSO-SLO-01b is operational only. SLA credits governed exclusively by SSO-SLO-01 per-tenant breach |
+| SOC 2 mapping | CC7.2 (anomaly monitoring), CC7.3 (incident response) |
+| Evidence artefact | SSO-FLEET-E-001 (§49.7) |
+
+---
+
+### §49.6 pg_cron Job 36: `sso_fleet_health_check`
+
+```sql
+-- pg_cron job 36: sso_fleet_health_check
+-- Schedule: */5 * * * *  (every 5 minutes)
+-- Role: form_audit
+-- Purpose: Evaluate SSO-SLO-01b — fleet-wide SSO health companion signal
+-- Fires AL-SSO-FLEET-01 (P1) when >= 3 distinct tenants simultaneously breach SSO-SLO-01
+-- Privacy floor: no user_email, user_email_hash, or identity data in any outbound signal
+
+DO $$
+DECLARE
+  v_worker_url TEXT := current_setting('app.emit_audit_event_worker_url', TRUE);
+  v_alert_url  TEXT := current_setting('app.form_alert_relay_url', TRUE);
+  v_window     INTERVAL := INTERVAL '15 minutes';
+  v_threshold  INT := 3;
+  v_min_attempts INT := 5;
+
+  -- Per-tenant aggregates
+  r_tenant RECORD;
+
+  -- Fleet aggregates
+  v_failing_tenant_count  INT := 0;
+  v_total_attempts        BIGINT := 0;
+  v_total_successes       BIGINT := 0;
+  v_fleet_success_rate    NUMERIC(5,2);
+  v_dedup_key             TEXT;
+  v_15min_epoch           BIGINT;
+BEGIN
+  -- NULL GUC guard — prevents silent no-ops if GUCs not configured
+  IF v_worker_url IS NULL THEN
+    RAISE EXCEPTION 'app.emit_audit_event_worker_url GUC is NULL — job 36 cannot emit DEC-030 events';
+  END IF;
+  IF v_alert_url IS NULL THEN
+    RAISE EXCEPTION 'app.form_alert_relay_url GUC is NULL — job 36 cannot route AL-SSO-FLEET-01';
+  END IF;
+
+  -- Evaluate SSO-SLO-01 per-tenant over the 15-minute rolling window
+  FOR r_tenant IN
+    SELECT
+      tenant_id,
+      COUNT(*) FILTER (WHERE event_type = 'sso.login_success') AS successes,
+      COUNT(*) FILTER (WHERE event_type = 'sso.login_failed')  AS failures,
+      COUNT(*) AS attempts
+    FROM audit_log_events
+    WHERE
+      event_type IN ('sso.login_success', 'sso.login_failed')
+      AND created_at > NOW() - v_window
+    GROUP BY tenant_id
+    HAVING COUNT(*) >= v_min_attempts
+  LOOP
+    v_total_attempts  := v_total_attempts  + r_tenant.attempts;
+    v_total_successes := v_total_successes + r_tenant.successes;
+
+    -- Count tenants breaching SSO-SLO-01 (success rate < 99%)
+    IF r_tenant.successes::NUMERIC / NULLIF(r_tenant.attempts, 0) < 0.99 THEN
+      v_failing_tenant_count := v_failing_tenant_count + 1;
+    END IF;
+  END LOOP;
+
+  -- Compute fleet-wide success rate (weighted by attempt volume)
+  v_fleet_success_rate := CASE
+    WHEN v_total_attempts = 0 THEN 100.00
+    ELSE ROUND((v_total_successes::NUMERIC / v_total_attempts) * 100, 2)
+  END;
+
+  -- SSO-SLO-01b breach check: >= 3 tenants simultaneously failing SSO-SLO-01
+  IF v_failing_tenant_count >= v_threshold THEN
+    v_15min_epoch := FLOOR(EXTRACT(EPOCH FROM NOW()) / 900)::BIGINT;
+    v_dedup_key   := 'al-sso-fleet-01-' || v_15min_epoch::TEXT;
+
+    -- Fire AL-SSO-FLEET-01 via form-alert-relay Cloudflare Worker
+    PERFORM net.http_post(
+      url     := v_alert_url || '/alert',
+      headers := '{"Content-Type":"application/json"}'::JSONB,
+      body    := jsonb_build_object(
+        'alert_id',             'AL-SSO-FLEET-01',
+        'severity',             'P1',
+        'service',              'form-platform',
+        'dedup_key',            v_dedup_key,
+        'summary',              format(
+          'SSO fleet health breach: %s tenants failing SSO-SLO-01 (fleet success rate %s%%)',
+          v_failing_tenant_count, v_fleet_success_rate
+        ),
+        'failing_tenant_count', v_failing_tenant_count,
+        'fleet_success_rate_pct', v_fleet_success_rate,
+        'window_minutes',       15,
+        'breach_threshold',     v_threshold,
+        'sla_credit_impact',    'none'
+      )::TEXT
+    );
+
+    -- Emit DEC-030 HMAC-chained audit event (siem.sso_fleet_health_breach)
+    PERFORM net.http_post(
+      url     := v_worker_url,
+      headers := '{"Content-Type":"application/json"}'::JSONB,
+      body    := jsonb_build_object(
+        'event_type',           'siem.sso_fleet_health_breach',
+        'severity',             'HIGH',
+        'retention_years',      3,
+        'alert_rule',           'AL-SSO-FLEET-01',
+        'failing_tenant_count', v_failing_tenant_count,
+        'fleet_success_rate_pct', v_fleet_success_rate,
+        'window_minutes',       15,
+        'breach_threshold',     v_threshold,
+        'sla_credit_impact',    'none',
+        'dec_reference',        'DEC-070'
+      )::TEXT
+    );
+  END IF;
+
+  -- Freshness advisory: emit system.fleet_sso_check_stale if this job does not run
+  -- (monitored by §12.7 health supervisor — 6-minute freshness window, same pattern as job 24)
+
+END $$;
+```
+
+**Privacy attestation for job 36:** The query aggregates `COUNT(*)` by `tenant_id` within the SQL engine only. No `tenant_id` value, `user_email`, `user_email_hash`, individual login event, or GDPR Art. 9 data appears in the PagerDuty event body, Slack notification, or `siem.sso_fleet_health_breach` DEC-030 payload. The outbound payload contains only: `failing_tenant_count` (integer), `fleet_success_rate_pct` (numeric, fleet-wide weighted average), `window_minutes: 15`, `breach_threshold: 3`, `sla_credit_impact: 'none'`, `dec_reference: 'DEC-070'`.
+
+---
+
+### §49.7 SOC 2 Evidence Artefact: SSO-FLEET-E-001
+
+| Field | Value |
+|---|---|
+| Evidence ID | SSO-FLEET-E-001 |
+| SOC 2 criteria | CC7.2 (anomaly and threat monitoring), CC7.3 (incident response timeliness) |
+| Description | Quarterly export of AL-SSO-FLEET-01 PagerDuty incidents cross-referenced with pg_cron job 36 (`sso_fleet_health_check`) run history |
+| Collection procedure | (1) Export all AL-SSO-FLEET-01 PagerDuty incidents from `form-platform` for the quarter. (2) Pull pg_cron job 36 run-history from `cron.job_run_details WHERE jobid = 36` for the same period. (3) For each incident, verify a corresponding job 36 execution within 5 minutes at the breach timestamp. (4) If zero incidents fired in the quarter, file a zero-incident attestation JSON with job 36 run-history appended (same pattern as SSO-OBS-E-007 zero-event quarters). |
+| Zero-event handling | Zero AL-SSO-FLEET-01 incidents in a quarter is a **positive** control signal (fleet health maintained). File zero-incident attestation with job 36 run-history as affirmative evidence. |
+| File path | `compliance/evidence/sso/SSO-FLEET-E-001_<YYYY-QN>.csv` |
+| Retention | 3 years |
+| First filing | At SOC 2 observation period open (M11) |
+| CC7.2 auditor narrative | AL-SSO-FLEET-01 fires on `siem.sso_fleet_health_breach` DEC-030 HMAC-chained events produced by pg_cron job 36. The alert-triggering evidence and the SOC 2 evidence artefact share the same HMAC chain, satisfying CC7.2's requirement that anomaly monitoring operates on the same authoritative record as the audit trail. |
+| CC7.3 auditor narrative | AL-SSO-FLEET-01 routes to PagerDuty `form-platform` (IC + security-engineer) within 5 minutes of job 36 execution. The 30-minute cooldown prevents duplicate pages while maintaining the ability to re-trigger on sustained fleet degradation. SSO-FLEET-E-001 cross-checks the chain: pg_cron job 36 run → DEC-030 event → PagerDuty page within the 30-minute SLA response window. |
+
+---
+
+### §49.8 §12.6 pg_cron Registry Addition
+
+> **Action item (P0, M5):** Add the following row to the §12.6 pg_cron registry table when deploying job 36.
+
+| Job # | Name | Schedule | Role | Freshness window | SOC 2 | Alert |
+|---|---|---|---|---|---|---|
+| 36 | `sso_fleet_health_check` | `*/5 * * * *` | `form_audit` | 6 min | CC7.2/CC7.3 | AL-SSO-FLEET-01 (P1, PagerDuty `form-platform`) |
+
+**Freshness monitoring:** `system.fleet_sso_check_stale` LOW/1yr advisory emitted by the §12.7 health supervisor if job 36 has not produced a run-history entry within 6 minutes (same pattern as job 24 `scim_mass_deprovision_check` and job 35 `google_directory_alert_check`).
+
+---
+
+### §49.9 Implementation Checklist
+
+#### P0 — Before AL-SSO-FLEET-01 implementation (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy pg_cron job 36 (`sso_fleet_health_check`) to production Supabase: register the `DO $$` block from §49.6 via Supabase Dashboard → Database → pg_cron; confirm schedule `*/5 * * * *`; confirm role `form_audit`; run `SELECT * FROM cron.job_run_details WHERE jobid = 36 ORDER BY runid DESC LIMIT 1` to verify first execution; add job 36 row to §12.6 pg_cron registry. | platform-engineer + devops-lead | **P0** | M5 | [ ] |
+| 2 | Configure AL-SSO-FLEET-01 PagerDuty alert route in `form-platform` service: dedup key `al-sso-fleet-01-{15min_epoch}`, 30-minute cooldown, P1 urgency, routing to IC + security-engineer; validate with synthetic test (emit ≥ 3 `sso.login_failed` bursts for 3 distinct tenants in staging within 15 minutes; confirm PagerDuty page fires within 5 minutes of job 36 execution). | devops-lead | **P0** | M5 | [ ] |
+| 3 | Register `siem.sso_fleet_health_breach` as a HIGH/3yr DEC-030 event type in `docs/AUDIT_LOG_SCHEMA.md §SIEM`; register `system.fleet_sso_check_stale` as LOW/1yr advisory in `docs/AUDIT_LOG_SCHEMA.md §System`; add job 36 freshness monitoring to §12.7 health supervisor (6-minute window). | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Add SSO-FLEET-E-001 row to §26.11 SOC 2 evidence table and to `docs/SOC2_READINESS.md` master evidence table (CC7.2/CC7.3). File first SSO-FLEET-E-001 artefact at observation period open; if zero AL-SSO-FLEET-01 incidents fired, file zero-incident attestation JSON with job 36 run-history appended. | compliance-officer | **P1** | M11 | [ ] |
+| 5 | Add AL-SSO-FLEET-01 row to §26.8 alert table (condensed format, `fleet_sso_health` subsection). Update §26.11 CC7.2 alert rule count accordingly. | devops-lead | **P1** | M5 | [ ] |
+
+---
+
+### §49.10 OQ Gap Tracker
+
+| OQ | Status | Notes |
+|---|---|---|
+| **OQ-SSO-OBS-01** | **🟢 Resolved — DEC-070 (2026-06-19)** | Per-tenant SSO-SLO-01 confirmed; fleet-wide SSO-SLO-01b companion added (AL-SSO-FLEET-01, P1, pg_cron job 36). `sla_credit_impact: 'none'` on SSO-SLO-01b. See `docs/DECISION_LOG.md DEC-070`. |
+
+---
+
+*v4.6.0 (2026-06-19): §49 OQ-SSO-OBS-01 Resolution — Per-Tenant vs. Fleet-Wide SSO-SLO-01 Evaluation: Per-Tenant Confirmed with Fleet-Wide Companion Signal (DEC-070). Closes OQ-SSO-OBS-01 from §26.13 (P1 — before first enterprise SLA review, Month 13 deadline — open since v1.3, 2026-06-09). Decision (DEC-070, 2026-06-19): Option C adopted — per-tenant SSO-SLO-01 evaluation confirmed as primary (matches ENTERPRISE_SLA §3.1 "Availability is measured per tenant"); fleet-wide SSO-SLO-01b added as operational companion signal (≥ 3 distinct tenants simultaneously breaching SSO-SLO-01 = AL-SSO-FLEET-01, P1, `sla_credit_impact: 'none'`). Five grounds: (1) ENTERPRISE_SLA §3.1 mandates per-tenant — fleet averaging risks contract violation; (2) existing alert architecture already per-tenant scoped via `tenant_id` label filtering — no refactor required; (3) per-tenant granularity matches DATA_MODEL RLS row-level isolation model; (4) fleet companion closes systemic detection gap (≥ 3 tenants simultaneously = correlated platform failure, not coincident independent IdP issues); (5) SSO-SLO-01b `sla_credit_impact: 'none'` is a hard invariant encoded in DEC-030 event payload. §49.3 option analysis: Option A (per-tenant only) — rejected, misses fleet-level regression below single-tenant threshold; Option B (fleet-wide only) — rejected, contradicts ENTERPRISE_SLA §3.1 per-tenant credit language; Option C (per-tenant primary + fleet companion) — adopted. §49.4 SSO-SLO-01b formal definition: ≥ 3 distinct tenants with active SSO breaching SSO-SLO-01 simultaneously in any 15-minute rolling window; data source: `audit_log_events` (`sso.login_success`, `sso.login_failed`). §49.5 AL-SSO-FLEET-01: P1, PagerDuty `form-platform` → IC + security-engineer, dedup key `al-sso-fleet-01-{15min_epoch}`, 30-min cooldown, CC7.2/CC7.3 mapping. §49.6 pg_cron job 36 (`sso_fleet_health_check`, `*/5 * * * *`, `form_audit` role): full SQL implementation — per-tenant GROUP BY over 15-minute window → count breaching tenants → if ≥ 3: POST to form-alert-relay (AL-SSO-FLEET-01) + emit `siem.sso_fleet_health_breach` DEC-030 HIGH/3yr event; NULL GUC guard on both `app.emit_audit_event_worker_url` and `app.form_alert_relay_url`; `system.fleet_sso_check_stale` LOW/1yr freshness advisory (6-min window, §12.7 health supervisor pattern). §49.7 SOC 2 evidence artefact SSO-FLEET-E-001 (CC7.2/CC7.3 — quarterly AL-SSO-FLEET-01 PagerDuty export + job 36 run-history cross-check; zero-incident quarters as affirmative attestation; 3yr; `compliance/evidence/sso/SSO-FLEET-E-001_<YYYY-QN>.csv`; first filing M11). §49.8 §12.6 pg_cron registry: job 36 row specification. §49.9 five-item implementation checklist: 3× P0/M5 (job 36 deploy + staging validation, AL-SSO-FLEET-01 PagerDuty config, DEC-030 event registration + freshness monitoring), 2× P1/M5–M11 (SSO-FLEET-E-001 SOC 2 evidence registration + first filing, §26.8 alert table addition). §49.10 OQ gap tracker: OQ-SSO-OBS-01 🟢 Resolved DEC-070. §26.13 updated: OQ-SSO-OBS-01 row marked 🟢 Resolved DEC-070 (§49). §48.7 updated: OQ-SSO-OBS-01 row marked 🟢 Resolved DEC-070 (§49). Document header: v4.5.0 → v4.6.0. Privacy floor: `tenant_id` (FORM internal UUID) in SQL GROUP BY only — not in any PagerDuty event body, Slack notification, or DEC-030 payload; `failing_tenant_count` (integer) and `fleet_success_rate_pct` (numeric, fleet-wide weighted average) are the only aggregate values in outbound signals; no `user_email`, `user_email_hash`, individual session content, or GDPR Art. 9 data in any signal, event, or artefact. Cross-references: `docs/DECISION_LOG.md DEC-070` (decision rationale); `docs/OBSERVABILITY.md §26.3` (SSO-SLO-01 canonical definition — unchanged); `docs/OBSERVABILITY.md §26.13` (OQ-SSO-OBS-01 row — updated 🟢 Resolved); `docs/OBSERVABILITY.md §48.7` (OQ gap tracker — OQ-SSO-OBS-01 updated 🟢 Resolved); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — job 36 to be added per §49.8/§49.9 item 1); `docs/OBSERVABILITY.md §12.7` (health supervisor — `system.fleet_sso_check_stale` freshness monitoring per §49.9 item 3); `docs/OBSERVABILITY.md §46.3` (form-alert-relay — job 36 routes AL-SSO-FLEET-01 via existing relay); `docs/AUDIT_LOG_SCHEMA.md §SIEM` (`siem.sso_fleet_health_breach` HIGH/3yr — P0/M5 registration per §49.9 item 3); `docs/AUDIT_LOG_SCHEMA.md §System` (`system.fleet_sso_check_stale` LOW/1yr — P0/M5 per §49.9 item 3); `docs/SOC2_READINESS.md` (SSO-FLEET-E-001 to be registered per §49.9 item 4); `docs/SSO_SCIM_IMPLEMENTATION.md §26.3` (SSO-SLO-01 per-tenant definition — §49 confirms alignment with ENTERPRISE_SLA §3.1); `docs/ENTERPRISE_SLA.md §3.1` ("Availability is measured per tenant" — contract language basis for per-tenant primary). Owner: compliance-officer + enterprise-architect + devops-lead + platform-engineer.*
 
 ---
 

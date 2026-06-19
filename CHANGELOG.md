@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [6.29.1] — 2026-06-19
+
+### Added
+- `docs/OBSERVABILITY.md §49` — OQ-SSO-OBS-01 Resolution: per-tenant SSO-SLO-01 evaluation confirmed (ENTERPRISE_SLA §3.1); fleet-wide SSO-SLO-01b companion signal added (AL-SSO-FLEET-01, P1, pg_cron job 36 `sso_fleet_health_check`); DEC-070. Closes P1 open question open since v1.3.
+- `docs/DECISION_LOG.md DEC-070` — OQ-SSO-OBS-01 decision: per-tenant confirmed, SSO-SLO-01b operational companion, `sla_credit_impact: 'none'`.
+
+### Changed
+- `docs/OBSERVABILITY.md` — header v4.5.0 → v4.6.0; §26.13 OQ-SSO-OBS-01 row → 🟢 Resolved DEC-070; §48.7 OQ gap tracker OQ-SSO-OBS-01 → 🟢 Resolved DEC-070.
+- `VERSION` — 6.29.0 → 6.29.1.
+
 ## [6.29.0] — 2026-06-19
 
 ### Added
