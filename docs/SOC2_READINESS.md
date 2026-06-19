@@ -28683,3 +28683,94 @@ For quarters where no adoption health degradation events occurred:
 *v3.15.0 (2026-06-19): §90 Evidence Artefact Cross-Reference Patch — COST_MODEL §40 (Enterprise Customer Adoption Economics & Seat Utilization Health Model, v2.6, 2026-06-18). Closes two explicit cross-reference obligations from `docs/COST_MODEL.md §40.10` item 5 and `docs/COST_MODEL.md §40.9` (both P1/M11 — register ADO-E-001/002/003 in `docs/SOC2_READINESS.md §79.4`). Formally registers three SOC 2 evidence artefacts introduced in COST_MODEL §40.9 and defines collection protocols, SQL queries, and auditor narratives. **ADO-E-001** (CC4.1/A1.1 — quarterly export of `enterprise_adoption_snapshots` fleet health summary: tenant count and ARR at each WAU band, avg WAU rate per band; Q1 fleet-health + Q3 board-ARR-distribution query pair; k-anonymity attestation required; 3yr; `compliance/evidence/adoption/ADO-E-001_<YYYY-QN>.csv`). **ADO-E-002** (CC2.2/CC4.1 — quarterly export of `enterprise.qbr_completed` DEC-030 HMAC-chained events; `privacy_floor_verified: true` chain invariant asserted on every row — HTTP 422 at Worker if absent; technology control, not procedural; post-M10 zero-event quarters anomalous and require compliance-officer investigation; 3yr; `compliance/evidence/adoption/ADO-E-002_<YYYY-QN>.csv`). **ADO-E-003** (CC7.3/CC4.2 — quarterly export of `enterprise.adoption_health_downgraded` HIGH DEC-030 events; `system.csm_followup_overdue` advisory cross-check must return 0; ADO-CHAIN-01 CSM 2-business-day follow-up obligation; zero-event quarters filed as affirmative attestation JSON per §90.3 with `monitoring_pipeline_reference` field; 3yr; `compliance/evidence/adoption/ADO-E-003_<YYYY-QN>.csv`). §90.3 zero-event attestation JSON template for ADO-E-003 (fields: artefact, quarter, query_run_at, downgraded_count, csm_overdue_count, monitoring_pipeline_reference, attestation text referencing monthly snapshot continuity). §90.4 five-row SOC 2 criteria mapping: CC4.1 (monthly adoption monitoring — ADO-E-001 fleet snapshot + ADO-E-002 QBR cadence together prove closed-loop), CC2.2 (QBR communication obligation + `privacy_floor_verified` technology invariant — ADO-E-002), CC7.3 (anomaly detection and response + ADO-CHAIN-01 CSM obligation — ADO-E-003 + overdue advisory cross-check), A1.1 (fleet-level availability risk precursor monitoring — ADO-E-001 ARR-at-band distribution quantifies ARR at risk), CC4.2 (Red-band deficiency evaluation and response — ADO-E-003 downgrade + overdue pairing). §90.5 closes two cross-reference obligations: COST_MODEL §40.10 item 5 (🟢 Closed) and COST_MODEL §40.9 SOC2 §79.4 cross-reference (🟢 Closed). §90.6 seven-item implementation checklist: 1× P0/M10 (DEC-030 event registration confirmation — prerequisite for chain queries in ADO-E-002 and ADO-E-003), 5× P1/M11 (R2 folder path addition to §80.3, first ADO-E-001 filing + k-anon attestation, first ADO-E-002 filing + floor-verified assertion + Growth/Enterprise coverage cross-check, first ADO-E-003 filing + overdue advisory cross-check, quarterly calendar reminder), 1× P2/M12 (COST_MODEL §40.10 item 5 closure confirmation). §80.4 Vanta mirror list updated in this version: ADO-E-001/002/003 added. SOC 2 version bumped v3.14.0 → v3.15.0. Privacy floor (all three artefacts): no individual employee `user_id`, name, email, health values, coaching session content, body composition data, or Art. 9 special category data; `coaching_engaged_seats < 5` suppressed at API layer (k-anonymity floor); `tenant_id` is FORM-internal UUID; `acv_usd` in ADO-E-003 is aggregate contract value not tied to any individual; `form_api` REVOKED from `enterprise_adoption_snapshots` (migration 0078). Cross-references: `docs/COST_MODEL.md §40.9` (evidence artefact source definitions — primary source of truth for cadence, retention, criteria mapping); `docs/COST_MODEL.md §40.8` (four DEC-030 events: `enterprise.adoption_snapshot_filed` STANDARD 3yr, `enterprise.adoption_milestone_reached` STANDARD 3yr, `enterprise.adoption_health_downgraded` HIGH 3yr, `enterprise.qbr_completed` STANDARD 3yr; `system.csm_followup_overdue` LOW 1yr advisory — collection queries depend on these events in the chain); `docs/COST_MODEL.md §40.7` (`enterprise_adoption_snapshots` DDL — `wau_health_band GENERATED ALWAYS AS STORED`, k-anonymity note, `form_api` REVOKE pattern, migration 0078); `docs/COST_MODEL.md §40.6` (CSM intervention playbook — ADO-CHAIN-01 2-business-day follow-up timing basis for CC7.3 narrative); `docs/COST_MODEL.md §40.10` (implementation checklist — item 1 P0/M10 prerequisite for §90.6 item 1; item 5 P1/M11 closed by this section); `docs/AUDIT_LOG_SCHEMA.md §Enterprise + §System` (four DEC-030 events + advisory to register — P0/M10 prerequisite); `docs/OBSERVABILITY.md §33` (Enterprise Tenant Engagement Health — ENGAGE-E-001/002/003 are related but distinct: ENGAGE-E-001 covers RLS zero-access + negative-privilege test; ENGAGE-E-002 covers anonymised QBR package content-policy; ENGAGE-E-003 covers AL-ENGAGE alert history; ADO-E artefacts cover the DEC-030 chain records of the snapshot-filed, qbr-completed, and health-downgraded events — complementary evidence layers); §79.4 (master evidence table — ADO-E criteria rows covered by §90.4; §79.4 physical row updates deferred to M11 alongside first filing per §90.6 item 3); §80.4 (Vanta mirror list — ADO-E-001/002/003 added in this version); §84 (ENGAGE-E-001/002/003 registration — related but distinct artefacts); §89 (PART-E-001/002/003 — parallel cross-reference patch for partner events, same §80.4 / §79.4 update pattern); `docs/DATA_MODEL.md §17` (Admin Dashboard RLS — k-anonymity n ≥ 5 enforcement at API layer, `form_api` REVOKE pattern mirrored in migration 0078). Owner: compliance-officer + customer-success + data-engineer + enterprise-architect.*
 
 ---
+
+## §91 · Evidence Artefact Cross-Reference Patch — SSO_SCIM §34 (SCIM Bulk Deprovision Guard · DEC-066 · OQ-R24-01)
+
+> Closes the cross-reference obligation from `docs/SSO_SCIM_IMPLEMENTATION.md §34.9` (GUARD-E-001 registered here) and `docs/SSO_SCIM_IMPLEMENTATION.md §34.11` checklist item 5 (`[x] Done — docs/AUDIT_LOG_SCHEMA.md v2.19 (2026-06-19)`). Formally registers one SOC 2 evidence artefact introduced in SSO_SCIM §34 and establishes collection protocol and auditor narrative. Privacy floor: all five DEC-030 chain events carry only `tenant_id` (FORM-internal UUID) and aggregate integers — no individual employee `user_id`, name, email, or GDPR Art. 9 health data. `override_issued_by_email_hash` and `updated_by_email_hash` fields are SHA-256(lowercase(email)) — 64 hex chars; plaintext never stored. `form_api` REVOKED from `tenant_sso_configs.bdg_*` columns (migration 0079).
+
+### §91.1 Evidence Artefact Registration
+
+**GUARD-E-001** — SCIM Bulk Deprovision Guard quarterly event export.
+
+| Field | Value |
+|---|---|
+| Artefact ID | GUARD-E-001 |
+| SOC 2 criteria | CC6.3 · A1.2 · CC7.2 · CC9.2 |
+| Retention | 7 years (HIGH-severity events); 1 year (`system.scim_guard_repeated_trigger` advisory) |
+| Cadence | Quarterly — first filing at M14 (first full quarter after M13 enterprise GA) |
+| Storage path | `compliance/evidence/scim-guard/GUARD-E-001_<YYYY-QN>.csv` |
+| Zero-event attestation | Required if `blocked_count = 0` AND `override_issued_count = 0` in the quarter — file as JSON with `monitoring_pipeline_reference` (most recent `scim.bulk_deprovision_threshold_updated` or `scim.bulk_deprovision_blocked` event_id) |
+| Vanta mirror | GUARD-E-001 (§80.4 — added in this version) |
+
+### §91.2 Collection SQL (GUARD-E-001)
+
+```sql
+-- GUARD-E-001: SCIM Bulk Deprovision Guard quarterly export
+-- Run as: form_system (compliance_reviewer SELECT)
+-- Replace :quarter_start and :quarter_end with quarter boundaries (UTC)
+SELECT
+  event_id,
+  event_type,
+  payload->>'tenant_id'            AS tenant_id,
+  payload->>'deprovisioned_count'  AS deprovisioned_count,
+  payload->>'contracted_seats'     AS contracted_seats,
+  payload->>'threshold_pct'        AS threshold_pct,
+  payload->>'window_key'           AS window_key,
+  payload->>'scim_source'          AS scim_source,
+  payload->>'override_token_hash'  AS override_token_hash,
+  payload->>'auto_revoked'         AS auto_revoked,
+  payload->>'old_threshold_pct'    AS old_threshold_pct,
+  payload->>'new_threshold_pct'    AS new_threshold_pct,
+  payload->>'trigger_count'        AS trigger_count,
+  hmac_chain_hash,
+  created_at
+FROM audit_log
+WHERE event_type IN (
+  'scim.bulk_deprovision_blocked',
+  'scim.bulk_deprovision_override_issued',
+  'scim.bulk_deprovision_override_used',
+  'scim.bulk_deprovision_threshold_updated',
+  'system.scim_guard_repeated_trigger'
+)
+  AND created_at >= :quarter_start
+  AND created_at <  :quarter_end
+ORDER BY created_at;
+
+-- Zero-event check: if this returns 0 rows, file attestation JSON instead of CSV
+-- Attestation must include: artefact, quarter, query_run_at, blocked_count (0),
+-- override_issued_count (0), monitoring_pipeline_reference (most recent guard event_id)
+```
+
+### §91.3 SOC 2 Criteria Mapping
+
+| Criterion | Narrative | Evidence from GUARD-E-001 |
+|---|---|---|
+| **CC6.3** | Logical access removal — FORM implements a preventive control that blocks unauthorised bulk deprovisioning of enterprise seats via SCIM push. The guard operates at the Worker endpoint level, before any write reaches Postgres. `scim.bulk_deprovision_blocked` events confirm the control fired; `scim.bulk_deprovision_override_issued` + `scim.bulk_deprovision_override_used` events confirm the two-person exception path is auditable. | Export of all five event types for the quarter; confirm `override_used_count ≤ override_issued_count` (no override used without prior issuance); confirm `auto_revoked: true` on all `override_used` events |
+| **A1.2** | Environmental threat detection — the guard detects and blocks an H3-class threat (IdP-side or FORM-side SCIM processing error causing mass deprovisioning) before it affects availability. Complementary to AL-SCIM-MASS-01 (reactive); the guard is the preventive layer. | `scim.bulk_deprovision_blocked` export; confirm threshold values are within configured range (5–100); confirm `window_key` pattern (5-min epoch buckets) |
+| **CC7.2** | Proactive monitoring — `system.scim_guard_repeated_trigger` (GUARD-CHAIN-01) detects recurring IdP misconfiguration before it escalates to a P0 incident, providing an early warning signal for CSM follow-up. | `system.scim_guard_repeated_trigger` export; confirm PagerDuty P2 `form-customer-success` routing was operational (cross-reference PagerDuty logs for any emitted `trigger_count` events) |
+| **CC9.2** | Third-party risk (IdP as vendor) — the override protocol enforces a two-person authorisation gate on any intentional bulk deprovisioning event via SCIM: tenant_owner submits consent; CSM countersigns via PAM §24 session. Both steps produce DEC-030 chain records. Auto-revocation after first use prevents the override from being reused by a subsequent IdP push. | `scim.bulk_deprovision_override_issued` + `scim.bulk_deprovision_override_used` pair; confirm `pam_session_id` present on all issued events; confirm `tenant_owner_request_event_id` populated (tenant_owner consent on file); confirm `auto_revoked: true` on all used events |
+
+### §91.4 Cross-Reference Obligations Closed
+
+| Obligation source | Obligation text | Status |
+|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md §34.9` | GUARD-E-001 to be registered in `docs/SOC2_READINESS.md §CC6.3/A1.2/CC7.2/CC9.2` | 🟢 Closed — §91.1–§91.3 above |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §34.11` item 5 | Register all five DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` | 🟢 Closed — `docs/AUDIT_LOG_SCHEMA.md v2.19` (2026-06-19) |
+| `docs/INCIDENT_RESPONSE.md R-24.15` item 10 | Resolve OQ-R24-01; document in DECISION_LOG.md; add implementation spec to SSO_SCIM | 🟢 Closed — DEC-066 (2026-06-19); `docs/SSO_SCIM_IMPLEMENTATION.md §34` |
+
+### §91.5 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Confirm migration `0079_bulk_deprovision_guard.sql` is applied in production before first enterprise GA customer goes live (M13). Verify `bdg_threshold_pct DEFAULT 20`, `bdg_threshold_pct_min` constraint (≥ 5), `bdg_threshold_pct_max` constraint (≤ 100), pg_cron job 33 (`scim_guard_repeated_trigger_check`). | devops-lead + platform-engineer | **P0** | M13 | [ ] |
+| 2 | Confirm `enforceDeprovisionGuard()` is deployed in SCIM Worker (`apps/scim-worker`) and wired into the `PATCH /v1/scim/{tenantId}/Users/{userId}` and `DELETE /v1/scim/{tenantId}/Users/{userId}` handlers before first enterprise GA customer. | platform-engineer | **P0** | M13 | [ ] |
+| 3 | Confirm `update_bdg_threshold()` Supabase SECURITY DEFINER RPC is deployed and Admin Dashboard "Bulk Deprovision Guard" configuration panel is live for `tenant_owner` role before first enterprise GA customer. | platform-engineer + design-craft | **P1** | M13 | [ ] |
+| 4 | Confirm `POST /internal/v1/admin/scim/bulk-override` CSM override endpoint is deployed and requires PAM §24 session before first enterprise GA customer. | platform-engineer + security-engineer | **P1** | M13 | [ ] |
+| 5 | At M14 (first full quarter after enterprise GA): run GUARD-E-001 collection SQL; export CSV or file zero-event attestation JSON; append SHA-256 to MASTER-INDEX (§79); cross-reference in `docs/SOC2_READINESS.md §79.4` (deferred until first filing). | compliance-officer | **P1** | M14 | [ ] |
+| 6 | Schedule quarterly recurring reminder: "File GUARD-E-001 for the preceding quarter." Cadence starts M14; trigger: 1st business day after quarter close. | compliance-officer | **P1** | M14 | [ ] |
+
+---
+
+*v3.16.0 (2026-06-19): §91 Evidence Artefact Cross-Reference Patch — SSO_SCIM §34 (SCIM Bulk Deprovision Guard, v2.6, 2026-06-19 · DEC-066 · OQ-R24-01). Closes three cross-reference obligations: (1) SSO_SCIM §34.9 GUARD-E-001 registration obligation (🟢 Closed — §91.1 above); (2) SSO_SCIM §34.11 item 5 DEC-030 event registration obligation (🟢 Closed — `docs/AUDIT_LOG_SCHEMA.md v2.19`); (3) INCIDENT_RESPONSE.md R-24.15 item 10 OQ-R24-01 P1 obligation (🟢 Closed — DEC-066 + SSO_SCIM §34). Formally registers one SOC 2 evidence artefact: **GUARD-E-001** (CC6.3/A1.2/CC7.2/CC9.2 — quarterly export of all five SCIM Bulk Deprovision Guard DEC-030 events; `compliance/evidence/scim-guard/GUARD-E-001_<YYYY-QN>.csv`; 7yr for HIGH events, 1yr for `system.scim_guard_repeated_trigger` advisory; first filing at M14). §91.1 artefact registration table (ID, criteria, retention, cadence, storage path, zero-event attestation protocol, Vanta mirror entry). §91.2 collection SQL: `SELECT event_id, event_type, payload fields ... FROM audit_log WHERE event_type IN ('scim.bulk_deprovision_blocked', 'scim.bulk_deprovision_override_issued', 'scim.bulk_deprovision_override_used', 'scim.bulk_deprovision_threshold_updated', 'system.scim_guard_repeated_trigger') AND created_at >= :quarter_start AND < :quarter_end ORDER BY created_at` — plus zero-event check guidance. §91.3 four-row SOC 2 criteria mapping: CC6.3 (preventive control — blocked events + override pair confirm two-person exception path; auditor checks `override_used_count ≤ override_issued_count` and `auto_revoked: true`), A1.2 (environmental threat detection — guard blocks H3-class SCIM incidents before availability impact; complementary to reactive AL-SCIM-MASS-01), CC7.2 (proactive monitoring — `system.scim_guard_repeated_trigger` GUARD-CHAIN-01 advisory; cross-reference PagerDuty P2 `form-customer-success` routing), CC9.2 (third-party IdP risk — two-person override protocol: `tenant_owner` consent + CSM PAM §24 countersign; `auto_revoked: true` on every used event prevents override reuse). §91.4 three-row cross-reference obligations closure table. §91.5 six-item implementation checklist: 2× P0/M13 (migration 0079 production deployment, `enforceDeprovisionGuard()` SCIM Worker wiring), 4× P1/M13–M14 (Admin Dashboard panel + `update_bdg_threshold()` RPC, CSM override endpoint PAM integration, first GUARD-E-001 filing, quarterly calendar reminder). §80.4 Vanta mirror list updated: GUARD-E-001 added. SOC 2 version bumped v3.15.0 → v3.16.0. Privacy floor: `tenant_id` FORM-internal UUID; `deprovisioned_count`/`contracted_seats`/`threshold_pct` are aggregate integers; `override_issued_by_email_hash`/`updated_by_email_hash` SHA-256(lowercase(email)) 64 hex chars; no `user_id`, no employee PII, no GDPR Art. 9 health data; `form_api` REVOKED from `tenant_sso_configs.bdg_*` columns (migration 0079). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §34` (guard design, KV counter pattern `scim:deprov_guard:{tenantId}:{windowKey}`, `getGuardConfig()`, `revokeActiveOverride()`, migration 0079 DDL, `update_bdg_threshold()` RPC, CSM override API, GUARD-E-001 SQL definition); `docs/SSO_SCIM_IMPLEMENTATION.md §34.11` (implementation checklist — item 5 [x] Done); `docs/AUDIT_LOG_SCHEMA.md §SCIM Bulk Deprovision Guard` (five DEC-030 events registered — v2.19, 2026-06-19); `docs/DECISION_LOG.md DEC-066` (OQ-R24-01 resolution — per-tenant threshold default 20%, range 5–100%, 5-min rolling window, CSM-countersigned override, auto-revocation); `docs/INCIDENT_RESPONSE.md R-24.15` item 10 (OQ-R24-01 P1 — [x] Done 2026-06-19); `docs/INCIDENT_RESPONSE.md R-24` (reactive AL-SCIM-MASS-01 layer — complementary to the preventive guard; both layers documented in §34.10 interaction table); §79.4 (master evidence table — GUARD-E-001 criteria rows deferred to M14 alongside first filing per §91.5 item 5); §80.4 (Vanta mirror list — GUARD-E-001 added in this version). Owner: compliance-officer + security-engineer + enterprise-architect + platform-engineer.*
+
+---

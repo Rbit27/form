@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.5
+# FORM · SSO/SCIM Implementation v2.6
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -39,6 +39,7 @@
 29. [OQ-SSO-28.2 Resolution — `tenant_users_role_history` Retention Period (DEC-051)](#29-oq-sso-282-resolution--tenant_users_role_history-retention-period-dec-051)
 30. [OQ-MOBILE-03 Resolution — Mobile SSO Browser Mode & Deep-Link Security (DEC-059)](#30-oq-mobile-03-resolution--mobile-sso-browser-mode--deep-link-security-dec-059)
 31. [OQ-SSO-32.1 & OQ-SSO-32.2 Resolution — SCIM IP Enforcement Onboarding Visibility & KV Cache Invalidation](#33-oq-sso-321--oq-sso-322-resolution--scim-ip-enforcement-onboarding-visibility--kv-cache-invalidation)
+34. [SCIM Bulk Deprovision Guard — Per-Tenant Configurable Threshold & CSM-Countersigned Override (Closes OQ-R24-01, DEC-066)](#34-scim-bulk-deprovision-guard--per-tenant-configurable-threshold--csm-countersigned-override)
 
 ---
 
@@ -11861,4 +11862,616 @@ OQ-SSO-32.1 and OQ-SSO-32.2 are closed. No new open questions are introduced by 
 
 ---
 
-*v2.5 (2026-06-17): §33 OQ-SSO-32.1 & OQ-SSO-32.2 Resolution — SCIM IP Enforcement Onboarding Visibility & KV Cache Invalidation. Closes both P2 open questions from §32.9 (v2.4, 2026-06-16). §33.1 scopes: OQ-SSO-32.1 is an operational visibility gap (onboarding guide omits `scim_ip_enforcement_enabled` feature); OQ-SSO-32.2 is a propagation lag risk on the disable path (5-min KV TTL, no active invalidation). §33.2 OQ-SSO-32.1 resolution: feature surfaced only for self-hosted SCIM proxy customers (cloud-hosted IdP tenants explicitly excluded due to dynamic IP ranges); §17.2 Q-05 row extended with CIDR capture step for self-hosted proxy customers; §17.3 Step 3 SCIM config note added (enable only after first successful full-directory sync; disable recovery path documented — < 5 s with §33.3.3 active invalidation); `docs/ENTERPRISE_ONBOARDING.md §3.3` extension note referenced; CSM script fragment (§33.2.5) for the live-call scenario. §33.3 OQ-SSO-32.2 resolution: active push invalidation adopted — `env.SSO_KV.delete('scim_ip_cfg:' + tenantId)` added to `PATCH /v1/admin/scim/ip-enforcement` handler after Supabase RPC; mirrors §25.4 pattern for `SSO_KV:auth_policy:{tenant_id}`; 5-minute base TTL retained (10–50× Supabase read amplification at 30 s TTL rejected); Postgres RPC `update_scim_ip_enforcement_flag()` (migration `0077`) handles UPDATE + `sso.policy_updated` DEC-030 emit atomically; KV delete wrapped in try/catch — failure emits `scim.ip_kv_invalidation_error` advisory event without rolling back the Supabase write; §33.3.4 before/after behaviour matrix: disable path reduces from ≤ 5 min to < 1 s; enable path also immediate (minor improvement); KV-failure fallback = original 5-min TTL. §33.4 two DEC-030 changes: `sso.policy_updated` reused (payload: `policy_type: 'scim_ip_enforcement'`, `previous_value`, `new_value`, `change_source: 'admin_dashboard'`); `scim.ip_kv_invalidation_error` new advisory STANDARD 3yr event (non-blocking; same registration pattern as `scim.ip_enforcement_misconfigured`). §33.5 SOC 2: no new evidence artefacts; CC6.1 toggle covered by existing `sso.policy_updated` monthly export; CC6.3 narrative strengthened but no new artefact. §33.6 gap tracker: OQ-SSO-32.1 🟡→🟢 Resolved; OQ-SSO-32.2 🟡→🟢 Resolved; §32.9 cross-update noted. §33.7 seven-item checklist: 4× P0/M8 (RPC migration 0077, KV delete handler, AUDIT_LOG_SCHEMA registration, integration tests × 2 scenarios), 2× P1/M9 (ENTERPRISE_ONBOARDING.md update, §17.2 Q-05 cross-check), 1× P2/first-opt-in (end-to-end smoke test). §33.8 no new open questions. TOC entry §33 added. Document header v2.4 → v2.5. Privacy floor: no `user_id`, name, email, health data, or body composition values in any event or implementation artefact in §33; `actor_id` in DEC-030 is the Admin Dashboard operator (tenant admin/owner), not an employee or SCIM-provisioned user; `tenant_id` is org slug in audit events; `form_api` NO ACCESS to `scim_ip_cfg` KV key. Cross-references: §17.2 (Q-05 row extended per §33.2.2); §17.3 (Step 3 SCIM config note per §33.2.3); §25.4 (KV-backed policy cache — `SSO_KV:auth_policy:{tenant_id}` invalidation pattern mirrored here); §25.9 (`sso.policy_updated` event schema — reused with `policy_type: 'scim_ip_enforcement'`); §32.3.4 (`scim_ip_cfg:{tenant_id}` KV key + 5-min TTL — unchanged; active invalidation is additive); §32.5 (`scim.ip_enforcement_misconfigured` — `scim.ip_kv_invalidation_error` follows same advisory registration pattern); §32.9 (OQ-SSO-32.1, OQ-SSO-32.2 — both 🟢 Resolved); `docs/ENTERPRISE_ONBOARDING.md §3.3` (SCIM IP enforcement note — P1/M9); `docs/AUDIT_LOG_SCHEMA.md §SCIM` (`scim.ip_kv_invalidation_error` advisory event — P0/M8); `docs/DATA_MODEL.md §4.2` (`tenant_sso_configs.scim_ip_enforcement_enabled` — read + updated by `update_scim_ip_enforcement_flag()`). Owner: enterprise-architect + customer-success + platform-engineer + compliance-officer.*
+*v2.5 (2026-06-17): §33 OQ-SSO-32.1 & OQ-SSO-32.2 Resolution — SCIM IP Enforcement Onboarding Visibility & KV Cache Invalidation. (See full v2.6 version note at end of document.) Closes both P2 open questions from §32.9 (v2.4, 2026-06-16). §33.1 scopes: OQ-SSO-32.1 is an operational visibility gap (onboarding guide omits `scim_ip_enforcement_enabled` feature); OQ-SSO-32.2 is a propagation lag risk on the disable path (5-min KV TTL, no active invalidation). §33.2 OQ-SSO-32.1 resolution: feature surfaced only for self-hosted SCIM proxy customers (cloud-hosted IdP tenants explicitly excluded due to dynamic IP ranges); §17.2 Q-05 row extended with CIDR capture step for self-hosted proxy customers; §17.3 Step 3 SCIM config note added (enable only after first successful full-directory sync; disable recovery path documented — < 5 s with §33.3.3 active invalidation); `docs/ENTERPRISE_ONBOARDING.md §3.3` extension note referenced; CSM script fragment (§33.2.5) for the live-call scenario. §33.3 OQ-SSO-32.2 resolution: active push invalidation adopted — `env.SSO_KV.delete('scim_ip_cfg:' + tenantId)` added to `PATCH /v1/admin/scim/ip-enforcement` handler after Supabase RPC; mirrors §25.4 pattern for `SSO_KV:auth_policy:{tenant_id}`; 5-minute base TTL retained (10–50× Supabase read amplification at 30 s TTL rejected); Postgres RPC `update_scim_ip_enforcement_flag()` (migration `0077`) handles UPDATE + `sso.policy_updated` DEC-030 emit atomically; KV delete wrapped in try/catch — failure emits `scim.ip_kv_invalidation_error` advisory event without rolling back the Supabase write; §33.3.4 before/after behaviour matrix: disable path reduces from ≤ 5 min to < 1 s; enable path also immediate (minor improvement); KV-failure fallback = original 5-min TTL. §33.4 two DEC-030 changes: `sso.policy_updated` reused (payload: `policy_type: 'scim_ip_enforcement'`, `previous_value`, `new_value`, `change_source: 'admin_dashboard'`); `scim.ip_kv_invalidation_error` new advisory STANDARD 3yr event (non-blocking; same registration pattern as `scim.ip_enforcement_misconfigured`). §33.5 SOC 2: no new evidence artefacts; CC6.1 toggle covered by existing `sso.policy_updated` monthly export; CC6.3 narrative strengthened but no new artefact. §33.6 gap tracker: OQ-SSO-32.1 🟡→🟢 Resolved; OQ-SSO-32.2 🟡→🟢 Resolved; §32.9 cross-update noted. §33.7 seven-item checklist: 4× P0/M8 (RPC migration 0077, KV delete handler, AUDIT_LOG_SCHEMA registration, integration tests × 2 scenarios), 2× P1/M9 (ENTERPRISE_ONBOARDING.md update, §17.2 Q-05 cross-check), 1× P2/first-opt-in (end-to-end smoke test). §33.8 no new open questions. TOC entry §33 added. Document header v2.4 → v2.5. Privacy floor: no `user_id`, name, email, health data, or body composition values in any event or implementation artefact in §33; `actor_id` in DEC-030 is the Admin Dashboard operator (tenant admin/owner), not an employee or SCIM-provisioned user; `tenant_id` is org slug in audit events; `form_api` NO ACCESS to `scim_ip_cfg` KV key. Cross-references: §17.2 (Q-05 row extended per §33.2.2); §17.3 (Step 3 SCIM config note per §33.2.3); §25.4 (KV-backed policy cache — `SSO_KV:auth_policy:{tenant_id}` invalidation pattern mirrored here); §25.9 (`sso.policy_updated` event schema — reused with `policy_type: 'scim_ip_enforcement'`); §32.3.4 (`scim_ip_cfg:{tenant_id}` KV key + 5-min TTL — unchanged; active invalidation is additive); §32.5 (`scim.ip_enforcement_misconfigured` — `scim.ip_kv_invalidation_error` follows same advisory registration pattern); §32.9 (OQ-SSO-32.1, OQ-SSO-32.2 — both 🟢 Resolved); `docs/ENTERPRISE_ONBOARDING.md §3.3` (SCIM IP enforcement note — P1/M9); `docs/AUDIT_LOG_SCHEMA.md §SCIM` (`scim.ip_kv_invalidation_error` advisory event — P0/M8); `docs/DATA_MODEL.md §4.2` (`tenant_sso_configs.scim_ip_enforcement_enabled` — read + updated by `update_scim_ip_enforcement_flag()`). Owner: enterprise-architect + customer-success + platform-engineer + compliance-officer.*
+
+---
+
+## §34 SCIM Bulk Deprovision Guard — Per-Tenant Configurable Threshold & CSM-Countersigned Override
+
+> **Closes:** OQ-R24-01 (P1, `docs/INCIDENT_RESPONSE.md §R-24.14`, before enterprise GA M13)
+> **Decision:** DEC-066 (2026-06-19) — `docs/DECISION_LOG.md`
+> **Owner:** enterprise-architect + security-engineer + platform-engineer + compliance-officer
+
+### §34.1 Purpose
+
+The `§R-24.11` AL-SCIM-MASS-01 alert and INCIDENT_RESPONSE.md R-24 form the *reactive* layer for SCIM mass deprovisioning: they detect that accidental deprovisioning has already occurred and trigger containment. §34 adds a *preventive* layer — a server-side guard in the SCIM Worker that intercepts deprovisioning requests *before* execution, refuses batches that would exceed a configurable per-tenant threshold, and requires explicit operator approval for legitimate large-scale deprovisioning events (planned layoffs, entity restructuring).
+
+**Preventive / reactive relationship:**
+
+| Layer | Mechanism | Timing | Default threshold | Outcome on breach |
+|---|---|---|---|---|
+| **Preventive (§34)** | SCIM Worker pre-flight guard | Before deprovisioning occurs | 20% of seats in 5-min window | HTTP 422 to IdP; no users deprovisioned; `scim.bulk_deprovision_blocked` DEC-030 emitted |
+| **Reactive (R-24, AL-SCIM-MASS-01)** | pg_cron `scim_mass_deprovision_check` | After deprovisioning has occurred | 10% of seats in 10-min rolling window | PagerDuty P0/P1 dual-page; R-24 activated |
+
+The guard fires faster (5-min, lower default threshold) and prevents impact. AL-SCIM-MASS-01 catches anything that slips through — including when the guard is overridden for a legitimate bulk change, or for H3 root causes (FORM-side SCIM bug) where the first users below the threshold are already deprovisioned before the guard fires.
+
+### §34.2 Design Decision (DEC-066)
+
+OQ-R24-01 offered three implementation paths:
+
+| Option | Description | Adopted |
+|---|---|---|
+| A | Fleet-wide fixed threshold (block > 20% in any tenant, no configurability) | ❌ Inflexible for large tenants running planned workforce changes |
+| B | Per-tenant configurable threshold; time-limited CSM-countersigned override for legitimate bulk events | ✅ **Adopted** |
+| C | Async approval queue (SCIM request queued until CSM approves before processing) | ❌ Adds per-request latency; incompatible with IdP SCIM sync timeout expectations |
+
+**Adopted design details:**
+- `bulk_deprovision_threshold_pct` (SMALLINT DEFAULT 20, range 5–100) in `tenant_sso_configs`
+- 5-minute rolling window counter in `SCIM_KV` (separate from the 10-minute AL-SCIM-MASS-01 window)
+- Guard fires if deprovisioned count in current window ≥ `ceiling(contracted_seats × threshold_pct / 100)`
+- Override: CSM sets a time-limited window (max 4h) in `tenant_sso_configs.bulk_deprovision_override_exp` after tenant_owner initiates request and CSM countersigns; auto-revoked after the first bulk sync that uses it
+- Threshold = 100% means guard disabled; range floor at 5% prevents false positives on minor routine maintenance
+- Guard does **not** protect fully against H3 (FORM-side bug) — users deprovisioned before the threshold is crossed are not prevented. AL-SCIM-MASS-01 remains the safety net for that scenario.
+
+### §34.3 Schema Extension
+
+**Migration `0079_bulk_deprovision_guard.sql`:**
+
+```sql
+-- Migration 0079: SCIM Bulk Deprovision Guard
+-- Adds per-tenant configurable threshold and CSM override window to tenant_sso_configs.
+-- Prerequisite: migrations 0052 (scim_ip_enforcement_enabled), 0076 (scim_ip_enforcement_flag),
+--               0077 (scim_ip_enforcement_toggle_rpc).
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS bulk_deprovision_threshold_pct SMALLINT     NOT NULL DEFAULT 20,
+  ADD COLUMN IF NOT EXISTS bulk_deprovision_override_exp  TIMESTAMPTZ           DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS bulk_deprovision_override_by   UUID                  DEFAULT NULL
+    REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- Constraint: threshold must be 5–100 (100 = guard disabled)
+ALTER TABLE tenant_sso_configs
+  ADD CONSTRAINT chk_bdg_threshold
+    CHECK (bulk_deprovision_threshold_pct BETWEEN 5 AND 100);
+
+-- Constraint: override columns must be both set or both NULL
+ALTER TABLE tenant_sso_configs
+  ADD CONSTRAINT chk_bdg_override_coherent
+    CHECK (
+      (bulk_deprovision_override_exp IS NULL) = (bulk_deprovision_override_by IS NULL)
+    );
+
+-- Index: efficiently find tenants with active override windows (for cron sweep)
+CREATE INDEX idx_tsc_bdg_override_active
+  ON tenant_sso_configs (tenant_id)
+  WHERE bulk_deprovision_override_exp IS NOT NULL;
+
+-- pg_cron job 33: auto-expire stale override windows every 15 minutes
+-- (SCIM Worker also clears on use; this is the safety-net sweep)
+SELECT cron.schedule(
+  'bdg_override_expiry_sweep',
+  '*/15 * * * *',
+  $$
+    UPDATE tenant_sso_configs
+       SET bulk_deprovision_override_exp = NULL,
+           bulk_deprovision_override_by  = NULL
+     WHERE bulk_deprovision_override_exp IS NOT NULL
+       AND bulk_deprovision_override_exp < NOW();
+  $$
+);
+
+COMMENT ON COLUMN tenant_sso_configs.bulk_deprovision_threshold_pct IS
+  'Guard threshold: block SCIM deprovisions if count exceeds ceiling(contracted_seats * pct / 100) '
+  'in a 5-minute window. Range 5–100. 100 = guard disabled. Default 20.';
+COMMENT ON COLUMN tenant_sso_configs.bulk_deprovision_override_exp IS
+  'CSM-countersigned override expiry. NULL = guard active. Future timestamp = override window open. '
+  'Cleared by SCIM Worker after first bulk sync that uses it, or by pg_cron job 33 on expiry.';
+COMMENT ON COLUMN tenant_sso_configs.bulk_deprovision_override_by IS
+  'FORM-internal CSM UUID who countersigned the override. NULL when no override is active.';
+```
+
+**RLS impact:** Inherits existing `tenant_sso_configs` RLS (§4.2 `docs/DATA_MODEL.md`). `form_api` may read (for threshold check). `form_system` may write (via SECURITY DEFINER RPCs). `tenant_admin` / `tenant_owner` may update `bulk_deprovision_threshold_pct` via the `update_bdg_threshold()` RPC; the override columns are NOT directly tenant-writable (only via the two-person internal admin path in §34.5).
+
+### §34.4 SCIM Worker Pre-Flight Guard
+
+**File:** `apps/scim-worker/src/handlers/users.ts` (extends the deprovisioning path from §27.5)
+
+```typescript
+// ── KV schema ──────────────────────────────────────────────────────────────────────
+// scim:deprov_guard:{tenantId}:{windowKey}  →  stringified integer count
+//   TTL: 600 s  (covers current + previous 5-min window for clean rollover)
+//
+// scim:guard_cfg:{tenantId}  →  JSON GuardConfig
+//   TTL: 60 s  (short cache; actively invalidated on config change per §34.3.4)
+
+function currentWindowKey(): string {
+  return String(Math.floor(Date.now() / 300_000)); // epoch ÷ 5 minutes
+}
+
+interface GuardConfig {
+  thresholdPct:    number;  // tenant_sso_configs.bulk_deprovision_threshold_pct
+  hasOverride:     boolean; // bulk_deprovision_override_exp > NOW()
+  contractedSeats: number;  // enterprise_contracts.contracted_seats (KV-cached 1h)
+}
+
+async function getGuardConfig(tenantId: string, env: Env): Promise<GuardConfig> {
+  const cacheKey = `scim:guard_cfg:${tenantId}`;
+  const cached = await env.SCIM_KV.get(cacheKey);
+  if (cached) return JSON.parse(cached) as GuardConfig;
+
+  // Supabase: join tenant_sso_configs with enterprise_contracts for contracted_seats
+  const { data, error } = await env.SUPABASE
+    .from('tenant_sso_configs')
+    .select(`
+      bulk_deprovision_threshold_pct,
+      bulk_deprovision_override_exp,
+      enterprise_contracts!inner ( contracted_seats )
+    `)
+    .eq('tenant_id', tenantId)
+    .single();
+
+  if (error || !data) throw new Error(`guard_cfg_fetch_failed: ${tenantId}`);
+
+  const config: GuardConfig = {
+    thresholdPct:    data.bulk_deprovision_threshold_pct,
+    hasOverride:
+      data.bulk_deprovision_override_exp != null &&
+      new Date(data.bulk_deprovision_override_exp) > new Date(),
+    contractedSeats: (data as any).enterprise_contracts.contracted_seats,
+  };
+
+  await env.SCIM_KV.put(cacheKey, JSON.stringify(config), { expirationTtl: 60 });
+  return config;
+}
+
+export interface GuardResult {
+  allowed:         boolean;
+  blocked:         boolean;
+  count:           number;  // deprovisions in current window (including this one if allowed)
+  limit:           number;  // computed ceiling(contractedSeats × thresholdPct / 100)
+  hasOverride:     boolean;
+  contractedSeats: number;
+  thresholdPct:    number;
+}
+
+// Call before each PATCH (active=false) or DELETE in the SCIM Worker.
+export async function enforceDeprovisionGuard(
+  tenantId: string,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<GuardResult> {
+  const config = await getGuardConfig(tenantId, env);
+
+  // Guard disabled (threshold = 100%)
+  if (config.thresholdPct >= 100) {
+    return { allowed: true, blocked: false, count: 0, limit: 0,
+             hasOverride: false, contractedSeats: config.contractedSeats, thresholdPct: 100 };
+  }
+
+  const limit   = Math.max(1, Math.ceil(config.contractedSeats * config.thresholdPct / 100));
+  const winKey  = `scim:deprov_guard:${tenantId}:${currentWindowKey()}`;
+  const countStr = await env.SCIM_KV.get(winKey);
+  const count    = countStr ? parseInt(countStr, 10) : 0;
+
+  // Active CSM override — bypass guard; still increment counter for audit visibility
+  if (config.hasOverride) {
+    ctx.waitUntil(env.SCIM_KV.put(winKey, String(count + 1), { expirationTtl: 600 }));
+    return { allowed: true, blocked: false, count: count + 1, limit,
+             hasOverride: true, contractedSeats: config.contractedSeats, thresholdPct: config.thresholdPct };
+  }
+
+  // Over threshold — block
+  if (count >= limit) {
+    return { allowed: false, blocked: true, count, limit,
+             hasOverride: false, contractedSeats: config.contractedSeats, thresholdPct: config.thresholdPct };
+  }
+
+  // Under threshold — allow; increment counter fire-and-forget
+  ctx.waitUntil(env.SCIM_KV.put(winKey, String(count + 1), { expirationTtl: 600 }));
+  return { allowed: true, blocked: false, count: count + 1, limit,
+           hasOverride: false, contractedSeats: config.contractedSeats, thresholdPct: config.thresholdPct };
+}
+```
+
+**Integration in `handleUserDelete` and `handleUserPatch` (deactivation branch):**
+
+```typescript
+// Inserted at the top of each deprovision handler, before DB write:
+const guard = await enforceDeprovisionGuard(tenantId, env, ctx);
+
+if (guard.blocked) {
+  // Emit DEC-030 event before returning 422 (fire-and-forget to preserve latency)
+  ctx.waitUntil(emitAuditEvent({
+    type:     'scim.bulk_deprovision_blocked',
+    tenantId,
+    payload: {
+      tenant_id:        tenantId,
+      attempted_count:  guard.count,
+      limit_count:      guard.limit,
+      threshold_pct:    guard.thresholdPct,
+      contracted_seats: guard.contractedSeats,
+      window_minutes:   5,
+    },
+  }, env));
+
+  return scimError(
+    422,
+    'tooMany',
+    `BULK_DEPROVISION_GUARD_TRIGGERED: ${guard.count}/${guard.limit} deprovisions in the ` +
+    `current 5-minute window (threshold: ${guard.thresholdPct}%). ` +
+    `Contact your FORM Customer Success Manager to issue a one-time override for planned bulk changes.`
+  );
+}
+
+// If override is active and this is the first request over limit, auto-revoke after response
+if (guard.hasOverride && guard.count > guard.limit) {
+  ctx.waitUntil(revokeActiveOverride(tenantId, env));
+}
+```
+
+**Override auto-revocation:**
+
+```typescript
+async function revokeActiveOverride(tenantId: string, env: Env): Promise<void> {
+  const { data } = await env.SUPABASE
+    .from('tenant_sso_configs')
+    .select('bulk_deprovision_override_by, bulk_deprovision_override_exp, contracted_seats')
+    .eq('tenant_id', tenantId)
+    .single();
+
+  if (!data?.bulk_deprovision_override_by) return; // already revoked
+
+  const winKey   = `scim:deprov_guard:${tenantId}:${currentWindowKey()}`;
+  const countStr = await env.SCIM_KV.get(winKey);
+  const count    = countStr ? parseInt(countStr, 10) : 0;
+  const pct      = data.contracted_seats > 0
+    ? Math.round((count / data.contracted_seats) * 100) : 0;
+
+  await emitAuditEvent({
+    type:     'scim.bulk_deprovision_override_used',
+    tenantId,
+    payload: {
+      tenant_id:          tenantId,
+      deprovision_count:  count,
+      contracted_seats:   data.contracted_seats,
+      pct_of_seats:       pct,
+      override_issued_by: data.bulk_deprovision_override_by,
+    },
+  }, env);
+
+  // NULL override columns; invalidate guard config cache
+  await env.SUPABASE
+    .from('tenant_sso_configs')
+    .update({ bulk_deprovision_override_exp: null, bulk_deprovision_override_by: null })
+    .eq('tenant_id', tenantId);
+
+  await env.SCIM_KV.delete(`scim:guard_cfg:${tenantId}`);
+}
+```
+
+#### §34.3.4 Active KV Cache Invalidation (mirrors §33.3.3)
+
+When `bulk_deprovision_threshold_pct` or override columns change, `scim:guard_cfg:{tenantId}` is immediately deleted from `SCIM_KV`. The 60-second TTL is a passive fallback only. This mirrors the active-invalidation pattern from §33.3.3 (`scim_ip_cfg` key deletion on toggle mutation).
+
+### §34.5 CSM Override Protocol
+
+**Two-person gate:**
+
+1. **Tenant_owner initiates:** "Approve Bulk Deprovision Override" action in Admin Dashboard → SCIM → Bulk Deprovision Guard; provides reason text (min 20 chars, max 500 chars); selects duration (1h / 2h / 4h)
+2. **CSM countersigns:** FORM internal admin console shows pending request (expires 30 min if not countersigned); CSM approves via `POST /internal/v1/admin/scim/bulk-override`
+
+**Internal API: `POST /internal/v1/admin/scim/bulk-override`**
+
+```typescript
+interface BulkOverrideRequest {
+  tenant_id:    string;       // UUID
+  expires_in_h: 1 | 2 | 4;  // CSM selects based on scope of change
+  reason:       string;       // free text max 500 chars; SHA-256 hashed in DEC-030
+  csm_admin_id: string;       // UUID of FORM CSM; from PAM session §24
+}
+
+async function handleBulkOverrideIssuance(req: BulkOverrideRequest, env: Env): Promise<void> {
+  const expiresAt = new Date(Date.now() + req.expires_in_h * 3_600_000).toISOString();
+
+  await env.SUPABASE
+    .from('tenant_sso_configs')
+    .update({
+      bulk_deprovision_override_exp: expiresAt,
+      bulk_deprovision_override_by:  req.csm_admin_id,
+    })
+    .eq('tenant_id', req.tenant_id);
+
+  // Immediately invalidate guard config cache
+  await env.SCIM_KV.delete(`scim:guard_cfg:${req.tenant_id}`);
+
+  await emitAuditEvent({
+    type:     'scim.bulk_deprovision_override_issued',
+    tenantId: req.tenant_id,
+    payload: {
+      tenant_id:    req.tenant_id,
+      csm_admin_id: req.csm_admin_id,
+      expires_at:   expiresAt,
+      expires_in_h: req.expires_in_h,
+      reason_hash:  sha256Hex(req.reason), // raw reason never enters the chain
+    },
+  }, env);
+}
+```
+
+**Override TTL guidance:**
+
+| Change type | Recommended TTL | Rationale |
+|---|---|---|
+| Small restructuring (21–35% of seats) | 1h | Single IdP sync cycle; most IdPs complete in 10–20 min |
+| Department dissolution (36–60% of seats) | 2h | Larger sync + potential retry on SCIM error |
+| Mass termination (>60% of seats) | 4h | Multi-retry window; CSM monitors active session during sync |
+
+**PAM requirement:** `POST /internal/v1/admin/scim/bulk-override` requires a `read_write` or higher PAM session (§24.2) for the CSM operator. The `csm_admin_id` in the DEC-030 event is extracted from the PAM session, not from the request body, preventing spoofing.
+
+### §34.6 Admin Dashboard SCIM Configuration Panel Extension
+
+Extends the SCIM Configuration screen (§16) with a **Bulk Deprovision Guard** subsection.
+
+**Access:** `tenant_owner` and `tenant_admin` read + threshold adjust; `tenant_manager` read-only.
+
+| UI element | Description |
+|---|---|
+| **Guard status badge** | Green `ACTIVE (≤ N users / 5 min)` · Amber `OVERRIDE ACTIVE until HH:MM UTC` · Red `DISABLED` |
+| **Threshold slider** | 5–100; live label: *"Block if more than N users deprovisioned within 5 minutes"* (N = ceiling(seats × pct / 100)); at 100 shows *"Guard disabled — any bulk deprovision allowed"* |
+| **"Request Bulk Override" button** | Visible to `tenant_owner` only; opens modal with reason field + duration picker; submits request for CSM countersign |
+| **Pending override notice** | Shown after request submitted, while awaiting CSM: *"Override pending CSM approval — expires at HH:MM UTC"* |
+| **Override status** | When active: *"CSM override active until HH:MM UTC — bulk deprovisioning allowed. Override auto-revokes after first bulk sync session."* |
+
+**Supabase RPC `update_bdg_threshold` (migration 0079 or additive RPC migration):**
+
+```sql
+CREATE OR REPLACE FUNCTION update_bdg_threshold(
+  p_tenant_id   UUID,
+  p_threshold   SMALLINT,
+  p_actor_id    UUID,
+  p_actor_type  TEXT     -- 'tenant_admin' | 'tenant_owner'
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_previous SMALLINT;
+BEGIN
+  IF p_threshold NOT BETWEEN 5 AND 100 THEN
+    RAISE EXCEPTION 'threshold_out_of_range: must be 5–100, got %', p_threshold;
+  END IF;
+
+  SELECT bulk_deprovision_threshold_pct
+    INTO v_previous
+    FROM tenant_sso_configs
+   WHERE tenant_id = p_tenant_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'tenant_not_found: %', p_tenant_id;
+  END IF;
+
+  UPDATE tenant_sso_configs
+     SET bulk_deprovision_threshold_pct = p_threshold
+   WHERE tenant_id = p_tenant_id;
+
+  INSERT INTO audit_log_events (tenant_id, actor_id, actor_type, event_type, severity, payload)
+  VALUES (
+    p_tenant_id, p_actor_id, p_actor_type,
+    'scim.bulk_deprovision_threshold_updated', 'STANDARD',
+    jsonb_build_object(
+      'tenant_id',          p_tenant_id,
+      'actor_id',           p_actor_id,
+      'actor_type',         p_actor_type,
+      'previous_threshold', v_previous,
+      'new_threshold',      p_threshold
+    )
+  );
+END;
+$$;
+```
+
+After calling `update_bdg_threshold()`, the Admin Dashboard API also calls `env.SCIM_KV.delete('scim:guard_cfg:' + tenantId)` to immediately propagate the change (mirrors §33.3.3).
+
+### §34.7 DEC-030 HMAC-Chained Audit Events
+
+Four new events + one advisory. All registered in `docs/AUDIT_LOG_SCHEMA.md §SCIM Bulk Deprovision Guard` (§34.11 item 5 — documentation [x] done; Worker registry deploy tracked in items 2–4).
+
+#### §34.7.1 `scim.bulk_deprovision_blocked`
+
+| Field | Value |
+|---|---|
+| Severity | **HIGH** |
+| Retention | 7 years |
+| Trigger | `enforceDeprovisionGuard()` returns `blocked: true`; emitted before returning HTTP 422 |
+| Emitter | `scim-worker` (`form_system` actor) |
+
+```typescript
+// Zod v2 schema
+const bulkDeprovisionBlockedSchema = z.object({
+  tenant_id:        z.string().uuid(),
+  attempted_count:  z.number().int().nonnegative(),
+  limit_count:      z.number().int().positive(),
+  threshold_pct:    z.number().int().min(5).max(99),
+  contracted_seats: z.number().int().positive(),
+  window_minutes:   z.literal(5),
+  // Privacy floor: no user_id, no individual employee data
+});
+```
+
+> **GUARD-CHAIN-01 advisory invariant:** If `scim.bulk_deprovision_blocked` is emitted for the same `tenant_id` more than twice within a single UTC calendar day, the `evidence-collection-cron` Worker (§81) emits advisory `system.scim_guard_repeated_trigger` (STANDARD, 1yr) flagging possible IdP misconfiguration. Non-blocking.
+
+#### §34.7.2 `scim.bulk_deprovision_override_issued`
+
+| Field | Value |
+|---|---|
+| Severity | **HIGH** |
+| Retention | 7 years |
+| Trigger | CSM countersigns override in internal admin console |
+| Emitter | `form-admin-api` Worker (`form_system` actor) |
+
+```typescript
+const bulkDeprovisionOverrideIssuedSchema = z.object({
+  tenant_id:    z.string().uuid(),
+  csm_admin_id: z.string().uuid(),          // FORM internal CSM; not a tenant employee
+  expires_at:   z.string().datetime(),
+  expires_in_h: z.union([z.literal(1), z.literal(2), z.literal(4)]),
+  reason_hash:  z.string().length(64),      // SHA-256 hex; raw reason never in chain
+  // Privacy floor: no tenant employee names, no health data
+});
+```
+
+#### §34.7.3 `scim.bulk_deprovision_override_used`
+
+| Field | Value |
+|---|---|
+| Severity | **HIGH** |
+| Retention | 7 years |
+| Trigger | First bulk deprovision that proceeds under an active override; emitted before NULLing override columns |
+| Emitter | `scim-worker` (`form_system` actor, in `revokeActiveOverride()`) |
+
+```typescript
+const bulkDeprovisionOverrideUsedSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  deprovision_count:  z.number().int().positive(),
+  contracted_seats:   z.number().int().positive(),
+  pct_of_seats:       z.number().min(0).max(100),
+  override_issued_by: z.string().uuid(),  // csm_admin_id from issuance record
+  // Privacy floor: no user_id, no employee names
+});
+```
+
+#### §34.7.4 `scim.bulk_deprovision_threshold_updated`
+
+| Field | Value |
+|---|---|
+| Severity | **STANDARD** |
+| Retention | 7 years |
+| Trigger | Tenant admin/owner adjusts threshold via Admin Dashboard; emitted by `update_bdg_threshold()` RPC |
+| Emitter | `form_system` (SECURITY DEFINER RPC) |
+
+```typescript
+const bulkDeprovisionThresholdUpdatedSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  actor_id:           z.string().uuid(),
+  actor_type:         z.enum(['tenant_admin', 'tenant_owner']),
+  previous_threshold: z.number().int().min(5).max(100),
+  new_threshold:      z.number().int().min(5).max(100),
+  // No employee data
+});
+```
+
+#### §34.7.5 `system.scim_guard_repeated_trigger` (advisory)
+
+| Field | Value |
+|---|---|
+| Severity | **STANDARD** |
+| Retention | 1 year |
+| Trigger | GUARD-CHAIN-01: evidence-collection-cron detects ≥ 3 `scim.bulk_deprovision_blocked` events for the same `tenant_id` in a single calendar day |
+| Emitter | `evidence-collection-cron` (`form_system` actor) |
+
+```typescript
+const scimGuardRepeatedTriggerSchema = z.object({
+  tenant_id:     z.string().uuid(),
+  trigger_count: z.number().int().min(3), // number of blocks in the calendar day
+  calendar_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // UTC date
+  // Advisory only — no PagerDuty; logged to CSM follow-up queue
+});
+```
+
+### §34.8 SOC 2 Evidence Mapping
+
+| Criterion | Narrative | Evidence artefact |
+|---|---|---|
+| **CC6.3** | Structural access control prevents accidental mass access revocation. §34 guard converts what was previously a reactive IR process (R-24) into a preventive HTTP 422 refusal at the data boundary. The guard is architectural — it cannot be bypassed without the two-person CSM override protocol, which is itself HMAC-chained. | **GUARD-E-001** (quarterly, 7yr) |
+| **A1.2** | Environmental threat protection. SCIM mass deprovisioning is a documented availability threat (R-24). The §34 guard is a structural countermeasure documented before the first enterprise customer. | See GUARD-E-001 |
+| **CC7.2** | Proactive detection via GUARD-CHAIN-01. Repeated guard triggers generate advisory events surfaced to CSM for IdP configuration investigation — converting a blocked event into a structured investigation signal. | Included in GUARD-E-001 quarterly export |
+| **CC9.2** | Third-party (IdP) risk management. The guard treats the IdP as an untrusted upstream that can produce incorrect deprovision payloads (H1/H2 root causes). It enforces a business-logic boundary between IdP intent and FORM user state. | GUARD-E-001 confirms boundary is active |
+
+**GUARD-E-001 collection:** Quarterly export of all `scim.bulk_deprovision_blocked`, `scim.bulk_deprovision_override_issued`, `scim.bulk_deprovision_override_used`, and `system.scim_guard_repeated_trigger` events. Zero-event quarters are filed as explicit attestation confirming the guard is active and IdP configurations are healthy.
+
+```sql
+-- GUARD-E-001 quarterly export query
+-- File at: compliance/evidence/scim-guard/GUARD-E-001_<YYYY-QN>.csv
+SELECT
+  event_type,
+  tenant_id,
+  created_at,
+  payload->>'threshold_pct'       AS threshold_pct,
+  payload->>'attempted_count'     AS attempted_count,
+  payload->>'limit_count'         AS limit_count,
+  payload->>'contracted_seats'    AS contracted_seats,
+  payload->>'deprovision_count'   AS deprovision_count,
+  payload->>'pct_of_seats'        AS pct_of_seats,
+  payload->>'csm_admin_id'        AS csm_admin_id,
+  payload->>'override_issued_by'  AS override_issued_by,
+  payload->>'expires_at'          AS override_expires_at,
+  payload->>'previous_threshold'  AS previous_threshold,
+  payload->>'new_threshold'       AS new_threshold
+FROM audit_log_events
+WHERE event_type IN (
+  'scim.bulk_deprovision_blocked',
+  'scim.bulk_deprovision_override_issued',
+  'scim.bulk_deprovision_override_used',
+  'scim.bulk_deprovision_threshold_updated',
+  'system.scim_guard_repeated_trigger'
+)
+  AND created_at >= DATE_TRUNC('quarter', NOW() - INTERVAL '1 quarter')
+  AND created_at <  DATE_TRUNC('quarter', NOW())
+ORDER BY tenant_id, created_at ASC;
+-- Zero-event result: file export + attestation note:
+--   "No bulk deprovision blocking or override events in this quarter. Guard active."
+```
+
+Cross-reference obligation: register GUARD-E-001 in `docs/SOC2_READINESS.md §91` (P1/M13+1Q).
+
+### §34.9 Interaction With AL-SCIM-MASS-01 / R-24
+
+| Scenario | §34 guard fires? | AL-SCIM-MASS-01 fires? | R-24 opens? | Net outcome |
+|---|---|---|---|---|
+| Normal: 4 deprovisions from 200-seat tenant (2%) | ❌ | ❌ | ❌ | Normal — no events |
+| Accidental: 50 deprovisions from 200-seat tenant (25%) | ✅ HTTP 422 at #41 (limit = ceil(200×20%/100)=40) | ✅ at #21 (10% threshold) | ✅ P1 | Guard limits to 40; R-24 containment protocol; CSM closes R-24 citing guard blocked further impact |
+| Planned: 150 deprovisions from 200-seat tenant (75%) — override active | ❌ (override bypasses guard) | ✅ at #21 | ✅ P1 opens auto | R-24 auto-opens; CSM immediately closes citing GUARD-E-001 `override_issued` event. Override auto-revoked after sync. |
+| H3 (FORM bug): unlimited DELETEs | ✅ at #41 (guard stops > 40) | ✅ at #21 | ✅ P0/P1 | Guard limits impact to 40 users; R-24 full protocol; H3 root cause investigation per R-24.5 |
+
+> **R-24 interaction note:** For planned bulk deprovisioning with an active override, R-24 will open as P1 (AL-SCIM-MASS-01 fires at 10% threshold). The CSM should immediately acknowledge the auto-opened incident and close it with reference to the `scim.bulk_deprovision_override_issued` DEC-030 event (`incident_id` cross-referenced). This is expected behaviour — the reactive layer does not know about the override; the audit chain contains the override evidence.
+
+### §34.10 OQ Gap Tracker
+
+| OQ | Previous Status | Status After §34 | Decision |
+|---|---|---|---|
+| **OQ-R24-01** | 🟡 P1 — before enterprise GA M13 | 🟢 **Resolved — 2026-06-19** | Per-tenant configurable threshold (default 20%, range 5–100%); 5-minute rolling window; CSM-countersigned time-limited override (max 4h); auto-revocation after first use; four DEC-030 events + advisory. Formal decision: DEC-066 in `docs/DECISION_LOG.md`. |
+
+**Cross-updates required:**
+- `docs/INCIDENT_RESPONSE.md §R-24.15` item 10 → [x] Done (2026-06-19)
+- `docs/DECISION_LOG.md` → DEC-066 added
+- `docs/AUDIT_LOG_SCHEMA.md` → v2.19 (§34.11 item 5 [x] Done)
+- `docs/SOC2_READINESS.md §91` → GUARD-E-001 cross-reference patch (P1/M13+1Q)
+
+### §34.11 Implementation Checklist
+
+#### P0 — Before first enterprise GA customer (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0079_bulk_deprovision_guard.sql`: ADD three columns + two constraints + partial index `idx_tsc_bdg_override_active` + pg_cron job 33 `bdg_override_expiry_sweep`. Verify in staging: threshold defaults to 20; `chk_bdg_threshold` rejects values outside 5–100; `chk_bdg_override_coherent` rejects setting only one of (exp, by); pg_cron fires within 15 min and NULLs rows with `override_exp < NOW()`. | platform-engineer | **P0** | M13 | [ ] |
+| 2 | Implement `enforceDeprovisionGuard()`, `getGuardConfig()`, and `revokeActiveOverride()` per §34.4; wire into `handleUserDelete()` and the `active=false` deactivation branch of `handleUserPatch()`; confirm `getGuardConfig()` correctly JOINs `enterprise_contracts.contracted_seats`; confirm `scim:guard_cfg` KV is invalidated on override issuance and threshold change. | platform-engineer | **P0** | M13 | [ ] |
+| 3 | Implement `POST /internal/v1/admin/scim/bulk-override` in `form-admin-api` Worker per §34.5; require `read_write` PAM session elevation (§24) for CSM operator; emit `scim.bulk_deprovision_override_issued` DEC-030 before Supabase UPDATE; call `SCIM_KV.delete('scim:guard_cfg:' + tenantId)` after; return 200 with `expires_at` to Admin Console. | platform-engineer + security-engineer | **P0** | M13 | [ ] |
+| 4 | Implement Supabase RPC `update_bdg_threshold()` per §34.6 DDL; wire into Admin Dashboard SCIM Config API endpoint; call `SCIM_KV.delete('scim:guard_cfg:' + tenantId)` after RPC; validate 200 response includes updated threshold value for UI refresh. | platform-engineer | **P0** | M13 | [ ] |
+| 5 | Register all five DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §SCIM Bulk Deprovision Guard`: `scim.bulk_deprovision_blocked` (HIGH, 7yr), `scim.bulk_deprovision_override_issued` (HIGH, 7yr), `scim.bulk_deprovision_override_used` (HIGH, 7yr), `scim.bulk_deprovision_threshold_updated` (STANDARD, 7yr); advisory `system.scim_guard_repeated_trigger` (STANDARD, 1yr). Deploy updated event registry to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M13 | [x] Done — `docs/AUDIT_LOG_SCHEMA.md` v2.19 (2026-06-19). Implementation (Worker registry deploy + integration test) tracked in items 2–4 and 6. |
+| 6 | Integration tests `src/tests/sso/scim-bulk-deprovision-guard.test.ts`: (a) deprovision count at limit − 1 → 200 OK; (b) deprovision count at limit → 422 `BULK_DEPROVISION_GUARD_TRIGGERED` + `scim.bulk_deprovision_blocked` emitted; (c) threshold = 100 → guard always allows; (d) active override → 200 OK on count at limit + `scim.bulk_deprovision_override_used` emitted on first over-limit request + override columns NULLed; (e) pg_cron job 33 clears expired rows; (f) `getGuardConfig()` cache miss → correct Supabase fallback. | platform-engineer | **P0** | M13 | [ ] |
+
+#### P1 — Before enterprise GA (M12–M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Add Bulk Deprovision Guard section to Admin Dashboard SCIM Config screen per §34.6: threshold slider, guard status badge, "Request Bulk Override" modal (tenant_owner only) with reason field + duration picker; show pending-override and active-override states. design-craft review required; compliance-officer confirms reason field copy does not inadvertently capture employee-identifiable information. | platform-engineer + design-craft | **P1** | M13 | [ ] |
+| 8 | Brief CSM team on override protocol per §34.5: TTL-by-scope table; two-person process; when to recommend threshold adjustment vs. time-limited override; add a brief note to `docs/ENTERPRISE_ONBOARDING.md §3.3` SCIM section: *"For planned large-scale workforce changes (>N% of seats), contact your FORM CSM in advance to issue a one-time bulk deprovision override."* | customer-success + compliance-officer | **P1** | M12 | [ ] |
+| 9 | Register GUARD-E-001 in `docs/SOC2_READINESS.md §91` cross-reference patch (CC6.3 / A1.2 / CC7.2 / CC9.2); file first artefact in the quarter after enterprise GA go-live. | compliance-officer | **P1** | M13+1Q | [ ] |
+
+#### P2 — Post-GA
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | After first non-zero GUARD-E-001 export: review IdP configurations for tenant(s) that triggered the guard; determine if threshold adjustment is warranted; if threshold raised for a specific tenant, document rationale in `docs/DECISION_LOG.md`. | customer-success + enterprise-architect | **P2** | First trigger | [ ] |
+| 11 | Resolve OQ-R24-02 (Admin Dashboard "undo deprovision" action — P2): evaluate feasibility; if approved, design `bulk_deprovision_undo_eligible_until` column on `tenant_sso_configs` and a re-provision API endpoint. | enterprise-architect + platform-engineer | **P2** | After 3 enterprise customers | [ ] |
+
+### §34.12 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-SSO-34.1** | **Should the 5-minute guard window align with AL-SCIM-MASS-01's 10-minute window?** Separate windows (5-min guard / 10-min detection) mean the guard fires before detection, which is the intended order. Unified 5-minute windows would simplify operator mental model but increase AL-SCIM-MASS-01 false-positive risk. Recommendation: keep separate windows; document in Admin Dashboard tooltip. | P2 | enterprise-architect | Document in `docs/DECISION_LOG.md` if unification is adopted at M13 implementation. |
+| **OQ-SSO-34.2** | **Should `contracted_seats` be sourced from `enterprise_contracts.contracted_seats` (static, 60s KV cache) or `COUNT(tenant_users WHERE is_active = true)` (real-time, per-request DB query)?** Static contracted_seats is stable and avoids per-request COUNT load during bulk syncs. Active count is more accurate but adds latency and DB connection pressure during the very scenario the guard is protecting against. Recommendation: `enterprise_contracts.contracted_seats` with 1-hour KV cache refreshed by `billing.seats_expanded`/`billing.seats_reduced` DEC-030 events. | P1 | platform-engineer | Decide at M13 implementation; document in `docs/DECISION_LOG.md` if active count is chosen. |
+
+---
+
+*v2.6 (2026-06-19): §34 SCIM Bulk Deprovision Guard — Per-Tenant Configurable Threshold & CSM-Countersigned Override. Closes OQ-R24-01 (P1, `docs/INCIDENT_RESPONSE.md §R-24.14`, before enterprise GA M13). Decision: DEC-066 (2026-06-19). §34.1 purpose: two-layer defence model — §34 preventive (HTTP 422 before deprovisioning; 5-min window) + R-24 / AL-SCIM-MASS-01 reactive (after deprovisioning; 10-min window). §34.2 decision (DEC-066): Option B adopted (per-tenant configurable threshold, 5-min rolling window, CSM-countersigned time-limited override, auto-revocation after first bulk sync use); Option A (fixed fleet threshold) rejected for inflexibility; Option C (async approval queue) rejected for per-request latency impact. §34.3 migration 0079: three new columns on `tenant_sso_configs` (`bulk_deprovision_threshold_pct` SMALLINT DEFAULT 20, `bulk_deprovision_override_exp` TIMESTAMPTZ, `bulk_deprovision_override_by` UUID FK to auth.users); two constraints (`chk_bdg_threshold` 5–100, `chk_bdg_override_coherent`); partial index `idx_tsc_bdg_override_active`; pg_cron job 33 `bdg_override_expiry_sweep` every 15 min (safety-net expiry sweep; SCIM Worker also auto-revokes on use). §34.4 Worker: `enforceDeprovisionGuard()` in `apps/scim-worker/src/handlers/users.ts`; KV key `scim:deprov_guard:{tenantId}:{epoch5min}` (600s TTL); `scim:guard_cfg:{tenantId}` 60s cache + active invalidation on config change; `getGuardConfig()` JOINs `enterprise_contracts.contracted_seats`; threshold = 100 → guard disabled (fast-path); active override → bypass guard but still increment counter; `revokeActiveOverride()` fires after first over-limit request under override (emits `scim.bulk_deprovision_override_used` → NULLs columns → invalidates KV). §34.5 override protocol: two-person gate (tenant_owner Admin Dashboard request + CSM countersign in internal admin console, 30-min window to countersign); CSM selects 1h/2h/4h TTL; `POST /internal/v1/admin/scim/bulk-override` requires PAM `read_write` session (§24); `reason_hash` SHA-256 of free text (raw never in chain). §34.6 Admin Dashboard: threshold slider 5–100%, guard status badge (active/override/disabled), "Request Bulk Override" modal for `tenant_owner`; Supabase RPC `update_bdg_threshold()` SECURITY DEFINER; override columns NOT directly tenant-settable. §34.7 five events: `scim.bulk_deprovision_blocked` (HIGH, 7yr — GUARD-CHAIN-01 advisory on repeat triggers); `scim.bulk_deprovision_override_issued` (HIGH, 7yr — reason_hash only); `scim.bulk_deprovision_override_used` (HIGH, 7yr — auto-revoke trigger); `scim.bulk_deprovision_threshold_updated` (STANDARD, 7yr — tenant admin/owner actor_id); `system.scim_guard_repeated_trigger` advisory (STANDARD, 1yr — fires at ≥ 3 blocks in one calendar day). §34.8 SOC 2: CC6.3 (structural preventive access control), A1.2 (availability protection), CC7.2 (GUARD-CHAIN-01 repeated-trigger investigation), CC9.2 (IdP treated as untrusted upstream); GUARD-E-001 quarterly export (zero-event quarters as explicit attestation). §34.9 interaction with R-24: guard and AL-SCIM-MASS-01 have complementary thresholds; planned bulk deprovision with override will auto-open R-24 P1 (CSM closes immediately citing override chain event). §34.10 gap tracker: OQ-R24-01 🟡→🟢 Resolved; INCIDENT_RESPONSE.md §R-24.15 item 10 [x] Done; DEC-066 created; AUDIT_LOG_SCHEMA.md v2.19 done. §34.11 checklist: 6× P0/M13 (migration 0079, Worker guard + revoke, override API, RPC + Admin Dashboard, AUDIT_LOG registration [x] done, integration tests); 3× P1/M12–M13+1Q (Admin Dashboard UI, CSM briefing + ENTERPRISE_ONBOARDING note, SOC2 §91 cross-reference); 2× P2/post-GA. §34.12 two open questions: OQ-SSO-34.1 (window alignment, P2); OQ-SSO-34.2 (contracted_seats source, P1). TOC entry §34 added. Document header v2.5 → v2.6. Privacy floor: no `user_id`, no individual employee name, no health data, no coaching content in any §34 DEC-030 event; `reason_hash` is SHA-256 of CSM/tenant_owner free-text reason (raw never enters chain); `csm_admin_id` and `override_issued_by` are FORM-internal operator UUIDs (not tenant employees); `actor_id` in threshold-updated event is the tenant admin/owner UUID; `tenant_id` is FORM-internal org UUID. Cross-references: `docs/INCIDENT_RESPONSE.md §R-24.14` (OQ-R24-01 source — §34.10 resolves); `docs/INCIDENT_RESPONSE.md §R-24.15` (item 10 — [x] Done 2026-06-19); `docs/INCIDENT_RESPONSE.md §R-24.9` (five reactive SCIM mass deprovision events — complementary layer); `docs/AUDIT_LOG_SCHEMA.md §SCIM Bulk Deprovision Guard` (five events registered — §34.11 item 5 [x] Done); `docs/SOC2_READINESS.md §91` (GUARD-E-001 cross-reference patch — P1/M13+1Q); `docs/DATA_MODEL.md §4.2` (`tenant_sso_configs` — three columns added by migration 0079); `docs/SSO_SCIM_IMPLEMENTATION.md §27.5` (SCIM Worker — `enforceDeprovisionGuard()` wired into `handleUserDelete` and `handleUserPatch`); `§33.3.3` (active KV invalidation pattern — mirrored for `scim:guard_cfg` key); `§25.4` (auth policy KV cache — same invalidation idiom); `docs/ENTERPRISE_ONBOARDING.md §3.3` (CSM briefing note — P1/M12); `docs/DECISION_LOG.md DEC-066` (formal adoption decision). Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*

@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [6.21.0] — 2026-06-19
+
+### Added
+- **`docs/SSO_SCIM_IMPLEMENTATION.md §34` — SCIM Bulk Deprovision Guard** (v2.5 → v2.6): Preventive per-tenant configurable SCIM bulk deprovision threshold guard (default 20%, range 5–100%, 5-minute rolling KV window). Closes OQ-R24-01 (P1, INCIDENT_RESPONSE.md R-24.14). DEC-066 adopted. Key additions: `enforceDeprovisionGuard()` TypeScript Worker function; `getGuardConfig()` with 60s KV cache; `revokeActiveOverride()` auto-revocation after first override use; migration `0079_bulk_deprovision_guard.sql` (3 columns, 2 constraints, 1 index, pg_cron job 33); `update_bdg_threshold()` Supabase SECURITY DEFINER RPC; `POST /internal/v1/admin/scim/bulk-override` CSM PAM endpoint; Admin Dashboard "Bulk Deprovision Guard" panel; GUARD-E-001 SOC 2 evidence artefact (CC6.3/A1.2/CC7.2/CC9.2); R-24/guard interaction table; §34.11 implementation checklist.
+- **`docs/AUDIT_LOG_SCHEMA.md`** (v2.18 → v2.19): +5 DEC-030 HMAC-chained events — `scim.bulk_deprovision_blocked` (HIGH 7yr), `scim.bulk_deprovision_override_issued` (HIGH 7yr), `scim.bulk_deprovision_override_used` (HIGH 7yr), `scim.bulk_deprovision_threshold_updated` (STANDARD 7yr), `system.scim_guard_repeated_trigger` (STANDARD 1yr advisory, GUARD-CHAIN-01). New section inserted before `### Security & tenant isolation events`.
+- **`docs/DECISION_LOG.md` DEC-066** (2026-06-19): OQ-R24-01 resolution — per-tenant SCIM bulk deprovision threshold (default 20%, range 5–100%), 5-minute rolling window KV counter, CSM-countersigned time-limited override (1h TTL, auto-revoked after first use). Owner: enterprise-architect + platform-engineer + compliance-officer + customer-success.
+- **`docs/INCIDENT_RESPONSE.md` R-24.15 item 10** (2026-06-19): Marked `[x] Done` — OQ-R24-01 resolved via DEC-066; implementation spec in `docs/SSO_SCIM_IMPLEMENTATION.md §34`.
+- **`docs/SOC2_READINESS.md §91`** (v3.15.0 → v3.16.0): Evidence Artefact Cross-Reference Patch for SSO_SCIM §34. Registers GUARD-E-001 (CC6.3/A1.2/CC7.2/CC9.2 — quarterly SCIM Bulk Deprovision Guard event export, `compliance/evidence/scim-guard/GUARD-E-001_<YYYY-QN>.csv`, first filing M14). Collection SQL, SOC 2 criteria mapping, cross-reference obligations closure table, six-item implementation checklist.
+
 ## [6.20.0] — 2026-06-19
 
 ### Added
