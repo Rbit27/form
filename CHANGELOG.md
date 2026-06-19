@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [6.10.0] — 2026-06-19
+
+### Added
+- `content/post-1271-step-count-not-training.md` — Block 1251–1300 Cluster 3, post 1/10. Крокомір: що він рахує і чому це не тренування. Акселерометр і класифікація кроків, точність ±1–4% при ходьбі vs. нульове відображення силових, походження «10 000 кроків» (Hatano 1965), NEAT-фрейм, практичні орієнтири для атлета.
+- `content/post-1272-active-calories-accuracy.md` — Cluster 3, post 2/10. Активні калорії: похибка 30–50% — норма. ЧСС→VO2→ккал алгоритм, Shcherbina et al. 2017 (27–93% похибка), EPOC як пропущений витрат, силові vs. кардіо точність, відносне порівняння замість абсолютних чисел.
+- `content/post-1273-training-load-algorithms.md` — Cluster 3, post 3/10. Training Load у Garmin/Polar/Whoop. Firstbeat EPOC, Polar Cardio+Muscle Load, Whoop Strain 24/7. Спільна межа: ЧСС не відображає нейром'язовий стрес. ACWR для силовиків — перенесена концепція. Тонни (кг×повторення) надійніший показник.
+- `content/post-1274-readiness-score-algorithms.md` — Cluster 3, post 4/10. Body Battery, Oura Readiness, Whoop Recovery: алгоритми і обмеження. Непрозора методологія, відображення минулого, 2–4 тижні для baseline. Де корисні (тренд, конгруентність), де шкодять (тривога, автоматичне скасування тренувань).
+- `content/post-1275-vo2max-from-wearable.md` — Cluster 3, post 5/10. VO2max від трекера: submax ЧСС-VO2 проекція. Точність ±3.5 мл/кг/хв (~7%) для бігунів (Roos et al. 2013). Ненадійно: силовики, спека, нерівний рельєф, початківці, бета-блокатори. Тренд за місяці — корисний. Абсолютна цифра — умовна.
+- `content/post-1276-neat-and-step-counter.md` — Cluster 3, post 6/10. NEAT і крокомір: різниця до 2 000 ккал/день між людьми (Levine et al. 2005). Феномен «активного атлета, що сидить», LPL і тривале сидіння (Hamilton et al. 2007), легка ходьба як компонент відновлення (Menzies et al. 2010). Межа між NEAT і компульсивним рухом.
+- `content/post-1277-intensity-minutes-active-minutes.md` — Cluster 3, post 7/10. Intensity Minutes, Active Minutes, Apple кільця: метрики для загальної популяції. Чому силове тренування майже не рахується в ЧСС-based метриках. Stand Minutes — єдина з реальним LPL-бекграундом. Психологія закриття кілець.
+- `content/post-1278-respiratory-rate-wearable.md` — Cluster 3, post 8/10. Дихальна частота від трекера: PPG-based RR, похибка ±1–2 вдихи/хв. Whoop включає в Recovery. Ранній детектор хвороби (Quer et al. 2021 COVID-19 detection). Для здорового атлета — тихий маркер з низькою щоденною варіабельністю.
+- `content/post-1279-combining-wearable-metrics.md` — Cluster 3, post 9/10. Як об'єднати метрики трекера. Мінімальний набір: HRV rolling average + RHR + суб'єктив + тренувальний об'єм. Фрейм конгруентності. Saw et al. 2015: суб'єктивні маркери часто чутливіші за об'єктивні. Типові помилки інтерпретації.
+- `content/post-1280-activity-load-cluster-3-synthesis.md` — Cluster 3 synthesis, post 10/10. Десять висновків блоку: крокомір, калорії, Training Load, Score-метрики, VO2max, NEAT, Intensity Minutes, RR, інтеграція метрик, конгруентність. Загальна межа корисності трекерів. Наступний кластер: сон.
+- `blog.html` — оновлено: posts 1271–1280 додано в каталог.
+
+### Changed
+- `VERSION` — 6.9.2 → 6.10.0.
+
+---
+
 ## [6.9.2] — 2026-06-19
 
 ### Changed
