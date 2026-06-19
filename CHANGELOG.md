@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.50.0] — 2026-06-19
+
+### Added
+- `content/post-231-programs-for-athletes-that-dont-exist.md` — Editorial series post 231, block 231–240 opener. «Чому більшість тренувальних програм написано для атлета, якого не існує». П'ять прихованих припущень у кожній програмі (стабільний сон, однорідне відновлення, психологічна нейтральність, стабільний мікроцикл, повний adherence) і чому вони рідко відповідають дійсності. Ключовий аргумент: різниця між принципом (прогресивне перевантаження, специфічність, відновлення) і параметром (конкретна вага, кількість підходів, частота). Чотири практичні сценарії адаптації без порушення принципу. Blumert et al. 2007; Kraemer & Ratamess 2004; Kiely 2012; Meeusen et al. 2013; Halson 2014. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+
+### Changed
+- `blog.html` — картка post-231 додана вище post-211 (Training Science · 2026-06-19).
+- `STATUS.md` — рядок «Editorial 211» розширено до «Editorial 211–231»: post-231 додано v6.50.0; README roadmap updated posts 231–240.
+- `README.md` — roadmap: posts 231–240 proposed (block theme: «Self-coached атлет як перекладач принципів у контекст»). Post-231 позначено draft · v6.50.0.
+- `VERSION` — v6.49.0 → v6.50.0.
+
+---
+
 ## [6.49.0] — 2026-06-19
 
 ### Added
