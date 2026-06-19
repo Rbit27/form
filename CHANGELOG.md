@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.27.1] — 2026-06-19
+
+### Added
+- `content/post-1411-prohramuvannia-35-plus-zahalni-pryntsypy.md` — Block 1401–1450, Cluster 2 opener, post 1411. «Програмування після 35: як фізіологія першого кластера перекладається у структуру тренувань» — три змінні три коригування: об'єм (вужчий МЕД–МАВ коридор), частота (2x/тиждень стандарт, розширене відновне вікно), інтенсивність (70–85% 1RM оптимум); чому «щадний режим» — неправильна відповідь; рамка кластера 2 (пости 1412–1420). Peterson et al. 2011, Androulakis-Korakakis 2020, Bickel 2011, Ahtiainen 2003, Schoenfeld 2016, Harridge 1999. clinical-safety: PASS.
+
+### Changed
+- `blog.html` — post-1411 card added (Training 35–55 · 13 хв · 2026-06-19).
+- `STATUS.md` — Block 1401–1450 updated: 10/50 → 11/50; Cluster 2 in progress; post-1411 note added.
+- `VERSION` — 6.27.0 → 6.27.1.
+
+---
+
 ## [6.27.0] — 2026-06-19
 
 ### Added
