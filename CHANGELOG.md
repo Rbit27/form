@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [6.8.1] — 2026-06-19
+
+### Added
+- `content/post-1251-hrv-rolling-average-vs-daily-point.md` — Block 1251–1300 post 1/50. «HRV як тренувальний сигнал: чому одна точка нічого не означає» — RMSSD як парасимпатичний маркер; добова варіабельність 20–30% (Plews 2012/2013); три типи відхилень (гострий одноденний спад, прогресивний спад тренду, обвал тренду); 7-денне rolling average vs. щоденна точка; персональний baseline (28 вимірювань — мінімум, Nordin et al. 2019); PPG vs. ECG accuracy gap (Hernando et al. 2018); HRV-guided training переваги і обмеження (Buchheit 2014); практичний алгоритм застосування без readiness кружечків. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `README.md` — Block 1496–1510 «Програмування для атлета без ідеальних умов» added as proposed · v6.8.1. 15 тем: непередбачуваний графік, мінімальний ефективний тиждень, батьківство і тренування, перельоти, хвороба, готель, зміна залу, перехідний тиждень, стресовий місяць, 45-хвилинний блок, паралельний хобі-спорт, сезонна адаптація, системний стрес, 6-місячне планування з перервами, синтез.
+
+### Changed
+- `blog.html` — card for post-1251 added (Wearables & Data · 13 хв).
+- `STATUS.md` — Block 1251–1300 IN PROGRESS 1/50 · content-engine routine 2026-06-19.
+
 ## [6.8.0] — 2026-06-19
 
 ### Added

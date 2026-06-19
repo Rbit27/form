@@ -16,6 +16,7 @@
 |---|---|---|---|
 | 01–10 | Foundational / brand | 10 | Published |
 | 11–50 | Core sport science | 40 | Published — post-11 (deload weeks) added v5.98.2; sports-scientist review pending |
+| Block 1251–1300 | Wearables, data & the self-coached athlete | 1/50 | IN PROGRESS — post-1251 (HRV rolling average) added v6.8.1; sports-scientist review pending; content-engine routine 2026-06-19 |
 | Editorial 119 | Programme expiry signals | 1 | draft — post-119 (program-signs-stopped-working) added v6.0.1; clinical-safety PASS; sports-scientist review pending |
 | Editorial 120 | Nine frameworks synthesis (112–120) | 1 | draft — post-120 (synthesis-nine-frameworks) added v6.1.1; clinical-safety NOT_REQUIRED; sports-scientist review pending |
 | 51–99 | Applied training science | 49 | Published |
