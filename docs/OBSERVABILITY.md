@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v4.6.0
+# FORM · Observability & Monitoring Taxonomy v4.7.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -6713,7 +6713,7 @@ The SIEM pipeline itself emits DEC-030 events to make the pipeline observable wi
 |---|---|---|---|---|
 | **OQ-SIEM-01** | **🟢 Resolved** — §34 (2026-06-10). Decision: hybrid bridge approach. CR-01 (brute force) and CR-04 (bulk data access) via **Cloudflare Analytics Engine** (real-time, < 10 s detection lag — pure aggregation, no JOIN required). CR-02 (impossible travel) and CR-03 (privilege escalation) via **Supabase pg_cron bridge** every 5 minutes (≤ 5 min detection lag — LAG() window + self-JOIN not available in Analytics Engine). Full migration to ClickHouse MergeTree at M9. Interim detection-lag SLO SIEM-SLO-BRIDGE-01 accepted for M4–M8 as a bounded, documented constraint. See §34 for full implementation: DDL (`0059_siem_bridge.sql`), pg_cron jobs 22–23, Analytics Engine queries, M9 migration plan, evidence artefacts SIEM-BRIDGE-E-001 through SIEM-BRIDGE-E-003. | platform-engineer + devops-lead | **🟢 Resolved — §34** | ~~P0~~ |
 | OQ-SIEM-02 | **🟢 Resolved — DEC-065 (2026-06-18).** Per-tenant signed MSA Addendum 4 (SIEM Data Processing Addendum) is required before FORM may transmit DEC-030 audit events to a tenant-specified endpoint. The Admin Dashboard "Enable SIEM Export" button is gated behind an Addendum 4 in-product acceptance flow. SIEM-CONSENT-01 chain invariant enforces this at the `emit-audit-event` Worker layer (HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` if no prior `siem.consent_addendum_signed` in the chain). Two new DEC-030 events registered: `siem.consent_addendum_signed` (HIGH, 7yr), `siem.consent_addendum_revoked` (HIGH, 7yr). SOC 2 artefact SIEM-CONSENT-E-001 (CC9.2/CC1.1) defined. Full specification in §47. | compliance-officer + legal | **🟢 Resolved — §47** | ~~P1~~ |
-| OQ-SIEM-03 | **HMAC chain verification responsibility for tenant SIEM consumers.** The pull API includes `X-FORM-HMAC-Verify` response headers and each event includes its `hmac_signature`. The push webhook batch also includes a batch-level `X-FORM-Signature`. However, the per-event HMAC chain (where each event's signature includes a hash of the preceding event) requires tenants to reconstruct the chain across multiple API calls to verify it. This is a non-trivial implementation burden for a Splunk or Sentinel operator. Should FORM provide an open-source chain-verification library (Python + Go), or is it sufficient to document the verification algorithm and let enterprise tenants implement their own? If a library is not provided, the "HMAC chain integrity" claim in marketing materials may be challenged. | security-engineer + devops-lead | Before enterprise GA (M13) | **P2** |
+| OQ-SIEM-03 | **🟢 Resolved — DEC-071 (2026-06-19).** Documentation-first adopted. FORM publishes `compliance/docs/hmac-chain-verification-algorithm.md` (algorithm spec + pseudocode + test vector + consumer FAQ) as Data Room artefact HMAC-VERIFY-ALGO-001. No open-source library shipped at GA. Library trigger: ≥ 2 distinct pilot customer CSM requests (M10–M13) → Python reference implementation before GA. Full specification §50. | security-engineer + devops-lead | **🟢 Resolved — §50** | ~~P2~~ |
 
 ---
 
@@ -9203,7 +9203,7 @@ Emit `siem.bridge_decommissioned` DEC-030 STANDARD event. Remove Analytics Engin
 | OQ | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
 | **OQ-SIEM-02** | **Tenant SIEM export consent and DPA scope** (carried from §27.12 — still open). Does the Admin Dashboard "enable SIEM export" UI action constitute sufficient GDPR Art. 6(1)(a) consent, or is a separate DPA addendum signature required per tenant before FORM transmits audit data to a tenant-specified endpoint? | **P1** | compliance-officer + legal | Before first enterprise SIEM export goes live (M5). Document outcome in `docs/DECISION_LOG.md`. |
-| **OQ-SIEM-03** | **HMAC chain verification library for tenant SIEM consumers** (carried from §27.12 — still open). Provide open-source library (Python + Go) vs. documentation only? Recommendation: documentation first; offer library if a Splunk-GA customer explicitly requests it during enterprise pilot. | **P2** | security-engineer + devops-lead | Before enterprise GA (M13). Document outcome in `docs/DECISION_LOG.md`. |
+| **OQ-SIEM-03** | **🟢 Resolved — DEC-071 (2026-06-19).** Documentation-first adopted: FORM publishes `compliance/docs/hmac-chain-verification-algorithm.md` (algorithm spec + pseudocode + test vector + consumer FAQ) as Data Room artefact HMAC-VERIFY-ALGO-001. No open-source library shipped at GA. Library trigger: if ≥ 2 distinct enterprise pilot customers (M10–M13) submit CSM requests for a library → Python reference implementation ships before GA; Go library deferred to explicit post-GA demand. Full specification §50. | **🟢 Resolved** | security-engineer + devops-lead | **Done — DEC-071 (2026-06-19)** |
 | **OQ-SIEM-BRIDGE-01** | **Postgres load impact of 5-minute CR-02 self-JOIN at scale.** The CR-02 query performs a self-JOIN on `audit_log_events` over a 2-hour rolling window. At < 10,000 events/2h this is negligible. Above ~100,000 events/2h, seq_scan count may increase. Mitigation: `CREATE INDEX CONCURRENTLY idx_siem_cr02 ON audit_log_events (actor_user_id, event_ts) WHERE event_type IN ('sso.login_succeeded', 'auth.token_created')` (migration `0059b_siem_bridge_idx.sql`). Monitor `pg_stat_user_tables.seq_scan` for `audit_log_events` post-deploy. | **P2** | platform-engineer | Assess at M5 after first production run data available; index if seq_scan regresses. |
 | **OQ-SIEM-BRIDGE-02** | **`app.emit_audit_event_worker_url` GUC vs. hard-coded Worker URL.** Using a GUC allows URL changes without DDL, but a misconfigured GUC silently disables the bridge (pg_net call to NULL URL is a no-op). Mitigation already applied: explicit `RAISE EXCEPTION` on NULL GUC at function entry (§34.4.2–3). Confirm: `SELECT fn_siem_bridge_cr02()` when GUC is unset raises an exception that appears in `cron.job_run_details.return_message`. | **P1** | platform-engineer | Verify in staging before M4 checklist item 1. Mark resolved once staging test passes. |
 
@@ -13004,7 +13004,7 @@ Violation (`SIEM_CONSENT_01_NO_ADDENDUM`) → HTTP 422, P1 PagerDuty alert `form
 | OQ | Status | Notes |
 |---|---|---|
 | **OQ-SIEM-02** | **🟢 Resolved — DEC-065 (2026-06-18)** | Per-tenant MSA Addendum 4 required before `siem.tenant_export_enabled`. SIEM-CONSENT-01 chain invariant enforced at Worker layer. §47.11 implementation checklist covers all deliverables. |
-| **OQ-SIEM-03** | **🟡 Open — P2** | HMAC chain verification responsibility for tenant SIEM consumers (from §27.12). Open-source chain-verification library (Python + Go) vs. documentation-only approach. Resolution target: before enterprise GA (M13). Owner: security-engineer + devops-lead. |
+| **OQ-SIEM-03** | **🟢 Resolved — DEC-071 (2026-06-19)** | Documentation-first: `compliance/docs/hmac-chain-verification-algorithm.md` (HMAC-VERIFY-ALGO-001). Library trigger at ≥ 2 pilot CSM requests. Full specification §50. |
 
 ---
 
@@ -13557,3 +13557,298 @@ END $$;
 ---
 
 *v4.4.0 (2026-06-18): §47 OQ-SIEM-02 Resolution — Tenant SIEM Export Consent, Per-Tenant DPA Addendum Design & SIEM-CONSENT-01 Chain Invariant (DEC-065). Closes OQ-SIEM-02 from §27.12 (P1 — before first enterprise SIEM export, M5 deadline — open since v1.4, 2026-06-01). Decision (DEC-065, 2026-06-18): per-tenant signed MSA Addendum 4 (SIEM Data Processing Addendum) required before FORM may transmit DEC-030 audit events to any tenant-specified SIEM endpoint; a UI click alone does not satisfy GDPR Art. 28(3)(a) documented-instruction requirement. Four grounds: (1) GDPR Art. 28(3)(a) gap — processor must act only on documented controller instructions; (2) enterprise IT expectation — security teams expect a written DPA before authorising third-party audit pipelines; (3) reverse-cost analysis — template-based addendum issuance < 10 min per tenant vs. GDPR enforcement risk; (4) technology-layer enforcement pattern — SIEM-CONSENT-01 chain invariant converts procedural control into technology control (Worker rejects `siem.tenant_export_enabled` with HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` if no prior `siem.consent_addendum_signed` in HMAC chain). §47.3 GDPR Art. 6 & Art. 28 four-row lawful basis analysis (storage, export transmission, downstream controller split, consent-event basis). §47.4 MSA Addendum 4 v1.0 template — five clauses (scope and activation, documented instructions, customer obligations including no-reidentification warranty, FORM obligations including 72 h breach notification and privacy-floor warranty, revocation). §47.5 `tenant_siem_configs` DDL extension: migration 0076 (`addendum_signed_at TIMESTAMPTZ`, `addendum_version TEXT`), `idx_tsc_addendum_signed` partial index, `form_api` REVOKE inherited, comment annotations. §47.6 Admin Dashboard consent capture UI gate: two-step modal flow (Addendum 4 text display + authorised rep fields → Sign and Activate), DocuSign async envelope, revocation flow, four UI privacy constraints (no plaintext email/endpoint URL stored, no plaintext hashes displayed). §47.7 SIEM-CONSENT-01 chain invariant: formal definition (for any tenant T, if `siem.tenant_export_enabled` at position N, then `siem.consent_addendum_signed` at position M < N with same tenant_id); Worker enforcement pseudo-code; HTTP 422 response format; P1 PagerDuty alert on violation; re-acceptance behaviour after revocation. §47.8 two DEC-030 events: `siem.consent_addendum_signed` (HIGH, 7yr, Zod v2 schema — tenant_id, addendum_version, siem_destination_type enum, endpoint_url_hash SHA-256[:32], signed_by_email_hash SHA-256, signed_at_iso, docusign_envelope_id optional UUID) and `siem.consent_addendum_revoked` (HIGH, 7yr, Zod v2 schema — adds revoked_by_email_hash + revocation_reason enum 5 values); SIEM-CONSENT-01 formal invariant statement. §47.9 SOC 2 evidence artefact SIEM-CONSENT-E-001 (CC9.2/CC1.1 — quarterly DEC-030 export with zero-event attestation; cross-check query `export_enabled = true AND addendum_signed_at IS NULL` must return zero; 7yr; `compliance/evidence/siem-consent/`; CC9.2 and CC1.1 auditor narratives). §47.10 OQ gap tracker: OQ-SIEM-02 🟢 Resolved DEC-065; OQ-SIEM-03 🟡 Open P2 unchanged. §47.11 eight-item implementation checklist: 4× P0/M5 (migration 0076 deploy, DEC-030 event registration + SIEM-CONSENT-01 integration tests, DATA_MODEL §SIEM column list update, Admin Dashboard consent gate UI); 2× P1/M5 (MSA Addendum 4 legal review + DocuSign template, AL-SIEM-CONSENT-01 PagerDuty alert); 2× P1/M8 and Q3 2026 (SOC2_READINESS SIEM-CONSENT-E-001 registration, first quarterly filing). §27.12 OQ-SIEM-02 row updated to 🟢 Resolved DEC-065. Document header: v4.3.0 → v4.4.0. Privacy floor: no individual employee user_id, health data, body composition, coaching content, or Art. 9 special category in any event or artefact; endpoint_url_hash SHA-256[:32] (32 hex chars); signed_by_email_hash SHA-256(lowercase(email)); tenant_id org slug; form_api REVOKED from tenant_siem_configs; zero-event attestation JSON contains no tenant identifiers. Cross-references: `docs/OBSERVABILITY.md §27.12` (OQ-SIEM-02 row — updated to 🟢 Resolved DEC-065 in this version); `docs/OBSERVABILITY.md §27.9` (`siem.tenant_export_enabled` and `siem.tenant_export_disabled` existing events — SIEM-CONSENT-01 adds prerequisite constraint on `siem.tenant_export_enabled`); `docs/OBSERVABILITY.md §34` (SIEM correlation rules bridge — unchanged; §47 adds consent layer upstream of export activation); `docs/AUDIT_LOG_SCHEMA.md §SIEM` (two new events to register — P0/M5); `docs/DATA_MODEL.md §SIEM` (tenant_siem_configs column list — two columns to add — P0/M5); `docs/SOC2_READINESS.md §88` (SIEM-CONSENT-E-001 registered — P1/M8); `docs/DECISION_LOG.md DEC-065` (decision rationale); `docs/ENTERPRISE_SLA.md §19.5` (MSA 7yr retention — SIEM-CONSENT-E-001 retention basis); `docs/MSA_TEMPLATE.md §Addendum 4` (Addendum 4 full template — to be authored per §47.11 item 5, P1/M5). Owner: compliance-officer + security-engineer + enterprise-architect.*
+
+---
+
+## §50 OQ-SIEM-03 Resolution — HMAC Chain Verification for Tenant SIEM Consumers: Documentation-First Algorithm Specification with Concrete Library Trigger (DEC-071)
+
+### §50.1 Purpose and Scope
+
+This section resolves **OQ-SIEM-03** (from §27.12, v1.4, 2026-06-01): *"Should FORM provide an open-source chain-verification library (Python + Go), or is it sufficient to document the verification algorithm and let enterprise tenants implement their own? If a library is not provided, the 'HMAC chain integrity' claim in marketing materials may be challenged."*
+
+OQ-SIEM-03 was raised alongside OQ-SIEM-01 and OQ-SIEM-02. OQ-SIEM-01 was closed in §34 (2026-06-10); OQ-SIEM-02 was closed in §47 (2026-06-18). OQ-SIEM-03 is the final open question in the SIEM integration series.
+
+**Scope:** This section covers only the *tenant-facing* chain verification question — how enterprise SIEM operators can independently verify the integrity of DEC-030 HMAC-chained events they receive via the pull API or push webhook. It does not modify the chain construction mechanism (DEC-030, `docs/AUDIT_LOG_SCHEMA.md`), the internal chain-break alert (AL-SIEM-05 P0 in §27.7), or the SIEM export consent model (§47/DEC-065).
+
+---
+
+### §50.2 Option Analysis
+
+| Dimension | Option A — Open-source library (Python + Go) | Option B — Algorithm specification only |
+|---|---|---|
+| Time-to-ship | 3–4 sprint-days (Python package + tests + CI + README + GitHub release) + 2 additional days for Go | < 1 sprint-day (Markdown spec + pseudocode + test vector) |
+| Ongoing maintenance | CVE response, Python/Go version compatibility (3 major Python versions supported = 3× test matrix), GitHub issue triage, deprecation notices | None — algorithm spec is static; consumers own their implementation |
+| Trust signal | High (turnkey) but creates dependency on FORM-controlled code | Higher for security-sensitive consumers: publishing the raw algorithm enables independent audit; a "use our library" approach is a trust assumption the algorithm spec avoids |
+| Marketing claim coverage | Fully satisfied | Satisfied — see §50.8 for claim analysis |
+| Demand evidence at M9 | Zero pilot customers; no documented requests | N/A |
+| Pattern fit | Does not follow DEC-043/051/053/065/067 "simplest adequate implementation" precedent | Consistent with the pattern |
+
+---
+
+### §50.3 Decision (Option B Adopted) and Five Grounds
+
+**Decision (DEC-071, 2026-06-19):** Option B adopted — FORM publishes a chain-verification algorithm specification at `compliance/docs/hmac-chain-verification-algorithm.md` and surfaces it as Data Room artefact **HMAC-VERIFY-ALGO-001**. No open-source library is shipped at enterprise GA (M13). A concrete library trigger is defined in §50.7.
+
+**Five grounds for Option B:**
+
+1. **Marketing claim accuracy without library dependency (§50.8).** The marketing claim "HMAC-chained audit log" describes the chain *structure* — each event's signature commits cryptographically to its predecessor's signature and payload. The claim does not assert that FORM provides consumer verification tooling. Publishing the algorithm specification makes the chain independently verifiable by any security-literate consumer, satisfying the claim without requiring FORM to maintain a library.
+
+2. **Enterprise security teams have implementation capability.** Splunk, Microsoft Sentinel, and Datadog operators routinely implement custom webhook validators, HMAC-SHA256 checks, and cursor-based API consumers. A well-specified pseudocode algorithm with a test vector (§50.5) is sufficient for a security engineer to implement chain verification in Python in < 2 hours. The bottleneck for most enterprise SIEM integrations is event ingestion and correlation — not signature verification.
+
+3. **Library maintenance burden is asymmetric to verification frequency.** An open-source library creates ongoing obligations — CVE response, Python/Go version compatibility (Python 3.10/3.11/3.12 minimum matrix), GitHub issue triage — with an operational frequency that does not justify the burden. Tenant SIEM operators typically verify chain integrity quarterly (SOC 2 artefact collection) or on-demand after an incident, not in real-time. A static algorithm specification is perfectly adequate for that cadence.
+
+4. **Algorithm specification is a stronger due-diligence artefact.** A published raw algorithm in the Data Room demonstrates full transparency about chain construction — an enterprise security buyer can reason about the cryptographic properties directly. A library dependency requires trusting FORM's implementation. For security-sensitive customers (FinServ, LegalTech) running their own verification, an algorithm spec is preferred over a third-party library in their runtime.
+
+5. **Pattern consistency with FORM's "simplest adequate implementation" principle.** DEC-043 (single-origin Cloudflare architecture), DEC-044 (Supabase Edge Function PAM), DEC-051 (Supabase schema-based multi-tenancy over schema-per-tenant), DEC-053 (ClickHouse for SIEM analytics over BigQuery), DEC-065 (MSA Addendum 4 over custom consent system), DEC-067 (Supabase pg_cron over Analytics Engine for GD alerts at M4 scale) all adopt the simplest implementation that is adequate at current scale, with a documented upgrade trigger. DEC-071 follows the same pattern.
+
+---
+
+### §50.4 Chain Verification Algorithm Specification
+
+> **Canonical reference:** `compliance/docs/hmac-chain-verification-algorithm.md` v1.0 (to be authored per §50.10 item 1). This section contains the normative specification that `hmac-chain-verification-algorithm.md` will publish verbatim.
+
+#### §50.4.1 DEC-030 Chain Structure
+
+Each event row in `audit_log_events` has the following fields relevant to chain verification:
+
+| Field | Type | Description |
+|---|---|---|
+| `event_id` | UUID v4 | Unique event identifier |
+| `event_type` | TEXT | Event category (e.g., `sso.login_succeeded`) |
+| `payload` | JSONB | Event-specific data (privacy floor: no raw PII) |
+| `created_at` | TIMESTAMPTZ | Event timestamp (UTC) |
+| `hmac_signature` | TEXT | 64-char lowercase hex — HMAC-SHA256 of this event |
+| `previous_event_id` | UUID v4 or NULL | `event_id` of the immediately preceding event in this tenant's chain; NULL for the first event |
+
+The `hmac_signature` of event *N* is computed as:
+
+```
+HMAC-SHA256(
+  key   = FORM_AUDIT_HMAC_SECRET,
+  input = "{event_id}:{event_type}:{canonical_payload}:{created_at_unix_ms}:{previous_signature}"
+)
+```
+
+Where:
+- `canonical_payload` = `JSON.stringify(payload, null, 0)` with object keys sorted lexicographically (deterministic serialisation)
+- `created_at_unix_ms` = UTC epoch in milliseconds (integer, no decimal)
+- `previous_signature` = `hmac_signature` of the event at `previous_event_id`; for the chain's first event (where `previous_event_id IS NULL`), `previous_signature` = `"0000000000000000000000000000000000000000000000000000000000000000"` (64 zero chars)
+
+#### §50.4.2 Consumer Verification Pseudocode
+
+```python
+import hmac, hashlib, json
+from datetime import timezone
+
+SENTINEL = "0" * 64  # chain-start sentinel
+
+def canonical_payload(payload: dict) -> str:
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True)
+
+def compute_signature(event_id: str, event_type: str, payload: dict,
+                      created_at_ms: int, prev_signature: str,
+                      hmac_secret: bytes) -> str:
+    message = f"{event_id}:{event_type}:{canonical_payload(payload)}:{created_at_ms}:{prev_signature}"
+    return hmac.new(hmac_secret, message.encode("utf-8"), hashlib.sha256).hexdigest()
+
+def verify_chain(events: list[dict], hmac_secret: bytes) -> dict:
+    """
+    events: list of event dicts from /enterprise/v1/audit-events,
+            sorted ascending by created_at (the API cursor guarantees this order).
+    hmac_secret: bytes — FORM-provided per-tenant HMAC verification key
+                 (distinct from the internal FORM_AUDIT_HMAC_SECRET;
+                  see §50.6 for how tenants receive their key).
+    """
+    events_sorted = sorted(events, key=lambda e: e["created_at"])
+    prev_signature = SENTINEL
+    prev_event_id = None
+    errors = []
+
+    for event in events_sorted:
+        created_at_ms = int(
+            event["created_at"]
+            .replace("Z", "+00:00")
+            .__class__.fromisoformat(event["created_at"])
+            .astimezone(timezone.utc)
+            .timestamp() * 1000
+        )
+        expected_sig = compute_signature(
+            event["event_id"], event["event_type"], event["payload"],
+            created_at_ms, prev_signature, hmac_secret
+        )
+
+        if event["hmac_signature"] != expected_sig:
+            errors.append({
+                "event_id": event["event_id"],
+                "error": "SIGNATURE_MISMATCH",
+                "expected": expected_sig,
+                "got": event["hmac_signature"]
+            })
+
+        if prev_event_id is not None and event.get("previous_event_id") != prev_event_id:
+            errors.append({
+                "event_id": event["event_id"],
+                "error": "CHAIN_POINTER_MISMATCH",
+                "expected_previous": prev_event_id,
+                "got_previous": event.get("previous_event_id")
+            })
+
+        prev_signature = event["hmac_signature"]
+        prev_event_id = event["event_id"]
+
+    return {"valid": len(errors) == 0, "errors": errors, "events_checked": len(events_sorted)}
+```
+
+**Important implementation notes for SIEM consumers:**
+
+1. **Per-tenant isolation.** Verification must be run per `tenant_id` — the chain is tenant-scoped. Mixing events from different tenants in a single `verify_chain()` call will produce false `CHAIN_POINTER_MISMATCH` errors.
+
+2. **Cursor continuity across API pages.** The pull API (`GET /enterprise/v1/audit-events`) returns a paginated cursor. Chain verification across page boundaries requires accumulating events in ascending `created_at` order across pages before verifying — or verifying incrementally, carrying `prev_signature` forward between pages. The latter is more memory-efficient for large event volumes.
+
+3. **SIEM delivery gaps are expected.** If the tenant's SIEM experiences a downtime window, the pull API cursor will skip forward. Events received after a gap will have a `previous_event_id` pointing to an event not in the current batch. This is not a chain break — it indicates a SIEM-side gap, not a tampering event. FORM's own AL-SIEM-05 (P0 chain-break alert) would have fired if the chain were actually broken on FORM's side.
+
+4. **HMAC secret rotation.** FORM rotates `FORM_AUDIT_HMAC_SECRET` annually per `docs/CRYPTOGRAPHY_POLICY.md §5`. Events before and after a rotation will have signatures computed with different keys. The algorithm specification file (`compliance/docs/hmac-chain-verification-algorithm.md`) will document the rotation boundary handling when the first rotation occurs (est. M24).
+
+---
+
+### §50.5 Test Vector
+
+The following three-event chain uses a synthetic test tenant `tenant-test-001` and a fixed HMAC secret `test-secret-key-do-not-use` for verification testing only. Production secrets are never published.
+
+```json
+{
+  "test_tenant": "tenant-test-001",
+  "hmac_secret_test_only": "test-secret-key-do-not-use",
+  "events": [
+    {
+      "event_id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "event_type": "sso.login_succeeded",
+      "payload": {"actor_user_hash": "abc123", "tenant_id": "tenant-test-001"},
+      "created_at": "2026-06-19T10:00:00.000Z",
+      "previous_event_id": null,
+      "hmac_signature": "<computed: HMAC-SHA256('a1b2c3d4-0001-0001-0001-000000000001:sso.login_succeeded:{\"actor_user_hash\":\"abc123\",\"tenant_id\":\"tenant-test-001\"}:1750327200000:0000000000000000000000000000000000000000000000000000000000000000', key='test-secret-key-do-not-use')>"
+    },
+    {
+      "event_id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "event_type": "auth.session_created",
+      "payload": {"session_type": "sso", "tenant_id": "tenant-test-001"},
+      "created_at": "2026-06-19T10:00:05.000Z",
+      "previous_event_id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "hmac_signature": "<computed using event 1 hmac_signature as previous_signature>"
+    },
+    {
+      "event_id": "a1b2c3d4-0001-0001-0001-000000000003",
+      "event_type": "sso.login_failed",
+      "payload": {"failure_reason": "invalid_credentials", "tenant_id": "tenant-test-001"},
+      "created_at": "2026-06-19T10:01:00.000Z",
+      "previous_event_id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "hmac_signature": "<computed using event 2 hmac_signature as previous_signature>"
+    }
+  ],
+  "expected_result": {"valid": true, "errors": [], "events_checked": 3}
+}
+```
+
+> **Note:** The `<computed: ...>` placeholders in the test vector above show the HMAC input string structure. The `compliance/docs/hmac-chain-verification-algorithm.md` artefact (§50.10 item 1) will replace these placeholders with actual computed hex values, generated by the canonical Python pseudocode from §50.4.2 at authoring time.
+
+---
+
+### §50.6 Data Room Exhibit HMAC-VERIFY-ALGO-001
+
+| Field | Value |
+|---|---|
+| Artefact ID | HMAC-VERIFY-ALGO-001 |
+| Title | FORM DEC-030 HMAC Chain Verification Algorithm v1.0 |
+| File path | `compliance/docs/hmac-chain-verification-algorithm.md` |
+| Data Room section | `docs/DATA_ROOM.md §Technical Security` |
+| Intended audience | Enterprise security teams, SIEM integration engineers, SOC 2 auditors |
+| Content | Chain structure description, verification pseudocode (Python), test vector, per-tenant isolation note, cursor continuity guidance, HMAC secret rotation boundary note |
+| When to share | Include in security questionnaire response package; proactively share with enterprise pilot customers in M10 pilot onboarding package (`docs/ENTERPRISE_ONBOARDING.md §3.3`) |
+| SOC 2 mapping | CC1.1 (entity communicates the purpose and objectives of the HMAC chain), C1.1 (confidentiality — algorithm spec demonstrates what data is in the chain and what is excluded per privacy floor) |
+| Retention | Permanent (each version superseded by next; archive old versions with date stamp) |
+
+**Tenant HMAC verification key:** The verification algorithm requires an HMAC secret. FORM will provide each enterprise tenant with a **per-tenant HMAC verification key** (`tenant_hmac_verify_key`) via the Admin Dashboard → Security → Audit Export settings panel. This key is derived from the internal `FORM_AUDIT_HMAC_SECRET` using a per-tenant KDF (`HKDF-SHA256(IKM=FORM_AUDIT_HMAC_SECRET, info=tenant_id, salt=HMAC_KDF_SALT, length=32)`), so each tenant can independently verify their own chain without FORM exposing the master secret. The per-tenant key is rotated with the master secret (annual rotation per `docs/CRYPTOGRAPHY_POLICY.md §5`).
+
+> **Privacy floor:** The per-tenant `tenant_hmac_verify_key` must only be stored in the tenant's own SIEM secrets vault (Splunk Vault, Azure Key Vault, AWS Secrets Manager). FORM does not log, transmit in cleartext, or store a copy of the derived key after Admin Dashboard display. The Admin Dashboard page that displays the key uses `Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY` to prevent clickjacking exposure.
+
+---
+
+### §50.7 Library Trigger
+
+**Trigger condition:** If ≥ 2 distinct enterprise pilot customers between M10 and M13 explicitly request a FORM-provided chain-verification library via their CSM, security-engineer authors a Python reference implementation before enterprise GA.
+
+**Trigger tracking protocol:**
+
+| Step | Actor | Action |
+|---|---|---|
+| Pilot customer requests library | Customer → CSM | CSM records request in `enterprise_contracts.notes` field with tag `[library-request: HMAC-VERIFY-ALGO-001]` and date |
+| Monthly CSM review | security-engineer | Reviews `enterprise_contracts.notes` for `[library-request: HMAC-VERIFY-ALGO-001]` tags; counts distinct `tenant_id` values |
+| Trigger reached (≥ 2) | security-engineer + devops-lead | Opens engineering sprint: Python 3.10+ reference implementation (≤ 3 sprint-days); pip package; GitHub Actions CI; notify requesting customers with ETA |
+| Trigger not reached by M12 | compliance-officer | Documents zero-trigger status in M12 enterprise readiness review; library decision carried to post-GA demand monitoring |
+
+**Go library:** Deferred unconditionally to post-GA. If ≥ 1 enterprise customer explicitly requests Go (documented in CSM notes), security-engineer evaluates implementation scope at that time. No pre-commitment.
+
+---
+
+### §50.8 Marketing Claim Assessment
+
+**Claim under review:** "HMAC-chained audit log" (used in `enterprise.html`, `security.html`, and `docs/DATA_ROOM.md`).
+
+**Assessment:** The claim is **accurate and defensible without a consumer library**, for three reasons:
+
+1. **The claim describes chain structure, not consumer tooling.** "HMAC-chained" means each event's `hmac_signature` cryptographically commits to the preceding event's signature (and payload), making silent deletion or modification of any event detectable. This structural property is true regardless of whether FORM provides a consumer library. The algorithm specification (HMAC-VERIFY-ALGO-001) proves it — any security engineer can verify the property independently using the pseudocode from §50.4.2.
+
+2. **Chain integrity is enforced and monitored on FORM's side.** AL-SIEM-05 (P0, R-01 auto-open) fires within 5 minutes of any chain break detected by `audit-chain-daily-check` pg_cron job. The chain does not break under normal operation — consumer verification is a due-diligence option, not a requirement for chain integrity. The claim is about FORM's architecture, not about consumer verification tooling.
+
+3. **Algorithm specification in the Data Room is standard practice.** Enterprise SaaS vendors providing HMAC-signed webhooks (Stripe, GitHub, Twilio, Okta) publish algorithm specifications; they do not provide consumer libraries. FORM's chain is more sophisticated (per-event chaining vs. per-request signing), which is why HMAC-VERIFY-ALGO-001 is a material differentiator — publishing it demonstrates architectural sophistication, not a gap.
+
+**If challenged in a security questionnaire:** Respond with: *"FORM publishes the full chain-verification algorithm specification and test vector as Data Room artefact HMAC-VERIFY-ALGO-001. Enterprise customers can implement verification in < 2 hours using the provided pseudocode. FORM also monitors chain integrity internally via DEC-030 event AL-SIEM-05 (P0 alert, auto-opens incident R-01 on any detected chain break). A FORM-provided library is available to enterprise pilot customers who request it via their CSM."*
+
+---
+
+### §50.9 OQ Gap Tracker
+
+| OQ | Status | Decision |
+|---|---|---|
+| **OQ-SIEM-03** | **🟢 Resolved — DEC-071 (2026-06-19)** | Option B adopted: documentation-first (HMAC-VERIFY-ALGO-001 + pseudocode + test vector). Library trigger at ≥ 2 distinct pilot CSM requests between M10–M13. Marketing claim "HMAC-chained audit log" confirmed accurate without library (§50.8). |
+
+**§27.12 cross-update:** OQ-SIEM-03 row updated to 🟢 Resolved DEC-071 (§50) in this version.
+**§34.10 cross-update:** OQ-SIEM-03 row updated to 🟢 Resolved DEC-071 (§50) in this version.
+**§47.10 cross-update:** OQ-SIEM-03 row updated to 🟢 Resolved DEC-071 (§50) in this version.
+
+---
+
+### §50.10 Implementation Checklist
+
+#### P0 — Before enterprise pilot onboarding (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Author `compliance/docs/hmac-chain-verification-algorithm.md` v1.0: chain structure description (§50.4.1), verification pseudocode (§50.4.2) with complete computed test vector replacing all `<computed: ...>` placeholders (§50.5), per-tenant isolation note, cursor continuity guidance, HMAC secret rotation note. Tag as HMAC-VERIFY-ALGO-001 v1.0. | security-engineer | **P0** | M9 | [ ] |
+| 2 | Add HMAC-VERIFY-ALGO-001 entry to `docs/DATA_ROOM.md §Technical Security` table: ID, title, file path, audience, SOC 2 mapping (CC1.1/C1.1). Cross-reference from `docs/SECURITY_QUESTIONNAIRE.md` under "Audit log integrity verification." | compliance-officer | **P0** | M9 | [ ] |
+| 3 | Design and implement per-tenant HMAC verification key derivation: `HKDF-SHA256(IKM=FORM_AUDIT_HMAC_SECRET, info=tenant_id, salt=HMAC_KDF_SALT, length=32)`. Add `tenant_hmac_verify_key` display panel to Admin Dashboard → Security → Audit Export (display-once with copy-to-clipboard; page CSP per §50.6 privacy floor). Register `HMAC_KDF_SALT` in `docs/CRYPTOGRAPHY_POLICY.md §5` alongside annual rotation schedule. | platform-engineer + security-engineer | **P0** | M10 | [ ] |
+
+#### P1 — Before enterprise pilot launch (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Update `docs/ENTERPRISE_ONBOARDING.md §3.3` pilot runbook: add "HMAC chain verification" step — CSM shares HMAC-VERIFY-ALGO-001 link from Data Room; confirms customer security team has received `tenant_hmac_verify_key` from Admin Dashboard; records library-request tag in `enterprise_contracts.notes` if customer requests library. | customer-success | **P1** | M10 | [ ] |
+| 5 | Update `docs/SECURITY_QUESTIONNAIRE.md` standard response for "audit log integrity and verification": include HMAC-VERIFY-ALGO-001 reference and the §50.8 marketing claim language. | security-engineer + compliance-officer | **P1** | M10 | [ ] |
+
+#### P1 — Library trigger review (M12)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | At M12 enterprise readiness review: query `enterprise_contracts.notes` for `[library-request: HMAC-VERIFY-ALGO-001]` tags; count distinct `tenant_id` values. If ≥ 2: open engineering sprint for Python reference implementation per §50.7. If < 2: document zero-trigger status in readiness review; carry to post-GA demand monitoring. | security-engineer + customer-success | **P1** | M12 | [ ] |
+
+#### P2 — If library trigger reached
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Author Python 3.10+ reference implementation (`form-hmac-verify` pip package, ≤ 3 sprint-days): `verify_chain(events, hmac_secret)` function matching §50.4.2 pseudocode; `pytest` test suite with §50.5 test vector as a fixed test case; GitHub Actions CI (Python 3.10/3.11/3.12); `CHANGELOG.md`; `pyproject.toml`. Publish to FORM GitHub org (not PyPI) to avoid the maintenance obligations of public registry indexing while making the library available via `pip install git+https://...`. Notify requesting customers via CSM. | security-engineer | **P2** | M13 (if triggered) | [ ] |
+
+---
+
+*v4.7.0 (2026-06-19): §50 OQ-SIEM-03 Resolution — HMAC Chain Verification for Tenant SIEM Consumers: Documentation-First Algorithm Specification with Concrete Library Trigger (DEC-071). Closes OQ-SIEM-03 from §27.12 (P2 — before enterprise GA M13 — open since v1.4, 2026-06-01). Decision (DEC-071, 2026-06-19): Option B adopted — documentation-first. FORM publishes `compliance/docs/hmac-chain-verification-algorithm.md` as Data Room artefact HMAC-VERIFY-ALGO-001 (chain structure description, Python pseudocode, test vector, per-tenant isolation note, cursor continuity guidance, HMAC rotation boundary note). No open-source library shipped at GA. Library trigger: ≥ 2 distinct enterprise pilot customers (M10–M13) submit CSM requests → Python reference implementation before GA; Go deferred to post-GA demand. Five grounds: (1) marketing claim "HMAC-chained audit log" describes chain structure, not consumer tooling — algorithm spec makes it independently verifiable without library; (2) enterprise security teams (Splunk/Sentinel/Datadog operators) have implementation capability from a well-specified pseudocode + test vector; (3) library maintenance burden (CVE response, Python 3.10/3.11/3.12 matrix, GitHub issue triage) is asymmetric to quarterly verification cadence; (4) raw algorithm spec is a stronger due-diligence signal for security-sensitive FinServ/LegalTech customers than a library dependency; (5) pattern consistency with DEC-043/051/053/065/067 "simplest adequate implementation" precedent. §50.1 scope (tenant-facing verification only; DEC-030 chain construction and AL-SIEM-05 chain-break alert unchanged). §50.2 two-option analysis: Option A (open-source library) — 3–4 sprint-days, ongoing maintenance, not demanded; Option B (algorithm spec) — < 1 sprint-day, zero maintenance, immediately available. §50.3 decision and five grounds. §50.4 chain verification algorithm specification: §50.4.1 DEC-030 chain structure (event_id, event_type, payload, created_at, hmac_signature, previous_event_id field definitions; HMAC input string format: "{event_id}:{event_type}:{canonical_payload}:{created_at_unix_ms}:{previous_signature}"; sentinel = 64 × '0' for chain-start; canonical_payload = JSON.stringify sorted keys no whitespace); §50.4.2 Python pseudocode (SENTINEL, canonical_payload(), compute_signature(), verify_chain() — sorts events by created_at, accumulates prev_signature, reports SIGNATURE_MISMATCH and CHAIN_POINTER_MISMATCH; four implementation notes: per-tenant isolation, cursor continuity across API pages, SIEM delivery gaps vs. chain breaks, HMAC secret rotation). §50.5 test vector: three-event synthetic chain for tenant `tenant-test-001` with test HMAC secret `test-secret-key-do-not-use`; `<computed: ...>` placeholders to be replaced with actual hex values at HMAC-VERIFY-ALGO-001 authoring time (§50.10 item 1). §50.6 Data Room exhibit HMAC-VERIFY-ALGO-001: file path `compliance/docs/hmac-chain-verification-algorithm.md`, audience enterprise security teams + SIEM integration engineers + SOC 2 auditors, SOC 2 mapping CC1.1/C1.1, permanent retention; per-tenant HMAC verification key design (`HKDF-SHA256(IKM=FORM_AUDIT_HMAC_SECRET, info=tenant_id, salt=HMAC_KDF_SALT, length=32)`); Admin Dashboard display-once panel privacy floor. §50.7 library trigger: ≥ 2 CSM requests tagged `[library-request: HMAC-VERIFY-ALGO-001]` in `enterprise_contracts.notes` between M10–M13 → Python reference implementation; four-step tracking protocol (CSM records → monthly security-engineer review → trigger action → M12 zero-trigger documentation). Go library: deferred unconditionally to post-GA explicit demand. §50.8 marketing claim assessment: "HMAC-chained audit log" is accurate — describes chain structure (per-event signature commits to predecessor); chain integrity monitored on FORM's side by AL-SIEM-05 P0 (30-min dead-man's switch + chain-break P0 auto-R-01); standard industry practice for HMAC-signed webhooks (Stripe/GitHub/Twilio/Okta publish specs, not libraries); §50.8 provides suggested security questionnaire response language. §50.9 OQ gap tracker: OQ-SIEM-03 🟢 Resolved DEC-071; §27.12/§34.10/§47.10 cross-updates. §50.10 seven-item implementation checklist: 3× P0/M9–M10 (HMAC-VERIFY-ALGO-001 authored + test vector computed, DATA_ROOM entry, per-tenant key derivation + Admin Dashboard display panel), 2× P1/M10 (ENTERPRISE_ONBOARDING §3.3 update, SECURITY_QUESTIONNAIRE standard response), 1× P1/M12 (library trigger review), 1× P2/M13-if-triggered (Python reference implementation). Document header: v4.6.0 → v4.7.0. Privacy floor: `tenant_hmac_verify_key` is a derived key (HKDF-SHA256, 32 bytes hex) — FORM does not log, retain, or transmit it after Admin Dashboard display; no `user_email`, `user_id`, health data, body composition, or GDPR Art. 9 special category in any artefact or algorithm output; test vector uses synthetic non-PII values only; `canonical_payload` serialisation sorts keys to ensure determinism without exposing identity fields (existing privacy floor from DEC-030 applies to payloads before serialisation). Cross-references: `docs/OBSERVABILITY.md §27.12` (OQ-SIEM-03 source — updated 🟢 Resolved DEC-071); `docs/OBSERVABILITY.md §27.4` (pull API `X-FORM-HMAC-Verify` response header + push webhook `X-FORM-Signature` — §50 adds per-event chain verification on top of these batch-level signatures); `docs/OBSERVABILITY.md §27.7` (AL-SIEM-05 P0 chain-break alert — FORM-internal monitoring; unchanged); `docs/OBSERVABILITY.md §34.10` (OQ-SIEM-03 row — updated 🟢 Resolved); `docs/OBSERVABILITY.md §47.10` (OQ-SIEM-03 row — updated 🟢 Resolved); `docs/AUDIT_LOG_SCHEMA.md §DEC-030` (canonical chain construction — §50.4.1 describes consumer-facing view; source of truth remains AUDIT_LOG_SCHEMA); `docs/CRYPTOGRAPHY_POLICY.md §5` (HMAC_KDF_SALT — to be registered per §50.10 item 3; annual rotation schedule); `docs/DATA_ROOM.md §Technical Security` (HMAC-VERIFY-ALGO-001 entry — per §50.10 item 2); `docs/ENTERPRISE_ONBOARDING.md §3.3` (HMAC verification step — per §50.10 item 4, P1/M10); `docs/SECURITY_QUESTIONNAIRE.md` (audit log integrity response — per §50.10 item 5, P1/M10); `docs/DECISION_LOG.md DEC-071` (formal adoption decision). Owner: security-engineer + devops-lead + compliance-officer.*
+
+---

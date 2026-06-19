@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [6.33.1] — 2026-06-19
+
+### Added
+- `docs/OBSERVABILITY.md §50` — OQ-SIEM-03 Resolution: HMAC Chain Verification for Tenant SIEM Consumers — Documentation-First Algorithm Specification with Concrete Library Trigger (DEC-071, v4.7.0). Adopts Option B (documentation-only): publishes `compliance/docs/hmac-chain-verification-algorithm.md` as Data Room artefact HMAC-VERIFY-ALGO-001 (DEC-030 chain structure, Python verification pseudocode, 3-event test vector, per-tenant isolation note, cursor-continuity guidance). No open-source library at GA. Library trigger: ≥ 2 distinct pilot CSM requests (M10–M13) → Python reference implementation before GA; Go deferred to post-GA. Per-tenant HMAC verification key via HKDF-SHA256. Seven-item implementation checklist (3× P0/M9–M10, 2× P1/M10, 1× P1/M12, 1× P2/M13-if-triggered). Marketing claim "HMAC-chained audit log" confirmed accurate without library (§50.8). Closes OQ-SIEM-03 (open since docs/OBSERVABILITY.md v1.4, 2026-06-01).
+- `docs/DECISION_LOG.md DEC-071` — HMAC chain verification documentation-first decision: five grounds (claim accuracy, adequate capability match, asymmetric maintenance burden, stronger due-diligence signal, pattern consistency with DEC-043/051/053/065/067). Reverse cost: low (library is additive; spec unchanged).
+
+### Changed
+- `docs/OBSERVABILITY.md` — version header v4.6.0 → v4.7.0. OQ-SIEM-03 row in §27.12, §34.10, and §47.10 updated from 🟡 Open P2 → 🟢 Resolved DEC-071 (§50).
+- `VERSION` — 6.33.0 → 6.33.1.
+
 ## [6.33.0] — 2026-06-19
 
 ### Added
