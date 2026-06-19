@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [6.38.0] — 2026-06-19
+
+### Added
+- `content/post-1462-load-progression-models.md` — Block 1451–1500 · Cluster 2 · пост 2/10. Прогресія навантаження: лінійна (початківець), хвильова DUP (intermediate), блокова (advanced). Феномен відстроченої трансформації (Verkoshansky/Siff). Прогресія за об'ємом, щільністю і специфічністю — не тільки за вагою. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1463-volume-intensity-balance.md` — Block 1451–1500 · Cluster 2 · пост 3/10. MEV/MAV/MRV як рамка планування (Israetel et al.). Компроміс об'єму і інтенсивності: акумуляція — об'єм, реалізація — інтенсивність. Як MRV змінюється залежно від сну, стресу і тижня у блоці. Персональний пошук MRV через практику. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1464-training-frequency-distribution.md` — Block 1451–1500 · Cluster 2 · пост 4/10. 2× на м'яз на тиждень — стандарт (Schoenfeld 2016 мета-аналіз). PPL×2, Upper/Lower, Full Body: критерії вибору. Шість рухових патернів замість м'язових груп. Правило 1:1 жим–тяга. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1465-tempo-tut-evidence.md` — Block 1451–1500 · Cluster 2 · пост 5/10. TUT переоцінений як самостійний параметр — при контрольованому об'ємі різниця мінімальна (Schoenfeld & Grgic 2020). Ексцентрик важливий через механічний стимул, а не TUT. Концентрик: максимальне зусилля у реалізаційних фазах. Паузи і їх функція. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1466-deload-structure-planning.md` — Block 1451–1500 · Cluster 2 · пост 6/10. Механізм deload і відстрочена трансформація. Volume deload (40–60% підходів при збереженій вазі) — стандарт. Типи: volume/intensity/full. Ознаки overreaching vs. ознаки передчасного deload. Запланований (кожні 4–6 тижнів) і реактивний. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1467-mesocycle-transition-mechanics.md` — Block 1451–1500 · Cluster 2 · пост 7/10. Перехід між мезоциклами: аналіз блоку → тестування (якщо потрібне) → діагностика слабких ланок → вибір вправ → планування прогресії → фіксація. Тестування AMRAP vs. 1RM. Документаційна практика. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1468-weak-links-diagnosis-programming.md` — Block 1451–1500 · Cluster 2 · пост 8/10. Стicking point, технічна деградація, асиметрія. Діагностика через журнал і відео. Типові слабкі ланки в присіданні (upper back, quad), становій (sticking point старт, upper back локаут), жимі (трицепс). Адресація через допоміжні вправи. Асиметрія > 15% → unilateral. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1469-self-coached-programming-challenges.md` — Block 1451–1500 · Cluster 2 · пост 9/10. Специфіка self-coached: confirmation bias, уникання слабкості, RPE-деградація, послідовність, ego-driven рішення. Практичні контрмеханізми: відео, upfront-рішення, мінімальна/стандартна/максимальна версія сесії, AMRAP-калібровка. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1470-cluster2-synthesis.md` — Block 1451–1500 · Cluster 2 · пост 10/10 · **CLUSTER 2 COMPLETE**. Synthesis дев'яти постів у єдину операційну рамку: що робити до, під час і після мезоциклу. Місце Victor у рамці. Перехід до Cluster 3. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — додано записи post-1462 through post-1470; blog.html updated to post-1470.
+- `STATUS.md` — Block 1451–1500 оновлено: Cluster 2 COMPLETE 20/50; next: Cluster 3.
+- `VERSION` — 6.37.1 → 6.38.0.
+
+---
+
 ## [6.37.1] — 2026-06-19
 
 ### Changed
