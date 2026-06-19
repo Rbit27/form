@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.26.1] — 2026-06-19
+
+### Added
+- `content/post-171-video-self-analysis.md` — Editorial post 171. «Відеоаналіз власного тренування: що бачить камера, що бачить тренер, що не бачить жоден» — KR vs. KP (Schmidt & Lee 2011); concurrent vs. terminal feedback (Salmoni 1984); confirmation bias при самоаналізі (Miall & Wolpert 1996); що камера бачить добре і де її сліпі плями; що бачить тренер vs. що не бачить; практичний протокол двох ракурсів і одного конкретного питання на сесію. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — post-171 card added (Training science · 13 хв · 2026-06-19).
+- `STATUS.md` — Editorial series updated to 11–37, 44–50, 106–122, 170–171, 1361; post-171 note added.
+- `VERSION` — 6.26.0 → 6.26.1.
+
+---
+
 ## [6.26.0] — 2026-06-19
 
 ### Added
