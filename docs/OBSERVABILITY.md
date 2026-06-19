@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v4.3.0
+# FORM · Observability & Monitoring Taxonomy v4.4.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 

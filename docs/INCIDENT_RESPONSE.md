@@ -10487,7 +10487,7 @@ This document must be authored per §18.7 item 1 and included in the auditor onb
 
 ---
 
-**v2.6 · 2026-06-14 · Owner: security-engineer + compliance-officer**
+**v2.7 · 2026-06-15 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 

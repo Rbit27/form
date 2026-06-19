@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.9.2] — 2026-06-19
+
+### Changed
+- `docs/SOC2_READINESS.md` — document header corrected v3.13.1 → v3.14.0. §89 (Evidence Artefact Cross-Reference Patch: MSA_TEMPLATE Addendum 5, Partner Agreement) was authored and its version note appended in a previous commit but the H1 title line was not updated at that time. Header now matches the v3.14.0 body note.
+- `docs/OBSERVABILITY.md` — document header corrected v4.3.0 → v4.4.0. §47 (OQ-SIEM-02 Resolution — SIEM-CONSENT-01 Chain Invariant, DEC-065) body note correctly reads v4.4.0 since 2026-06-18; H1 title line now matches.
+- `docs/INCIDENT_RESPONSE.md` — review footer block corrected v2.6 · 2026-06-14 → v2.7 · 2026-06-15. The v2.7 version note (R-05 OFB-REGION-01 cross-reference patch) was appended to the body but the static footer review block retained the prior version stamp.
+- `VERSION` — 6.9.1 → 6.9.2.
+
 ## [6.9.1] — 2026-06-19
 
 ### Added
