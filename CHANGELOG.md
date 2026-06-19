@@ -1,5 +1,23 @@
 # Changelog · FORM
 
+## [6.8.0] — 2026-06-19
+
+### Added
+- `content/post-1241-victor-centralized-feedback-memory.md` — Cluster 5 post 1/10. Victor як централізована пам'ять feedback: чотири систематичні проблеми пам'яті (ефект рецентності, підтверджувальне спотворення, стискання, відсутність міток), що Victor робить інакше, практичний старт.
+- `content/post-1242-victor-context-tagging-system.md` — Cluster 5 post 2/10. Система контекстних міток у Victor: чотири виміри (джерело, умови тренування, тренувальна фаза, тип спостереження), практичний приклад запису, мінімальний набір.
+- `content/post-1243-victor-feedback-logging-protocol.md` — Cluster 5 post 3/10. Протокол внесення feedback у Victor: три рівні запису (базовий 2 хв / стандартний 5 хв / розширений 10–15 хв), таймінг, що не записувати, позначка підтверджує/суперечить.
+- `content/post-1244-victor-delayed-analysis-protocol.md` — Cluster 5 post 4/10. Відстрочений аналіз через Victor: 48-годинне правило на практиці — два різних моменти запису, чому 48 год, Victor як «якір» між моментами.
+- `content/post-1245-victor-pattern-recognition.md` — Cluster 5 post 5/10. Патерни через Victor: три типи (частотний, часовий, крос-джерельний), чому пам'ять не бачить патернів, патерни як аргумент у розмові з тренером, патерн відсутності.
+- `content/post-1246-victor-coach-integration.md` — Cluster 5 post 6/10. Victor і тренер: два формати запису тренерського feedback (реальний час vs. стратегічний), три ефекти Victor, що Victor не робить, варіант без постійного тренера.
+- `content/post-1247-victor-training-partner-integration.md` — Cluster 5 post 7/10. Victor і тренувальний партнер: верифікація та суперечності — два сценарії (збіг незалежних джерел / суперечність), рівні підтвердження (гіпотеза → кандидат → підтверджений патерн).
+- `content/post-1248-victor-competitive-context-protocol.md` — Cluster 5 post 8/10. Victor і конкурентний контекст: повна послідовність від дня змагань до програмних рішень, ізоляція feedback від конкурентів, змагання як дані.
+- `content/post-1249-victor-self-assessment-loop.md` — Cluster 5 post 9/10. Victor і самооцінка: замикання петлі — три практики (калібрування, виявлення розбіжностей, зворотна верифікація), де самооцінка перевищує точність зовнішніх джерел.
+- `content/post-1250-cluster-5-block-synthesis.md` — Cluster 5 post 10/10 + Block synthesis. Синтез кластера 5 (6 принципів Victor) і повний синтез блоку 1201–1250 «Coaching intelligence»: пять кластерів у зв'язку, три центральних принципи, що блок не вирішив.
+
+### Changed
+- `blog.html` — posts 1241–1250 додані (Cluster 5: Victor як feedback-інфраструктура). blog.html тепер відображає пости до post-1250.
+- `STATUS.md` — Block 1201–1250 COMPLETE 50/50 · v6.8.0; наступні пріоритети оновлені.
+
 ## [6.7.2] — 2026-06-18
 
 ### Changed
