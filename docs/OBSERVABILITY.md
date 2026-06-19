@@ -7330,7 +7330,7 @@ The privacy concern motivating a separate pseudonym is **access-control solvable
 | 1 | Create Metabase Collection `/collections/pam-security`; set View permissions to groups `FORM-DevOps`, `FORM-Security`, `FORM-Compliance`; move PAM dashboard (§29.7) into this collection | devops-lead | **P0** | M4 | [ ] |
 | 2 | Provision Cloudflare API token `cf-ae-pam-read` scoped to `PAM_TELEMETRY` binding only; store in 1Password `FORM-Engineering` vault; share with devops-lead + security-engineer | devops-lead | **P0** | M4 | [ ] |
 | 3 | Validate Metabase `admin_user_id` column displays UUID only in all PAM dashboard panels — no name-resolution query against any user directory; add Metabase audit log verification step to SOC 2 observation-period evidence runbook | devops-lead + compliance-officer | **P0** | M4 | [ ] |
-| 4 | Document investigation procedure (§29.12.2, final paragraph) in internal security runbook; add to `docs/INCIDENT_RESPONSE.md` R-20 (Insider Threat) §C3 evidence query notes as "PAM_TELEMETRY query requires active PagerDuty incident reference" | security-engineer | **P1** | M4 | [ ] |
+| 4 | Document investigation procedure (§29.12.2, final paragraph) in internal security runbook; add to `docs/INCIDENT_RESPONSE.md` R-20 (Insider Threat) §C3 evidence query notes as "PAM_TELEMETRY query requires active PagerDuty incident reference" | security-engineer | **P1** | M4 | [x] **Done — 2026-06-19.** PAM_TELEMETRY investigation procedure blockquote added to `docs/INCIDENT_RESPONSE.md` R-20 §C3 (after Art. 9 exposure SQL closing ```): references §29.12.2 final paragraph; specifies PagerDuty incident requirement, timeline-addition obligation, and `cf-ae-pam-read` token access restriction. INCIDENT_RESPONSE v2.8. |
 
 ---
 

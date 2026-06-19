@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [6.18.1] — 2026-06-19
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v2.7 → v2.8. Two cross-reference patch closures: (1) §1 IC Quick-Start addendum — concurrent incident coordination line added per §18.7 item 3 (P1/M7, overdue): "Two active incidents? → Confirm distinct IDs in #incidents. Separate channels, separate ICs for ≥ P1. (§18.4)"; closes DEC-053 documentation obligation. (2) R-20 §C3 PAM_TELEMETRY procedural note — blockquote added after Art. 9 exposure SQL per `docs/OBSERVABILITY.md §29.12.4` item 4 (P1/M4, overdue): documents §29.12.2 investigation procedure control (UUID queries against `PAM_TELEMETRY` require active PagerDuty incident; findings added to incident timeline; `cf-ae-pam-read` token access restriction). §18.7 item 3 marked [x] Done.
+- `docs/OBSERVABILITY.md` — §29.12.4 item 4 marked [x] Done: PAM_TELEMETRY investigation procedure note confirmed added to `docs/INCIDENT_RESPONSE.md` R-20 §C3. Document version v4.4.0 unchanged (patch-level status update).
+- `VERSION` — 6.18.0 → 6.18.1.
+
 ## [6.18.0] — 2026-06-19
 
 ### Added
