@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.27.2] — 2026-06-19
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md §35` — OQ-SSO-34.2 Resolution: BDG `getGuardConfig()` Seat Source (DEC-069). Decision: `enterprise_contracts.contracted_seats` with 3600s KV safety-net TTL + active invalidation on `billing.seats_expanded`/`billing.seats_reduced` DEC-030 events. Option B (real-time `COUNT(active tenant_users)`) rejected on anti-DoS, audit-traceability, and pattern-consistency grounds. Six-dimension option matrix, updated `getGuardConfig()` TypeScript spec, four edge cases, §35.7 SOC 2 CC6.3 three-step audit reconstruction protocol, five-item implementation checklist (3× P0/M13 + 2× P1/M13).
+- `docs/DECISION_LOG.md DEC-069` — formal adoption record for OQ-SSO-34.2.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §34.12 OQ-SSO-34.2 row → 🟢 Resolved (DEC-069); document header v2.6 → v2.7.
+- `VERSION` — 6.27.1 → 6.27.2.
+
+---
+
 ## [6.27.1] — 2026-06-19
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.6
+# FORM · SSO/SCIM Implementation v2.7
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -12470,7 +12470,180 @@ Cross-reference obligation: register GUARD-E-001 in `docs/SOC2_READINESS.md §91
 | ID | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
 | **OQ-SSO-34.1** | **Should the 5-minute guard window align with AL-SCIM-MASS-01's 10-minute window?** Separate windows (5-min guard / 10-min detection) mean the guard fires before detection, which is the intended order. Unified 5-minute windows would simplify operator mental model but increase AL-SCIM-MASS-01 false-positive risk. Recommendation: keep separate windows; document in Admin Dashboard tooltip. | P2 | enterprise-architect | Document in `docs/DECISION_LOG.md` if unification is adopted at M13 implementation. |
-| **OQ-SSO-34.2** | **Should `contracted_seats` be sourced from `enterprise_contracts.contracted_seats` (static, 60s KV cache) or `COUNT(tenant_users WHERE is_active = true)` (real-time, per-request DB query)?** Static contracted_seats is stable and avoids per-request COUNT load during bulk syncs. Active count is more accurate but adds latency and DB connection pressure during the very scenario the guard is protecting against. Recommendation: `enterprise_contracts.contracted_seats` with 1-hour KV cache refreshed by `billing.seats_expanded`/`billing.seats_reduced` DEC-030 events. | P1 | platform-engineer | Decide at M13 implementation; document in `docs/DECISION_LOG.md` if active count is chosen. |
+| **OQ-SSO-34.2** | **Should `contracted_seats` be sourced from `enterprise_contracts.contracted_seats` (static, 60s KV cache) or `COUNT(tenant_users WHERE is_active = true)` (real-time, per-request DB query)?** Static contracted_seats is stable and avoids per-request COUNT load during bulk syncs. Active count is more accurate but adds latency and DB connection pressure during the very scenario the guard is protecting against. Recommendation: `enterprise_contracts.contracted_seats` with 1-hour KV cache refreshed by `billing.seats_expanded`/`billing.seats_reduced` DEC-030 events. | ~~P1~~ | platform-engineer | 🟢 **Resolved — DEC-069 (2026-06-19).** Option A adopted. See §35. |
+
+---
+
+## §35 OQ-SSO-34.2 Resolution — BDG `getGuardConfig()` Seat Source: `enterprise_contracts` with Event-Refreshed 1-Hour KV Cache (DEC-069)
+
+### §35.1 Problem Statement
+
+The Bulk Deprovision Guard limit is computed as `ceil(contracted_seats × threshold_pct / 100)`. The `getGuardConfig()` function (§34.4) must resolve `contracted_seats` for each tenantId. Two candidate sources:
+
+| Source | Key characteristic |
+|---|---|
+| **Option A:** `enterprise_contracts.contracted_seats` (KV-cached, 1h TTL, event-invalidated) | Contract-level billing record; stable; auditable; zero per-request DB cost after warmup |
+| **Option B:** `COUNT(tenant_users WHERE is_active = true AND tenant_id = :id)` (real-time DB query) | Real-time active seat count; reflects provisioning state instantly; one DB query per SCIM DELETE/PATCH under bulk load |
+
+OQ-SSO-34.2 was raised in §34.12 (v2.6, 2026-06-19) as a P1 question to be resolved before M13 enterprise GA implementation.
+
+---
+
+### §35.2 Option Analysis
+
+| Dimension | Option A — `enterprise_contracts` (KV, 1h TTL + event-invalidation) | Option B — `COUNT(active tenant_users)` (real-time DB) |
+|---|---|---|
+| **DB pressure during bulk sync** | Zero after KV warmup; Supabase fallback only on cold cache | One COUNT per SCIM DELETE/PATCH during bulk event stream — N queries for an N-user deprovision batch |
+| **Accuracy** | Matches commercial entitlement; may briefly lag a seat reduction (≤ 1h, or seconds with event invalidation) | Real-time; reflects provisioning state; but COUNT may lag replication under heavy write load |
+| **Stale risk** | `billing.seats_reduced` missed → guard limit slightly high for ≤ 1h (more permissive, bounded) | Replication lag under concurrent bulk writes can make COUNT stale in exactly the scenario it must be accurate |
+| **Audit traceability** | Block event auditable from immutable records: `contracted_seats` (enterprise_contracts row) + `threshold_pct` (preceding DEC-030 chain event); no snapshot needed | No immutable COUNT anchor at block time; auditor must reconstruct from unreliable WAL replay |
+| **Failure mode on DB error** | KV hit absorbs DB error; HTTP 503 only on cold-cache DB failure | Every guard evaluation fails on DB error — cold-cache and warm-cache alike |
+| **SOC 2 CC6.3 evidence** | Guard limit is deterministic and reconstructable from audit chain | Guard limit depends on a volatile COUNT; reconstruction requires point-in-time tenant_users snapshot |
+
+---
+
+### §35.3 Decision: Option A Adopted (DEC-069)
+
+**`enterprise_contracts.contracted_seats` with 3600s KV safety-net TTL and active invalidation on `billing.seats_expanded` / `billing.seats_reduced` DEC-030 events.**
+
+Five grounds:
+
+1. **Anti-DoS design principle.** The guard fires precisely when bulk sync load is highest. Adding a per-request COUNT to the hot path creates a feedback loop: the more users being deprovisioned, the more COUNT queries fire, increasing DB connection pressure, which delays guard evaluation — undermining the mechanism designed to contain the event. Absorbing seat resolution into the KV layer decouples guard latency from bulk-sync load entirely.
+
+2. **Contract is the authoritative seat count.** `enterprise_contracts.contracted_seats` is the billing record of what the tenant has paid for and is FORM's source of truth for commercial entitlement. Active provisioned users may temporarily diverge (seats purchased but not yet provisioned after a contract expansion; seats pending deactivation after a SCIM sync). The guard limit should reflect what the tenant is entitled to, not what has been provisioned at that moment.
+
+3. **Bounded staleness with concrete event-driven floor.** `billing.seats_expanded` and `billing.seats_reduced` DEC-030 events are emitted synchronously when a contract change is processed. The `billing-event-relay` Worker receives these events and calls `SCIM_KV.delete('scim:guard_cfg:' + tenantId)` before returning. In normal operation, the KV reflects the new contracted_seats within seconds of a contract change. The 3600s TTL is a safety-net for missed invalidation events only.
+
+4. **SOC 2 audit traceability.** A CC6.3 auditor verifying a `scim.bulk_deprovision_blocked` event can reconstruct the exact guard limit using only immutable chain records (§35.7 reconstruction protocol). A real-time COUNT has no immutable anchor; reconstructing the guard limit at block time T would require a point-in-time active-user COUNT snapshot that does not exist in the DEC-030 audit corpus.
+
+5. **Pattern consistency.** FORM's KV caching pattern with active invalidation is established across the codebase: `auth_policy:{tenantId}` (§25.4), `scim:ip:{tenantId}` (§33.3.3). Extending the same idiom to `scim:guard_cfg:{tenantId}` requires zero new infrastructure and is already partially specified in §34.4. This follows the DEC-043/044/051/053/065/067 "simplest adequate implementation" principle.
+
+---
+
+### §35.4 Updated `getGuardConfig()` Implementation
+
+The KV TTL is raised from 60s (§34.4 spec) to **3600s** (1-hour safety-net). The Supabase query JOIN is unchanged. The function signature and caller interface are unmodified.
+
+```typescript
+// apps/scim-worker/src/handlers/users.ts
+
+interface GuardConfig {
+  contractedSeats: number;
+  thresholdPct: number;        // 5–100; value 100 = guard disabled (fast-path)
+  overrideExp: string | null;  // ISO-8601 UTC or null
+}
+
+async function getGuardConfig(
+  tenantId: string,
+  kv: KVNamespace,
+  db: SupabaseClient
+): Promise<GuardConfig> {
+  const cacheKey = `scim:guard_cfg:${tenantId}`;
+
+  // 1. KV hit — 3600s safety-net TTL; typical invalidation is event-driven (§35.5)
+  const cached = await kv.get<GuardConfig>(cacheKey, 'json');
+  if (cached) return cached;
+
+  // 2. KV miss — query Supabase; JOIN across enterprise_contracts for contracted_seats
+  const { data, error } = await db
+    .from('enterprise_contracts')
+    .select(`
+      contracted_seats,
+      tenant_sso_configs!inner(
+        bulk_deprovision_threshold_pct,
+        bulk_deprovision_override_exp
+      )
+    `)
+    .eq('tenant_id', tenantId)
+    .single();
+
+  if (error || !data) {
+    // P1 alert routed via form-alert-relay (§46.3); SCIM Worker returns HTTP 503 to IdP
+    throw new Error(`BDG_SEAT_LOOKUP_FAILED:${tenantId}`);
+  }
+
+  const config: GuardConfig = {
+    contractedSeats: data.contracted_seats,
+    thresholdPct: data.tenant_sso_configs.bulk_deprovision_threshold_pct,
+    overrideExp: data.tenant_sso_configs.bulk_deprovision_override_exp ?? null,
+  };
+
+  // 3. Populate cache — 3600s safety-net; event-driven invalidation preferred (§35.5)
+  await kv.put(cacheKey, JSON.stringify(config), { expirationTtl: 3600 });
+  return config;
+}
+```
+
+**Privacy floor:** The KV value contains only `contractedSeats` (integer), `thresholdPct` (integer), and `overrideExp` (UTC timestamp string or null). No `user_id`, employee name, email, health data, or GDPR Art. 9 category is stored in KV or emitted in the Supabase fallback query.
+
+---
+
+### §35.5 Billing Event KV Invalidation
+
+The `billing-event-relay` Cloudflare Worker subscribes to the `emit-audit-event` DEC-030 event stream and calls `SCIM_KV.delete('scim:guard_cfg:' + event.payload.tenant_id)` on receipt of either:
+
+| Event | When emitted | Cache effect |
+|---|---|---|
+| `billing.seats_expanded` | Contract amendment increases `contracted_seats` | Delete `scim:guard_cfg:{tenantId}` — guard limit increases on next `getGuardConfig()` call |
+| `billing.seats_reduced` | Contract amendment decreases `contracted_seats` | Delete `scim:guard_cfg:{tenantId}` — guard limit tightens on next `getGuardConfig()` call |
+
+**Invalidation failure path:** If `SCIM_KV.delete` throws (KV transient error), the `billing-event-relay` Worker emits a `system.scim_guard_cfg_cache_stale` advisory event (LOW severity, 1yr retention) via `emit-audit-event`. This event does not page on-call; compliance-officer reviews stale-advisory events in the next business day. The 3600s TTL safety-net ensures the stale cache clears within 1 hour without any operator action.
+
+---
+
+### §35.6 Edge Cases
+
+| Scenario | Guard behaviour | Operator action |
+|---|---|---|
+| KV miss + Supabase DB error during bulk sync | `BDG_SEAT_LOOKUP_FAILED` → SCIM Worker returns HTTP 503 to IdP; P1 PagerDuty `form-platform` via `form-alert-relay` | Platform-engineer investigates Supabase connectivity; IdP SCIM client retries on HTTP 503 (standard SCIM retry behaviour) |
+| `billing.seats_reduced` event missed (KV stale for ≤ 1h) | Guard limit briefly higher than new contracted_seats; guard is more permissive than intended by ≤ `(old − new) × threshold_pct / 100` users | Stale window self-clears within 1h via TTL safety-net; `system.scim_guard_cfg_cache_stale` advisory flags the miss; compliance-officer notes in GUARD-E-001 if block event occurred during stale window |
+| `billing.seats_expanded` event missed (KV stale for ≤ 1h) | Guard limit briefly lower than new contracted_seats; guard may fire HTTP 422 on a legitimate large-batch provision | CSM issues a time-limited bulk override (§34.5) to allow the planned provision; stale cache clears within 1h |
+| threshold_pct updated via Admin Dashboard (`update_bdg_threshold()` RPC) | Existing §34.4 active KV invalidation fires: `SCIM_KV.delete('scim:guard_cfg:' + tenantId)` via RPC post-hook | No additional action needed; §35 does not change the threshold invalidation path |
+
+---
+
+### §35.7 SOC 2 Audit Traceability Protocol
+
+A CC6.3 auditor verifying a `scim.bulk_deprovision_blocked` event at time **T** can reconstruct the exact guard limit using immutable records in three steps, without querying live tenant_users state:
+
+1. **Contracted seats at T:** Query `enterprise_contracts WHERE tenant_id = :tid AND effective_from ≤ T ORDER BY effective_from DESC LIMIT 1` → `contracted_seats`.
+2. **Threshold at T:** In the DEC-030 HMAC chain, find the most recent `scim.bulk_deprovision_threshold_updated` event with `payload.tenant_id = :tid` and `created_at ≤ T` → `payload.new_threshold_pct`.
+3. **Guard limit:** `ceil(contracted_seats × threshold_pct / 100)`.
+
+This three-step protocol is deterministic, requires no point-in-time active-user snapshot, and produces the same result on any replay. The `scim.bulk_deprovision_blocked` event `payload.contracted_seats` field (§34.7) also records the value at the time of the block as a direct shortcut — the auditor can verify the field against the reconstruction.
+
+**Auditor narrative for CC6.3:** The guard limit at any block event is reconstructable from two immutable records: the `enterprise_contracts` billing row and the preceding DEC-030 `scim.bulk_deprovision_threshold_updated` event. The `billing.seats_reduced` event-driven KV invalidation ensures the guard reflected the current contract within seconds of any seat reduction; the 3600s TTL provides a documented maximum staleness bound. No real-time active-user COUNT is required — the reconstruction does not depend on any volatile database state.
+
+---
+
+### §35.8 OQ Gap Tracker
+
+| OQ | Status | Decision |
+|---|---|---|
+| **OQ-SSO-34.2** | 🟢 **Resolved — DEC-069 (2026-06-19)** | Option A adopted: `enterprise_contracts.contracted_seats` with 3600s KV TTL + event-driven invalidation on `billing.seats_expanded` / `billing.seats_reduced`. Option B (real-time COUNT) rejected on anti-DoS, audit-traceability, and pattern-consistency grounds. |
+
+---
+
+### §35.9 Implementation Checklist
+
+#### P0 — Before enterprise GA (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update `getGuardConfig()` in `apps/scim-worker/src/handlers/users.ts`: change `kv.put` TTL from 60s to 3600s; verify Supabase fallback query JOINs `enterprise_contracts.contracted_seats` (already in §34.4 spec); add `BDG_SEAT_LOOKUP_FAILED` exception throw with P1 alert path. No Supabase schema changes required. | platform-engineer | **P0** | M13 | [ ] |
+| 2 | Wire `billing-event-relay` Cloudflare Worker to call `SCIM_KV.delete('scim:guard_cfg:' + event.payload.tenant_id)` on receipt of `billing.seats_expanded` and `billing.seats_reduced` DEC-030 events. On `SCIM_KV.delete` failure: emit `system.scim_guard_cfg_cache_stale` (LOW, 1yr) via `emit-audit-event` Worker. | platform-engineer | **P0** | M13 | [ ] |
+| 3 | Integration tests `src/tests/sso/scim-guard-seat-source.test.ts`: (a) `billing.seats_reduced` event → `scim:guard_cfg:{tenantId}` deleted from KV; (b) next `getGuardConfig()` call returns updated `contractedSeats` from Supabase; (c) guard limit re-computed at new lower contracted_seats → HTTP 422 fires one step earlier; (d) KV miss + Supabase error → `BDG_SEAT_LOOKUP_FAILED` thrown + HTTP 503 returned to SCIM client. | platform-engineer | **P0** | M13 | [ ] |
+
+#### P1 — Before enterprise GA (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Register `system.scim_guard_cfg_cache_stale` (LOW, 1yr) advisory event in `docs/AUDIT_LOG_SCHEMA.md §System`. Deploy updated event registry to `emit-audit-event` Worker. | compliance-officer + platform-engineer | **P1** | M13 | [ ] |
+| 5 | Author `compliance/fieldwork/scim-bulk-deprovision-guard.md` fieldwork guide: include §35.7 three-step audit traceability reconstruction protocol; include §34.11 GUARD-E-001 collection SQL; cross-reference `compliance/evidence/scim-guard/GUARD-E-001_<YYYY-QN>.csv` storage path. Index in `compliance/evidence/auditor-onboarding/README.md`. | compliance-officer | **P1** | M13 | [ ] |
+
+---
+
+*v2.7 (2026-06-19): §35 OQ-SSO-34.2 Resolution — BDG `getGuardConfig()` Seat Source: `enterprise_contracts.contracted_seats` with Event-Refreshed 1-Hour KV Cache (DEC-069). Closes OQ-SSO-34.2 (P1, §34.12, before enterprise GA M13). Decision: **Option A adopted** — `enterprise_contracts.contracted_seats` cached at `scim:guard_cfg:{tenantId}` (3600s safety-net TTL) with active invalidation on `billing.seats_expanded` / `billing.seats_reduced` DEC-030 events by `billing-event-relay` Cloudflare Worker. Option B (`COUNT(tenant_users WHERE is_active = true)` per-request DB query) rejected. Five grounds: (1) anti-DoS — N-user bulk deprovision would generate N COUNT queries at peak DB load, risking connection saturation during the scenario the guard is designed to contain; (2) contract is authoritative — `enterprise_contracts.contracted_seats` is the billing entitlement record; active provisioned count may diverge during seat transitions; (3) bounded staleness — event-driven invalidation delivers new contracted_seats within seconds of a billing change; 3600s TTL safety-net bounds worst-case staleness to 1 hour; (4) SOC 2 CC6.3 audit traceability — block decisions fully reconstructable from immutable records (§35.7 three-step protocol: enterprise_contracts row + preceding threshold_updated chain event); no live COUNT snapshot needed; (5) pattern consistency with DEC-043/044/051/053/065/067 "simplest adequate implementation" and existing KV invalidation idiom (§25.4, §33.3.3). §35.1 problem statement: two candidate seat sources, key trade-offs. §35.2 six-dimension option matrix (DB pressure, accuracy, stale risk, audit traceability, DB-error failure mode, SOC 2 CC6.3 evidence). §35.3 five grounds for Option A adoption. §35.4 updated `getGuardConfig()` TypeScript: `GuardConfig` interface (contractedSeats, thresholdPct, overrideExp); 3600s `kv.put` TTL; `enterprise_contracts JOIN tenant_sso_configs` Supabase fallback; `BDG_SEAT_LOOKUP_FAILED:${tenantId}` exception + HTTP 503 + P1 alert on DB error. Privacy floor: KV value contains only aggregate integers and a UTC timestamp string; no user_id, email, health, or Art. 9 data. §35.5 billing event invalidation: `billing-event-relay` calls `SCIM_KV.delete` on `billing.seats_expanded`/`billing.seats_reduced`; `system.scim_guard_cfg_cache_stale` LOW/1yr advisory on KV delete failure. §35.6 four edge cases: DB error → HTTP 503 + P1 alert; seats_reduced missed → stale ≤ 1h, guard more permissive (bounded, acceptable); seats_expanded missed → guard fires early on large provision (CSM override resolves); threshold_pct update → existing §34.4 invalidation path unchanged. §35.7 SOC 2 audit traceability: three-step reconstruction from immutable records (enterprise_contracts row + preceding scim.bulk_deprovision_threshold_updated event); `scim.bulk_deprovision_blocked` payload `contracted_seats` field provides direct shortcut. CC6.3 auditor narrative: limit reconstructable without live COUNT; event-driven invalidation ensures ≤ seconds staleness on seat reduction; 3600s TTL is documented maximum bound. §35.8 OQ gap tracker: OQ-SSO-34.2 🟢 Resolved (DEC-069, 2026-06-19). §35.9 five-item implementation checklist: 3× P0/M13 (getGuardConfig() KV TTL 60→3600s + BDG_SEAT_LOOKUP_FAILED path, billing-event-relay KV invalidation wiring + stale advisory, integration tests); 2× P1/M13 (system.scim_guard_cfg_cache_stale AUDIT_LOG_SCHEMA registration, fieldwork guide). §34.12 OQ tracker updated: OQ-SSO-34.2 row → 🟢 Resolved (DEC-069). Document header: v2.6 → v2.7. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §34.4` (getGuardConfig() implementation — KV TTL raised 60→3600s; Supabase JOIN already present); `docs/SSO_SCIM_IMPLEMENTATION.md §34.12` (OQ-SSO-34.2 source — closed in this version); `docs/SSO_SCIM_IMPLEMENTATION.md §34.7` (`scim.bulk_deprovision_blocked` payload `contracted_seats` field — traceability shortcut per §35.7); `docs/SSO_SCIM_IMPLEMENTATION.md §25.4` (auth policy KV cache — same invalidation idiom); `docs/SSO_SCIM_IMPLEMENTATION.md §33.3.3` (IP enforcement KV invalidation — same pattern); `docs/AUDIT_LOG_SCHEMA.md §System` (`system.scim_guard_cfg_cache_stale` — to be registered per §35.9 item 4, P1/M13); `docs/DECISION_LOG.md DEC-069` (formal adoption decision). Owner: platform-engineer + enterprise-architect + compliance-officer.*
 
 ---
 
