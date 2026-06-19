@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.37.1] — 2026-06-19
+
+### Changed
+- `docs/OBSERVABILITY.md` — §12.6 pg_cron health monitoring job registry: jobs 28–37 registered (v4.7.0 → v4.7.1). Closes ten cross-reference obligations across SSO_SCIM_IMPLEMENTATION.md, DATA_MODEL.md, SOC2_READINESS.md, and OBSERVABILITY.md itself. Job 28: `ci_telemetry_daily_sync` (CC8.1, §38.9). Job 29: `backup_age_monitor` (A1.2/CC7.2, §39.7, every 4h). Job 30: `quarterly_perf_regression_check` (A1.2/CC7.2, §40.6, PERF-SLO-06). Job 31: `wearable_sync_freshness_check` (CC7.2/WS-SLO-06, §41). Job 32: `turh_retention_purge` (CC6.3/GDPR Art. 17(3)(b), SSO_SCIM §29/DEC-051). Job 34: `bdg_override_expiry_sweep` (CC6.3/A1.2, SSO_SCIM §34.3/DEC-066, every 15min). Job 35: `google_directory_alert_check` (CC7.2/CC7.3, §48/SOC2_READINESS §92/DEC-067, every 5min — closes §48.8 item 3 P1/M4 obligation). Job 36: `dsar_slo_miss_counter_reset` (P5.1/CC7.2, DATA_MODEL §35.4/DEC-052, quarterly). Job 37: `caep_reregister_sweep` (CC6.3, SSO_SCIM §36/DEC-072, every 5min — closes SSO_SCIM §36.6 item 1 P0/M5 obligation). Conflict resolution: SSO_SCIM §34.3 and DATA_MODEL §35.4 both claimed "job 33" for newly authored jobs after `evidence_cron_freshness_check` (job 33) was already canonical; resolved as `bdg_override_expiry_sweep` → job 34, `dsar_slo_miss_counter_reset` → job 36. Freshness window note updated to cover 5-min, 15-min, and quarterly cadences. `system.gdir_alert_check_stale` LOW/1yr DEC-030 event noted for AUDIT_LOG_SCHEMA.md §System registration.
+- `VERSION` — 6.37.0 → 6.37.1.
+
+---
+
 ## [6.37.0] — 2026-06-19
 
 ### Added
