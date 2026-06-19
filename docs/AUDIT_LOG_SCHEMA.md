@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.17
+# FORM · Audit Log Schema v2.18
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -1120,6 +1120,11 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `dsar.certificate_delivered` | 7 years | SOC 2 P8.0 — delivery confirmation closes the CERT-CHAIN-01 four-event chain (`dsar.deletion_soft → deletion_confirmed → certificate_issued → certificate_delivered`); CC7.2 — `delivered_to_hash` + `delivery_channel` document that the disposal notification reached the intended party; STANDARD severity; 7yr required because the delivery record completes Art. 17 accountability — shorter retention would leave `dsar.certificate_issued` without a verifiable follow-through across multi-year SOC 2 Type II observation windows |
 | `siem.consent_addendum_signed` | 7 years | SOC 2 CC9.2 / CC1.1 — SIEM-CONSENT-01 chain prerequisite; primary evidence source for SIEM-CONSENT-E-001 quarterly artefact; contractual record of MSA Addendum 4 acceptance (GDPR Art. 28(3)(a) documented instruction); 7yr matches MSA retention floor (`docs/ENTERPRISE_SLA.md §19.5`) and SOC 2 multi-cycle evidence requirement; `docs/OBSERVABILITY.md §47.8` (DEC-065) |
 | `siem.consent_addendum_revoked` | 7 years | SOC 2 CC9.2 / CC1.1 — revocation record paired with `siem.consent_addendum_signed`; required in SIEM-CONSENT-E-001 quarterly export to confirm controlled lifecycle of SIEM data processing instructions; `revocation_reason` enum supports audit fieldwork; 7yr matches signed-event retention (both events together tell the full Addendum 4 lifecycle story across multi-year SOC 2 Type II observation windows); `docs/OBSERVABILITY.md §47.8` (DEC-065) |
+| `enterprise.adoption_snapshot_filed` | 3 years | SOC 2 CC4.1 / A1.1 — monthly adoption health monitoring record (ADO-E-001); aggregate-only: no `user_id`, no per-user health data; `coaching_engaged_seats < 5` suppressed at API layer; 3yr sufficient as operational performance evidence — not a financial or contract record; `docs/COST_MODEL.md §40.8.1` |
+| `enterprise.adoption_milestone_reached` | 3 years | SOC 2 CC4.1 — milestone achievement record (S1/S2/S3 funnel stages); emitted once per milestone per tenant; aggregate rate, not individual attribution; 3yr sufficient as performance milestone evidence; `docs/COST_MODEL.md §40.8.2` |
+| `enterprise.adoption_health_downgraded` | 3 years | SOC 2 CC7.3 / CC4.2 — adoption anomaly detection event (ADO-E-003 anchor); HIGH severity — emitted when `wau_health_band` worsens (Green → Amber, Green → Red, Amber → Red); triggers ADO-CHAIN-01 CSM follow-up monitoring; `acv_usd` is contract-level aggregate; 3yr matches adoption snapshot retention floor; `docs/COST_MODEL.md §40.8.3` |
+| `enterprise.qbr_completed` | 3 years | SOC 2 CC2.2 / CC4.1 — quarterly business review completion record (ADO-E-002); `privacy_floor_verified: true` literal is a QBR-PRIV-01 chain invariant — HTTP 422 if absent; `renewal_date` is contract-level metadata; no attendee names, no per-user metrics; 3yr matches adoption snapshot retention floor and is sufficient for single SOC 2 Type II observation period; `docs/COST_MODEL.md §40.8.4` |
+| `system.csm_followup_overdue` | 1 year | ADO-CHAIN-01 advisory signal — emitted by `evidence-collection-cron` when `enterprise.adoption_health_downgraded` has no CSM follow-up within 10 business days; LOW severity; non-blocking; routes to compliance-officer SIEM review queue; 1yr sufficient as operational advisory record (primary downgrade evidence covered by 3yr `enterprise.adoption_health_downgraded`); `docs/COST_MODEL.md §40.8.3` |
 
 After retention period, rows **hard-deleted via partition drop** (not soft-delete). Hash of deleted-partition's last row preserved у `audit_log_retention_summary` for chain continuity proof.
 
@@ -2484,6 +2489,122 @@ export const SiemConsentAddendumRevokedPayload = z.object({
 
 ---
 
+### Enterprise Adoption Monitoring events (DEC-030 HMAC-chained · COST_MODEL §40.8 · CC4.1/CC2.2/CC7.3/CC4.2/A1.1)
+
+> Defined in `docs/COST_MODEL.md §40.8` (v2.6, 2026-06-18 — §40 Enterprise Customer Adoption Economics & Seat Utilization Health Model). Five DEC-030 HMAC-chained events covering the monthly adoption snapshot lifecycle, customer milestone detection, health band degradation, QBR completion governance, and CSM follow-up advisory monitoring. **Scope:** Enterprise tier — all active Starter/Growth/Enterprise tenants. **ADO-CHAIN-01 monitoring invariant:** If `enterprise.adoption_health_downgraded` is emitted for a tenant, the `evidence-collection-cron` Worker checks for a corresponding `enterprise.qbr_completed` or CRM CSM check-in within 10 business days; if neither is present, it emits `system.csm_followup_overdue` (LOW advisory, non-blocking). **QBR-PRIV-01 chain invariant:** `enterprise.qbr_completed` carries `privacy_floor_verified: z.literal(true)` — the `emit-audit-event` Worker returns HTTP 422 if the field is absent or `false`, preventing the QBR completion event from being chained without explicit CSM attestation that no individual employee data was shared. **Privacy invariant (all five events):** no `user_id`, no individual health values, no coaching content, no employee names or email addresses — tenant-aggregate or contract-level metadata only. `enterprise_adoption_snapshots` table: `form_api` REVOKED; `compliance_reviewer` SELECT-only; `form_system` ALL. `coaching_engaged_seats < 5` suppressed at API query layer (k-anonymity floor — see `docs/COST_MODEL.md §40.7.2`). Cross-ref: `docs/COST_MODEL.md §40` (full adoption economics model — S1/S2/S3 funnel, health band matrix, QBR financial framework, `enterprise_adoption_snapshots` DDL migration 0078, four DEC-030 event Zod schemas, CSM intervention playbook); `docs/COST_MODEL.md §40.9` (ADO-E-001/002/003 SOC 2 evidence artefacts); `docs/SOC2_READINESS.md §90` (ADO-E-001 CC4.1/A1.1, ADO-E-002 CC2.2/CC4.1, ADO-E-003 CC7.3/CC4.2 registered in master evidence table v3.15.0). **Closes `docs/COST_MODEL.md §40.10` checklist item 1 (P0/M10 — register `enterprise.adoption_snapshot_filed`, `enterprise.adoption_milestone_reached`, `enterprise.adoption_health_downgraded`, `enterprise.qbr_completed`, and `system.csm_followup_overdue` in `docs/AUDIT_LOG_SCHEMA.md §Enterprise + §System` before first enterprise pilot go-live).**
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `enterprise.adoption_snapshot_filed` | STANDARD | 3 yr | Monthly `evidence-collection-cron` Worker (automated) or CSM manual trigger via Admin Console; fires after INSERT into `enterprise_adoption_snapshots` and health band comparison vs. prior month | `tenant_id` (UUID), `snapshot_month` (ISO date `YYYY-MM-01`), `contracted_seats` (int), `activated_seats` (int), `activation_rate_pct` (float 0–100), `wau_count` (int), `wau_rate_pct` (float 0–100), `habitual_seat_count` (int), `habitual_rate_pct` (float 0–100), `wau_health_band` (enum: `green`\|`amber`\|`red`), `coaching_sessions_total` (int), `filed_by` (enum: `evidence-collection-cron`\|`csm-manual`) |
+| `enterprise.adoption_milestone_reached` | STANDARD | 3 yr | Emitted once per milestone per tenant when a snapshot crosses a threshold for the first time: S1 ≥ 40% activated seats by Day 28, S2 WAU ≥ 30% at M3, S3 Habitual ≥ 20% at M6, or WAU crosses Green band (≥ 40%) | `tenant_id` (UUID), `milestone` (enum: `s1_activation_40pct`\|`s2_wau_30pct`\|`s3_habitual_20pct`\|`s2_wau_40pct_green`), `rate_pct` (float 0–100 — actual rate at milestone crossing), `contracted_seats` (int), `days_since_contract_start` (int ≥ 0) |
+| `enterprise.adoption_health_downgraded` | HIGH | 3 yr | Monthly snapshot job detects `wau_health_band` is worse than the prior month: Green → Amber, Green → Red, or Amber → Red; also triggers ADO-CHAIN-01 monitoring: `system.csm_followup_overdue` emitted if no CSM follow-up recorded within 10 business days | `tenant_id` (UUID), `snapshot_month` (ISO date `YYYY-MM-01`), `prior_band` (enum: `green`\|`amber`\|`red`), `current_band` (enum: `green`\|`amber`\|`red`), `wau_rate_pct` (float 0–100), `contracted_seats` (int), `acv_usd` (int — aggregate contract value; no individual employee data) |
+| `enterprise.qbr_completed` | STANDARD | 3 yr | CSM triggers via Admin Console "Complete QBR" modal after QBR call; cannot be back-dated more than 7 days; **QBR-PRIV-01 chain invariant:** `privacy_floor_verified: true` required or HTTP 422 | `tenant_id` (UUID), `qbr_date` (ISO date `YYYY-MM-DD`), `tier` (enum: `starter`\|`growth`\|`enterprise`), `contracted_seats` (int), `wau_rate_pct_at_qbr` (float 0–100 — from latest snapshot), `wau_health_band_at_qbr` (enum: `green`\|`amber`\|`red`), `renewal_date` (ISO date `YYYY-MM-DD` — date only, no time), `expansion_discussed` (bool), `privacy_floor_verified` (`true` literal — `z.literal(true)`; HTTP 422 if absent or `false`) |
+| `system.csm_followup_overdue` | LOW | 1 yr | Advisory: `evidence-collection-cron` weekly sweep emits this when a tenant has `enterprise.adoption_health_downgraded` with no `enterprise.qbr_completed` or CRM check-in task within 10 business days; non-blocking; routes to compliance-officer SIEM review queue, not PagerDuty | `tenant_id` (UUID), `downgrade_event_id` (UUID — DEC-030 chain record ID of the triggering `adoption_health_downgraded` event), `days_since_downgrade` (int ≥ 10), `current_band` (enum: `amber`\|`red`), `acv_usd` (int — contract-level; for CSM triage priority) |
+
+**Zod v2 schemas (canonical source: `docs/COST_MODEL.md §40.8` — registered here for `emit-audit-event` Worker validation):**
+
+```typescript
+import { z } from 'zod/v4';
+
+// enterprise.adoption_snapshot_filed — COST_MODEL §40.8.1
+export const AdoptionSnapshotFiledPayload = z.object({
+  tenant_id:               z.string().uuid(),
+  snapshot_month:          z.string().regex(/^\d{4}-\d{2}-01$/),    // ISO date, first of month
+  contracted_seats:        z.number().int().positive(),
+  activated_seats:         z.number().int().nonnegative(),
+  activation_rate_pct:     z.number().min(0).max(100),
+  wau_count:               z.number().int().nonnegative(),
+  wau_rate_pct:            z.number().min(0).max(100),
+  habitual_seat_count:     z.number().int().nonnegative(),
+  habitual_rate_pct:       z.number().min(0).max(100),
+  wau_health_band:         z.enum(['green', 'amber', 'red']),
+  coaching_sessions_total: z.number().int().nonnegative(),
+  filed_by:                z.enum(['evidence-collection-cron', 'csm-manual']),
+  // Privacy floor: no user_id, no per-user data, no coaching content
+});
+
+// enterprise.adoption_milestone_reached — COST_MODEL §40.8.2
+export const AdoptionMilestoneReachedPayload = z.object({
+  tenant_id:                  z.string().uuid(),
+  milestone:                  z.enum([
+    's1_activation_40pct',    // 40% seats activated — Day 28/60 milestone
+    's2_wau_30pct',           // WAU ≥ 30% at M3
+    's3_habitual_20pct',      // Habitual ≥ 20% at M6
+    's2_wau_40pct_green',     // WAU crosses Green threshold (≥ 40%)
+  ]),
+  rate_pct:                   z.number().min(0).max(100),
+  contracted_seats:           z.number().int().positive(),
+  days_since_contract_start:  z.number().int().nonnegative(),
+  // Emitted once per milestone per tenant — not on every snapshot
+  // No user_id, no individual data
+});
+
+// enterprise.adoption_health_downgraded — COST_MODEL §40.8.3
+export const AdoptionHealthDowngradedPayload = z.object({
+  tenant_id:          z.string().uuid(),
+  snapshot_month:     z.string().regex(/^\d{4}-\d{2}-01$/),
+  prior_band:         z.enum(['green', 'amber', 'red']),
+  current_band:       z.enum(['green', 'amber', 'red']),
+  wau_rate_pct:       z.number().min(0).max(100),
+  contracted_seats:   z.number().int().positive(),
+  acv_usd:            z.number().positive(),   // aggregate contract value — not individual-level data
+  // No user_id, no employee names, no health values
+});
+
+// enterprise.qbr_completed — COST_MODEL §40.8.4
+export const QbrCompletedPayload = z.object({
+  tenant_id:                z.string().uuid(),
+  qbr_date:                 z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  tier:                     z.enum(['starter', 'growth', 'enterprise']),
+  contracted_seats:         z.number().int().positive(),
+  wau_rate_pct_at_qbr:      z.number().min(0).max(100),
+  wau_health_band_at_qbr:   z.enum(['green', 'amber', 'red']),
+  renewal_date:             z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // date only — no time component
+  expansion_discussed:      z.boolean(),
+  privacy_floor_verified:   z.literal(true),   // QBR-PRIV-01 chain invariant — HTTP 422 if absent or false
+  // No attendee names, no per-user engagement metrics, no coaching content
+});
+
+// system.csm_followup_overdue — ADO-CHAIN-01 advisory (LOW, non-blocking)
+export const CsmFollowupOverduePayload = z.object({
+  tenant_id:             z.string().uuid(),
+  downgrade_event_id:    z.string().uuid(),        // DEC-030 chain record ID of adoption_health_downgraded
+  days_since_downgrade:  z.number().int().min(10), // advisory fires at ≥ 10 business days
+  current_band:          z.enum(['amber', 'red']),
+  acv_usd:               z.number().positive(),    // contract-level; for CSM triage priority
+  // Advisory only — does not block the chain; no PagerDuty
+});
+```
+
+**ADO-CHAIN-01 monitoring invariant:** When `enterprise.adoption_health_downgraded` is emitted for a tenant, a CSM check-in task must be created in Linear within 2 business days. The `evidence-collection-cron` Worker (§81) runs a weekly advisory sweep checking whether any `adoption_health_downgraded` event from the past 10 business days lacks a corresponding `enterprise.qbr_completed` event or a CRM-linked CSM task for the same `tenant_id`. If the 10-business-day window is exceeded, the Worker emits `system.csm_followup_overdue` (LOW, 1yr, advisory). This is an operational control, not a chain gate — it does not block any subsequent event and does not return HTTP 422. It routes to the compliance-officer weekly SIEM review queue, not PagerDuty.
+
+**QBR-PRIV-01 chain invariant:** For any `enterprise.qbr_completed` event, `privacy_floor_verified` must be `true`. This field is typed as `z.literal(true)` in the Zod v2 schema — the Admin Console "Complete QBR" modal's submit button is disabled until the CSM checks the attestation checkbox (*"I confirm no individual employee data was shared in this QBR"*). The `emit-audit-event` Worker independently re-validates the literal before chaining the event; if `privacy_floor_verified` is absent or `false`, the Worker returns HTTP 422 and rolls back the Admin Console action. This converts the privacy floor for QBR communications from a procedural policy into an architectural enforcement that creates a tamper-evident chain record of the CSM's attestation.
+
+**Emitter assignments:**
+- `enterprise.adoption_snapshot_filed` — `evidence-collection-cron` Cloudflare Worker (§81, automated monthly run) or `admin-dashboard-api` (CSM manual trigger, `form_system` role). Fail-closed: if the Worker returns non-2xx, the `enterprise_adoption_snapshots` INSERT is rolled back.
+- `enterprise.adoption_milestone_reached` — `evidence-collection-cron` (same monthly run as `adoption_snapshot_filed`; emitted only once per milestone per `tenant_id`; idempotency enforced via milestone history check before emission).
+- `enterprise.adoption_health_downgraded` — `evidence-collection-cron` (same monthly run; emitted after snapshot row is committed and band comparison detects a downgrade; HIGH severity — treated as a potential revenue risk signal).
+- `enterprise.qbr_completed` — `admin-dashboard-api` (CSM manual trigger via Admin Console "Complete QBR" modal; `form_system` role; QBR-PRIV-01 chain invariant enforced at Worker layer, not only UI layer).
+- `system.csm_followup_overdue` — `evidence-collection-cron` (weekly advisory sweep; LOW severity; no PagerDuty; routes to compliance-officer SIEM review queue).
+
+**SOC 2 evidence artefacts (registered in `docs/SOC2_READINESS.md §90`, v3.15.0, 2026-06-19):**
+
+| Artefact | SOC 2 criteria | Description | Cadence | Retention | Path |
+|---|---|---|---|---|---|
+| **ADO-E-001** | CC4.1, A1.1 | Quarterly export of `enterprise_adoption_snapshots` for all active tenants; `wau_health_band` distribution (Green/Amber/Red counts + ACV at each band — Q3 fleet summary); k-anonymity attestation for `coaching_engaged_seats`; zero-row quarters filed as affirmative health attestation JSON | Quarterly from M11 | 3 yr | `compliance/evidence/adoption/ADO-E-001_<YYYY-QN>.csv` |
+| **ADO-E-002** | CC2.2, CC4.1 | Quarterly export of all `enterprise.qbr_completed` DEC-030 events; `privacy_floor_verified: true` in every row verified at export; zero-event Starter quarters documented as expected (semi-annual cadence) | Quarterly from M11 | 3 yr | `compliance/evidence/adoption/ADO-E-002_<YYYY-QN>.csv` |
+| **ADO-E-003** | CC7.3, CC4.2 | Quarterly export of `enterprise.adoption_health_downgraded` events paired with evidence of CSM follow-up within 10 business days (`system.csm_followup_overdue` absence or resolution confirmed); zero-event quarters filed as affirmative attestation JSON | Quarterly from M11 | 3 yr | `compliance/evidence/adoption/ADO-E-003_<YYYY-QN>.csv` |
+
+**Auditor narrative for CC4.1:** FORM monitors enterprise customer adoption health on a monthly cadence via `enterprise_adoption_snapshots`. The DEC-030 chain records the snapshot (ADO-E-001), milestone achievement, and health band degradation (ADO-E-003). The QBR cadence (ADO-E-002) is a formally documented performance review with each tenant. Together, these three artefacts demonstrate that FORM evaluates system performance against defined thresholds and acts when those thresholds are not met — satisfying CC4.1's requirement to monitor performance against commitments on an ongoing basis.
+
+**Auditor narrative for CC2.2:** `enterprise.qbr_completed` with `privacy_floor_verified: true` is an immutable DEC-030 chain record that FORM communicated aggregate product performance to the enterprise tenant on a documented date. QBR-PRIV-01 ensures the communication did not include prohibited individual-level data — a chain enforcement, not a procedural check. ADO-E-002 provides quarterly evidence of this communication cadence across the fleet, satisfying CC2.2's requirement to communicate externally about matters affecting the security and performance of the system.
+
+**Auditor narrative for CC7.3:** `enterprise.adoption_health_downgraded` (HIGH) is the anomaly-detection event — it signals that a tenant's adoption trajectory has worsened, which is a leading indicator of churn risk and, at Red band, a deficiency in FORM's customer success controls. ADO-E-003 pairs downgrade events with evidence of CSM follow-up within 10 business days, demonstrating that FORM evaluates identified anomalies and responds within a defined timeframe. `system.csm_followup_overdue` ensures unanswered downgrade events surface to compliance-officer review — converting a potential process gap into a chain-recorded advisory signal.
+
+**Auditor narrative for CC4.2 and A1.1:** Monthly snapshots, health band downgrade detection, CSM follow-up monitoring, and quarterly QBR cadence create a continuous performance monitoring loop demonstrating that FORM evaluates deficiencies (Red-band accounts) and tracks resolution. A1.1 mapping: adoption health degradation is a capacity-adjacent signal — insufficient utilisation creates churn risk, which threatens service continuity for the affected tenant's contract; ADO-CHAIN-01 CSM follow-up monitoring with `system.csm_followup_overdue` ensures FORM responds to utilisation threats proactively.
+
+---
+
 ## Export & delivery
 
 Enterprise tenants can:
@@ -2523,6 +2644,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.18 · 2026-06-19 · owner: compliance-officer + security-engineer + enterprise-architect + customer-success**
+*v2.18 (2026-06-19): +5 events — Enterprise Adoption Monitoring (COST_MODEL §40.8 · CC4.1/CC2.2/CC7.3/CC4.2/A1.1 · P0/M10). New section `### Enterprise Adoption Monitoring events (DEC-030 HMAC-chained · COST_MODEL §40.8 · CC4.1/CC2.2/CC7.3/CC4.2/A1.1)` inserted before `## Export & delivery`. (1) `enterprise.adoption_snapshot_filed` (STANDARD, 3yr): monthly `enterprise_adoption_snapshots` INSERT record (migration 0078); emitted by `evidence-collection-cron` or CSM manual trigger; payload: `tenant_id`, `snapshot_month` (`/^\d{4}-\d{2}-01$/`), `contracted_seats`, `activated_seats`, `activation_rate_pct`, `wau_count`, `wau_rate_pct`, `habitual_seat_count`, `habitual_rate_pct`, `wau_health_band` (green/amber/red), `coaching_sessions_total`, `filed_by` (evidence-collection-cron|csm-manual); no `user_id`, no per-user data, `coaching_engaged_seats < 5` suppressed at API layer. (2) `enterprise.adoption_milestone_reached` (STANDARD, 3yr): emitted once per milestone per tenant on first threshold crossing; milestone enum: `s1_activation_40pct`/`s2_wau_30pct`/`s3_habitual_20pct`/`s2_wau_40pct_green`; idempotency enforced. (3) `enterprise.adoption_health_downgraded` (HIGH, 3yr): emitted by monthly snapshot run when `wau_health_band` worsens (Green→Amber, Green→Red, Amber→Red); payload: `tenant_id`, `snapshot_month`, `prior_band`, `current_band`, `wau_rate_pct`, `contracted_seats`, `acv_usd` (aggregate contract value); ADO-CHAIN-01 monitoring invariant: `evidence-collection-cron` weekly sweep checks for CSM follow-up within 10 business days; emits `system.csm_followup_overdue` (LOW advisory) if absent. (4) `enterprise.qbr_completed` (STANDARD, 3yr): CSM manual trigger via Admin Console "Complete QBR" modal (cannot be back-dated > 7 days); QBR-PRIV-01 chain invariant: `privacy_floor_verified: z.literal(true)` required — HTTP 422 if absent or false; payload: `tenant_id`, `qbr_date`, `tier`, `contracted_seats`, `wau_rate_pct_at_qbr`, `wau_health_band_at_qbr`, `renewal_date` (date only), `expansion_discussed` (bool), `privacy_floor_verified` (literal true); no attendee names, no per-user metrics. (5) `system.csm_followup_overdue` (LOW, 1yr): ADO-CHAIN-01 advisory; emitted by weekly `evidence-collection-cron` sweep; payload: `tenant_id`, `downgrade_event_id` (UUID FK to adoption_health_downgraded chain record), `days_since_downgrade` (int ≥ 10), `current_band` (amber|red), `acv_usd`; non-blocking — no HTTP 422 gate; routes to compliance-officer SIEM review, not PagerDuty. Zod v2 schemas: `AdoptionSnapshotFiledPayload`, `AdoptionMilestoneReachedPayload`, `AdoptionHealthDowngradedPayload`, `QbrCompletedPayload`, `CsmFollowupOverduePayload` — canonical source `docs/COST_MODEL.md §40.8`; registered here for `emit-audit-event` Worker validation. Retention table: +6 rows (enterprise.adoption_snapshot_filed 3yr CC4.1/A1.1; enterprise.adoption_milestone_reached 3yr CC4.1; enterprise.adoption_health_downgraded 3yr CC7.3/CC4.2; enterprise.qbr_completed 3yr CC2.2/CC4.1; system.csm_followup_overdue 1yr advisory). SOC 2 auditor narratives for CC4.1, CC2.2, CC7.3, CC4.2, A1.1. Evidence artefacts: ADO-E-001/002/003 (already registered in `docs/SOC2_READINESS.md §90`, v3.15.0, 2026-06-19). Closes `docs/COST_MODEL.md §40.10` checklist item 1 (P0/M10 — register all four §40.8 DEC-030 events + `system.csm_followup_overdue` advisory in AUDIT_LOG_SCHEMA.md §Enterprise + §System before first enterprise pilot go-live). Cross-ref: `docs/COST_MODEL.md §40.8` (Zod schema source of truth); `docs/SOC2_READINESS.md §90` (ADO-E-001/002/003 master evidence table); `docs/ENTERPRISE.md` (privacy floor — no individual employee data to HR). Owner: compliance-officer + security-engineer + enterprise-architect + customer-success.*
 
 **v2.17 · 2026-06-19 · owner: compliance-officer + security-engineer + enterprise-architect**
 *v2.17 (2026-06-19): +2 `siem.consent_addendum_signed` / `siem.consent_addendum_revoked` DEC-030 HMAC-chained events (SIEM Consent & Export Governance · OBSERVABILITY §47 · DEC-065 · P0/M5). Closes `docs/OBSERVABILITY.md §47.11` checklist item 2 (P0/M5 — register both events in AUDIT_LOG_SCHEMA.md §SIEM namespace before first enterprise SIEM export goes live). New section `### SIEM Consent & Export Governance events (DEC-030 HMAC-chained · OBSERVABILITY §47 · DEC-065 · SOC 2 CC9.2/CC1.1)` inserted before `## Export & delivery`. (1) `siem.consent_addendum_signed` (HIGH, 7yr): SIEM-CONSENT-01 chain prerequisite; emitted synchronously by `emit-audit-event` Worker on MSA Addendum 4 in-product acceptance (Admin Dashboard → Integrations → SIEM Export → Sign and Activate); payload (Zod v2 — `SiemConsentAddendumSignedPayload`): `tenant_id` (string max 64), `addendum_version` (regex `/^\d+\.\d+$/`), `siem_destination_type` (5-value enum: splunk/sentinel/datadog/qradar/webhook), `endpoint_url_hash` (SHA-256[:32] — 32 hex chars; URL never in chain), `signed_by_email_hash` (SHA-256(lowercase(email)) — 64 hex chars; plaintext never stored by FORM), `signed_at_iso` (ISO 8601 UTC), `docusign_envelope_id` (UUID optional — set async when DocuSign envelope created; export not blocked pending DocuSign). (2) `siem.consent_addendum_revoked` (HIGH, 7yr): revocation record; emitted synchronously on "Revoke Addendum" admin confirmation; payload (Zod v2 — `SiemConsentAddendumRevokedPayload`): `tenant_id`, `addendum_version`, `siem_destination_type`, `endpoint_url_hash`, `revoked_by_email_hash` (SHA-256(lowercase(email)) — 64 hex chars), `revoked_at_iso` (ISO 8601), `revocation_reason` (5-value enum: tenant_requested/compliance_officer_required/contract_termination/addendum_version_update/security_incident). SIEM-CONSENT-01 formal invariant: for any `tenant_id` T, if `siem.tenant_export_enabled` at chain position N, then `siem.consent_addendum_signed` at position M < N for same T; `emit-audit-event` Worker returns HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` on violation → P1 PagerDuty `form-security`. Revocation does not reset invariant; new re-acceptance (new `siem.consent_addendum_signed`) re-satisfies it before re-activation. Fail-closed: if Worker returns non-2xx, Admin Dashboard action is rolled back. SOC 2 evidence artefact SIEM-CONSENT-E-001 (CC9.2/CC1.1): quarterly export of both event types; cross-check query (`SELECT COUNT(*) FROM tenant_siem_configs WHERE export_enabled = true AND addendum_signed_at IS NULL` must return zero); zero-event quarters filed as affirmative SIEM-CONSENT-01 attestation JSON; 7yr retention; path `compliance/evidence/siem-consent/SIEM-CONSENT-E-001_<YYYY-QN>.csv` (or `.json` zero-event attestation); registered in `docs/SOC2_READINESS.md §88` (v3.9.2, 2026-06-18). Retention table: +2 rows (`siem.consent_addendum_signed` 7yr CC9.2/CC1.1; `siem.consent_addendum_revoked` 7yr CC9.2/CC1.1). Privacy floor (both events): `endpoint_url_hash` SHA-256[:32] (32 hex chars); `signed_by_email_hash` / `revoked_by_email_hash` SHA-256(lowercase(email)) (64 hex chars); no `user_id`, no Art. 9 health data, no body-composition values, no coaching content; `tenant_id` = org slug; `form_api` REVOKED from `tenant_siem_configs`. Cross-ref: `docs/OBSERVABILITY.md §47.7` (SIEM-CONSENT-01 invariant + Worker enforcement pseudo-code); `docs/OBSERVABILITY.md §47.8` (canonical Zod v2 schemas — source of truth; this section registers them in the DEC-030 SIEM namespace); `docs/OBSERVABILITY.md §47.9` (SIEM-CONSENT-E-001 SOC 2 evidence artefact definition); `docs/OBSERVABILITY.md §47.11 item 2` (P0/M5 — 🟢 closed by this patch); `docs/MSA_TEMPLATE.md §Addendum 4` (five-clause SIEM DPA template v1.0, DEC-065, 2026-06-18 — the instrument these events record acceptance/revocation of); `docs/DATA_MODEL.md §40.3` (migration 0076 — `addendum_signed_at TIMESTAMPTZ` + `addendum_version TEXT` + `idx_tsc_addendum_signed` partial index on `tenant_siem_configs`); `docs/SOC2_READINESS.md §88` (SIEM-CONSENT-E-001 registered); `docs/DECISION_LOG.md DEC-065` (decision rationale). Owner: compliance-officer + security-engineer + enterprise-architect.*

@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [6.14.1] — 2026-06-19
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.18. Five new DEC-030 HMAC-chained events registered in new `### Enterprise Adoption Monitoring events (DEC-030 HMAC-chained · COST_MODEL §40.8 · CC4.1/CC2.2/CC7.3/CC4.2/A1.1)` section inserted before `## Export & delivery`. (1) `enterprise.adoption_snapshot_filed` (STANDARD, 3yr): monthly `evidence-collection-cron` INSERT record for `enterprise_adoption_snapshots`; Zod v2 `AdoptionSnapshotFiledPayload`; no `user_id`, `coaching_engaged_seats < 5` suppressed at API layer. (2) `enterprise.adoption_milestone_reached` (STANDARD, 3yr): once-per-milestone-per-tenant threshold crossing record; milestone enum `s1_activation_40pct`/`s2_wau_30pct`/`s3_habitual_20pct`/`s2_wau_40pct_green`; idempotency enforced. (3) `enterprise.adoption_health_downgraded` (HIGH, 3yr): emitted on band worsening (Green→Amber, Green→Red, Amber→Red); ADO-CHAIN-01 monitoring invariant specified — `system.csm_followup_overdue` advisory emitted by weekly cron if no CSM follow-up within 10 business days. (4) `enterprise.qbr_completed` (STANDARD, 3yr): CSM manual trigger via Admin Console; QBR-PRIV-01 chain invariant: `privacy_floor_verified: z.literal(true)` required — HTTP 422 if absent or false; `renewal_date` date-only, no attendee names. (5) `system.csm_followup_overdue` (LOW, 1yr): ADO-CHAIN-01 advisory; `downgrade_event_id` FK to triggering chain record; non-blocking; compliance-officer SIEM review queue. Retention table: +6 rows (adoption_snapshot_filed 3yr CC4.1/A1.1; adoption_milestone_reached 3yr CC4.1; adoption_health_downgraded 3yr CC7.3/CC4.2; qbr_completed 3yr CC2.2/CC4.1; csm_followup_overdue 1yr advisory). SOC 2 auditor narratives for CC4.1, CC2.2, CC7.3, CC4.2, A1.1. Evidence artefacts ADO-E-001/002/003 cross-referenced (already registered in `docs/SOC2_READINESS.md §90`). Document header v2.17 → v2.18. compliance-officer + security-engineer + enterprise-architect + customer-success.
+- `docs/COST_MODEL.md` — §40.10 checklist item 1 marked [x] Done (documentation — AUDIT_LOG_SCHEMA.md v2.18, 2026-06-19); implementation gates (migration 0078, evidence-collection-cron extension, Admin Console modal, integration test) tracked in items 2–4.
+- `VERSION` — 6.14.0 → 6.14.1.
+
 ## [6.14.0] — 2026-06-19
 
 ### Added
