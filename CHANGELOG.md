@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [6.8.2] — 2026-06-19
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.17. Two new DEC-030 HMAC-chained events registered in new `§SIEM Consent & Export Governance events` section: `siem.consent_addendum_signed` (HIGH, 7yr) and `siem.consent_addendum_revoked` (HIGH, 7yr). Closes `docs/OBSERVABILITY.md §47.11` checklist item 2 (P0/M5 — DEC-065). Includes Zod v2 schemas, SIEM-CONSENT-01 chain invariant spec, SIEM-CONSENT-E-001 SOC 2 evidence mapping (CC9.2/CC1.1), CC9.2/CC1.1 auditor narratives, retention table (+2 rows), and fail-closed emitter assignment. Privacy floor: endpoint URL and email hashed only; no user_id or Art. 9 data in chain.
+- `docs/OBSERVABILITY.md` — §47.11 checklist item 2 marked [x] Done (2026-06-19).
+
 ## [6.8.1] — 2026-06-19
 
 ### Added
