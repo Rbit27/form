@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.23.0] — 2026-06-19
+
+### Added
+- `content/post-170-five-thinking-traps-self-coached-athlete.md` — Editorial 170 (series 161–180, synthesis 166–170). «П'ять пасток мислення, які зупиняють атлета більше, ніж погана програма»: (1) пошук оптимальної програми як заміна тренуванню; (2) DOMS/помп/тривалість як метрика якості сесії; (3) оцінка блоку за першими двома тижнями; (4) чужий прогрес як точка відліку; (5) програма як священний текст замість гіпотези. Механізм і вихід для кожної. 5-крокий мінімальний протокол (базова лінія → зобов'язання → журнал → ретроспектива → повтор). Ralston 2017; Schoenfeld 2016; Damas 2016; Hubal 2005; Zatsiorsky 2006. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — post-170 card додано (першим у списку)
+- `STATUS.md` — Editorial series розширено до 11–37, 44–50, 106–122, 170, 1361; post-170 written v6.23.0
+
+---
+
 ## [6.22.0] — 2026-06-19
 
 ### Added
