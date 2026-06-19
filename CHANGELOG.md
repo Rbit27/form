@@ -12,12 +12,16 @@
 - `content/post-1448-multiple-identities-35-plus-protect-athletic.md` — Множинні ідентичності після 35: ієрархія значущості ролей (Stets & Burke 2000), намір vs. зобов'язання (Grove et al. 1997), небезпека over-identification, п'ятикрокова рамка ранжування. Cluster 5, post 8/10. clinical-safety: NOT_REQUIRED.
 - `content/post-1449-long-term-athletic-identity-10-20-30-years.md` — Довгострокова атлетична ідентичність: masters athletes (Tanaka & Seals 2008, Pollock et al. 1997), чотири фази мотивації (performance → health → mastery → legacy), deliberate practice (Ericsson et al. 1993). Cluster 5, post 9/10. clinical-safety: NOT_REQUIRED.
 - `content/post-1450-cluster-5-synthesis-adherence-athletic-identity-35-plus.md` — Синтез кластеру 5: взаємодія п'яти механізмів адгеренсу, аудит-чекліст, failure modes за механізмом, триступеневий протокол повернення, завершення блоку 1401–1450. Cluster 5, post 10/10 · Block synthesis. clinical-safety: NOT_REQUIRED.
+- `content/post-181-training-age-progress-horizons.md` — Тренувальний вік і очікування прогресу: три горизонти, де логіка роботи різна. Тренувальний вік vs. час у залі. Три горизонти адаптації: горизонт 1 (0–18 міс., сесійний рівень, лінійна прогресія), горизонт 2 (18 міс.–3 роки, мезоцикловий рівень, хвилеподібна прогресія), горизонт 3 (3+ роки, річний рівень, блокова логіка). Чотири евристики самодіагностики. Порівняльна таблиця параметрів по горизонтах. clinical-safety PASS. Pending: sports-scientist review.
+- `README.md` — Розширення roadmap editorial series: posts 211–220 «Системне мислення атлета» — 10 нових тем (think in systems, ієрархія сигналів від тіла, «добра» vs. «популярна» програма, MED, консистентність, «слухати тіло» vs. виправдання, структура vs. відчуття, когнітивний ресурс і планування, довгострокова тренованість як інвестиція, синтез).
 
 ### Changed
-- `blog.html` — картки posts 1442–1450 додані. blog.html updated to post-1450.
+- `blog.html` — картки posts 1442–1450 додані. Картки додані: post-181 (Training Science · 13 хв · 2026-06-19); post-15, post-14, post-13, post-12 (Training Science · 2026-05-16). blog.html updated to post-1450 · post-181.
+- `STATUS.md` — Block 1401–1450: BLOCK COMPLETE 50/50. 11–50: blog.html cards added for posts 12–15. 100–200: 101 → 102 posts, post-181 added. Version header updated to v6.34.0.
 - `VERSION` — 6.33.1 → 6.34.0.
 
 ---
+
 
 ## [6.33.1] — 2026-06-19
 
