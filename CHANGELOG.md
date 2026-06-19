@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.39.1] — 2026-06-19
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — registered `system.gdir_alert_check_stale` DEC-030 HMAC-chained event (LOW severity, 1yr retention) in `### System` section (v2.20). Event emitted by `pg-cron-health-monitor` health supervisor when pg_cron job 35 (`google_directory_alert_check`, `*/5 * * * *`) exceeds its 6-min freshness window — leaves AL-SSO-GDIR-01/AL-SSO-GDIR-02 in a CC7.2 detection blind spot. Payload: `job_name`, `schedule`, `last_successful_run` (ISO 8601), `gap_minutes`, `freshness_window_minutes: 6`. Privacy invariant: no `user_id`, no `tenant_id`, no health data — infrastructure monitoring signal. PagerDuty P1 `form-devops`; dedup `gdir-alert-check-stale`. Retention table +1 row. SOC 2 quarterly evidence: SSO-OBS-E-007 Part B. Closes `docs/OBSERVABILITY.md §48.8` item 3 (P1/M4 — registration obligation flagged in CHANGELOG v6.37.1 — 🟢). Cross-ref: OBSERVABILITY §12.6 (job 35), OBSERVABILITY §48 (AL-SSO-GDIR-01/02), SOC2_READINESS §92 (SSO-OBS-E-007), DEC-067, DEC-030.
+- `VERSION` — 6.39.0 → 6.39.1.
+
+---
+
 ## [6.39.0] — 2026-06-19
 
 ### Added
