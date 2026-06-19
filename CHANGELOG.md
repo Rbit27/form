@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.18.0] — 2026-06-19
+
+### Added
+- **post-1361** — «Систематична послідовність як стратегічна перевага: чому adherence перевищує оптимальність на п'ятирічному горизонті» — відкриває Cluster 2 (posts 1361–1370 · Реальні умови і багаторічна послідовність) у Block 1351–1400. Efficacy vs. effectiveness на довгому горизонті; компаундинг послідовності; три причини втрати послідовності; МЕД як стратегічний інструмент; програмування від поверху; протокол форс-мажору. Bickel 2011, Ralston 2017, Androulakis-Korakakis 2020, Peterson 2011. clinical-safety: PASS. sports-scientist review required before publish.
+- `blog.html` — картка post-1361 додана (Block 1351–1400 Cluster 2 opener · Long-term Progress).
+- `STATUS.md` — Block 1351–1400 Cluster 2 IN PROGRESS; editorial series розширено до post-1361.
+- `VERSION` — 6.17.0 → 6.18.0.
+
 ## [6.17.0] — 2026-06-19
 
 ### Added
