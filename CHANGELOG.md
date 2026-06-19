@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.47.0] — 2026-06-19
+
+### Added
+- `content/post-1560-weekly-progress-review-integration-protocol.md` — Block 1556–1570, Cluster 1 synthesis (post 5/5). «Тижневий огляд прогресу: як інтегрувати e1RM, RPE-тренд і відеоаналіз в одну систему». Протокол 20 хв/тиждень для self-coached атлета. Три шари адаптації з різними часовими горизонтами: силова (e1RM, 3–4 тижні), нейром'язова (RPE-тренд, 1–2 тижні), технічна (відеоаналіз, 2–6 тижнів). Крок 1 — e1RM вектор (дельта за 4 тижні, три зони: прогрес/нейтраль/регресія); Крок 2 — RPE-тренд (±0.5 threshold, матриця 4 узгоджень з e1RM); Крок 3 — відеоаналіз (дрейф першого vs. останнього повторення, 3 сценарії і дії); Крок 4 — інтегральна матриця 6 сценаріїв (e1RM↑/нейтр/↓ × RPE↓/↑ × техніка стабільна/дрейф → конкретна дія). Шаблон журнального запису. 4 типові помилки. Алгоритм дій при конфліктних сигналах. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. **Cluster 1 COMPLETE (posts 1556–1560).**
+
+### Changed
+- `blog.html` — post-1560 card added at top (Progress Evaluation · 14 хв · 2026-06-19).
+- `STATUS.md` — Block 1556–1570 updated: 4/15 → 5/15; Cluster 1 marked COMPLETE; next = Cluster 2 (плато vs. шум).
+- `VERSION` — v6.46.0 → v6.47.0.
+
+---
+
 ## [6.46.0] — 2026-06-19
 
 ### Added
