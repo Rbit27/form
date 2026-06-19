@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.14.0] — 2026-06-19
+
+### Added
+- `content/post-51-reading-training-data.md` — Editorial series Block 51–100, post 1/50. «Як читати власні тренувальні дані — і не робити хибних висновків»: три структурні помилки self-coached атлета (рішення за точкою замість тренду; порівняння з учора замість 8-тижневого горизонту; плутанина кореляції і причини), що насправді треба читати в даних, і як Victor це робить без ручного аналізу. Посилання: Lukas et al. 2021 (HRV trend vs. single measure), Helms et al. 2014 (4–8 тижнів мінімум для оцінки прогресу). clinical-safety PASS.
+
+### Changed
+- `blog.html` — post-51 card added (Editorial series · Training science · between post-106 and post-50).
+- `README.md` — posts 881–885 added to editorial roadmap table (draft · v6.14.0): concurrent strength+hypertrophy, testing 1RM, exercise order, HRV as programming tool, volume tolerance across training career.
+- `STATUS.md` — row 51–99 updated: post-51 added v6.14.0, clinical-safety PASS, sports-scientist review pending.
+- `VERSION` — 6.13.0 → 6.14.0.
+
 ## [6.13.0] — 2026-06-19
 
 ### Added

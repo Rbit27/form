@@ -494,6 +494,11 @@ Planned — posts 764–800:
 | 878 | RPE vs. %1RM: коли авторегуляція переважає | draft · v5.22.0 · review_pending: sports-scientist |
 | 879 | Погана сесія: рішення в залі в реальному часі | draft · v5.22.0 · review_pending: sports-scientist |
 | 880 | П'ятирічний горизонт: чому він змінює щоденні рішення | draft · v5.22.0 · review_pending: sports-scientist |
+| 881 | Сила і гіпертрофія одночасно: чи реально і як програмувати | draft · v6.14.0 · review_pending: sports-scientist |
+| 882 | Тестування 1RM: коли, як і що з результатом робити | draft · v6.14.0 · review_pending: sports-scientist |
+| 883 | Порядок вправ у сесії: нейром'язова логіка проти звички | draft · v6.14.0 · review_pending: sports-scientist |
+| 884 | HRV як інструмент програмування: протокол, а не трекер | draft · v6.14.0 · review_pending: sports-scientist |
+| 885 | Обсяг і тренувальна кар'єра: як толерантність до навантаження змінюється з роками | draft · v6.14.0 · review_pending: sports-scientist |
 
 ### Block 901–950 — Practical athlete intelligence (proposed · v4.57.0)
 
