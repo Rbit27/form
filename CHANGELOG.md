@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [6.10.2] — 2026-06-19
+
+### Changed
+- `admin-dashboard.html` — Adoption Health screen added (COST_MODEL §40.10 P1 item 7). New sidebar item «Adoption Health» between Engagement and Reports. Screen implements: S1 Activation / S2 WAU / S3 Habitual stage cards with GREEN/AMBER/RED health band badge; 6-month WAU + Habitual trend chart; coaching engagement panel with k-anonymity gate (coaching_engaged_pct suppressed if cohort < 5 seats); QBR & renewal block (last QBR date, next QBR date, renewal date, privacy_floor_verified attestation note); privacy floor note referencing enterprise_adoption_snapshots. All values aggregated at tenant level — no user_id, no individual data. Acme Corp demo: S1 70% (threshold ≥60% Day 60 ✓), S2 WAU 47% (threshold ≥30% M3 ✓), S3 Habitual 38% (threshold ≥20% M6 ✓) → GREEN band.
+- `VERSION` — 6.10.1 → 6.10.2.
+
 ## [6.10.1] — 2026-06-19
 
 ### Added
