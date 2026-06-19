@@ -1,5 +1,24 @@
 # Changelog · FORM
 
+## [6.34.0] — 2026-06-19
+
+### Added
+- `content/post-1442-athletic-identity-35-plus-build-break-rebuild.md` — Тренувальна ідентичність після 35: AIMS і логіка підтвердження (Brewer et al. 1993), три механізми руйнування (накопичення ролей, порівняння з молодим собою, травми), три кроки відновлення після перерви. Cluster 5, post 2/10. clinical-safety: NOT_REQUIRED.
+- `content/post-1443-minimum-training-standard-35-plus-threshold.md` — Мінімальний тренувальний стандарт: фізіологія підтримуючого тренування (Bickel 2011, Ralston 2017, Androulakis-Korakakis 2020), аудит найгіршого тижня, різниця між МТС і ситуативним «лінивим тижнем». Cluster 5, post 3/10. clinical-safety: NOT_REQUIRED.
+- `content/post-1444-structure-over-decisions-35-plus-training.md` — Структура замість рішень: decision fatigue (Baumeister 2007), implementation intentions (Gollwitzer 1999, 2006 meta-analysis), контекстуальні тригери і звичка (Wood & Neal 2007, Neal et al. 2012). Cluster 5, post 4/10. clinical-safety: NOT_REQUIRED.
+- `content/post-1445-plastic-program-three-week-versions-35-plus.md` — Пластична програма: стандартний/скорочений/форс-мажорний тиждень, MEV/MAV/MRV рамка (Israetel et al.), клас A/B/C вправ, алгоритм вибору версії тижня. Cluster 5, post 5/10. clinical-safety: NOT_REQUIRED.
+- `content/post-1446-visible-progress-training-log-motivation-35-plus.md` — Видимий прогрес: SDT і потреба в компетентності (Deci & Ryan 2000), що відстежувати для 35+ (e1RM, RPE, між-підходне відновлення), місячний тренд vs. тижневий шум. Cluster 5, post 6/10. clinical-safety: NOT_REQUIRED.
+- `content/post-1447-return-after-break-protocol-35-plus.md` — Повернення після перерви: міонуклеарна ретенція (Bruusgaard et al. 2010; Egner et al. 2016), асиметрична крива детренування, психологічні бар'єри, двотижневий реінтеграційний блок 60–70%. Cluster 5, post 7/10. clinical-safety: NOT_REQUIRED.
+- `content/post-1448-multiple-identities-35-plus-protect-athletic.md` — Множинні ідентичності після 35: ієрархія значущості ролей (Stets & Burke 2000), намір vs. зобов'язання (Grove et al. 1997), небезпека over-identification, п'ятикрокова рамка ранжування. Cluster 5, post 8/10. clinical-safety: NOT_REQUIRED.
+- `content/post-1449-long-term-athletic-identity-10-20-30-years.md` — Довгострокова атлетична ідентичність: masters athletes (Tanaka & Seals 2008, Pollock et al. 1997), чотири фази мотивації (performance → health → mastery → legacy), deliberate practice (Ericsson et al. 1993). Cluster 5, post 9/10. clinical-safety: NOT_REQUIRED.
+- `content/post-1450-cluster-5-synthesis-adherence-athletic-identity-35-plus.md` — Синтез кластеру 5: взаємодія п'яти механізмів адгеренсу, аудит-чекліст, failure modes за механізмом, триступеневий протокол повернення, завершення блоку 1401–1450. Cluster 5, post 10/10 · Block synthesis. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — картки posts 1442–1450 додані. blog.html updated to post-1450.
+- `VERSION` — 6.33.1 → 6.34.0.
+
+---
+
 ## [6.33.1] — 2026-06-19
 
 ### Added
