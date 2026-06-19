@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [6.40.0] — 2026-06-19
+
+### Added
+- `content/post-1471-goal-specific-programming-framework.md` — Block 1451–1500 · Cluster 3 opener · пост 1/10. «Програмування під ціль: чому "тренуватись" і "тренуватись для чогось конкретного" — різні речі» — три принципові цілі (сила/гіпертрофія/кондиція), принцип специфічності цілі (Sale, 1988), проблема «зробити все одночасно» і interference (Wilson et al., 2012), ланцюжок ціль→провідна адаптація→параметри→структура, горизонти цілі (блок/мезоцикл/рік). clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1472-maximal-strength-programming.md` — пост 2/10. «Програмування для максимальної сили: параметри, логіка, типові помилки» — три механізми нейром'язової адаптації (рекрутування, синхронізація, пригнічення Гольджі; Zatsiorsky & Kraemer), ключові параметри (≥85% 1RM, знижений обсяг, 3–5 хв відпочинок, максимальна специфічність), структура силового мезоциклу (4×4→4×3→4×2→2×1 прогресія або RPE-based), допоміжна/акцесорна мінімальна, силовий блок у контексті річного плану. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1473-hypertrophy-programming.md` — пост 3/10. «Програмування для гіпертрофії: обсяг, механіка, межі ефективного тренування» — три механізми (Schoenfeld, 2010): механічна напруга, метаболічний стрес, пошкодження м'язів; MEV/MAV/MRV концепція (RP Strength); широкий діапазон повторень (6–30+; Schoenfeld et al., 2017); відпочинок 1.5–3 хв (Schoenfeld et al., 2016); частота 2× краще за 1×; структура мезоциклу «хвиля підйомів»; гіпертрофія ≠ сила автоматично. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1474-conditioning-strength-endurance-programming.md` — пост 4/10. «Програмування для кондиції та силової витривалості» — кондиція як інфраструктура (Deweese et al., 2013); три типи: аеробна база (Зона 2), MetCon (AMRAP/EMOM/tabata), силова витривалість (висока щільність); провідна змінна — щільність; прогресія — більша робота за менший час; аеробна база як довгостроковий актив. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1475-strength-hypertrophy-combined-programming.md` — пост 5/10. «Поєднання сили та гіпертрофії в одному блоці» — природний зв'язок (структурний потенціал × нейром'язова ефективність); DUP і powerbuilding як стратегії (Rhea & Alderman, 2004); обмеження: ресурс відновлення, конкуруючі провідні параметри; чотири правила поєднання; для кого ефективно, для кого секвенування краще. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1476-concurrent-training-interference-effect.md` — пост 6/10. «Concurrent training та interference effect» — Wilson et al. (2012) мета-аналіз: сила −11%, гіпертрофія −31% vs. ізольоване силове; AMPK-mTOR конфлікт; тип кардіо (велосипед/гребля < бігу); частота (<3×/тиж мінімальний interference); часовий проміжок ≥6 год (Robineau et al., 2016); таблиця рекомендацій за сценарієм. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1477-goal-prioritization-annual-plan.md` — пост 7/10. «Пріоритизація цілей у річному плані» — секвенування vs. паралельність; різні часові рамки адаптацій (нейром'язова 4–6 тижнів, гіпертрофія 8–16+ тижнів, аеробна місяці); класична послідовність 5 фаз; тривалість кожної; варіанти А/Б/В для різних профілів; типові помилки. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1478-transitioning-between-training-goals.md` — пост 8/10. «Перехід між цілями тренування» — що відбувається наприкінці блоку (накопичена втома, адаптаційна стеля, специфічні патерни); роль перехідного тижня (deload); специфіка переходу гіпертрофія→сила, сила→гіпертрофія, сила→кондиція; ознаки поганого переходу; maintenance volume (Jäger et al., 2011). clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1479-goal-specific-exercise-selection.md` — пост 9/10. «Ціль-специфічний вибір вправ» — три осі впливу цілі на вибір (специфічність/варіативність, ROM і навантажувальний профіль, вільне навантаження vs. машини); силовий блок (конкурентний рух незмінний, слабкі ланки, акцесорне мінімальне); гіпертрофічний (широкий арсенал, ізоляція дозволена); кондиційний (безпека при втомі, функціональні патерни); практична таблиця ціль→вправи. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1480-cluster-3-synthesis-programming-by-goal.md` — пост 10/10 · Cluster 3 synthesis. «Синтез кластеру 3: рамка програмування під ціль» — зведена таблиця трьох адаптацій і параметрів; п'ять питань для вибору провідної цілі; рамка річного плану (flowchart); підсумок interference і переходів; як Victor підтримує goal-specific програмування; що кластер не вирішує (advanced теми — Cluster 4). clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — додано картки posts 1471–1480 (Cluster 3 · Програмування під конкретні цілі); blog.html updated to post-1480.
+- `STATUS.md` — Block 1451–1500 оновлено: Cluster 3 COMPLETE (posts 1471–1480); footer v6.40.0.
+- `VERSION` — 6.39.1 → 6.40.0.
+
+---
+
 ## [6.39.1] — 2026-06-19
 
 ### Changed
