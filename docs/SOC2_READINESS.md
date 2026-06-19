@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.19.0
+# FORM · SOC 2 Type II Readiness v3.20.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -26880,7 +26880,7 @@ compliance/evidence/
 **What is mirrored to Vanta (upload required):**
 
 All primary artefacts from §79.4 (31 items) plus:
-SCIM-ROLE-E-001/002, ENUM-E-001/002/003, PART-E-001/002/003, TURH-RET-E-001, DSAR-E-007/008/009/010/011/012, APIKEY-E-001/002/003/004/005, CTOOL-E-001/002/003/004/005, VAULT-E-001/002/003 (this section), ADO-E-001/002/003 (§90).
+SCIM-ROLE-E-001/002, ENUM-E-001/002/003, PART-E-001/002/003, TURH-RET-E-001, DSAR-E-007/008/009/010/011/012, APIKEY-E-001/002/003/004/005, CTOOL-E-001/002/003/004/005, VAULT-E-001/002/003 (this section), ADO-E-001/002/003 (§90), GUARD-E-001 (§91), SSO-OBS-E-007 (§92), HMAC-VERIFY-ALGO-001 (§93, documentation artefact — Vanta mirrors Data Room link + SHA-256), CAEP-E-001 (§94), SSO-FLEET-E-001 (§95).
 
 **What stays R2-only (never uploaded to Vanta):**
 
@@ -29229,5 +29229,185 @@ ORDER BY created_at;
 ---
 
 *v3.19.0 (2026-06-19): §94 Evidence Artefact Cross-Reference Patch — SSO_SCIM §36 (CAEP Cert-Rotation Re-Registration, SSF Polling Fallback SLA & RISC Hijacking Group Cache Eviction · DEC-072 · OQ-SSO-23.1/23.3/23.4 · CC6.3 / A1.1 / CC7.4). Closes the implicit SOC 2 registration gap from `docs/SSO_SCIM_IMPLEMENTATION.md §36` (v2.8, 2026-06-19 · DEC-072). Formally registers one SOC 2 evidence artefact: **CAEP-E-001** (CC6.3/A1.1/CC7.4 — two-part quarterly export; Part A: cert-rotation-triggered `sso.caep_reregistration_queued` → `sso.caep_stream_registered` event pair; Part B: zero-tolerance `sso.google_directory_sync_error` `error_type: 'cache_eviction_failed_on_risc_hijacking'` check; quarterly from M10; `compliance/evidence/caep/CAEP-E-001_<YYYY-QN>.csv`). §94.1 artefact registration table (ID, criteria CC6.3/A1.1/CC7.4, 7yr retention, quarterly cadence, storage path, zero-event JSON attestation templates for Part A and Part B). §94.2 two-part collection SQL: Part A (three-step — Step 1 `sso.caep_reregistration_queued` queue events with `trigger = 'cert_rotation'`; Step 2 `sso.caep_stream_registered` completion events; Step 3 `sso.caep_stream_error` zero-row cross-check; zero-event guidance with job 37 freshness cross-check instruction). Part B (primary `sso.google_directory_sync_error` with `error_type: 'cache_eviction_failed_on_risc_hijacking'` — expect zero rows; complementary `sso.session_revoked` / `sso.account_suspended` with `risc_event_type = 'hijacking'` — confirms primary KV revocation path exercised). §94.3 two zero-event attestation JSON templates (Part A fields: queued/registered/error counts + job37_stale count + monitoring_pipeline_reference; Part B fields: cache_eviction_failed + risc_hijacking_events counts + monitoring_pipeline_reference). §94.4 three-row SOC 2 criteria mapping: CC6.3 (CAEP cert-rotation re-registration pipeline — automated `cert-expiry-check` hook → migration 0082 `caep_reregistration_required` flag → pg_cron job 37 sweep → `caep_stream_registered` event; OQ-SSO-23.3 contractual layer: SSF PUSH mandatory for CAEP SLA addendum, JWT TTL fallback for non-PUSH tenants; Part A event pair is tamper-evident proof via HMAC chain), A1.1 (pg_cron job 37 `caep_reregister_sweep` as SSO session integrity monitoring infrastructure — 6-min freshness window; stale job → pending re-registration rows accumulate → real-time revocation capability degraded; CAEP-E-001 Part A Step 2 + 3 confirms outputs reached IdP and produced valid new stream IDs — complementary to OBSERVABILITY §12.6 infrastructure evidence), CC7.4 (RISC hijacking → `google_directory_group_cache` eviction in `handleRiscEvent()` — closes stale group-membership retention window of up to 24 hours; additive branch guarded by `google_directory_sync_enabled = true`; non-fatal design; primary KV revocation unaffected; Part B zero-row result = CC7.4 response chain operating correctly; non-zero = root-cause investigation required before filing). §94.5 three-row cross-reference obligations closure table: OBSERVABILITY §12.6 job 37 registration (🟢 Closed — v0.4 patch 2026-06-19), pattern obligation §85/§91 continuation (🟢 Closed — §94 fills SSO_SCIM §36 gap), AUDIT_LOG_SCHEMA `sso.caep_reregistration_queued` + vocabulary extension (🟡 Open P0/M5 — tracked in SSO_SCIM §36.6 item 4). §94.6 nine-item implementation checklist: 5× P0/M5 (migration 0082 DDL, pg_cron job 37 deploy + `cron.job_run_details` confirmation, cert-expiry-check hook wiring, AUDIT_LOG_SCHEMA registration + vocabulary extension, `handleRiscEvent()` cache eviction branch), 4× P1/M10 (M5–M10 pre-flight evidence collection + zero-event attestation filing, §80.3 `caep/` subfolder addition, §79.4 three-criteria rows, quarterly calendar reminder). §80.3 `caep/` subfolder added in this version. §80.4 Vanta mirror list updated: CAEP-E-001 added. SOC 2 version bumped v3.18.0 → v3.19.0. Privacy floor: `tenant_id` FORM-internal UUID; `caep_stream_id` IdP-opaque stream identifier (not a personal data element); `admin_user_id_hash` SHA-256 sentinel for system-initiated actions (not a real user UUID); `user_email_hash` SHA-256(lowercase(idpSubjectEmail)) — raw email never stored in DEC-030 chain (consistent with SSO_SCIM §23.7.6 and §21.6 privacy floor); `reregistration_trigger` controlled vocabulary only; `error_message` truncated to 200 chars (SSO_SCIM §36.4.3 design); no individual employee name, coaching content, health values, body composition data, or GDPR Art. 9 special category data in any CAEP-E-001 event or artefact row; `form_api` does not have SELECT on `tenant_sso_configs` migration 0082 columns. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §36` (primary source — DEC-072, OQ-SSO-23.1/23.3/23.4 resolutions, migration 0082 DDL, cert-expiry-check hook spec §36.2.4, `caep_reregister_sweep` sweep design §36.2.3, `sso.caep_reregistration_queued` STANDARD/7yr, `sso.caep_stream_registered` HIGH/7yr, `sso.caep_stream_error` HIGH/7yr, RISC hijacking cache eviction §36.4.3, OQ Gap Tracker §36.5, implementation checklist §36.6); `docs/SSO_SCIM_IMPLEMENTATION.md §23.9` (AL-CAEP-01 P1 `form-security` — failure path for sweep; Part A Step 3 non-zero rows indicate AL-CAEP-01 fired); `docs/SSO_SCIM_IMPLEMENTATION.md §21.4.2` (`google_directory_group_cache` DDL — DELETE target in §36.4.3); `docs/SSO_SCIM_IMPLEMENTATION.md §20` (SAML cert rotation state machine — `cert_rotation_state → 'complete'` is the hook trigger for §94 Part A chain); `docs/SSO_SCIM_IMPLEMENTATION.md §23.11` (OQ tracker — OQ-SSO-23.1/23.3/23.4 all 🟢 Resolved DEC-072); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — job 37 `caep_reregister_sweep` registered in v0.4 patch 2026-06-19; §94.2 Part A zero-event guidance references job 37 `system.cron_job_stale` cross-check); `docs/MSA_TEMPLATE.md §Addendum 3` (CAEP SLA language update per OQ-SSO-23.3 — P1/M5); `docs/ENTERPRISE_ONBOARDING.md §2.4` (CAEP PUSH prerequisite note per OQ-SSO-23.3 — P1/M5); `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF` (`sso.caep_reregistration_queued` registration + `sso.google_directory_sync_error` vocabulary extension — P0/M5, tracked as §94.5 open obligation); `docs/DECISION_LOG.md DEC-072` (formal adoption decision — three grounds for each resolution); §79.4 (master evidence table — CAEP-E-001 three-criteria rows deferred to M10 per §94.6 item 8); §80.3 (R2 evidence folder structure — `caep/` subfolder added in this version per §94.6 item 7); §80.4 (Vanta mirror list — CAEP-E-001 added in this version); §91 (GUARD-E-001), §92 (SSO-OBS-E-007), §93 (HMAC-VERIFY-ALGO-001) — parallel cross-reference patches. Owner: security-engineer + compliance-officer + platform-engineer.*
+
+---
+
+## §95 · Evidence Artefact Cross-Reference Patch — OBSERVABILITY §49 (Fleet-Wide SSO Health Monitoring · DEC-070 · OQ-SSO-OBS-01 · CC7.2 / CC7.3)
+
+> Closes the cross-reference obligation from `docs/OBSERVABILITY.md §49.9` item 4 (P1/M11 — "Add SSO-FLEET-E-001 row to §26.11 SOC 2 evidence table and to `docs/SOC2_READINESS.md` master evidence table (CC7.2/CC7.3). File first SSO-FLEET-E-001 artefact at observation period open; if zero AL-SSO-FLEET-01 incidents fired, file zero-incident attestation JSON with job 36 run-history appended."). Formally registers one SOC 2 evidence artefact introduced in OBSERVABILITY §49.7 (v4.6.0, 2026-06-19 · DEC-070 · OQ-SSO-OBS-01 Resolution). **SSO-FLEET-E-001 is a periodic export artefact** — quarterly from M11; zero-incident quarters are filed as affirmative attestations (fleet SSO health maintained). Privacy floor: the `siem.sso_fleet_health_breach` DEC-030 payload encodes only `failing_tenant_count` (integer) and `fleet_success_rate_pct` (numeric, fleet-wide weighted average); no individual `tenant_id` value, `user_email`, `user_email_hash`, session content, or GDPR Art. 9 data appears in any PagerDuty event body, Slack notification, or DEC-030 chain event per the §49.6 privacy attestation. `form_api` does not have SELECT on `audit_log_events`.
+
+---
+
+### §95.1 Evidence Artefact Registration
+
+**SSO-FLEET-E-001** — Fleet-wide SSO health monitoring quarterly export (AL-SSO-FLEET-01 PagerDuty incidents + pg_cron job 36 run-history cross-reference).
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | SSO-FLEET-E-001 |
+| **SOC 2 criteria** | CC7.2 · CC7.3 |
+| **Retention** | 3 years — `siem.sso_fleet_health_breach` (HIGH/3yr); pg_cron job 36 run-history from `cron.job_run_details` appended to artefact |
+| **Cadence** | Quarterly — first filing at M11 (SOC 2 observation period open); zero-incident quarters expected pre-M10 (no active enterprise tenants) and must be filed as affirmative attestation JSON per §95.3 |
+| **Storage path** | `compliance/evidence/sso/SSO-FLEET-E-001_<YYYY-QN>.csv` (or `.json` for zero-incident attestation) |
+| **Zero-event attestation** | Required when zero AL-SSO-FLEET-01 PagerDuty incidents fired in the quarter — file as JSON (see §95.3 below); pg_cron job 36 run-history (Part A Step 1) must still be appended to confirm the monitoring pipeline operated without gaps > 6 minutes |
+| **Vanta mirror** | SSO-FLEET-E-001 (§80.4 — added in this version) |
+
+---
+
+### §95.2 Collection Queries
+
+#### Part A — pg_cron Job 36 Run-History (quarterly)
+
+Part A provides the CC7.2 evidence that the monitoring mechanism (`sso_fleet_health_check`) ran continuously throughout the quarter without gaps > 6 minutes. In zero-incident quarters, `job36_gaps_over_6min: 0` is the operative CC7.2 evidence — it confirms the fleet monitoring loop operated even when no SSO health breach threshold was reached.
+
+```sql
+-- SSO-FLEET-E-001 Part A: pg_cron job 36 (sso_fleet_health_check) run-history for the quarter
+-- Run as: form_system (has SELECT on cron.job_run_details)
+-- Replace :quarter_start and :quarter_end with UTC quarter boundaries
+
+-- Step 1: Full run-history — append entire output to SSO-FLEET-E-001 artefact
+SELECT
+  runid,
+  jobid,
+  start_time,
+  end_time,
+  status,
+  return_message
+FROM cron.job_run_details
+WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'sso_fleet_health_check')
+  AND start_time >= :quarter_start
+  AND start_time <  :quarter_end
+ORDER BY start_time;
+
+-- Step 2: Freshness gap cross-check — expect zero rows (no gaps > 6 minutes)
+SELECT
+  runid,
+  jobid,
+  start_time,
+  end_time,
+  status,
+  return_message,
+  EXTRACT(EPOCH FROM (start_time - LAG(start_time) OVER (ORDER BY start_time))) / 60
+    AS gap_since_prior_run_minutes
+FROM cron.job_run_details
+WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'sso_fleet_health_check')
+  AND start_time >= :quarter_start
+  AND start_time <  :quarter_end
+HAVING EXTRACT(EPOCH FROM (start_time - LAG(start_time) OVER (ORDER BY start_time))) / 60 > 6
+ORDER BY start_time;
+-- Non-zero result: each gap is a CC7.2 monitoring outage. Flag to devops-lead.
+-- A system.fleet_sso_check_stale (LOW/1yr) DEC-030 advisory should have been emitted
+-- by the §12.7 health supervisor for each gap > 6 minutes; cross-check the advisory
+-- event count against the gap-row count from this query.
+```
+
+**Expected result (Step 2):** Zero rows. Any non-zero result represents a period when the fleet SSO health check was not running — flag to devops-lead; a remediation note must be filed alongside SSO-FLEET-E-001.
+
+---
+
+#### Part B — DEC-030 Fleet Health Breach Events (quarterly)
+
+Part B provides the HMAC-chained record of every `siem.sso_fleet_health_breach` event emitted by job 36. Each event corresponds to a period where ≥ 3 distinct tenants simultaneously breached SSO-SLO-01. The DEC-030 chain proves the alert signal was derived from the same immutable audit record as the SOC 2 artefact, satisfying the CC7.2 signal-source coherence requirement.
+
+```sql
+-- SSO-FLEET-E-001 Part B: DEC-030 fleet health breach events for the quarter
+-- Run as: form_system (compliance_reviewer SELECT on audit_log_events)
+-- Privacy floor per §49.6: payload contains only aggregate integers and percentages;
+-- no individual tenant_id, user_email, user_email_hash, or GDPR Art. 9 data.
+SELECT
+  event_id,
+  event_type,
+  payload->>'failing_tenant_count'    AS failing_tenant_count,
+  payload->>'fleet_success_rate_pct'  AS fleet_success_rate_pct,
+  payload->>'window_minutes'          AS window_minutes,
+  payload->>'breach_threshold'        AS breach_threshold,
+  payload->>'sla_credit_impact'       AS sla_credit_impact,
+  payload->>'alert_rule'              AS alert_rule,
+  payload->>'dec_reference'           AS dec_reference,
+  hmac_chain_hash,
+  created_at
+FROM audit_log_events
+WHERE event_type = 'siem.sso_fleet_health_breach'
+  AND created_at >= :quarter_start
+  AND created_at <  :quarter_end
+ORDER BY created_at;
+-- Zero rows: no fleet-wide SSO health breach threshold reached in the quarter.
+-- File zero-incident attestation JSON per §95.3.
+-- Non-zero rows: pair each with a corresponding AL-SSO-FLEET-01 PagerDuty incident
+-- in Part C. Assert sla_credit_impact = 'none' on every row (hard DEC-070 invariant).
+```
+
+**Post-query assertion:** Assert `sla_credit_impact = 'none'` for every row — a hard DEC-070 invariant encoded in the DEC-030 event payload. Any row with a different value is a chain-integrity finding requiring immediate compliance-officer review.
+
+---
+
+#### Part C — PagerDuty AL-SSO-FLEET-01 Incident Export Methodology
+
+Part C is a manual PagerDuty API export filtered on `service.name = 'form-platform'` and `incident.title ILIKE '%AL-SSO-FLEET-01%'` for the quarter boundary. Each row must include: `incident_id`, `triggered_at`, `resolved_at`, `time_to_acknowledge_minutes`, and a resolution note. For each incident, cross-reference with the corresponding `siem.sso_fleet_health_breach` Part B DEC-030 event within ±5 minutes of `triggered_at` — the matching `event_id` and `hmac_chain_hash` confirm the alert was sourced from an immutable HMAC-chained record. For zero-incident quarters, the PagerDuty export is an empty file; Parts A + B confirm the monitoring pipeline was active and no fleet-wide SSO health breach threshold was reached.
+
+---
+
+### §95.3 Zero-Incident Attestation Template
+
+For quarters where no AL-SSO-FLEET-01 incidents fired:
+
+```json
+{
+  "artefact": "SSO-FLEET-E-001",
+  "quarter": "<YYYY-QN>",
+  "query_run_at": "<ISO-8601>",
+  "al_sso_fleet_01_incidents": 0,
+  "siem_fleet_health_breach_events": 0,
+  "job36_gaps_over_6min": 0,
+  "monitoring_pipeline_reference": "cron.job_run_details jobname = 'sso_fleet_health_check' — run history appended as job36_run_details_<YYYY-QN>.csv",
+  "attestation": "Zero AL-SSO-FLEET-01 PagerDuty incidents fired in the quarter. Zero siem.sso_fleet_health_breach DEC-030 events in audit_log_events — fleet-wide SSO health breach threshold (>= 3 distinct tenants simultaneously breaching SSO-SLO-01 in a 15-minute window) was not reached. pg_cron job 36 (sso_fleet_health_check) ran without gaps > 6 minutes throughout the quarter. Zero-incident quarter is affirmative evidence of fleet SSO health stability, not an omission. job 36 run-history appended as supporting evidence. Affirmed by compliance-officer."
+}
+```
+
+> **Pre-M10 norm:** FORM has 0 active enterprise tenants at M4–M9. Zero-incident attestation quarters Q3 2026 through Q1 2027 (est.) are expected and affirmative. The `job36_gaps_over_6min: 0` field is the operative SOC 2 evidence for CC7.2 in these quarters — it confirms the fleet monitoring loop ran even though no tenants triggered it.
+
+---
+
+### §95.4 SOC 2 Criteria Mapping
+
+| Criterion | Control description | SSO-FLEET-E-001 evidence role |
+|---|---|---|
+| **CC7.2** | Anomaly and threat monitoring — pg_cron job 36 (`sso_fleet_health_check`, `*/5 * * * *`, `form_audit` role) evaluates fleet-wide SSO health across all active tenants every 5 minutes. When ≥ 3 distinct tenants simultaneously breach SSO-SLO-01 (login success < 99% in any 15-minute rolling window), job 36 emits `siem.sso_fleet_health_breach` DEC-030 HIGH/3yr and routes AL-SSO-FLEET-01 P1 to PagerDuty `form-platform`. The alert-triggering evidence and the SOC 2 evidence artefact share the same HMAC-chained record — the `siem.sso_fleet_health_breach` event that triggers the PagerDuty page is the same immutable DEC-030 event exported in Part B, satisfying CC7.2's requirement that anomaly monitoring operates on the same authoritative record as the audit trail (signal-source coherence per DEC-070). | Part A Step 1: confirms the full job 36 run-history for the quarter — the monitoring mechanism (`sso_fleet_health_check`) was continuously operational. Part A Step 2: confirms no monitoring gaps > 6 minutes — expected zero rows; non-zero rows represent CC7.2 outages requiring remediation evidence and advisory cross-check against `system.fleet_sso_check_stale` count. Part B: confirms the DEC-030 HMAC-chained breach event volume — the immutable record from which AL-SSO-FLEET-01 fires. Together, Parts A + B demonstrate that anomaly detection was continuously operational and that any fleet-wide SSO breach was recorded in the immutable audit trail. |
+| **CC7.3** | Incident response timeliness — AL-SSO-FLEET-01 routes to PagerDuty `form-platform` (IC + security-engineer) within 5 minutes of pg_cron job 36 execution detecting ≥ 3 simultaneous breaching tenants. The 30-minute cooldown (dedup key `al-sso-fleet-01-{15min_epoch}`) prevents duplicate pages while maintaining the ability to re-trigger on sustained fleet degradation. The 30-minute SLA response window (`docs/ENTERPRISE_SLA.md §4`, SSO-SLO-01 per-tenant basis) begins at the PagerDuty trigger time. SSO-FLEET-E-001 cross-checks the chain: pg_cron job 36 run → `siem.sso_fleet_health_breach` DEC-030 event → PagerDuty page within the 30-minute SLA response window — three verifiable links in a single HMAC-chained audit trail. | Part C: PagerDuty AL-SSO-FLEET-01 incident export confirms that any fleet-wide SSO health breach produced an on-call response and that `time_to_acknowledge_minutes` was within the 30-minute SLA response window. Cross-referencing each incident with the corresponding Part B DEC-030 event (±5 minutes) proves the response was triggered by an immutable HMAC-chained record, not an out-of-band alert. For zero-incident quarters, Parts A + B together demonstrate that the absence of incidents reflects the absence of fleet-wide SSO anomalies — not a failure of the monitoring pipeline. |
+
+---
+
+### §95.5 Cross-Reference Obligations Closed by §95
+
+| Obligation source | Obligation text | Status |
+|---|---|---|
+| `docs/OBSERVABILITY.md §49.9` item 4 | "Add SSO-FLEET-E-001 row to §26.11 SOC 2 evidence table and to `docs/SOC2_READINESS.md` master evidence table (CC7.2/CC7.3). File first SSO-FLEET-E-001 artefact at observation period open; if zero AL-SSO-FLEET-01 incidents fired, file zero-incident attestation JSON with job 36 run-history appended." | 🟢 **Closed** — §95.1 registers SSO-FLEET-E-001 with CC7.2/CC7.3 criteria; §95.4 provides two-criterion auditor narratives; §95.2 establishes collection protocol; §79.4 physical row update deferred to M11 alongside first filing (§95.6 item 5) |
+| Implicit pattern obligation (§92 OBSERVABILITY §48, §93 OBSERVABILITY §50) | Every OBSERVABILITY section that introduces a new SOC 2 evidence artefact with an explicit cross-reference obligation to `docs/SOC2_READINESS.md §79.4` receives a corresponding cross-reference patch formally registering the artefact under the applicable trust service criteria | 🟢 **Closed** — §95.1 registers SSO-FLEET-E-001 (CC7.2/CC7.3); §95.4 provides two-criterion auditor narratives with DEC-070 signal-source coherence rationale; §95.2 three-part collection protocol closes the evidence gap for OBSERVABILITY §49 controls |
+| `docs/OBSERVABILITY.md §49.9` item 5 | "Add AL-SSO-FLEET-01 row to §26.8 alert table (condensed format, `fleet_sso_health` subsection). Update §26.11 CC7.2 alert rule count accordingly." | 🟡 **Open P1/M5** — not a `docs/SOC2_READINESS.md` documentation obligation; tracked here for completeness; owner devops-lead; `docs/OBSERVABILITY.md §49.9` item 5 |
+
+---
+
+### §95.6 Implementation Checklist
+
+#### P0 — Before AL-SSO-FLEET-01 implementation (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy pg_cron job 36 (`sso_fleet_health_check`) to production Supabase per OBSERVABILITY §49.6: register the `DO $$` block via Supabase Dashboard → Database → pg_cron; confirm schedule `*/5 * * * *`, role `form_audit`; run `SELECT * FROM cron.job_run_details WHERE jobid = 36 ORDER BY runid DESC LIMIT 1` to verify first execution; add job 36 row to `docs/OBSERVABILITY.md §12.6` pg_cron registry per OBSERVABILITY §49.9 item 1. | platform-engineer + devops-lead | **P0** | M5 | [ ] |
+| 2 | Configure AL-SSO-FLEET-01 PagerDuty alert route in `form-platform` service: dedup key `al-sso-fleet-01-{15min_epoch}`, 30-minute cooldown, P1 urgency, routing to IC + security-engineer; validate with staging synthetic test (emit ≥ 3 `sso.login_failed` bursts for 3 distinct tenants within 15 minutes; confirm PagerDuty page fires within 5 minutes of job 36 execution) per OBSERVABILITY §49.9 item 2. | devops-lead | **P0** | M5 | [ ] |
+| 3 | Register `siem.sso_fleet_health_breach` (HIGH/3yr) in `docs/AUDIT_LOG_SCHEMA.md §SIEM` and `system.fleet_sso_check_stale` (LOW/1yr) in `docs/AUDIT_LOG_SCHEMA.md §System`; add job 36 freshness monitoring to `docs/OBSERVABILITY.md §12.7` health supervisor (6-minute window, `system.fleet_sso_check_stale` advisory on breach). Per OBSERVABILITY §49.9 item 3. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+
+#### P1 — Before and at SOC 2 observation period open (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Confirm `compliance/evidence/sso/` R2 subfolder (added in §92.6 item 1) includes the SSO-FLEET-E-001 naming convention: `SSO-FLEET-E-001_<YYYY-QN>.csv` (active incidents) or `SSO-FLEET-E-001_<YYYY-QN>.json` (zero-incident attestation). Confirm `form-api` NO ACCESS invariant covers the `form-soc2-evidence/sso/` R2 prefix. SHA-256 of each artefact to be appended to MASTER-INDEX (§79) at time of filing. | compliance-officer | **P1** | M11 | [ ] |
+| 5 | At M11 (SOC 2 observation period open): run Part A (Steps 1 + 2), Part B, and Part C collection queries; export SSO-FLEET-E-001 artefact (CSV or zero-incident JSON per §95.3); append SHA-256 to MASTER-INDEX (§79); add SSO-FLEET-E-001 two-criterion rows to §79.4 master evidence table (CC7.2 and CC7.3). Note: zero-incident attestation quarters Q3 2026 and Q4 2026 (pre-M10) are expected and must be filed at M11 as a backfill batch if the observation period opens mid-year. | compliance-officer | **P1** | M11 | [ ] |
+| 6 | Add SSO-FLEET-E-001 to §80.4 Vanta mirror list (this version — done). Confirm Vanta integration can ingest quarterly CSV exports from `form-soc2-evidence/sso/`; test with a synthetic SSO-FLEET-E-001 staging-validation file before M11 alongside the SSO-OBS-E-007 Vanta staging test (§92.6 item 5) — both artefacts share the same R2 subfolder and Vanta evidence category. | compliance-officer + devops-lead | **P1** | M11 | [ ] |
+| 7 | Schedule quarterly recurring reminder: "File SSO-FLEET-E-001 for the preceding quarter." Cadence starts M11; trigger: 1st business day after quarter close. Co-ordinate with the SSO-OBS-E-007 quarterly calendar reminder (§92.6 item 6) — both artefacts file to `compliance/evidence/sso/` on the same schedule and can be batched. | compliance-officer | **P1** | M11 | [ ] |
+
+---
+
+*v3.20.0 (2026-06-19): §95 Evidence Artefact Cross-Reference Patch — OBSERVABILITY §49 (Fleet-Wide SSO Health Monitoring · DEC-070 · OQ-SSO-OBS-01 Resolution · CC7.2 / CC7.3). Closes the explicit cross-reference obligation from `docs/OBSERVABILITY.md §49.9` item 4 (P1/M11 — "Add SSO-FLEET-E-001 row to §26.11 SOC 2 evidence table and to `docs/SOC2_READINESS.md` master evidence table (CC7.2/CC7.3)"). Formally registers one SOC 2 evidence artefact: **SSO-FLEET-E-001** (CC7.2/CC7.3 — quarterly export of AL-SSO-FLEET-01 PagerDuty incidents cross-referenced with pg_cron job 36 (`sso_fleet_health_check`) run-history; 3yr; `compliance/evidence/sso/SSO-FLEET-E-001_<YYYY-QN>.csv`; first filing M11). §95.1 artefact registration table (ID, criteria CC7.2/CC7.3, 3yr retention, quarterly cadence from M11, storage path, zero-incident attestation protocol, Vanta mirror entry). §95.2 three-part collection methodology: Part A (two-step — Step 1: full job 36 run-history from `cron.job_run_details` for the quarter, role `form_system`; Step 2: freshness gap cross-check — LAG window query identifying gaps > 6 minutes, expected zero rows; non-zero rows require devops-lead remediation note and cross-check against `system.fleet_sso_check_stale` advisory event count), Part B (`siem.sso_fleet_health_breach` DEC-030 HIGH/3yr event export for the quarter — aggregate-only payload: `failing_tenant_count`, `fleet_success_rate_pct`, `window_minutes: 15`, `breach_threshold: 3`, `sla_credit_impact: 'none'`; post-query assertion: `sla_credit_impact = 'none'` on all rows — hard DEC-070 invariant; zero rows: file zero-incident JSON per §95.3), Part C (manual PagerDuty API export of AL-SSO-FLEET-01 incidents from `form-platform` service; each row: `incident_id`, `triggered_at`, `resolved_at`, `time_to_acknowledge_minutes`, resolution note; cross-reference each incident with a Part B DEC-030 event within ±5 minutes — proves alert sourced from immutable HMAC chain; zero-incident quarters: empty export; Parts A + B confirm pipeline health). §95.3 zero-incident attestation JSON template (fields: artefact, quarter, query_run_at, al_sso_fleet_01_incidents, siem_fleet_health_breach_events, job36_gaps_over_6min, monitoring_pipeline_reference, attestation text noting breach threshold not reached + job 36 continuity + pre-M10 normality note; `job36_gaps_over_6min: 0` is operative CC7.2 evidence in pre-M10 quarters). §95.4 two-row SOC 2 criteria mapping: CC7.2 (monitoring mechanism — job 36 evaluates fleet-wide SSO-SLO-01 every 5 minutes; DEC-070 signal-source coherence: alert and SOC 2 artefact share same HMAC chain; Parts A Step 1 + 2 prove continuous operation + zero gaps; Part B confirms breach event immutability; non-zero Part A Step 2 gaps are CC7.2 outages requiring remediation), CC7.3 (anomaly response — AL-SSO-FLEET-01 P1 pages `form-platform` within 5 minutes of job 36 execution; 30-minute cooldown prevents duplicate pages; Part C PagerDuty export cross-referenced with Part B DEC-030 events within ±5 minutes proves response chain integrity + `time_to_acknowledge_minutes` within 30-minute SLA window; zero-incident quarters: Parts A + B demonstrate absence of anomalies not failure of pipeline). §95.5 three-row cross-reference obligations closure table: OBSERVABILITY §49.9 item 4 (🟢 Closed — §95.1 + §95.4 + §95.2 collection protocol; §79.4 deferred to M11 per §95.6 item 5), pattern obligation §92/§93 continuation (🟢 Closed — §95 fills OBSERVABILITY §49 gap with DEC-070 signal-source coherence rationale), OBSERVABILITY §49.9 item 5 §26.8 alert table addition (🟡 Open P1/M5 — non-SOC2-READINESS obligation, tracked for completeness, owner devops-lead). §95.6 seven-item implementation checklist: 3× P0/M5 (job 36 Supabase deploy + `cron.job_run_details` verification + §12.6 registry addition, AL-SSO-FLEET-01 PagerDuty route config + 30-min cooldown + staging synthetic validation, `siem.sso_fleet_health_breach` HIGH/3yr + `system.fleet_sso_check_stale` LOW/1yr AUDIT_LOG_SCHEMA registration + §12.7 health supervisor 6-min window), 4× P1/M11 (§80.3 `sso/` subfolder SSO-FLEET-E-001 naming convention confirmation + `form-api` NO ACCESS invariant check, first SSO-FLEET-E-001 filing at M11 + pre-M10 zero-incident backfill batch + §79.4 two-row update, Vanta staging test co-ordinated with SSO-OBS-E-007 §92.6 item 5, quarterly calendar reminder batched with SSO-OBS-E-007 reminder). §80.4 Vanta mirror list updated: SSO-FLEET-E-001 added (this version); additionally backfills GUARD-E-001 (§91), SSO-OBS-E-007 (§92), HMAC-VERIFY-ALGO-001 (§93), CAEP-E-001 (§94) which were declared added in prior version notes but not applied to the §80.4 text. SOC 2 version bumped v3.19.0 → v3.20.0. Privacy floor (SSO-FLEET-E-001): `siem.sso_fleet_health_breach` DEC-030 payload contains only `failing_tenant_count` (integer) and `fleet_success_rate_pct` (numeric, fleet-wide weighted average); no individual `tenant_id` value, `user_email`, `user_email_hash`, coaching session content, body composition data, or GDPR Art. 9 special category data appears in any DEC-030 event body, PagerDuty incident body, or SSO-FLEET-E-001 artefact row per §49.6 privacy attestation; `form_api` does not have SELECT on `audit_log_events` (form_audit role — read-only aggregate queries only; no PII columns returned). Cross-references: `docs/OBSERVABILITY.md §49` (primary source — DEC-070 decision record, OQ-SSO-OBS-01 resolution rationale, SSO-SLO-01b formal definition §49.4, AL-SSO-FLEET-01 alert rule §49.5, pg_cron job 36 full SQL implementation §49.6, SSO-FLEET-E-001 source definition §49.7, §12.6 registry row §49.8, implementation checklist §49.9, OQ gap tracker §49.10); `docs/OBSERVABILITY.md §26.3` (SSO-SLO-01 canonical definition — per-tenant basis for SSO-SLO-01b companion signal); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — job 36 `sso_fleet_health_check` to be added per §49.8 and §95.6 item 1); `docs/OBSERVABILITY.md §12.7` (health supervisor — `system.fleet_sso_check_stale` LOW/1yr advisory on job 36 6-minute freshness breach; Part A Step 2 cross-check mechanism); `docs/OBSERVABILITY.md §46.3` (form-alert-relay — job 36 routes AL-SSO-FLEET-01 via existing relay, dedup key `al-sso-fleet-01-{15min_epoch}`, 30-min cooldown); `docs/AUDIT_LOG_SCHEMA.md §SIEM` (`siem.sso_fleet_health_breach` HIGH/3yr — P0/M5 registration obligation per §95.6 item 3); `docs/AUDIT_LOG_SCHEMA.md §System` (`system.fleet_sso_check_stale` LOW/1yr — P0/M5 per §95.6 item 3); `docs/DECISION_LOG.md DEC-070` (formal adoption — five grounds for Option C: per-tenant primary + fleet-wide companion; `sla_credit_impact: 'none'` hard invariant; signal-source coherence basis for CC7.2 narrative); `docs/ENTERPRISE_SLA.md §3.1` ("Availability is measured per tenant" — CC7.3 SSO-SLO-01 per-tenant SLA credit basis; SSO-SLO-01b `sla_credit_impact: 'none'` is the fleet complement); §79.4 (master evidence table — SSO-FLEET-E-001 two-criterion rows deferred to M11 alongside first filing per §95.6 item 5); §80.3 (R2 evidence folder structure — `form-soc2-evidence/sso/` subfolder already added in §92.6; SSO-FLEET-E-001 naming convention to be confirmed per §95.6 item 4); §80.4 (Vanta mirror list — SSO-FLEET-E-001 added in this version); §92 (SSO-OBS-E-007 — parallel artefact for per-tenant Google Directory sync alert evidence; same `compliance/evidence/sso/` storage path and quarterly filing schedule; complementary CC7.2/CC7.3 evidence layer). Owner: compliance-officer + devops-lead + platform-engineer + security-engineer.*
 
 ---

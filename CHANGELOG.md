@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [6.48.1] — 2026-06-19
+
+### Added
+- `docs/SOC2_READINESS.md §95` — Evidence Artefact Cross-Reference Patch: OBSERVABILITY §49 (DEC-070 · OQ-SSO-OBS-01 · CC7.2 / CC7.3). Registers SSO-FLEET-E-001 — quarterly export of AL-SSO-FLEET-01 PagerDuty incidents cross-referenced with pg_cron job 36 (`sso_fleet_health_check`) run-history; 3yr retention; `compliance/evidence/sso/SSO-FLEET-E-001_<YYYY-QN>.csv`; first filing M11. Closes OBSERVABILITY §49.9 item 4 (P1/M11). Three-part collection methodology: Part A (job 36 full run-history + freshness gap cross-check — LAG window, zero gaps expected; `system.fleet_sso_check_stale` advisory cross-check on non-zero gaps); Part B (`siem.sso_fleet_health_breach` DEC-030 HIGH/3yr export — aggregate-only payload; `sla_credit_impact: 'none'` hard DEC-070 invariant asserted on every row); Part C (manual PagerDuty AL-SSO-FLEET-01 incident export; each incident cross-referenced with Part B DEC-030 event within ±5 minutes). Zero-incident attestation JSON template for pre-M10 quarters (fields: artefact, quarter, query_run_at, incident count, breach event count, job36 gap count, monitoring_pipeline_reference, attestation text). Two-row CC7.2/CC7.3 criteria mapping with DEC-070 signal-source coherence rationale. Cross-reference closure table closes §49.9 item 4 (🟢) and pattern obligation (🟢); §49.9 item 5 §26.8 alert table addition tracked (🟡 Open P1/M5, devops-lead). Seven-item implementation checklist (3× P0/M5, 4× P1/M11). §80.4 Vanta mirror list updated: SSO-FLEET-E-001 added; backfills GUARD-E-001 (§91), SSO-OBS-E-007 (§92), HMAC-VERIFY-ALGO-001 (§93), CAEP-E-001 (§94) which were declared added in prior version notes but not applied to the §80.4 text. SOC2_READINESS v3.19.0 → v3.20.0.
+
+### Changed
+- `VERSION` — v6.48.0 → v6.48.1.
+
+---
+
 ## [6.48.0] — 2026-06-19
 
 ### Added
