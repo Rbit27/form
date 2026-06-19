@@ -1,4 +1,4 @@
-# FORM · Project Status v6.7.1
+# FORM · Project Status v6.9.1
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v6.7.1** — 2026-06-18
+**v6.9.1** — 2026-06-19
 
 ---
 
@@ -16,7 +16,7 @@
 |---|---|---|---|
 | 01–10 | Foundational / brand | 10 | Published |
 | 11–50 | Core sport science | 40 | Published — post-11 (deload weeks) added v5.98.2; sports-scientist review pending |
-| Block 1251–1300 | Wearables, data & the self-coached athlete | 10/50 | **Cluster 1 COMPLETE v6.9.0** (posts 1251–1260 · HRV deep dive): rolling average vs. daily point (1251), 7-day baseline protocol (1252), HRV in accumulation block (1253), sleep score vs. HRV (1254), measurement protocol (1255), strength vs. metabolic (1256), when to ignore HRV (1257), women & menstrual cycle — CONDITIONAL PASS (1258), confounders (1259), cluster synthesis (1260). blog.html updated to post-1260. sports-scientist review required before publish. Next: Cluster 2 (posts 1261–1270 · ЧСС у спокої та під час тренування). |
+| Block 1251–1300 | Wearables, data & the self-coached athlete | 20/50 | **Cluster 1 COMPLETE v6.9.0** (posts 1251–1260 · HRV deep dive): rolling average vs. daily point (1251), 7-day baseline protocol (1252), HRV in accumulation block (1253), sleep score vs. HRV (1254), measurement protocol (1255), strength vs. metabolic (1256), when to ignore HRV (1257), women & menstrual cycle — CONDITIONAL PASS (1258), confounders (1259), cluster synthesis (1260). **Cluster 2 COMPLETE v6.9.1** (posts 1261–1270 · ЧСС у спокої та під час тренування): RHR як маркер відновлення (1261), тижневий тренд vs. щоденна точка (1262), HRmax і міф «220 − вік» (1263), індивідуальні зони ЧСС від AT (1264), ЧСС при силовому тренуванні — pressor reflex (1265), cardiac drift при кардіо (1266), HRR — відновлення після тренування (1267), ЧСС стресу vs. ЧСС навантаження (1268), ЧСС vs. HRV (1269), cluster synthesis (1270). blog.html updated to post-1270. sports-scientist review required before publish. Next: Cluster 3 (posts 1271–1280 · крокомір, об'єм руху і activity load). |
 | Editorial 119 | Programme expiry signals | 1 | draft — post-119 (program-signs-stopped-working) added v6.0.1; clinical-safety PASS; sports-scientist review pending |
 | Editorial 120 | Nine frameworks synthesis (112–120) | 1 | draft — post-120 (synthesis-nine-frameworks) added v6.1.1; clinical-safety NOT_REQUIRED; sports-scientist review pending |
 | 51–99 | Applied training science | 49 | Published |
