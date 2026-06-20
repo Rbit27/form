@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.55.0] — 2026-06-20
+
+### Added
+- `content/post-233-program-adaptation-when-it-undermines-progress.md` — Editorial series post 233, block 231–240. «Що таке «адаптація програми» і де вона починає підривати прогрес». Таксономія трьох типів адаптації (ситуативна / структурна / дрейф); когнітивний механізм раціоналізації post-hoc (Teixeira et al. 2012; Crabtree & Holloway 2022); три операційних сигнали дрейфу (обсяг нижче 70%, інтенсивність нижче порогу, принципи замінились преференціями); парадокс авторегуляції vs. дрейфу (Helms et al. 2014; Zourdos et al. 2016; Mattocks et al. 2017); протокол 15-хвилинного аудиту раз на чотири тижні; чому явне переписування програми ефективніше за непомічений дрейф. Посилання на post-232 (принцип vs. параметр). clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — картка post-233 додана (перед post-232).
+- `STATUS.md` — editorial series оновлено до 211–240, post-233 записано.
+- `VERSION` — v6.54.1 → v6.55.0.
+
+---
+
 ## [6.54.1] — 2026-06-20
 
 ### Added
