@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.87.0] — 2026-06-20
+
+### Added
+- `content/post-1731-training-volume-what-it-measures.md` — Block 1731–1780 Cluster 1, post 1/10. Об'єм тренування: що він справді вимірює і чому це важливо. Три визначення об'єму (тоннаж / підходи / ефективні підходи). Schoenfeld et al. 2017 дозо-реакційний ефект (≥10 підходів/тиждень → superior hypertrophy). MEV/MAV/MRV — введення в рамку. Стеля за сесію (4–6 ефективних підходів). Зовнішній стрес як прихована змінна MRV (Stults-Kolehmainen & Sinha 2014). Victor і відстеження об'єму. clinical_safety: NOT_REQUIRED.
+
+### Changed
+- `README.md` — Block 1681–1730: статус оновлено до COMPLETE · v6.86.0. Cluster 5 (posts 1722–1730) → all done. Block 1731–1780 «Управління об'ємом і навантаженням для силового атлета» added as proposed (50 topics, 5 clusters). Post-1731 → draft.
+- `blog.html` — card для post-1731 додано перед post-1730.
+- `STATUS.md` — Block 1731–1780 IN PROGRESS; post-1731 added; наступний post-1732.
+- `VERSION` — 6.86.0 → 6.87.0.
+
+---
+
 ## [6.86.0] — 2026-06-20
 
 ### Added
