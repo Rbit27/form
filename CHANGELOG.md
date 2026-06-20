@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.66.0] — 2026-06-20
+
+### Added
+- `content/post-237-self-progress-reading.md` — Editorial 211–250 series post 8/10. «Як читати власний прогрес без зовнішнього тренера: п'ять запитань, що замінюють погляд збоку». П'ять структурованих запитань, що відтворюють зовнішній аналітичний погляд для self-coached атлета: читати журнал від третьої особи, валідність метрики, тренд а не точка, gap між записаним і реальним, поведінкові патерни. clinical-safety NOT_REQUIRED. Dunning & Kruger 1999; Kross et al. 2014; Helms 2018; Schoenfeld 2017. 13 хв.
+
+### Changed
+- `blog.html` — додано картку post-237 перед post-236.
+- `STATUS.md` — Editorial 211–250: 7 → 8 постів; post-237 (self-progress-reading) зафіксовано; README roadmap updated: posts 254–256 proposed.
+- `VERSION` — 6.65.0 → 6.66.0.
+
+---
+
 ## [6.65.0] — 2026-06-20
 
 ### Added
