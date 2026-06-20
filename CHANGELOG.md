@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.62.1] — 2026-06-20
+
+### Fixed
+- `docs/OBSERVABILITY.md` v4.7.2 — pg_cron job-number conflict resolution: `sso_fleet_health_check` renumbered from job 36 to job 38 throughout §49 and §12.6. Job 36 was already assigned to `dsar_slo_miss_counter_reset` in the §12.6 v0.4 patch (canonical authority). Job 38 row added to §12.6 registry table. §12.6 freshness window note and conflict resolution note (v0.5) updated.
+- `docs/SOC2_READINESS.md` v3.21.1 — §95 pg_cron job citations corrected to job 38 (§95.1, §95.2, §95.3 attestation JSON fields `job38_gaps_over_6min`/`job38_run_details_`, §95.3 pre-M10 note, §95.4 CC7.2/CC7.3, §95.5, §95.6 checklist items 1–3, version footer).
+
+### Changed
+- `VERSION` — 6.62.0 → 6.62.1.
+
+---
+
 ## [6.62.0] — 2026-06-20
 
 ### Added
