@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [6.72.0] — 2026-06-20
+
+### Added
+- `content/post-1652-deadlift-erectors-accessory.md` — Cluster 3 post 2/10. Розгиначі спини як обмежувач середньої фази станового підйому. Ознаки дефіциту, back extension зі штангою, RDL з паузою, паузний DL нижче колін, горизонт адаптації 8–12 тижнів.
+- `content/post-1653-deadlift-hamstrings-accessory.md` — Cluster 3 post 3/10. Підколінні сухожилля: двосуглобова функція, RDL з паузою, Nordic curl, ексцентричне зміцнення. Суmo-специфіка.
+- `content/post-1654-deadlift-glutes-lockout-accessory.md` — Cluster 3 post 4/10. Сідничні м'язи як обмежувач локауту. Hip thrust з ізометрією у верхній точці, паузний DL у верхній третині, pull-through. Суmo-специфіка.
+- `content/post-1655-deadlift-quads-liftoff-accessory.md` — Cluster 3 post 5/10. Квадрицепси у відриві від підлоги. Механіка першої фази, deficit deadlift, паузний DL у перших 2–3 см, front squat як загальний об'єм.
+- `content/post-1656-deadlift-upper-back-lats-accessory.md` — Cluster 3 post 6/10. Верхня спина і широка спина: контроль грифа і стабілізація. Straight arm pulldown для latissimus, barbell row для верхньої спини. Різниця між двома функціями.
+- `content/post-1657-deadlift-core-iap-accessory.md` — Cluster 3 post 7/10. Корс і IAP як фундамент передачі зусилля. Техніка брейсингу як передумова. Farmer's carry, weighted plank, pallof press, deadbug.
+- `content/post-1658-deadlift-adductors-hip-sumo-accessory.md` — Cluster 3 post 8/10. Аддуктори і кульшовий суглоб: специфіка суmo. Copenhagen plank, sumo RDL, adductor machine, lateral lunge. Мобільність кульшового суглоба як окрема змінна.
+- `content/post-1659-deadlift-accessory-selection-protocol.md` — Cluster 3 post 9/10. Покроковий протокол добору допоміжних вправ: від симптому до зони обмежувача, від типу дефіциту до конкретного інструменту і розміщення у програмі.
+- `content/post-1660-cluster3-synthesis-deadlift-accessory.md` — Cluster 3 post 10/10 (синтез). Карта обмежувачів станового підйому, кроки діагностики, типові помилки, базовий стек без діагнозу, горизонти адаптації. **CLUSTER 3 COMPLETE 10/10.**
+
+### Changed
+- `blog.html` — posts 1652–1660 added (9 нових записів перед post-1651).
+- `STATUS.md` — Block 1631–1680 Cluster 3 updated: COMPLETE 10/10 · v6.72.0; наступний: Cluster 4 (posts 1661–1670 · допоміжна для жиму лежачи).
+- `VERSION` — 6.71.1 → 6.72.0.
+
+---
+
 ## [6.71.1] — 2026-06-20
 
 ### Changed
