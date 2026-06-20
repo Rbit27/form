@@ -23,6 +23,7 @@ All documents in this package require read-only access granted by the compliance
 |---|---|---|---|
 | Incident reason hash retrieval | `compliance/fieldwork/incident-reason-verification.md` | P3.2, CC2.2 | Verify that `incident.severity_changed` chain records contain no plaintext PII; retrieve IC reason from Linear ticket and verify SHA-256 hash |
 | Concurrent incident chain verification | `compliance/fieldwork/concurrent-incident-chain-verification.md` | CC7.4, CC4.1 | Verify per-incident event sequences when two or more incidents were simultaneously active; explains interleaved master chain design and provides skip-and-verify SQL |
+| SCIM Bulk Deprovision Guard | `compliance/fieldwork/scim-bulk-deprovision-guard.md` | CC6.3, A1.2, CC7.2, CC9.2 | Verify the preventive control that blocks mass SCIM deprovisioning above a per-tenant threshold. Includes BDG architecture, three-step audit traceability reconstruction (DEC-069 §35.7), GUARD-E-001 collection SQL (primary + CC6.3 assertion + CC7.2 stale-advisory), zero-event attestation procedure, and privacy floor attestation |
 
 ---
 
@@ -42,7 +43,10 @@ The following fieldwork procedures are referenced in other compliance documents 
 | DSAR chain retrieval | `docs/GDPR_DPIA.md` | Available — request from compliance-officer |
 | Incident reason hash retrieval | `compliance/fieldwork/incident-reason-verification.md` | **Authored v1.0 (2026-06-18)** |
 | Concurrent incident chain verification | `compliance/fieldwork/concurrent-incident-chain-verification.md` | **Authored v1.0 (2026-06-18)** |
+| SCIM Bulk Deprovision Guard fieldwork guide | `compliance/fieldwork/scim-bulk-deprovision-guard.md` | **Authored v1.0 (2026-06-20)** |
 
 ---
+
+*v1.1 (2026-06-20): Added SCIM Bulk Deprovision Guard fieldwork guide to the fieldwork protocol table and existing procedures table. Closes `docs/SSO_SCIM_IMPLEMENTATION.md §35.9` item 5 (P1/M13) and `docs/SOC2_READINESS.md §98.5` item 3. Cross-references: `compliance/fieldwork/scim-bulk-deprovision-guard.md` (v1.0, 2026-06-20); `docs/SOC2_READINESS.md §91` (GUARD-E-001 primary registration); `docs/SSO_SCIM_IMPLEMENTATION.md §35.9` item 5 (marked [x] Done 2026-06-20). Owner: compliance-officer.*
 
 *v1.0 (2026-06-18): Initial authoring. Created to satisfy `docs/INCIDENT_RESPONSE.md §18.7 checklist item 1` (P1/M7) which requires the concurrent-incident fieldwork document to be "included in auditor onboarding package index at `compliance/evidence/auditor-onboarding/README.md`." Owner: compliance-officer.*

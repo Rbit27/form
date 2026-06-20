@@ -1,5 +1,27 @@
 # Changelog · FORM
 
+## [6.81.0] — 2026-06-20
+
+### Added
+- `content/post-1691-lower-body-prep-why-different.md` — Block 1681–1730 Cluster 2 post 1/10. П'ять рівнів нижнього кінетичного ланцюга, таблиця рухомість/стабільність по суглобах, чому підготовка нижньої частини тіла вимагає більше кроків.
+- `content/post-1692-dorsiflexion-ankle-squat.md` — Дорсифлексія як #1 механічне обмеження присідання. Lunge wall test, м'якотканинне vs. кісткове обмеження, banded ankle mobilization, heel-elevated squat.
+- `content/post-1693-hip-mobility-squat-deadlift.md` — Різниця вимог між присіданням і становим підйомом. CARs, 90/90 Hip Flow, Banded Hip Distraction, PVC Hip Hinge. Sumo-специфіка.
+- `content/post-1694-glute-activation-pre-training.md` — Нейронна фасилітація сідниць. EMG-дані (clamshell 57%, banded walk 65%, hip thrust 79% MVC). Дозування: RPE 4–6, 2 серії.
+- `content/post-1695-core-iap-priming.md` — IAP як механізм стабілізації хребта. Dead Bug, Bird Dog, Pallof Press. Дихальний ресет перед першим важким підходом.
+- `content/post-1696-squat-specific-warm-up-protocol.md` — Операційний протокол для дня присідань: 7 кроків (27 хв при 90-хв сесії), скорочений і компресований варіанти, протокол для 1ПМ.
+- `content/post-1697-deadlift-specific-warm-up-protocol.md` — Протокол для дня становового підйому. Грудний відділ, lats, hip hinge mob. Sumo-доповнення. Відмінності від протоколу присідання.
+- `content/post-1698-adapting-protocol-mobility-restrictions.md` — Адаптація при тимчасових, структурних та анатомічних обмеженнях. Червоні прапори (FAI, асиметрія, прогресуюче обмеження). Постійне рішення vs. тимчасовий обхід.
+- `content/post-1699-lower-body-prep-common-mistakes.md` — П'ять помилок: тільки розтяжка без активації, пропуск ankle work, активація до відмови, порушення послідовності, однаковий протокол для двох рухів.
+- `content/post-1700-cluster2-synthesis-lower-body-prep.md` — Синтез кластеру 2. Таблиця суглоб × обмеження × інструмент × час. Два дерева рішень (присідання / становий). Victor-точки. Кластер 2 COMPLETE 10/10.
+- `compliance/fieldwork/scim-bulk-deprovision-guard.md` v1.0 — Standalone SOC 2 fieldwork guide для SCIM Bulk Deprovision Guard (CC6.3/A1.2/CC7.2/CC9.2). Секції: архітектура BDG, три-кроковий протокол реконструкції (DEC-069 §35.7) з psql-командами, повний GUARD-E-001 SQL (primary + §98.2 contracted-seats assertion + §98.3 stale-advisory), процедура нульової attestation, privacy floor. Closes SSO_SCIM §35.9 item 5 (P1/M13) + SOC2_READINESS §98.5 item 3.
+
+### Changed
+- `blog.html` — posts 1691–1700 added (cards для Cluster 2 нижньої частини тіла).
+- `compliance/evidence/auditor-onboarding/README.md` v1.1 — SCIM BDG fieldwork guide added to fieldwork protocol table and existing procedures table.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §35.9` — item 5 marked `[x] Done — 2026-06-20`.
+- `STATUS.md` — Block 1681–1730 Cluster 2 COMPLETE; next: Cluster 3 (posts 1701–1710, підготовка верхньої частини тіла).
+- `VERSION` — 6.80.1 → 6.81.0.
+
 ## [6.80.1] — 2026-06-20
 
 ### Changed
