@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [6.68.0] — 2026-06-20
+
+### Added
+- `content/post-1631-accessory-work-role-self-coached.md` — Block 1631–1680 Cluster 1, post 1/10. Що таке допоміжна вправа і для чого вона потрібна self-coached атлету: визначення, дві ролі (усунення слабкої ланки і загальний руховий резервуар), практичний тест на корисність вправи. clinical-safety NOT_REQUIRED.
+- `content/post-1632-accessory-work-classification-gpp-spp.md` — Block 1631–1680 Cluster 1, post 2/10. Класифікація допоміжної роботи: GPP (загально-підготовча), SPP (специфічно-підготовча), виправляючі вправи. Три категорії з різною логікою програмування, інтенсивності і місця в тижні. clinical-safety NOT_REQUIRED.
+- `content/post-1633-accessory-work-minimum-effective-dose.md` — Block 1631–1680 Cluster 1, post 3/10. Принцип мінімальної ефективної дози для допоміжної роботи. Чому self-coached атлети переходять MED, алгоритм визначення мінімуму, довідкові значення за стажем. clinical-safety NOT_REQUIRED.
+- `content/post-1634-main-lifts-vs-accessory-priority.md` — Block 1631–1680 Cluster 1, post 4/10. Ієрархія пріоритетів: основні підйоми завжди першими. Ієрархія скорочення при нестачі часу, єдиний сценарій для тимчасової зміни пріоритету. clinical-safety NOT_REQUIRED.
+- `content/post-1635-choosing-accessory-exercises-criteria.md` — Block 1631–1680 Cluster 1, post 5/10. Чотири критерії вибору допоміжних вправ: локалізація обмеження, рівень специфічності, доповнення vs. дублювання, технічна доступність. Алгоритм фільтрації. clinical-safety NOT_REQUIRED.
+- `content/post-1636-accessory-intensity-to-failure.md` — Block 1631–1680 Cluster 1, post 6/10. Інтенсивність допоміжної роботи: чи варто доходити до відмови. Технічна vs. м'язова відмова, RIR-таблиця для кожної категорії вправ, виняток для гіпертрофії. clinical-safety NOT_REQUIRED.
+- `content/post-1637-deload-accessory-work-strategy.md` — Block 1631–1680 Cluster 1, post 7/10. Деload для допоміжної роботи: volume deload vs. intensity deload, пропорції зниження, що залишати і що прибирати, чеклист деload-тижня. clinical-safety NOT_REQUIRED.
+- `content/post-1638-tracking-accessory-work-logs.md` — Block 1631–1680 Cluster 1, post 8/10. Відстеження допоміжної роботи: різна логіка для SPP, GPP і виправляючих вправ. Як перевіряти кореляцію між прогресом допоміжки і основного підйому. clinical-safety NOT_REQUIRED.
+- `content/post-1639-top5-accessory-programming-mistakes.md` — Block 1631–1680 Cluster 1, post 9/10. Топ-5 помилок у програмуванні допоміжної роботи для self-coached атлетів. Самодіагностична таблиця. clinical-safety NOT_REQUIRED.
+- `content/post-1640-cluster-synthesis-accessory-principles.md` — Block 1631–1680 Cluster 1, post 10/10. Синтез: шестикрокова операційна карта допоміжної роботи self-coached атлета. Чеклист одного тренування. Анонс Cluster 2 (допоміжна для присідання). clinical-safety NOT_REQUIRED.
+- `docs/DECISION_LOG.md §DEC-077` — Block 1631–1680 тема: Допоміжна робота і спеціалізовані вправи. 5 кластерів: принципи (1631–1640), присідання (1641–1650), тяга (1651–1660), жим (1661–1670), інтеграція + синтез (1671–1680).
+- `blog.html` — 10 нових карток (post-1631–1640, категорія Programming) додано на початок стрічки.
+
+### Changed
+- `VERSION` — 6.67.0 → 6.68.0.
+
+---
+
 ## [6.67.0] — 2026-06-20
 
 ### Added
