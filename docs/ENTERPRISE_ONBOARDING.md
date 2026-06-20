@@ -1,4 +1,4 @@
-# FORM · Enterprise Customer Onboarding v0.1
+# FORM · Enterprise Customer Onboarding v0.2
 
 > Operational playbook for every enterprise deal from contract signature through Year 1 renewal.
 > Owner: `customer-success` + `enterprise-architect` + `compliance-officer`.
@@ -186,6 +186,35 @@ After SSO is live:
 | `tenant_manager` | Aggregate analytics for assigned group/department | Individual data, billing, SSO, user management |
 
 The individual-data prohibition is enforced at RLS — it is not a UI restriction that can be bypassed. Any request from any role for individual user data returns zero rows at the database layer.
+
+### 3.5 Audit log — HMAC chain verification
+
+Reference: `docs/OBSERVABILITY.md §50` (DEC-071). Applies to Growth+ customers with SIEM export enabled.
+
+FORM's DEC-030 audit log is **HMAC-chained**: each event's `hmac_signature` cryptographically commits to the preceding event's signature and payload, making silent deletion or modification of any event detectable. Enterprise customers may independently verify the integrity of their exported audit events using the FORM-published algorithm specification.
+
+**CSM responsibilities during pilot onboarding:**
+
+1. Share the HMAC chain verification algorithm specification with the customer's security team:
+   - Data Room artefact: **HMAC-VERIFY-ALGO-001** (`compliance/docs/hmac-chain-verification-algorithm.md`)
+   - Provide via the §1.2 security review package — include in the NDA-gated package alongside the pentest summary.
+   - Audience: customer SIEM integration engineer or security engineer. Implementation time: < 2 hours using the Python pseudocode and test vector.
+
+2. Direct the customer to retrieve their **per-tenant HMAC verification key** (`tenant_hmac_verify_key`):
+   - Location: Admin Dashboard → Security → Audit Export
+   - Display-once panel — customer must copy to their SIEM secrets vault (Splunk Vault, Azure Key Vault, or AWS Secrets Manager) before closing.
+   - FORM does not retain a copy after display. If lost, the CSM can initiate a key rotation request via `security@form.coach`.
+
+3. If the customer's security team requests a **FORM-provided verification library** (Python package):
+   - Record the request in `enterprise_contracts.notes` with tag `[library-request: HMAC-VERIFY-ALGO-001]` and date.
+   - Confirm the request has been logged to the CSM's monthly security-engineer review queue.
+   - Do not commit to a delivery date — the library is triggered by ≥ 2 distinct pilot customers requesting it (per DEC-071 §50.7). Anticipated timeline: within one sprint of trigger being reached.
+
+**Standard customer question — "Can we verify the audit log independently?"**
+
+> "Yes. FORM publishes the full chain-verification algorithm specification and test vector as Data Room artefact HMAC-VERIFY-ALGO-001. Your security team can implement verification in < 2 hours using the provided Python pseudocode. FORM also monitors chain integrity internally via an automated job (P0 alert, auto-opens an incident on any detected chain break). A FORM-provided library is available upon request via your CSM if your team prefers not to implement the pseudocode directly."
+
+**Privacy floor:** The `tenant_hmac_verify_key` is a derived key (HKDF-SHA256, 32 bytes hex) specific to your tenant. It does not expose FORM's master HMAC secret. Verification algorithm output contains only event metadata and integrity pass/fail results — no individual employee health data, no `user_id` values, no GDPR Art. 9 special category data.
 
 ---
 

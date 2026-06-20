@@ -3,14 +3,14 @@
 | Field | Value |
 |---|---|
 | **Document title** | Security Questionnaire — Pre-filled CAIQ Lite & Common Enterprise DDQ Responses |
-| **Version** | v1.0 |
+| **Version** | v1.1 |
 | **Status** | IN FORCE |
 | **Effective date** | 2026-06-06 |
 | **Owner** | `security-engineer` + `compliance-officer` |
 | **Evidence artifact ID** | SQ-E-001 |
 | **Cross-references** | `docs/SOC2_READINESS.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/CRYPTOGRAPHY_POLICY.md`, `docs/DATA_MODEL.md`, `docs/INCIDENT_RESPONSE.md`, `docs/SUBPROCESSORS.md`, `docs/GDPR_DPIA.md`, `docs/ENTERPRISE.md` |
-| **Last reviewed** | 2026-06-06 |
-| **Next review due** | 2027-06-06 |
+| **Last reviewed** | 2026-06-20 |
+| **Next review due** | 2027-06-20 |
 | **Distribution** | NDA-gated. Available to qualified prospects and current enterprise customers via `security@form.coach`. |
 
 ---
@@ -475,6 +475,25 @@ Observability architecture: `docs/OBSERVABILITY.md`. SLO taxonomy: `docs/OBSERVA
 
 ---
 
+**LOG-04: Can customers independently verify the integrity of their exported audit log events?**
+
+Yes. FORM publishes the full chain-verification algorithm specification and test vector as Data Room artefact **HMAC-VERIFY-ALGO-001** (`compliance/docs/hmac-chain-verification-algorithm.md`).
+
+- **Algorithm specification:** DEC-030 chain structure (event_id, event_type, payload, created_at, hmac_signature, previous_event_id), HMAC input string format, sentinel value for chain-start, canonical payload serialisation (JSON.stringify with sorted keys, no whitespace).
+- **Verification pseudocode:** Python 3.x reference implementation with `verify_chain()` function; reports `SIGNATURE_MISMATCH` and `CHAIN_POINTER_MISMATCH` for any detected tamper. Implementation time: < 2 hours.
+- **Test vector:** Three-event synthetic chain with a known HMAC secret; allows customers to confirm their implementation produces expected signatures before running against production exports.
+- **Per-tenant HMAC verification key:** Each enterprise tenant receives a dedicated `tenant_hmac_verify_key` (HKDF-SHA256 derived from the FORM master secret; 32 bytes hex) available at Admin Dashboard → Security → Audit Export. Tenants verify their own chain without FORM exposing the master secret.
+- **FORM-side monitoring:** Chain integrity is independently monitored by FORM via an automated daily job (AL-SIEM-05, P0 severity). Any detected chain break auto-opens incident R-01. Customer-side verification is a due-diligence option, not a prerequisite for chain integrity.
+- **Library availability:** A FORM-provided Python verification library is available to enterprise pilot customers who request it via their CSM. Requests are tracked and a library is authored when ≥ 2 distinct pilot customers request it (DEC-071).
+
+**Standard security questionnaire response (audit log integrity and verification):**
+
+*"FORM publishes the full chain-verification algorithm specification and test vector as Data Room artefact HMAC-VERIFY-ALGO-001. Enterprise customers can implement verification in < 2 hours using the provided pseudocode. FORM also monitors chain integrity internally via DEC-030 event AL-SIEM-05 (P0 alert, auto-opens incident R-01 on any detected chain break). A FORM-provided library is available to enterprise pilot customers who request it via their CSM."*
+
+Algorithm specification: `docs/OBSERVABILITY.md §50` (DEC-071). SOC 2 mapping: CC1.1 (entity communicates control environment integrity), C1.1 (confidentiality — algorithm spec demonstrates what data is in the chain and what is excluded per privacy floor).
+
+---
+
 ### SEF — Security Incident Management, E-Discovery & Cloud Forensics
 
 **SEF-01: Do you have a documented security incident response plan?**
@@ -682,9 +701,10 @@ Turnaround for custom questionnaire formats (SIG Full, HECVAT, CAIQ Full): 5 bus
 
 | Version | Date | Changes |
 |---|---|---|
+| v1.1 | 2026-06-20 | LOG-04 added: customer-side HMAC audit log integrity verification. References HMAC-VERIFY-ALGO-001 (DEC-071, `docs/OBSERVABILITY.md §50`). Standard questionnaire response language per §50.8. Closes `docs/OBSERVABILITY.md §50.10` item 5 (P1/M10). Owner: security-engineer + compliance-officer. |
 | v1.0 | 2026-06-06 | Initial release. 16 CAIQ Lite domains + §2 extended DDQ sections. Reviewed against `docs/SOC2_READINESS.md`, `docs/CRYPTOGRAPHY_POLICY.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/SUBPROCESSORS.md`, `docs/INCIDENT_RESPONSE.md`, `docs/DATA_MODEL.md`, `docs/ENTERPRISE.md`. |
 
-*Next review due: 2027-06-06 or immediately upon material change to security posture, sub-processor list, or SOC 2 audit status.*
+*Next review due: 2027-06-20 or immediately upon material change to security posture, sub-processor list, or SOC 2 audit status.*
 
 ---
 

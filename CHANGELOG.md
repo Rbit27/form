@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.54.1] — 2026-06-20
+
+### Added
+- `docs/ENTERPRISE_ONBOARDING.md §3.5` — "Audit log — HMAC chain verification" onboarding step (v0.1 → v0.2). Three-step CSM protocol: (1) share HMAC-VERIFY-ALGO-001 Data Room artefact (`compliance/docs/hmac-chain-verification-algorithm.md`) via §1.2 NDA-gated security package; (2) direct customer security team to `tenant_hmac_verify_key` at Admin Dashboard → Security → Audit Export (display-once; FORM does not retain copy); (3) record `[library-request: HMAC-VERIFY-ALGO-001]` tag in `enterprise_contracts.notes` if customer requests verification library. Standard customer Q&A response block. Privacy floor note (HKDF-SHA256 derived key, no Art. 9 data in verification output). Closes `docs/OBSERVABILITY.md §50.10` item 4 (P1/M10 — DEC-071).
+- `docs/SECURITY_QUESTIONNAIRE.md LOG-04` — "Can customers independently verify the integrity of their exported audit log events?" (v1.0 → v1.1). Full HMAC-VERIFY-ALGO-001 response: algorithm specification reference (`docs/OBSERVABILITY.md §50`), Python pseudocode with `verify_chain()`, test vector, per-tenant key (`HKDF-SHA256(IKM=FORM_AUDIT_HMAC_SECRET, info=tenant_id, …)` at Admin Dashboard), FORM-side AL-SIEM-05 P0 chain-break monitoring, library availability on CSM request. §50.8 standard security questionnaire response language included verbatim. SOC 2 mapping CC1.1/C1.1. Closes `docs/OBSERVABILITY.md §50.10` item 5 (P1/M10 — DEC-071). Last reviewed updated 2026-06-06 → 2026-06-20.
+
+### Changed
+- `docs/OBSERVABILITY.md §50.10` — items 4 and 5 marked `[x] Done` (2026-06-20). Document version v4.7.0 unchanged (patch-level status update).
+- `VERSION` — v6.54.0 → v6.54.1.
+
+---
+
 ## [6.54.0] — 2026-06-20
 
 ### Added
