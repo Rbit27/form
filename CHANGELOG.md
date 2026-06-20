@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [6.70.0] — 2026-06-20
+
+### Added
+- `content/post-1641-squat-accessory-logic.md` — Block 1631–1680 Cluster 2, post 1/10. Логіка допоміжної роботи для присідання: три типи обмежувачів (м'язовий, позиційний, стабілізаційний), діагностика за відео і відчуттями, принцип «1–2 вправи на обмежувач».
+- `content/post-1642-squat-quad-accessory.md` — Cluster 2, post 2/10. Квадрицепси як обмежувач у присіданні: ознаки дефіциту, паузне присідання / front squat / goblet squat як специфічна допоміжна, обсяг і програмування.
+- `content/post-1643-squat-posterior-chain-accessory.md` — Cluster 2, post 3/10. Задній ланцюг у присіданні: обмежувач верхньої третини, RDL / good morning / hip thrust / box squat, розведення по тренувальних днях.
+- `content/post-1644-squat-bottom-position-accessory.md` — Cluster 2, post 4/10. Паузне присідання і box squat як технічні інструменти: функціональна різниця, правила ваги і тривалості паузи, коли обидва зайві.
+- `content/post-1645-squat-core-stability-accessory.md` — Cluster 2, post 5/10. Кор і стабілізація у присіданні: IAP-механізм, farmer's carry / overhead squat / pallof press / dead bug, відмінність від скручувань.
+- `content/post-1646-squat-knee-stability-accessory.md` — Cluster 2, post 6/10. Колінна стабільність і відведення стегна: три причини вальгусу, clamshell / lateral band walk / BSS / banded squat, роль стопи.
+- `content/post-1647-squat-hip-mobility-accessory.md` — Cluster 2, post 7/10. Кульшовий суглоб і присідання: чотири мобільнісних компоненти, тести на обмеження, banded ankle mobilization / deep squat hold / 90/90 / cossack squat; пасивна vs. активна мобільність.
+- `content/post-1648-squat-upper-back-accessory.md` — Cluster 2, post 8/10. Верхня спина у присіданні: ознаки слабкості, face pull / chest-supported row / yoke carry як специфічна допоміжка для вертикального стиснення.
+- `content/post-1649-squat-accessory-volume-frequency.md` — Cluster 2, post 9/10. Обсяг і частота допоміжної роботи для присідання: орієнтири за категорією, правило «не більше 2–3 вправ одночасно», тижнева рамка для 3–4 тренувань.
+- `content/post-1650-cluster-synthesis-squat-accessory.md` — Cluster 2, post 10/10 (синтез). Операційний протокол: п'ять кроків від симптому до оцінки ефекту, таблиця симптом→вправа, антишаблони.
+- `blog.html` — posts 1641–1650 додані до каталогу (Programming, draft).
+
+### Changed
+- `STATUS.md` — Block 1631–1680: Cluster 1 → Cluster 2 COMPLETE 10/50; next: Cluster 3 (posts 1651–1660 · допоміжна для станового підйому).
+- `VERSION` — 6.69.1 → 6.70.0.
+
+---
+
 ## [6.69.1] — 2026-06-20
 
 ### Added
