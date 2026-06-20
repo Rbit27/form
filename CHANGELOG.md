@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.54.0] — 2026-06-20
+
+### Added
+- `content/post-39-training-partner.md` — editorial № 39: «Тренування з партнером: де соціальна фасилітація підсилює прогрес, де вона його блокує». Zajonc (1965) social facilitation: arousal підсилює домінантні реакції і заважає новим патернам; Kerrigan et al. (2017) meta-analysis adherence; Hausenblas et al. (2001) social presence і зусилля; Baron (1986) distraction-conflict theory; Latané et al. (1979) social loafing; Carron et al. (1996) group cohesion; Feltz et al. (2011) Köhler effect; три типи партнерства (accountability / parallel / shared program); два операційних питання; три правила протоколу. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — картка post-39 додана (перед post-38).
+- `STATUS.md` — editorial series оновлено до 11–39, 44–50.
+- `VERSION` — v6.53.0 → v6.54.0.
+
+---
+
 ## [6.53.0] — 2026-06-20
 
 ### Added
