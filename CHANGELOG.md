@@ -13,10 +13,13 @@
 - `content/post-1688-warm-up-time-constraint-poor-recovery.md` — post 8/10. Компресований протокол при обмеженому часі: що скорочується (загальна, мобілізація, репетиція) і що ніколи не скорочується (навантажені підходи). Поганий стан відновлення: розминочний підхід як тест готовності. RPE 60–70% як кількісна відмітка. Victor запит при аномальному RPE в розминці. Три заборони при поганому відновленні.
 - `content/post-1689-warm-up-top5-mistakes.md` — post 9/10. Топ-5 помилок self-coached атлета: (1) статична розтяжка перед важкими підходами, (2) перехід від загальної частини одразу до навантажених, (3) занадто багато розминочних підходів, (4) розминка невідповідного руху, (5) реальне зусилля в розминочних підходах. Спільний знаменник: відсутність розуміння функції кожного елемента.
 - `content/post-1690-cluster1-synthesis-warm-up-protocol.md` — post 10/10. Синтез кластеру 1: референсна таблиця (ціль × інструмент × час × позиція), дерево рішень для 60/90 хв / змагальний день / обмежений час. Victor і розминка: чотири параметри моніторингу. Вісім ключових висновків кластеру. Анонс Cluster 2 (1691–1700 · рухова підготовка нижньої частини тіла).
+- `content/post-42-velocity-based-training.md` — Editorial series post 42. «Velocity-Based Training — швидкість грифа як ціна повторення» — MCV як об'єктивний сигнал зусилля і готовності; load-velocity профіль і velocity zones; VL% як критерій зупинки підходу (10–15% силовий, 20–25% гіпертрофійний); побудова власного профілю; обладнання від GymAware до суб'єктивної оцінки без датчика. González-Badillo et al. (2014, 2017); Weakley et al. (2021). clinical-safety: PASS. sports-scientist review required before publish.
+- `content/post-43-post-activation-potentiation.md` — Editorial series post 43. «Post-Activation Potentiation і PAPE — як важкий підхід робить наступний вибуховіший» — PAP vs PAPE термінологія; три механізми (MLC-фосфорилювання, мотонейронна збудливість via PICs, пеннаційний кут); парадокс потенціація+втома одночасно; оптимальне вікно 5–12 хвилин; практичний complex training і contrast sets; обмеження для новачків. Tillin & Bishop (2003); Seitz & Haff (2016); Cuenca-Fernández et al. (2017). clinical-safety: PASS. sports-scientist review required before publish.
 
 ### Changed
 - `docs/DECISION_LOG.md` — DEC-078 додано: Block 1681–1730 тема «Розминка та рухова підготовка для силового атлета» (5 кластерів, 50 постів). clinical-safety: NOT_REQUIRED. sports-scientist review required.
-- `STATUS.md` — Block 1681–1730 Cluster 1 COMPLETE (10/10 · v6.80.0) додано; наступний Cluster 2 позначено.
+- `blog.html` — post-42 і post-43 картки додано; post-1681–1690 картки додано.
+- `STATUS.md` — Block 1681–1730 Cluster 1 COMPLETE (10/10 · v6.80.0) додано; editorial series 11–43 (оновлено з 11–40); block 11–50 row оновлено: posts 42, 43 tracked v6.80.0. Blog cards added.
 - `VERSION` — 6.79.1 → 6.80.0.
 
 ---
