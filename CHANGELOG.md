@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.62.0] — 2026-06-20
+
+### Added
+- `content/post-235-discipline-vs-programming-error.md` — Editorial 211–250 series post 6/10. «Де закінчується дисципліна — і починається помилка у програмуванні». П'ять сигналів кожного сценарію + тест одного запитання для розрізнення. clinical-safety NOT_REQUIRED. 13 хв.
+
+### Changed
+- `blog.html` — додано картку post-235 перед post-234.
+- `README.md` — post-235 → draft · v6.62.0; додано proposed posts 251–253.
+- `STATUS.md` — Editorial 211–250 оновлено: post-235 added v6.62.0.
+- `VERSION` — 6.61.0 → 6.62.0.
+
+---
+
 ## [6.61.0] — 2026-06-20
 
 ### Added
