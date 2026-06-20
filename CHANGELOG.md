@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.80.1] — 2026-06-20
+
+### Changed
+- `docs/SOC2_READINESS.md §79.4` — EXP-E-001 (CC5.2/CC1.4, annual `billing.seats_expanded` chain export with `floor_respected: true` attestation) and EXP-E-002 (CC4.1, quarterly adoption health band vs. expansion pipeline cross-reference) added to master evidence table. Closes COST_MODEL §41.10 item 7 (P1/M11). SOC 2 doc v3.22.1 → v3.23.0.
+- `docs/SOC2_READINESS.md §80.3` — `expansion/` subfolder added to R2 `form-soc2-evidence` folder structure with `form-api NO ACCESS` invariant.
+- `docs/SOC2_READINESS.md §80.4` — EXP-E-001/EXP-E-002 (§41.9) added to Vanta mirror list.
+- `docs/COST_MODEL.md §41.10` — checklist item 7 (P1/M11) marked `[x] Done (2026-06-20, SOC2_READINESS v3.23.0 §79.4/§80.3/§80.4)`.
+- `VERSION` — 6.80.0 → 6.80.1.
+
+---
+
 ## [6.80.0] — 2026-06-20
 
 ### Added

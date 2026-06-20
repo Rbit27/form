@@ -10996,7 +10996,7 @@ Two evidence artefacts are required to demonstrate that expansion pricing contro
 |---|---|---|---|---|---|
 | 5 | Build CSM expansion playbook: when `enterprise.qbr_completed` is received with `expansion_discussed: true` AND `wau_health_band = 'green'`, create a Linear task for the CSM with expansion proposal template, tier cross-reference (§41.4), and discount authority reminder (§41.5). SLA: proposal delivered to tenant within 5 business days. | customer-success | **P1** | M11 | [ ] |
 | 6 | Add expansion history panel to Admin Console (tenant_admin read-only): show `expansion_count`, `initial_seats`, `current_seats`, `last_expansion_date`, and a sparkline of seat count history. No individual user data; aggregate contract-level only. | platform-engineer + design-craft | **P1** | M11 | [ ] |
-| 7 | Add `compliance/evidence/expansion/` folder to §80.3 R2 evidence folder structure in SOC2_READINESS.md; register EXP-E-001 and EXP-E-002 in the §79.4 master evidence table. | compliance-officer | **P1** | M11 | [ ] |
+| 7 | Add `compliance/evidence/expansion/` folder to §80.3 R2 evidence folder structure in SOC2_READINESS.md; register EXP-E-001 and EXP-E-002 in the §79.4 master evidence table. | compliance-officer | **P1** | M11 | [x] Done (2026-06-20, SOC2_READINESS v3.23.0 §79.4/§80.3/§80.4) |
 
 #### P2 — After first 5 expansion events
 
