@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.85.0] — 2026-06-20
+
+### Added
+- `content/post-1721-block1681-1730-synthesis-intro.md` — Block 1681–1730 Cluster 5, post 1/10. Синтез блоку 1681–1730: огляд чотирьох кластерів (принципи, нижня частина тіла, верхня частина тіла, особливі умови), три точки перетину між кластерами, три принципи що управляють блоком, дорожня карта Cluster 5 (posts 1722–1730). clinical_safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — post-1721 card додано перед post-1720. blog.html updated to post-1721.
+- `README.md` — Block 1681–1730: додано Cluster 3 (1701–1710), Cluster 4 (1711–1720) і Cluster 5 (1721–1730) з повним переліком тем та статусами. Cluster 2 статус → done. Block статус оновлено до IN PROGRESS v6.85.0.
+- `STATUS.md` — Block 1681–1730: Cluster 5 IN PROGRESS; post-1721 added; наступний post-1722.
+- `VERSION` — 6.84.0 → 6.85.0.
+
+---
+
 ## [6.84.0] — 2026-06-20
 
 ### Added
