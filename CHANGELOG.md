@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.98.0] — 2026-06-20
+
+### Added
+- `content/post-1743-high-low-training-principle.md` — Block 1731–1780 · Cluster 2 · Post 3/10. High/Low принцип і хвилеподібне навантаження всередині тижня. Чому рівномірне «середнє» навантаження щодня поступається поляризації важко/легко (Issurin 2010; Seiler & Tønnessen 2009). Daily Undulating Periodization: Rhea et al. (2002) — DUP vs. лінійна прогресія за 12 тижнів, Zourdos et al. (2016). Charlie Francis H/L принцип, адаптований для силового тренінгу. High-сесія: RPE 8–9, 40–60% тижневого об'єму. Low-сесія: RPE 5–7, 10–20% тижневого об'єму, не конкурує з High за відновлення. Практичні структури для 3 і 4 днів/тиждень (H–L–H, Upper/Lower з H/L, Push/Pull/Legs). Розподіл підходів між сесіями: поляризована vs. рівномірна стратегія. Таблиця прикладу двох рівнів хвиль: між тижнями і всередині тижня. Відновлення між High-сесіями: Damas et al. (2016) — 72 год для великих м'язових груп. П'ять помилок при впровадженні H/L. Victor: session RPE, розподіл об'єму між сесіями, суб'єктивне відновлення перед High. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — post-1743 додано вгорі списку.
+- `STATUS.md` — Block 1731–1780 Cluster 2 оновлено: post-1743 COMPLETE, наступний post-1744.
+- `VERSION` — 6.97.0 → 6.98.0.
+
+---
+
 ## [6.97.0] — 2026-06-20
 
 ### Added
