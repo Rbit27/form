@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [7.4.2] — 2026-06-20
+
+### Added
+- `content/post-1772-mrv-breach-signals-accumulated-fatigue.md` — Cluster 5 · Post 2/10 · Block 1731–1780. Сигнали перевищення MRV: маркери накопиченої втоми (performance decline, RPE drift, мотиваційні флаги). Meeusen et al. (2013) ECSS/ACSM overtraining consensus, Halson & Jeukendrup (2004) overreaching vs overtraining. Різниця між важким тижнем і системним перевтомленням. Три кроки відповіді. Як Victor фіксує і флажить MRV-порушення. clinical-safety: NOT_REQUIRED.
+- `content/post-1776-five-volume-management-mistakes.md` — Cluster 5 · Post 6/10 · Block 1731–1780. П'ять помилок управління об'ємом: volume inflation без відновлення, один об'єм для всіх м'язів, ігнорування сигналів втоми, рахунок всіх підходів як рівних, зміна занадто багатьох змінних одночасно. Для кожної: причина, вигляд у даних Victor, корекція. clinical-safety: NOT_REQUIRED.
+
 ## [7.4.0] — 2026-06-20
 
 ### Added
