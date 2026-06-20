@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [6.77.0] — 2026-06-20
+
+### Added
+- `content/post-1672-pullup-latissimus-accessory.md` — Block 1631–1680 Cluster 5, post 2/10. Широкий спинний у підтягуванні: анатомія у зонах 1 і 2, два типи дефіциту (не відривається від висяння, зупиняється в середній фазі), специфічна допоміжна (straight-arm pulldown, lat pulldown з супінацією, single-arm cable pulldown, негативи), програмування, три типові помилки. clinical-safety: NOT_REQUIRED.
+- `content/post-1673-pullup-scapular-stabilizers-accessory.md` — Block 1631–1680 Cluster 5, post 3/10. Лопаткові стабілізатори у тягових рухах: нижній трапець (депресія), зубчастий передній (контроль протракції), ромбоподібні (ретракція). Два режими відмови. Специфічна допоміжна (band pull-apart, face pull, Y/T/W raises, scapular pull-up), порядок активації. clinical-safety: NOT_REQUIRED.
+- `content/post-1674-pullup-rear-delt-rhomboid-accessory.md` — Block 1631–1680 Cluster 5, post 4/10. Задній дельт і ромбоподібні: горизонтальне відведення у верхній точці підтягування і фінішна ретракція горизонтальної тяги. Діагностика по зонах підтягування (зона 3) і горизонтальної тяги (зона 3). Специфічна допоміжна (face pull, cable rear delt fly, chest-supported row з паузою, prone Y-T). clinical-safety: NOT_REQUIRED.
+- `content/post-1675-pullup-bicep-accessory.md` — Block 1631–1680 Cluster 5, post 5/10. Біцепс у тягових рухах: вторинний рушій у верхній третині, chin-up vs pull-up активація, чотири ознаки дефіциту, диференціація від латисімус-дефіциту і заднього дельта, специфічна допоміжна (supinated lat pulldown, incline DB curl, Zottman curl, hammer curl), пастка «більше curl-ів». clinical-safety: NOT_REQUIRED.
+- `content/post-1676-pullup-grip-forearm-accessory.md` — Block 1631–1680 Cluster 5, post 6/10. Хват і передпліччя: три компоненти (crush, pinch, support grip), чотири ознаки ізольованого хват-обмежувача, питання лямок (volume з лямками, grip-тренування окремо), п'ять методів тренування хвату, програмування по частоті. clinical-safety: NOT_REQUIRED.
+- `content/post-1677-pullup-core-accessory.md` — Block 1631–1680 Cluster 5, post 7/10. Кор у тяговому русі: антиекстензія у підтягуванні (hollow body у специфічному контексті), антиротація при горизонтальній тязі. Діагностика (розгойдування тіла, ротація тулуба при важкій тязі), п'ять специфічних вправ (RKC plank, Pallof press, hollow hold, anti-rotation cable, dead bug), різниця між корисним і некорисним core-work. clinical-safety: NOT_REQUIRED.
+- `content/post-1678-row-specific-accessory.md` — Block 1631–1680 Cluster 5, post 8/10. Горизонтальна тяга: специфічна допоміжна для BB bent-over row, cable seated row і chest-supported row. Чому три варіанти мають різні обмежувачі. Таблиці діагнозу, первинна і вторинна допоміжна, правило лямок у рядах. clinical-safety: NOT_REQUIRED.
+- `content/post-1679-pullup-row-accessory-selection-protocol.md` — Block 1631–1680 Cluster 5, post 9/10. Семикроковий протокол добору допоміжних: рух → відео → зона → тип обмежувача → 1-2 вправи → 4–6 тижнів → переоцінка. Дві таблиці Zone × Limiter Type → Accessory (вертикальна і горизонтальна тяга). П'ять помилок у доборі. clinical-safety: NOT_REQUIRED.
+- `content/post-1680-cluster5-synthesis-pullup-row-accessory.md` — Block 1631–1680 Cluster 5, post 10/10 (синтез). Зведена карта 13 обмежувачів, чотири кроки діагностики, п'ять типових помилок тягових рухів, push/pull баланс з перспективи тяги, «Що Victor відстежує» (RPE-тренд по зонах, grip failure прапори, чекбокси лопаткової ретракції), адаптаційні горизонти. BLOCK 1631–1680 COMPLETE. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — post cards 1672–1680 додано перед post-1671.
+- `STATUS.md` — Block 1631–1680 COMPLETE 50/50 · v6.77.0; blog.html updated to post-1680; total posts 1200.
+- `VERSION` — 6.76.0 → 6.77.0.
+
+---
+
 ## [6.76.0] — 2026-06-20
 
 ### Added
