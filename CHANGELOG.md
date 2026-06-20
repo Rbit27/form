@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.71.0] — 2026-06-20
+
+### Added
+- `content/post-1651-deadlift-accessory-logic.md` — Block 1631–1680 Cluster 3, post 1/10. Логіка допоміжної роботи для станового підйому: три типи обмежувачів (м'язовий, позиційний, стабілізаційний), три зони підйому (відрив, середина, локаут), діагностика за відео і відчуттями, принцип точкового вибору 1–2 вправ, антишаблон «допоміжки для всього». clinical_safety: NOT_REQUIRED.
+- `blog.html` — картка post-1651 додана перед post-1650 (Programming, draft, 8 хв).
+- `README.md` — Blocks 1606–1660 додані до roadmap: pullup/row completion (1606–1610), overhead press (1611–1620), movement system synthesis (1621–1630), accessory principles cluster 1 (1631–1640), squat accessory cluster 2 (1641–1650), deadlift accessory cluster 3 proposed (1651–1660).
+
+### Changed
+- `STATUS.md` — Block 1631–1680: Cluster 2 COMPLETE → Cluster 3 started (post-1651, 1/10); README roadmap updated to v6.71.0.
+- `VERSION` — 6.70.0 → 6.71.0.
+
+---
+
 ## [6.70.0] — 2026-06-20
 
 ### Added
