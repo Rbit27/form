@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.22.0
+# FORM · SOC 2 Type II Readiness v3.22.1
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -28741,6 +28741,60 @@ ORDER BY created_at;
 -- override_issued_count (0), monitoring_pipeline_reference (most recent guard event_id)
 ```
 
+**§98.2 Extension — Contracted-seats traceability assertion (DEC-069 CC6.3, run alongside primary export):**
+
+```sql
+-- DEC-069 §35.7 CC6.3 traceability assertion
+-- For every scim.bulk_deprovision_blocked event in the quarter,
+-- verify payload.contracted_seats matches enterprise_contracts at block time.
+-- Expected: 0 rows (all contracted_seats values match billing record)
+-- Run as: form_system (compliance_reviewer SELECT on both audit_log_events and enterprise_contracts)
+SELECT
+  ale.event_id,
+  ale.created_at,
+  ale.payload->>'tenant_id'               AS tenant_id,
+  (ale.payload->>'contracted_seats')::int  AS payload_contracted_seats,
+  ec.contracted_seats                      AS billing_contracted_seats
+FROM audit_log_events ale
+JOIN LATERAL (
+  SELECT contracted_seats
+  FROM enterprise_contracts
+  WHERE tenant_id = (ale.payload->>'tenant_id')::uuid
+    AND effective_from <= ale.created_at
+  ORDER BY effective_from DESC
+  LIMIT 1
+) ec ON true
+WHERE ale.event_type = 'scim.bulk_deprovision_blocked'
+  AND ale.created_at >= :quarter_start
+  AND ale.created_at <  :quarter_end
+  AND (ale.payload->>'contracted_seats')::int <> ec.contracted_seats;
+-- Zero rows = assertion passes. Non-zero rows = anomaly requiring compliance-officer review before filing.
+-- Possible causes: (a) contract amendment mid 5-min rolling window, (b) billing-event-relay KV miss
+-- lasting > 3600s TTL safety-net, or (c) enterprise_contracts effective_from history gap.
+```
+
+**§98.3 Extension — Stale-advisory cross-check (DEC-069 CC7.2, run alongside primary export):**
+
+```sql
+-- CC7.2 stale-advisory count: billing-event-relay KV delete failures during the quarter
+-- Expected: 0 rows for a healthy billing event relay; non-zero requires compliance-officer review
+-- Run as: form_audit (read-only)
+SELECT
+  payload->>'tenant_id'  AS tenant_id,
+  COUNT(*)               AS stale_events,
+  MIN(created_at)        AS first_stale_at,
+  MAX(created_at)        AS last_stale_at
+FROM audit_log_events
+WHERE event_type = 'system.scim_guard_cfg_cache_stale'
+  AND created_at >= :quarter_start
+  AND created_at <  :quarter_end
+GROUP BY payload->>'tenant_id'
+ORDER BY stale_events DESC;
+-- Zero rows = advisory path operational, no missed invalidations.
+-- Non-zero: review whether any scim.bulk_deprovision_blocked event fired during the ≤ 3600s stale
+-- window; if blocked_event.contracted_seats < actual contracted_seats, note in GUARD-E-001 filing.
+```
+
 ### §91.3 SOC 2 Criteria Mapping
 
 | Criterion | Narrative | Evidence from GUARD-E-001 |
@@ -29776,7 +29830,7 @@ ORDER BY stale_events DESC;
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 1 | Register `system.scim_guard_cfg_cache_stale` (LOW severity, 1yr retention) in `docs/AUDIT_LOG_SCHEMA.md §System`. Payload schema: `{ "tenant_id": "<uuid>", "kv_key": "scim:guard_cfg:<tenantId>", "error_message": "<string>", "emitted_at": "<ISO-8601>" }`. Deploy updated event name to `emit-audit-event` Worker. Cross-reference §35.5 (`billing-event-relay` emit call). | compliance-officer + platform-engineer | **P1** | M13 | [ ] |
-| 2 | Add §98.2 `contracted_seats` assertion SQL and §98.3 stale-advisory cross-check SQL to §91.2 GUARD-E-001 collection procedure (in-place extension of the §91.2 SQL block). Mark §35.9 item 4 as `[x] Done (2026-06-20, SOC2_READINESS §98)` in `docs/SSO_SCIM_IMPLEMENTATION.md §35.9`. | compliance-officer | **P1** | M13 | [ ] |
+| 2 | Add §98.2 `contracted_seats` assertion SQL and §98.3 stale-advisory cross-check SQL to §91.2 GUARD-E-001 collection procedure (in-place extension of the §91.2 SQL block). Mark §35.9 item 4 as `[x] Done (2026-06-20, SOC2_READINESS §98)` in `docs/SSO_SCIM_IMPLEMENTATION.md §35.9`. | compliance-officer | **P1** | M13 | [x] **Done — 2026-06-20.** §91.2 extended with §98.2 CC6.3 contracted-seats assertion SQL and §98.3 CC7.2 stale-advisory cross-check SQL. `docs/SSO_SCIM_IMPLEMENTATION.md §35.9` item 4 marked `[x] Done (2026-06-20, SOC2_READINESS §98)`. SOC 2 doc v3.22.0 → v3.22.1. |
 | 3 | Author `compliance/fieldwork/scim-bulk-deprovision-guard.md` standalone fieldwork guide. Required sections: (a) BDG purpose and architecture (refs §34 + §35); (b) §35.7 three-step reconstruction protocol with sample `psql` commands; (c) GUARD-E-001 full collection SQL (§91.2 + §98.2 assertion + §98.3 stale-advisory); (d) zero-event attestation procedure; (e) privacy floor attestation (no employee data in any output). Index in `compliance/evidence/auditor-onboarding/README.md`. Mark §35.9 item 5 as `[x] Done` on completion. | compliance-officer | **P1** | M13 | [ ] |
 
 #### P1 — Before first GUARD-E-001 filing (M14)
@@ -29784,6 +29838,10 @@ ORDER BY stale_events DESC;
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 4 | At M14 GUARD-E-001 collection: (a) run §91.2 primary export SQL; (b) run §98.2 `contracted_seats` assertion SQL — must return 0 rows; (c) run §98.3 stale-advisory cross-check SQL — document count (zero is expected; non-zero requires a note explaining whether the ≤ 3600s stale window overlapped any block event); (d) file combined output at `compliance/evidence/scim-guard/GUARD-E-001_<YYYY-QN>.csv`; (e) append SHA-256 to MASTER-INDEX. | compliance-officer | **P1** | M14 | [ ] |
+
+---
+
+*v3.22.1 (2026-06-20): §91.2 GUARD-E-001 Collection SQL Extension + §98.5 item 2 closure. Closes the docs-side obligation from `docs/SSO_SCIM_IMPLEMENTATION.md §35.9` item 4 and `docs/SOC2_READINESS.md §98.5` item 2 (both P1/M13). §91.2 extended in-place with two new SQL blocks: (1) §98.2 contracted-seats traceability assertion — for every `scim.bulk_deprovision_blocked` event in the quarter, verifies `payload.contracted_seats` matches `enterprise_contracts.contracted_seats` at block time via LATERAL JOIN; expected 0 rows; non-zero requires compliance-officer review before filing; run as `form_system` (compliance_reviewer SELECT on both tables); (2) §98.3 stale-advisory cross-check — counts `system.scim_guard_cfg_cache_stale` advisory events grouped by `tenant_id`; expected 0 rows; non-zero indicates `billing-event-relay` KV delete failures requiring review of whether any block event fired during the ≤ 3600s stale window; run as `form_audit` (read-only). §98.5 item 2 marked `[x] Done — 2026-06-20`. `docs/SSO_SCIM_IMPLEMENTATION.md §35.9` item 4 marked `[x] Done (2026-06-20, SOC2_READINESS §98)` — compliance-officer + platform-engineer AUDIT_LOG_SCHEMA.md §System physical registration of `system.scim_guard_cfg_cache_stale` (LOW/1yr) remains pending per §98.5 item 1 (P1/M13). SOC 2 doc v3.22.0 → v3.22.1. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §35.9` item 4 (status `[ ]` → `[x] Done 2026-06-20`); `docs/SSO_SCIM_IMPLEMENTATION.md §35.7` (three-step reconstruction protocol — §91.2 assertion SQL exercises Step 1 programmatically); `docs/SOC2_READINESS.md §98.2` (assertion SQL source); `docs/SOC2_READINESS.md §98.3` (stale-advisory SQL source + CC7.2 monitoring rationale); `docs/SOC2_READINESS.md §91.3` (CC6.3/A1.2/CC7.2/CC9.2 criteria mapping — §91.2 extension supports CC6.3 and CC7.2 rows); `docs/DECISION_LOG.md DEC-069` (Option A rationale — `enterprise_contracts.contracted_seats` as authoritative seat source; 3600s KV TTL + event-driven invalidation). Privacy floor: assertion SQL output contains `event_id`, `created_at`, `tenant_id` (FORM-internal UUID), and two integers (`payload_contracted_seats`, `billing_contracted_seats`); no `user_id`, employee name, email, health value, or GDPR Art. 9 data in either source or output; stale-advisory SQL output contains `tenant_id` + aggregate integers + timestamps only. Owner: compliance-officer.*
 
 ---
 

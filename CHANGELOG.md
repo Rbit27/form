@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [6.73.1] — 2026-06-20
+
+### Changed
+- `docs/SOC2_READINESS.md` — §91.2 GUARD-E-001 collection SQL extended with two §98-directed SQL blocks: (1) §98.2 contracted-seats traceability assertion (DEC-069 CC6.3) — LATERAL JOIN verifying `scim.bulk_deprovision_blocked` `payload.contracted_seats` matches `enterprise_contracts` at block time; (2) §98.3 stale-advisory cross-check (CC7.2) — counts `system.scim_guard_cfg_cache_stale` advisory events per tenant per quarter. §98.5 item 2 marked `[x] Done — 2026-06-20`. SOC 2 doc v3.22.0 → v3.22.1.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §35.9 item 4 marked `[x] Done (2026-06-20, SOC2_READINESS §98)`. Docs-side obligation fulfilled; `AUDIT_LOG_SCHEMA.md §System` physical registration of `system.scim_guard_cfg_cache_stale` (LOW/1yr) remains pending per §98.5 item 1. Document header v2.7 → v2.8.1 (v2.8 header update omitted at §36 authoring time; corrected). SSO/SCIM doc v2.7 → v2.8.1.
+- `VERSION` — 6.73.0 → 6.73.1.
+
+---
+
 ## [6.73.0] — 2026-06-20
 
 ### Added
