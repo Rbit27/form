@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [6.69.1] — 2026-06-20
+
+### Added
+- `docs/SOC2_READINESS.md §97` — Cross-reference patch: formally registers CC6-E-CAEP-001/002/003/004 (SSO_SCIM §23 CAEP/SSF real-time session revocation architecture — CC6.3/CC6.6/CC7.2/CC7.3) in SOC2_READINESS §79.4. These four evidence artefacts were defined in SSO_SCIM §23.10 (v1.5, 2026-06-01) with SOC 2 criteria mapping but never cross-referenced here; §94 covered DEC-072 controls (§36) only. Artefacts registered: CC6-E-CAEP-001 (caep_events distribution, CC6.3, quarterly/3yr), CC6-E-CAEP-002 (audit_log sso.caep_* HMAC chain, CC6.3/CC7.3, quarterly/7yr — referenced in MSA Addendum 6.4 as primary SLA evidence), CC6-E-CAEP-003 (tenant CAEP stream registration snapshot sanitized, CC6.3, quarterly/3yr), CC6-E-CAEP-004 (AL-CAEP-01/03 PagerDuty incident history, CC7.2/CC7.3, quarterly/3yr). SOC2_READINESS v3.21.1 → v3.21.2.
+
+### Changed
+- `docs/SOC2_READINESS.md §94` — Stale reference patch (§97.4): corrected `docs/MSA_TEMPLATE.md §Addendum 3` → `§Addendum 6` and `docs/ENTERPRISE_ONBOARDING.md §2.4` → `§2.3` in §94 intro, §94.4 CC6.3 criteria row, and §94 version footer (4 occurrences). Root cause: §94 authored 2026-06-19 before MSA v0.5 + ENTERPRISE_ONBOARDING §2.3 published on 2026-06-20 (v6.67.0).
+- `VERSION` — 6.69.0 → 6.69.1.
+
 ## [6.69.0] — 2026-06-20
 
 ### Added
