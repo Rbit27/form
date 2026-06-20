@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [6.88.0] — 2026-06-20
+
+### Added
+- `docs/SOC2_READINESS.md §99` — Cross-Reference Patch: DATA_MODEL §42 (`enterprise_contracts` Expansion Tracking Schema · migration 0083 · CC5.2 / CC1.4 / CC4.1 / A1.2). Closes the implicit §90–§98 pattern obligation: every DATA_MODEL section introducing canonical DDL whose SOC 2 evidence artefacts are registered in SOC2_READINESS receives a bidirectional cross-reference patch. §99.1 three-document chain (COST_MODEL §41 → SOC2_READINESS §79.4 v3.23.0 → DATA_MODEL §42). §99.2 seven-row canonical DDL invariant table: `CHECK (current_seats >= initial_seats)` (CC5.2 backstop), `CHECK (expansion_count >= 0)` (CC1.4 counter integrity), `initial_seats` back-fill UPDATE (CC1.4 baseline), `idx_ec_expansion_count` partial index (A1.2 evidence-collection performance), `idx_ec_last_expansion_date` partial index (A1.2 date-range performance), `tenant_contract_portal` view patch excluding `initial_seats` (CC1.4/privacy floor), `tenant_manager` exclusion confirmed (CC4.2). §42.3 staging validation registered as migration artefact. §99.3 two privacy floor supplements: `initial_seats` exclusion from `tenant_contract_portal` (FORM-internal expansion benchmark not exposed to tenant_admin); `tenant_manager` HR exclusion confirmed for all four new columns — zero-query DDL proof for CC4.2. §99.4 four-row criteria mapping supplement (DDL reinforcement): CC5.2 (two independent control layers), CC1.4 (back-fill + counter constraint), CC4.1 (partial index as prerequisite for sustained quarterly EXP-E-002 cadence), A1.2 (§42.6 BDG cache invalidation + `system.scim_guard_cfg_cache_stale` monitoring signal). §99.5 closes two obligations (pattern + §42 one-way reference). §99.6 four-item checklist: 3× P0/M10 (migration validation + artefact, KV invalidation hook, view patch), 1× P1/M12 (first EXP-E-001 with `expansion_count` cross-reference assertion). SOC 2 doc v3.23.0 → v3.24.0.
+
+### Changed
+- `VERSION` — 6.87.0 → 6.88.0.
+
+---
+
 ## [6.87.0] — 2026-06-20
 
 ### Added
