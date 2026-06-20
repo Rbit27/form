@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.21
+# FORM · Multi-Tenant Data Model v1.22
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -15876,3 +15876,393 @@ SELECT COUNT(*) AS red_band_expansions
 ---
 
 *v1.20 (2026-06-19): §41 Enterprise Customer Adoption Snapshots Schema — `enterprise_adoption_snapshots`. Closes cross-reference obligation from `docs/COST_MODEL.md §40.7` (v2.6, 2026-06-18): §40.7 defined the DDL, §40.8 defined the DEC-030 events, §40.9 registered ADO-E-001/002/003 — all cross-referencing `docs/DATA_MODEL.md §41` as the canonical DATA_MODEL section. §41.1 purpose + three design invariants (no `user_id` structural guarantee, `form_api` REVOKED, k-anon gate at API layer) + privacy floor. §41.2 migration dependency chain (0078 terminal migration; no FK to deal outcomes or partners). §41.3 `adoption_health_band` ENUM with churn probability and commercial implication table. §41.4 full DDL (cross-referenced from COST_MODEL §40.7.1): eleven columns (three `GENERATED ALWAYS AS STORED` — `activation_rate_pct`, `wau_rate_pct`, `habitual_rate_pct`, `wau_health_band`), `uq_tenant_snapshot_month` UNIQUE + `chk_adoption_coherent` CHECK, three indexes, five-row design notes table. §41.5 RLS: four policies — `eas_tenant_read` (tenant_admin/owner own-tenant SELECT), `eas_compliance_read` (compliance_reviewer all), `eas_system_all` (form_system), `REVOKE ALL` from form_api; `tenant_manager` excluded with explicit rationale (HR must not see aggregate health that could allow employee inference). §41.6 analytics queries deferred to COST_MODEL §40.7.3; k-anon enforcement note (API must suppress `coaching_engaged_seats < 5` → `null`; no derived pct field). §41.7 four DEC-030 events: `enterprise.adoption_snapshot_filed` (STANDARD, 3yr, ADO-CHAIN-01 deduplication invariant), `enterprise.adoption_milestone_reached` (STANDARD, 3yr, idempotent per milestone per tenant), `enterprise.adoption_health_downgraded` (HIGH, 3yr, Linear task + `system.csm_followup_overdue` LOW/1yr advisory at 10-day lapse), `enterprise.qbr_completed` (STANDARD, 3yr, `privacy_floor_verified: z.literal(true)` HTTP 422 invariant); advisory note for `system.csm_followup_overdue` routing (Slack `#alerts-csm`, not PagerDuty). §41.8 three SOC 2 evidence artefacts: ADO-E-001 (CC4.1/A1.1 quarterly fleet health band distribution + GENERATED column attestation), ADO-E-002 (CC2.2/CC4.1 QBR chain export with `privacy_floor_verified` attestation), ADO-E-003 (CC7.3/CC4.2 downgrade response + Linear task pairing); storage paths; zero-count filing protocol. §41.9 ten-item implementation checklist: 4× P0/M10 (migration 0078 + GENERATED column staging validation, DEC-030 registration + three integration tests, `evidence-collection-cron` extension, Admin Console QBR modal), 4× P1/M10–M11 (ADO-E-001 first filing, ADO-E-002 first filing, Admin Dashboard panel with k-anon + tenant_manager block, ENTERPRISE_ONBOARDING update), 2× P2/M18+ (OQ-ADO-01 calibration, OQ-ADO-02 MSA clause). §41.10 three open questions (OQ-ADO-01/02/03 from COST_MODEL §40.11). TOC updated to add §40 and §41 entries. Header updated v1.19 → v1.20. Privacy floor: no individual employee `user_id`, name, email, health values, coaching content, or GDPR Art. 9 special category data in any column, DEC-030 event payload, or SOC 2 evidence artefact; `coaching_engaged_seats < 5` suppressed at API layer (non-waivable); `notes_hash` SHA-256 + ADOPTION_NOTES_SALT (plaintext never stored); `tenant_id` FORM-internal UUID; `form_api` REVOKED; `tenant_manager` excluded from RLS policies. Cross-references: `docs/COST_MODEL.md §40` (authoritative DDL, analytics queries, DEC-030 Zod v2 schemas, implementation checklist, COST_MODEL §40.9 cross-reference obligation — closed by this §41); `docs/SOC2_READINESS.md §90` (ADO-E-001/002/003 artefacts + auditor narratives); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Adoption Events` (four DEC-030 events to register — P0/M10); `docs/OBSERVABILITY.md §33` (CHS model — parallel tenant engagement signal); `docs/ENTERPRISE.md §"Day 0→90 implementation timeline"` (S1/S2/S3 milestone calendar basis); `docs/CRYPTOGRAPHY_POLICY.md §5` (ADOPTION_NOTES_SALT — register at M10; annual rotation schedule); `docs/ENTERPRISE_ONBOARDING.md` (§41.9 item 8 — CSM brief update P1/M10); `docs/DATA_MODEL.md §25` (offboarding pipeline — adoption snapshots archived before tenant row deletion; `ON DELETE RESTRICT` FK boundary). Owner: enterprise-architect + compliance-officer + customer-success.*
+
+---
+
+## 43. `enterprise_renewals` Schema — Migration 0084
+
+> Owner: `enterprise-architect` + `compliance-officer` + `customer-success`. Review: before first contract renewal event is processed (M12), on any change to renewal pricing mechanics, and annually.
+> Scope: enterprise tier only. New table — not an extension of an existing table. Supplements `enterprise_contracts` (§16) by recording each renewal event as an immutable append-only row, making the full pricing lifecycle auditable without mutating the live billing record.
+> References: `docs/COST_MODEL.md §42` (authoritative economic spec, inline DDL authoring source, DEC-030 Zod v2 schemas, and implementation checklist); `docs/SOC2_READINESS.md §100` (DDL-layer invariant registration for REN-E-001/002/003 criteria mapping supplement — added simultaneously with this section); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (three DEC-030 events: `enterprise.renewal_notice_sent`, `enterprise.renewal_escalation_calculated`, `enterprise.contract_renewed` — registered P0/M12); `docs/MSA_TEMPLATE.md §6` (auto-renewal, 90-day notice, seat reduction policy referenced by `renewal_type_enum` values); DEC-030 (HMAC-chained audit log); `docs/ENTERPRISE.md` (tier pricing $6–12/seat, multi-year discounts −15%/−25%, no-go criteria).
+
+---
+
+### 43.1 Purpose and Design Principles
+
+`enterprise_renewals` closes the schema gap between contract inception (`enterprise_contracts`, §16) and the renewal economics defined in `docs/COST_MODEL.md §42`. Before this table, each contract renewal was a silent UPDATE to `enterprise_contracts` — `acv_usd`, `renewal_date`, and `price_per_seat_usd_cents` could change with no historical record. The full pricing lifecycle (rate escalation, multi-year commitment, retention discount, seat reduction at renewal) was invisible to the audit log at the DDL layer.
+
+**Three design invariants that distinguish `enterprise_renewals` from all other enterprise tables:**
+
+1. **Append-only. No UPDATE after INSERT.** Each contract renewal creates exactly one new row. The row is never updated after creation. Historical pricing decisions are immutable. If a renewal is renegotiated before the renewal date, a new row is created with `renewal_type = 'retention_discount'` and the `pricing_exception_event_id` soft-ref linking to the §32 exception event. The prior row is not deleted.
+
+2. **`floor_respected` is structurally `true`. Always.** The column carries `CHECK (floor_respected = true)` — the database will reject any INSERT where `floor_respected` is `false`, even if an application bug bypasses the Worker-layer `z.literal(true)` Zod guard on `enterprise.contract_renewed`. This is the DDL-layer backstop for the pricing floor commitment (COST_MODEL §31.5): two independent enforcement layers, each auditable independently.
+
+3. **`form_api` REVOKED. No tenant access.** `enterprise_renewals` contains financial contract terms (rates, ACV, TCV, discount percentages). No `tenant_admin`, `tenant_owner`, or `tenant_manager` role may SELECT or write to this table. All writes go through Admin Console → `emit-audit-event` Cloudflare Worker → `form_system`. The DDL REVOKE is the access boundary; the RLS policies are a belt-and-suspenders enforcement layer.
+
+**Privacy floor:** No individual employee `user_id`, name, email, health values (heart rate, body composition, workout load), coaching session content, or GDPR Art. 9 special category data is stored in any column, used in any DEC-030 event payload referenced by this table, or included in any SOC 2 evidence artefact produced from `enterprise_renewals`. All financial values are aggregate contract-level figures. `tenant_id` is a FORM-internal UUID never shared in marketing or external reports. `bls_report_date` in the linked `enterprise.renewal_escalation_calculated` event is a calendar date only (never a URL — see COST_MODEL §42.5.1).
+
+---
+
+### 43.2 Migration Dependency Chain
+
+```sql
+-- Migration order (must be applied sequentially):
+-- 0082_sso_caep_reregistration.sql              (SSO_SCIM §36 — CAEP columns on tenant_sso_configs)
+-- 0083_enterprise_contracts_expansion_fields.sql (§42 — initial_seats / current_seats / expansion_count)
+-- 0084_enterprise_renewals.sql                  (this section — new table)
+
+-- Dependency graph:
+--   0084 references enterprise_contracts(id) via ON DELETE RESTRICT FK.
+--   enterprise_contracts is established by initial migrations (§16).
+--   0084 also references tenants(id) via tenant_id FK (ON DELETE RESTRICT).
+--   The ON DELETE RESTRICT on both FKs is intentional: a tenant row or contract row
+--   must never be deleted while renewal history exists; deletions must go through
+--   the tenant data deletion pipeline (§67) which archives renewal rows to cold storage
+--   before issuing DELETE CASCADE on the tenants table.
+--
+--   0083 is listed as a prerequisite because the enterprise_contracts renewal UPDATE
+--   (§43.3.2) writes current_seats from 0083. On databases where 0083 has not been
+--   applied, the renewal UPDATE will fail with "column current_seats does not exist".
+--
+-- Safe to run on a live database with zero downtime:
+--   CREATE TABLE with FK constraints is a metadata-only operation.
+--   CREATE INDEX and CREATE UNIQUE INDEX acquire ShareLock — run during low-traffic window.
+--   REVOKE ALL FROM form_api is instantaneous.
+```
+
+---
+
+### 43.3 DDL — Migration 0084
+
+**Authoritative economic spec: `docs/COST_MODEL.md §42.6`**
+
+#### 43.3.1 `enterprise_renewals` table
+
+```sql
+-- Migration: 0084_enterprise_renewals.sql
+-- Depends on: 0083_enterprise_contracts_expansion_fields.sql (§42)
+-- Decision: DEC-030 (HMAC-chained audit log); pricing floor: COST_MODEL §31.5
+
+CREATE TYPE renewal_type_enum AS ENUM (
+  'standard_annual',       -- 1-year renewal at current list
+  'multi_year_2',          -- 2-year renewal at −15%
+  'multi_year_3',          -- 3-year renewal at −25%
+  'retention_discount',    -- below-list renewal; requires §32 approval
+  'non_renewal'            -- customer or FORM terminates; no new term
+);
+
+CREATE TYPE rate_basis_enum AS ENUM (
+  'escalation',            -- CPI+1% (COST_MODEL §42.5) applied to prior rate
+  'current_list',          -- current list price with applicable tier discount
+  'retention_discount',    -- §32-approved exception below list
+  'rate_lock_continuation' -- prior rate maintained (e.g., strategic lock-in)
+);
+
+CREATE TABLE enterprise_renewals (
+  id                        UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 UUID           NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  original_contract_id      UUID           NOT NULL REFERENCES enterprise_contracts(id) ON DELETE RESTRICT,
+  renewal_type              renewal_type_enum NOT NULL,
+  renewal_date              DATE           NOT NULL,
+  prior_seats               INTEGER        NOT NULL CHECK (prior_seats > 0),
+  renewed_seats             INTEGER        NOT NULL CHECK (renewed_seats > 0),
+  prior_rate_per_seat_usd   NUMERIC(10,4)  NOT NULL CHECK (prior_rate_per_seat_usd > 0),
+  new_rate_per_seat_usd     NUMERIC(10,4)  NOT NULL CHECK (new_rate_per_seat_usd > 0),
+  rate_basis                rate_basis_enum NOT NULL,
+  escalation_applied        BOOLEAN        NOT NULL DEFAULT false,
+  escalation_pct            NUMERIC(5,4),                    -- NULL if escalation_applied = false
+  cpi_reference_month       DATE,                             -- first day of BLS reference month; date-only, never URL
+  multi_year_discount_pct   NUMERIC(5,4),                    -- NULL if standard_annual
+  floor_respected           BOOLEAN        NOT NULL DEFAULT true, -- DDL CHECK enforces = true always
+  new_acv_usd               NUMERIC(12,2)  GENERATED ALWAYS AS (renewed_seats * new_rate_per_seat_usd * 12) STORED,
+  new_contract_years        SMALLINT       NOT NULL DEFAULT 1 CHECK (new_contract_years IN (1, 2, 3)),
+  new_tcv_usd               NUMERIC(14,2)  GENERATED ALWAYS AS (renewed_seats * new_rate_per_seat_usd * 12 * new_contract_years) STORED,
+  pricing_exception_event_id UUID,                            -- soft-ref to §32 exception DEC-030 event; NULL if no exception
+  notice_event_id           UUID,                             -- soft-ref to enterprise.renewal_notice_sent DEC-030 id
+  dec030_renewal_event_id   UUID,                             -- soft-ref to enterprise.contract_renewed DEC-030 id
+  created_at                TIMESTAMPTZ    NOT NULL DEFAULT now(),
+
+  CONSTRAINT chk_escalation_fields CHECK (
+    (escalation_applied = false AND escalation_pct IS NULL AND cpi_reference_month IS NULL)
+    OR (escalation_applied = true AND escalation_pct IS NOT NULL AND cpi_reference_month IS NOT NULL)
+  ),
+  CONSTRAINT chk_multi_year_discount CHECK (
+    (renewal_type IN ('multi_year_2', 'multi_year_3') AND multi_year_discount_pct IS NOT NULL)
+    OR (renewal_type NOT IN ('multi_year_2', 'multi_year_3') AND multi_year_discount_pct IS NULL)
+  ),
+  CONSTRAINT chk_floor_always_respected CHECK (floor_respected = true),
+  CONSTRAINT chk_non_renewal_seats CHECK (
+    renewal_type != 'non_renewal' OR renewed_seats = 0
+  )
+);
+
+-- Indexes
+CREATE UNIQUE INDEX idx_er_tenant_renewal_date ON enterprise_renewals(tenant_id, renewal_date);
+CREATE INDEX idx_er_renewal_date               ON enterprise_renewals(renewal_date DESC);
+CREATE INDEX idx_er_renewal_type               ON enterprise_renewals(renewal_type);
+
+COMMENT ON TABLE enterprise_renewals IS
+  'Immutable append-only record of each enterprise contract renewal event. '
+  'One row per renewal. Never updated after INSERT. '
+  'floor_respected CHECK constraint is the DDL-layer backstop for the COST_MODEL §31.5 pricing floor. '
+  'form_api REVOKED — financial contract data; all writes via Admin Console → emit-audit-event Worker.';
+
+COMMENT ON COLUMN enterprise_renewals.floor_respected IS
+  'Always true. CHECK (floor_respected = true) is the DDL-layer enforcement of COST_MODEL §31.5 pricing floor. '
+  'The Worker-layer z.literal(true) guard on enterprise.contract_renewed is the primary enforcement; '
+  'this CHECK is the independent DDL backstop.';
+
+COMMENT ON COLUMN enterprise_renewals.cpi_reference_month IS
+  'First day of the BLS CPI-U reference month used for escalation calculation. '
+  'Date-only (YYYY-MM-01). Never a URL — see COST_MODEL §42.5.1 privacy note. '
+  'NULL when escalation_applied = false (enforced by chk_escalation_fields).';
+
+COMMENT ON COLUMN enterprise_renewals.pricing_exception_event_id IS
+  'Soft-reference to the §32 pricing exception approval DEC-030 event UUID. '
+  'NULL unless renewal_type = retention_discount. '
+  'Hard FK not used because the DEC-030 chain lives in audit_log_events, not a relational table.';
+```
+
+#### 43.3.2 `enterprise_contracts` update at renewal
+
+On each renewal, `enterprise_contracts` is updated to reflect the new term. The same row is the live billing record; `enterprise_renewals` holds the immutable history.
+
+```sql
+-- Executed within a single SERIALIZABLE transaction together with the
+-- enterprise_renewals INSERT and the enterprise.contract_renewed DEC-030 event emission.
+-- Never run without the corresponding INSERT into enterprise_renewals in the same transaction.
+
+UPDATE enterprise_contracts
+   SET contracted_seats        = renewed_seats,          -- billing-authoritative seat count
+       current_seats           = renewed_seats,           -- §42 expansion tracking column; mirrors contracted_seats at renewal
+       acv_usd                 = (renewed_seats * new_rate_per_seat_usd * 12),
+       renewal_date            = renewal_date + (new_contract_years * INTERVAL '1 year'),
+       price_per_seat_usd_cents = ROUND(new_rate_per_seat_usd * 100)::INTEGER,
+       status                  = 'active'
+ WHERE id = original_contract_id;
+
+-- Post-renewal invariant check (run before committing transaction):
+-- SELECT contracted_seats, current_seats, acv_usd, renewal_date
+--   FROM enterprise_contracts WHERE id = original_contract_id;
+-- Verify: contracted_seats = current_seats = renewed_seats;
+--         acv_usd = renewed_seats * new_rate_per_seat_usd * 12;
+--         renewal_date = prior_renewal_date + new_contract_years years.
+```
+
+#### 43.3.3 Staging validation checklist
+
+Run all five checks before applying migration 0084 to production:
+
+```sql
+-- 1. Confirm both ENUMs landed with correct values:
+SELECT enum_range(NULL::renewal_type_enum), enum_range(NULL::rate_basis_enum);
+-- Expected: 5 values for renewal_type_enum; 4 values for rate_basis_enum.
+
+-- 2. INSERT one row per renewal_type variant; confirm GENERATED columns compute correctly:
+--    Test: renewed_seats=100, new_rate_per_seat_usd=9.0000, new_contract_years=2
+--    Expected: new_acv_usd = 10800.00; new_tcv_usd = 21600.00.
+INSERT INTO enterprise_renewals (tenant_id, original_contract_id, renewal_type, renewal_date,
+  prior_seats, renewed_seats, prior_rate_per_seat_usd, new_rate_per_seat_usd, rate_basis,
+  multi_year_discount_pct, floor_respected, new_contract_years)
+VALUES (gen_random_uuid(), '<test_contract_id>', 'multi_year_2', '2027-01-01',
+  80, 100, 9.5000, 9.0000, 'current_list', 0.1500, true, 2);
+
+-- 3. Verify UNIQUE INDEX rejects duplicate (tenant_id, renewal_date) pairs:
+--    Second INSERT with same tenant_id + renewal_date must fail with UNIQUE VIOLATION.
+
+-- 4. Verify chk_floor_always_respected:
+--    INSERT with floor_respected = false must fail with CHECK VIOLATION.
+UPDATE enterprise_renewals SET floor_respected = false WHERE id = '<test_id>';
+-- Expected: ERROR: new row for relation "enterprise_renewals" violates check constraint "chk_floor_always_respected"
+
+-- 5. Confirm form_api cannot SELECT any row:
+SET ROLE form_api;
+SELECT * FROM enterprise_renewals LIMIT 1;
+-- Expected: ERROR: permission denied for table enterprise_renewals
+RESET ROLE;
+```
+
+---
+
+### 43.4 Column Summary
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | UUID | NOT NULL | `gen_random_uuid()` | PK |
+| `tenant_id` | UUID | NOT NULL | — | FK → `tenants(id)` ON DELETE RESTRICT |
+| `original_contract_id` | UUID | NOT NULL | — | FK → `enterprise_contracts(id)` ON DELETE RESTRICT |
+| `renewal_type` | `renewal_type_enum` | NOT NULL | — | Standard annual / multi-year 2 or 3 / retention discount / non-renewal |
+| `renewal_date` | DATE | NOT NULL | — | Date the renewed term begins |
+| `prior_seats` | INTEGER | NOT NULL | — | Seat count on the expiring contract; CHECK > 0 |
+| `renewed_seats` | INTEGER | NOT NULL | — | Seat count on the new term; CHECK > 0; 0 only when `renewal_type = non_renewal` |
+| `prior_rate_per_seat_usd` | NUMERIC(10,4) | NOT NULL | — | Per-seat monthly rate on the expiring contract; CHECK > 0 |
+| `new_rate_per_seat_usd` | NUMERIC(10,4) | NOT NULL | — | Per-seat monthly rate on the new term; CHECK > 0 |
+| `rate_basis` | `rate_basis_enum` | NOT NULL | — | Mechanism that determined `new_rate_per_seat_usd` |
+| `escalation_applied` | BOOLEAN | NOT NULL | false | True when CPI+1% escalation was applied |
+| `escalation_pct` | NUMERIC(5,4) | NULL | — | Applied escalation fraction (e.g. 0.0312 = 3.12%); NULL when `escalation_applied = false` |
+| `cpi_reference_month` | DATE | NULL | — | First day of BLS CPI-U reference month; date-only, never URL; NULL when no escalation |
+| `multi_year_discount_pct` | NUMERIC(5,4) | NULL | — | Applied multi-year discount (0.15 or 0.25); NULL unless `multi_year_2` or `multi_year_3` |
+| `floor_respected` | BOOLEAN | NOT NULL | true | Always true; CHECK (floor_respected = true) is DDL-layer pricing floor backstop |
+| `new_acv_usd` | NUMERIC(12,2) | GENERATED | — | `renewed_seats × new_rate × 12`; GENERATED ALWAYS AS STORED |
+| `new_contract_years` | SMALLINT | NOT NULL | 1 | Contract term length; CHECK IN (1, 2, 3) |
+| `new_tcv_usd` | NUMERIC(14,2) | GENERATED | — | `renewed_seats × new_rate × 12 × new_contract_years`; GENERATED ALWAYS AS STORED |
+| `pricing_exception_event_id` | UUID | NULL | — | Soft-ref to §32 exception DEC-030 event; NULL unless `retention_discount` |
+| `notice_event_id` | UUID | NULL | — | Soft-ref to `enterprise.renewal_notice_sent` DEC-030 id (RENEW-CHAIN-01) |
+| `dec030_renewal_event_id` | UUID | NULL | — | Soft-ref to `enterprise.contract_renewed` DEC-030 id |
+| `created_at` | TIMESTAMPTZ | NOT NULL | `now()` | Immutable; not updated after INSERT |
+
+**CHECK constraints:**
+
+| Constraint | Definition | Purpose |
+|-----------|-----------|---------|
+| `chk_escalation_fields` | `escalation_applied`, `escalation_pct`, `cpi_reference_month` all-NULL or all-NOT-NULL together | Prevents partial escalation audit trails |
+| `chk_multi_year_discount` | `multi_year_discount_pct` NOT NULL iff `renewal_type IN ('multi_year_2', 'multi_year_3')` | Ensures discount % is recorded for every multi-year commitment |
+| `chk_floor_always_respected` | `floor_respected = true` | DDL-layer pricing floor backstop; independent of Worker-layer Zod guard |
+| `chk_non_renewal_seats` | `renewal_type != 'non_renewal' OR renewed_seats = 0` | Non-renewal rows must carry zero renewed seats |
+
+**GENERATED columns:**
+
+Both GENERATED columns use `STORED` — computed at INSERT time and physically stored. They are queryable without re-computation, making ARR waterfall queries (COST_MODEL §42.8.1) and NRR decomposition (COST_MODEL §42.8.3) index-scannable without function overhead.
+
+---
+
+### 43.5 Row-Level Security (RLS)
+
+```sql
+ALTER TABLE enterprise_renewals ENABLE ROW LEVEL SECURITY;
+
+-- form_api: REVOKED entirely. Financial contract data; no direct API access permitted.
+-- tenant_admin, tenant_owner, tenant_manager: no access. Renewal pricing is FORM-internal.
+REVOKE ALL ON enterprise_renewals FROM form_api;
+
+-- compliance_reviewer: unrestricted SELECT (SOC 2 audits, REN-E-001/002/003 evidence queries)
+GRANT SELECT ON enterprise_renewals TO compliance_reviewer;
+
+CREATE POLICY rls_er_compliance_reviewer
+  ON enterprise_renewals
+  FOR SELECT
+  TO compliance_reviewer
+  USING (TRUE);
+
+-- form_admin: unrestricted SELECT (internal FORM staff — compliance-officer, CSM, finance)
+GRANT SELECT ON enterprise_renewals TO form_admin;
+
+CREATE POLICY rls_er_form_admin
+  ON enterprise_renewals
+  FOR SELECT
+  TO form_admin
+  USING (TRUE);
+
+-- form_system: full access (Admin Console → Worker path for INSERT on renewal confirmation)
+GRANT SELECT, INSERT ON enterprise_renewals TO form_system;
+
+CREATE POLICY rls_er_form_system
+  ON enterprise_renewals
+  FOR ALL
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+
+-- No UPDATE or DELETE policies: append-only by design. No role receives UPDATE or DELETE grants.
+```
+
+**RLS matrix:**
+
+| Role | SELECT | INSERT | UPDATE | DELETE | Notes |
+|------|--------|--------|--------|--------|-------|
+| `form_api` | ✗ REVOKED | ✗ REVOKED | ✗ REVOKED | ✗ REVOKED | Financial data; no API access |
+| `tenant_admin` | ✗ | ✗ | ✗ | ✗ | Renewal pricing is FORM-internal |
+| `tenant_owner` | ✗ | ✗ | ✗ | ✗ | Renewal pricing is FORM-internal |
+| `tenant_manager` | ✗ | ✗ | ✗ | ✗ | HR/People-ops; privacy floor |
+| `form_admin` | ✓ all rows | ✗ | ✗ | ✗ | Internal staff (compliance-officer, CSM) |
+| `compliance_reviewer` | ✓ all rows | ✗ | ✗ | ✗ | SOC 2 auditor read-only |
+| `form_system` | ✓ all rows | ✓ | ✗ | ✗ | Worker path; no UPDATE (append-only) |
+
+**DDL auditor proof:** `SELECT * FROM pg_policies WHERE tablename = 'enterprise_renewals'` returns exactly three rows (rls_er_compliance_reviewer, rls_er_form_admin, rls_er_form_system) — zero rows matching `form_api` or any tenant role. `SELECT has_table_privilege('form_api', 'enterprise_renewals', 'SELECT')` returns `false`.
+
+---
+
+### 43.6 RENEW-CHAIN-01 & ESCALATION-CHAIN-01 Enforcement
+
+The two chain invariants are defined in `docs/COST_MODEL.md §42.7` and enforced in the `emit-audit-event` Cloudflare Worker. This section documents the DDL-layer relationship to each invariant.
+
+**RENEW-CHAIN-01:** `enterprise.contract_renewed` is blocked (HTTP 422 `RENEW_CHAIN_01_VIOLATION`) if no `enterprise.renewal_notice_sent` event for the same `tenant_id` exists within 120 days before the renewal event. The `notice_event_id` column on `enterprise_renewals` is the soft-reference that makes this linkage inspectable at the DDL layer: any row where `notice_event_id IS NULL` after the Admin Console renewal workflow is a data integrity anomaly (the workflow must populate this field at INSERT time). Evidence: cross-tab `notice_event_id IS NOT NULL` across all rows; expected: 100%.
+
+**ESCALATION-CHAIN-01:** `enterprise.contract_renewed` with `rate_basis = 'escalation'` requires `enterprise.renewal_escalation_calculated` within 150 days. The DDL invariant: any row with `escalation_applied = true` must have `escalation_pct IS NOT NULL AND cpi_reference_month IS NOT NULL` (enforced by `chk_escalation_fields`). If the chain invariant were bypassed at the Worker layer, the `chk_escalation_fields` CHECK would still reject an INSERT where `escalation_applied = true` without `escalation_pct` — making a silent chain violation impossible at the DDL layer.
+
+**SOC 2 evidence query (RENEW-CHAIN-01 compliance):**
+
+```sql
+-- REN-E-001 annual chain compliance check: zero rows expected.
+-- Any row with notice_event_id IS NULL indicates a chain integrity anomaly.
+SELECT id, tenant_id, renewal_date, renewal_type, rate_basis
+  FROM enterprise_renewals
+ WHERE renewal_type != 'non_renewal'    -- non-renewals do not require notice chain
+   AND notice_event_id IS NULL
+   AND created_at >= date_trunc('year', NOW() - INTERVAL '1 year')
+   AND created_at <  date_trunc('year', NOW());
+-- Expected: 0 rows. File result as REN-E-001 annual chain compliance attestation.
+-- Any non-zero result requires immediate compliance-officer investigation before REN-E-001 is filed.
+```
+
+**SOC 2 evidence query (ESCALATION-CHAIN-01 compliance):**
+
+```sql
+-- Any escalation renewal without escalation_pct indicates a chain invariant bypass attempt.
+-- chk_escalation_fields should prevent this at INSERT time; this query is the quarterly audit check.
+SELECT id, tenant_id, renewal_date, rate_basis, escalation_applied, escalation_pct
+  FROM enterprise_renewals
+ WHERE rate_basis = 'escalation'
+   AND (escalation_pct IS NULL OR cpi_reference_month IS NULL);
+-- Expected: 0 rows. chk_escalation_fields CHECK makes this impossible in production.
+-- File result as ESCALATION-CHAIN-01 DDL compliance attestation within REN-E-001 annual export.
+```
+
+---
+
+### 43.7 SOC 2 Evidence Cross-References
+
+Three evidence artefacts are defined in `docs/COST_MODEL.md §42.9` and cross-referenced here with the DDL-layer invariants that underpin each artefact.
+
+| Artefact | TSC Criteria | DDL-layer invariant from §43 | Full spec location |
+|---------|-------------|------------------------------|-------------------|
+| **REN-E-001** | CC5.2 / CC1.4 | `chk_floor_always_respected CHECK (floor_respected = true)` provides DDL-layer backstop for the `z.literal(true)` chain guard; `notice_event_id` column enables per-row RENEW-CHAIN-01 compliance attestation | `docs/COST_MODEL.md §42.9` |
+| **REN-E-002** | CC4.1 / CC2.2 | `idx_er_tenant_renewal_date UNIQUE INDEX (tenant_id, renewal_date)` guarantees the quarterly notice compliance export query performs at O(log n) even at fleet scale; prevents evidence collection delay | `docs/COST_MODEL.md §42.9` |
+| **REN-E-003** | CC4.1 / A1.1 | `idx_er_renewal_type INDEX (renewal_type)` enables the annual renewal conversion rate cross-tab by `renewal_type` at query efficiency; `new_acv_usd` and `new_tcv_usd` GENERATED STORED columns make fleet-level ARR waterfall queryable without in-query arithmetic | `docs/COST_MODEL.md §42.9` |
+
+**REN-E-001 DDL supplement — CC5.2 auditor narrative:** `chk_floor_always_respected` is an independent DDL control that operates without any application or Worker involvement. Even in a hypothetical scenario where the `emit-audit-event` Worker is deployed with a modified schema that omits the `z.literal(true)` guard, the DDL constraint would reject any INSERT with `floor_respected = false` with an HTTP 500 at the Supabase layer — which would surface as a failed Admin Console renewal workflow, creating an observable control failure rather than a silent bypass. The chain gate and the DDL CHECK are independent control layers, each independently provable to an auditor via `\d enterprise_renewals`.
+
+**REN-E-002 DDL supplement — CC4.1 auditor narrative:** `idx_er_tenant_renewal_date UNIQUE INDEX` guarantees that the REN-E-002 quarterly notice compliance export — which joins `enterprise_renewals` with the DEC-030 chain to confirm every account with a `renewal_date` in the observation quarter has a `notice_event_id` on file — executes within the evidence collection window. Without this index, the join degrades to O(n × m) at fleet scale and could delay or block quarterly evidence filing.
+
+---
+
+### 43.8 Implementation Checklist
+
+#### P0 — Before first renewal event is processed (M12)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0084_enterprise_renewals.sql` after confirming migration 0083 is applied and all five staging validation checks from §43.3.3 pass: (a) ENUM range check; (b) GENERATED column arithmetic with multi_year_2 test row; (c) UNIQUE INDEX violation test; (d) `chk_floor_always_respected` CHECK violation test; (e) `form_api` REVOKE enforcement test. Retain staging output at `compliance/evidence/renewals/migration-0084-validation_<YYYY-MM-DD>.txt`. Cross-reference: COST_MODEL §42.10 item 2 tracks the same operational act — marking that item done simultaneously marks this item done. | platform-engineer | **P0** | M12 | [ ] |
+| 2 | Register RENEW-CHAIN-01 and ESCALATION-CHAIN-01 in `emit-audit-event` Cloudflare Worker per COST_MODEL §42.7. Integration tests: (a) `enterprise.contract_renewed` returns HTTP 422 `RENEW_CHAIN_01_VIOLATION` when no prior `enterprise.renewal_notice_sent` for tenant_id within 120 days; (b) `enterprise.contract_renewed` with `rate_basis='escalation'` returns HTTP 422 `ESCALATION_CHAIN_01_VIOLATION` when no prior `enterprise.renewal_escalation_calculated` within 150 days; (c) `enterprise.contract_renewed` returns HTTP 422 when the Worker-layer Zod schema receives `floor_respected: false`. | platform-engineer | **P0** | M12 | [ ] |
+| 3 | Confirm `notice_event_id` is populated at INSERT time by the Admin Console "Confirm Renewal" workflow (Step 3 of COST_MODEL §42.10 item 3): the `emit-audit-event` post-event hook must write the `enterprise.renewal_notice_sent` DEC-030 UUID into `notice_event_id` in the same SERIALIZABLE transaction as the `enterprise_renewals` INSERT and `enterprise_contracts` UPDATE. Test: after a synthetic renewal, run the §43.6 RENEW-CHAIN-01 compliance query — expected: 0 rows. | platform-engineer | **P0** | M12 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | File first REN-E-001 annual renewal chain export after first renewal cycle: run §43.6 RENEW-CHAIN-01 and ESCALATION-CHAIN-01 compliance queries; assert 0 rows; record `floor_respected = true` attestation for all rows; file at `compliance/evidence/renewals/REN-E-001_<YYYY>.csv`. Register REN-E-001, REN-E-002, REN-E-003 in `docs/SOC2_READINESS.md §79.4` master evidence table (COST_MODEL §42.10 item 5, P1/M13). Cross-reference: `docs/SOC2_READINESS.md §100.6 item 2` tracks this registration obligation. | compliance-officer | **P1** | M13 | [ ] |
+| 5 | Add `enterprise_renewals` table entry to `docs/DATA_ROOM.md §Enterprise Schema`: table name, migration 0084, canonical source (DATA_MODEL §43), audience (compliance-officer + security-engineer + enterprise-architect + SOC 2 auditor). | compliance-officer | **P1** | M13 | [ ] |
+
+---
+
+### 43.9 Cross-Reference Obligations Created by §43
+
+| Obligation | Source | Status |
+|-----------|--------|--------|
+| COST_MODEL §42.6 one-way DDL reference → DATA_MODEL | `docs/COST_MODEL.md §42.6.1` states "Migration 0084 creates the enterprise_renewals table as the authoritative record" without citing DATA_MODEL as the canonical DATA_MODEL source | 🟢 **Closed — §43 is the DATA_MODEL canonical registration; COST_MODEL §42.6 is the authoritative economic spec; the two-document chain is now bidirectional** |
+| SOC2_READINESS registration for DDL-layer invariants supporting REN-E-001/002/003 | `docs/COST_MODEL.md §42.9` registered artefacts citing COST_MODEL §42 as DDL source; DATA_MODEL §43 now provides the canonical DDL layer | 🟢 **Closed — `docs/SOC2_READINESS.md §100` (added simultaneously) registers DATA_MODEL §43 as canonical DDL source and supplies the DDL-layer auditor narratives for CC5.2/CC1.4/CC4.1** |
+| COST_MODEL §42.10 item 2 cross-reference back-pointer | §42.10 item 2 says "migration 0084 DDL" without a DATA_MODEL cross-reference | 🟡 **Pending — platform-engineer should update §42.10 item 2 status note to reference DATA_MODEL §43 as canonical when marking item done (P0/M12)** |
+
+---
+
+*v1.22 (2026-06-20): §43 `enterprise_renewals` Schema — Migration 0084. Closes cross-reference obligation from `docs/COST_MODEL.md §42.6` (v2.8, 2026-06-20): §42.6.1 authored the DDL inline; DATA_MODEL §43 is the canonical DATA_MODEL registration, making the chain bidirectional. §43.1 purpose + three design invariants (append-only/never-UPDATE, `floor_respected` CHECK structural enforcement, `form_api` REVOKED) + privacy floor. §43.2 migration dependency chain: 0082 → 0083 → 0084; ON DELETE RESTRICT on both FKs (tenant_id + original_contract_id) is intentional — tenant data deletion pipeline (§67) must archive renewal rows before CASCADE. §43.3.1 full DDL (canonical from COST_MODEL §42.6.1): two ENUMs (5-value `renewal_type_enum`, 4-value `rate_basis_enum`); CREATE TABLE (21 columns — UUID PK, two FK RESTRICT, `renewal_type_enum`, DATE, two INTEGER CHECK > 0, two NUMERIC(10,4) CHECK > 0, `rate_basis_enum`, BOOLEAN, two NULLable NUMERIC for escalation, NULLable NUMERIC for multi-year discount, `floor_respected` BOOLEAN DEFAULT true, two GENERATED ALWAYS AS STORED NUMERIC, SMALLINT CHECK IN (1,2,3), three soft-ref UUID NULLable, TIMESTAMPTZ); four CHECKs (escalation_fields all-or-nothing, multi_year_discount iff multi_year type, floor_always_respected = true, non_renewal_seats = 0); three indexes (UNIQUE (tenant_id, renewal_date), renewal_date DESC, renewal_type); four COMMENT ON annotations. §43.3.2 `enterprise_contracts` renewal UPDATE in single SERIALIZABLE transaction with enterprise_renewals INSERT and enterprise.contract_renewed event emission; post-renewal invariant check SQL. §43.3.3 five-item staging validation checklist (ENUM range, GENERATED arithmetic, UNIQUE violation, chk_floor violation, form_api REVOKE). §43.4 full column summary table (21 rows); CHECK constraints table (4 rows); GENERATED columns note (STORED semantics for ARR waterfall query efficiency). §43.5 RLS: `form_api` REVOKED; `compliance_reviewer` SELECT all; `form_admin` SELECT all; `form_system` SELECT + INSERT only (no UPDATE — append-only); no tenant role grants; DDL auditor proof queries. §43.6 RENEW-CHAIN-01 and ESCALATION-CHAIN-01 DDL relationship: `notice_event_id` soft-ref as per-row chain compliance attestation anchor; `chk_escalation_fields` as ESCALATION-CHAIN-01 DDL backstop; two SOC 2 evidence queries (RENEW-CHAIN-01 annual compliance, ESCALATION-CHAIN-01 quarterly audit). §43.7 SOC 2 evidence cross-references: three artefacts (REN-E-001 CC5.2/CC1.4, REN-E-002 CC4.1/CC2.2, REN-E-003 CC4.1/A1.1) with DDL-layer invariant column; CC5.2 and CC4.1 auditor narratives. §43.8 five-item implementation checklist: 3× P0/M12 (migration 0084 with staging validation, RENEW-CHAIN-01/ESCALATION-CHAIN-01 Worker integration tests, notice_event_id population test), 2× P1/M13 (REN-E-001/002/003 first filing + §79.4 master evidence table registration, DATA_ROOM entry). §43.9 three cross-reference obligations (COST_MODEL §42.6 one-way → now bidirectional ✓, SOC2_READINESS §100 DDL-layer registration ✓, COST_MODEL §42.10 item 2 back-pointer 🟡). Document header v1.21 → v1.22. Privacy floor: no individual employee `user_id`, name, email, health values (heart rate, body composition, workout load), coaching session content, or GDPR Art. 9 special category data in any column, DEC-030 event payload, or SOC 2 evidence artefact; `cpi_reference_month` date-only (never URL per COST_MODEL §42.5.1); `tenant_id` FORM-internal UUID; `form_api` REVOKED; no tenant-role SELECT on any renewal data. Cross-references: `docs/COST_MODEL.md §42` (authoritative economic spec + inline DDL authoring source + DEC-030 Zod v2 schemas + RENEW-CHAIN-01/ESCALATION-CHAIN-01 formal definitions + implementation checklist §42.10); `docs/SOC2_READINESS.md §100` (DDL-layer invariant registration for REN-E-001/002/003 — added simultaneously); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (three DEC-030 events to register — `enterprise.renewal_notice_sent` STANDARD/7yr, `enterprise.renewal_escalation_calculated` HIGH/7yr, `enterprise.contract_renewed` STANDARD/7yr — P0/M12); `docs/MSA_TEMPLATE.md §6` (auto-renewal, 90-day notice, seat reduction policy); `docs/DATA_MODEL.md §42` (migration 0083 prerequisite — expansion fields on enterprise_contracts; `current_seats` updated by §43.3.2 renewal UPDATE); `docs/DATA_MODEL.md §16` (enterprise_contracts — the table supplemented by this schema); `docs/DATA_MODEL.md §67` (tenant data deletion pipeline — ON DELETE RESTRICT boundary; renewal rows archived before tenant CASCADE); `docs/CRYPTOGRAPHY_POLICY.md §5` (no new secrets; `cpi_reference_month` is plain date, not encrypted). Owner: enterprise-architect + compliance-officer + customer-success.*
