@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [6.61.0] — 2026-06-20
+
+### Added
+- `content/post-1601-pullup-individual-variation.md` — Block 1571–1620 Cluster 4 post 1/10. Що таке «правильне» підтягування і чому відповідь залежить від структури тіла. Три рівні правильності, чотири змінні (хват, тип, глибина, кут тулуба), чотири універсальних параметри.
+- `content/post-1602-pullup-anthropometry-grip.md` — Cluster 4 post 2/10. Антропометрія і вибір хвату: ширина (вузький/плечовий/широкий), тип пронація/супінація/нейтраль, кут. Таблиця антропометрія → вибір хвату. Lehman et al. (2004) ЕМГ chin-up vs. pull-up.
+- `content/post-1603-pullup-row-emg-muscle-activation.md` — Cluster 4 post 3/10. EMG-дані для підтягувань і горизонтальної тяги. Latissimus, біцепс, нижня трапеція, ромбоподібні, задня дельта. Signorile (2002), Fenwick (2009). Вертикальна і горизонтальна тяга — взаємодоповнення, не дублювання.
+- `content/post-1604-scapular-mechanics-pulling.md` — Cluster 4 post 4/10. Механіка лопатки у тягових рухах: чотири фази у підтягуванні, три найчастіші порушення (scapular shrug, winging, тяга без ретракції), три тести для self-coached атлета.
+- `content/post-1605-horizontal-row-variations.md` — Cluster 4 post 5/10. Горизонтальна тяга: варіації та їх механіка. Bent-over row, seated cable row, T-bar, inverted row. Матриця вибору за метою.
+- `content/post-1606-pullup-rom-lockout.md` — Cluster 4 post 6/10. ROM у підтягуваннях: dead hang vs. «майже розгинання», підборіддя vs. груди, часткові повтори. McMahon et al. (2014), Pedrosa et al. (2022) — тренування у розтягнутій позиції і гіпертрофічний стимул.
+- `content/post-1607-pullup-row-video-diagnosis.md` — Cluster 4 post 7/10. Відеодіагностика двох ракурсів для підтягування і bent-over row. Пріоритети P0–P3: таблиці по чотири рівні. Протокол перегляду на 0.25× швидкості.
+- `content/post-1608-pullup-row-technical-limiters-matrix.md` — Cluster 4 post 8/10. Три типи технічних обмежувачів (мобільність / сила / моторний контроль) і матриця корекції для підтягування і горизонтальної тяги.
+- `content/post-1609-pullup-progression-zero-to-weighted.md` — Cluster 4 post 9/10. П'ять ступенів прогресії підтягувань: активаційний фундамент → ексцентрична прогресія → перші концентричні → накопичення об'єму → навантажені підтягування. Критерії переходу між ступенями.
+- `content/post-1610-pullup-row-cluster-synthesis.md` — Cluster 4 post 10/10 (block synthesis). Три рівні системи self-коучингу для підтягувань і горизонтальної тяги: що визначити один раз, що перевіряти щотренування, що переглядати на мезоциклі. Анонс Cluster 5 (вертикальний жим).
+
+### Changed
+- `blog.html` — додано posts 1601–1610 у верхній секції списку.
+- `STATUS.md` — Block 1571–1620 Cluster 4 COMPLETE 10/10; наступний пріоритет Cluster 5 (posts 1611–1620).
+- `VERSION` — 6.60.1 → 6.61.0.
+
+---
+
 ## [6.60.1] — 2026-06-20
 
 ### Changed
