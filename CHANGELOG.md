@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [7.5.0] — 2026-06-20
+
+### Added
+- `content/post-1773-volume-progression-mesocycles.md` — Cluster 5 · Post 3/10 · Block 1731–1780. Прогресія об'єму між мезоциклами: loading block → deload → новий блок (не з нуля). Israetel et al. (2019): правило +2–4 ефективних підходи за мезоцикл. Таблиця чотирьох послідовних блоків. Коли об'єм плато і прогресують інтенсивністю. Міжмезоциклова карта Victor. clinical-safety: NOT_REQUIRED.
+- `content/post-1774-deload-when-how-much-protocol.md` — Cluster 5 · Post 4/10 · Block 1731–1780. Деловантаж: плановий vs реактивний, протокол -40–60%/RPE ≤ 6/1 тиждень, суперкомпенсація. Bosquet et al. (2007): 2–3% приріст після планового зниження. Bickel et al. (2011): інтенсивність як збережувальний сигнал. Дві типові помилки (не робити / занадто глибоко). clinical-safety: NOT_REQUIRED.
+- `content/post-1775-weekly-volume-audit-protocol.md` — Cluster 5 · Post 5/10 · Block 1731–1780. 15-хвилинний протокол тижневого аудиту: ефективні підходи vs MEV/MAV, RPE-тренд, суб'єктивна свіжість, технічні нотатки. Чотири запитання → три виходи (продовжити/скоригувати/деловантаж). Автоматична агрегація в Victor. clinical-safety: NOT_REQUIRED.
+- `content/post-1777-volume-needs-experience-progression.md` — Cluster 5 · Post 7/10 · Block 1731–1780. Потреби в об'ємі по стадіях: початківець 6–10, інтермедіат 10–16, досвідчений 16–22+. Ralston et al. (2017), Colquhoun et al. (2018). Чому менший стартовий об'єм — ефективніший підхід. Як Victor адаптує рекомендації до тренувального віку. clinical-safety: NOT_REQUIRED.
+- `content/post-1778-victor-volume-management-partnership.md` — Cluster 5 · Post 8/10 · Block 1731–1780. Межі автоматизації Victor: що система бачить (ефективні підходи, RPE-тренди, MEV/MAV/MRV, флаги) і що не бачить (суб'єктивний стан, сон без трекера, контекст). Модель партнерства: Victor = пам'ять + аналіз + флаги; Атлет = контекст + рішення + логування. clinical-safety: NOT_REQUIRED.
+- `content/post-1779-pre-mesocycle-checklist.md` — Cluster 5 · Post 9/10 · Block 1731–1780. Чекліст перед новим мезоциклом: 4 блоки (оцінка попереднього, стан зараз, цілі нового, фіксація в Victor). 8 запитань + 3 кроки Victor-онбординг. clinical-safety: NOT_REQUIRED.
+- `content/post-1780-block-synthesis-volume-management-system.md` — Cluster 5 · Post 10/10 · Block 1731–1780. BLOCK SYNTHESIS: синтез 50 постів кластерів 1–5, три поведінкові зрушення, архітектура операційної системи управління об'ємом. Анонс Block 1781–1830 (інтенсивність і управління навантаженням). **BLOCK 1731–1780 COMPLETE 50/50.** clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — картки posts 1772–1780 додані; total entries updated to post-1780. Block 1731–1780 Cluster 5 COMPLETE.
+- `STATUS.md` — Block 1731–1780 позначено COMPLETE 50/50; Cluster 5 COMPLETE v7.5.0; наступні пріоритети: Block 1781–1830 (тема TBD — product-strategist + sports-scientist).
+
 ## [7.4.2] — 2026-06-20
 
 ### Added
