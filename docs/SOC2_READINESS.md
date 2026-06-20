@@ -29983,8 +29983,9 @@ The rows below supplement the §79.4 criteria mapping for EXP-E-001 and EXP-E-00
 | **Economic spec + DDL authoring** | `docs/COST_MODEL.md §42` | v2.8 | 2026-06-20 | Renewal pricing mechanics, price escalation model, multi-year commitment, `enterprise_renewals` DDL spec, DEC-030 Zod v2 schemas, RENEW-CHAIN-01/ESCALATION-CHAIN-01 chain invariants, REN-E-001/002/003 evidence artefact definitions |
 | **Canonical DDL registration** | `docs/DATA_MODEL.md §43` | v1.22 | 2026-06-20 | Canonical Postgres DDL, RLS policies (REVOKE form_api), RENEW-CHAIN-01/ESCALATION-CHAIN-01 DDL relationship, SOC 2 evidence queries, staging validation checklist |
 | **SOC 2 cross-reference closure** | `docs/SOC2_READINESS.md §100` | v3.24.1 | 2026-06-20 | This section — bidirectional cross-reference registration, canonical DDL source update for REN-E-001/002/003, DDL-layer invariant auditor narratives, implementation checklist |
+| **DEC-030 event registration** | `docs/AUDIT_LOG_SCHEMA.md §Enterprise Contract Renewal` | v2.23 | 2026-06-20 | Three DEC-030 HMAC-chained events registered: `enterprise.renewal_notice_sent` (STANDARD, 7yr), `enterprise.renewal_escalation_calculated` (HIGH, 7yr), `enterprise.contract_renewed` (STANDARD, 7yr); RENEW-CHAIN-01/ESCALATION-CHAIN-01 invariant blocks; Zod v2 schemas; REN-E-001/002/003 evidence artefact table; auditor narratives (CC5.2/CC1.4/CC4.1/CC2.2/A1.1). Closes COST_MODEL §42.10 item 1 (P0/M12 — 🟢 2026-06-20). |
 
-**Sequencing note:** Unlike the §96/§99 pattern where DATA_MODEL additions post-dated SOC2_READINESS artefact registration, §43 and §100 are added simultaneously with COST_MODEL §42 (all 2026-06-20). The three-document chain is established in a single commit, creating the bidirectional reference at origin rather than as a retroactive patch.
+**Sequencing note:** Unlike the §96/§99 pattern where DATA_MODEL additions post-dated SOC2_READINESS artefact registration, §43 and §100 are added simultaneously with COST_MODEL §42 (all 2026-06-20). The DEC-030 event registration in AUDIT_LOG_SCHEMA.md v2.23 completes the four-document chain.
 
 ---
 

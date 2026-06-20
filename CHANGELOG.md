@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [7.5.2] — 2026-06-20
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.21 → v2.23. Новий розділ `### Enterprise Contract Renewal events (DEC-030 HMAC-chained · COST_MODEL §42.7 · CC5.2/CC1.4/CC4.1/CC2.2/A1.1)` вставлено перед `## Export & delivery`. Зареєстровано три DEC-030 HMAC-chained події з `docs/COST_MODEL.md §42.7`: `enterprise.renewal_notice_sent` (STANDARD, 7yr — RENEW-CHAIN-01 anchor, `days_until_renewal` 85–100, `notice_type` enum, `sent_by` FORM UUID), `enterprise.renewal_escalation_calculated` (HIGH, 7yr — ESCALATION-CHAIN-01 prerequisite, `bls_report_date` date-only, `floor_respected: z.literal(true)` HTTP 422), `enterprise.contract_renewed` (STANDARD, 7yr — RENEW-CHAIN-01 + ESCALATION-CHAIN-01 terminal event, `notice_event_id` FK, `pricing_exception_event_id` для retention_discount path, `floor_respected: z.literal(true)` HTTP 422). Три Zod v2 схеми. RENEW-NOTICE-01 моніторинг invariant. Три SOC 2 evidence artefacts (REN-E-001 CC5.2/CC1.4, REN-E-002 CC4.1/CC2.2, REN-E-003 CC4.1/A1.1). Retention table +3 rows. Closes `docs/COST_MODEL.md §42.10` checklist item 1 (P0/M12 — 🟢).
+- `docs/COST_MODEL.md` — §42.10 checklist item 1 позначено `[x] Done (2026-06-20, AUDIT_LOG_SCHEMA.md v2.23)`.
+- `docs/SOC2_READINESS.md` — §100.1 three-document chain table extended: додано 4-й рядок для `docs/AUDIT_LOG_SCHEMA.md §Enterprise Contract Renewal` v2.23 (DEC-030 event registration); sequencing note оновлено.
+- `VERSION` — 7.5.1 → 7.5.2.
+
 ## [7.5.1] — 2026-06-20
 
 ### Added
