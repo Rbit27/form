@@ -1,5 +1,24 @@
 # Changelog · FORM
 
+## [6.86.0] — 2026-06-20
+
+### Added
+- `content/post-1722-movement-condition-matrix.md` — Block 1681–1730 Cluster 5, post 2/10. Матриця рух × умова: таблиця 5 рухів × 6 умов (стандарт / 10–15 хв / 5 хв / змагальний день / без залу / поганий стан) з конкретними протоколами і джерельними постами. 5-крокова схема рішення до тренування. clinical_safety: NOT_REQUIRED.
+- `content/post-1723-athlete-level-warmup.md` — Block 1681–1730 Cluster 5, post 3/10. Рівень атлета і розминка: початківець (патерн учиться у розминці), середній (активація, не навчання), досвідчений (протокол ефективності + PAP критичний). Таблиця рівень × пріоритет × навантажені підходи × RPE × PAP × мінімальний час. clinical_safety: NOT_REQUIRED.
+- `content/post-1724-bench-full-protocol.md` — Block 1681–1730 Cluster 5, post 4/10. Жим лежачи: повна схема у 5 умовах (стандарт / 10–15 хв / 5 хв / змагальний день / поганий стан). PAP-підхід 92–95% за 8–12 хв до опенера. Три зони підготовки (грудний відділ / плечовий комплекс / зап'ясток). Victor-логування. clinical_safety: NOT_REQUIRED.
+- `content/post-1725-squat-full-protocol.md` — Block 1681–1730 Cluster 5, post 5/10. Присідання: повна схема у 5 умовах. Hip CARs + ankle dorsiflexion + bird dog + goblet squat + 5 навантажених підходів (стандарт). PAP 90–95% на змагальний день. Діагностичний RPE при поганому стані. clinical_safety: NOT_REQUIRED.
+- `content/post-1726-deadlift-full-protocol.md` — Block 1681–1730 Cluster 5, post 6/10. Становий підйом: специфіка без ексцентрики, задній ланцюг стомлюється швидко. Hip hinge drills (RDL без штанги + hip airplane). PAP для змагань: 85–90% (не 90–95%). Sumo vs. conventional: різна підготовка кульшового. clinical_safety: NOT_REQUIRED.
+- `content/post-1727-pullups-rows-protocol.md` — Block 1681–1730 Cluster 5, post 7/10. Підтягування і горизонтальна тяга: протокол без безкоштовного розігріву від попередніх вправ. Scapular CARs, band pull-apart, dead hang. Другорядний рух: 2 підходи. Grip fatigue після станового — окремий параметр. clinical_safety: NOT_REQUIRED.
+- `content/post-1728-victor-warmup-profile.md` — Block 1681–1730 Cluster 5, post 8/10. Victor-профіль розминки: що логується (тип, тривалість, флаги, RPE навантажених підходів, RPE першого робочого), що обчислює (RPE-baseline, диференціал за типом), що НЕ робить. Три вимоги для побудови profіlу: ≥30 сесій, однакові умови, мін 3 сесії на рух × тип. clinical_safety: NOT_REQUIRED.
+- `content/post-1729-top7-warmup-mistakes.md` — Block 1681–1730 Cluster 5, post 9/10. Топ-7 помилок: рівномірне скорочення, мобільність до загальної, PAP на тренуванні, ритуальна розминка без адаптації, пропуск навантажених підходів, хибна інтерпретація болю (Victor ≠ медична оцінка), відсутність логування. Паттерн → data-сигнал → фікс. clinical_safety: NOT_REQUIRED.
+- `content/post-1730-block-synthesis-operational-guide.md` — Block 1681–1730 Cluster 5, post 10/10 · BLOCK COMPLETE. Синтез блоку 1681–1730: операційний довідник силового атлета. Таблиця рух × умова з посиланнями на протоколи (пости 1724–1727, 1719), три принципи, матриця рівня атлета, 5-кроковий текстовий decision tree, Victor-профіль (3 bullet). Довідник, не огляд. clinical_safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — cards для постів 1722–1730 додано перед post-1721. Статус post-1721 → Cluster 5 COMPLETE. blog.html updated to post-1730.
+- `VERSION` — 6.85.0 → 6.86.0.
+
+---
+
 ## [6.85.0] — 2026-06-20
 
 ### Added
