@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.76.0] — 2026-06-20
+
+### Added
+- `docs/COST_MODEL.md §41` — Enterprise Seat Expansion Economics: Mid-Contract Upsell, Tier Upgrade Pricing & Expansion Governance. Closes documentation gap between §40 (adoption health signal, Green-band 35% expansion probability) and §23 (NRR engine, Seat Expansion ARR). Covers: three expansion trigger types (T1 CSM-initiated, T2 tenant-initiated, T3 milestone-driven); minimum increment 25 seats; pro-rata billing formula; tier-crossing credit mechanics; two billing variants (BV-1 immediate, BV-2 anniversary rollup); tier upgrade pricing and commercial conditions; discount authority matrix with six tiers; migration 0083 (`enterprise_contracts` + `initial_seats`, `current_seats`, `expansion_count`, `last_expansion_date`); four DEC-030 HMAC-chained events (`enterprise.expansion_initiated` STANDARD 7yr, `billing.seats_expanded` financial extension STANDARD 7yr, `enterprise.tier_upgraded` STANDARD 7yr, `enterprise.expansion_floor_enforced` HIGH 7yr) — all with `floor_respected: true` chain invariant and no individual user data; adoption-weighted NRR decomposition ($1,112 expected expansion ARR/yr per Starter account at 40/45/15 band distribution); two SOC 2 evidence artefacts (EXP-E-001 CC5.2/CC1.4 annual, EXP-E-002 CC4.1 quarterly); nine-item implementation checklist; three open questions (OQ-EXP-01 probability calibration, OQ-EXP-02 self-serve threshold, OQ-EXP-03 tier upgrade as amendment vs. new contract). Document header updated v2.6 → v2.7.
+
+### Changed
+- `docs/COST_MODEL.md` — header v2.6 → v2.7; TOC entry §41 added.
+- `VERSION` — 6.75.0 → 6.76.0.
+
+---
+
 ## [6.75.0] — 2026-06-20
 
 ### Added

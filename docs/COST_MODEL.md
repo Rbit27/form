@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.6
+# FORM · Cost Model & Unit Economics v2.7
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -274,6 +274,18 @@
     - 40.9 SOC 2 Evidence Mapping
     - 40.10 Implementation Checklist
     - 40.11 Open Questions (OQ-ADO-01 to OQ-ADO-03)
+41. [Enterprise Seat Expansion Economics: Mid-Contract Upsell, Tier Upgrade Pricing & Expansion Governance](#41-enterprise-seat-expansion-economics-mid-contract-upsell-tier-upgrade-pricing--expansion-governance)
+    - 41.1 Purpose & Scope
+    - 41.2 Expansion Trigger Framework
+    - 41.3 Mid-Contract Seat Expansion Billing Model
+    - 41.4 Tier Upgrade Pricing
+    - 41.5 Expansion Discount Authority Matrix
+    - 41.6 `enterprise_contracts` Schema Extensions (Migration 0083)
+    - 41.7 DEC-030 HMAC-Chained Audit Events
+    - 41.8 NRR Decomposition at Seat Level
+    - 41.9 SOC 2 Evidence Mapping
+    - 41.10 Implementation Checklist
+    - 41.11 Open Questions (OQ-EXP-01 to OQ-EXP-03)
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -10560,3 +10572,449 @@ const qbrCompletedSchema = z.object({
 ---
 
 *v2.6 (2026-06-18): §40 Enterprise Customer Adoption Economics & Seat Utilization Health Model — closes the documentation gap between §39 (deal close — contract signed) and §34 (renewal risk — churn detected). No prior section covers the financial consequences of M1–M6 adoption health for enterprise accounts. §40.1 purpose and scope: three-stage adoption funnel (S1 Activation, S2 Weekly-Active, S3 Habitual); privacy floor (aggregate-only, k-anon n ≥ 5, no `user_id` in any §40 artefact); relationship to §34 (§40 is the early-detection layer; §34 is the at-risk-account response). §40.2 adoption funnel: S1 Activation threshold 40% seats by Day 28 / 60% by Day 60; S2 WAU 30% by M3; S3 Habitual 20% of activated seats by M6; milestone calendar aligned to `docs/ENTERPRISE.md` Day 0→90 timeline; Victor coaching as habituation driver (2.8× habitual-rate advantage for coached users). §40.3 seat utilization health matrix: Green (WAU ≥ 40% / Habitual ≥ 25%, ~5% churn probability), Amber (20–39% / 10–24%, ~25%), Red (< 20% / < 10%, ~60%); ARR at risk per band per tier (Starter → Enterprise); expansion probability by band (Green 35% seat expansion, Amber 12%, Red 2%); NRR implication (Green fleet NRR ~105%, Red fleet NRR ~57%). §40.4 QBR financial framework: permissible aggregate metrics table (activated seats, WAU rate, coaching engagement rate, workout log rate, streak cohort size ≥ 5, Victor session volume — all aggregate, no user names); QBR slide template; QBR cadence economics (Starter $221/yr, Growth $618/yr, Enterprise $1,545/yr; all < 2.9% of ACV). §40.5 adoption-to-renewal probability model: five-row renewal probability matrix by M3 WAU band × M6 Habitual band with CSM intervention lift (9–17pp); break-even intervention analysis (Growth Amber account: 122 hrs positive EV; Growth Red: 293 hrs; Enterprise Amber: 490 hrs — binding constraint is always CSM capacity, never ROI). §40.6 CSM intervention playbook: five action rows by band + milestone (Day 28 Amber, M3 Amber, M3 Red, M6 Amber, M6 Red) with time budget and DEC-030 event trigger. §40.7 `enterprise_adoption_snapshots` DDL: UUID PK; `tenant_id` FK RESTRICT; `snapshot_month` DATE (first of month); `contracted_seats`; `activated_seats` + `activation_rate_pct` GENERATED; `wau_count` + `wau_rate_pct` GENERATED; `habitual_seat_count` + `habitual_rate_pct` GENERATED; `coaching_sessions_total`, `coaching_engaged_seats` (k-anon at query layer); `workout_sessions_total`; `wau_health_band` GENERATED ALWAYS AS STORED (green/amber/red enum); `snapshot_filed_by` enum; `notes_hash` SHA-256 + salt (no plaintext notes in table); `dec030_event_id` soft-ref; `uq_tenant_snapshot_month` UNIQUE; `chk_adoption_coherent` CHECK; three indexes; four RLS policies (tenant_admin/owner SELECT own-tenant, compliance_reviewer SELECT all, form_system ALL, form_api REVOKED); k-anonymity note (coaching_engaged_seats < 5 suppressed at API layer). §40.7.3 four SQL queries: Q1 fleet health summary; Q2 CSM priority list (Amber/Red sorted by ACV); Q3 adoption-band ARR distribution (board metric); Q4 per-tenant QBR trend (no user_id). §40.8 four DEC-030 events: `enterprise.adoption_snapshot_filed` (STANDARD, 3yr — Zod v2 schema: tenant_id, snapshot_month, contracted_seats, activated_seats, activation_rate_pct, wau_count, wau_rate_pct, habitual_seat_count, habitual_rate_pct, wau_health_band, coaching_sessions_total, filed_by; no user_id); `enterprise.adoption_milestone_reached` (STANDARD, 3yr — milestone enum: s1_activation_40pct / s2_wau_30pct / s3_habitual_20pct / s2_wau_40pct_green); `enterprise.adoption_health_downgraded` (HIGH, 3yr — prior_band, current_band, wau_rate_pct, acv_usd aggregate; ADO-CHAIN-01: CSM follow-up task in Linear within 2 business days; advisory `system.csm_followup_overdue` LOW 1yr if overdue > 10 days without qbr_completed); `enterprise.qbr_completed` (STANDARD, 3yr — `privacy_floor_verified: true` literal chain invariant; HTTP 422 if absent; renewal_date date-only; expansion_discussed boolean). §40.9 three SOC 2 evidence artefacts: ADO-E-001 (CC4.1/A1.1 — quarterly fleet adoption export with health-band ARR distribution; 3yr), ADO-E-002 (CC2.2/CC4.1 — quarterly QBR completion chain export with privacy_floor_verified attestation; 3yr), ADO-E-003 (CC7.3/CC4.2 — downgrade events + CSM follow-up evidence; 3yr). CC4.1 auditor narrative: monthly snapshots + QBR cadence + downgrade response chain demonstrates performance monitoring against defined thresholds. CC2.2 auditor narrative: `enterprise.qbr_completed` chain invariant converts the QBR communication record from a procedural note to a technology-enforced audit event. §40.10 ten-item implementation checklist: 4× P0/M10 (DEC-030 event registration + HTTP 422 integration test, migration 0078 DDL, evidence-collection-cron extension, Admin Console QBR modal); 4× P1/M10–M11 (ADO-E-001 first filing, ADO-E-002 first filing, Admin Dashboard adoption panel with k-anon gate, CSM onboarding deck briefing); 2× P2/M18 and on-event (OQ-ADO-01 closure after 5 renewals, individual-data request process audit). §40.11 three open questions: OQ-ADO-01 (P2 — FORM-specific renewal probability calibration after 5 renewals, est. M18); OQ-ADO-02 (P2 — per-tenant k-anonymity floor configurability; n < 5 prohibited globally); OQ-ADO-03 (P1 — CV session count in snapshot; blocked pending DPIA update before CV enterprise go-live). TOC entry §40 added. Document header updated v2.5 → v2.6. Privacy floor: no individual employee `user_id`, name, email, health values, coaching content, or Art. 9 special category data in any §40 DEC-030 event, `enterprise_adoption_snapshots` row, or evidence artefact; `coaching_engaged_seats < 5` suppressed at API layer; `notes_hash` SHA-256 + `ADOPTION_NOTES_SALT` (plaintext never stored); `tenant_id` is FORM-internal UUID; form_api REVOKED from `enterprise_adoption_snapshots`. Cross-references: `docs/ENTERPRISE.md` (Day 0→90 implementation timeline — §40.2.2 milestone calendar; no-go criteria; privacy floor); `docs/ENTERPRISE_ONBOARDING.md §2.3` (pilot comms script — Victor first-interaction 48hr target); §8.7 (seat utilization < 30% M3 churn signal — §40.3 formalises this as a health band threshold with financial mapping); §23 (NRR engine — §40.3.3 expansion probability by health band feeds NRR decomposition); §26 (CSM team scaling — QBR cadence hours from §26.4; intervention rates from §40.6 use §26.8 fully-loaded CSM rate $44.13/hr); §34 (renewal risk — §40 is the early-detection layer feeding §34.2 churn risk classification; §34.5 retention discount authorization may be reached after §40.6 Red-band intervention exhausted); §36 (implementation cost — quality onboarding is the primary driver of S1 Activation rate); §37.5 (ARR build table — deal ACV basis for §40.3.2 ARR at risk); `docs/DATA_MODEL.md §17` (Admin Dashboard RLS — k-anonymity n ≥ 5 enforcement; `form_api` REVOKE pattern); `docs/AUDIT_LOG_SCHEMA.md §Enterprise + §System` (four new events + one advisory event — P0/M10); `docs/SOC2_READINESS.md §79.4` (master evidence table — ADO-E-001/002/003 to be registered — P1/M11). Owner: customer-success + enterprise-architect + data-engineer + compliance-officer.*
+
+---
+
+## 41. Enterprise Seat Expansion Economics: Mid-Contract Upsell, Tier Upgrade Pricing & Expansion Governance
+
+### 41.1 Purpose & Scope
+
+This section closes the documentation gap between §40 (adoption health signal → expansion probability) and §23 (NRR engine → expansion ARR recognised). Prior sections establish that Green-band accounts carry a 35% seat expansion probability within 12 months (§40.3.3) and that "Seat Expansion ARR" is a named component of the NRR formula (§23.1), but no section models how a mid-contract seat expansion or tier upgrade is priced, billed, governed, or recorded in the audit log.
+
+**Scope of §41:**
+
+| Sub-section | What it covers |
+|---|---|
+| §41.2 | Three expansion trigger types and qualification criteria |
+| §41.3 | Pro-rata billing formula for mid-contract seat additions |
+| §41.4 | Tier upgrade pricing: credit, price delta, and multi-year implications |
+| §41.5 | Discount authority matrix for expansion deals |
+| §41.6 | `enterprise_contracts` schema columns added by migration 0083 |
+| §41.7 | DEC-030 HMAC-chained events (`enterprise.expansion_initiated`, `billing.seats_expanded` supplement, `enterprise.tier_upgraded`, `enterprise.expansion_floor_enforced`) |
+| §41.8 | Seat-level NRR decomposition connecting §40 adoption bands to §23 ARR bridge |
+| §41.9 | SOC 2 evidence artefacts EXP-E-001 and EXP-E-002 |
+| §41.10 | Implementation checklist |
+| §41.11 | Open questions OQ-EXP-01 to OQ-EXP-03 |
+
+**What §41 is not:** §41 does not cover seat *reductions* (§35.3), contract terminations (§35.4–35.5), retention discounts (§34.5), or renewal pricing (§34). Seat additions after contract expiry (at renewal) are handled through the standard renewal process (§34) and are not expansion events for the purpose of this section.
+
+**Privacy floor (non-waivable):** no individual `user_id`, name, email, health record, coaching transcript, or Art. 9 special-category data appears in any §41 DEC-030 event, schema column, or evidence artefact. All seat counts are aggregate headcounts at the contract level. HR and the employer's procurement team never see which individual employees use FORM.
+
+**Cross-references:** §23.1 (NRR ARR bridge — Seat Expansion ARR line), §31.5 (COGS-anchored price floor), §31.6 (discount authority matrix baseline), §34 (renewal economics), §35.3 (seat reduction — mirror of this section for downward moves), §40.3.3 (Green-band 35% expansion probability), `docs/DATA_MODEL.md §24` (`billing.seats_expanded` event schema), `docs/ENTERPRISE.md` (pricing tiers, multi-year discounts, Day 0→90 implementation timeline), `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (event registry target for §41.7 events).
+
+---
+
+### 41.2 Expansion Trigger Framework
+
+Three trigger types can initiate a mid-contract seat expansion. All three result in the same billing mechanics (§41.3) but differ in initiator, qualification criteria, and CSM time cost.
+
+#### 41.2.1 Trigger Types
+
+| Trigger | Initiator | Qualification signal | Typical timeline | CSM time (est.) |
+|---|---|---|---|---|
+| **T1 — CSM-initiated (adoption health)** | CSM identifies Green-band account at QBR or monthly snapshot review | `wau_health_band = 'green'` AND `expansion_discussed = true` on latest `enterprise.qbr_completed` event | M6–M9 post-contract start | 4–8 hrs (discovery call + proposal + amendment) |
+| **T2 — Tenant-initiated (self-serve request)** | HR admin or champion requests additional seats via Admin Console or email | Any band; no adoption threshold required | Any point in contract term | 2–4 hrs (verify eligibility, quote, counter-sign amendment) |
+| **T3 — Milestone-driven (headcount event)** | Hiring surge, acquisition, or org restructure triggers contractual "growth clause" (if included) | Contractual; employment headcount growth documented by customer | Any point; typically tied to annual HR review cycle | 1–2 hrs (clause verification + invoice update) |
+
+#### 41.2.2 Minimum Expansion Increment
+
+The minimum expansion order is **25 seats**. Orders below 25 seats are declined at the Admin Console layer and routed to the CSM for context; in exceptional cases the founder can approve sub-minimum expansions (see §41.5 discount authority for the approval path).
+
+Rationale: administrative overhead per amendment (legal review, DocuSign, billing system update, DEC-030 event chain) requires ≥ 25 seats to break even at a fully-loaded CSM+legal rate of $62/hr (§36.5) over the 2-hour minimum processing time.
+
+#### 41.2.3 Expansion vs. Over-Allocation
+
+An over-allocated account (active users > `contracted_seats`) is **not** an expansion event — it is a contract compliance issue. The CSM first issues a cure notice (§35.2 amendment taxonomy: AX-04 over-allocation) and the tenant must either purchase additional seats (triggering a T2 expansion) or reduce active users within 30 days. Over-allocation discovered in the audit log triggers `system.seat_overallocation_detected` (DEC-030 advisory event, LOW, 1yr — registered separately in AUDIT_LOG_SCHEMA.md §System; not covered by §41.7).
+
+---
+
+### 41.3 Mid-Contract Seat Expansion Billing Model
+
+#### 41.3.1 Pro-Rata Billing Principle
+
+Expansion seats are billed from the expansion effective date to the contract anniversary date (end of the current term year). This keeps the contract anniversary date fixed — a single renewal date for the total seat count — which simplifies finance operations and avoids multiple renewal events per account.
+
+**Formula:**
+
+```
+expansion_arr      = new_seats × rate_per_seat_per_month × 12
+expansion_invoice  = new_seats × rate_per_seat_per_month × months_remaining
+months_remaining   = CEIL( (contract_anniversary_date - expansion_effective_date) / 30.44 )
+```
+
+Where `rate_per_seat_per_month` is the per-seat rate applicable to the *total* contracted seat count post-expansion (see §41.3.2 tier-based rate selection), subject to the price floor (§31.5) and discount authority (§41.5).
+
+#### 41.3.2 Rate Selection After Expansion
+
+When an expansion causes the total seat count to cross a tier boundary (e.g. from 190 → 220 seats, crossing the 200-seat Starter→Growth boundary), the rate for **all seats** (existing + new) steps down to the Growth tier rate at the expansion effective date:
+
+| Tier | Seat range | List rate per seat/month |
+|---|---|---|
+| Starter | 50–199 seats | $12.00 |
+| Growth | 200–999 seats | $9.00 |
+| Enterprise | 1,000+ seats | $6.00–$8.00 (negotiated) |
+
+*(Source: docs/ENTERPRISE.md §Pricing)*
+
+**Tier crossing credit:** if the existing seats were billed at $12/seat for the remainder of the current term year (prepaid or invoiced), the delta between $12 and $9 × existing_seats × months_remaining is credited to the tenant's account on the expansion invoice. This prevents the tenant from paying the higher rate retroactively; it does not create a cash refund (credit applied to the expansion invoice or future invoice, not issued as cash).
+
+```
+tier_crossing_credit = existing_seats × (old_rate - new_rate) × months_remaining
+net_expansion_invoice = expansion_invoice - tier_crossing_credit
+```
+
+If `net_expansion_invoice ≤ 0`, the credit carries forward to the next invoice cycle (not refunded as cash).
+
+#### 41.3.3 Two Billing Variants
+
+| Variant | Description | When to use |
+|---|---|---|
+| **BV-1 — Immediate invoice** | Issue a separate invoice for the pro-rata amount at expansion effective date | Default; used when tenant requests immediate seat activation |
+| **BV-2 — Anniversary rollup** | Accrue the pro-rata expansion ARR internally; add to the renewal invoice | Used when expansion occurs within 90 days of contract anniversary AND tenant requests consolidation; requires CSM + finance approval; expansion seats activated immediately but invoiced at renewal |
+
+BV-2 reduces tenant invoice burden in the final quarter of the contract year. The DEC-030 event (§41.7) is emitted at the time of seat activation regardless of billing variant; ASC 606 revenue recognition begins at activation.
+
+#### 41.3.4 Price Floor Enforcement
+
+The effective rate per seat after expansion must not fall below the COGS-anchored price floor for the resulting tier (§31.5). If a proposed expansion discount would breach the floor, the system emits `enterprise.expansion_floor_enforced` (§41.7.4) and the discount is capped automatically. The CSM receives an in-system alert; founder approval is required to proceed with a below-floor expansion (which would require a strategic rationale documented in a DECISION_LOG entry).
+
+---
+
+### 41.4 Tier Upgrade Pricing
+
+A tier upgrade (Starter → Growth or Growth → Enterprise) without a seat count increase triggers a separate pricing path from a seat expansion with tier crossing.
+
+#### 41.4.1 Pure Tier Upgrade (Same Seat Count)
+
+A customer at 175 seats (Starter, $12/seat/mo) requests upgrade to Growth tier ($9/seat/mo) without adding seats.
+
+```
+upgrade_delta_per_month = existing_seats × (new_rate - old_rate)   # negative = cheaper
+upgrade_invoice_remainder = upgrade_delta_per_month × months_remaining
+```
+
+For Starter → Growth, `upgrade_delta_per_month < 0` (price decreases). FORM does not execute pure tier upgrades that solely reduce revenue without a corresponding seat commitment increase, unless:
+
+- the upgrade is bundled with a multi-year commitment extension (§35.7 price-lock mechanism), adding at least 12 months to the contract term; or
+- the customer commits to a minimum seat count at the Growth floor (200 seats) even if current headcount is below 200.
+
+**Commercial rationale:** Growth tier unlocks features not available in Starter (advanced analytics, priority support SLA, dedicated CSM). The tier change must be tied to additional value or a longer commitment to preserve FORM's ARR per logo.
+
+#### 41.4.2 Tier Upgrade + Seat Expansion (Combined)
+
+When a customer upgrades tier and adds seats in the same amendment, the combined mechanics are:
+
+1. Determine the new tier from the total post-expansion seat count.
+2. Calculate expansion_invoice (new_seats × new_rate × months_remaining).
+3. Calculate tier_crossing_credit (existing_seats × rate_delta × months_remaining).
+4. Net invoice = expansion_invoice − tier_crossing_credit.
+5. Emit `enterprise.tier_upgraded` and `enterprise.expansion_initiated` as separate DEC-030 events with the same `amendment_id` correlation field.
+
+#### 41.4.3 Growth → Enterprise Upgrade
+
+The Enterprise tier ($6–8/seat/month negotiated) does not have a fixed list rate. The upgrade price is negotiated by the founder or AE and is subject to:
+
+- a mandatory DECISION_LOG entry (DEC-0XX) documenting the effective rate and strategic rationale;
+- the price floor of §31.5 (never below COGS-anchored minimum);
+- founder approval for any rate below $7.00/seat/month.
+
+Enterprise-tier contracts must include: dedicated CSM, quarterly business review SLA, SOC 2 Type II report access, and 99.9% uptime SLA (as documented in docs/ENTERPRISE.md).
+
+---
+
+### 41.5 Expansion Discount Authority Matrix
+
+Expansion discounts are governed by the same authority matrix as new-deal discounts (§31.6), with additional rules specific to mid-contract events.
+
+| Discount type | Standard authority | Notes |
+|---|---|---|
+| Volume discount at tier boundary (auto) | System-generated | Applied automatically when seat count crosses tier boundary; no approval needed |
+| Expansion discount ≤ 5% off list | CSM | Logged via `enterprise.expansion_initiated` with `discount_pct` field |
+| Expansion discount 6–15% off list | CSM + customer-success lead | Async approval documented in Linear; ≤ 24hr SLA |
+| Expansion discount 16–25% off list | Founder | Documented in DECISION_LOG; expansion blocked until approved |
+| Expansion discount > 25% off list | Founder + board observer | Reserved for strategic accounts with multi-year commitment |
+| Below-floor expansion (any %) | Founder + DECISION_LOG | `enterprise.expansion_floor_enforced` event emitted; requires strategic rationale |
+| Sub-minimum increment (< 25 seats) | Founder | Exception; must document why minimum increment waived |
+| Multi-year commitment tie-in discount ≤ 10% | CSM + customer-success lead | Conditional on multi-year amendment signed concurrently; discount reverts if not signed within 14 days |
+
+**Price floor reference (§31.5):** Starter floor $8.40/seat/month; Growth floor $6.30/seat/month; Enterprise floor $4.50/seat/month. These floors are COGS-anchored and non-negotiable without a board decision.
+
+---
+
+### 41.6 `enterprise_contracts` Schema Extensions (Migration 0083)
+
+Migration `0083_enterprise_contracts_expansion_fields.sql` adds four columns and two indexes to the existing `enterprise_contracts` table (§16). No columns are dropped or renamed; this is a backwards-compatible additive migration.
+
+#### 41.6.1 DDL
+
+```sql
+-- Migration 0083: expansion tracking fields on enterprise_contracts
+-- Backwards-compatible additive migration; no DROP, no RENAME.
+-- Run after migration 0082 (enterprise_adoption_snapshots, migration 0078 alias) is applied.
+
+ALTER TABLE enterprise_contracts
+  ADD COLUMN IF NOT EXISTS initial_seats          INTEGER    NOT NULL DEFAULT 0
+                           CHECK (initial_seats >= 0),
+  ADD COLUMN IF NOT EXISTS current_seats          INTEGER    NOT NULL DEFAULT 0
+                           CHECK (current_seats >= initial_seats),
+  ADD COLUMN IF NOT EXISTS expansion_count        SMALLINT   NOT NULL DEFAULT 0
+                           CHECK (expansion_count >= 0),
+  ADD COLUMN IF NOT EXISTS last_expansion_date    DATE       NULL;
+
+COMMENT ON COLUMN enterprise_contracts.initial_seats       IS 'Seats at contract signing; immutable after first expansion.';
+COMMENT ON COLUMN enterprise_contracts.current_seats       IS 'Current contracted seats including all mid-contract expansions.';
+COMMENT ON COLUMN enterprise_contracts.expansion_count     IS 'Number of approved mid-contract expansion events on this contract.';
+COMMENT ON COLUMN enterprise_contracts.last_expansion_date IS 'Date of most recent approved expansion; NULL if no expansion has occurred.';
+
+-- Back-fill: for existing contracts, initial_seats = current_seats = contracted_seats (existing column).
+-- contracted_seats is the authoritative billing seat count and is not removed by this migration.
+UPDATE enterprise_contracts
+   SET initial_seats = contracted_seats,
+       current_seats = contracted_seats
+ WHERE initial_seats = 0;
+
+-- Index: CSM dashboard query (accounts sorted by expansion velocity)
+CREATE INDEX IF NOT EXISTS idx_ec_expansion_count
+    ON enterprise_contracts (expansion_count DESC)
+    WHERE expansion_count > 0;
+
+-- Index: finance query (expansions in a date range)
+CREATE INDEX IF NOT EXISTS idx_ec_last_expansion_date
+    ON enterprise_contracts (last_expansion_date)
+    WHERE last_expansion_date IS NOT NULL;
+```
+
+#### 41.6.2 RLS Behaviour
+
+The RLS policies on `enterprise_contracts` (defined in §16) are unchanged. `tenant_admin` and `tenant_owner` roles can SELECT their own row (including the new columns); `form_system` has ALL; `form_api` access is unchanged. The new columns carry no individual user data — they are aggregate contract-level counts.
+
+#### 41.6.3 `contracted_seats` Column Relationship
+
+`contracted_seats` (existing, §16) remains the single billing-authoritative seat count used by the BDG `getGuardConfig()` (SSO_SCIM_IMPLEMENTATION.md §35). After each approved expansion, `contracted_seats` is updated to the new total via a `form_system` write; `current_seats` (new column) mirrors this value; the gap `current_seats − initial_seats` is the cumulative expansion across the contract lifetime.
+
+`billing.seats_expanded` DEC-030 KV cache invalidation trigger (referenced in SSO_SCIM_IMPLEMENTATION.md §35.7) fires on update to `contracted_seats`; the BDG cache (TTL 3600s) is invalidated immediately via the Cloudflare KV write in the `emit-audit-event` Worker's post-event hook.
+
+---
+
+### 41.7 DEC-030 HMAC-Chained Audit Events
+
+All four events below must be registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (P0 implementation task). HMAC chain mechanics follow DEC-030: `HMAC-SHA256(key=HKDF-SHA256(IKM=FORM_AUDIT_HMAC_SECRET, info=tenant_id, salt=HMAC_KDF_SALT, length=32), input="{event_id}:{event_type}:{canonical_payload}:{created_at_unix_ms}:{previous_signature}")`. Canonical payload = `JSON.stringify(payload, Object.keys(payload).sort())`.
+
+**Privacy floor enforced on all events:** no `user_id`, no employee name, no email address, no health metric value, no coaching transcript content, no biometric identifier. All seat counts are aggregate integers at the contract level.
+
+#### 41.7.1 `enterprise.expansion_initiated`
+
+Emitted when a seat expansion is formally approved (amendment counter-signed). This is the anchor event for the expansion sub-chain.
+
+```typescript
+// Zod v2 schema — enterprise.expansion_initiated
+// Retention: STANDARD · 7 years (financial record)
+const ExpansionInitiatedPayload = z.object({
+  tenant_id:              z.string().uuid(),
+  contract_id:            z.string().uuid(),
+  amendment_id:           z.string().uuid(),         // DocuSign / amendment identifier
+  trigger_type:           z.enum(['csm_initiated', 'tenant_initiated', 'milestone_driven']),
+  seats_before:           z.number().int().positive(),
+  seats_added:            z.number().int().min(1),   // validated ≥ 25 unless founder-approved sub-minimum
+  seats_after:            z.number().int().positive(),
+  tier_before:            z.enum(['starter', 'growth', 'enterprise']),
+  tier_after:             z.enum(['starter', 'growth', 'enterprise']),
+  tier_crossing:          z.boolean(),               // true if tier_before ≠ tier_after
+  rate_per_seat_usd:      z.number().positive(),     // effective rate post-expansion
+  expansion_invoice_usd:  z.number().nonnegative(),  // pro-rata invoice amount
+  tier_crossing_credit_usd: z.number().nonnegative().default(0),
+  net_invoice_usd:        z.number().nonnegative(),
+  billing_variant:        z.enum(['immediate', 'anniversary_rollup']),
+  expansion_effective_date: z.string().date(),       // ISO 8601 date
+  contract_anniversary_date: z.string().date(),
+  months_remaining:       z.number().int().min(1),
+  discount_pct:           z.number().min(0).max(100),
+  floor_respected:        z.literal(true),           // chain invariant; HTTP 422 if absent
+  approved_by:            z.enum(['csm', 'cs_lead', 'founder', 'founder_board']),
+  decision_log_ref:       z.string().nullable(),     // DEC-0XX if discount > 15% or below-floor
+  // No user_id, no employee name, no health data.
+});
+```
+
+#### 41.7.2 `billing.seats_expanded` (Supplement to DATA_MODEL §24)
+
+`billing.seats_expanded` is already registered in DATA_MODEL §24 as a STANDARD, 7yr event with the minimal fields required for the billing system. §41 adds the following financial fields as optional extensions to that schema. The DATA_MODEL §24 registration is the canonical home; §41 documents the additional fields to be added in the next AUDIT_LOG_SCHEMA.md patch.
+
+```typescript
+// Additional fields for billing.seats_expanded beyond DATA_MODEL §24 baseline
+// These extend the existing schema — do not replace it.
+const SeatExpandedFinancialExtension = z.object({
+  // existing DATA_MODEL §24 fields omitted for brevity (tenant_id, seats_before, seats_after, effective_date)
+  expansion_arr_usd:        z.number().nonnegative(),  // annualised value of new seats at effective rate
+  net_invoice_usd:          z.number().nonnegative(),  // pro-rata invoice for remainder of term
+  billing_variant:          z.enum(['immediate', 'anniversary_rollup']),
+  amendment_id:             z.string().uuid(),          // correlation with enterprise.expansion_initiated
+  floor_respected:          z.literal(true),
+  // No user_id, no individual-level data.
+});
+```
+
+#### 41.7.3 `enterprise.tier_upgraded`
+
+Emitted only when `tier_before ≠ tier_after` (i.e., only on tier-crossing expansions or pure tier upgrades). Correlated with `enterprise.expansion_initiated` via `amendment_id`.
+
+```typescript
+// Zod v2 schema — enterprise.tier_upgraded
+// Retention: STANDARD · 7 years (financial + compliance record)
+const TierUpgradedPayload = z.object({
+  tenant_id:              z.string().uuid(),
+  contract_id:            z.string().uuid(),
+  amendment_id:           z.string().uuid(),
+  tier_before:            z.enum(['starter', 'growth', 'enterprise']),
+  tier_after:             z.enum(['starter', 'growth', 'enterprise']),
+  seats_at_upgrade:       z.number().int().positive(),
+  old_rate_per_seat_usd:  z.number().positive(),
+  new_rate_per_seat_usd:  z.number().positive(),
+  tier_crossing_credit_usd: z.number().nonnegative(),
+  upgrade_effective_date: z.string().date(),
+  multi_year_commitment:  z.boolean(),               // true if upgrade tied to term extension
+  decision_log_ref:       z.string().nullable(),
+  floor_respected:        z.literal(true),
+  // No user_id, no individual-level data.
+});
+```
+
+#### 41.7.4 `enterprise.expansion_floor_enforced`
+
+Emitted when the system auto-caps a proposed discount to the price floor (§31.5, §41.3.4). This is a HIGH-retention event because it documents that a requested below-floor price was rejected — material for SOC 2 CC5.2 (pricing controls) and investor due diligence.
+
+```typescript
+// Zod v2 schema — enterprise.expansion_floor_enforced
+// Retention: HIGH · 7 years (pricing control evidence)
+const ExpansionFloorEnforcedPayload = z.object({
+  tenant_id:              z.string().uuid(),
+  contract_id:            z.string().uuid(),
+  amendment_id:           z.string().uuid(),
+  tier_after:             z.enum(['starter', 'growth', 'enterprise']),
+  requested_rate_usd:     z.number().positive(),
+  floor_rate_usd:         z.number().positive(),
+  applied_rate_usd:       z.number().positive(),     // = floor_rate_usd
+  floor_source:           z.literal('COST_MODEL_§31.5'),
+  csm_notified:           z.boolean(),
+  founder_approval_required: z.boolean(),
+  // No user_id, no individual-level data.
+});
+```
+
+#### 41.7.5 Event Registration Checklist Item
+
+Register all four events in AUDIT_LOG_SCHEMA.md §Enterprise:
+
+| Event | Classification | Retention | Priority |
+|---|---|---|---|
+| `enterprise.expansion_initiated` | STANDARD | 7 years | P0 |
+| `billing.seats_expanded` (financial extension) | STANDARD | 7 years | P0 (additive patch) |
+| `enterprise.tier_upgraded` | STANDARD | 7 years | P0 |
+| `enterprise.expansion_floor_enforced` | HIGH | 7 years | P0 |
+
+---
+
+### 41.8 NRR Decomposition at Seat Level
+
+This section bridges the seat-level expansion mechanics of §41.3 to the ARR-level NRR model of §23.
+
+#### 41.8.1 Seat Expansion ARR in the NRR Formula
+
+From §23.1:
+
+```
+NRR = (Beginning ARR + Expansion ARR − Contraction ARR − Churn ARR) / Beginning ARR
+```
+
+**Seat Expansion ARR** is the annualised incremental ARR from mid-contract seat additions:
+
+```
+Seat Expansion ARR (for period) = Σ (new_seats_i × rate_per_seat_i × 12)  for all expansions i in period
+```
+
+This is the full annualised value, not the pro-rata invoice amount. The pro-rata invoice amount is the cash collected; the full annualised ARR delta is the metric tracked for NRR purposes.
+
+#### 41.8.2 Expansion Probability by Adoption Band (§40.3.3 Reference)
+
+| Adoption band | 12-month seat expansion probability | Avg. expansion size (new seats) | Expected Expansion ARR per account (Starter 150 seats) |
+|---|---|---|---|
+| Green (WAU ≥ 40%, Habitual ≥ 25%) | **35%** | 45 seats | $45 × $12 × 12 × 0.35 = **$2,268 incremental ARR** |
+| Amber (WAU 20–39%, Habitual 10–24%) | 12% | 25 seats | $25 × $12 × 12 × 0.12 = **$432 incremental ARR** |
+| Red (WAU < 20%, Habitual < 10%) | 2% | 25 seats (rare) | $25 × $12 × 12 × 0.02 = **$72 incremental ARR** |
+
+*(Probabilities: §40.3.3 proxies; will be calibrated to FORM actuals after Deal 5 expansion, linked to OQ-EXP-01.)*
+
+The adoption-weighted expected expansion ARR per Starter account = **$2,268 × P(Green) + $432 × P(Amber) + $72 × P(Red)**. Substituting the §40.3.3 band distribution assumption (40% Green, 45% Amber, 15% Red):
+
+```
+E[Expansion ARR per Starter account] = $2,268 × 0.40 + $432 × 0.45 + $72 × 0.15
+                                     = $907 + $194 + $11
+                                     = $1,112 / year
+```
+
+For a fleet of 10 Starter accounts ($21,600 ARR each), the expected fleet Seat Expansion ARR in Year 1 = **$11,120**, contributing ~5.1% to the NRR numerator before tier migrations and churn.
+
+#### 41.8.3 Contribution to 120% NRR Target
+
+From §14.6, FORM's NRR target is 120%. At a 15% logo churn rate assumption, the expansion engine must generate ≥ 35% gross expansion to offset churn and reach 120% NRR.
+
+Seat expansion is the *largest single lever* in that 35% expansion requirement (larger than tier upgrades or add-ons at current product scope). The §40 adoption health model is therefore directly connected to the NRR target: improving Green-band distribution from 40% → 50% of the fleet raises expected seat expansion ARR by ~25% per the table above.
+
+CSM adoption intervention investment (§40.6) is financially justified as an NRR lever, not merely a churn-prevention measure.
+
+---
+
+### 41.9 SOC 2 Evidence Mapping
+
+Two evidence artefacts are required to demonstrate that expansion pricing controls are operating effectively.
+
+| Evidence ID | Trust Service Criteria | Description | Filing path | Retention | Cadence |
+|---|---|---|---|---|---|
+| **EXP-E-001** | CC5.2, CC1.4 | Annual export of all `billing.seats_expanded` events from the DEC-030 chain, showing `floor_respected: true` on every row, `expansion_arr_usd`, `net_invoice_usd`, and `discount_pct` ≤ approval authority threshold. Exported as CSV from the `form-soc2-evidence` R2 bucket (EU, WORM Governance mode). Attestation: "No expansion event in the audit period had `floor_respected: false` or a discount exceeding the authority matrix in §41.5." | `compliance/evidence/expansion/EXP-E-001_<YYYY>.csv` | 7 years | Annual (post-contract-anniversary sweep) |
+| **EXP-E-002** | CC4.1 | Quarterly cross-reference: adoption health band distribution from `enterprise_adoption_snapshots` vs. expansion pipeline in `enterprise_contracts` (expansion_count > 0 in the quarter). Confirms that CSM expansion outreach is correlated with Green-band accounts, not indiscriminate upsell pressure. Documents that no expansion was initiated for a Red-band account without a documented recovery plan. | `compliance/evidence/expansion/EXP-E-002_<YYYY>-Q<N>.csv` | 3 years | Quarterly |
+
+**CC5.2 auditor narrative:** the `enterprise.expansion_floor_enforced` event (§41.7.4) provides point-in-time evidence that the system rejected below-floor pricing automatically. EXP-E-001 provides the period-level attestation. Together they demonstrate that pricing controls over expansion discounts are both technically enforced and periodically verified.
+
+**CC4.1 auditor narrative:** EXP-E-002 demonstrates that the expansion process is monitored against the adoption health model (§40), not driven purely by sales pressure. This satisfies the "monitoring of controls" criterion for the enterprise revenue management control environment.
+
+---
+
+### 41.10 Implementation Checklist
+
+#### P0 — Before first expansion event is processed
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all four §41.7 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise`: `enterprise.expansion_initiated` (STANDARD, 7yr), `billing.seats_expanded` financial extension (STANDARD, 7yr — additive patch to existing entry), `enterprise.tier_upgraded` (STANDARD, 7yr), `enterprise.expansion_floor_enforced` (HIGH, 7yr). Deploy updated event registry to `emit-audit-event` Worker. Write integration test: `enterprise.expansion_initiated` returns HTTP 422 when `floor_respected` field is absent. | platform-engineer + compliance-officer | **P0** | M10 | [ ] |
+| 2 | Apply migration `0083_enterprise_contracts_expansion_fields.sql` (§41.6.1): ADD COLUMNS `initial_seats`, `current_seats`, `expansion_count`, `last_expansion_date`; back-fill from `contracted_seats`; CREATE INDEX `idx_ec_expansion_count` and `idx_ec_last_expansion_date`. Run EXPLAIN ANALYZE on CSM dashboard query and finance date-range query against 50 synthetic rows; confirm index scans. | platform-engineer | **P0** | M10 | [ ] |
+| 3 | Implement BDG KV cache invalidation on `contracted_seats` update: ensure `billing.seats_expanded` post-event hook in the `emit-audit-event` Worker triggers a Cloudflare KV DELETE for `bDG:${tenant_id}:guardConfig` immediately after the DEC-030 event is chained. Integration test: verify cache miss on next `getGuardConfig()` call after expansion. Cross-reference: SSO_SCIM_IMPLEMENTATION.md §35.7. | platform-engineer | **P0** | M10 | [ ] |
+| 4 | Build expansion amendment workflow in Admin Console (form_admin + CSM roles): seat count input (min 25, validated); billing variant selector (BV-1 / BV-2); discount field with authority gate (auto-lock above CSM authority threshold); floor enforcement preview (show `enterprise.expansion_floor_enforced` warning before submit if proposed rate < floor); DocuSign integration for amendment counter-signature; on approval → UPDATE `enterprise_contracts` (contracted_seats, current_seats, expansion_count, last_expansion_date) + emit DEC-030 chain (`enterprise.expansion_initiated` then `billing.seats_expanded`). | platform-engineer | **P0** | M11 | [ ] |
+
+#### P1 — Before SOC 2 observation period
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Build CSM expansion playbook: when `enterprise.qbr_completed` is received with `expansion_discussed: true` AND `wau_health_band = 'green'`, create a Linear task for the CSM with expansion proposal template, tier cross-reference (§41.4), and discount authority reminder (§41.5). SLA: proposal delivered to tenant within 5 business days. | customer-success | **P1** | M11 | [ ] |
+| 6 | Add expansion history panel to Admin Console (tenant_admin read-only): show `expansion_count`, `initial_seats`, `current_seats`, `last_expansion_date`, and a sparkline of seat count history. No individual user data; aggregate contract-level only. | platform-engineer + design-craft | **P1** | M11 | [ ] |
+| 7 | Add `compliance/evidence/expansion/` folder to §80.3 R2 evidence folder structure in SOC2_READINESS.md; register EXP-E-001 and EXP-E-002 in the §79.4 master evidence table. | compliance-officer | **P1** | M11 | [ ] |
+
+#### P2 — After first 5 expansion events
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | After 5 expansion events: run §41.8.2 expected vs. actual expansion probability comparison; update the three-row probability table with FORM-specific actuals; create DECISION_LOG DEC-0XX; partially close OQ-EXP-01. | data-engineer + founder | **P2** | M18 (est.) | [ ] |
+| 9 | Evaluate OQ-EXP-02 (self-serve expansion in Admin Console without CSM countersignature): assess abandonment rate from T2 trigger data; if T2 (tenant-initiated) triggers consistently result in < 2hr CSM involvement for standard expansions (≤ 50 seats, no tier crossing, discount 0%), design self-serve path; route above those thresholds to CSM. | platform-engineer + customer-success | **P2** | M18 (est.) | [ ] |
+
+---
+
+### 41.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-EXP-01** | **What are FORM's actual seat expansion probabilities by adoption band?** §41.8.2 uses §40.3.3 proxies (Green 35%, Amber 12%, Red 2%). These are SaaS wellness sector estimates. After the first 5 expansion events, run a cross-tab of `expansion_count > 0` on `enterprise_contracts` against `wau_health_band` from `enterprise_adoption_snapshots` for the same quarter. Update the probability table and the expected NRR contribution calculation. | **P2** | data-engineer + founder | After Deal 5 expansion event (est. M18) |
+| **OQ-EXP-02** | **Should mid-contract seat expansions below a threshold (e.g. ≤ 50 seats, no tier crossing, 0% discount) be self-serve via the Admin Console without CSM countersignature?** Benefit: reduces CSM time per expansion from 2–4 hrs to ~30 min (review + billing trigger only). Risk: removes human check on discount authority and floor compliance for small deals; mitigated by system-enforced floor and automated discount cap. Resolution: evaluate after first 5 T2 (tenant-initiated) expansions to assess whether CSM involvement added material value. | **P2** | platform-engineer + customer-success | After 5 T2 expansions (est. M14–M16) |
+| **OQ-EXP-03** | **For a mid-contract tier upgrade (same seat count, lower per-seat rate), should FORM structure the change as a contract amendment to the existing term or as a new contract?** Amendment path: simpler for the tenant, preserves anniversary date, but requires careful ASC 606 contract modification treatment (cumulative catch-up vs. prospective). New contract path: clean revenue recognition boundary, but creates two contract records and complicates the SCIM provisioning (BDG must reference correct contract). Resolution: outside counsel (ASC 606 specialist) input required; OQ to be evaluated before the first Growth→Enterprise pure upgrade request. Until resolved, pure tier upgrades must be accompanied by a seat count increase (≥ 25 seats) to anchor the amendment in a clear incremental goods/services framework. | **P1** | founder + outside counsel (ASC 606) | Before first pure tier upgrade request (est. M12–M15) |
+
+---
+
+*v2.7 (2026-06-20): §41 Enterprise Seat Expansion Economics — closes the documentation gap between §40 (adoption health signal: Green-band 35% expansion probability) and §23 (NRR engine: Seat Expansion ARR). §41.1 purpose and scope: three expansion trigger types (T1 CSM-initiated, T2 tenant-initiated, T3 milestone-driven); minimum expansion increment 25 seats; expansion vs. over-allocation distinction. §41.2 expansion trigger framework: qualification signals, CSM time budget, sub-minimum waiver path. §41.3 mid-contract billing model: pro-rata formula (`expansion_invoice = new_seats × rate × months_remaining`); tier-crossing credit for existing seats stepping to lower rate; two billing variants (BV-1 immediate invoice, BV-2 anniversary rollup); price floor enforcement. §41.4 tier upgrade pricing: pure tier upgrade commercial conditions (multi-year commitment or seat floor); combined tier-upgrade + seat-expansion mechanics; Growth→Enterprise negotiated rate governance. §41.5 expansion discount authority matrix: six authority tiers (system-auto → board); below-floor path requiring founder + DECISION_LOG. §41.6 migration 0083: adds `initial_seats`, `current_seats`, `expansion_count`, `last_expansion_date` to `enterprise_contracts`; back-fill from `contracted_seats`; two indexes; `contracted_seats` remains billing-authoritative for BDG. §41.7 four DEC-030 HMAC-chained events: `enterprise.expansion_initiated` (STANDARD, 7yr — `floor_respected: true` chain invariant, `amendment_id` correlation field, all financial fields, no user_id); `billing.seats_expanded` financial extension (STANDARD, 7yr — additive patch to DATA_MODEL §24 baseline); `enterprise.tier_upgraded` (STANDARD, 7yr — `amendment_id` correlation with expansion_initiated); `enterprise.expansion_floor_enforced` (HIGH, 7yr — `requested_rate_usd`, `floor_rate_usd`, `floor_source: COST_MODEL_§31.5`). §41.8 NRR decomposition: Seat Expansion ARR = Σ(new_seats × rate × 12); adoption-weighted expected expansion ARR per Starter account = $1,112/yr at 40/45/15 Green/Amber/Red distribution; contribution to 120% NRR target — seat expansion is the primary lever in the required 35% gross expansion. §41.9 two SOC 2 evidence artefacts: EXP-E-001 (CC5.2/CC1.4 — annual `billing.seats_expanded` export with `floor_respected` attestation; 7yr; `compliance/evidence/expansion/`); EXP-E-002 (CC4.1 — quarterly expansion pipeline vs. adoption health band cross-reference; 3yr). §41.10 nine-item implementation checklist: 4× P0/M10–M11 (DEC-030 event registration + HTTP 422 integration test, migration 0083 DDL, BDG KV cache invalidation on `contracted_seats` update, Admin Console expansion amendment workflow); 3× P1/M11 (CSM expansion playbook triggered by `qbr_completed` with `expansion_discussed: true`, Admin Console expansion history panel, SOC2_READINESS evidence table update); 2× P2/M18 (OQ-EXP-01 calibration after 5 expansions, OQ-EXP-02 self-serve evaluation). §41.11 three open questions: OQ-EXP-01 (P2 — actual expansion probability calibration; est. M18); OQ-EXP-02 (P2 — self-serve expansion below threshold; est. M14–M16); OQ-EXP-03 (P1 — mid-contract tier upgrade as amendment vs. new contract; outside counsel required; gate: pure tier upgrade blocked until resolved). TOC entry §41 added. Document header updated v2.6 → v2.7. Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or Art. 9 special-category data in any §41 DEC-030 event, schema column, or evidence artefact; all seat counts are aggregate integers at the contract level; `form_api` access to `enterprise_contracts` unchanged. Cross-references: `docs/ENTERPRISE.md` (Starter $12 / Growth $9 / Enterprise $6–8 per seat; multi-year discounts; no-go customer criteria); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (four new events — P0 registration target); `docs/DATA_MODEL.md §24` (`billing.seats_expanded` baseline schema); `docs/SSO_SCIM_IMPLEMENTATION.md §35` (BDG `contracted_seats` source; KV cache invalidation on expansion); §23.1 (NRR formula — Seat Expansion ARR component); §31.5 (COGS-anchored price floor); §31.6 (discount authority matrix baseline); §34 (renewal economics — expansion is not renewal); §35.3 (seat reduction — mirror of §41 for downward moves); §40.3.3 (Green-band 35% expansion probability — source for §41.8.2). Owner: enterprise-architect + customer-success + data-engineer + compliance-officer.*
