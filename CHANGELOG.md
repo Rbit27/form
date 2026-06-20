@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [6.67.0] — 2026-06-20
+
+### Added
+- `docs/MSA_TEMPLATE.md §Addendum 6` — CAEP/SSF Real-Time Session Control SLA Addendum v1.0. Closes `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` item 6 (P1/M5 · DEC-072). Six sections: §6.1 purpose/scope (baseline JWT TTL vs. CAEP path), §6.2 real-time SLA ("less than 60 seconds in normal operation", PUSH prerequisite, polling excluded, SLA credit mechanism), §6.3 Customer Obligations (maintain PUSH; notify CSM on change; confirm `active` stream), §6.4 SOC 2 evidence (CC6-E-CAEP-002; privacy floor: user_id_hash + tenant_id only), §6.5 Governing law, §6.6 Outside counsel requirement. Order Form: CAEP SLA checkbox; Exhibits: Addendum 6 entry; Internal Notes: Addendum 6 guidance row. Applies to Okta / Entra ID / Google Workspace OIDC only; non-PUSH IdPs → JWT TTL baseline.
+- `docs/ENTERPRISE_ONBOARDING.md §2.3` — CAEP/SSF IdP prerequisite verification. Closes `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` item 7 (P1/M5 · DEC-072). Five-row IdP compatibility table. Two SLA paths: CAEP Addendum 6 (< 60 s) vs. JWT TTL baseline (≤ 15 min). Five-item CSM checklist including IdP confirmation script, Linear tracker field, Addendum 6 gate, and post-go-live CAEP stream status check.
+
+### Changed
+- `docs/MSA_TEMPLATE.md` — v0.4 → v0.5 (Addendum 6 + Order Form + Exhibits + Internal Notes).
+- `docs/ENTERPRISE_ONBOARDING.md` — v0.2 → v0.3 (§2.3 added).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §36.6 items 6 and 7 marked `[x] Done`.
+- `VERSION` — 6.66.0 → 6.67.0.
+
+---
+
 ## [6.66.0] — 2026-06-20
 
 ### Added

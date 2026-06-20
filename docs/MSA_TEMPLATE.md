@@ -1,4 +1,4 @@
-# FORM · Master Service Agreement · Template v0.4
+# FORM · Master Service Agreement · Template v0.5
 
 > **Internal use only — PRE-LEGAL-REVIEW DRAFT.**
 > This template must be reviewed and approved by outside counsel before execution with any customer.
@@ -510,6 +510,7 @@ Data Residency:      □ EU (Frankfurt)  □ US (us-east-1)  □ Other: ______
 White-label:         □ Yes (Addendum 1 required)  □ No
 CCPA Addendum:       □ Yes (for CA/US customers)  □ No
 SIEM Addendum:       □ Yes (Addendum 4 required if SIEM export enabled)  □ No
+CAEP SLA Addendum:   □ Yes (Addendum 6 — Okta / Entra ID / Google Workspace OIDC only)  □ No
 Support Tier:        □ Standard (email 24h)  □ Growth (Slack 4h)  □ Enterprise (phone + Slack 24×7)
 
 Exhibits incorporated:
@@ -520,6 +521,7 @@ Exhibits incorporated:
   □ Addendum 1 — White-Label (if applicable)
   □ Addendum 2 — US Privacy / CCPA SPA (if applicable)
   □ Addendum 4 — SIEM Data Processing (if SIEM export enabled)
+  □ Addendum 6 — CAEP/SSF Real-Time Session Control SLA (if PUSH-capable IdP)
 
 FORM signatory:      _________________________ Date: _________
                      [NAME], [TITLE]
@@ -955,6 +957,67 @@ Filing: outside counsel sign-off memo to `compliance/contracts/msa-addendum-5-v1
 
 ---
 
+## ADDENDUM 6 — CAEP/SSF REAL-TIME SESSION CONTROL SLA ADDENDUM
+
+**Addendum 6 · CAEP/SSF Real-Time Session Control SLA · v1.0**
+
+> Conditional — incorporated only where Customer's Order Form selects a PUSH-capable IdP (Okta, Microsoft Entra ID, or Google Workspace OIDC) and the CAEP stream reaches `active` status before pilot launch. Pre-legal-review draft — outside counsel review required before first production execution (§6.6).
+
+This Addendum is incorporated into and forms part of the Master Subscription Agreement ("MSA") between FORM Health Ltd ("FORM") and the enterprise tenant identified in the Order Form ("Customer"). Capitalised terms not defined here have the meaning given in the MSA.
+
+### Addendum 6.1 — Purpose and Scope
+
+This Addendum supplements Exhibit B (Service Level Agreement) by specifying FORM's real-time session revocation SLA commitment for Customers whose Identity Provider (IdP) supports the OpenID Shared Signals Framework (SSF) with PUSH delivery (CAEP/RISC).
+
+**Standard (non-CAEP) session revocation:** For all tenants, session revocation following an IdP-side security event occurs at the next JWT validation check — within the maximum JWT TTL of 15 minutes as set out in Exhibit B §3. This baseline applies regardless of IdP type and is SOC 2 CC6.3 compliant.
+
+**CAEP/SSF real-time revocation (this Addendum):** For tenants with a PUSH-capable IdP and an active CAEP stream, FORM additionally commits to the session revocation SLA in §6.2 below.
+
+### Addendum 6.2 — Real-Time Session Revocation SLA
+
+When this Addendum is in effect:
+
+**§6.2.1 Revocation latency commitment.** FORM revokes access within the IdP's SET (Security Event Token) delivery latency plus FORM's processing latency. In normal operation this is **less than 60 seconds** from the IdP emitting the security event. This commitment applies to the following CAEP/RISC event types: `session-revoked`, `credential-change`, `account-disabled`, `account-enabled`, `account-purged`, `device-compliance-change`, and Google RISC `hijacking`.
+
+**§6.2.2 PUSH delivery prerequisite.** This SLA is contingent on: (a) the Customer's IdP supporting CAEP/RISC PUSH delivery to FORM's receiver endpoint (`POST /enterprise/v1/sso/caep-receiver/{tenant_id}`); and (b) the CAEP stream being in `active` status in FORM's system. If the stream enters `error` or `inactive` status, the baseline JWT TTL (≤ 15 minutes) applies until stream health is restored. FORM monitors stream health via a dead-man's switch alert (AL-CAEP-03: no events on an active stream for 4 consecutive hours during business hours triggers P2 PagerDuty escalation and CSM notification). Full specification: `docs/SSO_SCIM_IMPLEMENTATION.md §23.9`.
+
+**§6.2.3 PUSH-only; polling fallback not included.** SSF PULL/poll mode is not included in this Addendum. If the Customer's IdP is PUSH-capable but PUSH delivery becomes temporarily unavailable, FORM's revocation latency during the outage falls back to the baseline JWT TTL (≤ 15 minutes); no SLA credit accrues during an IdP-side PUSH delivery outage.
+
+**§6.2.4 SLA credit.** Session revocation latency breaches attributable solely to FORM-side processing failures (not IdP delivery latency or IdP PUSH delivery outages) may be raised as SLA disputes per MSA Article 18.3. Credits are calculated under Exhibit B §4 and remain the sole remedy per MSA §15.4.
+
+### Addendum 6.3 — Customer Obligations
+
+Customer must:
+
+(a) Maintain CAEP/RISC PUSH delivery configuration in their IdP for the duration of this Addendum.
+
+(b) Notify FORM's CSM promptly if the IdP PUSH delivery capability is disabled, modified, or migrated to a non-PUSH-capable configuration. Upon such notification, FORM will treat this Addendum as suspended and revert to the baseline JWT TTL commitment; Addendum 6 may be reinstated on written confirmation that PUSH delivery is restored.
+
+(c) Confirm, through FORM Admin Dashboard → SSO Settings, that the CAEP stream is in `active` status before relying on Addendum 6 SLA commitments.
+
+### Addendum 6.4 — Evidence and SOC 2 Mapping
+
+FORM maintains DEC-030 HMAC-chained audit events for all CAEP/RISC revocation actions. For SOC 2 CC6.3 evidence purposes: `sso.caep_event_received` (STANDARD, 7yr) records the SET receipt timestamp; `sso.caep_session_revoked` (HIGH, 7yr) records revocation completion. The delta between these timestamps constitutes the FORM-side processing latency. Full evidence artefact: CC6-E-CAEP-002 (`docs/SSO_SCIM_IMPLEMENTATION.md §23.10`).
+
+**Privacy floor:** All DEC-030 CAEP events contain only `user_id_hash` (SHA-256 of the IdP subject identifier) and `tenant_id` — never plaintext email addresses, health data, body composition values, coaching content, or GDPR Art. 9 special category data. Reference: `docs/SSO_SCIM_IMPLEMENTATION.md §23.7.6`.
+
+### Addendum 6.5 — Governing Law and Conflict
+
+Governing law for this Addendum follows the MSA: Delaware (US Customers); Ireland (EU Customers per Addendum 3). In the event of conflict between this Addendum and Exhibit B, this Addendum prevails on the CAEP/RISC session revocation SLA it governs.
+
+### Addendum 6.6 — Outside Counsel Review Requirement
+
+This Addendum must be reviewed by outside counsel before first production execution. Review points:
+
+1. Whether the "less than 60 seconds in normal operation" language is sufficiently qualified by the PUSH delivery prerequisite (§6.2.2) and the polling carve-out (§6.2.3) to avoid strict liability on IdP-side latency spikes.
+2. Whether the §6.2.4 SLA credit mechanism is consistent with Exhibit B §4 and MSA §15.4 (SLA credits as sole remedy).
+3. Whether the IdP PUSH outage exclusion (§6.2.3) is enforceable under all applicable governing law jurisdictions.
+4. Whether Addendum 6 SET payload processing requires a separate DPA amendment, or whether Exhibit C (DPA) and Addendum 3 (EU Data Residency) provide adequate coverage.
+
+Filing path: `compliance/contracts/{CUSTOMER_SLUG}/msa-addendum-6-v1.0-counsel-signoff.pdf`.
+
+---
+
 ## INTERNAL NOTES (REMOVE BEFORE SENDING TO CUSTOMER)
 
 | Topic | Guidance |
@@ -972,10 +1035,13 @@ Filing: outside counsel sign-off memo to `compliance/contracts/msa-addendum-5-v1
 | Redline limits | Standard-term self-service redline ≤ ±10% on commercial terms only. Any redline touching §8 (Privacy Floor), §9 (AUP), §5.3 (AI training), or §12.2 (health data deletion) requires compliance-officer approval regardless of deal size. |
 | EU DPA Annex B | **Addendum 3 is required for all EU-region Customers (`eu-central-1` / `eu-west-1`).** Outside counsel review MANDATORY before execution (see Addendum 3.6). Confirm Cloudflare R2 EU jurisdiction annually (OFB-E-006). Do NOT sign EU enterprise DPA without Addendum 3 + counsel sign-off filed at `compliance/contracts/{CUSTOMER_SLUG}/eu-dpa-annex-b-counsel-signoff-v{N}.pdf`. |
 | SIEM Addendum 4 | **Addendum 4 is required before any SIEM export is activated.** SIEM-CONSENT-01 chain invariant enforces this at the Worker layer (HTTP 422 rejection if no prior signed addendum). Outside counsel review required before first production execution (see §4.8). Do NOT activate SIEM export without Addendum 4 signed and `siem.consent_addendum_signed` DEC-030 event emitted. Evidence: SIEM-CONSENT-E-001 quarterly. Full spec: `docs/OBSERVABILITY.md §47` (DEC-065). |
+| CAEP SLA Addendum 6 | **Addendum 6 applies only to Customers with Okta, Microsoft Entra ID, or Google Workspace OIDC.** Confirm CAEP PUSH capability before including in the MSA package (see `docs/ENTERPRISE_ONBOARDING.md §2.3`). Non-PUSH IdPs (other SAML 2.0) receive JWT TTL baseline (≤ 15 min) — do NOT include Addendum 6. Outside counsel review required before first execution (see §6.6). Stream must be in `active` status before Customer can rely on the < 60 s SLA. Full spec: `docs/SSO_SCIM_IMPLEMENTATION.md §23` + `§36` (DEC-072). |
 
 ---
 
-*v0.4 · 2026-06-18 · owners: compliance-officer, enterprise-architect, founder · next review: before first EU enterprise DPA execution (outside counsel required per Addendum 3.6), before first SIEM export goes live (outside counsel required per §4.8), and before first enterprise multi-year contract (M10 per §11.4) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35`, `docs/DATA_MODEL.md §36` (DEC-061), `docs/OBSERVABILITY.md §47` (DEC-065)*
+*v0.5 · 2026-06-20 · owners: compliance-officer, enterprise-architect, founder · next review: before first EU enterprise DPA execution (outside counsel required per Addendum 3.6), before first SIEM export goes live (outside counsel required per §4.8), before first CAEP SLA Addendum 6 execution (outside counsel required per §6.6), and before first enterprise multi-year contract (M10 per §11.4) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35`, `docs/DATA_MODEL.md §36` (DEC-061), `docs/OBSERVABILITY.md §47` (DEC-065), `docs/SSO_SCIM_IMPLEMENTATION.md §23` + `§36` (DEC-072)*
+
+*v0.5 (2026-06-20): ADDENDUM 6 — CAEP/SSF Real-Time Session Control SLA Addendum v1.0. Closes `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` item 6 (P1/M5 — "Update MSA CAEP addendum: replace '< 30 seconds' with 'near-real-time (< 60 seconds in normal operation)'; add IdP PUSH requirement sentence" — DEC-072). Addendum 6 is Addendum-5-plus-one (not Addendum 3 — the §36.6 checklist reference to "§Addendum 3" was a drafting error; Addendum 3 is EU Data Residency Terms). Six sections: §6.1 Purpose and Scope — baseline JWT TTL (≤ 15 min) vs. CAEP real-time path; Addendum 6 conditional on PUSH-capable IdP (Okta/Entra/Microsoft Entra ID/Google Workspace OIDC) and `active` stream status. §6.2 Real-Time Session Revocation SLA — §6.2.1: "less than 60 seconds in normal operation" language (DEC-072 §36.3.2 Part 1 verbatim); applies to 7 CAEP/RISC event types (session-revoked, credential-change, account-disabled, account-enabled, account-purged, device-compliance-change, RISC hijacking); §6.2.2: PUSH delivery prerequisite + AL-CAEP-03 dead-man's switch reference (§23.9 — 4h business-hours threshold → P2 PagerDuty + CSM notification); §6.2.3: polling fallback excluded (SSF PULL not supported; IdP PUSH outage → baseline TTL, no credit); §6.2.4: SLA credit mechanism — FORM-side processing failure only, calculated per Exhibit B §4, sole remedy per MSA §15.4. §6.3 Customer Obligations — three: maintain PUSH config; notify CSM on PUSH capability change (Addendum suspension on notification, reinstatement on written PUSH restoration confirmation); confirm `active` stream status before relying on SLA. §6.4 Evidence and SOC 2 Mapping — DEC-030 HMAC chain: `sso.caep_event_received` STANDARD/7yr (SET receipt timestamp) + `sso.caep_session_revoked` HIGH/7yr (revocation completion timestamp); delta = FORM-side processing latency; CC6-E-CAEP-002 artefact reference (§23.10); privacy floor: user_id_hash SHA-256 + tenant_id only, no Art. 9 data in any CAEP event. §6.5 Governing Law — Delaware/Ireland per MSA; Addendum 6 prevails on CAEP session revocation SLA if conflict with Exhibit B. §6.6 Outside Counsel review requirement — four review points: "< 60 seconds" qualification sufficiency; SLA credit consistency with Exhibit B §4 + MSA §15.4; IdP PUSH exclusion enforceability; DPA amendment necessity for SET payload processing. Order Form: CAEP SLA Addendum checkbox added; Exhibits incorporated: Addendum 6 entry added. Internal Notes: CAEP SLA Addendum 6 guidance row added (PUSH-capable IdPs only; non-PUSH → JWT TTL baseline; confirm `docs/ENTERPRISE_ONBOARDING.md §2.3`). Privacy floor: no individual employee user_id, health data, body composition, coaching content, or Art. 9 special category data in any DEC-030 CAEP event; SHA-256(idpSubjectEmail) as user_id_hash only; tenant_id FORM-internal UUID. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §23` (CAEP/SSF architecture — event types, 10-step processing pipeline, AL-CAEP-03 dead-man's switch, CC6-E-CAEP-002 evidence artefact); `docs/SSO_SCIM_IMPLEMENTATION.md §36.3.2` (DEC-072 Part 1 — "near-real-time (< 60 s in normal operation)" contractual language, PUSH mandatory for CAEP SLA addendum); `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` (checklist item 6 — P1/M5, now [x] Done); `docs/ENTERPRISE_ONBOARDING.md §2.3` (CAEP PUSH prerequisite verification — CSM checklist before MSA signature package assembly); `docs/ENTERPRISE_SLA.md §3` (JWT TTL baseline — ≤ 15 min baseline for non-CAEP and during PUSH outage); `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF` (sso.caep_event_received STANDARD/7yr + sso.caep_session_revoked HIGH/7yr); `docs/DECISION_LOG.md DEC-072` (CAEP SLA language decision). Owner: compliance-officer + enterprise-architect + legal.*
 
 *v0.4 (2026-06-18): Addendum 4 — SIEM Data Processing Addendum v1.0. Closes `docs/OBSERVABILITY.md §47.11` checklist item 5 (P1/M5 — "Author `docs/MSA_TEMPLATE.md §Addendum 4`"). Decision: DEC-065 (2026-06-18). Five-clause structure per §47.4: (1) Clause 1 — Scope and Activation (SIEM-CONSENT-01 chain invariant reference; Designated Endpoint designation; no-activation-before-Effective-Date commitment); (2) Clause 2 — Documented Instructions (GDPR Art. 28(3)(a) written-instruction compliance; instruction scope and duration; endpoint constraint); (3) Clause 3 — Customer Obligations (five sub-clauses: adequate legal basis; Designated Endpoint DPA coverage; no-reidentification warranty on pseudonymised fields; retention-policy compliance; breach notification to FORM); (4) Clause 4 — FORM Obligations (privacy floor warranty — no user_id/Art. 9/body composition/coaching content/plaintext endpoint URL in transmitted events; HMAC-chain integrity fields; 72h breach notification; DEC-030 chain record of acceptance and revocation); (5) Clause 5 — Revocation (Admin Dashboard "Revoke SIEM Addendum" action; 5-minute effect; DEC-030 `siem.consent_addendum_revoked` HIGH 7yr record; re-acceptance protocol). §4.6 SOC 2 evidence: SIEM-CONSENT-E-001 (CC9.2/CC1.1 — quarterly DEC-030 export; cross-check query returns zero); privacy floor on artefact (SHA-256[:32] endpoint_url_hash; SHA-256 signed_by_email_hash; no individual health data). §4.7 Governing law (Delaware/Ireland per MSA; Addendum 4 prevails on SIEM data flow activities). §4.8 Outside counsel review requirement (five review points: Art. 28(3)(a) documented-instruction sufficiency; customer warranty vs. evidence-of-basis; 72h breach notification alignment; revocation-as-instruction-withdrawal; DocuSign electronic acceptance validity; filing path `compliance/contracts/msa-addendum-4-v1.0-counsel-signoff.pdf`). Order Form updated: SIEM Addendum checkbox added; Exhibits incorporated list updated with Addendum 4. Internal Notes: SIEM Addendum 4 guidance row added. Privacy floor: no individual employee user_id, health data, Art. 9 special category, body composition, or coaching content in any Audit Event transmitted under this Addendum; endpoint_url_hash SHA-256[:32]; signed_by_email_hash SHA-256(lowercase(email)); tenant_id org slug only; form_api REVOKED from tenant_siem_configs. Cross-references: `docs/OBSERVABILITY.md §47` (DEC-065 — SIEM consent architecture, SIEM-CONSENT-01 invariant, Admin Dashboard gate, DEC-030 events, SIEM-CONSENT-E-001 artefact); `docs/OBSERVABILITY.md §47.11 item 5` (checklist obligation — now [x] Done); `docs/AUDIT_LOG_SCHEMA.md §SIEM` (siem.consent_addendum_signed HIGH 7yr + siem.consent_addendum_revoked HIGH 7yr — to be registered P0/M5); `docs/DATA_MODEL.md §SIEM` (tenant_siem_configs addendum_signed_at + addendum_version columns — migration 0076, P0/M5); `docs/SOC2_READINESS.md §88` (SIEM-CONSENT-E-001 SOC 2 evidence registration); `docs/ENTERPRISE.md §8` (Privacy Floor — non-negotiable; applies to all Audit Events transmitted under this Addendum); `docs/DECISION_LOG.md DEC-065` (decision rationale). Owner: compliance-officer + enterprise-architect + legal.*
 

@@ -1,4 +1,4 @@
-# FORM · Enterprise Customer Onboarding v0.2
+# FORM · Enterprise Customer Onboarding v0.3
 
 > Operational playbook for every enterprise deal from contract signature through Year 1 renewal.
 > Owner: `customer-success` + `enterprise-architect` + `compliance-officer`.
@@ -80,6 +80,32 @@ Confirm with the customer's IT lead before Day 0:
 - Send written summary of success criteria to Slack Connect and customer lead email within 24 hours
 - Open onboarding tracker (Linear project: `ENT-[customer-slug]`)
 - Tag `tenant.created` event in audit log — see §3.1
+
+### 2.3 CAEP/SSF IdP prerequisite verification
+
+Before assembling the MSA signature package, the CSM must confirm whether the customer's IdP supports CAEP/RISC PUSH delivery. This determines which session-revocation SLA applies and whether Addendum 6 is included.
+
+| IdP | CAEP/RISC PUSH support | SLA path |
+|---|---|---|
+| Okta (SaaS) | ✅ SSF Transmitter with PUSH | CAEP SLA Addendum 6 — < 60 s in normal operation |
+| Microsoft Entra ID | ✅ Microsoft Graph CAE events via SSF | CAEP SLA Addendum 6 — < 60 s in normal operation |
+| Google Workspace OIDC | ✅ Google RISC API | CAEP SLA Addendum 6 — < 60 s in normal operation |
+| OneLogin | 🟡 Limited — verify SAML assertion frequency | JWT TTL baseline ≤ 15 min — no Addendum 6 |
+| Other SAML 2.0 IdPs | ❌ PUSH not supported | JWT TTL baseline ≤ 15 min — no Addendum 6 |
+
+**CAEP SLA Addendum 6** is available only if: (a) the IdP is in the ✅ row above, AND (b) the CAEP stream reaches `active` status before pilot launch. Full architecture: `docs/SSO_SCIM_IMPLEMENTATION.md §23`. Addendum 6 full text: `docs/MSA_TEMPLATE.md §Addendum 6`.
+
+**Baseline (non-CAEP tenants):** Session revocation occurs at JWT expiry — ≤ 15 minutes from the IdP event. This is the pre-§23 baseline and is SOC 2 CC6.3 compliant. No Addendum 6 is required or offered.
+
+**CSM action checklist:**
+
+- [ ] Ask IT contact: *"Which IdP will you use for SSO — Okta, Microsoft Entra ID, Google Workspace, or another? Does your plan support CAEP or RISC push events?"*
+- [ ] Record IdP name and PUSH capability in the Linear tracker (`ENT-[customer-slug]` → field `idp_type`)
+- [ ] If PUSH-capable IdP confirmed (✅): include Addendum 6 in MSA signature package; brief Customer that < 60 s SLA activates once the CAEP stream shows `active` in Admin Dashboard → SSO Settings
+- [ ] If non-PUSH IdP (🟡 or ❌): do not include Addendum 6; note "JWT TTL baseline (≤ 15 min)" in tracker; brief IT contact on propagation window
+- [ ] After SSO go-live: confirm CAEP stream status in Admin Dashboard → SSO Settings → CAEP Status; if stream shows `error`, escalate to platform-engineer before closing the CAEP SLA commitment
+
+> **Privacy floor:** The CAEP/RISC SET payload that FORM processes contains only `user_id_hash` (SHA-256 of the IdP subject identifier) and `tenant_id` — never plaintext email, health data, body composition values, or coaching content. This applies regardless of which IdP the customer uses. Reference: `docs/SSO_SCIM_IMPLEMENTATION.md §23.7.6`.
 
 ---
 
@@ -516,6 +542,8 @@ If a customer asks for individual-level data or proposes an excluded use case:
 Do not offer workarounds, do not say "we can look into it," do not escalate to engineering. Escalate to founder only.
 
 ---
+
+*v0.3 (2026-06-20): §2.3 CAEP/SSF IdP prerequisite verification. Closes `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` item 7 (P1/M5 — "Update `docs/ENTERPRISE_ONBOARDING.md §2.4`: add CAEP PUSH capability as explicit prerequisite; add non-PUSH fallback note" — DEC-072). Added as §2.3 (Section 2 previously had only §2.1 and §2.2; §2.4 in the checklist was a drafting placeholder; §2.3 is the correct insertion point). Five-row IdP compatibility table: Okta (SSF Transmitter PUSH ✅ → Addendum 6), Microsoft Entra ID (Graph CAE/SSF ✅ → Addendum 6), Google Workspace OIDC (RISC API ✅ → Addendum 6), OneLogin (limited 🟡 → JWT TTL baseline), other SAML 2.0 (❌ → JWT TTL baseline). Two SLA paths: CAEP SLA Addendum 6 (< 60 s in normal operation, requires `active` stream) vs. baseline JWT TTL (≤ 15 min, SOC 2 CC6.3 compliant, no Addendum 6). Five-item CSM action checklist: IdP confirmation question script, Linear tracker `idp_type` field, Addendum 6 inclusion gate (PUSH-capable only), JWT TTL baseline note for non-PUSH, post-go-live stream status check in Admin Dashboard → SSO Settings → CAEP Status. Privacy floor note: CAEP SET payload = user_id_hash (SHA-256 idpSubject) + tenant_id only; no Art. 9 data. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §23` (CAEP/SSF architecture); `docs/SSO_SCIM_IMPLEMENTATION.md §36.3.2 Part 2` (source obligation — "PUSH mandatory; non-PUSH → JWT TTL baseline; no CAEP SLA addendum"); `docs/SSO_SCIM_IMPLEMENTATION.md §23.7.6` (privacy floor — SET payload fields); `docs/MSA_TEMPLATE.md §Addendum 6` (CAEP SLA Addendum full text); `docs/DECISION_LOG.md DEC-072` (PUSH mandatory decision). Owner: customer-success + enterprise-architect + compliance-officer.*
 
 *v0.2 (2026-06-09): §11.1 Contract termination timeline — API key revocation step added at Day 30 (MDD-P1-04): all active `tenant_api_keys` rows for the departing tenant are wiped immediately after SCIM token revocation; `api_key.revoked` (reason: `'tenant_offboarding'`) is emitted per active key (DEC-030 HIGH, 7-year retention, HMAC-chained in insertion order). §11.2 DEC-030 event table updated with `api_key.revoked` row. `docs/AUDIT_LOG_SCHEMA.md api_key.revoked` reason enum updated to include `tenant_offboarding`. Closes MDD-P1-04 in `docs/SOC2_READINESS.md`. SOC 2 CC6.4 (credential lifecycle — departed tenant API keys no longer valid post-30d). enterprise-architect + compliance-officer.*
 
