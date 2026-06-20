@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.89.0] — 2026-06-20
+
+### Added
+- `content/post-1732-tonnage-real-role.md` — Block 1731–1780 · Cluster 1 · Post 2/10. Тоннаж: що він вимірює, де корисний і де обманює. Три способи збільшити тоннаж без прогресу. Де тоннаж справді корисний: архівна перевірка при незмінній структурі, виявлення регресії, розподіл навантаження між групами. Порівняльна таблиця тоннаж / кількість підходів / ефективні підходи — три рівні точності. Як Victor читає тоннаж як допоміжний, а не основний сигнал. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1733-mev-minimum-effective-volume.md` — Block 1731–1780 · Cluster 1 · Post 3/10. MEV: мінімальний ефективний об'єм. Різниця між «тренуватись замало» і «бути нижче MEV». Дозо-відповідний зв'язок (Schoenfeld 2017) і нижній поріг. MEV для гіпертрофії vs. сили (Krieger 2010, Ralston 2017). Чотири фактори, що зміщують MEV: тренувальний вік, м'язова група, якість підходів, стан відновлення. Орієнтовна таблиця MEV по основних м'язових групах. Підтримувальний об'єм vs. MEV (Bickel 2011). MEV і частота. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1734-mav-maximum-adaptive-volume.md` — Block 1731–1780 · Cluster 1 · Post 4/10. MAV: максимальний адаптивний об'єм — оптимальна зона між MEV і MRV. MAV як діапазон, а не фіксоване число. Чотири фактори, що змінюють MAV: тренувальний вік, м'язова група, фаза мезоциклу, зовнішній стрес (Stults-Kolehmainen 2014). MAV для гіпертрофії (12–20 підх/тиждень) vs. сили (4–8 важких підходів). Шість практичних сигналів: у MAV-зоні і за нею. Структура накопичувального блоку: MEV → MAV за 3–5 тижнів. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — posts 1732, 1733, 1734 додані вгорі списку.
+- `VERSION` — 6.88.0 → 6.89.0.
+
+---
+
 ## [6.88.0] — 2026-06-20
 
 ### Added
