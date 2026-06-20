@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.69.0] — 2026-06-20
+
+### Added
+- `content/post-238-does-program-fit-you.md` — Editorial series 231–250, post 9/10. «Як оцінити, чи програма підходить саме тобі — без тренера і без n=1 гадань». П'ять сигналів відповідності: патерн відновлення, технічна якість під навантаженням, тренд сили/RPE, поведінка між сесіями, накопичення мікротравматизму. Структурований self-assessment після 4-тижневого блоку. clinical-safety NOT_REQUIRED.
+- `blog.html` — картка post-238 додана перед post-237.
+- `README.md` — post-238 → draft; нові теми 257–260 proposed.
+
+### Changed
+- `STATUS.md` — рядок Editorial 211–250: post-238 додано, count 8→9, roadmap 257–260 proposed.
+- `VERSION` — 6.68.0 → 6.69.0.
+
 ## [6.68.0] — 2026-06-20
 
 ### Added
