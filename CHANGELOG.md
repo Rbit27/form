@@ -1,5 +1,27 @@
 # Changelog · FORM
 
+## [6.53.0] — 2026-06-20
+
+### Added
+- `content/post-1571-squat-technique-individual-variation.md` — Block 1571–1620 Cluster 1 post 1/10. Opener: три рівні «правильності» техніки (безпека, адаптаційна ефективність, індивідуальна відповідність); чому антропометрія визначає механіку більше ніж тренер; константи незалежно від будови тіла (нейтральний хребет, колінно-стопна відповідність, контроль ROM). Типові помилки тренера і атлета-аматора. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1572-squat-anthropometry-proportions.md` — Cluster 1 post 2/10. Антропометрія і присідання: три ключових пропорції (стегно/гомілка, тулуб/ноги, дорсифлексія); тест knee-to-wall, тест Faber/Craig; практичні висновки для чотирьох антропометричних профілів. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1573-squat-highbar-vs-lowbar.md` — Cluster 1 post 3/10. Хай-бар vs. лоу-бар: механічні відмінності, порівняльна таблиця EMG (Escamilla 2001), навантаження на суглоби, антропометричні сценарії вибору. Різниця в абсолютній силі ~8–10% (Glassbrook 2019). clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1574-squat-stance-width-toe-angle.md` — Cluster 1 post 4/10. Ширина стійки і кут носків: тест Fan, п'ятикроковий протокол налаштування, типові помилки («вузько», «носки вперед»). Кісткова структура вертлюжної западини і антеверсія/ретроверсія визначають природній кут. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1575-squat-depth-mobility-anatomy-goals.md` — Cluster 1 post 5/10. Глибина присідання: чотири рівні ROM, порівняльна EMG (Caterisano 2002), навантаження на ПС і ПКЗ, структурні vs. функціональні обмежувачі, butt wink причини і рішення, таблиця рекомендацій за контекстом. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1576-squat-forward-lean-causes-norms.md` — Cluster 1 post 6/10. Нахил тулуба вперед: п'ять причин (антропометрія, дорсифлексія, кор, квадрицепс, позиція штанги) і діагностична матриця для розрізнення. Протокол корекції для кожної причини. Нормальний діапазон нахилу за Escamilla (2001). clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1577-squat-knee-valgus-research.md` — Cluster 1 post 7/10. Вальгус коліна: різниця між компенсаторним і колапсуючим вальгусом; п'ять причин; критичний розбір Fry et al. (2003) і правила «коліна за носком»; діагностичний протокол для self-coached атлета (bodyweight vs. важкі ваги). clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1578-squat-self-diagnosis-video.md` — Cluster 1 post 8/10. Відеодіагностика присідання: два обов'язкових ракурси, протоколи читання сагітальної і фронтальної площини, коли відзнімати, 15-хвилинний протокол аналізу, confirmation bias (Miall & Wolpert 1996). clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1579-squat-technical-limiters-strength-mobility-pattern.md` — Cluster 1 post 9/10. Технічні обмежувачі: три типи (мобільний, силовий, патерновий), діагностична матриця з п'яти критеріїв, комбіновані обмежувачі і порядок корекції. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1580-squat-cluster-synthesis.md` — Cluster 1 post 10/10. Синтез операційна система самокоучингу: 4 рівні (антропометрична карта один раз → відеодіагностика раз на 4–6 тижнів → матриця обмежувачів при регресії → один фокус на сесію). Checklist для двох ракурсів. Анонс Cluster 2 (становий підйом). Block 1571–1620 Cluster 1 COMPLETE 10/10. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `docs/DECISION_LOG.md` — DEC-075 (Block 1571–1620 тема: Техніка великих рухів для self-coached атлета, 5 кластерів × 10 постів) + DEC-074 (нумерація: пояснення пропуску 1501–1555, зарезервовані для заплановних але ненаписаних блоків). Append-only.
+
+### Changed
+- `blog.html` — десять нових карток (posts 1571–1580, тег «Technique») додані на початок списку. blog.html updated to post-1580.
+- `STATUS.md` — Block 1571–1620 Cluster 1 COMPLETE 10/10; next: Cluster 2 (1581–1590, становий підйом та варіації).
+- `VERSION` — v6.52.1 → v6.53.0.
+
+---
+
 ## [6.52.1] — 2026-06-19
 
 ### Changed
