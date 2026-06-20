@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.21.2
+# FORM · SOC 2 Type II Readiness v3.22.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -29646,6 +29646,144 @@ The following two cross-references in §94 became stale after §94 was authored 
 |---|---|---|---|---|---|
 | 4 | Run CC6-E-CAEP-001 through CC6-E-CAEP-004 collection queries for the M5–M10 period as an observation-period pre-flight audit. Expected results: CC6-E-CAEP-001 zero rows (no IdP security events before enterprise customer acquisition); CC6-E-CAEP-002 zero rows (or a small number of `sso.caep_stream_registered` HIGH/7yr events from initial stream configuration); CC6-E-CAEP-003 zero rows (no enterprise tenants yet); CC6-E-CAEP-004 zero incidents (stream health monitoring in ready state). File zero-event attestation JSONs per §97.2 templates; append SHA-256 to MASTER-INDEX (§79). | compliance-officer | **P1** | M10 | [ ] |
 | 5 | Schedule quarterly recurring reminder (first due M11): "File CC6-E-CAEP-001 through CC6-E-CAEP-004 for the preceding quarter alongside CAEP-E-001." Trigger: 1st business day after quarter close. Consolidate with CAEP-E-001 filing schedule (§94.6 item 9) into a single quarterly CAEP evidence collection run. | compliance-officer | **P1** | M10 | [ ] |
+
+---
+
+*v3.22.0 (2026-06-20): §98 Cross-Reference Patch — SSO_SCIM §35 (BDG `getGuardConfig()` Seat Source · DEC-069 · OQ-SSO-34.2 · CC6.3 / A1.2 / CC7.2). Supplements §91 (GUARD-E-001) with three additions: (1) CC6.3 audit traceability supplement — `contracted_seats` in `scim.bulk_deprovision_blocked` payload is sourced from `enterprise_contracts.contracted_seats` (immutable billing record, DEC-069), enabling the §35.7 three-step reconstruction protocol (enterprise_contracts row + preceding `scim.bulk_deprovision_threshold_updated` chain event + `ceil()` formula) without any live `COUNT(tenant_users)` query; the `payload.contracted_seats` shortcut field in the chain event allows direct auditor verification. (2) A1.2 availability protection supplement — Option A (KV caching with 3600s safety-net TTL + active event-driven invalidation on `billing.seats_expanded`/`billing.seats_reduced`) decouples guard evaluation from Supabase DB load; N-user bulk deprovision generates zero Supabase queries after KV warmup (vs. N per-request COUNTs under the rejected Option B), preventing a DB-saturation feedback loop in the exact scenario the guard is designed to contain. (3) CC7.2 new advisory monitoring signal — `system.scim_guard_cfg_cache_stale` (LOW/1yr) fires when `billing-event-relay` KV delete fails; non-paging, daily compliance review; self-clearing within 3600s TTL safety-net. §98.1 SSO_SCIM §35 context (four-row summary). §98.2 GUARD-E-001 CC6.3 traceability supplement: three-step reconstruction protocol from §35.7; `payload.contracted_seats` shortcut field; GUARD-E-001 collection SQL supplement adding `contracted_seats` assertion. §98.3 three-row SOC 2 criteria mapping supplement (CC6.3, A1.2, CC7.2). §98.4 two obligations closed: SSO_SCIM §35.9 item 4 (`system.scim_guard_cfg_cache_stale` AUDIT_LOG_SCHEMA registration — 🟡 open, prerequisite for CC7.2 stale-advisory cross-check in GUARD-E-001); SSO_SCIM §35.9 item 5 (compliance/fieldwork/scim-bulk-deprovision-guard.md — 🟡 open, §98.2 §35.7 protocol registered here as interim SOC2_READINESS reference pending standalone fieldwork guide). §98.5 four-item implementation checklist: 1× P1/M13 (AUDIT_LOG_SCHEMA `system.scim_guard_cfg_cache_stale` registration), 1× P1/M13 (GUARD-E-001 stale-advisory SQL extension added to §91.2), 1× P1/M13 (fieldwork guide at compliance/fieldwork/scim-bulk-deprovision-guard.md), 1× P1/M14 (first GUARD-E-001 filing — include `contracted_seats` assertion per §98.2 and stale-advisory cross-check per §98.3). SOC 2 version bumped v3.21.2 → v3.22.0. Privacy floor: `system.scim_guard_cfg_cache_stale` LOW/1yr advisory carries only `tenant_id` (FORM-internal UUID) and a timestamp — no individual employee name, email, health value, or GDPR Art. 9 data; `contracted_seats` in `scim.bulk_deprovision_blocked` payload is an integer (no identity dimension); `billing-event-relay` invalidation path does not touch any employee-level data. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §35` (v2.7, 2026-06-19 — DEC-069 decision text; §35.4 `getGuardConfig()` implementation; §35.5 billing event KV invalidation; §35.6 edge cases; §35.7 SOC 2 audit traceability three-step protocol; §35.8 OQ-SSO-34.2 🟢 Resolved; §35.9 implementation checklist items 4–5); `docs/SSO_SCIM_IMPLEMENTATION.md §34.7` (`scim.bulk_deprovision_blocked` payload `contracted_seats` field — §35.7 traceability shortcut); `docs/SSO_SCIM_IMPLEMENTATION.md §34.11` (original GUARD-E-001 cross-reference obligation — closed by §91); `docs/AUDIT_LOG_SCHEMA.md §System` (`system.scim_guard_cfg_cache_stale` LOW/1yr — P1/M13 registration obligation per §98.5 item 1); `docs/SOC2_READINESS.md §91` (GUARD-E-001 primary registration — §98 supplements §91, does not replace it); `docs/DECISION_LOG.md DEC-069` (formal adoption decision — Option A: `enterprise_contracts.contracted_seats` with 3600s KV TTL + event-driven invalidation). Owner: compliance-officer + security-engineer + enterprise-architect.*
+
+---
+
+## §98 · Cross-Reference Patch — SSO_SCIM §35 (BDG `getGuardConfig()` Seat Source: `enterprise_contracts` with Event-Refreshed 1-Hour KV Cache · DEC-069 · OQ-SSO-34.2 · CC6.3 / A1.2 / CC7.2)
+
+> Closes the implicit cross-reference obligation arising from `docs/SSO_SCIM_IMPLEMENTATION.md §35` (v2.7, 2026-06-19 — DEC-069 · OQ-SSO-34.2 Resolution) and the explicit obligations in §35.9 items 4–5 (P1/M13). Supplements §91 (GUARD-E-001 primary registration) with the CC6.3 audit traceability protocol from §35.7, the A1.2 availability protection rationale from DEC-069, and a new CC7.2 advisory monitoring signal (`system.scim_guard_cfg_cache_stale`). No new artefact IDs are introduced; GUARD-E-001 (§91) is extended. Privacy floor: `system.scim_guard_cfg_cache_stale` advisory carries only `tenant_id` (FORM-internal UUID) and an emit timestamp — no `user_id`, employee name, email, health value, or GDPR Art. 9 special category data. `contracted_seats` in `scim.bulk_deprovision_blocked` is an integer derived from the commercial billing record, not from any individual employee record. `billing-event-relay` KV invalidation path handles only `billing.seats_expanded` / `billing.seats_reduced` DEC-030 events and does not read or transmit any employee-level data.
+
+---
+
+### §98.1 SSO_SCIM §35 Context
+
+`docs/SSO_SCIM_IMPLEMENTATION.md §35` (v2.7, 2026-06-19) resolves OQ-SSO-34.2 (P1, raised in §34.12) by adopting Option A — `enterprise_contracts.contracted_seats` as the seat source for `getGuardConfig()` — over Option B (real-time `COUNT(tenant_users WHERE is_active = true)`).
+
+| Dimension | Decision (DEC-069) |
+|---|---|
+| **Seat source** | `enterprise_contracts.contracted_seats` — the billing record of what the tenant has paid for; cached at `scim:guard_cfg:{tenantId}` with 3600s safety-net TTL |
+| **Cache invalidation** | Active: `billing-event-relay` Cloudflare Worker calls `SCIM_KV.delete('scim:guard_cfg:' + tenantId)` on receipt of `billing.seats_expanded` or `billing.seats_reduced` DEC-030 events, typically within seconds of a contract change. TTL safety-net: 3600s for missed invalidation events |
+| **Option B rejected** | Real-time `COUNT(tenant_users WHERE is_active = true)` per SCIM DELETE/PATCH — N queries for N-user bulk deprovision batch; volatile COUNT has no immutable anchor at block time; DB-error failure mode affects every guard evaluation |
+| **SOC 2 grounds (§35.3)** | (1) Anti-DoS: KV decouples guard from DB load at peak bulk-sync pressure. (2) Contract is authoritative: billing entitlement, not provisioning state. (3) Bounded staleness: event-driven invalidation within seconds; 3600s TTL as documented maximum bound. (4) CC6.3 audit traceability: guard limit at any block event is reconstructable from two immutable records per §35.7 protocol. (5) Pattern consistency with DEC-043/044/051/053/065/067 idiom |
+
+---
+
+### §98.2 GUARD-E-001 CC6.3 Traceability Supplement
+
+GUARD-E-001 (registered in §91) collects `scim.bulk_deprovision_blocked` and related events quarterly. §35 (DEC-069) strengthens the CC6.3 auditor narrative by specifying that the `contracted_seats` field in the block event payload (§34.7) is sourced from `enterprise_contracts.contracted_seats` — an immutable billing record — enabling deterministic reconstruction of the guard limit at any historical block time without requiring a point-in-time active-user snapshot.
+
+#### §35.7 Three-Step Reconstruction Protocol (CC6.3 Auditor Fieldwork)
+
+To verify the guard limit recorded in a `scim.bulk_deprovision_blocked` event at time **T** for tenant **tid**:
+
+| Step | Query / source | Expected result |
+|---|---|---|
+| **1 — Contracted seats at T** | `SELECT contracted_seats FROM enterprise_contracts WHERE tenant_id = :tid AND effective_from ≤ :T ORDER BY effective_from DESC LIMIT 1` | Returns the `contracted_seats` value that was in effect at block time T |
+| **2 — Threshold at T** | In the DEC-030 HMAC chain: find the most recent `scim.bulk_deprovision_threshold_updated` event with `payload.tenant_id = :tid` and `created_at ≤ :T` → `payload.new_threshold_pct` | Returns the threshold percentage configured at block time T |
+| **3 — Guard limit** | `CEIL(contracted_seats × threshold_pct / 100)` | Must equal `payload.deprovisioned_count + 1` (i.e., the block fires at one unit above the limit) |
+
+**Shortcut:** The `scim.bulk_deprovision_blocked` event payload includes `payload.contracted_seats` (§34.7), which records the value used by `getGuardConfig()` at the time of the block. An auditor can verify this value directly against Step 1 without running the reconstruction — the reconstruction protocol confirms the shortcut field was populated correctly by `enterprise_contracts`, not from a volatile COUNT.
+
+#### GUARD-E-001 Collection SQL Extension
+
+The following assertion SQL should be appended to the §91.2 GUARD-E-001 collection procedure (run at M14 and each subsequent quarter):
+
+```sql
+-- DEC-069 §35.7 CC6.3 traceability assertion
+-- For every scim.bulk_deprovision_blocked event in the quarter,
+-- verify payload.contracted_seats matches enterprise_contracts at block time.
+-- Expected: 0 rows (all contracted_seats values match billing record)
+SELECT
+  ale.event_id,
+  ale.created_at,
+  ale.payload->>'tenant_id'           AS tenant_id,
+  (ale.payload->>'contracted_seats')::int  AS payload_contracted_seats,
+  ec.contracted_seats                  AS billing_contracted_seats
+FROM audit_log_events ale
+JOIN LATERAL (
+  SELECT contracted_seats
+  FROM enterprise_contracts
+  WHERE tenant_id = (ale.payload->>'tenant_id')::uuid
+    AND effective_from <= ale.created_at
+  ORDER BY effective_from DESC
+  LIMIT 1
+) ec ON true
+WHERE ale.event_type = 'scim.bulk_deprovision_blocked'
+  AND ale.created_at >= :quarter_start
+  AND ale.created_at <  :quarter_end
+  AND (ale.payload->>'contracted_seats')::int <> ec.contracted_seats;
+-- Zero rows = assertion passes. Non-zero rows = anomaly requiring compliance-officer review.
+-- A non-zero result may indicate: (a) a contract amendment processed during the 5-min rolling window,
+-- (b) a billing-event-relay missed invalidation that lasted > 3600s (TTL safety-net failure),
+-- or (c) a data integrity issue in enterprise_contracts effective_from history.
+```
+
+**Privacy floor:** The assertion query reads `enterprise_contracts.contracted_seats` (aggregate integer) and `audit_log_events.payload.contracted_seats` (aggregate integer). No `user_id`, employee name, email, or GDPR Art. 9 data appears in either source or in the assertion output. `tenant_id` is a FORM-internal UUID. `form_api` has NO ACCESS to `enterprise_contracts` (per §91.1 table and migration 0079 RLS policy).
+
+---
+
+### §98.3 SOC 2 Criteria Mapping Supplement
+
+The following rows supplement the criteria coverage established in §91.3 (GUARD-E-001 primary registration).
+
+| Criterion | Supplement from DEC-069 / §35 | Evidence |
+|---|---|---|
+| **CC6.3** | **Guard limit reconstruction is deterministic and does not depend on volatile database state.** `getGuardConfig()` resolves `contracted_seats` from `enterprise_contracts` (billing record), not from a real-time `COUNT(tenant_users)`. The §35.7 three-step protocol enables a CC6.3 auditor to reconstruct the exact guard limit at any historical `scim.bulk_deprovision_blocked` event using only: (a) the `enterprise_contracts` row effective at block time T and (b) the preceding `scim.bulk_deprovision_threshold_updated` DEC-030 chain event. The `payload.contracted_seats` shortcut field provides direct verification. This reconstruction does not require querying live `tenant_users` state or the WAL transaction log. | GUARD-E-001 quarterly export (§91.2) + §98.2 assertion SQL confirming `payload.contracted_seats` matches `enterprise_contracts` at block time |
+| **A1.2** | **KV caching decouples guard evaluation from DB load during peak bulk-sync pressure.** If `getGuardConfig()` queried `COUNT(tenant_users WHERE is_active = true)` per SCIM DELETE/PATCH request (Option B, rejected by DEC-069), an N-user bulk deprovision batch would generate N concurrent COUNT queries against Supabase — creating a DB connection pressure feedback loop at the exact moment the guard is designed to activate. Option A (KV hit, zero Supabase queries after warmup) eliminates this feedback loop: the guard fires HTTP 422 immediately from the KV value, before any DB query. On KV cold-cache miss (first request or post-TTL expiry), one Supabase query populates the KV entry; subsequent requests in the same 3600s TTL window are zero-DB-cost. This decoupling is the primary anti-DoS design rationale recorded in DEC-069 §35.3 ground 1. | DEC-069 in `docs/DECISION_LOG.md`; §35.3 grounds and §35.4 `getGuardConfig()` implementation (3600s `kv.put`, single JOIN on cold-cache miss); GUARD-E-001 `scim.bulk_deprovision_blocked` export confirms guard fires at Worker layer before Supabase mutation |
+| **CC7.2** | **`system.scim_guard_cfg_cache_stale` advisory event monitors missed billing-event KV invalidations.** If `billing-event-relay`'s `SCIM_KV.delete` call fails (KV transient error), `billing-event-relay` emits `system.scim_guard_cfg_cache_stale` (LOW, 1yr) via `emit-audit-event`. This event does not page on-call (LOW severity); compliance-officer reviews stale-advisory events during the next business day. The 3600s TTL safety-net self-corrects within 1 hour without operator action. The advisory event converts a silent error path (missed KV invalidation) into an observable monitoring signal in the DEC-030 audit chain. | `system.scim_guard_cfg_cache_stale` DEC-030 events counted during GUARD-E-001 quarterly collection (see §98.4 stale-advisory cross-check SQL); zero-count quarters confirm the billing-event-relay KV invalidation path operated without errors |
+
+**Stale-advisory cross-check SQL (append to GUARD-E-001 collection):**
+
+```sql
+-- CC7.2 stale-advisory count: billing-event-relay KV delete failures during the quarter
+-- Expected: 0 rows for a healthy billing event relay; non-zero requires compliance-officer review
+SELECT
+  payload->>'tenant_id'  AS tenant_id,
+  COUNT(*)               AS stale_events,
+  MIN(created_at)        AS first_stale_at,
+  MAX(created_at)        AS last_stale_at
+FROM audit_log_events
+WHERE event_type = 'system.scim_guard_cfg_cache_stale'
+  AND created_at >= :quarter_start
+  AND created_at <  :quarter_end
+GROUP BY payload->>'tenant_id'
+ORDER BY stale_events DESC;
+-- Zero rows = advisory path operational, no missed invalidations.
+-- Non-zero: review whether a block event fired during the ≤ 3600s stale window;
+-- if blocked_event.contracted_seats < actual contracted_seats, note in GUARD-E-001 filing.
+```
+
+---
+
+### §98.4 Cross-Reference Obligations Closed or Updated by §98
+
+| Obligation source | Obligation text | Status |
+|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md §35.9` item 4 (P1/M13) | "Register `system.scim_guard_cfg_cache_stale` (LOW, 1yr) advisory event in `docs/AUDIT_LOG_SCHEMA.md §System`. Deploy updated event registry to `emit-audit-event` Worker." | 🟡 **Partially closed** — §98.3 documents the CC7.2 monitoring role and stale-advisory cross-check SQL for GUARD-E-001. The AUDIT_LOG_SCHEMA.md §System physical registration (event name, severity, retention, payload schema) remains pending per §98.5 item 1 (P1/M13). |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §35.9` item 5 (P1/M13) | "Author `compliance/fieldwork/scim-bulk-deprovision-guard.md` fieldwork guide: include §35.7 three-step audit traceability reconstruction protocol; include §34.11 GUARD-E-001 collection SQL; cross-reference `compliance/evidence/scim-guard/GUARD-E-001_<YYYY-QN>.csv` storage path. Index in `compliance/evidence/auditor-onboarding/README.md`." | 🟡 **Interim registration** — §98.2 above provides the §35.7 three-step protocol and the CC6.3 assertion SQL inline in SOC2_READINESS. The standalone `compliance/fieldwork/scim-bulk-deprovision-guard.md` fieldwork guide remains pending per §98.5 item 3 (P1/M13). |
+| Implicit pattern obligation (§90–§97 series) | Every SSO_SCIM section that introduces a SOC 2 decision or new DEC-030 event receives a SOC2_READINESS cross-reference patch. §35 (DEC-069, v2.7, 2026-06-19) introduced a CC6.3 audit traceability protocol and a new `system.scim_guard_cfg_cache_stale` advisory event but received no §90-series cross-reference patch at authoring time. | 🟢 **Closed — §98 fills the §35 gap in the §90–§97 pattern series.** |
+
+---
+
+### §98.5 Implementation Checklist
+
+#### P1 — Before enterprise GA (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.scim_guard_cfg_cache_stale` (LOW severity, 1yr retention) in `docs/AUDIT_LOG_SCHEMA.md §System`. Payload schema: `{ "tenant_id": "<uuid>", "kv_key": "scim:guard_cfg:<tenantId>", "error_message": "<string>", "emitted_at": "<ISO-8601>" }`. Deploy updated event name to `emit-audit-event` Worker. Cross-reference §35.5 (`billing-event-relay` emit call). | compliance-officer + platform-engineer | **P1** | M13 | [ ] |
+| 2 | Add §98.2 `contracted_seats` assertion SQL and §98.3 stale-advisory cross-check SQL to §91.2 GUARD-E-001 collection procedure (in-place extension of the §91.2 SQL block). Mark §35.9 item 4 as `[x] Done (2026-06-20, SOC2_READINESS §98)` in `docs/SSO_SCIM_IMPLEMENTATION.md §35.9`. | compliance-officer | **P1** | M13 | [ ] |
+| 3 | Author `compliance/fieldwork/scim-bulk-deprovision-guard.md` standalone fieldwork guide. Required sections: (a) BDG purpose and architecture (refs §34 + §35); (b) §35.7 three-step reconstruction protocol with sample `psql` commands; (c) GUARD-E-001 full collection SQL (§91.2 + §98.2 assertion + §98.3 stale-advisory); (d) zero-event attestation procedure; (e) privacy floor attestation (no employee data in any output). Index in `compliance/evidence/auditor-onboarding/README.md`. Mark §35.9 item 5 as `[x] Done` on completion. | compliance-officer | **P1** | M13 | [ ] |
+
+#### P1 — Before first GUARD-E-001 filing (M14)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | At M14 GUARD-E-001 collection: (a) run §91.2 primary export SQL; (b) run §98.2 `contracted_seats` assertion SQL — must return 0 rows; (c) run §98.3 stale-advisory cross-check SQL — document count (zero is expected; non-zero requires a note explaining whether the ≤ 3600s stale window overlapped any block event); (d) file combined output at `compliance/evidence/scim-guard/GUARD-E-001_<YYYY-QN>.csv`; (e) append SHA-256 to MASTER-INDEX. | compliance-officer | **P1** | M14 | [ ] |
 
 ---
 

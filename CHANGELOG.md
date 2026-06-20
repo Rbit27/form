@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.71.1] — 2026-06-20
+
+### Changed
+- `docs/SOC2_READINESS.md` — §98 Cross-Reference Patch: SSO_SCIM §35 (DEC-069 · OQ-SSO-34.2) · BDG `getGuardConfig()` seat source audit traceability (CC6.3 / A1.2 / CC7.2). Supplements §91 (GUARD-E-001) with §35.7 three-step reconstruction protocol, `contracted_seats` assertion SQL, A1.2 KV decoupling rationale, and `system.scim_guard_cfg_cache_stale` CC7.2 advisory monitoring signal. SOC 2 doc v3.21.2 → v3.22.0.
+- `VERSION` — 6.71.0 → 6.71.1.
+
+---
+
 ## [6.71.0] — 2026-06-20
 
 ### Added
