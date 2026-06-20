@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.78.0] — 2026-06-20
+
+### Added
+- `content/post-41-discipline-vs-programming-error.md` — Editorial series post 41. «Де закінчується дисципліна — і починається помилка у програмуванні» — п'ять маркерів розмежування: RPE-дрейф, нульовий прогрес 4+ тижнів, технічна регресія у свіжому стані, зникнення варіативності відповіді, відчуття «відбуваю номер»; три рішення (деловантаження+переоцінка / мікроадаптація / перебудова блоку) з алгоритмом вибору; чотирикроковий діагностичний алгоритм; Peterson 2011 (adherence), Hubal 2005 (варіабельність відгуку), Schoenfeld 2010 (progressive overload), Ralston 2017 (1 ефективний підхід), Meeusen et al. 2013 (NFOR у мотивованих атлетів), Zatsiorsky & Kraemer 2006 (принцип варіативності). clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — post-41 card додано перед post-1680.
+- `STATUS.md` — post-41 → draft v6.78.0; blog.html updated; README 266–270 proposed.
+- `README.md` — post-41 → draft · v6.78.0; posts 266–270 added as proposed.
+- `VERSION` — 6.77.0 → 6.78.0.
+
+---
+
 ## [6.77.0] — 2026-06-20
 
 ### Added
