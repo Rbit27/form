@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.83.0] — 2026-06-20
+
+### Added
+- `content/post-42-video-technique-analysis.md` — Editorial post-42 (founder voice · George). Відеоаналіз власної техніки: проприоцептивна ілюзія і розрив між наміром і реалізацією. Ракурси зйомки та що кожен показує (сагітальний, фронтальний, 45°). Технічні маркери для чотирьох основних рухів (присідання, жим, станова, тяга). Де камера принципово сліпа: м'язова активація, IAP, суб'єктивне RPE, структурна морфологія. Типові помилки при перегляді відео (порівняння з елітою, вибір «найкращого» кадру, аналіз без фокусу). Практичний протокол: одне питання → один важкий підхід → одна корекція → цикл. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — added card for post-42-video-technique-analysis (Training Methodology · 13 хв · editorial founder voice).
+- `STATUS.md` — 11–50 row updated: post-42-video-technique-analysis added v6.83.0.
+- `README.md` — Editorial series header updated: 11–42 drafted. post-42 → draft · v6.83.0. Posts 891–895 proposed (нові теми self-coached атлет).
+- `VERSION` — 6.82.0 → 6.83.0.
+
 ## [6.82.0] — 2026-06-20
 
 ### Added
