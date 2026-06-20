@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.79.0] — 2026-06-20
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §"Enterprise Seat Expansion & Tier Upgrade events"` (v2.21 → v2.22) — Registers four DEC-030 HMAC-chained events from `docs/COST_MODEL.md §41.7` (P0/M10): (1) `enterprise.expansion_initiated` (STANDARD, 7yr) — anchor event on DocuSign countersignature; `amendment_id` UUID correlates the expansion cluster; `floor_respected: z.literal(true)` chain invariant (HTTP 422 if absent); `trigger_type` (csm_initiated / tenant_initiated / milestone_driven); `approved_by` authority enum; `decision_log_ref` required when `discount_pct > 15`. (2) `billing.seats_expanded` (STANDARD, 7yr) — first full AUDIT_LOG_SCHEMA registration; DATA_MODEL §24.5.1 baseline fields (`tenant_id`, `previous_seats`, `new_seats`, `price_per_seat_usd_cents`) + COST_MODEL §41.7.2 financial extension (`expansion_arr_usd`, `net_invoice_usd`, `billing_variant`, `amendment_id`, `floor_respected: z.literal(true)`); EXP-CHAIN-01 successor (HTTP 422 if `expansion_initiated` absent); BDG KV cache-invalidation trigger (SSO_SCIM §35.7). (3) `enterprise.tier_upgraded` (STANDARD, 7yr) — emitted only when `tier_crossing: true` (EXP-CHAIN-02); `old_rate_per_seat_usd`, `new_rate_per_seat_usd`, `tier_crossing_credit_usd`, `multi_year_commitment`. (4) `enterprise.expansion_floor_enforced` (HIGH, 7yr) — emitted synchronously when Admin Console detects `proposed_rate < floor`; FLOOR-CHAIN-01 predecessor to `expansion_initiated`; `requested_rate_usd`, `floor_rate_usd`, `applied_rate_usd`, `floor_source: literal('COST_MODEL_§31.5')`, `founder_approval_required`. Three chain invariants: EXP-CHAIN-01 (`billing.seats_expanded` follows `expansion_initiated`, HTTP 422); EXP-CHAIN-02 (`tier_upgraded` when `tier_crossing: true`, HTTP 422); FLOOR-CHAIN-01 (`expansion_floor_enforced` precedes `expansion_initiated`). Four Zod v2 schemas registered (`ExpansionInitiatedPayload`, `SeatsExpandedPayload`, `TierUpgradedPayload`, `ExpansionFloorEnforcedPayload`). SOC 2 artefacts: EXP-E-001 (CC5.2/CC1.4 annual; 7yr; `compliance/evidence/expansion/EXP-E-001_<YYYY>.csv`) and EXP-E-002 (CC4.1 quarterly; 3yr; `compliance/evidence/expansion/EXP-E-002_<YYYY>-Q<N>.csv`); registration in SOC2_READINESS §79.4/§80.3 pending P1/M11. Retention table: +4 rows. Privacy floor: no `user_id`, no employee name/email, no health data; aggregate contract-level only; `enterprise_contracts` financial rate columns `form_api` REVOKED.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — version v2.21 → v2.22; retention table +4 rows; v2.22 footer entry added.
+- `docs/COST_MODEL.md §41.10` — checklist item 1 (P0/M10) marked `[x] Done (2026-06-20, AUDIT_LOG_SCHEMA v2.22)`. Document header v2.7 unchanged (patch-level status update).
+- `VERSION` — 6.78.0 → 6.79.0.
+
+---
+
 ## [6.78.0] — 2026-06-20
 
 ### Added
