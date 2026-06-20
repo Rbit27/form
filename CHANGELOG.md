@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [6.74.0] — 2026-06-20
+
+### Added
+- `content/post-1661-bench-accessory-logic.md` — Block 1631–1680 Cluster 4, post 1/10. Логіка допоміжної роботи для жиму лежачи: три типи обмежувачів (м'язовий, позиційний, стабілізаційний), три зони підйому, відео- і відчуттєва діагностика, принцип вибору допоміжки. clinical-safety: NOT_REQUIRED.
+- `content/post-1662-bench-triceps-accessory.md` — Cluster 4 post 2/10. Трицепси у жимі: анатомія трьох головок, ознаки локаут-дефіциту, close grip bench, JM press, board press, overhead extension. Диференціація м'язового vs. позиційного дефіциту. clinical-safety: NOT_REQUIRED.
+- `content/post-1663-bench-chest-accessory.md` — Cluster 4 post 3/10. Грудні у нижній точці ROM: чому нижня точка найважча, як bounce маскує дефіцит, pause bench, Larsen press, dumbbell bench як повний-ROM варіант, зв'язок leg drive з нижньою точкою. clinical-safety: NOT_REQUIRED.
+- `content/post-1664-bench-front-delts-accessory.md` — Cluster 4 post 4/10. Передні дельти і середня фаза: роль дельти у горизонтальному жимі, incline bench, overhead press, front raise, ризик перетренованості дельти при великому обсязі жиму. clinical-safety: NOT_REQUIRED.
+- `content/post-1665-bench-upper-back-arch-accessory.md` — Cluster 4 post 5/10. Верхня спина і arch: функція ретракції лопаток, barbell row, chest-supported row, face pull, lat pulldown, правило 1:1 тяг і жимів, arch у грудному vs. поперековому відділі. clinical-safety: NOT_REQUIRED.
+- `content/post-1666-bench-core-leg-drive-accessory.md` — Cluster 4 post 6/10. Корс і leg drive: ланцюг ноги→корс→arch→гриф, ознаки відсутнього leg drive, Larsen press як діагностика, farmer's carry, технічна відпрацювання включення ніг, arch і безпека попереку. clinical-safety: NOT_REQUIRED.
+- `content/post-1667-bench-grip-wrist-accessory.md` — Cluster 4 post 7/10. Хват і зап'ясток: правильне положення грифа у долоні, нейтральне зап'ясток, «закрутка» грифа, wrist extension, farmer's carry для хвату, ширина хвату і зміна навантаження, коли бинти маскують проблему. clinical-safety: NOT_REQUIRED.
+- `content/post-1668-bench-rotator-cuff-accessory.md` — Cluster 4 post 8/10. Ротаторна манжета: чотири м'язи і їх роль у стабілізації суглоба, зовнішня ротація, face pull, band pull-apart, Y/T/W/L raises, кут опускання і навантаження на манжету, дисбаланс ротаторів при великому обсязі жиму. clinical-safety: NOT_REQUIRED.
+- `content/post-1669-bench-accessory-selection-protocol.md` — Cluster 4 post 9/10. Протокол добору: симптом → тип дефіциту → вправа → цикл оцінки. Таблиця рішень, типові помилки, мінімальний стек без діагнозу, частота оцінки результату. clinical-safety: NOT_REQUIRED.
+- `content/post-1670-cluster4-synthesis-bench-accessory.md` — Cluster 4 post 10/10 (синтез). Карта обмежувачів жиму лежачи, кроки діагностики, типові помилки, базовий стек, горизонти адаптації, зв'язок із Cluster 5. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — posts 1661–1670 додані перед post-1660 (Cluster 4 COMPLETE).
+- `STATUS.md` — Block 1631–1680 Cluster 4 COMPLETE 40/50 · v6.74.0; наступний Cluster 5.
+- `VERSION` — 6.73.1 → 6.74.0.
+
+---
+
 ## [6.73.1] — 2026-06-20
 
 ### Changed
