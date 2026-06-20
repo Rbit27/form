@@ -1,4 +1,4 @@
-# FORM · Project Status v6.61.0
+# FORM · Project Status v6.63.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v6.61.0** — 2026-06-20
+**v6.63.0** — 2026-06-20
 
 ---
 
@@ -146,8 +146,8 @@
 - Block 1401–1450: **COMPLETE 50/50 · v6.34.0** — тема: Тренування 35–55 (DEC-068). BLOCK COMPLETE. blog.html updated to post-1450. sports-scientist review required before publish.
 - Block 1451–1500: **COMPLETE 50/50 · v6.45.0** — тема: Переодизація та довгострокове програмування (DEC-073). Cluster 1 COMPLETE v6.36.0 (posts 1451–1460). Cluster 2 COMPLETE v6.38.0 (posts 1461–1470). Cluster 3 COMPLETE v6.40.0 (posts 1471–1480). Cluster 4 COMPLETE v6.43.0 (posts 1481–1490). **Cluster 5 COMPLETE v6.45.0** (posts 1491–1500 · Практична побудова власного плану): авторегуляція RPE/RIR (1491), DUP і тижнева варіація (1492), коли змінювати програму (1493), перехід між блоками (1494), мікро-мезо-макроцикл (1495), п'ять помилок програмування (1496), читання програми між блоками (1497), від шаблону до персоналізованої (1498), програмування без тренера (1499), **block synthesis (1500)**. blog.html updated to post-1500. clinical-safety: NOT_REQUIRED all. sports-scientist review required before publish. **BLOCK COMPLETE.**
 - Block 1556–1570: **COMPLETE 15/15 · v6.51.0** — тема: Практична оцінка тренувального прогресу без тренера. Cluster 1 COMPLETE v6.47.0 (posts 1556–1560 · Інструменти оцінки прогресу): opener (1556), e1RM (1557), RPE-тренд (1558), відеоаналіз (1559), тижневий огляд-синтез (1560). Cluster 2 COMPLETE v6.49.0 (posts 1561–1565 · Плато vs. шум — діагностика справжньої стагнації): визначення плато (1561), джерела шуму (1562), три типи стагнації (1563), діагностичний протокол (1564), матриця рішень (1565). **Cluster 3 COMPLETE v6.51.0** (posts 1566–1570 · Стратегії виходу з плато): вихід з тренувальної стагнації — 4 важелі (1566), вихід з відновлювальної стагнації — деловантаж + аудит (1567), вихід з технічної стагнації — локалізація обмежувача + корекційний блок (1568), межі self-coached протоколу (1569), **block synthesis — операційна система 3 рівнів (1570)**. blog.html updated to post-1570. clinical-safety: NOT_REQUIRED all. sports-scientist review required before publish. **BLOCK COMPLETE 15/15 · v6.51.0.**
-- Block 1571–1620: **Cluster 4 COMPLETE 10/10 · v6.61.0** — тема: Техніка великих рухів (DEC-075). Cluster 1 COMPLETE v6.53.0 (posts 1571–1580 · Присідання). Cluster 2 COMPLETE v6.57.0 (posts 1581–1590 · Становий підйом та варіації). Cluster 3 COMPLETE v6.59.0 (posts 1591–1600 · Жим лежачи та варіації). **Cluster 4 COMPLETE v6.61.0** (posts 1601–1610 · Підтягування та горизонтальна тяга): що таке «правильне» підтягування (1601), антропометрія і вибір хвату — ширина/тип/кут (1602), EMG-дані підтягування і row — Signorile (2002), Fenwick (2009) (1603), механіка лопатки — 4 фази, 3 типи порушень, 3 тести (1604), варіації горизонтальної тяги і матриця вибору (1605), ROM і часткові повтори — McMahon et al., Pedrosa et al. (1606), відеодіагностика двох ракурсів і пріоритети P0–P3 (1607), три типи технічних обмежувачів і матриця корекції (1608), п'ять ступенів прогресії від нуля до навантаженого (1609), синтез кластеру 4 (1610). blog.html updated to post-1610. clinical-safety: NOT_REQUIRED all. sports-scientist review required before publish. **Наступний: Cluster 5 (posts 1611–1620 · Вертикальний жим та жим над головою).**
+- Block 1571–1620: **Cluster 5 COMPLETE 10/10 · v6.63.0** — тема: Техніка великих рухів (DEC-075). Cluster 1 COMPLETE v6.53.0 (posts 1571–1580 · Присідання). Cluster 2 COMPLETE v6.57.0 (posts 1581–1590 · Становий підйом та варіації). Cluster 3 COMPLETE v6.59.0 (posts 1591–1600 · Жим лежачи та варіації). Cluster 4 COMPLETE v6.61.0 (posts 1601–1610 · Підтягування та горизонтальна тяга). **Cluster 5 COMPLETE v6.63.0** (posts 1611–1620 · Вертикальний жим та жим над головою): правильний OHP і варіативність (1611), антропометрія і хват — biacromial distance (1612), EMG-дані — Saeterbakken & Fimland 2013, Schwanbeck 2009 (1613), механіка лопатки — 4 фази, 3 порушення, 3 тести (1614), варіації і матриця вибору (1615), ROM і локаут — McMahon 2014, Pedrosa 2022 (1616), відеодіагностика двох ракурсів і P0–P3 (1617), три типи обмежувачів і матриця корекції (1618), п'ять ступенів прогресії від нуля до навантаженого (1619), синтез кластеру 5 (1620). blog.html updated to post-1620. clinical-safety: NOT_REQUIRED all. sports-scientist review required before publish. **Наступний: Cluster 6 (posts 1621–1630 · тема TBD).**
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v6.61.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v6.63.0**
