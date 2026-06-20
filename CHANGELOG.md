@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [6.83.1] — 2026-06-20
+
+### Changed
+- `docs/OBSERVABILITY.md §6.2` — four SCIM / SSO security alert subsections integrated from §26.8 into the consolidated §6.2 Alert Rules table: `mass_deprovision` (AL-SCIM-MASS-01 — SCIM mass deprovisioning ≥ 10% of seats, P0/P1 dual-level, `docs/INCIDENT_RESPONSE.md R-24`), `scim_endpoint_operations` (AL-SCIM-01 sensitive attribute burst P1, AL-SCIM-02 5xx spike P2, AL-SCIM-03 sync stall P2, AL-SCIM-04 chain invariant violation P1 + R-05 co-activate), `scim_role_history` (AL-SCIM-05 nightly reconciliation gap P2), `sso_browser_security` (AL-SSO-WEB-01 mobile WebView blocked P1 — zero-fire expected state). These subsections were defined in §26.7a/b/c and §26.8 with explicit "(new subsection in §6.2, insert after …)" markers but had not been physically integrated into the §6.2 consolidated table. SOC 2 CC7.2: §26.11's claim of "twenty-one alert rules" covering AL-SCIM-MASS-01, AL-SCIM-01..04, AL-SCIM-05 is now accurate in §6.2. Document header v4.7.2 → v4.7.3.
+- `docs/SOC2_READINESS.md §73` — checklist item 10 (P1/M6: add AL-C1-01 to §6.2 `c1_erasure_sla` subsection) marked `[x] Done — 2026-06-09, OBSERVABILITY.md v2.0` — the subsection existed since OBSERVABILITY v2.0 but the SOC2 checklist had not been updated.
+- `VERSION` — 6.83.0 → 6.83.1.
+
 ## [6.83.0] — 2026-06-20
 
 ### Added

@@ -24789,7 +24789,7 @@ Four new events for Confidentiality TSC operational monitoring. All adhere to th
 | 7 | Add C1-CHAIN-02 (encryption verification gap > 380 days) to the weekly HMAC batch processor alongside CRYPTO-CHAIN-01/02 (OBSERVABILITY.md §30.6). | platform-engineer | **P1** | M6 | [ ] |
 | 8 | Run first quarterly data asset inventory review (§73.2.2): open `compliance/c1/data-asset-inventory.md`; confirm no new stores or reclassifications needed; append revision history entry; emit `compliance.data_asset_inventory_reviewed` DEC-030 event; file PRE-73-E-002 v1 in `compliance/evidence/c1/nda-register-2026-Q2.csv`. | compliance-officer | **P1** | M6 | [ ] |
 | 9 | Update §51 Consolidated Gap Register: mark C1-GAP-001 as 🟡 Authored with reference to §73 and PRE-73-E-001. | compliance-officer | **P1** | M5 | [ ] |
-| 10 | Add AL-C1-01 to the canonical §6.2 Alert Rules table in `docs/OBSERVABILITY.md` under a new `c1_erasure_sla` subsection (analogous to §29.5 `pam_session_health`). | devops-lead | **P1** | M6 | [ ] |
+| 10 | Add AL-C1-01 to the canonical §6.2 Alert Rules table in `docs/OBSERVABILITY.md` under a new `c1_erasure_sla` subsection (analogous to §29.5 `pam_session_health`). | devops-lead | **P1** | M6 | [x] Done — 2026-06-09, OBSERVABILITY.md v2.0 §6.2 `c1_erasure_sla` subsection |
 
 #### P2 — Before Observation Period Close
 
