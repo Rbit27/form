@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.20
+# FORM · Multi-Tenant Data Model v1.21
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -15520,6 +15520,358 @@ Full auditor narratives, SQL collection queries, and cadence specifications are 
 | **OQ-ADO-01** | Are the `docs/COST_MODEL.md §40.5` renewal probability proxy estimates (Green ~95%, Amber ~75%, Red ~40% post-intervention) accurate for FORM's enterprise customers? Model derives from SaaS wellness benchmarks, not FORM-specific renewal data. | P2 | customer-success + data-engineer | Calibrate after first 5 enterprise renewals (est. M18). If variance > 15pp in any band, update §40.5 and document in DECISION_LOG. |
 | **OQ-ADO-02** | Can the per-tenant k-anonymity floor (`coaching_engaged_seats < 5` suppressed) be configured by tenant size? A 500-seat enterprise might argue the threshold is too conservative. | P2 | compliance-officer + enterprise-architect | Default n ≥ 5 is non-waivable globally; configure only downward (stricter) on customer request. Upward configuration is prohibited. Evaluate formally if > 3 enterprise customers raise this in QBR notes. |
 | **OQ-ADO-03** | Should `coaching_sessions_total` and `coaching_engaged_seats` include CV (computer vision) pose sessions or only Victor text/voice coaching sessions? CV session inclusion requires a DPIA update before CV enterprise go-live. | P1 | platform-engineer + compliance-officer | Blocked pending DPIA update for CV enterprise. Resolve before first tenant with CV enabled is added to `enterprise_adoption_snapshots`. |
+
+---
+
+*v1.21 (2026-06-20): §42 `enterprise_contracts` Expansion Tracking Schema Extension — Migration 0083. Closes cross-reference obligation from `docs/COST_MODEL.md §41.6` (v2.7, 2026-06-20): §41.6 defined the DDL, §41.6.2/§41.6.3 defined RLS behaviour and `contracted_seats` relationship — all cross-referencing `docs/DATA_MODEL.md §42` as the canonical DATA_MODEL section. §42.1 purpose + four design principles (additive-only migration, `contracted_seats` billing authority unchanged, no new user data, BDG KV invalidation on expansion). §42.2 migration dependency chain (0083 terminal in expansion cluster; must follow 0078 for adoption snapshots and 0082 for CAEP re-registration columns). §42.3 full DDL from COST_MODEL §41.6.1: four ADD COLUMNs (`initial_seats`, `current_seats`, `expansion_count`, `last_expansion_date`), back-fill UPDATE, two partial indexes. §42.4 column semantics: `contracted_seats` (existing, billing-authoritative for BDG) vs. `current_seats` (mirrors `contracted_seats` post-expansion; tracks divergence during amendment) vs. `initial_seats` (immutable at contract signing; denominator for expansion ratio); `expansion_count` SMALLINT increment invariant. §42.5 RLS behaviour: unchanged from §16; four policies apply to new columns without modification; `tenant_admin/owner` SELECT includes new columns; `tenant_manager` (HR) excluded — column data is contract-level commercial metadata, not individual health data. §42.6 BDG cache invalidation: `billing.seats_expanded` DEC-030 post-event hook triggers `SCIM_KV.delete('scim:guard_cfg:{tenantId}')` — ensures `getGuardConfig()` re-queries `contracted_seats` within seconds of amendment approval; 3600s safety-net TTL per SSO_SCIM §35. §42.7 four DEC-030 HMAC-chained events (authoritative Zod v2 schemas and privacy floor documentation in COST_MODEL §41.7): `enterprise.expansion_initiated` (STANDARD, 7yr), `billing.seats_expanded` financial extension (STANDARD, 7yr), `enterprise.tier_upgraded` (STANDARD, 7yr), `enterprise.expansion_floor_enforced` (HIGH, 7yr — `floor_respected: true` chain invariant, HTTP 422 if absent). §42.8 two SOC 2 evidence artefacts: EXP-E-001 (CC5.2/CC1.4, annual `billing.seats_expanded` export with `floor_respected: true` attestation, 7yr, `compliance/evidence/expansion/`; registered in SOC2_READINESS v3.23.0 §79.4/§80.3/§80.4 — 2026-06-20) and EXP-E-002 (CC4.1, quarterly adoption health band vs. expansion pipeline cross-reference, 3yr). §42.9 seven-item implementation checklist: 3× P0/M10 (migration 0083 deploy + EXPLAIN ANALYZE on both indexes, BDG KV cache invalidation hook implementation + integration test, Admin Console expansion amendment workflow), 3× P1/M11 (CSM expansion playbook triggered by `qbr_completed`, Admin Console expansion history panel, first EXP-E-001 zero-count quarterly filing), 1× P1-outside-counsel/M12 (OQ-EXP-03 tier-upgrade contract structure — pure tier upgrade blocked until resolved). §42.10 one open question (OQ-EXP-03 from COST_MODEL §41.11 — P1, outside counsel required). TOC entry §42 added. Header updated v1.20 → v1.21. Privacy floor: `initial_seats`, `current_seats`, `expansion_count`, `last_expansion_date` are aggregate contract-level integers and a calendar date — no `user_id`, no employee name, no email, no health metric, no coaching content, no GDPR Art. 9 special category data in any new column or DEC-030 event payload. Cross-references: `docs/COST_MODEL.md §41` (authoritative DDL, DEC-030 Zod v2 schemas, discount authority matrix, implementation checklist — COST_MODEL §41.6 cross-reference obligation closed by this §42); `docs/SOC2_READINESS.md §79.4/§80.3/§80.4` (EXP-E-001/EXP-E-002 evidence artefacts + auditor narratives — registered v3.23.0 2026-06-20); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Seat Expansion & Tier Upgrade events` (four DEC-030 events registered v2.22 — COST_MODEL §41.10 item 1, done 2026-06-20); `docs/SSO_SCIM_IMPLEMENTATION.md §35` (BDG `getGuardConfig()` — sources `contracted_seats` with 3600s KV cache + event-driven invalidation on `billing.seats_expanded`); `docs/DATA_MODEL.md §16` (`enterprise_contracts` baseline DDL — §42 is an additive extension, not a replacement); `docs/DATA_MODEL.md §41` (adoption snapshots — `evidence-collection-cron` reads `contracted_seats` from `enterprise_contracts` for each active tenant; §42 columns enable expansion ratio computation); `docs/DECISION_LOG.md` (OQ-EXP-03 — tier upgrade contract structure; resolution pending outside counsel). Owner: enterprise-architect + compliance-officer + platform-engineer.*
+
+---
+
+## 42. `enterprise_contracts` Expansion Tracking Schema Extension — Migration 0083
+
+> Owner: `enterprise-architect` + `compliance-officer` + `platform-engineer`. Review: before first enterprise pilot go-live (M10), on any contract structure change, and annually.
+> Scope: enterprise tier only. Additive extension to `enterprise_contracts` (§16). No columns dropped or renamed. No new table created.
+> References: `docs/COST_MODEL.md §41` (authoritative source for DDL, discount authority, DEC-030 Zod v2 schemas, and implementation checklist); `docs/SOC2_READINESS.md §79.4/§80.3/§80.4` (EXP-E-001/EXP-E-002 evidence artefacts — registered v3.23.0, 2026-06-20); `docs/SSO_SCIM_IMPLEMENTATION.md §35` (BDG `getGuardConfig()` seat source and KV cache invalidation); DEC-030 (HMAC-chained audit log); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Seat Expansion & Tier Upgrade events` (four DEC-030 events — registered v2.22, 2026-06-20).
+
+---
+
+### 42.1 Purpose and Design Principles
+
+Migration `0083_enterprise_contracts_expansion_fields.sql` closes the schema gap between COST_MODEL §41 (seat expansion economics) and the `enterprise_contracts` table defined in §16. Before this migration, the table tracked only the instantaneous `contracted_seats` count — there was no record of whether that seat count had ever changed or how many times it had grown. Mid-contract expansions could not be attributed, CSM expansion velocity dashboards had no database backing, and SOC 2 evidence for the floor-enforcement invariant (EXP-E-001) had no stable query anchor.
+
+**Four design principles that govern this migration:**
+
+1. **Additive only.** Four columns are added; zero dropped; zero renamed. All existing application code, RLS policies, Supabase client queries, and BDG cache keys remain valid after migration 0083 is applied.
+
+2. **`contracted_seats` remains billing-authoritative.** This column (§16.4) is the single source of truth for `getGuardConfig()` (SSO_SCIM §35), `assertFeatureEnabled()` (§19), and all BDG enforcement decisions. The new `current_seats` column mirrors `contracted_seats` as a human-readable expansion journal, but it does not replace `contracted_seats` for any billing or entitlement purpose.
+
+3. **No new user data of any kind.** `initial_seats`, `current_seats`, `expansion_count`, and `last_expansion_date` are aggregate integers and a calendar date at the contract level. No `user_id`, no employee name, no email, no health metric, and no GDPR Art. 9 special category data is introduced by this migration.
+
+4. **BDG KV invalidation fires on every `contracted_seats` update.** The `billing.seats_expanded` DEC-030 post-event hook (SSO_SCIM §35.5) deletes the BDG KV cache key `scim:guard_cfg:{tenantId}` within seconds of any seat count change — ensuring the guard limit never lags an expansion approval by more than the 3600s safety-net TTL.
+
+**Privacy floor:** No individual employee `user_id`, name, email, health values (heart rate, body composition, workout load), coaching session content, or GDPR Art. 9 special category data is stored in any column added by this migration, used in any DEC-030 event payload, or included in any SOC 2 evidence artefact from this extension. All values are aggregate contract-level integers or dates. `tenant_id` is a FORM-internal UUID never shared in marketing or external reports.
+
+---
+
+### 42.2 Migration Dependency Chain
+
+```sql
+-- Migration order (must be applied sequentially):
+-- 0078_enterprise_adoption_snapshots.sql   (§41 — new table; no dependency on enterprise_contracts)
+-- 0082_sso_caep_reregistration.sql         (SSO_SCIM §36 — CAEP columns on tenant_sso_configs)
+-- 0083_enterprise_contracts_expansion_fields.sql  (this section — additive to enterprise_contracts)
+
+-- Dependency graph:
+--   0083 modifies enterprise_contracts, which already exists from §16 initial migrations.
+--   0083 has no FK dependencies on 0078 or 0082 — ordering constraint is by convention,
+--   not by schema graph, to match the logical development sequence in COST_MODEL §41.
+--
+-- Safe to run on a live database with zero downtime:
+--   ALTER TABLE … ADD COLUMN IF NOT EXISTS with a DEFAULT is a metadata-only operation in
+--   Postgres 11+ — no table rewrite, no lock escalation beyond AccessShareLock during DDL.
+--   The back-fill UPDATE (below) runs after the ADD COLUMNs and may take seconds on large
+--   tables; should be run in a migration window, not via Supabase auto-migration in production.
+```
+
+---
+
+### 42.3 DDL — Migration 0083
+
+**Authoritative source: `docs/COST_MODEL.md §41.6.1`**
+
+```sql
+-- Migration: 0083_enterprise_contracts_expansion_fields.sql
+-- Backwards-compatible additive migration; no DROP, no RENAME.
+-- Run after migration 0082 (CAEP reregistration columns on tenant_sso_configs) is applied.
+
+ALTER TABLE enterprise_contracts
+  ADD COLUMN IF NOT EXISTS initial_seats       INTEGER   NOT NULL DEFAULT 0
+                           CHECK (initial_seats >= 0),
+  ADD COLUMN IF NOT EXISTS current_seats       INTEGER   NOT NULL DEFAULT 0
+                           CHECK (current_seats >= initial_seats),
+  ADD COLUMN IF NOT EXISTS expansion_count     SMALLINT  NOT NULL DEFAULT 0
+                           CHECK (expansion_count >= 0),
+  ADD COLUMN IF NOT EXISTS last_expansion_date DATE      NULL;
+
+COMMENT ON COLUMN enterprise_contracts.initial_seats       IS 'Seats at contract signing; immutable after first expansion.';
+COMMENT ON COLUMN enterprise_contracts.current_seats       IS 'Current contracted seats including all mid-contract expansions.';
+COMMENT ON COLUMN enterprise_contracts.expansion_count     IS 'Number of approved mid-contract expansion events on this contract.';
+COMMENT ON COLUMN enterprise_contracts.last_expansion_date IS 'Date of most recent approved expansion; NULL if no expansion has occurred.';
+
+-- Back-fill: for existing contracts, initial_seats = current_seats = contracted_seats.
+-- contracted_seats is the authoritative billing seat count and is not removed by this migration.
+UPDATE enterprise_contracts
+   SET initial_seats = contracted_seats,
+       current_seats = contracted_seats
+ WHERE initial_seats = 0;
+
+-- Index: CSM expansion velocity dashboard (accounts sorted by expansion count)
+CREATE INDEX IF NOT EXISTS idx_ec_expansion_count
+    ON enterprise_contracts (expansion_count DESC)
+    WHERE expansion_count > 0;
+
+-- Index: finance query (expansions within a date range)
+CREATE INDEX IF NOT EXISTS idx_ec_last_expansion_date
+    ON enterprise_contracts (last_expansion_date)
+    WHERE last_expansion_date IS NOT NULL;
+```
+
+**Staging validation checklist (run before applying to production):**
+
+```sql
+-- 1. Confirm ADD COLUMNs landed with correct types and defaults:
+SELECT column_name, data_type, column_default, is_nullable
+  FROM information_schema.columns
+ WHERE table_name = 'enterprise_contracts'
+   AND column_name IN ('initial_seats','current_seats','expansion_count','last_expansion_date')
+ ORDER BY column_name;
+-- Expected: initial_seats INTEGER DEFAULT 0 NOT NULL; current_seats INTEGER DEFAULT 0 NOT NULL;
+--           expansion_count SMALLINT DEFAULT 0 NOT NULL; last_expansion_date DATE NULL.
+
+-- 2. Confirm back-fill correctness (all existing rows should have initial_seats = contracted_seats):
+SELECT COUNT(*) AS unfilled
+  FROM enterprise_contracts
+ WHERE initial_seats = 0 AND contracted_seats > 0;
+-- Expected: 0
+
+-- 3. Verify partial index on expansion_count (only rows where expansion_count > 0 appear):
+EXPLAIN (ANALYZE, BUFFERS)
+  SELECT tenant_id, expansion_count
+    FROM enterprise_contracts
+   WHERE expansion_count > 0
+   ORDER BY expansion_count DESC;
+-- Expected: Index Scan using idx_ec_expansion_count (at ≥ 50 synthetic rows with expansion_count > 0)
+
+-- 4. Verify partial index on last_expansion_date:
+EXPLAIN (ANALYZE, BUFFERS)
+  SELECT tenant_id, last_expansion_date
+    FROM enterprise_contracts
+   WHERE last_expansion_date BETWEEN '2026-01-01' AND '2026-12-31';
+-- Expected: Index Scan using idx_ec_last_expansion_date
+
+-- 5. Confirm CHECK constraint enforcement (current_seats >= initial_seats):
+INSERT INTO enterprise_contracts (tenant_id, contracted_seats, initial_seats, current_seats, ...)
+VALUES ('test-tenant', 100, 200, 150, ...);
+-- Expected: ERROR: new row violates check constraint "enterprise_contracts_current_seats_check"
+-- (current_seats=150 < initial_seats=200 is invalid)
+```
+
+---
+
+### 42.4 Column Semantics
+
+| Column | Type | Nullable | Mutability | Meaning |
+|---|---|---|---|---|
+| `contracted_seats` (existing) | INTEGER | NOT NULL | Updated on every approval | Billing-authoritative seat count; used by BDG `getGuardConfig()`, `assertFeatureEnabled()`, and all entitlement gates |
+| `initial_seats` (new) | INTEGER | NOT NULL | **Immutable after first expansion** | Seat count at contract signing; set from `contracted_seats` at back-fill time; must not be changed once `expansion_count > 0` |
+| `current_seats` (new) | INTEGER | NOT NULL | Updated in sync with `contracted_seats` | Mirrors `contracted_seats` after each approved expansion; `current_seats − initial_seats` = cumulative seat growth across the contract lifetime |
+| `expansion_count` (new) | SMALLINT | NOT NULL | Incremented on each approved expansion | Count of approved mid-contract expansions; used by CSM velocity dashboard and NRR decomposition (COST_MODEL §41.8) |
+| `last_expansion_date` (new) | DATE | NULL | Updated on each approved expansion | Calendar date of the most recent amendment approval; NULL for contracts with no expansion history |
+
+**Invariant enforced at application layer (not DDL):** `initial_seats` must not be updated once `expansion_count > 0`. The `emit-audit-event` Worker's `enterprise.expansion_initiated` handler must guard this before writing. Violation would corrupt the expansion ratio `(current_seats − initial_seats) / initial_seats` used in COST_MODEL §41.8 NRR decomposition.
+
+**Why `current_seats` and `contracted_seats` coexist:** `contracted_seats` is the legacy column referenced across multiple Workers, RLS expressions, and the BDG cache — changing its semantic would require a flag day across all consumers. `current_seats` is introduced as a clean journaling column that always mirrors `contracted_seats` but carries explicit intent (its name signals "this has been updated during the contract term") while `contracted_seats` remains the billing anchor.
+
+**`last_expansion_date` is a DATE, not TIMESTAMPTZ:** Amendment counter-signature timestamps are stored in the `enterprise.expansion_initiated` DEC-030 event payload (`signed_at: z.string().datetime()`). The `last_expansion_date` column stores only the calendar date — sufficient for CSM dashboards and finance date-range queries, and avoids timezone-awareness complexity at the DDL layer.
+
+---
+
+### 42.5 RLS Behaviour
+
+The RLS policies on `enterprise_contracts` defined in §16.4 are unchanged by migration 0083. All four new columns are covered by the existing policies without modification:
+
+| Role | SELECT | INSERT/UPDATE/DELETE |
+|---|---|---|
+| `form_admin` | All rows, all columns (including new) | All |
+| `form_system` | All rows, all columns | All |
+| `tenant_admin`, `tenant_owner` | Own `tenant_id`, `status = 'active'` — new columns included; `arr_cents` excluded via `tenant_contract_portal` view (§16.4) | None (read-only via form_api) |
+| `form_api` | Via `tenant_contract_portal` view (excludes `arr_cents`; includes new columns except `initial_seats` — see below) | None |
+| `compliance_reviewer` | All rows, all columns via explicit grant | None (read-only) |
+| `tenant_manager` (HR) | **None — excluded by §16.4 policy** | None |
+
+**`initial_seats` in `tenant_contract_portal`:** This column is commercially sensitive (reveals at-signing seat count before any expansion, which allows the tenant to infer FORM's expansion velocity data). The `tenant_contract_portal` view should **not** expose `initial_seats` to `tenant_admin` reads via `form_api`. Add to the exclusion list alongside `arr_cents`:
+
+```sql
+-- Patch to tenant_contract_portal view (already defined in §16.4):
+-- Re-create the view to include current_seats, expansion_count, last_expansion_date
+-- but exclude initial_seats and arr_cents.
+CREATE OR REPLACE VIEW tenant_contract_portal AS
+  SELECT
+    id,
+    tenant_id,
+    contract_ref,
+    plan,
+    seats_contracted,
+    current_seats,
+    expansion_count,
+    last_expansion_date,
+    billing_period,
+    po_number,
+    start_at,
+    end_at,
+    auto_renew,
+    status
+    -- arr_cents intentionally excluded
+    -- initial_seats intentionally excluded (FORM-internal expansion benchmark)
+  FROM enterprise_contracts
+  WHERE status = 'active';
+```
+
+**Why `tenant_manager` (HR) is excluded:** The new columns record how many seats were purchased and how many times the contract was amended. While this is not individual employee data, it is commercial contract metadata that HR does not need for any legitimate workflow. The privacy floor principle ("HR never sees individual user data") extends here to commercial contract terms that are outside HR's operational scope.
+
+---
+
+### 42.6 BDG Cache Invalidation
+
+`docs/SSO_SCIM_IMPLEMENTATION.md §35` defines the BDG (Bulk-Deprovision Guard) architecture: `getGuardConfig()` reads `contracted_seats` from `enterprise_contracts` via a Supabase JOIN, caches it at `scim:guard_cfg:{tenantId}` with a 3600s safety-net TTL, and uses it to block bulk SCIM deprovisioning that would drop active users below the contracted seat floor.
+
+After migration 0083 is applied, the BDG must additionally update `current_seats`, `expansion_count`, and `last_expansion_date` as part of the `enterprise.expansion_initiated` approval flow. The sequence is:
+
+```
+1. Amendment counter-signature received by Admin Console API
+2. emit-audit-event Worker: chain enterprise.expansion_initiated DEC-030 event
+3. emit-audit-event Worker post-event hook:
+   a. UPDATE enterprise_contracts SET
+        contracted_seats   = seats_after,       -- billing-authoritative update
+        current_seats      = seats_after,        -- mirror update
+        expansion_count    = expansion_count + 1,
+        last_expansion_date = CURRENT_DATE
+      WHERE id = :contract_id;
+   b. emit billing.seats_expanded DEC-030 event (financial record)
+   c. billing-event-relay Worker: SCIM_KV.delete('scim:guard_cfg:{tenantId}')
+      (SSO_SCIM §35.5 — invalidates BDG cache; next getGuardConfig() call re-queries Supabase)
+```
+
+**Why step 3c is critical:** If the BDG cache is not invalidated after an expansion, `getGuardConfig()` will return the pre-expansion `contracted_seats` for up to 3600s. During that window, a SCIM provisioning attempt for the newly purchased seats could be blocked by the guard — a false-positive block that would require manual CSM override to resolve. The event-driven cache delete reduces the staleness window from up to 3600s to the round-trip latency of the `billing-event-relay` Worker call (typically < 200ms).
+
+**Failure mode:** If `SCIM_KV.delete` fails, the `billing-event-relay` Worker emits `system.scim_guard_cfg_cache_stale` DEC-030 LOW/1yr (SSO_SCIM §35.5) and routes a Slack `#alerts-platform` advisory. The 3600s safety-net TTL ensures eventual consistency without a manual intervention requirement.
+
+---
+
+### 42.7 DEC-030 HMAC-Chained Events
+
+Four DEC-030 events are registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Seat Expansion & Tier Upgrade events` (AUDIT_LOG_SCHEMA v2.22, 2026-06-20 — COST_MODEL §41.10 item 1 status: Done). Full Zod v2 schemas, field-level privacy invariants, and SOC 2 mapping are in `docs/COST_MODEL.md §41.7`. The table below provides the operational summary for platform-engineer integration.
+
+| Event type | Severity | Retention | Trigger | Chain invariant |
+|---|---|---|---|---|
+| `enterprise.expansion_initiated` | STANDARD | 7 yr | Amendment counter-signature approved; emitted before `contracted_seats` is updated | `floor_respected: true` literal required in payload (`z.literal(true)`); HTTP 422 `EXPANSION_FLOOR_VIOLATED` if absent or false. `amendment_id` field must be set to DocuSign/amendment identifier for correlation with `enterprise.tier_upgraded` |
+| `billing.seats_expanded` | STANDARD | 7 yr | Emitted immediately after `contracted_seats` UPDATE succeeds; financial record of the seat-count change | Additive patch to existing `billing.seats_expanded` entry in AUDIT_LOG_SCHEMA §6; `amendment_id` correlates to paired `enterprise.expansion_initiated` event |
+| `enterprise.tier_upgraded` | STANDARD | 7 yr | Emitted when a tier-upgrade amendment is approved (tier crosses Starter→Growth or Growth→Enterprise boundary, with or without seat expansion) | `amendment_id` correlates to `enterprise.expansion_initiated` (same amendment); at least one of `seats_before ≠ seats_after` or `tier_before ≠ tier_after` must be true |
+| `enterprise.expansion_floor_enforced` | HIGH | 7 yr | Emitted when the Admin Console expansion workflow detects that the proposed per-seat rate is below the COGS-anchored price floor (COST_MODEL §31.5) | `floor_source: 'COST_MODEL_§31.5'` literal required; `requested_rate_usd` and `floor_rate_usd` must both be present; emitted regardless of whether the expansion is ultimately approved at floor rate or rejected |
+
+**`enterprise.expansion_initiated` floor invariant:** The `floor_respected: true` field converts price-floor compliance into a technology-enforced chain constraint. The `emit-audit-event` Worker checks `floor_respected` before appending to the HMAC chain — a submit that does not include `floor_respected: true` produces HTTP 422 rather than a chain event. An expansion below the floor that was approved by the founder (per COST_MODEL §41.5) must carry `floor_respected: true` with an accompanying `pricing_exception_event_id` field referencing the prior `enterprise.expansion_floor_enforced` event.
+
+**Privacy floor for all four events:** no `user_id`, no employee name, no email address, no health metric value, no coaching content. `tenant_id` is the only tenant identifier; seat counts are aggregate integers; rates are contract-level USD values.
+
+---
+
+### 42.8 SOC 2 Evidence Artefacts
+
+Full auditor narratives, SQL collection queries, and cadence specifications are in `docs/SOC2_READINESS.md §79.4/§80.3/§80.4` (registered v3.23.0, 2026-06-20).
+
+| Artefact ID | Description | TSC | Retention | Storage path |
+|---|---|---|---|---|
+| EXP-E-001 | Annual `billing.seats_expanded` DEC-030 export — all expansion events for the observation year, with `floor_respected: true` attestation confirming price-floor compliance was enforced at the chain layer for every expansion. `expansion_count` from `enterprise_contracts` cross-referenced to confirm event count matches column value. | CC5.2 / CC1.4 | 7 yr | `compliance/evidence/expansion/EXP-E-001_<YYYY>.csv` |
+| EXP-E-002 | Quarterly adoption health band vs. expansion pipeline cross-reference — for each `expansion_count > 0` contract in the quarter, join `enterprise_contracts` to `enterprise_adoption_snapshots` for the same tenant and confirm that all expansions occurred in Green-band (`wau_health_band = 'green'`) or Amber-band (`wau_health_band = 'amber'`) months. A Red-band expansion is a CSM process anomaly requiring explanation in the evidence narrative. | CC4.1 | 3 yr | `compliance/evidence/expansion/EXP-E-002_<YYYY>-Q<N>.csv` |
+
+**EXP-E-001 collection query:**
+
+```sql
+-- Run by compliance-officer annually; output to EXP-E-001_<YYYY>.csv
+SELECT
+  ale.event_id,
+  ale.event_type,
+  ale.tenant_id,
+  (ale.payload->>'amendment_id')::TEXT        AS amendment_id,
+  (ale.payload->>'seats_before')::INTEGER     AS seats_before,
+  (ale.payload->>'seats_after')::INTEGER      AS seats_after,
+  (ale.payload->>'floor_respected')::BOOLEAN  AS floor_respected,
+  ale.created_at                              AS event_timestamp,
+  ale.hmac_signature
+FROM audit_log_events ale
+WHERE ale.event_type = 'billing.seats_expanded'
+  AND ale.created_at >= date_trunc('year', NOW()) - INTERVAL '1 year'
+  AND ale.created_at <  date_trunc('year', NOW())
+ORDER BY ale.tenant_id, ale.created_at;
+
+-- Attestation assertion (must be zero):
+SELECT COUNT(*) AS floor_violations
+  FROM audit_log_events
+ WHERE event_type = 'billing.seats_expanded'
+   AND created_at >= date_trunc('year', NOW()) - INTERVAL '1 year'
+   AND (payload->>'floor_respected')::BOOLEAN IS DISTINCT FROM TRUE;
+-- Expected: 0  (any non-zero count is a CC5.2 finding requiring explanation)
+```
+
+**EXP-E-002 collection query:**
+
+```sql
+-- Run by compliance-officer quarterly; output to EXP-E-002_<YYYY>-Q<N>.csv
+-- Cross-reference expansion events with adoption health band at time of expansion
+SELECT
+  ec.tenant_id,
+  ec.expansion_count,
+  ec.last_expansion_date,
+  eas.snapshot_month,
+  eas.wau_health_band,
+  eas.wau_rate_pct
+FROM enterprise_contracts ec
+JOIN enterprise_adoption_snapshots eas
+  ON eas.tenant_id = ec.tenant_id
+ AND eas.snapshot_month = date_trunc('month', ec.last_expansion_date)::DATE
+WHERE ec.expansion_count > 0
+  AND ec.last_expansion_date >= date_trunc('quarter', NOW()) - INTERVAL '3 months'
+  AND ec.last_expansion_date <  date_trunc('quarter', NOW())
+ORDER BY ec.tenant_id, ec.last_expansion_date;
+
+-- Red-band expansion anomaly check:
+SELECT COUNT(*) AS red_band_expansions
+  FROM enterprise_contracts ec
+  JOIN enterprise_adoption_snapshots eas
+    ON eas.tenant_id = ec.tenant_id
+   AND eas.snapshot_month = date_trunc('month', ec.last_expansion_date)::DATE
+ WHERE ec.expansion_count > 0
+   AND eas.wau_health_band = 'red'
+   AND ec.last_expansion_date >= date_trunc('quarter', NOW()) - INTERVAL '3 months';
+-- Expected: 0 (any non-zero requires auditor narrative explaining CSM exception)
+```
+
+**Zero-count protocol:** File an empty CSV with a one-paragraph attestation for any period before the first approved expansion event. Zero-count EXP-E-001/EXP-E-002 quarters are acceptable during the SOC 2 observation period and are filed as affirmative evidence that no undocumented expansions occurred.
+
+---
+
+### 42.9 Implementation Checklist
+
+#### P0 — Before first expansion event is processed (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0083_enterprise_contracts_expansion_fields.sql`: ADD COLUMNS (`initial_seats`, `current_seats`, `expansion_count`, `last_expansion_date`), back-fill UPDATE from `contracted_seats`, CREATE partial indexes `idx_ec_expansion_count` and `idx_ec_last_expansion_date`. Run full staging validation checklist from §42.3: EXPLAIN ANALYZE on both indexes with ≥ 50 synthetic rows; confirm index scans; confirm `current_seats >= initial_seats` CHECK fires on violation; confirm back-fill leaves zero unfilled rows. | platform-engineer | **P0** | M10 | [ ] |
+| 2 | Implement `billing-event-relay` KV cache invalidation hook (§42.6): on `billing.seats_expanded` DEC-030 event emission, call `SCIM_KV.delete('scim:guard_cfg:{tenantId}')` within the post-event hook of `emit-audit-event` Worker. On KV delete failure, emit `system.scim_guard_cfg_cache_stale` DEC-030 LOW/1yr. Integration test: emit a `billing.seats_expanded` event for a synthetic `tenant_id`, then call `getGuardConfig()` and confirm KV cache miss (re-query from Supabase). Cross-reference: `docs/SSO_SCIM_IMPLEMENTATION.md §35.5`. | platform-engineer | **P0** | M10 | [ ] |
+| 3 | Build Admin Console expansion amendment workflow (form_admin + CSM roles only): seat count input (min 25 seats, validated); tier selector; discount field with authority gate per COST_MODEL §41.5 (auto-lock above CSM authority threshold); floor enforcement preview (show `enterprise.expansion_floor_enforced` warning before submit if proposed rate < COST_MODEL §31.5 floor); DocuSign integration for amendment counter-signature; on approval → UPDATE `enterprise_contracts` (contracted_seats, current_seats, expansion_count, last_expansion_date in single transaction) + emit DEC-030 chain (`enterprise.expansion_initiated` then `billing.seats_expanded`). Privacy constraint: no `user_id` or health data in any field. | platform-engineer | **P0** | M11 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11–M12)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Build CSM expansion playbook trigger: when `enterprise.qbr_completed` DEC-030 event is received with `expansion_discussed: true` AND the most recent `enterprise_adoption_snapshots` row for that `tenant_id` has `wau_health_band = 'green'`, create a Linear task for the assigned CSM with the expansion proposal template (tier cross-reference per COST_MODEL §41.4, discount authority reminder per COST_MODEL §41.5). SLA: proposal delivered to tenant within 5 business days of QBR completion event. | customer-success | **P1** | M11 | [ ] |
+| 5 | Add expansion history panel to Admin Console (tenant_admin/tenant_owner read-only via `tenant_contract_portal` view): show `expansion_count`, `current_seats`, `last_expansion_date`, and seats delta sparkline (`current_seats − initial_seats` by expansion event date from DEC-030 chain). Do not display `initial_seats` to tenant_admin (excluded from `tenant_contract_portal` per §42.5). No individual user data; aggregate contract-level only. | platform-engineer + design-craft | **P1** | M11 | [ ] |
+| 6 | File EXP-E-001 first annual export to `compliance/evidence/expansion/EXP-E-001_2026.csv`. Even if zero expansion events have occurred, file a zero-count CSV with one-paragraph attestation confirming no `billing.seats_expanded` events existed in the observation window. | compliance-officer | **P1** | M11 | [ ] |
+| 7 | Resolve OQ-EXP-03 (§42.10): engage outside counsel (ASC 606 specialist) to determine whether a pure tier upgrade (same seat count, lower per-seat rate) is a contract amendment or a new contract. Until resolved, pure tier upgrades must include a minimum 25-seat expansion to anchor the amendment in incremental goods/services (per COST_MODEL §41.11 blocker). Gate: no pure tier upgrade may be processed until OQ-EXP-03 is resolved and documented in `docs/DECISION_LOG.md`. | compliance-officer + outside counsel | **P1** | M12 | [ ] |
+
+#### P2 — After first 5 expansion events (est. M16–M18)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | After 5 approved expansion events: run COST_MODEL §41.8.2 expected vs. actual expansion probability comparison by adoption band (`expansion_count > 0` on `enterprise_contracts` cross-tabbed against `wau_health_band` from `enterprise_adoption_snapshots` for the same month). If any band deviates > 15pp from COST_MODEL §41.8.2 proxy estimates (Green 35%, Amber 12%, Red 2%), update §41.8.2 with actuals and create a DECISION_LOG entry. Document as OQ-EXP-01 partial resolution. | data-engineer + customer-success | **P2** | M18 (est.) | [ ] |
+
+---
+
+### 42.10 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-EXP-03** | **Should a mid-contract tier upgrade (same seat count, lower per-seat rate) be structured as a contract amendment or a new contract?** Amendment path: simpler for the tenant, preserves anniversary date, but requires ASC 606 contract modification treatment (cumulative catch-up vs. prospective recognition). New contract path: clean revenue recognition boundary, but creates two active contract records and complicates SCIM provisioning (BDG must reference the correct `contracted_seats`). **Current gate:** pure tier upgrades are blocked until this is resolved; any Growth→Enterprise request that does not include ≥ 25 additional seats must be deferred pending outside counsel input. | **P1** | compliance-officer + outside counsel (ASC 606) | Engage outside counsel at M10; resolve before first Growth→Enterprise pure upgrade request (est. M12–M15). Document resolution in `docs/DECISION_LOG.md DEC-0XX`. Update §42.3 migration notes and COST_MODEL §41.11 OQ-EXP-03 status on resolution. |
 
 ---
 
