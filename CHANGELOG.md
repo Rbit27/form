@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [6.82.0] — 2026-06-20
+
+### Added
+- `content/post-1701-upper-body-prep-intro.md` — Block 1681–1730 Cluster 3 opener, post 1/10. Рухова підготовка верхньої частини тіла: три зони обмежень (грудний відділ, плечовий комплекс, зап'ястковий комплекс). Self-assessment для кожної зони: Wall Angel + Thoracic Rotation (T-spine), Supine ER + Cross-Body Stretch (плечо), Wrist Extension Test (зап'ясток). Таблиця зон × рухів: що лімітує bench press, OHP та підтягування/ряди. Анонс 1702–1710. clinical-safety: NOT_REQUIRED.
+- `content/post-1702-thoracic-spine-mobility.md` — T-spine як «суглоб у середині»: анатомія T1–T12, критичні сегменти для силового атлета (T4–T8 для OHP, T6–T10 для арки, T10–T12 ротація). Три доказові вправи: Foam Roller Extension (сегментна екстензія), Open Book Rotation (ізольована ротація), Cat-Cow з T-spine акцентом. Зв'язок T-spine з жимом лежачи (арка), OHP (вертикальне вирівнювання), підтягуванням (ротаційна рухливість у лопатковій ретракції). Правило двох вправ для обмеженого часу. clinical-safety: NOT_REQUIRED.
+- `content/post-1703-shoulder-external-rotation.md` — Зовнішня ротація плеча: механіка субакроміального простору при дефіциті ER, роль infraspinatus + teres minor. Два тести: Supine ER Test (норма ≥90°), Cross-Body Stretch (задня капсула). Side-Lying ER, Sleeper Stretch, Wall ER Drill — три цільові вправи з протоколами. Зв'язок ER з шириною хвата у bench press: <70° = механізм ризику. Диференціація м'якої тканини vs. задньої капсули як джерела обмеження. clinical-safety: NOT_REQUIRED.
+- `content/post-1704-lat-shoulder-flexion-overhead.md` — Latissimus dorsi як ключовий обмежувач OHP: анатомія через торако-люмбальну фасцію. Два тести: Doorway Lat Stretch, Overhead Reach (лежачи). Три вправи: Lat Stretch на стійці, Quadruped Lat Stretch, Active Lat Mobilization (вис). Зв'язок з підтягуванням (dead hang = той самий обмежувач). Таблиця дозування за рівнем обмеження (норма / помірне / виражене). clinical-safety: NOT_REQUIRED.
+- `content/post-1705-rotator-cuff-activation.md` — Чотири м'язи RotC і їх роль у bench та OHP (таблиця). Принципи активаційної роботи перед тренуванням: малий об'єм, мала вага, після прогріву, повільний темп. Band Pull-Apart (straight + Y), Face Pull, Cuban Press, Empty/Full Can — чотири вправи з протоколами. Дві готові схеми: активація перед bench (5–6 хв) і перед OHP (6–7 хв). clinical-safety: NOT_REQUIRED.
+- `content/post-1706-scapular-control-activation.md` — Лопатка як операційний центр тягових рухів. Три м'язові системи: serratus anterior, lower trapezius, middle trap + rhomboids. Тести: Wall Slide (lower trap / SA слабкість), Dead Hang (winging scapula). Чотири вправи: Scapular Pull-Up (ізольована депресія без ліктьового згинання), Band Pull-Apart, Prone YTW, Serratus Push-Up. Лопаткова дисфункція як механізм травматизму — не реабілітація, а стандартна профілактика. clinical-safety: NOT_REQUIRED.
+- `content/post-1707-bench-press-warm-up-protocol.md` — Специфічний протокол для bench press як пріоритетного руху дня (~24–28 хв). П'ять кроків: загальна розминка → T-spine → плечова мобілізація → RotC активація → навантажені підходи. Таблиця підйому ваги (приклад 100 кг: 6 проміжних підходів). Шість технічних точок перевірки у підході з порожнім грифом. Скорочений протокол 12–15 хв. Дерево рішень за симптомами. Victor: плечо до/після розминки (1–5). clinical-safety: NOT_REQUIRED.
+- `content/post-1708-ohp-warm-up-protocol.md` — Специфічний протокол для OHP (~28–32 хв). Таблиця відмінностей bench vs. OHP (T-spine, плечова флексія, lat, supraspinatus, кор). П'ять кроків: загальна розминка → T-spine + lat мобілізація (7–9 хв, пріоритет) → плечова активація → кор-активація → навантажені підходи. Таблиця підйому ваги (приклад 70 кг). Шість технічних точок. Скорочений протокол 15 хв. Дерево рішень. DB OHP як тимчасова альтернатива при обмеженій ER. clinical-safety: NOT_REQUIRED.
+- `content/post-1709-pull-up-row-warm-up-protocol.md` — Специфічний протокол для підтягувань і рядів (~22–26 хв). Специфіка вертикальної vs. горизонтальної тяги. П'ять кроків: гребний ергометр → Active Lat Hang → лопаткова активація (пріоритет) → хват/передпліччя → навантажені підходи. Таблиці навантажених підходів для pull-up і row. Скорочений протокол 12 хв. Дерево рішень: winging, weak grip, неповний ROM. Хват як окремий обмежувальний фактор. clinical-safety: NOT_REQUIRED.
+- `content/post-1710-cluster3-synthesis-upper-body-prep.md` — Синтез кластеру 3 (posts 1701–1710). Зведена таблиця: зона × обмеження × інструмент × час × рух (9 рядків). Три дерева рішень: bench, OHP, pull-up/row. Мінімальний протокол 15 хв для трьох рухів. Принцип двошарової підготовки для верхньої частини (мобілізаційний + активаційний, обидва обов'язкові). Victor: 5 точок даних і як використовуються. Анонс Cluster 4 (особливі умови). clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — updated to post-1710: added blog cards for posts 1692–1710 (19 нових карток).
+- `STATUS.md` — Cluster 2 COMPLETE, Cluster 3 COMPLETE (posts 1701–1710) · v6.82.0. Наступний: Cluster 4.
+- `VERSION` — 6.81.1 → 6.82.0.
+
+---
+
 ## [6.81.1] — 2026-06-20
 
 ### Changed
