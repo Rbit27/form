@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [6.60.1] — 2026-06-20
+
+### Changed
+- `docs/CRYPTOGRAPHY_POLICY.md` — v1.2 → v1.3. Registered `HMAC_KDF_SALT` (§5 Key Rotation + §6 Key Custody) and `ADOPTION_NOTES_SALT` (§5 + §6). Closes `docs/SOC2_READINESS.md §93.5` item 2 (P0/M9 — `HMAC_KDF_SALT` prerequisite for HMAC-VERIFY-ALGO-001 test vector and Admin Dashboard per-tenant key derivation panel), `docs/SOC2_READINESS.md §96.6` item 2 (P0/M10 — `ADOPTION_NOTES_SALT`), and `docs/DATA_MODEL.md §41.9` item 1 (P0/M10 — `ADOPTION_NOTES_SALT` registration obligation).
+- `VERSION` — 6.60.0 → 6.60.1.
+
+---
+
 ## [6.60.0] — 2026-06-20
 
 ### Added
