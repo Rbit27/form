@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.58.0] — 2026-06-20
+
+### Added
+- `content/post-40-evaluate-own-program.md` — «Як оцінити власну програму: 5 ознак, що вона більше не працює для тебе». Editorial series post 40. Три сценарії відмови програми (фізіологічний/структурний/виконавський); п'ять операційних маркерів: нульова прогресія 4+ тижнів (Ralston 2017), RPE-дрейф вгору (Helms 2016), технічна деградація у свіжому стані, структурний конфлікт з розкладом (Peterson 2011 — adherence як найсильніший предиктор), сповільнення відновлення (Halson 2014); три питання до рішення; алгоритм відповіді для кожної ознаки. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — post-40 blog card inserted above post-39.
+- `README.md` — post-40 → draft · v6.58.0; Block 1591–1605 «Жим лежачи та варіації» added as proposed (15 topics, Cluster 3).
+- `STATUS.md` — editorial series updated to 11–40; post-40 entry prepended.
+- `VERSION` — 6.57.0 → 6.58.0.
+
+---
+
 ## [6.57.0] — 2026-06-20
 
 ### Added
