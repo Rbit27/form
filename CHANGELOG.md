@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [6.73.0] — 2026-06-20
+
+### Added
+- `content/post-261-program-vs-intuition-when-to-deviate.md` — Editorial series post 261. «Програма або інтуїція: коли відступ від плану — правильне рішення, а коли — виправдання». Чотири критерії аутрегуляції (технічна деградація, RPE-відхилення, варіабельність між підходами, тест «аргументу для тренера»), протокол рішення в залі, розбір чому «слухати тіло» без калібрування — не методологія. Zourdos 2016; Helms 2017; Schoenfeld & Grgic 2019; Meeusen et al. 2013. clinical-safety: NOT_REQUIRED. 13 хв read.
+
+### Changed
+- `blog.html` — post-261 card added before post-238.
+- `STATUS.md` — Editorial 211–265 row updated: post-261 draft · v6.73.0; README roadmap 261–265 proposed.
+- `README.md` — Editorial roadmap extended: posts 261–265 added (261 draft, 262–265 proposed).
+- `VERSION` — 6.72.0 → 6.73.0.
+
+---
+
 ## [6.72.0] — 2026-06-20
 
 ### Added
