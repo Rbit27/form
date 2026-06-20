@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.7
+# FORM · Cost Model & Unit Economics v2.8
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -286,6 +286,18 @@
     - 41.9 SOC 2 Evidence Mapping
     - 41.10 Implementation Checklist
     - 41.11 Open Questions (OQ-EXP-01 to OQ-EXP-03)
+42. [Enterprise Contract Renewal Economics: Multi-Year Commitment Pricing, Price Escalation & Renewal ARR Waterfall](#42-enterprise-contract-renewal-economics-multi-year-commitment-pricing-price-escalation--renewal-arr-waterfall)
+    - 42.1 Purpose & Scope
+    - 42.2 Renewal Pricing Mechanics
+    - 42.3 Renewal Notice Protocol (MSA §6 Compliance)
+    - 42.4 Multi-Year Commitment Economics at Renewal
+    - 42.5 Price Escalation Model (CPI+1%, 5% Cap)
+    - 42.6 `enterprise_renewals` Schema (Migration 0084)
+    - 42.7 DEC-030 HMAC-Chained Audit Events
+    - 42.8 Renewal ARR Waterfall & NRR Contribution
+    - 42.9 SOC 2 Evidence Mapping
+    - 42.10 Implementation Checklist
+    - 42.11 Open Questions (OQ-REN-01 to OQ-REN-03)
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -11018,3 +11030,437 @@ Two evidence artefacts are required to demonstrate that expansion pricing contro
 ---
 
 *v2.7 (2026-06-20): §41 Enterprise Seat Expansion Economics — closes the documentation gap between §40 (adoption health signal: Green-band 35% expansion probability) and §23 (NRR engine: Seat Expansion ARR). §41.1 purpose and scope: three expansion trigger types (T1 CSM-initiated, T2 tenant-initiated, T3 milestone-driven); minimum expansion increment 25 seats; expansion vs. over-allocation distinction. §41.2 expansion trigger framework: qualification signals, CSM time budget, sub-minimum waiver path. §41.3 mid-contract billing model: pro-rata formula (`expansion_invoice = new_seats × rate × months_remaining`); tier-crossing credit for existing seats stepping to lower rate; two billing variants (BV-1 immediate invoice, BV-2 anniversary rollup); price floor enforcement. §41.4 tier upgrade pricing: pure tier upgrade commercial conditions (multi-year commitment or seat floor); combined tier-upgrade + seat-expansion mechanics; Growth→Enterprise negotiated rate governance. §41.5 expansion discount authority matrix: six authority tiers (system-auto → board); below-floor path requiring founder + DECISION_LOG. §41.6 migration 0083: adds `initial_seats`, `current_seats`, `expansion_count`, `last_expansion_date` to `enterprise_contracts`; back-fill from `contracted_seats`; two indexes; `contracted_seats` remains billing-authoritative for BDG. §41.7 four DEC-030 HMAC-chained events: `enterprise.expansion_initiated` (STANDARD, 7yr — `floor_respected: true` chain invariant, `amendment_id` correlation field, all financial fields, no user_id); `billing.seats_expanded` financial extension (STANDARD, 7yr — additive patch to DATA_MODEL §24 baseline); `enterprise.tier_upgraded` (STANDARD, 7yr — `amendment_id` correlation with expansion_initiated); `enterprise.expansion_floor_enforced` (HIGH, 7yr — `requested_rate_usd`, `floor_rate_usd`, `floor_source: COST_MODEL_§31.5`). §41.8 NRR decomposition: Seat Expansion ARR = Σ(new_seats × rate × 12); adoption-weighted expected expansion ARR per Starter account = $1,112/yr at 40/45/15 Green/Amber/Red distribution; contribution to 120% NRR target — seat expansion is the primary lever in the required 35% gross expansion. §41.9 two SOC 2 evidence artefacts: EXP-E-001 (CC5.2/CC1.4 — annual `billing.seats_expanded` export with `floor_respected` attestation; 7yr; `compliance/evidence/expansion/`); EXP-E-002 (CC4.1 — quarterly expansion pipeline vs. adoption health band cross-reference; 3yr). §41.10 nine-item implementation checklist: 4× P0/M10–M11 (DEC-030 event registration + HTTP 422 integration test, migration 0083 DDL, BDG KV cache invalidation on `contracted_seats` update, Admin Console expansion amendment workflow); 3× P1/M11 (CSM expansion playbook triggered by `qbr_completed` with `expansion_discussed: true`, Admin Console expansion history panel, SOC2_READINESS evidence table update); 2× P2/M18 (OQ-EXP-01 calibration after 5 expansions, OQ-EXP-02 self-serve evaluation). §41.11 three open questions: OQ-EXP-01 (P2 — actual expansion probability calibration; est. M18); OQ-EXP-02 (P2 — self-serve expansion below threshold; est. M14–M16); OQ-EXP-03 (P1 — mid-contract tier upgrade as amendment vs. new contract; outside counsel required; gate: pure tier upgrade blocked until resolved). TOC entry §41 added. Document header updated v2.6 → v2.7. Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or Art. 9 special-category data in any §41 DEC-030 event, schema column, or evidence artefact; all seat counts are aggregate integers at the contract level; `form_api` access to `enterprise_contracts` unchanged. Cross-references: `docs/ENTERPRISE.md` (Starter $12 / Growth $9 / Enterprise $6–8 per seat; multi-year discounts; no-go customer criteria); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (four new events — P0 registration target); `docs/DATA_MODEL.md §24` (`billing.seats_expanded` baseline schema); `docs/SSO_SCIM_IMPLEMENTATION.md §35` (BDG `contracted_seats` source; KV cache invalidation on expansion); §23.1 (NRR formula — Seat Expansion ARR component); §31.5 (COGS-anchored price floor); §31.6 (discount authority matrix baseline); §34 (renewal economics — expansion is not renewal); §35.3 (seat reduction — mirror of §41 for downward moves); §40.3.3 (Green-band 35% expansion probability — source for §41.8.2). Owner: enterprise-architect + customer-success + data-engineer + compliance-officer.*
+
+---
+
+## 42. Enterprise Contract Renewal Economics: Multi-Year Commitment Pricing, Price Escalation & Renewal ARR Waterfall
+
+### 42.1 Purpose & Scope
+
+> Owner: enterprise-architect + customer-success + compliance-officer. Audience: CS team, founder, future CFO. Review: quarterly (conversion rate), annually (escalation clause). Cross-references: §23 (Enterprise NRR Engine — renewal ARR as NRR denominator), §26 (CS Cost Model — CSM time budget for renewal cycle), §31 (Price Floor & Discount Governance — floor constraint applies at renewal), §32 (Pricing Exception Approval — retention discount on renewal), §34 (Renewal Risk Register — churn decision feeding renewal type), §35 (Contract Amendment — mid-contract changes before renewal date), §41 (Seat Expansion Economics — expansion at renewal vs. mid-contract), `docs/ENTERPRISE.md` (tier pricing; multi-year discount table; no-go criteria), `docs/MSA_TEMPLATE.md §6` (90-day notice clause; auto-renewal; price escalation), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 HMAC chain — renewal event registry).
+
+Sections §34 and §40 address the *risk* side of renewal — churn probability, CSM intervention, and adoption health signals. Section §23 models the *output* — NRR formula with Renewal ARR as the denominator. Section §41 covers *mid-contract expansion* but stops at the contract boundary. None of these sections answers the financially critical questions at the contract renewal event itself:
+
+1. **What rate does FORM charge at renewal?** — list price, rate-locked, or escalated under the MSA price escalation clause?
+2. **What is the multi-year commitment discount economics on renewal?** — identical to new-deal discounts, or renewal-specific rates?
+3. **How does FORM operationalise the 90-day renewal notice obligation** under MSA §6 while emitting a DEC-030 audit record?
+4. **What is the Renewal ARR waterfall** — how many seats renew at what rate, and how does that feed the §23.1 NRR calculation?
+5. **What evidence does a SOC 2 auditor see** to confirm FORM honored price commitments and floor governance at renewal?
+
+This section fills that gap. All figures are [ESTIMATE] until FORM completes its first five enterprise renewal cycles. Privacy floor identical to §40–§41: all renewal events operate at the `tenant_id` (contract) level only — no individual employee `user_id`, health values, coaching content, or Art. 9 special-category data in any §42 artefact.
+
+---
+
+### 42.2 Renewal Pricing Mechanics
+
+#### 42.2.1 Baseline pricing principle at renewal
+
+Customers on a signed contract are rate-locked for the contracted term (per MSA §8.4). At renewal, the customer is subject to current list pricing with applicable tier discounts from §31.6, **unless**:
+
+| Condition | Renewal rate outcome |
+|---|---|
+| Single-year contract, no escalation clause | Current list price at renewal date — same tier discount matrix as new deal (§31.6) |
+| Multi-year contract, Year 2+ renewal | CPI+1% escalation applied to contracted rate, capped at 5% per year (§42.5; MSA §8.6) |
+| Retention discount authorised (§32) | Below-list rate; must remain ≥ floor (§31.5); requires same approval chain as new-deal exception |
+| Non-renewal / seat reduction | Seat count reduction ≥ 10% triggers unit price renegotiation per MSA §8.5; floor still applies |
+
+#### 42.2.2 Minimum seat count at renewal
+
+The contracted seat count is the billing floor for the renewal term. Seat reductions at renewal are governed by MSA §8.5:
+
+| Reduction magnitude | Treatment |
+|---|---|
+| ≤ 10% of contracted seats | Permitted at renewal at same per-seat rate; FORM does not ratchet up the rate |
+| > 10% of contracted seats, but stays above tier minimum | Triggers unit price renegotiation; rate reverts to current list for the reduced seat count |
+| Falls below tier minimum seats | Must renegotiate tier (downgrade to lower tier pricing) or exit |
+
+**Implication for NRR:** Seat reductions at renewal reduce Renewal ARR below the prior-period denominator, lowering NRR. Modelled as `churn_arr_pct` in §23.1 Contraction ARR component. The §34.5 retention discount authorisation machinery may prevent this by offering a temporary rate concession to hold the seat count.
+
+#### 42.2.3 Rate-lock vs. renewal list price — calculation
+
+```
+renewal_invoice_annual = renewed_seats × renewal_rate_per_seat × 12
+
+where renewal_rate_per_seat:
+  = prior_rate × (1 + escalation_pct)          -- if multi-year term, Year 2+
+  OR current_list_rate × (1 - renewal_discount) -- if annual contract renewing
+  whichever is applicable per §42.2.1, subject to floor(§31.5)
+```
+
+The `enterprise_renewals` table (§42.6) records `rate_basis` as an enum (`escalation` | `current_list` | `retention_discount` | `rate_lock_continuation`) to make the calculation auditable.
+
+---
+
+### 42.3 Renewal Notice Protocol (MSA §6 Compliance)
+
+MSA §6.1 requires FORM to give 90 days' written notice before the renewal date for any price change above CPI+1%. For standard renewals at current list price or below, the MSA auto-renewal clause applies — the contract rolls over unless either party gives a non-renewal notice at least 90 days before the renewal date.
+
+#### 42.3.1 Notice lifecycle — three states
+
+| State | Trigger | DEC-030 event emitted | Owner |
+|---|---|---|---|
+| **Standard renewal notice** | 90 days before `renewal_date` — compliance-officer confirms no price change above escalation cap | `enterprise.renewal_notice_sent` (STANDARD, 7yr) | compliance-officer via Admin Console |
+| **Price escalation notice** | 90 days before renewal, Year 2+ multi-year contract, escalation > 0% | `enterprise.renewal_escalation_calculated` (HIGH, 7yr) + `enterprise.renewal_notice_sent` (STANDARD, 7yr) | compliance-officer; escalation calc auto-populated from prior rate |
+| **Non-renewal notice** | Either party signals non-renewal | `enterprise.renewal_notice_sent` with `notice_type: 'non_renewal'` (HIGH, 7yr) | compliance-officer or customer (CSM logs customer non-renewal intent within 24h of receipt) |
+
+#### 42.3.2 90-day compliance monitoring
+
+FORM's `evidence-collection-cron` Cloudflare Worker (§81) checks `enterprise_contracts.renewal_date` 95 days out and fires a PagerDuty P1 (`form-enterprise`) alert to the compliance-officer if no `enterprise.renewal_notice_sent` event exists for the tenant within the expected window. This is the RENEW-NOTICE-01 monitoring invariant.
+
+```sql
+-- RENEW-NOTICE-01: flag contracts where renewal is in 85–95 days but no notice event filed
+SELECT ec.tenant_id, ec.renewal_date, ec.acv_usd
+FROM enterprise_contracts ec
+WHERE ec.status = 'active'
+  AND ec.renewal_date BETWEEN CURRENT_DATE + 85 AND CURRENT_DATE + 95
+  AND NOT EXISTS (
+    SELECT 1 FROM audit_log_events ale
+    WHERE ale.event_type = 'enterprise.renewal_notice_sent'
+      AND ale.payload->>'tenant_id' = ec.tenant_id::text
+      AND ale.created_at > ec.renewal_date - INTERVAL '100 days'
+  );
+```
+
+---
+
+### 42.4 Multi-Year Commitment Economics at Renewal
+
+Multi-year commitments at renewal follow the same discount schedule as new-deal multi-year pricing (per `enterprise.html` and §16.4), with one difference: the discount is applied to the **renewal rate base** (current list, or escalated rate if applicable) — not to the prior-period contracted rate.
+
+| Renewal commitment | Discount vs. annual list | Rationale |
+|---|---|---|
+| 1-year annual renewal | — (no discount) | Standard; no cash-flow benefit to FORM |
+| 2-year prepay at renewal | −15% on Year 1 + Year 2 | Eliminates next-cycle logo churn risk; Y2 cash upfront |
+| 3-year prepay at renewal | −25% on all three years | Maximum cash-flow benefit; rate-locked below escalation path |
+
+**Multi-year vs. annual NRR impact:** A 3-year renewal at −25% reduces Renewal ARR vs. current list but locks the account out of the churn denominator for 3 years. Net NRR effect over a 3-year window is positive when: `(logo_churn_probability × ACV) × 3 years > 25% discount × ACV × 3 years`. At the §34.2 Green-band churn probability of < 10%, multi-year renewal is **always NRR-accretive** at current tier pricing.
+
+#### 42.4.1 Multi-year renewal discount authority
+
+Multi-year renewal discounts ≤ 25% are pre-authorised (same as new-deal authority in §31.6 CSM tier). Discounts > 25% (e.g., large-account strategic lock-in) require founder approval and a DECISION_LOG entry per §32.
+
+---
+
+### 42.5 Price Escalation Model (CPI+1%, 5% Cap)
+
+Per MSA §8.6 and §31.7.2, multi-year contracts allow FORM to apply annual price escalation starting at the second renewal of any multi-year term (i.e., Year 3+ of the original commitment). Single-year contracts do not carry an automatic escalation right — price at renewal is current list.
+
+#### 42.5.1 Escalation formula
+
+```
+renewal_rate = min(prior_rate × (1 + CPI + 0.01), prior_rate × 1.05)
+
+where:
+  CPI    = US CPI-U YoY inflation rate published by BLS for the month
+             preceding the renewal notice date (typically October for
+             January 1 renewals)
+  0.01   = FORM fixed 1% uplift above CPI (contractual)
+  1.05   = hard cap: 5% total increase maximum regardless of CPI
+```
+
+**At low inflation (CPI 2–3%):** Applied escalation 3–4%; Year 3 rate vs. Year 1 = +3% to +4% compounded.
+**At high inflation (CPI ≥ 4%):** Cap triggers at 5%; FORM cannot exceed 5% regardless of CPI index.
+
+#### 42.5.2 Escalation floor check
+
+The escalated rate must still satisfy the §31.5 COGS-anchored price floor. If a retention discount has been previously granted that brought the rate near the floor, escalation may produce a rate that exceeds the floor — in that case escalation is permitted (it moves the rate back toward list). If the un-escalated rate is already at or above list, escalation is inapplicable.
+
+#### 42.5.3 Escalation evidence requirement
+
+Each escalation calculation must emit `enterprise.renewal_escalation_calculated` with the CPI source reference (`bls_report_url_hash` SHA-256 of the BLS press release URL — never the raw URL to avoid PII-adjacent link tracking) before the 90-day renewal notice. This constitutes the SOC 2 CC1.4 audit trail for pricing commitment compliance.
+
+---
+
+### 42.6 `enterprise_renewals` Schema (Migration 0084)
+
+Migration 0084 creates the `enterprise_renewals` table as the authoritative record of each contract renewal event. It supplements `enterprise_contracts` (the live billing-authoritative record) with a renewal history that allows audit of pricing decisions across the contract lifecycle.
+
+#### 42.6.1 DDL
+
+```sql
+-- migration 0084_enterprise_renewals.sql
+-- Depends on: 0083_enterprise_contracts_expansion_fields.sql (§41.6)
+
+CREATE TYPE renewal_type_enum AS ENUM (
+  'standard_annual',       -- 1-year renewal at current list
+  'multi_year_2',          -- 2-year renewal at −15%
+  'multi_year_3',          -- 3-year renewal at −25%
+  'retention_discount',    -- below-list renewal; requires §32 approval
+  'non_renewal'            -- customer or FORM terminates; no new term
+);
+
+CREATE TYPE rate_basis_enum AS ENUM (
+  'escalation',            -- CPI+1% (§42.5) applied to prior rate
+  'current_list',          -- current list price with applicable tier discount
+  'retention_discount',    -- §32-approved exception below list
+  'rate_lock_continuation' -- prior rate maintained (e.g., strategic lock-in)
+);
+
+CREATE TABLE enterprise_renewals (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  original_contract_id      UUID NOT NULL REFERENCES enterprise_contracts(id) ON DELETE RESTRICT,
+  renewal_type              renewal_type_enum NOT NULL,
+  renewal_date              DATE NOT NULL,
+  prior_seats               INTEGER NOT NULL CHECK (prior_seats > 0),
+  renewed_seats             INTEGER NOT NULL CHECK (renewed_seats > 0),
+  prior_rate_per_seat_usd   NUMERIC(10,4) NOT NULL CHECK (prior_rate_per_seat_usd > 0),
+  new_rate_per_seat_usd     NUMERIC(10,4) NOT NULL CHECK (new_rate_per_seat_usd > 0),
+  rate_basis                rate_basis_enum NOT NULL,
+  escalation_applied        BOOLEAN NOT NULL DEFAULT false,
+  escalation_pct            NUMERIC(5,4),                    -- NULL if escalation_applied = false
+  cpi_reference_month       DATE,                             -- first day of BLS reference month
+  multi_year_discount_pct   NUMERIC(5,4),                    -- NULL if standard_annual
+  floor_respected           BOOLEAN NOT NULL DEFAULT true,    -- always true; enforced at Worker
+  new_acv_usd               NUMERIC(12,2) GENERATED ALWAYS AS (renewed_seats * new_rate_per_seat_usd * 12) STORED,
+  new_contract_years        SMALLINT NOT NULL DEFAULT 1 CHECK (new_contract_years IN (1, 2, 3)),
+  new_tcv_usd               NUMERIC(14,2) GENERATED ALWAYS AS (renewed_seats * new_rate_per_seat_usd * 12 * new_contract_years) STORED,
+  pricing_exception_event_id UUID,                            -- soft-ref to §32 exception event if retention_discount
+  notice_event_id           UUID,                             -- soft-ref to enterprise.renewal_notice_sent DEC-030 id
+  dec030_renewal_event_id   UUID,                             -- soft-ref to enterprise.contract_renewed DEC-030 id
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT chk_escalation_fields CHECK (
+    (escalation_applied = false AND escalation_pct IS NULL AND cpi_reference_month IS NULL)
+    OR (escalation_applied = true AND escalation_pct IS NOT NULL AND cpi_reference_month IS NOT NULL)
+  ),
+  CONSTRAINT chk_multi_year_discount CHECK (
+    (renewal_type IN ('multi_year_2', 'multi_year_3') AND multi_year_discount_pct IS NOT NULL)
+    OR (renewal_type NOT IN ('multi_year_2', 'multi_year_3') AND multi_year_discount_pct IS NULL)
+  ),
+  CONSTRAINT chk_floor_always_respected CHECK (floor_respected = true),
+  CONSTRAINT chk_non_renewal_seats CHECK (
+    renewal_type != 'non_renewal' OR renewed_seats = 0
+  )
+);
+
+-- Indexes
+CREATE UNIQUE INDEX idx_er_tenant_renewal_date ON enterprise_renewals(tenant_id, renewal_date);
+CREATE INDEX idx_er_renewal_date ON enterprise_renewals(renewal_date DESC);
+CREATE INDEX idx_er_renewal_type ON enterprise_renewals(renewal_type);
+
+-- RLS
+ALTER TABLE enterprise_renewals ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_er_compliance_reviewer ON enterprise_renewals
+  FOR SELECT USING (auth.role() IN ('compliance_reviewer', 'form_admin'));
+CREATE POLICY rls_er_form_system ON enterprise_renewals
+  FOR ALL USING (auth.role() = 'form_system');
+REVOKE ALL ON enterprise_renewals FROM form_api;  -- financial; no direct API access
+
+-- Staging validation
+-- 1. INSERT one row per renewal_type variant and confirm GENERATED columns compute correctly
+-- 2. Verify UNIQUE INDEX rejects duplicate (tenant_id, renewal_date) pairs
+-- 3. Verify chk_non_renewal_seats: renewal_type='non_renewal' with renewed_seats > 0 must FAIL
+-- 4. Verify chk_floor_always_respected: floor_respected = false must FAIL
+-- 5. Confirm form_api cannot SELECT any row (REVOKE enforced)
+```
+
+#### 42.6.2 `enterprise_contracts` update at renewal
+
+On renewal, `enterprise_contracts` is updated to reflect the new term (not replaced — the same row is the live billing record):
+
+```sql
+UPDATE enterprise_contracts
+SET contracted_seats = renewed_seats,
+    current_seats    = renewed_seats,      -- §41.6 expansion tracking column
+    acv_usd          = new_acv_usd,
+    renewal_date     = renewal_date + (new_contract_years * INTERVAL '1 year'),
+    price_per_seat_usd_cents = ROUND(new_rate_per_seat_usd * 100)::INTEGER,
+    status           = 'active'
+WHERE id = original_contract_id;
+```
+
+The `enterprise_renewals` table then holds the historical record of each renewal event, making the billing evolution auditable without mutating history.
+
+---
+
+### 42.7 DEC-030 HMAC-Chained Audit Events
+
+All renewal lifecycle events are HMAC-chained per DEC-030. Three events cover the renewal lifecycle. Privacy floor on all events: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 data. All identifiers are `tenant_id` (FORM-internal UUID) and contract-level aggregate financials only.
+
+#### 42.7.1 `enterprise.renewal_notice_sent` (STANDARD, 7 years)
+
+Emitted by compliance-officer via Admin Console "Send Renewal Notice" action. Must be emitted ≥ 90 days before `renewal_date`. RENEW-CHAIN-01 invariant: `enterprise.contract_renewed` is blocked (HTTP 422 `RENEW_CHAIN_01_VIOLATION`) if no preceding `enterprise.renewal_notice_sent` for the same `tenant_id` within 120 days before the renewal event.
+
+```typescript
+// Zod v2 schema — RenewalNoticeSentPayload
+const RenewalNoticeSentPayload = z.object({
+  tenant_id:             z.string().uuid(),
+  renewal_date:          z.string().regex(/^\d{4}-\d{2}-\d{2}$/),   // date-only
+  days_until_renewal:    z.number().int().min(85).max(100),          // 90±5 window
+  current_seats:         z.number().int().positive(),
+  current_acv_usd:       z.number().positive(),
+  notice_type:           z.enum(['standard', 'price_escalation', 'non_renewal']),
+  escalation_preview_pct: z.number().min(0).max(0.05).optional(),   // present if price_escalation
+  sent_by:               z.string().uuid(),                          // compliance-officer UUID
+});
+```
+
+PagerDuty routing: none for `standard`; P1 `form-enterprise` for `price_escalation` (CSM must brief customer) and `non_renewal`.
+
+#### 42.7.2 `enterprise.renewal_escalation_calculated` (HIGH, 7 years)
+
+Emitted at the same time as `enterprise.renewal_notice_sent` when escalation applies. Carries the full calculation audit trail (prior rate, CPI rate, applied escalation, cap trigger, new rate). ESCALATION-CHAIN-01: `enterprise.contract_renewed` with `rate_basis = 'escalation'` requires preceding `enterprise.renewal_escalation_calculated` for same `tenant_id` within 150 days → HTTP 422 `ESCALATION_CHAIN_01_VIOLATION`.
+
+```typescript
+// Zod v2 schema — RenewalEscalationCalculatedPayload
+const RenewalEscalationCalculatedPayload = z.object({
+  tenant_id:             z.string().uuid(),
+  prior_rate_per_seat_usd: z.number().positive(),
+  cpi_rate_pct:          z.number().min(0).max(0.15),
+  applied_escalation_pct: z.number().min(0).max(0.05),              // capped at 0.05
+  cap_triggered:         z.boolean(),                                // true if CPI+1% > 5%
+  new_rate_per_seat_usd: z.number().positive(),
+  floor_respected:       z.literal(true),
+  bls_report_date:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),  // BLS release date (not URL)
+  calculated_by:         z.string().uuid(),                          // compliance-officer UUID
+});
+```
+
+Emitter: compliance-officer via Admin Console "Calculate Escalation" step in renewal workflow. Rate auto-populated; compliance-officer reviews and confirms before emitting.
+
+#### 42.7.3 `enterprise.contract_renewed` (STANDARD, 7 years)
+
+Emitted by compliance-officer via Admin Console "Confirm Renewal" action, after DocuSign Order Form counter-signature (or auto-renewal confirmation under MSA §6.1). This is the anchor event for the renewal term — triggers the `enterprise_contracts` UPDATE (§42.6.2) and INSERT into `enterprise_renewals` (§42.6.1) in a single database transaction.
+
+RENEW-CHAIN-01 enforced: HTTP 422 if no preceding `enterprise.renewal_notice_sent`.
+ESCALATION-CHAIN-01 enforced: HTTP 422 if `rate_basis = 'escalation'` and no preceding `enterprise.renewal_escalation_calculated`.
+
+```typescript
+// Zod v2 schema — ContractRenewedPayload
+const ContractRenewedPayload = z.object({
+  tenant_id:               z.string().uuid(),
+  renewal_date:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  renewal_type:            z.enum(['standard_annual', 'multi_year_2', 'multi_year_3', 'retention_discount', 'non_renewal']),
+  prior_seats:             z.number().int().positive(),
+  renewed_seats:           z.number().int().min(0),                  // 0 only for non_renewal
+  prior_rate_per_seat_usd: z.number().positive(),
+  new_rate_per_seat_usd:   z.number().min(0),                        // 0 only for non_renewal
+  new_acv_usd:             z.number().min(0),
+  new_contract_years:      z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  rate_basis:              z.enum(['escalation', 'current_list', 'retention_discount', 'rate_lock_continuation']),
+  escalation_pct:          z.number().min(0).max(0.05).optional(),
+  multi_year_discount_pct: z.number().min(0).max(0.25).optional(),
+  floor_respected:         z.literal(true),
+  pricing_exception_event_id: z.string().uuid().optional(),          // required if retention_discount
+  notice_event_id:         z.string().uuid(),                        // RENEW-CHAIN-01 anchor
+  confirmed_by:            z.string().uuid(),                        // compliance-officer UUID
+});
+```
+
+#### 42.7.4 Chain invariants summary
+
+| Invariant ID | Condition | HTTP response on violation | Runbook |
+|---|---|---|---|
+| **RENEW-CHAIN-01** | `enterprise.contract_renewed` must follow `enterprise.renewal_notice_sent` for same `tenant_id` within 120 days | HTTP 422 `RENEW_CHAIN_01_VIOLATION` | R-05 (HMAC chain audit) |
+| **ESCALATION-CHAIN-01** | `enterprise.contract_renewed` with `rate_basis = 'escalation'` must follow `enterprise.renewal_escalation_calculated` for same `tenant_id` within 150 days | HTTP 422 `ESCALATION_CHAIN_01_VIOLATION` | R-05 |
+| **RENEW-NOTICE-01** | `evidence-collection-cron` fires P1 alert if no notice event 85–95 days before renewal_date | PagerDuty P1 `form-enterprise` | compliance-officer to emit notice within 5 days |
+
+---
+
+### 42.8 Renewal ARR Waterfall & NRR Contribution
+
+#### 42.8.1 Renewal ARR definition
+
+```
+Renewal ARR = Σ across all accounts renewing in period:
+  renewed_seats × new_rate_per_seat_usd × 12
+```
+
+For NRR calculation in §23.1, Renewal ARR is disaggregated into:
+
+| Component | Formula | NRR effect |
+|---|---|---|
+| **Retained ARR** | renewed_seats × min(new_rate, prior_rate) × 12 | Retention rate = Retained ARR / Beginning ARR |
+| **Escalation uplift** | renewed_seats × max(new_rate − prior_rate, 0) × 12 | Counted in Expansion ARR (Price) component of §23.1.3 |
+| **Contraction ARR** | (prior_seats − renewed_seats) × prior_rate × 12 | Negative; lowers NRR |
+| **Churned ARR** | prior_ACV for accounts that chose non-renewal | Fully negative; lowers NRR denominator |
+
+#### 42.8.2 Renewal conversion rate model [ESTIMATE]
+
+| Scenario | Retention rate | Notes |
+|---|---|---|
+| Green-band (WAU ≥ 40% at renewal) | ~92% [ESTIMATE] | Standard renewal; minimal CSM time |
+| Amber-band (WAU 20–39%) | ~68% [ESTIMATE] | CSM intervention required; retention discount possible |
+| Red-band (WAU < 20%) | ~38% [ESTIMATE] | High churn risk; founder + CSM renewal call; significant retention discount or loss |
+
+At the modelled fleet distribution (45% Green / 40% Amber / 15% Red per §40.3), blended renewal rate ≈ **74%** [ESTIMATE]. This is below the §23.5 gross retention target of 85% — the gap is bridged by:
+1. The CSM intervention playbook (§34.5) converting ~20% of Red accounts to retained
+2. Multi-year renewal commitments removing Green/Amber accounts from the annual churn pool
+
+**Adjusted blended renewal rate with interventions:** ~83% [ESTIMATE] — within 2pp of the 85% gross retention target.
+
+#### 42.8.3 NRR decomposition with renewals
+
+Using the §23.5 NRR target of ≥ 120% and the §41.8 expansion contribution:
+
+| NRR component | Target | Source |
+|---|---|---|
+| Gross renewal retention | 85% | §42.8.2 adjusted blended rate |
+| Seat expansion (mid-contract) | +15–20% | §41.8; Green-band 35% expansion probability |
+| Price escalation (Year 3+) | +2–4% | §42.5; CPI+1% cap 5% |
+| Multi-year renewal uplift (reduced churn) | +3–5% | §42.4; 3-year lock eliminates annual churn risk |
+| Contraction / seat reduction | −2–5% | §34.5; Amber/Red accounts reducing seats |
+
+Modelled NRR: **≈ 105–124%** [ESTIMATE] — range reflects CSM intervention success rate. Upper bound (124%) assumes Green-band fleet expansion + Year 3 escalation. Lower bound (105%) reflects Amber-heavy fleet with moderate churn. The 120% target is achievable at ≥ 75% Green-band distribution with consistent expansion cadence from §41.
+
+---
+
+### 42.9 SOC 2 Evidence Mapping
+
+| Artefact ID | TSC criteria | Description | Cadence | Retention | Storage path |
+|---|---|---|---|---|---|
+| **REN-E-001** | CC5.2 / CC1.4 | Annual `enterprise.contract_renewed` chain export: all renewals in the observation year with `floor_respected: true` attestation, `rate_basis` distribution (escalation / list / retention_discount), and notice-event cross-reference confirming RENEW-CHAIN-01 compliance. Zero `floor_respected = false` rows is the pass condition. | Annual | 7 years | `compliance/evidence/renewals/REN-E-001_<YYYY>.csv` |
+| **REN-E-002** | CC4.1 / CC2.2 | Quarterly renewal notice compliance export: all `enterprise.renewal_notice_sent` events in the quarter with `days_until_renewal` distribution and `notice_type` breakdown. Cross-check: every account with `renewal_date` in the following 90 days has a notice event on file. Zero-notice accounts flagged as exceptions requiring compliance-officer explanation. | Quarterly | 3 years | `compliance/evidence/renewals/REN-E-002_<YYYY-QN>.csv` |
+| **REN-E-003** | CC4.1 / A1.1 | Annual renewal conversion rate analysis: blended retention rate by WAU health band at renewal vs. §42.8.2 model; escalation uplift realised vs. modelled; multi-year commitment conversion rate. Board-level ARR waterfall showing Retained + Escalation Uplift − Contraction − Churn. No individual tenant data — fleet-level aggregate with `tenant_count` per band. | Annual | 3 years | `compliance/evidence/renewals/REN-E-003_<YYYY>.csv` |
+
+**CC5.2 auditor narrative:** CC5.2 requires FORM to enforce commitments and accountabilities across the entity. The `floor_respected: z.literal(true)` chain invariant on `enterprise.contract_renewed` means FORM cannot issue a renewal below the COGS-anchored price floor (§31.5) without generating an HTTP 422 that the compliance-officer must override via the §32 exception path — which itself emits a separate `enterprise.pricing_exception_approved` event. REN-E-001 proves that every renewal in the observation year honored the floor commitment.
+
+**CC1.4 auditor narrative:** CC1.4 requires FORM to hold individuals accountable for performance of internal control responsibilities. Each `enterprise.contract_renewed` event carries a `confirmed_by` UUID (the compliance-officer) and a `notice_event_id` FK to the prerequisite notice event — RENEW-CHAIN-01. The chain makes any out-of-sequence renewal (notice missing or post-dated) a system-enforced block, not a human-auditable control.
+
+**CC2.2 auditor narrative:** CC2.2 requires FORM to communicate information to external parties about its availability, security, and processing commitments. The 90-day renewal notice is a contractual commitment to enterprise customers per MSA §6.1. REN-E-002 proves FORM honored this commitment on a per-account basis across the observation quarter — not as a policy claim but as a DEC-030 chain record.
+
+**CC4.1 auditor narrative:** CC4.1 requires FORM to evaluate and communicate performance against defined thresholds. REN-E-003's renewal conversion rate analysis constitutes FORM's annual evaluation of whether its enterprise retention economics are tracking to the §23.5 NRR target. Presented at the quarterly board review, it closes the management-level monitoring loop for enterprise ARR quality.
+
+---
+
+### 42.10 Implementation Checklist
+
+#### P0 — Before first renewal event is processed (M12)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all three §42.7 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise`: `enterprise.renewal_notice_sent` (STANDARD, 7yr), `enterprise.renewal_escalation_calculated` (HIGH, 7yr), `enterprise.contract_renewed` (STANDARD, 7yr). Write RENEW-CHAIN-01 and ESCALATION-CHAIN-01 invariant blocks in `emit-audit-event` Worker. Integration test: `enterprise.contract_renewed` returns HTTP 422 when no prior `enterprise.renewal_notice_sent` exists for tenant_id within 120 days. | platform-engineer + compliance-officer | **P0** | M12 | [ ] |
+| 2 | Apply migration `0084_enterprise_renewals.sql` (§42.6.1): CREATE TYPE `renewal_type_enum`; CREATE TYPE `rate_basis_enum`; CREATE TABLE `enterprise_renewals` with full DDL, CHECKs, indexes, and RLS; REVOKE ALL FROM `form_api`. Run EXPLAIN ANALYZE on `idx_er_tenant_renewal_date` and `idx_er_renewal_date` against 20 synthetic rows. | platform-engineer | **P0** | M12 | [ ] |
+| 3 | Build Admin Console "Renewal Workflow" (compliance-officer role): Step 1 — "Send Notice" (auto-calculates days_until_renewal; populates escalation_preview_pct if Year 2+ multi-year; emits `enterprise.renewal_notice_sent`); Step 2 — "Calculate Escalation" if applicable (pre-populated from prior rate + CPI input field; emits `enterprise.renewal_escalation_calculated`; compliance-officer confirms); Step 3 — "Confirm Renewal" (DocuSign counter-signature gate; renewal_type selector; multi-year discount auto-applied; floor check preview; emits `enterprise.contract_renewed` + UPDATE `enterprise_contracts` + INSERT `enterprise_renewals` in one transaction). | platform-engineer | **P0** | M12 | [ ] |
+| 4 | Implement RENEW-NOTICE-01 monitoring cron: extend `evidence-collection-cron` with 95-day lookahead on `enterprise_contracts.renewal_date`; fire PagerDuty P1 `form-enterprise` if no notice event on file; dedup `renew-notice-missing-{tenant_id}` 72h. Compliance-officer receives alert → 5-day SLA to emit notice. | devops-lead | **P0** | M11 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | File first REN-E-001 annual renewal chain export after first renewal cycle; assert `floor_respected: true` for every row; note `rate_basis` distribution; file at `compliance/evidence/renewals/REN-E-001_<YYYY>.csv`. Register REN-E-001, REN-E-002, REN-E-003 in `docs/SOC2_READINESS.md §79.4` master evidence table. | compliance-officer | **P1** | M13 | [ ] |
+| 6 | File first REN-E-002 quarterly notice compliance export after first renewal notice is sent; confirm RENEW-CHAIN-01 compliance for all accounts in the quarter; file at `compliance/evidence/renewals/REN-E-002_<YYYY-QN>.csv`. | compliance-officer | **P1** | M12 | [ ] |
+| 7 | Add "Renewal Economics" panel to Admin Console (form_admin read-only): fleet renewal date heatmap (next 12 months); ARR renewing by month; health-band distribution of renewing accounts; escalation applicability flag. No individual tenant names exposed to non-form_admin roles. | platform-engineer + design-craft | **P1** | M13 | [ ] |
+| 8 | Add price escalation clause to `docs/MSA_TEMPLATE.md §8.6`: "CPI+1%, capped at 5% per year, applied at second and subsequent annual renewals within a multi-year term; 90-day advance written notice required; FORM will provide the calculation methodology and BLS source on request." Outside counsel review before any MSA is signed with an enterprise customer. | compliance-officer + founder | **P1** | M5 (before first MSA signature) | [ ] |
+
+#### P2 — After first 5 renewal cycles
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | File first REN-E-003 annual renewal conversion rate analysis after Year 1 renewal cohort completes; compare to §42.8.2 model; create DECISION_LOG DEC-0XX if actuals deviate ≥ 10pp from model; update §42.8.2 with actuals; close OQ-REN-01. | data-engineer + customer-success | **P2** | M24 (est. first cohort) | [ ] |
+| 10 | Evaluate CPI source selection (OQ-REN-02): after first escalation event, confirm BLS CPI-U vs. CPI-W vs. PCE produces acceptable escalation level; document the chosen index in DECISION_LOG; update §42.5.1 formula comment. | compliance-officer + founder | **P2** | First escalation event (est. M36+) | [ ] |
+
+---
+
+### 42.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-REN-01** | **What are FORM's actual enterprise renewal conversion rates by WAU health band?** §42.8.2 uses SaaS wellness sector proxies (Green ~92%, Amber ~68%, Red ~38%). After 5 renewal cycles: cross-tab `enterprise_renewals.renewal_type` against `enterprise_adoption_snapshots.wau_health_band` 90 days before renewal. Update model; create DECISION_LOG entry; update §34 churn risk thresholds if actuals deviate significantly. | **P2** | data-engineer + customer-success | After 5 renewal events (est. M24) |
+| **OQ-REN-02** | **Which CPI index should FORM use for price escalation?** §42.5.1 references CPI-U (All Urban Consumers) — the most common SaaS contract reference. Alternative: CPI-W (Urban Wage Earners and Clerical Workers, slightly lower). For enterprise customers with EU contracts: HICP (Eurostat Harmonised Index of Consumer Prices) may be preferable. Decision required before first escalation notice is sent. Outside counsel input recommended for EU customer MSA. | **P1** | compliance-officer + founder | Before first escalation notice (est. M36+; or earlier if multi-year contract reaches Year 3) |
+| **OQ-REN-03** | **Should multi-year renewal commitments be offered as a self-serve option in the Admin Console (i.e., tenant_admin can initiate a renewal commitment without CSM involvement)?** Benefit: reduces CSM time on standard Green-band accounts; may improve commitment conversion rate (lower friction). Risk: removes CSM touchpoint that could surface expansion opportunities or account health signals. Resolution: evaluate after first 10 renewals; instrument whether CSM-attended vs. self-serve renewals show different ACV change rates. Until then, all renewals require compliance-officer + CSM countersignature. | **P2** | customer-success + platform-engineer | After 10 renewal events (est. M30) |
+
+---
+
+*v2.8 (2026-06-20): §42 Enterprise Contract Renewal Economics: Multi-Year Commitment Pricing, Price Escalation & Renewal ARR Waterfall — closes the documentation gap between §34 (churn risk classification) and §23 (NRR engine formula) by modeling the full financial mechanics of the contract renewal event. §42.1 purpose and scope: five operational gaps filled (renewal rate determination, multi-year commitment at renewal, 90-day notice operationalisation, Renewal ARR waterfall construction, SOC 2 renewal pricing evidence). §42.2 renewal pricing mechanics: four-row rate-outcome table (standard annual → current list; multi-year Year 2+ → CPI+1%; retention discount → §32 approval; non-renewal → unit price renegotiation); seat reduction thresholds (≤ 10% no renegotiation; > 10% triggers unit price reset; below tier minimum forces downgrade or exit); renewal invoice formula. §42.3 renewal notice protocol: three notice states (standard / price_escalation / non_renewal); RENEW-NOTICE-01 monitoring invariant — `evidence-collection-cron` pg_cron SQL fires P1 PagerDuty if no notice event 85–95 days before renewal_date. §42.4 multi-year commitment at renewal: same −15%/−25% discount schedule as new-deal (per `enterprise.html`); applied to renewal rate base; NRR-accretive at Green-band churn probability < 10% because logo lock-in value exceeds discount cost; founder approval required for > 25%. §42.5 price escalation model: formula `min(prior_rate × (1 + CPI + 0.01), prior_rate × 1.05)`; CPI-U reference; hard 5% annual cap; floor check on escalated rate; `bls_report_date` (not URL) in event payload for audit traceability without PII-adjacent URL tracking. §42.6 migration 0084: `enterprise_renewals` CREATE TABLE (UUID PK, `tenant_id` FK RESTRICT, `original_contract_id` FK RESTRICT, `renewal_type_enum`, `renewal_date` DATE, `prior_seats`/`renewed_seats` CHECK > 0, `prior_rate_per_seat_usd`/`new_rate_per_seat_usd` CHECK > 0, `rate_basis_enum`, `escalation_applied`/`escalation_pct`/`cpi_reference_month`, `multi_year_discount_pct`, `floor_respected` CHECK = true, `new_acv_usd` GENERATED, `new_contract_years` CHECK IN (1,2,3), `new_tcv_usd` GENERATED, `pricing_exception_event_id` soft-ref, `notice_event_id` soft-ref, `dec030_renewal_event_id` soft-ref); four CHECKs (escalation_fields, multi_year_discount, floor_always_respected, non_renewal_seats); UNIQUE INDEX `(tenant_id, renewal_date)`; two additional indexes; four RLS policies; form_api REVOKED. §42.7 three DEC-030 HMAC-chained events: `enterprise.renewal_notice_sent` (STANDARD, 7yr — `notice_type` enum: standard/price_escalation/non_renewal; `days_until_renewal` 85–100 range validated; Zod `RenewalNoticeSentPayload`), `enterprise.renewal_escalation_calculated` (HIGH, 7yr — full CPI calculation audit trail; `cap_triggered` bool; `bls_report_date` date-only; ESCALATION-CHAIN-01 prerequisite for `contract_renewed` with `rate_basis='escalation'`; Zod `RenewalEscalationCalculatedPayload`), `enterprise.contract_renewed` (STANDARD, 7yr — complete renewal terms; `floor_respected: z.literal(true)` chain invariant; `notice_event_id` FK to RENEW-CHAIN-01; Zod `ContractRenewedPayload`). Two chain invariants: RENEW-CHAIN-01 (`contract_renewed` requires `renewal_notice_sent` within 120 days → HTTP 422 `RENEW_CHAIN_01_VIOLATION`); ESCALATION-CHAIN-01 (`contract_renewed` with `rate_basis='escalation'` requires `renewal_escalation_calculated` within 150 days → HTTP 422). §42.8 renewal ARR waterfall: four-component decomposition (Retained ARR, Escalation Uplift → Expansion ARR, Contraction ARR, Churned ARR); renewal conversion rate model by WAU health band (Green ~92%, Amber ~68%, Red ~38% [ESTIMATE]); blended rate ≈ 74% raw / ~83% with CSM intervention — within 2pp of 85% gross retention target; NRR range 105–124% [ESTIMATE] depending on fleet band distribution and expansion realisation. §42.9 three SOC 2 evidence artefacts: REN-E-001 (CC5.2/CC1.4 — annual `contract_renewed` chain export with `floor_respected: true` attestation + RENEW-CHAIN-01 compliance; 7yr), REN-E-002 (CC4.1/CC2.2 — quarterly renewal notice compliance export with `days_until_renewal` distribution; 3yr), REN-E-003 (CC4.1/A1.1 — annual renewal conversion rate analysis; fleet-level aggregate, no tenant names; 3yr). §42.10 ten-item implementation checklist: 4× P0/M11–M12 (DEC-030 registration + RENEW-CHAIN-01/ESCALATION-CHAIN-01 integration tests, migration 0084 DDL, Admin Console renewal workflow 3-step, RENEW-NOTICE-01 monitoring cron), 4× P1/M12–M13 (REN-E-001/002 first filings, Admin Console renewal panel, MSA §8.6 price escalation clause update with outside counsel), 2× P2/M24–M30 (OQ-REN-01 actual conversion rate calibration, OQ-REN-02 CPI index decision, OQ-REN-03 self-serve renewal evaluation). §42.11 three open questions: OQ-REN-01 (P2 — actual renewal conversion rates by band after 5 cycles; est. M24); OQ-REN-02 (P1 — CPI index selection before first escalation notice; default CPI-U; EU customers may require HICP); OQ-REN-03 (P2 — self-serve renewal option in Admin Console after 10 cycles). Document header v2.7 → v2.8. Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 data in any §42 DEC-030 event, `enterprise_renewals` row, or evidence artefact; `tenant_id` is FORM-internal UUID; `form_api` REVOKED from `enterprise_renewals`; `bls_report_date` date-only (never raw URL). Cross-references: `docs/ENTERPRISE.md` (tier pricing $6–12/seat; multi-year discounts −15%/−25%; no-go criteria); `docs/MSA_TEMPLATE.md §6` (auto-renewal; 90-day notice; §8.5 seat reduction policy); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (three new DEC-030 events to register — P0/M12); `docs/SOC2_READINESS.md §79.4` (REN-E-001/002/003 to register — P1/M13); §23.1 (NRR formula — Renewal ARR = NRR denominator); §23.5 (NRR target 120%); §26.10 (`enterprise.renewal_negotiation_started` — companion event emitted by CSM at renewal kick-off, 30–60 days before notice); §31.5 (COGS-anchored price floor — applies at renewal); §31.6 (discount authority matrix — retention discount approval chain); §32 (Pricing Exception Approval — retention discount ≥ §32 threshold requires same flow); §34 (Renewal Risk Register — churn classification feeding renewal type selection); §35.3 (seat reduction at renewal — mirrors §42.2.2); §40.3 (WAU health band at renewal — §42.8.2 conversion rate inputs); §41 (Seat Expansion Economics — expansion mid-contract distinct from renewal seat change). Owner: enterprise-architect + customer-success + compliance-officer + data-engineer.*

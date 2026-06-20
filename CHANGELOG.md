@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [6.98.1] — 2026-06-20
+
+### Added
+- `docs/COST_MODEL.md §42` — Enterprise Contract Renewal Economics: Multi-Year Commitment Pricing, Price Escalation & Renewal ARR Waterfall. Covers renewal pricing mechanics (standard annual at current list, multi-year Year 2+ at CPI+1% capped 5%, retention discount per §32), seat reduction thresholds (≤10% no renegotiation; >10% triggers reset), 90-day renewal notice protocol (RENEW-NOTICE-01 SQL cron, 3 notice states), price escalation formula, Migration 0084 (`enterprise_renewals` table with RLS + REVOKE ALL), 3 DEC-030 HMAC-chained audit events with Zod schemas (`enterprise.renewal_notice_sent`, `enterprise.renewal_escalation_calculated`, `enterprise.contract_renewed`), 2 chain invariants (RENEW-CHAIN-01 / ESCALATION-CHAIN-01 enforced via HTTP 422), Renewal ARR waterfall decomposing into NRR §23.1, blended conversion rate model (~74% raw / ~83% with intervention [ESTIMATE]), 3 SOC 2 evidence artefacts (REN-E-001/002/003 covering CC5.2/CC4.1/A1.1), and a 10-item implementation checklist (P0 M11-12, P1 M12-13, P2 M24-30). enterprise-architect + compliance-officer + security-engineer.
+
+### Changed
+- `docs/COST_MODEL.md` — version bump v2.7 → v2.8; TOC extended with §42 entries.
+- `VERSION` — 6.98.0 → 6.98.1.
+
+---
+
 ## [6.98.0] — 2026-06-20
 
 ### Added
