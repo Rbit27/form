@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [6.84.0] — 2026-06-20
+
+### Added
+- `content/post-1711-warm-up-time-limited-hierarchy.md` — Cluster 4, post 1/10. Розминка за обмеженого часу: ієрархія скорочення. Три рівні: незнімний мінімум (загальна + навантажені підходи), пріоритет за поточним рухом, що вирізати першим. Правило МЕД при браку часу: три елементи повністю > сім наполовину. clinical_safety: NOT_REQUIRED.
+- `content/post-1712-5min-warm-up-protocol.md` — Cluster 4, post 2/10. 5-хвилинний протокол: абсолютний мінімум. Схема: 2 хв загальна (ЧСС 110–130) + 1 хв пріоритетний елемент + 2 хв три підходи штанги. Реальний вплив на RPE порівняно з 0 хв і повною розминкою. clinical_safety: NOT_REQUIRED.
+- `content/post-1713-10min-warm-up-protocol.md` — Cluster 4, post 3/10. 10-хвилинний протокол: де знаходиться розрив ефективності. Нелінійна залежність 5 vs. 10 vs. 20+ хв. Схема: загальна (3 хв) + мобілізація+активація (3 хв) + 4 навантажені підходи (4 хв). Порівняльна таблиця за RPE першого підходу. clinical_safety: NOT_REQUIRED.
+- `content/post-1714-competition-day-warm-up-strategy.md` — Cluster 4, post 4/10. Змагальний день: логіка підготовки до максимального зусилля. Три принципи: не виснажуйся, калібруй під чергу, PAP. Таблиця часу до виходу × протокол. Ритуальна функція розминки. clinical_safety: NOT_REQUIRED.
+- `content/post-1715-competition-bench-press-warm-up.md` — Cluster 4, post 5/10. Змагальна розминка жиму лежачи: повна схема 6 підходів (опенер 120 кг), скорочені за 20 і 15 хв. Специфіка: setup і arch у кожному підході, пауза від 70%+, команди суддів. PAP за 8–12 хв. clinical_safety: NOT_REQUIRED.
+- `content/post-1716-competition-squat-deadlift-warm-up.md` — Cluster 4, post 6/10. Змагальна розминка присідання і станового: схеми підходів для обох рухів, рухова підготовка перед підходами, скорочені варіанти. Специфіка: глибина, IAP, страп, відстань від штанги. clinical_safety: NOT_REQUIRED.
+- `content/post-1717-travel-warm-up-protocol.md` — Cluster 4, post 7/10. Розминка в подорожі: тіловаговий протокол 10–15 хв. Загальна розминка без обладнання, мобілізація (Lizard Pose, Thread the Needle), активація. Адаптація під нижню/верхню частину тіла. 5-хвилинний мінімум для готелю. clinical_safety: NOT_REQUIRED.
+- `content/post-1718-home-warm-up-no-equipment.md` — Cluster 4, post 8/10. Розминка вдома: 12-хвилинний протокол без залу. World's Greatest Stretch, Thoracic Extension на стільці. Адаптація під тіловаговий, пресовий і еспандерний тренінг. Психологічна функція розминки як ритуалу запуску. clinical_safety: NOT_REQUIRED.
+- `content/post-1719-warm-up-fatigue-poor-condition.md` — Cluster 4, post 9/10. Розминка при поганому стані (втома/недосип): фізіологічні зміни, діагностичний RPE у навантажених підходах, матриця рішень (RPE 65% → корекція плану). Три помилки. clinical_safety: NOT_REQUIRED.
+- `content/post-1720-cluster4-synthesis-special-conditions.md` — Cluster 4, post 10/10 (синтез). Матриця 7 умов × протокол × пріоритет. Дерево рішень. Три спільні принципи. Що Victor відстежує в особливих умовах. **Block 1681–1730 Cluster 4 COMPLETE.** clinical_safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — posts 1711–1720 додані (10 нових записів перед post-1710). blog.html updated to post-1720.
+- `VERSION` — 6.83.1 → 6.84.0.
+- `STATUS.md` — Block 1681–1730 Cluster 4 COMPLETE; наступний: Cluster 5 (синтез блоку 1681–1730).
+
+---
+
 ## [6.83.1] — 2026-06-20
 
 ### Changed
