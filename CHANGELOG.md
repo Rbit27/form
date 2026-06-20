@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [6.58.1] — 2026-06-20
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.21: +7 CAEP / SSF events (`sso.caep_event_received`, `sso.caep_session_revoked`, `sso.caep_user_suspended`, `sso.caep_user_purged`, `sso.caep_stream_error`, `sso.caep_stream_registered` from §23; `sso.caep_reregistration_queued` from §36 / DEC-072). New `### CAEP / SSF events` section with ordering constraint §23.8, 4 SOC 2 evidence artefacts (CC6-E-CAEP-001..004), and CC6.3 auditor narrative. `sso.google_directory_sync_error` controlled vocabulary extended with `'cache_eviction_failed_on_risc_hijacking'` (DEC-072 §36.4). Closes SSO_SCIM §23.13 item 9 (P0/M4) and §36.6 item 4 (P0/M5).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §23.13 checklist item 9 marked `[x] Done`; §36.6 checklist item 4 marked `[x] Done`.
+- `VERSION` — 6.58.0 → 6.58.1.
+
+---
+
 ## [6.58.0] — 2026-06-20
 
 ### Added
