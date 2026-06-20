@@ -198,4 +198,17 @@
 
 ---
 
-**v0.1 · травень 2026 · оновлюється з кожним etapом**
+## Technical Security
+
+Enterprise security artefacts shared with enterprise customers and SOC 2 auditors under NDA. Not investor-facing.
+
+| Artefact ID | Title | File path | Audience | SOC 2 mapping | When to share |
+|---|---|---|---|---|---|
+| **HMAC-VERIFY-ALGO-001** | FORM DEC-030 HMAC Chain Verification Algorithm v1.0 | `compliance/docs/hmac-chain-verification-algorithm.md` | Enterprise security teams, SIEM engineers, SOC 2 auditors | CC1.1, C1.1 | Include in security questionnaire package; share proactively in M10 pilot onboarding (`docs/ENTERPRISE_ONBOARDING.md §3.5`) |
+
+Cross-reference: `docs/SECURITY_QUESTIONNAIRE.md LOG-04` (standard response for "audit log integrity and verification").
+
+---
+
+**v0.1 · травень 2026 · оновлюється з кожним etapом**  
+*v0.2 (2026-06-20): §Technical Security added — HMAC-VERIFY-ALGO-001 entry (DEC-071, `docs/OBSERVABILITY.md §50.10` item 2).*

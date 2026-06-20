@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.56.0] — 2026-06-20
+
+### Added
+- `compliance/docs/hmac-chain-verification-algorithm.md` v1.0 — HMAC-VERIFY-ALGO-001: FORM DEC-030 HMAC Chain Verification Algorithm for enterprise SIEM consumers (closes `docs/OBSERVABILITY.md §50.10` items 1 and 2, P0/M9, DEC-071). §2 chain structure (DEC-030 fields, HMAC-SHA256 input format `{event_id}:{event_type}:{canonical_payload}:{created_at_unix_ms}:{previous_signature}`, chain-start sentinel = 64 zero chars, `canonical_payload = json.dumps(sort_keys=True, separators=(",", ":"))`, `created_at_unix_ms` = integer epoch ms). §3 Python 3.10+ verification pseudocode: `verify_chain(events, hmac_secret)` — sorts by `created_at`, accumulates `prev_signature`, detects `SIGNATURE_MISMATCH` and `CHAIN_POINTER_MISMATCH`; helper functions `compute_signature()`, `canonical_payload()`, `created_at_to_ms()`. §4 four implementation notes: per-tenant isolation (one chain per `tenant_id`), cursor continuity (accumulate-then-verify or incremental carry-forward), SIEM delivery gaps vs. chain breaks (AL-SIEM-05 P0 fires on FORM-side break; gap-period events verifiable by timestamp-range pull request), HMAC secret rotation boundary handling (two keys for cross-rotation exports; 30-day advance notice; rotation est. M24). §5 test vector with all computed hex signatures: Sig1 = `6926f92c8a76a5986bf1cac4d2de8ff0056fc6cd49b9212d528a77c2af0d56f5` (event `sso.login_succeeded`, `created_at_ms = 1781863200000`, `previous_signature = 64 zeros`); Sig2 = `af8620250edfd83b994723921973b2e339a9534259b9f7015d2f8ec2567efaaf` (event `auth.session_created`, `created_at_ms = 1781863205000`); Sig3 = `ba05639de41cb1fadecb47931f2b5e2be884848834a0f664c5c6bc35e69a8a0a` (event `sso.login_failed`, `created_at_ms = 1781863260000`); `expected_result = {valid: true, errors: [], events_checked: 3}`. §6 security questionnaire standard response verbatim (per-tenant key via HKDF-SHA256, Admin Dashboard display-once, AL-SIEM-05 P0 monitoring, library on CSM request). §7 privacy floor (key not retained post-display, no PII/Art.9 data in chain artefacts, synthetic test vector). §8 cross-reference table (8 entries: OBSERVABILITY §50, §27.4, §27.7; AUDIT_LOG_SCHEMA DEC-030; CRYPTOGRAPHY_POLICY §5; ENTERPRISE_ONBOARDING §3.5; SECURITY_QUESTIONNAIRE LOG-04; DATA_ROOM §Technical Security; DECISION_LOG DEC-071). Per-tenant key derivation note: `HKDF-SHA256(IKM=FORM_AUDIT_HMAC_SECRET, info=tenant_id, salt=HMAC_KDF_SALT, len=32)`. Owner: security-engineer + devops-lead + compliance-officer.
+
+### Changed
+- `docs/DATA_ROOM.md` — §Technical Security section added (v0.1 → v0.2): HMAC-VERIFY-ALGO-001 row with ID, title, file path (`compliance/docs/hmac-chain-verification-algorithm.md`), audience (enterprise security teams, SIEM engineers, SOC 2 auditors), SOC 2 mapping (CC1.1/C1.1), sharing trigger (security questionnaire package + M10 pilot onboarding §3.5). Closes `docs/OBSERVABILITY.md §50.10` item 2 (P0/M9 — DEC-071).
+- `docs/OBSERVABILITY.md §50.10` — items 1 and 2 marked `[x] Done` (2026-06-20). Document version v4.7.0 unchanged (patch-level status update).
+- `VERSION` — v6.55.0 → v6.56.0.
+
+---
+
 ## [6.55.0] — 2026-06-20
 
 ### Added
