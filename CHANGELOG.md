@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [6.90.0] — 2026-06-20
+
+### Added
+- `content/post-43-when-rpe-lies.md` — Editorial series · post 43. "Коли RPE бреше: ситуації, де суб'єктивна шкала не калібрована." Сім ситуацій де RPE систематично дає хибний сигнал: нова вправа (занижений 1–2 одиниці через нейром'язову неефективність), мотиваційний anchoring (очікування замість вимірювання), накопичена втома (1RM знижується, RPE не реагує; Meeusen et al. 2013), емоційний фон (Rolph et al. 2019), недосип-парадокс (Knowles et al. 2018), ефект першого підходу, зона 9–10 (похибка вдвічі більша; Colbert et al. 2021). Алгоритм калібрування з 5 кроків. Порівняльна таблиця ефектів. Тон: editorial-brutalist. Оцінка 13 хв. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — post-43-when-rpe-lies додано вгорі списку.
+- `STATUS.md` — content engine table row 11–50 оновлено: post-43-when-rpe-lies → draft v6.90.0.
+- `VERSION` — 6.89.0 → 6.90.0.
+
+---
+
 ## [6.89.0] — 2026-06-20
 
 ### Added
