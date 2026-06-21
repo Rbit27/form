@@ -1,5 +1,24 @@
 # Changelog · FORM
 
+## [7.11.0] — 2026-06-21
+
+### Added
+- `content/post-1812-recovery-travel-jet-lag.md` — Cluster 4 Post 2/10. Циркадна біологія і джетлаг: SCN, Zeitgebers, нейром'язовий добовий пік. Вплив на SWS і HRV (Atkinson & Reilly). Схід→захід vs. захід→схід. Протокол до/під час/після перельоту. Тренування в готелі параметрами таблицею. HRV-реакліматизація. clinical-safety PASS.
+- `content/post-1813-recovery-pre-competition-peak-phase.md` — Cluster 4 Post 3/10. Передзмагальний тейпер: нейром'язова відповідь, метааналіз Bosquet et al. (2007) +3%. Тривалість 7–14 днів. Формула: -40–50% об'єму, збережена інтенсивність. Типові помилки тейпера. HRV як навігатор. Активаційна сесія за 1–2 дні. clinical-safety PASS.
+- `content/post-1814-recovery-irregular-schedule-shift-work.md` — Cluster 4 Post 4/10. Хронічний соціальний джетлаг і ротаційний графік. ГР і SWS при денному сні. Типи графіків: фіксована ніч vs. ротація. Базові принципи: стабільність > оптимальність. Таблиця корекцій по типу тижня. Динамічна базова лінія HRV. clinical-safety PASS.
+- `content/post-1815-recovery-concurrent-training.md` — Cluster 4 Post 5/10. Interference effect: AMPK/mTORC1 (Hickson 1980, Wilson et al. 2012). Часовий інтервал 6+ год. Порядок сесій. Тип кардіо і рівень interference. Об'єм аеробного ≤90 хв/тиж. clinical-safety PASS.
+- `content/post-1816-recovery-heat-environment.md` — Cluster 4 Post 6/10. Терморегуляція і конкуренція за серцевий викид. Нейром'язова функція при гіпертермії. Дегідратація −2% і сила (Judelson et al.). Теплова акліматизація 10–14 днів. Pre-cooling, сон при спеці, HRV перекалібрування. clinical-safety PASS.
+- `content/post-1817-recovery-minimum-effective-volume.md` — Cluster 4 Post 7/10. MEV: 1 сесія 2–3 підходи ≥70% 1ПМ зберігає адаптацію 8–12 тижнів (Bickel et al., 2011). Структура MEV-блоків А і Б. Повернення до повного об'єму поетапно. Інтенсивність важливіша за об'єм у MEV. clinical-safety PASS.
+- `content/post-1818-recovery-functional-overreaching.md` — Cluster 4 Post 8/10. Спектр FOR/NFOR/OTS. Маркери FOR. Поетапний протокол: Фаза 1 (MEV/2 тижні) → Фаза 2 (50%) → Фаза 3 (70–80%). Ранні сигнали попередження. OTS виходить за межі самостійного управління — зазначено явно. clinical-safety PASS.
+- `content/post-1819-recovery-knowledge-worker-cognitive-load.md` — Cluster 4 Post 9/10. Когнітивна стомленість: глутамат у dlPFC (Wiehler et al., 2022). RPE при когнітивній стомленості (Marcora et al., 2009). Технічна якість і центральна відмова. Стратегії knowledge worker: ранкові сесії, пауза перед тренуванням, тижнева структура. clinical-safety PASS.
+- `content/post-1820-cluster4-synthesis-context-specific-recovery.md` — Cluster 4 Post 10/10 SYNTHESIS. Операційна карта 9 контекстів (таблиця). Ієрархія корекцій. Що ніколи не знижується. Таблиця інтерпретації HRV/RPE за контекстом. Тимчасові vs. структурні корекції. Cluster 4 одним реченням на контекст. Анонс Cluster 5. clinical-safety PASS.
+
+### Changed
+- `blog.html` — додано пости 1812–1820.
+- `VERSION` — 7.10.1 → 7.11.0.
+
+---
+
 ## [7.10.1] — 2026-06-21
 
 ### Changed
