@@ -12,7 +12,11 @@
 - `content/post-1788-recovery-35-plus-age-factors.md` — Cluster 1 · Post 8/10 · Block 1781–1830. Відновлення після 35: GH/IGF-1/T зниження, сповільнений ресинтез колагену сухожиль/зв'язок, зменшення SWS. Що НЕ змінюється: максимальний силовий потенціал, гіпертрофічна відповідь. Masters athletes meta-analyses. Практичні корекції програмування. clinical-safety: NOT_REQUIRED.
 - `content/post-1789-active-recovery-when-helps-when-hurts.md` — Cluster 1 · Post 9/10 · Block 1781–1830. Активне відновлення: визначення (30–50% VO2max), механізми кровообігу і лімфатики. Дані: DOMS знижується на 10–20%, але структурна репарація не прискорюється. Коли допомагає (прогулянка 20–30 хв після максимального зусилля) vs. заважає (прихований середній інтенсив). Практичний протокол: ЧСС < 130. clinical-safety: NOT_REQUIRED.
 
+- `content/post-1790-cluster1-synthesis-recovery-architecture.md` — Cluster 1 · Post 10/10 · Block 1781–1830 · **CLUSTER 1 COMPLETE**. Операційна карта відновлення: п'ять векторів, часова матриця відновлення (вектор × вікно × маркери × деградація), ієрархія пріоритетів (сон → алостатичне навантаження → нейром'язовий стан → справжній відпочинок → нутрієнтний тайминг), протокол моніторингу (Victor-сторона + атлет-сторона), три режими помилок, огляд Clusters 2–5. clinical-safety: NOT_REQUIRED.
+
 ### Changed
+- `blog.html` — картки post-1782 через post-1790 додані; total entries updated to post-1790.
+- `STATUS.md` — Block 1781–1830 Cluster 1 COMPLETE 10/10; IN PROGRESS 10/50.
 - `VERSION` — 7.5.2 → 7.6.0.
 
 ---
