@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.21.1] — 2026-06-21
+
+### Changed
+- `docs/OBSERVABILITY.md` — v4.8.0 → v4.8.1: §6.2 Consolidated Alert Rules: `enterprise_mid_contract_termination_risk` subsection (AL-ETF-01, P1, `form-customer-success`) and `contract_renewal_health` subsection (AL-RENEW-01, P1, `form-enterprise`) inserted between `sso_browser_security` and `pam_session_health`. §51.7 items 3/4/5 marked `[x] Done`. Closes three P0/M11 obligations from OBSERVABILITY §51.7.
+- `docs/SOC2_READINESS.md` — v3.24.3 → v3.24.4: §79.4 master evidence table: `REN-OBS-E-001` row added (CC4.1/A1.1 — quarterly `renewal_notice_check` pg_cron job 39 run history; `renewals/`). §80.4 Vanta mirror list updated to include `REN-OBS-E-001 (OBSERVABILITY §51.5)`. Closes OBSERVABILITY §51.7 item 4.
+- `docs/COST_MODEL.md` — v2.10 → v2.11: §42.10 item 4 documentation closure — RENEW-NOTICE-01 monitoring cron marked `[x] Done (documentation)`; implementation decision: pg_cron job 39 (OBSERVABILITY §51.2.1) over original Cloudflare Worker extension spec. Closes OBSERVABILITY §51.7 item 5.
+- `VERSION` — 7.21.0 → 7.21.1.
+
+---
+
 ## [7.21.0] — 2026-06-21
 
 ### Added
