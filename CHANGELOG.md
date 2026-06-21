@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [7.40.0] — 2026-06-21
+
+### Added
+- `content/post-2055-rest-intervals-timer-vs-readiness.md` — Editorial 2051–2060 post 5/10. Час відпочинку між сетами: таймер чи суб'єктивна готовність — що працює. PCr resynthesis kinetics: Hultman et al. (1967) + Greenhaff et al. (1994) — 50% at 30s, 87% at 90s, 97–99% at 3–4 min. Schoenfeld et al. (2016): 3 min vs. 1 min — significant superiority for strength and hypertrophy outcomes in trained men. de Salles et al. (2009) meta-analysis: 2–5 min rest outperforms <1 min for strength/hypertrophy. Subjective readiness failure modes: habituation to discomfort, psychological pressure to move, day-to-day recovery variability. Timer failure modes: ignores session-to-session variability, doesn't adapt to exercise demand, promotes mechanical execution. Operational filter: timer mandatory for strength (1–5RM, 85%+), standardization, and athletes who tend to rush; subjective readiness appropriate for technical work, experienced athletes, atypical conditions. Hybrid model: minimum timer floor (2 min) + maximum ceiling window (30–60 s post-beep). RPE delta test: first to third set at standardized 3-min rest — >2-point jump flags systemic recovery issue. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `blog.html` — post-2055 card added (above post-2054).
+- `STATUS.md` — Block 2051–2060 updated to 5/10.
+
+---
+
 ## [7.39.0] — 2026-06-21
 
 ### Added
