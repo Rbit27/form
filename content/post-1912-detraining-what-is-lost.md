@@ -1,5 +1,5 @@
 ---
-title: "Деадаптація: що реально втрачається за 2–8 тижнів без тренувань"
+title: "Деадаптація: що реально втрачається за 2–8 тижнів"
 slug: detraining-what-is-lost
 date: 2026-06-21
 author: George (FORM founder)

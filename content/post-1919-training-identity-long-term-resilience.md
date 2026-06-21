@@ -1,5 +1,5 @@
 ---
-title: "Тренувальна ідентичність як фундамент стійкості: довгострокова перспектива"
+title: "Тренувальна ідентичність як фундамент стійкості"
 slug: training-identity-long-term-resilience
 date: 2026-06-21
 author: George (FORM founder)
