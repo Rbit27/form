@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.17.0] — 2026-06-21
+
+### Added
+- `content/post-1851-social-influence-on-training-behavior.md` — Block 1831–1880 · Cluster 3 · Post 1/10. Три механізми соціального впливу на тренувальну поведінку: соціальні норми (Cialdini 2003), соціальне порівняння (Festinger 1954), поведінкова контагія (Christakis & Fowler 2009). Чому self-coached атлет вразливіший до соціального шуму без зовнішньої структури тренера. Протокол щомісячного аудиту середовища — 4 питання. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — post-1851 card added; now current to post-1851.
+- `README.md` — post-1851 status: `proposed` → `draft · v7.17.0`; title updated.
+- `STATUS.md` — Block 1831–1880: IN PROGRESS 20/50 → 21/50; Cluster 3 IN PROGRESS 1/10 noted; Next updated to post-1852.
+- `VERSION` — 7.16.0 → 7.17.0.
+
+---
+
 ## [7.16.0] — 2026-06-21
 
 ### Added
