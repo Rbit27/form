@@ -1,5 +1,24 @@
 # Changelog · FORM
 
+## [7.22.0] — 2026-06-21
+
+### Added
+- `content/post-1871-longterm-athlete-expectations-vs-reality.md` — Block 1831–1880 · Cluster 5 · Post 1/10. Що відбувається через 5–10 років тренування: нелінійне сповільнення адаптаційного темпу (Schoenfeld 2016), чотири розриви між очікуванням і реальністю, що реально накопичується за 10 років (технічна зрілість, знання власного відгуку, стійкість системи, калібровка зусиль), три типи довгострокових атлетів. clinical-safety: NOT_REQUIRED · sports-scientist review required.
+- `content/post-1872-behavioral-crises-in-training.md` — Block 1831–1880 · Cluster 5 · Post 2/10. Поведінкові кризи: чотири типи (криза цілей, криза програми, криза ідентичності, накопичена стомленість), діагностичний протокол 4 кроки, головна помилка — ігнорування. clinical-safety: NOT_REQUIRED · sports-scientist review required.
+- `content/post-1873-goals-change-over-years.md` — Block 1831–1880 · Cluster 5 · Post 3/10. Зміна цілей з роками: чотири природних переходи (від результату до процесу, від «більше» до «краще», від досягнення до підтримання, від цілей до стилю практики), три помилки переоцінки цілей. clinical-safety: NOT_REQUIRED · sports-scientist review required.
+- `content/post-1874-athletic-identity-35-55.md` — Block 1831–1880 · Cluster 5 · Post 4/10. Тренувальна ідентичність 35–55: три зміни зовнішнього контексту, чотири специфічні поведінкові ризики, тренувальні адаптації, поведінкові переваги зрілого атлета. clinical-safety: NOT_REQUIRED · sports-scientist review required.
+- `content/post-1875-from-program-to-principles.md` — Block 1831–1880 · Cluster 5 · Post 5/10. Від програми до принципів: чотири рівні особистої методології (незмінні принципи, персональні параметри, операційні правила, відкриті гіпотези), як методологія формується, чотири помилки при переході. clinical-safety: NOT_REQUIRED · sports-scientist review required.
+- `content/post-1876-training-narrative.md` — Block 1831–1880 · Cluster 5 · Post 6/10. Тренувальний наратив: наратив як інтерпретаційна структура, три джерела деструктивних наративів, три найпоширеніші деструктивні наративи і альтернативні фрейми, змінюється через досвід і дані. clinical-safety: NOT_REQUIRED · sports-scientist review required.
+- `content/post-1877-progress-comparison-without-external-benchmarks.md` — Block 1831–1880 · Cluster 5 · Post 7/10. Порівняння і прогрес: чотири проблеми соціального порівняння, три рівні внутрішньої системи оцінки, два законних використання зовнішнього порівняння, протокол квартальної самооцінки. clinical-safety: NOT_REQUIRED · sports-scientist review required.
+- `content/post-1878-behavioral-maturity-8-signs.md` — Block 1831–1880 · Cluster 5 · Post 8/10. Поведінкова зрілість: 8 ознак зрілого атлета, три спільних принципи (дія на основі даних, системне мислення, реалізм і самосвідомість). clinical-safety: NOT_REQUIRED · sports-scientist review required.
+- `content/post-1879-cluster5-synthesis-behavioral-maturity.md` — Block 1831–1880 · Cluster 5 · Post 9/10 · CLUSTER SYNTHESIS. Операційна модель: три рівні зрілої практики (зрілий зв'язок з цілями, функціональний наратив і система оцінки, системна стійкість). Місце Victor у довгостроковій практиці. Практичний чекліст. clinical-safety: NOT_REQUIRED · sports-scientist review required.
+- `content/post-1880-block-synthesis-training-behavior-identity.md` — Block 1831–1880 · Block Synthesis · Post 10/10 · BLOCK COMPLETE 50/50. Зведена операційна модель чотирьох рівнів архітектури зрілої практики: ідентичність і наратив, система зворотного зв'язку, операційна система регулярності, довгострокова адаптивність. Місце Victor у кожному рівні. Квартальний чекліст для self-coached атлета. clinical-safety: NOT_REQUIRED · sports-scientist review required.
+
+### Changed
+- `blog.html` — 10 нових карток: posts 1871–1880 (Block 1831–1880 · Cluster 5 · BLOCK COMPLETE). Оновлено до post-1880.
+- `STATUS.md` — Block 1831–1880 COMPLETE 50/50 · v7.22.0; наступний пріоритет: Block 1881–1930 (тема TBD · product-strategist + sports-scientist).
+- `VERSION` — 7.21.1 → 7.22.0.
+
 ## [7.21.1] — 2026-06-21
 
 ### Changed
