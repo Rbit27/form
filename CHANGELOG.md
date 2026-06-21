@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [7.20.0] — 2026-06-21
+
+### Added
+- `content/post-1861-regularity-as-system-not-motivation.md` — Block 1831–1880 · Cluster 4 · Post 1/10. Регулярність як системна характеристика: чому мотивація — ненадійна основа. Чотири елементи системи: фіксований розклад, мінімальна версія, порогові умови відпочинку, протокол після пропуску. Кумулятивний ефект регулярності vs. інтенсивності. Deci & Ryan SDT. clinical-safety: NOT_REQUIRED.
+- `content/post-1862-training-habit-loop-mechanics.md` — Block 1831–1880 · Cluster 4 · Post 2/10. Механіка habit loop у силовому тренінгу. Duhigg (2012) сигнал→рутина→нагорода. Habit stacking (Clear, 2018). Lally et al. 2010: медіана 66 днів для формування звички. Перші 8–12 тижнів — критична фаза. Ефективні нагороди для тренування. clinical-safety: NOT_REQUIRED.
+- `content/post-1863-missed-training-response-protocol.md` — Block 1831–1880 · Cluster 4 · Post 3/10. Пропущене тренування: три типи пропуску і правило «наступного тренування». What-the-hell effect (Polivy & Herman, 1985). Bandura self-efficacy. Серія пропусків як сигнал для перегляду системи. clinical-safety: NOT_REQUIRED.
+- `content/post-1864-motivational-cycles-training.md` — Block 1831–1880 · Cluster 4 · Post 4/10. Мотиваційні цикли: три фази (активація, нормалізація, спад). Дофамін і новизна (Schultz, 1998). Три хибних реакції на спад. Нормалізація як місце реального прогресу. clinical-safety: NOT_REQUIRED.
+- `content/post-1865-fatigue-vs-demotivation.md` — Block 1831–1880 · Cluster 4 · Post 5/10. Стомленість vs. демотивація: три рівні стомленості (периферійна, ЦНС, системна). Діагностичний протокол: маркери відновлення + тест 10 хвилин + контекст. Протоколи для кожного стану. clinical-safety: NOT_REQUIRED.
+- `content/post-1866-minimum-effective-regularity.md` — Block 1831–1880 · Cluster 4 · Post 6/10. Мінімальна ефективна регулярність. Наукова база (Ralston 2017, Schoenfeld 2017): 1–2 сесії з 50–60% об'єму при збереженні інтенсивності підтримують адаптацію. Мінімальна версія тренування як заздалегідь визначений формат. clinical-safety: NOT_REQUIRED.
+- `content/post-1867-training-on-a-bad-day.md` — Block 1831–1880 · Cluster 4 · Post 7/10. Тренування у «поганий день»: три сценарії (емоційно важкий / дефіцит сну / хворий стан) і три рішення. Neck check rule (Fitzgerald, 1991). Тест 10 хвилин. clinical-safety: NOT_REQUIRED.
+- `content/post-1868-streak-perfectionism-trap.md` — Block 1831–1880 · Cluster 4 · Post 8/10. Стрік і перфекціонізм: де стрік корисний, де стає пасткою. FORM DEC-013: grace після двох пропусків, не одного. Консистентність (відсоток виконаних сесій) vs. неперервна послідовність. Три пастки тренувального перфекціонізму. clinical-safety: NOT_REQUIRED.
+- `content/post-1869-long-term-consistency-vs-short-term-optimization.md` — Block 1831–1880 · Cluster 4 · Post 9/10. Довгострокова стійкість vs. короткострокова оптимізація. Кумулятивні адаптаційні горизонти. Три деструктори: травми, часті зміни програми, тривалі паузи. Local vs. global optimum у програмуванні. clinical-safety: NOT_REQUIRED.
+- `content/post-1870-cluster4-synthesis-regularity-system.md` — Block 1831–1880 · Cluster 4 · Post 10/10 · CLUSTER COMPLETE. Операційна система регулярності: чотири рівні (архітектура розкладу, протоколи збоїв, управління мотивацією, довгострокова метрика). Роль Victor у системі регулярності. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — 10 нових карток: posts 1861–1870 (Block 1831–1880 · Cluster 4 · Регулярність, звичка та стійкість практики). blog.html оновлено до post-1870.
+- `STATUS.md` — Block 1831–1880 Cluster 4 COMPLETE 10/10 · v7.20.0; next: Cluster 5 (posts 1871–1880, тема TBD).
+- `VERSION` — 7.19.1 → 7.20.0.
+
+---
+
 ## [7.19.1] — 2026-06-21
 
 ### Added
