@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.32.1] — 2026-06-21
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-30: GDPR Workout Data Retention Purge Failure — `workout_data_purge` pg_cron stale. Full runbook covering severity classification (P1 → P0 → P0 escalated with Art. 33 DPA assessment threshold), T+0–T+30 immediate actions, five root-cause hypotheses with scope queries, PAM-gated manual purge recovery, PURGE-CRON-CHAIN-01 DEC-030 HMAC-chained audit trail (`system.purge_cron_failure_declared` HIGH/7yr, `system.purge_cron_manual_run_completed` STANDARD/7yr, `system.purge_cron_restored` STANDARD/3yr), five evidence artefacts (PURGE-CRON-E-001 → PURGE-CRON-COMP-E-001), SOC 2 CC6.5/CC7.2/A1.2 mapping, and post-incident controls. Owner: compliance-officer + devops-lead + platform-engineer.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — §System: three new PURGE-CRON events registered after `system.gdir_alert_check_stale`; PURGE-CRON-CHAIN-01 ordering invariant documented for all three.
+- `docs/OBSERVABILITY.md` — §12.6 pg_cron registry: job 26 (`workout_data_purge`) stale-consequence cross-reference updated to include `INCIDENT_RESPONSE R-30 (§R-30.5)`.
+- `STATUS.md` — VERSION → 7.32.1.
+
 ## [7.32.0] — 2026-06-21
 
 ### Added

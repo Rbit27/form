@@ -11226,3 +11226,435 @@ Store artefacts at `compliance/evidence/etf-cron/r29-<incident_id>/` with `MANIF
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
 ---
+
+## R-30 GDPR Workout Data Retention Purge Failure — `workout_data_purge` pg_cron Stale
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `workout_data_purge` pg_cron job 26 exceeds the 26-hour freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` (§12.7) emits `system.cron_job_stale` with `job_name = 'workout_data_purge'`; routes to PagerDuty P1 `form-devops` with dedup key `purge-job-26-stale` per AL-GDPR-04 (§37.5)
+> **Primary owners:** compliance-officer · devops-lead · platform-engineer
+> **Regulatory risk:** Job 26 enforces FORM's GDPR Art. 5(1)(e) storage-limitation commitment: workout data (`workout_sets`, `workout_sessions`, `body_metrics`) for users with `deleted_at < NOW() - INTERVAL '30 days'` must be permanently deleted daily. A stale job means **at-risk data persists beyond its lawful retention period** — a potential GDPR Art. 5(1)(e) violation. If `body_metrics` rows are affected, Art. 9 special-category risk applies and outside counsel must assess Art. 33 DPA notification obligation.
+> **Critical distinction from R-27 / R-28 / R-29:** R-27 (job 33 stale) is a SOC 2 evidence gap — operational; R-28 (job 39 stale) is a contractual deadline risk; R-29 (job 25 stale) is a commercial/financial risk. R-30 (job 26 stale) is a **regulatory compliance risk** — GDPR Art. 5(1)(e) storage-limitation breach affecting individual users' personal data. No customer-facing communication template is required; the breach is FORM-internal and mitigated by running the manual purge immediately upon detection. Outside counsel is required only at P0 escalated (body_metrics affected AND stale > 72h).
+
+---
+
+### R-30.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 26)** | `pg-cron-health-monitor` Edge Function (§12.7, runs hourly) | No successful `workout_data_purge` run in `pg_cron.job_run_details` within the prior 26 h | **P1** (escalates to P0 if R-30-C1 finds deleted users with overdue workout data) | PagerDuty `form-devops` (HIGH urgency) — dedup key `purge-job-26-stale` per §12.6 registry |
+| **AL-GDPR-04 absent** | Compliance-officer manual observation: no `data.workout_data_purged` DEC-030 event in `audit_log_events` for > 26 h on a day when deleted users exist | Observation during daily monitoring check or GDPR-E-002 quarterly review | **P1** | `form-devops` |
+| **`pg_cron.job_run_details` gap** | Devops-lead queries `pg_cron.job_run_details WHERE jobname = 'workout_data_purge'` and finds a gap > 26 h | Manual investigation following any Supabase maintenance window or pg_net degradation report | **P1 → assess R-30-C1 for P0 upgrade** | `form-devops` |
+
+> **P0 escalation criterion:** Upon any R-30 activation, compliance-officer runs R-30-C1 immediately. If any deleted user has rows in `workout_sets`, `workout_sessions`, or `body_metrics` AND `deleted_at < NOW() - INTERVAL '30 days'`, the severity escalates to **P0** — FORM is retaining personal data beyond its stated lawful purpose, constituting a GDPR Art. 5(1)(e) storage-limitation breach.
+>
+> **P0 escalated criterion:** P0 condition AND R-30-C3 returns `body_metrics_count > 0` AND stale period > 72 h — compliance-officer and outside counsel must assess GDPR Art. 33 DPA notification obligation within the remaining notification window.
+
+---
+
+### R-30.2 Severity Classification
+
+| Condition | Severity | Escalation |
+|---|---|---|
+| Job 26 stale AND R-30-C1 returns 0 rows (no deleted user has overdue workout data) | **P1** | IC + compliance-officer + devops-lead; restore job 26 within 4-hour SLA; no GDPR notification required |
+| Job 26 stale AND R-30-C1 returns ≥ 1 row (at least one deleted user has workout data past 30-day hold) | **P0** | IC + compliance-officer + devops-lead + platform-engineer; run manual purge immediately (§R-30.5 Step 2); file PURGE-CRON-COMP-E-001; compliance-officer assesses Art. 33 obligation |
+| Job 26 stale AND R-30-C3 returns `body_metrics_count > 0` AND stale_hours > 72 | **P0 escalated** | IC + compliance-officer + founder + outside counsel (within 2h); Art. 9 special-category data retained beyond lawful period; GDPR Art. 33 DPA notification risk assessment mandatory |
+| Job 26 stale AND root cause is a Supabase platform outage (R-03 active) | **P1 (R-03 primary)** | Defer manual purge until Supabase restored; R-03 is primary; R-30 activates once platform is stable; if stale period > 26h post-restoration, run R-30-C1 immediately |
+
+---
+
+### R-30.3 Immediate Actions (T+0 to T+30 min)
+
+```
+T+0   system.cron_job_stale fires for job 26. PagerDuty form-devops P1 pages devops-lead.
+      IC opens #ir-purge-stale-YYYYMMDD in Slack.
+      Emit system.purge_cron_failure_declared DEC-030 HIGH/7yr (§R-30.7) as first chain entry.
+      Record: confirmed_stale_since (from pg_cron.job_run_details, last successful run timestamp).
+
+T+5   Run R-30-C1 (§R-30.4): identify any deleted user with workout data past 30-day hold.
+      If R-30-C1 returns ≥ 1 row: escalate to P0.
+        - Page compliance-officer via PagerDuty escalation.
+        - Run R-30-C3 (§R-30.4): assess body_metrics affected count.
+        - If body_metrics_count > 0 AND stale_hours > 72: escalate to P0 escalated.
+          → Page founder immediately.
+          → Notify outside counsel within 2h for Art. 33 DPA notification assessment.
+        - Proceed to §R-30.5 Step 2 (manual purge backfill) BEFORE restoring the job.
+      If R-30-C1 returns 0 rows: remain at P1. Proceed to Step 1 (restore job 26).
+
+T+10  Run R-30-C2 (§R-30.4): check pg_cron.job_run_details for the exact stale window.
+      Determine how many missed daily runs have elapsed (each run = 1 day = 24h gap).
+      Determine root cause category (§R-30.4 H1–H5).
+      If pg_cron is unresponsive: activate R-03 (Infrastructure Outage) in parallel. Pause §R-30.5.
+
+T+15  If H3 (pg_net degraded): job SQL may have run but DEC-030 emission failed.
+      Query audit_log_events for data.workout_data_purged within the stale window —
+      if present, the purge may have succeeded despite the stale alert; re-verify by running R-30-C1.
+      If R-30-C1 returns 0 and data.workout_data_purged exists: job ran silently; treat as H3 recovery.
+
+T+20  If P0: compliance-officer opens PAM session (read_only elevation) and runs manual purge SQL
+      (§R-30.5 Step 2) for all qualifying deleted users. Record deleted row counts per table.
+      Emit system.purge_cron_manual_run_completed DEC-030 STANDARD/7yr (§R-30.7) immediately after.
+
+T+30  All immediate actions complete. Begin restoration procedure (§R-30.5 Step 1 or Step 3).
+      Update incident channel with R-30-C1 result, root cause hypothesis, and P0/P1/P0-escalated status.
+```
+
+---
+
+### R-30.4 Root Cause Hypotheses and Scope Queries
+
+**R-30-C1 — Deleted users with workout data past 30-day hold:**
+
+```sql
+-- Requires form_admin BYPASSRLS via pam-db-proxy (read_only PAM elevation)
+-- Reason: "R-30 workout_data_purge stale — overdue retention scope — INC-YYYYMMDD"
+-- Privacy: aggregate count only — no user_id in result (privacy invariant)
+SELECT
+  COUNT(DISTINCT u.id)                                               AS affected_users_count,
+  COUNT(ws.id)                                                       AS workout_sets_count,
+  COUNT(wsession.id)                                                 AS workout_sessions_count,
+  MIN(u.deleted_at)                                                  AS earliest_deletion_date,
+  MAX(NOW() - u.deleted_at)                                          AS max_data_age
+FROM users u
+LEFT JOIN workout_sessions wsession ON wsession.user_id = u.id
+LEFT JOIN workout_sets ws ON ws.session_id IN (
+  SELECT id FROM workout_sessions WHERE user_id = u.id
+)
+WHERE u.deleted_at IS NOT NULL
+  AND u.deleted_at < NOW() - INTERVAL '30 days'
+  AND (wsession.id IS NOT NULL OR ws.id IS NOT NULL);
+```
+
+> **Interpretation:** Any row where `affected_users_count > 0` is a P0 condition. The result must be recorded as PURGE-CRON-E-002 (aggregate counts only — no `user_id`). `max_data_age` drives the P0 escalated assessment for Art. 9 risk.
+
+**R-30-C2 — Exact stale window from pg_cron run history:**
+
+```sql
+-- Determine when job 26 last ran successfully and how many daily runs were missed
+SELECT
+  jobname,
+  start_time,
+  end_time,
+  status,
+  return_message
+FROM cron.job_run_details
+WHERE jobname = 'workout_data_purge'
+ORDER BY start_time DESC
+LIMIT 10;
+```
+
+> **Interpretation:** The gap between `start_time` of the most recent row and `NOW()` is the stale duration. Missed runs = `CEIL(stale_hours / 24)`. Each missed run is one day where qualifying deleted users accumulated new data-age without the purge executing.
+
+**R-30-C3 — Body metrics scope (Art. 9 risk assessment):**
+
+```sql
+-- Assess body_metrics affected count for Art. 9 special-category risk evaluation
+-- Privacy: aggregate count only — no user_id in result
+SELECT
+  COUNT(DISTINCT u.id)                AS affected_users_with_body_metrics,
+  COUNT(bm.id)                        AS body_metrics_rows_count
+FROM users u
+JOIN body_metrics bm ON bm.user_id = u.id
+WHERE u.deleted_at IS NOT NULL
+  AND u.deleted_at < NOW() - INTERVAL '30 days';
+```
+
+> **Interpretation:** Any non-zero result triggers the P0 escalated Art. 9 assessment. `body_metrics` records weight, body fat %, and other physiological measurements that may qualify as special-category health data under GDPR Art. 9 depending on DPA interpretation. `body_metrics_rows_count > 0` AND stale > 72h → outside counsel notification required.
+
+**Root cause hypotheses:**
+
+| Hypothesis | Diagnosis | Recovery path |
+|---|---|---|
+| **H1** — pg_cron job deleted or disabled | `SELECT * FROM cron.job WHERE jobname = 'workout_data_purge'` returns no rows or `active = false` | Re-create job via `0055a_workout_data_purge_cron.sql` migration re-run; or `SELECT cron.schedule('workout_data_purge', '0 2 * * *', $$...$$)` |
+| **H2** — SQL exception (schema change) | `cron.job_run_details.return_message` contains an error; likely DDL change to `workout_sets`, `workout_sessions`, or `body_metrics` | Identify the DDL migration that broke the query; fix the job SQL to match new schema; re-run migration for corrected job; coordinate with platform-engineer |
+| **H3** — pg_net degraded (DEC-030 emission failed) | Job ran but `pg_net.http_post` call to `emit-audit-event` failed; `return_message` may show a partial success | Verify by checking for `data.workout_data_purged` events; if absent, manually emit via `emit-audit-event` Worker with correct aggregate counts; check pg_net health |
+| **H4** — `service_role` permission revoked | `EXPLAIN` the purge SQL with `service_role`; confirms `permission denied` or RLS block | Re-grant `service_role` SELECT/DELETE on `workout_sets`, `workout_sessions`, `body_metrics`, `users` per `0055a_workout_data_purge_cron.sql` grants |
+| **H5** — Supabase platform outage | R-03 active; pg_cron not running globally | R-03 is primary; defer purge until platform restored; R-30-C1 immediately upon restoration |
+
+---
+
+### R-30.5 Recovery Procedure
+
+**Step 1: Diagnose root cause (T+10–T+15)**
+
+Per H1–H5 (§R-30.4), determine the exact failure mode. Review `cron.job_run_details` (R-30-C2). If H5 (Supabase outage), activate R-03 as primary and return here once platform is stable.
+
+**Step 2: Manual purge backfill (P0 — run BEFORE restoring the job)**
+
+> **When required:** R-30-C1 returns ≥ 1 row. Run this before restoring job 26 to ensure the manual backfill is the chain-authoritative purge event for the stale window.
+
+```sql
+-- PAM elevation required: form_admin BYPASSRLS via pam-db-proxy
+-- Document PAM session ID in incident channel before executing
+-- Privacy invariant: record aggregate counts only — never log individual user_id
+
+-- Capture counts before DELETE for DEC-030 payload
+WITH affected AS (
+  SELECT id FROM users
+  WHERE deleted_at IS NOT NULL
+    AND deleted_at < NOW() - INTERVAL '30 days'
+)
+SELECT COUNT(*) AS users_to_purge FROM affected;
+
+-- Execute purge (three statements — run in sequence within the PAM session)
+DELETE FROM workout_sets
+WHERE session_id IN (
+  SELECT id FROM workout_sessions
+  WHERE user_id IN (
+    SELECT id FROM users
+    WHERE deleted_at IS NOT NULL
+      AND deleted_at < NOW() - INTERVAL '30 days'
+  )
+);
+-- Record: GET DIAGNOSTICS sets_deleted = ROW_COUNT
+
+DELETE FROM workout_sessions
+WHERE user_id IN (
+  SELECT id FROM users
+  WHERE deleted_at IS NOT NULL
+    AND deleted_at < NOW() - INTERVAL '30 days'
+);
+-- Record: GET DIAGNOSTICS sessions_deleted = ROW_COUNT
+
+DELETE FROM body_metrics
+WHERE user_id IN (
+  SELECT id FROM users
+  WHERE deleted_at IS NOT NULL
+    AND deleted_at < NOW() - INTERVAL '30 days'
+);
+-- Record: GET DIAGNOSTICS metrics_deleted = ROW_COUNT
+```
+
+After completing the DELETE statements, emit `system.purge_cron_manual_run_completed` DEC-030 STANDARD/7yr (§R-30.7) with the actual row counts. File PURGE-CRON-COMP-E-001 (Template PURGE-INT-01 — §R-30.6).
+
+**Step 3: Restore job 26**
+
+Per root cause:
+- **H1** (job deleted): `SELECT cron.schedule('workout_data_purge', '0 2 * * *', $$ ... $$)` using the exact DDL from `0055a_workout_data_purge_cron.sql`.
+- **H2** (SQL exception): Deploy corrected migration; verify `cron.job_run_details` for the updated job.
+- **H3** (pg_net degraded): Confirm pg_net health; job SQL is intact; no restore action needed beyond pg_net restoration.
+- **H4** (permissions revoked): Re-run permission grants; job SQL is intact.
+- **H5** (Supabase outage): R-03 handles restoration; job was not modified.
+
+**Step 4: Confirm restoration (T+30–T+60)**
+
+Manually trigger a test run: `SELECT cron.run_job('workout_data_purge')`. Verify:
+1. `cron.job_run_details` shows a successful run with `status = 'succeeded'`
+2. `data.workout_data_purged` DEC-030 STANDARD/1yr is emitted (even if `users_purged = 0`)
+3. R-30-C1 re-run returns 0 rows
+4. Emit `system.purge_cron_restored` DEC-030 STANDARD/3yr (§R-30.7)
+5. Confirm PagerDuty `purge-job-26-stale` dedup key auto-resolves
+
+---
+
+### R-30.6 Communication Templates
+
+**PURGE-INT-01 — Internal Compensating Control Memo**
+
+> Required whenever: Step 2 (manual purge) was executed OR R-30-C1 returned any row (P0 condition). Filed to `compliance/evidence/purge-cron/PURGE-CRON-COMP-E-001-INC-YYYYMMDD.md`. No customer-facing notification exists for R-30 — the breach is FORM-internal (failure of a background data lifecycle job) and does not require disclosure to affected users unless outside counsel advises Art. 33 notification (P0 escalated only).
+
+```
+FORM INTERNAL — PRIVILEGED & CONFIDENTIAL
+Compensating Control Memo — workout_data_purge Cron Failure
+Date: YYYY-MM-DD
+Incident ID: INC-YYYYMMDD
+Initial severity: [P1 / P0 / P0 escalated]
+
+1. CONTROL FAILURE
+   pg_cron job 26 (`workout_data_purge`, schedule `0 2 * * *`) failed to run for
+   [N] consecutive days starting [confirmed_stale_since ISO].
+   Last successful run: [timestamp from pg_cron.job_run_details].
+   Root cause (H1–H5): [hypothesis confirmed].
+
+2. IMPACT ASSESSMENT
+   Affected users with overdue workout data: [count from R-30-C1]
+   workout_sets past retention: [count]
+   workout_sessions past retention: [count]
+   body_metrics past retention: [count from R-30-C3]
+   Art. 9 risk flag: [YES / NO — body_metrics_count > 0]
+   DPA notification assessment required: [YES / NO — Art. 9 AND stale > 72h]
+
+3. COMPENSATING CONTROL EXECUTED
+   Manual purge SQL executed at: [ISO timestamp]
+   PAM session ID: [session UUID]
+   Users purged: [count]  workout_sets deleted: [count]
+   workout_sessions deleted: [count]  body_metrics deleted: [count]
+   DEC-030 system.purge_cron_manual_run_completed emitted: [YES / NO]
+   Chain record: audit_log_events event_id [UUID]
+
+4. RESTORATION
+   Job 26 restored at: [ISO timestamp]
+   Confirmation test run: [SUCCESS / FAILURE]
+   DEC-030 system.purge_cron_restored emitted: [YES / NO]
+
+5. ART. 33 DPA NOTIFICATION ASSESSMENT (complete if P0 escalated)
+   body_metrics_count: [N]
+   Stale duration at detection: [N hours]
+   Was retained data accessed by any FORM system beyond normal read path?: [YES / NO / UNKNOWN]
+   Outside counsel engaged: [YES / NO — name/firm]
+   Assessment outcome: [Notification required / Not required / Pending counsel opinion]
+   DPA notification filed: [YES / NO / N/A]
+   Filing reference (if applicable): [reference]
+
+Signed: [compliance-officer] [date]
+Founder review: [REQUIRED if P0 escalated — founder signature]
+```
+
+> **No customer-facing notification template exists for R-30.** If outside counsel determines Art. 33 notification is required (P0 escalated), the DPA notification is filed directly with the relevant supervisory authority (ICO for UK/EEA users, Irish DPC for EEA users) per FORM's GDPR DPA registry. The affected users are not directly notified unless Art. 34 high-risk breach threshold is also met — a determination requiring outside counsel.
+
+---
+
+### R-30.7 DEC-030 HMAC-Chained Audit Events
+
+Three new HMAC-chained audit events are defined by this runbook. All three must be registered in `docs/AUDIT_LOG_SCHEMA.md §System` before job 26 is deployed to production (R-30.11 item 1, P0/M6).
+
+**`system.purge_cron_failure_declared`**
+
+| Field | Value |
+|---|---|
+| Event type | `system.purge_cron_failure_declared` |
+| Severity | HIGH |
+| Retention | 7 yr |
+| Emitter | IC (compliance-officer or devops-lead) via `emit-audit-event` Worker at T+0 |
+| Chain position | Must be the FIRST R-30 event in any chain for a given `incident_id` |
+
+```typescript
+// Zod v2 schema
+const PurgeCronFailureDeclaredPayload = z.object({
+  incident_id:           z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),    // ISO 8601 — from pg_cron.job_run_details
+  stale_hours:           z.number().positive(),    // hours since last successful run
+  missed_daily_runs:     z.number().int().nonneg(),
+  trigger:               z.enum(['pagerduty_alert', 'manual_discovery']),
+  initial_severity:      z.enum(['P1', 'P0', 'P0_escalated']),
+});
+```
+
+**`system.purge_cron_manual_run_completed`**
+
+| Field | Value |
+|---|---|
+| Event type | `system.purge_cron_manual_run_completed` |
+| Severity | STANDARD |
+| Retention | 7 yr |
+| Emitter | IC (compliance-officer) via `emit-audit-event` Worker immediately after manual purge completes |
+| Chain position | Must be preceded by `system.purge_cron_failure_declared` for the same `incident_id` |
+
+```typescript
+// Zod v2 schema — privacy invariant: row counts only, NO user_id
+const PurgeCronManualRunCompletedPayload = z.object({
+  incident_id:              z.string().uuid(),
+  users_purged_count:       z.number().int().nonneg(),   // affected_users from R-30-C1
+  workout_sets_deleted:     z.number().int().nonneg(),
+  workout_sessions_deleted: z.number().int().nonneg(),
+  body_metrics_deleted:     z.number().int().nonneg(),
+  purge_duration_ms:        z.number().positive(),
+  run_by_pam_session_id:    z.string().uuid(),           // PAM session, not raw user_id
+  all_clear_after_purge:    z.boolean(),                 // true if R-30-C1 re-run returned 0 rows
+});
+```
+
+**`system.purge_cron_restored`**
+
+| Field | Value |
+|---|---|
+| Event type | `system.purge_cron_restored` |
+| Severity | STANDARD |
+| Retention | 3 yr |
+| Emitter | Devops-lead via `emit-audit-event` Worker after confirmation test run succeeds |
+| Chain position | Must be preceded by `system.purge_cron_failure_declared` for the same `incident_id` |
+
+```typescript
+// Zod v2 schema
+const PurgeCronRestoredPayload = z.object({
+  incident_id:           z.string().uuid(),
+  restored_at:           z.string().datetime(),
+  root_cause_category:   z.enum(['H1_job_deleted', 'H2_sql_exception', 'H3_pg_net_degraded',
+                                 'H4_permission_revoked', 'H5_supabase_outage']),
+  fix_deployed_at:       z.string().datetime(),
+  missed_daily_runs:     z.number().int().nonneg(),
+  users_affected_count:  z.number().int().nonneg(),
+  body_metrics_affected: z.boolean(),
+  art33_assessment_required: z.boolean(),
+});
+```
+
+**PURGE-CRON-CHAIN-01 ordering invariant:** For any `incident_id` associated with this runbook, `system.purge_cron_failure_declared` must precede all `system.purge_cron_manual_run_completed` events and `system.purge_cron_restored`. A chain where `purge_cron_restored` precedes `purge_cron_failure_declared` for the same `incident_id` is a PURGE-CRON-CHAIN-01 violation — escalate to security-engineer and activate R-05.
+
+---
+
+### R-30.8 Evidence Preservation
+
+Store artefacts at `compliance/evidence/purge-cron/r30-<incident_id>/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 criteria | Retention |
+|---|---|---|---|
+| **PURGE-CRON-E-001** | DEC-030 `system.purge_cron_failure_declared` HMAC chain export (confirms incident declared within 26h freshness window — detective control operated; the stale duration is bounded) | CC7.2, PI1.2 | 7 yr |
+| **PURGE-CRON-E-002** | R-30-C1 query output: aggregate counts (`affected_users_count`, `workout_sets_count`, `workout_sessions_count`, `max_data_age`) + R-30-C3 output (`affected_users_with_body_metrics`, `body_metrics_rows_count`). Proves scope of overdue data. **Privacy invariant: aggregate counts only — no `user_id`.** | CC6.5, PI1.2, P4.1 | 7 yr |
+| **PURGE-CRON-E-003** | `pg_cron.job_run_details` export for job 26 covering the stale window (proves stale start time, missed run count, return_message for root cause) | CC7.2, A1.1 | 3 yr |
+| **PURGE-CRON-E-004** | DEC-030 `system.purge_cron_manual_run_completed` HMAC chain export — confirms manual purge was executed and row counts; proves compensating control closed the GDPR Art. 5(1)(e) gap | CC6.5, PI1.2 | 7 yr |
+| **PURGE-CRON-COMP-E-001** | Signed compensating control memo (Template PURGE-INT-01); filed to `compliance/evidence/purge-cron/PURGE-CRON-COMP-E-001-INC-YYYYMMDD.md`; uploaded to Vanta as a CC6.5 and PI1.2 compensating control | CC6.5, PI1.2 | 7 yr |
+
+---
+
+### R-30.9 SOC 2 Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **PI1.2** — Processing is complete, valid, accurate, timely, and authorised | PURGE-CRON-E-001 + PURGE-CRON-E-004 | The `pg-cron-health-monitor` (§12.7) detected job 26 stale within the 26h freshness window; IC activated R-30 within the P1 SLA; `system.purge_cron_failure_declared` is the HMAC-chained record that the processing completeness control was offline; `system.purge_cron_manual_run_completed` proves a compensating control was executed and processing was completed |
+| **CC6.5** — Logical and physical access controls — data deletion/retention | PURGE-CRON-E-002 + PURGE-CRON-COMP-E-001 | R-30-C1/C3 prove which data was overdue and in what volume; PURGE-CRON-COMP-E-001 is the management attestation that the data lifecycle control failure was detected, assessed, and remediated; the manual purge closed the GDPR Art. 5(1)(e) gap |
+| **CC7.2** — Anomaly detection and monitoring | PURGE-CRON-E-001 + PURGE-CRON-E-003 | `system.cron_job_stale` for job 26 is generated by `pg-cron-health-monitor` within one hourly cycle of the 26h freshness window being exceeded; PURGE-CRON-E-003 (`pg_cron.job_run_details` export) confirms the exact stale duration for auditor inspection |
+| **A1.1** — Addresses threats to meeting availability commitments | PURGE-CRON-E-003 | Job 26 stale = GDPR Art. 5(1)(e) compliance gap; PURGE-CRON-E-003 proves the gap was detected within the 26h window and remediated; GDPR-E-002 quarterly evidence (§37.9) will reflect the incident and compensating control |
+
+**PI1.2 auditor narrative:** PI1.2 requires FORM to ensure processing is complete. Job 26 (`workout_data_purge`) is the automated control that ensures post-deletion data lifecycle completion for consumer users. The 26h freshness window (§12.6) is the defined evaluation cadence threshold. The `pg-cron-health-monitor` (§12.7) detects any breach within one hourly cycle. R-30 documents the IC response, compensating control (manual purge execution), and restoration. PURGE-CRON-COMP-E-001 is the signed management acknowledgement that the control gap was detected, assessed, and remediated.
+
+**CC6.5 auditor narrative:** CC6.5 requires FORM to implement logical access controls including data retention and deletion policies. Job 26 is the primary automated enforcement mechanism for FORM's stated 30-day deletion schedule for post-account-deletion workout data (GDPR Art. 5(1)(e) and FORM Privacy Policy). R-30-C1 is the scope assessment that confirms whether the control failure resulted in data being retained beyond its policy-defined limit. PURGE-CRON-E-002 is the evidence that the scope was assessed; PURGE-CRON-E-004 proves the gap was closed before the SOC 2 observation period record closes.
+
+---
+
+### R-30.10 Post-Incident Controls
+
+| Control | Trigger condition | Owner | SLA |
+|---|---|---|---|
+| Add Scenario S (workout data purge cron failure — pg_cron job 26 stale; manual purge backfill for affected users) to §9.4 tabletop catalog | Any activation of R-30 (regardless of severity) | security-engineer + compliance-officer | 30 days post-PIR |
+| Review pg_cron job 26 SQL for exception handling: add `BEGIN ... EXCEPTION WHEN OTHERS THEN` block that emits `system.purge_cron_failure_declared` directly from pg_cron on exception (belt-and-suspenders — DEC-030 event even if `net.http_post` fails) | H2 (SQL exception) or H3 (pg_net degraded) confirmed as root cause | platform-engineer + devops-lead | 14 days post-PIR |
+| Review DDL change governance for `workout_sets`, `workout_sessions`, `body_metrics`, `users.deleted_at`: require compliance-officer sign-off for any DDL change that alters column names or types queried by job 26 | H2 (SQL exception) with DDL change as root cause | enterprise-architect + platform-engineer | 30 days post-PIR |
+| Update `docs/OBSERVABILITY.md §37.10` implementation checklist: note that R-30 authoring closes the documentation obligation for job 26 stale recovery runbook | This runbook authoring | compliance-officer | Next sprint |
+| If P0 escalated (body_metrics affected AND stale > 72h): schedule outside counsel annual review of GDPR Art. 33 applicability and Art. 9 classification of `body_metrics` data under each DPA jurisdiction (UK ICO, Irish DPC, other active supervisory authorities) | P0 escalated confirmed | compliance-officer + founder | Within 45 days of P0 escalated resolution |
+
+---
+
+### R-30.11 Implementation Checklist
+
+#### P0 — Before job 26 is deployed to production (M6)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register three DEC-030 events from §R-30.7 in `docs/AUDIT_LOG_SCHEMA.md §System`: `system.purge_cron_failure_declared` (HIGH, 7yr), `system.purge_cron_manual_run_completed` (STANDARD, 7yr), `system.purge_cron_restored` (STANDARD, 3yr). Add Zod v2 schemas per §R-30.7 payload definitions. Add PURGE-CRON-CHAIN-01 ordering invariant to the `emit-audit-event` Worker chain-invariant registry. | compliance-officer + platform-engineer | **P0** | M6 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.21, 2026-06-21: three PURGE-CRON events registered in §System after `system.gdir_alert_check_stale`; PURGE-CRON-CHAIN-01 ordering invariant noted.** |
+| 2 | Confirm `pg-cron-health-monitor` (§12.7) routes `system.cron_job_stale` for `jobname = 'workout_data_purge'` to PagerDuty `form-devops` P1 AL-GDPR-04 with dedup key `purge-job-26-stale` per §12.6 registry. Write integration test: simulate job 26 gap > 26h in staging; confirm `system.cron_job_stale` is emitted with `job_name = 'workout_data_purge'` and PagerDuty test payload is generated. | devops-lead + platform-engineer | **P0** | M6 | [ ] |
+
+#### P1 — Before first consumer user deletion cohort reaches 30-day hold (M7)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Store Template PURGE-INT-01 at `compliance/evidence/ir-templates/r30-purge-int-01.md`. Compliance-officer reviews the P0 escalated Art. 33 DPA notification assessment section specifically (outside counsel requirement when `body_metrics_count > 0` AND stale > 72h). | compliance-officer | **P1** | M7 | [ ] |
+| 4 | Add `docs/OBSERVABILITY.md §12.6` cross-reference: update job 26 `workout_data_purge` registry entry to add `INCIDENT_RESPONSE R-30 (job 26 stale recovery runbook — §R-30.5)` in the stale consequence column. | compliance-officer | **P1** | M6 | [x] **Done — OBSERVABILITY.md v4.9.0, 2026-06-21: §12.6 job 26 entry updated with INCIDENT_RESPONSE R-30 cross-reference.** |
+| 5 | Add PURGE-CRON-E-001 through PURGE-CRON-COMP-E-001 artefact definitions to `docs/SOC2_READINESS.md §79.4` master evidence table: five artefacts with TSC criteria (PI1.2/CC6.5/CC7.2/A1.1), cadence (incident-triggered), retention (7yr / 3yr), and storage path (`compliance/evidence/purge-cron/r30-<incident_id>/`). Add `purge-cron/` R2 subfolder to §80.3. | compliance-officer | **P1** | M6 | [ ] |
+
+#### P2 — Before SOC 2 observation period (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Add Scenario S (workout data purge cron failure) to §9.4 tabletop catalog: compliance-officer disables job 26 in staging; IC runs R-30-C1; executes manual purge SQL for a synthetic deleted-user cohort; confirms `data.workout_data_purged` and `system.purge_cron_manual_run_completed` DEC-030 events emitted; restores job; confirms `system.purge_cron_restored` emitted and R-30-C1 returns 0. | security-engineer + compliance-officer | **P2** | M12 | [ ] |
+
+---
+
+*v1.0 (2026-06-21): R-30 GDPR Workout Data Retention Purge Failure — thirtieth runbook. Closes the documentation gap identified by `docs/OBSERVABILITY.md §12.6` (job 26 registry entry: "stale = GDPR Art. 5(1)(e) storage-limitation breach — post-deleted user workout data persists beyond 30-day hold window") and `docs/OBSERVABILITY.md §37.7` (job 26 spec): §37.5 defines AL-GDPR-04 (P1 PagerDuty `form-devops` on job 26 stale), but no recovery runbook existed for when job 26 becomes stale. R-30 provides the full IC protocol for when `workout_data_purge` pg_cron job 26 exceeds the 26h freshness window. Trigger: `system.cron_job_stale` with `job_name = 'workout_data_purge'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-devops`, dedup `purge-job-26-stale`. Critical distinction from R-27/R-28/R-29: R-27 is a SOC 2 evidence gap (operational); R-28 is contractual/legal deadline risk; R-29 is commercial/financial risk; R-30 is a **regulatory compliance risk** — GDPR Art. 5(1)(e) storage-limitation breach. No customer-facing communication template (unlike R-28) — the breach is FORM-internal. Three-severity matrix: P1 (stale, no deleted users with overdue data — monitoring gap only), P0 (stale AND ≥1 deleted user with workout data past 30-day hold — GDPR Art. 5(1)(e) active breach; manual purge required), P0 escalated (body_metrics affected AND stale > 72h — Art. 9 risk; outside counsel required for Art. 33 DPA notification assessment). T+0–T+30 immediate actions: DEC-030 `system.purge_cron_failure_declared` HIGH/7yr at T+0; R-30-C1 scope query at T+5 (P0 upgrade gate); R-30-C3 body_metrics assessment for Art. 9 risk at T+5 (P0 escalated upgrade gate); R-30-C2 pg_cron.job_run_details at T+10 (stale window + root cause); H3 (pg_net) check at T+15; manual purge SQL at T+20 if P0; restoration at T+30. Three scope queries: R-30-C1 (affected users count + workout_sets/sessions counts), R-30-C2 (pg_cron.job_run_details last 10 runs for staleness + missed run count), R-30-C3 (body_metrics affected count for Art. 9 risk assessment — all aggregate counts, no user_id). Five root cause hypotheses: H1 (pg_cron job deleted), H2 (SQL exception — DDL change to workout_sets/workout_sessions/body_metrics), H3 (pg_net degraded), H4 (service_role permission revoked), H5 (Supabase platform outage — R-03 primary). Four-step recovery: Step 1 (diagnose root cause H1–H5); Step 2 (manual purge backfill — three DELETE statements with PAM elevation; emit `system.purge_cron_manual_run_completed` STANDARD/7yr; file PURGE-CRON-COMP-E-001); Step 3 (restore job 26 per root cause); Step 4 (confirm restoration via `SELECT cron.run_job()` + R-30-C1 re-run + `system.purge_cron_restored` STANDARD/3yr). One communication template: PURGE-INT-01 (internal compensating control memo — required at P0 or when Step 2 executed; no customer-facing template; Art. 33 DPA notification section included for P0 escalated). Three DEC-030 HMAC-chained events: `system.purge_cron_failure_declared` HIGH/7yr (Zod: `incident_id`, `confirmed_stale_since` datetime, `stale_hours` positive, `missed_daily_runs` nonneg int, `trigger` enum, `initial_severity` enum), `system.purge_cron_manual_run_completed` STANDARD/7yr (Zod: `incident_id`, `users_purged_count` nonneg int, `workout_sets_deleted` nonneg int, `workout_sessions_deleted` nonneg int, `body_metrics_deleted` nonneg int, `purge_duration_ms` positive, `run_by_pam_session_id` UUID, `all_clear_after_purge` bool), `system.purge_cron_restored` STANDARD/3yr (Zod: `incident_id`, `restored_at` datetime, `root_cause_category` enum H1–H5, `fix_deployed_at` datetime, `missed_daily_runs` nonneg int, `users_affected_count` nonneg int, `body_metrics_affected` bool, `art33_assessment_required` bool); PURGE-CRON-CHAIN-01 ordering invariant: `purge_cron_failure_declared` precedes all `purge_cron_manual_run_completed` and `purge_cron_restored` for same `incident_id` — inversion triggers R-05. Five evidence artefacts: PURGE-CRON-E-001 (`system.purge_cron_failure_declared` chain export, CC7.2/PI1.2, 7yr), PURGE-CRON-E-002 (R-30-C1/C3 aggregate query outputs, CC6.5/PI1.2/P4.1, 7yr — no user_id), PURGE-CRON-E-003 (`pg_cron.job_run_details` for job 26 stale window, CC7.2/A1.1, 3yr), PURGE-CRON-E-004 (`system.purge_cron_manual_run_completed` chain export, CC6.5/PI1.2, 7yr), PURGE-CRON-COMP-E-001 (signed Template PURGE-INT-01 memo, CC6.5/PI1.2, 7yr — required at P0 or when Step 2 executed). Four SOC 2 criteria: PI1.2 (processing completeness — manual purge proves data lifecycle completed), CC6.5 (data deletion controls — R-30-C1/C3 scope assessment + PURGE-CRON-COMP-E-001 remediation attestation), CC7.2 (pg-cron-health-monitor anomaly detection), A1.1 (GDPR Art. 5(1)(e) compliance gap detected within 26h freshness window). Five post-incident controls: Scenario S tabletop (30d post-PIR), pg_cron SQL exception handling improvement (H2/H3), DDL change governance for workout tables (H2 DDL root cause), §37.10 checklist cross-reference update, outside counsel Art. 33/Art. 9 annual review (P0 escalated only). Six-item implementation checklist: 2× P0/M6 (three DEC-030 events registered + PURGE-CRON-CHAIN-01 in emit-audit-event; §12.7 routing integration test), 3× P1/M6-M7 (PURGE-INT-01 template + Art. 33 review section; §12.6 job 26 cross-reference; SOC2_READINESS §79.4 evidence table + §80.3 R2 subfolder), 1× P2/M12 (Scenario S tabletop). Privacy floor: all three system events carry only FORM-internal operational metadata — stale duration, timestamp, root cause enum, aggregate row counts; `system.purge_cron_manual_run_completed.users_purged_count` is an integer (no user_id, no email, no health values); PURGE-CRON-E-002 carries only aggregate counts from R-30-C1/C3 — never `user_id`, never health values, never PII; PURGE-INT-01 carries only aggregate counts + compliance metadata; `form_api` must never route any §R-30 event to any user-facing or tenant-facing endpoint. Cross-references: `docs/OBSERVABILITY.md §12.6` (job 26 `workout_data_purge` registry entry — stale = GDPR Art. 5(1)(e) breach; R-30 now referenced as recovery runbook per v4.9.0); `docs/OBSERVABILITY.md §37.5` (AL-GDPR-04 canonical alert rule — P1 PagerDuty `form-devops`; dedup `purge-job-26-stale`); `docs/OBSERVABILITY.md §37.7` (job 26 DDL + DEC-030 ordering spec); `docs/OBSERVABILITY.md §12.7` (`pg-cron-health-monitor` — emits `system.cron_job_stale` that triggers this runbook); `docs/AUDIT_LOG_SCHEMA.md §System` (three DEC-030 events registered per R-30.11 item 1 [x] Done — v2.21); `docs/SOC2_READINESS.md §79.4` (PURGE-CRON evidence artefacts to register per R-30.11 item 5 [ ]); `docs/OBSERVABILITY.md §37.9` (GDPR-E-002 — quarterly job 26 run log evidence artefact, separate from incident-triggered PURGE-CRON artefacts); R-05 (HMAC chain break — parallel activation if PURGE-CRON-CHAIN-01 inversion detected); R-03 (Infrastructure Outage — parallel activation if Supabase platform outage is root cause, H5); R-15 (Health Data Field Detected in Error Payload — cross-activate if P0 escalated with Art. 9 data confirmed retained in error logs or monitoring pipelines, not just the primary tables); R-28 (Renewal Notice Monitoring Failure — CC4.1/CC2.2 pattern precedent; PURGE-CRON-COMP-E-001 follows RENEW-CRON-COMP-E-001 structure); AL-GDPR-04 (§37.5 — P1 alert that fires when job 26 itself is stale; R-30 fires in response to this alert). Owner: compliance-officer + devops-lead + platform-engineer.*
+
+---
+
+**v1.0 · 2026-06-21 · Owner: compliance-officer + devops-lead + platform-engineer**
+**Review: after every P0/P1 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
+
+---
