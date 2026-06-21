@@ -275,6 +275,23 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 269 | Контроль змінних: чому не можна одночасно міняти програму, харчування і розклад | proposed · v6.78.0 |
 | 270 | Синтез 266–270: п'ять практичних інструментів self-coached атлета без зайвої складності | proposed · v6.78.0 |
 
+### Editorial series: 271–280 — Exercise physiology deep dives, vol. 2 (proposed · v7.10.0)
+
+Другий том поглиблених матеріалів з фізіології вправ і спортивної науки. Тон: editorial-brutalist, 13-min read. Посилання на первинні джерела.
+
+| Post | Topic | Status |
+|---|---|---|
+| 271 | Скільки відпочивати між підходами: наука проти залу — різниця між гіпертрофією і силою | draft · v7.10.0 → post-271-rest-intervals-hypertrophy-strength.md |
+| 272 | Цикл розтягування-скорочення: як тіло зберігає і повертає пружну енергію | draft · v7.10.0 → post-272-stretch-shortening-cycle-ssc.md |
+| 273 | Соціальна фасилітація у тренінгу: чому ти піднімаєш більше (або менше), коли хтось дивиться | draft · v7.10.0 → post-273-social-facilitation-training.md |
+| 274 | Трифазне тренування: ексцентрик → ізометрик → концентрик — чому послідовність має значення | draft · v7.10.0 → post-274-triphasic-training-eccentric-isometric-concentric-blocks.md |
+| 275 | Навмисна швидкість: CAT і нейральні адаптації при субмаксимальних вагах | draft · v7.10.0 → post-275-compensatory-acceleration-training-intent-neural-specificity.md |
+| 276 | Чому перший місяць у залі обманює: нейральна адаптація vs. структурна гіпертрофія | draft · v7.10.0 → post-276-first-month-neural-structural-adaptation.md |
+| 277 | Детренінг і повернення: скільки реально втрачається і за який час | draft · v7.10.0 → post-277-detraining-comeback-timeline.md |
+| 278 | Суперсети: коли скорочують час і не коштують сили — антагоністичні пари | draft · v7.10.0 → post-278-supersets-antagonist-pairs.md |
+| 279 | Rest-pause тренінг: нейром'язова механіка внутрішньосетного відпочинку | draft · v7.10.0 → post-279-rest-pause-intraset-rest-motor-unit-recruitment.md |
+| 280 | Тренінг у спеку: що відбувається з тілом і як не зламати адаптацію | draft · v7.10.0 → post-280-heat-training-thermal-stress.md |
+
 > **Open question OQ-EDITORIAL-01:** Числові файли `post-22-periodization.md` — `post-25-breathing-mechanics.md` (написані 2026-05-17) конфліктують за номером з editorial series posts 22-25. Рішення: ці May-файли потрібно або перенумерувати в діапазон 200+ (де вони логічно входять у «Exercise physiology deep dives»), або зберегти як окремий контент-бібліотечний пост без editorial-серійного номера. Рішення потребує founder review. **OQ-EDITORIAL-01 status: 🟡 Unresolved**
 
 ---
