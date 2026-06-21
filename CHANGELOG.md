@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.28.1] — 2026-06-21
+
+### Changed
+- `docs/OBSERVABILITY.md` — v4.8.3: §12.6 job 25 cross-ref column updated to include `INCIDENT_RESPONSE R-29 (job 25 stale recovery runbook — §R-29.5)`; §36.5 implementation checklist item 6 added (P1/M10, [x] Done). Closes R-29.11 item 4 and R-29.10 post-incident control.
+- `docs/SOC2_READINESS.md` — v3.24.6: §79.4 master evidence table — five ETF-CRON artefacts registered (ETF-CRON-E-001/CC4.1+CC7.2, ETF-CRON-E-002/CC5.2+CC7.2, ETF-CRON-E-003/CC4.1+A1.1, ETF-CRON-E-004/CC4.1+CC5.2, ETF-CRON-COMP-E-001/CC4.1+CC5.2); §80.3 `etf-cron/` R2 subfolder added; §80.4 Vanta mirror list updated. Closes R-29.11 item 5.
+- `docs/INCIDENT_RESPONSE.md` — R-29.11 items 4 and 5 marked [x] Done.
+- `VERSION` — 7.28.0 → 7.28.1.
+
+---
+
 ## [7.28.0] — 2026-06-21
 
 ### Added
