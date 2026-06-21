@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.24.1] — 2026-06-21
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.24.5: §79.4 master evidence table — six RENEW-CRON incident-triggered artefacts registered: RENEW-CRON-E-001 (CC4.1/CC7.2, 7yr — `system.renew_cron_failure_declared` HMAC chain export), RENEW-CRON-E-002 (CC4.1/CC2.2, 7yr — R-28-C1/C3 SQL outputs), RENEW-CRON-E-003 (CC4.1/A1.1, 3yr — `pg_cron.job_run_details` stale window), RENEW-CRON-E-004 (CC4.1/CC2.2, 7yr — `system.renew_cron_manual_check_completed` chain exports), RENEW-CRON-E-005 (CC2.2/CC4.1, 7yr — `enterprise.renewal_notice_sent` chain exports), RENEW-CRON-COMP-E-001 (CC4.1/CC2.2, 7yr — Template REN-01 compensating control memo). §80.3 `renewals/` comment updated. §80.4 Vanta mirror list updated. Closes INCIDENT_RESPONSE R-28.11 item 5 (P1/M11).
+- `docs/OBSERVABILITY.md` — v4.8.2: §12.6 pg_cron registry job 39 stale-condition cross-ref column updated with `INCIDENT_RESPONSE R-28 (job 39 stale recovery runbook — §R-28.5)`; §51.7 item 8 added ([x] Done) documenting R-28 cross-reference closure. Closes INCIDENT_RESPONSE R-28.11 item 4 (P1/M11) and R-28.10 post-incident control.
+- `docs/INCIDENT_RESPONSE.md` — R-28.11 items 4 and 5 marked `[x] Done` with closure notes referencing OBSERVABILITY.md v4.8.2 and SOC2_READINESS.md v3.24.5 respectively.
+- `VERSION` — 7.24.0 → 7.24.1.
+
+---
+
 ## [7.24.0] — 2026-06-21
 
 ### Added
