@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.21.0] — 2026-06-21
+
+### Added
+- `content/post-2041-program-flexibility-vs-consistency.md` — Editorial 2041–2050 · Block opener. Гнучкість програми vs. послідовність: чотири патерни псевдо-гнучкості (нова інформація, нудьга, чужий прогрес, три тижні плато), нейром'язова фаза адаптації 4–6 тижнів, операційна перевірка з чотирьох питань до будь-якої зміни програми. Heaselgrave et al. 2019, Peterson 2011. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — нова картка post-2041 (Editorial 2041–2050 · Self-Coaching). blog.html оновлено до post-2041.
+- `README.md` — roadmap: Editorial 2041–2050 «Хибні спрощення в тренувальній культурі» додано; post-2041 → draft; posts 2042–2050 proposed.
+- `STATUS.md` — Editorial 2041–2050 IN PROGRESS 1/10 · v7.21.0; version header оновлено до v7.21.0.
+- `VERSION` — 7.20.0 → 7.21.0.
+
+---
+
 ## [7.20.0] — 2026-06-21
 
 ### Added
