@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [7.36.0] — 2026-06-21
+
+### Added
+- `content/post-2035-ai-coach-vs-gpt-wrapper.md` — Editorial block 2031–2040 post 5/10. AI-coach і GPT-wrapper: як відрізнити продукт від красиво упакованого автозаповнення. Three requirements for a real AI-coach: persistent athlete state, longitudinal response model, differentiated context reaction. Three practical tests: memory test, context test, prediction test. Why GPT-wrappers answer context-independent questions well but context-dependent questions dangerously. What to expect and not expect from AI training tools. clinical-safety: NOT_REQUIRED. sports-scientist review: NOT_REQUIRED.
+- `content/post-2036-readiness-scores-dashboard-dependency.md` — Editorial block 2031–2040 post 6/10. Readiness score і dashboard dependency: коли цифра починає керувати тобою. What readiness scores actually measure (proxies: HRV, RHR, skin temperature). Four dashboard-dependency mechanisms: external locus of control, post-rationalisation, anxiety without data, over-caution at low scores. Where readiness is genuinely useful: systemic trends, personal calibration, sharp deviation detection. Protocol: assess own state before app; score as Bayesian prior, subjective state as update; one tracker minimum 3 months; quarterly week without device. Hammert et al. (2024) HRV-guided training. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+- `content/post-2037-tracking-fatigue-vs-output.md` — Editorial block 2031–2040 post 7/10. Відстеження втоми і відстеження результату: чому це різні речі і чому треба обидві. Output tracking answers "is the system progressing?"; fatigue tracking answers "what state is the system in?". Six-scenario divergence matrix. Three metrics each for output and fatigue. Banister et al. (1975) fitness–fatigue model. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+- `content/post-2038-when-technology-is-the-obstacle.md` — Editorial block 2031–2040 post 8/10. Коли технологія заважає: ознаки, що інструмент став милицею. Four signs of tech dependency. Mechanisms forming dependency: engagement design, uncertainty, social confirmation, gradual authority shift. Five-question dependency test. Four-step dismantling protocol. clinical-safety: NOT_REQUIRED. sports-scientist review: NOT_REQUIRED.
+- `content/post-2039-vo2max-estimate-longitudinal-tracking.md` — Editorial block 2031–2040 post 9/10. VO2max estimate: що цифра говорить у динаміці. Consumer devices use sub-maximal inference (RMSE ±3–6 ml/kg/min — Shcherbina et al. 2017, Kinnunen et al. 2020). Strength-athlete specifics: body mass increase lowers relative VO2max. Stable-conditions longitudinal trend at 3+ months horizon meaningful; single measurements and comparisons with population norms are not. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+- `content/post-2040-technology-stack-synthesis.md` — Editorial block 2031–2040 post 10/10 · BLOCK SYNTHESIS. Синтез: технологічний стек self-coached атлета у 2026. Fundamental position: technology supports decisions, does not replace them. Minimum effective stack: training log, timer, camera 1–2×/week. Justified expansion criteria for HRV, full tracker, AI tools. Four questions before any new tool. FORM position on coaching autonomy. clinical-safety: NOT_REQUIRED. sports-scientist review: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — six blog cards added for posts 2035–2040.
+- `STATUS.md` — Editorial 2031–2040 → **COMPLETE 10/10 · v7.36.0**; current version → v7.36.0.
+
 ## [7.35.0] — 2026-06-21
 
 ### Added
