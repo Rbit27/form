@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [7.24.0] — 2026-06-21
+
+### Added
+- `content/post-2042-progressive-overload-three-failures.md` — Block 2041–2050 · Post 2/10. «"Більше = краще": три ситуації, де принцип прогресивного перевантаження перетворюється на помилку» — три сценарії: (1) об'єм до відновлювальної адаптації (Schoenfeld et al. 2017 + overreach pattern); (2) вага до технічної консолідації (Comfort et al. 2012); (3) частота до стабілізації відновлення (Ralston et al. 2017 + volume-not-adjusted error). Спільна механіка — перевантаження здатності, а не м'яза. Операційний протокол трьох питань. Victor логіка: вимагає метрики деградації перед рекомендацією прогресу. clinical-safety: NOT_REQUIRED. sports-scientist: review pending.
+
+### Changed
+- `blog.html` — post-2042 картка додана (Sports Science · 13 хв · draft).
+- `STATUS.md` — Block 2041–2050 IN PROGRESS 2/10 · v7.24.0. Version header оновлений до v7.24.0.
+- `VERSION` — 7.23.0 → 7.24.0.
+
+---
+
 ## [7.23.0] — 2026-06-21
 
 ### Added
