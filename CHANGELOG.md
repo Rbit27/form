@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [7.47.1] — 2026-06-21
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md` — `### Enterprise Contract Renewal Monitoring events (DEC-030 HMAC-chained · OBSERVABILITY §51 · CC4.1/CC2.2/A1.1)`: new section registering two DEC-030 events for the RENEW-NOTICE-01 pg_cron job 39 monitoring control. (1) `enterprise.renewal_notice_overdue` HIGH/7yr: per-tenant alert event emitted when RENEW-NOTICE-01 SQL detects an active contract in the 85–95-day notice window with no `enterprise.renewal_notice_sent` on file; fires AL-RENEW-01 P1 PagerDuty `form-enterprise`; Zod v2 `RenewalNoticeOverduePayload`; CC4.1/CC2.2 auditor narratives; REN-E-002 SOC 2 mapping. (2) `system.renewal_notice_check_passed` LOW/1yr: operational all-clear health signal emitted when zero gaps detected; no `tenant_id` — privacy floor; 26h absence triggers `system.cron_job_stale` + INCIDENT_RESPONSE R-28; Zod v2 `RenewalNoticeCheckPassedPayload`; REN-OBS-E-001 A1.1 mapping. Two retention table rows added. **Closes `docs/OBSERVABILITY.md §51.7` item 1 (P0/M11).** AUDIT_LOG_SCHEMA.md v2.27 → v2.28.
+
+### Changed
+- `docs/OBSERVABILITY.md` — §51.7 item 1 marked `[x] Done (2026-06-21, AUDIT_LOG_SCHEMA.md v2.28)`; §51.4.1 + §51.4.2 registration obligation notes updated to 🟢 Done. Header v4.9.1 → v4.9.2 (v4.8.4 patch note added to version history).
+- `VERSION` → 7.47.1
+
+---
+
 ## [7.47.0] — 2026-06-21
 
 ### Added
