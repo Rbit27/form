@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [7.42.1] — 2026-06-21
+
+### Added
+- `docs/INCIDENT_RESPONSE.md R-33` — BDG Override Expiry Sweep Failure runbook (job 34 `bdg_override_expiry_sweep`, `*/15 * * * *`, 20-min freshness window, DEC-066/migration 0079 SCIM guard safety-net). P1/P0 severity split, H1–H4 root cause hypotheses, PAM-elevated manual UPDATE procedure (P0), three DEC-030 events (BDG-SWEEP-CHAIN-01 anchor), four evidence artefacts (BDG-EXP-E-001–004), SOC 2 CC6.3/CC7.2/A1.2 mapping.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.25 → v2.26 — Three BDG-SWEEP DEC-030 events added: `system.bdg_sweep_failure_declared` (HIGH/7yr, BDG-SWEEP-CHAIN-01 anchor), `system.bdg_sweep_override_cleared` (STANDARD/7yr, P0 only), `system.bdg_sweep_restored` (STANDARD/3yr).
+- `docs/OBSERVABILITY.md` v4.8.5 → v4.9.1 — §12.6 job 34 `bdg_override_expiry_sweep` stale-consequence cross-ref extended with `INCIDENT_RESPONSE R-33 (job 34 stale recovery runbook — §R-33.5)`; v0.8 patch note added.
+- `docs/SOC2_READINESS.md` v3.24.8 → v3.25.1 — §79.4 four BDG-EXP-E artefacts registered (BDG-EXP-E-001–004); §80.3 `bdg-sweep/` R2 subfolder added; §80.4 Vanta mirror list updated.
+
+---
+
 ## [7.42.0] — 2026-06-21
 
 ### Added

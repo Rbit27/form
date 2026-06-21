@@ -12643,3 +12643,402 @@ Store artefacts at `compliance/evidence/caep-sweep/r32-<incident_id>/` with `MAN
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
 ---
+
+## R-33 BDG Override Expiry Sweep Failure — `bdg_override_expiry_sweep` pg_cron Stale
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `bdg_override_expiry_sweep` pg_cron job 34 exceeds the 20-minute freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` (§12.7) emits `system.cron_job_stale` with `job_name = 'bdg_override_expiry_sweep'`; routes to PagerDuty P1 `form-security` → security-engineer with dedup key `bdg-sweep-stale` per §12.6
+> **Primary owners:** security-engineer · devops-lead · compliance-officer
+> **Security risk:** Job 34 (`*/15 * * * *`) NULLs expired BDG columns on `tenant_sso_configs` where `bulk_deprovision_override_exp < NOW()`. A stale job means any tenant whose CSM-issued override window has expired is left with the override DB row intact — the Bulk Deprovision Guard (BDG) cannot automatically re-engage its seat-protection threshold until the SCIM Worker's `revokeActiveOverride()` path fires on the next over-limit request. If no further SCIM sync occurs during the stale window the DB row remains and the guard is effectively dormant. CC6.3 / A1.2 access-control gap.
+> **Belt-and-suspenders design context (critical distinction from R-30/R-31):** Job 34 is explicitly a **safety-net sweep**. The SCIM Worker's `revokeActiveOverride()` function (SSO_SCIM §34.4) also NULLs the override columns on the first bulk sync request that exceeds the override window under an active override. If job 34 is stale but a SCIM sync occurs during the stale window, `revokeActiveOverride()` fires and the guard re-engages — **no harm done**. P0 is only declared when R-33-C1 confirms at least one tenant has an expired DB override row AND no remediation SCIM sync has cleared it via the Worker path.
+> **Critical distinction from R-32:** R-32 is a silent-drop integrity risk (expired CAEP streams silently drop session-revocation events). R-33 is a guard-dormancy risk — active deprovisioning without the guard re-engaging. Unlike R-32, there is no HTTP Worker call required for recovery: manual remediation is a single direct Postgres UPDATE.
+
+---
+
+### R-33.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 34)** | `pg-cron-health-monitor` Edge Function (§12.7, runs hourly) | No successful `bdg_override_expiry_sweep` run in `pg_cron.job_run_details` within the prior 20 min | **P1** (escalates to P0 if R-33-C1 finds tenants with `bulk_deprovision_override_exp < NOW()`) | PagerDuty `form-security` P1 → security-engineer; dedup key `bdg-sweep-stale` per §12.6 registry |
+| **Manual discovery** | security-engineer observes `bulk_deprovision_override_exp IS NOT NULL` for a row past expiry in the Admin Dashboard or via a routine DB query | Post-override CSM check or Admin Dashboard review | **P1 → assess R-33-C1 for P0 upgrade** | `form-security` |
+
+> **P0 escalation criterion:** Upon any R-33 activation, security-engineer runs R-33-C1 immediately. If any `tenant_sso_configs` row has `bulk_deprovision_override_exp IS NOT NULL AND bulk_deprovision_override_exp < NOW()`, severity escalates to **P0** — the BDG override TTL (1h/2h/4h) has elapsed without the guard re-engaging in the DB. The SCIM Worker's `revokeActiveOverride()` may not have fired if no subsequent SCIM sync occurred during the stale window.
+
+---
+
+### R-33.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P1** | Stale; R-33-C1 returns zero rows with expired override | 30 min investigation; no SLA-credit risk | Diagnose root cause; restore job 34; emit DEC-030 chain |
+| **P0** | Stale AND R-33-C1 returns ≥ 1 tenant with `bulk_deprovision_override_exp < NOW()` | 15 min to manual DB clear (R-33.5 Step 2); restore within 30 min | Manual UPDATE to NULL expired columns; emit `system.bdg_sweep_override_cleared`; file BDG-INT-01 |
+
+---
+
+### R-33.3 Immediate Actions (T+0 to T+30 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `system.bdg_sweep_failure_declared` (HIGH/7yr) via `emit-audit-event` Worker | security-engineer | Required at ALL severity levels. Do this FIRST before any DB queries. BDG-SWEEP-CHAIN-01 anchor. |
+| **T+5** | Run R-33-C1 (scope query) | security-engineer | Count of tenants with active expired override rows. If count > 0 → escalate to P0. No tenant names in the output. |
+| **T+10** | Run R-33-C2 (`pg_cron.job_run_details` for job 34) | security-engineer | Confirms stale start time, missed-run count, last `return_message`. |
+| **T+15** | Classify root cause (H1–H4) from R-33-C3 | security-engineer | See §R-33.4 for hypothesis tree. |
+| **T+15** *(P0 only)* | Execute Step 2 — manual UPDATE to NULL expired override columns | security-engineer (PAM elevation) | Emit `system.bdg_sweep_override_cleared` STANDARD/7yr immediately after successful UPDATE COMMIT. |
+| **T+20–T+30** | Restore job 34 per root cause diagnosis | devops-lead | See §R-33.5 Steps 3–4. Emit `system.bdg_sweep_restored` on confirmed first successful run. |
+
+---
+
+### R-33.4 Root Cause Hypotheses and Scope Queries
+
+#### R-33-C1 — Expired override scope (P0 upgrade gate)
+
+```sql
+-- Run at T+5. Aggregate counts only — no tenant names, no individual user data.
+-- P0 upgrade if count > 0.
+SELECT
+  COUNT(*)                                           AS tenants_with_expired_override,
+  MIN(bulk_deprovision_override_exp)                 AS earliest_expiry,
+  MAX(bulk_deprovision_override_exp)                 AS latest_expiry,
+  NOW() - MAX(bulk_deprovision_override_exp)         AS max_overdue_interval
+FROM tenant_sso_configs
+WHERE bulk_deprovision_override_exp IS NOT NULL
+  AND bulk_deprovision_override_exp < NOW();
+```
+
+**Privacy floor:** Returns only aggregate counts and timestamp extremes. No `tenant_id`, no `override_issued_by_email_hash`, no deprovisioned-user data appears in this query output. File R-33-C1 output as BDG-EXP-E-003 (§R-33.8).
+
+#### R-33-C2 — pg_cron stale window
+
+```sql
+-- Last 10 runs of job 34. Confirms stale start and missed 15-min runs.
+SELECT
+  jobid,
+  start_time,
+  end_time,
+  return_message,
+  CASE WHEN status = 'succeeded' THEN '✅' ELSE '❌' END AS ok
+FROM pg_cron.job_run_details
+WHERE jobid = (SELECT jobid FROM pg_cron.job WHERE jobname = 'bdg_override_expiry_sweep')
+ORDER BY start_time DESC
+LIMIT 10;
+```
+
+#### R-33-C3 — Root cause classification from return_message
+
+```sql
+-- Parse return_message for H1–H4 classification.
+SELECT
+  start_time,
+  return_message,
+  CASE
+    WHEN return_message ILIKE '%permission denied%'
+      OR return_message ILIKE '%insufficient privilege%'     THEN 'H3_permission_revoked'
+    WHEN return_message ILIKE '%relation%does not exist%'
+      OR return_message ILIKE '%column%does not exist%'
+      OR return_message ILIKE '%check constraint%'
+      OR return_message ILIKE '%deadlock%'
+      OR return_message ILIKE '%lock timeout%'               THEN 'H2_sql_exception'
+    WHEN return_message ILIKE '%connection%'
+      OR return_message ILIKE '%too many clients%'           THEN 'H4_supabase_outage'
+    WHEN return_message = 'job not found'
+      OR return_message IS NULL                              THEN 'H1_job_deleted'
+    ELSE 'unknown'
+  END AS hypothesis
+FROM pg_cron.job_run_details
+WHERE jobid = (SELECT jobid FROM pg_cron.job WHERE jobname = 'bdg_override_expiry_sweep')
+ORDER BY start_time DESC
+LIMIT 5;
+```
+
+#### Root cause hypotheses
+
+| Hypothesis | Description | Primary signal | Recovery path |
+|---|---|---|---|
+| **H1 — Job deleted/disabled** | `bdg_override_expiry_sweep` was removed from `pg_cron.job` or `active = false` | `return_message IS NULL`; `SELECT COUNT(*) FROM pg_cron.job WHERE jobname = 'bdg_override_expiry_sweep'` returns 0 | Recreate job per SSO_SCIM §34.3 SQL spec; verify `active = true` |
+| **H2 — SQL exception** | DDL change to `tenant_sso_configs` (column rename, constraint add, lock contention) broke the UPDATE | `return_message` contains `relation does not exist`, `check constraint`, `deadlock`, or `lock timeout` | Fix DDL regression; release lock; re-enable job; re-run UPDATE manually if P0 |
+| **H3 — service_role permission revoked** | `service_role` lost UPDATE permission on `tenant_sso_configs` | `return_message` contains `permission denied` or `insufficient privilege` | Restore `GRANT UPDATE ON tenant_sso_configs TO service_role` (migration); verify with test UPDATE on staging |
+| **H4 — Supabase platform outage** | Postgres unavailable; all pg_cron jobs failing simultaneously | Multiple jobs stale simultaneously; Supabase status page incident; see R-03 | R-03 primary; R-33 resolves automatically when Supabase restores |
+
+**H4 check:** Before executing any recovery action, verify `SELECT 1` from a separate Supabase client succeeds. If not, escalate to R-03 and park R-33 until Supabase restores.
+
+---
+
+### R-33.5 Recovery Procedure
+
+#### Step 1 — Diagnose root cause (T+10–T+15)
+
+Run R-33-C2 and R-33-C3. Cross-reference with H1–H4 table.
+
+| Check | Command | Expected (healthy) |
+|---|---|---|
+| Job exists and is active | `SELECT jobname, active FROM pg_cron.job WHERE jobname = 'bdg_override_expiry_sweep'` | 1 row, `active = true` |
+| DB connection healthy | `SELECT NOW()` from Supabase client | Returns current timestamp within 1 s |
+| service_role UPDATE permission | `SELECT has_table_privilege('service_role', 'tenant_sso_configs', 'UPDATE')` | `true` |
+| `tenant_sso_configs` schema intact | `\d tenant_sso_configs` or `SELECT column_name FROM information_schema.columns WHERE table_name = 'tenant_sso_configs' AND column_name IN ('bulk_deprovision_override_exp', 'bulk_deprovision_override_by')` | Both columns present |
+
+#### Step 2 — Manual UPDATE (P0 only, PAM-elevated, T+15)
+
+Only required if R-33-C1 returned `tenants_with_expired_override > 0`.
+
+**Step 2a — Scope confirmation:**
+```sql
+-- Confirm rows to clear. Record output as BDG-EXP-E-003 supplement.
+SELECT tenant_id, bulk_deprovision_override_exp, bulk_deprovision_override_by
+FROM tenant_sso_configs
+WHERE bulk_deprovision_override_exp IS NOT NULL
+  AND bulk_deprovision_override_exp < NOW();
+-- Note: tenant_id is a FORM-internal UUID (not a customer name). Do not log to external systems.
+```
+
+**Step 2b — Execute the UPDATE (mirrors job 34 SQL exactly):**
+```sql
+UPDATE tenant_sso_configs
+SET
+  bulk_deprovision_override_exp = NULL,
+  bulk_deprovision_override_by  = NULL
+WHERE bulk_deprovision_override_exp IS NOT NULL
+  AND bulk_deprovision_override_exp < NOW();
+-- Record rows_updated count from UPDATE output.
+```
+
+**Step 2c — Verify all clear:**
+```sql
+-- Must return 0 rows after Step 2b.
+SELECT COUNT(*) AS remaining_expired
+FROM tenant_sso_configs
+WHERE bulk_deprovision_override_exp IS NOT NULL
+  AND bulk_deprovision_override_exp < NOW();
+```
+
+**Step 2d — Emit `system.bdg_sweep_override_cleared` STANDARD/7yr immediately after Step 2b COMMIT confirms:**
+```bash
+curl -X POST https://api.form.coach/internal/v1/audit \
+  -H "Authorization: Bearer $PAM_SESSION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_type": "system.bdg_sweep_override_cleared",
+    "severity": "STANDARD",
+    "retention_years": 7,
+    "tenant_id": "00000000-0000-0000-0000-000000000000",
+    "payload": {
+      "incident_id": "<incident_uuid>",
+      "overrides_cleared_count": <rows_updated>,
+      "earliest_override_expiry": "<ISO-8601>",
+      "latest_override_expiry":  "<ISO-8601>",
+      "run_by_pam_session_id":   "<pam_session_uuid>",
+      "all_clear_after_clear":   true
+    }
+  }'
+# Confirm HTTP 200. If HTTP 422 → BDG-SWEEP-CHAIN-01 ordering violation → activate R-05.
+```
+
+#### Step 3 — Restore job 34 (T+20)
+
+| Root cause | Restoration action |
+|---|---|
+| H1 — job deleted | Recreate: `SELECT cron.schedule('bdg_override_expiry_sweep', '*/15 * * * *', $$ UPDATE tenant_sso_configs SET bulk_deprovision_override_exp = NULL, bulk_deprovision_override_by = NULL WHERE bulk_deprovision_override_exp IS NOT NULL AND bulk_deprovision_override_exp < NOW() $$);` |
+| H2 — SQL exception | Fix the DDL regression; release locks; re-enable job (`UPDATE pg_cron.job SET active = true WHERE jobname = 'bdg_override_expiry_sweep'`) |
+| H3 — permission revoked | `GRANT UPDATE (bulk_deprovision_override_exp, bulk_deprovision_override_by) ON tenant_sso_configs TO service_role;` or restore full `service_role` grant per security-engineer review |
+| H4 — Supabase outage | R-03 primary; job auto-resumes when Supabase restores |
+
+#### Step 4 — Confirm restoration (T+25–T+30)
+
+```sql
+-- Confirm next successful run appears in job_run_details within 20 min.
+SELECT start_time, status, return_message
+FROM pg_cron.job_run_details
+WHERE jobid = (SELECT jobid FROM pg_cron.job WHERE jobname = 'bdg_override_expiry_sweep')
+ORDER BY start_time DESC
+LIMIT 1;
+-- Expected: status = 'succeeded', start_time > restoration timestamp.
+```
+
+Emit `system.bdg_sweep_restored` STANDARD/3yr after confirming successful run.
+
+---
+
+### R-33.6 Communication Templates
+
+#### BDG-INT-01 — Internal Security Memo (P0 only)
+
+> **Required when:** Step 2 was executed (i.e., R-33-C1 returned `tenants_with_expired_override > 0`).
+> **Not required at P1** (zero expired override rows — monitoring gap only).
+> **No customer-facing communication required** — this is a FORM-internal BDG guard-maintenance failure. No enterprise tenant data was accessed or exfiltrated; the risk was a temporary lapse in the guard's automatic re-engagement path.
+
+```
+INTERNAL SECURITY MEMO — BDG Override Expiry Sweep Failure
+Classification: CONFIDENTIAL — Security Team only
+Incident ID: [incident_uuid]
+Date: [YYYY-MM-DD HH:MM UTC]
+
+SUMMARY
+pg_cron job 34 (bdg_override_expiry_sweep, */15 * * * *) was stale from [confirmed_stale_since]
+to [restoration_time] ([stale_minutes] minutes). Root cause: [H1/H2/H3/H4].
+Expired overrides in DB at P0 declaration: [overrides_cleared_count] tenant(s).
+
+IMPACT ASSESSMENT
+Tenants with expired DB override during stale window: [overrides_cleared_count]
+Override max_overdue_interval: [max_overdue_interval]
+SCIM Worker revokeActiveOverride() co-active: [yes/no — did any SCIM sync occur during stale window?]
+If yes: belt-and-suspenders path was operative; actual guard re-engagement gap was limited.
+If no: guard re-engagement was fully dependent on manual Step 2 clear.
+
+REMEDIATION
+Manual UPDATE executed at [timestamp] under PAM session [pam_session_uuid].
+Overrides cleared: [overrides_cleared_count].
+All-clear confirmed: [R-33-C1 zero-row result at Step 2c].
+DEC-030 system.bdg_sweep_override_cleared emitted: [yes/HTTP status].
+Job 34 restored: [restoration timestamp].
+
+SOC 2 EVIDENCE
+BDG-EXP-E-001: system.bdg_sweep_failure_declared chain export — compliance/evidence/bdg-sweep/r33-[incident_id]/
+BDG-EXP-E-003: R-33-C1 scope output — compliance/evidence/bdg-sweep/r33-[incident_id]/
+BDG-EXP-E-004: system.bdg_sweep_override_cleared chain export — compliance/evidence/bdg-sweep/r33-[incident_id]/
+
+Signed: [security-engineer name] — [date]
+Reviewed: compliance-officer — [date]
+```
+
+Store signed template at `compliance/evidence/ir-templates/r33-bdg-int-01.md` and file incident-specific copy at `compliance/evidence/bdg-sweep/r33-<incident_id>/BDG-INT-01-INC-YYYYMMDD.md`.
+
+---
+
+### R-33.7 DEC-030 Chain Specification
+
+Three HMAC-chained audit events. All registered in `docs/AUDIT_LOG_SCHEMA.md §System` (R-33.11 item 1).
+
+#### `system.bdg_sweep_failure_declared` — HIGH, 7yr retention
+
+Emitter: security-engineer (IC) via `emit-audit-event` Worker at T+0 of every R-33 activation (P1 and P0). This event is the BDG-SWEEP-CHAIN-01 anchor — it must precede all other R-33 chain events for the same `incident_id`.
+
+```typescript
+// Zod v2 payload schema
+z.object({
+  incident_id:                    z.string().uuid(),
+  confirmed_stale_since:          z.string().datetime(),
+  stale_minutes:                  z.number().positive(),
+  missed_runs:                    z.number().int().nonneg(),
+  tenants_with_expired_override:  z.number().int().nonneg(),  // from R-33-C1
+  trigger:                        z.enum(['pagerduty_alert', 'manual_discovery']),
+  initial_severity:               z.enum(['P1', 'P0']),
+})
+```
+
+**Privacy invariant:** No `user_id`, no `tenant_id`, no `override_issued_by_email_hash` — operational incident declaration only. `tenants_with_expired_override` is aggregate count.
+
+#### `system.bdg_sweep_override_cleared` — STANDARD, 7yr retention
+
+Emitter: security-engineer (IC) via `emit-audit-event` Worker immediately after Step 2b UPDATE COMMIT (P0 only). Not emitted at P1.
+
+```typescript
+z.object({
+  incident_id:              z.string().uuid(),
+  overrides_cleared_count:  z.number().int().nonneg(),
+  earliest_override_expiry: z.string().datetime(),
+  latest_override_expiry:   z.string().datetime(),
+  run_by_pam_session_id:    z.string().uuid(),
+  all_clear_after_clear:    z.boolean(),
+})
+```
+
+**Privacy invariant:** No `user_id`, no `tenant_id`, no `override_issued_by_email_hash` — aggregate counts and PAM session UUID only. `run_by_pam_session_id` is a PAM break-glass session UUID, not a FORM application `user_id`.
+
+#### `system.bdg_sweep_restored` — STANDARD, 3yr retention
+
+Emitter: devops-lead via `emit-audit-event` Worker after confirming the first successful `pg_cron.job_run_details` entry for job 34 post-restoration.
+
+```typescript
+z.object({
+  incident_id:                    z.string().uuid(),
+  restored_at:                    z.string().datetime(),
+  root_cause_category:            z.enum(['H1_job_deleted', 'H2_sql_exception', 'H3_permission_revoked', 'H4_supabase_outage']),
+  fix_deployed_at:                z.string().datetime(),
+  overrides_manually_cleared:     z.number().int().nonneg(),   // 0 at P1; > 0 at P0
+})
+```
+
+**Privacy invariant:** No `user_id`, no `tenant_id` — `overrides_manually_cleared` is aggregate count only.
+
+#### BDG-SWEEP-CHAIN-01 ordering invariant
+
+`system.bdg_sweep_failure_declared` for a given `incident_id` must precede all `system.bdg_sweep_override_cleared` and `system.bdg_sweep_restored` events for the same `incident_id`. Inversion (e.g., `override_cleared` before `failure_declared`) indicates a DEC-030 chain integrity issue → activate R-05. `emit-audit-event` Worker returns HTTP 422 on BDG-SWEEP-CHAIN-01 violation.
+
+---
+
+### R-33.8 Evidence Preservation
+
+Four evidence artefacts. Store in `compliance/evidence/bdg-sweep/r33-<incident_id>/`.
+
+| Artefact ID | SOC 2 criteria | Description | Cadence | Retention | Storage path |
+|---|---|---|---|---|---|
+| **BDG-EXP-E-001** | CC7.2 / CC6.3 | DEC-030 `system.bdg_sweep_failure_declared` HMAC chain export (HIGH/7yr): confirms R-33 IC declared within 20-min freshness window of last successful job 34 run, proving the §12.7 dead-man's switch detective control operated within its freshness SLA. BDG-SWEEP-CHAIN-01 anchor: this event must precede all `system.bdg_sweep_override_cleared` and `system.bdg_sweep_restored` for same `incident_id`. | Incident-triggered | 7yr | `bdg-sweep/r33-<incident_id>/` |
+| **BDG-EXP-E-002** | CC7.2 / A1.2 | `pg_cron.job_run_details` export for `jobname = 'bdg_override_expiry_sweep'` (job 34) covering the stale window: confirms stale start time and all missed 15-min run timestamps. Proves stale duration was bounded and detected within the 20-min freshness window via the `pg-cron-health-monitor` dead-man's switch. 3yr retention. | Incident-triggered | 3yr | `bdg-sweep/r33-<incident_id>/` |
+| **BDG-EXP-E-003** | CC6.3 / A1.2 | R-33-C1 aggregate scope output (`tenants_with_expired_override`, `earliest_expiry`, `latest_expiry`, `max_overdue_interval`): proves severity classification basis (P1 = `tenants_with_expired_override = 0`; P0 = `tenants_with_expired_override > 0`) and the scope of guard-dormancy risk. **Privacy floor: aggregate counts and timestamp extremes only — no `tenant_id`, no `override_issued_by_email_hash`, no deprovisioned-user counts.** At P1: zero-count attestation is the affirmative control confirmation. | Incident-triggered | 3yr | `bdg-sweep/r33-<incident_id>/` |
+| **BDG-EXP-E-004** | CC6.3 / CC7.3 | DEC-030 `system.bdg_sweep_override_cleared` HMAC chain export (STANDARD/7yr): proves manual UPDATE cleared all expired override rows within the 15-min P0 SLA; `overrides_cleared_count` and `all_clear_after_clear: true` provide auditor-inspectable proof that the BDG guard re-engagement gap was closed under PAM elevation. **Privacy floor: aggregate count and PAM session UUID only — no `tenant_id`, no `override_issued_by_email_hash`.** **P0 only** — not emitted or collected at P1. | Incident-triggered (P0 only) | 7yr | `bdg-sweep/r33-<incident_id>/` |
+
+**Evidence collection procedure:** At any R-33 activation, security-engineer collects BDG-EXP-E-001 (from `audit_log_events` chain export), BDG-EXP-E-002 (from `pg_cron.job_run_details` query R-33-C2), and BDG-EXP-E-003 (from R-33-C1 output) immediately on activation. At P0 (after Step 2 completes), add BDG-EXP-E-004 (chain export for `system.bdg_sweep_override_cleared`) and the signed BDG-INT-01 memo. Upload all artefacts to `compliance/evidence/bdg-sweep/r33-<incident_id>/` and Vanta within 24h of incident close.
+
+---
+
+### R-33.9 SOC 2 Evidence Mapping
+
+| TSC criterion | Control | R-33 evidence |
+|---|---|---|
+| **CC6.3** — Restricts logical access | BDG override TTL enforcement: after the configured window (1h/2h/4h), bulk deprovision above the threshold should be re-blocked; R-33 ensures any DB stale gap is detected and cleared within 15 min (P0) | BDG-EXP-E-003 proves scope (zero count = P1 all-clear; positive count → Step 2 + BDG-EXP-E-004 proves remediation). Belt-and-suspenders note: `revokeActiveOverride()` in SCIM Worker (SSO_SCIM §34.4) is the primary path; job 34 is the safety-net sweep. Both control layers are documented for CC6.3. |
+| **A1.2** — Maintains availability of systems | BDG controls the rate of SCIM seat changes; an expired override with no re-engagement could allow unlimited deprovisioning that reduces licensed seat count unexpectedly, impacting capacity management | BDG-EXP-E-002 proves monitoring gap was bounded (≤ 20 min detection). BDG-EXP-E-003 zero-count attestation at P1 proves no capacity-management impact during the stale window. |
+| **CC7.2** — Evaluates anomalies / monitoring | `pg-cron-health-monitor` dead-man's switch (§12.7) detects job 34 stale within the 20-min freshness window (3-run tolerance at 15-min cadence) and emits `system.cron_job_stale` → PagerDuty P1 `form-security` | BDG-EXP-E-001 chain export proves IC declared within the detection SLA. BDG-EXP-E-002 `pg_cron.job_run_details` proves stale duration was bounded. |
+| **CC7.3** — Responds to anomalies | P0 SLA: manual UPDATE clears expired override rows within 15 min of P0 declaration | BDG-EXP-E-004 proves `system.bdg_sweep_override_cleared` emitted with `all_clear_after_clear: true` within 15 min of P0 declaration. |
+
+**CC6.3 auditor narrative:** CC6.3 requires FORM to restrict logical access to authorized users. The BDG prevents accidental mass deprovisioning (CC6.3 bulk-action control, DEC-066). Job 34 is the automatic TTL-expiry sweep that re-engages the guard after a CSM-issued override window closes. BDG-EXP-E-003 at P1 proves the guard was never in a DB-stale expired state during the SOC 2 observation period. At P0, BDG-EXP-E-004 proves that any DB-stale period was remediated within 15 min under PAM elevation — a control-level compensating action documented in BDG-INT-01.
+
+**A1.2 auditor narrative:** A1.2 requires FORM to maintain system availability consistent with its commitments. Unlimited bulk deprovisioning past an override window could deprovision more users than contracted, triggering capacity-management and SLA issues. BDG-EXP-E-002's stale-duration proof establishes that the maximum window during which the guard safety-net was absent is bounded to ≤ 20 min (the detection SLA), not the full stale period (which could be up to the time between hourly `pg-cron-health-monitor` runs).
+
+---
+
+### R-33.10 Post-Incident Controls
+
+| Control | Deadline | Owner | Notes |
+|---|---|---|---|
+| PIR (Post-Incident Review per §8) | 5 business days after incident close | security-engineer + devops-lead | Required for all P0; recommended for P1 if stale > 30 min |
+| H2 DDL governance gate | 14 days | devops-lead | If H2 (SQL exception): add `tenant_sso_configs` to the DDL change review list in CI pipeline — any migration touching BDG columns must include a job 34 smoke-test in the migration PR template |
+| H3 permission recovery | 14 days | devops-lead | If H3 (permission revoked): add `service_role` UPDATE grant on `tenant_sso_configs` to the permission audit checklist (§23.4) |
+| OBSERVABILITY §12.6 cross-reference update | Closes with R-33.11 item 4 | compliance-officer | Job 34 stale-consequence column should reference `INCIDENT_RESPONSE R-33` once this runbook is live |
+| Scenario W tabletop drill | Next scheduled tabletop (§9.4) | security-engineer | Disable job 34 in staging; confirm R-33-C1 zero-count at P1; optionally set synthetic expired override row to test P0 path |
+
+---
+
+### R-33.11 Implementation Checklist
+
+#### P0 — Before job 34 is deployed to production (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register three DEC-030 events from §R-33.7 in `docs/AUDIT_LOG_SCHEMA.md §System`: `system.bdg_sweep_failure_declared` (HIGH, 7yr), `system.bdg_sweep_override_cleared` (STANDARD, 7yr), `system.bdg_sweep_restored` (STANDARD, 3yr). Add BDG-SWEEP-CHAIN-01 ordering invariant to the `emit-audit-event` Worker chain-invariant registry. | compliance-officer + platform-engineer | **P0** | M5 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.26, 2026-06-21: three BDG-SWEEP events registered in §System after `system.caep_sweep_restored`; BDG-SWEEP-CHAIN-01 ordering invariant noted.** |
+| 2 | Confirm `pg-cron-health-monitor` (§12.7) routes `system.cron_job_stale` for `jobname = 'bdg_override_expiry_sweep'` to PagerDuty `form-security` P1 with dedup key `bdg-sweep-stale` per §12.6 registry. Write integration test: disable job 34 in staging for > 20 min; confirm `system.cron_job_stale` emitted with `job_name = 'bdg_override_expiry_sweep'`; confirm PagerDuty P1 fires on `form-security`. Also write P0 path test: insert a synthetic `tenant_sso_configs` row with `bulk_deprovision_override_exp = NOW() - INTERVAL '1 hour'`; run R-33-C1; confirm count > 0 upgrade path. | devops-lead + security-engineer | **P0** | M5 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M7)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Store Template BDG-INT-01 at `compliance/evidence/ir-templates/r33-bdg-int-01.md`. Security-engineer reviews the P0 escalation criteria (specifically: the belt-and-suspenders note — confirm whether `revokeActiveOverride()` fired for each expired-override tenant during the stale window by cross-checking SCIM sync events in `audit_log_events`). | security-engineer | **P1** | M7 | [ ] |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 34 `bdg_override_expiry_sweep` registry entry: add `INCIDENT_RESPONSE R-33 (job 34 stale recovery runbook — §R-33.5)` to the stale-consequence cross-ref column. | compliance-officer | **P1** | M5 | [x] **Done — OBSERVABILITY.md v4.9.1, 2026-06-21: §12.6 job 34 entry stale-consequence column updated with INCIDENT_RESPONSE R-33 cross-reference.** |
+| 5 | Add BDG-EXP-E-001 through BDG-EXP-E-004 artefact definitions to `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.3/A1.2/CC7.2/CC7.3). Add `bdg-sweep/` R2 subfolder to §80.3. Add BDG-EXP artefacts to §80.4 Vanta mirror list. | compliance-officer | **P1** | M7 | [x] **Done — SOC2_READINESS.md v3.25.1, 2026-06-21: four BDG-EXP artefacts registered in §79.4; `bdg-sweep/` subfolder added to §80.3; Vanta mirror list §80.4 updated.** |
+
+#### P2 — Before SOC 2 observation period (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Add Scenario W (BDG override expiry sweep stale) to §9.4 tabletop catalog: devops-lead disables job 34 in staging; security-engineer inserts synthetic row with `bulk_deprovision_override_exp = NOW() - INTERVAL '2 hours'`; runs R-33-C1 (confirms count = 1 → P0); executes Step 2b UPDATE in staging; confirms zero-count in Step 2c; emits `system.bdg_sweep_override_cleared` test event; restores job 34; confirms `system.bdg_sweep_restored` emitted. Optional belt-and-suspenders path test: instead of Step 2 manual UPDATE, confirm `revokeActiveOverride()` fires on next synthetic SCIM sync request for the test tenant. | security-engineer + devops-lead | **P2** | M12 | [ ] |
+
+---
+
+*v1.0 (2026-06-21): R-33 BDG Override Expiry Sweep Failure — thirty-third runbook. Closes the documentation gap identified by `docs/OBSERVABILITY.md §12.6` (job 34 `bdg_override_expiry_sweep` registry entry: `bdg-sweep-stale` PagerDuty dedup key with P1 `form-security` routing, but no INCIDENT_RESPONSE cross-reference — unlike peer stale runbooks R-28/R-29/R-30/R-31/R-32 which each carry an explicit §12.6 cross-reference). R-33 provides the full IC protocol for when `bdg_override_expiry_sweep` (job 34, `*/15 * * * *`, 20-min freshness) exceeds its freshness window. Trigger: `system.cron_job_stale` with `job_name = 'bdg_override_expiry_sweep'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-security` → security-engineer; dedup `bdg-sweep-stale`. Critical distinction from R-32 and all prior stale runbooks: R-33 targets a **safety-net sweep** — job 34 is explicitly belt-and-suspenders to the SCIM Worker's `revokeActiveOverride()` path (SSO_SCIM §34.4). At P1 (no expired DB override rows), the risk is a monitoring gap only; the Worker path would clear any override on the next SCIM sync. At P0 (expired DB rows with no intervening SCIM sync), the guard re-engagement gap is real and requires a manual UPDATE under PAM elevation. Unlike R-30/R-31 (GDPR breach risk) or R-32 (SSO session-integrity risk), R-33 is a **BDG guard-maintenance failure** — no user data breach, no GDPR Art. 5(1)(e) risk, no CAEP stream integrity gap; the risk is limited to the window between the last SCIM sync and job 34 restoration. Two-severity matrix: P1 (stale, `tenants_with_expired_override = 0` per R-33-C1 — monitoring gap only; Worker path is belt-and-suspenders), P0 (stale AND R-33-C1 count > 0 — expired DB override active; manual clear required within 15 min). T+0–T+30 immediate actions: DEC-030 `system.bdg_sweep_failure_declared` HIGH/7yr at T+0; R-33-C1 scope query at T+5 (P0 upgrade gate — aggregate counts only); R-33-C2 pg_cron.job_run_details at T+10 (stale window + missed 15-min runs); R-33-C3 root cause classification from return_message; manual UPDATE at T+15 (P0 only, PAM-elevated); restoration at T+20–T+30. Three scope queries: R-33-C1 (aggregate expired-override counts — no `tenant_id`, no email hash), R-33-C2 (pg_cron.job_run_details last 10 runs for stale window + missed run count), R-33-C3 (return_message CASE analysis for H1–H4). Four root cause hypotheses: H1 (job deleted/disabled), H2 (SQL exception — DDL change, lock contention, constraint violation), H3 (service_role permission revoked), H4 (Supabase platform outage — R-03 primary). Unlike R-30/R-31 (which involve pg_net HTTP calls) and R-32 (which calls an external Worker), job 34 is a **pure Postgres UPDATE** — no pg_net dependency; root cause set is simpler. Four-step recovery: Step 1 (diagnose H1–H4 with four-check table); Step 2 (manual UPDATE — Step 2a: scope SQL for expired rows; Step 2b: `UPDATE tenant_sso_configs SET ... WHERE ...`; Step 2c: zero-count all-clear verification; Step 2d: emit `system.bdg_sweep_override_cleared` STANDARD/7yr); Step 3 (restore job 34 per root cause, H1–H4 table); Step 4 (confirm restoration via `pg_cron.job_run_details` + `system.bdg_sweep_restored` STANDARD/3yr). One communication template: BDG-INT-01 (internal security incident memo — required at P0 when Step 2 executed; not required at P1; no customer-facing template). Three DEC-030 HMAC-chained events: `system.bdg_sweep_failure_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `tenants_with_expired_override` nonneg int, `trigger` enum['pagerduty_alert','manual_discovery'], `initial_severity` enum['P1','P0']), `system.bdg_sweep_override_cleared` STANDARD/7yr (Zod: `incident_id` UUID, `overrides_cleared_count` nonneg int, `earliest_override_expiry` datetime, `latest_override_expiry` datetime, `run_by_pam_session_id` UUID, `all_clear_after_clear` bool), `system.bdg_sweep_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause_category` enum H1–H4, `fix_deployed_at` datetime, `overrides_manually_cleared` nonneg int); BDG-SWEEP-CHAIN-01 ordering invariant: `bdg_sweep_failure_declared` precedes all `bdg_sweep_override_cleared` and `bdg_sweep_restored` for same `incident_id` — inversion triggers R-05. Four evidence artefacts: BDG-EXP-E-001 (`system.bdg_sweep_failure_declared` chain export, CC7.2/CC6.3, 7yr — every R-33 activation), BDG-EXP-E-002 (`pg_cron.job_run_details` for job 34 stale window, CC7.2/A1.2, 3yr — every R-33 activation), BDG-EXP-E-003 (R-33-C1 aggregate scope — expired override counts only, no `tenant_id`, CC6.3/A1.2, 3yr — every R-33 activation including P1 zero-count attestation), BDG-EXP-E-004 (`system.bdg_sweep_override_cleared` chain export, CC6.3/CC7.3, 7yr — P0 only). Four SOC 2 criteria: CC6.3 (BDG override TTL enforcement — guard re-engagement within 15-min P0 SLA; belt-and-suspenders Worker path noted), A1.2 (capacity-management safeguard — unlimited bulk deprovisioning past override window bounded to ≤ 20 min detection gap), CC7.2 (pg-cron-health-monitor 20-min freshness detection), CC7.3 (15-min P0 manual UPDATE SLA under PAM elevation). Five post-incident controls: PIR (5 business days), H2 DDL governance gate for `tenant_sso_configs` changes (14 days), H3 permission audit checklist (14 days), §12.6 job 34 cross-reference update [x] Done v4.9.1, Scenario W tabletop (M12). Six-item implementation checklist: 2× P0/M5 (AUDIT_LOG_SCHEMA registration [x] Done v2.26; §12.7 routing + P0-path integration test), 3× P1/M5–M7 (BDG-INT-01 template; §12.6 cross-ref [x] Done v4.9.1; SOC2_READINESS §79.4/§80.3/§80.4 [x] Done v3.25.1), 1× P2/M12 (Scenario W tabletop). Privacy floor: all three system events carry only FORM-internal operational metadata — stale duration, aggregate counts, root cause enum, PAM session UUID; no `user_id`, no `tenant_id`, no `override_issued_by_email_hash`, no deprovisioned-user data appear in any R-33 event or evidence artefact; BDG-EXP-E-003 carries only aggregate counts and timestamp extremes — never `tenant_id`, never email hash, never individual user data; BDG-INT-01 carries only aggregate counts + compliance metadata; `form_api` must never route any §R-33 event to any user-facing or tenant-facing endpoint. Cross-references: `docs/OBSERVABILITY.md §12.6` (job 34 `bdg_override_expiry_sweep` registry entry — stale consequence updated with INCIDENT_RESPONSE R-33 per v4.9.1 [x] Done); `docs/OBSERVABILITY.md §12.7` (`pg-cron-health-monitor` — emits `system.cron_job_stale` that triggers this runbook); `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (DEC-066 / migration 0079 DDL — `bdg_override_expiry_sweep` pg_cron spec; `idx_tsc_bdg_override_active` partial index; belt-and-suspenders design rationale; override TTLs 1h/2h/4h); `docs/SSO_SCIM_IMPLEMENTATION.md §34.4` (`revokeActiveOverride()` function — Worker primary path for override revocation; R-33 Step 2 is the compensating control when no SCIM sync fires during stale window); `docs/AUDIT_LOG_SCHEMA.md §System` (three DEC-030 events registered per R-33.11 item 1 [x] Done v2.26); `docs/SOC2_READINESS.md §79.4` (BDG-EXP artefacts registered per R-33.11 item 5 [x] Done v3.25.1); `scim.bulk_deprovision_override_used` (HIGH/7yr — emitted by `revokeActiveOverride()` when Worker path fires; cross-check this event to determine if belt-and-suspenders cleared the override before manual Step 2 was needed); `scim.bulk_deprovision_blocked` (HIGH/7yr — emitted when guard re-engages after override expiry on next SCIM sync); R-05 (HMAC chain break — activate on BDG-SWEEP-CHAIN-01 ordering violation); R-03 (Infrastructure Outage — primary if H4 Supabase outage confirmed); migration 0079 DDL (`bulk_deprovision_override_exp`, `bulk_deprovision_override_by` columns on `tenant_sso_configs`; `idx_tsc_bdg_override_active` partial index). Owner: security-engineer + devops-lead + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-21 · Owner: security-engineer + devops-lead + compliance-officer**
+**Review: after every P0/P1 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
+
+---

@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.8.1
+# FORM · SSO/SCIM Implementation v2.8.2
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
