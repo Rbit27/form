@@ -1,5 +1,27 @@
 # Changelog · FORM
 
+## [7.16.0] — 2026-06-21
+
+### Added
+- `content/post-1841-reading-own-training-feedback.md` — Block 1831–1880 · Cluster 2 · Post 1/10. Три джерела тренувального відгуку (суб'єктивне / об'єктивне / поведінковий патерн), ієрархія надійності, три типи помилок читання, чотири питання після тренування, Victor як зовнішня пам'ять. clinical-safety: NOT_REQUIRED.
+- `content/post-1842-when-looks-wrong-is-functionally-acceptable.md` — Block 1831–1880 · Cluster 2 · Post 2/10. Звідки береться «ідеальна модель» техніки і чому вона не враховує морфологію (McGill, Frost). Три категорії «виглядає не так»: анатомічна варіація / компенсаторний патерн / функціональний збій. Чотирикроковий алгоритм оцінки. clinical-safety: NOT_REQUIRED.
+- `content/post-1843-typical-self-assessment-mistakes-strength.md` — Block 1831–1880 · Cluster 2 · Post 3/10. Шість системних помилок самооцінки: recency bias, подвійний стандарт, конфлікт «хотілось / підняв», неправильна референтна точка, переоцінка суб'єктивного при накопиченій втомі, ігнорування поведінкового патерну. clinical-safety: NOT_REQUIRED.
+- `content/post-1844-video-analysis-own-movement-methodology.md` — Block 1831–1880 · Cluster 2 · Post 4/10. Мінімальний протокол запису (що і коли знімати), кути камери, контрольні маркери для присяду / станового / жиму, чотирикроковий алгоритм аналізу, помилки відеоаналізу. clinical-safety: NOT_REQUIRED.
+- `content/post-1845-cognitive-bias-training-confirmation-status-quo.md` — Block 1831–1880 · Cluster 2 · Post 5/10. Confirmation bias (Nickerson 1998) і status quo bias (Samuelson & Zeckhauser 1988, Kahneman & Tversky 1979) у тренуванні: прояви, чому небезпечні без тренера, протоколи протидії. clinical-safety: NOT_REQUIRED.
+- `content/post-1846-when-self-reflection-helps-vs-hinders.md` — Block 1831–1880 · Cluster 2 · Post 6/10. Де саморефлексія продуктивна, де заважає (internal focus під час руху — Wulf et al.), руминація vs аналіз, чотирирівневий ритм рефлексії. clinical-safety: NOT_REQUIRED.
+- `content/post-1847-feedback-loop-self-coached-athlete.md` — Block 1831–1880 · Cluster 2 · Post 7/10. Чотири компоненти замкненої feedback loop: збір даних → аналіз → рішення → виконання. Де петля найчастіше розривається. Часові горизонти і типи рішень (таблиця). Victor як структура петлі. clinical-safety: NOT_REQUIRED.
+- `content/post-1848-training-journal-as-temporal-feedback.md` — Block 1831–1880 · Cluster 2 · Post 8/10. Три функції журналу, мінімум vs оптимум запису, формати, як читати (тижневий / мезоцикловий / «рік тому» перегляд). clinical-safety: NOT_REQUIRED.
+- `content/post-1849-five-questions-after-training-block.md` — Block 1831–1880 · Cluster 2 · Post 9/10. П'ять питань мезоциклової ретроспективи: що прогресувало / що не прогресувало і чому / оптимальне навантаження / що зробив би інакше / одна зміна для наступного блоку. Коли проводити. clinical-safety: NOT_REQUIRED.
+- `content/post-1850-cluster2-synthesis-self-assessment-system.md` — Block 1831–1880 · Cluster 2 · Post 10/10 · CLUSTER SYNTHESIS. П'ять рівнів операційної системи самооцінки: запис після тренування → тижневий аналіз → відеоаналіз → когнітивна корекція → мезоциклова ретроспектива. Карта системи. Що система не замінює. Victor в архітектурі системи. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — posts 1841–1850 added (Cluster 2 · Самооцінка без тренера); now current to post-1850.
+- `README.md` — posts 1841–1850 status: `proposed` → `draft · v7.16.0`.
+- `STATUS.md` — Block 1831–1880: IN PROGRESS 10/50 → 20/50; Cluster 2 COMPLETE noted; Next updated to Cluster 3.
+- `VERSION` — 7.15.2 → 7.16.0.
+
+---
+
 ## [7.15.2] — 2026-06-21
 
 ### Changed
