@@ -10845,3 +10845,384 @@ Store artefacts at `compliance/evidence/renewals/r28-<incident_id>/` with `MANIF
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
 ---
+
+## R-29 Enterprise Mid-Contract Termination Risk Monitoring Failure
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `mid_contract_termination_risk_check` pg_cron job 25 exceeds the 8-day freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` (§12.7) emits `system.cron_job_stale` with `job_name = 'mid_contract_termination_risk_check'`; routes to PagerDuty P1 `form-customer-success` with dedup key `mid-contract-risk-check-stale`
+> **Primary owners:** compliance-officer · devops-lead · platform-engineer · customer-success (CSM lead)
+> **Commercial risk:** Job 25 is the sole automated detector of enterprise accounts sliding toward mid-contract termination — CHS < 20 sustained ≥ 4 consecutive weeks AND days_remaining > 180. A stale job is a **mid-contract churn blind spot**: FORM cannot initiate CSM intervention or enforce the Early Termination Fee (ETF) for accounts it does not know are at risk.
+> **Critical distinction from R-28:** R-28 (job 39 stale) carries a legal/contractual deadline risk — MSA §6.1 notice must be sent within a narrow 10-day window or FORM is in breach. R-29 (job 25 stale) carries a **commercial and financial risk** — no external obligation is breached, but FORM may forfeit CSM intervention opportunity and ETF revenue recovery for high-ACV accounts that terminate without being flagged. No customer-facing template is required for R-29 (all communication is internal or CSM-to-account); outside counsel is required only if an account terminates during the stale period.
+
+---
+
+### R-29.1 Severity Matrix
+
+| Condition | Severity | Owner | Response SLA |
+|---|---|---|---|
+| Job 25 stale (≥ 8 days since last successful run); R-29-C1 returns zero at-risk tenants | **P1** | CSM lead + compliance-officer | Restore within 48 h; PIR within 14 days |
+| Job 25 stale AND R-29-C1 returns ≥ 1 tenant with `contract_acv_usd ≥ $50k` AND `days_remaining > 180` — high-ACV account at CHS < 20 for ≥ 4 weeks, undetected by job 25 during stale period | **P0** | CSM lead + compliance-officer + founder | CSM call initiated within 4 h; restore within 24 h; PIR within 7 days |
+| P0 AND a tenant at risk has terminated their contract (or filed a termination notice) **during the stale period** — ETF recovery window may be foreclosed | **P0 escalated** | Founder + compliance-officer + outside counsel | Outside counsel consult within 2 h; founder notification at T+0; PIR within 72 h |
+
+**P0 upgrade gate (run at T+5):** Execute R-29-C1. If any row has `contract_acv_usd ≥ $50,000` AND `days_remaining > 180` AND the tenant appears in ≥ 4 consecutive `tenant_engagement_snapshots` rows with `chs_score < 20` within the past 28 days, immediately upgrade to P0. P0 upgrade does not require confirmation of the root cause first.
+
+**P0 escalated gate:** After R-29-C1, check `enterprise_contracts WHERE tenant_id IN (at-risk list) AND status IN ('terminated','pending_termination') AND status_changed_at > :stale_since`. Any result = P0 escalated. Outside counsel must assess whether FORM's ETF entitlement survives if FORM did not issue a pre-termination risk flag during the stale period.
+
+---
+
+### R-29.2 Trigger and Context
+
+**What job 25 does:**
+
+`mid_contract_termination_risk_check` runs at `0 9 * * 1` (09:00 UTC every Monday) — after `tenant_chs_compute` (job 17, 02:30 UTC Monday) to ensure the latest CHS snapshot is available. It executes the AL-ETF-01 detection query (§36.2 detection query and COST_MODEL §35.9.1 logic):
+
+1. Identifies tenants with `chs_score < 20` in ≥ 4 consecutive weekly `tenant_engagement_snapshots` rows within the past 28 days, filtered for `below_k_threshold = false` (≥10 seats).
+2. Cross-joins against `enterprise_contracts` to assert `days_remaining > 180` (mid-contract, not approaching renewal).
+3. Applies the 30-day per-tenant dedup guard (`mid_contract_risk_alerted_at`): skips emission if an alert was already sent within 30 days.
+4. For each qualifying tenant, emits `enterprise.mid_contract_termination_risk_flagged` DEC-030 HIGH/7yr via `pg_net` → `emit-audit-event` Worker, then UPDATEs `tenants SET mid_contract_risk_alerted_at = NOW()`. DEC-030 chain entry precedes the UPDATE.
+5. Routes PagerDuty P1 AL-ETF-01 alert to `form-customer-success` → CSM lead + CS lead; posts to Slack `#enterprise-health` HIGH.
+
+**Freshness window:** 8 days (Monday ± 1-day tolerance). The `pg-cron-health-monitor` (§12.7) fires `system.cron_job_stale` if no successful `job_run_details` entry appears within 8 days. A stale alert = ≥ 2 missed Monday runs (two consecutive Mondays without the job succeeding).
+
+**Commercial impact of stale period:**
+
+A two-Monday gap means FORM may not have detected a tenant that crossed the CHS-4-consecutive-weeks threshold during that window. Unlike R-28's legal exposure (MSA §6.1 notice obligation), R-29's risk is commercial: a high-ACV account at CHS < 20 for 6+ weeks without a CSM intervention call has a materially higher probability of unilateral termination. If the account terminates before FORM detects the risk, the ETF recovery path may be contested. Revenue at risk per stale incident: proportional to the contracted ACV and ETF rate schedule (COST_MODEL §35.5.3) of undetected tenants.
+
+---
+
+### R-29.3 Immediate Actions (T+0 to T+30)
+
+```
+T+0   Acknowledge PagerDuty P1 alert (dedup key: mid-contract-risk-check-stale).
+      Open incident channel: #inc-YYYYMMDD-etf-cron in Slack.
+      Assign Incident Commander (IC): CSM lead or compliance-officer (on-call rotation).
+      Emit system.etf_cron_failure_declared (§R-29.7) DEC-030 HIGH/7yr immediately.
+      Payload: incident_id (INC-YYYYMMDD), confirmed_stale_since (from §12.7 trigger timestamp),
+      stale_hours (hours since last successful run per pg_cron.job_run_details),
+      trigger (enum: cron_job_stale), initial_severity (P1 or P0 from upgrade gate result).
+      This event must be emitted BEFORE any remediation or scope queries. Chain ordering enforced.
+
+T+5   Execute R-29-C1 (§R-29.4): at-risk tenant scope query.
+      If any row has contract_acv_usd ≥ $50,000 AND days_remaining > 180: upgrade to P0.
+      Immediately notify CSM lead and founder via Slack #enterprise-health:
+      "P0 UPGRADE — job 25 stale; [N] high-ACV tenant(s) at CHS < 20 undetected.
+      Initiating CSM intervention per §R-29.5 Step 3."
+      Also run P0 escalated gate: check for contract terminations during stale period.
+
+T+10  Execute R-29-C2 (§R-29.4): confirm exact stale window from pg_cron.job_run_details.
+      Identify how many Monday runs were missed. Stale windows > 2 missed Mondays are P0
+      regardless of R-29-C1 result — extended blind spot elevates commercial risk.
+      Run R-29-C3: attempt SELECT cron.job_run_details WHERE jobname = 'mid_contract_termination_risk_check'
+      AND start_time > NOW() - INTERVAL '14 days' to confirm pg_cron is responsive.
+      If pg_cron is unresponsive: activate R-03 (Infrastructure Outage) in parallel. Pause §R-29.5.
+
+T+15  Determine root cause category (§R-29.4 H1–H5).
+      If H3 (pg_net degraded): job SQL may have run but DEC-030 emission silently failed.
+      Check audit_log_events for enterprise.mid_contract_termination_risk_flagged within the stale window —
+      if present, the job detected and emitted correctly; pg_net failure was in the PagerDuty call only;
+      manually re-fire AL-ETF-01 via PagerDuty API for each such tenant.
+
+T+20  If P0: compliance-officer and CSM lead jointly execute the manual ETF-01 detection query
+      (§36.2 detection query verbatim) in Supabase SQL editor under service_role.
+      For each tenant returned: CSM lead creates CRM case "Mid-Contract At-Risk — Manual Detection"
+      and logs in incident channel: "At-risk tenant [tenant_id] identified manually — CHS [score],
+      [weeks] weeks below 20, [days] days remaining, ACV $[amount]. CSM call within 4h."
+      Emit system.etf_cron_manual_check_completed (§R-29.7) after completing this manual run.
+
+T+30  All immediate actions complete. Begin restoration procedure (§R-29.5 Step 1).
+      Update incident channel with R-29-C1 result, P0/P1 status, and root cause hypothesis.
+```
+
+---
+
+### R-29.4 Root Cause Hypotheses and Scope Queries
+
+**R-29-C1 — Tenants at CHS < 20 for ≥ 4 consecutive weeks with days_remaining > 180:**
+
+```sql
+-- Requires form_admin BYPASSRLS via pam-db-proxy (read_only PAM elevation)
+-- Reason: "R-29 etf-cron stale — at-risk tenant scope assessment — INC-YYYYMMDD"
+-- Privacy: tenant_id (FORM-internal UUID), CHS aggregate score, and contract-level financials only.
+-- No individual employee user_id, name, email, health data, or GDPR Art. 9 special-category data.
+WITH consecutive_low_chs AS (
+  SELECT
+    tes.tenant_id,
+    COUNT(*) AS weeks_below_threshold,
+    MIN(tes.chs_score) AS min_chs_score,
+    MAX(tes.snapshot_date) AS latest_snapshot_date
+  FROM tenant_engagement_snapshots tes
+  WHERE tes.snapshot_date >= NOW() - INTERVAL '28 days'
+    AND tes.chs_score < 20
+    AND tes.below_k_threshold = false
+  GROUP BY tes.tenant_id
+  HAVING COUNT(*) >= 4
+)
+SELECT
+  clc.tenant_id,
+  clc.weeks_below_threshold,
+  clc.min_chs_score                              AS current_min_chs_score,
+  clc.latest_snapshot_date,
+  t.contract_end_date,
+  (t.contract_end_date - NOW()::date)::int       AS days_remaining,
+  t.contract_acv_usd,
+  t.mid_contract_risk_alerted_at,
+  ec.status                                      AS contract_status
+FROM consecutive_low_chs clc
+JOIN tenants t ON t.id = clc.tenant_id
+LEFT JOIN enterprise_contracts ec ON ec.tenant_id = clc.tenant_id AND ec.status IN ('active','terminated','pending_termination')
+WHERE (t.contract_end_date - NOW()::date) > 180
+ORDER BY t.contract_acv_usd DESC NULLS LAST;
+```
+
+> **Interpretation:** Any row with `contract_acv_usd ≥ $50,000` is a P0 condition. Any row with `contract_status IN ('terminated','pending_termination')` is P0 escalated — ETF recovery may be contested; immediately escalate to founder and outside counsel. Rows with `mid_contract_risk_alerted_at IS NOT NULL` AND `mid_contract_risk_alerted_at > :stale_since` indicate the 30-day dedup guard fired before the stale event — these accounts were already known to be at risk and a CSM call should have been initiated; verify CRM case status.
+
+**R-29-C2 — Exact stale window from pg_cron run history:**
+
+```sql
+-- Determine when job 25 last ran successfully and how many Monday runs were missed
+SELECT
+  jobname,
+  start_time,
+  end_time,
+  status,
+  return_message
+FROM cron.job_run_details
+WHERE jobname = 'mid_contract_termination_risk_check'
+ORDER BY start_time DESC
+LIMIT 10;
+```
+
+> **Interpretation:** The gap between `start_time` of the most recent row and `NOW()` is the stale duration. Count the number of Mondays at 09:00 UTC that fell within this gap — that is the number of missed weekly checks. Each missed Monday = one detection cycle FORM did not run. If the gap spans ≥ 3 Mondays, the CHS time-series for at-risk tenants has shifted by ≥ 3 data points since the last detection run — a tenant that was borderline (3 weeks at CHS < 20) may now be at 6 weeks, deep in confirmed at-risk territory.
+
+**R-29-C3 — Tenants whose risk window may have been fully missed and who have since recovered:**
+
+```sql
+-- Detects the commercial worst-case: a tenant was at CHS < 20 for ≥ 4 weeks DURING the stale period
+-- but has since recovered to CHS ≥ 20 — FORM's ETF detection window closed without intervention.
+-- Run with the confirmed stale_since timestamp from R-29-C2.
+-- Note: this query identifies tenants whose most recent snapshot (post-stale) shows CHS ≥ 20
+-- but who were below threshold during the stale window.
+SELECT
+  tes_before.tenant_id,
+  tes_before.snapshot_count_below_20,
+  tes_before.min_chs_during_stale,
+  tes_after.latest_chs_score                     AS current_chs_score,
+  t.contract_end_date,
+  (t.contract_end_date - NOW()::date)::int       AS days_remaining,
+  t.contract_acv_usd
+FROM (
+  SELECT
+    tenant_id,
+    COUNT(*) AS snapshot_count_below_20,
+    MIN(chs_score) AS min_chs_during_stale
+  FROM tenant_engagement_snapshots
+  WHERE snapshot_date BETWEEN :stale_since_date - INTERVAL '28 days' AND :stale_since_date
+    AND chs_score < 20
+    AND below_k_threshold = false
+  GROUP BY tenant_id
+  HAVING COUNT(*) >= 4
+) tes_before
+JOIN (
+  SELECT DISTINCT ON (tenant_id)
+    tenant_id,
+    chs_score AS latest_chs_score
+  FROM tenant_engagement_snapshots
+  WHERE snapshot_date > :stale_since_date
+  ORDER BY tenant_id, snapshot_date DESC
+) tes_after ON tes_after.tenant_id = tes_before.tenant_id
+             AND tes_after.latest_chs_score >= 20
+JOIN tenants t ON t.id = tes_before.tenant_id
+WHERE (t.contract_end_date - NOW()::date) > 180
+ORDER BY t.contract_acv_usd DESC NULLS LAST;
+```
+
+> **Interpretation:** Any result means a tenant satisfied the AL-ETF-01 detection criteria during the stale period but has since recovered. FORM missed the intervention window. These tenants are no longer triggerable by job 25 in its current form (CHS ≥ 20 now), but their risk history should be documented in CRM and reviewed in the PIR. If `contract_acv_usd > $50k`: CSM lead schedules a proactive account review call within 7 days. The recovery does not eliminate the commercial risk — CHS < 20 recoveries without external intervention have a documented re-churn rate within 60 days.
+
+**Root cause hypotheses:**
+
+| # | Hypothesis | Diagnostic signal | Immediate mitigation |
+|---|---|---|---|
+| **H1** | pg_cron scheduler disabled or job 25 deleted | `SELECT * FROM cron.job WHERE jobname = 'mid_contract_termination_risk_check'` returns 0 rows | Re-create job 25 per `docs/OBSERVABILITY.md §36.2`; trigger manual detection run (§R-29.5 Step 2) |
+| **H2** | SQL exception in detection query (schema change: `tenant_engagement_snapshots` DDL, `tenants.mid_contract_risk_alerted_at` column dropped or renamed, `enterprise_contracts` FK violation) | `cron.job_run_details.status = 'failed'` + `return_message` contains error detail | Fix the exception; test corrected query in Supabase SQL editor with staging data; redeploy; trigger manual run |
+| **H3** | pg_net degraded: detection SQL ran and found results, but DEC-030 emission or PagerDuty call silently failed | `cron.job_run_details.status = 'succeeded'` but no `enterprise.mid_contract_termination_risk_flagged` events in `audit_log_events` for tenants that should have been flagged; pg_net logs show 5xx or timeout | Check pg_net → `emit-audit-event` connectivity; re-emit DEC-030 events for each at-risk tenant via `emit-audit-event` admin endpoint; manually re-fire AL-ETF-01 PagerDuty alerts for each affected tenant |
+| **H4** | service_role permission revoked from `tenant_engagement_snapshots`, `tenants`, or `audit_log_events` | `SELECT has_table_privilege('service_role', 'tenant_engagement_snapshots', 'SELECT')` returns `false` | Restore permissions per `docs/DATA_MODEL.md §41` RLS specification with security-engineer approval; document as DEC-030 `access.permission_change` event; re-run job 25 |
+| **H5** | Supabase platform outage — pg_cron scheduler offline | No pg_cron jobs across the fleet ran during the period; `pg_cron.job_run_details` shows gaps for multiple jobs simultaneously | Activate R-03 (Infrastructure Outage) as primary; R-29 deferred until platform restored |
+
+---
+
+### R-29.5 Recovery Procedure
+
+**Step 1 — Restore job 25 to active status.**
+
+Resolve the root cause per §R-29.4 H1–H5, then:
+
+1. For H1 (job deleted): recreate job 25 with exact spec from `docs/OBSERVABILITY.md §36.2`:
+   ```sql
+   SELECT cron.schedule(
+     'mid_contract_termination_risk_check',
+     '0 9 * * 1',
+     $$ /* §36.2 detection query + pg_net emission + UPDATE guard from OBSERVABILITY.md §36.2 */ $$
+   );
+   ```
+2. For H2 (SQL exception): diagnose the exception from `cron.job_run_details.return_message`. If the root cause is a DDL change to `tenant_engagement_snapshots` (most likely candidate — §41 adoption snapshot schema), coordinate with platform-engineer to confirm the column map change, update the job body, test in Supabase SQL editor with a synthetic at-risk tenant row in staging, then redeploy.
+3. For H3 (pg_net degraded): confirm pg_net is healthy before triggering manual runs. If pg_net is still degraded, manually emit DEC-030 events and PagerDuty alerts through the `emit-audit-event` admin endpoint directly, bypassing pg_net.
+4. For H4 (permission revoked): apply `GRANT SELECT ON tenant_engagement_snapshots TO service_role`, `GRANT SELECT ON tenants TO service_role`, `GRANT SELECT, INSERT ON audit_log_events TO service_role` with security-engineer approval; document as DEC-030 `access.permission_change` event HIGH/7yr before restoring the cron job.
+5. For H5 (platform outage): wait for R-03 resolution before proceeding; job 25 resumes automatically once pg_cron is restored.
+
+**Step 2 — Manual ETF-01 detection backfill for missed Monday runs.**
+
+For each Monday that was missed during the stale period:
+
+1. Execute the §36.2 detection query directly in Supabase SQL editor under `service_role`. Record the result set (tenant_id, weeks_below_threshold, chs_score, days_remaining, contract_acv_usd) for this manual run.
+2. For each tenant returned:
+   - Emit `enterprise.mid_contract_termination_risk_flagged` DEC-030 HIGH/7yr via the `emit-audit-event` admin endpoint with `risk_signal_source: 'csm_manual_flag'` and the CHS values from the manual query result. Set the event timestamp to the midpoint of the missed Monday window (09:00 UTC on the missed Monday), not NOW() — this accurately represents when the detection should have occurred.
+   - UPDATE `tenants SET mid_contract_risk_alerted_at = NOW()` for the tenant only after the DEC-030 chain event is confirmed (ordering invariant: emission precedes state mutation, same as the automated job).
+3. Emit `system.etf_cron_manual_check_completed` DEC-030 STANDARD/7yr (§R-29.7) after completing each missed-Monday backfill. One event per missed Monday run, not one per tenant.
+4. For all-clear Monday windows (zero tenants flagged by the detection query for that week's snapshot window): emit `system.etf_cron_check_passed` LOW/1yr with `tenants_checked` count from the query and `check_run_at` set to the midpoint of the missed Monday window.
+
+> **Note on snapshot availability:** The §36.2 query uses `tenant_engagement_snapshots WHERE snapshot_date >= NOW() - INTERVAL '28 days'`. When backfilling, the current weekly snapshots represent the current CHS state, not the state at the missed Monday. For historical accuracy, re-run the query with `snapshot_date >= :missed_monday_date - INTERVAL '28 days' AND snapshot_date <= :missed_monday_date`. This requires `pam-db-proxy` elevated read access. If historical snapshot data is unavailable for a given window (e.g., retention purge), note the gap in the `system.etf_cron_manual_check_completed` event payload under `data_gap_acknowledged: true`.
+
+**Step 3 — CSM intervention for at-risk tenants identified during manual run.**
+
+For each tenant returned by R-29-C1 or Step 2 that has not already received a CSM intervention in the past 30 days (verified by `mid_contract_risk_alerted_at`):
+
+1. CSM lead creates a CRM case under the tenant account: type "Mid-Contract At-Risk", source "R-29 Manual Detection", severity per contract_acv_usd tier.
+2. CSM lead contacts the tenant's primary contact (typically Operations Director or HR lead, never the individual employee) within 4 hours for P0 and within 48 hours for P1, using the AL-ETF-01 on-call protocol from §36.3.
+3. Log the outreach in the incident channel: `"CSM call initiated for [tenant_id] — ACV $[amount], CHS [score], [weeks] weeks below 20, [days] days remaining. Contact: [role, not name]. Call scheduled: [ISO 8601]. DEC-030 event ID: [event_id]."`
+4. Mark the CRM case with the incident ID (INC-YYYYMMDD) so the PIR can cross-reference CSM outcome.
+
+**For tenants where contract_status = 'terminated' or 'pending_termination' (P0 escalated):**
+
+1. Notify founder immediately (within 15 minutes of R-29-C1 result): `"P0 ESCALATED — [tenant_id] terminated or in pending_termination status. Contract ACV: $[amount]. ETF recovery eligibility: TBD pending outside counsel. Stale period: [confirmed_stale_since] to [now]."`
+2. Outside counsel consultation within 2 hours: assess whether FORM's ETF entitlement under MSA §11.4 survives a scenario where the automated detection system was offline during the contractually-relevant risk window.
+3. Compliance-officer prepares ETF-CRON-COMP-E-001 memo (Template ETF-INT-01, §R-29.6) covering all terminated/at-risk tenants; file at `compliance/evidence/etf-cron/ETF-CRON-COMP-E-001-INC-YYYYMMDD.md`.
+4. Document the ETF recovery determination and outside counsel recommendation in `enterprise_contracts.notes` for each affected `tenant_id`. This note constitutes evidence for any future ETF dispute.
+
+**Step 4 — Confirm restoration.**
+
+1. Trigger a test manual run of job 25: `SELECT cron.run_job('mid_contract_termination_risk_check')`.
+2. Confirm `enterprise.mid_contract_termination_risk_flagged` (for a synthetic at-risk tenant in staging) or `system.etf_cron_check_passed` (if no staging tenant qualifies) appears in `audit_log_events` within 90 seconds of the test run. Note: job 25 runs a heavier query than job 39; allow up to 2 minutes in production.
+3. Confirm `pg_cron.job_run_details WHERE jobname = 'mid_contract_termination_risk_check' AND start_time > NOW() - INTERVAL '2h'` shows `status = 'succeeded'`.
+4. Emit `system.etf_cron_restored` DEC-030 STANDARD/3yr (§R-29.7). Update incident status: RESOLVED. Schedule PIR within 7 days (P1) or 3 days (P0/P0 escalated).
+
+---
+
+### R-29.6 Communication Templates
+
+**Template ETF-INT-01 — Internal compensating control memo (required whenever Step 2 or Step 3 was executed, or whenever R-29-C1 returned any row):**
+
+> **FORM Internal Memo — Mid-Contract Termination Risk Monitoring Failure Compensating Control**
+>
+> Incident: INC-YYYYMMDD
+> Stale period: {confirmed_stale_since} UTC through {restoration_time} UTC ({stale_hours} h)
+> Missed Monday runs: {N} (dates: {list of missed Monday dates at 09:00 UTC})
+> Root cause: {H1–H5 category and description}
+> Tenants identified at CHS < 20 (≥ 4 weeks) during stale period: {list of tenant_ids with chs_score, days_remaining, acv_usd}
+>
+> **Compensating control:** Compliance-officer and CSM lead jointly executed the §36.2 ETF-01 detection query manually for each missed Monday window. For each tenant identified: `enterprise.mid_contract_termination_risk_flagged` DEC-030 HIGH/7yr emitted with `risk_signal_source: 'csm_manual_flag'` (event IDs: {list}). `system.etf_cron_manual_check_completed` DEC-030 STANDARD/7yr events are HMAC-chained for each manually-executed Monday window.
+>
+> **CSM intervention status:** {list each at-risk tenant_id and: "CRM case opened — [date/time]; CSM call scheduled — [date/time]; no CSM contact required (dedup guard — alerted [date])"} | {EXCEPTION — tenant [tenant_id] terminated during stale period — see §R-29.5 Step 3 P0 escalated protocol; outside counsel engaged {date}}
+>
+> **ETF recovery eligibility (for any terminated account):** {CONFIRMED — outside counsel advises ETF entitlement intact per MSA §11.4 [date]} | {CONTESTED — outside counsel advises uncertain; recommend settlement discussion [date]} | {NOT APPLICABLE — no terminations during stale period}
+>
+> **Root cause remediation:** {describe fix; date deployed or expected completion}
+>
+> Signed: {compliance-officer} · {date}
+
+> **When to send ETF-INT-01:** Required whenever Step 2 (manual detection backfill) was executed or whenever R-29-C1 returned any row. One memo per incident covers all affected tenants. File at `compliance/evidence/etf-cron/ETF-CRON-COMP-E-001-INC-YYYYMMDD.md`. No customer-facing version of this memo exists for R-29 — all communication with at-risk tenants is initiated as a normal CSM outreach (Step 3), not as an incident notification.
+
+---
+
+### R-29.7 DEC-030 HMAC-Chained Audit Events
+
+Chain ordering constraint: `system.etf_cron_failure_declared` must be the first event emitted for a given `incident_id`. Each `system.etf_cron_manual_check_completed` event must follow the declaration. `system.etf_cron_restored` must be last and emitted only after the first confirmed successful automated job 25 run post-fix.
+
+**Privacy invariant (all three events):** No individual employee `user_id`, name, email, health data, body composition, workout load, coaching session content, or GDPR Art. 9 special-category data. `tenant_id` appears only in `system.etf_cron_manual_check_completed.tenants_flagged[]` where the IC has confirmed a specific tenant was at CHS < 20 for ≥ 4 weeks — this is a FORM-internal commercial risk classification carrying only a UUID and aggregate engagement score (same data class as `enterprise.mid_contract_termination_risk_flagged`, which already carries `tenant_id` and `chs_score_current`). `form_api` must never route these events to any tenant-facing endpoint.
+
+| Event type | Severity | Retention | Trigger | Zod v2 payload schema |
+|---|---|---|---|---|
+| `system.etf_cron_failure_declared` | HIGH | 7 yr | IC declares incident after `system.cron_job_stale` fires for job 25 and this runbook is activated | `z.object({ incident_id: z.string(), confirmed_stale_since: z.string().datetime(), stale_hours: z.number().positive(), monday_runs_missed: z.number().int().nonnegative(), trigger: z.enum(["cron_job_stale","manual_observation","job_run_details_gap"]), initial_severity: z.enum(["P0","P1","P0_escalated"]) })` |
+| `system.etf_cron_manual_check_completed` | STANDARD | 7 yr | Manual §36.2 ETF-01 detection query executed for one missed Monday window; one event per missed Monday | `z.object({ incident_id: z.string(), check_window_monday: z.string().datetime(), tenants_checked: z.number().int().nonnegative(), tenants_flagged: z.array(z.string().uuid()), max_acv_flagged_usd: z.number().int().nonneg(), all_clear: z.boolean(), data_gap_acknowledged: z.boolean() })` |
+| `system.etf_cron_restored` | STANDARD | 3 yr | First confirmed successful automated job 25 run post-fix (not manual) | `z.object({ incident_id: z.string(), restored_at: z.string().datetime(), root_cause_category: z.enum(["job_deleted","sql_exception","pg_net_degraded","permission_revoked","platform_outage"]), fix_deployed_at: z.string().datetime(), monday_runs_missed: z.number().int().nonneg(), p0_tenants_flagged: z.number().int().nonneg(), terminations_during_stale: z.number().int().nonneg() })` |
+
+**ETF-CRON-CHAIN-01 ordering invariant:** For any `incident_id` associated with this runbook, `system.etf_cron_failure_declared` must precede all `system.etf_cron_manual_check_completed` events and `system.etf_cron_restored`. A chain where `etf_cron_restored` precedes `etf_cron_failure_declared` for the same `incident_id` is an ETF-CRON-CHAIN-01 violation — escalate to security-engineer and activate R-05.
+
+---
+
+### R-29.8 Evidence Preservation
+
+Store artefacts at `compliance/evidence/etf-cron/r29-<incident_id>/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 criteria | Retention |
+|---|---|---|---|
+| **ETF-CRON-E-001** | DEC-030 `system.etf_cron_failure_declared` HMAC chain export (confirms incident declared within 8-day freshness window per §12.6; proves the detective control operated and the stale duration was bounded) | CC4.1, CC7.2 | 7 yr |
+| **ETF-CRON-E-002** | R-29-C1 query output: table of at-risk tenants with `chs_score`, `days_remaining`, `contract_acv_usd`, and `contract_status` (proves which accounts were in the risk window during the stale period and whether any were in termination status); R-29-C3 query output if applicable (proves which tenants recovered during the stale period without intervention) | CC5.2, CC7.2 | 7 yr |
+| **ETF-CRON-E-003** | `pg_cron.job_run_details` export for job 25 covering the stale window (proves the stale start time, the number of missed Monday runs, and the exact last successful run timestamp; auditor-inspectable confirmation of the stale duration) | CC4.1, A1.1 | 3 yr |
+| **ETF-CRON-E-004** | DEC-030 `system.etf_cron_manual_check_completed` chain exports — one per missed Monday run; confirms each manual §36.2 detection execution, the tenant count checked, and the `tenants_flagged[]` list | CC4.1, CC5.2 | 7 yr |
+| **ETF-CRON-COMP-E-001** | Signed compensating control memo (Template ETF-INT-01); filed to `compliance/evidence/etf-cron/ETF-CRON-COMP-E-001-INC-YYYYMMDD.md`; uploaded to Vanta as a CC4.1 and CC5.2 compensating control | CC4.1, CC5.2 | 7 yr |
+
+---
+
+### R-29.9 SOC 2 Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC4.1** — Selects, develops, and performs ongoing evaluations | ETF-CRON-E-001 + ETF-CRON-COMP-E-001 | The `pg-cron-health-monitor` dead-man's switch (§12.7) detected job 25 stale within the 8-day freshness window defined in §12.6; the IC activated R-29 within the P1 SLA; `system.etf_cron_failure_declared` is the HMAC-chained record of the evaluation threshold breach; ETF-CRON-COMP-E-001 is the management response and compensating control |
+| **CC5.2** — Risk assessment: identifies and analyses risks to achievement of objectives | ETF-CRON-E-002 + ETF-CRON-E-004 | For each missed Monday window, compliance-officer manually executed the §36.2 detection query; ETF-CRON-E-002 proves which accounts were at CHS < 20 during the stale period; ETF-CRON-E-004 proves the manual detection run was completed; this demonstrates that even when the automated control is offline, FORM's risk identification process operates via compensating manual control |
+| **CC7.2** — Anomaly detection and monitoring | ETF-CRON-E-001 + ETF-CRON-E-003 | `system.cron_job_stale` for job 25 is generated by `pg-cron-health-monitor` (§12.7) within one hourly cycle of the 8-day freshness window being exceeded; ETF-CRON-E-003 (`pg_cron.job_run_details` export) confirms the exact stale duration and missed-run timestamps for auditor inspection |
+| **A1.1** — Addresses threats to meeting availability commitments | ETF-CRON-E-003 | Job 25 stale = AL-ETF-01 detection offline = enterprise mid-contract churn monitoring gap; ETF-CRON-E-003 proves the gap was detected within the 8-day window and remediated within the P1/P0 SLA; ETF-OBS-E-001 quarterly evidence (§36.4) will reflect the gap and compensating control |
+
+**CC5.2 auditor narrative:** CC5.2 requires FORM to identify and analyse risk to achievement of revenue objectives. Job 25 (`mid_contract_termination_risk_check`) is the automated CC5.2 control execution engine for mid-contract churn risk — its 8-day freshness window (§12.6) is the defined evaluation cadence threshold. The `pg-cron-health-monitor` (§12.7) detects any breach within one hourly cycle. R-29 documents the IC response, compensating control (manual ETF-01 detection execution), and CSM intervention. ETF-CRON-COMP-E-001 is the signed management acknowledgement that the control gap was detected, assessed, and remediated — the same evidence pattern used for evidence-collection-cron failures per R-27 (CC4.2 precedent) and renewal-notice-cron failures per R-28 (CC4.1/CC2.2 precedent).
+
+**CC4.1 auditor narrative:** CC4.1 requires FORM to evaluate and communicate control performance against defined thresholds. The §12.6 registry formally defines job 25's 8-day freshness window as the evaluation threshold. The `pg-cron-health-monitor` fires within one hourly cycle of this threshold being exceeded, providing a bounded detection latency. R-29 was authored to close the documentation gap identified by §12.6 (job 25 stale consequence: "mid-contract churn risk blind spot") — the same pattern as R-27 (job 33, evidence-collection-cron) and R-28 (job 39, renewal-notice-check): each §12.6 registered job with a defined stale consequence has a corresponding runbook.
+
+---
+
+### R-29.10 Post-Incident Controls
+
+| Control | Trigger condition | Owner | SLA |
+|---|---|---|---|
+| Add Scenario R (mid-contract termination risk monitoring failure — pg_cron job 25 stale; manual ETF-01 detection catch-up for at-risk tenants) to §9.4 tabletop catalog | Any activation of R-29 (regardless of severity) | security-engineer + compliance-officer | 30 days post-PIR |
+| Review pg_cron job 25 SQL for exception handling: add `BEGIN ... EXCEPTION WHEN OTHERS THEN` block that emits `system.etf_cron_failure_declared` directly from pg_cron on exception (belt-and-suspenders: DEC-030 event even if the main `net.http_post` fails) | H2 (SQL exception) or H3 (pg_net degraded) confirmed as root cause | platform-engineer + devops-lead | 14 days post-PIR |
+| Review `tenant_engagement_snapshots` DDL change governance: require a compliance-officer sign-off for any DDL change that alters column names or types in the tables queried by job 25 (`tenant_engagement_snapshots.chs_score`, `below_k_threshold`, `snapshot_date`; `tenants.contract_end_date`, `mid_contract_risk_alerted_at`, `contract_acv_usd`) | H2 (SQL exception) with DDL change as root cause | enterprise-architect + platform-engineer | 30 days post-PIR |
+| Update `docs/OBSERVABILITY.md §36.5` cross-reference: note that R-29 is the runbook for job 25 stale condition (link `docs/INCIDENT_RESPONSE.md R-29`) | This runbook authoring | compliance-officer | Next sprint |
+| If P0 escalated (tenant terminated during stale period): schedule outside counsel annual review of ETF-CRON force-majeure applicability and whether the automated detection obligation constitutes a material term of FORM's enterprise contract | P0 escalated with at least one terminated account | compliance-officer + founder | Within 45 days of P0 escalated resolution |
+
+---
+
+### R-29.11 Implementation Checklist
+
+#### P0 — Before job 25 is deployed to production (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register three DEC-030 events from §R-29.7 in `docs/AUDIT_LOG_SCHEMA.md §System`: `system.etf_cron_failure_declared` (HIGH, 7yr), `system.etf_cron_manual_check_completed` (STANDARD, 7yr), `system.etf_cron_restored` (STANDARD, 3yr). Add Zod v2 schemas per §R-29.7 payload definitions. Add ETF-CRON-CHAIN-01 ordering invariant to the `emit-audit-event` Worker chain-invariant registry. | compliance-officer + platform-engineer | **P0** | M10 | [ ] |
+| 2 | Confirm `pg-cron-health-monitor` (§12.7) routes `system.cron_job_stale` for `jobname = 'mid_contract_termination_risk_check'` to PagerDuty `form-customer-success` P1 HIGH urgency with dedup key `mid-contract-risk-check-stale` per §12.6 registry entry. Write integration test: simulate job 25 gap > 8 days in staging; confirm `system.cron_job_stale` is emitted with `job_name = 'mid_contract_termination_risk_check'` and PagerDuty test payload is generated. | devops-lead + platform-engineer | **P0** | M10 | [ ] |
+
+#### P1 — Before first enterprise contract reaches M10 + 28 days (first possible CHS-4-week detection window)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Store Template ETF-INT-01 at `compliance/evidence/ir-templates/r29-etf-int-01.md`. Compliance-officer reviews the template; founder reviews the P0 escalated ETF recovery determination section specifically (commercial exposure if outside counsel advises ETF entitlement is contested). | compliance-officer | **P1** | M10 | [ ] |
+| 4 | Add `docs/OBSERVABILITY.md §36.5` cross-reference: in the §36.5 implementation checklist, add item 6 after item 5: "Add §12.6 cross-reference for job 25 stale recovery runbook: the operational failure runbook for `mid_contract_termination_risk_check` (job 25) staleness is `docs/INCIDENT_RESPONSE.md R-29`." | compliance-officer | **P1** | M10 | [ ] |
+| 5 | Add ETF-CRON-E-001 through ETF-CRON-COMP-E-001 artefact definitions to `docs/SOC2_READINESS.md §79.4` master evidence table: five artefacts with TSC criteria (CC4.1/CC5.2/CC7.2/A1.1), cadence (incident-triggered), retention (7yr or 3yr), and storage path (`compliance/evidence/etf-cron/r29-<incident_id>/`). | compliance-officer | **P1** | M10 | [ ] |
+
+#### P2 — Before SOC 2 observation period (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Add Scenario R (mid-contract termination risk monitoring cron failure) to §9.4 tabletop catalog: compliance-officer simulates job 25 gap by manually deleting and re-creating the pg_cron job in staging; IC runs R-29-C1/C2/C3; CSM lead initiates synthetic CSM outreach for a staging tenant at `chs_score = 15` with `days_remaining = 300`; confirms `enterprise.mid_contract_termination_risk_flagged` emitted; restores job; confirms `system.etf_cron_restored` emitted. | security-engineer + compliance-officer + customer-success | **P2** | M12 | [ ] |
+| 7 | Add weekly health assertion for job 25: every Monday at 09:30 UTC, pg_cron health supervisor confirms `enterprise.mid_contract_termination_risk_flagged` OR `system.etf_cron_check_passed` appeared since 08:30 UTC (covers the 09:00 UTC scheduled run with 30-min window); if absent, fire AL-ETF-CRON-DRY-01 P2 Slack `#observability`. Register as job 41 in §12.6. | devops-lead | **P2** | M12 | [ ] |
+
+---
+
+*v3.0 (2026-06-21): R-29 Enterprise Mid-Contract Termination Risk Monitoring Failure — twenty-ninth runbook. Closes the documentation gap identified by `docs/OBSERVABILITY.md §12.6` (job 25 registry entry: "stale = mid-contract churn risk blind spot for high-value at-risk accounts") and §36.2–§36.3 (pg_cron job 25 spec and AL-ETF-01 alert rule): §36.3 defines the alert routing for AL-ETF-01 activation (job 25 detects an at-risk tenant) and §12.6 defines the stale-condition PagerDuty routing, but no recovery runbook existed for when job 25 itself becomes stale. R-29 provides the full IC protocol for when `mid_contract_termination_risk_check` pg_cron job 25 exceeds the 8-day freshness window. Trigger: `system.cron_job_stale` with `job_name = 'mid_contract_termination_risk_check'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-customer-success`, dedup `mid-contract-risk-check-stale`. Critical distinction from R-28 (renewal-notice-cron): R-28 carries an immediate legal/contractual deadline risk (MSA §6.1 90-day notice within a narrow 10-day window); R-29 carries a commercial/financial risk (churn blind spot — FORM may forfeit CSM intervention opportunity and ETF recovery for high-ACV accounts). Job 25 runs weekly (not daily); missed windows are 7-day gaps (two missed Mondays before alert fires). Three-severity matrix: P1 (stale, no high-ACV at-risk tenant — monitoring gap with no immediate commercial risk beyond the stale window), P0 (stale AND ≥1 tenant with ACV ≥ $50k at CHS < 20 for ≥4 weeks AND days_remaining > 180 — high-ACV churn blind spot; CSM call within 4h), P0 escalated (at-risk tenant terminated during stale period — ETF recovery may be contested; outside counsel within 2h; founder notification at T+0). T+0–T+30 immediate actions: DEC-030 `system.etf_cron_failure_declared` HIGH/7yr at T+0; R-29-C1 at-risk tenant scope query at T+5 (P0 upgrade gate including P0 escalated check for terminations); R-29-C2 pg_cron.job_run_details stale window query at T+10 (missed Monday count); root cause determination (H1–H5) at T+10–T+15; P0 manual detection backfill at T+20 if applicable; restoration at T+30. Three scope queries: R-29-C1 (consecutive CHS < 20 tenants with days_remaining > 180 and contract_status check), R-29-C2 (pg_cron.job_run_details last 10 runs for staleness + Monday gap count), R-29-C3 (tenants at CHS < 20 during stale period who have since recovered — closed intervention windows). Five root cause hypotheses: H1 (pg_cron job deleted), H2 (SQL exception — most likely `tenant_engagement_snapshots` DDL change), H3 (pg_net degraded), H4 (service_role permission revoked from snapshot/tenants tables), H5 (Supabase platform outage — R-03 primary). Four-step recovery: Step 1 (restore job 25 per H1–H5 root cause — includes DDL change coordination for H2); Step 2 (manual §36.2 detection query backfill per missed Monday, emitting `enterprise.mid_contract_termination_risk_flagged` HIGH/7yr per tenant with `risk_signal_source: 'csm_manual_flag'` and `system.etf_cron_manual_check_completed` STANDARD/7yr per window; note snapshot historical availability caveat with `data_gap_acknowledged` flag); Step 3 (CSM intervention for each flagged tenant via CRM case + CSM call within 4h P0/48h P1; P0 escalated: outside counsel + founder notification + ETF recovery documentation in enterprise_contracts.notes); Step 4 (confirm restoration via test manual run + `system.etf_cron_restored` STANDARD/3yr). One communication template: ETF-INT-01 (internal compensating control memo — required whenever Step 2 or 3 executed or R-29-C1 returned any row; no customer-facing template exists for R-29 — CSM outreach is normal AL-ETF-01 protocol, not an incident notification). Three DEC-030 HMAC-chained events: `system.etf_cron_failure_declared` HIGH/7yr (Zod: `incident_id`, `confirmed_stale_since` datetime, `stale_hours` positive, `monday_runs_missed` nonneg int, `trigger` enum, `initial_severity` enum), `system.etf_cron_manual_check_completed` STANDARD/7yr (Zod: `incident_id`, `check_window_monday` datetime, `tenants_checked` nonneg int, `tenants_flagged` UUID[], `max_acv_flagged_usd` nonneg int, `all_clear` bool, `data_gap_acknowledged` bool), `system.etf_cron_restored` STANDARD/3yr (Zod: `incident_id`, `restored_at` datetime, `root_cause_category` enum, `fix_deployed_at` datetime, `monday_runs_missed` nonneg int, `p0_tenants_flagged` nonneg int, `terminations_during_stale` nonneg int); ETF-CRON-CHAIN-01 ordering invariant: etf_cron_failure_declared precedes all etf_cron_manual_check_completed and etf_cron_restored for same incident_id — inversion triggers R-05. Five evidence artefacts: ETF-CRON-E-001 (failure declared chain export, CC4.1/CC7.2, 7yr), ETF-CRON-E-002 (R-29-C1/C3 query outputs, CC5.2/CC7.2, 7yr), ETF-CRON-E-003 (pg_cron.job_run_details export, CC4.1/A1.1, 3yr), ETF-CRON-E-004 (manual check chain exports per window, CC4.1/CC5.2, 7yr), ETF-CRON-COMP-E-001 (signed compensating control memo, CC4.1/CC5.2, 7yr). Four SOC 2 criteria: CC4.1 (8-day freshness threshold detection + compensating control evidence), CC5.2 (risk identification — manual ETF-01 detection proves ongoing risk assessment despite automated control offline), CC7.2 (pg-cron-health-monitor anomaly detection), A1.1 (enterprise mid-contract churn monitoring operational gap). Five post-incident controls: Scenario R tabletop (30d post-PIR), pg_cron exception-handling improvement (H2/H3), DDL change governance for snapshot tables (H2 DDL root cause), §36.5 cross-reference update, outside counsel ETF force-majeure review (P0 escalated only). Seven-item implementation checklist: 2× P0/M10 (three DEC-030 events registered + ETF-CRON-CHAIN-01 in emit-audit-event; §12.7 routing integration test), 3× P1/M10 (ETF-INT-01 template + founder review; §36.5 cross-reference; SOC2_READINESS §79.4 evidence table), 2× P2/M12 (Scenario R tabletop, job 41 weekly dry-run assertion). Privacy floor: all three system events carry only FORM-internal operational metadata — stale duration, timestamp, root cause enum, count of tenants flagged; `system.etf_cron_manual_check_completed.tenants_flagged[]` carries tenant UUIDs (same data class as `enterprise.mid_contract_termination_risk_flagged` which already carries `tenant_id`); no individual employee `user_id`, name, email, health value, CHS individual score, body composition, coaching session content, or GDPR Art. 9 special-category data in any §R-29 event, evidence artefact, or template; ETF-INT-01 carries `tenant_id` (UUID only) + aggregate `chs_score` + contract-level financials — no personal data; `form_api` must never route any §R-29 event to any tenant-facing endpoint. Cross-references: `docs/OBSERVABILITY.md §36.2` (pg_cron job 25 spec — schedule, detection SQL, emission logic, dedup guard); `docs/OBSERVABILITY.md §36.3` (AL-ETF-01 canonical alert rule — P1 routing, 30-day dedup, resolution criteria); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — job 25 entry with 8-day freshness window and `form-customer-success` PagerDuty routing); `docs/OBSERVABILITY.md §12.7` (`pg-cron-health-monitor` — dead-man's switch that emits `system.cron_job_stale` and fires this runbook); `docs/COST_MODEL.md §35.9.1` (`enterprise.mid_contract_termination_risk_flagged` canonical DEC-030 event definition — Zod schema, deduplication logic, HMAC chain INSERT); `docs/COST_MODEL.md §35.5.3` (ETF rate schedule — declining-balance rates M1–M36; context for P0 escalated ETF recovery assessment); `docs/COST_MODEL.md §35.6.3` (EV waiver model — CSM references §35.6.3 when account escalates to termination discussion during or after R-29); `docs/DATA_MODEL.md §41` (enterprise adoption snapshots schema — `tenant_engagement_snapshots` DDL; permission grants for `service_role`); `docs/AUDIT_LOG_SCHEMA.md §System` (three DEC-030 events to register — P0/M10 per R-29.11 item 1); `docs/SOC2_READINESS.md §79.4` (master evidence table — five ETF-CRON artefacts to register per R-29.11 item 5); R-05 (HMAC chain break — parallel activation if ETF-CRON-CHAIN-01 inversion detected); R-03 (Infrastructure Outage — parallel activation if Supabase platform outage is root cause, H5); R-28 (Renewal Notice Monitoring Failure — CC4.1/CC2.2 pattern precedent; ETF-CRON-COMP-E-001 follows RENEW-CRON-COMP-E-001 structure); AL-ETF-01 (§36.3 — fires when job 25 detects a qualifying at-risk tenant; R-29 fires when job 25 cannot run at all). Owner: compliance-officer + devops-lead + platform-engineer + customer-success.*
+
+---
+
+**v3.0 · 2026-06-21 · Owner: security-engineer + compliance-officer**
+**Review: after every P0/P1 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
+
+---

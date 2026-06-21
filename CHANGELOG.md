@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [7.26.1] — 2026-06-21
+
+### Added
+- `docs/INCIDENT_RESPONSE.md R-29` — Enterprise Mid-Contract Termination Risk Monitoring Failure. Twenty-ninth runbook. Closes the documentation gap in `docs/OBSERVABILITY.md §12.6` for pg_cron job 25 (`mid_contract_termination_risk_check`, schedule `0 9 * * 1`, 8-day freshness): §12.6 defines PagerDuty P1 `form-customer-success` routing on staleness but no IC recovery runbook existed. R-29 provides: three-severity matrix (P1 stale / P0 high-ACV at-risk tenant undetected / P0 escalated contract terminated during stale); T+0–T+30 immediate actions with `system.etf_cron_failure_declared` HIGH/7yr at T+0; three scope queries (R-29-C1 at-risk tenant assessment, R-29-C2 pg_cron.job_run_details stale duration, R-29-C3 tenants recovered without intervention); five root cause hypotheses H1–H5; four-step recovery (restore job 25, manual §36.2 backfill per missed Monday, CSM intervention, confirm restoration); internal Template ETF-INT-01 (no customer-facing template — CSM outreach is normal AL-ETF-01 protocol); three DEC-030 HMAC-chained events with ETF-CRON-CHAIN-01 ordering invariant; five SOC 2 evidence artefacts (CC4.1/CC5.2/CC7.2/A1.1); seven-item implementation checklist.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — version footer v2.9 → v3.0.
+- `VERSION` — 7.26.0 → 7.26.1.
+
+---
+
 ## [7.26.0] — 2026-06-21
 
 ### Added
