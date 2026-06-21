@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.46.0] — 2026-06-21
+
+### Added
+- `content/post-2112-external-observability-system.md` — Editorial 2111–2120 post 2/10. Як побудувати систему зовнішньої спостережливості без тренера поруч. Core argument: self-observation is structurally limited — during a set, cognitive bandwidth is occupied by execution, leaving the observational channel overloaded or closed; Moran et al. (2012) show even trained athletes cannot accurately reproduce their kinematic parameters from internal sensation, and error grows with fatigue. Four-level observability system: (1) video — external eye for technique and movement pattern; shoot primary lifts first+last set, review same day with a specific question, store by date+exercise; (2) numerical log — external memory for progress dynamics; minimum: weight×reps×sets + RPE + one-sentence note; (3) structured self-review — weekly 10 min (e1RM trend, RPE drift, adherence %, one decision) + block 30 min (start/end table, three questions); (4) external check — at least once per block, partner or specialist. System vs. ritual: a system generates decisions — if a weekly review produces no concrete decision it's a ritual. Minimum viable version: 60s entry → 10 min weekly review → 30 min block summary. FORM angle: Victor treats video as pattern-over-time (not good/bad), auto-aggregates all log data, triggers structured questions at the right moment. Fitzsimons & Finkel (2011) on minimal public accountability raising self-assessment accuracy. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `blog.html` — post-2112 card added (above post-2060, below post-2111).
+- `README.md` — post-2112 → draft.
+- `STATUS.md` — Editorial 2111–2120 updated 2/10 · v7.46.0; next priorities updated.
+- `VERSION` → 7.46.0
+
+---
+
 ## [7.45.0] — 2026-06-21
 
 ### Added
