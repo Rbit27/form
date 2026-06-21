@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [7.33.0] — 2026-06-21
+
+### Added
+- `docs/SOC2_READINESS.md` — §79.4: five PURGE-CRON evidence artefacts registered: **PURGE-CRON-E-001** (`system.purge_cron_failure_declared` HMAC chain, CC7.2/PI1.2, 7yr), **PURGE-CRON-E-002** (R-30-C1/C3 aggregate scope queries, CC6.5/PI1.2/P4.1, 7yr), **PURGE-CRON-E-003** (`pg_cron.job_run_details` stale window, CC7.2/A1.1, 3yr), **PURGE-CRON-E-004** (`system.purge_cron_manual_run_completed` HMAC chain, CC6.5/PI1.2, 7yr), **PURGE-CRON-COMP-E-001** (Template PURGE-INT-01 signed memo + Art. 33 assessment, CC6.5/PI1.2, 7yr). All incident-triggered on R-30 P0 activation or when Step 2 executed.
+
+### Changed
+- `docs/SOC2_READINESS.md` — §80.3 R2 folder structure: `purge-cron/` subfolder added after `etf-cron/` (`form-api NO ACCESS`; stores per-activation `r30-<incident_id>/` subdirectories).
+- `docs/SOC2_READINESS.md` — §80.4 Vanta mirror list: PURGE-CRON-E-001/002/003/004 + PURGE-CRON-COMP-E-001 appended (INCIDENT_RESPONSE R-30.8).
+- `docs/INCIDENT_RESPONSE.md` — R-30.11 item 5 marked `[x] Done` (SOC2_READINESS.md v3.25.0, 2026-06-21).
+- `STATUS.md` — VERSION → 7.33.0.
+
 ## [7.32.1] — 2026-06-21
 
 ### Added
