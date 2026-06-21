@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.0
+# FORM · Incident Response Runbook v3.1
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -12147,6 +12147,498 @@ Store artefacts at `compliance/evidence/audit-log-purge/r31-<incident_id>/` with
 ---
 
 **v1.0 · 2026-06-21 · Owner: compliance-officer + devops-lead + security-engineer**
+**Review: after every P0/P1 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
+
+---
+
+## R-32 CAEP Stream Re-Registration Sweep Failure — `caep_reregister_sweep` pg_cron Stale
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `caep_reregister_sweep` pg_cron job 37 exceeds the 6-minute freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` (§12.7) emits `system.cron_job_stale` with `job_name = 'caep_reregister_sweep'`; routes to PagerDuty P1 `form-security` → security-engineer with dedup key `caep-sweep-stale` per §12.6
+> **Primary owners:** security-engineer · devops-lead · compliance-officer
+> **Security risk:** Job 37 performs automatic CAEP stream re-registration after SAML SP certificate rotation. A stale job means any enterprise tenant for whom `caep_reregistration_required = TRUE` (set by the `cert-expiry-check` hook at `cert_rotation_state → 'complete'`) is left with a **stale CAEP stream pointing at the pre-rotation SP certificate endpoint**. The IdP cannot deliver RISC `token-claims-change` or `session-revoked` events to FORM — enterprise sessions that should be revoked are silently left active. CC6.3 SSO session-integrity monitoring gap.
+> **Critical distinction from R-04 / R-05 / R-28 / R-31:** R-04 (SSO/SAML compromise) and R-05 (HMAC chain break) are security breaches. R-28 (job 39 stale) is a contractual deadline risk. R-31 (job 27 stale) carries a self-referential DEC-030 ordering constraint that can block the recovery action. R-32 is an **operational failure of the SSO session-integrity monitoring sweep** — no data breach, no chain break, no GDPR Art. 5(1)(e) overcollection. Unlike R-31, R-32 has **no DELETE-blocking chain invariant** — the recovery action (manual re-registration API call) is always executable once the root cause is resolved. Severity depends entirely on whether any tenant has `caep_reregistration_required = TRUE` at the time of stale detection.
+
+---
+
+### R-32.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 37)** | `pg-cron-health-monitor` Edge Function (§12.7, runs hourly) | No successful `caep_reregister_sweep` run in `pg_cron.job_run_details` within the prior 6 min | **P1** (escalates to P0 if R-32-C1 finds tenants with `caep_reregistration_required = TRUE` or `caep_status = 'error'`) | PagerDuty `form-security` P1 → security-engineer; dedup key `caep-sweep-stale` per §12.6 registry |
+| **AL-CAEP-01 co-active** | `sso.caep_stream_error` DEC-030 HIGH/7yr emitted with `error_type: 'reregistration_failed_post_cert_rotation'` for ≥ 1 tenant during the stale window | Prior sweep attempted re-registration, exhausted 3 retries, set `caep_status = 'error'` — AL-CAEP-01 (SSO_SCIM §23.9) fires independently | **P0** | `form-security` P0 via AL-CAEP-01; confirm R-32 as co-incident |
+| **Manual discovery** | security-engineer observes `caep_status != 'active'` for a tenant following a cert rotation, or Admin Dashboard shows CAEP stream health degraded | Post-rotation CSM check or CAEP SLO monitoring | **P1 → assess R-32-C1 for P0 upgrade** | `form-security` |
+
+> **P0 escalation criterion:** Upon any R-32 activation, security-engineer runs R-32-C1 immediately. If any `tenant_sso_configs` row has `caep_reregistration_required = TRUE`, severity escalates to **P0** — a cert rotation completed but the CAEP stream was not updated; RISC and CAEP events from the IdP are being delivered to the stale endpoint and silently dropped.
+>
+> **P0 escalation criterion (caep_status = 'error'):** If R-32-C1 reveals tenants with `caep_status = 'error'` from a prior failed sweep (3-retry exhaustion), severity escalates to **P0** — IdP SSF subscription is broken; RISC/CAEP events are not delivered at all. Confirm AL-CAEP-01 is active for each such tenant; if not, investigate suppression and page devops-lead.
+
+---
+
+### R-32.2 Severity Classification
+
+| Condition | Severity | Escalation |
+|---|---|---|
+| Job 37 stale AND R-32-C1 returns 0 tenants with `caep_reregistration_required = TRUE` AND 0 with `caep_status = 'error'` | **P1** | IC + security-engineer + devops-lead; restore job 37 within 4-hour SLA; monitoring gap only; no session integrity breach |
+| Job 37 stale AND R-32-C1 returns ≥ 1 tenant with `caep_reregistration_required = TRUE` (cert rotation completed; CAEP stream not updated) | **P0** | IC + security-engineer + devops-lead + compliance-officer; execute manual re-registration within 30 min of scope confirmation; CC6.3 session-integrity gap active |
+| Job 37 stale AND R-32-C1 returns ≥ 1 tenant with `caep_status = 'error'` (3-retry failure — IdP SSF subscription broken) | **P0** | IC + security-engineer + devops-lead; investigate IdP SSF endpoint health; AL-CAEP-01 co-active |
+| Job 37 stale AND root cause is a Supabase platform outage (R-03 active) | **P1 (R-03 primary)** | Defer manual re-registration scope assessment until Supabase restored; R-03 is primary; R-32 activates once platform is stable; run R-32-C1 immediately post-restoration |
+
+---
+
+### R-32.3 Immediate Actions (T+0 to T+30 min)
+
+```
+T+0   system.cron_job_stale fires for job 37. PagerDuty form-security P1 pages security-engineer.
+      IC opens #ir-caep-sweep-stale-YYYYMMDD in Slack.
+      Emit system.caep_sweep_failure_declared DEC-030 HIGH/7yr (§R-32.7) as chain anchor.
+      Record: confirmed_stale_since (from pg_cron.job_run_details, last successful run timestamp).
+
+T+5   Run R-32-C1 (§R-32.4): count tenants with caep_reregistration_required = TRUE
+      and tenants with caep_status = 'error'.
+      If caep_reregistration_required_count ≥ 1: escalate to P0.
+        - Page devops-lead and compliance-officer.
+        - Proceed to §R-32.5 Step 2 (manual re-registration) after root cause assessment.
+      If caep_status_error_count ≥ 1 AND AL-CAEP-01 not already active: escalate to P0.
+        - Confirm AL-CAEP-01 PagerDuty alert is active for each affected tenant.
+        - If AL-CAEP-01 suppressed or missing: page devops-lead for PagerDuty routing investigation.
+      If both counts = 0: remain at P1. Proceed directly to Step 1 (restore job 37).
+
+T+10  Run R-32-C2 (§R-32.4): check pg_cron.job_run_details for job 37 stale window.
+      Determine exact stale start time and number of missed 5-min runs.
+      Run R-32-C3 (§R-32.4): classify root cause hypothesis H1–H5 from return_message.
+      If pg_cron is unresponsive: activate R-03 in parallel. Pause §R-32.5.
+
+T+15  If P0 (caep_reregistration_required = TRUE tenants confirmed): security-engineer opens PAM
+      break-glass session (read_write elevation, reason: 'r32_caep_sweep_recovery').
+      If H3 (caep-stream-manager Worker unreachable): investigate Worker health before calling API.
+      Call POST /internal/v1/caep/reregister with affected tenant_ids (§R-32.5 Step 2).
+      Record HTTP response, tenants_reregistered_count, tenants_failed_count, PAM session UUID.
+
+T+20  Verify caep_reregistration_required = FALSE for all re-registered tenants (§R-32.5 Step 3).
+      Verify sso.caep_stream_registered DEC-030 HIGH/7yr emitted per tenant (§R-32.5 Step 3).
+      Emit system.caep_sweep_manual_reregister_completed DEC-030 STANDARD/7yr (§R-32.7).
+      Restore job 37 per root cause (§R-32.5 Step 4).
+
+T+30  Run §R-32.5 Step 5 (confirm restoration).
+      Emit system.caep_sweep_restored DEC-030 STANDARD/3yr after confirmed restoration.
+      Update incident channel with scope, root cause, P0/P1 status, restoration confirmation.
+```
+
+---
+
+### R-32.4 Root Cause Hypotheses and Scope Queries
+
+**R-32-C1 — Tenants with active CAEP re-registration backlog or stream errors:**
+
+```sql
+-- Scope assessment: tenants awaiting CAEP re-registration or with stream errors.
+-- Requires compliance_reviewer role (read-only on tenant_sso_configs).
+-- Reason: "R-32 caep_reregister_sweep stale — scope assessment — INC-YYYYMMDD"
+-- Privacy: tenant_id (FORM-internal UUID) only — no user email, no health data, no CAEP URLs.
+SELECT
+  COUNT(*) FILTER (WHERE caep_reregistration_required = TRUE)          AS caep_reregistration_required_count,
+  COUNT(*) FILTER (WHERE caep_status = 'error')                        AS caep_status_error_count,
+  COUNT(*) FILTER (WHERE caep_reregistration_required = TRUE
+                     AND caep_status = 'error')                        AS both_flags_count,
+  COUNT(*) FILTER (WHERE caep_reregistration_trigger = 'cert_rotation'
+                     AND caep_reregistration_required = TRUE)          AS cert_rotation_pending_count
+FROM tenant_sso_configs
+WHERE sso_type IN ('saml', 'oidc')
+  AND is_active = TRUE;
+```
+
+> **Interpretation:** `caep_reregistration_required_count ≥ 1` → P0: cert rotation completed (cert-expiry-check hook fired and set the flag) but the CAEP stream was not updated. Every minute of sweep stale represents a window where RISC and session-revoked events are delivered to the stale pre-rotation stream endpoint. `caep_status_error_count ≥ 1` → P0 (AL-CAEP-01 co-active): prior 3-retry failure; IdP SSF subscription broken for these tenants. `both_flags_count ≥ 1` → the sweep attempted re-registration after the hook set the flag but all three retries failed — IdP SSF endpoint likely unreachable or returning 4xx/5xx.
+
+**R-32-C2 — Exact stale window from pg_cron run history:**
+
+```sql
+-- Determine when job 37 last ran successfully and how many 5-min runs were missed.
+SELECT
+  jobname,
+  start_time,
+  end_time,
+  status,
+  return_message
+FROM cron.job_run_details
+WHERE jobname = 'caep_reregister_sweep'
+ORDER BY start_time DESC
+LIMIT 10;
+```
+
+> **Interpretation:** The gap between `start_time` of the most recent row and `NOW()` is the stale duration. Job 37 runs every 5 minutes (`*/5 * * * *`); missed runs = `FLOOR(stale_minutes / 5)`. A stale window > 30 min (6 missed runs) for a tenant with `caep_reregistration_required = TRUE` means cert rotation completed with no CAEP re-registration attempted — the IdP has been delivering CAEP/RISC events to the stale SP cert endpoint for that entire window.
+
+**R-32-C3 — Root cause classification from return_message:**
+
+```sql
+-- Classify root cause hypothesis from job 37 failed run return_message.
+SELECT
+  jobname,
+  start_time,
+  status,
+  return_message,
+  CASE
+    WHEN return_message ILIKE '%job%not%found%'
+      OR status = 'unscheduled'                                       THEN 'H1 — job_deleted_or_disabled'
+    WHEN return_message ILIKE '%timeout%'
+      OR return_message ILIKE '%connection%reset%'
+      OR return_message ILIKE '%pg_net%'
+      OR return_message ILIKE '%fetch%failed%'                        THEN 'H2 — db_connection_or_pg_net_degraded'
+    WHEN return_message ILIKE '%worker%'
+      OR return_message ILIKE '%503%'
+      OR return_message ILIKE '%502%'
+      OR return_message ILIKE '%unreachable%'                         THEN 'H3 — caep_stream_manager_worker_down'
+    WHEN return_message ILIKE '%429%'
+      OR return_message ILIKE '%rate%limit%'                          THEN 'H4 — idp_ssf_rate_limit'
+    WHEN return_message ILIKE '%permission%'
+      OR return_message ILIKE '%insufficient%privilege%'              THEN 'H2 — db_permission_error'
+    ELSE 'H5_or_unknown — manual review required'
+  END AS root_cause_signal
+FROM cron.job_run_details
+WHERE jobname = 'caep_reregister_sweep'
+  AND status != 'succeeded'
+ORDER BY start_time DESC
+LIMIT 5;
+```
+
+**Root cause hypotheses:**
+
+| # | Hypothesis | Diagnostic signal | Immediate mitigation |
+|---|---|---|---|
+| **H1** | pg_cron job 37 deleted or disabled | `SELECT * FROM cron.job WHERE jobname = 'caep_reregister_sweep'` returns 0 rows or `active = false` | Re-create job 37 per `docs/OBSERVABILITY.md §12.6` spec (`*/5 * * * *`, `form_audit` role, SSO_SCIM §36.2.3 SQL); then manually re-register any `caep_reregistration_required = TRUE` tenants via §R-32.5 Step 2 |
+| **H2** | DB connection failure or pg_net degraded: job 37 couldn't reach `caep-stream-manager` Worker via `net.http_post` | `return_message` contains timeout, pg_net, or connection error; check `net.http_request_queue` backlog in Supabase | Verify pg_net health; once restored, job 37 resumes automatically on next tick; if cert-rotation tenants cannot wait 5 min, proceed to §R-32.5 Step 2 manual call |
+| **H3** | `caep-stream-manager` Worker unreachable (Cloudflare Worker deployment failure, CPU limit, routing issue) | `return_message` contains 502/503/unreachable; `curl https://caep-stream-manager.form.coach/health` returns non-200 | Verify Worker deployment in Cloudflare dashboard; check CPU / invocation metrics; redeploy via `wrangler deploy`; once Worker healthy, execute §R-32.5 Step 2 if P0 |
+| **H4** | IdP SSF endpoint rate-limiting FORM's re-registration requests (429) | `return_message` contains 429 or rate-limit signal; R-32-C1 shows `caep_status = 'error'` tenants with `caep_reregistration_trigger = 'cert_rotation'` | Verify job 37 inter-tenant 200ms yield deployed correctly (SSO_SCIM §36.2.3); if rate-limiting persists, batch manual re-registration in 5-tenant batches with 60-second inter-batch delays; open IdP support ticket for rate-limit increase |
+| **H5** | Supabase platform outage | R-03 active; pg_cron not running globally | R-03 is primary; defer CAEP scope assessment until platform restored; run R-32-C1 immediately post-restoration; job 37 resumes on next scheduled tick once Supabase is healthy |
+
+---
+
+### R-32.5 Recovery Procedure
+
+**Step 1: Diagnose root cause (T+10–T+15)**
+
+| Check | Query | Expected result |
+|---|---|---|
+| Job 37 exists in pg_cron | `SELECT active, schedule FROM cron.job WHERE jobname = 'caep_reregister_sweep'` | `active = true`, `schedule = '*/5 * * * *'` |
+| Most recent run status | R-32-C2 output | `status = 'succeeded'` for most recent row; gap < 6 min |
+| caep-stream-manager Worker health | `curl https://caep-stream-manager.form.coach/health` | HTTP 200 |
+| pg_net connectivity | `SELECT net.http_get('https://caep-stream-manager.form.coach/health')` | HTTP 200 response queued successfully |
+| Scope of affected tenants | R-32-C1 output | `caep_reregistration_required_count = 0` AND `caep_status_error_count = 0` (P1 if true) |
+
+---
+
+**Step 2: Manual CAEP stream re-registration (P0 only — tenants with `caep_reregistration_required = TRUE` confirmed by R-32-C1)**
+
+> **Prerequisite:** `system.caep_sweep_failure_declared` (§R-32.7) emitted at T+0. PAM break-glass session open (security-engineer, `read_write` elevation, reason: `r32_caep_sweep_recovery`). Root cause assessed (H3 — Worker down — must be restored before calling API).
+
+**Step 2a — Query affected tenant IDs:**
+
+```sql
+-- Retrieve tenant_ids with caep_reregistration_required = TRUE for manual re-registration.
+-- Requires compliance_reviewer role.
+-- Reason: "R-32 manual CAEP re-registration scope — INC-YYYYMMDD"
+-- Privacy: tenant_id (FORM-internal UUID) only — no user email, no CAEP stream tokens.
+SELECT
+  id                             AS tenant_id,
+  caep_status,
+  caep_reregistration_trigger,
+  caep_last_reregistered_at,
+  caep_reregistration_required
+FROM tenant_sso_configs
+WHERE caep_reregistration_required = TRUE
+  AND is_active = TRUE
+ORDER BY caep_last_reregistered_at ASC NULLS FIRST;
+```
+
+**Step 2b — Call `POST /internal/v1/caep/reregister` for affected tenants:**
+
+```bash
+# Manual CAEP stream re-registration via caep-stream-manager Worker.
+# Worker processes tenant_ids serially with 200ms inter-tenant yield (per SSO_SCIM §36.2.3).
+# CAEP_INTERNAL_TOKEN: 1Password FORM-Engineering vault → caep-stream-manager-internal-token.
+# Document PAM session UUID in incident channel before calling.
+curl -X POST https://caep-stream-manager.form.coach/internal/v1/caep/reregister \
+  -H "Authorization: Bearer $CAEP_INTERNAL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_ids": ["<tenant_id_1>", "<tenant_id_2>"],
+    "incident_id": "INC-YYYYMMDD-XXXXXX",
+    "triggered_by": "r32_manual_recovery"
+  }'
+# Expected: HTTP 200 with per-tenant result array.
+# Success per tenant: caep_reregistration_required = FALSE, caep_stream_id updated,
+#                     sso.caep_stream_registered DEC-030 HIGH/7yr emitted.
+# Failure per tenant: caep_status = 'error', sso.caep_stream_error HIGH/7yr emitted,
+#                     AL-CAEP-01 fires — resolve root cause before retry.
+```
+
+> **If `caep-stream-manager` Worker is down (H3):** Do NOT call the API. Restore the Worker first (§R-32.5 Step 4 H3 row). Once healthy and job 37 restored, tenants with `caep_reregistration_required = TRUE` will be processed on the next 5-min sweep tick. Manual call only needed if the Worker cannot be restored within the 30-min P0 SLA.
+
+**Step 2c — Emit `system.caep_sweep_manual_reregister_completed`:**
+
+Emit DEC-030 STANDARD/7yr (§R-32.7) immediately after the re-registration API call completes. Include `tenants_reregistered_count` (success), `tenants_failed_count` (failure), `run_by_pam_session_id`, and `reregister_api_http_status`. Re-run R-32-C1 to verify `caep_reregistration_required_count = 0` for all successfully re-registered tenants; set `all_clear_after_reregister` accordingly.
+
+---
+
+**Step 3: Verify stream registration (P0)**
+
+```sql
+-- Verify caep_reregistration_required = FALSE and caep_status = 'active' for re-registered tenants.
+-- Requires compliance_reviewer role.
+SELECT
+  id                         AS tenant_id,
+  caep_status,
+  caep_reregistration_required,
+  caep_last_reregistered_at,
+  caep_stream_id
+FROM tenant_sso_configs
+WHERE id IN (<tenant_id_1>, <tenant_id_2>)
+ORDER BY caep_last_reregistered_at DESC;
+```
+
+> **Expected result:** `caep_reregistration_required = FALSE`, `caep_status = 'active'`, `caep_last_reregistered_at` updated within the last 5 minutes. If any tenant still shows `caep_reregistration_required = TRUE` or `caep_status = 'error'`: re-attempt Step 2b for that tenant after resolving the root cause. If IdP SSF endpoint returns non-200 on retry, activate H4 mitigation (batched re-registration) or open a support escalation with the IdP.
+
+---
+
+**Step 4: Restore job 37 per root cause**
+
+| Root cause | Restoration action |
+|---|---|
+| **H1** (job deleted) | `SELECT cron.schedule('caep_reregister_sweep', '*/5 * * * *', $$ [job SQL from SSO_SCIM §36.2.3] $$)` as `form_audit` role; confirm first successful run in `pg_cron.job_run_details` within 5 min |
+| **H2** (pg_net degraded) | Once pg_net health confirmed, job 37 resumes automatically on the next 5-min tick; verify in `pg_cron.job_run_details` |
+| **H3** (`caep-stream-manager` Worker down) | Redeploy via `wrangler deploy` or Cloudflare dashboard; confirm health endpoint returns HTTP 200; job 37 resumes on next tick |
+| **H4** (IdP SSF rate-limiting) | Verify job 37 inter-tenant 200ms yield is correctly deployed (SSO_SCIM §36.2.3); if persistent, contact IdP support for rate-limit increase; use batched manual re-registration in the interim |
+| **H5** (Supabase outage) | R-03 resolution restores pg_cron; job 37 resumes on next scheduled tick |
+
+---
+
+**Step 5: Confirm restoration**
+
+```sql
+-- Confirm job 37 is active and recently ran successfully.
+SELECT jobname, active, schedule
+FROM cron.job
+WHERE jobname = 'caep_reregister_sweep';
+
+-- Confirm most recent runs succeeded.
+SELECT jobname, start_time, end_time, status, return_message
+FROM cron.job_run_details
+WHERE jobname = 'caep_reregister_sweep'
+ORDER BY start_time DESC
+LIMIT 5;
+```
+
+After confirmed success: emit `system.caep_sweep_restored` DEC-030 STANDARD/3yr (§R-32.7). File CAEP-SWEEP-E-004 at P0. Update incident channel with restoration confirmation and close the incident.
+
+---
+
+### R-32.6 Communication Templates
+
+#### Template CAEP-INT-01 — Internal Security Incident Memo (P0 only)
+
+> **Required when:** R-32-C1 confirms ≥ 1 tenant with `caep_reregistration_required = TRUE` AND manual re-registration was executed (Step 2).
+> **Not required:** P1 (zero `caep_reregistration_required = TRUE` tenants — monitoring gap only, no session integrity breach).
+> **No customer-facing communication required** — CAEP stream management is a FORM-internal SSO infrastructure control. Enterprise tenants are not informed of CAEP implementation details. If a confirmed session revocation failure is discovered during the investigation (a session that should have been revoked via CAEP signal was left active during the stale window), escalate immediately to R-04 (SSO/SAML Compromise) for customer-facing communications and legal assessment.
+
+```
+FORM INTERNAL — SECURITY RESTRICTED
+INTERNAL SECURITY INCIDENT MEMO — R-32 CAEP STREAM RE-REGISTRATION SWEEP FAILURE
+Incident ID: INC-YYYYMMDD-XXXXXX
+Date: YYYY-MM-DD
+Prepared by: [security-engineer]  Reviewed by: [compliance-officer]
+PAM Session: [run_by_pam_session_id from system.caep_sweep_manual_reregister_completed]
+
+1. INCIDENT SUMMARY
+Job 37 (caep_reregister_sweep, */5 * * * *) detected stale at [confirmed_stale_since]
+by the pg-cron-health-monitor dead-man's switch (§12.7, 6-min freshness window).
+Stale gap: [stale_minutes] min. Missed 5-min runs: [missed_runs].
+
+2. SCOPE ASSESSMENT (R-32-C1)
+Tenants with caep_reregistration_required = TRUE: [caep_reregistration_required_count]
+Tenants with caep_status = 'error': [caep_status_error_count]
+Cert-rotation-triggered pending: [cert_rotation_pending_count]
+CAEP stream stale window exposure: [stale_minutes] min
+
+3. MANUAL RE-REGISTRATION (P0 only)
+PAM session UUID: [run_by_pam_session_id]
+Tenants re-registered successfully: [tenants_reregistered_count]
+Tenants failed (require further investigation): [tenants_failed_count]
+API HTTP response: [reregister_api_http_status]
+All-clear after re-registration (R-32-C1 re-run = 0 required): [TRUE/FALSE]
+
+4. DEC-030 EVENTS EMITTED
+- system.caep_sweep_failure_declared (HIGH/7yr) — T+0
+- system.caep_sweep_manual_reregister_completed (STANDARD/7yr) — after Step 2c [P0 only]
+- system.caep_sweep_restored (STANDARD/3yr) — after Step 5 confirmation
+
+5. ROOT CAUSE
+Category: [H1_job_deleted | H2_pg_net_degraded | H3_worker_down | H4_idp_rate_limit | H5_supabase_outage]
+Fix deployed at: [fix_deployed_at]
+
+6. SOC 2 CRITERIA
+CC6.3 — CAEP stream integrity restored via manual compensating control within 30-min P0 SLA.
+CC7.2 — pg-cron-health-monitor detected stale within 6-minute freshness window.
+CC7.3 — Security-engineer responded within PagerDuty P1 SLA.
+
+Filed at: compliance/evidence/caep-sweep/r32-<incident_id>/CAEP-INT-01-INC-YYYYMMDD.md
+Signed: [security-engineer]
+```
+
+---
+
+### R-32.7 DEC-030 Chain Specification
+
+**CAEP-SWEEP-CHAIN-01 ordering invariant:** For any `incident_id` associated with this runbook, `system.caep_sweep_failure_declared` must precede all `system.caep_sweep_manual_reregister_completed` and `system.caep_sweep_restored` events for the same `incident_id`. A chain where `caep_sweep_restored` or `caep_sweep_manual_reregister_completed` precedes `caep_sweep_failure_declared` for the same `incident_id` is a CAEP-SWEEP-CHAIN-01 violation — escalate to security-engineer and activate R-05.
+
+**Event 1 — `system.caep_sweep_failure_declared`**
+
+| Field | Value |
+|---|---|
+| Event type | `system.caep_sweep_failure_declared` |
+| Severity | HIGH |
+| Retention | 7 yr |
+| Emitter | IC (human) via `emit-audit-event` Worker at T+0 of incident declaration |
+| Chain position | CAEP-SWEEP-CHAIN-01 anchor — must precede events 2 and 3 for same `incident_id` |
+
+```typescript
+// Zod v2 schema
+const CaepSweepFailureDeclaredPayload = z.object({
+  incident_id:                         z.string().uuid(),
+  confirmed_stale_since:               z.string().datetime(),
+  stale_minutes:                       z.number().positive(),
+  missed_runs:                         z.number().int().nonneg(),
+  caep_reregistration_required_count:  z.number().int().nonneg(), // 0 = P1; ≥1 = P0
+  caep_status_error_count:             z.number().int().nonneg(), // from R-32-C1
+  trigger:                             z.enum(['pagerduty_alert', 'manual_discovery', 'al_caep_01_co_incident']),
+  initial_severity:                    z.enum(['P1', 'P0']),
+});
+```
+
+**Event 2 — `system.caep_sweep_manual_reregister_completed`**
+
+| Field | Value |
+|---|---|
+| Event type | `system.caep_sweep_manual_reregister_completed` |
+| Severity | STANDARD |
+| Retention | 7 yr |
+| Emitter | IC (human) via `emit-audit-event` Worker immediately after Step 2b API call completes (Step 2c) |
+| Chain position | Must be preceded by `system.caep_sweep_failure_declared` for same `incident_id`; P0 only |
+
+```typescript
+// Zod v2 schema
+const CaepSweepManualReregisterCompletedPayload = z.object({
+  incident_id:                  z.string().uuid(),
+  tenants_reregistered_count:   z.number().int().nonneg(),
+  tenants_failed_count:         z.number().int().nonneg(),
+  run_by_pam_session_id:        z.string().uuid(),
+  all_clear_after_reregister:   z.boolean(), // R-32-C1 re-run returned required_count = 0
+  reregister_api_http_status:   z.number().int(),
+});
+```
+
+**Event 3 — `system.caep_sweep_restored`**
+
+| Field | Value |
+|---|---|
+| Event type | `system.caep_sweep_restored` |
+| Severity | STANDARD |
+| Retention | 3 yr |
+| Emitter | devops-lead (human) via `emit-audit-event` Worker after job 37 restored and Step 5 confirmation succeeds |
+| Chain position | Must be preceded by `system.caep_sweep_failure_declared` for same `incident_id` |
+
+```typescript
+// Zod v2 schema
+const CaepSweepRestoredPayload = z.object({
+  incident_id:                    z.string().uuid(),
+  restored_at:                    z.string().datetime(),
+  root_cause_category:            z.enum([
+                                    'H1_job_deleted',
+                                    'H2_pg_net_degraded',
+                                    'H3_worker_down',
+                                    'H4_idp_rate_limit',
+                                    'H5_supabase_outage',
+                                  ]),
+  fix_deployed_at:                z.string().datetime(),
+  tenants_manually_reregistered:  z.number().int().nonneg(), // 0 at P1; count from Step 2 at P0
+  al_caep_01_co_active:           z.boolean(),
+});
+```
+
+**Privacy invariant (all three events):** No `user_id`, no `tenant_email`, no CAEP stream endpoint URLs, no SAML assertion contents, no RISC event payloads. `run_by_pam_session_id` is a PAM break-glass session identifier — not a FORM application user identity. `tenants_reregistered_count` and `tenants_manually_reregistered` are aggregate integers — no tenant names, no SAML entity IDs, no IdP metadata. `form_api` **must never route any §R-32 event to any user-facing or tenant-facing endpoint.**
+
+---
+
+### R-32.8 Evidence Preservation
+
+Store artefacts at `compliance/evidence/caep-sweep/r32-<incident_id>/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 criteria | Retention | When collected |
+|---|---|---|---|---|
+| **CAEP-SWEEP-E-001** | DEC-030 `system.caep_sweep_failure_declared` HMAC chain export (HIGH/7yr): confirms IC declared R-32 within the 6-min freshness window, proving the pg-cron-health-monitor dead-man's switch (AL from §12.7) operated within its SLA. CAEP-SWEEP-CHAIN-01 anchor: precedes all other chain events for this `incident_id`. | CC7.2, CC6.3 | 7 yr | On every R-32 activation (any severity) |
+| **CAEP-SWEEP-E-002** | `pg_cron.job_run_details` export for `jobname = 'caep_reregister_sweep'` (job 37) covering the stale window: confirms stale start time, missed 5-min run timestamps, and `return_message` values for each failed run (H1–H5 root cause signal from R-32-C3). Proves the monitoring gap was bounded and provides the auditor-inspectable stale duration. | CC7.2, A1.1 | 3 yr | On every R-32 activation (R-32-C2 output at T+10) |
+| **CAEP-SWEEP-E-003** | R-32-C1 query output: aggregate scope assessment (`caep_reregistration_required_count`, `caep_status_error_count`, `cert_rotation_pending_count`). At P1: zero-count attestation confirming no CAEP stream integrity breach during the stale window. At P0: breach scope confirming affected tenant count. **Privacy floor: aggregate counts only — no tenant names, no IdP metadata, no CAEP endpoint URLs.** | CC6.3, CC7.2 | 3 yr | On every R-32 activation including P1 zero-count attestation |
+| **CAEP-SWEEP-E-004** | DEC-030 chain exports: (a) `sso.caep_stream_registered` HIGH/7yr per tenant — emitted by `caep-stream-manager` Worker on each successful manual re-registration (Step 2b), confirming CAEP stream was restored; (b) `system.caep_sweep_manual_reregister_completed` STANDARD/7yr — emitted after Step 2c, confirming manual re-registration scope and completion under PAM elevation. Together proves CC6.3 CAEP stream integrity was restored via a supervised manual compensating control. | CC6.3, CC7.3 | 7 yr | P0 only — when R-32-C1 returns `caep_reregistration_required_count ≥ 1` and manual re-registration was executed |
+
+---
+
+### R-32.9 SOC 2 Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC6.3** — Logical access controls | CAEP-SWEEP-E-001, CAEP-SWEEP-E-003, CAEP-SWEEP-E-004 (P0) | FORM maintains CAEP stream integrity for enterprise SSO tenants via `caep_reregister_sweep` job 37 (`*/5 * * * *`); the 6-minute dead-man's switch detects sweep failure within 18 minutes (3-run tolerance); the R-32 protocol provides a supervised manual compensating control when the automated sweep fails |
+| **CC7.2** — Anomaly detection and monitoring | CAEP-SWEEP-E-001, CAEP-SWEEP-E-002 | pg-cron-health-monitor detected job 37 stale within the 6-minute freshness window; CAEP-SWEEP-E-002 proves the monitoring gap was bounded and the stale start time is auditor-inspectable |
+| **CC7.3** — Response to anomalies | CAEP-SWEEP-E-004 (P0), Template CAEP-INT-01 (P0) | Security-engineer responded within PagerDuty P1 SLA; manual re-registration executed within 30-minute P0 SLA from scope confirmation at T+15; CAEP stream integrity restored under PAM elevation with DEC-030 chain confirmation |
+| **A1.1** — Availability commitments | CAEP-SWEEP-E-002 | CAEP session-integrity monitoring was disrupted for a bounded window; the 6-minute detection threshold (3-run tolerance at `*/5 * * * *`) ensures a maximum monitoring gap of ≤ 18 minutes before the anomaly is surfaced |
+
+**CC6.3 auditor narrative:** CC6.3 requires FORM to implement logical access controls to prevent unauthorized access. The `caep_reregister_sweep` job maintains CAEP stream currency after SAML SP cert rotation (DEC-072 / OQ-SSO-23.1 resolution) — ensuring RISC `token-claims-change` and `session-revoked` events continue to be delivered to the correct IdP SSF subscription. A stale sweep after cert rotation creates a window where enterprise sessions cannot be remotely revoked via CAEP signaling. CAEP-SWEEP-E-003 provides the auditor-inspectable scope assessment: a zero `caep_reregistration_required_count` at any R-32 activation during the SOC 2 observation period confirms no CAEP stream integrity breach occurred (P1 — monitoring gap only). A non-zero count (P0) triggers the R-32 compensating control protocol, documented by CAEP-SWEEP-E-004 proving the stream was restored under PAM elevation within the 30-minute SLA.
+
+---
+
+### R-32.10 Post-Incident Controls
+
+| Control | Trigger condition | Owner | SLA |
+|---|---|---|---|
+| Schedule PIR within 5 business days: review root cause, DEC-030 chain completeness, stale window vs. active cert rotations, any confirmed session revocation failure during the gap | Any R-32 activation | IC (primary) | 5 business days post-restoration |
+| If H3 (`caep-stream-manager` Worker down): add Worker health pre-flight check to `cert-expiry-check` cron output — if Worker returns non-200 at `cert_rotation_state → 'complete'`, fire PagerDuty P1 `form-security` before setting `caep_reregistration_required = TRUE` | H3 root cause confirmed | platform-engineer + devops-lead | 14 days post-PIR |
+| If H4 (IdP rate-limiting): open support ticket with IdP for SSF API rate-limit increase; document per-IdP rate-limit thresholds in `docs/SSO_SCIM_IMPLEMENTATION.md §36.2`; evaluate whether 5-tenant batch size needs reducing | H4 root cause confirmed | security-engineer | 30 days post-incident |
+| Update `docs/OBSERVABILITY.md §12.6` job 37 stale-condition cross-ref column to include `INCIDENT_RESPONSE R-32 (job 37 stale recovery runbook — §R-32.5)` | This runbook authoring | compliance-officer | Next authoring sprint |
+| Add `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` implementation checklist item: note that R-32 is the operational recovery runbook for `caep_reregister_sweep` stale condition | This runbook authoring | compliance-officer | Next authoring sprint |
+
+---
+
+### R-32.11 Implementation Checklist
+
+#### P0 — Before first enterprise SAML cert rotation event (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register three DEC-030 events from §R-32.7 in `docs/AUDIT_LOG_SCHEMA.md §System`: `system.caep_sweep_failure_declared` (HIGH, 7yr), `system.caep_sweep_manual_reregister_completed` (STANDARD, 7yr), `system.caep_sweep_restored` (STANDARD, 3yr). Add CAEP-SWEEP-CHAIN-01 ordering invariant to the `emit-audit-event` Worker chain-invariant registry. | compliance-officer + platform-engineer | **P0** | M5 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.25, 2026-06-21: three CAEP-SWEEP events registered in §System after `system.audit_log_purge_restored`; CAEP-SWEEP-CHAIN-01 ordering invariant noted.** |
+| 2 | Confirm `pg-cron-health-monitor` (§12.7) routes `system.cron_job_stale` for `jobname = 'caep_reregister_sweep'` to PagerDuty `form-security` P1 with dedup key `caep-sweep-stale` per §12.6. Write integration test: simulate job 37 gap > 6 min in staging; confirm `system.cron_job_stale` emitted with `job_name = 'caep_reregister_sweep'`; confirm PagerDuty P1 fires on `form-security`. | devops-lead + security-engineer | **P0** | M5 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M7)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Store Template CAEP-INT-01 at `compliance/evidence/ir-templates/r32-caep-int-01.md`. Security-engineer reviews the P0 escalation criteria and manual re-registration procedure (§R-32.5 Step 2) against the live `caep-stream-manager` Worker spec (`POST /internal/v1/caep/reregister` from SSO_SCIM §36.2.3). | security-engineer | **P1** | M7 | [ ] |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 37 `caep_reregister_sweep` registry entry: add `INCIDENT_RESPONSE R-32 (job 37 stale recovery runbook — §R-32.5)` to the stale-consequence cross-ref column. | compliance-officer | **P1** | M5 | [x] **Done — OBSERVABILITY.md v4.8.5, 2026-06-21: §12.6 job 37 entry stale-consequence column updated with INCIDENT_RESPONSE R-32 cross-reference.** |
+| 5 | Add CAEP-SWEEP-E-001 through CAEP-SWEEP-E-004 artefact definitions to `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.3/CC7.2/CC7.3/A1.1). Add `caep-sweep/` R2 subfolder to §80.3. Add CAEP-SWEEP artefacts to §80.4 Vanta mirror list. | compliance-officer | **P1** | M7 | [x] **Done — SOC2_READINESS.md v3.24.8, 2026-06-21: four CAEP-SWEEP artefacts registered in §79.4; `caep-sweep/` subfolder added to §80.3; Vanta mirror list §80.4 updated.** |
+| 6 | Add `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` implementation checklist item: note R-32 as operational recovery runbook for `caep_reregister_sweep` stale condition; reference §R-32.5 recovery procedure. | compliance-officer | **P1** | M7 | [ ] |
+
+#### P2 — Before SOC 2 observation period (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Add Scenario V (CAEP sweep stale during cert rotation) to §9.4 tabletop catalog: devops-lead disables job 37 in staging; security-engineer sets `caep_reregistration_required = TRUE` for a synthetic test tenant; runs R-32-C1; executes Step 2b curl call to `POST /internal/v1/caep/reregister`; confirms `sso.caep_stream_registered` DEC-030 HIGH/7yr emitted; confirms `caep_reregistration_required = FALSE`; restores job 37; emits `system.caep_sweep_restored`. | security-engineer + devops-lead | **P2** | M12 | [ ] |
+
+---
+
+*v1.0 (2026-06-21): R-32 CAEP Stream Re-Registration Sweep Failure — thirty-second runbook. Closes the documentation gap identified by `docs/OBSERVABILITY.md §12.6` (job 37 `caep_reregister_sweep` registry entry: `caep-sweep-stale` PagerDuty dedup key with P1 `form-security` routing, but no INCIDENT_RESPONSE cross-reference — unlike peer stale runbooks R-28/R-29/R-30/R-31 which each carry an explicit §12.6 cross-reference). R-32 provides the full IC protocol for when `caep_reregister_sweep` (job 37, `*/5 * * * *`, 6-min freshness) exceeds its freshness window. Trigger: `system.cron_job_stale` with `job_name = 'caep_reregister_sweep'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-security` → security-engineer; dedup `caep-sweep-stale`. Critical distinction from R-28/R-29/R-30/R-31: R-32 is an **SSO session-integrity control gap** — job 37 maintains CAEP stream currency after SAML SP cert rotation (DEC-072 / OQ-SSO-23.1 resolution); a stale sweep leaves enterprise tenants with `caep_reregistration_required = TRUE` holding stale CAEP stream subscriptions, silently dropping RISC `token-claims-change` and `session-revoked` events; no GDPR Art. 5(1)(e) overcollection risk (unlike R-30/R-31); no contractual deadline risk (unlike R-28). Unlike R-31 (self-referential DEC-030 ordering constraint — DELETE blocked on HTTP 422), R-32 has **no DELETE-blocking chain invariant** — the recovery action (manual re-registration API call) is always executable once the root cause is resolved. Two-severity matrix: P1 (stale, zero tenants with `caep_reregistration_required = TRUE` AND zero `caep_status = 'error'` — monitoring gap only, no CAEP stream integrity breach), P0 (stale AND ≥ 1 tenant with `caep_reregistration_required = TRUE` OR `caep_status = 'error'` — active CC6.3 session-integrity gap; manual re-registration required within 30 min). T+0–T+30 immediate actions: DEC-030 `system.caep_sweep_failure_declared` HIGH/7yr at T+0; R-32-C1 scope query at T+5 (P0 upgrade gate — aggregate counts, no tenant names); R-32-C2 pg_cron.job_run_details at T+10 (stale window + missed 5-min runs); R-32-C3 root cause classification from return_message; manual re-registration at T+15 (P0 only, PAM-elevated); restoration at T+20–T+30. Three scope queries: R-32-C1 (aggregate counts — no tenant names, no CAEP endpoint URLs), R-32-C2 (pg_cron.job_run_details last 10 runs for stale window + missed run count), R-32-C3 (return_message CASE analysis for H1–H5). Five root cause hypotheses: H1 (job deleted/disabled), H2 (DB connection or pg_net degraded), H3 (`caep-stream-manager` Worker down — Cloudflare deployment failure), H4 (IdP SSF rate-limiting — 429 responses exhausting 3-retry limit per SSO_SCIM §36.2.3), H5 (Supabase platform outage — R-03 primary). Five-step recovery: Step 1 (diagnose H1–H5 with five-check table); Step 2 (manual re-registration — Step 2a: scope SQL for tenant_ids; Step 2b: `POST /internal/v1/caep/reregister` curl call under PAM elevation; Step 2c: emit `system.caep_sweep_manual_reregister_completed` STANDARD/7yr); Step 3 (verify `caep_reregistration_required = FALSE` + `caep_status = 'active'`); Step 4 (restore job 37 per root cause, H1–H5 table); Step 5 (confirm restoration + emit `system.caep_sweep_restored`). One communication template: CAEP-INT-01 (internal security incident memo — required at P0 when Step 2 executed; not required at P1; no customer-facing template). Three DEC-030 HMAC-chained events: `system.caep_sweep_failure_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `caep_reregistration_required_count` nonneg int, `caep_status_error_count` nonneg int, `trigger` enum, `initial_severity` enum['P1','P0']), `system.caep_sweep_manual_reregister_completed` STANDARD/7yr (Zod: `incident_id` UUID, `tenants_reregistered_count` nonneg int, `tenants_failed_count` nonneg int, `run_by_pam_session_id` UUID, `all_clear_after_reregister` bool, `reregister_api_http_status` int), `system.caep_sweep_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause_category` enum H1–H5, `fix_deployed_at` datetime, `tenants_manually_reregistered` nonneg int, `al_caep_01_co_active` bool); CAEP-SWEEP-CHAIN-01 ordering invariant: `caep_sweep_failure_declared` precedes all `caep_sweep_manual_reregister_completed` and `caep_sweep_restored` for same `incident_id` — inversion triggers R-05. Four evidence artefacts: CAEP-SWEEP-E-001 (`system.caep_sweep_failure_declared` chain export, CC7.2/CC6.3, 7yr — every R-32 activation), CAEP-SWEEP-E-002 (`pg_cron.job_run_details` for job 37 stale window, CC7.2/A1.1, 3yr — every R-32 activation), CAEP-SWEEP-E-003 (R-32-C1 aggregate scope — counts only, no CAEP endpoint URLs or tenant names, CC6.3/CC7.2, 3yr — every R-32 activation including zero-count P1 attestation), CAEP-SWEEP-E-004 (`sso.caep_stream_registered` + `system.caep_sweep_manual_reregister_completed` chain exports, CC6.3/CC7.3, 7yr — P0 only). Four SOC 2 criteria: CC6.3 (CAEP stream integrity — sweep restores SSO session revocation coverage post cert rotation; 30-min P0 SLA), CC7.2 (pg-cron-health-monitor 6-min freshness detection; ≤ 18-min monitoring gap), CC7.3 (30-min P0 manual re-registration SLA under PAM elevation), A1.1 (stale window bounded to ≤ 18 min before alert). Five post-incident controls: PIR (5 business days), H3 Worker health pre-flight gate (14 days), H4 IdP rate-limit support ticket + §36.2 documentation (30 days), §12.6 job 37 cross-reference update [x] Done v4.8.5, SSO_SCIM §36.6 checklist item (next sprint). Seven-item implementation checklist: 2× P0/M5 (AUDIT_LOG_SCHEMA registration [x] Done v2.25; §12.7 routing + integration test), 4× P1/M5–M7 (CAEP-INT-01 template; §12.6 cross-ref [x] Done v4.8.5; SOC2_READINESS §79.4/§80.3/§80.4 [x] Done v3.24.8; SSO_SCIM §36.6 checklist), 1× P2/M12 (Scenario V tabletop). Privacy floor: all three system events carry only FORM-internal operational metadata — stale duration, aggregate counts, root cause enum; `run_by_pam_session_id` is a PAM session UUID (not a FORM user_id); CAEP-SWEEP-E-003 carries only aggregate counts — never tenant names, CAEP endpoint URLs, SAML entity IDs, or CAEP stream tokens; `form_api` must never route any §R-32 event to any user-facing or tenant-facing endpoint. Cross-references: `docs/OBSERVABILITY.md §12.6` (job 37 `caep_reregister_sweep` registry entry — stale consequence updated with INCIDENT_RESPONSE R-32 per v4.8.5 [x] Done); `docs/OBSERVABILITY.md §12.7` (`pg-cron-health-monitor` — emits `system.cron_job_stale` that triggers this runbook); `docs/SSO_SCIM_IMPLEMENTATION.md §36` (DEC-072 / OQ-SSO-23.1 resolution — `caep_reregister_sweep` full spec: `*/5 * * * *`, LIMIT 50, 200ms inter-tenant yield, 3-retry limit with exponential back-off, `caep_reregistration_required` flag lifecycle, `sso.caep_stream_registered` HIGH/7yr / `sso.caep_stream_error` HIGH/7yr); `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` (implementation checklist — item to reference R-32 per R-32.11 item 6); `docs/AUDIT_LOG_SCHEMA.md §System` (three DEC-030 events registered per R-32.11 item 1 [x] Done v2.25); `docs/SOC2_READINESS.md §79.4` (CAEP-SWEEP artefacts registered per R-32.11 item 5 [x] Done v3.24.8); `sso.caep_stream_registered` (HIGH/7yr — success signal from `caep-stream-manager` Worker); `sso.caep_stream_error` (HIGH/7yr — `error_type: 'reregistration_failed_post_cert_rotation'` — failure signal, triggers AL-CAEP-01); `sso.caep_reregistration_queued` (STANDARD/7yr — emitted by cert-expiry-check hook at `cert_rotation_state → 'complete'`); AL-CAEP-01 (SSO_SCIM §23.9 — fires on 3-retry failure; may be co-active with R-32 at P0); R-04 (SSO/SAML compromise — escalate if confirmed session revocation failure); R-05 (HMAC chain break — activate on CAEP-SWEEP-CHAIN-01 ordering violation); migration 0082 DDL (`caep_reregistration_required`, `caep_last_reregistered_at`, `caep_reregistration_trigger` columns on `tenant_sso_configs`). Owner: security-engineer + devops-lead + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-21 · Owner: security-engineer + devops-lead + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 

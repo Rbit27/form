@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [7.37.1] — 2026-06-21
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-32: CAEP Stream Re-Registration Sweep Failure recovery runbook for pg_cron job 37 (`caep_reregister_sweep`, `*/5 * * * *`, 6-min freshness window). Two-severity matrix: P1 (stale, `caep_status_error_count = 0` — monitoring gap only; CAEP streams in-flight but re-registration sweep halted), P0 (stale + `caep_status_error_count > 0` — active CAEP stream integrity breach; manual `POST /internal/v1/caep/reregister` PAM-elevated call required). Five root cause hypotheses H1–H5 (job deleted, pg_net degraded, Worker down, IdP rate-limit, Supabase outage). Three DEC-030 events: `system.caep_sweep_failure_declared` (HIGH/7yr, CAEP-SWEEP-CHAIN-01 anchor), `system.caep_sweep_manual_reregister_completed` (STANDARD/7yr, P0 only, PAM-elevated API call), `system.caep_sweep_restored` (STANDARD/3yr, root cause H1–H5). Four evidence artefacts: CAEP-SWEEP-E-001/002/003/004. Template CAEP-INT-01 internal memo (no customer-facing comms). SOC 2 mapping: CC6.3, CC7.2, CC7.3, A1.1.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.25: three new DEC-030 System events registered after `system.audit_log_purge_restored`: `system.caep_sweep_failure_declared` (HIGH/7yr, CAEP-SWEEP-CHAIN-01 anchor — IC emits at T+0), `system.caep_sweep_manual_reregister_completed` (STANDARD/7yr, P0 only — PAM-elevated `POST /internal/v1/caep/reregister`), `system.caep_sweep_restored` (STANDARD/3yr — devops-lead restoration confirmation, H1–H5 root_cause_category). CAEP-SWEEP-CHAIN-01 ordering invariant noted; HTTP 422 on violation.
+- `docs/OBSERVABILITY.md` — v4.8.5: §12.6 job 37 `caep_reregister_sweep` registry entry updated — stale-consequence cross-ref column appended with `INCIDENT_RESPONSE R-32 (job 37 stale recovery runbook — §R-32.5)`. v0.7 patch note added.
+- `docs/SOC2_READINESS.md` — v3.24.8: §79.4 four CAEP-SWEEP artefacts registered (CAEP-SWEEP-E-001/002/003/004) after AUDIT-PURGE-COMP-E-001; §80.3 `caep-sweep/` subfolder added after `audit-log-purge/`; §80.4 Vanta mirror list updated with CAEP-SWEEP-E-001–004 (R-32.8 incident-triggered).
+- `docs/INCIDENT_RESPONSE.md` — v3.1: R-32 appended; header v3.0 → v3.1.
+- `STATUS.md` — VERSION → 7.37.1.
+
 ## [7.37.0] — 2026-06-21
 
 ### Added

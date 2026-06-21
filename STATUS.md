@@ -1,4 +1,4 @@
-# FORM · Project Status v7.37.0
+# FORM · Project Status v7.37.1
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v7.37.0** — 2026-06-21
+**v7.37.1** — 2026-06-21
 
 ---
 
@@ -159,4 +159,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v7.37.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v7.37.1**
