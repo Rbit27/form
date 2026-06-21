@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [7.8.1] — 2026-06-21
+
+### Changed
+- `docs/COST_MODEL.md` — v2.8 → v2.9: marked §35.10 item 1, §37.10 item 1, §38.10 item 1, and §39.10 item 1 as `[x] Done`, syncing checklist state with AUDIT_LOG_SCHEMA.md registrations already completed in v1.7/v2.3/v2.7/v2.9 (2026-06-12 through 2026-06-15). No model or schema changes.
+- `VERSION` — 7.8.0 → 7.8.1.
+
+---
+
 ## [7.8.0] — 2026-06-21
 
 ### Added
