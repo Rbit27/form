@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.26.0] — 2026-06-21
+
+### Added
+- `content/post-2043-sets-quality-vs-quantity.md` — Block 2041–2050 · Post 3/10. «Кількість vs. якість підходів: де реальне тренувальне навантаження» — концепція ефективного повторення (Morton et al. 2019: близькість до відмови, а не абсолютна вага); ефективний підхід (Baz-Valle et al. 2022: 0–4 RIR); деградація якості всередині сесії (Fink et al. 2018: 1 хв vs. 3 хв відпочинку); деградація між сесіями при недовідновленні; алгоритм «коли додавати підходи, коли підвищувати якість»; калібрування RIR для self-coached атлета; техніка як компонент якості підходу; Victor RPE/RIR логіка. Schoenfeld et al. 2017, Helms et al. 2016, Krieger 2010. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — post-2043 картка додана (Sports Science · 13 хв · draft).
+- `STATUS.md` — Editorial 2041–2050 IN PROGRESS 3/10 · v7.26.0. Version footer оновлений до v7.26.0.
+- `README.md` — post-2042 → draft · v7.24.0; post-2043 → draft · v7.26.0.
+- `VERSION` — 7.25.0 → 7.26.0.
+
+---
+
 ## [7.25.0] — 2026-06-21
 
 ### Added
