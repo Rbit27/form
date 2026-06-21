@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [7.22.2] — 2026-06-21
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v2.8 → v2.9: §19 / R-28 Enterprise Contract Renewal Notice Monitoring Failure — twenty-eighth runbook. Covers `renewal_notice_check` pg_cron job 39 (OBSERVABILITY §51) going stale beyond the 26h freshness window, taking the RENEW-NOTICE-01 detection control offline. Closes documentation gap in OBSERVABILITY §12.6 (job 39 stale alert defined but no recovery runbook existed). Three-severity matrix: P1 (stale, no tenant in 85–95-day detection window), P0 (stale + tenant in detection window, notice not yet sent — 2h SLA to dispatch manually), P0 escalated (detection window fully closed with no notice — customer notification + outside counsel within 1h). R-28-C1/C2/C3 scope queries, five root cause hypotheses (H1: job deleted, H2: SQL exception, H3: pg_net degraded, H4: service_role permission revoked, H5: platform outage), four-step recovery (restore job 39, manual RENEW-NOTICE-01 backfill per missed window, manual notice dispatch via Admin Console, confirm restoration). Two communication templates: REN-01 (internal compensating control memo) and REN-02 (customer notification for P0 escalated — outside counsel review required if days_remaining < 60). Three DEC-030 HMAC-chained events: `system.renew_cron_failure_declared` HIGH/7yr, `system.renew_cron_manual_check_completed` STANDARD/7yr, `system.renew_cron_restored` STANDARD/3yr; RENEW-CRON-CHAIN-01 ordering invariant. Six evidence artefacts RENEW-CRON-E-001–E-005 + RENEW-CRON-COMP-E-001 mapped to CC4.1/CC2.2/CC7.2/A1.1. Seven-item implementation checklist: 2× P0/M11, 3× P1/M11, 2× P2/M8–M12 (incl. Scenario Q tabletop and job 40 weekly dry-run). Cross-references: OBSERVABILITY §51/§12.6/§12.7, COST_MODEL §42.3.2/§42.7, DATA_MODEL §43, R-05, R-03, R-27. compliance-officer + devops-lead + platform-engineer.
+- `VERSION` — 7.22.1 → 7.22.2.
+
+---
+
 ## [7.22.1] — 2026-06-21
 
 ### Added

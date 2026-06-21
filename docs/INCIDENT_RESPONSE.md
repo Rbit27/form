@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v2.8
+# FORM · Incident Response Runbook v2.9
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -10492,7 +10492,355 @@ This document must be authored per §18.7 item 1 and included in the auditor onb
 
 ---
 
-**v2.8 · 2026-06-19 · Owner: security-engineer + compliance-officer**
+## 19. R-28: Enterprise Contract Renewal Notice Monitoring Failure (job 39 stale)
+
+### R-28: Enterprise Contract Renewal Notice Monitoring Failure — `renewal_notice_check` pg_cron Stale
+
+> **Scope:** Covers incidents where the `renewal_notice_check` pg_cron job (job 39, daily 09:00 UTC, `docs/OBSERVABILITY.md §51`) goes stale beyond its 26-hour freshness window, taking the RENEW-NOTICE-01 detection control offline. When job 39 is stale, FORM cannot automatically detect whether any active enterprise tenant has a `renewal_date` falling within the 85–95-day notice-obligation window defined in `docs/COST_MODEL.md §42.3.2`. If the 10-day detection window closes without the compliance-officer sending the required 90-day notice under MSA §6.1, the customer may have contractual grounds to contest the notice and could exit without penalty — a direct ARR and legal-exposure risk.
+>
+> **Not R-05 (HMAC Chain Break):** AL-EVD-02 (`audit.chain_integrity_violation`) is a separate incident from a stale cron. If `system.cron_job_stale` for job 39 and AL-EVD-02 fire simultaneously, activate R-05 as the primary track; R-28 governs the RENEW-NOTICE-01 catch-up procedure in parallel.
+>
+> **Not R-03 (Infrastructure Outage):** If the root cause is a Supabase platform outage causing pg_cron to fail fleet-wide, activate R-03 first; R-28 governs the post-restoration RENEW-NOTICE-01 manual catch-up.
+>
+> **Not AL-RENEW-01:** That alert fires when job 39 runs successfully and detects an overdue notice for a specific tenant. R-28 activates when job 39 has not run at all — the monitoring control itself is silent.
+
+---
+
+#### R-28.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 39)** | `pg-cron-health-monitor` Edge Function (§12.7, runs hourly) | No successful `renewal_notice_check` run in `pg_cron.job_run_details` within the prior 26 h | **P1** (escalates to P0 if R-28-C1 finds a tenant in the 85–95-day detection window) | PagerDuty `form-compliance` (HIGH urgency) — dedup key `renewal-notice-check-stale` per §12.6 registry |
+| **AL-RENEW-01 absent** | Compliance-officer manual observation: no `system.renewal_notice_check_passed` AND no `enterprise.renewal_notice_overdue` DEC-030 event in `audit_log_events` for > 26 h | Observation during quarterly REN-OBS-E-001 review or daily monitoring check | **P1** | `form-compliance` |
+| **`pg_cron.job_run_details` gap** | Devops-lead queries `pg_cron.job_run_details WHERE jobname = 'renewal_notice_check'` and finds a gap > 26 h | Manual investigation following any Supabase maintenance window or pg_net degradation report | **P1 → assess R-28-C1 for P0 upgrade** | `form-compliance` |
+
+> **P0 escalation criterion:** Upon any R-28 activation, compliance-officer runs R-28-C1 immediately. If any active tenant has `renewal_date BETWEEN CURRENT_DATE + 85 AND CURRENT_DATE + 95` AND no `enterprise.renewal_notice_sent` DEC-030 event is on file for that `tenant_id` within 100 days, the severity escalates to **P0** — the MSA §6.1 compliance window may close during the stale period without detection.
+
+---
+
+#### R-28.2 Severity Classification
+
+| Condition | Severity | Escalation |
+|---|---|---|
+| Job 39 stale AND R-28-C1 returns zero rows (no tenant in 85–95-day window) | **P1** | IC + compliance-officer + devops-lead; restore job 39 within 4-hour SLA; no customer notification required |
+| Job 39 stale AND R-28-C1 returns ≥ 1 row (at least one tenant in 85–95-day window, notice not yet sent) | **P0** | IC + compliance-officer + founder + CSM; immediately run RENEW-NOTICE-01 SQL manually for each flagged tenant; send notice per §R-28.5 Step 3 within 2 hours of P0 declaration; file RENEW-CRON-COMP-E-001 |
+| Job 39 stale AND a tenant's 85–95-day window fully closed during the stale period with no notice sent | **P0 escalated** | IC + compliance-officer + founder + outside counsel; immediate customer notification (Template REN-02, §R-28.6); treat as MSA §6.1 compliance exception; document in `enterprise_contracts.notes`; notify CSM within 1 hour |
+| Job 39 stale AND root cause is a Supabase platform outage (R-03 active) | **P1 (R-03 primary)** | Defer RENEW-NOTICE-01 catch-up until Supabase restored; R-03 is primary; R-28 activates once platform is stable |
+
+---
+
+#### R-28.3 Immediate Actions (T+0 to T+30 min)
+
+```
+T+0   system.cron_job_stale fires for job 39. PagerDuty form-compliance P1 pages compliance-officer.
+      IC opens #ir-renew-notice-stale-YYYYMMDD in Slack.
+      Emit system.renew_cron_failure_declared DEC-030 HIGH (§R-28.7) as first chain entry.
+      Record: confirmed_stale_since (from pg_cron.job_run_details, last successful run timestamp).
+
+T+5   Run R-28-C1 (§R-28.4): identify any tenant in 85–95-day detection window with no notice on file.
+      If R-28-C1 returns ≥ 1 row: escalate to P0.
+        - Page founder and CSM via PagerDuty escalation.
+        - Proceed directly to §R-28.5 Step 3 (manual notice assessment) BEFORE restoring the job.
+      If R-28-C1 returns 0 rows: remain at P1. Proceed to Step 1 (restore job 39).
+
+T+10  Run R-28-C2 (§R-28.4): check pg_cron.job_run_details for the exact stale window.
+      Determine how many missed runs have elapsed (each run = 1 day = 24h gap).
+      Run R-28-C3: attempt SELECT cron.job_run_details WHERE jobname = 'renewal_notice_check'
+      AND start_time > NOW() - INTERVAL '48h' to confirm pg_cron is responsive.
+      If pg_cron is unresponsive: activate R-03 (Infrastructure Outage) in parallel. Pause §R-28.5.
+
+T+15  Determine root cause category (§R-28.4 H1–H5).
+      If H3 (pg_net degraded): job SQL ran but PagerDuty call failed and DEC-030 not emitted;
+      critical: job 39 may have already detected an overdue tenant but silently failed to alert.
+      Query audit_log_events for enterprise.renewal_notice_overdue within the stale window — if present,
+      the job detected and failed silently; manually re-fire AL-RENEW-01 via PagerDuty API.
+
+T+20  If P0: compliance-officer manually executes RENEW-NOTICE-01 SQL (§51.2.3) for each
+      flagged tenant from R-28-C1. For each tenant with no notice on file: send renewal notice
+      per §R-28.5 Step 3 and emit enterprise.renewal_notice_sent DEC-030 STANDARD/7yr.
+      Emit system.renew_cron_manual_check_completed (§R-28.7) per tenant assessed.
+
+T+30  All immediate actions complete. Begin restoration procedure (§R-28.5 Step 1).
+      Update incident channel with R-28-C1 result, root cause hypothesis, and P0/P1 status.
+```
+
+---
+
+#### R-28.4 Root Cause Hypotheses and Scope Queries
+
+**R-28-C1 — Tenants in the 85–95-day detection window with no notice on file:**
+
+```sql
+-- Requires form_admin BYPASSRLS via pam-db-proxy (read_only PAM elevation)
+-- Reason: "R-28 renewal notice stale — detection window assessment — INC-YYYYMMDD"
+-- Privacy: tenant_id (FORM-internal UUID) and financial contract dates only; no user PII
+SELECT
+  ec.id                                          AS contract_id,
+  ec.tenant_id,
+  ec.renewal_date,
+  (ec.renewal_date - CURRENT_DATE)::int          AS days_until_renewal,
+  ec.current_seats,
+  ec.acv_usd,
+  EXISTS (
+    SELECT 1 FROM audit_log_events ale
+    WHERE ale.action = 'enterprise.renewal_notice_sent'
+      AND ale.payload->>'tenant_id' = ec.tenant_id::text
+      AND ale.created_at > ec.renewal_date - INTERVAL '100 days'
+  )                                              AS notice_on_file
+FROM enterprise_contracts ec
+WHERE ec.status = 'active'
+  AND ec.renewal_date BETWEEN CURRENT_DATE + 85 AND CURRENT_DATE + 95
+ORDER BY ec.renewal_date ASC;
+```
+
+> **Interpretation:** Any row where `notice_on_file = false` is a P0 condition — this tenant's MSA §6.1 notice obligation is within the detection window and job 39 has been unable to detect it during the stale period. Send notice immediately (§R-28.5 Step 3).
+
+**R-28-C2 — Exact stale window from pg_cron run history:**
+
+```sql
+-- Determine when job 39 last ran successfully and how many runs were missed
+SELECT
+  jobname,
+  start_time,
+  end_time,
+  status,
+  return_message
+FROM cron.job_run_details
+WHERE jobname = 'renewal_notice_check'
+ORDER BY start_time DESC
+LIMIT 10;
+```
+
+> **Interpretation:** The gap between `start_time` of the most recent row and `NOW()` is the stale duration. The number of expected 09:00 UTC runs missed = `CEIL(stale_hours / 24)`. Each missed run is one potential undetected notice obligation period.
+
+**R-28-C3 — Identify tenants whose detection window was fully covered by the stale period:**
+
+```sql
+-- Detects the worst case: a tenant passed through the ENTIRE 85–95-day window while job 39 was stale.
+-- Any row here means the window closed without FORM detecting the obligation: P0 escalated.
+-- Run with the confirmed stale_since timestamp from R-28-C2.
+SELECT
+  ec.tenant_id,
+  ec.renewal_date,
+  (ec.renewal_date - CURRENT_DATE)::int          AS days_remaining,
+  ec.acv_usd
+FROM enterprise_contracts ec
+WHERE ec.status = 'active'
+  -- Renewal was in the detection window at the START of the stale period
+  AND ec.renewal_date BETWEEN :stale_since_date + 85 AND :stale_since_date + 95
+  -- But the window has now closed (< 85 days remain or passed)
+  AND (ec.renewal_date - CURRENT_DATE) < 85
+  AND NOT EXISTS (
+    SELECT 1 FROM audit_log_events ale
+    WHERE ale.action = 'enterprise.renewal_notice_sent'
+      AND ale.payload->>'tenant_id' = ec.tenant_id::text
+      AND ale.created_at > ec.renewal_date - INTERVAL '100 days'
+  )
+ORDER BY ec.renewal_date ASC;
+```
+
+> **Any result = P0 escalated.** The detection window closed without a notice being sent. Activate Template REN-02 (§R-28.6) and outside counsel consultation within 1 hour.
+
+**Root cause hypotheses:**
+
+| # | Hypothesis | Diagnostic signal | Immediate mitigation |
+|---|---|---|---|
+| **H1** | pg_cron scheduler disabled or job 39 deleted | `SELECT * FROM cron.job WHERE jobname = 'renewal_notice_check'` returns 0 rows | Re-create job 39 per `docs/OBSERVABILITY.md §51.2.3`; trigger manual run |
+| **H2** | SQL exception in RENEW-NOTICE-01 query (schema change, FK violation, pg_net misconfiguration) | `cron.job_run_details.status = 'failed'` + `return_message` contains error | Fix the exception; test query in Supabase SQL editor; redeploy; trigger manual run |
+| **H3** | pg_net degraded: job SQL ran but DEC-030 emission or PagerDuty call silently failed | `cron.job_run_details.status = 'succeeded'` but no DEC-030 events in `audit_log_events`; pg_net logs show 5xx or timeout | Check pg_net → PagerDuty connectivity; re-emit DEC-030 events for each missed run via `emit-audit-event` admin endpoint; manually re-fire AL-RENEW-01 for any detected tenants |
+| **H4** | service_role permission revoked from `enterprise_contracts` or `audit_log_events` | `SELECT has_table_privilege('service_role', 'enterprise_contracts', 'SELECT')` returns `false` | Restore permissions per `docs/DATA_MODEL.md §43.5` RLS specification; re-run job 39 |
+| **H5** | Supabase platform outage — pg_cron scheduler offline | No pg_cron jobs across the fleet ran during the period; `pg_cron.job_run_details` shows gaps for multiple jobs simultaneously | Activate R-03 (Infrastructure Outage) as primary; R-28 deferred until platform restored |
+
+---
+
+#### R-28.5 Recovery Procedure
+
+**Step 1 — Restore job 39 to active status.**
+
+Resolve the root cause per §R-28.4 H1–H5, then:
+
+1. For H1 (job deleted): recreate job 39 with exact spec from `docs/OBSERVABILITY.md §51.2.3`:
+   ```sql
+   SELECT cron.schedule(
+     'renewal_notice_check',
+     '0 9 * * *',
+     $$ /* RENEW-NOTICE-01 SQL from §51.2.3 */ $$
+   );
+   ```
+2. For H2 (SQL exception): fix the exception, test the corrected query in Supabase SQL editor against a synthetic row in staging, then update the pg_cron job body.
+3. For H3 (pg_net degraded): confirm pg_net is healthy before triggering manual runs — if pg_net is still degraded, manual DEC-030 emission and PagerDuty alerts must be fired through the `emit-audit-event` admin endpoint directly.
+4. For H4 (permission revoked): apply `GRANT SELECT ON enterprise_contracts TO service_role` and `GRANT INSERT ON audit_log_events TO service_role` with `security-engineer` approval; document permission change as a DEC-030 `access.permission_change` event.
+5. For H5 (platform outage): wait for R-03 resolution before proceeding; job 39 will resume automatically once pg_cron is restored.
+
+**Step 2 — Manual RENEW-NOTICE-01 backfill for missed runs.**
+
+For each 24-hour window that was missed during the stale period:
+1. Execute the RENEW-NOTICE-01 SQL (§51.2.3) directly in Supabase SQL editor under `service_role`.
+2. For each tenant returned (overdue notice): emit `enterprise.renewal_notice_overdue` DEC-030 HIGH/7yr via the `emit-audit-event` admin endpoint. Record the `check_run_at` timestamp as the time the manual run was executed (not NOW() — use the midpoint of the missed 24h window to accurately represent when the detection should have occurred).
+3. Emit `system.renew_cron_manual_check_completed` DEC-030 STANDARD/7yr (§R-28.7) after completing each missed-window backfill. One event per missed 24-hour window.
+4. For all-clear windows (zero tenants flagged): emit `system.renewal_notice_check_passed` LOW/1yr per §51.4.2 with `contracts_checked` populated from the manual run result count and `check_run_at` set to the midpoint of the missed window.
+
+**Step 3 — Manual notice dispatch for tenants in the detection window.**
+
+For each tenant returned by R-28-C1 (in the 85–95-day window with no notice on file):
+1. Open FORM Admin Console → Enterprise → Accounts → `[tenant_name]` → Renewal → "Send Renewal Notice".
+2. This emits `enterprise.renewal_notice_sent` DEC-030 STANDARD/7yr. The Admin Console auto-calculates `days_until_renewal` from `enterprise_contracts.renewal_date`.
+3. If price escalation applies under MSA §8.6, emit `enterprise.renewal_escalation_calculated` first per `docs/COST_MODEL.md §42.5.3`.
+4. Note the notice delivery in the incident channel: `"Renewal notice sent to [tenant_id] — [days_remaining] days until renewal. Notice timestamp: [ISO 8601]. DEC-030 event ID: [event_id]."`
+5. CSM follows up with the customer's tenant_admin contact within 24 hours to confirm receipt.
+
+**For tenants returned by R-28-C3 (detection window fully closed, P0 escalated):**
+
+1. Notify the customer immediately by email (Template REN-02, §R-28.6) within 1 hour of R-28-C3 result.
+2. Document the date of the missed window, the stale duration, and root cause in `enterprise_contracts.notes` for the affected `tenant_id`.
+3. Consult outside counsel within 24 hours on MSA §6.1 notice exception options. Record the consultation outcome in the PIR.
+4. Compliance-officer signs the RENEW-CRON-COMP-E-001 memo (Template REN-01, §R-28.6) covering all affected tenants; file at `compliance/evidence/renewals/RENEW-CRON-COMP-E-001-INC-YYYYMMDD.md`.
+
+**Step 4 — Confirm restoration.**
+
+1. Trigger a test manual run of job 39: `SELECT cron.run_job('renewal_notice_check')`.
+2. Confirm `system.renewal_notice_check_passed` (or `enterprise.renewal_notice_overdue` for a flagged tenant) appears in `audit_log_events` within 60 seconds of the test run.
+3. Confirm `pg_cron.job_run_details WHERE jobname = 'renewal_notice_check' AND start_time > NOW() - INTERVAL '2h'` shows `status = 'succeeded'`.
+4. Emit `system.renew_cron_restored` DEC-030 STANDARD/3yr (§R-28.7). Update incident status: RESOLVED. Schedule PIR within 7 days.
+
+---
+
+#### R-28.6 Communication Templates
+
+**Template REN-01 — Compensating control memo (internal; required for every R-28 activation where a tenant was in the 85–95-day window or the window fully closed):**
+
+> **FORM Compliance Memo — Renewal Notice Monitoring Failure Compensating Control**
+>
+> Incident: INC-YYYYMMDD
+> Stale period: {confirmed_stale_since} UTC through {restoration_time} UTC ({stale_hours} h)
+> Root cause: {H1–H5 category and description}
+> Tenants in detection window during stale period: {list of tenant_ids with renewal_date}
+>
+> **Compensating control:** Compliance-officer manually executed RENEW-NOTICE-01 SQL (§51.2.3) for each missed 24-hour window and for each tenant in the detection window per R-28-C1. Renewal notices were sent for all tenants where `notice_on_file = false` via Admin Console (DEC-030 event IDs: {list}). `system.renew_cron_manual_check_completed` DEC-030 STANDARD/7yr events are HMAC-chained for each manually-executed window period.
+>
+> **MSA §6.1 compliance status:** {COMPLIANT — all notices sent within the detection window} | {EXCEPTION — detection window closed for tenant_id(s): {list}; customer notification sent per Template REN-02; outside counsel consulted {date}}
+>
+> **Root cause remediation:** {describe fix; date deployed or expected completion}
+>
+> Signed: {compliance-officer} · {date}
+
+> **When to send REN-01:** Required whenever Step 3 (manual notice dispatch) was executed or whenever R-28-C3 returned any result. One memo per incident covers all affected tenants. File as `compliance/evidence/renewals/RENEW-CRON-COMP-E-001-INC-YYYYMMDD.md`.
+
+---
+
+**Template REN-02 — Customer notification (P0 escalated only; detection window fully closed with no notice sent):**
+
+> **Subject: Important — Renewal Notice for Your FORM Enterprise Agreement**
+>
+> Dear {customer_name},
+>
+> We are writing regarding the upcoming renewal of your FORM Enterprise Agreement (Agreement ID: {contract_id}), which is scheduled for renewal on {renewal_date}.
+>
+> Under the terms of our Master Services Agreement (§6.1), we are required to provide you with 90 days' advance notice of renewal. Your renewal notice is being provided today, {current_date}, which is {days_remaining} days before your renewal date.
+>
+> {If days_remaining < 90}: We acknowledge that this notice is being provided later than our contractual commitment of 90 days in advance. We sincerely apologise for this delay, which was caused by a temporary technical issue in our notification monitoring system that has since been resolved. We understand this may affect your planning and are committed to addressing any concerns you may have.
+>
+> Your renewal terms are as follows: {renewal_terms — seats, rate, term length}. {If escalation applies}: As per §{escalation_clause} of your MSA, a price adjustment of {escalation_pct}% applies for this renewal, calculated using CPI-U for the reference month of {cpi_reference_month}.
+>
+> Please contact your Customer Success Manager, {csm_name}, at {csm_email} to discuss your renewal options or to raise any questions about this notice.
+>
+> Sincerely,
+> {compliance-officer name}
+> Compliance Officer, FORM
+
+> **When to send REN-02:** Only when R-28-C3 returns rows — i.e., the detection window fully closed without a notice. Send within 1 hour of R-28-C3 result. Outside counsel must review before sending if `days_remaining < 60`. Retain a copy in the incident evidence folder.
+
+---
+
+#### R-28.7 DEC-030 HMAC-Chained Audit Events
+
+Chain ordering constraint: `system.renew_cron_failure_declared` must be the first event emitted for a given `incident_id`. Each `system.renew_cron_manual_check_completed` event must follow the declaration. `system.renew_cron_restored` must be last and emitted only after the first confirmed successful automated job 39 run post-fix.
+
+**Privacy invariant (all three events):** No individual employee `user_id`, name, email, health data, body composition, workout load, coaching session content, or GDPR Art. 9 special-category data. `tenant_id` appears only in `system.renew_cron_manual_check_completed.tenants_in_detection_window[]` where the IC has confirmed a specific tenant's renewal is at risk — this is a FORM-internal financial contract record (same data class as `enterprise.renewal_notice_overdue`, which also carries `tenant_id`). `form_api` must never route these events to any tenant-facing endpoint.
+
+| Event type | Severity | Retention | Trigger | Zod v2 payload schema |
+|---|---|---|---|---|
+| `system.renew_cron_failure_declared` | HIGH | 7 yr | IC declares incident after `system.cron_job_stale` fires for job 39 and this runbook is activated | `z.object({ incident_id: z.string(), confirmed_stale_since: z.string().datetime(), stale_hours: z.number().positive(), trigger: z.enum(["cron_job_stale","manual_observation","job_run_details_gap"]), initial_severity: z.enum(["P0","P1"]) })` |
+| `system.renew_cron_manual_check_completed` | STANDARD | 7 yr | Step 2 manual RENEW-NOTICE-01 execution complete for one missed 24-hour window; one event per window | `z.object({ incident_id: z.string(), check_window_midpoint: z.string().datetime(), tenants_checked: z.number().int().nonnegative(), tenants_in_detection_window: z.array(z.string().uuid()), notices_sent: z.number().int().nonneg(), all_clear: z.boolean() })` |
+| `system.renew_cron_restored` | STANDARD | 3 yr | First confirmed successful automated job 39 run post-fix (not manual) | `z.object({ incident_id: z.string(), restored_at: z.string().datetime(), root_cause_category: z.enum(["job_deleted","sql_exception","pg_net_degraded","permission_revoked","platform_outage"]), fix_deployed_at: z.string().datetime(), total_windows_missed: z.number().int().nonneg(), p0_tenants_affected: z.number().int().nonneg() })` |
+
+**RENEW-CRON-CHAIN-01 ordering invariant:** For any `incident_id` associated with this runbook, `system.renew_cron_failure_declared` must precede all `system.renew_cron_manual_check_completed` events and `system.renew_cron_restored`. A chain where `renew_cron_restored` precedes `renew_cron_failure_declared` for the same `incident_id` is a RENEW-CRON-CHAIN-01 violation — escalate to security-engineer and activate R-05.
+
+---
+
+#### R-28.8 Evidence Preservation
+
+Store artefacts at `compliance/evidence/renewals/r28-<incident_id>/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 criteria | Retention |
+|---|---|---|---|
+| **RENEW-CRON-E-001** | DEC-030 `system.renew_cron_failure_declared` HMAC chain export (confirms incident declared within 26h of last successful run; proves detective control operated within the §12.6 freshness SLA) | CC4.1, CC7.2 | 7 yr |
+| **RENEW-CRON-E-002** | R-28-C1 query output: table of tenants in 85–95-day window with `notice_on_file` column (proves which tenants were at risk during the stale period); R-28-C3 query output if applicable (proves P0 escalated scope) | CC4.1, CC2.2 | 7 yr |
+| **RENEW-CRON-E-003** | `pg_cron.job_run_details` export for job 39 covering the stale window (proves the stale start time and all missed-run timestamps; auditor-inspectable confirmation of the stale duration) | CC4.1, A1.1 | 3 yr |
+| **RENEW-CRON-E-004** | DEC-030 `system.renew_cron_manual_check_completed` chain exports — one per missed window; confirms each manual RENEW-NOTICE-01 execution and its result | CC4.1, CC2.2 | 7 yr |
+| **RENEW-CRON-E-005** | For each notice sent during Step 3: `enterprise.renewal_notice_sent` DEC-030 STANDARD/7yr event chain export; confirms MSA §6.1 obligation was fulfilled manually for all affected tenants | CC2.2, CC4.1 | 7 yr |
+| **RENEW-CRON-COMP-E-001** | Signed compensating control memo (Template REN-01); filed to `compliance/evidence/renewals/RENEW-CRON-COMP-E-001-INC-YYYYMMDD.md`; uploaded to Vanta as a CC4.1 compensating control | CC4.1, CC2.2 | 7 yr |
+
+---
+
+#### R-28.9 SOC 2 Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC4.1** — Selects, develops, and performs ongoing evaluations | RENEW-CRON-E-001 + RENEW-CRON-COMP-E-001 | The `pg-cron-health-monitor` dead-man's switch (§12.7) detected job 39 stale within the 26h freshness window defined in §12.6; the compliance-officer activated R-28 within the P1 SLA; `system.renew_cron_failure_declared` is the HMAC-chained record of the evaluation threshold breach; RENEW-CRON-COMP-E-001 is the management response and compensating control |
+| **CC2.2** — Communicates information externally about commitments | RENEW-CRON-E-002 + RENEW-CRON-E-004 + RENEW-CRON-E-005 | For every tenant in the 85–95-day detection window during the stale period, compliance-officer manually ran RENEW-NOTICE-01 and sent any outstanding renewal notice; `enterprise.renewal_notice_sent` DEC-030 chain events prove the MSA §6.1 90-day commitment was fulfilled for each affected tenant |
+| **CC7.2** — Anomaly detection and monitoring | RENEW-CRON-E-001 + RENEW-CRON-E-003 | `system.cron_job_stale` for job 39 is generated by `pg-cron-health-monitor` (§12.7) within 1 hour of the freshness window being exceeded; RENEW-CRON-E-003 (`pg_cron.job_run_details` export) confirms the exact stale duration and missed-run timestamps for auditor inspection |
+| **A1.1** — Addresses threats to meeting availability commitments | RENEW-CRON-E-003 | Job 39 stale = RENEW-NOTICE-01 detection offline = enterprise ARR renewal monitoring gap; RENEW-CRON-E-003 proves the gap was detected within 26h and remediated within the P1/P0 SLA; REN-OBS-E-001 quarterly evidence (OBSERVABILITY §51.5) will reflect the gap and compensating control in its quarterly `pg_cron.job_run_details` export |
+
+**CC4.1 auditor narrative:** CC4.1 requires FORM to evaluate and communicate control performance against defined thresholds. Job 39 (`renewal_notice_check`) is the RENEW-NOTICE-01 control execution engine — its 26-hour freshness window (§12.6) is the defined threshold. The `pg-cron-health-monitor` (§12.7) detects any breach within one hourly cycle and emits `system.cron_job_stale`, routing to PagerDuty P1 `form-compliance`. R-28 documents the IC response, compensating control (manual RENEW-NOTICE-01 execution), and restoration. RENEW-CRON-COMP-E-001 is the signed management acknowledgement that the control gap was detected, assessed, and remediated — the same evidence pattern used for `evidence-collection-cron` failures per R-27 (CC4.2 precedent).
+
+**CC2.2 auditor narrative:** CC2.2 requires FORM to communicate information to external parties about its contractual commitments. The 90-day renewal notice is a commitment per MSA §6.1. RENEW-CRON-E-005 (`enterprise.renewal_notice_sent` DEC-030 exports) proves that for every tenant whose detection window overlapped with the stale period, a notice was sent either by job 39 (before the stale event) or manually by the compliance-officer (Step 3 of §R-28.5). Where the detection window fully closed without a notice (P0 escalated), Template REN-02 and outside counsel consultation constitute the compensating communication — documented in RENEW-CRON-COMP-E-001.
+
+---
+
+#### R-28.10 Post-Incident Controls
+
+| Control | Trigger condition | Owner | SLA |
+|---|---|---|---|
+| Add Scenario Q (renewal notice monitoring failure — pg_cron job 39 stale; manual RENEW-NOTICE-01 catch-up for tenants in detection window) to §9.4 tabletop catalog | Any activation of R-28 (regardless of severity) | security-engineer + compliance-officer | 30 days post-PIR |
+| Review pg_cron job 39 SQL for exception handling: add `BEGIN ... EXCEPTION WHEN OTHERS THEN` block that emits `system.renew_cron_failure_declared` directly from pg_cron on exception (belt-and-suspenders: DEC-030 event even if the main `net.http_post` fails) | H2 (SQL exception) or H3 (pg_net degraded) confirmed as root cause | platform-engineer + devops-lead | 14 days post-PIR |
+| Add synthetic weekly dry-run test: every Monday at 09:15 UTC, pg_cron health supervisor confirms `system.renewal_notice_check_passed` or `enterprise.renewal_notice_overdue` appeared since 08:30 UTC (covers the 09:00 UTC scheduled run with 30-min window); if absent, fire AL-RENEW-CRON-DRY-01 P2 Slack `#observability` | Scheduled quarterly regardless of incidents | devops-lead | 30 days post-PIR |
+| Update `docs/OBSERVABILITY.md §51.7` cross-reference: note that R-28 is the runbook for job 39 stale condition (link `docs/INCIDENT_RESPONSE.md R-28`) | This runbook authoring | compliance-officer | Next sprint |
+| If P0 escalated (R-28-C3 returned rows): add OQ-REN-04 to `docs/COST_MODEL.md §42.11` open questions: "What is FORM's contractual exposure if the MSA §6.1 90-day notice is delivered late due to a system failure? Does the force majeure clause apply to monitoring system failures?" and schedule outside counsel resolution before next enterprise renewal. | P0 escalated with detection window fully closed | compliance-officer + founder | Within 30 days of P0 activation |
+
+---
+
+#### R-28.11 Implementation Checklist
+
+#### P0 — Before job 39 is deployed to production (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register three DEC-030 events from §R-28.7 in `docs/AUDIT_LOG_SCHEMA.md §System`: `system.renew_cron_failure_declared` (HIGH, 7yr), `system.renew_cron_manual_check_completed` (STANDARD, 7yr), `system.renew_cron_restored` (STANDARD, 3yr). Add Zod v2 schemas per §R-28.7 payload definitions. Add RENEW-CRON-CHAIN-01 ordering invariant to the `emit-audit-event` Worker chain-invariant registry. | compliance-officer + platform-engineer | **P0** | M11 | [ ] |
+| 2 | Confirm `pg-cron-health-monitor` (§12.7) routes `system.cron_job_stale` for `jobname = 'renewal_notice_check'` to PagerDuty `form-compliance` P1 HIGH urgency with dedup key `renewal-notice-check-stale` per §12.6 registry entry. Write integration test: simulate job 39 gap > 26h in staging; confirm `system.cron_job_stale` is emitted with `job_name = 'renewal_notice_check'` and PagerDuty test payload is generated. | devops-lead + platform-engineer | **P0** | M11 | [ ] |
+
+#### P1 — Before first enterprise renewal enters the 85–95-day window (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Store Template REN-01 at `compliance/evidence/ir-templates/r28-ren-01.md`; Template REN-02 at `compliance/evidence/ir-templates/r28-ren-02.md`. Compliance-officer reviews both templates; outside counsel reviews Template REN-02 specifically (customer-facing language; legal exposure for late notice). | compliance-officer | **P1** | M11 | [ ] |
+| 4 | Add `docs/OBSERVABILITY.md §51.7` cross-reference: in the §51.7 implementation checklist, add a note after item 2 (`renewal_notice_check` physical deploy) that the operational failure runbook for job 39 staleness is `docs/INCIDENT_RESPONSE.md R-28`. | compliance-officer | **P1** | M11 | [ ] |
+| 5 | Add RENEW-CRON-E-001 through RENEW-CRON-COMP-E-001 artefact definitions to `docs/SOC2_READINESS.md §79.4` master evidence table: five artefacts with TSC criteria (CC4.1/CC2.2/CC7.2/A1.1), cadence (incident-triggered), retention (7yr or 3yr), and storage path (`compliance/evidence/renewals/r28-<incident_id>/`). | compliance-officer | **P1** | M11 | [ ] |
+
+#### P2 — Before SOC 2 observation period (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Add Scenario Q (renewal notice monitoring cron failure) to §9.4 tabletop catalog: compliance-officer simulates job 39 gap by manually deleting and re-creating the pg_cron job in staging; IC runs R-28-C1/C2/C3; compliance-officer manually executes RENEW-NOTICE-01 SQL for a synthetic tenant with `renewal_date = CURRENT_DATE + 90`; confirms `system.renew_cron_manual_check_completed` emitted; restores job; confirms `system.renew_cron_restored` emitted. | security-engineer + compliance-officer | **P2** | M8 | [ ] |
+| 7 | Add weekly dry-run check (§R-28.10 Post-Incident Control item 3): pg_cron job (job 40 — next available after job 39) at `15 9 * * 1` (Mondays 09:15 UTC); asserts `system.renewal_notice_check_passed` or `enterprise.renewal_notice_overdue` appeared since 08:30 UTC; fires AL-RENEW-CRON-DRY-01 P2 Slack `#observability` if absent; register in §12.6 as job 40. | devops-lead | **P2** | M12 | [ ] |
+
+---
+
+*v2.9 (2026-06-21): R-28 Enterprise Contract Renewal Notice Monitoring Failure — twenty-eighth runbook. Closes the documentation gap identified by `docs/OBSERVABILITY.md §12.6` (job 39 registry entry: "stale = RENEW-NOTICE-01 detection blind spot") and §51 (renewal notice monitoring observability): §12.6 defines the alert routing for job 39 staleness but no recovery runbook was specified. R-28 provides the full IC protocol for when `renewal_notice_check` pg_cron job 39 exceeds the 26h freshness window. Trigger: `system.cron_job_stale` with `job_name = 'renewal_notice_check'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-compliance`, dedup `renewal-notice-check-stale`. Critical distinction from R-27 (evidence-collection-cron): job 39 runs daily (not monthly); the MSA §6.1 compliance risk is a narrow 10-day window (85–95 days before renewal_date); a stale job of even 11 days could fully miss a tenant's detection window, creating a legal exposure for late notice. Three-severity matrix: P1 (stale, no tenant in detection window — monitoring offline but no immediate compliance risk), P0 (stale AND tenant(s) in 85–95-day window with no notice on file — send notice manually within 2 hours), P0 escalated (detection window fully closed without notice — customer notification Template REN-02 + outside counsel within 1 hour). T+0–T+30 immediate actions: DEC-030 `system.renew_cron_failure_declared` HIGH/7yr at T+0; R-28-C1 detection window scope query at T+5 (P0 upgrade gate); R-28-C2 pg_cron.job_run_details stale window query at T+10; root cause determination (H1–H5) at T+10–T+15; P0 manual notice dispatch at T+20 if applicable; restoration procedure at T+30. Three scope queries: R-28-C1 (active enterprise_contracts in 85–95-day window with notice_on_file bool), R-28-C2 (pg_cron.job_run_details last 10 runs for staleness confirmation), R-28-C3 (tenants whose detection window fully closed during stale period — P0 escalated gate). Five root cause hypotheses: H1 (pg_cron job deleted), H2 (SQL exception in RENEW-NOTICE-01 query), H3 (pg_net degraded — job ran but alert+DEC-030 silently failed), H4 (service_role permission revoked), H5 (Supabase platform outage — R-03 primary). Four-step recovery: Step 1 (restore job 39 per H1–H5 root cause); Step 2 (manual RENEW-NOTICE-01 SQL backfill per missed 24h window, emitting `system.renew_cron_manual_check_completed` STANDARD/7yr and `system.renewal_notice_check_passed` LOW/1yr per window); Step 3 (manual notice dispatch via Admin Console for each tenant in detection window; `enterprise.renewal_notice_sent` STANDARD/7yr per §42.7; Template REN-02 for P0 escalated); Step 4 (confirm restoration via `system.renew_cron_restored` STANDARD/3yr). Two communication templates: REN-01 (internal compensating control memo — required whenever Step 3 executed) and REN-02 (customer notification for P0 escalated — outside counsel review mandatory if days_remaining < 60). Three DEC-030 HMAC-chained events: `system.renew_cron_failure_declared` HIGH/7yr (Zod: `incident_id`, `confirmed_stale_since` datetime, `stale_hours` positive, `trigger` enum, `initial_severity` enum), `system.renew_cron_manual_check_completed` STANDARD/7yr (Zod: `incident_id`, `check_window_midpoint` datetime, `tenants_checked` nonneg int, `tenants_in_detection_window` UUID[], `notices_sent` nonneg int, `all_clear` bool), `system.renew_cron_restored` STANDARD/3yr (Zod: `incident_id`, `restored_at` datetime, `root_cause_category` enum, `fix_deployed_at` datetime, `total_windows_missed` nonneg int, `p0_tenants_affected` nonneg int); RENEW-CRON-CHAIN-01 ordering invariant: failure_declared precedes all manual_check_completed and renew_cron_restored for same incident_id — inversion triggers R-05. Six evidence artefacts: RENEW-CRON-E-001 (failure declared chain export, CC4.1/CC7.2, 7yr), RENEW-CRON-E-002 (R-28-C1/C3 query outputs, CC4.1/CC2.2, 7yr), RENEW-CRON-E-003 (pg_cron.job_run_details export, CC4.1/A1.1, 3yr), RENEW-CRON-E-004 (manual check chain exports per window, CC4.1/CC2.2, 7yr), RENEW-CRON-E-005 (enterprise.renewal_notice_sent chain exports, CC2.2/CC4.1, 7yr), RENEW-CRON-COMP-E-001 (signed compensating control memo, CC4.1/CC2.2, 7yr). Four SOC 2 criteria: CC4.1 (26h freshness threshold detection + compensating control evidence), CC2.2 (MSA §6.1 notice commitment + manual fulfillment proof), CC7.2 (pg-cron-health-monitor anomaly detection), A1.1 (enterprise ARR monitoring operational gap). Five post-incident controls: Scenario Q tabletop (30d post-PIR), pg_cron exception-handling improvement (H2/H3), weekly dry-run check proposal (job 40, Mondays 09:15 UTC), §51.7 cross-reference update, OQ-REN-04 (P0 escalated only — MSA force majeure vs. system failure). Seven-item implementation checklist: 2× P0/M11 (three DEC-030 events registered + RENEW-CRON-CHAIN-01 in emit-audit-event; §12.7 routing integration test), 3× P1/M11 (REN-01/REN-02 templates + outside counsel review; §51.7 cross-reference; SOC2_READINESS §79.4 evidence table), 2× P2/M8–M12 (Scenario Q tabletop, job 40 weekly dry-run). Privacy floor: `system.renew_cron_failure_declared` carries no user PII — only stale duration and trigger type; `system.renew_cron_manual_check_completed.tenants_in_detection_window[]` carries tenant UUIDs (FORM-internal, no personal data) — same data class as `enterprise.renewal_notice_overdue` which already carries `tenant_id`; `system.renew_cron_restored` carries only timing and root cause enum; REN-02 (customer notification) contains contract-level dates and terms — no individual employee user_id, name, email, health values, coaching content, or GDPR Art. 9 special-category data in any §R-28 event, evidence artefact, or communication template; `form_api` must never route any §R-28 event to a tenant-facing endpoint. Cross-references: `docs/OBSERVABILITY.md §51` (RENEW-NOTICE-01 spec — job 39 schedule, SQL, DEC-030 events, AL-RENEW-01); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — job 39 entry with 26h freshness window and `form-compliance` PagerDuty routing); `docs/OBSERVABILITY.md §12.7` (`pg-cron-health-monitor` — dead-man's switch that emits `system.cron_job_stale` and fires this runbook); `docs/COST_MODEL.md §42.3.2` (RENEW-NOTICE-01 invariant SQL); `docs/COST_MODEL.md §42.7` (`enterprise.renewal_notice_sent` DEC-030 STANDARD/7yr — Step 3 output event); `docs/DATA_MODEL.md §43` (`enterprise_contracts` and `enterprise_renewals` schema — R-28-C1/C2/C3 query targets); `docs/AUDIT_LOG_SCHEMA.md §System` (three DEC-030 events to register — P0/M11 per R-28.11 item 1); `docs/SOC2_READINESS.md §79.4` (master evidence table — five RENEW-CRON-E-0XX artefacts to register per R-28.11 item 5); R-05 (HMAC chain break — parallel activation if AL-EVD-02 fires simultaneously; RENEW-CRON-CHAIN-01 inversion also triggers); R-03 (Infrastructure Outage — parallel activation if Supabase platform outage is root cause, H5); R-27 (Evidence Collection Automation Failure — CC4.1/CC4.2 pattern precedent; RENEW-CRON-COMP-E-001 follows EVD-COMP-E-001 structure); AL-RENEW-01 (OBSERVABILITY §51.3 — fires when job 39 detects an overdue notice; R-28 fires when job 39 cannot run at all). Owner: compliance-officer + devops-lead + platform-engineer.*
+
+---
+
+**v2.9 · 2026-06-21 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
