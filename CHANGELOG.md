@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [7.15.2] — 2026-06-21
+
+### Changed
+- `docs/SOC2_READINESS.md` — §98.5 item 3 cross-reference patch: `compliance/fieldwork/scim-bulk-deprovision-guard.md` fieldwork guide (authored 2026-06-20, indexed in `compliance/evidence/auditor-onboarding/README.md` v1.1) was reflected in `docs/SSO_SCIM_IMPLEMENTATION.md §35.9` item 5 ([x] Done — 2026-06-20, v2.8.1) but not in SOC2_READINESS §98.5. This patch closes the one-document gap: §98.5 item 3 `[ ]` → `[x] Done — 2026-06-20`. Document header v3.24.2 → v3.24.3 + v3.24.3 version footer added. No new DDL, DEC-030 events, or evidence artefact IDs.
+- `VERSION` — 7.15.1 → 7.15.2.
+
+---
+
 ## [7.15.1] — 2026-06-21
 
 ### Added
