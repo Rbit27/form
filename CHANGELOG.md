@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.38.0] — 2026-06-21
+
+### Added
+- `content/post-2052-progression-without-weight-increase-overload.md` — Editorial 2051–2060 post 2/10. Прогресія без числового збільшення: що ще рахується як overload. Three adaptation mechanisms (Schoenfeld 2010): mechanical tension (primary, mTOR pathway), metabolic stress, muscle damage. Seven forms of non-weight progression: double progression (reps→weight), density (shorter rest), ROM expansion (Schoenfeld & Grgic 2020 lengthened partials), tempo manipulation (TUT, eccentric), exercise variation, reduced external stabilisation, bilateral→unilateral transition. Self-coached error: logging only weight/reps misses volume, density, ROM progress. Overload 3×3 matrix: dimensions (volume/intensity/density) × actions (increase/decrease/shift) — change one dimension per mesocycle. Decision algorithm: when weight IS the right variable vs. when another dimension is more appropriate (RPE, technique stability, cycle phase, recovery state). clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+- `content/post-2053-technical-plateau-technique-replaces-weight.md` — Editorial 2051–2060 post 3/10. Технічне плато — коли поліпшення техніки заміщує підняття ваги. Distinction: strength plateau (exhausted adaptive potential, solution = program change) vs technique plateau (motor pattern change, temporary number drop, solution = time + quality reps). Three concrete mechanics examples: quarter-squat→full ROM, restricted ROM bench→full, lumbar-flexion deadlift→hip hinge — all reassessments of baseline at correct mechanics. Motor learning curve (Schmidt & Lee, 2011): cognitive → associative → autonomous stage; 300–500 quality reps at 60–75% 1RM minimum. Practical calculation: 2 sessions/week × 3×6 reps = 36 reps/week → minimum 8–16 weeks to recover previous numbers at new mechanics. Common failure loop: numbers drop → change program → cancel technique work → old number returns via old pattern → false confirmation. When technique improvement genuinely costs strength (rare): anatomical variation (anteversion, limb proportion ratio) — rule: deviation identical at 40% and 90% = anatomy; deviation appears under load = compensation. Decision tree: three branches with diagnostic criteria and specific solutions. Four journal additions when changing technique: date, motor-sensation quality score (1–5), video every 2–3 weeks, RPE deviation tracking. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `blog.html` — post-2052 and post-2053 cards added (above post-2051).
+- `STATUS.md` — Editorial 2051–2060 → 3/10 · v7.38.0.
+
 ## [7.37.1] — 2026-06-21
 
 ### Added
