@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [7.15.0] — 2026-06-21
+
+### Added
+- `content/post-1832-habit-vs-decision-training-behavior.md` — Block 1831–1880 · Cluster 1 · Post 2/10. Звичка проти рішення: поведінкова механіка регулярного тренування. Habit loop і базальні ганглії (Graybiel 2008), decision fatigue (Baumeister 1998), SRHI automaticity index (Verplanken & Orbell 2003), контекстна специфічність звички (Wood et al. 2002, 2005). Victor як зовнішня cue-структура. clinical-safety: NOT_REQUIRED.
+- `content/post-1833-environment-behavioral-design-training.md` — Block 1831–1880 · Cluster 1 · Post 3/10. Середовище і поведінковий дизайн. Nudge theory (Thaler & Sunstein 2008), context-dependent habits (Wood, Neal & Drolet 2013), friction reduction vs willpower (Fogg 2019). Victor як структурований prompt замість відкритого питання. clinical-safety: NOT_REQUIRED.
+- `content/post-1834-self-talk-internal-narrative-athlete.md` — Block 1831–1880 · Cluster 1 · Post 4/10. Внутрішній монолог атлета. Instructional vs motivational self-talk meta-analysis (Hatzigeorgiadis et al. 2011, ESr=0.48). «Possible selves» і поведінка (Markus & Nurius 1986). Три мовні пастки. Журнал як поведінковий архів ідентичності. clinical-safety: NOT_REQUIRED.
+- `content/post-1835-social-accountability-vs-autonomous-motivation.md` — Block 1831–1880 · Cluster 1 · Post 5/10. Зовнішня підзвітність vs внутрішня мотивація. SDT (Ryan & Deci 2000), Deci et al. 1999 (128 studies), Kohler effect (Feltz et al. 2011). Victor як інфраструктура, не джерело мотивації. clinical-safety: NOT_REQUIRED.
+- `content/post-1836-perfectionism-training-trap.md` — Block 1831–1880 · Cluster 1 · Post 6/10. Перфекціонізм і тренування. Hewitt & Flett 1991 (три виміри), adaptive vs maladaptive perfectionism in sport (Gotwals et al. 2012). All-or-nothing thinking. Умовна ідентичність = крихка конструкція. clinical-safety: NOT_REQUIRED.
+- `content/post-1837-return-after-break-identity-recovery.md` — Block 1831–1880 · Cluster 1 · Post 7/10. Повернення після перерви. Abstinence violation effect (Marlatt & Gordon 1985). Детренованість: сила тримається 3–4 тижні (Mujika & Padilla 2000), м'язова пам'ять (Bruusgaard et al. 2010). DEC-013 (streak grace). Протокол повернення. clinical-safety: NOT_REQUIRED.
+- `content/post-1838-goal-vs-process-orientation-training.md` — Block 1831–1880 · Cluster 1 · Post 8/10. Ціль проти процесу. Task vs ego orientation (Nicholls 1984, 1989), три рівні цілей (Hardy, Jones & Gould 1996). Victor відстежує процесні метрики, не тільки 1RM. clinical-safety: NOT_REQUIRED.
+- `content/post-1839-athletic-identity-age-35-55.md` — Block 1831–1880 · Cluster 1 · Post 9/10. Ідентичність і вік 35–55. Stambulova Career Transition Model, Houle et al. 2010, Dionigi 2006 (masters athletes). Криза vs трансформація ідентичності. Відновлення як компетентність — не управління спадом. clinical-safety: NOT_REQUIRED.
+- `content/post-1840-cluster1-synthesis-athletic-identity-architecture.md` — Block 1831–1880 · Cluster 1 · Post 10/10 · CLUSTER SYNTHESIS. Поведінковий стек 5 рівнів. Аудит кожного рівня (5 діагностичних питань). Чотири захисні рейки. Роль Victor. Анонс Cluster 2. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — 9 нових карток постів 1832–1840 додано (category: Training Behavior). blog.html актуальний до post-1840.
+- `STATUS.md` — Block 1831–1880: IN PROGRESS 1/50 → IN PROGRESS 10/50; Cluster 1 COMPLETE 10/10 · v7.15.0. Наступний: Cluster 2 posts 1841–1850.
+- `VERSION` — 7.14.1 → 7.15.0.
+
+---
+
 ## [7.14.1] — 2026-06-21
 
 ### Changed
