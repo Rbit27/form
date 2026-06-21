@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [7.6.2] — 2026-06-21
+
+### Changed
+- `docs/MSA_TEMPLATE.md` — v0.5 → v0.6. New §4.6 Multi-Year Price Escalation clause (seven sub-clauses) added to Article 4 (Order Forms, Fees, and Payment). Closes `docs/COST_MODEL.md §42.10` checklist item 8 (P1/M5). §4.6.1 Applicability: Year 2 and Year 3 of 2- or 3-year Multi-Year Commitments only. §4.6.2 Escalation Formula: `min(Prior Rate × (1 + CPI + 0.01), Prior Rate × 1.05)` — CPI-U (All Urban Consumers), fixed +1% service-improvement component, 5% annual cap non-waivable by agreement. §4.6.3 Price Floor: COGS-anchored minimum per `docs/COST_MODEL.md §31.5`; floor applies if escalated rate would fall below it. §4.6.4 Notice Requirement: 90-day written notice to billing contact; content includes Escalated Rate, BLS CPI-U reference month (date only, no URL), escalation percentage, cap-confirmation, and right to request full methodology within 15 business days. §4.6.5 Escalation Transparency: FORM provides complete calculation on 15-day written request; no BLS URL in any notice or audit payload. §4.6.6 Audit Record: each Annual Escalation recorded as `enterprise.renewal_escalation_calculated` (HIGH, 7-year) per DEC-030 HMAC chain; payload: BLS reference month (date-only), CPI percentage, cap trigger flag, Prior Rate, Escalated Rate. §4.6.7 Outside Counsel Checkpoint: required before first §4.6 execution (OQ-REN-02) — three confirmation points (CPI-U jurisdiction appropriateness, 5% cap enforceability, 90-day notice statutory compliance); EU customers may require HICP index substitution; filing path `compliance/contracts/{CUSTOMER_SLUG}/msa-s46-counsel-signoff-v{N}.pdf`. §4.5 updated to defer multi-year escalation governance to §4.6. Internal Notes: §4.6 row added. Privacy floor: BLS reference month date-only in all notices and DEC-030 payloads; no individual employee user_id, health data, or Art. 9 category in any §4.6 artefact. Cross-references: `docs/COST_MODEL.md §42.5` (formula source, `bls_report_date` date-only constraint), `docs/COST_MODEL.md §42.10 item 8` (closed 🟢), `docs/COST_MODEL.md §42.11 OQ-REN-02` (counsel path), `docs/COST_MODEL.md §31.5` (price floor), `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`enterprise.renewal_escalation_calculated` DEC-030 event). Owner: compliance-officer + enterprise-architect + founder.
+- `docs/COST_MODEL.md` — §42.10 item 8 marked `[x] Done (2026-06-21, MSA_TEMPLATE.md v0.6 §4.6)`.
+- `VERSION` — 7.6.1 → 7.6.2.
+
+---
+
 ## [7.6.1] — 2026-06-21
 
 ### Added

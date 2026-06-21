@@ -1,4 +1,4 @@
-# FORM · Master Service Agreement · Template v0.5
+# FORM · Master Service Agreement · Template v0.6
 
 > **Internal use only — PRE-LEGAL-REVIEW DRAFT.**
 > This template must be reviewed and approved by outside counsel before execution with any customer.
@@ -117,7 +117,39 @@ Fees are exclusive of all taxes, levies, and duties. Customer is responsible for
 
 ### 4.5 Fee Changes
 
-FORM may adjust fees for renewal terms with minimum 90 days written notice prior to the renewal date. Increases exceeding 10% per year require compliance-officer review before issuance of the notice.
+FORM may adjust fees for renewal terms with minimum 90 days written notice prior to the renewal date. Increases exceeding 10% per year require compliance-officer review before issuance of the notice. For multi-year commitments, §4.6 governs the escalation formula in lieu of this discretionary authority.
+
+### 4.6 Multi-Year Price Escalation
+
+**4.6.1 Applicability.** This section applies exclusively to Order Forms with a contracted term of two (2) or three (3) years ("Multi-Year Commitments"). It governs the per-seat rate adjustment applied at the start of the second and each subsequent annual period within the Multi-Year Commitment ("Annual Escalation"). It does not apply to one-year contracts, whose renewal pricing is governed by §4.5.
+
+**4.6.2 Escalation Formula.** The per-seat rate for each renewal period (Year 2 and Year 3 of a three-year commitment) is calculated as:
+
+```
+Escalated Rate = min(Prior Rate × (1 + CPI + 0.01),  Prior Rate × 1.05)
+```
+
+where:
+
+- **Prior Rate** is the per-seat monthly rate in effect for the immediately preceding annual period, inclusive of any multi-year discount applied at contract execution.
+- **CPI** is the percentage change in the U.S. Bureau of Labor Statistics Consumer Price Index for All Urban Consumers (CPI-U, All Items, 12-month percentage change) for the most recent full calendar month available on the date the escalation notice is issued.
+- **0.01** is the fixed 1% service-improvement component applied in addition to CPI.
+- **1.05** is the hard annual cap: the Escalated Rate shall not exceed 105% of the Prior Rate regardless of CPI. This cap cannot be waived by agreement of the parties.
+
+**4.6.3 Price Floor.** The Escalated Rate shall not fall below FORM's COGS-anchored minimum rate as published in FORM's internal pricing governance policy (`docs/COST_MODEL.md §31.5`). If the cap calculation in §4.6.2 would produce a rate above the floor, the cap applies. If, for any reason, the cap calculation would produce a rate below the floor (a circumstance not expected under normal CPI conditions), the floor applies and Customer will be notified in the escalation notice.
+
+**4.6.4 Notice Requirement.** FORM will deliver written notice of the Annual Escalation to Customer's primary billing contact at least ninety (90) days before the start of the renewal period to which the escalated rate applies. The notice will include:
+
+(a) the Escalated Rate per seat per month;  
+(b) the BLS CPI-U report reference month used in the calculation (date only; no URL required);  
+(c) the calculated escalation percentage and confirmation that it does not exceed the 5% annual cap;  
+(d) a statement that Customer may request the full calculation methodology from its designated Customer Success Manager within 15 business days of receipt.
+
+**4.6.5 Escalation Transparency.** Upon written request within 15 business days of receiving the escalation notice, FORM will provide Customer with the complete escalation calculation: Prior Rate, CPI-U reference month and percentage, the calculated Escalated Rate, and confirmation of cap application if triggered. FORM will not provide a URL to the BLS data source in any notice or audit log payload; Customer may independently verify the CPI-U figure at bls.gov using the disclosed reference month.
+
+**4.6.6 Audit Record.** Each Annual Escalation is recorded as a tamper-evident HMAC-chained audit event (`enterprise.renewal_escalation_calculated`, HIGH severity, 7-year retention) per FORM's DEC-030 audit chain policy (`docs/AUDIT_LOG_SCHEMA.md`). The audit event captures: the BLS report reference month (date only), the CPI percentage applied, the cap trigger flag, the Prior Rate, and the Escalated Rate. No raw BLS URL appears in any audit payload.
+
+**4.6.7 Outside Counsel Review.** *[⚠ OUTSIDE COUNSEL REVIEW REQUIRED before this clause is included in any executed Order Form — OQ-REN-02 (`docs/COST_MODEL.md §42.11`). Confirm: (a) CPI-U (All Urban Consumers) as the reference index is appropriate for the Customer's jurisdiction; EU contracts may require substitution of the Eurostat Harmonised Index of Consumer Prices (HICP) or another agreed index; (b) enforceability of the 5% hard cap as a liquidated limitation on escalation in the Customer's governing law jurisdiction; (c) whether the 90-day notice period satisfies local statutory notice requirements for price changes in B2B SaaS agreements. Until outside counsel confirms (a)–(c), FORM must not execute an Order Form containing this clause.]*
 
 ---
 
@@ -1038,6 +1070,10 @@ Filing path: `compliance/contracts/{CUSTOMER_SLUG}/msa-addendum-6-v1.0-counsel-s
 | CAEP SLA Addendum 6 | **Addendum 6 applies only to Customers with Okta, Microsoft Entra ID, or Google Workspace OIDC.** Confirm CAEP PUSH capability before including in the MSA package (see `docs/ENTERPRISE_ONBOARDING.md §2.3`). Non-PUSH IdPs (other SAML 2.0) receive JWT TTL baseline (≤ 15 min) — do NOT include Addendum 6. Outside counsel review required before first execution (see §6.6). Stream must be in `active` status before Customer can rely on the < 60 s SLA. Full spec: `docs/SSO_SCIM_IMPLEMENTATION.md §23` + `§36` (DEC-072). |
 
 ---
+
+*v0.6 · 2026-06-21 · owners: compliance-officer, enterprise-architect, founder · next review: before first EU enterprise DPA execution (outside counsel required per Addendum 3.6), before first SIEM export goes live (outside counsel required per §4.8), before first CAEP SLA Addendum 6 execution (outside counsel required per §6.6), before first enterprise multi-year contract (M10 per §11.4), and **before any Order Form containing §4.6 is executed** (outside counsel required per §4.6.7 / OQ-REN-02) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35` + `§42`, `docs/DATA_MODEL.md §36` (DEC-061), `docs/OBSERVABILITY.md §47` (DEC-065), `docs/SSO_SCIM_IMPLEMENTATION.md §23` + `§36` (DEC-072)*
+
+*v0.6 (2026-06-21): §4.6 Multi-Year Price Escalation clause — closes `docs/COST_MODEL.md §42.10` checklist item 8 (P1/M5 — "Add price escalation clause to docs/MSA_TEMPLATE.md"). §4.5 updated to defer multi-year escalation governance to §4.6. Seven sub-clauses: §4.6.1 Applicability (Year 2 and Year 3 of 2- or 3-year Multi-Year Commitments only; one-year contracts remain governed by §4.5 discretionary authority). §4.6.2 Escalation Formula: `Escalated Rate = min(Prior Rate × (1 + CPI + 0.01), Prior Rate × 1.05)` — CPI is BLS CPI-U All Urban Consumers 12-month percentage change at most recent full calendar month before notice issuance; +1% fixed service-improvement component; hard 5% annual cap not waivable by agreement of the parties. §4.6.3 Price Floor: Escalated Rate shall not fall below COGS-anchored minimum per `docs/COST_MODEL.md §31.5`; if escalated rate would fall below floor (not expected under normal CPI), floor applies and customer is notified. §4.6.4 Notice Requirement: 90-day written notice to billing contact before escalation effective date; notice content — Escalated Rate, BLS CPI-U reference month (date only; no URL), escalation percentage with cap-confirmation, right to request full calculation methodology within 15 business days. §4.6.5 Escalation Transparency: on Customer's written request within 15 business days, FORM provides complete calculation (Prior Rate, CPI reference month and percentage, Escalated Rate, cap flag); no BLS URL in any notice or audit payload (Customer may independently verify at bls.gov with disclosed reference month). §4.6.6 Audit Record: every Annual Escalation recorded as `enterprise.renewal_escalation_calculated` (HIGH severity, 7-year retention) per DEC-030 HMAC chain (`docs/AUDIT_LOG_SCHEMA.md`); payload: BLS report month (date-only), CPI percentage, cap trigger flag, Prior Rate, Escalated Rate; no raw BLS URL in any audit payload. §4.6.7 Outside Counsel Review Checkpoint: required before first §4.6 execution (OQ-REN-02) — confirm (a) CPI-U appropriateness for Customer jurisdiction (EU may require HICP or agreed index); (b) 5% hard cap enforceability under applicable governing law; (c) 90-day notice sufficiency under local statutory B2B SaaS price change requirements; filing path `compliance/contracts/{CUSTOMER_SLUG}/msa-s46-counsel-signoff-v{N}.pdf`. Internal Notes: §4.6 guidance row added (OQ-REN-02 counsel required; EU customers may require HICP substitution; 5% cap non-waivable). Privacy floor: BLS reference month is date-only in all notices and DEC-030 payloads; no raw URL, no individual employee user_id, no health data, no Art. 9 category in any §4.6 artefact; `tenant_id` FORM-internal UUID; `enterprise.renewal_escalation_calculated` payload consistent with `docs/AUDIT_LOG_SCHEMA.md §Enterprise` DEC-030 schema. Cross-references: `docs/COST_MODEL.md §42.5` (CPI+1% formula source and `bls_report_date` date-only privacy constraint); `docs/COST_MODEL.md §42.10 item 8` (checklist obligation — now [x] Done); `docs/COST_MODEL.md §42.11 OQ-REN-02` (CPI index open question — outside counsel path); `docs/COST_MODEL.md §31.5` (COGS-anchored price floor); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`enterprise.renewal_escalation_calculated` DEC-030 event canonical schema); `docs/ENTERPRISE_SLA.md §RENEWAL` (90-day notice consistency); `docs/COST_MODEL.md §42.4` (multi-year discount — discount base for Prior Rate derivation). Owner: compliance-officer + enterprise-architect + founder.*
 
 *v0.5 · 2026-06-20 · owners: compliance-officer, enterprise-architect, founder · next review: before first EU enterprise DPA execution (outside counsel required per Addendum 3.6), before first SIEM export goes live (outside counsel required per §4.8), before first CAEP SLA Addendum 6 execution (outside counsel required per §6.6), and before first enterprise multi-year contract (M10 per §11.4) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35`, `docs/DATA_MODEL.md §36` (DEC-061), `docs/OBSERVABILITY.md §47` (DEC-065), `docs/SSO_SCIM_IMPLEMENTATION.md §23` + `§36` (DEC-072)*
 
