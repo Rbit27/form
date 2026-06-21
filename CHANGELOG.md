@@ -1,5 +1,27 @@
 # Changelog · FORM
 
+## [7.30.0] — 2026-06-21
+
+### Added
+- `content/post-1911-extended-pause-return-fundamentals.md` — Block 1881–1930 · Cluster 4 · Post 1/10 · CLUSTER OPENER. «Після тривалої паузи: чому просто «повернутись» не працює» — два режими провалу (надто агресивний / надто пасивний); пауза як передбачувана характеристика довгострокової практики; карта кластеру 4. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1912-detraining-what-is-lost.md` — Block 1881–1930 · Cluster 4 · Post 2/10. «Деадаптація: що реально втрачається за 2–8 тижнів без тренувань» — три якості по-різному: нейральна сила (Hortobágyi 2000), гіпертрофія (Bickel 2011), VO₂max (Mitchell 1992); таблиця хронології по тижнях; міонуклеарна ретенція і м'язова пам'ять (Gundersen 2016); пастка нейральної готовності. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1913-athlete-identity-during-pause.md` — Block 1881–1930 · Cluster 4 · Post 3/10. «Ідентичність атлета під час паузи: не «колишній», а «на паузі»» — Stambulova 2009 (ідентичність і кар'єрні переходи); Brewer et al. 1993 (Athletic Identity); три тактики: мінімальний фізичний зв'язок, мова/журнал, конкретна дата повернення (Gollwitzer 1999). clinical-safety: CONDITIONAL PASS. sports-scientist review required.
+- `content/post-1914-ramp-up-short-pause.md` — Block 1881–1930 · Cluster 4 · Post 4/10. «Рамп-ап протокол: повернення після паузи 2–6 тижнів» — 3-тижневий протокол (60–70% → 75–85% → 100% обсягу, RPE cap поетапний); DOMS після повернення (Clarkson & Hubal 2002); DOMS як операційний сигнал. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1915-ramp-up-extended-pause.md` — Block 1881–1930 · Cluster 4 · Post 5/10. «Рамп-ап протокол: повернення після паузи 2–6 місяців і більше» — 3-фазний протокол (стабілізація тж. 1–2 → акумуляція тж. 3–5 → нормалізація тж. 6+); помилка «надолужити»; рамка «новий підготовчий блок зі стартовою перевагою». clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1916-minimum-effective-dose-insurance.md` — Block 1881–1930 · Cluster 4 · Post 6/10. «Мінімальна підтримуюча доза: страховка від паузи» — Bickel 2011 (1/9 обсягу зберігає силу); Androulakis-Korakakis 2020 (1–2 важких сети/тиж підтримують гіпертрофію); шаблон МПД 2×/тиж; превентивне розгортання. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1917-antifragile-training-architecture.md` — Block 1881–1930 · Cluster 4 · Post 7/10. «Антикрихкість у тренуванні: система, яка не ламається» — 3 принципи: надлишковість (місце/час/вправи), масштабованість (3 режими з критеріями), МПД як якір; аудит крихкості (5 запитань); Wood & Neal 2007 (структура > воля). clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1918-emergency-training-protocol.md` — Block 1881–1930 · Cluster 4 · Post 8/10. «Аварійний план тренування: протокол форс-мажору» — decision fatigue (Baumeister 2011); шаблон 2×/тиж 30 хв (сесія А: нижнє+тяг, сесія Б: верхнє+задня); критерії активації і деактивації; документування плану. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1919-training-identity-long-term-resilience.md` — Block 1881–1930 · Cluster 4 · Post 9/10. «Тренувальна ідентичність як фундамент стійкості: довгострокова перспектива» — неперервність як власний тренувальний фактор (Krieger 2010); лог + мова + PR + авторство; ідентичність прив'язана до практики, не до результатів (Stambulova 2009). clinical-safety: CONDITIONAL PASS. sports-scientist review required.
+- `content/post-1920-cluster4-synthesis-resilience-map.md` — Block 1881–1930 · Cluster 4 · Post 10/10 · CLUSTER SYNTHESIS. «Від виживання до стійкості: операційна карта кластеру 4» — таблиця 9 постів з інструментами; 3 алгоритми (ПАУЗА ПОЧАЛАСЬ / ПРОГНОЗУЄТЬСЯ / ПРОФІЛАКТИКА); 6 принципів кластеру; preview Cluster 5 «Довгострокова стабільність». clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-2046-training-perfectionism-help-hinder.md` — Editorial 2041–2050 · Post 6/10. «Тренувальний перфекціонізм: де він допомагає, де руйнує» — адаптивний vs. дезадаптивний перфекціонізм (Frost et al. 1990; Hewitt & Flett 1991); корисний у технічному домені (точність виконання, журнал, режим сну); деструктивний у домені дотримання (критерій входу, катастрофізація, novel program bias); операційна таблиця; «стандарт якості» vs. «критерій входу». clinical-safety: CONDITIONAL PASS. sports-scientist review required.
+- `blog.html` — 11 карток додано (posts 1911–1920, 2046).
+
+### Changed
+- `STATUS.md` — Block 1881–1930: 30/50 → 40/50 · Cluster 4 COMPLETE. Editorial 2041–2050: 5/10 → 6/10.
+- `VERSION` — 7.29.0 → 7.30.0.
+
+---
+
 ## [7.29.0] — 2026-06-21
 
 ### Added
