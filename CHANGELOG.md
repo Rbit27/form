@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.45.0] — 2026-06-21
+
+### Added
+- `content/post-2111-coach-functions-self-coached-athlete.md` — Editorial 2111–2120 post 1/10 · NEW BLOCK. Чотири функції тренера, які self-coached атлет виконує сам. Core argument: a coach performs four specific cognitive functions — external observation (sees patterns outside your subjectivity), accurate memory (numbers not narrative — Meehl 1954: statistical prediction outperforms clinical judgment), the uncomfortable question (without emotional self-protection), contextual adjustment (plan adapted to real life, not ideal conditions). Without a coach these functions don't disappear — they go unperformed or performed poorly with no system. Replacements: video analysis for external eye; training log + monthly review + block summary for accurate memory; quarterly uncomfortable-question protocol (e1RM delta, RPE drift, adherence %, distanced-perspective question); three-zone system (green/yellow/red) for contextual adjustment. Fourth function: external accountability (Gollwitzer & Brandstätter 1997 — public commitment mechanism changes behavior). FORM angle: Victor designed around all four functions with explanation, not silent switching. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `blog.html` — post-2111 card added (above post-2060).
+- `README.md` — roadmap block 2111–2120 (Self-coaching як практика: структура, функції, рішення) added; post-2111 → draft.
+- `STATUS.md` — Editorial 2111–2120 entry added (1/10 · v7.45.0); Next priorities updated; version header bumped to v7.45.0.
+- `VERSION` — 7.44.0 → 7.45.0.
+
+---
+
 ## [7.44.0] — 2026-06-21
 
 ### Added
