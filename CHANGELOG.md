@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [7.25.0] — 2026-06-21
+
+### Added
+- `content/post-1891-new-job-schedule-disruption.md` — Block 1881–1930 · Cluster 2 · Post 1/10. Нова робота і радикальна зміна графіку: мета першого місяця = явка не якість, три варіанти часового вікна (до/після/обід) з критеріями вибору, адаптація маршруту, когнітивне навантаження онбордингу як алостатичний стресор, соціальні зобов'язання vs. тренування в перші 4–6 тижнів, покрокований чекліст. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1892-business-travel-training-system.md` — Block 1881–1930 · Cluster 2 · Post 2/10. Ділові поїздки: три рівні польового протоколу (A — зал з вагами, B — гантелі/гумки, C — власна вага), чекліст перед поїздкою, правило 48 годин (перша сесія встановлює прецедент), часова зона і тренування, протокол конфлікту з діловою вечерею, довге відрядження 2+ тижні як тимчасова нова база. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1893-relocation-new-city-training-setup.md` — Block 1881–1930 · Cluster 2 · Post 3/10. Переїзд у нове місто або країну: Wood et al. (2005) — вікно відкритості 2–4 тижні, правило першого тижня (зал і перша сесія до нових рутин), три пріоритети (зал / слот / маршрут), специфіка міжнародного переїзду, переїзд як перезавантаження системи. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1894-parenthood-training-restructure.md` — Block 1881–1930 · Cluster 2 · Post 4/10. Народження дитини: реальність перших 3 місяців (розбитий сон, когнітивне навантаження, алостатичний стрес), нові тренувальні вікна (ранній ранок / денний сон / після партнера / вихідні), зміна очікувань «оптимальне» → «достатнє», формат 2 сесій A/B 45 хв, вплив дефіциту сну на нейром'язову координацію, DEC-013 grace. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1895-remote-office-transition.md` — Block 1881–1930 · Cluster 2 · Post 5/10. Офіс↔дистанційно: два напрямки переходу з різними ризиками, офіс→дистанційно (втрата маршруту-тригера, розмиття меж, зниження локомоції), дистанційно→офіс (втрата часового ресурсу), гібрид (прив'язка до дня/часу не формату), примусовий перехід і behavioural spillover, матриця рішень 4×3. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1896-gym-loss-home-training-bridge.md` — Block 1881–1930 · Cluster 2 · Post 6/10. Втрата залу: що домашнє тренування може і не може, три рівні (0/1/2) з конкретними протоколами, психологічна помилка «домашнє не рахується», організація простору, паралельний пошук нового залу, межі ефективності (до 4–8 тижнів / 8–16 / після 16), правило першої домашньої сесії за 48h. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1897-high-cognitive-load-training.md` — Block 1881–1930 · Cluster 2 · Post 7/10. Когнітивне навантаження: Marcora et al. (2009) — когнітивна стомленість підвищує суб'єктивний RPE, три режими (кризовий тиждень / розтягнутий стрес / пік з відомою датою), тренування як інструмент управління когнітивним станом (Chang et al. 2012 — 2–4h покращення), уникати нових вправ і RPE 10, правило «не відпрацьовувати» після кризи. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1898-financial-constraint-training.md` — Block 1881–1930 · Cluster 2 · Post 8/10. Фінансові обмеження: ієрархія витрат на тренування (6 рівнів), мінімальні вимоги до бюджетного залу, де шукати (муніципальні / університети / гаражні зали), домашній зал — коли має сенс, реальний потенціал гантелей для досвідченого атлета, фінансова ситуація і тренувальна ідентичність. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1899-vacation-seasonal-transition.md` — Block 1881–1930 · Cluster 2 · Post 9/10. Відпустка і сезони: тривалість як головний фактор (4 рівні), три рівні польового протоколу без залу, психологія рішення до початку, сезонні переходи (зима→весна форсований ріст, літня спека і нейром'язова координація, зимова зниженість енергії), протокол повернення після 1–2 і 3–4 тижнів. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-1900-cluster2-synthesis-life-transition-matrix.md` — Block 1881–1930 · Cluster 2 · Post 10/10 · CLUSTER SYNTHESIS. Матриця 9 life-transition сценаріїв: головний ризик, ключове рішення, мінімум підтримки. П'ять спільних принципів: рішення до переходу, мінімальна присутність важливіша за якість, тимчасове зниження ≠ деградація, перший крок критичний, після переходу — не відпрацьовувати. Операційна блок-схема. Victor і контекстні мітки. Коли life-transition потребує більшого. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — cards added for posts 1891–1900 (Block 1881–1930 Cluster 2 · Конкретні life-transition сценарії). blog.html updated to post-1900.
+- `STATUS.md` — Block 1881–1930 updated: Cluster 2 COMPLETE 10/10 (posts 1891–1900); next: Cluster 3 (posts 1901–1910).
+- `VERSION` — 7.24.1 → 7.25.0.
+
+---
+
 ## [7.24.1] — 2026-06-21
 
 ### Changed
