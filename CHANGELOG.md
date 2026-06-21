@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.10.1] — 2026-06-21
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.24.1 → v3.24.2: §79.4 master evidence table — added REN-E-001 (CC5.2/CC1.4 · annual `enterprise.contract_renewed` chain export + RENEW-CHAIN-01 zero-row query), REN-E-002 (CC4.1/CC2.2 · quarterly `enterprise.renewal_notice_sent` export), REN-E-003 (CC4.1/A1.1 · annual renewal conversion rate cross-tab). §80.3 R2 folder structure — `renewals/` subfolder added with `form-api NO ACCESS`. §80.4 Vanta mirror list — `REN-E-001/002/003 (§42.9)` appended. §100.6 item 2 documentation portion marked done. Closes three cross-reference obligations: COST_MODEL §42.10 item 5 (documentation portion), DATA_MODEL §43.8 item 4 (documentation portion), SOC2_READINESS §100.6 item 2 (documentation portion).
+- `docs/COST_MODEL.md` — v2.9 → v2.10: §42.10 item 5 status updated (§79.4 registration done; first evidence filing pending first renewal cycle est. M12).
+- `docs/DATA_MODEL.md` — v1.22 → v1.23: §43.8 item 4 status updated (§79.4 registration done; first evidence filing pending first renewal cycle est. M12).
+- `VERSION` — 7.10.0 → 7.10.1.
+
+---
+
 ## [7.10.0] — 2026-06-21
 
 ### Added
