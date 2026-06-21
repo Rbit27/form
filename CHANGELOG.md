@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [7.43.0] — 2026-06-21
+
+### Added
+- `content/post-2058-neuromuscular-adaptation-year-one.md` — Editorial 2051–2060 post 8/10. Нейром'язова адаптація в перший рік тренувань: чому приріст сили — не те, що думаєш. Core argument: strength gains in the first 6–12 weeks of training are primarily neural, not hypertrophic — and understanding this changes how to build a first-year program. Covers: Moritani & deVries (1979) seminal EMG study — force gains outpace muscle mass; Sale (1988) — neural adaptation dominant in first 6–12 weeks in untrained. Motor unit recruitment mechanics: Henneman size principle (1965), rate coding, intermuscular coordination, motor unit synchronization. Hakkinen et al. (1985): voluntary activation in untrained below potential max. Folland & Williams (2007) review: 60–90% of early strength gains attributed to neural mechanisms (4–8 wk). Beginner gains mechanism: neural learning from zero + motor learning rapid coordination gains + low baseline. Four mistakes that stall neural adaptation: (1) no intent for maximal velocity (Behm & Sale 1993 — intent matters); (2) excessive exercise variety — neural adaptation is movement-specific; (3) training to failure every set (Enoka 1988 — quality motor commands, not exhaustion); (4) ignoring movement pattern quality. Neural → hypertrophic transition at 6–12 weeks. Practical principles: frequency > volume early; linear progression = neural learning structure; RIR 2–3 for base movements; muscle memory is largely neural memory. Operational answer. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `blog.html` — post-2058 card added (above post-2056).
+- `STATUS.md` — Editorial 2051–2060 updated: 7/10 → 8/10 · v7.43.0; post-2058 entry added.
+- `README.md` — roadmap 2101–2110 (від нейральної адаптації до системного мислення self-coached атлета) added as proposed.
+- `VERSION` — 7.42.1 → 7.43.0.
+
 ## [7.42.1] — 2026-06-21
 
 ### Added
