@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [7.27.0] — 2026-06-21
+
+### Added
+- `content/post-1901-internal-transition-opener.md` — Block 1881–1930 · Cluster 3 · Post 1/10. Внутрішній перехід як окрема категорія: три типи (мотиваційний, цільовий, перфекціоністська стагнація), розрізнення від перетренованості. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1902-motivational-transition-training.md` — Block 1881–1930 · Cluster 3 · Post 2/10. Системний мотиваційний спад: чотири причини (вичерпана ціль, плато, зміна контексту, накопичена втома), діагностична послідовність, що реально допомагає. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1903-all-or-nothing-training-pattern.md` — Block 1881–1930 · Cluster 3 · Post 3/10. «Все або нічого»: механіка, три джерела, практичні прояви, обхідний протокол (офіційний мінімальний формат, перейменування, відокремлення явки від якості). Bickel et al. 2011. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1904-perfectionism-training-regularity.md` — Block 1881–1930 · Cluster 3 · Post 4/10. Перфекціонізм: де функціональний (технічний, програмний частково), де дисфункціональний (умов, виконання, прогресу, помилки). Тест трьох рівнів. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1905-training-goal-change-adaptation.md` — Block 1881–1930 · Cluster 3 · Post 5/10. Зміна цілей: три типи, п'ятикроковий протокол, ідентичність у практиці а не в цілі, поступова адаптація vs. перезапуск. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1906-priority-shift-strength-to-other.md` — Block 1881–1930 · Cluster 3 · Post 6/10. Зміна пріоритету від сили: interference effect (Wilson 2012), три сценарії (→витривалість, →мобільність, →специфіка), три запитання перед зміною. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1907-compound-internal-external-transition.md` — Block 1881–1930 · Cluster 3 · Post 7/10. Складений перехід: три приклади взаємопідсилення, ознаки, хибна тактика «по черзі», протокол паралельної обробки. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1908-simultaneous-changes-hierarchy-protocol.md` — Block 1881–1930 · Cluster 3 · Post 8/10. Ієрархія рішень при «ідеальному шторм»: три рівні, 4-тижневий протокол, принцип одного рішення на тиждень. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1909-exit-prolonged-internal-transition.md` — Block 1881–1930 · Cluster 3 · Post 9/10. Вихід з тривалого внутрішнього переходу: чотири фази, правило першого кроку (20–30 хвилин, 50–60% об'єму), психологічний борг, відновлення vs. перебудова. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1910-cluster3-synthesis-internal-transitions.md` — Block 1881–1930 · Cluster 3 · Post 10/10 · CLUSTER SYNTHESIS. Операційна карта внутрішніх переходів: всі типи у таблицях, шість принципів, спільний алгоритм-блок-схема, анонс Cluster 4. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-2044-training-to-failure-when-right-when-wrong.md` — Editorial 2041–2050 · Post 4/10 (Хибні спрощення в тренувальній культурі). Відмова у тренуванні: технічна vs. механічна vs. конкурентна. Giessing 2016, Sampson & Groeller 2016, Lasevicius 2022 — зона 0–4 RIR оптимальна, 0 vs. 2–3 RIR мінімальна різниця при суттєво нижчій системній вартості. Де відмова виправдана (ізольовані, останній підхід, тренажери). Де надлишкова (вільні рухи без страховки, ранні підходи, нова техніка, поганий відновлення). Операційна таблиця RIR-таргетингу. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — blog cards added: post-1901 through post-1910 (Training Behavior), post-2044 (Sports Science). blog.html updated to post-1910 and post-2044.
+- `VERSION` — 7.26.1 → 7.27.0.
+
+---
+
 ## [7.26.1] — 2026-06-21
 
 ### Added
