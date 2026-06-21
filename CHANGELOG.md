@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.44.0] — 2026-06-21
+
+### Added
+- `content/post-2059-training-documentation-vs-analytics.md` — Editorial 2051–2060 post 9/10. Тренувальна документація vs. тренувальна аналітика: де проходить межа корисного. Core argument: documentation (recording what happened) and analytics (extracting meaning) are two distinct processes with different goals — confusing them or neglecting either creates systematic decision-making failure. Three failure modes: over-documentation (archive without use, control illusion, signal buried in noise); under-documentation (decisions based on systematically distorted memory — Meehl 1954 clinical vs. statistical prediction: even a simple structured log outperforms «overall impression»); tool without system (changing apps without changing review habit). Minimum effective log: weight × reps × sets + RPE + one technical note = 5–8 lines/session. Three analytics levels: weekly (5–10 min, tactical — did session match plan?); monthly/inter-block (20–30 min, tactical+strategic — e1RM trend, RPE drift, technical drift); quarterly (45–60 min, strategic — quarterly review, block planning). Data hierarchy: Level 1 = e1RM, RPE at standardized loads, technical quality (highest diagnostic value); Level 2 = weekly volume, session rating, rest duration; Level 3 = sleep, external stress, context (explains anomalies, doesn't build trends). Usefulness test: three concrete decisions influenced by the log in the last month. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+- `content/post-2060-editorial-block-synthesis-critical-thinking.md` — Editorial 2051–2060 post 10/10 · BLOCK SYNTHESIS. Синтез блоку 2051–2060: критичне мислення self-coached атлета. Block map table: all 10 posts with topic and key principle. The unifying thread: critical thinking in training = the ability to ask the right question before making a decision — each post contains one fundamental question the self-coached athlete often skips. Five synthesis principles: (1) diagnosis precedes decision — define what before deciding what to do; (2) time horizon determines visible reality — different decisions require different data windows; (3) progression is a system of variables — know which variable you're manipulating; (4) minimum effective decision beats complex correct one; (5) self-coaching requires explicit substitution of three coach functions (external eye, accurate memory, uncomfortable question). Three systemic traps: confirmation thinking (seeing progress where wanted); single-data-point decisions (one session ≠ trend); system management hypertrophy (infrastructure heavier than training). Decision reference table mapping 8 questions to the relevant posts. Preview: Editorial 2061–2070 — «Тренування в умовах реального дорослого атлета». clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `blog.html` — post-2060 and post-2059 cards added (above post-2058).
+- `STATUS.md` — Editorial 2051–2060 updated: 8/10 · v7.43.0 → COMPLETE 10/10 · v7.44.0; post-2059 and post-2060 entries added; Next priorities updated.
+- `VERSION` — 7.43.1 → 7.44.0.
+
+---
+
 ## [7.43.1] — 2026-06-21
 
 ### Added
