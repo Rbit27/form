@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.14.0] — 2026-06-21
+
+### Added
+- `content/post-1831-athletic-identity-vs-motivation.md` — Block 1831–1880 · Cluster 1 · Post 1/10. Атлетична ідентичність vs. мотивація: Brewer, Van Raalte & Linder 1993 (AIMS); ego depletion Baumeister et al. 1998; implementation intentions Gollwitzer 1999; habit formation 66-day median Lally et al. 2010; self-efficacy Bandura 1997; мінімальна доза як якір ідентичності Bickel et al. 2011; три помилки ідентичності; 4 практичних кроки. clinical-safety NOT_REQUIRED.
+
+### Changed
+- `blog.html` — додано картку для post-1831 (Block 1831–1880 Cluster 1).
+- `README.md` — post-1831 → draft · v7.14.0; Block 1981–2030 «Реальний атлет у реальному житті: тренування поза оптимальними умовами» (50 proposed posts) added.
+- `STATUS.md` — Block 1831–1880 IN PROGRESS 1/50; version header + footer updated to v7.14.0.
+- `VERSION` — 7.13.0 → 7.14.0.
+
+---
+
 ## [7.13.0] — 2026-06-21
 
 ### Added
