@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [7.34.0] — 2026-06-21
+
+### Added
+- `content/post-2033-training-log-signal-noise-decision.md` — Editorial block 2031–2040 post 3/10. Тренувальний щоденник як інструмент аналізу: сигнал, шум і рішення. Key arguments: (1) logs answer "what happened," not "why" — conflating the two is the most common analytical error; (2) signal vs. noise taxonomy for strength athletes — high-signal: weekly tonnage by movement pattern, 5-week trend on primary lift, one subjective recovery metric; low-signal: single-session result, daily mood, week-over-week delta; (3) false precision trap — 5% adjustments on 20% noisy data; (4) three-metric discipline — track only what drives a decision; (5) three-data-point rule before any programming change. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `blog.html` — post-2033 card added (top of grid, above post-2032).
+- `STATUS.md` — Editorial 2031–2040 → 3/10; VERSION → 7.34.0.
+
 ## [7.33.0] — 2026-06-21
 
 ### Added
