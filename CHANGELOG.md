@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.35.0] — 2026-06-21
+
+### Added
+- `content/post-2034-home-video-analysis-camera-blind-spots.md` — Editorial block 2031–2040 post 4/10. Відеоаналіз техніки вдома: що вчить камера і де її сліпа зона. Key arguments: (1) camera captures 2D projection of 3D movement from one angle — positional markers, bar path, rep drift, rhythm; (2) systematic blind spots: third plane geometry, muscle activation vs. kinematics, internal state/RPE, load context; (3) confirmation bias in self-analysis — Miall & Wolpert (1996) internal model bias; (4) three high-value scenarios: new movement learning, suspected technical regression, technique drift under fatigue; (5) operational protocol: two angles (sagittal + frontal), one question per session, every 1–2 weeks, own-reference comparison only. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `blog.html` — post-2034 card added (bottom of grid, after post-12).
+- `README.md` — post-2033 → draft · v7.34.0; post-2034 → draft · v7.35.0; roadmap 2061–2070 (тренування в умовах реального дорослого атлета) added as proposed.
+- `STATUS.md` — Editorial 2031–2040 → 4/10 · v7.35.0; VERSION → 7.35.0.
+
 ## [7.34.0] — 2026-06-21
 
 ### Added
