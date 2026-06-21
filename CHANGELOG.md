@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.37.0] — 2026-06-21
+
+### Added
+- `content/post-2051-cost-of-mistakes-self-coached.md` — Editorial block 2051–2060 post 1/10. Ціна помилки у self-coached тренуванні: які помилки зворотні, а які — ні. Three-class taxonomy: Class A (cheap/reversible, 1–4 weeks); Class B (conditionally reversible, depends on reaction time — 4 weeks to 18 months); Class C (hard/irreversible — entrenched motor patterns, structural injuries from chronic incorrect loading). Transition mechanism A→B→C: ignoring signals turns cheap mistakes expensive. Three most common self-coached transitions: volume without reaction, technical drift under fatigue, pain-signal without response. Asymmetry of risk: excessive caution is also a Class B error. Three-question framework before major decisions: cost if right / cost if wrong / how fast will you know. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `blog.html` — post-2051 card added (top of grid).
+- `README.md` — post-2051 → draft · v7.37.0; roadmap 2071–2080 (діагностичне мислення self-coached атлета) added as proposed.
+- `STATUS.md` — Editorial 2051–2060 → 1/10 · v7.37.0; current version → v7.37.0.
+
 ## [7.36.1] — 2026-06-21
 
 ### Added
