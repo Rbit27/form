@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.39.0] — 2026-06-21
+
+### Added
+- `content/post-2054-training-journal-mirror-three-months.md` — Editorial 2051–2060 post 4/10. Тренувальний журнал як дзеркало: що він говорить через 3 місяці. Core distinction: real-time journal vs. retrospective journal at 90 days — different objects with different diagnostic value. Three patterns visible only at 3-month scale: (1) unconscious load wave — stochastic deload vs. discipline failure require 3-month view to distinguish; (2) RPE calibration drift — same number, different relative intensity across the block, detectable via anchor-point comparison; (3) technical drift under load — visible in retrospective video or technique-note comparison. Common retrospective errors: confirmation reading, single-point reaction vs. pattern, absolute vs. relative comparison. 5-step retrospective protocol: aggregate weekly data, three key questions (frequency, volume trend, wave), RPE anchor check, technical review, one specific conclusion. What the journal cannot tell you: pattern vs. cause — retrospective requires second step of hypothesis about context. Minimum logging system: weight/sets/reps + RPE per last working set + one-liner on session feel. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+- README.md — Roadmap 2081–2090 proposed (Editorial series: тренувальна система і довгострокове мислення).
+
+### Changed
+- `blog.html` — post-2054 card added (above post-2053).
+- `STATUS.md` — Editorial 2051–2060 → 4/10 · v7.39.0.
+
 ## [7.38.0] — 2026-06-21
 
 ### Added
