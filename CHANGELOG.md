@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [7.14.1] — 2026-06-21
+
+### Changed
+- `docs/DATA_MODEL.md` — §40.9 cross-reference patch: OQ-SIEM-03 updated from 🟡 Open P2 to 🟢 Resolved DEC-071 (2026-06-19). DEC-071 resolved this in `docs/OBSERVABILITY.md §50` (v4.7.0) but §40.9 was not included in that patch's cross-update sweep. Document header v1.23 → v1.24.
+- `VERSION` — 7.14.0 → 7.14.1.
+
+---
+
 ## [7.14.0] — 2026-06-21
 
 ### Added
