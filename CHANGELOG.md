@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [7.42.0] — 2026-06-21
+
+### Added
+- `content/post-2057-block-structure-recreational-athlete.md` — Editorial 2051–2060 post 7/10. Блокова структура для звичайного атлета: чи потрібна вона без змагань. Core argument: periodization structure is not a competitive-athlete privilege — it is a tool for managing interference effects and accumulating targeted adaptation. Covers: Issurin block periodization framework (2008) — accumulation / transmutation / realization phases; recreational athlete interpretation (realization block optional, first two universally applicable). Four concrete advantages for non-competitive athletes: psychological horizon, real accumulation, differentiated data, built-in recovery rhythm. Four situations where blocks don't add value: novice stage, very low volume, high schedule unpredictability. Practical two-phase cycle: accumulation (4–6 wk, 65–80% 1RM, 8–15 rep range) → intensification (3–4 wk, 80–90%+ 1RM, 3–6 rep range) → transition week. Three early-block-exit signals: volume-no-longer-feels-like-load; accumulated fatigue markers; external disruption > 10–14 days. DUP alternative: Rhea et al. (2002) LP vs. DUP comparison (28% vs. 14% bench, 36% vs. 18% squat over 12 wk); three-day DUP schema (strength / hypertrophy / endurance). Operational decision table: novice → linear; early intermediate → DUP or wave; intermediate+ → block; advanced → mandatory. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — R-32.11 item 6 marked [x] Done (2026-06-21): `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` item 9 added; post-incident controls row updated.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §36.6 item 9 added: cross-reference to INCIDENT_RESPONSE R-32 as operational recovery runbook for `caep_reregister_sweep` stale condition; two-severity matrix and §R-32.5 Steps 1–5 cited. Closes R-32.11 item 6.
+
 ## [7.41.0] — 2026-06-21
 
 ### Added
