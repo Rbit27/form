@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [7.18.0] — 2026-06-21
+
+### Added
+- `content/post-1852-social-comparison-in-gym.md` — Block 1831–1880 · Cluster 3 · Post 2/10. Соціальне порівняння в залі: чому зал конструктивно провокує порівняння (схожість задачі + видимість результату). Upward vs. downward comparison — механіка за Festinger (1954). Де порівняння замінює аналіз власних даних (ego-lifting, ваговий стрибок, знецінення прогресу). Протокол ізоляції від порівняльного шуму через конкретний план і журнал. clinical-safety: NOT_REQUIRED.
+- `content/post-1853-social-media-training-noise.md` — Block 1831–1880 · Cluster 3 · Post 3/10. Positive selection bias і illusion of consensus у фітнес-контенті. Три категорії медіа-впливу: методологічний шум, обсяговий тиск, тімінговий тиск. Операційний критерій «корисна інформація vs. шум»: правило 24 годин без підтверджуючих власних даних. Куратура замість пасивного споживання. clinical-safety: NOT_REQUIRED.
+- `content/post-1854-training-partner-structure-vs-dependency.md` — Block 1831–1880 · Cluster 3 · Post 4/10. Що тренувальний партнер реально дає (регулярність за Carron et al. 2003, страховка, соціальний контекст). Де партнерство стає проблемою: розклад-залежність, компроміс програми, ефект темпу, соціальна механіка за рахунок тренувальної. Чотири принципи структури без залежності. clinical-safety: NOT_REQUIRED.
+- `content/post-1855-group-training-individual-plan.md` — Block 1831–1880 · Cluster 3 · Post 5/10. Три механіки групового тиску на індивідуальну програму (соціальний темп, конкуренція, зміна пріоритетів). Три ролі групового формату: основа / допоміжний / ситуативний. Практика збереження власних координат у WOD і командному тренінгу. clinical-safety: NOT_REQUIRED.
+- `content/post-1856-competitive-context-without-competitive-goal.md` — Block 1831–1880 · Cluster 3 · Post 6/10. Коли конкуренція є корисним інструментом (social facilitation, Zajonc 1965) і коли стає проблемою: ego-lifting, перебудова пріоритетів, хибний прогрес. Перевірка перед ваговим рішенням. Конкуренція з собою як базова форма для self-coached атлета. clinical-safety: NOT_REQUIRED.
+- `content/post-1857-social-accountability-without-external-pressure.md` — Block 1831–1880 · Cluster 3 · Post 7/10. Три типи підзвітності і стійкість кожного. Мінімальний ефективний протокол (Локвуд і Кролич 2008): одна людина, одна метрика, раз на тиждень. Помилки: без метрики, без наслідків, як соціальна гра, як замінник програми. Альтернативи без живого партнера. clinical-safety: NOT_REQUIRED.
+- `content/post-1858-when-social-environment-overrides-plan.md` — Block 1831–1880 · Cluster 3 · Post 8/10. Тренувальний дрейф: визначення, чотири сигнали, три діагностичних питання. Відновлення без «починати спочатку»: фіксація стану → порівняння з планом → рішення → нова точка старту. Превенція через конкретний план і тижневий огляд. clinical-safety: NOT_REQUIRED.
+- `content/post-1859-designing-training-environment.md` — Block 1831–1880 · Cluster 3 · Post 9/10. П'ять рівнів тренувального середовища за Thaler & Sunstein (2008) choice architecture: фізичний простір, часова структура, соціальний контекст, цифрове середовище, підготовка. Практичний quarterly аудит. Чому дизайн середовища надійніший за мотивацію. clinical-safety: NOT_REQUIRED.
+- `content/post-1860-cluster3-synthesis-individual-practice-social-context.md` — Block 1831–1880 · Cluster 3 · Post 10/10 · CLUSTER SYNTHESIS. Синтез постів 1851–1860. Операційна модель трьох рівнів: фільтрація шуму, свідоме використання соціальних факторів, дизайн середовища. Реактивний vs. проактивний режим. Тижневий дрейф-чек, середовищний аудит Q, мінімальна підзвітність. Місце Victor як антишумового референсу. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — posts 1852–1860 added (Cluster 3 · Block 1831–1880). Total posts displayed: 1860.
+- `STATUS.md` — Block 1831–1880 updated: IN PROGRESS 21/50 → 30/50 · Cluster 3 COMPLETE · v7.18.0. Next: Cluster 4 posts 1861–1870.
+- `VERSION` — 7.17.1 → 7.18.0.
+
+---
+
 ## [7.17.1] — 2026-06-21
 
 ### Changed
