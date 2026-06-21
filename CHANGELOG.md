@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [7.43.1] — 2026-06-21
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md` v2.26 → v2.27 — `system.scim_guard_cfg_cache_stale` (LOW/1yr) registered in §System. Closes `docs/SOC2_READINESS.md §98.5` item 1 (P1/M13). Advisory event emitted by `billing-event-relay` Cloudflare Worker when `SCIM_KV.delete` throws during BDG KV cache invalidation; 3600s TTL safety-net self-clears; compliance-officer reviews in GUARD-E-001 quarterly stale-advisory cross-check.
+
+### Changed
+- `docs/SOC2_READINESS.md` — §98.5 item 1 status updated to `[x] Done — AUDIT_LOG_SCHEMA.md v2.27, 2026-06-21`.
+- `VERSION` — 7.43.0 → 7.43.1.
+
 ## [7.43.0] — 2026-06-21
 
 ### Added
