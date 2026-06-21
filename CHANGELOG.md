@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.29.0] — 2026-06-21
+
+### Added
+- `content/post-16-underrecovery-vs-overtraining.md` — Editorial series · Post 16/∞. «Недовідновлення або перетренованість: як self-coached атлет читає сигнали тіла» — чотири точки спектру втоми (гостра втома, функціональне перевантаження, нефункціональне перевантаження, OTS); надійні маркери (HRV-тренд, RPE-дрейф, технічна деградація, сон); ненадійні (мотивація, DOMS, суб'єктивне «відчуття»); практичний протокол розрізнення; таблиця відповідей за станом. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — картка для post-16 додана перед post-15.
+- `README.md` — Editorial series 281–290 «Self-coached athlete decision systems» (10 тем, proposed) · v7.29.0.
+
+### Changed
+- `STATUS.md` — content library row 11–50: post-16 зафіксовано.
+- `VERSION` — 7.28.1 → 7.29.0.
+
+---
+
 ## [7.28.1] — 2026-06-21
 
 ### Changed
