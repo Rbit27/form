@@ -1,5 +1,22 @@
 # Changelog · FORM
 
+## [7.6.0] — 2026-06-21
+
+### Added
+- `content/post-1782-sleep-primary-recovery-vector.md` — Cluster 1 · Post 2/10 · Block 1781–1830. Сон як первинний вектор відновлення: SWS і секреція GH (70–80% в перших 2 циклах), REM і консолідація рухових навичок, синтез білка під час сну. Наслідки депривації: RPE зростає, силовий вихід падає 2–8%. Тривалість vs. якість — sleep efficiency як операційний маркер. Victor-інтеграція з трекерами. clinical-safety: NOT_REQUIRED.
+- `content/post-1783-ans-hrv-what-is-measured.md` — Cluster 1 · Post 3/10 · Block 1781–1830. АНС і HRV: RMSSD і LF/HF, симпатично-парасимпатичний баланс, ранковий протокол (лежачи, до кофеїну, 5 хв). Міжіндивідуальна варіація: числа непорівнянні між атлетами, тільки власний тренд. Гострий спад після тренування vs. хронічна супресія. Коли HRV вводить в оману: хвороба, алкоголь, дорога. Порівняння пристроїв: Polar H10 vs. оптичні. clinical-safety: NOT_REQUIRED.
+- `content/post-1784-central-peripheral-neuromuscular-fatigue.md` — Cluster 1 · Post 4/10 · Block 1781–1830. Центральна і периферійна нейром'язова стомленість: метаболіти і crossbridge cycling (периферійна), суправертебральний drive і рекрутування рухових одиниць (центральна). Чому «ЦНС тижнями відновлюється» — перебільшення (24–72год). Практичне розрізнення: локально vs. глобально. Victor: паттерни через RPE кількох вправ. clinical-safety: NOT_REQUIRED.
+- `content/post-1785-inflammation-repair-after-training.md` — Cluster 1 · Post 5/10 · Block 1781–1830. Запалення і репарація: EIMD механізм (Z-disk, sarcomere strain), IL-6/TNF-α у репарації. DOMS — не надійний маркер гіпертрофії (дані після 2018). Repeated bout effect. НПЗП і лід: дані про притуплення адаптації. Хронічне запалення при систематичному недовідновленні. clinical-safety: NOT_REQUIRED.
+- `content/post-1786-protein-carbs-recovery-physiology.md` — Cluster 1 · Post 6/10 · Block 1781–1830. Білок і вуглеводи у відновленні — фізіологія, не дієтологія. mTORC1-шлях, leucine-поріг (~2–3г), тимчасове вікно MPS (Aragon & Schoenfeld 2013). Ресинтез глікогену: 5–7%/год, GLUT4-транслокація. Коли timing критичний (< 8год між сесіями) vs. коли ні. Явний дисклеймер: не дієтологічна консультація. clinical-safety: CONDITIONAL_PASS (guard rails вбудовані).
+- `content/post-1787-stress-allostatic-load-recovery.md` — Cluster 1 · Post 7/10 · Block 1781–1830. Стрес і алостатичне навантаження: модель McEwen, HPA вісь і кортизол при тренувальному і психологічному стресі. Тіло не розрізняє стрес-джерело. Life load audit — 3 запитання перед мезоциклом. Victor: HRV-тренд як інтегратор всіх стресорів. clinical-safety: NOT_REQUIRED.
+- `content/post-1788-recovery-35-plus-age-factors.md` — Cluster 1 · Post 8/10 · Block 1781–1830. Відновлення після 35: GH/IGF-1/T зниження, сповільнений ресинтез колагену сухожиль/зв'язок, зменшення SWS. Що НЕ змінюється: максимальний силовий потенціал, гіпертрофічна відповідь. Masters athletes meta-analyses. Практичні корекції програмування. clinical-safety: NOT_REQUIRED.
+- `content/post-1789-active-recovery-when-helps-when-hurts.md` — Cluster 1 · Post 9/10 · Block 1781–1830. Активне відновлення: визначення (30–50% VO2max), механізми кровообігу і лімфатики. Дані: DOMS знижується на 10–20%, але структурна репарація не прискорюється. Коли допомагає (прогулянка 20–30 хв після максимального зусилля) vs. заважає (прихований середній інтенсив). Практичний протокол: ЧСС < 130. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `VERSION` — 7.5.2 → 7.6.0.
+
+---
+
 ## [7.5.2] — 2026-06-20
 
 ### Changed
