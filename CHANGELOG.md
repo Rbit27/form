@@ -1,5 +1,30 @@
 # Changelog · FORM
 
+## [7.31.0] — 2026-06-21
+
+### Added
+- `content/post-1921-longterm-stability-cluster5-opener.md` — Block 1881–1930 · Cluster 5 · Post 1/10 · CLUSTER OPENER. «Довгострокова стабільність: від кризового управління до автоматичної адаптації» — п'ять операційних ознак зрілої системи; таблиця кластерів 1–5; Woodman & Hardy (2001) якість системи управління стресом. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1922-automatic-triggers-training-system.md` — Block 1881–1930 · Cluster 5 · Post 2/10. «Автоматичні тригери: як система сама приймає рішення» — Gollwitzer (1999) implementation intentions; три рівні тригерів (часові, IF-THEN, сигнальні HRV/RPE); алгоритм проектування власних тригерів; таблиця шаблонних тригерів. Wood & Neal (2007): мотивація менш релевантна при правильних тригерах. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1923-weekly-training-decision-algorithm.md` — Block 1881–1930 · Cluster 5 · Post 3/10. «Тижневий алгоритм тренувальних рішень: від ситуативного до системного» — три питання (тижнева ємність / режим / конкретні слоти); алгоритм з урахуванням мезоциклу; три приклади застосування; таблиця ситуативний vs. системний. Lally et al. (2010). clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1924-longterm-progress-12month-view.md` — Block 1881–1930 · Cluster 5 · Post 4/10. «Довгостроковий прогрес: чому 12-місячна картина важливіша за 4-тижневу» — три ефекти спотворення 4-тижневого горизонту; таблиця хронологічних горизонтів адаптацій; Krieger (2010); структура макроциклу; метрики квартального і річного відстеження. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1925-monthly-review-feedback-loop.md` — Block 1881–1930 · Cluster 5 · Post 5/10. «Мінімальна петля зворотного зв'язку: щомісячний огляд тренувань» — чотири блоки огляду (адгерентність, метрики, суб'єктивна якість 1–5, рішення); шаблон запису; Carver & Scheier (1982) теорія контролю і само-регуляції. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1926-training-log-autonomous-adaptation.md` — Block 1881–1930 · Cluster 5 · Post 6/10. «Тренувальний журнал як інструмент автономної адаптації» — архів vs. зворотний зв'язок; мінімальний запис (5 елементів); читання до і після сесії; патерни мезоциклу; Stamatis et al. (2020) метакогніція. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1927-proactive-training-adaptation.md` — Block 1881–1930 · Cluster 5 · Post 7/10. «Від реакції до прогнозування: проактивна адаптація тренувань» — реактивна vs. проактивна логіка; Baumeister et al. (1998) виснаження его; два рівні проекції; принцип «навмисного деловантаження»; карта ризиків; квартальне вікно (15–20 хв). clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1928-self-regulated-athlete-autonomy.md` — Block 1881–1930 · Cluster 5 · Post 8/10. «Self-regulated athlete: операційне визначення тренувальної автономії» — Zimmerman (2000): само-моніторинг → само-оцінка → само-корекція; таблиця self-coached vs. self-regulated; Bandura (1997) самоефективність; п'ять операційних ознак; три базові практики. clinical-safety: CONDITIONAL PASS. sports-scientist review required.
+- `content/post-1929-from-rules-to-principles-training-maturity.md` — Block 1881–1930 · Cluster 5 · Post 9/10. «Від правил до принципів: тренувальна зрілість і її ознаки» — чотири принципи силового тренування; п'ять ознак переходу; таблиця стадій зрілості; де правила залишаються цінними; практичний тест. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-1930-cluster5-block-synthesis.md` — Block 1881–1930 · Cluster 5 · Post 10/10 · CLUSTER SYNTHESIS · BLOCK SYNTHESIS. «Від виживання до автономії: синтез кластеру 5 і блоку 1881–1930» — операційна карта 10 постів кластеру 5; п'ять принципів блоку; вісь прогресу від виживання до автономії; preview блоків 1931–2000. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-2047-universal-principles-dont-apply-to-you.md` — Editorial 2041–2050 · Post 7/10. «Чому тренувальні принципи «для всіх» не для тебе» — Hubal et al. (2005): діапазон відповіді на тренування −2% до +59%; чотири домени варіативності (частота, діапазон, обсяг, відновлення); три помилки від ставлення до «середніх» як до особистих; алгоритм персоналізації 5 кроків. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-2048-dunning-kruger-strength-training.md` — Editorial 2041–2050 · Post 8/10. «Ефект Даннінга-Крюгера у силовому тренуванні: карта некомпетентності» — чому тренування ідеальне середовище для DK-ефекту; чотири стадії; де ефект болісний (техніка, відновлення, оцінка програми); п'ять практик зниження. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-2049-evaluate-training-advice-criteria.md` — Editorial 2041–2050 · Post 9/10. «Як оцінити якість тренувальної поради: операційні критерії» — четири причини труднощів оцінки; п'ять критеріїв (компетенція, обґрунтування, специфічність, джерело, власні дані); швидкий фільтр; де поради найненадійніші. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `content/post-2050-editorial-block-synthesis-operational-thinking.md` — Editorial 2041–2050 · Post 10/10 · BLOCK SYNTHESIS. «Синтез блоку 2041–2050: операційне мислення self-coached атлета» — операційна карта 10 постів; п'ять принципів блоку; хибне спрощення як маркетинговий механізм; «До/Після» фрейм операційного мислення; preview Editorial 2051–2060. clinical-safety: NOT_REQUIRED. sports-scientist review required.
+- `blog.html` — 14 карток додано (posts 1921–1930, 2047–2050).
+
+### Changed
+- `STATUS.md` — Block 1881–1930: Cluster 5 COMPLETE 50/50 (BLOCK COMPLETE). Editorial 2041–2050: 6/10 → 10/10 (COMPLETE). Version updated to v7.31.0.
+- `VERSION` — 7.30.0 → 7.31.0.
+
+---
+
 ## [7.30.0] — 2026-06-21
 
 ### Added
