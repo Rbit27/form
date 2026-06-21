@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [7.41.0] — 2026-06-21
+
+### Added
+- `content/post-2056-exercise-change-when-and-why.md` — Editorial 2051–2060 post 6/10. Коли треба змінити вправу — і чому більшість робить це надто рано або надто пізно. Two failure modes: too early (novelty myth, boredom) vs. too late (real accommodation). SAID principle — Behm & Sale (1993), Morrissey et al. (1995): strength adaptations are movement-specific. Motor learning stages (Schmidt & Lee 2011): cognitive → associative → autonomous — hundreds of reps to reach autonomous. Repeated bout effect (Damas et al. 2018): DOMS reduction ≠ adaptation reduction. Regional hypertrophy and variety (Fonseca et al. 2014, Kassiano et al. 2022): argument for accessory selection, not constant rotation of primary lifts. Exercise variation ≠ exercise change — critical distinction. Three scenarios to change: adaptation ceiling (8–10+ weeks stagnation, all variables controlled), structural mismatch to current goal, persistent discomfort at specific anatomical position (not pain — that → doctor). Three questions before swapping. Journal-based decision table: load trend × RPE drift × technique stability × context. Practical algorithm: 6-step process from log review to decision. README: block 2091–2100 (Психологія прогресу та довгострокова мотивація) added as proposed. clinical-safety: NOT_REQUIRED. sports-scientist review: pending.
+
+### Changed
+- `blog.html` — post-2056 card added (above post-2055).
+- `STATUS.md` — Editorial 2051–2060 updated to 6/10 · v7.41.0.
+- `README.md` — post-2056 → draft · v7.41.0; block 2091–2100 proposed.
+
+---
+
 ## [7.40.0] — 2026-06-21
 
 ### Added
