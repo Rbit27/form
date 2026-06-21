@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.19.0] — 2026-06-21
+
+### Added
+- `content/post-2031-technology-vs-decision.md` — Editorial 2031–2040 · Post 1/10. Технологія не замінює рішення: де AI-додатки допомагають self-coached атлету — і де безсилі. Три категорії тренувальних рішень (структурні / тактичні / оперативні) і роль алгоритму в кожній. Чому «персоналізація» у більшості додатків — шаблон з параметрами. Фундаментальна межа технології: якість руху, контекст поза даними, нейром'язовий стан у реальному часі. Що FORM будує і де чесні про обмеження. clinical-safety: NOT_REQUIRED. sports-scientist review: not required.
+
+### Changed
+- `blog.html` — post-2031 card added (Editorial 2031–2040 · Post 1/10). Category: Training Methodology.
+- `README.md` — Editorial roadmap extended: posts 2031–2040 proposed (cluster: Technology & self-coached practice). post-2031 → draft.
+- `STATUS.md` — Editorial 2031–2040 row added: IN PROGRESS 1/10 · v7.19.0.
+- `VERSION` — 7.18.0 → 7.19.0.
+
+---
+
 ## [7.18.0] — 2026-06-21
 
 ### Added
