@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v4.7.3
+# FORM · Observability & Monitoring Taxonomy v4.8.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -1188,12 +1188,13 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `dsar_slo_miss_counter_reset` | `0 0 1 1,4,7,10 *` | 35 days | P5.1 / CC7.2 — resets `enterprise_sla_counters.dsar_slo_misses_this_quarter` to zero at the start of each calendar quarter (1 Jan / 1 Apr / 1 Jul / 1 Oct at 00:00 UTC); ensures the `dsar-fulfillment-worker` P1/P2 alert routing logic operates on a per-quarter basis (counter = 1 → PagerDuty P1; counter > 1 → Slack P2); without this reset, a miss in Q1 inflates the counter into Q2 causing all Q2 first-miss events to route as P2 instead of P1 (CC7.2 alert escalation degradation); emits no DEC-030 event — the counter is an internal routing control, not an audit record; stale = cross-quarter counter accumulation, causing alert-severity under-escalation for DSAR SLO breaches | PagerDuty P1 `form-compliance` → compliance-officer; dedup `dsar-slo-counter-stale`; 35-day freshness window (quarterly cadence); cross-ref: DATA_MODEL §35.4 / DEC-052 (canonical counter definition and routing logic); AL-DSAR-05 (P1/P2 routing — `docs/OBSERVABILITY.md §37.12`); §70 DSAR SLO monitoring — **job 36** *(originally referenced as "job 33" in `docs/DATA_MODEL.md §35.4` — renumbered to 36; see conflict resolution note below)* |
 | `caep_reregister_sweep` | `*/5 * * * *` | 6 min | CC6.3 — automatic CAEP stream re-registration sweep triggered by SAML cert rotation; queries `tenant_sso_configs WHERE caep_reregistration_required = TRUE`; processes up to 50 tenants per run (LIMIT 50, 200ms inter-tenant yield, 3-retry limit per tenant with exponential back-off); on success: `caep_reregistration_required = FALSE`, `caep_stream_id` updated to new stream ID, `caep_last_reregistered_at = NOW()`, `sso.caep_stream_registered` DEC-030 HIGH/7yr emitted with sentinel `admin_user_id_hash`; on 3-retry failure: `caep_status = 'error'`, `sso.caep_stream_error` HIGH/7yr emitted with `error_type: 'reregistration_failed_post_cert_rotation'`, AL-CAEP-01 fires; stale = cert rotation produces stale CAEP streams → RISC and CAEP events not delivered post-rotation → CC6.3 SSO session-integrity monitoring gap | PagerDuty P1 `form-security` → security-engineer; dedup `caep-sweep-stale`; 6-min freshness window (3-run tolerance of 5-min cadence); cross-ref: SSO_SCIM §36 / DEC-072 (OQ-SSO-23.1 resolution); migration 0082 DDL (`caep_reregistration_required`, `caep_last_reregistered_at`, `caep_reregistration_trigger`); `sso.caep_reregistration_queued` STANDARD/7yr (set by cert-expiry-check hook at `cert_rotation_state → 'complete'`); AL-CAEP-01 (SSO_SCIM §23.9) — **job 37** |
 | `sso_fleet_health_check` | `*/5 * * * *` | 6 min | CC7.2/CC7.3 — fleet-wide SSO health companion signal (SSO-SLO-01b); evaluates whether ≥ 3 distinct tenants simultaneously have login success rate < 99% (≥ 5 attempts each) in any 15-min rolling window; fires AL-SSO-FLEET-01 (P1, PagerDuty `form-platform` → IC + security-engineer) and emits `siem.sso_fleet_health_breach` DEC-030 HIGH/3yr on breach; `sla_credit_impact: 'none'` hard invariant (DEC-070) — SSO-SLO-01b never triggers SLA credits; per-tenant SSO-SLO-01 remains the SLA credit basis; stale = SSO-SLO-01b systemic detection blind spot — a correlated fleet-level SSO regression affecting ≥ 3 tenants simultaneously goes undetected | `system.fleet_sso_check_stale` LOW/1yr advisory emitted by §12.7 health supervisor on gap detection; PagerDuty P1 `form-platform` → IC + security-engineer on breach; dedup `al-sso-fleet-01-{15min_epoch}` 30-min cooldown; 6-min freshness window (3-run tolerance of 5-min cadence); cross-ref: §49 AL-SSO-FLEET-01/SSO-SLO-01b (canonical definitions); SSO-FLEET-E-001 (CC7.2/CC7.3, quarterly); DEC-070 (decision rationale); SOC2_READINESS §95 (evidence registration); `sla_credit_impact: 'none'` — **job 38** *(renumbered from §49 draft "job 36" — see conflict resolution note below; §12.6 job 36 = `dsar_slo_miss_counter_reset` was already canonical at time §49 was authored)* |
+| `renewal_notice_check` | `0 9 * * *` | 26 h | CC4.1 / CC2.2 — RENEW-NOTICE-01 monitoring invariant (COST_MODEL §42.3.2); daily check for active `enterprise_contracts` with `renewal_date BETWEEN CURRENT_DATE + 85 AND CURRENT_DATE + 95` and no `enterprise.renewal_notice_sent` DEC-030 event on file within the prior 100 days; on detection: emits `enterprise.renewal_notice_overdue` HIGH/7yr per flagged tenant + fires AL-RENEW-01 PagerDuty P1 `form-enterprise`; dedup `renew-notice-missing-{tenant_id}` 72h; on all-clear: emits `system.renewal_notice_check_passed` LOW/1yr; stale = RENEW-NOTICE-01 detection blind spot — a contract may reach < 85 days to renewal with no notice on file and no alert fired → MSA §6.1 non-compliance risk; CC4.1 control gap | PagerDuty P1 `form-compliance` → compliance-officer; dedup `renewal-notice-check-stale`; 26h freshness window (daily cadence); cross-ref: §51.3 AL-RENEW-01; COST_MODEL §42.3.2 (invariant spec); COST_MODEL §42.7 (`enterprise.renewal_notice_sent` DEC-030 event); DATA_MODEL §43 (`enterprise_renewals`); REN-OBS-E-001 (CC4.1/A1.1, quarterly) — **job 39** |
 
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
 **Job-number conflict resolution (v0.5, 2026-06-20):** `docs/OBSERVABILITY.md §49` (v4.6.0, 2026-06-19) authored `sso_fleet_health_check` as "job 36". At the time §49 was written, the v0.4 §12.6 patch (same date) had already assigned job 36 to `dsar_slo_miss_counter_reset`. Since §12.6 is the canonical authority for job numbers, `sso_fleet_health_check` is renumbered to **job 38** (next available after job 37 `caep_reregister_sweep`). All §49 in-text citations corrected in this v0.5 patch. All `docs/SOC2_READINESS.md §95` cross-references updated to job 38 accordingly.
 
-*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter.
+*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs.
 
 **DEC-030 events emitted by `pg-cron-health-monitor`** — registered in `docs/AUDIT_LOG_SCHEMA.md §System`:
 
@@ -1214,6 +1215,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 **v0.5 · 2026-06-20 · Owner: devops-lead**
 **Review: quarterly or on architecture change. Next scheduled review: August 2026.**
 **SOC 2 evidence: CC7.2 (system monitoring). See also INCIDENT_RESPONSE.md for CC7.3–CC7.5.**
+*v0.6 patch (2026-06-21): Job 39 `renewal_notice_check` added to §12.6 registry — closes COST_MODEL §42.10 item 4 documentation obligation (RENEW-NOTICE-01 monitoring observability). Daily 09:00 UTC; 26h freshness window; fires AL-RENEW-01 PagerDuty P1 `form-enterprise` on detection; emits `enterprise.renewal_notice_overdue` HIGH/7yr per flagged tenant and `system.renewal_notice_check_passed` LOW/1yr on all-clear; SOC 2 CC4.1/CC2.2 (REN-OBS-E-001). Canonical section: §51.*
 *v0.5 patch (2026-06-20): Job 38 `sso_fleet_health_check` added to §12.6 registry — resolves pg_cron job-number conflict where §49 (v4.6.0, 2026-06-19) claimed "job 36" for `sso_fleet_health_check` after the v0.4 patch had already assigned job 36 to `dsar_slo_miss_counter_reset`. Resolution: `sso_fleet_health_check` renumbered to job 38 (next available after job 37 `caep_reregister_sweep`). §49 updated throughout to replace "job 36" with "job 38" for `sso_fleet_health_check`. `docs/SOC2_READINESS.md §95` updated to match. Freshness window note extended to include job 38 in the 5-minute cadence group. Conflict resolution note (v0.5) added.*
 *v0.4 patch (2026-06-19): Jobs 28–37 registered in §12.6 — closes ten cross-reference obligations: §38.9 (job 28 `ci_telemetry_daily_sync` — CC8.1 daily CI/CD telemetry aggregation); §39.7 (job 29 `backup_age_monitor` — A1.2/CC7.2 backup freshness sentinel, every 4h); §40.6 (job 30 `quarterly_perf_regression_check` — A1.2/CC7.2 PERF-SLO-06 baseline regression, quarterly); §41 (job 31 `wearable_sync_freshness_check` — CC7.2/WS-SLO-06 fleet freshness, daily 07:05 UTC); `docs/SSO_SCIM_IMPLEMENTATION.md §29` / DEC-051 (job 32 `turh_retention_purge` — CC6.3/GDPR Art. 17(3)(b) 7yr role-history retention, daily 04:00 UTC); `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` / DEC-066 (job 34 `bdg_override_expiry_sweep` — CC6.3/A1.2 SCIM guard override expiry, every 15 min — renumbered from cross-doc reference "job 33"); §48 / SOC2_READINESS.md §92 / DEC-067 (job 35 `google_directory_alert_check` — CC7.2/CC7.3 Google Directory sync anomaly detection, every 5 min — closes §48.8 item 3 P1/M4 obligation); `docs/DATA_MODEL.md §35.4` / DEC-052 (job 36 `dsar_slo_miss_counter_reset` — P5.1/CC7.2 DSAR SLO counter quarterly reset — renumbered from cross-doc reference "job 33"); `docs/SSO_SCIM_IMPLEMENTATION.md §36` / DEC-072 (job 37 `caep_reregister_sweep` — CC6.3 CAEP stream re-registration sweep, every 5 min — closes SSO_SCIM §36.6 item 1 P0/M5 obligation). Conflict resolution: `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` and `docs/DATA_MODEL.md §35.4` both claimed "job 33" for newly authored jobs; both are renumbered here (`bdg_override_expiry_sweep` → 34; `dsar_slo_miss_counter_reset` → 36). Freshness window note updated to cover 5-min, 15-min, and quarterly cadences. `system.gdir_alert_check_stale` LOW/1yr DEC-030 event noted for AUDIT_LOG_SCHEMA.md §System registration per §48.8 item 3.*
 *v0.3 patch (2026-06-12): Added jobs 26 (`workout_data_purge`) and 27 (`audit_log_retention_purge`) to the canonical registry — these were specified in §37.7 when v3.3 shipped but were not physically inserted into this table at the time.*
@@ -13898,6 +13900,247 @@ The following three-event chain uses a synthetic test tenant `tenant-test-001` a
 
 *v4.7.3 (2026-06-20): §6.2 Consolidated Alert Rules — four SCIM / SSO security subsections integrated from §26.8. Closes the integration gap where §26.7a `mass_deprovision` (AL-SCIM-MASS-01), §26.7b `scim_endpoint_operations` (AL-SCIM-01 through AL-SCIM-04), §26.7c `scim_role_history` (AL-SCIM-05), and §26.8 `sso_browser_security` (AL-SSO-WEB-01) were authored with explicit "(new subsection in §6.2, insert after …)" markers but were never physically inserted into the consolidated §6.2 alert rules table. The §6.2 integration of `cert_lifecycle` / `session_revocation` / `google_directory_sync` (§26.8 checklist item, P0/M4) had been completed but the four subsequent subsections were left in §26.8 only. This patch inserts all four into §6.2 in the prescribed order — after `google_directory_sync`, before `pam_session_health` — matching the "insert after" sequence in §26.8. SOC 2 CC7.2 impact: §26.11 already cited "twenty-one alert rules (AL-CERT-01..05, AL-REVOKE-01..02, AL-SSO-GDIR-01..05, AL-SCIM-MASS-01, AL-SCIM-01..04, AL-SCIM-05)" as continuous anomaly monitors; §6.2 now reflects this complete set, making the consolidated table accurate for auditor review without requiring a cross-reference to §26.8. Privacy floor: all four added subsections carry only FORM-internal `tenant_id` UUIDs, structured enum fields, and aggregate counts in alert payloads; no individual employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data appears in any alert trigger or DEC-030 event payload referenced by these rules. Document header: v4.7.2 → v4.7.3. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §26.7a` (AL-SCIM-MASS-01 source; `docs/INCIDENT_RESPONSE.md R-24` mass-deprovisioning response); `docs/SSO_SCIM_IMPLEMENTATION.md §26.7b` (AL-SCIM-01 through AL-SCIM-04; R-05 for chain invariant violation); `docs/SSO_SCIM_IMPLEMENTATION.md §26.7c` (AL-SCIM-05 role history reconciliation); `docs/SSO_SCIM_IMPLEMENTATION.md §30.10` (AL-SSO-WEB-01 mobile WebView security); `docs/SOC2_READINESS.md §26.11` (CC7.2 twenty-one alert rules claim — now accurate after §6.2 integration). Owner: devops-lead + security-engineer.*
 
+*v4.8.0 (2026-06-21): §51 Enterprise Contract Renewal Monitoring Observability (RENEW-NOTICE-01) — closes COST_MODEL §42.10 item 4 documentation obligation. pg_cron job 39 `renewal_notice_check` (daily 09:00 UTC, 26h freshness); AL-RENEW-01 (P1 PagerDuty `form-enterprise`); DEC-030 events `enterprise.renewal_notice_overdue` HIGH/7yr and `system.renewal_notice_check_passed` LOW/1yr; SOC 2 evidence REN-OBS-E-001 (CC4.1/A1.1, quarterly) and REN-E-002 (CC4.1/CC2.2, quarterly — registered in SOC2_READINESS §79.4 by COST_MODEL v2.10); §6.2 `contract_renewal_health` subsection integration; eight-item implementation checklist (5× P0/M11, 2× P1/M12); §12.6 registry updated to job 39 with v0.6 patch note. Document header v4.7.3 → v4.8.0. Privacy floor: all alert and event payloads carry only `tenant_id` UUID, `renewal_date` (DATE), `days_until_renewal` (int), `acv_usd` (aggregate contract amount); no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data; `form_api` REVOKED from `enterprise_contracts` and `enterprise_renewals` per DATA_MODEL §43. Cross-references: `docs/COST_MODEL.md §42.3.2` (RENEW-NOTICE-01 invariant definition and SQL); `docs/COST_MODEL.md §42.7` (`enterprise.renewal_notice_sent` DEC-030 canonical definition); `docs/COST_MODEL.md §42.9` (REN-E-002 evidence mapping CC4.1/CC2.2); `docs/COST_MODEL.md §42.10 item 4` (implementation task — pg_cron job 39 adopted in preference to Cloudflare Worker extension, for table co-location and pattern consistency with jobs 24/25); `docs/DATA_MODEL.md §43` (`enterprise_renewals` schema, migration 0084); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`enterprise.renewal_notice_sent` registered; `enterprise.renewal_notice_overdue` and `system.renewal_notice_check_passed` to be registered per §51.7 item 1); `docs/SOC2_READINESS.md §79.4` (REN-E-001/002/003 registered — v3.24.2; REN-OBS-E-001 to be added per §51.7 item 4); `docs/INCIDENT_RESPONSE.md R-05` (chain gap suspected escalation path). Owner: devops-lead + compliance-officer + security-engineer.*
 *v4.7.0 (2026-06-19): §50 OQ-SIEM-03 Resolution — HMAC Chain Verification for Tenant SIEM Consumers: Documentation-First Algorithm Specification with Concrete Library Trigger (DEC-071). Closes OQ-SIEM-03 from §27.12 (P2 — before enterprise GA M13 — open since v1.4, 2026-06-01). Decision (DEC-071, 2026-06-19): Option B adopted — documentation-first. FORM publishes `compliance/docs/hmac-chain-verification-algorithm.md` as Data Room artefact HMAC-VERIFY-ALGO-001 (chain structure description, Python pseudocode, test vector, per-tenant isolation note, cursor continuity guidance, HMAC rotation boundary note). No open-source library shipped at GA. Library trigger: ≥ 2 distinct enterprise pilot customers (M10–M13) submit CSM requests → Python reference implementation before GA; Go deferred to post-GA demand. Five grounds: (1) marketing claim "HMAC-chained audit log" describes chain structure, not consumer tooling — algorithm spec makes it independently verifiable without library; (2) enterprise security teams (Splunk/Sentinel/Datadog operators) have implementation capability from a well-specified pseudocode + test vector; (3) library maintenance burden (CVE response, Python 3.10/3.11/3.12 matrix, GitHub issue triage) is asymmetric to quarterly verification cadence; (4) raw algorithm spec is a stronger due-diligence signal for security-sensitive FinServ/LegalTech customers than a library dependency; (5) pattern consistency with DEC-043/051/053/065/067 "simplest adequate implementation" precedent. §50.1 scope (tenant-facing verification only; DEC-030 chain construction and AL-SIEM-05 chain-break alert unchanged). §50.2 two-option analysis: Option A (open-source library) — 3–4 sprint-days, ongoing maintenance, not demanded; Option B (algorithm spec) — < 1 sprint-day, zero maintenance, immediately available. §50.3 decision and five grounds. §50.4 chain verification algorithm specification: §50.4.1 DEC-030 chain structure (event_id, event_type, payload, created_at, hmac_signature, previous_event_id field definitions; HMAC input string format: "{event_id}:{event_type}:{canonical_payload}:{created_at_unix_ms}:{previous_signature}"; sentinel = 64 × '0' for chain-start; canonical_payload = JSON.stringify sorted keys no whitespace); §50.4.2 Python pseudocode (SENTINEL, canonical_payload(), compute_signature(), verify_chain() — sorts events by created_at, accumulates prev_signature, reports SIGNATURE_MISMATCH and CHAIN_POINTER_MISMATCH; four implementation notes: per-tenant isolation, cursor continuity across API pages, SIEM delivery gaps vs. chain breaks, HMAC secret rotation). §50.5 test vector: three-event synthetic chain for tenant `tenant-test-001` with test HMAC secret `test-secret-key-do-not-use`; `<computed: ...>` placeholders to be replaced with actual hex values at HMAC-VERIFY-ALGO-001 authoring time (§50.10 item 1). §50.6 Data Room exhibit HMAC-VERIFY-ALGO-001: file path `compliance/docs/hmac-chain-verification-algorithm.md`, audience enterprise security teams + SIEM integration engineers + SOC 2 auditors, SOC 2 mapping CC1.1/C1.1, permanent retention; per-tenant HMAC verification key design (`HKDF-SHA256(IKM=FORM_AUDIT_HMAC_SECRET, info=tenant_id, salt=HMAC_KDF_SALT, length=32)`); Admin Dashboard display-once panel privacy floor. §50.7 library trigger: ≥ 2 CSM requests tagged `[library-request: HMAC-VERIFY-ALGO-001]` in `enterprise_contracts.notes` between M10–M13 → Python reference implementation; four-step tracking protocol (CSM records → monthly security-engineer review → trigger action → M12 zero-trigger documentation). Go library: deferred unconditionally to post-GA explicit demand. §50.8 marketing claim assessment: "HMAC-chained audit log" is accurate — describes chain structure (per-event signature commits to predecessor); chain integrity monitored on FORM's side by AL-SIEM-05 P0 (30-min dead-man's switch + chain-break P0 auto-R-01); standard industry practice for HMAC-signed webhooks (Stripe/GitHub/Twilio/Okta publish specs, not libraries); §50.8 provides suggested security questionnaire response language. §50.9 OQ gap tracker: OQ-SIEM-03 🟢 Resolved DEC-071; §27.12/§34.10/§47.10 cross-updates. §50.10 seven-item implementation checklist: 3× P0/M9–M10 (HMAC-VERIFY-ALGO-001 authored + test vector computed, DATA_ROOM entry, per-tenant key derivation + Admin Dashboard display panel), 2× P1/M10 (ENTERPRISE_ONBOARDING §3.3 update, SECURITY_QUESTIONNAIRE standard response), 1× P1/M12 (library trigger review), 1× P2/M13-if-triggered (Python reference implementation). Document header: v4.6.0 → v4.7.0. Privacy floor: `tenant_hmac_verify_key` is a derived key (HKDF-SHA256, 32 bytes hex) — FORM does not log, retain, or transmit it after Admin Dashboard display; no `user_email`, `user_id`, health data, body composition, or GDPR Art. 9 special category in any artefact or algorithm output; test vector uses synthetic non-PII values only; `canonical_payload` serialisation sorts keys to ensure determinism without exposing identity fields (existing privacy floor from DEC-030 applies to payloads before serialisation). Cross-references: `docs/OBSERVABILITY.md §27.12` (OQ-SIEM-03 source — updated 🟢 Resolved DEC-071); `docs/OBSERVABILITY.md §27.4` (pull API `X-FORM-HMAC-Verify` response header + push webhook `X-FORM-Signature` — §50 adds per-event chain verification on top of these batch-level signatures); `docs/OBSERVABILITY.md §27.7` (AL-SIEM-05 P0 chain-break alert — FORM-internal monitoring; unchanged); `docs/OBSERVABILITY.md §34.10` (OQ-SIEM-03 row — updated 🟢 Resolved); `docs/OBSERVABILITY.md §47.10` (OQ-SIEM-03 row — updated 🟢 Resolved); `docs/AUDIT_LOG_SCHEMA.md §DEC-030` (canonical chain construction — §50.4.1 describes consumer-facing view; source of truth remains AUDIT_LOG_SCHEMA); `docs/CRYPTOGRAPHY_POLICY.md §5` (HMAC_KDF_SALT — to be registered per §50.10 item 3; annual rotation schedule); `docs/DATA_ROOM.md §Technical Security` (HMAC-VERIFY-ALGO-001 entry — per §50.10 item 2); `docs/ENTERPRISE_ONBOARDING.md §3.3` (HMAC verification step — per §50.10 item 4, P1/M10); `docs/SECURITY_QUESTIONNAIRE.md` (audit log integrity response — per §50.10 item 5, P1/M10); `docs/DECISION_LOG.md DEC-071` (formal adoption decision). Owner: security-engineer + devops-lead + compliance-officer.*
 
 ---
+
+---
+
+## §51 Enterprise Contract Renewal Monitoring Observability (RENEW-NOTICE-01)
+
+### §51.1 Purpose and Scope
+
+This section documents the observability controls for FORM's enterprise contract renewal pipeline — specifically the RENEW-NOTICE-01 monitoring invariant defined in `docs/COST_MODEL.md §42.3.2`. MSA §6.1 requires 90 days' written notice before renewal date for any price change above CPI+1%; the auto-renewal clause applies otherwise. RENEW-NOTICE-01 ensures no enterprise contract enters the 85–95 day pre-renewal window without a filed `enterprise.renewal_notice_sent` DEC-030 event.
+
+This section covers:
+
+1. pg_cron job 39 (`renewal_notice_check`) — canonical RENEW-NOTICE-01 implementation (§51.2)
+2. Alert rule AL-RENEW-01 — P1 PagerDuty `form-enterprise` on detection (§51.3)
+3. DEC-030 events: `enterprise.renewal_notice_overdue` HIGH/7yr and `system.renewal_notice_check_passed` LOW/1yr (§51.4)
+4. SOC 2 evidence mapping: CC4.1/CC2.2 → REN-E-002 and REN-OBS-E-001 (§51.5)
+5. §6.2 consolidated alert rules integration — new `contract_renewal_health` subsection (§51.6)
+6. Implementation checklist (§51.7)
+
+**Privacy floor invariant (inherits from `docs/ENTERPRISE.md` and COST_MODEL §42):** All alert and event payloads carry only `tenant_id` (FORM-internal UUID), `renewal_date` (DATE), `days_until_renewal` (int), and `acv_usd` (aggregate contract amount). No individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data appears in any event payload or alert payload. `form_api` is REVOKED from `enterprise_contracts` and `enterprise_renewals` per DATA_MODEL §43.
+
+---
+
+### §51.2 RENEW-NOTICE-01: pg_cron job 39 — `renewal_notice_check`
+
+#### §51.2.1 Implementation approach
+
+RENEW-NOTICE-01 is implemented as a standalone pg_cron job running the compliance SQL (COST_MODEL §42.3.2) directly in Postgres via pg_cron + pg_net, consistent with the patterns established by `mid_contract_termination_risk_check` (job 25, COST_MODEL §35.9.1) and `scim_mass_deprovision_check` (job 24, SSO_SCIM §26.7a). This approach — rather than extending the `evidence-collection-cron` Cloudflare Worker (COST_MODEL §42.10 item 4 original spec) — keeps the compliance SQL co-located with the tables it queries and reduces cross-boundary latency for a daily SLA-critical check.
+
+**Implementation decision:** pg_cron job 39 adopted in preference to Cloudflare Worker extension. COST_MODEL §42.10 item 4 should be updated to reflect this implementation path on deployment (§51.7 item 5). No formal DECISION_LOG entry required — this is an implementation detail within the established pg_cron + pg_net pattern; no architectural boundary crossing, no new data processor, no privacy or security trade-off.
+
+#### §51.2.2 Job specification
+
+| Field | Value |
+|---|---|
+| Job name | `renewal_notice_check` |
+| Schedule | `0 9 * * *` (daily 09:00 UTC) |
+| Freshness window | 26 h |
+| §12.6 registry slot | **job 39** |
+| Compliance relevance | CC4.1 / CC2.2 — RENEW-NOTICE-01; ensures `enterprise.renewal_notice_sent` DEC-030 event is on file 85–95 days before each active enterprise contract's `renewal_date` |
+| On detection | Emits `enterprise.renewal_notice_overdue` DEC-030 HIGH/7yr per flagged tenant (§51.4.1); fires AL-RENEW-01 PagerDuty P1 (§51.3) |
+| On no breach | Emits `system.renewal_notice_check_passed` DEC-030 LOW/1yr (aggregate; no `tenant_id` in the all-clear event — privacy floor) |
+| Stale consequence | RENEW-NOTICE-01 detection blind spot — a contract may reach < 85 days to renewal with no notice on file and no alert fired → MSA §6.1 non-compliance risk; CC4.1 control gap |
+| Alert if stale | PagerDuty P1 `form-compliance` → compliance-officer; dedup `renewal-notice-check-stale`; 26h freshness window (daily cadence) |
+| Run context | `service_role` (elevated — `form_api` is REVOKED from `enterprise_contracts`); read `enterprise_contracts`, `audit_log_events`; write `audit_log_events` only |
+
+#### §51.2.3 RENEW-NOTICE-01 SQL
+
+Canonical SQL per `docs/COST_MODEL.md §42.3.2` (reproduced for implementation reference):
+
+```sql
+-- RENEW-NOTICE-01: flag contracts where renewal is in 85–95 days but no notice event filed
+SELECT ec.tenant_id, ec.renewal_date, ec.acv_usd
+FROM enterprise_contracts ec
+WHERE ec.status = 'active'
+  AND ec.renewal_date BETWEEN CURRENT_DATE + 85 AND CURRENT_DATE + 95
+  AND NOT EXISTS (
+    SELECT 1 FROM audit_log_events ale
+    WHERE ale.event_type = 'enterprise.renewal_notice_sent'
+      AND ale.payload->>'tenant_id' = ec.tenant_id::text
+      AND ale.created_at > ec.renewal_date - INTERVAL '100 days'
+  );
+```
+
+For each result row, the job:
+1. Emits `enterprise.renewal_notice_overdue` HIGH/7yr DEC-030 event (§51.4.1) for the flagged `tenant_id`
+2. Fires AL-RENEW-01 via `net.http_post` to PagerDuty `form-enterprise` (§51.3)
+3. Applies 72h dedup key `renew-notice-missing-{tenant_id}` — matches COST_MODEL §42.10 item 4 dedup spec; prevents re-alert storms during the compliance-officer's 5-day SLA window while preserving the per-run audit trail
+
+If no result rows: emits one `system.renewal_notice_check_passed` LOW/1yr event with aggregate `contracts_checked` count (no `tenant_id`).
+
+#### §51.2.4 Tables accessed and RLS context
+
+`renewal_notice_check` executes as `service_role` (elevated — required because `form_api` is REVOKED from `enterprise_contracts` per DATA_MODEL §43 RLS policy). Access profile:
+
+| Table | Operation | Columns touched |
+|---|---|---|
+| `enterprise_contracts` | SELECT | `tenant_id`, `renewal_date`, `acv_usd`, `status` |
+| `audit_log_events` | SELECT (NOT EXISTS subquery) | `event_type`, `payload->>'tenant_id'`, `created_at` |
+| `audit_log_events` | INSERT (DEC-030 emission) | Full row via HMAC-chain writer function |
+
+**Privacy floor check:** the SQL selects `tenant_id` (FORM-internal UUID), `renewal_date` (DATE), and `acv_usd` (aggregate contract value). No `user_id`, employee name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data is selected, processed, or emitted.
+
+---
+
+### §51.3 Alert Rule AL-RENEW-01
+
+**Trigger condition:** Any active `enterprise_contracts` row has `renewal_date BETWEEN CURRENT_DATE + 85 AND CURRENT_DATE + 95` with no `enterprise.renewal_notice_sent` DEC-030 event for the same `tenant_id` with `created_at > renewal_date - INTERVAL '100 days'`.
+
+| Field | Value |
+|---|---|
+| Alert ID | AL-RENEW-01 |
+| Source | `renewal_notice_check` pg_cron (job 39, §12.6, daily 09:00 UTC) |
+| Severity | P1 |
+| Notification | PagerDuty `form-enterprise` → compliance-officer |
+| Dedup key | `renew-notice-missing-{tenant_id}` |
+| Dedup window | 72 h |
+| Response SLA | 5 days — compliance-officer emits notice within 5 days of first alert; if still within the 85–95 day window, notice satisfies MSA §6.1; if < 85 days remain at the time of notice, treat as an MSA §6.1 notice exception (document in `enterprise_contracts.notes`) |
+| Auto-resolve | Yes — job re-runs at 09:00 UTC; once `enterprise.renewal_notice_sent` is on file, the NOT EXISTS subquery excludes the tenant from the next result set; PagerDuty resolves automatically |
+| Runbook | §51.3.1 |
+| DEC-030 event | `enterprise.renewal_notice_overdue` HIGH/7yr (§51.4.1) |
+| SOC 2 evidence | REN-E-002 CC4.1/CC2.2 — quarterly renewal notice compliance export (COST_MODEL §42.9); REN-OBS-E-001 CC4.1/A1.1 — quarterly job 39 run history (§51.5) |
+| Cross-references | `docs/COST_MODEL.md §42.3.2` (invariant definition); `docs/COST_MODEL.md §42.7` (`enterprise.renewal_notice_sent` DEC-030 event); `docs/DATA_MODEL.md §43` (`enterprise_renewals` schema); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (event registration); `docs/INCIDENT_RESPONSE.md R-05` (if chain gap suspected) |
+
+#### §51.3.1 AL-RENEW-01 runbook
+
+1. **Confirm the alert is valid.** Open Supabase table editor → `enterprise_contracts` → filter `status = 'active'`, `renewal_date` between `today + 85` and `today + 95`. Confirm the tenant is active and the renewal date is correct (not a test row or stale record).
+
+2. **Check for notice event.** Query `audit_log_events` for `event_type = 'enterprise.renewal_notice_sent'` AND `payload->>'tenant_id' = '<tenant_id>'` AND `created_at > renewal_date - INTERVAL '100 days'`. If an event is found but AL-RENEW-01 still fired, this is likely a dedup timing edge — verify the event `created_at` is within the 100-day query window; escalate to devops-lead if the SQL logic appears incorrect.
+
+3. **Emit the renewal notice.** Log into FORM Admin Console → Enterprise → Accounts → `[tenant_name]` → Renewal → "Send Renewal Notice". This emits `enterprise.renewal_notice_sent` DEC-030 STANDARD/7yr. If price escalation applies under MSA §8.6, emit `enterprise.renewal_escalation_calculated` first per COST_MODEL §42.5.3.
+
+4. **Verify auto-resolution.** Wait for the next `renewal_notice_check` run at 09:00 UTC. Confirm AL-RENEW-01 resolves in PagerDuty.
+
+5. **If < 85 days remain when notice is sent:** The RENEW-NOTICE-01 detection window (85–95 days) was missed. This is an MSA §6.1 compliance exception. Notify the enterprise customer immediately by email; document the date, reason for delay, and customer acknowledgement in `enterprise_contracts.notes`; open R-05 (HMAC chain audit) if the original detection failure was caused by a chain integrity gap.
+
+6. **If the dedup window suppresses the next alert within 72 h:** The PagerDuty dedup is intentional — one page per 72 h per tenant. If the compliance-officer needs to verify ongoing non-resolution, query `enterprise.renewal_notice_overdue` in `audit_log_events` for the `tenant_id`; presence of events confirms the job continues to detect the gap on each daily run.
+
+#### §51.3.2 §6.2 integration note
+
+AL-RENEW-01 belongs in §6.2 Consolidated Alert Rules under a new `contract_renewal_health` subsection — insert after the `enterprise_mid_contract_termination_risk` subsection (§36 AL-ETF-01) and before `pam_session_health` (§29.4 AL-PAM-01). See §51.6 for the complete subsection text to insert.
+
+---
+
+### §51.4 DEC-030 Events
+
+#### §51.4.1 `enterprise.renewal_notice_overdue`
+
+Emitted by `renewal_notice_check` (job 39) once per flagged `tenant_id` per daily job run when the RENEW-NOTICE-01 SQL returns one or more rows. The PagerDuty dedup key `renew-notice-missing-{tenant_id}` (72h) prevents alert storms — but the DEC-030 event is emitted on every run that detects an overdue tenant, preserving the full audit trail without suppression.
+
+| Field | Value |
+|---|---|
+| Event type | `enterprise.renewal_notice_overdue` |
+| Severity | HIGH |
+| Retention | 7 yr |
+| HMAC chain | Yes — DEC-030 HMAC-chained in `audit_log_events` |
+| SOC 2 mapping | CC4.1 (control performance evaluated against threshold), CC2.2 (MSA §6.1 contractual commitment monitoring) |
+
+**Zod v2 schema:**
+
+```typescript
+const RenewalNoticeOverduePayload = z.object({
+  tenant_id:          z.string().uuid(),
+  renewal_date:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),   // ISO 8601 date-only
+  days_until_renewal: z.number().int().min(85).max(95),
+  acv_usd:           z.number().positive(),
+  check_run_at:       z.string().datetime(),                       // ISO 8601 UTC
+  alert_dedup_key:    z.string(),                                  // "renew-notice-missing-{tenant_id}"
+});
+```
+
+**Privacy floor:** `tenant_id` is a FORM-internal UUID. `acv_usd` is an aggregate contract-level financial amount — no individual employee data. `renewal_date` and `days_until_renewal` are contract-level dates. No `user_id`, name, email, health value, body composition, or GDPR Art. 9 special-category data.
+
+**Registration obligation:** `enterprise.renewal_notice_overdue` must be registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise` per §51.7 item 1 (P0/M11).
+
+#### §51.4.2 `system.renewal_notice_check_passed`
+
+Emitted by `renewal_notice_check` (job 39) when the RENEW-NOTICE-01 SQL returns zero rows. An operational all-clear health signal — does not contain `tenant_id` or any contract-identifying information.
+
+| Field | Value |
+|---|---|
+| Event type | `system.renewal_notice_check_passed` |
+| Severity | LOW |
+| Retention | 1 yr |
+| HMAC chain | Yes — DEC-030 HMAC-chained |
+| SOC 2 mapping | A1.1 (capacity and operational risk monitoring) |
+
+**Zod v2 schema:**
+
+```typescript
+const RenewalNoticeCheckPassedPayload = z.object({
+  contracts_checked: z.number().int().nonnegative(),
+  check_run_at:      z.string().datetime(),
+});
+```
+
+**Privacy floor:** No `tenant_id` or any tenant-identifying information. This event is safe to stream to SIEM without any redaction.
+
+**Registration obligation:** `system.renewal_notice_check_passed` must be registered in `docs/AUDIT_LOG_SCHEMA.md §System` per §51.7 item 1 (P0/M11).
+
+---
+
+### §51.5 SOC 2 Evidence Mapping
+
+| Artefact ID | SOC 2 Criteria | Description | Frequency | Retention | Path |
+|---|---|---|---|---|---|
+| **REN-E-002** | CC4.1 / CC2.2 | Quarterly renewal notice compliance export: all `enterprise.renewal_notice_sent` DEC-030 events in the quarter with `days_until_renewal` distribution and `notice_type` breakdown. Cross-check: every account with `renewal_date` in the following 90 days has a notice event on file. Zero-notice accounts flagged as exceptions requiring compliance-officer explanation. Already registered in `docs/SOC2_READINESS.md §79.4` master evidence table (COST_MODEL v2.10, 2026-06-21). | Quarterly | 3 yr | `compliance/evidence/renewals/REN-E-002_<YYYY-QN>.csv` |
+| **REN-OBS-E-001** | CC4.1 / A1.1 | Quarterly `renewal_notice_check` pg_cron job 39 run history: confirms zero stale-job gaps > 26 h throughout the quarter. Sourced from `pg_cron.job_run_details WHERE jobname = 'renewal_notice_check'`. Zero gaps > 26 h is the pass condition. Demonstrates that the RENEW-NOTICE-01 detection control was continuously operational, not merely configured. | Quarterly | 3 yr | `compliance/evidence/renewals/REN-OBS-E-001_<YYYY-QN>.md` |
+
+**CC4.1 auditor narrative:** CC4.1 requires FORM to evaluate and communicate control performance against defined thresholds. AL-RENEW-01 (P1 PagerDuty `form-enterprise`, 5-day compliance-officer SLA) is the defined threshold for MSA §6.1 compliance. REN-E-002 proves this threshold was monitored and respected on a per-account basis across the observation quarter — not as a policy claim but as a DEC-030 HMAC-chained record. REN-OBS-E-001 proves the monitoring control itself was continuously operational.
+
+**CC2.2 auditor narrative:** CC2.2 requires FORM to communicate information to external parties about commitments. The 90-day renewal notice is a contractual commitment per MSA §6.1. `enterprise.renewal_notice_sent` DEC-030 STANDARD/7yr proves the commitment was honored; `enterprise.renewal_notice_overdue` HIGH/7yr (when present in the quarter) proves FORM detected any gap and alerted the compliance-officer within one daily check cycle.
+
+**A1.1 auditor narrative:** A1.1 requires monitoring for threats to the availability of enterprise commitments. RENEW-NOTICE-01 (job 39) prevents the enterprise contract lifecycle from proceeding without compliant notice — an operational risk that, if undetected, would affect FORM's ability to retain enterprise ARR and fulfill MSA obligations.
+
+---
+
+### §51.6 §6.2 Consolidated Alert Rules Integration
+
+New subsection `contract_renewal_health` — insert after the `enterprise_mid_contract_termination_risk` subsection (§36 AL-ETF-01) and before `pam_session_health` (§29.4 AL-PAM-01) in §6.2 Consolidated Alert Rules.
+
+**Subsection: `contract_renewal_health` (AL-RENEW-01 — §51.3):**
+
+| Alert Name | Trigger Condition | Severity | Notification Channel | Runbook |
+|---|---|---|---|---|
+| **Renewal notice overdue** | `enterprise_contracts.renewal_date BETWEEN CURRENT_DATE + 85 AND CURRENT_DATE + 95` with no `enterprise.renewal_notice_sent` DEC-030 event for `tenant_id` within the prior 100 days of renewal; detected by `renewal_notice_check` pg_cron job 39 (daily 09:00 UTC, §51.2) | P1 | PagerDuty `form-enterprise` → compliance-officer; dedup `renew-notice-missing-{tenant_id}` 72h; auto-resolves when notice event on file at next 09:00 UTC run | AL-RENEW-01 runbook §51.3.1; escalate to R-05 if underlying DEC-030 chain gap suspected |
+
+**SOC 2 mapping:** CC4.1 (performance threshold monitoring for MSA §6.1 obligation), CC2.2 (external contractual commitment fulfillment), A1.1 (enterprise ARR operational risk detection).
+
+---
+
+### §51.7 Implementation Checklist
+
+#### P0 — Before first enterprise contract approaches the 95-day renewal window (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `enterprise.renewal_notice_overdue` (HIGH/7yr, Zod schema `RenewalNoticeOverduePayload` per §51.4.1) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise`; register `system.renewal_notice_check_passed` (LOW/1yr, Zod schema `RenewalNoticeCheckPassedPayload` per §51.4.2) in `docs/AUDIT_LOG_SCHEMA.md §System`. | compliance-officer + security-engineer | **P0** | M11 | [ ] |
+| 2 | Implement `renewal_notice_check` pg_cron job (job 39, schedule `0 9 * * *`): RENEW-NOTICE-01 SQL (§51.2.3); per-tenant `enterprise.renewal_notice_overdue` HIGH/7yr DEC-030 emission; AL-RENEW-01 via `net.http_post` to PagerDuty `form-enterprise`; dedup key `renew-notice-missing-{tenant_id}` 72h; `system.renewal_notice_check_passed` LOW/1yr emission on all-clear. Run as `service_role`. Confirm first successful run in `pg_cron.job_run_details`. | devops-lead + platform-engineer | **P0** | M11 | [ ] |
+| 3 | Insert AL-RENEW-01 into §6.2 Consolidated Alert Rules under new `contract_renewal_health` subsection (insert after AL-ETF-01, before AL-PAM-01) per §51.6 subsection text. | devops-lead | **P0** | M11 | [ ] |
+| 4 | Add REN-OBS-E-001 (§51.5) to `docs/SOC2_READINESS.md §79.4` master evidence table and to the quarterly evidence collection runbook. File path: `compliance/evidence/renewals/REN-OBS-E-001_<YYYY-QN>.md`. | compliance-officer | **P0** | M11 | [ ] |
+| 5 | Update `docs/COST_MODEL.md §42.10 item 4` status: mark as closed with pg_cron job 39 implementation; note that RENEW-NOTICE-01 is implemented via pg_cron + pg_net rather than Cloudflare Worker extension per §51.2.1 decision. | devops-lead | **P0** | M11 | [ ] |
+
+#### P1 — Before first renewal notice is sent (M12)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Test RENEW-NOTICE-01 end-to-end in staging: (a) insert synthetic `enterprise_contracts` row with `renewal_date = CURRENT_DATE + 90`, `status = 'active'`; (b) run `renewal_notice_check` manually via `SELECT cron.run_job('renewal_notice_check')`; (c) verify `enterprise.renewal_notice_overdue` DEC-030 HIGH/7yr emitted with correct `tenant_id`, `renewal_date`, `days_until_renewal`, `acv_usd`; (d) verify AL-RENEW-01 PagerDuty P1 fired on `form-enterprise`; (e) verify dedup key `renew-notice-missing-{tenant_id}` prevents second page within 72 h; (f) insert `enterprise.renewal_notice_sent` event for the same `tenant_id`; (g) re-run job; (h) verify `system.renewal_notice_check_passed` emitted and PagerDuty alert auto-resolves. | devops-lead + qa-lead | **P1** | M12 | [ ] |
+| 7 | File first REN-OBS-E-001 quarterly evidence artefact after first full operational quarter: export `pg_cron.job_run_details WHERE jobname = 'renewal_notice_check'` for the quarter; confirm zero stale-job gaps > 26 h; file at `compliance/evidence/renewals/REN-OBS-E-001_<YYYY-QN>.md`. | compliance-officer | **P1** | M12 | [ ] |
+
+---
+
+### §51.8 OQ Gap Tracker
+
+| OQ | Status | Decision |
+|---|---|---|
+| — | No open questions | RENEW-NOTICE-01 is a fully specified invariant (COST_MODEL §42.3.2 SQL + COST_MODEL §42.10 item 4 spec). Implementation approach (pg_cron job 39 vs. Cloudflare Worker extension) is resolved in §51.2.1 in favour of pg_cron for table co-location and pattern consistency with jobs 24 and 25. No ambiguity in alert routing, DEC-030 events, SOC 2 mapping, or evidence artefacts. |
+
+---
+
+*v4.8.0 (2026-06-21): §51 Enterprise Contract Renewal Monitoring Observability — closes COST_MODEL §42.10 item 4 documentation obligation (RENEW-NOTICE-01 monitoring invariant not yet registered in OBSERVABILITY.md as of COST_MODEL v2.10). §51.1 purpose and scope (RENEW-NOTICE-01; MSA §6.1 90-day notice requirement; privacy floor). §51.2 pg_cron job 39 `renewal_notice_check` (daily 09:00 UTC, 26h freshness window): §51.2.1 implementation decision — pg_cron + pg_net adopted in preference to Cloudflare Worker extension for table co-location and pattern consistency with jobs 24/25; §51.2.2 job specification table (schedule, freshness, compliance relevance, on-detection, on-all-clear, stale consequence, run context); §51.2.3 RENEW-NOTICE-01 SQL (reproduced from COST_MODEL §42.3.2 — SELECT active contracts with renewal_date in 85–95 days and no notice event within 100 days; per-tenant DEC-030 emission + AL-RENEW-01 + 72h dedup; all-clear emission); §51.2.4 tables accessed (`enterprise_contracts` SELECT, `audit_log_events` SELECT + INSERT; `service_role`; no write to `enterprise_contracts`). §51.3 AL-RENEW-01 alert rule (P1, PagerDuty `form-enterprise` → compliance-officer, dedup `renew-notice-missing-{tenant_id}` 72h, 5-day SLA, auto-resolve on notice filed); §51.3.1 six-step runbook (confirm validity → check event → emit notice → verify resolution → MSA §6.1 exception handling → dedup window advisory); §51.3.2 §6.2 integration note (insert after AL-ETF-01, before AL-PAM-01). §51.4 two DEC-030 events: `enterprise.renewal_notice_overdue` HIGH/7yr (Zod `RenewalNoticeOverduePayload`: `tenant_id` UUID, `renewal_date` date-regex, `days_until_renewal` int 85–95, `acv_usd` positive, `check_run_at` datetime, `alert_dedup_key` string; registered per §51.7 item 1 P0/M11); `system.renewal_notice_check_passed` LOW/1yr (Zod `RenewalNoticeCheckPassedPayload`: `contracts_checked` nonneg int, `check_run_at` datetime; no tenant_id — privacy floor; registered per §51.7 item 1 P0/M11). §51.5 two evidence artefacts: REN-E-002 (CC4.1/CC2.2, quarterly, 3yr — already in SOC2_READINESS §79.4, COST_MODEL v2.10); REN-OBS-E-001 (CC4.1/A1.1, quarterly, 3yr — new; `compliance/evidence/renewals/REN-OBS-E-001_<YYYY-QN>.md`; §51.7 item 4 to register in SOC2_READINESS §79.4). §51.6 §6.2 consolidated alert rules `contract_renewal_health` subsection (insert after AL-ETF-01, before AL-PAM-01). §51.7 seven-item implementation checklist: 5× P0/M11 (AUDIT_LOG_SCHEMA event registration, pg_cron job 39 implementation, §6.2 insertion, SOC2_READINESS REN-OBS-E-001 registration, COST_MODEL §42.10 item 4 status update), 2× P1/M12 (end-to-end staging test, first REN-OBS-E-001 evidence filing). §51.8 OQ gap tracker: no open questions. §12.6 registry: job 39 `renewal_notice_check` row added; freshness note updated; v0.6 patch note. Document header v4.7.3 → v4.8.0. Owner: devops-lead + compliance-officer + security-engineer.*

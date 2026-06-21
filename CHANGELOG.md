@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [7.17.1] — 2026-06-21
+
+### Changed
+- `docs/OBSERVABILITY.md` — v4.7.3 → v4.8.0. §51 Enterprise Contract Renewal Monitoring Observability (RENEW-NOTICE-01): pg_cron job 39 `renewal_notice_check` (daily 09:00 UTC, 26h freshness); alert AL-RENEW-01 (P1, PagerDuty `form-enterprise`, dedup 72h); DEC-030 events `enterprise.renewal_notice_overdue` HIGH/7yr and `system.renewal_notice_check_passed` LOW/1yr; SOC 2 evidence REN-OBS-E-001 (CC4.1/A1.1) and REN-E-002 (CC4.1/CC2.2); §6.2 `contract_renewal_health` subsection; seven-item checklist. §12.6 pg_cron registry updated: job 39 row added; freshness note updated; v0.6 patch note. Closes COST_MODEL §42.10 item 4 documentation obligation (RENEW-NOTICE-01 not previously registered in OBSERVABILITY.md).
+- `VERSION` — 7.17.0 → 7.17.1.
+
+---
+
 ## [7.17.0] — 2026-06-21
 
 ### Added
