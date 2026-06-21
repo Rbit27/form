@@ -2614,6 +2614,47 @@
         </div>
       </div>
 
+      <!-- Privileged Access Activity — OBSERVABILITY.md §29.13 checklist item 2 · design-craft + platform-engineer -->
+      <div class="stat-card mb-6" id="pamActivityCard">
+        <div class="flex justify-between items-start mb-6">
+          <div>
+            <div class="label">Privileged Access Activity</div>
+            <div class="text-dim text-sm mt-1" style="max-width:520px">FORM engineering access to your data is time-limited, two-person approved, and fully audited.</div>
+          </div>
+          <select class="input-field" id="pamPeriodSelector" onchange="updatePamActivity()" style="max-width:196px;width:auto;flex-shrink:0">
+            <option value="0">Current month</option>
+            <option value="1">Previous month</option>
+            <option value="2">2 months ago</option>
+            <option value="3">3 months ago</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 mb-6">
+          <div>
+            <div class="text-mute text-xs font-mono mb-2">Privileged operations</div>
+            <div class="data text-paper text-4xl font-light" id="pamOpsCount">47</div>
+            <div class="text-mute text-xs font-mono mt-2" id="pamOpsPeriod">June 2026 · PAM sessions · DEC-030 HMAC-chained</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-2">Break-glass activations</div>
+            <div class="flex items-center gap-3 mt-1">
+              <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" id="pamBgDot" style="background:#22c55e"></div>
+              <div class="data text-4xl font-light" id="pamBgCount" style="color:#22c55e">0</div>
+              <button id="pamBgWarning" class="hidden text-xs font-mono px-2 py-0.5 rounded" style="background:rgba(251,191,36,0.12);color:#FBBF24;border:1px solid rgba(251,191,36,0.3)" title="Break-glass access is authorised for production incidents only and requires a mandatory post-hoc review. Contact your CSM for details.">⚠ emergency access</button>
+            </div>
+            <div class="text-xs font-mono mt-2" id="pamBgNote" style="color:#22c55e">None this period</div>
+          </div>
+        </div>
+
+        <div class="bg-deep border border-line rounded-xl p-4 mb-5 text-mute text-xs font-mono leading-relaxed">
+          Every privileged operation requires: (1) <span class="text-paper">two-person approval</span> — a second engineer co-signs the elevation; (2) <span class="text-paper">time-bound session</span> — 4 h max, no renewal; (3) <span class="text-paper">full audit chain</span> — HMAC-chained DEC-030 events retained 7 years. Break-glass additionally triggers a mandatory post-incident review within 72 h. No query content, admin identities, or session details are present in this view.
+        </div>
+
+        <div class="border-t border-line pt-4">
+          <a href="/security.html#privileged-access" class="text-acid text-xs font-mono hover:underline">Learn about FORM's privileged access controls →</a>
+        </div>
+      </div>
+
       <!-- Break-glass access log -->
       <div class="stat-card mb-6">
         <div class="flex justify-between items-center mb-6">
@@ -2736,6 +2777,43 @@
       setTimeout(() => btn.textContent = prev, 1500);
     });
   });
+
+  // Privileged Access Activity panel — OBSERVABILITY.md §29.13
+  // Simulated responses; production: GET /api/admin/tenants/:tenantId/pam-activity
+  const PAM_DATA = [
+    { ops: 47, bg: 0, label: 'June 2026' },
+    { ops: 62, bg: 0, label: 'May 2026' },
+    { ops: 51, bg: 1, label: 'April 2026' },
+    { ops: 38, bg: 0, label: 'March 2026' },
+  ];
+
+  function updatePamActivity() {
+    const period = parseInt(document.getElementById('pamPeriodSelector').value, 10);
+    const d = PAM_DATA[period];
+    document.getElementById('pamOpsCount').textContent = d.ops;
+    document.getElementById('pamOpsPeriod').textContent = d.label + ' · PAM sessions · DEC-030 HMAC-chained';
+
+    const dot     = document.getElementById('pamBgDot');
+    const count   = document.getElementById('pamBgCount');
+    const note    = document.getElementById('pamBgNote');
+    const warning = document.getElementById('pamBgWarning');
+
+    if (d.bg === 0) {
+      dot.style.background = '#22c55e';
+      count.style.color    = '#22c55e';
+      count.textContent    = '0';
+      note.style.color     = '#22c55e';
+      note.textContent     = 'None this period';
+      warning.classList.add('hidden');
+    } else {
+      dot.style.background = '#FBBF24';
+      count.style.color    = '#FBBF24';
+      count.textContent    = d.bg;
+      note.style.color     = '#FBBF24';
+      note.textContent     = d.bg === 1 ? '1 event · post-hoc review on file' : d.bg + ' events · post-hoc reviews on file';
+      warning.classList.remove('hidden');
+    }
+  }
 </script>
 </body>
 </html>

@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [7.19.1] — 2026-06-21
+
+### Added
+- `admin-dashboard.html` — "Privileged Access Activity" card added to the Security & Compliance tab (OBSERVABILITY.md §29.13 checklist item 2 · P1/M5). Card elements: heading + sub-heading ("time-limited, two-person approved, fully audited"); primary stat `privilegedOperationsCount` (large numeral); secondary stat break-glass activations with green dot + "None" at zero, amber dot + count + tooltip at >0; period selector (current month, previous 3 calendar months); explanatory PAM mechanics note (two-person approval, 4 h session cap, DEC-030 HMAC chain, 72 h post-hoc review obligation); footer link to `/security.html#privileged-access`. Mock data covers June–March 2026 including one break-glass event in April to exercise the amber state. Period-selector JS added: `updatePamActivity()` re-renders both stats on change. Privacy floor enforced by design: no `admin_user_id`, no session ID, no query content — only aggregate counts per period. Positioned above the existing "Break-glass & support access · last 90 days" card. Ref: OBSERVABILITY.md §29.13.3 (backend SQL), §29.13.4 (privacy invariants), §29.13.5 (placement + copy), §29.13.7 (SOC 2 CC6.1 / C1.2 mapping). Owner: design-craft + platform-engineer + compliance-officer.
+
+### Changed
+- `docs/OBSERVABILITY.md §29.13.8` — checklist item 2 marked `[x] Done — 2026-06-21, admin-dashboard.html v0.48.0`.
+- `docs/DATA_MODEL.md §31` — checklist item 10 (DSAR status widget) marked `[x] Done — 2026-06-21, admin-dashboard.html v0.48.0`. Widget was present in dashboard but checklist not updated; cross-reference closure only — no HTML change required.
+- `VERSION` — 7.19.0 → 7.19.1.
+
+---
+
 ## [7.19.0] — 2026-06-21
 
 ### Added

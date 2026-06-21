@@ -13066,7 +13066,7 @@ Evidence collection path: `compliance/evidence/dsar/DSAR-E-00{1..6}_<YYYY-QN>.pd
 |---|---|---|---|---|---|
 | 8 | Implement tenant admin DSAR status endpoint `GET /api/v1/enterprise/dsar` returning only allowlisted columns (§31.4 privacy floor). Verify HR persona cannot access `export_url`, `refusal_basis`, or `tables_erased`. | enterprise-architect + compliance-officer | **P1** | M5 | [ ] |
 | 9 | Collect DSAR-E-001 through DSAR-E-006 evidence artefacts after first production DSAR lifecycle; store in `compliance/evidence/dsar/`; cross-reference `docs/SOC2_READINESS.md` P4.0 and P8.0 evidence tables. | compliance-officer | **P1** | M5 | [ ] |
-| 10 | Add DSAR status widget to admin-dashboard.html Compliance screen (open requests, days remaining, overdue count). | platform-engineer | **P1** | M5 | [ ] |
+| 10 | Add DSAR status widget to admin-dashboard.html Compliance screen (open requests, days remaining, overdue count). | platform-engineer | **P1** | M5 | [x] Done — 2026-06-21, admin-dashboard.html v0.48.0 |
 
 #### P2 — Post-GA
 
