@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.15.1] — 2026-06-21
+
+### Added
+- `content/post-45-progress-beyond-barbell-weight.md` — Editorial · training-methodology. Прогрес без ваги штанги: що ще рахується і чому. Шість паралельних метрик адаптації (повтори при тому ж RPE, технічна стабільність, відновлення між підходами, швидкість штанги, об'ємна ємність, консистентність). Алгоритм діагнозу для self-coached атлета, коли штанга «стоїть». Refs: Schoenfeld 2010, Atherton & Rennie 2009, Bazuelo-Ruiz et al. 2015, Barker et al. 2010. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — картка post-45 додана (Training Methodology · 13 хв · draft · 2026-06-21). blog.html актуальний до post-45.
+- `README.md` — post-45 → draft · v7.15.1.
+- `STATUS.md` — 11–50 row: post-45 entry added · v7.15.1. Version header updated to v7.15.1.
+- `VERSION` — 7.15.0 → 7.15.1.
+
+---
+
 ## [7.15.0] — 2026-06-21
 
 ### Added
