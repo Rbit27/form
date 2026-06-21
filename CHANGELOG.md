@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [7.36.1] — 2026-06-21
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-31: GDPR Audit Log Retention Purge Failure recovery runbook for pg_cron job 27 (`audit_log_retention_purge`, `0 3 1 * *`, 48h freshness window). Three-severity matrix: P1 (stale, zero eligible rows — monitoring gap; expected until ~2033), P0 (stale + eligible rows — GDPR Art. 5(1)(e) overcollection breach; manual purge required), P0-chain (H6 chain verification failure — `emit-audit-event` HTTP 422 → DELETE intentionally blocked; R-05 co-activation required). Six root cause hypotheses H1–H6. Unique H6: self-referential DEC-030 ordering constraint requires `data.audit_log_purge_completed` emitted HTTP 200 confirmed BEFORE DELETE. Three DEC-030 events: `system.audit_log_purge_failure_declared` (HIGH/7yr), `system.audit_log_purge_manual_run_completed` (STANDARD/7yr, `dec030_ordering_respected: z.literal(true)` mandatory), `system.audit_log_purge_restored` (STANDARD/3yr, `r05_activated`). Five evidence artefacts: AUDIT-PURGE-E-001/002/003/004/AUDIT-PURGE-COMP-E-001. Template AUDIT-INT-01 internal memo.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.24: three new DEC-030 events registered in §System after `system.purge_cron_restored`: `system.audit_log_purge_failure_declared` (HIGH/7yr), `system.audit_log_purge_manual_run_completed` (STANDARD/7yr, `dec030_ordering_respected: z.literal(true)`), `system.audit_log_purge_restored` (STANDARD/3yr, H1–H6 root_cause_category, `r05_activated`). AUDIT-PURGE-CHAIN-01 ordering invariant noted.
+- `docs/OBSERVABILITY.md` — v4.8.4: §12.6 job 27 `audit_log_retention_purge` registry entry updated — stale consequence column includes `INCIDENT_RESPONSE R-31 (job 27 stale recovery runbook — §R-31.5)`.
+- `docs/SOC2_READINESS.md` — v3.24.7: §79.4 five AUDIT-PURGE artefacts registered (AUDIT-PURGE-E-001/002/003/004/AUDIT-PURGE-COMP-E-001); §80.3 `audit-log-purge/` subfolder added; §80.4 Vanta mirror list updated.
+- `docs/INCIDENT_RESPONSE.md` — v3.0: R-31 appended; header v2.9 → v3.0.
+- `STATUS.md` — VERSION → 7.36.1.
+
 ## [7.36.0] — 2026-06-21
 
 ### Added

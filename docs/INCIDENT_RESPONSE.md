@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v2.9
+# FORM · Incident Response Runbook v3.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -11654,6 +11654,499 @@ Store artefacts at `compliance/evidence/purge-cron/r30-<incident_id>/` with `MAN
 ---
 
 **v1.0 · 2026-06-21 · Owner: compliance-officer + devops-lead + platform-engineer**
+**Review: after every P0/P1 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
+
+---
+
+## R-31 GDPR Audit Log Retention Purge Failure — `audit_log_retention_purge` pg_cron Stale
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `audit_log_retention_purge` pg_cron job 27 exceeds the 48-hour freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` (§12.7) emits `system.cron_job_stale` with `job_name = 'audit_log_retention_purge'`; routes to PagerDuty P1 `form-devops` + `form-compliance` with dedup key `purge-job-27-stale` per AL-GDPR-05 (§37.7)
+> **Primary owners:** compliance-officer · devops-lead · security-engineer
+> **Regulatory risk:** Job 27 enforces FORM's GDPR Art. 5(1)(e) storage-limitation ceiling on the audit log itself: `audit_log_events` rows with `emitted_at < NOW() - INTERVAL '2557 days'` (7 years) must be permanently deleted monthly. A stale job means **the audit log table grows without bound and the 7-year ceiling cannot be enforced** — a potential GDPR Art. 5(1)(e) overcollection violation once eligible rows accumulate (expected ~2033 given FORM's 2026 launch). At P1 (no eligible rows yet), the risk is a monitoring gap only. At P0 (eligible rows exist), FORM is retaining audit log events beyond their lawful maximum retention period.
+> **Critical distinction from R-27 / R-28 / R-29 / R-30:** R-27 (job 33 stale) is a SOC 2 evidence gap — operational; R-28 (job 39 stale) is a contractual deadline risk; R-29 (job 25 stale) is a commercial/financial risk; R-30 (job 26 stale) is a GDPR Art. 5(1)(e) breach affecting individual users' personal data. R-31 (job 27 stale) is a **GDPR Art. 5(1)(e) overcollection risk on FORM's own audit infrastructure** — no individual user_id is retained beyond ceiling; the affected data is operational event metadata in the audit chain, not health values or PII. Unlike R-30, no Art. 9 special-category health data is involved. Unlike R-28, no customer-facing communication is required. Critical unique factor: job 27 has a **self-referential DEC-030 ordering constraint** — `data.audit_log_purge_completed` must be emitted and HTTP 200 confirmed BEFORE the DELETE executes (chain end-state preserved). If `emit-audit-event` returns HTTP 422 (chain verification failure → **H6**), the DELETE is **intentionally aborted** and **R-05 must be co-activated immediately** — this is the only runbook where a chain integrity failure causes the recovery DELETE itself to be blocked.
+
+---
+
+### R-31.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 27)** | `pg-cron-health-monitor` Edge Function (§12.7, runs hourly) | No successful `audit_log_retention_purge` run in `pg_cron.job_run_details` within the prior 48 h | **P1** (escalates to P0 if R-31-C1 finds rows > 7 years old) | PagerDuty `form-devops` (HIGH urgency) — dedup key `purge-job-27-stale` per §12.6 registry; simultaneous `form-compliance` page → compliance-officer |
+| **AL-GDPR-05 absent** | Compliance-officer observation: no `data.audit_log_purge_completed` DEC-030 event in `audit_log_events` for > 48 h following the 1st of any month | Manual monitoring check or GDPR-E-003 quarterly review | **P1** | `form-devops` + `form-compliance` |
+| **`pg_cron.job_run_details` gap** | Devops-lead queries `pg_cron.job_run_details WHERE jobname = 'audit_log_retention_purge'` and finds a gap > 48 h | Manual investigation following any Supabase maintenance window or pg_net degradation report | **P1 → assess R-31-C1 for P0 upgrade** | `form-devops` |
+
+> **P0 escalation criterion:** Upon any R-31 activation, compliance-officer runs R-31-C1 immediately. If any `audit_log_events` row has `emitted_at < NOW() - INTERVAL '2557 days'`, the severity escalates to **P0** — FORM is retaining audit log data beyond the 7-year maximum retention ceiling. Note: given FORM's 2026 launch date, no rows are expected to be eligible until ~2033. P0 is unlikely in the near term but must be assessed on every R-31 activation.
+>
+> **P0-chain criterion:** Root cause confirmed as **H6** (chain verification failure): `emit-audit-event` Worker returned HTTP 422 when job 27 attempted to emit `data.audit_log_purge_completed` before executing the DELETE. The DELETE was intentionally aborted per DEC-030 ordering invariant. **R-05 (HMAC Chain Integrity Failure) must be co-activated immediately** — the chain verification failure is a P0 security event independent of the job stale status.
+
+---
+
+### R-31.2 Severity Classification
+
+| Condition | Severity | Escalation |
+|---|---|---|
+| Job 27 stale AND R-31-C1 returns 0 eligible rows (no rows > 7 years — expected until ~2033) | **P1** | IC + compliance-officer + devops-lead; restore job 27 within 4-hour SLA; no GDPR notification required; monitoring gap only |
+| Job 27 stale AND R-31-C1 returns ≥ 1 eligible row (`audit_log_events` rows past 7-year ceiling) | **P0** | IC + compliance-officer + devops-lead + security-engineer; emit `data.audit_log_purge_completed` and confirm HTTP 200 BEFORE manual DELETE; file AUDIT-PURGE-COMP-E-001 |
+| Job 27 stale AND root cause is H6 (chain verification failure — `emit-audit-event` returned HTTP 422) | **P0-chain** | IC + compliance-officer + security-engineer; **DO NOT execute manual DELETE**; activate R-05 immediately; DELETE is intentionally blocked per DEC-030 ordering invariant until chain integrity is restored |
+| Job 27 stale AND root cause is a Supabase platform outage (R-03 active) | **P1 (R-03 primary)** | Defer manual purge assessment until Supabase restored; R-03 is primary; R-31 activates once platform is stable; run R-31-C1 immediately post-restoration |
+
+---
+
+### R-31.3 Immediate Actions (T+0 to T+30 min)
+
+```
+T+0   system.cron_job_stale fires for job 27. PagerDuty form-devops P1 pages devops-lead.
+      Simultaneous form-compliance page → compliance-officer (§12.6 dual-routing).
+      IC opens #ir-audit-purge-stale-YYYYMMDD in Slack.
+      Emit system.audit_log_purge_failure_declared DEC-030 HIGH/7yr (§R-31.7) as first chain entry.
+      Record: confirmed_stale_since (from pg_cron.job_run_details, last successful run timestamp).
+      This event must be emitted BEFORE any remediation or scope queries. Chain ordering enforced.
+
+T+5   Run R-31-C1 (§R-31.4): identify any audit_log_events row with emitted_at > 7 years old.
+      If R-31-C1 returns eligible_rows_count ≥ 1: escalate to P0.
+        - Page security-engineer via PagerDuty escalation.
+        - DO NOT execute DELETE until data.audit_log_purge_completed is emitted and HTTP 200 confirmed.
+        - Proceed to §R-31.5 Step 2 (manual purge sequence) BEFORE restoring the job.
+      If R-31-C1 returns 0 eligible rows: remain at P1. Proceed to Step 1 (restore job 27).
+
+T+10  Run R-31-C2 (§R-31.4): check pg_cron.job_run_details for the exact stale window.
+      Determine how many 1st-of-month runs were missed (missed_monthly_runs).
+      Determine root cause category (§R-31.4 H1–H6).
+      If pg_cron is unresponsive: activate R-03 (Infrastructure Outage) in parallel. Pause §R-31.5.
+
+T+15  Run R-31-C3 (§R-31.4): distinguish H3 (pg_net failure) from H6 (chain verification failure).
+      If return_message contains HTTP 422 or chain/ordering signal: H6 confirmed.
+        - DO NOT execute manual purge SQL.
+        - Activate R-05 (HMAC Chain Integrity Failure) immediately in parallel.
+        - Update incident channel: "H6 confirmed — R-05 co-activated. Manual DELETE blocked per
+          AUDIT-PURGE-CHAIN-01 ordering invariant. Job 27 restoration deferred until R-05 closes."
+      If return_message contains network timeout / connection error: H3 (pg_net degraded).
+        - Check audit_log_events for data.audit_log_purge_completed within the stale window.
+        - If present and HTTP 200 was confirmed: job may have run partially; re-verify R-31-C1.
+
+T+20  If P0 (eligible rows AND NOT H6): compliance-officer opens PAM session (read_write elevation)
+      and executes the manual purge sequence (§R-31.5 Step 2).
+      Critical DEC-030 ordering: call emit-audit-event for data.audit_log_purge_completed FIRST.
+      Confirm HTTP 200 response. If HTTP 422: STOP — downgrade to P0-chain; activate R-05.
+      Only upon HTTP 200 confirmed: execute manual DELETE SQL.
+      Record rows_deleted, oldest_event_deleted, newest_event_deleted, purge_duration_ms.
+      Emit system.audit_log_purge_manual_run_completed DEC-030 STANDARD/7yr (§R-31.7) immediately after.
+      Payload MUST include dec030_ordering_respected: true (attestation of ordering invariant compliance).
+
+T+30  All immediate actions complete. Begin restoration procedure (§R-31.5 Steps 1–4).
+      Update incident channel with R-31-C1 result, root cause hypothesis, and P0/P1/P0-chain status.
+```
+
+---
+
+### R-31.4 Root Cause Hypotheses and Scope Queries
+
+**R-31-C1 — Audit log events exceeding 7-year retention ceiling:**
+
+```sql
+-- Check audit_log_events for rows past the 7-year (2,557-day) retention ceiling.
+-- Requires compliance_reviewer role (read-only; emitted_at timestamp only — no payload read).
+-- Reason: "R-31 audit_log_retention_purge stale — overcollection scope — INC-YYYYMMDD"
+-- Privacy: aggregate count and timestamp bounds only — no payload content, no actor_id,
+-- no user_id, no tenant_id, no event_type distribution. Pure infrastructure metadata.
+SELECT
+  COUNT(*)                AS eligible_rows_count,
+  MIN(emitted_at)         AS oldest_eligible_event,
+  MAX(emitted_at)         AS newest_eligible_event,
+  MAX(NOW() - emitted_at) AS max_retention_age
+FROM audit_log_events
+WHERE emitted_at < NOW() - INTERVAL '2557 days';
+```
+
+> **Interpretation:** Zero rows is the expected result for any R-31 activation before ~2033 (FORM launched 2026; 7-year ceiling reached ~2033). Zero rows → P1 (monitoring gap only, no overcollection). Any row with `eligible_rows_count ≥ 1` → P0: FORM is retaining audit log data beyond the 7-year maximum. Record this result as AUDIT-PURGE-E-003 (aggregate metadata only). Even at P1 (zero rows), AUDIT-PURGE-E-003 must be filed as a zero-row attestation confirming no overcollection occurred during the stale window.
+
+**R-31-C2 — Exact stale window from pg_cron run history:**
+
+```sql
+-- Determine when job 27 last ran successfully and how many monthly runs were missed.
+SELECT
+  jobname,
+  start_time,
+  end_time,
+  status,
+  return_message
+FROM cron.job_run_details
+WHERE jobname = 'audit_log_retention_purge'
+ORDER BY start_time DESC
+LIMIT 6;
+```
+
+> **Interpretation:** The gap between `start_time` of the most recent row and `NOW()` is the stale duration. Job 27 runs on the 1st of each month at 03:00 UTC; missed monthly runs = count of 1st-of-month 03:00 UTC timestamps within the gap. A stale window spanning ≥ 2 months means at least one complete monthly cycle was skipped — escalate to compliance-officer for GDPR Art. 5(1)(e) gap documentation even at P1.
+
+**R-31-C3 — Chain verification failure vs pg_net failure (H3 vs H6 distinction):**
+
+```sql
+-- Distinguish H3 (pg_net degraded — emit-audit-event unreachable)
+-- from H6 (chain verification failure — emit-audit-event returned HTTP 422 → DELETE blocked).
+SELECT
+  jobname,
+  start_time,
+  status,
+  return_message,
+  CASE
+    WHEN return_message ILIKE '%422%'
+      OR return_message ILIKE '%chain%verification%'
+      OR return_message ILIKE '%ordering%violation%'        THEN 'H6 — chain_verification_failure (R-05 required; DELETE intentionally blocked)'
+    WHEN return_message ILIKE '%timeout%'
+      OR return_message ILIKE '%network%'
+      OR return_message ILIKE '%connect%'
+      OR return_message ILIKE '%pg_net%'                   THEN 'H3 — pg_net_degraded'
+    WHEN return_message ILIKE '%permission%denied%'
+      OR return_message ILIKE '%insufficient%privilege%'   THEN 'H4 — permission_revoked'
+    WHEN return_message ILIKE '%does not exist%'
+      OR return_message ILIKE '%column%'
+      OR return_message ILIKE '%relation%'                 THEN 'H2 — sql_exception (schema change)'
+    WHEN return_message ILIKE '%job%not%found%'
+      OR status = 'unscheduled'                            THEN 'H1 — job_deleted_or_disabled'
+    ELSE 'unknown — manual review required'
+  END AS root_cause_signal
+FROM cron.job_run_details
+WHERE jobname = 'audit_log_retention_purge'
+  AND status != 'succeeded'
+ORDER BY start_time DESC
+LIMIT 5;
+```
+
+> **Critical H6 interpretation:** If `root_cause_signal = 'H6 — chain_verification_failure'`, the `emit-audit-event` Worker returned HTTP 422 when job 27 attempted to emit `data.audit_log_purge_completed` as its pre-deletion chain anchor. The DELETE was **intentionally aborted** — correct behaviour per DEC-030 design. **Do NOT attempt a manual DELETE.** Activate R-05 immediately. H6 is the only root cause where the stale condition is caused by the chain verification working correctly.
+
+**Root cause hypotheses:**
+
+| # | Hypothesis | Diagnostic signal | Immediate mitigation |
+|---|---|---|---|
+| **H1** | pg_cron job deleted or disabled | `SELECT * FROM cron.job WHERE jobname = 'audit_log_retention_purge'` returns 0 rows or `active = false` | Re-create job 27 per `docs/OBSERVABILITY.md §37.7`; no manual DELETE required at P1; at P0 wait for next 1st-of-month run unless eligible rows confirmed |
+| **H2** | SQL exception (schema change to `audit_log_events` DDL — column rename, RLS policy change, or index drop affecting the DELETE WHERE clause) | `cron.job_run_details.status = 'failed'` + `return_message` contains SQL error detail | Identify the DDL migration; coordinate with security-engineer; fix job SQL; redeploy; trigger test run |
+| **H3** | pg_net degraded: `emit-audit-event` unreachable; job tried to emit `data.audit_log_purge_completed` but pg_net timed out before receiving HTTP 200 | `return_message` contains network timeout or connection error; no `data.audit_log_purge_completed` in `audit_log_events` for the current month | Check pg_net → `emit-audit-event` connectivity; manually emit via admin Worker call once pg_net restored; confirm HTTP 200; then execute DELETE if HTTP 200 confirmed |
+| **H4** | `service_role` permission revoked from `audit_log_events` (DELETE) | `SELECT has_table_privilege('service_role', 'audit_log_events', 'DELETE')` returns `false` | Re-grant `service_role` DELETE on `audit_log_events` per `docs/OBSERVABILITY.md §37.7` DDL spec with security-engineer approval; document as DEC-030 `access.permission_change` event |
+| **H5** | Supabase platform outage | R-03 active; pg_cron not running globally | R-03 is primary; defer purge assessment until platform restored; run R-31-C1 immediately upon restoration |
+| **H6** | Chain verification failure: `emit-audit-event` returned HTTP 422 when job 27 attempted to emit `data.audit_log_purge_completed` — HMAC chain ordering violation detected; DELETE intentionally blocked per DEC-030 design | `return_message` contains HTTP 422 or chain/ordering signal; R-31-C3 returns `H6 — chain_verification_failure`; no `data.audit_log_purge_completed` in `audit_log_events` for the current month | **DO NOT execute manual DELETE.** Co-activate R-05 (HMAC Chain Integrity Failure) immediately. Job 27 cannot restore until R-05 resolves the chain integrity issue. This is correct DEC-030 behaviour. |
+
+---
+
+### R-31.5 Recovery Procedure
+
+**Step 1: Diagnose root cause (T+10–T+15)**
+
+| Check | Query | Expected result |
+|---|---|---|
+| Job 27 exists in pg_cron | `SELECT active, schedule FROM cron.job WHERE jobname = 'audit_log_retention_purge'` | `active = true`, `schedule = '0 3 1 * *'` |
+| Most recent run status | R-31-C2 output | `status = 'succeeded'` for the most recent row; gap < 48h |
+| Chain verification signal | R-31-C3 output | No `H6` signal in return_message |
+| `service_role` DELETE privilege | `SELECT has_table_privilege('service_role', 'audit_log_events', 'DELETE')` | `true` |
+| pg_net connectivity | `SELECT net.http_get('https://emit-audit-event.form.coach/health')` | HTTP 200 or equivalent health response |
+
+---
+
+**Step 2: Manual purge (P0 only — eligible rows confirmed by R-31-C1, H6 NOT the root cause)**
+
+> **Critical DEC-030 ordering invariant (AUDIT-PURGE-CHAIN-01):** `data.audit_log_purge_completed` DEC-030 STANDARD event **must be emitted and HTTP 200 confirmed BEFORE the DELETE below executes.** This mirrors the automated job behaviour. If `emit-audit-event` returns HTTP 422 at this step: STOP, downgrade to P0-chain, activate R-05 immediately.
+
+**Step 2a — Emit `data.audit_log_purge_completed` (pre-deletion chain anchor):**
+
+```bash
+# Call emit-audit-event Worker with data.audit_log_purge_completed payload.
+# Confirm HTTP 200 before proceeding to Step 2b.
+# If HTTP 422: STOP. Activate R-05. Do NOT run the DELETE below.
+curl -X POST https://emit-audit-event.form.coach/emit \
+  -H "Authorization: Bearer $AUDIT_EMIT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_type": "data.audit_log_purge_completed",
+    "actor": "<pam-session-uuid>",
+    "payload": {
+      "incident_id": "INC-YYYYMMDD-XXXXXX",
+      "manual_run": true,
+      "eligible_rows_count": <R-31-C1 eligible_rows_count>,
+      "purge_type": "manual_r31_recovery"
+    }
+  }'
+# Expected: HTTP 200. Record response for AUDIT-PURGE-E-004.
+# HTTP 422 = H6 at manual step. STOP. Activate R-05.
+```
+
+**Step 2b — Execute manual DELETE (only after HTTP 200 confirmed in Step 2a):**
+
+```sql
+-- Manual audit log retention purge — P0 only
+-- Requires form_admin BYPASSRLS via pam-db-proxy (read_write PAM elevation)
+-- Reason: "R-31 manual audit log retention purge — INC-YYYYMMDD"
+-- PREREQUISITE: data.audit_log_purge_completed emitted and HTTP 200 confirmed (Step 2a).
+-- DO NOT run if Step 2a returned HTTP 422.
+
+-- Record eligible row counts BEFORE deleting (for system.audit_log_purge_manual_run_completed payload):
+SELECT
+  COUNT(*)        AS rows_to_delete,
+  MIN(emitted_at) AS oldest_event_to_delete,
+  MAX(emitted_at) AS newest_event_to_delete
+FROM audit_log_events
+WHERE emitted_at < NOW() - INTERVAL '2557 days';
+
+BEGIN;
+DELETE FROM audit_log_events
+WHERE emitted_at < NOW() - INTERVAL '2557 days';
+COMMIT;
+```
+
+**Step 2c — Emit `system.audit_log_purge_manual_run_completed`:**
+
+Emit DEC-030 STANDARD/7yr immediately after COMMIT. Payload must include `dec030_ordering_respected: true` (mandatory: attestation that `data.audit_log_purge_completed` HTTP 200 was confirmed before DELETE). Record PAM session UUID in `run_by_pam_session_id`. Re-run R-31-C1 and set `all_clear_after_purge` accordingly.
+
+---
+
+**Step 3: Restore job 27 per root cause**
+
+| Root cause | Restoration action |
+|---|---|
+| **H1** (job deleted) | `SELECT cron.schedule('audit_log_retention_purge', '0 3 1 * *', $$ [job SQL from OBSERVABILITY.md §37.7] $$)` |
+| **H2** (SQL exception) | Identify DDL change; update job SQL to match current schema; test in staging with synthetic old-dated rows; redeploy |
+| **H3** (pg_net degraded) | Once pg_net restored, job succeeds on next 1st-of-month scheduled run; optionally trigger via `SELECT cron.run_job(27)` if monthly run cannot be deferred |
+| **H4** (permission revoked) | `GRANT DELETE ON audit_log_events TO service_role` under PAM elevation; document as `access.permission_change` DEC-030 event |
+| **H5** (Supabase outage) | R-03 resolution restores pg_cron; job 27 succeeds on next scheduled run |
+| **H6** (chain verification failure) | R-05 must close first; after R-05 resolves chain integrity: test emit-audit-event with a synthetic event to confirm HTTP 200; job 27 succeeds on next 1st-of-month run once chain is healthy; no job re-creation required |
+
+---
+
+**Step 4: Confirm restoration**
+
+```sql
+-- Confirm job 27 is active
+SELECT jobname, active, schedule
+FROM cron.job
+WHERE jobname = 'audit_log_retention_purge';
+
+-- Confirm most recent run succeeded
+SELECT jobname, start_time, status, return_message
+FROM cron.job_run_details
+WHERE jobname = 'audit_log_retention_purge'
+ORDER BY start_time DESC
+LIMIT 3;
+```
+
+After confirmed success: emit `system.audit_log_purge_restored` DEC-030 STANDARD/3yr (§R-31.7). File AUDIT-PURGE-E-004 and AUDIT-PURGE-COMP-E-001 at P0. Update incident channel with restoration confirmation.
+
+---
+
+### R-31.6 Communication Templates
+
+#### Template AUDIT-INT-01 — Internal Compensating Control Memo (P0 only)
+
+> **Required when:** R-31-C1 returns `eligible_rows_count ≥ 1` AND manual DELETE executed (Step 2).
+> **Not required:** P1 (zero eligible rows — monitoring gap only, no overcollection).
+> **No customer-facing communication required** — overcollection affects FORM's own audit infrastructure data (operational event metadata), not individual user personal data subject to Art. 33 DPA notification obligations.
+
+```
+FORM INTERNAL — COMPLIANCE RESTRICTED
+COMPENSATING CONTROL MEMO — R-31 AUDIT LOG RETENTION PURGE FAILURE
+Incident ID: INC-YYYYMMDD-XXXXXX
+Date: YYYY-MM-DD
+Prepared by: [compliance-officer]  Reviewed by: [security-engineer]
+PAM Session: [run_by_pam_session_id from system.audit_log_purge_manual_run_completed]
+
+1. INCIDENT SUMMARY
+Job 27 (audit_log_retention_purge, 0 3 1 * *) detected stale at [confirmed_stale_since]
+by the pg-cron-health-monitor dead-man's switch (AL-GDPR-05, §37.7).
+Stale gap: [stale_hours] h. Missed monthly runs: [missed_monthly_runs].
+
+2. SCOPE ASSESSMENT (R-31-C1)
+Eligible rows (> 7-year / 2,557-day ceiling): [eligible_rows_count]
+Oldest eligible event: [oldest_eligible_event]
+Newest eligible event: [newest_eligible_event]
+Max retention age: [max_retention_age]
+
+3. DEC-030 ORDERING COMPLIANCE
+data.audit_log_purge_completed emitted via emit-audit-event before DELETE.
+emit-audit-event HTTP response: 200 OK (confirmed — chain end-state preserved).
+dec030_ordering_respected: TRUE
+
+4. MANUAL PURGE
+PAM session UUID: [run_by_pam_session_id]
+Rows deleted: [rows_deleted]
+Oldest event deleted: [oldest_event_deleted]
+Newest event deleted: [newest_event_deleted]
+Purge duration: [purge_duration_ms] ms
+All-clear after purge (R-31-C1 re-run = 0 rows): [TRUE/FALSE]
+
+5. DEC-030 EVENTS EMITTED
+- system.audit_log_purge_failure_declared (HIGH/7yr) — T+0
+- data.audit_log_purge_completed (STANDARD) — before DELETE; HTTP 200 confirmed
+- system.audit_log_purge_manual_run_completed (STANDARD/7yr) — after COMMIT
+- system.audit_log_purge_restored (STANDARD/3yr) — after job 27 restoration
+
+6. ROOT CAUSE
+Category: [H1_job_deleted | H2_sql_exception | H3_pg_net_degraded | H4_permission_revoked | H5_supabase_outage]
+Fix deployed at: [fix_deployed_at]
+
+7. SOC 2 CRITERIA
+CC6.5 — data retention ceiling enforced via manual compensating control; overcollection remediated.
+PI1.2 — R-31-C1 re-run = 0 rows; dec030_ordering_respected: true confirms ordering invariant.
+CC7.2 — pg-cron-health-monitor detected stale within 48-hour freshness window.
+
+Filed at: compliance/evidence/audit-log-purge/r31-<incident_id>/AUDIT-INT-01-INC-YYYYMMDD.md
+Signed: [compliance-officer]
+```
+
+---
+
+### R-31.7 DEC-030 Chain Specification
+
+**AUDIT-PURGE-CHAIN-01 ordering invariant:** For any `incident_id` associated with this runbook, `system.audit_log_purge_failure_declared` must precede all `system.audit_log_purge_manual_run_completed` and `system.audit_log_purge_restored` events for the same `incident_id`. A chain where `audit_log_purge_restored` or `audit_log_purge_manual_run_completed` precedes `audit_log_purge_failure_declared` for the same `incident_id` is an AUDIT-PURGE-CHAIN-01 violation — escalate to security-engineer and activate R-05.
+
+**Event 1 — `system.audit_log_purge_failure_declared`**
+
+| Field | Value |
+|---|---|
+| Event type | `system.audit_log_purge_failure_declared` |
+| Severity | HIGH |
+| Retention | 7 yr |
+| Emitter | IC (human) via `emit-audit-event` Worker at T+0 of incident declaration |
+| Chain position | AUDIT-PURGE-CHAIN-01 anchor — must precede events 2 and 3 for same `incident_id` |
+
+```typescript
+// Zod v2 schema
+const AuditLogPurgeFailureDeclaredPayload = z.object({
+  incident_id:           z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),
+  stale_hours:           z.number().positive(),
+  missed_monthly_runs:   z.number().int().nonneg(),
+  eligible_rows_count:   z.number().int().nonneg(), // 0 = P1; ≥1 = P0
+  trigger:               z.enum(['pagerduty_alert', 'manual_discovery']),
+  initial_severity:      z.enum(['P1', 'P0', 'P0_chain']),
+});
+```
+
+**Event 2 — `system.audit_log_purge_manual_run_completed`**
+
+| Field | Value |
+|---|---|
+| Event type | `system.audit_log_purge_manual_run_completed` |
+| Severity | STANDARD |
+| Retention | 7 yr |
+| Emitter | IC (human) via `emit-audit-event` Worker immediately after DELETE COMMIT (Step 2c) |
+| Chain position | Must be preceded by `system.audit_log_purge_failure_declared` for same `incident_id`; P0 only |
+
+```typescript
+// Zod v2 schema
+const AuditLogPurgeManualRunCompletedPayload = z.object({
+  incident_id:               z.string().uuid(),
+  rows_deleted:              z.number().int().nonneg(),
+  oldest_event_deleted:      z.string().datetime(),
+  newest_event_deleted:      z.string().datetime(),
+  purge_duration_ms:         z.number().positive(),
+  run_by_pam_session_id:     z.string().uuid(),  // PAM session UUID — not a FORM user_id
+  all_clear_after_purge:     z.boolean(),         // R-31-C1 re-run returned 0 rows
+  dec030_ordering_respected: z.literal(true),     // MANDATORY: data.audit_log_purge_completed HTTP 200 confirmed before DELETE
+});
+```
+
+**Event 3 — `system.audit_log_purge_restored`**
+
+| Field | Value |
+|---|---|
+| Event type | `system.audit_log_purge_restored` |
+| Severity | STANDARD |
+| Retention | 3 yr |
+| Emitter | devops-lead (human) via `emit-audit-event` Worker after job 27 restored and Step 4 confirmation succeeds |
+| Chain position | Must be preceded by `system.audit_log_purge_failure_declared` for same `incident_id` |
+
+```typescript
+// Zod v2 schema
+const AuditLogPurgeRestoredPayload = z.object({
+  incident_id:          z.string().uuid(),
+  restored_at:          z.string().datetime(),
+  root_cause_category:  z.enum([
+                          'H1_job_deleted',
+                          'H2_sql_exception',
+                          'H3_pg_net_degraded',
+                          'H4_permission_revoked',
+                          'H5_supabase_outage',
+                          'H6_chain_verification_failure',
+                        ]),
+  fix_deployed_at:      z.string().datetime(),
+  missed_monthly_runs:  z.number().int().nonneg(),
+  eligible_rows_purged: z.number().int().nonneg(), // 0 at P1; rows_deleted from Step 2b at P0
+  r05_activated:        z.boolean(),               // true if H6 confirmed and R-05 co-activated
+});
+```
+
+**Privacy invariant (all three events):** No `user_id`, no `tenant_id`, no individual health values, no audit event payload content from deleted rows. All fields are FORM-internal operational metadata: stale duration, timestamp, aggregate counts, PAM session UUID, root cause enum. `run_by_pam_session_id` is a PAM break-glass session identifier — not a FORM application user identity. `form_api` **must never route any §R-31 event to any user-facing or tenant-facing endpoint.**
+
+---
+
+### R-31.8 Evidence Preservation
+
+Store artefacts at `compliance/evidence/audit-log-purge/r31-<incident_id>/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 criteria | Retention | When collected |
+|---|---|---|---|---|
+| **AUDIT-PURGE-E-001** | DEC-030 `system.audit_log_purge_failure_declared` HMAC chain export (HIGH/7yr): confirms IC declared R-31 within the 48h freshness window, proving AL-GDPR-05 dead-man's switch operated within its SLA. AUDIT-PURGE-CHAIN-01 anchor: precedes all other chain events for this `incident_id`. | CC7.2, PI1.2 | 7 yr | On every R-31 activation |
+| **AUDIT-PURGE-E-002** | `pg_cron.job_run_details` export for `jobname = 'audit_log_retention_purge'` (job 27) covering the stale window: confirms stale start time, all missed 1st-of-month run timestamps, and `return_message` for each failed run (H1–H6 root cause signal). | CC7.2, A1.1 | 3 yr | On every R-31 activation (R-31-C2 output) |
+| **AUDIT-PURGE-E-003** | R-31-C1 query output: aggregate metadata only (`eligible_rows_count`, `oldest_eligible_event`, `newest_eligible_event`, `max_retention_age`). At P1: zero-row attestation confirming no overcollection. At P0: scope of Art. 5(1)(e) breach. **Privacy floor: no payload content, no actor_id, no user_id — counts and timestamps only.** | CC6.5, PI1.2 | 7 yr | On every R-31 activation (zero-row attestation at P1; breach scope at P0) |
+| **AUDIT-PURGE-E-004** | DEC-030 chain exports for: (a) `data.audit_log_purge_completed` (STANDARD — emitted before DELETE per Step 2a; HTTP 200 chain anchor) and (b) `system.audit_log_purge_manual_run_completed` (STANDARD/7yr — emitted after DELETE COMMIT per Step 2c; carries `rows_deleted`, `oldest_event_deleted`, `newest_event_deleted`, `purge_duration_ms`, `run_by_pam_session_id`, `all_clear_after_purge`, `dec030_ordering_respected: true`). Together proves DEC-030 ordering invariant was respected: chain anchor precedes DELETE. | CC6.5, PI1.2 | 7 yr | P0 only — when R-31-C1 returns ≥ 1 eligible row and manual DELETE executed |
+| **AUDIT-PURGE-COMP-E-001** | Signed Template AUDIT-INT-01 memo (§R-31.6): compliance-officer attestation that (1) stale gap detected within 48h per AL-GDPR-05, (2) R-31-C1 scope confirmed `eligible_rows_count`, (3) `data.audit_log_purge_completed` emitted and HTTP 200 confirmed before DELETE, (4) manual DELETE executed under PAM elevation, (5) `system.audit_log_purge_manual_run_completed` with `dec030_ordering_respected: true` confirms zero remaining eligible rows. Filed to `audit-log-purge/r31-<incident_id>/AUDIT-INT-01-INC-YYYYMMDD.md`; uploaded to Vanta. | CC6.5, PI1.2 | 7 yr | P0 only — required whenever Step 2 manual purge is executed |
+
+---
+
+### R-31.9 SOC 2 Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC6.5** — Data retention controls | AUDIT-PURGE-E-001, AUDIT-PURGE-E-003, AUDIT-PURGE-E-004 (P0), AUDIT-PURGE-COMP-E-001 (P0) | FORM enforces a 7-year maximum retention ceiling on audit log events via pg_cron job 27; the AL-GDPR-05 dead-man's switch detects stale within 48 hours; the R-31 protocol provides a supervised manual compensating control with DEC-030 chain ordering invariant compliance when the scheduled job fails |
+| **PI1.2** — Processing completeness | AUDIT-PURGE-E-003 (zero-row attestation or breach scope), AUDIT-PURGE-E-004 (`dec030_ordering_respected: true`, P0) | At P1: R-31-C1 zero-row result confirms no retention ceiling breach. At P0: `system.audit_log_purge_manual_run_completed` with `dec030_ordering_respected: true` and `all_clear_after_purge: true` proves the manual compensating control deleted all eligible rows |
+| **CC7.2** — Anomaly detection and monitoring | AUDIT-PURGE-E-001, AUDIT-PURGE-E-002 | pg-cron-health-monitor detected job 27 stale within the 48-hour freshness window; AUDIT-PURGE-E-002 proves the monitoring gap was bounded |
+| **A1.1** — Availability commitments | AUDIT-PURGE-E-002 | Monthly GDPR storage-ceiling monitoring cadence was disrupted for a bounded period; the 48-hour detection window ensures a maximum gap of ≤ 1 missed monthly cycle before the anomaly is surfaced by AL-GDPR-05 |
+
+**CC6.5 auditor narrative:** Job 27 is the automated enforcement mechanism for FORM's 7-year audit log retention ceiling (DEC-030 / CC6.5 / GDPR Art. 5(1)(e)). The job implements a self-referential DEC-030 ordering invariant: `data.audit_log_purge_completed` is emitted and HTTP 200 confirmed as a chain anchor before the DELETE executes — preserving the chain end-state. The R-31 recovery protocol mirrors this design: the IC manually emits the chain anchor and confirms HTTP 200 before executing the manual DELETE (Step 2a–2b). If `emit-audit-event` returns HTTP 422 at any point (H6), the DELETE is intentionally blocked and R-05 takes precedence. AUDIT-PURGE-E-003 provides the auditor-inspectable scope assessment using aggregate row counts only — no payload content from deleted rows is present in any evidence artefact.
+
+---
+
+### R-31.10 Post-Incident Controls
+
+| Control | Trigger condition | Owner | SLA |
+|---|---|---|---|
+| Schedule PIR within 5 business days: review root cause, DEC-030 chain completeness, and whether AUDIT-PURGE-COMP-E-001 was required | Any R-31 activation | IC (primary) | 5 business days post-restoration |
+| If H2 (SQL exception — DDL change to `audit_log_events`): require compliance-officer sign-off for any migration touching `audit_log_events` schema before merge; include a job 27 SQL compatibility test in staging | H2 root cause confirmed | devops-lead + security-engineer | 14 days post-PIR |
+| If H6 (chain verification failure): after R-05 closes — add Scenario U to §9.4 tabletop catalog (audit log purge chain verification failure): disable job 27 in staging, force emit-audit-event to return 422, confirm DELETE blocked, confirm R-05 activation path, restore chain, confirm HTTP 200 on next emit, confirm next job 27 run succeeds | H6 root cause confirmed | security-engineer + devops-lead | 30 days post-R-05 close |
+| Update `docs/OBSERVABILITY.md §37.7` implementation checklist: note that R-31 authoring closes the documentation obligation for job 27 stale recovery runbook | This runbook authoring | compliance-officer | Next sprint |
+
+---
+
+### R-31.11 Implementation Checklist
+
+#### P0 — Before job 27 runs in production (M6)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register three DEC-030 events from §R-31.7 in `docs/AUDIT_LOG_SCHEMA.md §System`: `system.audit_log_purge_failure_declared` (HIGH, 7yr), `system.audit_log_purge_manual_run_completed` (STANDARD, 7yr), `system.audit_log_purge_restored` (STANDARD, 3yr). Add AUDIT-PURGE-CHAIN-01 ordering invariant to the `emit-audit-event` Worker chain-invariant registry. Add `dec030_ordering_respected: z.literal(true)` field requirement to `system.audit_log_purge_manual_run_completed` validator. | compliance-officer + platform-engineer | **P0** | M6 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.24, 2026-06-21: three AUDIT-PURGE events registered in §System after `system.purge_cron_restored`; AUDIT-PURGE-CHAIN-01 ordering invariant noted.** |
+| 2 | Confirm `pg-cron-health-monitor` (§12.7) routes `system.cron_job_stale` for `jobname = 'audit_log_retention_purge'` to PagerDuty `form-devops` P1 AL-GDPR-05 with dedup key `purge-job-27-stale` AND simultaneously to `form-compliance` → compliance-officer per §12.6. Write integration test: simulate job 27 gap > 48h in staging; confirm `system.cron_job_stale` emitted; add H6 path test: force emit-audit-event to return 422 in staging; confirm DELETE is blocked, not cascaded. | devops-lead + security-engineer | **P0** | M6 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M7)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Store Template AUDIT-INT-01 at `compliance/evidence/ir-templates/r31-audit-int-01.md`. Compliance-officer reviews the `dec030_ordering_respected` attestation section — confirming the DEC-030 ordering invariant is correctly documented and the P0-chain distinction (H6 → R-05 required; DELETE blocked) is clearly flagged. | compliance-officer | **P1** | M7 | [ ] |
+| 4 | Add `docs/OBSERVABILITY.md §12.6` cross-reference: update job 27 `audit_log_retention_purge` registry entry to add `INCIDENT_RESPONSE R-31 (job 27 stale recovery runbook — §R-31.5)` in the stale consequence column. | compliance-officer | **P1** | M6 | [x] **Done — OBSERVABILITY.md v4.8.4, 2026-06-21: §12.6 job 27 entry updated with INCIDENT_RESPONSE R-31 cross-reference.** |
+| 5 | Add AUDIT-PURGE-E-001 through AUDIT-PURGE-COMP-E-001 artefact definitions to `docs/SOC2_READINESS.md §79.4` master evidence table. Add `audit-log-purge/` R2 subfolder to §80.3. Add AUDIT-PURGE artefacts to §80.4 Vanta mirror list. | compliance-officer | **P1** | M6 | [x] **Done — SOC2_READINESS.md v3.24.7, 2026-06-21: five AUDIT-PURGE artefacts registered in §79.4; `audit-log-purge/` subfolder added to §80.3; Vanta mirror list §80.4 updated.** |
+
+#### P2 — Before SOC 2 observation period (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Add Scenario U (audit log purge cron failure) to §9.4 tabletop catalog: compliance-officer disables job 27 in staging; IC runs R-31-C1 (confirms 0 eligible rows — expected); executes manual emit-audit-event call for `data.audit_log_purge_completed`; confirms HTTP 200; executes manual DELETE for synthetic `audit_log_events` rows with `emitted_at < NOW() - INTERVAL '2557 days'`; confirms `system.audit_log_purge_manual_run_completed` emitted with `dec030_ordering_respected: true`; restores job; confirms `system.audit_log_purge_restored` emitted. Optional H6 path: force emit-audit-event to return 422; confirm DELETE is blocked; confirm R-05 activation path. | security-engineer + compliance-officer | **P2** | M12 | [ ] |
+
+---
+
+*v1.0 (2026-06-21): R-31 GDPR Audit Log Retention Purge Failure — thirty-first runbook. Closes the documentation gap identified by `docs/OBSERVABILITY.md §12.6` (job 27 registry entry: no INCIDENT_RESPONSE cross-reference, unlike peer jobs 25/26/39 which carry R-29/R-30/R-28 references) and `docs/OBSERVABILITY.md §37.7` (job 27 spec): AL-GDPR-05 defines P1 dual-routing PagerDuty on job 27 stale, but no recovery runbook existed for when `audit_log_retention_purge` becomes stale. R-31 provides the full IC protocol for when job 27 exceeds the 48h freshness window. Trigger: `system.cron_job_stale` with `job_name = 'audit_log_retention_purge'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 dual-routing: `form-devops` → devops-lead AND `form-compliance` → compliance-officer; dedup `purge-job-27-stale`. Critical distinction from R-27/R-28/R-29/R-30: R-31 is an **audit infrastructure overcollection risk** — the data at risk is FORM's own audit log event metadata, not individual user health data (R-30) or contract/financial data (R-28/R-29). No Art. 9 special-category data involved. No customer-facing communication required. The defining unique characteristic of R-31 vs all prior runbooks: **self-referential DEC-030 ordering constraint** — `data.audit_log_purge_completed` must be emitted and HTTP 200 confirmed BEFORE the DELETE executes (chain end-state preserved as new tail entry). If `emit-audit-event` returns HTTP 422 (chain verification failure → H6), the DELETE is intentionally aborted — correct DEC-030 design. H6 is the only root cause in any runbook where the recovery action (manual DELETE) is intentionally blocked by the chain verification system, requiring R-05 co-activation before any purge can proceed. Three-severity matrix: P1 (stale, zero eligible rows — monitoring gap only; expected for all activations until ~2033 given FORM's 2026 launch), P0 (stale AND ≥1 row past 7-year ceiling — overcollection breach; manual purge required with DEC-030 chain anchor), P0-chain (H6 confirmed — chain verification failure; R-05 co-activation required; DELETE intentionally blocked). T+0–T+30 immediate actions: DEC-030 `system.audit_log_purge_failure_declared` HIGH/7yr at T+0; R-31-C1 scope query at T+5 (P0 upgrade gate); R-31-C2 pg_cron.job_run_details at T+10 (stale window + missed monthly runs); R-31-C3 H3-vs-H6 distinction at T+15 (critical: H6 → R-05, no DELETE); manual purge at T+20 if P0 AND NOT H6; restoration at T+30. Three scope queries: R-31-C1 (eligible rows count + timestamp bounds, no payload content), R-31-C2 (pg_cron.job_run_details last 6 runs for stale window + missed monthly run count), R-31-C3 (return_message CASE analysis for H1–H6 root cause). Six root cause hypotheses: H1 (job deleted/disabled), H2 (SQL exception — DDL change to `audit_log_events`), H3 (pg_net degraded), H4 (service_role DELETE permission revoked), H5 (Supabase platform outage — R-03 primary), H6 (chain verification failure — emit-audit-event HTTP 422 → DELETE intentionally blocked → R-05 co-activation). Four-step recovery: Step 1 (diagnose H1–H6); Step 2 (manual purge sequence — Step 2a: emit `data.audit_log_purge_completed` via curl + confirm HTTP 200; Step 2b: execute DELETE if HTTP 200; Step 2c: emit `system.audit_log_purge_manual_run_completed` with `dec030_ordering_respected: true`); Step 3 (restore job 27 per root cause); Step 4 (confirm restoration + emit `system.audit_log_purge_restored`). One communication template: AUDIT-INT-01 (internal compensating control memo — required at P0 when Step 2 executed; not required at P1; no customer-facing template). Three DEC-030 HMAC-chained events: `system.audit_log_purge_failure_declared` HIGH/7yr (Zod: `incident_id`, `confirmed_stale_since` datetime, `stale_hours` positive, `missed_monthly_runs` nonneg int, `eligible_rows_count` nonneg int, `trigger` enum, `initial_severity` enum['P1','P0','P0_chain']), `system.audit_log_purge_manual_run_completed` STANDARD/7yr (Zod: `incident_id`, `rows_deleted` nonneg int, `oldest_event_deleted` datetime, `newest_event_deleted` datetime, `purge_duration_ms` positive, `run_by_pam_session_id` UUID, `all_clear_after_purge` bool, `dec030_ordering_respected: z.literal(true)`), `system.audit_log_purge_restored` STANDARD/3yr (Zod: `incident_id`, `restored_at` datetime, `root_cause_category` enum H1–H6, `fix_deployed_at` datetime, `missed_monthly_runs` nonneg int, `eligible_rows_purged` nonneg int, `r05_activated` bool); AUDIT-PURGE-CHAIN-01 ordering invariant: `audit_log_purge_failure_declared` precedes all `audit_log_purge_manual_run_completed` and `audit_log_purge_restored` for same `incident_id` — inversion triggers R-05. Five evidence artefacts: AUDIT-PURGE-E-001 (`system.audit_log_purge_failure_declared` chain export, CC7.2/PI1.2, 7yr — every R-31 activation), AUDIT-PURGE-E-002 (`pg_cron.job_run_details` for job 27 stale window, CC7.2/A1.1, 3yr — every R-31 activation), AUDIT-PURGE-E-003 (R-31-C1 aggregate metadata — `eligible_rows_count` + timestamps only, CC6.5/PI1.2, 7yr — every R-31 activation including zero-row P1 attestation), AUDIT-PURGE-E-004 (`data.audit_log_purge_completed` + `system.audit_log_purge_manual_run_completed` chain exports, CC6.5/PI1.2, 7yr — P0 only), AUDIT-PURGE-COMP-E-001 (signed Template AUDIT-INT-01, CC6.5/PI1.2, 7yr — P0 only). Four SOC 2 criteria: CC6.5 (7-year ceiling enforced; manual compensating control with DEC-030 ordering invariant), PI1.2 (processing completeness — zero-row attestation proves no overcollection; `dec030_ordering_respected: true` proves manual purge ordering), CC7.2 (pg-cron-health-monitor anomaly detection within 48h), A1.1 (monthly GDPR storage-ceiling monitoring gap bounded within 48h). Four post-incident controls: PIR within 5 business days, DDL governance gate for `audit_log_events` schema (H2), Scenario U tabletop for H6 path (M12), §37.7 checklist cross-reference update. Six-item implementation checklist: 2× P0/M6 (DEC-030 events registered + AUDIT-PURGE-CHAIN-01 [x] Done v2.24; §12.7 routing + H6 blocking integration test), 3× P1/M6-M7 (AUDIT-INT-01 template; §12.6 job 27 cross-reference [x] Done v4.8.4; SOC2_READINESS §79.4/§80.3/§80.4 [x] Done v3.24.7), 1× P2/M12 (Scenario U tabletop). Privacy floor: all three system events carry only FORM-internal operational metadata — stale duration, timestamp, root cause enum, aggregate row counts; `run_by_pam_session_id` is a PAM session UUID (not a FORM user_id, not linkable to any consumer account); AUDIT-PURGE-E-003 carries only aggregate counts and timestamp bounds — never event payload content, never actor_id distribution, never user_id, never health values; AUDIT-INT-01 carries only aggregate counts + compliance metadata; `form_api` must never route any §R-31 event to any user-facing or tenant-facing endpoint. Cross-references: `docs/OBSERVABILITY.md §12.6` (job 27 registry entry — stale consequence updated with INCIDENT_RESPONSE R-31 per v4.8.4); `docs/OBSERVABILITY.md §37.7` (job 27 DDL + DEC-030 self-referential ordering invariant spec — H6 failure mode documented here); `docs/OBSERVABILITY.md §12.7` (`pg-cron-health-monitor` — emits `system.cron_job_stale` that triggers this runbook); `docs/AUDIT_LOG_SCHEMA.md §System` (three DEC-030 events registered per R-31.11 item 1 [x] Done — v2.24); `docs/SOC2_READINESS.md §79.4` (AUDIT-PURGE evidence artefacts registered per R-31.11 item 5 [x] Done — v3.24.7); `data.audit_log_purge_completed` (DEC-030 STANDARD — registered at v1.9; pre-deletion chain anchor for job 27; self-referential ordering constraint); R-05 (HMAC chain break — co-activated on H6 confirmation or AUDIT-PURGE-CHAIN-01 ordering violation); R-03 (Infrastructure Outage — primary if H5 Supabase outage); R-30 (GDPR Workout Data Retention Purge Failure — structural predecessor; PURGE-CRON-CHAIN-01 pattern adapted for AUDIT-PURGE-CHAIN-01); AL-GDPR-05 (§37.7 — P1 dual-routing alert on job 27 stale; R-31 fires in response). Owner: compliance-officer + devops-lead + security-engineer.*
+
+---
+
+**v1.0 · 2026-06-21 · Owner: compliance-officer + devops-lead + security-engineer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
