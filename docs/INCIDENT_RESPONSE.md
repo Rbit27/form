@@ -14425,3 +14425,300 @@ R-37 activations are documented as addenda to the existing SSO-FLEET-E-001 quart
 **Next scheduled review: June 2027 or after first P0 — whichever comes first.**
 
 ---
+
+## R-38 Google Directory Alert Check Stale — `google_directory_alert_check` (job 35) — AL-SSO-GDIR-01 / AL-SSO-GDIR-02 detection gap
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `google_directory_alert_check` pg_cron job 35 exceeds the 6-minute freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` Edge Function (§12.7, runs hourly) emits `system.cron_job_stale` with `job_name = 'google_directory_alert_check'`; routes to PagerDuty P1 `form-devops` → devops-lead + platform-engineer with dedup key `gdir-alert-check-stale` per `docs/OBSERVABILITY.md §12.6`
+> **Primary owners:** devops-lead · platform-engineer
+> **SLO risk:** Job 35 (`*/5 * * * *`) is the per-tenant Google Directory sync anomaly detection engine, implementing two alert rules against the DEC-030 HMAC-chained `audit_log_events` stream (DEC-067 signal-source coherence): (1) **AL-SSO-GDIR-01** — fires PagerDuty P2 `form-platform` when ≥ 3 `sso.google_directory_sync_error` events are detected for a single tenant within any rolling 15-min window; (2) **AL-SSO-GDIR-02** — fires Slack `#alerts-sso` when per-tenant P95 fetch latency exceeds 3,000 ms sustained for 5 consecutive 5-min windows. A stale job means both AL-SSO-GDIR-01 and AL-SSO-GDIR-02 are in a detection gap: per-tenant Google Directory sync error spikes and latency anomalies go undetected until the job resumes. Unlike R-37 (SSO-SLO-01b — fleet-level advisory), AL-SSO-GDIR-01 error-rate alerts carry direct per-tenant operational significance; a missed AL-SSO-GDIR-01 alert during a stale window means enterprise tenants may have experienced Google Directory sync failures without FORM noticing. AL-SSO-GDIR-02 latency drift is a pre-breach indicator only — no SLA credit exposure from P3 Slack alerts.
+> **Distinction from §12.7 advisory signal:** Job 35 additionally emits `system.gdir_alert_check_stale` (LOW/1yr) as a self-monitoring advisory signal when it detects its own gap from `pg_cron.job_run_details`. This advisory is separate from the `system.cron_job_stale` HIGH/7yr event emitted by the §12.7 health monitor that triggers this runbook. R-38 is activated by the HIGH pager; the LOW advisory is a secondary cross-check signal only (per `docs/OBSERVABILITY.md §48.4` — advisory does not page; compliance-officer reviews next business day). The distinction: `system.cron_job_stale` (health monitor detecting the gap externally, HIGH, pages IC) vs `system.gdir_alert_check_stale` (job 35 self-reporting its own gap, LOW, advisory only). R-38 is triggered by the former.
+> **Shared-failure risk:** Job 35 shares the same 5-min cadence and pg_cron infrastructure with jobs 37 (`caep_reregister_sweep`) and 38 (`sso_fleet_health_check`). Concurrent stale of multiple 5-min jobs strongly indicates H2/H4 (shared pg_cron infrastructure failure). Cross-check R-32 (job 37) and R-37 (job 38) stale alerts before diagnosing R-38 in isolation. If H2 is confirmed, co-activating R-03 is the correct primary response.
+
+---
+
+### R-38.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 35)** | `pg-cron-health-monitor` Edge Function (§12.7, runs hourly) | No successful `google_directory_alert_check` run in `pg_cron.job_run_details` within the prior 6 min | **P1** (escalates to P0 if R-38-C1 returns any tenant with ≥ 3 `sso.google_directory_sync_error` events in the stale window) | PagerDuty `form-devops` P1 → devops-lead + platform-engineer; dedup key `gdir-alert-check-stale` per §12.6 registry |
+| **Manual discovery** | devops-lead observes stale job during routine §12.6 review or SSO-OBS-E-007 quarterly evidence collection | Post-evidence-collection or routine monitoring check | **P1 → assess R-38-C1 for P0 upgrade** | `form-devops` |
+| **Co-active with R-32 or R-37** | Multiple 5-min cadence jobs staling simultaneously strongly suggests shared pg_cron infrastructure failure | Any R-32 (`caep-sweep-stale`) or R-37 (`sso-fleet-health-check-stale`) dedup key co-active with `gdir-alert-check-stale` | **P1 → shared cause; co-activate R-03 assessment** | See §R-38.4 H2 / H4 |
+
+> **P0 escalation criterion:** Upon any R-38 activation, devops-lead runs R-38-C1 immediately. If the query returns any row (i.e., any tenant had ≥ 3 `sso.google_directory_sync_error` events within a rolling 15-min window during the stale period), severity escalates to **P0** — the AL-SSO-GDIR-01 alert threshold was met during the blind spot and was not paged. Devops-lead must assess the per-tenant Google Directory sync error scope and determine whether enterprise tenants require notification.
+
+---
+
+### R-38.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P1** | Stale; R-38-C1 returns zero rows (no tenant reached ≥ 3 sync errors in any 15-min window during stale period) | 30 min investigation; detection gap only; no AL-SSO-GDIR-01 threshold was met during the blind spot | Diagnose root cause; restore job 35; verify `system.gdir_alert_check_stale` advisory events stop after restoration; emit DEC-030 GDIR-ALERT-CHAIN-01 events |
+| **P0** | Stale AND R-38-C1 returns ≥ 1 row (at least one tenant reached ≥ 3 `sso.google_directory_sync_error` events in a 15-min window during the stale period) | 15 min to manual per-tenant Google Directory sync error assessment; determine whether enterprise tenant notification is required | Run R-38-C1 full output across the entire stale window; assess per-tenant sync error scope; notify affected tenants via standard enterprise communication channel if errors indicate ongoing Directory sync failure; restore job 35; emit `system.gdir_alert_stale_declared` with `active_sync_error_tenant_count` |
+
+---
+
+### R-38.3 Immediate Actions (T+0 to T+30 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `system.gdir_alert_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker | devops-lead | Required at ALL severity levels. Do this FIRST before any DB queries. GDIR-ALERT-CHAIN-01 anchor. |
+| **T+5** | Run R-38-C1 (active GDIR-01 scope query) | devops-lead | Check for any tenant with ≥ 3 `sso.google_directory_sync_error` events in any rolling 15-min window during the stale period. Any row → P0; call IC immediately. |
+| **T+5** | Cross-check peer job stales: query `pg_cron.job_run_details` for job 37 (`caep_reregister_sweep`) and job 38 (`sso_fleet_health_check`) freshness | devops-lead | If jobs 37 and/or 38 are also stale → shared pg_cron infrastructure failure (H2/H4); co-activate R-03 assessment. R-38 resolves when infrastructure is restored. |
+| **T+10** | Run R-38-C2: check `pg_cron.job_run_details` for job 35 last 10 runs — confirm stale window start, missed-run count, `return_message` | devops-lead | Identifies root cause hypothesis (H1–H4). |
+| **T+15** *(P0 only)* | For each tenant returned by R-38-C1: assess whether Google Directory sync errors represent an ongoing failure requiring enterprise tenant notification per standard communication SLA | devops-lead + platform-engineer | AL-SSO-GDIR-01 is a P2 PagerDuty alert (not a SLA credit event). Tenant notification is at IC's discretion based on sync error scope and duration. |
+| **T+20–T+30** | Fix underlying cause and restore job 35 per root cause diagnosis | devops-lead + platform-engineer | See §R-38.5 Steps 2–3. Emit `system.gdir_alert_restored` on confirmed first successful run. |
+
+---
+
+### R-38.4 Root Cause Hypotheses and Scope Queries
+
+#### R-38-C1 — Active GDIR-01 scope query (P0 upgrade gate)
+
+```sql
+-- R-38-C1: Google Directory sync error scope during stale window
+-- Run as: form_system (compliance_reviewer SELECT)
+-- Replace :confirmed_stale_since with the timestamp of the last successful job 35 run
+-- Zero rows → P1 (no AL-SSO-GDIR-01 threshold met); non-zero → P0
+SELECT
+  payload->>'tenant_id'                                                              AS tenant_id,
+  COUNT(*) FILTER (WHERE action = 'sso.google_directory_sync_error')                AS error_count,
+  COUNT(*) FILTER (WHERE action = 'sso.google_directory_sync_success')              AS success_count,
+  COUNT(*)                                                                           AS total_count,
+  MAX(emitted_at) FILTER (WHERE action = 'sso.google_directory_sync_error')         AS latest_error_at
+FROM audit_log_events
+WHERE action IN ('sso.google_directory_sync_error', 'sso.google_directory_sync_success')
+  AND emitted_at >= :confirmed_stale_since - INTERVAL '15 minutes'
+  AND emitted_at <= NOW()
+GROUP BY payload->>'tenant_id'
+HAVING COUNT(*) FILTER (WHERE action = 'sso.google_directory_sync_error') >= 3
+ORDER BY error_count DESC;
+-- AL-SSO-GDIR-01 threshold: ≥ 3 errors per tenant in any rolling 15-min window
+-- Extend :confirmed_stale_since offset to cover the full stale window retrospectively
+```
+
+> **At P1:** Zero rows. The stale window was a detection gap without any tenant reaching the AL-SSO-GDIR-01 error-count threshold. Preserve zero-row result as the P1 severity attestation in the `system.gdir_alert_stale_declared` payload (`active_sync_error_tenant_count: 0`).
+
+> **At P0:** One or more rows. The AL-SSO-GDIR-01 threshold was met during the blind spot for the tenants listed. For each returned tenant: assess sync error volume, determine whether errors represent an ongoing Directory failure or a transient spike, and determine whether enterprise tenant notification is warranted per IC's discretion.
+
+#### R-38-C2 — pg_cron run history for job 35
+
+```sql
+-- R-38-C2: Stale window confirmation — last 10 runs of google_directory_alert_check
+SELECT
+  jobid, jobname, runid, job_pid,
+  database, username, command, status,
+  return_message, start_time, end_time
+FROM pg_cron.job_run_details
+WHERE jobname = 'google_directory_alert_check'
+ORDER BY start_time DESC
+LIMIT 10;
+```
+
+> Use output to confirm: (1) time of last successful run (defines stale window start), (2) missed-run count since stale window (5-min cadence — a 30-min stale window = 6 missed runs), (3) `return_message` for root cause classification.
+
+#### Root cause hypotheses
+
+| Hypothesis | Description | Primary signal | Recovery path |
+|---|---|---|---|
+| **H1 — Job deleted/disabled** | `google_directory_alert_check` was removed from `pg_cron.job` or `active = false` | `SELECT COUNT(*) FROM pg_cron.job WHERE jobname = 'google_directory_alert_check'` returns 0 | Recreate job 35 per `docs/OBSERVABILITY.md §48.4` SQL spec; verify `active = true` |
+| **H2 — Shared pg_cron infrastructure failure** | `pg_cron` scheduler itself is down or degraded; all 5-min jobs (35, 37, 38) staling simultaneously | R-38-C2 shows no runs at all; job 37 (`caep_reregister_sweep`) and/or job 38 (`sso_fleet_health_check`) stale concurrently; `pg_cron.job_run_details` has no entries after stale window start | Co-activate R-03 assessment; monitor Supabase status page; pg_cron resumes automatically when platform stabilises |
+| **H3 — `audit_log_events` query failure** | High table load, dead-tuple accumulation, or lock contention causes job 35 query to timeout or error | `return_message` contains timeout or lock error; `audit_log_events` table stats show high dead_tuple_ratio or locks in `pg_stat_activity` | Run `VACUUM ANALYZE audit_log_events` (avoid VACUUM FULL in production — use concurrent); investigate query plan with `EXPLAIN ANALYZE` against R-38-C1 pattern; consider `form_audit` role query timeout setting |
+| **H4 — Supabase platform outage** | Supabase Postgres or pg_cron scheduler is fully unavailable | No `return_message` entries after stale window start; Supabase status page incident | R-03 primary; R-38 resolves automatically when Supabase restores |
+
+---
+
+### R-38.5 Recovery Procedure
+
+#### Step 1 — Confirm stale and classify root cause
+
+| Check | Command / Action | Expected (healthy) | Unhealthy → action |
+|---|---|---|---|
+| Job exists | `SELECT * FROM pg_cron.job WHERE jobname = 'google_directory_alert_check'` | 1 row, `active = true` | 0 rows or `active = false` → H1; recreate per §48.4 |
+| Last run | `pg_cron.job_run_details` (R-38-C2) | `start_time` within prior 6 min | > 6 min → stale confirmed; check `return_message` |
+| Peer jobs | Query `pg_cron.job_run_details` for `caep_reregister_sweep` (job 37) and `sso_fleet_health_check` (job 38) | Both show `status = 'succeeded'` within their respective freshness windows | Both stale → H2/H4; co-activate R-03 |
+| `form_audit` role | `SELECT has_table_privilege('form_audit', 'audit_log_events', 'SELECT')` | `true` | `false` → permission regression; restore `form_audit` SELECT on `audit_log_events` via migration |
+| Supabase platform | Supabase status page | All systems operational | Outage → H4; activate R-03 |
+
+#### Step 2 *(P0 only)* — Per-tenant Google Directory sync error assessment
+
+If R-38-C1 returned non-zero rows:
+
+1. For each returned `tenant_id`: review `error_count`, `success_count`, and `latest_error_at` to determine whether sync errors are ongoing or were transient.
+2. If `latest_error_at` is within the last 30 min for any tenant and `error_count ≥ 3`: consider direct enterprise tenant notification via standard channel. Document decision (notify / not notify) in the GDIR-INT-01 internal communication (see §R-38.6).
+3. File R-38-C1 output (aggregate counts + `latest_error_at` per tenant — no row-level `user_id`, no individual employee data) as an evidence preservation record per §R-38.8.
+
+#### Step 3 — Restore job 35 per root cause
+
+| Root cause | Restoration action |
+|---|---|
+| **H1** | Recreate job 35 using the canonical `DO $$` block from `docs/OBSERVABILITY.md §48.4`; verify schedule `*/5 * * * *`; confirm role `form_audit`; confirm `active = true` |
+| **H2** | Await pg_cron scheduler recovery (typically automatic on Supabase platform stabilisation); do not recreate job — job 35 will resume running when the scheduler recovers; confirm via R-38-C2 `start_time` after recovery |
+| **H3** | Run `VACUUM ANALYZE audit_log_events`; if query timeout is the root cause, set `form_audit` role query timeout to 4 s (`ALTER ROLE form_audit SET statement_timeout = '4000'`) so single-run failures do not cascade; verify job 35 resumes succeeding |
+| **H4** | Await Supabase platform recovery; R-03 primary; R-38 resolves automatically |
+
+#### Step 4 — Confirm restoration and close
+
+1. After job 35 resumes, confirm a successful run via R-38-C2: `status = 'succeeded'` with `start_time` within the prior 6 min.
+2. Emit `system.gdir_alert_restored` (STANDARD/3yr) via `emit-audit-event` Worker with `incident_id` matching the `system.gdir_alert_stale_declared` emitted at T+0. GDIR-ALERT-CHAIN-01 terminal event.
+3. Resolve PagerDuty `gdir-alert-check-stale` incident.
+4. Confirm `system.gdir_alert_check_stale` (LOW/1yr) self-monitoring advisories have stopped appearing in `audit_log_events` for job 35.
+
+---
+
+### R-38.6 Internal Communication Template
+
+#### GDIR-INT-01 — Google Directory Alert Monitoring Gap Notice (P0 only)
+
+> **When to use:** Only when R-38-C1 returns non-zero rows (one or more tenants reached ≥ 3 `sso.google_directory_sync_error` events in a 15-min window during the stale period) AND IC determines tenant notification is appropriate.
+> **Audience:** enterprise-architect · compliance-officer · (optional) affected tenant CSM
+> **Channel:** internal Slack `#incidents-enterprise` + IC incident log
+
+```
+Subject: [P0 R-38] Google Directory Alert Check Stale — Sync Error Scope
+
+Timeline:
+  - Stale detected:  <timestamp>
+  - Confirmed stale since: <timestamp>
+  - Job 35 restored: <timestamp>
+  - Total stale window: <N> minutes (<M> missed runs)
+
+Sync Error Scope (R-38-C1 output):
+  - Tenants with ≥ 3 sync errors in any 15-min window: <count>
+  - Most affected tenant: <tenant_id>, <N> errors, last error at <timestamp>
+  - [Include full R-38-C1 output as attachment — aggregate counts only, no user PII]
+
+Root Cause: <H1/H2/H3/H4 — one-line description>
+
+AL-SSO-GDIR-01 Missed Alerts:
+  - <N> AL-SSO-GDIR-01 threshold breaches went unpaged during the stale window
+  - Decision: [Notify tenant / Not notifying — rationale]
+
+Resolution: Job 35 restored. system.gdir_alert_restored emitted. PagerDuty resolved.
+
+DEC-030 Chain: system.gdir_alert_stale_declared (HIGH/7yr) + system.gdir_alert_restored (STANDARD/3yr) — GDIR-ALERT-CHAIN-01.
+
+Next steps: [P0 post-mortem within 72 h; SSO-OBS-E-007 Part B addendum for this quarter]
+```
+
+> **No customer-facing communication template:** AL-SSO-GDIR-01 is an internal monitoring alert. R-38 stale does not directly constitute a per-tenant SLA breach. If Google Directory sync errors were ongoing during the stale window and the enterprise tenant requires notification, the account CSM follows the standard enterprise communication protocol — there is no R-38-specific customer template.
+
+---
+
+### R-38.7 DEC-030 HMAC-Chained Events
+
+Both events are emitted via the `emit-audit-event` Cloudflare Worker (HTTP 422 on GDIR-ALERT-CHAIN-01 violation — ordering invariant enforced server-side).
+
+#### `system.gdir_alert_stale_declared` — HIGH / 7 years
+
+```typescript
+z.object({
+  incident_id:                          z.string().uuid(),
+  confirmed_stale_since:                z.string().datetime(),
+  stale_minutes:                        z.number().positive(),
+  missed_runs:                          z.number().int().nonneg(),
+  active_sync_error_tenant_count:       z.number().int().nonneg(),
+  // 0 at P1 (no tenant reached GDIR-01 threshold); > 0 at P0
+  trigger:                              z.enum(['pagerduty_alert', 'manual_discovery', 'co_active_r32', 'co_active_r37']),
+  // co_active_r32 = R-32 (caep_reregister_sweep / job 37) also stale
+  // co_active_r37 = R-37 (sso_fleet_health_check / job 38) also stale
+  initial_severity:                     z.enum(['P1', 'P0']),
+  peer_jobs_stale:                      z.boolean(),
+  // true if job 37 (caep_reregister_sweep) or job 38 (sso_fleet_health_check) is concurrently stale
+})
+// Privacy floor: no user_id, no employee name/email, no health data, no GDPR Art. 9 special-category data.
+// tenant_id is NOT included — aggregate count only (active_sync_error_tenant_count).
+```
+
+#### `system.gdir_alert_restored` — STANDARD / 3 years
+
+```typescript
+z.object({
+  incident_id:                              z.string().uuid(),
+  restored_at:                              z.string().datetime(),
+  root_cause:                               z.enum(['H1', 'H2', 'H3', 'H4']),
+  fix_deployed_at:                          z.string().datetime(),
+  al_sso_gdir_01_window_assessment_performed: z.boolean(),
+  // true if R-38-C1 was run and result reviewed (always true; false only if emergency restoration
+  // required before query could be run — must be followed up with deferred R-38-C1 run)
+})
+// Privacy floor: no user_id, no tenant_id, no employee name/email, no health data.
+```
+
+#### GDIR-ALERT-CHAIN-01 — Ordering invariant
+
+`system.gdir_alert_restored` MUST follow `system.gdir_alert_stale_declared` for the same `incident_id`. If `system.gdir_alert_restored` is received for an `incident_id` with no prior `system.gdir_alert_stale_declared`, the `emit-audit-event` Worker returns HTTP 422 `GDIR_ALERT_CHAIN_01_VIOLATION` and R-05 is activated.
+
+---
+
+### R-38.8 Evidence Preservation
+
+| Artefact | Content | Privacy floor | SOC 2 | Retention | Storage path |
+|---|---|---|---|---|---|
+| **`system.gdir_alert_stale_declared`** DEC-030 HMAC chain export | GDIR-ALERT-CHAIN-01 incident anchor — `confirmed_stale_since`, `stale_minutes`, `missed_runs`, `active_sync_error_tenant_count`, `trigger`, `initial_severity`, `peer_jobs_stale` | Aggregate count only; no `tenant_id`, no `user_id`, no employee PII | CC7.2 / CC7.3 | 7 yr | R2 `compliance/evidence/sso/gdir-alert/r38-<incident_id>/` |
+| **R-38-C2 output** `pg_cron.job_run_details` for job 35 stale window | Confirms stale window duration, missed-run count, `return_message` | `pg_cron` operational metadata only — no tenant data, no user data | CC7.2 | 3 yr | R2 `compliance/evidence/sso/gdir-alert/r38-<incident_id>/` |
+| **R-38-C1 output** *(P0 only)* | Aggregate GDIR-01 scope during stale window — per-tenant error counts and `latest_error_at`; no individual events | `tenant_id` UUID + aggregate integer counts only — no `user_email_hash`, no group membership details, no GDPR Art. 9 data | CC7.3 | 3 yr | R2 `compliance/evidence/sso/gdir-alert/r38-<incident_id>/` |
+
+> **SSO-OBS-E-007 addendum:** R-38 activations must be documented as an addendum to the quarterly SSO-OBS-E-007 filing for the quarter in which the incident occurred (same pattern as R-37 and SSO-FLEET-E-001). The addendum table row format:
+
+| Quarter | Incident ID | Stale window (min) | Severity | Root cause | GDIR-01 scope | Resolution |
+|---|---|---|---|---|---|---|
+| YYYY-QN | `<incident_id>` | `<stale_minutes>` | P1 / P0 | H1/H2/H3/H4 | 0 tenants (P1) / N tenants (P0) | `system.gdir_alert_restored` emitted at `<timestamp>` |
+
+> **Zero-incident quarters:** If no R-38 activation occurred in the quarter, add `r38_activations: 0` to the SSO-OBS-E-007 zero-event attestation JSON (§92.3 template). This confirms the job 35 monitoring pipeline operated throughout the quarter without an IC-declared stale incident.
+
+> **`form_api` access:** NO ACCESS to `compliance/evidence/sso/gdir-alert/` per standard `form_api` REVOKE pattern (§80.3). Only `form_system` (compliance_reviewer) may read evidence artefacts.
+
+---
+
+### R-38.9 SOC 2 Criteria Mapping
+
+| Criterion | Control description | R-38 evidence role |
+|---|---|---|
+| **CC7.2** | Monitoring of system components — `pg-cron-health-monitor` generates `system.cron_job_stale` within 6 min of any missed `google_directory_alert_check` run; job 35 provides continuous AL-SSO-GDIR-01/02 anomaly detection at per-tenant resolution | SSO-OBS-E-007 quarterly `pg_cron.job_run_details` Part B export (with any R-38 activation addendum) proves monitoring control operated as specified throughout the observation period; R-38 activation records prove stale windows were detected within the 6-min freshness threshold |
+| **CC7.3** | Response to anomalies — R-38 defines the IC response protocol for job 35 stale, including the P0 per-tenant GDIR-01 scope assessment path and the DEC-030 HMAC chain anchoring the response | R-38 activation and DEC-030 event chain constitute auditor-inspectable evidence that FORM detects and responds to Google Directory monitoring control gaps within a defined SLA |
+
+> **Auditor narrative (CC7.2 + CC7.3):** FORM's `google_directory_alert_check` (job 35, every 5 minutes) implements the per-tenant AL-SSO-GDIR-01 and AL-SSO-GDIR-02 alert rules against the DEC-030 HMAC-chained `audit_log_events` stream (DEC-067 signal-source coherence — the same immutable record that proves the sync event occurred also provides the alerting signal). The `pg-cron-health-monitor` (§12.7) detects any job 35 gap exceeding 6 minutes and pages devops-lead + platform-engineer. Job 35's self-monitoring advisory (`system.gdir_alert_check_stale` LOW/1yr) provides a secondary cross-check signal for compliance-officer review. SSO-OBS-E-007 Part B quarterly exports (§92.2) prove continuous monitoring operation throughout the observation period. At P0, R-38 requires per-tenant GDIR-01 scope assessment and IC determination on tenant notification, ensuring a monitoring gap does not translate into an unaddressed sync failure.
+
+---
+
+### R-38.10 Post-Incident Controls
+
+| Control | Action | Owner | SLA |
+|---|---|---|---|
+| **PIR** | Post-incident review required for all P0 activations: root cause analysis, timeline, contributing factors, whether any AL-SSO-GDIR-01 alert was missed and whether tenant notification was warranted. Standard INCIDENT_RESPONSE post-mortem template. | devops-lead + platform-engineer | Filed within 72 h of resolution |
+| **H3 — `audit_log_events` maintenance** | If root cause H3 (query timeout/lock contention): schedule `VACUUM ANALYZE audit_log_events` to maintenance runbook; set `form_audit` query timeout to 4 s (one pg_cron cadence interval) so single-run failures do not cascade into full stale | devops-lead | 14 days |
+| **Peer job cross-check** | If H2 (shared pg_cron failure): add joint stale-correlation check to the evidence runbook — file R-38 activation incident alongside any co-active R-32 / R-37 incidents in the quarterly PIR to confirm shared root cause | devops-lead + platform-engineer | PIR |
+| **§12.6 cross-reference** | Update `docs/OBSERVABILITY.md §12.6` job 35 `google_directory_alert_check` registry entry to include `INCIDENT_RESPONSE R-38 (job 35 stale recovery runbook — §R-38.5)` in the stale-consequence cross-ref column | devops-lead | **Done — OBSERVABILITY.md §12.6 v1.1 patch, 2026-06-22** |
+| **SSO-OBS-E-007 quarterly collection** | Collect and file SSO-OBS-E-007 quarterly; include any R-38 activation addendum for that quarter per §R-38.8 | security-engineer + compliance-officer | End of each calendar quarter |
+
+---
+
+### R-38.11 Implementation Checklist
+
+#### P0 — Before job 35 is deployed to production (M4)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.gdir_alert_stale_declared` (HIGH, 7yr) and `system.gdir_alert_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §System`. Add GDIR-ALERT-CHAIN-01 ordering invariant note. Add `peer_jobs_stale` boolean to `system.gdir_alert_stale_declared` Zod schema definition. | security-engineer + compliance-officer | **P0** | M4 | [x] **Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.32.** Both events registered in §System with full Zod v2 schemas including `peer_jobs_stale` boolean; GDIR-ALERT-CHAIN-01 ordering invariant (HTTP 422 `GDIR_ALERT_CHAIN_01_VIOLATION`); retention table +2 rows (HIGH 7yr, STANDARD 3yr); v2.32 version note. |
+| 2 | Deploy R-38 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'google_directory_alert_check'` to PagerDuty service `form-devops` P1, dedup key `gdir-alert-check-stale`, routing to devops-lead + platform-engineer. Write integration test: disable job 35 in staging for > 6 min; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-devops`. | devops-lead | **P0** | M4 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Update SSO-OBS-E-007 description in `docs/SOC2_READINESS.md §92` to note that R-38 activation addenda are included in quarterly filings. Add R-38 addendum table row format and `r38_activations: 0` zero-incident field to §92.3 zero-event attestation JSON template. | compliance-officer | **P1** | M11 | [x] **Done — 2026-06-22, SOC2_READINESS.md v3.25.5.** §92.1 description + R-38 addendum table row; §92.2 Part D (R-38-C1 SQL, privacy floor, CC7.3 mapping); §92.3 zero-event JSON `r38_activations: 0` field; §92.4 CC7.3 updated; §92.5 R-38.11 item 3 closure row. |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 35 `google_directory_alert_check` registry entry: add `INCIDENT_RESPONSE R-38 (job 35 stale recovery runbook — §R-38.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M4 | [x] *(completed in OBSERVABILITY.md §12.6 v1.1 patch, 2026-06-22)* |
+
+---
+
+*v1.0 (2026-06-22): R-38 Google Directory Alert Check Stale — thirty-eighth runbook. Closes the documentation gap for `google_directory_alert_check` (job 35, `*/5 * * * *`, 6-min freshness window) identified in `docs/OBSERVABILITY.md §12.6` — job 35 was registered in the canonical §12.6 registry (v0.4 patch, 2026-06-19) and its self-monitoring DEC-030 advisory event (`system.gdir_alert_check_stale` LOW/1yr) was registered (AUDIT_LOG_SCHEMA v2.20, 2026-06-19), but no INCIDENT_RESPONSE runbook existed, unlike peer 5-min cadence jobs: job 37 `caep_reregister_sweep` (R-32) and job 38 `sso_fleet_health_check` (R-37). R-38 provides the full IC protocol for when job 35 exceeds its freshness window, covering the AL-SSO-GDIR-01/AL-SSO-GDIR-02 detection gap. R-37 (job 38 peer) explicitly cross-referenced "job 35 stale alerts" in its T+5 peer-check and H2 hypothesis table, presupposing this runbook's existence. Trigger: `system.cron_job_stale` with `job_name = 'google_directory_alert_check'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-devops` → devops-lead + platform-engineer; dedup `gdir-alert-check-stale`. Key distinction from R-37: R-37 covers a fleet-level advisory signal (SSO-SLO-01b, `sla_credit_impact: 'none'` per DEC-070); R-38 covers per-tenant operational sync anomaly detection (AL-SSO-GDIR-01/02), where a missed P2 PagerDuty alert during the stale window has direct per-tenant operational significance even though it is not a SLA credit event. Advisory self-monitoring signal (`system.gdir_alert_check_stale` LOW/1yr) is distinct from the HIGH IC-declared incident: LOW = job 35 self-reporting its gap; HIGH (`system.gdir_alert_stale_declared`) = IC declaring the incident after pager fires. Two-severity matrix: P1 (stale, R-38-C1 returns zero rows — no tenant reached GDIR-01 threshold; detection gap only), P0 (stale AND R-38-C1 returns ≥ 1 row — AL-SSO-GDIR-01 threshold met for ≥ 1 tenant during blind spot; per-tenant scope assessment + IC notification decision required). T+0–T+30 immediate actions: emit `system.gdir_alert_stale_declared` HIGH/7yr at T+0; R-38-C1 at T+5; peer-job stale cross-check (jobs 37 + 38) at T+5; R-38-C2 at T+10; P0 per-tenant scope assessment at T+15; restoration at T+20–T+30. Four root cause hypotheses: H1 (job deleted/disabled), H2 (shared pg_cron infrastructure failure — most likely if jobs 37/38 co-stale), H3 (`audit_log_events` query failure — timeout or lock contention), H4 (Supabase platform outage → R-03 primary). Two scope queries: R-38-C1 (P0 gate — active GDIR-01 scope: tenants with ≥ 3 `sso.google_directory_sync_error` events per tenant in any rolling 15-min window during stale period; zero rows → P1; non-zero → P0), R-38-C2 (pg_cron.job_run_details last 10 runs for stale window). Four recovery steps: Step 1 (confirm stale + classify root cause with five-check table); Step 2 (P0 only — per-tenant GDIR-01 scope assessment SQL; IC determination on tenant notification; GDIR-INT-01 internal communication); Step 3 (restore job 35 per H1–H4 table); Step 4 (confirm `status = 'succeeded'`; emit `system.gdir_alert_restored` STANDARD/3yr; resolve PagerDuty). One internal communication template: GDIR-INT-01 (P0 only; no customer-facing template; R-38 stale is not itself a per-tenant SLA credit event). Two DEC-030 HMAC-chained events: `system.gdir_alert_stale_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `active_sync_error_tenant_count` nonneg int, `trigger` enum['pagerduty_alert','manual_discovery','co_active_r32','co_active_r37'], `initial_severity` enum['P1','P0'], `peer_jobs_stale` bool); `system.gdir_alert_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `al_sso_gdir_01_window_assessment_performed` bool); GDIR-ALERT-CHAIN-01 ordering invariant: `restored` must follow `stale_declared` for same `incident_id`; HTTP 422 `GDIR_ALERT_CHAIN_01_VIOLATION` on breach → R-05. Evidence: SSO-OBS-E-007 quarterly (CC7.2/CC7.3, 3yr, quarterly; R-38 activations documented as addendum; zero-incident quarters file `r38_activations: 0` in zero-event attestation JSON with job 35 run-history appended; `compliance/evidence/sso/gdir-alert/r38-<incident_id>/`). SOC 2 criteria: CC7.2 (Google Directory monitoring control — `pg-cron-health-monitor` 6-min freshness detection + DEC-067 signal-source coherence), CC7.3 (response to anomalies — P0 per-tenant GDIR-01 scope assessment path + IC notification determination). Post-mortem required for all P0 activations, filed within 72 h. Five post-incident controls: PIR (72 h — P0 only), H3 `audit_log_events` maintenance (14 days), peer-job cross-check in quarterly PIR, §12.6 cross-reference [x] Done v1.1 patch 2026-06-22, SSO-OBS-E-007 quarterly collection. Four-item implementation checklist: 2× P0/M4 (AUDIT_LOG_SCHEMA registration + GDIR-ALERT-CHAIN-01 [x] Done 2026-06-22; PagerDuty routing + integration test), 2× P1/M4–M11 (SOC2_READINESS §92 SSO-OBS-E-007 description update [x] Done 2026-06-22; §12.6 cross-ref [x] Done v1.1 patch 2026-06-22). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 35 `google_directory_alert_check` registry entry — stale consequence updated with INCIDENT_RESPONSE R-38 per v1.1 patch [x] Done); `docs/OBSERVABILITY.md §48` (AL-SSO-GDIR-01/AL-SSO-GDIR-02 canonical alert definitions; job 35 SQL spec §48.4); `docs/OBSERVABILITY.md §48.6` (SSO-OBS-E-007 evidence artefact definition); `docs/SOC2_READINESS.md §92` (SSO-OBS-E-007 quarterly collection + R-38 addendum — updated v3.25.5 [x] Done); R-32 (CAEP re-registration sweep — peer 5-min cadence job 37; co-stale suggests H2/H4); R-37 (SSO fleet health check — peer 5-min cadence job 38; co-stale suggests H2/H4; R-37 T+5 peer-check and H2 hypothesis explicitly reference "job 35 stale alerts", establishing this runbook's necessity); R-03 (Infrastructure Outage — parallel activation if H2/H4 shared pg_cron failure confirmed); R-05 (HMAC chain break — activate on GDIR-ALERT-CHAIN-01 ordering violation). Owner: devops-lead + platform-engineer.*
+
+---
+
+**v1.0 · 2026-06-22 · Owner: devops-lead + platform-engineer**
+**Review: after every P0 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0 — whichever comes first.**
+
+---

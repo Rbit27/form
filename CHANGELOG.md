@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.87.1] — 2026-06-22
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-38: Google Directory Alert Check Stale (`google_directory_alert_check`, job 35). Thirty-eighth runbook. Closes the sole remaining gap in 5-min cadence pg_cron stale runbook coverage: job 35 had no INCIDENT_RESPONSE runbook despite being explicitly cross-referenced in R-37 (job 38 peer). R-38 covers the AL-SSO-GDIR-01 / AL-SSO-GDIR-02 detection blind-spot protocol with two-severity matrix (P1/P0), R-38-C1 GDIR-01 scope query, R-38-C2 pg_cron run history, four root cause hypotheses (H1–H4), four recovery steps, GDIR-INT-01 internal communication template (P0 only), DEC-030 GDIR-ALERT-CHAIN-01 chain, evidence preservation via SSO-OBS-E-007 addendum, SOC 2 CC7.2/CC7.3 mapping, and five post-incident controls.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.31 → v2.32: registered `system.gdir_alert_stale_declared` (HIGH, 7yr) and `system.gdir_alert_restored` (STANDARD, 3yr) in `§System` section with full Zod v2 schemas and GDIR-ALERT-CHAIN-01 ordering invariant (HTTP 422 `GDIR_ALERT_CHAIN_01_VIOLATION` → R-05). Closes R-38.11 item 1 (P0/M4).
+- `docs/OBSERVABILITY.md` — §12.6 v1.1 patch: added `INCIDENT_RESPONSE R-38 (job 35 stale recovery runbook — §R-38.5)` to the `google_directory_alert_check` stale-consequence cross-ref column. Closes R-38.10 `§12.6 cross-reference` post-incident control and R-38.11 item 4.
+- `docs/SOC2_READINESS.md` — v3.25.4 → v3.25.5: §92.2 Part D (R-38 activation cross-check SQL + addendum format); §92.3 `r38_activations: 0` zero-event field; §92.4 CC7.3 updated with R-38 response protocol; §92.5 R-38.11 item 3 closure row; §92.6 item 2 status updated to `[x] Done`. Closes R-38.11 item 3 (P1/M11).
+- `VERSION` — 7.87.0 → 7.87.1.
+
+---
+
 ## [7.87.0] — 2026-06-22
 
 ### Added
