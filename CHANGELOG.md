@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.92.0] — 2026-06-22
+
+### Added
+- `content/post-2261-program-selection-framework.md` — Editorial 2261–2270 «Від чужої програми до власного протоколу», post 1/10. Як вибрати програму серед сотень варіантів: рамка оцінки без аналізу паралічу. Два жорстких фільтри: адгеренс (Peterson et al. 2011 — найсильніший предиктор результату) і вбудований механізм прогресії. П'ять координат оцінки: тренувальний вік (новачок / проміжний / просунутий і логіка адаптаційного статусу), ціль блоку (одна, не дві), структура і частота (відповідність реальному розкладу), якість документації (чотири явні питання), сумісність із відновленням (сон, зовнішній стрес, Stults-Kolehmainen & Sinha 2014). Алгоритм 6 кроків. Три типові помилки: бренд замість параметрів, зміна програми до мінімального горизонту (Ralston et al. 2017: 6–8 тижнів), адаптація без розуміння логіки. Paradox of choice (Iyengar & Lepper 2000). Schoenfeld & Grgic (2019) мета-аналіз частоти. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. Blog card added.
+
+### Changed
+- `blog.html` — card added for post-2261 (position before post-2260).
+- `README.md` — post-2261 updated proposed → draft · v7.92.0; Editorial 2281–2285 «Самопрограмування: від реакції до системи» added as proposed (5 теми).
+- `STATUS.md` — total posts 2014 → 2015; Editorial 2261–2270 progress started 1/10.
+- `VERSION` — 7.91.0 → 7.92.0.
+
+---
+
 ## [7.91.0] — 2026-06-22
 
 ### Added
