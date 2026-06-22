@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [8.1.0] — 2026-06-22
+
+### Added
+- `content/post-2269-strength-and-cardio-conflict.md` — Editorial 2261–2270 series, post 9/10. Concurrent training interference effect: Hickson (1980) original finding, Wilson et al. (2012) meta-analysis (–31% hypertrophy, –18% strength). Molecular mechanism: AMPK vs mTOR conflict, Atherton et al. (2005) FASEB Journal. Three variables controlling interference magnitude: cardio volume/frequency, modality (muscle group overlap), temporal interval between sessions. Practical weekly structure for strength-priority, endurance-priority, and equal-concurrent athletes. Block periodization (Issurin 2008) as alternative to simultaneous development. HIIT caveats. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-2270-program-selection-series-synthesis.md` — Editorial 2261–2270 series, post 10/10. Block synthesis: 10 principles distilled from all 10 posts, each with a single action item. Four operational checklists: new program selection (9 items), current program evaluation (5 items), transition/adaptation decision (4 items), concurrent training (4 items). Full series reference table. Proposed topic candidates for Editorial 2271–2280. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — Cards added for post-2269 and post-2270. **Editorial 2261–2270 COMPLETE 10/10.**
+
+### Changed
+- `VERSION` — 8.0.1 → 8.1.0.
+
+---
+
 ## [8.0.1] — 2026-06-22
 
 ### Changed
