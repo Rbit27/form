@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [7.81.1] — 2026-06-22
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.29 → v2.30. Registered 4 new DEC-030 HMAC-chained system events for R-36 (Webhook Escalation Sweep Stale, job 41) and R-37 (SSO Fleet Health Check Stale, job 38) incident chains. Inserted in §System after `system.turh_purge_restored`: `system.webhook_escalation_stale_declared` (HIGH, 7yr, WH-ESCALATION-CHAIN-01 anchor), `system.webhook_escalation_restored` (STANDARD, 3yr, WH-ESCALATION-CHAIN-01 terminal), `system.sso_fleet_check_failure_declared` (HIGH, 7yr, SSO-FLEET-CHAIN-01 anchor, includes `peer_jobs_stale` boolean), `system.sso_fleet_check_restored` (STANDARD, 3yr, SSO-FLEET-CHAIN-01 terminal). Retention table +6 rows (includes 2 rows missed from v2.29: `system.turh_purge_failure_declared` HIGH 7yr and `system.turh_purge_restored` STANDARD 3yr). Both chain ordering invariants registered: `emit-audit-event` Worker returns HTTP 422 on inversion (WH-ESCALATION-CHAIN-01 / SSO-FLEET-CHAIN-01) → R-05.
+- `docs/INCIDENT_RESPONSE.md` — Marked R-36.11 item 1 [x] Done (P0/M10 — AUDIT_LOG_SCHEMA.md v2.30, 2026-06-22). Marked R-37.11 item 1 [x] Done (P0/M5 — AUDIT_LOG_SCHEMA.md v2.30, 2026-06-22).
+- `VERSION` — 7.81.0 → 7.81.1.
+
+---
+
 ## [7.81.0] — 2026-06-22
 
 ### Added

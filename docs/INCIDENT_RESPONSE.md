@@ -14111,7 +14111,7 @@ const WebhookEscalationRestoredPayload = z.object({
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register `system.webhook_escalation_stale_declared` (HIGH, 7yr) and `system.webhook_escalation_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §System`. Add WH-ESCALATION-CHAIN-01 ordering invariant note. | platform-engineer + compliance-officer | **P0** | M10 | [ ] |
+| 1 | Register `system.webhook_escalation_stale_declared` (HIGH, 7yr) and `system.webhook_escalation_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §System`. Add WH-ESCALATION-CHAIN-01 ordering invariant note. | platform-engineer + compliance-officer | **P0** | M10 | [x] **Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.30.** Both events registered in §System with full Zod v2 schemas and WH-ESCALATION-CHAIN-01 ordering invariant (HTTP 422 `WH_ESCALATION_CHAIN_01_VIOLATION`); retention table +2 rows (HIGH 7yr, STANDARD 3yr); v2.30 version note. |
 | 2 | Deploy R-36 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'webhook_degraded_escalation_check'` to PagerDuty service `form-platform` P1, dedup key `webhook-degraded-escalation-stale`, route to platform-engineer. Write integration test: disable job 41 in staging for > 35 min; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-platform`. | devops-lead | **P0** | M10 | [ ] |
 
 #### P1 — Before SOC 2 observation period
@@ -14400,7 +14400,7 @@ R-37 activations are documented as addenda to the existing SSO-FLEET-E-001 quart
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register `system.sso_fleet_check_failure_declared` (HIGH, 7yr) and `system.sso_fleet_check_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §System`. Add SSO-FLEET-CHAIN-01 ordering invariant note. Add `peer_jobs_stale` boolean to `system.sso_fleet_check_failure_declared` Zod schema definition. | security-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 1 | Register `system.sso_fleet_check_failure_declared` (HIGH, 7yr) and `system.sso_fleet_check_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §System`. Add SSO-FLEET-CHAIN-01 ordering invariant note. Add `peer_jobs_stale` boolean to `system.sso_fleet_check_failure_declared` Zod schema definition. | security-engineer + compliance-officer | **P0** | M5 | [x] **Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.30.** Both events registered in §System with full Zod v2 schemas including `peer_jobs_stale` boolean; SSO-FLEET-CHAIN-01 ordering invariant (HTTP 422 `SSO_FLEET_CHAIN_01_VIOLATION`); retention table +2 rows (HIGH 7yr, STANDARD 3yr); v2.30 version note. |
 | 2 | Deploy R-37 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'sso_fleet_health_check'` to PagerDuty service `form-platform` P1, dedup key `sso-fleet-health-check-stale`, routing to IC + security-engineer. Write integration test: disable job 38 in staging for > 6 min; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-platform`. | devops-lead | **P0** | M5 | [ ] |
 
 #### P1 — Before SOC 2 observation period (M11)
