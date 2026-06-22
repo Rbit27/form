@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [7.58.1] — 2026-06-22
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.2 → v3.3. §9.3 Tabletop Scenario Catalog extended: six new scenarios (G, H, I, J, K, X) consolidated from their respective runbook sections (R-12.12, R-13.14, R-14.11, R-17, R-16, R-34) into the canonical drill catalog. Scenario G: insider data exfiltration across 14 enterprise tenants, Art. 33 clock question, legal observer required. Scenario H: US DOJ criminal subpoena covering EU-resident enterprise users, Art. 48 GDPR analysis, scope minimisation against 'all records', external counsel required. Scenario I: DSAR export cross-tenant contamination (420-user tenant, Art. 9 data in wrong exports, ICO 72-h partial filing). Scenario J: Anthropic API 90-min outage during live enterprise sessions, fallback SLA validation, clinical_safety_bypass DEC-030 emission check. Scenario K: API key committed to public GitHub fork with junior IC + CO on PTO, R-16 rotation order, Art. 33 assessment matrix. Scenario X: turh_retention_purge job 32 stale, R-34-C1 P1/P0 gate query, staging drill procedure including optional P0 pseudonymisation path. §9.5 Year 2 schedule: Month 21 → Scenario G (insider exfiltration); Month 24 tabletop pool expanded to include H and I. §9.6 Year 3 Testing Schedule added (M25–M36): H at M27, I+Fire drill at M30, J+K dual tabletop at M33, X+pen test at M36. R-16 Scenario K checklist item [x] Done. R-34.11 item 6 Scenario X checklist item [x] Done. · v7.58.1
+- `VERSION` → 7.58.1
+
 ## [7.58.0] — 2026-06-22
 
 ### Added
