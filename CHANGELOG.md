@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [7.60.1] — 2026-06-22
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.4: Scenario O (Linear API unavailable during active P0) added to §9.3 tabletop catalog. Scenario covers AL-IR-LINEAR-01 (P2 Slack after 5× exponential-backoff, 62 s), `incident.opened` DEC-030 HIGH/7yr chain lock with `linear_ticket_url: "PENDING"` before Linear failure, `POST /internal/v1/incident/link-ticket` PAM-elevated amendment endpoint (§17.2.5), `incident.linear_ticket_linked` LOW/7yr `linked_by: "manual_ic"`. Five discussion points: chain lock at T+0; amendment endpoint PAM at 02:15 UTC; PENDING gap in IR-AUTO-E-001; R-03 co-trigger threshold; manual vs auto path in IR-AUTO-E-002 P95. §9.5 Month 22 updated: lightweight 30-min tabletop (security-engineer + platform-engineer; staging drill disabling Linear API, triggering synthetic SIEM alert, running amendment path, confirming chain record). §17.6 item 8 marked [x] Done. Closes the §17 `siem-incident-automator` P1 documentation obligation.
+- `VERSION` → 7.60.1
+
+---
+
 ## [7.60.0] — 2026-06-22
 
 ### Added
