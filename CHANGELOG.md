@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.86.0] — 2026-06-22
+
+### Added
+- `content/post-2252-block-goal-setting.md` — Editorial 2251–2260, post 2/10. Операційна ціль тренувального блоку: чим відрізняється від напряму (ціль-декорація vs. ціль-інструмент). Два рівні цілі: адаптаційна (один пріоритет на блок) і структурна (вимірювана метрика). Ціль-результат vs. ціль-процес. Три обмеження: базовий рівень, тривалість блоку, зовнішній контекст. Перевірочний список з 4 запитань. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `content/post-2253-accumulation-vs-intensification.md` — Editorial 2251–2260, post 3/10. Два фундаментальних адаптаційних режими силового тренінгу: накопичення (60–80% 1ПМ, 6–15 повт., RIR 2–4, структурна база) і інтенсифікація (80–95% 1ПМ, 1–5 повт., RIR 0–2, нейром'язова конверсія). Чому застрягання в одному режимі блокує прогрес. Логіка чергування і 24-тижневий практичний приклад. Один блок — один тип. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `blog.html` — Blog cards added for post-2252 і post-2253.
+
+### Changed
+- `STATUS.md` — total posts 2005 → 2007; Editorial 2251–2260 progress 1/10 → 3/10.
+- `VERSION` — 7.85.1 → 7.86.0.
+
+---
+
 ## [7.85.1] — 2026-06-22
 
 ### Changed
