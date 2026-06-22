@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.83.0] — 2026-06-22
+
+### Added
+- `content/post-2247-deliberate-practice-strength-training.md` — Editorial 2241–2250, post 7/10. Навмисна практика у силовому тренінгу: принципи Ericsson адаптовані для залу. П'ять умов deliberate practice і чому звичайне тренування не відповідає жодній. Фізична втома як принципове обмеження (на відміну від шахів і музики): технічна фаза має відбуватись на початку сесії, до накопичення втоми, що знижує технічний поріг. Зона навмисної практики — між автоматичним виконанням і технічним порогом. Декомпозиція руху: один параметр на сесію. Зворотний зв'язок між підходами (відео, паузовані повторення, RPE-якісний журнал). Структура технічної фази: 20–25 хвилин, 4–6 підходів, петля ціль-виконання-корекція-верифікація. Часові реалії і що рахується як навмисна практика. Типові помилки впровадження. Ericsson, Krampe & Tesch-Römer (1993); Ericsson & Pool (2016); Schmidt & Lee (2011). clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+
+### Changed
+- `blog.html` — blog cards added for posts 2245 (відеоаналіз), 2246 (технічний поріг), 2247 (deliberate practice); inserted before post-2244 card. Cards for 2245–2246 were missing from v7.82.0.
+- `README.md` — post-2247: proposed → draft · v7.83.0; filename added.
+- `STATUS.md` — total posts 2000 → 2001; Editorial 2241–2250 in progress 7/10; blog.html cards note updated.
+- `VERSION` — 7.82.0 → 7.83.0.
+
+---
+
 ## [7.82.0] — 2026-06-22
 
 ### Added
