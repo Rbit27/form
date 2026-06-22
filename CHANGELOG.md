@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.68.0] — 2026-06-22
+
+### Added
+- `content/post-2211-mesocycle-practical-definition.md` — Editorial 2211–2220 post 1/10. Що таке мезоцикл для практичних цілей. Часові константи адаптацій (Moritani & DeVries 1979; Schoenfeld 2010; Magnusson 2010). Три фази всередині блоку: накопичення / інтенсифікація / деловантаження. Чотири типи мезоциклу (силовий / гіпертрофійний / технічний / відновний). Перехід між блоками — conjugate sequencing (Issurin 2010). Три маркери хорошого блоку (e1RM або RPE-тренд, технічна якість, реакція на деловантаження). П'ять помилок управління мезоциклом. Peterson et al. (2011): adherence як сильніший предиктор результату за схему. Kiely (2012): деловантаження як фаза завершення адаптаційних процесів. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — card for post-2211 added (перед post-2134).
+- `STATUS.md` — Editorial 2211–2220: IN PROGRESS 1/10 · v7.68.0. NEXT: post-2212.
+- `README.md` — Editorial 2211–2220 block added to roadmap (10 proposed topics).
+- `VERSION` — 7.67.1 → 7.68.0.
+
+---
+
 ## [7.67.0] — 2026-06-22
 
 ### Added
