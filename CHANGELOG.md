@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.88.0] — 2026-06-22
+
+### Added
+- `content/post-2255-intensity-rpe-progression-within-block.md` — Editorial 2251–2260, post 5/10. Інтенсивність у блоці: %1ПМ і RPE як взаємодоповнювальні інструменти прогресії. Лінійна прогресія (таблиця по тижнях для накопичувального блоку). Wave loading — механізм хвилі, коли підходить, коли ні. Авторегуляція трьох рівнів: мікро (підхід), сесія, тиждень. Три симптоми некерованої прогресії інтенсивності. Практичний алгоритм: стартова інтенсивність і крок для накопичення vs. інтенсифікації. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. Blog card added.
+- `content/post-2256-deload-when-and-how.md` — Editorial 2251–2260, post 6/10. Deload: фізіологічне обґрунтування (нейром'язова втома, структурна мікротравматизація, психологічне виснаження, суперкомпенсація). Два типи: scheduled vs. autoregulated (симптоми-тригери). Три моделі: volume deload / intensity deload / combined deload з конкретними таблицями параметрів. Що не є deload (повна пауза, хаотичне «легеньке», тиждень нових вправ). Тривалість і частота за типом блоку. Маркери успішного deload. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. Blog card added.
+
+### Changed
+- `blog.html` — cards added for post-2255 and post-2256 (positions before post-2254).
+- `STATUS.md` — total posts 2008 → 2010; Editorial 2251–2260 progress 4/10 → 6/10.
+- `VERSION` — 7.87.1 → 7.88.0.
+
+---
+
 ## [7.87.1] — 2026-06-22
 
 ### Added
