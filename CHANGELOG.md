@@ -1,5 +1,10 @@
 # Changelog · FORM
 
+## [7.79.1] — 2026-06-22
+
+### Changed
+- `admin-dashboard.html` — Contract Renewal screen added (`data-screen="renewal"`). Closes COST_MODEL §42.10 items 3 & 7 (documentation phase). Two sections: (1) Renewal Economics fleet panel (`form_admin` read-only) — 4 metric cards (accounts renewing next 12mo, ARR at renewal, fleet health WAU-band distribution, escalation-eligible count + estimated ARR uplift), 12-month ARR-by-month bar chart (Jul 2026–Jun 2027), privacy floor callout (no individual tenant names in fleet view). (2) 3-step Renewal Workflow (`compliance-officer` role) — account selector + stepper: Step 1 Send Notice (`enterprise.renewal_notice_sent`, STANDARD, 7yr), Step 2 Calculate Escalation (locked for Year 1; unlocks for Year 2+ multi-year — CPI+1% formula, 5% hard cap, `bls_report_date` date-only), Step 3 Confirm Renewal (`enterprise.contract_renewed`, atomic with UPDATE `enterprise_contracts` + INSERT `enterprise_renewals`). RENEW-CHAIN-01 and ESCALATION-CHAIN-01 invariant callout with HTTP 422 behaviour documented. Privacy floor panel: fleet view shows tenant count only; workflow view shows account names for compliance-officer; no `user_id`, health data, or GDPR Art. 9 data. Sidebar nav item "Renewal" (↻) added between Billing and Audit log. VERSION 7.79.0 → 7.79.1. Cross-references: COST_MODEL §42 (renewal economics + 3-step workflow spec); COST_MODEL §31.5 (price floor); COST_MODEL §40 (privacy floor); DATA_MODEL §43 (`enterprise_renewals` DDL); AUDIT_LOG_SCHEMA §Enterprise (3 DEC-030 events); MSA_TEMPLATE §4.6 (escalation clause). compliance-officer + enterprise-architect.
+
 ## [7.79.0] — 2026-06-22
 
 ### Added
