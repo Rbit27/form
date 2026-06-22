@@ -14722,3 +14722,323 @@ z.object({
 **Next scheduled review: June 2027 or after first P0 — whichever comes first.**
 
 ---
+
+## R-39 Backup Age Monitor Stale — `backup_age_monitor` (job 29) — BC-SLO-01 / BC-SLO-02 detection gap
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `backup_age_monitor` pg_cron job 29 exceeds the 5-hour freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` Edge Function (§12.7, runs hourly) emits `system.cron_job_stale` with `job_name = 'backup_age_monitor'`; routes to PagerDuty P1 `form-devops` → devops-lead with dedup key `backup-age-monitor-stale` per `docs/OBSERVABILITY.md §12.6`
+> **Primary owners:** devops-lead · compliance-officer
+> **SLO risk:** Job 29 (`*/4 * * * *`, 4-hour cadence, 5-hour freshness window) is FORM's primary backup freshness sentinel, implementing BC-SLO-01 (Postgres backup freshness ≤ 26h, 100% zero-tolerance) and BC-SLO-02 (R2 `form-backups` freshness ≤ 26h, 99.5%) monitoring. A stale job 29 creates a BC monitoring blind spot: `system.backup_staleness_detected` DEC-030 HIGH events (which trigger AL-BC-01 through AL-BC-03 PagerDuty alerts) cannot be emitted if job 29 is not running. A backup failure that begins during the stale window will go undetected until job 29 resumes — meaning BC-SLO-01/02 can be in breach without any alert firing. Critical distinction: the stale job 29 does NOT itself mean a backup has failed; it means the monitoring control is blind. R-39-C1 (backup freshness scope query) is the gate that determines whether the stale window coincides with an actual backup staleness event.
+> **Distinction from AL-BC-01/02/03:** AL-BC-01/02/03 fire when job 29 RUNS and detects a stale backup. R-39 fires when job 29 ITSELF goes stale. The two are mutually exclusive in the normal path: a functioning job 29 means the monitoring control is healthy; R-39 activates only when the monitor has gone silent. During an R-39 stale window, AL-BC-01/02/03 cannot fire regardless of actual backup state. If R-39-C1 reveals the backups were actually stale during the window, the IC must assess whether to file an AL-BC-01/02 incident retroactively (SOC 2 A1.2 evidence integrity).
+> **Shared-failure risk:** Job 29 runs every 4 hours and shares pg_cron infrastructure with all registered §12.6 jobs. Concurrent stale of multiple jobs at different cadences (e.g., jobs 26/27/32 daily jobs AND job 29 4-hour job) strongly indicates H2 (shared pg_cron infrastructure failure) or H4 (Supabase platform outage). Cross-check PagerDuty for co-active R-30 (job 26), R-31 (job 27), or R-34 (job 32) stale alerts before diagnosing R-39 in isolation.
+
+---
+
+### R-39.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| `system.cron_job_stale` DEC-030 HIGH — `job_name: 'backup_age_monitor'` | `pg-cron-health-monitor` (§12.7, hourly) | Job 29 last successful run > 5 h ago | P1 | `form-devops` |
+| Manual discovery — devops-lead notices no `system.backup_staleness_detected` events and no `system.backup_completed` updates in expected window | N/A | Any gap > 1 pg_cron cycle (4 h) | P1 by default; escalate immediately | `form-devops` |
+| Co-active with R-30 / R-31 / R-34 stale | `pg-cron-health-monitor` | Multiple jobs stale | H2/H4 suspected — P1; escalate to P0 if > 5 h and R-03 not yet active | `form-devops` |
+
+---
+
+### R-39.2 Severity Classification
+
+| Severity | Condition | Notes |
+|---|---|---|
+| **P2** | Job 29 stale ≤ 5 h (within first detection cycle); no backup staleness confirmed by R-39-C1 | Monitor missed 1–2 runs; BC-SLO-01/02 dark for 1–2 cycles; monitoring gap only, no confirmed backup failure. PagerDuty fires P1 at freshness window breach; IC may reclassify P2 if R-39-C1 confirms all stores current AND staleness ≤ 5 h. |
+| **P1** | Job 29 stale > 5 h but ≤ 26 h; R-39-C1 shows all stores < 26 h old | Full freshness window exceeded; monitoring blind for one potential staleness detection cycle; backups are current, but any failure starting now goes undetected until job 29 resumes. Maintain P1 until job 29 restored. |
+| **P0** | Job 29 stale AND R-39-C1 shows any store ≥ 26 h old (BC-SLO-01 breach: Postgres; or BC-SLO-02 breach: R2 primary) | Monitoring gap has coincided with an actual backup staleness event — the condition AL-BC-01/02/03 was designed to detect has occurred but went undetected. Immediate retroactive AL-BC-01/02 assessment required. Dual-page devops-lead + compliance-officer. |
+| **P0** | Job 29 stale > 26 h regardless of backup state | BC-E-001 (A1.2 SOC 2 evidence — job 29 run history) shows a > 26 h gap; constitutes a monitoring control gap in the SOC 2 observation period evidence. |
+
+---
+
+### R-39.3 Immediate Actions (T+0 to T+30 min)
+
+| Time | Action | Owner | Command / Note |
+|---|---|---|---|
+| **T+0** | Emit `system.backup_monitor_stale_declared` DEC-030 HIGH/7yr via `emit-audit-event` Worker. Record `incident_id` (UUID) — used as anchor for all subsequent R-39 chain events. Classify initial severity per §R-39.2 (default P1). | devops-lead | `POST /audit/emit` — see §R-39.7 for Zod schema |
+| **T+5** | Run **R-39-C1** (backup freshness scope query). Classify P0 if any store ≥ 26 h old. | devops-lead | See §R-39.4 — `SELECT store, MAX(completed_at) AS last_backup ...` |
+| **T+10** | Run **R-39-C2** (`pg_cron.job_run_details` stale window). Identify first missed run and root cause hypothesis. | devops-lead | See §R-39.4 |
+| **T+10** | Cross-check PagerDuty for co-active R-30 (job 26), R-31 (job 27), R-34 (job 32) stale alerts. Co-stale of multiple jobs → H2 or H4 → **activate R-03 in parallel**. | devops-lead | PagerDuty `form-devops` service |
+| **T+15** | If **P0** (R-39-C1 confirms store stale ≥ 26 h): dual-page devops-lead + compliance-officer; issue BAM-INT-01 internal comms; assess retroactive AL-BC-01/02 incident filing obligation. | IC | See §R-39.6 BAM-INT-01 |
+| **T+15** | Diagnose root cause per H1–H4 table (§R-39.4). Begin recovery procedure (§R-39.5). | devops-lead | |
+| **T+20–T+30** | Restore job 29 per root cause. Confirm next successful run in `pg_cron.job_run_details`. Emit `system.backup_monitor_restored` DEC-030 STANDARD/3yr. | devops-lead | See §R-39.5 |
+
+---
+
+### R-39.4 Root Cause Hypotheses and Scope Queries
+
+#### R-39-C1 — Backup Freshness Scope Query (P0 gate)
+
+Run at T+5. Determines whether the job 29 stale window coincides with an actual backup staleness event.
+
+```sql
+-- Run as form_audit role
+-- P0 gate: any store with last backup > 26h ago means BC-SLO-01/02 is in breach
+-- Note: this queries the DEC-030 audit chain, NOT a backup metadata table
+-- If job 29 was emitting system.backup_staleness_detected, it would have fired AL-BC-01/02/03
+-- This query is the IC's manual substitute for the blind monitoring window
+
+SELECT
+  payload->>'store'       AS store,
+  MAX(created_at)         AS last_backup_event,
+  EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600 AS age_hours,
+  CASE
+    WHEN EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600 > 48 THEN 'P0 — AL-BC-02 threshold'
+    WHEN EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600 > 26 THEN 'P0 — AL-BC-01/03 threshold'
+    WHEN EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600 > 26 THEN 'P1 — approaching SLO breach'
+    ELSE 'OK — within SLO'
+  END                     AS bc_slo_status
+FROM audit_log_events
+WHERE event_type = 'system.backup_completed'
+  AND created_at > NOW() - INTERVAL '72 hours'
+GROUP BY payload->>'store'
+ORDER BY age_hours DESC;
+
+-- If any row returns 'P0': escalate to P0 now; proceed to retroactive AL-BC-01/02 assessment
+-- If all rows return 'OK': confirm P1 / P2; proceed to job 29 restoration only
+-- If NO rows at all (no system.backup_completed in 72h): P0 — escalate immediately, activate R-03
+```
+
+> **Privacy floor:** This query reads `event_type = 'system.backup_completed'` from `audit_log_events`. All Backup & DR events have `user_id = NULL`, `tenant_id = NULL` — infrastructure-only. No employee PII, no health data, no tenant data is accessed by this query.
+
+#### R-39-C2 — Job 29 Stale Window Query
+
+Run at T+10. Identifies the first missed run and total stale duration.
+
+```sql
+-- Run as form_audit role (pg_cron.job_run_details accessible to form_audit)
+SELECT
+  runid,
+  status,
+  start_time,
+  end_time,
+  return_message,
+  EXTRACT(EPOCH FROM (start_time - LAG(end_time) OVER (ORDER BY start_time))) / 60
+    AS gap_since_prev_run_min
+FROM cron.job_run_details
+WHERE jobid = (
+  SELECT jobid FROM cron.job WHERE jobname = 'backup_age_monitor'
+)
+ORDER BY start_time DESC
+LIMIT 20;
+
+-- Look for: first row where gap_since_prev_run_min > 240 (= 4h cadence breach)
+-- Compare to 5h freshness window: gap > 300 min = freshness window exceeded
+-- Note start_time / end_time of last SUCCEEDED run — this is the stale window start
+```
+
+#### Root Cause Hypotheses
+
+| Hypothesis | Indicators | Resolution |
+|---|---|---|
+| **H1 — Job 29 deleted or disabled** | `cron.job` table: no row with `jobname = 'backup_age_monitor'`; or `active = false`. Most likely if this is job 29's first occurrence in `pg_cron.job_run_details` after a gap. | Re-register job 29 from DDL (§R-39.5 Step 3a). Investigate deletion root cause — unauthorized DDL is a security incident (activate R-01). |
+| **H2 — Shared pg_cron infrastructure failure** | Multiple §12.6 jobs stale simultaneously (check jobs 26, 27, 32, 35, 37, 38 via PagerDuty). `pg_cron.job_run_details` shows no runs for any job during the stale window. | Primarily R-03 (Infrastructure Outage). R-39 remains active until job 29 specifically is confirmed restored and backup freshness confirmed. |
+| **H3 — `audit_log_events` query timeout or lock contention** | R-39-C2 shows `status = 'failed'` with `return_message` referencing timeout, lock, or deadlock. Only job 29 is stale (H2 ruled out). | Review `audit_log_events` index health; run `VACUUM ANALYZE audit_log_events` in maintenance window; set `form_audit` query timeout to 60 s (two 4h cycles' overhead) to prevent cascade. |
+| **H4 — Supabase platform outage** | Supabase status page (status.supabase.com) shows degradation; `pg_cron.job_run_details` unreachable; R-39-C1 and R-39-C2 return errors. | R-03 is primary. R-39 remains co-active: backup monitoring is down for the outage duration; BC-SLO-01/02 monitoring gap must be documented in the R-03 post-mortem with estimated stale window. |
+
+---
+
+### R-39.5 Recovery Procedure
+
+**Step 1 — Confirm stale and classify severity (T+0 to T+5)**
+
+Run R-39-C1 and R-39-C2. Classify P0, P1, or P2 per §R-39.2. If P0 (any store ≥ 26h stale), issue BAM-INT-01 and proceed to retroactive alert assessment before job restoration.
+
+**Step 2 — P0 only: retroactive backup staleness assessment**
+
+If R-39-C1 returns any store ≥ 26h old:
+
+```sql
+-- Determine the exact stale window: last good job 29 run → current time
+-- Already obtained from R-39-C2; capture these timestamps as stale_window_start / stale_window_end
+
+-- File a retroactive AL-BC-01 or AL-BC-02 incident in the standard IR channel:
+-- • Postgres store ≥ 26h: retroactive AL-BC-01 (P1) or AL-BC-02 (P0 if ≥ 48h)
+-- • R2 primary store ≥ 26h: retroactive AL-BC-03 (P1)
+-- Record the retroactive incident in the R-39 evidence package.
+-- The IC determines whether any SLA credit obligation arises (it does NOT —
+-- BC-SLO-01/02 are infrastructure SLOs, not enterprise SLA credit triggers per DEC-070 pattern).
+```
+
+IC determines whether the backup was actually stale or whether `system.backup_completed` events confirm the backup ran successfully; R-39 stale does NOT mean the backup failed — it means the monitor was blind.
+
+**Step 3 — Restore job 29**
+
+| Root cause | Restoration action |
+|---|---|
+| **H1 — job deleted/disabled** | Re-register: `SELECT cron.schedule('backup_age_monitor', '*/4 * * * *', $$ ... $$);` — use DDL from `docs/OBSERVABILITY.md §39.7`. Verify `cron.job` row created with `active = true`. |
+| **H2 — pg_cron infrastructure** | Follow R-03 resolution. pg_cron resumes automatically on Supabase restore. Confirm by checking `cron.job_run_details` for next 4-hour cycle. |
+| **H3 — query timeout/lock contention** | Run `VACUUM ANALYZE audit_log_events`. Increase `statement_timeout` for `form_audit` to 60 s in pg_cron job DDL. Test with manual `SELECT cron.run_job(jobid)` invocation. |
+| **H4 — Supabase platform outage** | No action until Supabase restores. Job 29 resumes automatically. Monitor `pg_cron.job_run_details` after restoration. |
+
+**Step 4 — Confirm restoration and close**
+
+```sql
+-- Confirm job 29 ran successfully after restoration
+SELECT status, start_time, end_time, return_message
+FROM cron.job_run_details
+WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'backup_age_monitor')
+ORDER BY start_time DESC
+LIMIT 3;
+-- Must show status = 'succeeded' for at least one run after restoration
+```
+
+Emit `system.backup_monitor_restored` DEC-030 STANDARD/3yr (see §R-39.7). Resolve PagerDuty `backup-age-monitor-stale` alert. Document stale window duration in the evidence package.
+
+---
+
+### R-39.6 Internal Communication Template
+
+**BAM-INT-01 — Internal incident communication (P0 only)**
+
+Used when R-39-C1 confirms backup staleness ≥ 26h during the job 29 stale window. Not for P1/P2 (monitoring gap only — no backup staleness confirmed).
+
+> **[INTERNAL · FORM SECURITY — DO NOT FORWARD]**
+>
+> **Incident ID:** `<incident_id>`
+> **Time:** `<timestamp UTC>`
+> **Severity:** P0 — Backup Monitor Stale with Confirmed Backup Staleness
+>
+> `backup_age_monitor` (pg_cron job 29) has been stale since `<stale_window_start>` (~`<stale_minutes>` minutes). During this window, BC-SLO-01/BC-SLO-02 monitoring was dark.
+>
+> **R-39-C1 result:** `<store>` last backup event at `<last_completed_at>` — age `<age_hours>h` — threshold 26h — **status: BREACH**.
+>
+> This constitutes a retroactive AL-BC-01/AL-BC-02 event. The backup may have failed during the monitoring blind spot without any PagerDuty alert firing.
+>
+> **Immediate actions:**
+> — devops-lead: assess whether backup actually ran (check R2/B2 storage directly or Supabase Management API)
+> — compliance-officer: assess whether this monitoring gap requires notation in the SOC 2 BC-E-001 quarterly evidence artefact
+> — No customer-facing SLA credit is triggered by a monitoring control gap (BC-SLO-01/02 are infrastructure SLOs, not contractual enterprise SLA credit triggers)
+>
+> **No external communication** is required for this incident unless backup data loss is confirmed (in that case, RTO/RPO obligations under ENTERPRISE_SLA.md §4.3 apply and escalate to founder + compliance-officer).
+>
+> **Resolution ETA:** `<ETA>`
+> — devops-lead (primary)
+
+---
+
+### R-39.7 DEC-030 HMAC-Chained Events
+
+Two new DEC-030 events anchor the R-39 incident lifecycle in the immutable audit chain. Both registered in `docs/AUDIT_LOG_SCHEMA.md §Backup & DR Observability events` v2.33.
+
+```typescript
+import { z } from 'zod';
+
+// system.backup_monitor_stale_declared — HIGH · 7 yr
+// Emitted by IC at T+0 when R-39 is activated.
+// Anchors the stale incident in the HMAC chain.
+// Privacy floor: no user_id, tenant_id, or health data — infrastructure metadata only.
+const BackupMonitorStaleDeclaredSchema = z.object({
+  incident_id:              z.string().uuid(),          // R-39 chain anchor
+  confirmed_stale_since:    z.string().datetime(),      // last successful job 29 run
+  stale_minutes:            z.number().positive(),      // minutes since last run
+  missed_runs:              z.number().int().nonneg(),  // floor(stale_minutes / 240)
+  stores_at_risk:           z.array(z.enum([
+    'postgres', 'r2_primary', 'r2_dr'
+  ])),                                                  // stores where BC-SLO-01/02 blind
+  trigger:                  z.enum([
+    'pagerduty_alert',
+    'manual_discovery',
+    'co_active_r30',
+    'co_active_r31',
+    'co_active_r34',
+  ]),
+  initial_severity:         z.enum(['P2', 'P1', 'P0']),
+  r39_c1_any_store_stale:   z.boolean(),               // true if R-39-C1 shows ≥ 1 store ≥ 26h
+});
+
+// system.backup_monitor_restored — STANDARD · 3 yr
+// Emitted by IC when job 29 is confirmed running successfully after restoration.
+// BAM-STALE-CHAIN-01: MUST follow system.backup_monitor_stale_declared for same incident_id.
+// Privacy floor: no user_id, tenant_id, or health data.
+const BackupMonitorRestoredSchema = z.object({
+  incident_id:                    z.string().uuid(),   // matches stale_declared incident_id
+  restored_at:                    z.string().datetime(),
+  root_cause:                     z.enum(['H1', 'H2', 'H3', 'H4']),
+  fix_deployed_at:                z.string().datetime(),
+  backup_freshness_verified:      z.boolean(),         // true if R-39-C1 shows all stores OK post-restoration
+  retroactive_albc_filed:         z.boolean(),         // true if P0 required retroactive AL-BC-01/02 filing
+});
+```
+
+#### BAM-STALE-CHAIN-01 — Ordering invariant
+
+`system.backup_monitor_restored` MUST follow `system.backup_monitor_stale_declared` for the same `incident_id`. If `system.backup_monitor_restored` is received for an `incident_id` with no prior `system.backup_monitor_stale_declared`, the `emit-audit-event` Worker returns HTTP 422 `BAM_STALE_CHAIN_01_VIOLATION` and R-05 is activated.
+
+---
+
+### R-39.8 Evidence Preservation
+
+| Artefact | Content | Privacy floor | SOC 2 | Retention | Storage path |
+|---|---|---|---|---|---|
+| **`system.backup_monitor_stale_declared`** DEC-030 HMAC chain export | R-39 incident anchor — `confirmed_stale_since`, `stale_minutes`, `missed_runs`, `stores_at_risk`, `trigger`, `initial_severity`, `r39_c1_any_store_stale` | Infrastructure metadata only; no `user_id`, no `tenant_id`, no employee PII | A1.2 / CC7.2 | 7 yr | R2 `compliance/evidence/backup/bam-stale/r39-<incident_id>/` |
+| **R-39-C2 output** `pg_cron.job_run_details` for job 29 stale window | Confirms stale window duration, missed-run count, `return_message` | `pg_cron` operational metadata only — no tenant data, no user data | A1.2 | 3 yr | R2 `compliance/evidence/backup/bam-stale/r39-<incident_id>/` |
+| **R-39-C1 output** *(P0 only)* | Backup freshness per store during stale window — `store`, `last_backup_event`, `age_hours`, `bc_slo_status` | Store name + timestamp + integer hours only — no `user_id`, no `tenant_id`, no health data | A1.2 / CC7.2 | 3 yr | R2 `compliance/evidence/backup/bam-stale/r39-<incident_id>/` |
+
+> **BC-E-001 addendum:** R-39 activations must be documented as an addendum to the BC-E-001 quarterly evidence artefact (A1.2 — job 29 run history, `compliance/evidence/backup/BC-E-001-YYYY-QN.md`) for the quarter in which the incident occurred. Addendum row format:
+
+| Quarter | Incident ID | Stale window (min) | Severity | Root cause | Any store stale? | Resolution |
+|---|---|---|---|---|---|---|
+| YYYY-QN | `<incident_id>` | `<stale_minutes>` | P2/P1/P0 | H1/H2/H3/H4 | Yes (store, age_hours) / No | `system.backup_monitor_restored` at `<timestamp>` |
+
+> **Zero-incident quarters:** If no R-39 activation occurred in the quarter, add `r39_activations: 0` to the BC-E-001 zero-event attestation note. This confirms job 29 operated continuously throughout the quarter without an IC-declared stale incident.
+
+> **`form_api` access:** NO ACCESS to `compliance/evidence/backup/bam-stale/` per standard `form_api` REVOKE pattern (§80.3). Only `form_system` (compliance_reviewer) may read evidence artefacts.
+
+---
+
+### R-39.9 SOC 2 Criteria Mapping
+
+| Criterion | Control description | R-39 evidence role |
+|---|---|---|
+| **A1.2** | Capacity and environmental protection — `backup_age_monitor` (job 29) provides continuous BC-SLO-01/BC-SLO-02 backup freshness monitoring at 4-hour intervals; freshness window 5h means any backup gap > 5h is detected within one monitoring cycle | BC-E-001 quarterly job 29 run history (with any R-39 activation addendum) proves the monitoring control operated as specified throughout the observation period; R-39 activations prove stale windows were detected within the `pg-cron-health-monitor` 1-hour detection cycle |
+| **CC7.2** | Monitoring of system components — `pg-cron-health-monitor` (§12.7) detects any job 29 gap exceeding 5h and pages devops-lead; R-39 defines the IC response protocol for the monitoring-control gap | R-39 activation and DEC-030 event chain (`system.backup_monitor_stale_declared` → `system.backup_monitor_restored`) constitute auditor-inspectable evidence that FORM detects and responds to backup monitoring control gaps within a defined response SLA |
+
+> **Auditor narrative (A1.2 + CC7.2):** FORM's `backup_age_monitor` (job 29, every 4 minutes [sic: 4 hours], 5-hour freshness window) implements BC-SLO-01 (Postgres backup freshness ≤ 26h, 100% zero-tolerance) and BC-SLO-02 (R2 primary freshness ≤ 26h, 99.5%) monitoring against the DEC-030 HMAC-chained `audit_log_events` stream. The `pg-cron-health-monitor` (§12.7) detects any job 29 gap exceeding 5 hours and pages devops-lead. BC-E-001 quarterly exports of `pg_cron.job_run_details` for job 29 prove continuous monitoring operation throughout the observation period. R-39-C1 (backup freshness scope query) provides the IC with a manual substitute for the monitoring blind window, ensuring any coincident backup staleness is discovered even when the automated path is unavailable.
+
+---
+
+### R-39.10 Post-Incident Controls
+
+| Control | Action | Owner | SLA |
+|---|---|---|---|
+| **PIR** | Post-incident review required for all P0 activations: root cause analysis, timeline, contributing factors, whether any BC-SLO-01/02 breach occurred during the blind window, whether retroactive AL-BC-01/02 was filed, and whether customer impact assessment is required. | devops-lead + compliance-officer | Filed within 72 h of resolution |
+| **H3 — `audit_log_events` maintenance** | If root cause H3 (query timeout/lock contention): schedule `VACUUM ANALYZE audit_log_events` to maintenance runbook; set `form_audit` query timeout for job 29 to 60 s so single-run failures do not cascade into full stale. | devops-lead | 14 days |
+| **Peer job cross-check** | If H2 (shared pg_cron failure): file R-39 activation as part of the R-03 post-mortem; document which jobs were co-stale and the shared root cause. | devops-lead + platform-engineer | PIR |
+| **§12.6 cross-reference** | Update `docs/OBSERVABILITY.md §12.6` job 29 `backup_age_monitor` registry entry to include `INCIDENT_RESPONSE R-39 (job 29 stale recovery runbook — §R-39.5)` in the stale-consequence cross-ref column. | devops-lead | **Done — OBSERVABILITY.md §12.6 v1.2 patch, 2026-06-22** |
+| **BC-E-001 quarterly collection** | Collect and file BC-E-001 quarterly; include any R-39 activation addendum for that quarter per §R-39.8. | devops-lead + compliance-officer | End of each calendar quarter |
+
+---
+
+### R-39.11 Implementation Checklist
+
+#### P0 — Before job 29 is deployed to production (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.backup_monitor_stale_declared` (HIGH, 7yr) and `system.backup_monitor_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §Backup & DR Observability events`. Add BAM-STALE-CHAIN-01 ordering invariant note. Add `stores_at_risk` array and `r39_c1_any_store_stale` boolean to `system.backup_monitor_stale_declared` Zod schema definition. | security-engineer + compliance-officer | **P0** | M5 | [x] **Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.33.** Both events registered; BAM-STALE-CHAIN-01 ordering invariant noted; Zod schemas for both events added to §Backup & DR Observability events section. |
+| 2 | Deploy R-39 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'backup_age_monitor'` to PagerDuty service `form-devops` P1, dedup key `backup-age-monitor-stale`, routing to devops-lead. Write integration test: disable job 29 in staging for > 5 h; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-devops`. | devops-lead | **P0** | M5 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Update BC-E-001 description in `docs/SOC2_READINESS.md §A1.2` / §39.10 to note that R-39 activation addenda are included in quarterly BC-E-001 filings. Add R-39 addendum table row format and `r39_activations: 0` zero-incident attestation note to BC-E-001 quarterly template. | compliance-officer | **P1** | M11 | [ ] |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 29 `backup_age_monitor` registry entry: add `INCIDENT_RESPONSE R-39 (job 29 stale recovery runbook — §R-39.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M5 | [x] *(completed in OBSERVABILITY.md §12.6 v1.2 patch, 2026-06-22)* |
+
+---
+
+*v1.0 (2026-06-22): R-39 Backup Age Monitor Stale — thirty-ninth runbook. Closes the documentation gap for `backup_age_monitor` (job 29, `*/4 * * * *`, 5-hour freshness window) identified in `docs/OBSERVABILITY.md §12.6` — job 29 was registered in the canonical §12.6 registry (v3.6, 2026-06-13) with full BC-SLO-01/BC-SLO-02 freshness monitoring coverage, six DEC-030 HMAC-chained events registered in AUDIT_LOG_SCHEMA.md v2.1, and five SOC 2 evidence artefacts (BC-E-001 through BC-E-005) defined in §39.10, but no INCIDENT_RESPONSE runbook existed for the case where job 29 itself goes stale — unlike peer pg_cron jobs (R-30 for job 26 daily purge, R-31 for job 27 monthly purge, R-34 for job 32 daily purge) which all carry explicit stale runbook cross-references in their §12.6 registry entries. R-39 provides the full IC protocol for when job 29 exceeds its freshness window, covering the BC-SLO-01 and BC-SLO-02 monitoring blind spot. Critical two-case distinction: (1) P1/P2 — job 29 stale but backups are current (monitoring gap only, no BC-SLO-01/02 breach); (2) P0 — job 29 stale AND R-39-C1 confirms a store ≥ 26h old (monitoring gap has coincided with an actual backup staleness event — retroactive AL-BC-01/02 assessment required). Trigger: `system.cron_job_stale` with `job_name = 'backup_age_monitor'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-devops` → devops-lead; dedup `backup-age-monitor-stale`. Key distinction from peer runbooks: R-39 is a meta-monitoring failure — the backup freshness sentinel went silent. Unlike R-30/R-31 (purge jobs where failure = GDPR compliance breach) or R-37/R-38 (SSO detection jobs where failure = per-tenant security gap), R-39's primary risk is that a backup failure could be occurring without detection — the monitoring control is blind, not necessarily that backups have failed. R-39-C1 (backup freshness scope query via `audit_log_events` for `system.backup_completed` events) is the IC's manual substitute for the automated path and is the P0 classification gate. Four root cause hypotheses: H1 (job deleted/disabled — potential security incident), H2 (shared pg_cron infrastructure failure — most likely if peer jobs co-stale), H3 (`audit_log_events` query timeout/lock contention), H4 (Supabase platform outage → R-03 primary). Two scope queries: R-39-C1 (P0 gate — backup freshness per store: `MAX(created_at)` of `system.backup_completed` grouped by `store`; age_hours ≥ 26 → P0), R-39-C2 (`pg_cron.job_run_details` last 20 runs for stale window with inter-run gap computation). Four recovery steps: Step 1 (confirm stale + classify severity per R-39-C1); Step 2 (P0 only — retroactive AL-BC-01/02 assessment; IC determination on whether backup actually ran during blind window); Step 3 (restore job 29 per H1–H4 table); Step 4 (confirm next successful run in `pg_cron.job_run_details`; emit `system.backup_monitor_restored` STANDARD/3yr; resolve PagerDuty). One internal communication template: BAM-INT-01 (P0 only; no customer-facing template; R-39 stale is not itself a per-tenant SLA credit event; backup data loss confirmation would separately escalate to founder + compliance-officer under ENTERPRISE_SLA.md §4.3). Two DEC-030 HMAC-chained events: `system.backup_monitor_stale_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `stores_at_risk` store-enum array, `trigger` enum['pagerduty_alert','manual_discovery','co_active_r30','co_active_r31','co_active_r34'], `initial_severity` enum['P2','P1','P0'], `r39_c1_any_store_stale` bool); `system.backup_monitor_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `backup_freshness_verified` bool, `retroactive_albc_filed` bool); BAM-STALE-CHAIN-01 ordering invariant: `restored` must follow `stale_declared` for same `incident_id`; HTTP 422 `BAM_STALE_CHAIN_01_VIOLATION` on breach → R-05. Evidence: BC-E-001 quarterly (A1.2/CC7.2, 3yr, quarterly; R-39 activations documented as addendum; zero-incident quarters note `r39_activations: 0`; `compliance/evidence/backup/bam-stale/r39-<incident_id>/`). SOC 2 criteria: A1.2 (backup freshness monitoring control — `pg-cron-health-monitor` 5-h detection + BC-E-001 run history proves monitoring operated throughout observation period), CC7.2 (monitoring of system components — R-39 activation + DEC-030 chain proves detection and response to monitoring control gaps within defined SLA). Post-mortem required for all P0 activations, filed within 72 h. Five post-incident controls: PIR (72 h — P0 only), H3 `audit_log_events` maintenance (14 days), peer job cross-check in R-03 post-mortem (H2), §12.6 cross-reference [x] Done v1.2 patch 2026-06-22, BC-E-001 quarterly collection. Four-item implementation checklist: 2× P0/M5 (AUDIT_LOG_SCHEMA registration + BAM-STALE-CHAIN-01 [x] Done 2026-06-22; PagerDuty routing + integration test), 2× P1/M5–M11 (SOC2_READINESS BC-E-001 description update; §12.6 cross-ref [x] Done v1.2 patch 2026-06-22). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 29 `backup_age_monitor` registry entry — stale consequence updated with INCIDENT_RESPONSE R-39 per v1.2 patch [x] Done); `docs/OBSERVABILITY.md §39` (full BC observability spec — BC-SLO-01/02/02b/03/04 definitions; six DEC-030 events; five evidence artefacts BC-E-001 through BC-E-005); `docs/OBSERVABILITY.md §39.4` (BC-SLO-01/BC-SLO-02 canonical definitions — thresholds for R-39-C1 P0 gate); `docs/OBSERVABILITY.md §39.9` (`system.backup_staleness_detected` HIGH/7yr — distinct from R-39 events: emitted by job 29 WHEN RUNNING to signal actual backup staleness; R-39 covers when job 29 is NOT running); `docs/SOC2_READINESS.md §A1.2` (A1.2 capacity monitoring — BC-E-001 quarterly evidence gate); `docs/ENTERPRISE_SLA.md §4.3` (RTO < 4h enterprise commitment — backup freshness directly supports RTO; confirmed backup data loss would escalate to SLA obligations); `docs/AUDIT_LOG_SCHEMA.md §Backup & DR Observability events` (six existing events + two new R-39 events registered v2.33 — `system.backup_monitor_stale_declared` HIGH/7yr, `system.backup_monitor_restored` STANDARD/3yr); R-30 (workout_data_purge stale — job 26 peer daily purge job, similar stale pattern); R-31 (audit_log_retention_purge stale — job 27 peer monthly purge job); R-34 (turh_retention_purge stale — job 32 peer daily purge job); R-03 (Infrastructure Outage — parallel activation if H2/H4 shared pg_cron failure confirmed); R-05 (HMAC chain break — activate on BAM-STALE-CHAIN-01 ordering violation). Owner: devops-lead + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-22 · Owner: devops-lead + compliance-officer**
+**Review: after every P0 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0 — whichever comes first.**
+
+---

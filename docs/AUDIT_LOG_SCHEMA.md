@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.32
+# FORM · Audit Log Schema v2.33
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -1760,6 +1760,40 @@ const BackupStalenessDetectedSchema = z.object({
 **`failure_reason: 'privacy_floor_violation'`** in `system.restore_test_failed`: additionally notifies `clinical-safety` via PagerDuty and triggers the RLS-invariant investigation procedure in `docs/INCIDENT_RESPONSE.md`. A restore test that fails the privacy floor check is classified as a P0 infrastructure incident, not a routine test failure.
 
 **Emitter assignments:** `system.backup_completed` and `system.backup_failed` are emitted by the FORM-managed backup Worker (automated, `form_system` role). `system.restore_test_*` are emitted manually by `devops-lead` via admin console during DR drill execution — no automated path (restore tests require human judgment and verification). `system.backup_staleness_detected` is emitted by pg_cron job 29 (`form_system` role, scheduled every 4h).
+
+**R-39 monitoring-control events (BAM-STALE-CHAIN-01):** Two additional events anchor the R-39 incident lifecycle when job 29 itself goes stale — distinct from `system.backup_staleness_detected` (which job 29 emits WHEN RUNNING to signal actual backup staleness). These events are emitted by the IC, not by automated processes. **BAM-STALE-CHAIN-01 ordering invariant:** `system.backup_monitor_restored` MUST follow `system.backup_monitor_stale_declared` for the same `incident_id`; the `emit-audit-event` Worker returns HTTP 422 `BAM_STALE_CHAIN_01_VIOLATION` on violation → R-05 activated. Privacy floor: no `user_id`, no `tenant_id`, no employee PII — infrastructure metadata only.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `system.backup_monitor_stale_declared` | HIGH | 7 yr | IC emits at T+0 when R-39 activated (`backup_age_monitor` job 29 exceeds 5h freshness window) | `incident_id` (UUID — BAM-STALE-CHAIN-01 anchor), `confirmed_stale_since`, `stale_minutes`, `missed_runs`, `stores_at_risk` (enum array), `trigger` (enum), `initial_severity` (enum P2/P1/P0), `r39_c1_any_store_stale` (bool) |
+| `system.backup_monitor_restored` | STANDARD | 3 yr | IC emits when job 29 confirmed running after restoration | `incident_id` (matches stale_declared), `restored_at`, `root_cause` (enum H1–H4), `fix_deployed_at`, `backup_freshness_verified` (bool), `retroactive_albc_filed` (bool) |
+
+```typescript
+// system.backup_monitor_stale_declared — HIGH · 7 yr (registered v2.33)
+const BackupMonitorStaleDeclaredSchema = z.object({
+  incident_id:            z.string().uuid(),
+  confirmed_stale_since:  z.string().datetime(),
+  stale_minutes:          z.number().positive(),
+  missed_runs:            z.number().int().nonneg(),
+  stores_at_risk:         z.array(z.enum(['postgres', 'r2_primary', 'r2_dr'])),
+  trigger:                z.enum([
+    'pagerduty_alert', 'manual_discovery',
+    'co_active_r30', 'co_active_r31', 'co_active_r34',
+  ]),
+  initial_severity:       z.enum(['P2', 'P1', 'P0']),
+  r39_c1_any_store_stale: z.boolean(),
+});
+
+// system.backup_monitor_restored — STANDARD · 3 yr (registered v2.33)
+const BackupMonitorRestoredSchema = z.object({
+  incident_id:               z.string().uuid(),
+  restored_at:               z.string().datetime(),
+  root_cause:                z.enum(['H1', 'H2', 'H3', 'H4']),
+  fix_deployed_at:           z.string().datetime(),
+  backup_freshness_verified: z.boolean(),
+  retroactive_albc_filed:    z.boolean(),
+});
+```
 
 ---
 

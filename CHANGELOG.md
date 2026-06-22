@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [7.89.1] — 2026-06-22
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-39 Backup Age Monitor Stale (`backup_age_monitor`, job 29): thirty-ninth runbook. Full IC protocol for when job 29 exceeds its 5-hour freshness window, covering the BC-SLO-01/BC-SLO-02 monitoring blind spot. Critical P0/P1/P2 classification gate (R-39-C1 backup freshness scope query determines whether a stale monitor coincides with an actual backup staleness event). Four root cause hypotheses (H1 deleted/disabled, H2 shared pg_cron, H3 query timeout, H4 platform outage). Two DEC-030 HMAC-chained events: `system.backup_monitor_stale_declared` (HIGH/7yr) and `system.backup_monitor_restored` (STANDARD/3yr); BAM-STALE-CHAIN-01 ordering invariant. Internal communication template BAM-INT-01 (P0 only). Evidence path `compliance/evidence/backup/bam-stale/r39-<incident_id>/`; BC-E-001 quarterly addendum format. SOC 2 criteria A1.2 + CC7.2. Owner: devops-lead + compliance-officer.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.32 → v2.33 — two new R-39 events registered in §Backup & DR Observability events: `system.backup_monitor_stale_declared` (HIGH, 7yr) and `system.backup_monitor_restored` (STANDARD, 3yr); BAM-STALE-CHAIN-01 ordering invariant (HTTP 422 `BAM_STALE_CHAIN_01_VIOLATION`); Zod schemas for both events. Retention table +2 rows (HIGH 7yr A1.2, STANDARD 3yr A1.2).
+- `docs/OBSERVABILITY.md` v4.9.3 → v4.9.4 — §12.6 job 29 `backup_age_monitor` cross-ref column extended to include `INCIDENT_RESPONSE R-39 (job 29 stale recovery runbook — §R-39.5)`. Closes the sole §12.6 entry without an INCIDENT_RESPONSE stale runbook cross-reference among jobs with defined stale consequences. v1.2 patch note added.
+- `VERSION` — 7.89.0 → 7.89.1.
+
+---
+
 ## [7.89.0] — 2026-06-22
 
 ### Added
