@@ -127,7 +127,8 @@
 
 ## Next priorities
 
-- **Editorial 2121–2130: COMPLETE 10/10 · v7.63.0** — posts 2121–2130 all written. post-2128 (v7.61.0) ознаки системної помилки; post-2129 (v7.62.0) рішення при неповних даних; post-2130 (v7.63.0) синтез блоку. blog.html: cards for posts 2128–2130 added. sports-scientist review required before publish. NEXT: Editorial 2131–2140 (Адаптація тренування до реального життя).
+- **Editorial 2131–2140: IN PROGRESS 1/10 · v7.64.0** — post-2131 (v7.64.0) тренування після безсонної ночі: алгоритм рішення, clinical-safety NOT_REQUIRED, sports-scientist review pending. blog.html card added. README: Editorial 2191–2200 (Психологія і поведінка self-coached атлета) added to roadmap. NEXT: post-2132 (нерегулярний графік і тренування).
+- **Editorial 2121–2130: COMPLETE 10/10 · v7.63.0** — posts 2121–2130 all written. post-2128 (v7.61.0) ознаки системної помилки; post-2129 (v7.62.0) рішення при неповних даних; post-2130 (v7.63.0) синтез блоку. blog.html: cards for posts 2128–2130 added. sports-scientist review required before publish.
 - **Editorial 2051–2060: COMPLETE 10/10 · v7.44.0** — posts 2059 (документація vs. аналітика) + 2060 (block synthesis) written; blog cards added; sports-scientist review required before publish
 - **Editorial 2061–2070: NEXT** — тема: Тренування в умовах реального дорослого атлета; posts 2061–2070 proposed in README
 - **Block 751–800: COMPLETE** — all 50/50 posts written; posts 791, 793, 794 clinical-safety CONDITIONAL PASS (guard rails embedded); sports-scientist review required for all 50 before publish

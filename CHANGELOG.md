@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [7.64.0] — 2026-06-22
+
+### Added
+- `content/post-2131-sleepless-night-training-algorithm.md` — Editorial 2131–2140, post 1/10. Тренування після безсонної ночі: триступеневий алгоритм рішення (класифікація контексту → режим сесії → параметри модифікації). Відмінність ситуативної і хронічної нестачі сну. Три умови для повного скасування. Пострестораційний принцип. Мотиваційний парадокс: алгоритм замінює мотивацію критеріями. clinical-safety: NOT_REQUIRED.
+- `blog.html` — card for post-2131 added.
+- `README.md` — Editorial 2191–2200 block (Психологія і поведінка self-coached атлета) added to roadmap.
+
+### Changed
+- `STATUS.md` — Editorial 2131–2140 marked IN PROGRESS 1/10; post-2131 noted.
+
+---
+
 ## [7.63.0] — 2026-06-22
 
 ### Added
