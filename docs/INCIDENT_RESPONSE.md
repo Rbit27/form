@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.1
+# FORM · Incident Response Runbook v3.2
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -13038,6 +13038,371 @@ Four evidence artefacts. Store in `compliance/evidence/bdg-sweep/r33-<incident_i
 ---
 
 **v1.0 · 2026-06-21 · Owner: security-engineer + devops-lead + compliance-officer**
+**Review: after every P0/P1 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
+
+---
+
+## R-34 SCIM Role History Retention Purge Failure — `turh_retention_purge` pg_cron Stale
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `turh_retention_purge` pg_cron job 32 exceeds the 26-hour freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` (§12.7) emits `system.cron_job_stale` with `job_name = 'turh_retention_purge'`; routes to PagerDuty P1 `form-compliance` → compliance-officer with dedup key `turh-purge-stale` per §12.6
+> **Primary owners:** compliance-officer · devops-lead · platform-engineer
+> **Regulatory risk:** Job 32 (`0 4 * * *`) is the daily hard-delete of `tenant_users_role_history` rows where `changed_at < NOW() - INTERVAL '7 years'` and the safety gate `user_id IS NULL AND user_id_pseudonym IS NOT NULL` is satisfied (SSO_SCIM §28.4 — the Erasure Worker must pseudonymise rows before the purge can delete them). A stale job means pseudonymised role-history rows accumulate beyond the 7-year DEC-051 ceiling — a SOC 2 CC6.3 evidence gap. At P0 (rows with `user_id IS NOT NULL` past 7yr detected via AL-TURH-01), the Erasure Worker also failed to pseudonymise those records — constituting GDPR Art. 5(1)(e) overcollection for directly-identifiable personal data retained beyond the lawful 7-year basis under Art. 17(3)(b).
+> **Critical distinction from R-30 and R-31:** R-30 targets live personal data of deleted users (immediate GDPR breach risk). R-31 targets audit log overcollection (DEC-030 chain governance). R-34 targets role-history records protected by a **two-stage safety gate**: the purge only deletes rows that the Erasure Worker has already pseudonymised (`user_id IS NULL AND user_id_pseudonym IS NOT NULL`). At P1, the stale job is a SOC 2 CC6.3 evidence gap only — pseudonymised rows pile up past 7yr but contain no directly-identifiable data; once the job resumes it will purge the backlog. P0 requires both the purge job being stale AND the Erasure Worker failing to pseudonymise rows — the latter is a separate pipeline; AL-TURH-01 (P2, Slack `#compliance-alerts`) fires that condition independently.
+
+---
+
+### R-34.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 32)** | `pg-cron-health-monitor` Edge Function (§12.7) | No successful `turh_retention_purge` run in `pg_cron.job_run_details` within the prior 26 h | **P1** (escalates to P0 if R-34-C1 finds rows with `user_id IS NOT NULL AND changed_at < NOW() - INTERVAL '7 years'`) | PagerDuty `form-compliance` P1 → compliance-officer; dedup key `turh-purge-stale` per §12.6 registry |
+| **AL-TURH-01 co-incident** | Separate Slack `#compliance-alerts` P2 alert fired when any `tenant_users_role_history` row has `user_id IS NOT NULL AND changed_at < NOW() - INTERVAL '7 years'` | Any such row exists | **P2 standalone; P0 co-upgrade when coincides with R-34 activation** | Slack `#compliance-alerts` (P2 standalone); escalates to PagerDuty `form-compliance` P0 if R-34 also active |
+| **Manual discovery** | compliance-officer observes stale job during TURH-RET-E-001 annual evidence collection or routine DB inspection | Post-evidence-collection or routine check | **P1 → assess R-34-C1 for P0 upgrade** | `form-compliance` |
+
+> **P0 escalation criterion:** Upon any R-34 activation, compliance-officer runs R-34-C1 immediately. If the query returns any rows with `user_id IS NOT NULL AND changed_at < NOW() - INTERVAL '7 years'`, severity escalates to **P0** — directly-identifiable personal data is being retained past the 7-year DEC-051/GDPR Art. 17(3)(b) ceiling with no pseudonymisation. This indicates a concurrent Erasure Worker failure, not merely purge job staleness.
+
+---
+
+### R-34.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P1** | Stale; R-34-C1 returns zero rows with `user_id IS NOT NULL` past 7yr | 30 min investigation; no GDPR breach risk; SOC 2 CC6.3 evidence gap only | Diagnose root cause; restore job 32; emit DEC-030 chain; file TURH-CRON-E-001/002/003 |
+| **P0** | Stale AND R-34-C1 returns ≥ 1 row with `user_id IS NOT NULL AND changed_at < NOW() - INTERVAL '7 years'` | 60 min to pseudonymisation of identified rows; compliance-officer assesses GDPR Art. 33 notification obligation within 72 h | Trigger Erasure Worker pseudonymisation for affected rows or execute PAM-elevated manual pseudonymisation; restore job 32; file TURH-INT-01; initiate DPO Art. 33 assessment |
+
+> **P0 note on Art. 33 assessment:** A P0 condition means directly-identifiable personal data (GDPR Art. 4(1)) has been retained past its lawful basis. Compliance-officer must assess within 72 h whether Art. 33 breach notification to the supervisory authority is required. This assessment is documented in TURH-INT-01 and reviewed by the DPO (or acting compliance-officer). Filing TURH-INT-01 starts the Art. 33 assessment clock. If assessment concludes no notification required, document the reasoning in TURH-INT-01 §4 (risk to natural persons: LOW — role-change records are administrative data, not health/financial/sensitive personal data per GDPR Art. 9).
+
+---
+
+### R-34.3 Immediate Actions (T+0 to T+30 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `system.turh_purge_failure_declared` (HIGH/7yr) via `emit-audit-event` Worker | compliance-officer | Required at ALL severity levels. Do this FIRST before any DB queries. TURH-PURGE-CHAIN-01 anchor. |
+| **T+5** | Run R-34-C1 (scope query) | compliance-officer | Counts rows with `user_id IS NOT NULL` past 7yr — the P0 upgrade gate. If count > 0 → escalate to P0 and call devops-lead immediately. |
+| **T+10** | Run R-34-C2 (`pg_cron.job_run_details` for job 32) | compliance-officer | Confirms stale start time, missed-run count, last `return_message`. |
+| **T+15** | Classify root cause (H1–H5) from R-34-C3 | compliance-officer + devops-lead | See §R-34.4 for hypothesis tree. |
+| **T+15** *(P0 only)* | Trigger Erasure Worker pseudonymisation for rows identified in R-34-C1 | compliance-officer + platform-engineer | See §R-34.5 Step 2. If Erasure Worker unreachable, execute PAM-elevated manual pseudonymisation per Step 2c. Emit TURH-INT-01 immediately after pseudonymisation confirms zero-count. |
+| **T+20–T+30** | Restore job 32 per root cause diagnosis | devops-lead | See §R-34.5 Steps 3–4. Emit `system.turh_purge_restored` on confirmed first successful run. |
+
+---
+
+### R-34.4 Root Cause Hypotheses and Scope Queries
+
+#### R-34-C1 — Unpseudonymised rows past 7yr (P0 upgrade gate)
+
+```sql
+-- R-34-C1: P0 gate — rows with live user_id reference past 7yr retention ceiling
+-- Privacy floor: aggregate counts and timestamp extremes only — no user_id, no tenant_id output
+SELECT
+  COUNT(*)                                             AS rows_unpseudonymised_past_7yr,
+  MIN(changed_at)                                      AS oldest_record_at,
+  EXTRACT(EPOCH FROM (NOW() - MIN(changed_at)))/86400  AS oldest_record_days
+FROM tenant_users_role_history
+WHERE user_id IS NOT NULL
+  AND changed_at < NOW() - INTERVAL '7 years';
+```
+
+> **At P1:** `rows_unpseudonymised_past_7yr = 0`. The zero-count result is the affirmative P1 attestation — no directly-identifiable personal data is retained past the 7yr ceiling. A stale purge means pseudonymised-but-not-yet-deleted rows accumulate; these contain no live `user_id` references. Preserve the R-34-C1 zero-count output as TURH-CRON-E-003.
+
+> **At P0:** `rows_unpseudonymised_past_7yr > 0`. Escalate immediately. Do NOT output `user_id`, `tenant_id`, or any individual row. The aggregate count is sufficient for severity classification. The Erasure Worker pipeline has a concurrent failure; follow P0 path in §R-34.5.
+
+#### R-34-C1b — Pseudonymised rows eligible for purge (backlog size)
+
+```sql
+-- R-34-C1b: Informational — rows eligible for purge (safety gate satisfied)
+-- These will be deleted on the first successful turh_retention_purge run post-restoration.
+-- Privacy floor: aggregate count only — no user_id_pseudonym, no tenant_id output
+SELECT
+  COUNT(*) AS rows_eligible_for_purge
+FROM tenant_users_role_history
+WHERE user_id IS NULL
+  AND user_id_pseudonym IS NOT NULL
+  AND changed_at < NOW() - INTERVAL '7 years';
+```
+
+> Informational only — does not affect severity classification. Provides backlog size for estimating purge duration on first restored run and for populating `rows_purged_by_restored_job` in `system.turh_purge_restored`.
+
+#### R-34-C2 — pg_cron run history for job 32
+
+```sql
+-- R-34-C2: Stale window confirmation — last 10 runs of turh_retention_purge
+SELECT
+  jobid, jobname, runid, job_pid,
+  database, username, command, status,
+  return_message, start_time, end_time
+FROM pg_cron.job_run_details
+WHERE jobname = 'turh_retention_purge'
+ORDER BY start_time DESC
+LIMIT 10;
+```
+
+> Use output to confirm: (1) time of last successful run (defines stale window start), (2) missed-run count since stale window, (3) `return_message` for H1–H5 classification.
+
+#### R-34-C3 — Root cause classification from return_message
+
+| `return_message` pattern | Hypothesis | Diagnosis |
+|---|---|---|
+| Job absent from `pg_cron.job` | **H1 — Job deleted** | `turh_retention_purge` entry missing from `pg_cron.job` table; deleted accidentally or intentionally. Restore per Step 3-H1. |
+| `ERROR: relation "tenant_users_role_history" does not exist` or similar schema error | **H2 — Schema change** | DDL change (rename, drop, column type change) on `tenant_users_role_history` broke the purge SQL. Investigate migration log. Restore per Step 3-H2. |
+| `ERROR: permission denied for table tenant_users_role_history` | **H3 — Permission revoked** | `service_role` or pg_cron executor permission revoked. Investigate IAM/Postgres GRANT log. Restore per Step 3-H3. |
+| `status = 'running'` with `start_time` > 26 h ago; or `return_message` indicating lock wait timeout | **H4 — Lock contention** | A long-running SCIM provisioning transaction or DDL migration held a lock on `tenant_users_role_history` during the 04:00 UTC purge window. Investigate `pg_stat_activity`. Terminate blocking query if safe. Restore per Step 3-H4. |
+| No `return_message` entries in `pg_cron.job_run_details` for job 32 after a known stale start time; pg_cron scheduler itself shows no activity | **H5 — Supabase platform outage** | `pg_cron` scheduler was down. Cross-ref with Supabase status page. If confirmed → R-03 (Infrastructure Outage) is the primary runbook. |
+
+> **H4 note (unique to R-34):** Unlike all peer stale runbooks (R-28 through R-33), `turh_retention_purge` executes a bulk DELETE on `tenant_users_role_history` — a table that receives continuous writes from the SCIM Worker on every enterprise role change event. Lock contention with SCIM provisioning load is a realistic H4 root cause not present in R-33 (which UPDATEs `tenant_sso_configs`, a low-write table). If H4 is confirmed, devops-lead should also assess whether the 04:00 UTC schedule remains optimal given SCIM write load growth, and consider adding a `statement_timeout` guard to the purge DELETE.
+
+---
+
+### R-34.5 Recovery Procedure
+
+#### Step 1 — Confirm stale and classify root cause
+
+| Check | Command / Action | Expected (healthy) | Unhealthy → action |
+|---|---|---|---|
+| Job exists | `SELECT * FROM pg_cron.job WHERE jobname = 'turh_retention_purge'` | 1 row returned | 0 rows → H1; see Step 3-H1 |
+| Last run | `pg_cron.job_run_details` (R-34-C2) | `start_time` within prior 26 h | > 26 h → stale confirmed; check `return_message` |
+| Status | `status` column of last run | `'succeeded'` | `'failed'` → H2/H3; `'running'` > 26 h → H4 lock |
+| Schema | `\d tenant_users_role_history` in psql | Table with expected DDL per SSO_SCIM §28.4 | Schema changed → H2 |
+| Supabase platform | Supabase status page | All systems operational | Outage → H5; activate R-03 |
+
+#### Step 2 — P0 only: Pseudonymise rows with `user_id IS NOT NULL` past 7yr
+
+> **P0 path only** — skip entirely at P1. At P1, R-34-C1 confirms zero rows with `user_id IS NOT NULL` past 7yr; no pseudonymisation action is required.
+
+**Step 2a — Confirm scope (aggregate counts only)**
+
+Run R-34-C1 to confirm `rows_unpseudonymised_past_7yr > 0` before taking action. Record the count for TURH-INT-01 §1.
+
+**Step 2b — Trigger Erasure Worker (preferred path)**
+
+The Erasure Worker (`erasure-worker` Cloudflare Worker, SSO_SCIM §28.4) is the canonical pseudonymisation pipeline. Trigger it for the affected user IDs:
+
+1. Pull the affected `user_id` values under PAM elevation (compliance-officer only — this is the ONLY point in R-34 where raw `user_id` values are accessed)
+2. Call the Erasure Worker `POST /pseudonymise` endpoint for each `user_id`
+3. Confirm `user_id IS NULL AND user_id_pseudonym IS NOT NULL` for those rows via aggregate count
+4. Run R-34-C1 again — confirm `rows_unpseudonymised_past_7yr = 0` (Step 2d all-clear)
+
+> If the Erasure Worker is unreachable or erroring (a separate concurrent incident), proceed to Step 2c.
+
+**Step 2c — Manual PAM-elevated pseudonymisation (fallback path)**
+
+Use `pam-db-proxy` break-glass to access Postgres as `form_admin BYPASSRLS`. Apply the SHA-256 pseudonymisation scheme per SSO_SCIM §28.4:
+
+```sql
+-- PAM-elevated fallback: manually pseudonymise rows past 7yr that Erasure Worker missed
+-- user_id_pseudonym = SHA-256(user_id::text || erasure_salt) per SSO_SCIM §28.4
+-- Obtain erasure_salt from Supabase Vault secrets; never log plaintext user_id
+UPDATE tenant_users_role_history
+SET
+  user_id_pseudonym = encode(
+    sha256((user_id::text || current_setting('app.erasure_salt'))::bytea),
+    'hex'
+  ),
+  user_id = NULL
+WHERE user_id IS NOT NULL
+  AND changed_at < NOW() - INTERVAL '7 years';
+```
+
+**Step 2d — Zero-count all-clear verification**
+
+Run R-34-C1 immediately after Step 2b or 2c. Confirm `rows_unpseudonymised_past_7yr = 0`. This zero-count result, timestamped, forms the core of TURH-CRON-E-003 evidence at P0. File TURH-INT-01 after zero-count confirmed.
+
+#### Step 3 — Restore job 32 per root cause
+
+| Root cause | Restoration action | Validation |
+|---|---|---|
+| **H1 — Job deleted** | Re-register job 32: `SELECT cron.schedule('turh_retention_purge', '0 4 * * *', $$DELETE FROM tenant_users_role_history WHERE user_id IS NULL AND user_id_pseudonym IS NOT NULL AND changed_at < NOW() - INTERVAL ''7 years''$$)` | `SELECT * FROM pg_cron.job WHERE jobname = 'turh_retention_purge'` returns 1 row with correct schedule and command |
+| **H2 — Schema change** | Revert DDL migration or patch purge SQL to match updated schema; redeploy `turh_retention_purge` job definition via canonical migration process | Table schema matches SSO_SCIM §28.4 DDL; purge SQL parses without error in staging |
+| **H3 — Permission revoked** | Restore `GRANT DELETE ON tenant_users_role_history TO service_role` (or equivalent) per current Supabase IAM state; audit who revoked and why | `pg_cron.job_run_details` next run shows `status = 'succeeded'` |
+| **H4 — Lock contention** | Identify and terminate blocking query (`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query_start < NOW() - INTERVAL '30 min'`); or await long transaction to commit naturally; confirm pg_cron retries succeed | Next scheduled 04:00 UTC run shows `status = 'succeeded'` in `pg_cron.job_run_details` |
+| **H5 — Platform outage** | Monitor Supabase status page; await platform recovery; confirm pg_cron resumes automatically | First run after platform recovery shows `status = 'succeeded'` in `pg_cron.job_run_details` |
+
+#### Step 4 — Confirm restoration and close incident
+
+1. Wait for the next scheduled run at 04:00 UTC or trigger a manual test run via `SELECT cron.run_job(<jobid>)`
+2. Confirm `pg_cron.job_run_details` shows `status = 'succeeded'` for `turh_retention_purge` post-fix
+3. Confirm `data.turh_purge_completed` DEC-030 STANDARD/1yr was emitted by the restored job with `deleted_count` matching R-34-C1b backlog count (proving the safety-gate backlog was cleared)
+4. Emit `system.turh_purge_restored` (STANDARD/3yr) via `emit-audit-event` Worker — see §R-34.7
+5. Resolve PagerDuty P1 incident `turh-purge-stale`
+
+---
+
+### R-34.6 Communication Templates
+
+#### TURH-INT-01 — Internal GDPR / SOC 2 Compliance Incident Memo (P0 only)
+
+> **Required when:** P0 severity (rows with `user_id IS NOT NULL` past 7yr confirmed by R-34-C1). Not required at P1.
+> **File at:** `compliance/evidence/turh-purge/r34-<incident_id>/TURH-INT-01-INC-<YYYYMMDD>.md`
+> **Recipients:** compliance-officer + DPO (or acting compliance-officer) + security-engineer
+> **SLA:** Draft within 60 min of R-34-C1 P0 confirmation; finalise Art. 33 assessment within 72 h of declaration
+
+**Template:**
+
+```
+TURH-INT-01 — SCIM Role History Retention Purge Failure: Internal GDPR Art. 33 Assessment
+
+Incident ID: <incident_id>
+Date: <YYYY-MM-DD>
+Severity: P0
+Declared by: compliance-officer
+DEC-030 anchor: system.turh_purge_failure_declared / <incident_id>
+
+§1 — Incident summary
+turh_retention_purge (pg_cron job 32, daily 04:00 UTC) confirmed stale as of <confirmed_stale_since>.
+R-34-C1 scope query confirmed <rows_unpseudonymised_past_7yr> rows in tenant_users_role_history
+with user_id IS NOT NULL AND changed_at < NOW() - INTERVAL '7 years'.
+These rows were not pseudonymised by the Erasure Worker within the 7yr DEC-051 retention ceiling.
+
+§2 — GDPR assessment
+Data category: SCIM role-change records (tenant_users_role_history). Administrative data recording
+changes to enterprise user roles (tenant_owner / tenant_admin / tenant_manager).
+NOT health data, NOT financial data, NOT GDPR Art. 9 special category data.
+Retention basis: GDPR Art. 17(3)(b) — retention necessary for compliance with legal obligation
+(7yr per DEC-051). Rows past 7yr have no remaining lawful retention basis.
+Risk to natural persons: LOW. Role-change records carry no health, financial, or sensitive data.
+Overcollection means individuals' administrative role transitions were retained past the 7yr ceiling
+due to a concurrent Erasure Worker pipeline failure. No evidence of unauthorised access or exfiltration.
+
+§3 — Remediation
+Pseudonymisation method: <Erasure Worker trigger / PAM-elevated manual UPDATE per SSO_SCIM §28.4>
+rows_pseudonymised: <N>
+Pseudonymisation confirmed (R-34-C1 zero-count after Step 2d): YES / NO
+Purge job restored at: <datetime>
+First successful purge run: <datetime>; data.turh_purge_completed.deleted_count: <N>
+
+§4 — Art. 33 notification assessment
+Notification required: NO — low risk to natural persons; administrative data; bounded excess duration;
+no evidence of unauthorised access; immediate pseudonymisation and purge executed within 60 min.
+Reasoning: [document specific reasoning per Art. 33(1) threshold]
+DPO sign-off: <name / date>
+```
+
+> **Privacy floor:** TURH-INT-01 §1 and §3 use aggregate counts from R-34-C1/R-34-C1b only — never includes individual `user_id`, `tenant_id`, employee name, email, or `user_id_pseudonym`. The memo is itself a compliance record, not an evidence export of personal data.
+
+---
+
+### R-34.7 DEC-030 Chain Specification
+
+Two DEC-030 HMAC-chained events are required for every R-34 activation:
+
+#### Event 1 — `system.turh_purge_failure_declared` (HIGH · 7yr retention)
+
+**When:** T+0 of every R-34 activation, before any DB scope queries. Emitter: compliance-officer via `emit-audit-event` Worker.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:                    z.string().uuid(),
+  confirmed_stale_since:          z.string().datetime(),
+  stale_minutes:                  z.number().positive(),
+  missed_runs:                    z.number().int().nonneg(),
+  rows_unpseudonymised_past_7yr:  z.number().int().nonneg(), // 0 if emitting before R-34-C1; re-emit if P0 upgraded after query
+  rows_eligible_for_purge:        z.number().int().nonneg(), // R-34-C1b backlog; 0 if emitting before query
+  trigger:                        z.enum(['pagerduty_alert', 'manual_discovery', 'al_turh_01_co_incident']),
+  initial_severity:               z.enum(['P1', 'P0']),
+})
+```
+
+> **Privacy invariant:** No `user_id`, no `tenant_id`, no employee name, no email, no `user_id_pseudonym`, no GDPR Art. 9 special category data — operational incident declaration only. `rows_unpseudonymised_past_7yr` is an aggregate count; emitting at T+0 before R-34-C1 is permitted with `rows_unpseudonymised_past_7yr = 0` and `initial_severity = 'P1'`; a second re-declaration may be emitted if upgraded to P0 after R-34-C1 confirms count > 0.
+
+#### Event 2 — `system.turh_purge_restored` (STANDARD · 3yr retention)
+
+**When:** Step 4 — after confirmed first successful `turh_retention_purge` run post-fix. Emitter: devops-lead via `emit-audit-event` Worker.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:                  z.string().uuid(),
+  restored_at:                  z.string().datetime(),
+  root_cause_category:          z.enum(['H1_job_deleted', 'H2_schema_change', 'H3_permission_revoked', 'H4_lock_contention', 'H5_supabase_outage']),
+  fix_deployed_at:              z.string().datetime(),
+  rows_pseudonymised_manually:  z.number().int().nonneg(), // 0 at P1; count at P0 (Step 2b/2c)
+  rows_purged_by_restored_job:  z.number().int().nonneg(), // from data.turh_purge_completed.deleted_count on first restored run
+})
+```
+
+> **Privacy invariant:** No `user_id`, no `tenant_id`, no `user_id_pseudonym` — `rows_pseudonymised_manually` and `rows_purged_by_restored_job` are aggregate counts; `root_cause_category` is a structured enum; all fields are operational metadata.
+
+#### TURH-PURGE-CHAIN-01 Ordering Invariant
+
+`system.turh_purge_failure_declared` **must precede** `system.turh_purge_restored` for the same `incident_id` in the HMAC chain. A `turh_purge_restored` event appearing before `turh_purge_failure_declared` for the same `incident_id` is a chain integrity violation → activate R-05 (`docs/INCIDENT_RESPONSE.md R-05`). The `emit-audit-event` Worker returns HTTP 422 on TURH-PURGE-CHAIN-01 ordering violation.
+
+---
+
+### R-34.8 Evidence Preservation
+
+Collect and upload to R2 `form-soc2-evidence` at `compliance/evidence/turh-purge/r34-<incident_id>/`:
+
+| Artefact ID | TSC domain | TSC criteria | Description | Retention | Cadence | Owner | R2 path suffix |
+|---|---|---|---|---|---|---|---|
+| **TURH-CRON-E-001** | CC6/CC4/CC7 | CC6.3 / CC4.1 / CC7.2 | DEC-030 `system.turh_purge_failure_declared` HMAC chain export (HIGH/7yr): confirms compliance-officer declared incident within the 26-h freshness window of last successful job 32 run, proving the `pg-cron-health-monitor` dead-man's switch operated within its freshness SLA. TURH-PURGE-CHAIN-01 anchor event. Payload includes `stale_minutes`, `missed_runs`, `rows_unpseudonymised_past_7yr` (aggregate counts — no `user_id`, no `tenant_id`). 7yr retention. **Incident-triggered — collected on every R-34 activation (any severity).** | 7 yr | On every R-34 activation | compliance-officer | `turh-purge/r34-<incident_id>/` |
+| **TURH-CRON-E-002** | CC7/A | CC7.2 / A1.2 | `pg_cron.job_run_details` export for `jobname = 'turh_retention_purge'` (job 32) covering the stale window from last successful run to restoration: confirms stale start time and all missed-run timestamps (daily 04:00 UTC cadence); auditor-inspectable proof of stale duration and missed-run count. Proves the CC6.3/P4.1 retention-ceiling enforcement gap was bounded and that FORM detected it within the 26-h freshness window via the `pg-cron-health-monitor` dead-man's switch. 3yr retention. **Incident-triggered.** | 3 yr | On R-34 activation (R-34-C2 at T+10) | compliance-officer | `turh-purge/r34-<incident_id>/` |
+| **TURH-CRON-E-003** | CC6/P4 | CC6.3 / P4.1 | R-34-C1 aggregate scope output (`rows_unpseudonymised_past_7yr`, `oldest_record_at`, `oldest_record_days`): proves the severity classification basis (P1 = `rows_unpseudonymised_past_7yr = 0`; P0 = `rows_unpseudonymised_past_7yr > 0`). **Privacy floor: aggregate counts and timestamp extremes only — no `user_id`, no `tenant_id`, no individual row data.** At P1: zero-count attestation is the affirmative SOC 2 evidence that no directly-identifiable personal data exceeded the 7yr ceiling during the stale window. At P0: confirms scope and is superseded by TURH-INT-01 Art. 33 assessment. 3yr retention. **Incident-triggered — collected on every R-34 activation including P1 zero-count.** | 3 yr | On every R-34 activation (after R-34-C1) | compliance-officer | `turh-purge/r34-<incident_id>/` |
+
+---
+
+### R-34.9 SOC 2 Evidence Mapping
+
+| SOC 2 criterion | Control | R-34 relevance |
+|---|---|---|
+| **CC6.3** | Logical access control — 7yr retention ceiling on SCIM role-change audit records enforced by job 32 | Stale job = ceiling unenforced for the stale window; TURH-CRON-E-001 + TURH-CRON-E-003 zero-count prove the gap was bounded (P1) or remediated within 60 min (P0) |
+| **CC4.1** | Defined performance commitment — DEC-051 7yr retention decision is an explicit commitment; `pg-cron-health-monitor` 26-h freshness window is the monitoring threshold | TURH-CRON-E-001 proves FORM detected the monitoring gap within its own defined threshold; §12.6 cross-reference proves the alert routing was pre-defined, not ad hoc |
+| **CC7.2** | Monitoring of system components — `pg-cron-health-monitor` generates `system.cron_job_stale` within 26 h of any missed `turh_retention_purge` run | TURH-CRON-E-002 (`pg_cron.job_run_details` stale window export) proves the monitoring control operated as specified throughout the stale window |
+| **P4.1** | Privacy notice and collection limitation — GDPR Art. 17(3)(b) lawful retention basis; overcollection at P0 when personal data retained past 7yr without pseudonymisation | TURH-CRON-E-003 zero-count (P1) = affirmative attestation that P4.1 was not violated during stale window; at P0: TURH-INT-01 Art. 33 assessment documents breach scope, remediation actions, and DPO sign-off |
+
+> **Auditor narrative (CC6.3 + CC4.1):** FORM's DEC-051 establishes a 7-year retention ceiling on `tenant_users_role_history`. `turh_retention_purge` (job 32) enforces this ceiling daily. The `pg-cron-health-monitor` detects any gap exceeding 26 h and pages the compliance-officer. TURH-CRON-E-001 (declaration chain event) and TURH-CRON-E-002 (pg_cron run history) together prove: (a) the control exists and is monitored, (b) the monitoring threshold was defined in advance, (c) the alert fired within the defined window. TURH-CRON-E-003 zero-count (P1) proves that even during the stale window, no directly-identifiable personal data exceeded the 7yr ceiling — the safety gate (`user_id IS NULL AND user_id_pseudonym IS NOT NULL`) preserved the privacy floor during the outage.
+
+> **Auditor narrative (P4.1 — privacy):** At P1, TURH-CRON-E-003 zero-count demonstrates that although the purge job was stale, the privacy floor (pseudonymisation prerequisite gate) was preserved — no raw personal data accumulated past 7yr. At P0, TURH-INT-01 documents the overcollection scope, the pseudonymisation remediation performed, and the GDPR Art. 33 assessment with DPO sign-off. This demonstrates that FORM has a defined, documented, and executed response process for privacy-related overcollection incidents, satisfying P4.1 monitoring and enforcement requirements.
+
+---
+
+### R-34.10 Post-Incident Controls
+
+| Control | Action | Owner | SLA |
+|---|---|---|---|
+| **PIR** | Post-incident review: root cause analysis, timeline, contributing factors, action items | compliance-officer + devops-lead | 5 business days |
+| **H2 DDL governance** | If root cause H2 (schema change broke purge SQL): add `tenant_users_role_history` DDL changes to the migration review checklist — any migration touching that table requires explicit `turh_retention_purge` SQL compatibility validation before deploy | devops-lead + platform-engineer | 14 days |
+| **H3 permission audit** | If root cause H3 (permission revoked): audit `pg_cron` executor role grants; confirm who revoked the grant and add TURH purge executor permissions to the quarterly permission review checklist | compliance-officer + devops-lead | 14 days |
+| **H4 lock contention review** | If root cause H4 (lock contention with SCIM Writer): review `turh_retention_purge` schedule (04:00 UTC) against SCIM write load patterns; consider adding `statement_timeout = '10min'` guard to the purge DELETE to prevent indefinite lock waits | devops-lead | 14 days |
+| **§12.6 cross-reference** | Update OBSERVABILITY.md §12.6 job 32 entry to add `INCIDENT_RESPONSE R-34` stale-consequence cross-reference | compliance-officer | **Done — OBSERVABILITY.md v4.9.3, 2026-06-21** |
+| **P0 DPO review** | If P0: DPO (or acting compliance-officer) reviews and signs off TURH-INT-01 Art. 33 assessment; initiate supervisory authority notification if threshold met | DPO / compliance-officer | 72 h from P0 declaration |
+| **Scenario X tabletop** | Add Scenario X (turh_retention_purge stale) to §9.4 tabletop catalog: devops-lead disables job 32 in staging; compliance-officer runs R-34-C1 (confirms zero count → P1); restores job 32; confirms `system.turh_purge_restored` emitted. Optional P0 path: insert synthetic TURH row with `user_id IS NOT NULL, changed_at = NOW() - INTERVAL '8 years'`; confirm R-34-C1 count = 1 → P0 upgrade; execute Step 2 pseudonymisation on synthetic row; confirm R-34-C1 zero-count (Step 2d); restore job 32 | devops-lead + compliance-officer | M12 |
+
+---
+
+### R-34.11 Implementation Checklist
+
+#### P0 — Before job 32 deploy to production (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register two DEC-030 events from §R-34.7 in `docs/AUDIT_LOG_SCHEMA.md §System`: `system.turh_purge_failure_declared` (HIGH, 7yr) and `system.turh_purge_restored` (STANDARD, 3yr). Add TURH-PURGE-CHAIN-01 ordering invariant note. | compliance-officer + platform-engineer | **P0** | M5 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.29, 2026-06-21: both TURH-PURGE events registered in §System after `system.bdg_sweep_restored`; TURH-PURGE-CHAIN-01 ordering invariant noted.** |
+| 2 | Confirm `pg-cron-health-monitor` (§12.7) routes `system.cron_job_stale` for `jobname = 'turh_retention_purge'` to PagerDuty `form-compliance` P1 with dedup key `turh-purge-stale` per §12.6 registry. Write integration test: disable job 32 in staging for > 26 h (or simulate via `pg_cron.job_run_details` mock); confirm `system.cron_job_stale` emitted with `job_name = 'turh_retention_purge'`; confirm PagerDuty P1 fires on `form-compliance`. Also write P0 path test: insert synthetic TURH row with `user_id IS NOT NULL, changed_at = NOW() - INTERVAL '8 years'`; run R-34-C1; confirm count = 1 → P0 upgrade path; execute Step 2 pseudonymisation on synthetic row; confirm R-34-C1 zero-count all-clear. | devops-lead + compliance-officer | **P0** | M5 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M7)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Store Template TURH-INT-01 at `compliance/evidence/ir-templates/r34-turh-int-01.md`. Compliance-officer reviews the P0 escalation criteria (specifically: the Art. 33 assessment reasoning in §4 — confirm that SCIM role-change records are administrative data not subject to high-risk Art. 33 thresholds, and document the legal rationale for LOW breach risk). DPO reviews and signs off the template structure before first production R-34 activation. | compliance-officer + DPO | **P1** | M7 | [ ] |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 32 `turh_retention_purge` registry entry: add `INCIDENT_RESPONSE R-34 (job 32 stale recovery runbook — §R-34.5)` to the stale-consequence cross-ref column. | compliance-officer | **P1** | M5 | [x] **Done — OBSERVABILITY.md v4.9.3, 2026-06-21: §12.6 job 32 entry stale-consequence column updated with INCIDENT_RESPONSE R-34 cross-reference.** |
+| 5 | Add TURH-CRON-E-001, TURH-CRON-E-002, and TURH-CRON-E-003 artefact definitions to `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.3/CC4.1/CC7.2/P4.1). Add `turh-purge/` R2 subfolder to §80.3. Add TURH-CRON artefacts to §80.4 Vanta mirror list. | compliance-officer | **P1** | M7 | [x] **Done — SOC2_READINESS.md v3.25.2, 2026-06-21: three TURH-CRON artefacts registered in §79.4; `turh-purge/` subfolder added to §80.3; Vanta mirror list §80.4 updated.** |
+
+#### P2 — Before SOC 2 observation period (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Add Scenario X (turh_retention_purge stale) to §9.4 tabletop catalog per §R-34.10 description. | compliance-officer + devops-lead | **P2** | M12 | [ ] |
+
+---
+
+*v1.0 (2026-06-21): R-34 SCIM Role History Retention Purge Failure — thirty-fourth runbook. Closes the documentation gap identified by `docs/OBSERVABILITY.md §12.6` (job 32 `turh_retention_purge` registry entry: `turh-purge-stale` PagerDuty dedup key with P1 `form-compliance` routing and 26-h freshness window, but no INCIDENT_RESPONSE cross-reference — unlike peer stale runbooks R-28/R-29/R-30/R-31/R-32/R-33 which each carry an explicit §12.6 cross-reference). R-34 provides the full IC protocol for when `turh_retention_purge` (job 32, `0 4 * * *`, 26-h freshness) exceeds its freshness window. Trigger: `system.cron_job_stale` with `job_name = 'turh_retention_purge'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-compliance` → compliance-officer; dedup `turh-purge-stale`. Critical distinction from R-30 (workout data — immediate personal data breach) and R-31 (audit log overcollection — DEC-030 chain governance): R-34 targets role-history records protected by a **two-stage safety gate** (`user_id IS NULL AND user_id_pseudonym IS NOT NULL`). The purge job only deletes rows the Erasure Worker has already pseudonymised. At P1 (R-34-C1 zero-count: no rows with `user_id IS NOT NULL` past 7yr), the risk is a SOC 2 CC6.3 evidence gap only — pseudonymised rows accumulate past 7yr but contain no directly-identifiable data; the job backlog self-clears on restoration. P0 requires both the purge job being stale AND the Erasure Worker failing to pseudonymise rows (rows with `user_id IS NOT NULL` past 7yr detected): this constitutes GDPR Art. 5(1)(e) overcollection and triggers the Art. 33 assessment in TURH-INT-01. Unlike R-33 (BDG override expiry — immediate DB state risk requiring manual UPDATE within 15 min), R-34 P0 requires pseudonymisation before deletion — the safety gate enforces this ordering invariant by design. Two-severity matrix: P1 (stale, `rows_unpseudonymised_past_7yr = 0` per R-34-C1 — CC6.3 evidence gap; Erasure Worker and pseudonymisation intact; purge backlog self-clears on restoration), P0 (stale AND R-34-C1 count > 0 — concurrent Erasure Worker failure; GDPR Art. 5(1)(e) overcollection; 60-min pseudonymisation SLA; Art. 33 assessment within 72 h). T+0–T+30 immediate actions: DEC-030 `system.turh_purge_failure_declared` HIGH/7yr at T+0; R-34-C1 P0 scope query at T+5 (aggregate counts only — no user_id/tenant_id output); R-34-C2 `pg_cron.job_run_details` at T+10; R-34-C3 root cause classification at T+15; Erasure Worker trigger at T+15 (P0 only); restoration at T+20–T+30. Five root cause hypotheses: H1 (job deleted/disabled in pg_cron), H2 (schema change broke purge SQL — DDL migration on `tenant_users_role_history` without validating purge compatibility), H3 (service_role permission revoked), H4 (lock contention with SCIM Writer write load on `tenant_users_role_history` during 04:00 UTC purge window — unique H4 risk not present in R-33 due to high-write table dynamics; H4 also motivates considering `statement_timeout` guard), H5 (Supabase platform outage → R-03 primary). Three scope queries: R-34-C1 (P0 gate — aggregate count of `user_id IS NOT NULL` rows past 7yr; no user_id/tenant_id output), R-34-C1b (informational — backlog of pseudonymised rows eligible for purge on restoration), R-34-C2 (pg_cron.job_run_details last 10 runs for stale window). Four recovery steps: Step 1 (diagnose H1–H5 with five-check table); Step 2 (P0 only — pseudonymise rows via Erasure Worker preferred path (Step 2b) or PAM-elevated manual SHA-256 UPDATE fallback (Step 2c); Step 2d zero-count all-clear verification; file TURH-INT-01); Step 3 (restore job 32 per root cause, H1–H5 table); Step 4 (confirm restoration via `pg_cron.job_run_details` + `data.turh_purge_completed` deleted_count + emit `system.turh_purge_restored` STANDARD/3yr). One communication template: TURH-INT-01 (internal GDPR Art. 33 assessment memo — required at P0 only; not required at P1; Art. 33 assessment window: 72 h from P0 declaration; expected outcome: LOW risk to natural persons for administrative role-change records per Art. 4(1) classification — not Art. 9 special category data). Two DEC-030 HMAC-chained events: `system.turh_purge_failure_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `rows_unpseudonymised_past_7yr` nonneg int, `rows_eligible_for_purge` nonneg int, `trigger` enum['pagerduty_alert','manual_discovery','al_turh_01_co_incident'], `initial_severity` enum['P1','P0']), `system.turh_purge_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause_category` enum H1–H5, `fix_deployed_at` datetime, `rows_pseudonymised_manually` nonneg int, `rows_purged_by_restored_job` nonneg int); TURH-PURGE-CHAIN-01 ordering invariant: `turh_purge_failure_declared` must precede `turh_purge_restored` for same `incident_id` — inversion triggers R-05; `emit-audit-event` Worker returns HTTP 422 on violation. Three evidence artefacts: TURH-CRON-E-001 (`system.turh_purge_failure_declared` chain export, CC6.3/CC4.1/CC7.2, 7yr — every R-34 activation), TURH-CRON-E-002 (`pg_cron.job_run_details` for job 32 stale window, CC7.2/A1.2, 3yr — every R-34 activation), TURH-CRON-E-003 (R-34-C1 aggregate scope — unpseudonymised row counts only, no user_id, no tenant_id, CC6.3/P4.1, 3yr — every R-34 activation including P1 zero-count attestation). Four SOC 2 criteria: CC6.3 (7yr ceiling enforcement — safety gate preserves pseudonymisation-first ordering invariant), CC4.1 (DEC-051 defined threshold with monitoring gap if stale — TURH-CRON-E-001 proves alert fired within 26-h window), CC7.2 (pg-cron-health-monitor 26-h freshness detection), P4.1 (GDPR Art. 17(3)(b) lawful retention basis; overcollection at P0; Art. 33 assessment documented in TURH-INT-01). Seven post-incident controls: PIR (5 business days), H2 DDL governance gate (14 days — `tenant_users_role_history` migration requires purge SQL compatibility validation), H3 permission audit (14 days), H4 lock contention schedule review (14 days — 04:00 UTC SCIM load assessment; `statement_timeout` consideration), §12.6 cross-reference update [x] Done v4.9.3, P0 DPO review (72 h Art. 33 sign-off), Scenario X tabletop (M12). Six-item implementation checklist: 2× P0/M5 (AUDIT_LOG_SCHEMA registration [x] Done v2.29; §12.7 routing + P0-path integration test), 3× P1/M5–M7 (TURH-INT-01 template + DPO pre-review; §12.6 cross-ref [x] Done v4.9.3; SOC2_READINESS §79.4/§80.3/§80.4 [x] Done v3.25.2), 1× P2/M12 (Scenario X tabletop). Privacy floor: all system events carry only FORM-internal operational metadata — stale duration, aggregate counts, root cause enum; no `user_id`, no `tenant_id`, no employee name, no email, no `user_id_pseudonym`, no GDPR Art. 9 special category data appear in any R-34 event or evidence artefact; TURH-CRON-E-003 carries only aggregate counts and timestamp extremes; TURH-INT-01 carries only aggregate counts and compliance metadata; `form_api` must never route any §R-34 event to any user-facing or tenant-facing endpoint. Cross-references: `docs/OBSERVABILITY.md §12.6` (job 32 `turh_retention_purge` registry entry — stale consequence updated with INCIDENT_RESPONSE R-34 per v4.9.3 [x] Done); `docs/OBSERVABILITY.md §12.7` (`pg-cron-health-monitor` — emits `system.cron_job_stale` that triggers this runbook); `docs/SSO_SCIM_IMPLEMENTATION.md §28.4` (TURH DDL schema — `user_id`/`user_id_pseudonym` XOR constraint; Erasure Worker pseudonymisation prerequisite; `chk_turh_user_xor_pseudonym` safety gate enforces pseudonymisation-first ordering); `docs/SSO_SCIM_IMPLEMENTATION.md §29` (DEC-051 — 7yr retention decision; OQ-SSO-28.2 resolution; job 32 pg_cron spec); `docs/AUDIT_LOG_SCHEMA.md §System` (two DEC-030 events registered per R-34.11 item 1 [x] Done v2.29); `docs/SOC2_READINESS.md §79.4` (TURH-CRON artefacts registered per R-34.11 item 5 [x] Done v3.25.2); `data.turh_purge_completed` DEC-030 STANDARD/1yr (emitted by `turh_retention_purge` job on each successful run; aggregate `deleted_count` only — no `user_id` or `tenant_id`; cross-check this event on Step 4 to populate `rows_purged_by_restored_job` in `system.turh_purge_restored`); AL-TURH-01 (P2, Slack `#compliance-alerts` — fires independently when any row has `user_id IS NOT NULL AND changed_at < NOW() - INTERVAL '7 years'`; co-triggers P0 severity upgrade if coincides with R-34 activation); R-05 (HMAC chain break — activate on TURH-PURGE-CHAIN-01 ordering violation); R-03 (Infrastructure Outage — primary runbook if H5 Supabase outage confirmed). Owner: compliance-officer + devops-lead + platform-engineer.*
+
+---
+
+**v1.0 · 2026-06-21 · Owner: compliance-officer + devops-lead + platform-engineer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 

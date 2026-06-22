@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [7.53.0] — 2026-06-22
+
+### Added
+- `docs/INCIDENT_RESPONSE.md R-34` — Runbook 34: `turh_retention_purge` (job 32) stale recovery. Closes the documentation gap identified in OBSERVABILITY.md §12.6 — job 32 was the sole pg_cron job with PagerDuty P1 routing but no INCIDENT_RESPONSE cross-reference. R-34 covers: trigger matrix (AL-CRON-STALE-032 P1 → P0 escalation), two-stage severity classification (P1 = monitoring gap / no personal data breach due to safety gate; P0 = both purge AND Erasure Worker failed), immediate actions, five root cause hypotheses (H1 job deleted, H2 schema change, H3 permission revoked, H4 lock contention, H5 Supabase outage), scope queries R-34-C1 and R-34-C1b, PAM-elevated manual pseudonymisation fallback (Step 2c), DEC-030 chain spec (TURH-PURGE-CHAIN-01 invariant: `system.turh_purge_failure_declared` must precede `system.turh_purge_restored`), evidence preservation (TURH-CRON-E-001/002/003), SOC 2 TSC mapping (CC6.3/CC4.1/CC7.2/P4.1), and post-incident controls. Privacy floor enforced throughout: all DEC-030 events carry only operational metadata — no `user_id`, no `tenant_id`, no GDPR Art. 9 data.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.1 → v3.2; R-34 appended after R-33.
+- `docs/OBSERVABILITY.md` — v4.9.2 → v4.9.3; §12.6 job 32 cross-ref column updated with `INCIDENT_RESPONSE R-34 (job 32 stale recovery runbook — §R-34.5)`.
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.27 → v2.29; two new DEC-030 events registered: `system.turh_purge_failure_declared` (HIGH/7yr, TURH-PURGE-CHAIN-01 anchor) and `system.turh_purge_restored` (STANDARD/3yr).
+- `docs/SOC2_READINESS.md` — v3.25.1 → v3.25.2; §79.4 three new evidence rows (TURH-CRON-E-001/002/003), §80.3 `turh-purge/` subfolder added, §80.4 Vanta mirror list updated.
+- `VERSION` → 7.53.0
+
+---
+
 ## [7.52.0] — 2026-06-22
 
 ### Added
