@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [8.2.0] — 2026-06-22
+
+### Added
+- `content/post-2306-linear-vs-nonlinear-progression.md` — Editorial 2306–2315 series, post 1/10. Лінійна vs. нелінійна прогресія для рекреаційного атлета. Rhea et al. (2002): DUP +28% vs LP +14% у силі за 12 тижнів у проміжних атлетів. Механіка LP: чому працює для новачків, де зупиняється. DUP (щоденна варіація інтенсивності/об'єму): дані Zourdos et al. (2016). WUP (тижнева варіація): практичний варіант для атлетів з обмеженнями відновлення між сесіями. Блокова переодизація (Issurin 2008): accumulation → transmutation → realization; для просунутих (3+ роки стажу). Colquhoun et al. (2017): BP vs DUP у пауерліфтерів — схожі результати, системна структура важливіша за вибір між ними. Три маркери переходу від LP до нелінійної: зупинка 3 тижні, RPE-тренд вгору, стаж 12–18 міс. Практична рамка по тренувальному віку. FORM/Victor: зміна моделі за даними, не за календарем. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `README.md` — Editorial 2306–2315 series added: «Переодизація для рекреаційного атлета» (10 posts). post-2306 → draft.
+
+### Changed
+- `blog.html` — card for post-2306 added above post-2270.
+- `VERSION` — 8.1.0 → 8.2.0.
+
+---
+
 ## [8.1.0] — 2026-06-22
 
 ### Added
