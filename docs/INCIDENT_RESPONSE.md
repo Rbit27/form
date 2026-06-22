@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.3
+# FORM · Incident Response Runbook v3.4
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -15042,5 +15042,387 @@ const BackupMonitorRestoredSchema = z.object({
 **v1.1 · 2026-06-22 · Owner: devops-lead + compliance-officer**
 **Review: after every P0 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0 — whichever comes first.**
+
+---
+
+## R-40 CI Telemetry Daily Sync Stale — `ci_telemetry_daily_sync` (job 28) — CC8.1 DORA evidence gap
+
+> Owner: devops-lead + compliance-officer. Review: after every activation, minimum annual.
+
+**Trigger:** `system.cron_job_stale` DEC-030 HIGH event with `job_name = 'ci_telemetry_daily_sync'` emitted by `pg-cron-health-monitor` (§12.7) when job 28 exceeds the 26-hour freshness window → PagerDuty P2 `form-devops` → devops-lead; dedup key `ci-telemetry-sync-stale`.
+
+**What job 28 does:** Materialises daily CI/CD pipeline telemetry from the Cloudflare Analytics Engine `CI_TELEMETRY` binding into the `ci_telemetry_daily` Postgres table (migration `0061_ci_telemetry_daily.sql`), sourcing DORA metrics (deployment frequency, lead time, change failure rate, MTTR) and CI RED metrics (pipeline failure rate, duration P95, migration success/failure). Used by the Metabase "CI/CD & Deployment Health" dashboard (`docs/OBSERVABILITY.md §38.7`) and the quarterly CI-E-003 DORA report (`docs/OBSERVABILITY.md §38.8`).
+
+**Critical distinction from AL-CI-07:** AL-CI-07 (`form-devops` Slack + PagerDuty P2) fires when job 28 stale is detected at the automated monitoring layer. R-40 is the IC protocol that executes when that alert requires structured diagnosis and recovery. Job 28 staleness does **not** create an immediate SLA credit exposure or GDPR compliance risk — the primary consequence is a DORA telemetry gap and a possible gap in the CI-E-003 quarterly SOC 2 evidence artefact.
+
+**Privacy floor:** Job 28 processes CI/CD infrastructure metadata only — commit SHAs, run IDs, GitHub Actions workflow names, job names, branch names, CI conclusions, durations. No `user_id`, no `tenant_id`, no employee PII, no health values, no coaching content in any payload. `ci_telemetry_daily` rows are infrastructure metadata exclusively.
+
+---
+
+### R-40.1 Trigger Matrix
+
+| Trigger | Dedup key | Routed to | Initial severity |
+|---|---|---|---|
+| `system.cron_job_stale` with `job_name = 'ci_telemetry_daily_sync'` from `pg-cron-health-monitor` | `ci-telemetry-sync-stale` | PagerDuty P2 `form-devops` → devops-lead | **P2** |
+| Manual discovery (no alert fired) | — | devops-lead direct | P2 |
+
+**Severity stays P2 for all R-40 activations.** Job 28 staleness is a telemetry and evidence gap — not a live customer SLA breach, GDPR compliance failure, or security incident. P1 escalation is not triggered by job 28 staleness alone. If root cause H1 (job deleted or disabled by an unexpected actor) is confirmed, co-activate R-05 (HMAC chain break) for the access investigation track in parallel.
+
+---
+
+### R-40.2 Severity Classification
+
+| Scenario | Severity | Rationale |
+|---|---|---|
+| Job 28 stale ≤ 7 days; last `ci_telemetry_daily` row ≤ 7 days old | **P2** | Telemetry gap present; DORA daily coverage incomplete; CI health board shows stale prior-day data. No SOC 2 evidence artefact deadline in immediate danger. |
+| Job 28 stale > 7 days | **P2 (elevated urgency)** | If stale window overlaps with end of quarter (Mar 31 / Jun 30 / Sep 30 / Dec 31), CI-E-003 DORA quarterly report computation is at risk. Restore before quarterly Metabase query at 07:00 UTC on the 1st of the following month. |
+| Root cause H1 confirmed — job deleted or disabled by unexpected actor | **P2 + R-05 co-activation** | Potential unauthorized change to pg_cron configuration — security investigation required alongside normal P2 recovery. |
+
+---
+
+### R-40.3 Immediate Actions (T+0 to T+30 min)
+
+#### T+0 — Acknowledge and emit DEC-030 anchor
+
+Acknowledge PagerDuty P2 `ci-telemetry-sync-stale`. Emit `system.ci_telemetry_stale_declared` HIGH/7yr DEC-030 event via Admin Console → Audit → Emit Event:
+
+```json
+{
+  "event_type": "system.ci_telemetry_stale_declared",
+  "incident_id": "<new-uuid-v4>",
+  "confirmed_stale_since": "<pg_cron last_run from R-40-C1>",
+  "stale_minutes": <integer>,
+  "missed_runs": <integer>,
+  "trigger": "pagerduty_alert",
+  "initial_severity": "P2"
+}
+```
+
+#### T+5 — Confirm stale window (R-40-C1)
+
+```sql
+-- R-40-C1: Confirm job 28 stale and measure gap
+SELECT
+  jobname,
+  status,
+  return_message,
+  start_time,
+  end_time,
+  EXTRACT(EPOCH FROM (NOW() - MAX(end_time) OVER ())) / 3600 AS hours_since_last_run
+FROM cron.job_run_details
+WHERE jobname = 'ci_telemetry_daily_sync'
+ORDER BY start_time DESC
+LIMIT 20;
+```
+
+**Pass condition:** `hours_since_last_run > 26` confirms stale. Note `return_message` from the last failed run — it is the primary H3/H4 discriminator.
+
+#### T+10 — Measure `ci_telemetry_daily` coverage gap (R-40-C2)
+
+```sql
+-- R-40-C2: Identify telemetry gap
+SELECT
+  MAX(sync_date)     AS last_synced_date,
+  NOW()::date        AS today,
+  (NOW()::date - MAX(sync_date)) AS gap_days
+FROM ci_telemetry_daily;
+```
+
+If `gap_days ≥ 7`, check whether the current date is within 7 calendar days of an end-of-quarter date (Mar 31 / Jun 30 / Sep 30 / Dec 31). If yes, flag in the R-40 incident ticket: CI-E-003 quarterly computation may be affected — restore job 28 before the Metabase DORA query at 07:00 UTC on the 1st of the following month.
+
+#### T+10 — Peer job health check (R-40-C3)
+
+```sql
+-- R-40-C3: Determine if shared pg_cron failure (H2)
+SELECT
+  jobname,
+  MAX(end_time)                                              AS last_run,
+  EXTRACT(EPOCH FROM (NOW() - MAX(end_time))) / 3600        AS hours_since_run
+FROM cron.job_run_details
+WHERE jobname IN (
+  'workout_data_purge',
+  'backup_age_monitor',
+  'white_label_cert_check',
+  'turh_retention_purge',
+  'renewal_notice_check'
+)
+GROUP BY jobname;
+```
+
+If ≥ 2 peer daily jobs are also stale within the same time window → H2 (shared pg_cron infrastructure failure). Co-activate R-03.
+
+#### T+15 — Job registration check (R-40-C4)
+
+```sql
+-- R-40-C4: Confirm job 28 exists in cron.job
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'ci_telemetry_daily_sync';
+```
+
+If no row returned → H1 (job deleted). Check Admin Console security event log and DEC-030 `audit_log_events` for recent `system.cron_config_changed` events. If deleted by unexpected actor — co-activate R-05 immediately.
+
+#### T+20 — Table access check (R-40-C5)
+
+```sql
+-- R-40-C5: Verify ci_telemetry_daily table accessible to form_system
+SELECT COUNT(*) FROM ci_telemetry_daily
+WHERE sync_date >= NOW()::date - INTERVAL '7 days';
+```
+
+Permission error on this query when run as `form_system` → H4 (RLS or schema change). Inspect recent `ci.migration_applied` DEC-030 events for `tables_affected @> ARRAY['ci_telemetry_daily']`.
+
+#### T+30 — Restore or escalate
+
+Proceed to §R-40.5 recovery. If root cause cannot be determined by T+30, notify compliance-officer via Slack `#compliance-alerts` with interim status: stale duration, gap_days, R-40-C1 `return_message`.
+
+---
+
+### R-40.4 Root Cause Hypotheses
+
+| Hypothesis | Indicators | Resolution path |
+|---|---|---|
+| **H1** — Job 28 deleted or disabled by unexpected actor | R-40-C4 returns no row; deletion not in scheduled maintenance window; no devops-lead record of intentional removal | Inspect `audit_log_events` for `system.cron_config_changed` events with `job_name = 'ci_telemetry_daily_sync'`; if unauthorized confirmed — co-activate R-05; re-register job 28 via `cron.schedule()` |
+| **H2** — Shared pg_cron infrastructure failure | R-40-C3 shows ≥ 2 peer daily jobs also stale in the same time window; `pg_cron` health-monitor itself may be delayed | Co-activate R-03 (Infrastructure Outage); pg_cron recovery per R-03.5 is primary; job 28 restores automatically when pg_cron resumes |
+| **H3** — Cloudflare Analytics Engine `CI_TELEMETRY` unreachable | R-40-C1 `return_message` shows network error, `net.http_post`/`net.http_get` timeout, HTTP 5xx from Worker proxy, or AE quota exceeded | Check Cloudflare AE status page; verify `CI_TELEMETRY` binding via `wrangler analytics dataset list`; re-run job 28 manually after AE recovery; assess backfill from AE 72h event retention |
+| **H4** — `ci_telemetry_daily` INSERT failure | R-40-C1 `return_message` shows `permission denied`, unique constraint violation, or foreign key error; R-40-C5 returns permission error | Inspect recent `ci.migration_applied` DEC-030 events for schema changes to `ci_telemetry_daily`; restore RLS grants per §38.10 item 6 (`form_system` INSERT, `form_admin` + `analytics_reader` SELECT) |
+| **H5** — Supabase platform outage | pg_cron health-monitor itself stale; multiple independent Supabase functions unavailable; `status.supabase.com` incident active | Co-activate R-03 (H4 branch); no job 28-specific action until Supabase restores |
+
+---
+
+### R-40.5 Recovery Procedure
+
+#### Step 1 — Re-register job if deleted (H1)
+
+If R-40-C4 shows job 28 missing, re-register:
+
+```sql
+SELECT cron.schedule(
+  'ci_telemetry_daily_sync',
+  '0 4 * * *',
+  $$SELECT ci_telemetry_sync()$$  -- canonical function per migration 0061_ci_telemetry_daily.sql
+);
+```
+
+Confirm job appears in `cron.job` with `active = true`. If the deletion was unauthorized, proceed with R-05 in parallel — do not restore alone.
+
+#### Step 2 — Restore AE connectivity (H3)
+
+Wait for Cloudflare AE status recovery. Verify `CI_TELEMETRY` binding is healthy: `wrangler analytics dataset list`. Run `github-actions-relay` Worker health check (GET `/health`). If AE event data for missed days is still within the 72h retention window, trigger a manual backfill via the Worker proxy endpoint documented in §38.9.
+
+#### Step 3 — Restore `ci_telemetry_daily` grants (H4)
+
+Re-apply grants per migration `0061_ci_telemetry_daily.sql`:
+
+```sql
+GRANT INSERT ON ci_telemetry_daily TO form_system;
+GRANT SELECT ON ci_telemetry_daily TO form_admin;
+GRANT SELECT ON ci_telemetry_daily TO analytics_reader;
+```
+
+Verify RLS policies on `ci_telemetry_daily` match the original migration definition before proceeding.
+
+#### Step 4 — Manual job run and verification
+
+Run job 28 manually:
+
+```sql
+SELECT cron.run_job('ci_telemetry_daily_sync');
+```
+
+Wait 90 seconds, then verify:
+
+```sql
+SELECT jobname, status, return_message, end_time
+FROM cron.job_run_details
+WHERE jobname = 'ci_telemetry_daily_sync'
+ORDER BY start_time DESC
+LIMIT 3;
+```
+
+**Pass condition:** `status = 'succeeded'` for the manual run. Confirm new rows in `ci_telemetry_daily`:
+
+```sql
+SELECT sync_date, COUNT(*) AS row_count, MAX(inserted_at) AS inserted_at
+FROM ci_telemetry_daily
+GROUP BY sync_date
+ORDER BY sync_date DESC
+LIMIT 5;
+```
+
+#### Step 5 — Gap backfill assessment
+
+If `gap_days ≥ 2` (R-40-C2), assess whether missed days can be backfilled from the Cloudflare AE `CI_TELEMETRY` dataset. AE retains raw events for ≥ 72 hours. For gaps > 3 days, telemetry is unrecoverable from AE — add a gap note to the CI-E-003 DORA quarterly report methodology section documenting the stale window, affected DORA metric dates, and why backfill was not possible.
+
+#### Step 6 — Resolve and emit restoration event
+
+Emit `system.ci_telemetry_restored` STANDARD/3yr and resolve PagerDuty P2 `ci-telemetry-sync-stale`:
+
+```json
+{
+  "event_type": "system.ci_telemetry_restored",
+  "incident_id": "<same-uuid-as-stale_declared>",
+  "restored_at": "<ISO 8601 UTC>",
+  "root_cause": "<H1|H2|H3|H4|H5>",
+  "fix_deployed_at": "<ISO 8601 UTC>",
+  "ci_telemetry_daily_gap_days": <integer>,
+  "backfill_attempted": <boolean>,
+  "backfill_rows_recovered": <integer or null>
+}
+```
+
+---
+
+### R-40.6 Internal Communication Template
+
+No customer-facing template for R-40 — job 28 staleness is not a per-tenant SLA event. One internal template:
+
+**CI-INT-01 — Slack `#devops` (if stale > 4h unresolved):**
+
+```
+[R-40 P2] ci_telemetry_daily_sync (job 28) stale {{stale_hours}}h.
+DORA telemetry gap: {{gap_days}} day(s) missing in ci_telemetry_daily.
+Root cause: {{H1|H2|H3|H4|H5 or "diagnosing"}}.
+{{If near end-of-quarter:}} ⚠️ CI-E-003 quarterly report at risk — restore before {{end_of_quarter_date}} 07:00 UTC.
+Incident ID: {{incident_id}}.
+IC: @devops-lead.
+```
+
+---
+
+### R-40.7 DEC-030 HMAC-Chained Events
+
+**CI-TELEMETRY-STALE-CHAIN-01 — Ordering invariant:** `system.ci_telemetry_restored` MUST follow `system.ci_telemetry_stale_declared` for the same `incident_id`. If `system.ci_telemetry_restored` is received for an `incident_id` with no prior `system.ci_telemetry_stale_declared`, the `emit-audit-event` Worker returns HTTP 422 `CI_TELEMETRY_STALE_CHAIN_01_VIOLATION` and R-05 is activated.
+
+#### `system.ci_telemetry_stale_declared` — HIGH · 7 yr
+
+Emitted by IC at T+0 when R-40 is activated.
+
+| Field | Value |
+|---|---|
+| Event type | `system.ci_telemetry_stale_declared` |
+| Severity | HIGH |
+| Retention | 7 yr |
+| HMAC chain | Yes — DEC-030 HMAC-chained |
+| SOC 2 mapping | CC8.1 (change management evidence integrity), CC7.2 (monitoring control gap) |
+
+```typescript
+// system.ci_telemetry_stale_declared — HIGH · 7 yr
+const CiTelemetryStaleDeclaredSchema = z.object({
+  incident_id:            z.string().uuid(),
+  confirmed_stale_since:  z.string().datetime(),   // ISO 8601 UTC — last successful run
+  stale_minutes:          z.number().positive(),
+  missed_runs:            z.number().int().nonneg(),
+  trigger:                z.enum([
+    'pagerduty_alert',
+    'manual_discovery',
+    'co_active_r03',     // H2 shared pg_cron failure co-activation
+  ]),
+  initial_severity:       z.literal('P2'),
+});
+```
+
+**Privacy floor:** No `user_id`, `tenant_id`, health data, or employee PII. All fields are FORM-internal CI/CD operational metadata.
+
+#### `system.ci_telemetry_restored` — STANDARD · 3 yr
+
+Emitted by IC at Step 6 when job 28 confirmed running after restoration.
+
+| Field | Value |
+|---|---|
+| Event type | `system.ci_telemetry_restored` |
+| Severity | STANDARD |
+| Retention | 3 yr |
+| HMAC chain | Yes — DEC-030 HMAC-chained |
+| SOC 2 mapping | CC8.1 (evidence gap closure documented), CC7.2 (monitoring restored) |
+
+```typescript
+// system.ci_telemetry_restored — STANDARD · 3 yr
+const CiTelemetryRestoredSchema = z.object({
+  incident_id:                  z.string().uuid(),
+  restored_at:                  z.string().datetime(),
+  root_cause:                   z.enum(['H1', 'H2', 'H3', 'H4', 'H5']),
+  fix_deployed_at:              z.string().datetime(),
+  ci_telemetry_daily_gap_days:  z.number().int().nonneg(),
+  backfill_attempted:           z.boolean(),
+  backfill_rows_recovered:      z.number().int().nonneg().nullable(),
+});
+```
+
+**Privacy floor:** No `user_id`, `tenant_id`, health data, or employee PII. `ci_telemetry_daily_gap_days` is an integer count of missed sync days — no content or identity data. `backfill_rows_recovered` is a non-negative integer or null.
+
+---
+
+### R-40.8 Evidence Preservation
+
+| Artefact | Content | Privacy floor | SOC 2 | Retention | Storage path |
+|---|---|---|---|---|---|
+| **`system.ci_telemetry_stale_declared`** DEC-030 chain export | R-40 incident anchor — `confirmed_stale_since`, `stale_minutes`, `missed_runs`, `trigger`, `initial_severity` | Infrastructure metadata only; no `user_id`, `tenant_id`, employee PII | CC8.1 / CC7.2 | 7 yr | R2 `compliance/evidence/ci/telemetry-stale/r40-<incident_id>/` |
+| **R-40-C1 output** `cron.job_run_details` for job 28 stale window | Confirms stale window duration, missed-run count, `return_message` from last failed run | `pg_cron` operational metadata only — no tenant data, no user data | CC8.1 / CC7.2 | 3 yr | R2 `compliance/evidence/ci/telemetry-stale/r40-<incident_id>/` |
+| **R-40-C2 output** *(if gap_days ≥ 1)* | `ci_telemetry_daily` coverage gap — `last_synced_date`, `today`, `gap_days` | Integer counts only; no content or identity data | CC8.1 | 3 yr | R2 `compliance/evidence/ci/telemetry-stale/r40-<incident_id>/` |
+
+> **CI-E-003 addendum:** Any R-40 activation where `ci_telemetry_daily_gap_days ≥ 1` must be documented in a methodology footnote to the CI-E-003 DORA quarterly report for the quarter in which the incident occurred. Addendum row format:
+
+| Quarter | Incident ID | Stale window (h) | Root cause | Gap days | Backfill | CI-E-003 impact |
+|---|---|---|---|---|---|---|
+| YYYY-QN | `<incident_id>` | `<stale_hours>` | H1/H2/H3/H4/H5 | `<gap_days>` | Yes (`<rows>` rows) / No | Partial gap in DORA deployment frequency and CFR for `<date_range>` |
+
+> **Zero-incident quarters:** If no R-40 activation occurred in the quarter, no CI-E-003 addendum is required. The DORA computation covers the full quarter without gaps.
+
+> **`form_api` access:** NO ACCESS to `compliance/evidence/ci/telemetry-stale/` per standard `form_api` REVOKE pattern (§80.3). Only `form_system` (compliance_reviewer) may read evidence artefacts.
+
+---
+
+### R-40.9 SOC 2 Criteria Mapping
+
+| Criterion | Control description | R-40 evidence role |
+|---|---|---|
+| **CC8.1** | Change management — `ci_telemetry_daily_sync` (job 28) materialises CI/CD pipeline telemetry into Postgres for the quarterly CI-E-003 DORA report, which is the primary CC8.1 evidence artefact for deployment frequency and change failure rate | R-40 activations document gaps in the DORA evidence coverage for the affected quarter; CI-E-003 addendum note preserves evidence-quality record; zero-gap quarters (no R-40 activation) demonstrate continuous DORA monitoring throughout the observation period |
+| **CC7.2** | Monitoring of system components — `pg-cron-health-monitor` (§12.7) detects job 28 gaps exceeding 26h and pages devops-lead via PagerDuty P2; R-40 defines the IC response protocol for the monitoring gap | R-40 activation and DEC-030 event chain (`system.ci_telemetry_stale_declared` → `system.ci_telemetry_restored`) constitute auditor-inspectable evidence that FORM detects and responds to CI telemetry monitoring gaps within a defined, structured response protocol |
+
+> **Auditor narrative (CC8.1 + CC7.2):** FORM's `ci_telemetry_daily_sync` (job 28, daily 04:00 UTC, 26h freshness window) materialises the `CI_TELEMETRY` Cloudflare Analytics Engine dataset into `ci_telemetry_daily` for DORA metric queries (deployment frequency, lead time, change failure rate, MTTR). The quarterly CI-E-003 DORA report (CC8.1 evidence) draws from these rows. The `pg-cron-health-monitor` (§12.7) detects any job 28 gap exceeding 26 hours and pages devops-lead via PagerDuty P2 `form-devops`. R-40 provides the IC with a structured response including a gap backfill assessment (AE 72h retention window) and a CI-E-003 addendum obligation for quarters with `gap_days ≥ 1`. The DEC-030 HMAC-chained event chain anchors any stale window in the tamper-evident audit record, independently verifiable per `compliance/docs/hmac-chain-verification-algorithm.md` (HMAC-VERIFY-ALGO-001).
+
+---
+
+### R-40.10 Post-Incident Controls
+
+| Control | Action | Owner | SLA |
+|---|---|---|---|
+| **H1 — Unauthorized deletion** | If H1 confirmed with no authorized maintenance record: initiate access investigation under R-05; review all `system.cron_config_changed` DEC-030 chain events from the prior 72h; rotate `form_system` pg_cron credentials as precaution if unauthorized access suspected | security-engineer | Immediately on H1 confirmation |
+| **H3 — AE connectivity recurring** | If H3 recurs ≥ 2 times: add monthly Cloudflare AE `CI_TELEMETRY` binding health check to devops runbook; consider Worker-level AE availability probe before each pg_cron daily run | devops-lead | 14 days after second H3 activation |
+| **CI-E-003 addendum** | If `ci_telemetry_daily_gap_days ≥ 1`: add addendum row to CI-E-003 DORA report for the affected quarter per §R-40.8 format documenting gap, root cause, and backfill status | devops-lead + compliance-officer | Before CI-E-003 quarterly filing |
+| **§12.6 cross-reference** | Update `docs/OBSERVABILITY.md §12.6` job 28 `ci_telemetry_daily_sync` registry entry to include `INCIDENT_RESPONSE R-40 (job 28 stale recovery runbook — §R-40.5)` in the stale-consequence cross-ref column | devops-lead | **Done — OBSERVABILITY.md §12.6 v1.3 patch, 2026-06-22** |
+| **AL-CI-07 formal registration** | AL-CI-07 is referenced in `docs/OBSERVABILITY.md §38.9` and §12.6 but lacks a formal entry in the §38.5 alert rules table. Add AL-CI-07: P2, `form-devops` PagerDuty P2 + Slack, dedup `ci-telemetry-sync-stale`, trigger = job 28 stale, runbook R-40 | devops-lead | P1, M8 (per R-40.11 item 4) |
+
+---
+
+### R-40.11 Implementation Checklist
+
+#### P0 — Before job 28 is deployed to production (M8)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.ci_telemetry_stale_declared` (HIGH/7yr) and `system.ci_telemetry_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §CI/CD Pipeline events`. Add CI-TELEMETRY-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-40.7. | security-engineer + compliance-officer | **P0** | M8 | [x] **Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.36.** R-40 monitoring-control events subsection added to §CI/CD Pipeline events; both events registered with full Zod schemas; CI-TELEMETRY-STALE-CHAIN-01 ordering invariant noted. |
+| 2 | Deploy R-40 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'ci_telemetry_daily_sync'` to PagerDuty service `form-devops` P2, dedup key `ci-telemetry-sync-stale`, routing to devops-lead. Integration test: disable job 28 in staging for > 26h; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P2 fires on `form-devops` with correct dedup key. | devops-lead | **P0** | M8 | [ ] |
+
+#### P1 — Before first quarterly DORA report filing (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Update `docs/OBSERVABILITY.md §12.6` job 28 `ci_telemetry_daily_sync` registry entry: add `INCIDENT_RESPONSE R-40 (job 28 stale recovery runbook — §R-40.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M8 | [x] *(completed in OBSERVABILITY.md §12.6 v1.3 patch, 2026-06-22)* |
+| 4 | Add AL-CI-07 formal entry to `docs/OBSERVABILITY.md §38.5` alert rules table: `ci_telemetry_daily_sync` stale > 26h, P2, PagerDuty `form-devops` + Slack `#devops`, dedup `ci-telemetry-sync-stale`, 26h freshness cross-ref §12.6 job 28, runbook R-40. | devops-lead | **P1** | M8 | [ ] |
+| 5 | After job 28 initial deploy in staging: run R-40-C2 against staging `ci_telemetry_daily`; confirm `gap_days = 0` immediately after first sync; document in CI-E-003 Q0 baseline (`compliance/evidence/cc8/ci-e-003-dora-baseline.pdf`). | devops-lead + data-engineer | **P1** | M9 | [ ] |
+
+---
+
+*v1.0 (2026-06-22): R-40 CI Telemetry Daily Sync Stale — fortieth runbook. Closes the documentation gap for `ci_telemetry_daily_sync` (job 28, `0 4 * * *`, 26h freshness window) identified in `docs/OBSERVABILITY.md §12.6` (v0.4 patch, 2026-06-19) — job 28 was registered in the canonical §12.6 registry with CC8.1 DORA evidence cross-references (`docs/OBSERVABILITY.md §38.5` AL-CI-07, `docs/OBSERVABILITY.md §38.8` CI-E-001/CI-E-003) but had no corresponding INCIDENT_RESPONSE runbook, unlike peer daily-cadence jobs (R-28 through R-34, R-39) which all carry explicit stale runbook cross-references in their §12.6 entries. Critical distinction from peer monitoring-control runbooks: job 28 staleness does not create a live SLA breach, GDPR compliance failure, or security incident — the primary risk is DORA telemetry gap and CC8.1 evidence quality reduction in the quarterly CI-E-003 DORA report. Severity stays P2 for all R-40 activations; P1 escalation not triggered by job 28 alone. H1 (unauthorized deletion) triggers R-05 co-activation as a separate security investigation track. Trigger: `system.cron_job_stale` with `job_name = 'ci_telemetry_daily_sync'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P2 `form-devops` → devops-lead; dedup `ci-telemetry-sync-stale`. Five root cause hypotheses: H1 (job deleted/disabled by unexpected actor — R-05 co-activation if unauthorized), H2 (shared pg_cron failure — R-03 co-activation), H3 (Cloudflare AE `CI_TELEMETRY` unreachable — quota, regional outage, or Worker proxy 5xx), H4 (`ci_telemetry_daily` INSERT failure — RLS change, schema migration, lock conflict), H5 (Supabase platform outage — R-03 H4 branch). Five scope queries: R-40-C1 (pg_cron staleness confirmation + `return_message`), R-40-C2 (`ci_telemetry_daily` coverage gap — `gap_days ≥ 7` triggers end-of-quarter urgency flag), R-40-C3 (peer job health check — H2 discriminator: ≥ 2 peer daily jobs stale), R-40-C4 (job registration check — H1 discriminator: no row in `cron.job`), R-40-C5 (`ci_telemetry_daily` access check — H4 discriminator: permission error under `form_system`). Six-step recovery procedure: Step 1 (H1 — re-register via `cron.schedule()`), Step 2 (H3 — AE connectivity restoration + 72h backfill window), Step 3 (H4 — restore RLS grants per §38.10 item 6), Step 4 (manual run + `cron.job_run_details` + `ci_telemetry_daily` verification), Step 5 (gap backfill assessment), Step 6 (emit `system.ci_telemetry_restored` STANDARD/3yr; resolve PagerDuty). Two DEC-030 HMAC-chained events: `system.ci_telemetry_stale_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `trigger` enum['pagerduty_alert','manual_discovery','co_active_r03'], `initial_severity` literal 'P2'); `system.ci_telemetry_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H5, `fix_deployed_at` datetime, `ci_telemetry_daily_gap_days` nonneg int, `backfill_attempted` bool, `backfill_rows_recovered` nonneg int nullable); CI-TELEMETRY-STALE-CHAIN-01: `restored` must follow `stale_declared` for same `incident_id`; HTTP 422 `CI_TELEMETRY_STALE_CHAIN_01_VIOLATION` on breach → R-05 activated. Evidence: R-40-C1 `cron.job_run_details` stale window (CC8.1/CC7.2, 3yr, `compliance/evidence/ci/telemetry-stale/r40-<incident_id>/`); R-40-C2 `ci_telemetry_daily` gap output for `gap_days ≥ 1` (CC8.1, 3yr); CI-E-003 addendum note for quarters with `gap_days ≥ 1` (Quarter, Incident ID, Stale window, Root cause, Gap days, Backfill, impact). SOC 2 criteria: CC8.1 (DORA evidence quality — CI-E-003 quarterly report carries addendum notes for R-40 activation quarters; zero R-40 quarters demonstrate continuous DORA monitoring); CC7.2 (monitoring of system components — R-40 activation + DEC-030 chain proves FORM detects and responds to CI telemetry monitoring gaps). Post-incident controls: H1 unauthorized deletion → R-05 + credential rotation; H3 recurrence × 2 → monthly AE binding health check; CI-E-003 addendum for `gap_days ≥ 1`; §12.6 cross-reference [x] Done v1.3 patch 2026-06-22; AL-CI-07 formal §38.5 registration (P1/M8). Five-item implementation checklist: 2× P0/M8 (AUDIT_LOG_SCHEMA registration [x] Done 2026-06-22; PagerDuty routing + integration test), 3× P1/M8–M9 (§12.6 cross-ref [x] Done v1.3 patch 2026-06-22; AL-CI-07 formal §38.5 entry; R-40-C2 staging verification after first deploy). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 28 `ci_telemetry_daily_sync` registry entry — stale-consequence cross-ref updated with INCIDENT_RESPONSE R-40 per v1.3 patch [x] Done 2026-06-22); `docs/OBSERVABILITY.md §38.5` (AL-CI-07 — referenced in §38.9 and §12.6 but needs formal §38.5 entry per R-40.11 item 4); `docs/OBSERVABILITY.md §38.8` (CI-E-001 CC8.1 quarterly CI run history; CI-E-003 DORA quarterly report — primary CC8.1 evidence artefacts, impacted when job 28 stale for `gap_days ≥ 1`); `docs/OBSERVABILITY.md §38.9` (job 28 pg_cron spec — daily 04:00 UTC; `CI_TELEMETRY` AE binding → `ci_telemetry_daily` Postgres table; P2 AL-CI-07 alert routing); `docs/AUDIT_LOG_SCHEMA.md §CI/CD Pipeline events` (`system.ci_telemetry_stale_declared` HIGH/7yr and `system.ci_telemetry_restored` STANDARD/3yr registered v2.36, 2026-06-22; CI-TELEMETRY-STALE-CHAIN-01 ordering invariant); `docs/SOC2_READINESS.md §21` (CC8.1 Change Management Controls — §38 OBSERVABILITY + R-40 INCIDENT_RESPONSE together provide the observability and incident-response layer for CC8.1 evidence); R-03 (Infrastructure Outage — H2/H5 co-activation path); R-05 (HMAC chain break — H1 unauthorized deletion co-activation path and CI-TELEMETRY-STALE-CHAIN-01 violation escalation). Owner: devops-lead + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-22 · Owner: devops-lead + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---
 
 ---

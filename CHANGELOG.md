@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.2.1] — 2026-06-22
+
+### Added
+- `docs/INCIDENT_RESPONSE.md R-40` — Recovery runbook for `ci_telemetry_daily_sync` (pg_cron job 28) staleness. Covers P2 classification, five root-cause hypotheses (H1 job deregistered, H2 peer daily jobs stale, H3 pg_cron schema lock, H4 `ci_telemetry_daily` table access, H5 GitHub Actions relay Worker down), five SQL scope queries (R-40-C1 through R-40-C5), DEC-030 HMAC-chained events (`system.ci_telemetry_stale_declared` HIGH/7yr, `system.ci_telemetry_restored` STANDARD/3yr), CI-TELEMETRY-STALE-CHAIN-01 ordering invariant, evidence artefacts CI-E-001 and CI-E-003, and SOC 2 CC8.1 mapping. Closes the sole gap in the §12.6 pg_cron job registry: jobs 26, 27, 29, 32–37 had R-XX cross-references; job 28 did not.
+- `docs/AUDIT_LOG_SCHEMA.md` R-40 monitoring-control events subsection — `system.ci_telemetry_stale_declared` and `system.ci_telemetry_restored` registered with full Zod schemas and CI-TELEMETRY-STALE-CHAIN-01 ordering invariant note. Version v2.35 → v2.36.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.3 → v3.4 (R-40 appended).
+- `docs/OBSERVABILITY.md §12.6` — job 28 cross-ref column updated to include `INCIDENT_RESPONSE R-40 (job 28 stale recovery runbook — §R-40.5)`. Version v1.2 patch → v1.3 patch notation.
+- `VERSION` — 8.2.0 → 8.2.1.
+
+---
+
 ## [8.2.0] — 2026-06-22
 
 ### Added

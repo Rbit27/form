@@ -1664,6 +1664,46 @@ const PipelineFailedSchema = z.object({
 
 ---
 
+**R-40 monitoring-control events (CI-TELEMETRY-STALE-CHAIN-01):** Two events anchor the R-40 incident lifecycle when job 28 itself goes stale. These events are emitted by the IC (Incident Commander), not by automated processes. **CI-TELEMETRY-STALE-CHAIN-01 ordering invariant:** `system.ci_telemetry_restored` MUST follow `system.ci_telemetry_stale_declared` for the same `incident_id`; the `emit-audit-event` Worker returns HTTP 422 `CI_TELEMETRY_STALE_CHAIN_01_VIOLATION` on violation → R-05 activated. **Privacy floor:** no `user_id`, no `tenant_id`, no employee PII — infrastructure metadata only. Cross-ref: `docs/INCIDENT_RESPONSE.md R-40` (full runbook — §R-40.5 declares stale, §R-40.9 auditor narrative); `docs/OBSERVABILITY.md §12.6` (job 28 registry entry); `docs/OBSERVABILITY.md §38.5` AL-CI-07 (staleness alert definition); CC8.1 (Change Management — DORA evidence gap is the compliance impact).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `system.ci_telemetry_stale_declared` | HIGH | 7 yr | IC emits at T+0 when R-40 activated (`ci_telemetry_daily_sync` job 28 exceeds 26h freshness window) | `incident_id` (UUID — CI-TELEMETRY-STALE-CHAIN-01 anchor), `confirmed_stale_since`, `stale_minutes`, `missed_runs`, `trigger` (enum: `pagerduty_alert` \| `manual_discovery` \| `co_active_r03`), `initial_severity` (literal `'P2'`) |
+| `system.ci_telemetry_restored` | STANDARD | 3 yr | IC emits when job 28 confirmed running after restoration | `incident_id` (matches stale_declared), `restored_at`, `root_cause` (enum H1–H5), `fix_deployed_at`, `ci_telemetry_daily_gap_days` (nonneg int), `backfill_attempted` (bool), `backfill_rows_recovered` (nonneg int nullable) |
+
+```typescript
+import { z } from 'zod';
+
+// system.ci_telemetry_stale_declared — HIGH · 7 yr · CC8.1 / CI-TELEMETRY-STALE-CHAIN-01
+const CiTelemetryStaleDeclaredSchema = z.object({
+  incident_id:            z.string().uuid(),
+  confirmed_stale_since:  z.string().datetime(),
+  stale_minutes:          z.number().positive(),
+  missed_runs:            z.number().int().nonneg(),
+  trigger:                z.enum([
+    'pagerduty_alert',
+    'manual_discovery',
+    'co_active_r03',
+  ]),
+  initial_severity:       z.literal('P2'),
+});
+
+// system.ci_telemetry_restored — STANDARD · 3 yr · CC8.1 / CI-TELEMETRY-STALE-CHAIN-01
+const CiTelemetryRestoredSchema = z.object({
+  incident_id:                  z.string().uuid(),
+  restored_at:                  z.string().datetime(),
+  root_cause:                   z.enum(['H1', 'H2', 'H3', 'H4', 'H5']),
+  fix_deployed_at:              z.string().datetime(),
+  ci_telemetry_daily_gap_days:  z.number().int().nonneg(),
+  backfill_attempted:           z.boolean(),
+  backfill_rows_recovered:      z.number().int().nonneg().nullable(),
+});
+```
+
+*v2.36 patch (2026-06-22): R-40 monitoring-control events registered — `system.ci_telemetry_stale_declared` (HIGH/7yr) and `system.ci_telemetry_restored` (STANDARD/3yr) anchor the CI-TELEMETRY-STALE-CHAIN-01 ordering invariant for job 28 (`ci_telemetry_daily_sync`) incident lifecycle. Closes INCIDENT_RESPONSE.md R-40.11 item 1. Owner: compliance-officer + devops-lead.*
+
+---
+
 ### Backup & DR Observability events (DEC-030 HMAC-chained · OBSERVABILITY §39 · A1.2/A1.3)
 
 > Defined in `docs/OBSERVABILITY.md §39`. Six events covering backup health and disaster recovery test lifecycle — daily backup completions, backup failures, and quarterly restore tests. **Privacy floor (all six events):** `user_id = NULL`, `tenant_id = NULL` — infrastructure-only events. No user identifiers, tenant data, or health data appear in any payload. `error_message_hash` in `system.backup_failed` and `system.restore_test_failed` uses SHA-256 to prevent raw error output from entering the chain. **`privacy_floor_verified` invariant:** `system.restore_test_completed` MUST have `privacy_floor_verified: true` to count as a successful SOC 2 A1.3 evidence artefact — a restore with `privacy_floor_verified: false` is treated as a failed test regardless of `success` field value. **BC-CHAIN-01 ordering invariant:** `system.restore_test_completed` or `system.restore_test_failed` MUST have a corresponding `system.restore_test_initiated` with matching `test_id` earlier in the chain; the `emit-audit-event` Worker returns HTTP 422 on violation. Cross-ref: `docs/BUSINESS_CONTINUITY.md §3.1` (RTO/RPO commitments — §39 is the observability layer); `docs/ENTERPRISE_SLA.md §4.3` (RTO = 4h — `rto_target_minutes: 240` is the literal contract commitment in the chain); `docs/OBSERVABILITY.md §39.10` (SOC 2 evidence artefacts BC-E-001 through BC-E-005). Closes OBSERVABILITY.md §39.11 checklist item 1 (P0, M13 enterprise GA).
