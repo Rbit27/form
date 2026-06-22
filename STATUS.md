@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v7.56.0** — 2026-06-22
+**v7.57.0** — 2026-06-22
 
 ---
 
@@ -127,7 +127,7 @@
 
 ## Next priorities
 
-- **Editorial 2121–2130: IN PROGRESS 3/10** — post-2121 (v7.54.0) + post-2122 (v7.55.0) + post-2123 (v7.56.0) written · NEXT: post-2124 (Авторегуляція vs. планова прогресія: коли відходити від програми, а коли — ні)
+- **Editorial 2121–2130: IN PROGRESS 4/10** — post-2121 (v7.54.0) + post-2122 (v7.55.0) + post-2123 (v7.56.0) + post-2124 (v7.57.0) written · NEXT: post-2125 (Три типи плато — і три різних рішення)
 - **Editorial 2051–2060: COMPLETE 10/10 · v7.44.0** — posts 2059 (документація vs. аналітика) + 2060 (block synthesis) written; blog cards added; sports-scientist review required before publish
 - **Editorial 2061–2070: NEXT** — тема: Тренування в умовах реального дорослого атлета; posts 2061–2070 proposed in README
 - **Block 751–800: COMPLETE** — all 50/50 posts written; posts 791, 793, 794 clinical-safety CONDITIONAL PASS (guard rails embedded); sports-scientist review required for all 50 before publish
