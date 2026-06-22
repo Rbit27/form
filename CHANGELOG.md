@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [7.64.1] — 2026-06-22
+
+### Changed
+- `enterprise.html` — Quarterly compliance attestation badge added to the Compliance &amp; security posture section (8th badge, green-teal accent, after Annual penetration tests). Closes the gap between `docs/ENTERPRISE.md §Hard commitments` ("Quarterly compliance attestation") and the enterprise landing page — this hard commitment was documented in ENTERPRISE.md but not surfaced to procurement audiences. Badge copy: "Written attestation each quarter — SOC 2 controls status, audit chain integrity, and privacy floor verification." Owners: compliance-officer + enterprise-architect. Cross-reference: `docs/ENTERPRISE.md` (hard commitments list). Clinical-safety: NOT_REQUIRED.
+
+---
+
 ## [7.64.0] — 2026-06-22
 
 ### Added
