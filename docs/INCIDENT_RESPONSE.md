@@ -14132,3 +14132,292 @@ const WebhookEscalationRestoredPayload = z.object({
 **Next scheduled review: June 2027 or after first P0 — whichever comes first.**
 
 ---
+
+## R-37 SSO Fleet Health Check Stale — `sso_fleet_health_check` (job 38) — SSO-SLO-01b detection gap
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `sso_fleet_health_check` pg_cron job 38 exceeds the 6-minute freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` Edge Function (§12.7, runs hourly) emits `system.cron_job_stale` with `job_name = 'sso_fleet_health_check'`; routes to PagerDuty P1 `form-platform` → IC + security-engineer with dedup key `sso-fleet-health-check-stale` per §12.6
+> **Primary owners:** security-engineer · devops-lead
+> **SLO risk:** Job 38 (`*/5 * * * *`) is the enforcement engine for SSO-SLO-01b — the fleet-wide SSO health companion signal. It evaluates every 5 minutes whether ≥ 3 distinct enterprise tenants simultaneously have SSO login success rate < 99% (≥ 5 attempts each) in any rolling 15-min window, firing AL-SSO-FLEET-01 (P1) and emitting `siem.sso_fleet_health_breach` DEC-030 HIGH/3yr on detection. A stale job means SSO-SLO-01b is in a detection gap: a correlated fleet-level SSO regression affecting multiple tenants simultaneously — caused by, for example, a Cloudflare Workers partial degradation or a shared upstream IdP latency event — goes undetected until the job resumes. Per DEC-070, `sla_credit_impact: 'none'` — SSO-SLO-01b breach never triggers SLA credits directly. However, an undetected fleet SSO degradation may concurrently cause per-tenant SSO-SLO-01 breaches (the SLA credit basis); security-engineer must inspect the stale window for any such per-tenant breaches and activate R-04 per-tenant if warranted.
+> **Critical distinction from peer stale runbooks:** R-37 is a **purely advisory detection-gap runbook** — unlike R-33/R-34/R-36 (requiring DB mutation) and R-35 (requiring external Cloudflare API polling), no data mutation and no external API call are required for recovery. Job 38 reads only from `audit_log_events` (internal Supabase) — the compensating control during stale is manual audit log inspection for correlated SSO failure patterns. Unlike R-36, there is no vendor dependency (no Resend or Cloudflare) in job 38's healthy execution path. The most likely stale cause is a shared pg_cron infrastructure failure (H2/H4), which would stale job 37 and job 35 concurrently — cross-check R-32 and any job 35 stale alerts before diagnosing R-37 in isolation.
+
+---
+
+### R-37.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 38)** | `pg-cron-health-monitor` Edge Function (§12.7, runs hourly) | No successful `sso_fleet_health_check` run in `pg_cron.job_run_details` within the prior 6 min | **P1** (escalates to P0 if R-37-C1 returns ≥ 3 distinct tenants with SSO failure rate > 1% in the last 15 min) | PagerDuty `form-platform` P1 → IC + security-engineer; dedup key `sso-fleet-health-check-stale` per §12.6 registry |
+| **Manual discovery** | security-engineer observes stale job during routine §12.6 review or SSO-FLEET-E-001 quarterly evidence collection | Post-evidence-collection or routine monitoring check | **P1 → assess R-37-C1 for P0 upgrade** | `form-platform` |
+| **Co-active with R-32 or job-35 stale** | Multiple 5-min cadence jobs staling simultaneously strongly suggests shared pg_cron infrastructure failure | Any R-32 (`caep-sweep-stale`) or job-35 stale alert co-active with `sso-fleet-health-check-stale` | **P1 → shared cause; co-activate R-03 assessment** | See §R-37.4 H2 / H4 |
+
+> **P0 escalation criterion:** Upon any R-37 activation, security-engineer runs R-37-C1 immediately. If the query returns ≥ 3 distinct `tenant_id` rows (≥ 3 tenants each with ≥ 5 SSO attempts and failure rate > 1% in the last 15 min), severity escalates to **P0** — an active fleet-level SSO degradation may have gone undetected during the stale window. The SSO-SLO-01b threshold is ≥ 3 tenants simultaneously; a P0 R-37 does not itself trigger SLA credits (DEC-070), but security-engineer must cross-reference per-tenant SSO-SLO-01 thresholds to determine whether any R-04 activations are warranted.
+
+---
+
+### R-37.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P1** | Stale; R-37-C1 returns < 3 tenants with active SSO failure rate > 1% | 30 min investigation; detection gap only; no active fleet breach is evident; no SLA credit risk | Diagnose root cause; restore job 38; verify `siem.sso_fleet_health_breach` events resume on next breach (or zero-event attestation if no breach during the stale window); emit DEC-030 chain |
+| **P0** | Stale AND R-37-C1 returns ≥ 3 distinct tenants with SSO failure rate > 1% | 15 min to manual per-tenant SSO-SLO-01 assessment; cross-check whether any R-04 activation is warranted | Run R-37-C1 full output; assess per-tenant SSO-SLO-01 breach (> 1% failure rate × > 15 min = SLA credit territory for individual tenants per ENTERPRISE.md §SLA); activate R-04 per-tenant if warranted; restore job 38; emit `system.sso_fleet_check_failure_declared` with `active_breach_tenant_count` |
+
+---
+
+### R-37.3 Immediate Actions (T+0 to T+30 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `system.sso_fleet_check_failure_declared` (HIGH/7yr) via `emit-audit-event` Worker | security-engineer | Required at ALL severity levels. Do this FIRST before any DB queries. SSO-FLEET-CHAIN-01 anchor. |
+| **T+5** | Run R-37-C1 (fleet SSO failure scope query) | security-engineer | Count distinct tenants with SSO failure rate > 1% in last 15 min. If count ≥ 3 → P0; call IC immediately. Also check R-37-C1 for the full stale window, not just the last 15 min, to catch breaches that started and recovered while job 38 was stale. |
+| **T+5** | Cross-check peer job stales: query `pg_cron.job_run_details` for job 37 (`caep_reregister_sweep`) and job 35 (`google_directory_alert_check`) freshness | security-engineer | If jobs 35 and/or 37 are also stale → shared pg_cron infrastructure failure (H2/H4); co-activate R-03 assessment. R-37 resolves when infrastructure is restored. |
+| **T+10** | Run R-37-C2: check `pg_cron.job_run_details` for job 38 last 10 runs — confirm stale window start, missed-run count, `return_message` | security-engineer | Identifies root cause hypothesis (H1–H4). |
+| **T+15** *(P0 only)* | For each tenant returned by R-37-C1 with failure rate > 1%: assess whether per-tenant SSO-SLO-01 has been breached (> 1% failure rate sustained > 15 min) and activate R-04 per-tenant if warranted | security-engineer + IC | Per DEC-070, SSO-SLO-01b breach has `sla_credit_impact: 'none'`. Per-tenant SSO-SLO-01 breach is the SLA credit basis — R-04 governs that path. |
+| **T+20–T+30** | Fix underlying cause and restore job 38 per root cause diagnosis | security-engineer + devops-lead | See §R-37.5 Steps 2–3. Emit `system.sso_fleet_check_restored` on confirmed first successful run. |
+
+---
+
+### R-37.4 Root Cause Hypotheses and Scope Queries
+
+#### R-37-C1 — Active fleet SSO failure scope (P0 upgrade gate)
+
+```sql
+-- R-37-C1: Fleet SSO failure scope — check for SSO-SLO-01b breach during stale window
+-- Run twice: (1) last 15 min (active breach check); (2) full stale window (retrospective breach check)
+SELECT
+  tenant_id,
+  COUNT(*) FILTER (WHERE action = 'sso.login_failed')  AS failed_logins,
+  COUNT(*)                                              AS total_attempts,
+  ROUND(100.0 * COUNT(*) FILTER (WHERE action = 'sso.login_failed')
+        / NULLIF(COUNT(*), 0), 2)                      AS failure_rate_pct
+FROM audit_log_events
+WHERE action IN ('sso.login_success', 'sso.login_failed')
+  AND created_at > NOW() - INTERVAL '15 minutes'
+GROUP BY tenant_id
+HAVING COUNT(*) >= 5  -- SSO-SLO-01b minimum-attempt threshold per tenant
+ORDER BY failure_rate_pct DESC;
+-- P0 if COUNT of returned rows (distinct tenants) >= 3
+```
+
+> **At P1:** Fewer than 3 tenants returned with failure rate > 1%. The stale window was a detection gap without an active fleet breach. Preserve zero-or-sub-threshold result as the P1 severity attestation in the DEC-030 `system.sso_fleet_check_failure_declared` payload.
+
+> **At P0:** ≥ 3 distinct tenants returned with failure rate > 1%. Escalate immediately. For each tenant: assess whether per-tenant SSO-SLO-01 (> 1% failure × > 15 min window) was breached and whether an R-04 activation is warranted. The R-37-C1 output (`active_breach_tenant_count`) populates the `system.sso_fleet_check_failure_declared` payload.
+
+#### R-37-C2 — pg_cron run history for job 38
+
+```sql
+-- R-37-C2: Stale window confirmation — last 10 runs of sso_fleet_health_check
+SELECT
+  jobid, jobname, runid, job_pid,
+  database, username, command, status,
+  return_message, start_time, end_time
+FROM pg_cron.job_run_details
+WHERE jobname = 'sso_fleet_health_check'
+ORDER BY start_time DESC
+LIMIT 10;
+```
+
+> Use output to confirm: (1) time of last successful run (defines stale window start), (2) missed-run count since stale window (5-min cadence — a 30-min stale window = 6 missed runs), (3) `return_message` for root cause classification.
+
+#### Root cause hypotheses
+
+| Hypothesis | Description | Primary signal | Recovery path |
+|---|---|---|---|
+| **H1 — Job deleted/disabled** | `sso_fleet_health_check` was removed from `pg_cron.job` or `active = false` | `SELECT COUNT(*) FROM pg_cron.job WHERE jobname = 'sso_fleet_health_check'` returns 0 | Recreate job 38 per `docs/OBSERVABILITY.md §49.6` SQL spec; verify `active = true` |
+| **H2 — Shared pg_cron infrastructure failure** | `pg_cron` scheduler itself is down or degraded; all 5-min jobs (38, 37, 35) staling simultaneously | R-37-C2 shows no runs at all; job 37 (`caep_reregister_sweep`) and/or job 35 stale concurrently; `pg_cron.job_run_details` has no entries after stale window start | Co-activate R-03 assessment; monitor Supabase status page; pg_cron resumes automatically when platform stabilises |
+| **H3 — `audit_log_events` query failure** | High table load, dead-tuple accumulation, or lock contention causes job 38 query to timeout or error | `return_message` contains timeout or lock error; `audit_log_events` table stats show high dead_tuple_ratio or locks in `pg_stat_activity` | Run `VACUUM ANALYZE audit_log_events` (avoid VACUUM FULL in production — use concurrent); investigate query plan with `EXPLAIN ANALYZE` against R-37-C1 pattern; consider `form_audit` role query timeout setting |
+| **H4 — Supabase platform outage** | Supabase Postgres or pg_cron scheduler is fully unavailable | No `return_message` entries after stale window start; Supabase status page incident | R-03 primary; R-37 resolves automatically when Supabase restores |
+
+---
+
+### R-37.5 Recovery Procedure
+
+#### Step 1 — Confirm stale and classify root cause
+
+| Check | Command / Action | Expected (healthy) | Unhealthy → action |
+|---|---|---|---|
+| Job exists | `SELECT * FROM pg_cron.job WHERE jobname = 'sso_fleet_health_check'` | 1 row, `active = true` | 0 rows or `active = false` → H1; recreate per §49.6 |
+| Last run | `pg_cron.job_run_details` (R-37-C2) | `start_time` within prior 6 min | > 6 min → stale confirmed; check `return_message` |
+| Peer jobs | Query `pg_cron.job_run_details` for `caep_reregister_sweep` (job 37) and `google_directory_alert_check` (job 35) | Both show `status = 'succeeded'` within their respective freshness windows | Both stale → H2/H4; co-activate R-03 |
+| `form_audit` role | `SELECT has_table_privilege('form_audit', 'audit_log_events', 'SELECT')` | `true` | `false` → permission regression; restore `form_audit` SELECT on `audit_log_events` via migration |
+| Supabase platform | Supabase status page | All systems operational | Outage → H4; activate R-03 |
+
+#### Step 2 — P0 only: Manual per-tenant SSO-SLO-01 assessment
+
+> **P0 path only** — skip entirely at P1. At P1, R-37-C1 confirms < 3 tenants have active SSO failures; no per-tenant SLA assessment is required.
+
+1. For each tenant returned by R-37-C1 (failure rate > 1%, ≥ 5 attempts), extend the query window to 30 min to assess SSO-SLO-01 breach duration:
+
+```sql
+SELECT
+  tenant_id,
+  MIN(created_at) AS first_failure_at,
+  MAX(created_at) AS last_failure_at,
+  COUNT(*) FILTER (WHERE action = 'sso.login_failed')  AS failed_logins,
+  COUNT(*)                                              AS total_attempts,
+  ROUND(100.0 * COUNT(*) FILTER (WHERE action = 'sso.login_failed')
+        / NULLIF(COUNT(*), 0), 2)                      AS failure_rate_pct,
+  EXTRACT(epoch FROM (MAX(created_at) - MIN(created_at))) / 60 AS breach_duration_min
+FROM audit_log_events
+WHERE tenant_id = $1  -- iterate per tenant from R-37-C1
+  AND action IN ('sso.login_success', 'sso.login_failed')
+  AND created_at > NOW() - INTERVAL '30 minutes'
+GROUP BY tenant_id;
+```
+
+2. If `failure_rate_pct > 1` AND `breach_duration_min > 15` → per-tenant SSO-SLO-01 breach confirmed; activate R-04 for that tenant.
+3. Record `active_breach_tenant_count` and each tenant's `breach_duration_min` for the `system.sso_fleet_check_failure_declared` DEC-030 payload.
+4. File SSO-FLEET-INT-01 (§R-37.6) for IC and compliance-officer context.
+
+#### Step 3 — Fix underlying cause and restore job 38
+
+| Root cause | Restoration action | Validation |
+|---|---|---|
+| **H1 — Job deleted** | Re-register job 38: copy the `DO $$` block from `docs/OBSERVABILITY.md §49.6` and register via Supabase Dashboard → Database → pg_cron | `SELECT * FROM pg_cron.job WHERE jobname = 'sso_fleet_health_check'` returns 1 row; next 5-min interval run shows `status = 'succeeded'` in `pg_cron.job_run_details` |
+| **H2 — Shared pg_cron failure** | Await pg_cron scheduler recovery per R-03 infrastructure runbook; no direct job-38-specific action | All 5-min cadence jobs (35, 37, 38) show `status = 'succeeded'` after platform recovery |
+| **H3 — `audit_log_events` query failure** | Run `VACUUM ANALYZE audit_log_events`; investigate and resolve lock contention or timeout; verify query plan via `EXPLAIN ANALYZE` | Next job 38 run shows `status = 'succeeded'` with normal `end_time - start_time` |
+| **H4 — Supabase outage** | Monitor Supabase status page; await platform recovery; pg_cron resumes automatically | First run after platform recovery shows `status = 'succeeded'` in `pg_cron.job_run_details` |
+
+#### Step 4 — Confirm restoration and close incident
+
+1. Confirm `pg_cron.job_run_details` shows `status = 'succeeded'` for `sso_fleet_health_check` post-fix
+2. Trigger a manual run if needed: `SELECT cron.run_job(<jobid>)` where `<jobid>` is job 38's ID from `pg_cron.job`
+3. Verify that the job emits either `siem.sso_fleet_health_breach` (if an ongoing breach is detected) or `system.renewal_notice_check_passed` — wait, the all-clear event for job 38 is the absence of `siem.sso_fleet_health_breach`; the job is silent on all-clear (no explicit all-clear DEC-030 event per §49 — distinguish from R-28 which emits `system.renewal_notice_check_passed`)
+4. Emit `system.sso_fleet_check_restored` (STANDARD/3yr) via `emit-audit-event` Worker — see §R-37.7
+5. Resolve PagerDuty P1 incident `sso-fleet-health-check-stale`
+6. If P0: confirm any co-activated R-04 incidents are tracked; record stale-window breach summary in SSO-FLEET-INT-01 §Outcome
+
+---
+
+### R-37.6 Communication Templates
+
+#### SSO-FLEET-INT-01 — Internal P0 communication template
+
+> **Required when:** P0 severity (R-37-C1 returns ≥ 3 tenants with active SSO failure rate > 1%). Not required at P1.
+> **Recipients:** IC + security-engineer + devops-lead + compliance-officer
+> **SLA:** Draft within 15 min of R-37-C1 P0 confirmation
+
+**Template:**
+
+```
+**[INTERNAL] SSO Fleet Health Check Stale — P0**
+Incident: {incident_id}
+Declared: {timestamp UTC}
+Stale since: {confirmed_stale_since UTC}
+Active breach tenants: {active_breach_tenant_count}
+Action: Per-tenant SSO-SLO-01 assessment underway; R-04 activation pending per-tenant scope
+SLA credit note: SSO-SLO-01b sla_credit_impact = 'none' (DEC-070);
+  per-tenant SSO-SLO-01 is SLA credit basis — assess each tenant separately via R-04
+IC: security-engineer
+```
+
+> **No customer-facing communication template is defined.** SSO-SLO-01b has `sla_credit_impact: 'none'` (DEC-070). If per-tenant SSO-SLO-01 breach is confirmed for specific tenants, R-04 governs all customer-facing communication for those tenants.
+
+---
+
+### R-37.7 DEC-030 Chain Specification
+
+Two DEC-030 HMAC-chained events are required for every R-37 activation:
+
+#### Event 1 — `system.sso_fleet_check_failure_declared` (HIGH · 7yr retention)
+
+**When:** T+0 of every R-37 activation, before any DB scope queries. Emitter: security-engineer via `emit-audit-event` Worker.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:                  z.string().uuid(),
+  confirmed_stale_since:        z.string().datetime(),
+  stale_minutes:                z.number().positive(),
+  missed_runs:                  z.number().int().nonneg(),
+  active_breach_tenant_count:   z.number().int().nonneg(), // 0 if P1; ≥ 3 if P0
+  trigger:                      z.enum(['pagerduty_alert', 'manual_discovery', 'co_active_r32']),
+  initial_severity:             z.enum(['P1', 'P0']),
+  peer_jobs_stale:              z.boolean(), // true if jobs 35 or 37 also stale (H2 indicator)
+})
+```
+
+> **Privacy invariant:** No `user_id`, no employee name, no health value, no GDPR Art. 9 data. `active_breach_tenant_count` is an aggregate integer — no `tenant_id` values in the declaration event itself. `peer_jobs_stale` is a boolean infrastructure signal.
+
+#### Event 2 — `system.sso_fleet_check_restored` (STANDARD · 3yr retention)
+
+**When:** After confirmed successful job 38 run post-fix. Emitter: security-engineer via `emit-audit-event` Worker.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:      z.string().uuid(), // must match failure_declared incident_id
+  restored_at:      z.string().datetime(),
+  root_cause:       z.enum(['H1', 'H2', 'H3', 'H4']),
+  fix_deployed_at:  z.string().datetime(),
+  r04_activated:    z.boolean(),       // true if any per-tenant R-04 was activated
+})
+```
+
+#### SSO-FLEET-CHAIN-01 — Ordering Invariant
+
+> `system.sso_fleet_check_restored` MUST be preceded by `system.sso_fleet_check_failure_declared` for the same `incident_id`. If `restored` is emitted without a corresponding `failure_declared`, emit `system.chain_integrity_violation` (HIGH/7yr) and activate R-05. The `emit-audit-event` Worker returns HTTP 422 `SSO_FLEET_CHAIN_01_VIOLATION` on invariant breach.
+
+---
+
+### R-37.8 Evidence Preservation
+
+R-37 activations are documented as addenda to the existing SSO-FLEET-E-001 quarterly artefact (defined in `docs/OBSERVABILITY.md §49.7`) — no separate evidence artefact is created for R-37 activations.
+
+| Artefact ID | TSC domain | TSC criteria | Description | Retention | Cadence | Owner | Path |
+|---|---|---|---|---|---|---|---|
+| **SSO-FLEET-E-001** | CC7 | CC7.2 / CC7.3 | Quarterly export of AL-SSO-FLEET-01 PagerDuty incidents cross-referenced with pg_cron job 38 (`sso_fleet_health_check`) run history from `pg_cron.job_run_details`. Any R-37 activation during the quarter is documented as an addendum: stale window, severity, R-37-C1 result, `incident_id`, root cause, resolution timestamp, and whether any R-04 co-activations occurred. **If zero AL-SSO-FLEET-01 incidents and zero R-37 activations during the quarter, file a zero-incident attestation JSON with the full job 38 run-history appended.** | 3 yr | Quarterly | security-engineer | `compliance/evidence/sso/sso-fleet-e-001-YYYY-QN.json` |
+
+---
+
+### R-37.9 SOC 2 Evidence Mapping
+
+| SOC 2 criterion | Control | R-37 relevance |
+|---|---|---|
+| **CC7.2** | Monitoring of system components — `pg-cron-health-monitor` generates `system.cron_job_stale` within 6 min of any missed `sso_fleet_health_check` run; job 38 provides continuous SSO-SLO-01b fleet-level detection | SSO-FLEET-E-001 quarterly `pg_cron.job_run_details` export (with any R-37 activation addendum) proves monitoring control operated as specified throughout the observation period; R-37 activation records prove stale windows were detected within the 6-min freshness threshold |
+| **CC7.3** | Response to anomalies — R-37 defines the IC response protocol for job 38 stale, including the P0 per-tenant SSO-SLO-01 assessment path (triggering R-04) and the DEC-030 HMAC chain anchoring the response | R-37 activation and DEC-030 event chain constitute auditor-inspectable evidence that FORM detects and responds to SSO monitoring control gaps within a defined SLA |
+
+> **Auditor narrative (CC7.2 + CC7.3):** FORM's `sso_fleet_health_check` (job 38, every 5 minutes) is the platform-level companion to per-tenant SSO-SLO-01 — it monitors whether ≥ 3 enterprise tenants simultaneously experience SSO degradation, surfacing correlated fleet-level failures that per-tenant monitoring alone cannot detect. The `pg-cron-health-monitor` (§12.7) detects any job 38 gap exceeding 6 minutes and pages IC + security-engineer. Per DEC-070, SSO-SLO-01b breaches carry `sla_credit_impact: 'none'` — the fleet signal is an operational quality indicator, not a contractual SLA commitment. At P0, R-37 requires per-tenant SSO-SLO-01 assessment and R-04 co-activation where warranted, ensuring that a monitoring gap does not translate into an unaddressed customer SLA breach. SSO-FLEET-E-001 quarterly exports prove continuous monitoring operation.
+
+---
+
+### R-37.10 Post-Incident Controls
+
+| Control | Action | Owner | SLA |
+|---|---|---|---|
+| **PIR** | Post-incident review required for all P0 activations: root cause analysis, timeline, contributing factors, whether any R-04 was warranted but initially missed. Standard INCIDENT_RESPONSE post-mortem template. | security-engineer + devops-lead | Filed within 72 h of resolution |
+| **H3 — `audit_log_events` maintenance** | If root cause H3 (query timeout/lock contention): schedule `VACUUM ANALYZE audit_log_events` to maintenance runbook; set `form_audit` query timeout to 4 s (one pg_cron cadence interval) so single-run failures do not cascade into full stale | devops-lead | 14 days |
+| **Peer job cross-check** | If H2 (shared pg_cron failure): add joint stale-correlation check to the evidence runbook — file R-37 activation incident alongside any co-active R-32 / job-35 stale incidents in the quarterly PIR to confirm shared root cause | security-engineer + devops-lead | PIR |
+| **§12.6 cross-reference** | Update `docs/OBSERVABILITY.md §12.6` job 38 `sso_fleet_health_check` registry entry to include `INCIDENT_RESPONSE R-37 (job 38 stale recovery runbook — §R-37.5)` in the stale-consequence cross-ref column | security-engineer | **Done — OBSERVABILITY.md §12.6 v1.0 patch, 2026-06-22** |
+| **SSO-FLEET-E-001 quarterly collection** | Collect and file SSO-FLEET-E-001 quarterly; include any R-37 activation addendum for that quarter | security-engineer | End of each calendar quarter |
+
+---
+
+### R-37.11 Implementation Checklist
+
+#### P0 — Before job 38 is deployed to production (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.sso_fleet_check_failure_declared` (HIGH, 7yr) and `system.sso_fleet_check_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §System`. Add SSO-FLEET-CHAIN-01 ordering invariant note. Add `peer_jobs_stale` boolean to `system.sso_fleet_check_failure_declared` Zod schema definition. | security-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 2 | Deploy R-37 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'sso_fleet_health_check'` to PagerDuty service `form-platform` P1, dedup key `sso-fleet-health-check-stale`, routing to IC + security-engineer. Write integration test: disable job 38 in staging for > 6 min; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-platform`. | devops-lead | **P0** | M5 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Update SSO-FLEET-E-001 description in `docs/SOC2_READINESS.md §95` to note that R-37 activation addenda are included in quarterly filings. Confirm `docs/SOC2_READINESS.md §95` still references job 38 (not old job 36 numbering from pre-v0.5 conflict resolution). | compliance-officer | **P1** | M11 | [ ] |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 38 `sso_fleet_health_check` registry entry: add `INCIDENT_RESPONSE R-37 (job 38 stale recovery runbook — §R-37.5)` to the stale-consequence cross-ref column. | security-engineer | **P1** | M5 | [x] *(completed in OBSERVABILITY.md §12.6 v1.0 patch, 2026-06-22)* |
+
+---
+
+*v1.0 (2026-06-22): R-37 SSO Fleet Health Check Stale — thirty-seventh runbook. Closes the documentation gap for `sso_fleet_health_check` (job 38, `*/5 * * * *`, 6-min freshness window) identified in `docs/OBSERVABILITY.md §12.6` — job 38 was registered in the canonical §12.6 registry (v0.5 patch, 2026-06-20) but had no corresponding INCIDENT_RESPONSE runbook, unlike peer 5-min cadence jobs: job 37 `caep_reregister_sweep` (R-32) and job 40 `white_label_cert_check` (R-35). R-37 provides the full IC protocol for when job 38 exceeds its freshness window, covering the SSO-SLO-01b detection gap. Trigger: `system.cron_job_stale` with `job_name = 'sso_fleet_health_check'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-platform` → IC + security-engineer; dedup `sso-fleet-health-check-stale`. Critical distinction from R-33/R-34/R-36: R-37 is a purely advisory detection-gap runbook — no data mutation and no external API call are required for recovery. Unique shared-failure risk: job 38 shares the same 5-min cadence and `audit_log_events` query infrastructure with jobs 35 and 37 — concurrent stale of multiple 5-min jobs strongly indicates H2/H4 (shared pg_cron failure), and co-activating R-03 is the correct response rather than diagnosing job 38 in isolation. DEC-070 hard invariant: `sla_credit_impact: 'none'` for SSO-SLO-01b — R-37 P0 is not itself a SLA credit event; but security-engineer must inspect the stale window for per-tenant SSO-SLO-01 breaches (the actual SLA credit basis) and activate R-04 per-tenant if warranted. Two-severity matrix: P1 (stale, R-37-C1 < 3 tenants — detection gap only; no active fleet breach suspected), P0 (stale AND R-37-C1 ≥ 3 tenants — potential active fleet breach during detection gap; 15-min per-tenant SSO-SLO-01 assessment SLA; R-04 co-activation). T+0–T+30 immediate actions: emit `system.sso_fleet_check_failure_declared` HIGH/7yr at T+0; R-37-C1 at T+5; peer-job stale cross-check at T+5; R-37-C2 at T+10; P0 per-tenant assessment at T+15; restoration at T+20–T+30. Four root cause hypotheses: H1 (job deleted/disabled), H2 (shared pg_cron infrastructure failure — most likely if jobs 35/37 co-stale), H3 (`audit_log_events` query failure — timeout or lock contention), H4 (Supabase platform outage → R-03 primary). Two scope queries: R-37-C1 (P0 gate — active fleet SSO failure scope: ≥ 3 distinct tenants with failure rate > 1% and ≥ 5 attempts in last 15 min; extendable to full stale window), R-37-C2 (pg_cron.job_run_details last 10 runs for stale window). Four recovery steps: Step 1 (confirm stale + classify root cause with five-check table); Step 2 (P0 only — per-tenant SSO-SLO-01 30-min window assessment SQL; R-04 activation per breaching tenant; SSO-FLEET-INT-01 file); Step 3 (restore job 38 per H1–H4 table); Step 4 (confirm `status = 'succeeded'`; emit `system.sso_fleet_check_restored` STANDARD/3yr; resolve PagerDuty). One internal communication template: SSO-FLEET-INT-01 (P0 only — no customer-facing template; SSO-SLO-01b is advisory; per-tenant R-04 governs customer communication). Two DEC-030 HMAC-chained events: `system.sso_fleet_check_failure_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `active_breach_tenant_count` nonneg int, `trigger` enum['pagerduty_alert','manual_discovery','co_active_r32'], `initial_severity` enum['P1','P0'], `peer_jobs_stale` bool); `system.sso_fleet_check_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `r04_activated` bool); SSO-FLEET-CHAIN-01 ordering invariant: `restored` must follow `failure_declared` for same `incident_id`; HTTP 422 `SSO_FLEET_CHAIN_01_VIOLATION` on breach → R-05. Evidence: SSO-FLEET-E-001 quarterly (CC7.2/CC7.3, 3yr, quarterly; R-37 activations documented as addendum; zero-incident quarters file zero-incident attestation with job 38 run-history appended; `compliance/evidence/sso/sso-fleet-e-001-YYYY-QN.json`). SOC 2 criteria: CC7.2 (fleet SSO monitoring control — `pg-cron-health-monitor` 6-min freshness detection), CC7.3 (response to anomalies — P0 per-tenant R-04 co-activation path). Post-mortem required for all P0 activations, filed within 72 h. Five post-incident controls: PIR (72 h — P0 only), H3 `audit_log_events` maintenance (14 days), peer-job cross-check in quarterly PIR, §12.6 cross-reference [x] Done v1.0 patch 2026-06-22, SSO-FLEET-E-001 quarterly collection. Four-item implementation checklist: 2× P0/M5 (AUDIT_LOG_SCHEMA registration + SSO-FLEET-CHAIN-01; PagerDuty routing + integration test), 2× P1/M5–M11 (SOC2_READINESS §95 SSO-FLEET-E-001 description update; §12.6 cross-ref [x] Done v1.0 patch 2026-06-22). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 38 `sso_fleet_health_check` registry entry — stale consequence updated with INCIDENT_RESPONSE R-37 per v1.0 patch [x] Done); `docs/OBSERVABILITY.md §49` (AL-SSO-FLEET-01 / SSO-SLO-01b canonical definitions; job 38 SQL spec §49.6); `docs/OBSERVABILITY.md §49.7` (SSO-FLEET-E-001 evidence artefact definition); `docs/DECISION_LOG.md DEC-070` (`sla_credit_impact: 'none'` decision — SSO-SLO-01b never triggers SLA credits); R-04 (Enterprise SSO outage — per-tenant SSO-SLO-01 breach path; R-04 co-activation at P0 if per-tenant failure confirmed); R-03 (Infrastructure Outage — parallel activation if H2/H4 shared pg_cron failure confirmed); R-05 (HMAC chain break — activate on SSO-FLEET-CHAIN-01 ordering violation); R-32 (CAEP re-registration sweep — peer 5-min cadence job 37; co-stale suggests H2/H4). Owner: security-engineer + devops-lead.*
+
+---
+
+**v1.0 · 2026-06-22 · Owner: security-engineer + devops-lead**
+**Review: after every P0 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0 — whichever comes first.**
+
+---

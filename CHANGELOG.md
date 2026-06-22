@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [7.70.1] — 2026-06-22
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-37 SSO Fleet Health Check Stale: thirty-seventh runbook, closes the documentation gap for `sso_fleet_health_check` pg_cron job 38 (`*/5 * * * *`, 6-min freshness window). Full IC protocol for SSO-SLO-01b detection gap: trigger matrix (PagerDuty `form-platform` P1 → IC + security-engineer, dedup `sso-fleet-health-check-stale`); two-severity matrix (P1: stale with < 3 tenants failing — detection gap only; P0: stale AND R-37-C1 ≥ 3 tenants — per-tenant SSO-SLO-01 assessment + R-04 co-activation); T+0–T+30 immediate actions; two scope queries (R-37-C1 fleet SSO failure scope, R-37-C2 pg_cron run history); four root cause hypotheses (H1 job deleted, H2 shared pg_cron failure, H3 `audit_log_events` query failure, H4 Supabase outage); four-step recovery; SSO-FLEET-INT-01 internal P0 template; DEC-030 HMAC chain (`system.sso_fleet_check_failure_declared` HIGH/7yr + `system.sso_fleet_check_restored` STANDARD/3yr + SSO-FLEET-CHAIN-01 ordering invariant); SSO-FLEET-E-001 evidence via R-37 addendum; CC7.2/CC7.3 SOC 2 mapping; four-item implementation checklist. Critical distinction: purely advisory detection-gap runbook — no data mutation, no external API polling required. DEC-070 hard invariant: `sla_credit_impact: 'none'` for SSO-SLO-01b; per-tenant SSO-SLO-01 remains the SLA credit basis.
+
+### Changed
+- `docs/OBSERVABILITY.md` — §12.6 pg_cron job 38 registry entry: stale-consequence cross-ref updated to include `INCIDENT_RESPONSE R-37 (job 38 stale recovery runbook — §R-37.5)` · v4.8.5.
+- `VERSION` — 7.70.0 → 7.70.1.
+
+---
+
 ## [7.70.0] — 2026-06-22
 
 ### Added
