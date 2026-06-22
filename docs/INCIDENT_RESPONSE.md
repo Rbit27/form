@@ -13751,3 +13751,384 @@ Collect and upload to R2 `form-soc2-evidence` at `compliance/evidence/wl/wl-cert
 **Next scheduled review: June 2027 or after first P0 — whichever comes first.**
 
 ---
+
+## R-36 Webhook Escalation Sweep Stale — `webhook_degraded_escalation_check` (job 41) — WH-SLO-04 / 48 h auto-suspension gap
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `webhook_degraded_escalation_check` pg_cron job 41 exceeds the 35-minute freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` Edge Function (§12.6) emits `system.cron_job_stale` with `job_name = 'webhook_degraded_escalation_check'`; routes to PagerDuty P1 `form-platform` → platform-engineer with dedup key `webhook-degraded-escalation-stale` per §12.6
+> **Primary owners:** platform-engineer · compliance-officer
+> **SLO risk:** Job 41 (`*/30 * * * *`) is the enforcement engine for two independent customer-facing obligations: (1) WH-SLO-04 — degraded webhook notification ≤ 2 h (dispatch WH-NOTIF-01 via Resend at the 2 h mark; §23 SLA credit trigger for Growth/Enterprise tier); (2) 48 h auto-suspension contract per ENTERPRISE_ADMIN_API §9 — set `tenant_webhooks.status = 'suspended'`, emit `integration.webhook_suspended` HIGH/7yr, dispatch WH-NOTIF-02. When job 41 is stale, both obligations are suspended simultaneously. The 30-min cadence means missed-run counts accumulate quickly: a 2-hour stale window ≈ 4 missed runs; a 24-hour outage ≈ 48 missed runs. P1 holds when no active webhook has passed either threshold unanswered during the stale window. P0 activates when ≥ 1 webhook is degraded past the 2 h WH-SLO-04 window without its SLO-breach event on file (R-36-C1 > 0) OR ≥ 1 webhook has been degraded ≥ 48 h without a suspension event (R-36-C2 > 0).
+> **Critical distinction from peer stale runbooks:** Unlike R-35 (WL cert check — Cloudflare manages cert renewal; FORM's role is detection only; no mutation required) and R-34 (retention purge — GDPR overcollection requiring pseudonymisation), R-36 requires **both customer notification and database state mutation** as compensating controls at P0. The job is not merely a sentinel — it actively manages webhook lifecycle state. Additionally, H3 (Resend API failure in notification dispatch) is a vendor dependency risk **not present in any peer stale runbook**: all other pg_cron jobs write to Postgres or call Cloudflare via CF_API_TOKEN, but job 41 calls the Resend API for WH-NOTIF-01/02; a Resend outage can cause job 41 to fail even when the Supabase/pg_cron infrastructure is healthy.
+
+---
+
+### R-36.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 41)** | `pg-cron-health-monitor` Edge Function (§12.6) | No successful `webhook_degraded_escalation_check` run in `pg_cron.job_run_details` within the prior 35 min | **P1** (escalates to P0 if R-36-C1 or R-36-C2 returns count > 0) | PagerDuty `form-platform` P1 → platform-engineer; dedup key `webhook-degraded-escalation-stale` per §12.6 registry |
+| **Manual discovery** | platform-engineer observes stale job during routine §12.6 review or WH-ESCALATION-E-001 quarterly evidence collection | Post-evidence-collection or routine check | **P1 → assess R-36-C1/C2 for P0 upgrade** | `form-platform` |
+
+> **P0 escalation criterion:** Upon any R-36 activation, platform-engineer runs R-36-C1 and R-36-C2 immediately. If **either** query returns count > 0, severity escalates to **P0**. Both queries must return 0 for P1 to hold. When both return rows, execute the suspension compensating control (Step 2c) before the notification compensating control (Step 2b) — the 48 h contractual window is the more time-sensitive obligation.
+
+---
+
+### R-36.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P1** | Stale; R-36-C1 = 0 AND R-36-C2 = 0 | 30 min investigation; monitoring gap only; all degraded webhooks were notified and escalated by prior runs before the stale window began; WH-SLO-04 clock may be delayed but no active breach | Diagnose root cause; restore job 41; verify `integration.webhook_delivery_slo_breach` events resume for newly eligible webhooks; emit DEC-030 chain |
+| **P0 (notification breach)** | Stale AND R-36-C1 > 0 — ≥ 1 `degraded` webhook past the 2 h WH-SLO-04 window with no `integration.webhook_delivery_slo_breach` on file | 30 min to manual notification for all affected webhooks; WH-SLO-04 actively breached; §23 SLA credit review required | Manual WH-NOTIF-01 equivalent dispatch per affected webhook (Step 2b); emit `integration.webhook_delivery_slo_breach` STANDARD/3yr per webhook; file WH-ESCALATION-INT-01; restore job 41 |
+| **P0 (suspension deadline miss)** | Stale AND R-36-C2 > 0 — ≥ 1 `degraded` webhook past 48 h with no `integration.webhook_suspended` on file | 15 min to PAM-elevated suspension UPDATE; ENTERPRISE_ADMIN_API §9 contractual obligation at risk; tenant expecting suspended state per API contract | PAM-elevated UPDATE `status = 'suspended'` per affected webhook (Step 2c); emit `integration.webhook_suspended` HIGH/7yr per webhook; CSM dispatches WH-NOTIF-02 equivalent; file WH-ESCALATION-INT-01; restore job 41 |
+
+> **Dual-P0 note:** Both P0 sub-cases can apply simultaneously. If R-36-C1 AND R-36-C2 both return rows, execute Step 2c (suspension) first — 15-min SLA — then Step 2b (notifications) — 30-min SLA.
+
+---
+
+### R-36.3 Immediate Actions (T+0 to T+30 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `system.webhook_escalation_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker | platform-engineer | Required at ALL severity levels. Do this FIRST before any DB queries. WH-ESCALATION-CHAIN-01 anchor. Severity field = 'P1'; update companion summary note if scope queries elevate. |
+| **T+5** | Run R-36-C1 and R-36-C2 (scope queries) | platform-engineer | If either count > 0 → escalate to P0; call compliance-officer immediately. |
+| **T+10** | Run R-36-C3 (`pg_cron.job_run_details` last 10 runs for job 41) | platform-engineer | Confirms stale start time, missed-run count (≈ floor((stale_min − 5) / 30)), last `return_message`. |
+| **T+10–T+15** | Classify root cause per §R-36.4 hypothesis table (H1–H5) | platform-engineer | Check H1 (job disabled in pg_cron) first; H3 (Resend API) if R-36-C3 shows runs started but failed on notification dispatch. |
+| **T+15** *(P0 suspension — C2 > 0)* | Execute Step 2c — PAM-elevated suspension UPDATE + emit `integration.webhook_suspended` per affected webhook | platform-engineer | Step 2c first if both P0 sub-cases apply. |
+| **T+20** *(P0 notification — C1 > 0)* | Execute Step 2b — manual WH-NOTIF-01 equivalent dispatch per affected webhook + emit `integration.webhook_delivery_slo_breach` | platform-engineer + CSM lead | See Step 2b. CSM lead responsible for Resend dispatch or direct email fallback. |
+| **T+20–T+30** | Fix underlying cause and restore job 41 per root cause | platform-engineer | See §R-36.5 Steps 3–4. Emit `system.webhook_escalation_restored` on confirmed first successful run. |
+
+---
+
+### R-36.4 Root Cause Hypotheses and Scope Queries
+
+#### R-36-C1 — SLO-04 notification breach scope (P0 notification upgrade gate)
+
+```sql
+-- R-36-C1: Webhooks degraded > 2 h without WH-NOTIF-01 dispatched
+-- Aggregate count only — no endpoint_url or tenant-identifying data in output
+SELECT
+  COUNT(*) AS notification_breach_count,
+  MIN(tw.degraded_since)                        AS earliest_degraded_since,
+  MAX(NOW() - tw.degraded_since)                AS longest_degraded_window
+FROM tenant_webhooks tw
+WHERE tw.status       = 'degraded'
+  AND tw.degraded_since < NOW() - INTERVAL '2 hours'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events ale
+    WHERE ale.event_type = 'integration.webhook_delivery_slo_breach'
+      AND (ale.payload->>'webhook_id')::uuid = tw.id
+      AND ale.occurred_at > tw.degraded_since
+  );
+-- P0 upgrade: notification_breach_count > 0
+-- P1 holds:   notification_breach_count = 0
+```
+
+> **At P1 (count = 0):** All degraded webhooks either degraded within the last 2 h (WH-SLO-04 clock not yet expired) or had their SLO-breach event filed by a prior job 41 run before the stale window began. No active notification breach.
+
+> **At P0:** Count > 0. At least one `degraded` webhook has passed the WH-SLO-04 2-hour window with no notification event on file. Proceed to §R-36.5 Step 2b. Preserve the R-36-C1 count as the `notification_breach_count` for WH-ESCALATION-INT-01 and the companion payload note.
+
+#### R-36-C2 — Suspension deadline scope (P0 suspension upgrade gate)
+
+```sql
+-- R-36-C2: Webhooks degraded > 48 h without auto-suspension executed
+-- Aggregate count only — no endpoint_url in output
+SELECT
+  COUNT(*) AS suspension_deadline_miss_count,
+  MIN(tw.degraded_since) AS earliest_degraded_since
+FROM tenant_webhooks tw
+WHERE tw.status       = 'degraded'
+  AND tw.degraded_since < NOW() - INTERVAL '48 hours'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events ale
+    WHERE ale.event_type = 'integration.webhook_suspended'
+      AND (ale.payload->>'webhook_id')::uuid = tw.id
+      AND ale.occurred_at > tw.degraded_since
+  );
+-- P0 upgrade: suspension_deadline_miss_count > 0
+-- P1 holds:   suspension_deadline_miss_count = 0
+```
+
+> **At P1 (count = 0):** No `degraded` webhook has been degraded for ≥ 48 h without a suspension event. The auto-suspension window has not been missed for any active webhook.
+
+> **At P0:** Count > 0. At least one webhook has been stuck in `degraded` past the 48 h ENTERPRISE_ADMIN_API §9 contract window. Proceed to §R-36.5 Step 2c (suspension) before Step 2b (notifications).
+
+#### R-36-C3 — pg_cron run history for job 41
+
+```sql
+-- R-36-C3: Last 10 pg_cron runs for webhook_degraded_escalation_check (job 41)
+SELECT jobid, runid, start_time, end_time, return_message, status
+FROM pg_cron.job_run_details
+WHERE jobid = (
+  SELECT jobid FROM pg_cron.job
+  WHERE jobname = 'webhook_degraded_escalation_check'
+)
+ORDER BY start_time DESC
+LIMIT 10;
+-- Stale: most recent start_time > 35 min ago
+-- Missed-run estimate: floor((EXTRACT(EPOCH FROM (NOW() - MAX(start_time))) / 60 - 5) / 30)
+```
+
+#### Root Cause Classification Table
+
+| Hypothesis | Key indicators | Diagnosis | Fix path |
+|---|---|---|---|
+| **H1 — Job deleted or disabled in pg_cron** | `SELECT * FROM pg_cron.job WHERE jobname = 'webhook_degraded_escalation_check'` returns 0 rows or `active = false`; peer jobs healthy | Most likely: deployment script error or manual intervention | Re-register job 41 from §43.7 canonical SQL spec; verify with immediate manual run |
+| **H2 — SQL exception (DDL change on `tenant_webhooks`)** | R-36-C3 shows `status = 'failed'` with `return_message` containing column/relation error; recent migration targeting `tenant_webhooks` | DDL migration altered `tenant_webhooks` schema without validating job 41 SQL compatibility | Patch job SQL to align with new schema or roll back migration; validate against current DDL; re-enable job |
+| **H3 — Resend API failure in notification dispatch** | R-36-C3 shows `status = 'failed'` with `return_message` containing Resend API error or timeout; `webhook-dispatcher` logs show elevated Resend error rates | Resend API outage or `RESEND_API_KEY` Worker Secret rotated without Worker re-deployment | Check Resend status page; if API is healthy, re-deploy Worker with corrected secret; if API outage, SQL state-mutation steps (Step 2c suspension) can proceed while Resend is down — defer Step 2b notification to CSM direct email; restore job 41 with Resend retry after API recovery |
+| **H4 — Lock contention on `tenant_webhooks`** | R-36-C3 shows `status = 'failed'` with `return_message` containing `lock timeout` or `deadlock detected`; high `webhook-dispatcher` Worker write load during the 30-min cadence window | Concurrent write activity from `webhook-dispatcher` (5-attempt retry ladder) conflicts with job 41 UPDATE at the 48 h suspension step | Add `SET LOCAL statement_timeout = '10s';` guard to job 41 SQL; consider `FOR UPDATE SKIP LOCKED` on the suspension SELECT; assess whether staggering job 41 schedule reduces contention; restore job 41 |
+| **H5 — Supabase platform outage** | All pg_cron jobs missing runs simultaneously; Supabase status page incident; R-36-C3 returns no rows after stale start time | Supabase platform outage — R-03 is the primary runbook | Activate R-03; R-36 resolves automatically when R-03 restores and job 41 resumes |
+
+---
+
+### R-36.5 Recovery Procedure
+
+> **Step ordering:** When both P0 sub-cases apply (R-36-C2 > 0 AND R-36-C1 > 0): execute Step 2c (suspension, 15-min SLA) before Step 2b (notifications, 30-min SLA). When only R-36-C1 > 0: skip Step 2c. When only R-36-C2 > 0: skip Step 2b. At P1 (both C1 = 0 and C2 = 0): skip both Steps 2b and 2c entirely.
+
+**Step 1 — Confirm stale and classify root cause**
+
+| Check | Query / Command | Pass condition |
+|---|---|---|
+| Job exists in pg_cron | `SELECT * FROM pg_cron.job WHERE jobname = 'webhook_degraded_escalation_check'` | Exactly 1 row; `active = true` |
+| Last successful run | R-36-C3 `start_time` | Within prior 35 min |
+| Stale confirmed | `MAX(start_time)` from R-36-C3 | > 35 min → stale |
+| Root cause | R-36-C3 `return_message` | H1–H5 per §R-36.4 table |
+| Resend API | Resend status page + check `RESEND_API_KEY` is valid for the current Worker deployment | 200 OK responses; no elevated errors; key matches active Worker Secret |
+| Supabase platform | Supabase status page | No active incident → H5 excluded |
+
+**Step 2c — Suspension deadline compensating control (P0 — R-36-C2 > 0 only)**
+
+> Skip entirely at P1 or when R-36-C2 = 0. Execute BEFORE Step 2b if both apply.
+
+**Step 2c-a:** Re-run R-36-C2 to confirm count > 0 and retrieve `webhook_id` UUIDs (PAM session — `form_system` role):
+
+```sql
+-- Step 2c-a: Retrieve webhook_ids past 48 h suspension deadline
+SELECT tw.id          AS webhook_id,
+       tw.tenant_id,
+       tw.degraded_since,
+       EXTRACT(EPOCH FROM (NOW() - tw.degraded_since)) / 3600 AS hours_degraded
+FROM tenant_webhooks tw
+WHERE tw.status      = 'degraded'
+  AND tw.degraded_since < NOW() - INTERVAL '48 hours'
+  AND NOT EXISTS (
+    SELECT 1 FROM audit_log_events ale
+    WHERE ale.event_type = 'integration.webhook_suspended'
+      AND (ale.payload->>'webhook_id')::uuid = tw.id
+      AND ale.occurred_at > tw.degraded_since
+  )
+ORDER BY tw.degraded_since ASC;
+-- Share webhook_id list with platform-engineer + CSM lead (FORM-internal UUIDs)
+```
+
+**Step 2c-b:** Under PAM elevation (`form_system` role), execute suspension UPDATE for each `webhook_id` from Step 2c-a:
+
+```sql
+-- Step 2c-b: Manual suspension (execute once per webhook_id — idempotent guard on status check)
+UPDATE tenant_webhooks
+SET    status        = 'suspended',
+       degraded_since = NULL
+WHERE  id     = '{WEBHOOK_ID}'
+  AND  status = 'degraded';  -- idempotent: no-op if job 41 ran between 2c-a and 2c-b
+```
+
+**Step 2c-c:** For each suspended webhook, emit `integration.webhook_suspended` HIGH/7yr via `emit-audit-event` Worker with `suspension_method: 'manual_r36_compensating_control'` in the payload. CSM lead dispatches the WH-NOTIF-02 equivalent email to each affected tenant (tenant admin contact retrieved via `tenants` table — `form_admin` role; no personal data in the DEC-030 event itself).
+
+**Step 2b — SLO-04 notification compensating control (P0 — R-36-C1 > 0 only)**
+
+> Skip entirely at P1 or when R-36-C1 = 0.
+
+**Step 2b-a:** Re-run R-36-C1 to confirm count > 0 and retrieve `webhook_id` UUIDs (PAM session):
+
+```sql
+-- Step 2b-a: Retrieve webhook_ids past 2 h WH-SLO-04 window without SLO-breach event
+SELECT tw.id          AS webhook_id,
+       tw.tenant_id,
+       tw.degraded_since,
+       EXTRACT(EPOCH FROM (NOW() - tw.degraded_since)) / 3600 AS hours_degraded
+FROM tenant_webhooks tw
+WHERE tw.status      = 'degraded'
+  AND tw.degraded_since < NOW() - INTERVAL '2 hours'
+  AND NOT EXISTS (
+    SELECT 1 FROM audit_log_events ale
+    WHERE ale.event_type = 'integration.webhook_delivery_slo_breach'
+      AND (ale.payload->>'webhook_id')::uuid = tw.id
+      AND ale.occurred_at > tw.degraded_since
+  )
+ORDER BY tw.degraded_since ASC;
+```
+
+**Step 2b-b:** For each `webhook_id`, emit `integration.webhook_delivery_slo_breach` STANDARD/3yr via `emit-audit-event` Worker with `notification_method: 'manual_r36_compensating_control'` in payload. CSM lead dispatches the WH-NOTIF-01 equivalent email to affected tenant. If Resend API is unavailable (H3 root cause): CSM lead sends notification from support email directly; attach email receipt to WH-ESCALATION-INT-01 as the SLO-04 notification evidence.
+
+**Step 3 — Restore job 41 per root cause**
+
+| Root cause | Restoration action |
+|---|---|
+| **H1 (job deleted)** | Re-register from §43.7 canonical SQL spec: `SELECT cron.schedule('webhook_degraded_escalation_check', '*/30 * * * *', $$ … $$)`; verify with immediate manual run |
+| **H2 (DDL change)** | Patch job 41 SQL to align with new `tenant_webhooks` schema OR roll back migration; validate against current DDL; re-enable job |
+| **H3 (Resend API)** | Confirm Resend API healthy; if `RESEND_API_KEY` rotated without Worker re-deploy: re-deploy `webhook-notifier` Worker with updated key; verify WH-NOTIF-01 dispatch in staging; re-enable job |
+| **H4 (lock contention)** | Add `SET LOCAL statement_timeout = '10s';` guard to job 41 SQL; consider `FOR UPDATE SKIP LOCKED` on the escalation SELECT; re-enable job; monitor `pg_cron.job_run_details` for recurrence |
+| **H5 (Supabase outage)** | Activate R-03 as primary; R-36 resolves when R-03 restores; verify job 41 resumes at next 30-min cadence tick |
+
+**Step 4 — Confirm restoration and emit chain close event**
+
+1. Trigger manual run: `SELECT cron.run_job('webhook_degraded_escalation_check')` and verify `status = 'succeeded'` in `pg_cron.job_run_details`.
+2. Verify `integration.webhook_delivery_slo_breach` events appear in `audit_log_events` for any newly eligible degraded webhooks (degraded > 2 h since last run).
+3. Verify `integration.webhook_suspended` events appear for any webhooks entering or past the 48 h window.
+4. Emit `system.webhook_escalation_restored` STANDARD/3yr via `emit-audit-event` Worker — see §R-36.7.
+
+---
+
+### R-36.6 Communication Templates
+
+#### WH-ESCALATION-INT-01 — Internal P0 compensating control memo
+
+> **Required when:** P0 severity (R-36-C1 > 0 OR R-36-C2 > 0). Not required at P1.  
+> **SLA:** Draft within 30 min of P0 confirmation; circulate to platform-engineer + compliance-officer + CSM lead.  
+> **Customer-facing notification:** WH-NOTIF-01 / WH-NOTIF-02 equivalents dispatched by CSM lead in Steps 2b/2c. No separate FORM-authored customer template is required for R-36 — the existing WH-NOTIF-01 and WH-NOTIF-02 Resend templates (§43.11) are the customer-facing channel.
+
+```
+SUBJECT: [INTERNAL] R-36 Compensating Control — Webhook Escalation Sweep Stale
+
+Incident ID: {incident_id}
+Declared: {T+0 timestamp} UTC
+IC: platform-engineer
+Severity: P0 [{notification_breach | suspension_deadline_miss | both}]
+
+STALE WINDOW:
+  Stale since:          {confirmed_stale_since} UTC
+  Missed runs (est.):   {missed_runs}  (30-min cadence)
+
+SCOPE (aggregate only — no individual webhook endpoint, no personal data):
+  R-36-C1 notification breach count:  {n} webhooks
+  R-36-C2 suspension deadline count:  {n} webhooks
+
+COMPENSATING CONTROLS EXECUTED:
+  Step 2c (suspension): {n} webhooks manually suspended at {timestamp} UTC
+                        WH-NOTIF-02 equivalent dispatched to {n} tenants
+  Step 2b (notifications): {n} webhooks manually notified at {timestamp} UTC
+                            integration.webhook_delivery_slo_breach emitted per webhook
+
+SLA CREDIT IMPACT:
+  WH-SLO-04 (degraded notification ≤ 2 h): {BREACHED / NO BREACH} for {n} webhook(s)
+  §23 SLA credit review: {REQUIRED / NOT REQUIRED} — compliance-officer action
+
+ROOT CAUSE: {H1|H2|H3|H4|H5}
+JOB RESTORED: {timestamp} UTC
+```
+
+---
+
+### R-36.7 DEC-030 Chain Specification
+
+Two DEC-030 HMAC-chained events are required for every R-36 activation:
+
+#### `system.webhook_escalation_stale_declared` HIGH/7yr
+
+**When:** T+0 of every R-36 activation, before any DB scope queries. Emitter: platform-engineer via `emit-audit-event` Worker.
+
+```typescript
+const WebhookEscalationStaleDeclaredPayload = z.object({
+  incident_id:                z.string().uuid(),
+  confirmed_stale_since:      z.string().datetime(),
+  stale_minutes:              z.number().positive(),
+  missed_runs:                z.number().int().nonneg(), // floor((stale_minutes − 5) / 30)
+  notification_breach_count:  z.number().int().nonneg(), // R-36-C1; 0 if emitting before query
+  suspension_deadline_count:  z.number().int().nonneg(), // R-36-C2; 0 if emitting before query
+  trigger:                    z.enum(['pagerduty_alert', 'manual_discovery']),
+  initial_severity:           z.enum(['P1', 'P0']),
+});
+```
+
+**Privacy floor:** No `webhook_id`, `tenant_id`, `endpoint_url`, `endpoint_url_hash`, or personal data in this event. `notification_breach_count` and `suspension_deadline_count` are aggregate integers only.
+
+#### `system.webhook_escalation_restored` STANDARD/3yr
+
+**When:** Step 4 — after confirmed first successful job 41 run post-restoration. Emitter: platform-engineer via `emit-audit-event` Worker.
+
+```typescript
+const WebhookEscalationRestoredPayload = z.object({
+  incident_id:                    z.string().uuid(),
+  restored_at:                    z.string().datetime(),
+  root_cause:                     z.enum(['H1', 'H2', 'H3', 'H4', 'H5']),
+  fix_deployed_at:                z.string().datetime(),
+  missed_runs:                    z.number().int().nonneg(),
+  webhooks_manually_suspended:    z.number().int().nonneg(),
+  webhooks_manually_notified:     z.number().int().nonneg(),
+  sla_credit_review_required:     z.boolean(), // true if notification_breach_count > 0
+});
+```
+
+#### WH-ESCALATION-CHAIN-01 — ordering invariant
+
+`system.webhook_escalation_stale_declared` **must** precede `system.webhook_escalation_restored` for the same `incident_id`. If `webhook_escalation_restored` is emitted without a corresponding `webhook_escalation_stale_declared` for the same `incident_id`:
+
+- Emit `system.chain_integrity_violation` HIGH/7yr with `{ violated_invariant: 'WH-ESCALATION-CHAIN-01', restoration_event_id: <UUID> }`.
+- Activate R-05 (HMAC Chain Break).
+- `emit-audit-event` Worker returns HTTP 422 `WH_ESCALATION_CHAIN_01_VIOLATION` on ordering inversion.
+
+---
+
+### R-36.8 Evidence Preservation
+
+| Artefact ID | TSC | Criteria | Description | Retention | Cadence | Owner | Path |
+|---|---|---|---|---|---|---|---|
+| **WH-ESCALATION-E-001** | CC7.2 / CC9.2 | CC7.2 / CC9.2 | Quarterly export of job 41 (`webhook_degraded_escalation_check`) run history from `pg_cron.job_run_details`, covering the full quarter: all run timestamps, status, and `return_message` for each 30-min execution. Provides auditor-inspectable proof that the WH-SLO-04 enforcement and 48 h auto-suspension mechanism operated continuously. Any stale windows documented with R-36 incident ID, resolution timestamp, and compensating control aggregate counts (no `webhook_id`, `tenant_id`, or `endpoint_url`). **Quarterly cadence — collected regardless of whether an R-36 activation occurred.** | 3 yr | Quarterly | platform-engineer | `compliance/evidence/webhooks/wh-escalation-e-001-YYYY-QN.md` |
+
+---
+
+### R-36.9 SOC 2 Evidence Mapping
+
+| SOC 2 criterion | Control | R-36 relevance |
+|---|---|---|
+| **CC7.2** | Monitoring of system components — `pg-cron-health-monitor` generates `system.cron_job_stale` within 35 min of any missed `webhook_degraded_escalation_check` run; job 41 provides continuous WH-SLO-04 and auto-suspension enforcement | WH-ESCALATION-E-001 quarterly `pg_cron.job_run_details` export proves monitoring control operated as specified; R-36 activation records prove stale windows were detected within the 35-min freshness threshold |
+| **CC9.2** | System availability and vendor management — WH-SLO-04 (degraded notification ≤ 2 h) and the 48 h auto-suspension contract define FORM's availability commitment to Growth/Enterprise tenants for webhook delivery (ENTERPRISE_ADMIN_API §9); Resend API is a vendor dependency for WH-NOTIF-01/02 dispatch (H3) | WH-ESCALATION-E-001 proves the enforcement mechanism operated within the defined SLA; R-36 P0 compensating control execution (Steps 2b/2c) demonstrates manual fallback procedures; CC9.2 Resend vendor dependency documented — H3 root cause + CSM direct-email fallback constitute the compensating control that makes WH-SLO-04 fulfilment vendor-independent at P0 |
+
+> **Auditor narrative (CC7.2 + CC9.2):** FORM's webhook delivery platform (ENTERPRISE_ADMIN_API §9) commits to WH-SLO-04 (degraded notification ≤ 2 h) for Growth/Enterprise tenants and auto-suspension at 48 h degraded per its published API contract. `webhook_degraded_escalation_check` (job 41, `*/30 * * * *`) is the enforcement engine for both commitments. The `pg-cron-health-monitor` detects any gap exceeding 35 min (one-run tolerance of the 30-min cadence) and pages platform-engineer. WH-ESCALATION-E-001 quarterly exports prove continuous enforcement operation. At P0, Steps 2b/2c constitute the compensating controls that preserve WH-SLO-04 and the suspension contract during the stale window — demonstrating that FORM's availability commitments are backed by both automated enforcement and a defined manual fallback procedure with documented DEC-030 chain evidence. The H3 Resend API fallback to CSM direct email demonstrates CC9.2 vendor management: FORM's notification obligation is fulfilled via an independent channel when the primary vendor is unavailable.
+
+---
+
+### R-36.10 Post-Incident Controls
+
+| Control | Action | Owner | SLA |
+|---|---|---|---|
+| **PIR** | Post-incident review within 5 business days (P0: 72 h); file `compliance/evidence/webhooks/wh-escalation-pir-{incident_id}.md`; root cause and H-code mandatory | platform-engineer + compliance-officer | 72 h (P0) / 5 days (P1) |
+| **H2 DDL governance gate** | After H2 root cause: add requirement that any migration targeting `tenant_webhooks` must include a comment confirming job 41 SQL compatibility validation. Add to migration template checklist. | platform-engineer | 14 days post-PIR |
+| **H3 Resend key rotation SOP** | After H3 root cause: document `RESEND_API_KEY` rotation SOP — rotation must be coordinated with Worker re-deployment; add rotation as a step to `docs/KEY_ROTATION.md §Resend`. | platform-engineer + devops-lead | 14 days post-PIR |
+| **H4 statement_timeout guard** | After H4 root cause: add `SET LOCAL statement_timeout = '10s';` to job 41 SQL; consider `FOR UPDATE SKIP LOCKED` on the escalation sweep SELECT; load-test under simulated high-write `webhook-dispatcher` load before re-enabling. | platform-engineer | 14 days post-PIR |
+| **SLA credit review** | If `sla_credit_review_required = true` in `webhook_escalation_restored` event: compliance-officer reviews §23 SLA credit eligibility for affected tenants; documents outcome in `enterprise_sla_counters`; notifies CSM lead. | compliance-officer | 48 h of restoration |
+| **§12.6 cross-reference** | Update `docs/OBSERVABILITY.md §12.6` job 41 `webhook_degraded_escalation_check` registry entry: add `INCIDENT_RESPONSE R-36 (job 41 stale recovery runbook — §R-36.5)` to the stale-consequence cross-ref column. | platform-engineer | **Done — OBSERVABILITY.md §12.6 v1.0 patch, 2026-06-22** |
+| **WH-ESCALATION-E-001 quarterly collection** | Collect and file WH-ESCALATION-E-001 at end of each calendar quarter; include any R-36 activation records for the quarter. | platform-engineer | End of each calendar quarter |
+| **Scenario WH tabletop** | Schedule Scenario WH tabletop exercise within 30 days of first P0 R-36 activation; minimum annual thereafter. Covers dual-P0 sub-case coordination (Step 2c before Step 2b) and H3 Resend fallback path. | platform-engineer + compliance-officer | 30 days post-first-P0 |
+
+---
+
+### R-36.11 Implementation Checklist
+
+#### P0 — Before job 41 goes to production
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.webhook_escalation_stale_declared` (HIGH, 7yr) and `system.webhook_escalation_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §System`. Add WH-ESCALATION-CHAIN-01 ordering invariant note. | platform-engineer + compliance-officer | **P0** | M10 | [ ] |
+| 2 | Deploy R-36 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'webhook_degraded_escalation_check'` to PagerDuty service `form-platform` P1, dedup key `webhook-degraded-escalation-stale`, route to platform-engineer. Write integration test: disable job 41 in staging for > 35 min; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-platform`. | devops-lead | **P0** | M10 | [ ] |
+
+#### P1 — Before SOC 2 observation period
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Add WH-ESCALATION-E-001 to `docs/SOC2_READINESS.md §79.4` evidence registry under CC7.2/CC9.2 criteria. Define quarterly collection cadence and R2 path `compliance/evidence/webhooks/wh-escalation-e-001-YYYY-QN.md`. | compliance-officer | **P1** | M11 | [ ] |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 41 `webhook_degraded_escalation_check` registry entry: add `INCIDENT_RESPONSE R-36 (job 41 stale recovery runbook — §R-36.5)` to the stale-consequence cross-ref column. | platform-engineer | **P1** | M10 | [x] *(completed in OBSERVABILITY.md §12.6 v1.0 patch, 2026-06-22)* |
+
+---
+
+*v1.0 (2026-06-22): R-36 Webhook Escalation Sweep Stale — thirty-sixth runbook. Closes the documentation gap for `webhook_degraded_escalation_check` (job 41, `*/30 * * * *`, 35-min freshness window) identified in `docs/OBSERVABILITY.md §12.6` — job 41 was registered in the canonical registry (v0.9 patch, 2026-06-22) alongside job 40, with job 40's stale runbook (R-35) authored in the same patch cycle, but job 41 had no corresponding runbook. R-36 provides the full IC protocol for when job 41 exceeds its freshness window. Trigger: `system.cron_job_stale` with `job_name = 'webhook_degraded_escalation_check'` from `pg-cron-health-monitor` (§12.6) → PagerDuty P1 `form-platform` → platform-engineer; dedup `webhook-degraded-escalation-stale`. Critical distinction from R-35 (WL cert check — detection-gap only; Cloudflare manages auto-renewal): R-36 requires **both customer notification and database state mutation** as compensating controls at P0 — job 41 is an enforcement engine, not merely a sentinel. Additional unique risk: H3 (Resend API failure) — all peer stale runbooks (R-28 through R-35) call Postgres or Cloudflare/KV; R-36 is the sole stale runbook with a Resend vendor dependency in the job's core path. Two-severity matrix with dual-P0 sub-cases: P1 (stale, R-36-C1 = 0 AND R-36-C2 = 0 — monitoring gap only; no active SLO or contract breach); P0 (notification breach: R-36-C1 > 0 — ≥ 1 degraded webhook past 2 h WH-SLO-04 window without slo_breach event; 30-min notification SLA), and/or P0 (suspension deadline: R-36-C2 > 0 — ≥ 1 degraded webhook past 48 h without suspension event; 15-min suspension SLA). T+0–T+30 immediate actions: `system.webhook_escalation_stale_declared` HIGH/7yr at T+0; R-36-C1 + R-36-C2 at T+5; R-36-C3 at T+10; root cause H1–H5 at T+10–T+15; Step 2c suspension at T+15 (P0 suspension path); Step 2b notifications at T+20 (P0 notification path); restoration at T+20–T+30. Five root cause hypotheses: H1 (job deleted/disabled), H2 (DDL change on `tenant_webhooks` — most likely H2 in this domain given active migration cadence), H3 (Resend API failure — novel risk; H3 fallback = CSM direct email, preserving WH-SLO-04 fulfilment vendor-independently), H4 (lock contention from `webhook-dispatcher` 5-attempt retry ladder — unique to `tenant_webhooks` high-write table; `statement_timeout` guard and `FOR UPDATE SKIP LOCKED` recommended at H4 root cause), H5 (Supabase platform outage → R-03 primary). Three scope queries: R-36-C1 (P0 notification gate — aggregate count of degraded webhooks > 2 h without slo_breach event), R-36-C2 (P0 suspension gate — aggregate count of degraded webhooks > 48 h without suspended event), R-36-C3 (pg_cron.job_run_details last 10 runs for stale window confirmation + missed-run count). Four-step recovery: Step 1 (confirm stale, six-check table, root cause H1–H5); Step 2c (P0 suspension — PAM-elevated UPDATE + integration.webhook_suspended HIGH/7yr per webhook + CSM WH-NOTIF-02 equivalent); Step 2b (P0 notification — integration.webhook_delivery_slo_breach STANDARD/3yr per webhook + CSM WH-NOTIF-01 equivalent, or direct email if H3 Resend unavailable); Step 3 (restore per H1–H5 table); Step 4 (confirm via manual run + slo_breach/suspended events + emit system.webhook_escalation_restored). One internal communication template: WH-ESCALATION-INT-01 (P0 only; covers both sub-cases; no customer-facing template — WH-NOTIF-01/02 Resend templates are the customer channel). Two DEC-030 HMAC-chained events: `system.webhook_escalation_stale_declared` HIGH/7yr (Zod: incident_id UUID, confirmed_stale_since datetime, stale_minutes positive, missed_runs nonneg int, notification_breach_count nonneg int, suspension_deadline_count nonneg int, trigger enum, initial_severity enum), `system.webhook_escalation_restored` STANDARD/3yr (Zod: incident_id UUID, restored_at datetime, root_cause enum H1–H5, fix_deployed_at datetime, missed_runs nonneg int, webhooks_manually_suspended nonneg int, webhooks_manually_notified nonneg int, sla_credit_review_required bool); WH-ESCALATION-CHAIN-01 ordering invariant: declared precedes restored for same incident_id — inversion triggers R-05 + HTTP 422 WH_ESCALATION_CHAIN_01_VIOLATION. One evidence artefact: WH-ESCALATION-E-001 (quarterly pg_cron.job_run_details export for job 41, CC7.2/CC9.2, 3yr, platform-engineer, `compliance/evidence/webhooks/wh-escalation-e-001-YYYY-QN.md`). Two SOC 2 criteria: CC7.2 (monitoring control — pg-cron-health-monitor 35-min freshness detection; WH-SLO-04 enforcement gap detection), CC9.2 (system availability + vendor management — WH-SLO-04 enforcement; Resend vendor dependency and independent fallback). Eight post-incident controls: PIR (72 h P0 / 5 days P1), H2 DDL governance gate (14 days), H3 Resend rotation SOP (14 days), H4 statement_timeout guard (14 days), SLA credit review (48 h if sla_credit_review_required), §12.6 cross-reference [x] Done v1.0 patch 2026-06-22, WH-ESCALATION-E-001 quarterly collection, Scenario WH tabletop (30 days post-first-P0). Four-item implementation checklist: 2× P0/M10 (AUDIT_LOG_SCHEMA registration; PagerDuty routing rule + integration test), 2× P1/M10–M11 (SOC2_READINESS WH-ESCALATION-E-001 registration; §12.6 cross-ref [x] Done v1.0 patch 2026-06-22). Privacy floor: all system events carry only FORM-internal operational metadata — stale duration, aggregate counts, root cause enum; no `webhook_id`, `tenant_id`, `endpoint_url`, `endpoint_url_hash`, individual user data, or GDPR Art. 9 special-category data in any R-36 event or evidence artefact; WH-ESCALATION-INT-01 carries only aggregate counts and H-code — no personal data; `form_api` must never route any §R-36 system event to any user-facing or tenant-facing endpoint. Cross-references: `docs/OBSERVABILITY.md §12.6` (job 41 `webhook_degraded_escalation_check` registry entry — stale consequence updated with INCIDENT_RESPONSE R-36 per v1.0 patch [x] Done); `docs/OBSERVABILITY.md §43.7` (pg_cron job 41 spec — schedule, escalation SQL, WH-NOTIF-01/02 dispatch, suspension UPDATE); `docs/OBSERVABILITY.md §43.5` (AL-WH-02 degraded alert, AL-WH-04 suspended alert — job 41 generates both trigger events); `docs/OBSERVABILITY.md §43.4` (WH-SLO-04 — degraded notification ≤ 2 h; §23 SLA credit engine); `docs/OBSERVABILITY.md §43.11` (WH-NOTIF-01 / WH-NOTIF-02 Resend templates — used as compensating control channels at P0); `docs/AUDIT_LOG_SCHEMA.md §System` (two DEC-030 events to register per R-36.11 item 1 — P0/M10); `docs/SOC2_READINESS.md §79.4` (WH-ESCALATION-E-001 to register per R-36.11 item 3 — P1/M11); `docs/ENTERPRISE_ADMIN_API.md §9` (Webhook Management API — defines 48 h auto-suspension contract and retry ladder); R-05 (HMAC chain break — activate on WH-ESCALATION-CHAIN-01 ordering violation); R-03 (Infrastructure Outage — parallel activation if H5 Supabase outage confirmed). Owner: platform-engineer + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-22 · Owner: platform-engineer + compliance-officer**
+**Review: after every P0 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0 — whichever comes first.**
+
+---

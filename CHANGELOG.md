@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [7.68.1] — 2026-06-22
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — R-36 Webhook Escalation Sweep Stale: thirty-sixth runbook. IC protocol for when `webhook_degraded_escalation_check` pg_cron job 41 (`*/30 * * * *`, 35-min freshness) exceeds its stale window. Two-severity matrix with dual-P0 sub-cases: P1 (stale, no active SLO breach); P0 (notification breach — R-36-C1 > 0: degraded webhook past WH-SLO-04 2 h window without slo_breach event; 30-min SLA) and/or P0 (suspension deadline miss — R-36-C2 > 0: degraded webhook past 48 h without suspended event; 15-min SLA). Critical distinction: unlike R-35 (detection-gap only), R-36 requires both customer notification AND database state mutation as compensating controls. H3 (Resend API failure) is a novel vendor-dependency risk not present in peer stale runbooks. Five root causes (H1 job deleted, H2 DDL change on `tenant_webhooks`, H3 Resend API, H4 lock contention from `webhook-dispatcher` high-write load, H5 Supabase outage → R-03). Three scope queries (R-36-C1 notification gate, R-36-C2 suspension gate, R-36-C3 pg_cron run history). Four-step recovery with Step 2c (PAM-elevated suspension UPDATE + integration.webhook_suspended HIGH/7yr + CSM WH-NOTIF-02 equivalent) before Step 2b (integration.webhook_delivery_slo_breach STANDARD/3yr + CSM WH-NOTIF-01 equivalent or direct email H3 fallback). DEC-030 events: `system.webhook_escalation_stale_declared` HIGH/7yr + `system.webhook_escalation_restored` STANDARD/3yr; WH-ESCALATION-CHAIN-01 ordering invariant. Evidence: WH-ESCALATION-E-001 (quarterly pg_cron.job_run_details export, CC7.2/CC9.2, 3yr). Four-item implementation checklist (2× P0/M10, 2× P1/M10–M11). Closes documentation gap left by OBSERVABILITY.md §12.6 v0.9 patch (2026-06-22) which registered job 41 without a stale runbook cross-reference.
+- `docs/OBSERVABILITY.md` — §12.6 v1.0 patch: job 41 `webhook_degraded_escalation_check` stale-consequence cross-ref extended with `INCIDENT_RESPONSE R-36 (job 41 stale recovery runbook — §R-36.5)`. Closes R-36.10 post-incident control and R-36.11 checklist item 4. DEC-030 registration obligation (R-36.11 item 1) and SOC2_READINESS evidence registration (R-36.11 item 3) remain pending.
+- `VERSION` — 7.68.0 → 7.68.1.
+
+---
+
 ## [7.68.0] — 2026-06-22
 
 ### Added
