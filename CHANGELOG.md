@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.90.0] — 2026-06-22
+
+### Added
+- `content/post-2258-weekly-undulation.md` — Editorial 2251–2260, post 8/10. Тижнева хвиля всередині блоку: чому однакові тижні дають гірший результат, ніж варіативні. Акомодаційний принцип Верхошанського (1988): передбачуваний паттерн знижує адаптаційний сигнал. Два типи ундуляції: лінійна хвиля (volume wave: MEV → +10% → +10% → deload) і нелінійна/справжня ундуляція (DUP). Rhea et al. (2002): DUP перевищила LP після 12 тижнів у тренованих суб'єктів. Три практичні моделі: хвиля обсягу (найпростіша, рекомендована для першого блоку), хвиля інтенсивності (RPE), комбінована хвиля (з застереженням про складність). Чітке розмежування: незапланована варіація = шум, запланована = сигнал. П'ять типових помилок. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. Blog card added.
+
+### Changed
+- `blog.html` — card added for post-2258 (position before post-2257).
+- `README.md` — post-2258 updated from proposed → draft · v7.90.0.
+- `STATUS.md` — total posts 2011 → 2012; Editorial 2251–2260 progress 7/10 → 8/10.
+- `VERSION` — 7.89.1 → 7.90.0.
+
+---
+
 ## [7.89.1] — 2026-06-22
 
 ### Added
