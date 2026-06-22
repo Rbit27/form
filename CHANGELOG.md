@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.96.1] — 2026-06-22
+
+### Changed
+- `docs/OBSERVABILITY.md` v4.9.4 → v4.9.5 — §39.10 BC-E-001 evidence artefact description extended: R-39 (Backup Age Monitor Stale) activation addendum clause and `r39_activations: 0` zero-incident attestation note added. Closes INCIDENT_RESPONSE R-39.11 item 3 (P1/M11) for the OBSERVABILITY.md component.
+- `docs/SOC2_READINESS.md` v3.25.6 → v3.25.7 — §71.7 A1.2 primary evidence artefacts column updated: BC-E-001 (quarterly job 29 run history; OBSERVABILITY.md §39.10) registered as primary A1.2 evidence artefact. Closes INCIDENT_RESPONSE R-39.11 item 3 (P1/M11) for the SOC2_READINESS.md component.
+- `docs/INCIDENT_RESPONSE.md` R-39 v1.0 → v1.1 — R-39.11 item 3 marked [x] Done (2026-06-22). No procedural changes to runbook steps.
+- `VERSION` — 7.96.0 → 7.96.1.
+
+---
+
 ## [7.96.0] — 2026-06-22
 
 ### Added
