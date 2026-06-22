@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [7.76.1] — 2026-06-22
+
+### Changed
+- `docs/COST_MODEL.md` v2.11 → v2.12 — §42.10 item 2 extended with canonical DDL reference: `docs/DATA_MODEL.md §43` (v1.22) cited as authoritative DATA_MODEL registration for migration 0084; platform-engineer directed to mark `docs/DATA_MODEL.md §43.8` item 1 done simultaneously. Closes `docs/DATA_MODEL.md §43.9` pending cross-reference obligation.
+- `docs/DATA_MODEL.md` v1.24 → v1.25 — §43.9 cross-reference obligation row updated from 🟡 Pending to 🟢 Closed; all three §43.9 obligations now 🟢.
+- `VERSION` — 7.76.0 → 7.76.1.
+
+---
+
 ## [7.76.0] — 2026-06-22
 
 ### Added

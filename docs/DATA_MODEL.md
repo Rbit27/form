@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.24
+# FORM · Multi-Tenant Data Model v1.25
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -16263,9 +16263,11 @@ Three evidence artefacts are defined in `docs/COST_MODEL.md §42.9` and cross-re
 |-----------|--------|--------|
 | COST_MODEL §42.6 one-way DDL reference → DATA_MODEL | `docs/COST_MODEL.md §42.6.1` states "Migration 0084 creates the enterprise_renewals table as the authoritative record" without citing DATA_MODEL as the canonical DATA_MODEL source | 🟢 **Closed — §43 is the DATA_MODEL canonical registration; COST_MODEL §42.6 is the authoritative economic spec; the two-document chain is now bidirectional** |
 | SOC2_READINESS registration for DDL-layer invariants supporting REN-E-001/002/003 | `docs/COST_MODEL.md §42.9` registered artefacts citing COST_MODEL §42 as DDL source; DATA_MODEL §43 now provides the canonical DDL layer | 🟢 **Closed — `docs/SOC2_READINESS.md §100` (added simultaneously) registers DATA_MODEL §43 as canonical DDL source and supplies the DDL-layer auditor narratives for CC5.2/CC1.4/CC4.1** |
-| COST_MODEL §42.10 item 2 cross-reference back-pointer | §42.10 item 2 says "migration 0084 DDL" without a DATA_MODEL cross-reference | 🟡 **Pending — platform-engineer should update §42.10 item 2 status note to reference DATA_MODEL §43 as canonical when marking item done (P0/M12)** |
+| COST_MODEL §42.10 item 2 cross-reference back-pointer | §42.10 item 2 says "migration 0084 DDL" without a DATA_MODEL cross-reference | 🟢 **Closed — 2026-06-22 (COST_MODEL v2.12, DATA_MODEL v1.25).** §42.10 item 2 task text updated to cite `docs/DATA_MODEL.md §43` (v1.22) as canonical DDL source and to link `docs/DATA_MODEL.md §43.8` item 1 as the simultaneous completion target. Cross-reference chain is now bidirectional at the checklist layer. |
 
 ---
+
+*v1.25 (2026-06-22): §43.9 cross-reference obligation closure — COST_MODEL §42.10 item 2 back-pointer. Closes the last 🟡 obligation in §43.9: `docs/COST_MODEL.md §42.10` item 2 (v2.12, 2026-06-22) now cites `docs/DATA_MODEL.md §43` (v1.22) as the canonical DDL source for migration 0084 and directs platform-engineer to mark `docs/DATA_MODEL.md §43.8` item 1 done simultaneously. §43.9 row updated from 🟡 Pending to 🟢 Closed. No schema, DDL, or RLS changes. Document header v1.24 → v1.25. Cross-references: `docs/COST_MODEL.md §42.10` (v2.12 — item 2 updated with canonical DDL reference); `docs/DATA_MODEL.md §43.8` item 1 (simultaneous completion target at migration apply time). Owner: enterprise-architect + compliance-officer.*
 
 *v1.23 (2026-06-21): Checklist sync — §43.8 item 4 status updated: documentation portion of REN-E-001/002/003 §79.4 registration completed (SOC2_READINESS v3.24.2, 2026-06-21); three rows added to §79.4 master evidence table; `renewals/` R2 subfolder and Vanta mirror list updated. First evidence filing remains pending first renewal cycle (est. M12). No schema or DDL changes. Document header v1.22 → v1.23. Owner: compliance-officer + enterprise-architect.*
 
