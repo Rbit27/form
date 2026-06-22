@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [7.75.1] — 2026-06-22
+
+### Changed
+- `docs/SOC2_READINESS.md` v3.25.3 — §95 R-37 addendum patch. Closes `docs/INCIDENT_RESPONSE.md R-37.11` item 3 (P1/M11): §95.1 SSO-FLEET-E-001 description updated to reference R-37 activation addenda + new `R-37 addendum` table row; §95.2 Part D added (SQL query over `system.sso_fleet_check_failure_declared` / `system.sso_fleet_check_restored` DEC-030 pairs, privacy floor, CC7.3 SOC 2 mapping); §95.3 zero-incident attestation JSON updated with `r37_activations: 0` field; §95.4 CC7.3 criteria row updated to reference Part D and INCIDENT_RESPONSE R-37; §95.5 R-37.11 item 3 closure row added. Job 38 numbering confirmed correct throughout §95. Owner: compliance-officer + security-engineer.
+- `docs/INCIDENT_RESPONSE.md` v1.1 — R-37.11 item 3 marked `[x] Done — 2026-06-22, SOC2_READINESS.md v3.25.3`; v1.1 version note added. Owner: compliance-officer.
+- `VERSION` — 7.75.0 → 7.75.1.
+
+---
+
 ## [7.75.0] — 2026-06-22
 
 ### Added
