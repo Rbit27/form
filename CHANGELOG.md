@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.84.0] — 2026-06-22
+
+### Added
+- `content/post-2248-constraining-conditions-technical-learning.md` — Editorial 2241–2250 post 8/10. Contextual interference effect (Shea & Morgan, 1979; Magill & Hall, 1990): random practice yields lower current performance but superior retention. Mechanisms: elaborative processing (Shea & Zimny, 1983) and action plan reconstruction (Lee & Magill, 1983). Variability of Practice Hypothesis (Schmidt, 1975): variability builds a generalizable motor schema. Differential Learning (Schöllhorn et al., 2006). Four practical methods for strength training: weight variability within technical phase, tempo variability, movement variation for sub-components, reduced video-feedback frequency (Schmidt et al., 1989; Winstein & Schmidt, 1990). Clear limits: variability is contraindicated in early learning, sub-threshold only, never when relearning is unstable. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `content/post-2249-mental-representation-movement-mastery.md` — Editorial 2241–2250 post 9/10. Ericsson's expert mental representations concept from «Peak»: two components (reference model + deviation-detection system). Limits of proprioception: relative vs absolute accuracy, signal competition under load, normalization (Proske & Gandevia, 2012). External vs internal attentional focus: CONSTRAINED ACTION HYPOTHESIS (Wulf, 2013; Wulf & Lewthwaite, 2016 meta-analysis) — external focus favours acquisition; Schoenfeld & Contreras (2016) caveat for isolation/activation in trained athletes. Forward model and backward model (Wolpert, Jordan, Miall, 1995): why experts «feel» deviations before a rep ends. Stepwise calibration cycle for self-coached athletes. Monthly protocol: weeks 1–2 active calibration, weeks 3–4 model testing without video. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `content/post-2250-technical-learning-series-synthesis.md` — Editorial 2241–2250 post 10/10, block synthesis. Three-level map of the series: nature of learning (2241–2244), feedback instruments and threshold (2245–2246), practice structure and mental model (2247–2249). Central thesis: skill acquisition = accurate mental model built through structured practice with external feedback, within the technical threshold, at the correct stage of the neuromuscular learning cycle. Minimum-week and full-week protocol templates. Monthly structure (calibration → structured practice → model testing → deload/assessment). Skill-stage table: new movement / stabilisation / development / relearning / automatism × correct tool. Three systematically ignored principles. Open questions for subsequent series: transfer, extreme-fatigue learning, variability individual response, FORM product integration. Fitts & Posner three-stage model as closing framework. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+
+### Changed
+- `blog.html` — three new cards added above post-2247: posts 2248, 2249, 2250.
+- `STATUS.md` — Editorial 2241–2250 COMPLETE 10/10; total posts 2001 → 2004; next priorities updated.
+
+---
+
 ## [7.83.1] — 2026-06-22
 
 ### Added
