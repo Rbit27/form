@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [7.94.1] — 2026-06-22
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.34 → v2.35 — +2 DEC-030 HMAC-chained events closing INCIDENT_RESPONSE R-35.11 item 1 (P0/M10). New entries added to `### System` section and retention table: (1) `system.wl_cert_check_failure_declared` (HIGH/7yr): devops-lead (IC) declares `white_label_cert_check` (job 40, `0 2 * * *`, 26h freshness window) stale incident at T+0 of every R-35 activation; WL-CERT-CHAIN-01 anchor; gap leaves WL-SLO-02/WL-SLO-03 in detection blind spot; Zod v2 payload: `incident_id`, `confirmed_stale_since`, `stale_hours`, `missed_runs`, `at_risk_domain_count`, `earliest_expiry_at` (nullable), `trigger` enum, `initial_severity` enum; HTTP 422 `WL_CERT_CHAIN_01_VIOLATION` on ordering inversion → R-05; CC7.2/A1.2. (2) `system.wl_cert_check_restored` (STANDARD/3yr): devops-lead confirms job 40 re-enabled and first successful post-fix run confirmed; Zod v2 payload: `incident_id`, `restored_at`, `root_cause` enum H1–H5, `fix_deployed_at`, `domains_verified` (aggregate count); WL-CERT-CHAIN-01 terminal event; CC7.2/A1.2. Privacy floor (both events): no `user_id`, no `tenant_id`, no domain names, no hostname values — `at_risk_domain_count` and `domains_verified` are aggregate integers. Owner: devops-lead + compliance-officer + security-engineer.
+- `docs/SOC2_READINESS.md` v3.25.5 → v3.25.6 — WL-CERT-E-001 registered in §79.4 consolidated evidence table: quarterly export of job 40 (`white_label_cert_check`) run history from `pg_cron.job_run_details`; CC7.2/A1.2; Auto; quarterly from M10; devops-lead; `compliance/evidence/wl/wl-cert-e-001-YYYY-QN.md`; 3yr retention. Closes R-35.11 item 3 (P1/M11). Privacy floor: `pg_cron.job_run_details` rows contain only `jobname`, `runid`, `started`, `ended`, `status`, `return_message` — no domain names, `tenant_id`, `user_id`, or GDPR Art. 9 special-category data. Owner: compliance-officer.
+- `docs/INCIDENT_RESPONSE.md` — R-35.11 items 1 and 3 marked done: item 1 `[x] Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.35`; item 3 `[x] Done — 2026-06-22, SOC2_READINESS.md v3.25.6`. Owner: devops-lead + compliance-officer.
+- `VERSION` — 7.94.0 → 7.94.1.
+
+---
+
 ## [7.94.0] — 2026-06-22
 
 ### Added

@@ -13730,14 +13730,14 @@ Collect and upload to R2 `form-soc2-evidence` at `compliance/evidence/wl/wl-cert
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register `system.wl_cert_check_failure_declared` (HIGH, 7yr) and `system.wl_cert_check_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §System`. Add WL-CERT-CHAIN-01 ordering invariant note. | devops-lead + compliance-officer | **P0** | M10 | [ ] |
+| 1 | Register `system.wl_cert_check_failure_declared` (HIGH, 7yr) and `system.wl_cert_check_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §System`. Add WL-CERT-CHAIN-01 ordering invariant note. | devops-lead + compliance-officer | **P0** | M10 | [x] Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.35 |
 | 2 | Deploy R-35 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'white_label_cert_check'` to PagerDuty service `form-devops` P1, dedup key `wl-cert-check-stale`, route to devops-lead. Write integration test: disable job 40 in staging for > 26 h; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-devops`. | devops-lead | **P0** | M10 | [ ] |
 
 #### P1 — Before SOC 2 observation period (M11)
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 3 | Add WL-CERT-E-001 to `docs/SOC2_READINESS.md` evidence registry under CC7.2 / A1.2 criteria. Define quarterly collection cadence and R2 path `compliance/evidence/wl/wl-cert-e-001-YYYY-QN.md`. | compliance-officer | **P1** | M11 | [ ] |
+| 3 | Add WL-CERT-E-001 to `docs/SOC2_READINESS.md` evidence registry under CC7.2 / A1.2 criteria. Define quarterly collection cadence and R2 path `compliance/evidence/wl/wl-cert-e-001-YYYY-QN.md`. | compliance-officer | **P1** | M11 | [x] Done — 2026-06-22, SOC2_READINESS.md v3.25.6 |
 | 4 | Update `docs/OBSERVABILITY.md §12.6` job 40 `white_label_cert_check` registry entry: add `INCIDENT_RESPONSE R-35 (job 40 stale recovery runbook — §R-35.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M10 | [x] *(completed in OBSERVABILITY.md §12.6 v0.9 patch, 2026-06-22)* |
 
 ---
