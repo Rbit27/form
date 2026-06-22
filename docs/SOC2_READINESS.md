@@ -19898,7 +19898,7 @@ Milestones use the same M-series convention as the rest of this document.
 #### P1 — Must complete before M12 (SOC 2 Type II observation window)
 
 - [ ] **PT-P1-01** — Remediate all P2 findings from M6 engagement within 30-day SLA; confirm re-tests complete; emit `admin.pentest_retest_completed` events. **Owner:** engineering + security-engineer. **Deadline:** M6 + 6 weeks.
-- [ ] **PT-P1-02** — Register all pentest DEC-030 event types (`admin.pentest_initiated`, `admin.pentest_finding_logged`, `admin.pentest_finding_remediated`, `admin.pentest_report_filed`, `admin.pentest_retest_completed`, `admin.pentest_risk_accepted`) in docs/AUDIT_LOG_SCHEMA.md event registry. **Owner:** security-engineer. **Deadline:** M6.
+- [x] **PT-P1-02** — Register all pentest DEC-030 event types (`admin.pentest_initiated`, `admin.pentest_finding_logged`, `admin.pentest_finding_remediated`, `admin.pentest_report_filed`, `admin.pentest_retest_completed`, `admin.pentest_risk_accepted`) in docs/AUDIT_LOG_SCHEMA.md event registry. **Owner:** security-engineer. **Deadline:** M6. **🟢 Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.34.**
 - [ ] **PT-P1-03** — Establish annual pentest calendar entry; configure PagerDuty / compliance calendar alert at M11 (30-day advance notice before M12 test start). **Owner:** compliance-officer. **Deadline:** M7.
 - [ ] **PT-P1-04** — Complete M12 annual pentest; file PT-E-001 through PT-E-006 artefacts; emit all DEC-030 events. **Owner:** security-engineer + compliance-officer. **Deadline:** M12.
 - [ ] **PT-P1-05** — Verify HMAC chain integrity covers all `admin.pentest_*` events from M6 engagement; store PT-E-005 chain verification output. **Owner:** security-engineer. **Deadline:** M6 + 4 weeks.
@@ -20145,7 +20145,7 @@ The following checklist items are added to the §61.11 implementation checklist.
 
 #### P1 — Must complete before M6 test start
 
-- [ ] **PT-P1-06** — Register `admin.pentest_chain_enumeration_authorised` event type in docs/AUDIT_LOG_SCHEMA.md event registry (alongside existing `admin.pentest_*` events per PT-P1-02). **Owner:** security-engineer. **Deadline:** M6. **Resolves:** OQ-PT-04.
+- [x] **PT-P1-06** — Register `admin.pentest_chain_enumeration_authorised` event type in docs/AUDIT_LOG_SCHEMA.md event registry (alongside existing `admin.pentest_*` events per PT-P1-02). **Owner:** security-engineer. **Deadline:** M6. **Resolves:** OQ-PT-04. **🟢 Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.34.**
 
 ---
 
@@ -20163,7 +20163,7 @@ The following checklist items are added to the §61.11 implementation checklist.
 
 The following actions must be completed in sequence before the M6 engagement letter is signed. This checklist is sequential — items with earlier deadlines must be complete before downstream items can proceed.
 
-- [ ] **62.8-01** — Register `admin.pentest_chain_enumeration_authorised` in docs/AUDIT_LOG_SCHEMA.md event registry with full DEC-030 spec (HIGH severity, 7-year retention, `emit-audit-event` Worker only, required payload fields per §62.4.3 Condition B1). **Owner:** security-engineer. **Deadline:** M5 (this month). **Prerequisite for:** PT-P0-10, PT-P1-06.
+- [x] **62.8-01** — Register `admin.pentest_chain_enumeration_authorised` in docs/AUDIT_LOG_SCHEMA.md event registry with full DEC-030 spec (HIGH severity, 7-year retention, `emit-audit-event` Worker only, required payload fields per §62.4.3 Condition B1). **Owner:** security-engineer. **Deadline:** M5 (this month). **Prerequisite for:** PT-P0-10, PT-P1-06. **🟢 Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.34.**
 - [ ] **62.8-02** — Draft and finalise engagement letter with: (a) Supabase shared-responsibility carve-out clause (§62.2.3 Procedure 2); (b) biometric data prohibition clause with SBF-001 synthetic fixture confirmation requirement; (c) Art. 9 halt-and-assess clause (§62.3.5); (d) Layer B production chain payload-content prohibition (§62.4.3 Condition B4). Compliance-officer reviews all four clauses before signing. **Owner:** compliance-officer. **Deadline:** M5 (before engagement letter signing date).
 - [ ] **62.8-03** — Send Supabase notification email at least 5 business days before scheduled test start; save `.eml` file locally for R2 filing. **Owner:** security-engineer. **Deadline:** M6 minus 5 business days.
 - [ ] **62.8-04** — File PT-E-007 (Supabase notification email) in R2 at `form-compliance-vault/pentests/{engagement_id}/PT-E-007-supabase-notification.eml` immediately after sending. **Owner:** security-engineer. **Deadline:** Same day as 62.8-03.

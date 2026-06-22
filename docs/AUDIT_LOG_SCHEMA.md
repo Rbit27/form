@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.33
+# FORM · Audit Log Schema v2.34
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -1230,6 +1230,13 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `enterprise.contract_renewed` | 7 years | Primary contract renewal record — `renewal_type`, `renewed_seats`, `new_acv_usd`, `new_contract_years`, `rate_basis`, `floor_respected: z.literal(true)` (HTTP 422 if absent), `notice_event_id` RENEW-CHAIN-01 FK, `pricing_exception_event_id` FK for retention_discount path; REN-E-001 primary evidence source (CC5.2/CC1.4 — annual `floor_respected` attestation + RENEW-CHAIN-01 notice cross-reference); financial record — 7yr matches Ukrainian Tax Code Art. 44 and EU VAT Directive Art. 245 financial retention floor; `docs/COST_MODEL.md §42.7.3` |
 | `enterprise.renewal_notice_overdue` | 7 years | HIGH-severity per-tenant alert event — emitted by `renewal_notice_check` job 39 when RENEW-NOTICE-01 SQL detects an active contract in the 85–95-day notice window with no `enterprise.renewal_notice_sent` on file; constitutes the CC4.1 monitoring record that the control fired and the compliance-officer was paged; 7yr retention matches enterprise contract audit floor — this event is the HMAC-chained evidence that AL-RENEW-01 operated; pairs with the absence of `enterprise.renewal_notice_sent` to prove the detection gap was caught before MSA §6.1 breach; REN-E-002 quarterly export cross-checks zero unresolved entries; `docs/OBSERVABILITY.md §51.4.1` |
 | `system.renewal_notice_check_passed` | 1 year | Operational all-clear health signal — emitted by `renewal_notice_check` job 39 when RENEW-NOTICE-01 SQL returns zero rows; confirms the CC4.1 monitoring control ran and found no MSA §6.1 compliance gaps; no `tenant_id` — privacy floor: aggregate `contracts_checked` count only; 1yr retention sufficient (operational monitoring signal; primary CC4.1/A1.1 evidence is REN-OBS-E-001 `pg_cron.job_run_details` export); `docs/OBSERVABILITY.md §51.4.2` |
+| `admin.pentest_initiated` | 7 years | Engagement anchor — signed engagement letter + authorised test window; `staging_only_flag`, `supabase_notification_filed`, `supabase_notification_date` fields provide auditable evidence of PT-E-007 filing and Art. 9 biometric prohibition confirmation; CC9.2 (vendor qualification), CC4.1 (adversarial risk control initiated); PENTEST-CHAIN-02 anchor; `docs/SOC2_READINESS.md §61.8` |
+| `admin.pentest_finding_logged` | 7 years | Per-finding immutable record — verbal notification SLA clock starts on emission for P0 findings; `cwe_id` + `cvss_score` enable defect register analytics (PT-E-003); CC7.1 (detection control validation record), CC4.1 (risk identification evidence); PENTEST-CHAIN-01 anchor; 7yr required — findings are cross-referenced across SOC 2 observation periods and must outlive remediation SLA windows by multiple years; `docs/SOC2_READINESS.md §61.8` |
+| `admin.pentest_finding_remediated` | 7 years | Remediation closure record — `remediation_pr` provides auditable link to code change; `retest_outcome` distinguishes confirmed-fix from partial-fix; PENTEST-CHAIN-01 successor (HTTP 422 if no preceding `admin.pentest_finding_logged` for same `finding_id`); CC7.2 (anomaly response), A1.2 (post-incident remediation confirmation); `docs/SOC2_READINESS.md §61.8` |
+| `admin.pentest_report_filed` | 7 years | Final report chain record — `report_sha256` provides tamper-evident hash of PT-E-001; finding count breakdown (`finding_count_p0/p1/p2/p3`) enables aggregate SOC 2 risk profile without exposing finding detail in chain; PENTEST-CHAIN-02 terminal event (HTTP 422 if no preceding `admin.pentest_initiated` for same `engagement_id`); CC4.1 (risk assessment evidence filed), CC7.1 (adversarial detection results); `docs/SOC2_READINESS.md §61.8` |
+| `admin.pentest_retest_completed` | 7 years | Per-finding re-test attestation record — `retest_method` enum (vendor / self) distinguishes independent re-test from internal verification; PENTEST-CHAIN-01 successor; 7yr retention mirrors primary `admin.pentest_finding_logged` record — re-test outcome is admissible evidence only while the underlying finding record is retained; CC7.2 (remediation verification), CC4.1 (control gap closure evidence); `docs/SOC2_READINESS.md §61.8` |
+| `admin.pentest_risk_accepted` | 7 years | Dual sign-off record — `approved_by_compliance_officer` + `approved_by_founder` boolean fields enforce the P2/P3 risk acceptance governance requirement (no unilateral acceptance permitted); `compensating_control` field provides SOC 2 CC5.3 evidence of risk treatment decision; 7yr matches financial + SOC 2 audit floor — risk acceptance decisions may be revisited across multiple observation periods; CC5.3 (risk treatment), CC4.1 (documented risk acceptance); no P0/P1 findings may be risk-accepted (enforced by `emit-audit-event` Worker severity gate); `docs/SOC2_READINESS.md §61.8` |
+| `admin.pentest_chain_enumeration_authorised` | 7 years | Layer B production enumeration gate — emitted by compliance-officer via `emit-audit-event` Worker BEFORE any vendor production query; `production_flag: true`, `staging_only_destructive_tests_confirmed: true` payload invariants provide CC6.1 logical access evidence; `enumeration_scope` is limited to `audit_log_events SELECT`; 7yr retention required — this is the authorisation event that makes Layer B production access auditor-admissible; HTTP 422 blocking if Layer B query precedes this event; cross-ref: PT-P0-10, PT-P1-06, 62.8-01; CC6.1 (logical access controls under adversarial conditions), CC9.2 (vendor boundary management); `docs/SOC2_READINESS.md §62.4` |
 
 After retention period, rows **hard-deleted via partition drop** (not soft-delete). Hash of deleted-partition's last row preserved у `audit_log_retention_summary` for chain continuity proof.
 
@@ -3057,6 +3064,193 @@ export const RenewalNoticeCheckPassedPayload = z.object({
 
 ---
 
+### Penetration Testing events (DEC-030 HMAC-chained · SOC2_READINESS §61 + §62 · CC4.1/CC7.1/CC7.2/CC6.1/CC6.6/CC9.2/A1.2)
+
+> Defined in `docs/SOC2_READINESS.md §61.8` and `docs/SOC2_READINESS.md §62.4.3` (v3.25.5, 2026-06-22). Seven DEC-030 HMAC-chained events covering the full penetration testing lifecycle: engagement initiation, per-finding logging, remediation, report filing, re-test completion, risk acceptance, and — conditionally — production chain enumeration authorisation. **Privacy floor (all seven events):** No `user_id`, no employee name, no email, no health value, no GDPR Art. 9 special-category data. `engagement_id` and `finding_id` are FORM-internal UUIDs from the PT defect register (`compliance/evidence/pentests/{engagement_id}/PT-E-003-defect-register.csv`). `vendor_name` and `vendor_accreditation` are business-level metadata only. Finding title and description remain in PT-E-001 vendor report (R2, 72h pre-signed URL, security-engineer + compliance-officer + auditor only) — NEVER in the HMAC chain. **PENTEST-CHAIN-01 (blocking):** `admin.pentest_finding_remediated` and `admin.pentest_retest_completed` each require a preceding `admin.pentest_finding_logged` for the same `finding_id` → HTTP 422 `PENTEST_CHAIN_01_VIOLATION` on inversion → R-05. **PENTEST-CHAIN-02 (blocking):** `admin.pentest_report_filed` requires a preceding `admin.pentest_initiated` for the same `engagement_id` → HTTP 422 `PENTEST_CHAIN_02_VIOLATION` on inversion → R-05. **PENTEST-CHAIN-03 (warning-level, non-blocking):** `admin.pentest_risk_accepted` should be preceded by `admin.pentest_finding_logged` for the same `finding_id`; missing predecessor logged to Better Stack (non-blocking — risk acceptance may be entered before full vendor report in emergency P0 triage). **Severity gate:** `admin.pentest_risk_accepted` is rejected HTTP 422 (`PENTEST_RISK_ACCEPTANCE_P0_P1_VIOLATION`) when `severity_tier ∈ {'P0', 'P1'}` — no P0 or P1 finding may be risk-accepted per §61.5. **Emitter restriction:** all seven events — `emit-audit-event` Worker only, PAM elevation required for `admin.*` namespace; `form_api` role cannot emit pentest events. **Closes `docs/SOC2_READINESS.md` PT-P1-02 (M6 — register all six §61.8 event types in `docs/AUDIT_LOG_SCHEMA.md`), PT-P1-06 (M6 — register `admin.pentest_chain_enumeration_authorised` in `docs/AUDIT_LOG_SCHEMA.md`), and 62.8-01 (M5 — register `admin.pentest_chain_enumeration_authorised` with full DEC-030 spec, HIGH severity, 7-year retention).**
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `admin.pentest_initiated` | HIGH | 7 yr | Engagement letter signed and NDA executed; emitter: compliance-officer (PAM-elevated) immediately before vendor begins any test activity | `engagement_id` (UUID — PENTEST-CHAIN-02 anchor), `vendor_name`, `vendor_accreditation` (enum: `CREST_CCT_APP`\|`CREST_CCT_INF`\|`CREST_ORG`\|`OSCP`\|`GPEN`\|`GWAPT`\|`multiple`), `scope_summary` (max 500 chars — no finding detail), `start_date` (YYYY-MM-DD), `scheduled_end_date` (YYYY-MM-DD), `authorised_by_compliance_officer` (bool literal `true`), `authorised_by_founder` (bool literal `true`), `staging_only_flag` (bool — `true` unless Layer B explicitly approved per §62.4), `supabase_notification_filed` (bool — PT-E-007 filing confirmation, per §62.2), `supabase_notification_date` (YYYY-MM-DD — must be ≥ 5 business days before `start_date`) |
+| `admin.pentest_finding_logged` | HIGH | 7 yr | Finding identified verbally or in writing by vendor; emitter: security-engineer (PAM-elevated); SLA clock starts on emission for P0 findings | `finding_id` (UUID — PENTEST-CHAIN-01 anchor), `engagement_id` (UUID — FK to `admin.pentest_initiated`), `severity_tier` (enum: `P0`\|`P1`\|`P2`\|`P3`), `affected_surface` (enum: `workers_edge_api`\|`supabase_postgrest`\|`supabase_auth`\|`multi_tenant_rls`\|`hmac_chain`\|`art9_biometric_pathway`\|`revenuecat_webhook`\|`resend_email`\|`sentry_scrubbing`\|`admin_interface`\|`r2_compliance_vault`\|`other`), `cwe_id` (string CWE-NNN), `cvss_score` (float 0.0–10.0), `reported_date` (YYYY-MM-DD), `sla_deadline` (YYYY-MM-DD — derived from `severity_tier`: P0+1d, P1+7d, P2+30d, P3+90d) |
+| `admin.pentest_finding_remediated` | HIGH | 7 yr | Remediation PR merged to production and initial re-test passed; emitter: security-engineer (PAM-elevated); requires preceding `admin.pentest_finding_logged` for same `finding_id` (PENTEST-CHAIN-01) | `finding_id`, `engagement_id`, `remediation_pr` (string URL — PR reference), `retest_date` (YYYY-MM-DD), `retest_outcome` (enum: `confirmed_fixed`\|`partial_fix_further_retest_required`), `remediation_owner` (role enum: `security-engineer`\|`platform-engineer`\|`devops-lead`\|`enterprise-architect`) |
+| `admin.pentest_report_filed` | HIGH | 7 yr | Final vendor report delivered and stored in R2 compliance vault; emitter: compliance-officer (PAM-elevated); requires preceding `admin.pentest_initiated` for same `engagement_id` (PENTEST-CHAIN-02) | `engagement_id`, `report_artefact_id` (string — PT-E-001 or equivalent artefact identifier), `report_sha256` (string — hex-encoded SHA-256 of PT-E-001 PDF), `finding_count_p0` (int ≥ 0), `finding_count_p1` (int ≥ 0), `finding_count_p2` (int ≥ 0), `finding_count_p3` (int ≥ 0), `r2_object_key` (string — `form-compliance-vault/pentests/{engagement_id}/PT-E-001-report.pdf`), `filed_by` (UUID — compliance-officer `user_id`) |
+| `admin.pentest_retest_completed` | MEDIUM | 7 yr | Re-test completed for any finding (pass or fail); emitter: security-engineer (PAM-elevated); requires preceding `admin.pentest_finding_logged` for same `finding_id` (PENTEST-CHAIN-01) | `finding_id`, `engagement_id`, `retest_date` (YYYY-MM-DD), `retest_outcome` (enum: `pass`\|`fail`\|`partial`), `retest_performed_by` (role enum: `vendor`\|`security-engineer`\|`platform-engineer`), `retest_method` (enum: `vendor`\|`self` — `self` only permitted for P2/P3 findings per §61.5) |
+| `admin.pentest_risk_accepted` | HIGH | 7 yr | P2/P3 finding formally accepted as residual risk with documented compensating control; emitter: compliance-officer (PAM-elevated) after dual sign-off; Worker rejects HTTP 422 (`PENTEST_RISK_ACCEPTANCE_P0_P1_VIOLATION`) if `severity_tier ∈ {'P0','P1'}` | `finding_id`, `engagement_id`, `severity_tier` (enum: `P2`\|`P3` only — HTTP 422 on P0/P1), `risk_acceptance_rationale` (max 500 chars), `compensating_control` (max 500 chars), `scheduled_remediation_date` (YYYY-MM-DD nullable — required for P2), `approved_by_compliance_officer` (bool literal `true`), `approved_by_founder` (bool literal `true`), `decision_log_ref` (string — DECISION_LOG entry reference) |
+| `admin.pentest_chain_enumeration_authorised` | HIGH | 7 yr | Layer B production chain read-only enumeration approved; emitter: compliance-officer (PAM-elevated) BEFORE any vendor production query (see §62.4.3 Condition B1); HTTP 422 blocking if any Layer B query is attempted without preceding this event | `engagement_id`, `authorised_by` (UUID — compliance-officer `user_id`), `authorisation_date` (YYYY-MM-DD), `vendor_name`, `enumeration_scope` (string literal `'audit_log_events SELECT'`), `production_flag` (bool literal `true`), `staging_only_destructive_tests_confirmed` (bool literal `true` — confirms Layer A destructive tests confined to staging), `credential_issued_to` (string — scoped read-only service role identifier), `credential_expiry` (datetime — max 48h from issuance) |
+
+**Zod v2 schemas (canonical source: `docs/SOC2_READINESS.md §61.8` + `§62.4.3` — update SOC2_READINESS.md first on any schema change):**
+
+```typescript
+// admin.pentest_initiated — HIGH · 7 yr (registered v2.34)
+const AdminPentestInitiatedSchema = z.object({
+  engagement_id:                  z.string().uuid(),
+  vendor_name:                    z.string().min(1).max(200),
+  vendor_accreditation:           z.enum([
+    'CREST_CCT_APP', 'CREST_CCT_INF', 'CREST_ORG',
+    'OSCP', 'GPEN', 'GWAPT', 'multiple',
+  ]),
+  scope_summary:                  z.string().max(500),
+  start_date:                     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  scheduled_end_date:             z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  authorised_by_compliance_officer: z.literal(true),
+  authorised_by_founder:          z.literal(true),
+  staging_only_flag:              z.boolean(),
+  supabase_notification_filed:    z.boolean(),
+  supabase_notification_date:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+// admin.pentest_finding_logged — HIGH · 7 yr (registered v2.34)
+const AdminPentestFindingLoggedSchema = z.object({
+  finding_id:      z.string().uuid(),
+  engagement_id:   z.string().uuid(),
+  severity_tier:   z.enum(['P0', 'P1', 'P2', 'P3']),
+  affected_surface: z.enum([
+    'workers_edge_api', 'supabase_postgrest', 'supabase_auth',
+    'multi_tenant_rls', 'hmac_chain', 'art9_biometric_pathway',
+    'revenuecat_webhook', 'resend_email', 'sentry_scrubbing',
+    'admin_interface', 'r2_compliance_vault', 'other',
+  ]),
+  cwe_id:          z.string().regex(/^CWE-\d+$/),
+  cvss_score:      z.number().min(0).max(10),
+  reported_date:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  sla_deadline:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+// admin.pentest_finding_remediated — HIGH · 7 yr (registered v2.34)
+const AdminPentestFindingRemediatedSchema = z.object({
+  finding_id:        z.string().uuid(),
+  engagement_id:     z.string().uuid(),
+  remediation_pr:    z.string().url(),
+  retest_date:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  retest_outcome:    z.enum(['confirmed_fixed', 'partial_fix_further_retest_required']),
+  remediation_owner: z.enum([
+    'security-engineer', 'platform-engineer', 'devops-lead', 'enterprise-architect',
+  ]),
+});
+
+// admin.pentest_report_filed — HIGH · 7 yr (registered v2.34)
+const AdminPentestReportFiledSchema = z.object({
+  engagement_id:      z.string().uuid(),
+  report_artefact_id: z.string().min(1),
+  report_sha256:      z.string().regex(/^[a-f0-9]{64}$/),
+  finding_count_p0:   z.number().int().nonnegative(),
+  finding_count_p1:   z.number().int().nonnegative(),
+  finding_count_p2:   z.number().int().nonnegative(),
+  finding_count_p3:   z.number().int().nonnegative(),
+  r2_object_key:      z.string().min(1),
+  filed_by:           z.string().uuid(),
+});
+
+// admin.pentest_retest_completed — MEDIUM · 7 yr (registered v2.34)
+const AdminPentestRetestCompletedSchema = z.object({
+  finding_id:           z.string().uuid(),
+  engagement_id:        z.string().uuid(),
+  retest_date:          z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  retest_outcome:       z.enum(['pass', 'fail', 'partial']),
+  retest_performed_by:  z.enum(['vendor', 'security-engineer', 'platform-engineer']),
+  retest_method:        z.enum(['vendor', 'self']),
+});
+
+// admin.pentest_risk_accepted — HIGH · 7 yr (registered v2.34)
+// Worker rejects HTTP 422 PENTEST_RISK_ACCEPTANCE_P0_P1_VIOLATION if severity_tier ∈ {'P0','P1'}
+const AdminPentestRiskAcceptedSchema = z.object({
+  finding_id:                    z.string().uuid(),
+  engagement_id:                 z.string().uuid(),
+  severity_tier:                 z.enum(['P2', 'P3']),
+  risk_acceptance_rationale:     z.string().max(500),
+  compensating_control:          z.string().max(500),
+  scheduled_remediation_date:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  approved_by_compliance_officer: z.literal(true),
+  approved_by_founder:           z.literal(true),
+  decision_log_ref:              z.string().min(1),
+});
+
+// admin.pentest_chain_enumeration_authorised — HIGH · 7 yr (registered v2.34)
+// Must precede any Layer B production query; HTTP 422 if Layer B query attempted first
+const AdminPentestChainEnumerationAuthorisedSchema = z.object({
+  engagement_id:                          z.string().uuid(),
+  authorised_by:                          z.string().uuid(),
+  authorisation_date:                     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  vendor_name:                            z.string().min(1).max(200),
+  enumeration_scope:                      z.literal('audit_log_events SELECT'),
+  production_flag:                        z.literal(true),
+  staging_only_destructive_tests_confirmed: z.literal(true),
+  credential_issued_to:                   z.string().min(1),
+  credential_expiry:                      z.string().datetime(),
+});
+```
+
+**HMAC chain invariants:**
+- **PENTEST-CHAIN-01 (blocking):** `admin.pentest_finding_remediated` and `admin.pentest_retest_completed` each require a preceding `admin.pentest_finding_logged` for the same `finding_id`. `emit-audit-event` Worker returns HTTP 422 `PENTEST_CHAIN_01_VIOLATION` on inversion → R-05.
+- **PENTEST-CHAIN-02 (blocking):** `admin.pentest_report_filed` requires a preceding `admin.pentest_initiated` for the same `engagement_id`. `emit-audit-event` Worker returns HTTP 422 `PENTEST_CHAIN_02_VIOLATION` on inversion → R-05.
+- **PENTEST-CHAIN-03 (warning-level):** `admin.pentest_risk_accepted` should be preceded by `admin.pentest_finding_logged` for the same `finding_id`. Missing predecessor logged to Better Stack (non-blocking).
+- **Severity gate:** `admin.pentest_risk_accepted` is rejected HTTP 422 `PENTEST_RISK_ACCEPTANCE_P0_P1_VIOLATION` when `severity_tier ∈ {'P0','P1'}`. No P0 or P1 finding may be risk-accepted — enforced by `emit-audit-event` Worker.
+- **Layer B gate:** `admin.pentest_chain_enumeration_authorised` is the authorisation event that gates any vendor Layer B production query. Worker enforces: if `admin.pentest_chain_enumeration_authorised` is absent for the `engagement_id`, any attempt to use the scoped read-only credential triggers R-05 chain anomaly response.
+
+**SOC 2 evidence artefacts (stored at `compliance/evidence/pentests/{engagement_id}/` with `MANIFEST.sha256`):**
+
+| Artefact | SOC 2 criterion | Description | Retention |
+|---|---|---|---|
+| **PT-E-001** | CC4.1 / CC7.1 / CC7.2 | Final vendor penetration test report (executive summary, technical findings, CVSS scores, CWE mappings, PoC details, remediation recommendations); SHA-256 recorded in `admin.pentest_report_filed`; restricted to security-engineer + compliance-officer + auditor (72h pre-signed URL only — never served via public path); chain-of-custody: `admin.pentest_report_filed` DEC-030 event must precede any auditor-share of PT-E-001 | 7 yr |
+| **PT-E-002** | CC9.2 | Vendor qualification record: CREST/OSCP/GPEN/GWAPT accreditation certificates, signed NDA, engagement letter (including biometric data prohibition clause per §61.7 and Supabase shared-responsibility carve-out per §62.2.3), conflict-of-interest check, professional indemnity confirmation (≥£2M); collected during vendor selection phase, filed before `admin.pentest_initiated` event | 7 yr |
+| **PT-E-003** | CC7.1 / CC4.1 | Defect register snapshot: point-in-time export of all `admin.pentest_finding_logged` events for the engagement, joined with `admin.pentest_finding_remediated` and `admin.pentest_risk_accepted` events; 15-field schema per §61.6 (finding_id, engagement_id, severity_tier, cwe_id, cvss_score, sla_deadline, remediation_pr, retest_outcome, dec030_event_id); filed at report receipt and at engagement closure | 7 yr |
+| **PT-E-004** | CC7.2 / A1.2 | Re-test attestation per finding: vendor (or self) attestation confirming re-test methodology and outcome; referenced in `admin.pentest_retest_completed.retest_method`; signed by tester; `retest_method: 'self'` attestations require security-engineer countersignature | 7 yr |
+| **PT-E-005** | CC7.2 | DEC-030 chain verification output: post-remediation `audit-chain-verify` Edge Function run by security-engineer covering all `admin.pentest_*` events (including `admin.pentest_chain_enumeration_authorised` if emitted) for the engagement; output confirms zero broken HMAC links and correct PENTEST-CHAIN-01/02 sequencing; NOT a vendor deliverable — generated by FORM security-engineer after all findings remediated | 7 yr |
+| **PT-E-006** | CC4.1 / CC7.1 | Annual summary report: aggregate finding counts by severity tier across all engagements in the calendar year; trend analysis vs prior year; no per-finding detail; compiled by compliance-officer; filed before M12 + 2 weeks | 7 yr |
+| **PT-E-007** | CC9.2 | Supabase notification email: `.eml` file confirming notification sent to security@supabase.com ≥ 5 business days before test start (per §62.2, OQ-PT-02 resolution); `supabase_notification_filed: true` and `supabase_notification_date` recorded in `admin.pentest_initiated` DEC-030 payload; PT-E-007 must be filed in R2 BEFORE vendor begins any test activity; notification email not filed in R2 with corresponding DEC-030 fields is not auditor-admissible | 7 yr |
+
+**SOC 2 auditor narratives:**
+
+**CC4.1 (Risk Identification):** `admin.pentest_initiated` provides auditable evidence that FORM commissioned an adversarial test meeting CREST/OSCP qualification criteria before first enterprise contract. `admin.pentest_finding_logged` events (with CVSS scores and CWE mappings) constitute the risk identification record. `admin.pentest_report_filed` (with `report_sha256`) proves the final report was filed unaltered. Together with PT-E-001 (chain-of-custody via DEC-030) and PT-E-006 (annual summary), they satisfy CC4.1's requirement that FORM identifies and analyses risks on an ongoing basis.
+
+**CC7.1 (Detection Controls Validated):** `admin.pentest_retest_completed` with `retest_outcome: 'pass'` and `retest_method: 'vendor'` is the auditable evidence that FORM's detection controls were tested adversarially and re-verified post-fix. PT-E-004 (re-test attestation) corroborates the chain event with vendor-signed confirmation.
+
+**CC7.2 (Anomaly Monitoring Verified):** `admin.pentest_chain_enumeration_authorised` (when emitted) is the evidence that FORM's HMAC chain was adversarially enumerated under controlled Layer B conditions. PT-E-005 (chain verification output) proves zero broken HMAC links across the full engagement event sequence — constituting the strongest available evidence that the chain's tamper-detection properties held under adversarial scrutiny.
+
+**CC6.1 (Logical Access Controls):** `admin.pentest_chain_enumeration_authorised` payload — `enumeration_scope: 'audit_log_events SELECT'`, `credential_expiry` (48h max), `staging_only_destructive_tests_confirmed: true` — demonstrates that production access for Layer B was explicitly scoped, time-bounded, and authorised before it occurred. The DEC-030 event is the evidence that CC6.1 logical access controls operated as designed even under adversarial enumeration conditions (per §62.4.3 OQ-PT-04 resolution).
+
+**CC6.6 (Supply-Chain Component Review):** `admin.pentest_initiated.vendor_accreditation` field confirms vendor selection met the §61.7 qualification criteria. PT-E-002 (vendor qualification record) provides the full CC9.2 supply-chain vendor management evidence.
+
+**CC9.2 (Vendor Management):** PT-E-002 (engagement letter with Supabase carve-out clause per §62.2.3, biometric prohibition clause per §61.7, £2M professional indemnity) + PT-E-007 (Supabase advance notification) = full vendor boundary management record.
+
+**A1.2 (Environmental Threat Detection):** `admin.pentest_finding_remediated` events with `retest_outcome: 'confirmed_fixed'` confirm that identified environmental threats (vulnerabilities) were remediated and independently verified. PT-E-004 (re-test attestation) provides the physical attestation corroborating the chain record.
+
+**Aggregate SOC 2 evidence query (safe for auditor-facing output — no finding detail, no Art. 9 data, no health values):**
+
+```sql
+-- PT-E-006 aggregate pattern: finding counts by severity and engagement year
+SELECT
+  DATE_TRUNC('year', reported_date)::DATE AS engagement_year,
+  severity_tier,
+  COUNT(*) AS findings_logged,
+  COUNT(r.finding_id) AS findings_remediated,
+  COUNT(ra.finding_id) AS findings_risk_accepted
+FROM (
+  SELECT
+    (payload->>'finding_id') AS finding_id,
+    (payload->>'engagement_id') AS engagement_id,
+    (payload->>'severity_tier') AS severity_tier,
+    (payload->>'reported_date')::DATE AS reported_date
+  FROM audit_log_events
+  WHERE event_type = 'admin.pentest_finding_logged'
+) fl
+LEFT JOIN (
+  SELECT payload->>'finding_id' AS finding_id
+  FROM audit_log_events
+  WHERE event_type = 'admin.pentest_finding_remediated'
+    AND (payload->>'retest_outcome') = 'confirmed_fixed'
+) r USING (finding_id)
+LEFT JOIN (
+  SELECT payload->>'finding_id' AS finding_id
+  FROM audit_log_events
+  WHERE event_type = 'admin.pentest_risk_accepted'
+) ra USING (finding_id)
+GROUP BY engagement_year, severity_tier
+ORDER BY engagement_year DESC, severity_tier;
+```
+
+---
+
 ## Export & delivery
 
 Enterprise tenants can:
@@ -3096,6 +3290,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.34 · 2026-06-22 · owner: security-engineer + compliance-officer**
+*v2.34 (2026-06-22): +7 events — Penetration Testing lifecycle (SOC2_READINESS §61.8 + §62.4.3 · CC4.1/CC7.1/CC7.2/CC6.1/CC6.6/CC9.2/A1.2 · PT-P1-02/PT-P1-06/62.8-01). New section `### Penetration Testing events (DEC-030 HMAC-chained · SOC2_READINESS §61 + §62 · CC4.1/CC7.1/CC7.2/CC6.1/CC6.6/CC9.2/A1.2)` inserted before `## Export & delivery`. (1) `admin.pentest_initiated` (HIGH, 7yr): engagement anchor — signed engagement letter; `authorised_by_compliance_officer: true` + `authorised_by_founder: true` dual-sign-off literals; `staging_only_flag` boolean; `supabase_notification_filed: true` + `supabase_notification_date` fields (PT-E-007 chain-of-custody per §62.2, OQ-PT-02 resolution); PENTEST-CHAIN-02 anchor; CC9.2/CC4.1. (2) `admin.pentest_finding_logged` (HIGH, 7yr): per-finding immutable record; `finding_id` UUID PENTEST-CHAIN-01 anchor; `severity_tier` enum P0/P1/P2/P3; `affected_surface` 12-value enum; `cwe_id` CWE-NNN regex; `cvss_score` float 0–10; `sla_deadline` computed per §61.5 SLA table; verbal notification SLA clock starts on P0 emission; CC7.1/CC4.1. (3) `admin.pentest_finding_remediated` (HIGH, 7yr): remediation closure; `remediation_pr` URL; `retest_outcome` enum (confirmed_fixed / partial_fix_further_retest_required); PENTEST-CHAIN-01 successor (HTTP 422 on inversion → R-05); CC7.2/A1.2. (4) `admin.pentest_report_filed` (HIGH, 7yr): final report chain record; `report_sha256` hex-64 tamper-evident hash of PT-E-001; `finding_count_p0/p1/p2/p3` aggregate summary (no per-finding detail in chain); `r2_object_key` path; PENTEST-CHAIN-02 terminal event (HTTP 422 on inversion → R-05); CC4.1/CC7.1. (5) `admin.pentest_retest_completed` (MEDIUM, 7yr): per-finding re-test attestation; `retest_method` enum (vendor / self — self only for P2/P3); PENTEST-CHAIN-01 successor; CC7.2/A1.2; 7yr matches primary `admin.pentest_finding_logged` record (re-test is admissible only while finding record is retained). (6) `admin.pentest_risk_accepted` (HIGH, 7yr): dual sign-off risk acceptance for P2/P3 findings; `approved_by_compliance_officer: true` + `approved_by_founder: true` literals; `compensating_control` max 500 chars (CC5.3 evidence); `decision_log_ref` required (mirrors PIPE-CHAIN-02 pattern); Worker HTTP 422 `PENTEST_RISK_ACCEPTANCE_P0_P1_VIOLATION` if `severity_tier ∈ {'P0','P1'}` — no P0/P1 risk acceptance permitted; CC5.3/CC4.1. (7) `admin.pentest_chain_enumeration_authorised` (HIGH, 7yr) — NEW from §62.4.3: Layer B production chain enumeration gate; `enumeration_scope: z.literal('audit_log_events SELECT')` hard invariant; `production_flag: z.literal(true)` + `staging_only_destructive_tests_confirmed: z.literal(true)` dual invariant; `credential_expiry` datetime (48h max); must precede any vendor Layer B query (enforced by Worker); CC6.1/CC9.2; OQ-PT-04 resolution. Retention table: +7 rows for all `admin.pentest_*` events and `admin.pentest_chain_enumeration_authorised`. PENTEST-CHAIN-01/02/03 invariant specs. PENTEST_RISK_ACCEPTANCE_P0_P1_VIOLATION severity gate. Full Zod v2 schemas for all 7 events. SOC 2 auditor narratives for CC4.1/CC7.1/CC7.2/CC6.1/CC6.6/CC9.2/A1.2. PT-E-001 through PT-E-007 artefact register. Aggregate PT-E-006 SQL query (privacy-safe, no finding detail, no Art. 9 data). **Closes `docs/SOC2_READINESS.md` PT-P1-02 (M6 — all six §61.8 event types now registered), PT-P1-06 (M6 — `admin.pentest_chain_enumeration_authorised` now registered), and 62.8-01 (M5 — full DEC-030 spec with HIGH severity, 7-year retention). Document header v2.33 → v2.34. Owner: security-engineer + compliance-officer.**
 
 **v2.32 · 2026-06-22 · owner: security-engineer + compliance-officer + devops-lead**
 *v2.32 (2026-06-22): +2 events — Google Directory Alert Check Stale incident chain (INCIDENT_RESPONSE R-38 · GDIR-ALERT-CHAIN-01 · CC7.2/CC7.3 · P0/M4). Two new DEC-030 HMAC-chained events added to `### System` section after `system.sso_fleet_check_restored`, closing INCIDENT_RESPONSE R-38.11 item 1 (P0/M4). (1) `system.gdir_alert_stale_declared` (HIGH, 7yr): devops-lead (IC) declares a `google_directory_alert_check` (job 35, `*/5 * * * *`, 6-min freshness window) stale incident at T+0 of every R-38 activation; constitutes a CC7.2 monitoring control degradation — AL-SSO-GDIR-01 and AL-SSO-GDIR-02 detection blind spot during stale window; Zod v2 payload: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `active_sync_error_tenant_count` nonneg int (0 at P1; > 0 at P0 when R-38-C1 confirms ≥ 1 tenant with ≥ 3 `sso.google_directory_sync_error` events in any 15-min window during stale period), `trigger` enum['pagerduty_alert','manual_discovery','co_active_r32','co_active_r37'] (co_active_r32 = R-32 job 37 `caep_reregister_sweep` co-stale; co_active_r37 = R-37 job 38 `sso_fleet_health_check` co-stale), `initial_severity` enum['P1','P0'], `peer_jobs_stale` boolean (true when co-stale with job 37 or job 38 — shared pg_cron infrastructure failure indicator H2/H4); emitting at T+0 with `active_sync_error_tenant_count = 0` and `initial_severity = 'P1'` is permitted; GDIR-ALERT-CHAIN-01 anchor; HTTP 422 `GDIR_ALERT_CHAIN_01_VIOLATION` on ordering inversion → R-05; privacy floor: no `user_id`, no `tenant_id` (aggregate count only), no employee name/email, no health data, no GDPR Art. 9 special-category data. (2) `system.gdir_alert_restored` (STANDARD, 3yr): devops-lead confirms job 35 re-enabled and first successful post-fix run confirmed; Zod v2 payload: `incident_id` UUID, `restored_at` datetime, `root_cause` enum['H1','H2','H3','H4'] (H1 = job deleted/disabled; H2 = shared pg_cron infrastructure co-stale with jobs 37/38; H3 = `audit_log_events` query failure/timeout; H4 = Supabase platform outage), `fix_deployed_at` datetime, `al_sso_gdir_01_window_assessment_performed` bool (true on all normal activations; false only if emergency restoration was required before R-38-C1 could be run, requiring deferred query); GDIR-ALERT-CHAIN-01 terminal event; privacy floor: no `user_id`, no `tenant_id`, no employee name/email, no health data. Retention table: +2 rows (`system.gdir_alert_stale_declared` HIGH 7yr CC7.2; `system.gdir_alert_restored` STANDARD 3yr CC7.2). GDIR-ALERT-CHAIN-01 ordering invariant: `system.gdir_alert_restored` MUST follow `system.gdir_alert_stale_declared` for same `incident_id`; `emit-audit-event` Worker returns HTTP 422 `GDIR_ALERT_CHAIN_01_VIOLATION` on inversion → R-05. Key distinction from `system.gdir_alert_check_stale` (LOW/1yr — registered v2.20, 2026-06-19): that LOW advisory event is emitted by job 35 itself as a self-monitoring signal (from `pg_cron.job_run_details`) and does not page; `system.gdir_alert_stale_declared` HIGH/7yr is the IC-declared incident record emitted at T+0 of R-38 activation after PagerDuty pages. Both events coexist in the chain for any given stale incident: LOW advisory from job 35 self-monitoring; HIGH declaration from IC. Cross-references: INCIDENT_RESPONSE R-38 §R-38.7 (canonical Zod schemas and GDIR-ALERT-CHAIN-01 full spec); OBSERVABILITY §12.6 job 35 (`gdir-alert-check-stale` dedup; `form-devops` P1 routing; R-38 cross-ref added v1.1 patch 2026-06-22); OBSERVABILITY §48 (AL-SSO-GDIR-01/AL-SSO-GDIR-02 canonical alert definitions; job 35 SQL spec §48.4); SOC2_READINESS §92 (SSO-OBS-E-007 R-38 activation addendum — updated v3.25.5 2026-06-22); AUDIT_LOG_SCHEMA v2.20 (prior registration of `system.gdir_alert_check_stale` LOW/1yr advisory); R-05 (GDIR-ALERT-CHAIN-01 violation response); R-32 (job 37 peer — co-stale trigger); R-37 (job 38 peer — co-stale trigger; R-37 T+5 and H2 hypothesis cross-referenced "job 35 stale alerts" establishing R-38's necessity); DEC-030. **Closes INCIDENT_RESPONSE R-38.11 item 1 (P0/M4 — 🟢 2026-06-22).** Document header v2.31 → v2.32. Owner: security-engineer + compliance-officer + devops-lead.*
