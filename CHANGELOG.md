@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [7.85.1] — 2026-06-22
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.25.3 → v3.25.4: §79.4 WH-ESCALATION-E-001 row added (CC7/CC9, CC7.2/CC9.2, quarterly `pg_cron.job_run_details` export for job 41, Auto, quarterly from M10, platform-engineer, `webhooks/`, 3yr). §80.3 `webhooks/` R2 subfolder added with `form-api NO ACCESS`. §80.4 Vanta mirror list updated. Closes INCIDENT_RESPONSE R-36.11 item 3 (P1/M11).
+- `docs/INCIDENT_RESPONSE.md` — v1.1: R-36.11 checklist item 3 marked [x] Done (2026-06-22, SOC2_READINESS.md v3.25.4). v1.1 version note added.
+
+---
+
 ## [7.85.0] — 2026-06-22
 
 ### Added
