@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.79.0] — 2026-06-22
+
+### Added
+- `content/post-2243-practice-vs-training-repetition-learning.md` — Editorial 2241–2250, post 3/10. Практика проти тренування: чому повторення не завжди рівне навчанню. Продуктивність vs. навчання (Soderstrom & Bjork 2015): два різних виміри одного процесу. Desirable difficulties (Bjork 1994): умови, що знижують продуктивність у сесії, підвищують засвоєння. Контекстуальна інтерференція (Shea & Morgan 1979): перемежована практика краща за блокову для довгострокового навчання. Spacing effect і розподілена практика (Ebbinghaus; Donovan & Radosevich 1999 мета-аналіз): час між сесіями як механізм консолідації. Парадокс зворотного зв'язку (Schmidt et al. 1990; Winstein & Schmidt 1990): частий feedback погіршує автономне засвоєння. Variability of practice (Schmidt 1975 schema theory): варіативність зміцнює рухову схему. Алгоритм 4 кроки для self-coached атлета: визнач мету сесії, визнач фазу засвоєння, вибудуй умови практики, відрізняй результат практики від тренування. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+
+### Changed
+- `blog.html` — blog card for post-2243 added (inserted above post-2242).
+- `README.md` — post-2243 → draft · v7.79.0.
+- `STATUS.md` — Total posts: 1995 → 1996; Editorial 2241–2250 in progress 2/10 → 3/10.
+- `VERSION` — 7.78.0 → 7.79.0.
+
+---
+
 ## [7.78.0] — 2026-06-22
 
 ### Added
