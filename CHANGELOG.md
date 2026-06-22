@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [7.91.0] — 2026-06-22
+
+### Added
+- `content/post-2259-planned-vs-autoregulated-deload.md` — Editorial 2251–2260, post 9/10. Плановий або авторегуляторний deload: як вирішити, який тип потрібен саме тобі. Два підходи з чіткими визначеннями і трейдофами. Confirmation bias як центральна проблема self-coached авторегуляції. П'ять конкретних вимірюваних тригерів: RPE-дрейф (+0.5–1 пункт × 3 сесії), e1RM-тренд (знижується 2 тижні), якість сну (3+ ночі нижче норми), ранкова ЧСС (+5 уд/хв × 3 дні), суб'єктивна готовність (≤5/10 × 3 дні). Правило «2 з 4» для активації деловантажу. Гібридний conditional extension protocol. Критерії вибору підходу. П'ять типових помилок. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. Blog card added.
+- `content/post-2260-mesocycle-synthesis-checklist.md` — Editorial 2251–2260, post 10/10. Синтез серії: перший самостійний блок. Одно-речне резюме кожного з постів 2251–2259. Довідкова таблиця параметрів: накопичувальний vs. інтенсифікаційний блок (ціль / тривалість / інтенсивність / обсяг / частота / деловантаж). 19-пунктовий операційний чекліст трьох фаз (планування: 9 пунктів; виконання: 5 пунктів; ретроспектива: 5 пунктів). Дев'ять типових помилок першого самостійного блоку. Victor integration point. Анонс Editorial 2261–2270 «Від чужої програми до власного протоколу». clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. Blog cards added.
+
+### Changed
+- `blog.html` — cards added for post-2259 and post-2260 (positions before post-2258).
+- `README.md` — posts 2259 and 2260 updated from proposed → draft · v7.91.0.
+- `STATUS.md` — total posts 2012 → 2014; Editorial 2251–2260 progress 8/10 → COMPLETE 10/10.
+- `VERSION` — 7.90.0 → 7.91.0.
+
+---
+
 ## [7.90.0] — 2026-06-22
 
 ### Added
