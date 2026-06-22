@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.89.0] — 2026-06-22
+
+### Added
+- `content/post-2257-training-frequency-stimulus-recovery.md` — Editorial 2251–2260, post 7/10. Частота тренувань: чому це питання про розподіл стимулу, а не про кількість сесій. SRA-крива (Stimulus→Recovery→Adaptation) як теоретична основа. Schoenfeld et al. 2016 мета-аналіз: 2x краще 1x при рівному об'ємі; 3x не дає значущої переваги над 2x (Colquhoun et al. 2018). Взаємодія частоти і обсягу: частота — механізм розподілу, обсяг — первинна змінна. Різні SRA-вікна для різних м'язових груп і типів рухів. Технічне засвоєння як додатковий аргумент вищої частоти для компаунд-рухів. Практичний алгоритм 5 кроків для вибору частоти в мезоциклі. 5 типових помилок. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. Blog card added.
+
+### Changed
+- `blog.html` — card added for post-2257 (position before post-2256).
+- `README.md` — posts 2255 and 2256 updated from proposed → draft; post-2257 added as draft · v7.89.0; Editorial 2271–2280 «Моніторинг без тренера: мінімальний стек даних» added as new proposed block.
+- `STATUS.md` — total posts 2010 → 2011; Editorial 2251–2260 progress 6/10 → 7/10.
+- `VERSION` — 7.88.0 → 7.89.0.
+
+---
+
 ## [7.88.0] — 2026-06-22
 
 ### Added
