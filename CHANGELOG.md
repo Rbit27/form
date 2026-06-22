@@ -1,5 +1,31 @@
 # Changelog · FORM
 
+## [7.63.0] — 2026-06-22
+
+### Added
+- `content/post-2130-self-coached-operational-thinking-synthesis.md` — Editorial 2121–2130 block synthesis, post 10/10. Синтез операційного мислення self-coached атлета: десять постів блоку зведені в єдину операційну петлю (спостерігай → інтерпретуй → вирішуй → виконуй). Чотири ключові принципи: явність моделі, pre-commitment, рівнева відповідність рішень, пропорційність порогу. Відкриті питання блоку, зв'язок з блоком 2131–2140.
+- `blog.html` — cards for posts 2128, 2129, 2130 added.
+
+### Changed
+- `STATUS.md` — Editorial 2121–2130 marked COMPLETE 10/10; next priorities updated to Editorial 2131–2140.
+- `README.md` — posts 2128–2130 status updated to draft.
+
+---
+
+## [7.62.0] — 2026-06-22
+
+### Added
+- `content/post-2129-decisions-with-incomplete-data.md` — Editorial 2121–2130, post 9/10. Рішення при неповних даних: алеаторна vs. епістемічна невизначеність, принцип зворотності, асиметрія помилок типу I і II у тренуванні. Техніка pre-commitment («що б мене переконало») — до досвіду, не після. Чотирикрокова структура прийняття рішень при невизначеності. clinical-safety: NOT_REQUIRED.
+
+---
+
+## [7.61.0] — 2026-06-22
+
+### Added
+- `content/post-2128-systemic-error-recognition.md` — Editorial 2121–2130, post 8/10. Сім ознак системної помилки в тренувальному підході. Різниця між тактичною помилкою (корекція параметра) і системною (перегляд моделі). Психологічні механізми, що утримують від перегляду: sunk cost, ідентифікація з підходом, невизначеність. П'ятикроковий протокол перегляду. clinical-safety: CONDITIONAL_PASS — guard rail for pain/injury embedded.
+
+---
+
 ## [7.60.1] — 2026-06-22
 
 ### Changed

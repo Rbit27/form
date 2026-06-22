@@ -127,7 +127,7 @@
 
 ## Next priorities
 
-- **Editorial 2121–2130: IN PROGRESS 7/10** — post-2121 (v7.54.0) + post-2122 (v7.55.0) + post-2123 (v7.56.0) + post-2124 (v7.57.0) + post-2125 (v7.58.0) + post-2126 (v7.59.0) + **post-2127 (v7.60.0)** written · NEXT: post-2128 (Коли зупинитись і переосмислити: ознаки системної помилки в підході). README: Editorial 2171–2180 «Зовнішній погляд» proposed · v7.58.0. **Editorial 2181–2190 «Невизначеність і рішення» proposed · v7.60.0.** blog.html: cards for post-2126 and post-2127 added · v7.60.0.
+- **Editorial 2121–2130: COMPLETE 10/10 · v7.63.0** — posts 2121–2130 all written. post-2128 (v7.61.0) ознаки системної помилки; post-2129 (v7.62.0) рішення при неповних даних; post-2130 (v7.63.0) синтез блоку. blog.html: cards for posts 2128–2130 added. sports-scientist review required before publish. NEXT: Editorial 2131–2140 (Адаптація тренування до реального життя).
 - **Editorial 2051–2060: COMPLETE 10/10 · v7.44.0** — posts 2059 (документація vs. аналітика) + 2060 (block synthesis) written; blog cards added; sports-scientist review required before publish
 - **Editorial 2061–2070: NEXT** — тема: Тренування в умовах реального дорослого атлета; posts 2061–2070 proposed in README
 - **Block 751–800: COMPLETE** — all 50/50 posts written; posts 791, 793, 794 clinical-safety CONDITIONAL PASS (guard rails embedded); sports-scientist review required for all 50 before publish
