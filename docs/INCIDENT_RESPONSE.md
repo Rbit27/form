@@ -13465,3 +13465,289 @@ Collect and upload to R2 `form-soc2-evidence` at `compliance/evidence/turh-purge
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
 ---
+
+## R-35 WL Cert Check Stale — `white_label_cert_check` (job 40) — WL-SLO-02/03 detection gap
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `white_label_cert_check` pg_cron job 40 exceeds the 26-hour freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` Edge Function (§12.6) emits `system.cron_job_stale` with `job_name = 'white_label_cert_check'`; routes to PagerDuty P1 `form-devops` → devops-lead with dedup key `wl-cert-check-stale` per §12.6
+> **Primary owners:** devops-lead · compliance-officer
+> **SLO risk:** Job 40 (`0 2 * * *`) checks SSL certificate expiry for all active white-label custom hostnames in `tenant_white_label_domains` via the Cloudflare Custom Hostnames API and emits `system.white_label_cert_checked` events into the audit log. A stale job means WL-SLO-02 (zero expired certs) and WL-SLO-03 (cert expiry warning ≥ 30 days) are both in a detection gap — the platform cannot confirm that Cloudflare auto-renewal is operating within the defined SLO thresholds for any active white-label domain. At P1 (no cert within 7 days of expiry), the risk is a monitoring gap only; Cloudflare auto-renewal is presumed intact. At P0 (≥ 1 active cert with `ssl_cert_expiry_at < NOW() + INTERVAL '7 days'`), both WL-SLO-02 and WL-SLO-03 enter a detection gap simultaneously — SLA credit trigger risk applies for affected white-label tenants (ENTERPRISE.md §Branding — white-label ≥ $50k ARR threshold).
+> **Critical distinction from peer stale runbooks:** Unlike R-33 (BDG guard-dormancy risk requiring immediate DB UPDATE) and R-34 (retention ceiling overcollection requiring pseudonymisation), R-35 is purely a detection-gap runbook — no direct data mutation is required for recovery. The cert auto-renewal is managed by Cloudflare; the platform's role is monitoring and alerting. P0 requires manual Cloudflare API polling to compensate for the stale detection window.
+
+---
+
+### R-35.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 40)** | `pg-cron-health-monitor` Edge Function (§12.6) | No successful `white_label_cert_check` run in `pg_cron.job_run_details` within the prior 26 h | **P1** (escalates to P0 if R-35-C1 finds ≥ 1 active cert with `ssl_cert_expiry_at < NOW() + INTERVAL '7 days'`) | PagerDuty `form-devops` P1 → devops-lead; dedup key `wl-cert-check-stale` per §12.6 registry |
+| **Manual discovery** | devops-lead observes stale job during routine OBSERVABILITY.md §12.6 review or WL-CERT-E-001 quarterly evidence collection | Post-evidence-collection or routine check | **P1 → assess R-35-C1 for P0 upgrade** | `form-devops` |
+
+> **P0 escalation criterion:** Upon any R-35 activation, devops-lead runs R-35-C1 immediately. If the query returns a count > 0 (any active `tenant_white_label_domains` row with `ssl_cert_expiry_at < NOW() + INTERVAL '7 days'`), severity escalates to **P0** — at least one white-label tenant cert is within 7 days of expiry while the detection job is stale. Both WL-SLO-02 and WL-SLO-03 are in a concurrent detection gap; SLA credit risk applies for affected white-label tenants.
+
+---
+
+### R-35.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P1** | Stale; R-35-C1 returns zero active certs with `ssl_cert_expiry_at < NOW() + INTERVAL '7 days'` | 30 min investigation; monitoring gap only; no cert is immediately at risk; Cloudflare auto-renewal presumed intact; no SLA credit risk | Diagnose root cause; restore job 40; verify `system.white_label_cert_checked` events resume; emit DEC-030 chain |
+| **P0** | Stale AND R-35-C1 returns ≥ 1 active cert with `ssl_cert_expiry_at < NOW() + INTERVAL '7 days'` | 30 min to manual Cloudflare API poll for all at-risk certs; notify affected tenants if cert has expired or will expire within 7 days | Manual Cloudflare API poll for each at-risk domain; compare `ssl_cert_expiry_at` to current Cloudflare status; notify affected tenants if cert expired or imminent; restore job 40; emit `system.wl_cert_check_failure_declared`; file WL-CERT-INT-01 |
+
+---
+
+### R-35.3 Immediate Actions (T+0 to T+30 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `system.wl_cert_check_failure_declared` (HIGH/7yr) via `emit-audit-event` Worker | devops-lead | Required at ALL severity levels. Do this FIRST before any DB queries. WL-CERT-CHAIN-01 anchor. |
+| **T+5** | Run R-35-C1 (scope query) | devops-lead | Count of active certs with `ssl_cert_expiry_at < NOW() + INTERVAL '7 days'`. If count > 0 → escalate to P0 and call compliance-officer immediately. |
+| **T+10** | Check `pg_cron.job_run_details` for job 40 — last successful run timestamp and error if any | devops-lead | Confirms stale start time, missed-run count, last `return_message`. |
+| **T+15** | Check Cloudflare Worker proxy logs for CF_API_TOKEN errors; verify Cloudflare Custom Hostnames API accessibility | devops-lead | See §R-35.4 root cause hypotheses. |
+| **T+15** *(P0 only)* | Manually poll each at-risk cert via Cloudflare API; compare `ssl_cert_expiry_at` to current status; notify affected tenants if cert has expired or will expire within 7 days | devops-lead | See §R-35.5 Step 2 (P0 path). File WL-CERT-INT-01 immediately after scope is confirmed. |
+| **T+20–T+30** | Fix underlying cause and restore job 40 per root cause diagnosis | devops-lead | See §R-35.5 Steps 3–4. Emit `system.wl_cert_check_restored` on confirmed first successful run. |
+
+---
+
+### R-35.4 Root Cause Hypotheses and Scope Queries
+
+#### R-35-C1 — At-risk cert scope (P0 upgrade gate)
+
+```sql
+SELECT COUNT(*) FROM tenant_white_label_domains
+WHERE status = 'active'
+  AND ssl_cert_expiry_at < NOW() + INTERVAL '7 days';
+```
+
+> **At P1:** Count = 0. No active cert is within 7 days of expiry. The detection gap is a monitoring risk only; Cloudflare auto-renewal is presumed intact. Preserve the R-35-C1 zero-count output as the P1 severity attestation.
+
+> **At P0:** Count > 0. Escalate immediately. At least one white-label tenant cert is at risk during the detection gap. Proceed to §R-35.5 Step 2 (manual Cloudflare API poll for all at-risk domains). The number of at-risk domains forms the `at_risk_domain_count` payload for `system.wl_cert_check_failure_declared`.
+
+#### R-35-C2 — pg_cron run history for job 40
+
+```sql
+-- R-35-C2: Stale window confirmation — last 10 runs of white_label_cert_check
+SELECT
+  jobid, jobname, runid, job_pid,
+  database, username, command, status,
+  return_message, start_time, end_time
+FROM pg_cron.job_run_details
+WHERE jobname = 'white_label_cert_check'
+ORDER BY start_time DESC
+LIMIT 10;
+```
+
+> Use output to confirm: (1) time of last successful run (defines stale window start), (2) missed-run count since stale window (daily 02:00 UTC cadence), (3) `return_message` for root cause classification.
+
+#### Root cause hypotheses
+
+| Hypothesis | Description | Primary signal | Recovery path |
+|---|---|---|---|
+| **H1 — Job deleted/disabled** | `white_label_cert_check` was removed from `pg_cron.job` or `active = false` | `return_message IS NULL`; `SELECT COUNT(*) FROM pg_cron.job WHERE jobname = 'white_label_cert_check'` returns 0 | Recreate job per §42.7 SQL spec; verify `active = true` |
+| **H2 — CF_API_TOKEN invalid or expired** | Cloudflare API token used by the Worker proxy to call the Custom Hostnames API has expired or been rotated without updating Supabase Vault | `return_message` contains `CF_API_TOKEN` error or Cloudflare API 403/401 response | Rotate CF_API_TOKEN in Supabase Vault; redeploy Worker proxy; verify Cloudflare Custom Hostnames API returns 200 for a test domain |
+| **H3 — Cloudflare Worker proxy failure** | The Worker proxy that mediates between pg_cron and the Cloudflare API is unreachable or erroring | `return_message` contains HTTP error from Worker proxy; Cloudflare Worker logs show 5xx | Redeploy or restart the Worker proxy; confirm Cloudflare Worker is healthy; re-enable job 40 |
+| **H4 — Cloudflare Custom Hostnames API unreachable** | Cloudflare API itself is unavailable (outage or incident) | Cloudflare API returns 5xx; Cloudflare status page incident; multiple CF-dependent jobs failing | Monitor Cloudflare status page; await API recovery; job 40 will self-recover on next 02:00 UTC run |
+| **H5 — Supabase platform outage** | `pg_cron` scheduler was down; all pg_cron jobs failing simultaneously | No `return_message` entries after stale start time; Supabase status page incident; see R-03 | R-03 primary; R-35 resolves automatically when Supabase restores |
+
+---
+
+### R-35.5 Recovery Procedure
+
+#### Step 1 — Confirm stale and classify root cause
+
+| Check | Command / Action | Expected (healthy) | Unhealthy → action |
+|---|---|---|---|
+| Job exists | `SELECT * FROM pg_cron.job WHERE jobname = 'white_label_cert_check'` | 1 row returned | 0 rows → H1; recreate per §42.7 |
+| Last run | `pg_cron.job_run_details` (R-35-C2) | `start_time` within prior 26 h | > 26 h → stale confirmed; check `return_message` |
+| Status | `status` column of last run | `'succeeded'` | `'failed'` → H2/H3/H4; check `return_message` |
+| CF_API_TOKEN | Verify token validity: `curl -H "Authorization: Bearer $CF_API_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify` | `{"success":true}` | 401/403 → H2; rotate token |
+| Cloudflare API | `curl -H "Authorization: Bearer $CF_API_TOKEN" https://api.cloudflare.com/client/v4/zones` | 200 with zone list | 5xx → H4; check Cloudflare status page |
+| Supabase platform | Supabase status page | All systems operational | Outage → H5; activate R-03 |
+
+#### Step 2 — P0 only: Manually poll at-risk certs via Cloudflare API
+
+> **P0 path only** — skip entirely at P1. At P1, R-35-C1 confirms zero active certs within 7 days of expiry; no manual cert polling is required.
+
+**Step 2a — Confirm scope**
+
+Run R-35-C1 to confirm count > 0 before taking action. Retrieve `earliest_expiry_at` from:
+
+```sql
+SELECT MIN(ssl_cert_expiry_at) AS earliest_expiry_at
+FROM tenant_white_label_domains
+WHERE status = 'active'
+  AND ssl_cert_expiry_at < NOW() + INTERVAL '7 days';
+```
+
+Record `at_risk_domain_count` and `earliest_expiry_at` for `system.wl_cert_check_failure_declared` payload and WL-CERT-INT-01.
+
+**Step 2b — Manual Cloudflare API poll for each at-risk domain**
+
+For each active domain in `tenant_white_label_domains` with `ssl_cert_expiry_at < NOW() + INTERVAL '7 days'`, query the Cloudflare Custom Hostnames API to obtain the current certificate status and actual expiry:
+
+1. Retrieve at-risk domains (hostname + Cloudflare custom hostname ID) under devops-lead access
+2. For each domain: `GET https://api.cloudflare.com/client/v4/zones/{zone_id}/custom_hostnames/{hostname_id}` — check `ssl.status` and `ssl.certificates[].expires_on`
+3. Compare Cloudflare `expires_on` to `ssl_cert_expiry_at` in `tenant_white_label_domains` — update stale DB values if the Cloudflare record has already renewed
+4. If any cert has `ssl.status = 'pending_validation'` or `expires_on < NOW()` — the cert has expired or auto-renewal failed; proceed to Step 2c
+
+**Step 2c — Tenant notification (if cert expired or will expire within 7 days and auto-renewal has not fired)**
+
+If Cloudflare API confirms cert has expired OR `expires_on < NOW() + INTERVAL '7 days'` and `ssl.status != 'active'`:
+
+1. Notify affected white-label tenants per ENTERPRISE.md §Branding communication SLA
+2. Document each affected domain, expiry timestamp, and notification timestamp in WL-CERT-INT-01
+3. Engage Cloudflare support if auto-renewal has failed for any domain
+
+#### Step 3 — Fix underlying cause and restore job 40
+
+| Root cause | Restoration action | Validation |
+|---|---|---|
+| **H1 — Job deleted** | Re-register job 40: `SELECT cron.schedule('white_label_cert_check', '0 2 * * *', <job_command_per_§42.7>)` | `SELECT * FROM pg_cron.job WHERE jobname = 'white_label_cert_check'` returns 1 row with correct schedule |
+| **H2 — CF_API_TOKEN invalid** | Rotate CF_API_TOKEN in Supabase Vault; redeploy Worker proxy with updated secret | `curl` verification of new token returns `{"success":true}`; next job 40 run shows `status = 'succeeded'` |
+| **H3 — Worker proxy failure** | Redeploy or restart Cloudflare Worker proxy; confirm Worker health via Cloudflare dashboard | Worker proxy responds 200 for health check; next job 40 run shows `status = 'succeeded'` |
+| **H4 — Cloudflare API outage** | Await Cloudflare API recovery per Cloudflare status page; no local action required | Cloudflare API returns 200; next 02:00 UTC run shows `status = 'succeeded'` in `pg_cron.job_run_details` |
+| **H5 — Supabase outage** | Monitor Supabase status page; await platform recovery; confirm pg_cron resumes automatically | First run after platform recovery shows `status = 'succeeded'` in `pg_cron.job_run_details` |
+
+#### Step 4 — Confirm restoration and close incident
+
+1. Trigger a manual run of job 40 to process the missed window: `SELECT cron.run_job(<jobid>)` where `<jobid>` is job 40's ID from `pg_cron.job`
+2. Confirm `pg_cron.job_run_details` shows `status = 'succeeded'` for `white_label_cert_check` post-fix
+3. Verify `system.white_label_cert_checked` events resume in the audit log for all active white-label domains
+4. Emit `system.wl_cert_check_restored` (STANDARD/3yr) via `emit-audit-event` Worker — see §R-35.7
+5. Resolve PagerDuty P1 incident `wl-cert-check-stale`
+
+---
+
+### R-35.6 Communication Templates
+
+#### WL-CERT-INT-01 — Internal Communication Template (P0 only)
+
+> **Required when:** P0 severity (≥ 1 active cert with `ssl_cert_expiry_at < NOW() + INTERVAL '7 days'` confirmed by R-35-C1). Not required at P1.
+> **Recipients:** devops-lead + compliance-officer + account owners for affected white-label tenants
+> **SLA:** Draft within 30 min of R-35-C1 P0 confirmation; no customer-facing template unless cert has already expired
+
+**Template:**
+
+```
+**[INTERNAL] WL Cert Check Stale — P0**
+Incident: {incident_id}
+Declared: {timestamp UTC}
+At-risk domains: {count} (ssl_cert_expiry_at < 7 days)
+Earliest expiry: {earliest_expiry_at}
+IC: devops-lead
+Action: Manual Cloudflare API poll underway for all at-risk domains
+```
+
+> **Note:** No customer-facing communication template is defined for P0 at declaration time. A customer-facing notification is only sent if Step 2c confirms that a cert has already expired or Cloudflare auto-renewal has visibly failed for a specific domain. If no cert has expired, the incident is resolved as an internal monitoring gap — white-label tenants are not notified of a monitoring-only incident.
+
+---
+
+### R-35.7 DEC-030 Chain Specification
+
+Two DEC-030 HMAC-chained events are required for every R-35 activation:
+
+#### Event 1 — `system.wl_cert_check_failure_declared` (HIGH · 7yr retention)
+
+**When:** T+0 of every R-35 activation, before any DB scope queries. Emitter: devops-lead via `emit-audit-event` Worker.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:           z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),
+  stale_hours:           z.number().positive(),
+  missed_runs:           z.number().int().nonneg(),
+  at_risk_domain_count:  z.number().int().nonneg(), // 0 if emitting before R-35-C1; update if P0 confirmed after query
+  earliest_expiry_at:    z.string().datetime().nullable(), // null if at_risk_domain_count = 0
+  trigger:               z.enum(['pagerduty_alert', 'manual_discovery']),
+  initial_severity:      z.enum(['P1', 'P0']),
+})
+```
+
+> **Privacy invariant:** No `tenant_id`, no domain hostname, no customer-identifying data — `at_risk_domain_count` is an aggregate count; `earliest_expiry_at` is a timestamp only. Operational incident declaration metadata only.
+
+#### Event 2 — `system.wl_cert_check_restored` (STANDARD · 3yr retention)
+
+**When:** Step 4 — after confirmed first successful `white_label_cert_check` run post-fix and `system.white_label_cert_checked` events resume. Emitter: devops-lead via `emit-audit-event` Worker.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:       z.string().uuid(),
+  restored_at:       z.string().datetime(),
+  root_cause:        z.enum(['H1_job_deleted', 'H2_cf_token_invalid', 'H3_worker_proxy_failure', 'H4_cloudflare_api_outage', 'H5_supabase_outage']),
+  fix_deployed_at:   z.string().datetime(),
+  domains_verified:  z.number().int().nonneg(), // count of domains confirmed healthy on restored run
+})
+```
+
+> **Privacy invariant:** No `tenant_id`, no domain hostname — `domains_verified` is an aggregate count; `root_cause` is a structured enum; all fields are operational metadata.
+
+#### WL-CERT-CHAIN-01 Ordering Invariant
+
+`system.wl_cert_check_failure_declared` **must precede** `system.wl_cert_check_restored` for the same `incident_id` in the HMAC chain. If `system.wl_cert_check_restored` is emitted without a corresponding `system.wl_cert_check_failure_declared` for the same `incident_id`, emit `system.chain_integrity_violation` (HIGH/7yr) and activate R-05 (`docs/INCIDENT_RESPONSE.md R-05`). The `emit-audit-event` Worker returns HTTP 422 on WL-CERT-CHAIN-01 ordering violation.
+
+---
+
+### R-35.8 Evidence Preservation
+
+Collect and upload to R2 `form-soc2-evidence` at `compliance/evidence/wl/wl-cert-e-001-<YYYY>-Q<N>.md`:
+
+| Artefact ID | TSC domain | TSC criteria | Description | Retention | Cadence | Owner | Path |
+|---|---|---|---|---|---|---|---|
+| **WL-CERT-E-001** | CC7 / A1 | CC7.2 / A1.2 | Quarterly export of job 40 (`white_label_cert_check`) run history from `pg_cron.job_run_details`, covering the full quarter: all run timestamps, status, and `return_message` for each daily 02:00 UTC execution. Provides auditor-inspectable proof that the WL-SLO-02/03 detection mechanism operated continuously throughout the SOC 2 observation period. Any stale windows are documented with the R-35 incident ID and resolution timestamp. **Quarterly cadence — collected regardless of whether an R-35 activation occurred during the quarter.** | 3 yr | Quarterly | devops-lead | `compliance/evidence/wl/wl-cert-e-001-YYYY-QN.md` |
+
+---
+
+### R-35.9 SOC 2 Evidence Mapping
+
+| SOC 2 criterion | Control | R-35 relevance |
+|---|---|---|
+| **CC7.2** | Monitoring of system components — `pg-cron-health-monitor` generates `system.cron_job_stale` within 26 h of any missed `white_label_cert_check` run; job 40 provides continuous WL-SLO-02/03 detection | WL-CERT-E-001 quarterly `pg_cron.job_run_details` export proves monitoring control operated as specified throughout the observation period; R-35 activation records prove stale windows were detected within the 26-h freshness threshold |
+| **A1.2** | System availability — WL-SLO-02 (zero expired certs) and WL-SLO-03 (cert expiry warning ≥ 30 days) define the availability commitment to white-label tenants (ENTERPRISE.md §Branding — ≥ $50k ARR) | WL-CERT-E-001 provides evidence that the detection mechanism supporting WL-SLO-02 and WL-SLO-03 operated within the defined monitoring SLA; R-35 P0 activation and resolution records demonstrate the escalation and manual compensating control (Cloudflare API polling) executed within the defined SLA |
+
+> **Auditor narrative (CC7.2 + A1.2):** FORM's white-label tier (ENTERPRISE.md §Branding) commits to WL-SLO-02 (zero expired certs) and WL-SLO-03 (cert expiry warning ≥ 30 days) for all active white-label custom hostnames. `white_label_cert_check` (job 40, daily 02:00 UTC) is the monitoring control enforcing these SLOs by polling the Cloudflare Custom Hostnames API. The `pg-cron-health-monitor` detects any gap exceeding 26 h and pages devops-lead. WL-CERT-E-001 quarterly exports prove continuous monitoring operation. At P0, the manual Cloudflare API polling step (§R-35.5 Step 2) is the compensating control that preserves WL-SLO-02/03 enforcement during the detection gap — demonstrating that FORM's availability commitments are backed by both automated monitoring and a defined manual fallback procedure.
+
+---
+
+### R-35.10 Post-Incident Controls
+
+| Control | Action | Owner | SLA |
+|---|---|---|---|
+| **PIR** | Post-incident review required for all P0 escalations: root cause analysis, timeline, contributing factors, action items. Template: standard INCIDENT_RESPONSE post-mortem template. | devops-lead + compliance-officer | Filed within 72 h of resolution |
+| **H2 CF_API_TOKEN rotation** | If root cause H2 (CF_API_TOKEN expired): add `white_label_cert_check` CF_API_TOKEN to the quarterly secrets rotation checklist; document expected token lifetime in OBSERVABILITY.md §12.6 job 40 notes | devops-lead | 14 days |
+| **H3 Worker proxy monitoring** | If root cause H3 (Worker proxy failure): add Cloudflare Worker proxy health check to the OBSERVABILITY.md §12.6 job 40 dependency list; configure Worker proxy uptime alert in Cloudflare dashboard | devops-lead | 14 days |
+| **P0 tenant notification review** | If P0: review whether any notified white-label tenants raised SLA credit claims; document resolution and any SLA credit decisions in WL-CERT-INT-01 §Outcome | devops-lead + compliance-officer | 5 business days |
+| **§12.6 cross-reference** | Update OBSERVABILITY.md §12.6 job 40 cross-ref column to include "INCIDENT_RESPONSE R-35 (job 40 stale recovery runbook — §R-35.5)" | devops-lead | **Done — OBSERVABILITY.md §12.6 v0.9 patch, 2026-06-22** |
+| **WL-CERT-E-001 quarterly collection** | Collect and file WL-CERT-E-001 quarterly at end of each calendar quarter; include any R-35 activation records for that quarter | devops-lead | End of each calendar quarter |
+
+---
+
+### R-35.11 Implementation Checklist
+
+#### P0 — Before job 40 is deployed to production (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.wl_cert_check_failure_declared` (HIGH, 7yr) and `system.wl_cert_check_restored` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md §System`. Add WL-CERT-CHAIN-01 ordering invariant note. | devops-lead + compliance-officer | **P0** | M10 | [ ] |
+| 2 | Deploy R-35 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'white_label_cert_check'` to PagerDuty service `form-devops` P1, dedup key `wl-cert-check-stale`, route to devops-lead. Write integration test: disable job 40 in staging for > 26 h; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-devops`. | devops-lead | **P0** | M10 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Add WL-CERT-E-001 to `docs/SOC2_READINESS.md` evidence registry under CC7.2 / A1.2 criteria. Define quarterly collection cadence and R2 path `compliance/evidence/wl/wl-cert-e-001-YYYY-QN.md`. | compliance-officer | **P1** | M11 | [ ] |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 40 `white_label_cert_check` registry entry: add `INCIDENT_RESPONSE R-35 (job 40 stale recovery runbook — §R-35.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M10 | [x] *(completed in OBSERVABILITY.md §12.6 v0.9 patch, 2026-06-22)* |
+
+---
+
+*v1.0 (2026-06-22): R-35 WL Cert Check Stale — thirty-fifth runbook. Closes the documentation gap for `white_label_cert_check` (job 40, `0 2 * * *`, 26-h freshness window) identified in `docs/OBSERVABILITY.md §12.6`. R-35 provides the full IC protocol for when job 40 exceeds its freshness window, covering the WL-SLO-02 (zero expired certs) and WL-SLO-03 (cert expiry warning ≥ 30 days) detection gap. Trigger: `system.cron_job_stale` with `job_name = 'white_label_cert_check'` from `pg-cron-health-monitor` (§12.6) → PagerDuty P1 `form-devops` → devops-lead; dedup `wl-cert-check-stale`. Critical distinction from R-33/R-34: R-35 is a detection-gap runbook only — no direct data mutation is required; cert auto-renewal is managed by Cloudflare; the platform's role is monitoring and alerting. Two-severity matrix: P1 (stale, R-35-C1 count = 0 — monitoring gap only; Cloudflare auto-renewal presumed intact; no cert is immediately at risk), P0 (stale AND R-35-C1 count > 0 — both WL-SLO-02 and WL-SLO-03 in detection gap; SLA credit risk for affected white-label tenants; manual Cloudflare API poll required). T+0–T+30 immediate actions: emit `system.wl_cert_check_failure_declared` HIGH/7yr at T+0; R-35-C1 at T+5; `pg_cron.job_run_details` check at T+10; CF_API_TOKEN and Worker proxy check at T+15; P0 manual Cloudflare API poll at T+15; restoration at T+20–T+30. Five root cause hypotheses: H1 (job deleted/disabled), H2 (CF_API_TOKEN invalid/expired — unique risk not present in peer stale runbooks), H3 (Cloudflare Worker proxy failure), H4 (Cloudflare Custom Hostnames API outage), H5 (Supabase platform outage → R-03 primary). Two scope queries: R-35-C1 (P0 gate — active certs with `ssl_cert_expiry_at < NOW() + INTERVAL '7 days'`; aggregate count only), R-35-C2 (pg_cron.job_run_details last 10 runs for stale window). Four recovery steps: Step 1 (confirm stale + classify root cause with six-check table); Step 2 (P0 only — manual Cloudflare API poll for each at-risk domain; notify affected tenants if cert expired or imminent; Step 2a scope confirmation; Step 2b API poll; Step 2c tenant notification); Step 3 (restore job 40 per root cause, H1–H5 table); Step 4 (manual run trigger; confirm `status = 'succeeded'`; verify `system.white_label_cert_checked` events resume; emit `system.wl_cert_check_restored` STANDARD/3yr). One internal communication template: WL-CERT-INT-01 (P0 only — no customer-facing template unless cert has already expired). Two DEC-030 HMAC-chained events: `system.wl_cert_check_failure_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_hours` positive, `missed_runs` nonneg int, `at_risk_domain_count` nonneg int, `earliest_expiry_at` datetime nullable, `trigger` enum['pagerduty_alert','manual_discovery'], `initial_severity` enum['P1','P0']), `system.wl_cert_check_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H5, `fix_deployed_at` datetime, `domains_verified` nonneg int); WL-CERT-CHAIN-01 ordering invariant: `wl_cert_check_failure_declared` must precede `wl_cert_check_restored` for same `incident_id` — if `restored` emitted without corresponding `failure_declared`, emit `system.chain_integrity_violation` HIGH/7yr and activate R-05; `emit-audit-event` Worker returns HTTP 422 on violation. One evidence artefact: WL-CERT-E-001 (quarterly `pg_cron.job_run_details` export for job 40, CC7.2/A1.2, 3yr, quarterly cadence, devops-lead, `compliance/evidence/wl/wl-cert-e-001-YYYY-QN.md`). Two SOC 2 criteria: CC7.2 (monitoring control — `pg-cron-health-monitor` 26-h freshness detection for WL-SLO-02/03), A1.2 (system availability — WL-SLO-02/03 enforcement for white-label tenants ≥ $50k ARR; compensating control via manual Cloudflare API poll at P0). Post-mortem required for all P0 escalations, filed within 72 h. Six post-incident controls: PIR (72 h — P0 only), H2 CF_API_TOKEN rotation (14 days), H3 Worker proxy monitoring (14 days), P0 tenant notification review (5 business days), §12.6 cross-reference [x] Done v0.9 patch 2026-06-22, WL-CERT-E-001 quarterly collection (end of each calendar quarter). Four-item implementation checklist: 2× P0/M10 (AUDIT_LOG_SCHEMA registration; PagerDuty routing rule + integration test), 2× P1/M10–M11 (SOC2_READINESS WL-CERT-E-001 registration; §12.6 cross-ref [x] Done v0.9 patch 2026-06-22). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 40 `white_label_cert_check` registry entry — stale consequence updated with INCIDENT_RESPONSE R-35 per v0.9 patch [x] Done); §42.7 (job 40 spec — `white_label_cert_check`); §42.4 WL-SLO-02 / WL-SLO-03; §42.5 AL-WL-04 / AL-WL-05; WL-CERT-E-001 (CC7.2/A1.2, quarterly 3yr); ENTERPRISE.md §Branding (white-label ≥ $50k ARR threshold); OBSERVABILITY.md §12.6 job 40 registry entry; R-05 (HMAC chain break — activate on WL-CERT-CHAIN-01 ordering violation); R-03 (Infrastructure Outage — primary runbook if H5 Supabase outage confirmed). Owner: devops-lead + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-22 · Owner: devops-lead + compliance-officer**
+**Review: after every P0 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0 — whichever comes first.**
+
+---

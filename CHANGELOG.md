@@ -12,6 +12,15 @@
 
 ---
 
+## [7.67.1] — 2026-06-22
+
+### Changed
+- `docs/OBSERVABILITY.md` — §12.6 pg_cron canonical registry v0.9 patch: registered jobs 40 (`white_label_cert_check`, daily 02:00 UTC, 26h freshness, CC7.2/A1.2) and 41 (`webhook_degraded_escalation_check`, every 30 min, 35-min freshness, CC9.2/CC7.2). Resolves two job-number conflicts: §42.7 (v3.9, 2026-06-14) had claimed "job 32" for `white_label_cert_check` and §43.7 (v4.0, 2026-06-14) had claimed "job 34" for `webhook_degraded_escalation_check` — both numbers were already canonical in §12.6 since the v0.4 patch (job 32 = `turh_retention_purge`; job 34 = `bdg_override_expiry_sweep`). In-text citations corrected throughout §42.7, §42.14 item 3, §43.7, §43.15 items 6–8. Conflict resolution note v0.9 added. Freshness window note extended to include jobs 40 and 41.
+- `docs/INCIDENT_RESPONSE.md` — R-35 stale recovery runbook added for `white_label_cert_check` (job 40): P1 default (stale, no at-risk certs) / P0 escalation (stale + ≥ 1 active cert expiring within 7 days); scope query R-35-C1; DEC-030 events `system.wl_cert_check_failure_declared` (HIGH/7yr) and `system.wl_cert_check_restored` (STANDARD/3yr); chain invariant WL-CERT-CHAIN-01; SOC 2 evidence WL-CERT-E-001 (CC7.2/A1.2, quarterly 3yr); internal communication template WL-CERT-INT-01 (P0 only). Completes the stale-runbook obligation introduced by OBSERVABILITY.md §42.7 (v3.9). Closes §12.6 job 40 cross-ref to INCIDENT_RESPONSE R-35.
+- `VERSION` — 7.67.0 → 7.67.1.
+
+---
+
 ## [7.66.0] — 2026-06-22
 
 ### Added
