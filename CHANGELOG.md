@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [7.87.0] — 2026-06-22
+
+### Added
+- `content/post-2254-volume-progression-within-block.md` — Editorial 2251–2260, post 4/10. Об'єм у блоці: MEV/MAV/MRV як три маркери дозування, а не цілі. Прогресія об'єму тиждень за тижнем (MEV → MAV → деловантаження). Чому об'єм і вага — різні механізми прогресії. Індивідуальна варіабельність: тренувальний вік, якість сну, зовнішній стрес. Операційні маркери перетину MRV. 4-крокий алгоритм для конкретного блоку. Krieger (2010), Schoenfeld, Ogborn & Krieger (2016), Hubal et al. (2005), Leproult & Van Cauter (2011), Halson (2014). clinical-safety: NOT_REQUIRED. sports-scientist review required before publish.
+- `blog.html` — Blog card added for post-2254.
+- `README.md` — Editorial 2261–2270 «Від чужої програми до власного протоколу» added as proposed (10 topics: program selection, linear/block/wave types, reading programs, adapting vs. following, safe modification, transitions, time-constrained programming, "no best program", aerobic/strength interference, synthesis).
+
+### Changed
+- `README.md` — rows 2252 і 2253 updated from `proposed` to `draft · v7.86.0` with filenames.
+- `STATUS.md` — total posts 2007 → 2008; Editorial 2251–2260 progress 3/10 → 4/10.
+- `VERSION` — 7.86.0 → 7.87.0.
+
+---
+
 ## [7.86.0] — 2026-06-22
 
 ### Added
