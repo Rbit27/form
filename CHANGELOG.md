@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.93.0] — 2026-06-22
+
+### Added
+- `content/post-2262-three-types-of-programs.md` — Editorial 2261–2270 block, post 2/10. Три типи програм: лінійна прогресія, блокова, хвильова — і коли кожна підходить. LP: нейральна адаптація за 48–72h SRA-цикл, Rippetoe logic, дві умови застосування (справжній початківець, повернення після перерви), сигнал провалу LP. Блокова: Issurin (2010) концентроване vs. розподілене навантаження, суперімпозиція ефектів, Stone et al. (1999), три фази (accumulation → transmutation → realization), три помилки. DUP/хвильова: Verkhoshansky accommodation principle, Rhea et al. (2002) — DUP подвоїв приріст сили LP при рівному обсязі за 12 тижнів у тренованих суб'єктів, різниця DUP vs. wave loading. Таблиця рішень 3×4 (тренувальний вік / ціль / днів на тиждень / гнучкість). Три типові помилки вибору. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. Blog card added.
+- `content/post-2263-how-to-read-a-program.md` — Editorial 2261–2270 block, post 3/10. Як читати готову програму: що між рядками важливіше за цифри. Програма — стиснутий аргумент про адаптацію, а не інструкція. §Обсяг: 3×5 vs. 5×3 механістично, working vs. all sets, MEV/MAV/MRV Israetel et al. (2019). §Інтенсивність: gap між тестованим і розрахованим 1RM, RPE калібрація у початківців і просунутих (Zourdos 2016, Helms 2016), RIR vs. RPE дивергенція, LP «add 2.5 kg» пастка в проміжному контексті. §Вибір вправ: ціль адаптації vs. заповнення слабкого місця, правила заміни, чому paused squat в Calgary Barbell не довільний. §Паузи: Schoenfeld et al. (2016) — різниця закривається при рівному обсязі, але падіння якості підходів залишається. §Червоні прапорці: 6 структурних дефектів. §П'ять питань перед стартом програми. clinical-safety: NOT_REQUIRED. sports-scientist review required before publish. Blog card added.
+
+### Changed
+- `blog.html` — cards added for post-2263 and post-2262 (prepended before post-2261).
+- `STATUS.md` — content table updated: posts 2262–2263 added, total 2015 → 2017; Editorial 2261–2270 progress 1/10 → 3/10; next priorities updated.
+- `VERSION` — 7.92.1 → 7.93.0.
+
+---
+
 ## [7.92.1] — 2026-06-22
 
 ### Changed
