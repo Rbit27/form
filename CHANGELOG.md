@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [7.85.0] — 2026-06-22
+
+### Added
+- `content/post-2251-what-is-a-mesocycle.md` — Editorial 2251–2260 post 1/10. Opens new block «Структура тренувального блоку: від наміру до мезоциклу». Central argument: weekly thinking gives tactics without strategy; the mesocycle is the minimum planning unit that lets a self-coached athlete control adaptation rather than just accumulate fatigue. Covers: why post-beginner athletes fail with week-to-week linear thinking (three failure modes: no culmination, no context for decisions, incorrect progress assessment); mesocycle as a block with a single dominant adaptive focus (accumulation / intensification / peaking / deload); duration calibration (Zourdos et al. 2016; Helms et al. 2018: 3–6 weeks by training status); block as unit of analysis for self-coached athlete without external observer; minimal two-phase structure (4-week accumulation → 1-week deload); first-block mistake: multiple equal priorities = no priority; post-block analysis as the input for the next block. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+
+### Changed
+- `blog.html` — post-2251 card added above post-2250.
+- `README.md` — Editorial 2251–2260 block added to roadmap with all 10 proposed topics.
+- `STATUS.md` — total posts 2004 → 2005; Editorial 2251–2260 started 1/10.
+- `VERSION` — 7.84.0 → 7.85.0.
+
+---
+
 ## [7.84.0] — 2026-06-22
 
 ### Added
