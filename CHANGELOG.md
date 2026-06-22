@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [7.83.1] — 2026-06-22
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md` v2.31 — +2 DEC-030 HMAC-chained events closing OBSERVABILITY §49.9 item 3 (P0/M5) and SOC2_READINESS §95.6 item 3 (P0/M5): (1) `siem.sso_fleet_health_breach` (HIGH, 3yr) — emitted by pg_cron job 38 (`sso_fleet_health_check`) when ≥ 3 enterprise tenants simultaneously breach SSO-SLO-01; new `### SSO Fleet Health Monitoring events` section; Zod v2 schema `SiemSsoFleetHealthBreachPayload` with `sla_credit_impact: z.literal('none')` DEC-070 hard invariant; SOC 2 CC7.2/CC7.3 auditor narratives; SSO-FLEET-E-001 Part B evidence mapping. (2) `system.fleet_sso_check_stale` (LOW, 1yr) — `pg-cron-health-monitor` advisory when job 38 exceeds 6-minute freshness window; `### System` section; Zod v2 payload with `job_name: z.literal('sso_fleet_health_check')`, `stale_since`, `stale_minutes`, `missed_runs`; consumed by SSO-FLEET-E-001 Part A Step 2 freshness gap cross-check (§95.2). Retention table +2 rows. Privacy floor: no `tenant_id` (group-by internal only), no user identity, no GDPR Art. 9 data; `failing_tenant_count` and `fleet_success_rate_pct` are aggregate-only fields.
+
+### Changed
+- `docs/OBSERVABILITY.md` — §49.9 item 3 status: `[ ]` → `[x] Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.31`.
+- `docs/SOC2_READINESS.md` — §95.6 item 3 status: `[ ]` → `[x] Done — 2026-06-22, AUDIT_LOG_SCHEMA.md v2.31`.
+- `VERSION` — 7.83.0 → 7.83.1.
+
+---
+
 ## [7.83.0] — 2026-06-22
 
 ### Added
