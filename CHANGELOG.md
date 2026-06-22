@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.0.0] — 2026-06-22
+
+### Added
+- `content/post-2268-no-perfect-program.md` — Editorial 2261–2270, post 8/10. Чому «кращої програми» не існує — і як це використовувати. Hubal et al. (2005): 585 учасників, однакова 12-тижнева програма — від –2% до +59% зміни поперечника м'яза, від –32% до +250% приросту сили. Bamman et al. (2007): high/moderate/low responders розрізняються на рівні транскрипційної відповіді м'язової тканини, а не старанності. Damas et al. (2019): групові середні в РКД маскують величезний діапазон індивідуальних відповідей. Три рівні відповідності програми: (1) відповідність цілі — West et al. (2010) специфічність стимулу; (2) відповідність контексту відновлення — Kivistö & Häkkinen (2007) вплив позатренувального стресу; (3) відповідність тренувальному віку — Erskine et al. (2010). Чотири критерії «хорошої» програми: прогресивне перевантаження, адекватний об'єм (MEV 4–6 підходів/групу/тиждень, Israetel 2019), правильна частота, структура deload (Schoenfeld 2010). Адгеренс перевершує оптимізацію — Schoenfeld et al. (2016). Синдром вічного пошуку програми. Нейральна адаптація 3–4 тижні Grosprêtre et al. (2016) як аргумент проти ранньої зміни. Precommitment як стратегія — Baumeister & Tierney (2011). 5-кроковий алгоритм вибору для self-coached атлета. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+
+### Changed
+- `blog.html` — blog card for post-2268 added above post-2267.
+- `README.md` — post-2268 → draft; Editorial 2261–2270 progress updated to 8/10.
+- `STATUS.md` — total posts updated 2022 → 2023; Editorial 2261–2270 progress updated to 8/10; version header v7.81.0 → v8.0.0.
+- `VERSION` — 7.99.0 → 8.0.0.
+
+---
+
 ## [7.99.0] — 2026-06-22
 
 ### Added
