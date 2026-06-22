@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [8.0.1] — 2026-06-22
+
+### Changed
+- `enterprise.html` — Contract clarity section added between pricing tiers and ROI/business-case section. Four editorial fact-cards cover the renewal mechanics sourced from `docs/COST_MODEL.md §42` and `docs/ENTERPRISE.md`: (1) 90-day renewal notice guarantee — MSA breach on FORM's side if missed; (2) Year 1 rate locked — no mid-term adjustments; (3) Multi-year Year 2+ escalation cap — CPI-U + 1%, hard ceiling 5% per year, methodology shared 90 days in advance; (4) Price floors enforced at billing-system layer — $6/seat Starter, $4.50/seat Growth, $4/seat Enterprise, no exception path can waive. New FAQ item efaq11: "What happens to pricing when we renew — will the rate increase?" — covers single-year reset vs. multi-year formula cap, BLS reference, floor logic, 10% seat-reduction threshold, MSA grounding. Fraunces editorial style; num/display/label/feature-card classes per established design system; no fabricated logos or case studies; all facts traceable to `docs/COST_MODEL.md §42.2–§42.5` and `docs/ENTERPRISE.md §Pricing`. compliance-officer: APPROVED (facts sourced from §42 and ENTERPRISE.md). privacy-floor: NOT_AFFECTED (no individual user data).
+- `VERSION` — 8.0.0 → 8.0.1.
+
+---
+
 ## [8.0.0] — 2026-06-22
 
 ### Added

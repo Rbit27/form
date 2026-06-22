@@ -545,6 +545,67 @@
 
 <hr class="divider" style="margin:0 2rem;" />
 
+<!-- ─── Contract clarity ─────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-24">
+  <div class="grid md:grid-cols-2 gap-16 items-start">
+
+    <div>
+      <div class="label mb-6">Contract terms</div>
+      <h2 class="display text-[52px] text-paper mb-6">Renewal<br/><em>without surprises.</em></h2>
+      <p class="text-dim text-base leading-relaxed mb-8" style="font-weight:300;">
+        Enterprise procurement teams need to model multi-year costs accurately. These mechanics are written into your MSA — not left to annual renegotiation.
+      </p>
+      <a href="/pricing-enterprise.html" class="btn-out">Open pricing calculator →</a>
+    </div>
+
+    <div class="space-y-4">
+
+      <div class="feature-card">
+        <div class="flex items-start gap-5">
+          <div class="num flex-shrink-0" style="font-size:26px;font-weight:300;color:#DDFF2D;line-height:1;min-width:48px;">90d</div>
+          <div>
+            <div class="text-paper text-sm font-medium mb-1.5">Renewal notice — 90 days in advance</div>
+            <div class="text-mute text-sm leading-relaxed">We notify you 90 days before renewal. Time to review terms, adjust seat count, or initiate a wind-down. A missed notice is an MSA breach on our side — not yours.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="flex items-start gap-5">
+          <div class="num flex-shrink-0" style="font-size:26px;font-weight:300;color:#DDFF2D;line-height:1;min-width:48px;">Y1</div>
+          <div>
+            <div class="text-paper text-sm font-medium mb-1.5">Year 1: your rate is locked</div>
+            <div class="text-mute text-sm leading-relaxed">Your contracted per-seat rate doesn't change in the first contract year. No mid-term adjustments, no surprise invoices. Pay annually upfront for an additional 10% reduction.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="flex items-start gap-5">
+          <div class="num flex-shrink-0" style="font-size:26px;font-weight:300;color:#DDFF2D;line-height:1;min-width:48px;">≤5%</div>
+          <div>
+            <div class="text-paper text-sm font-medium mb-1.5">Multi-year Year 2+: CPI + 1%, hard cap 5%</div>
+            <div class="text-mute text-sm leading-relaxed">For 2- or 3-year contracts, escalation from Year 2 onward is formula-bound: CPI-U + 1%, never exceeding 5% per year. The calculation and BLS reference are shared with your 90-day renewal notice. Not negotiable upward.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="flex items-start gap-5">
+          <div class="num flex-shrink-0" style="font-size:26px;font-weight:300;color:#DDFF2D;line-height:1;min-width:48px;">Floor</div>
+          <div>
+            <div class="text-paper text-sm font-medium mb-1.5">Price floors enforced at the billing layer</div>
+            <div class="text-mute text-sm leading-relaxed">No discount, exception, or negotiation can push rates below $6/seat (Starter), $4.50/seat (Growth), or $4/seat (Enterprise). These are structural minimums — a billing-system constraint, not a soft guideline.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
 <!-- ─── ROI / business case ───────────────────────────────── -->
 <section class="max-w-[1440px] mx-auto px-8 py-24">
   <div class="label mb-4">Business case</div>
@@ -1165,6 +1226,16 @@
         </button>
         <div class="faq-body" id="efaq10">
           FORM supports native log forwarding to Datadog, Splunk, Microsoft Sentinel, and IBM QRadar, plus webhook delivery and REST pull API. Events are HMAC-SHA256 chained (DEC-030) — each event includes a digest of the previous, so your SIEM can verify the chain hasn't been tampered with. Before the integration activates, your designated security representative signs a SIEM Data Processing Addendum (Addendum 4 to the MSA). This is a one-time step; the signed addendum version is recorded in the audit log. If you later revoke SIEM access, a new Addendum 4 is required before re-activation. Your endpoint URL is never stored in plaintext — FORM retains only the first half of its SHA-256 hash.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq11')">
+          <span>What happens to pricing when we renew — will the rate increase?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq11">
+          Year 1 is always your contracted rate — no changes. For single-year renewals, the rate resets to the then-current list price for your tier at renewal time. For multi-year contracts (2 or 3 years), escalation in Year 2 and beyond is formula-capped: CPI-U (All Urban Consumers, BLS) plus 1%, with a hard ceiling of 5% per year regardless of actual inflation. The calculation, BLS reference month, and resulting rate are shared in writing 90 days before renewal. If the formula would push your rate below the tier floor — $6/seat (Starter), $4.50/seat (Growth), $4/seat (Enterprise) — the floor applies instead. Seat reductions of 10% or less at renewal don't trigger a unit price renegotiation; above 10%, the rate resets to the current-list for your new seat count. All of this is MSA language, not a verbal commitment — your procurement team can review it before signing.
         </div>
       </div>
 
