@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [7.66.0] — 2026-06-22
+
+### Added
+- `content/post-2133-hotel-gym-travel-protocol.md` — Editorial 2131–2140 post 3/10. Hotel gym: мінімально-ефективний протокол для відрядження. Тривалість поїздки як перше рішення (1–2 дні / 3–5 днів / 7+). Мінімальний ефективний стимул: 1/9 об'єму → силова підтримка, 1/3 → гіпертрофійна (Bickel et al. 2011). Механізм eccentric tempo і mechanical tension без зовнішнього навантаження (Schoenfeld 2010). Протокол А (гантелі 15–30 кг, 5 патернів × 3 сети, темп 3-1-2, 35–45 хв). Протокол Б (bodyweight only, 4 патерни, 2–3 сети, 30–40 хв). Що пропустити: PR-спроби, ізоляція, максимальний об'єм, важкі технічні підйоми без стійки. RPE-калібрація у відрядженні: Waterhouse (2007) jet lag + Judelson (2007) hydration → суб'єктивне навантаження природно вище, стеля RPE 7–8. Повернення: -15–20% об'єму перший тиждень, без компенсаційної логіки. Дерево рішень 4 кроки. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `README.md` — Editorial block 2201–2210 "Практика самоконтролю" додано до roadmap (proposed · v7.66.0).
+
+### Changed
+- `blog.html` — card for post-2133 added (перед post-2132).
+- `STATUS.md` — Editorial 2131–2140 updated: IN PROGRESS 3/10 · v7.66.0. NEXT: post-2134 (два тренування на тиждень замість чотирьох).
+
+---
+
 ## [7.65.0] — 2026-06-22
 
 ### Added
