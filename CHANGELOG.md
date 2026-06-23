@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.22.0] — 2026-06-23
+
+### Added
+- `content/post-2377-what-to-measure-and-what-not-to.md` — Серія 2376–2385 «Зворотний зв'язок без тренера» пост 2/10. Ієрархія метрик: три рівні — первинні (вага/підходи/повт/RPE), контекстуальні (сон, загальний стан, HRV-тренд), прогресні (e1RM, обсяг, технічний аудит). Saw et al. (2016): суб'єктивні самооцінки узгоджуються з об'єктивними маркерами при регулярному зборі. Zourdos et al. (2016) RPE ICC 0.89–0.94. Plews et al. (2013) 7-денний ковзний середній HRV. Leproult & Van Cauter (2011) сон і тестостерон. DOMS, «відчуття помпи» — не маркери прогресу. Damas et al. (2016) DOMS як запальна реакція. Hubal et al. (2005) n-of-1. Правило корисності: якщо метрика не змінює рішення — шум. Мінімальна інформаційна система (первинне, контекстуальне, прогресне). clinical-safety: NOT_REQUIRED. Blog card added.
+- `content/post-2350-self-assessment-training-progress.md` — Серія 2346–2355 «Операційні інструменти self-coached атлета» пост 5/10. Чотири виміри прогресу: силовий вихід, обсягова ємність, технічна якість, відновлення. Горизонт оцінки мінімум 4–8 тижнів. Damas et al. (2016): перші 3–4 тижні переважно нейральна адаптація. Meeusen et al. (2013) мінімальний горизонт 4 тижні для діагностики. Чотири практичні методи: e1RM початок vs. кінець блоку (Reynolds 2006, Chapman 1998, Еплі формула), тижневий обсяг (Israetel et al. 2019 MRV), benchmark session (Zourdos et al. 2016), технічний аудит відео (Wulf et al. 2010, Miall & Wolpert 1996). Три систематичних помилки: відчуття замість даних (Helms 2016), чужий прогрес замість n-of-1 (Hubal 2005 розкид 0–250%), оцінка до деловантажу (Halson 2014 суперкомпенсаційне вікно). П'ять запитань протоколу блокової самооцінки. clinical-safety: NOT_REQUIRED. Blog card added.
+
+### Changed
+- `blog.html` — blog cards added for post-2377 (after post-2376) and post-2350 (prepended to grid, above post-2349).
+- `STATUS.md` — content table updated: post-2377 and post-2350 added; series progress updated; next priorities updated.
+- `VERSION` — 8.21.1 → 8.22.0 (MINOR: two new editorial posts, two series advanced).
+
+---
+
 ## [8.21.1] — 2026-06-23
 
 ### Changed
