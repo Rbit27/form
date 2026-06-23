@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.17.1] — 2026-06-23
+
+### Changed
+- `docs/SOC2_READINESS.md` — §101 added: Cross-Reference Patch for DATA_MODEL §44 (`enterprise_churn_events` · Migration 0085 · C1.2 / CC6.1 / CC4.1 / CC5.2). Closes the bidirectional three-document chain (COST_MODEL §43 → DATA_MODEL §44 → SOC2_READINESS §101) following the §84–§100 pattern. §101.1 three-document chain table. §101.2 twelve-row canonical DDL source registration: three ENUMs, `ece_deletion_sla_respected` CHECK (C1.2 DDL backstop — dual control layer), `ece_winback_acv_requires_converted` CHECK (CC5.2 WINBACK-CHAIN-01 backstop), `ece_offboarding_before_deletion` CHECK (CC6.1 process sequencing), UNIQUE INDEX `idx_ece_tenant_churn_date` (CC6.1 completeness), two non-unique indexes (CC4.1 performance guarantee), REVOKE form_api (CC6.1 access control), `fehs_at_churn` column (k≥10 aggregate), `offboarding_initiated_at` column (CC7.1 elapsed-time anchor). §101.3 four privacy floor supplements: FORM-internal only, tenant_manager exclusion (DDL proof query returns 0), fehs_at_churn tenant-aggregate, offboarding timestamps FORM-process-operational. §101.4 five-row SOC 2 criteria mapping supplement (C1.2 dual evidence paths, CC6.1 three DDL layers, CC4.1 O(log n) guarantee, CC5.2 WINBACK-CHAIN-01 DDL backstop, CC7.1 bounded-table compliance query). §101.5 four obligations closed (§84–§100 pattern, COST_MODEL §43.10 item 10, DATA_MODEL §44.11, DATA_MODEL §44.10 item 6 — all 🟢). §101.6 three-item checklist (P0 migration 0085, P1 DEC-030 events, P1 §79.4 registration). Header v3.25.7 → v3.26.0.
+- `docs/COST_MODEL.md` — §43.10 item 10 marked `[x] Done` (SOC2_READINESS §101 authored 2026-06-23 v3.26.0).
+- `docs/DATA_MODEL.md` — §44.10 item 6 marked `[x] Done`; §44.11 SOC2_READINESS §101 cross-ref obligation updated 🟡 Pending → 🟢 Closed.
+- `VERSION` — 8.17.0 → 8.17.1 (patch: SOC2_READINESS §101 extension).
+
+---
+
 ## [8.17.0] — 2026-06-23
 
 ### Added

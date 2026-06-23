@@ -16810,7 +16810,7 @@ Mirrors `docs/COST_MODEL.md §43.10 item 2` (this section closes that obligation
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 6 | Add `docs/SOC2_READINESS.md §101` cross-reference patch for DATA_MODEL §44 (`enterprise_churn_events`): map each column class to its TSC (C1.2, CC6.1, CC4.1) and evidence artefact (DEL-E-001, CHN-E-001), following the §84–§100 pattern. Tracked in COST_MODEL §43.10 item 10. | compliance-officer + enterprise-architect | **P2** | After DATA_MODEL §44 is written | [ ] |
+| 6 | Add `docs/SOC2_READINESS.md §101` cross-reference patch for DATA_MODEL §44 (`enterprise_churn_events`): map each column class to its TSC (C1.2, CC6.1, CC4.1) and evidence artefact (DEL-E-001, CHN-E-001), following the §84–§100 pattern. Tracked in COST_MODEL §43.10 item 10. | compliance-officer + enterprise-architect | **P2** | After DATA_MODEL §44 is written | [x] **Done — SOC2_READINESS §101 authored 2026-06-23 (v3.26.0).** |
 
 ---
 
@@ -16819,7 +16819,7 @@ Mirrors `docs/COST_MODEL.md §43.10 item 2` (this section closes that obligation
 | Obligation | Source | Status |
 |-----------|--------|--------|
 | COST_MODEL §43.10 item 2 → DATA_MODEL §44 | `docs/COST_MODEL.md §43.10 item 2` requires this section before migration 0085 is applied to production | 🟢 **Closed — §44 is the DATA_MODEL canonical registration. Mark COST_MODEL §43.10 item 2 `[x] Done` simultaneously when migration 0085 is applied to production.** |
-| SOC2_READINESS §101 cross-ref patch for DATA_MODEL §44 | `docs/COST_MODEL.md §43.10 item 10` requires SOC2_READINESS §101 cross-ref patch after DATA_MODEL §44 is written | 🟡 **Pending — §44 is now authored. COST_MODEL §43.10 item 10 (P2) can now be actioned by compliance-officer.** |
+| SOC2_READINESS §101 cross-ref patch for DATA_MODEL §44 | `docs/COST_MODEL.md §43.10 item 10` requires SOC2_READINESS §101 cross-ref patch after DATA_MODEL §44 is written | 🟢 **Closed — SOC2_READINESS §101 authored 2026-06-23 (v3.26.0). COST_MODEL §43.10 item 10 marked [x] Done.** |
 | AUDIT_LOG_SCHEMA registration for three DEC-030 events | `docs/COST_MODEL.md §43.10 item 1` requires `enterprise.winback_initiated` (HIGH, 7yr), `enterprise.winback_converted` (CRITICAL, 7yr), `enterprise.deletion_certificate_issued` (CRITICAL, 7yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise` | 🟡 **Pending — P0/M10. Independent of §44 authoring; tracked in COST_MODEL §43.10 item 1.** |
 | OBSERVABILITY §12.6 — pg_cron job 43 registration | `docs/COST_MODEL.md §43.10 item 3` requires DELETION-SLA-01 monitoring (job 43) in OBSERVABILITY §12.6 | 🟡 **Pending — P0/M10. Independent of §44 authoring; tracked in COST_MODEL §43.10 item 3.** |
 

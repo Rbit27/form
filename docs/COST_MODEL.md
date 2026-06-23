@@ -11911,7 +11911,7 @@ REVOKE ALL ON enterprise_churn_events FROM form_api;
 |---|---|---|---|---|---|
 | 8 | File first WIN-E-001 after Year 1 of enterprise operation; compare actual winback rates by `churn_reason` × `wau_band` to §43.5.1 model; update if actuals deviate ≥ 10 pp; close OQ-WIN-01. | data-engineer + customer-success | **P2** | M24 | [ ] |
 | 9 | Log actual CSM + engineering hours for first 3 offboardings; replace [ESTIMATE] flags in §43.3.1 with actuals; update §8.4 enterprise gross margin to include offboarding cost line item. | data-engineer + customer-success | **P2** | After 3 churn events | [ ] |
-| 10 | Add `docs/SOC2_READINESS.md §101` cross-reference patch for DATA_MODEL §44 (`enterprise_churn_events`): map each column class to its TSC (C1.2, CC6.1, CC4.1) and evidence artefact (DEL-E-001, CHN-E-001), following the §84–§100 pattern. | compliance-officer + enterprise-architect | **P2** | After DATA_MODEL §44 is written | [ ] |
+| 10 | Add `docs/SOC2_READINESS.md §101` cross-reference patch for DATA_MODEL §44 (`enterprise_churn_events`): map each column class to its TSC (C1.2, CC6.1, CC4.1) and evidence artefact (DEL-E-001, CHN-E-001), following the §84–§100 pattern. | compliance-officer + enterprise-architect | **P2** | After DATA_MODEL §44 is written | [x] **Done — SOC2_READINESS §101 authored 2026-06-23 (v3.26.0).** |
 
 ---
 
