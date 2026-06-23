@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [8.34.1] — 2026-06-23
+
+### Changed
+- `docs/DATA_MODEL.md §44.6` — WINBACK-CHAIN-01 definition patched per DEC-079: Worker lookup is now by `winback_initiated_event_id` (event UUID), not current `tenant_id`; `prior_tenant_id` on `WinbackConvertedPayload` carries the churned tenant UUID. Aligns DATA_MODEL with COST_MODEL §43.7 which was updated at DEC-079 adoption. Also fixes missed document header bump (v1.25 → v1.27). No DDL or RLS changes. Document header v1.25 → v1.27.
+
+---
+
 ## [8.34.0] — 2026-06-23
 
 ### Added
