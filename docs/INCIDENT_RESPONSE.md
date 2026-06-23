@@ -15392,7 +15392,7 @@ const CiTelemetryRestoredSchema = z.object({
 | **H3 — AE connectivity recurring** | If H3 recurs ≥ 2 times: add monthly Cloudflare AE `CI_TELEMETRY` binding health check to devops runbook; consider Worker-level AE availability probe before each pg_cron daily run | devops-lead | 14 days after second H3 activation |
 | **CI-E-003 addendum** | If `ci_telemetry_daily_gap_days ≥ 1`: add addendum row to CI-E-003 DORA report for the affected quarter per §R-40.8 format documenting gap, root cause, and backfill status | devops-lead + compliance-officer | Before CI-E-003 quarterly filing |
 | **§12.6 cross-reference** | Update `docs/OBSERVABILITY.md §12.6` job 28 `ci_telemetry_daily_sync` registry entry to include `INCIDENT_RESPONSE R-40 (job 28 stale recovery runbook — §R-40.5)` in the stale-consequence cross-ref column | devops-lead | **Done — OBSERVABILITY.md §12.6 v1.3 patch, 2026-06-22** |
-| **AL-CI-07 formal registration** | AL-CI-07 is referenced in `docs/OBSERVABILITY.md §38.9` and §12.6 but lacks a formal entry in the §38.5 alert rules table. Add AL-CI-07: P2, `form-devops` PagerDuty P2 + Slack, dedup `ci-telemetry-sync-stale`, trigger = job 28 stale, runbook R-40 | devops-lead | P1, M8 (per R-40.11 item 4) |
+| **AL-CI-07 formal registration** | AL-CI-07 is referenced in `docs/OBSERVABILITY.md §38.9` and §12.6 but lacks a formal entry in the §38.5 alert rules table. Add AL-CI-07: P2, `form-devops` PagerDuty P2 + Slack, dedup `ci-telemetry-sync-stale`, trigger = job 28 stale, runbook R-40 | devops-lead | **Done — OBSERVABILITY.md §38.5 v4.9.6, 2026-06-23** (closes R-40.11 item 4) |
 
 ---
 
@@ -15410,7 +15410,7 @@ const CiTelemetryRestoredSchema = z.object({
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 3 | Update `docs/OBSERVABILITY.md §12.6` job 28 `ci_telemetry_daily_sync` registry entry: add `INCIDENT_RESPONSE R-40 (job 28 stale recovery runbook — §R-40.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M8 | [x] *(completed in OBSERVABILITY.md §12.6 v1.3 patch, 2026-06-22)* |
-| 4 | Add AL-CI-07 formal entry to `docs/OBSERVABILITY.md §38.5` alert rules table: `ci_telemetry_daily_sync` stale > 26h, P2, PagerDuty `form-devops` + Slack `#devops`, dedup `ci-telemetry-sync-stale`, 26h freshness cross-ref §12.6 job 28, runbook R-40. | devops-lead | **P1** | M8 | [ ] |
+| 4 | Add AL-CI-07 formal entry to `docs/OBSERVABILITY.md §38.5` alert rules table: `ci_telemetry_daily_sync` stale > 26h, P2, PagerDuty `form-devops` + Slack `#devops`, dedup `ci-telemetry-sync-stale`, 26h freshness cross-ref §12.6 job 28, runbook R-40. | devops-lead | **P1** | M8 | [x] **Done — 2026-06-23, OBSERVABILITY.md v4.9.6.** AL-CI-07 row added to §38.5 alert rules table: P2, trigger = `system.cron_job_stale` for `job_name = 'ci_telemetry_daily_sync'`, PagerDuty `form-devops` P2 + Slack `#devops`, dedup `ci-telemetry-sync-stale`, R-40 runbook cross-ref; CI-E-003 addendum obligation noted in routing column. Closes R-40.10 "AL-CI-07 formal registration" post-incident control. |
 | 5 | After job 28 initial deploy in staging: run R-40-C2 against staging `ci_telemetry_daily`; confirm `gap_days = 0` immediately after first sync; document in CI-E-003 Q0 baseline (`compliance/evidence/cc8/ci-e-003-dora-baseline.pdf`). | devops-lead + data-engineer | **P1** | M9 | [ ] |
 
 ---

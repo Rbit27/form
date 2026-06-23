@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [8.4.1] — 2026-06-23
+
+### Changed
+- `docs/OBSERVABILITY.md` — AL-CI-07 (`ci_telemetry_daily_sync` stale > 26h) formally registered in §38.5 alert rules table: P2, PagerDuty `form-devops` + Slack `#devops`, dedup `ci-telemetry-sync-stale`, runbook R-40. Closes INCIDENT_RESPONSE R-40.11 item 4 (P1/M8) and R-40.10 "AL-CI-07 formal registration" post-incident control. Document header v4.9.5 → v4.9.6.
+- `docs/INCIDENT_RESPONSE.md` — R-40.11 item 4 marked `[x] Done` (OBSERVABILITY.md v4.9.6, 2026-06-23); R-40.10 "AL-CI-07 formal registration" control updated to Done.
+- `VERSION` — 8.4.0 → 8.4.1.
+
 ## [8.4.0] — 2026-06-23
 
 ### Added
