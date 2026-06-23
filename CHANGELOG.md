@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.21.1] — 2026-06-23
+
+### Changed
+- `docs/OBSERVABILITY.md` — §12.6 v1.4 patch: pg_cron **job 43** `deletion_sla_monitor` registered in canonical registry. Schedule `0 */6 * * *`; 7h freshness window (1-run tolerance). P1 alert at day 25 (5-day GDPR Art. 17 warning), P0 escalation at day 29 (1-day pre-breach). Emits `enterprise.deletion_sla_warning` HIGH/7yr and `enterprise.deletion_sla_critical` CRITICAL/7yr. Privacy invariant: payload contains only `tenant_id`, `days_since_deletion_requested`, `alert_tier` (no individual user data). Freshness window note extended. Document version v5.0.0 → v5.0.1.
+- `docs/DATA_MODEL.md` — §44.11 cross-reference obligation for OBSERVABILITY §12.6 pg_cron job 43 closed (🟡 → 🟢, v1.26 → minor patch).
+- `docs/COST_MODEL.md` — §43.10 item 3 status marked `[x] Done (documentation)`: job 43 registered in OBSERVABILITY §12.6; remaining physical deploy obligation noted (platform-engineer, M10).
+- `VERSION` — 8.21.0 → 8.21.1 (patch: extension of existing OBSERVABILITY §12.6 registry).
+
+---
+
 ## [8.21.0] — 2026-06-23
 
 ### Added
