@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v4.9.6
+# FORM · Observability & Monitoring Taxonomy v5.0.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -1205,6 +1205,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `renewal_notice_check` | `0 9 * * *` | 26 h | CC4.1 / CC2.2 — RENEW-NOTICE-01 monitoring invariant (COST_MODEL §42.3.2); daily check for active `enterprise_contracts` with `renewal_date BETWEEN CURRENT_DATE + 85 AND CURRENT_DATE + 95` and no `enterprise.renewal_notice_sent` DEC-030 event on file within the prior 100 days; on detection: emits `enterprise.renewal_notice_overdue` HIGH/7yr per flagged tenant + fires AL-RENEW-01 PagerDuty P1 `form-enterprise`; dedup `renew-notice-missing-{tenant_id}` 72h; on all-clear: emits `system.renewal_notice_check_passed` LOW/1yr; stale = RENEW-NOTICE-01 detection blind spot — a contract may reach < 85 days to renewal with no notice on file and no alert fired → MSA §6.1 non-compliance risk; CC4.1 control gap | PagerDuty P1 `form-compliance` → compliance-officer; dedup `renewal-notice-check-stale`; 26h freshness window (daily cadence); cross-ref: §51.3 AL-RENEW-01; COST_MODEL §42.3.2 (invariant spec); COST_MODEL §42.7 (`enterprise.renewal_notice_sent` DEC-030 event); DATA_MODEL §43 (`enterprise_renewals`); REN-OBS-E-001 (CC4.1/A1.1, quarterly); INCIDENT_RESPONSE R-28 (job 39 stale recovery runbook — §R-28.5) — **job 39** |
 | `white_label_cert_check` | `0 2 * * *` | 26 h | CC7.2 / A1.2 — nightly Cloudflare Custom Hostnames API poll (via Worker proxy holding `CF_API_TOKEN` as Worker Secret) for each active `tenant_white_label_domains` row; updates `ssl_cert_expiry_at`, `ssl_cert_status`, `status`, `last_checked_at`; emits `system.white_label_cert_checked` STANDARD/1yr per polled domain; emits `tenant.white_label_cert_expiry_warning` HIGH/7yr for `ssl_cert_expiry_at < NOW() + INTERVAL '30 days'`; emits `tenant.white_label_cert_expiry_breach` CRITICAL/7yr for expired certs + triggers AL-WL-05 PagerDuty P0; stale = WL-SLO-02 (zero expired certs) and WL-SLO-03 (cert expiry warning ≥ 30 days) detection gap — a cert approaching expiry or already expired goes undetected until next run; §23 SLA credit trigger risk for affected white-label tenants (ENTERPRISE.md §Branding — white-label available ≥ $50k ARR) | PagerDuty P1 `form-devops` → devops-lead; dedup `wl-cert-check-stale`; 26h freshness window (daily 02:00 UTC — after Cloudflare auto-renewal window which closes ~01:30 UTC); cross-ref: §42.7 (job spec); §42.4 WL-SLO-02/WL-SLO-03; §42.5 AL-WL-04/AL-WL-05; WL-CERT-E-001 (CC7.2/A1.2, quarterly 3yr); ENTERPRISE.md §Branding (≥ $50k ARR threshold); INCIDENT_RESPONSE R-35 (job 40 stale recovery runbook — §R-35.5) — **job 40** *(renumbered from §42.7 draft "job 32" — see conflict resolution note v0.9 below; §12.6 job 32 = `turh_retention_purge` was already canonical)* |
 | `webhook_degraded_escalation_check` | `*/30 * * * *` | 35 min | CC9.2 / CC7.2 — every-30-min sweep identifying `tenant_webhooks` rows in `degraded` state for ≥ 2 h; dispatches WH-NOTIF-01 Resend email + emits `integration.webhook_delivery_slo_breach` STANDARD/3yr at 2 h mark; at 48 h sets `status = 'suspended'` + emits `integration.webhook_suspended` HIGH/7yr + dispatches WH-NOTIF-02; stale = AL-WH-02/AL-WH-04 detection blind spot — degraded webhooks are not auto-escalated to suspended within the defined 48 h window; WH-NOTIF-01/02 customer notifications not sent; WH-SLO-04 (degraded notification ≤ 2 h) in breach | PagerDuty P1 `form-platform` → platform-engineer; dedup `webhook-degraded-escalation-stale`; 35-min freshness window (one-run tolerance of 30-min cadence — consistent with `bdg_override_expiry_sweep` (job 34) pattern at 20-min for 15-min cadence); cross-ref: §43.7 (job spec); §43.5 AL-WH-02/AL-WH-04; WH-SLO-04; §43.11 WH-NOTIF-01/WH-NOTIF-02; INCIDENT_RESPONSE R-36 (job 41 stale recovery runbook — §R-36.5) — **job 41** *(renumbered from §43.7 draft "job 34" — see conflict resolution note v0.9 below; §12.6 job 34 = `bdg_override_expiry_sweep` was already canonical)* |
+| `sca_sla_monitor` | `*/15 * * * *` | 20 min | CC6.8/CC7.1 — 24h critical CVE SLA enforcement sentinel; queries `audit_log_events` for `security.sca_critical_vulnerability_detected` events with `remediation_status = 'open'` and `occurred_at < NOW() - INTERVAL '24 hours'`; on breach: emits `security.sca_sla_breach` DEC-030 HIGH/7yr per open critical CVE + fires AL-SCA-01 via pg_net (PagerDuty P1 `form-security`); on all-clear: emits `system.sca_sla_check_passed` LOW/1yr (`{ open_critical_count: 0, check_run_at: datetime }`); stale = AL-SCA-01 detection blind spot — open critical CVEs could exceed the 24h SLA (SOC2_READINESS §54.5) without automated alert; SCA-SLO-01 monitoring gap | PagerDuty P1 `form-security` → security-engineer + devops-lead; dedup `sca-sla-critical-overdue` 1h; 20-min freshness (3-run tolerance of 15-min cadence — consistent with `bdg_override_expiry_sweep` (job 34) pattern); cross-ref: §52 AL-SCA-01; SOC2_READINESS §54.5 (Critical 24h SLA); SCA-OBS-E-002 (CC7.2/A1.1, quarterly 3yr) — **job 42** |
 
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
@@ -1212,7 +1213,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 
 **Job-number conflict resolution (v0.9, 2026-06-22):** Two sections within OBSERVABILITY.md independently claimed job numbers already assigned in this §12.6 canonical registry: (1) `docs/OBSERVABILITY.md §42.7` (v3.9, 2026-06-14) referenced `white_label_cert_check` as "job 32" — but job 32 was already assigned to `turh_retention_purge` when the v0.4 patch was published (2026-06-19); (2) `docs/OBSERVABILITY.md §43.7` (v4.0, 2026-06-14) referenced `webhook_degraded_escalation_check` as "job 34" — but job 34 was already assigned to `bdg_override_expiry_sweep` in the same v0.4 patch. Both are renumbered in this registry: `white_label_cert_check` → **job 40**; `webhook_degraded_escalation_check` → **job 41**. In-text citations in §42.7, §42.14 item 3, §43.7, and §43.15 items 6–8 corrected in this v0.9 patch (since both sections reside within OBSERVABILITY.md, consistent with the v0.5 precedent of correcting §49 in-text citations). This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
-*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC).
+*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern).
 
 **DEC-030 events emitted by `pg-cron-health-monitor`** — registered in `docs/AUDIT_LOG_SCHEMA.md §System`:
 
@@ -1233,6 +1234,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 **v0.5 · 2026-06-20 · Owner: devops-lead**
 **Review: quarterly or on architecture change. Next scheduled review: August 2026.**
 **SOC 2 evidence: CC7.2 (system monitoring). See also INCIDENT_RESPONSE.md for CC7.3–CC7.5.**
+*v1.3 patch (2026-06-23): §12.6 job 42 `sca_sla_monitor` registered — closes the SOC2_READINESS §54.10 item 11 documentation gap (FORM-SCA-001 alert not yet registered as a pg_cron job in §12.6 canonical registry). Schedule `*/15 * * * *`; 20-min freshness window (3-run tolerance of 15-min cadence — consistent with `bdg_override_expiry_sweep` (job 34) pattern); CC6.8/CC7.1 compliance relevance (24h critical CVE SLA enforcement); emits `security.sca_sla_breach` HIGH/7yr on breach and `system.sca_sla_check_passed` LOW/1yr on all-clear; fires AL-SCA-01 PagerDuty P1 `form-security` on detection. Freshness note extended to cover job 42. Canonical section: §52. Cross-ref: SOC2_READINESS §54.5 (Critical 24h SLA); SCA-OBS-E-002 (CC7.2/A1.1, quarterly 3yr). No other §12.6 rows modified.*
 *v1.2 patch (2026-06-22): §12.6 job 29 `backup_age_monitor` stale-consequence cross-ref extended — appended `INCIDENT_RESPONSE R-39 (job 29 stale recovery runbook — §R-39.5)` to the cross-ref column. Closes R-39.10 post-incident control "§12.6 cross-reference" and R-39.11 implementation checklist item 4 (P1/M5). Job 29 was registered in the §12.6 canonical registry (v3.6, 2026-06-13) with full BC-SLO-01/BC-SLO-02 monitoring coverage, but was the only §12.6 job whose stale-consequence consequence column lacked an INCIDENT_RESPONSE cross-reference despite peer daily-cadence jobs (jobs 26/27/32 → R-30/R-31/R-34) all carrying explicit stale runbook references. R-39 is now the thirty-ninth runbook in `docs/INCIDENT_RESPONSE.md`. Companion DEC-030 events `system.backup_monitor_stale_declared` (HIGH/7yr) and `system.backup_monitor_restored` (STANDARD/3yr) registered in `docs/AUDIT_LOG_SCHEMA.md §Backup & DR Observability events` v2.33 (2026-06-22); BAM-STALE-CHAIN-01 ordering invariant noted. No other §12.6 rows modified.*
 *v1.1 patch (2026-06-22): §12.6 job 35 `google_directory_alert_check` stale-consequence cross-ref extended — appended `INCIDENT_RESPONSE R-38 (job 35 stale recovery runbook — §R-38.5)` to the cross-ref column. Closes R-38.10 post-incident control "§12.6 cross-reference" and R-38.11 implementation checklist item 4 (P1/M4). Job 35 was registered in the §12.6 canonical registry in the v0.4 patch (2026-06-19) and its advisory DEC-030 event (`system.gdir_alert_check_stale` LOW/1yr) was registered in AUDIT_LOG_SCHEMA v2.20 (2026-06-19), but job 35 had no corresponding INCIDENT_RESPONSE runbook — the only 5-min cadence job without one, despite being explicitly cross-referenced in R-37 (job 38 peer) T+5 action and H2 hypothesis table as "job 35 stale alerts". R-38 is now the thirty-eighth runbook in `docs/INCIDENT_RESPONSE.md`. Companion DEC-030 events `system.gdir_alert_stale_declared` (HIGH/7yr) and `system.gdir_alert_restored` (STANDARD/3yr) registered in `docs/AUDIT_LOG_SCHEMA.md §System` v2.32 (2026-06-22); GDIR-ALERT-CHAIN-01 ordering invariant noted. SSO-OBS-E-007 description in `docs/SOC2_READINESS.md §92` updated per R-38.11 item 3 (P1/M11 — v3.25.5, 2026-06-22). No other §12.6 rows modified.*
 *v1.0 patch (2026-06-22): §12.6 job 41 `webhook_degraded_escalation_check` stale-consequence cross-ref extended — appended `INCIDENT_RESPONSE R-36 (job 41 stale recovery runbook — §R-36.5)` to the cross-ref column. Closes R-36.10 post-incident control "§12.6 cross-reference" and R-36.11 implementation checklist item 4 (P1/M10). Job 41 was registered in the §12.6 canonical registry in the v0.9 patch (2026-06-22) alongside job 40; job 40's stale runbook (R-35) was authored in the same patch cycle, but job 41 had no corresponding cross-reference. R-36 is now the thirty-sixth runbook in `docs/INCIDENT_RESPONSE.md`. Companion DEC-030 events `system.webhook_escalation_stale_declared` (HIGH/7yr) and `system.webhook_escalation_restored` (STANDARD/3yr) to be registered in `docs/AUDIT_LOG_SCHEMA.md §System` per R-36.11 item 1 (P0/M10). WH-ESCALATION-E-001 quarterly evidence artefact (CC7.2/CC9.2, 3yr) to be registered in `docs/SOC2_READINESS.md §79.4` per R-36.11 item 3 (P1/M11). No other §12.6 rows modified.*
@@ -14181,6 +14183,313 @@ New subsection `contract_renewal_health` — insert after the `enterprise_mid_co
 | — | No open questions | RENEW-NOTICE-01 is a fully specified invariant (COST_MODEL §42.3.2 SQL + COST_MODEL §42.10 item 4 spec). Implementation approach (pg_cron job 39 vs. Cloudflare Worker extension) is resolved in §51.2.1 in favour of pg_cron for table co-location and pattern consistency with jobs 24 and 25. No ambiguity in alert routing, DEC-030 events, SOC 2 mapping, or evidence artefacts. |
 
 ---
+
+## §52 Software Composition Analysis (SCA) & Dependency Vulnerability Monitoring Observability
+
+> Companion observability section to `docs/SOC2_READINESS.md §54` (SCA & Open-Source Supply Chain Security — CC6.8/CC7.1/CC9.2/CC8.1). §54 defines the three-layer SCA pipeline (Dependabot → npm audit → Snyk), vulnerability remediation SLAs, the SBOM programme, and all DEC-030 SCA event schemas. §52 provides the continuous runtime monitoring layer: SLOs, consolidated alert rules, the `sca_sla_monitor` pg_cron job (job 42), evidence artefacts, and §6.2 integration. §38 (CI/CD & Deployment Pipeline Observability) explicitly excludes SCA scanning and defers to this section.
+
+### §52.1 Scope & Architecture
+
+**In scope:**
+- Runtime SLA enforcement: automated detection when open critical CVEs exceed the 24h remediation SLA (SOC2_READINESS §54.5)
+- SCA pipeline health: CI scan failure detection across all three layers (Dependabot, npm audit, Snyk)
+- Licence compliance: detection and alerting for licence violations flagged by the three-layer pipeline
+- Risk acceptance governance: detection when a risk-accepted critical CVE (SOC2_READINESS §54.7) exceeds its expiry date without resolution
+- SBOM chain continuity: DEC-030 HMAC chain covering all SCA-emitted events (DEC-030 §7 integrity invariant — audited by `audit-chain-daily-check`)
+
+**Out of scope:**
+- SCA control definitions, remediation SLAs, SBOM generation schedule, and pipeline configuration — authoritative in `SOC2_READINESS §54`
+- DEC-030 SCA event schema definitions (Zod payloads) — registered in `docs/AUDIT_LOG_SCHEMA.md §Security`
+- IaC drift detection — `SOC2_READINESS §50`; CI/CD pipeline RED metrics — `§38`
+
+**Architecture:** The three-layer SCA pipeline (Dependabot auto-PRs → npm audit via GitHub Actions → Snyk scheduled scans) emits DEC-030 events to `audit_log_events` on detection. Job 42 (`sca_sla_monitor`) queries this table on a 15-min cadence to enforce the 24h critical CVE SLA. All alerting paths are HMAC-chained through DEC-030 — no raw CVE detail beyond public CVE identifiers appears in observability signals (privacy floor: no `user_id`, no `tenant_id`, no health data in any SCA event payload).
+
+**Privacy floor:** SCA events carry `cve_id` (public CVE identifiers), `severity`, `package_name`, `affected_version`, and `remediation_status`. No `user_id`, no `tenant_id`, no health data, no workout data. SCA evidence artefacts are safe for auditor review without redaction.
+
+### §52.2 RED Metrics
+
+| Signal | Rate | Errors | Duration |
+|---|---|---|---|
+| Dependabot PR pipeline | PRs opened per week per severity tier | PRs blocked (merge conflict, branch protection) | Time from CVE NVD publish → PR opened (target: < 4h for Critical) |
+| npm audit (CI gate) | Scans per week (target: every CI run) | Scans failed (exit code ≠ 0, infrastructure cause) | P95 scan duration (target: < 60s) |
+| Snyk scheduled scan | Scans per day | Scans errored (API timeout, auth failure) | Scan latency P95 (target: < 3 min) |
+| CVE remediation pipeline | Vulnerabilities remediated per sprint | Vulnerabilities breaching SLA (Critical > 24h, High > 7d) | Time-to-remediate P50/P95 by severity |
+
+Signal sources: GitHub Actions telemetry (CI gate metrics), `ci_telemetry_daily` table (aggregated by job 28 `ci_telemetry_daily_sync`), `audit_log_events` DEC-030 stream (SCA-specific events per AUDIT_LOG_SCHEMA §Security).
+
+### §52.3 SCA SLOs
+
+Three SLOs govern the SCA observability programme. SCA-SLO-01 breach detection is automated via job 42; SLO performance measurement is quarterly evidence (SCA-OBS-E-001).
+
+**SCA-SLO-01 — Zero open critical CVEs beyond 24h SLA**
+
+| Attribute | Value |
+|---|---|
+| Definition | At no point during the measurement period shall a `security.sca_critical_vulnerability_detected` DEC-030 event remain in `remediation_status = 'open'` state for more than 24 hours. |
+| Target | 100% (zero tolerance — no exceptions without a filed risk acceptance per SOC2_READINESS §54.7) |
+| Measurement window | Rolling 24h continuous |
+| Measurement source | `audit_log_events` WHERE `event_type = 'security.sca_critical_vulnerability_detected'` AND `payload->>'remediation_status' = 'open'` AND `occurred_at < NOW() - INTERVAL '24 hours'` |
+| SLO owner | security-engineer |
+| Breach action | AL-SCA-01 (PagerDuty P1 `form-security` → security-engineer + devops-lead); dedup `sca-sla-critical-overdue` 1h |
+| SOC 2 criteria | CC6.8 (malicious software prevention), CC7.1 (vulnerability identification and resolution) |
+| Evidence artefact | SCA-OBS-E-001 (quarterly, 3yr) |
+
+**SCA-SLO-02 — ≥ 95% of high CVEs resolved within 7-day SLA**
+
+| Attribute | Value |
+|---|---|
+| Definition | At least 95% of `security.sca_high_vulnerability_detected` DEC-030 events shall transition from `remediation_status = 'open'` to `'resolved'` (or an approved risk acceptance per §54.7) within 7 calendar days of the `occurred_at` timestamp. |
+| Target | ≥ 95% per calendar quarter |
+| Measurement window | Calendar quarter |
+| Measurement source | `audit_log_events` SCA high-severity event stream — detection vs. resolution timestamp delta |
+| SLO owner | security-engineer |
+| Breach action | AL-SCA-02 (Slack `#security-alerts`, P2) |
+| SOC 2 criteria | CC6.8, CC7.1, CC9.2 (vendor/open-source risk management) |
+| Evidence artefact | SCA-OBS-E-001 (quarterly, 3yr) |
+
+**SCA-SLO-03 — CI SCA scan pass rate ≥ 99.5%/month**
+
+| Attribute | Value |
+|---|---|
+| Definition | The npm audit CI gate (layer 2 of the three-layer SCA pipeline) must complete successfully on ≥ 99.5% of all CI runs in a calendar month. Failures due to actual CVE detections are expected workflow; this SLO measures scan infrastructure health (authentication, network, tooling), not vulnerability absence. |
+| Target | ≥ 99.5% per calendar month |
+| Measurement window | Calendar month |
+| Measurement source | `ci_telemetry_daily` WHERE `pipeline_step = 'npm_audit'` — `success_count / total_count` aggregated monthly |
+| SLO owner | devops-lead |
+| Breach action | AL-SCA-03 (PagerDuty P1 `form-devops`, immediate) |
+| SOC 2 criteria | CC8.1 (SCA as change management gate), CC7.1 |
+| Evidence artefact | SCA-OBS-E-001 (quarterly, 3yr) |
+
+### §52.4 Alert Rules
+
+Five alert rules cover the SCA observability surface. All five are also registered in §6.2 Consolidated Alert Rules under the `sca_vulnerability_monitoring` subsection (§52.6).
+
+**AL-SCA-01 — Critical CVE SLA Breach (P1)**
+
+| Attribute | Value |
+|---|---|
+| Trigger | Job 42 (`sca_sla_monitor`) detects ≥ 1 `security.sca_critical_vulnerability_detected` event with `remediation_status = 'open'` and `occurred_at < NOW() - INTERVAL '24 hours'` |
+| Severity | P1 |
+| Routing | PagerDuty service `form-security` → security-engineer + devops-lead |
+| Dedup key | `sca-sla-critical-overdue` (1h dedup window) |
+| SLA to acknowledge | 30 min |
+| SLA to resolve | Begin remediation within 4h; escalate to P0 if no resolution path within 24h |
+| Auto-resolve | Yes — when all qualifying events transition to `remediation_status ≠ 'open'` |
+| Runbook | (1) Confirm the CVE ID and package from the DEC-030 event payload. (2) Check whether a risk acceptance (§54.7) covers this CVE — if so, update `remediation_status` to `'risk_accepted'` and file the risk acceptance record. (3) If no risk acceptance: assign to security-engineer; begin Dependabot PR review or hotfix. (4) Emit `security.vulnerability_risk_accepted` DEC-030 event if risk acceptance path chosen. (5) Verify job 42 dedup expiry (1h) — a second alert may fire if the CVE remains open past the dedup window. (6) Confirm AL-SCA-01 auto-resolves once `remediation_status` transitions. |
+| SOC 2 cross-ref | SOC2_READINESS §54.5 (Critical 24h SLA); §54.10 item 11 (closes open checklist obligation — FORM-SCA-001 implemented as AL-SCA-01 via job 42) |
+
+**AL-SCA-02 — High CVE SLA Overdue (P2)**
+
+| Attribute | Value |
+|---|---|
+| Trigger | Any `security.sca_high_vulnerability_detected` event with `remediation_status = 'open'` and `occurred_at < NOW() - INTERVAL '7 days'` |
+| Severity | P2 |
+| Routing | Slack `#security-alerts` (no PagerDuty page) |
+| Dedup key | `sca-sla-high-overdue-{cve_id}` (24h dedup window) |
+| SLA to resolve | Begin remediation within 48h of alert; escalate to P1 if unresolved within 72h |
+| Auto-resolve | Yes — on `remediation_status` transition |
+| SOC 2 cross-ref | SOC2_READINESS §54.5 (High 7d SLA), CC6.8, CC9.2 |
+
+**AL-SCA-03 — CI SCA Scan Infrastructure Failure (P1)**
+
+| Attribute | Value |
+|---|---|
+| Trigger | Any CI run where the npm audit step exits with an infrastructure failure (authentication error, timeout, network failure — distinguished from a legitimate vulnerability detection by `sca_failure_type = 'infrastructure'` in the `security.sca_scan_failed` DEC-030 event payload) |
+| Severity | P1 |
+| Routing | PagerDuty service `form-devops` → devops-lead |
+| Dedup key | `sca-ci-scan-failure` (30 min dedup) |
+| SLA to acknowledge | 30 min |
+| Auto-resolve | Yes — on first successful CI SCA scan pass |
+| SOC 2 cross-ref | SOC2_READINESS §54.3 (npm audit CI gate), CC8.1 |
+
+**AL-SCA-04 — Licence Violation Detected (P2)**
+
+| Attribute | Value |
+|---|---|
+| Trigger | `security.licence_violation_detected` DEC-030 event emitted by the three-layer SCA pipeline |
+| Severity | P2 |
+| Routing | Slack `#security-alerts` + email to compliance-officer |
+| Dedup key | `sca-licence-violation-{package_name}` (24h dedup) |
+| SLA to resolve | Compliance-officer review within 5 business days; legal review if AGPL or SSPL is involved |
+| Auto-resolve | No — requires manual compliance-officer acknowledgement |
+| SOC 2 cross-ref | SOC2_READINESS §54.6 (licence compliance), CC9.2 |
+
+**AL-SCA-05 — Risk Acceptance Expiry (P2)**
+
+| Attribute | Value |
+|---|---|
+| Trigger | Any `security.vulnerability_risk_accepted` DEC-030 event where `risk_acceptance_expires_at < NOW()` and no subsequent `security.sca_critical_vulnerability_detected` with `remediation_status = 'resolved'` exists for the same `cve_id` |
+| Severity | P2 |
+| Routing | PagerDuty service `form-security` → security-engineer (Critical risk acceptances); Slack `#security-alerts` (High risk acceptances) |
+| Dedup key | `sca-risk-acceptance-expired-{cve_id}` (24h dedup) |
+| SLA to resolve | Re-file risk acceptance or begin remediation within 5 business days |
+| Auto-resolve | Yes — on `remediation_status = 'resolved'` or new risk acceptance filed |
+| SOC 2 cross-ref | SOC2_READINESS §54.7 (risk acceptance governance), CC6.8, CC9.2 |
+
+### §52.5 `sca_sla_monitor` pg_cron Job (Job 42)
+
+Job 42 is the runtime SLA enforcement sentinel for SCA-SLO-01. It is the monitoring complement to the manual remediation workflow defined in SOC2_READINESS §54.5.
+
+**Job specification:**
+
+| Attribute | Value |
+|---|---|
+| Job name | `sca_sla_monitor` |
+| Job number | 42 (§12.6 canonical registry) |
+| Schedule | `*/15 * * * *` (every 15 minutes, UTC) |
+| Freshness window | 20 min (3-run tolerance of 15-min cadence — consistent with `bdg_override_expiry_sweep` (job 34) pattern) |
+| Compliance relevance | CC6.8/CC7.1 — 24h critical CVE SLA enforcement sentinel |
+| On breach detected | Emits `security.sca_sla_breach` DEC-030 HIGH/7yr per open critical CVE; fires AL-SCA-01 PagerDuty P1 `form-security` via pg_net; dedup `sca-sla-critical-overdue` 1h |
+| On all-clear | Emits `system.sca_sla_check_passed` DEC-030 LOW/1yr; payload: `{ open_critical_count: 0, check_run_at: <datetime> }` |
+| Stale consequence | AL-SCA-01 detection blind spot — open critical CVEs could exceed the 24h SLA (SOC2_READINESS §54.5) without automated alert; SCA-SLO-01 monitoring gap |
+| Run context | `service_role`; accesses `audit_log_events` (SELECT + INSERT); no write to any application table; no `user_id` or `tenant_id` in payload (privacy floor) |
+
+#### §52.5.1 SLA Enforcement SQL
+
+The following query is the authoritative SCA-SLO-01 enforcement condition (derived from SOC2_READINESS §54.8). Job 42 runs this on every 15-min tick:
+
+```sql
+-- SCA-SLO-01 enforcement: open critical CVEs beyond the 24h remediation SLA
+-- Source: SOC2_READINESS §54.8 (adapted for pg_cron runtime context)
+SELECT
+  id                                                AS event_id,
+  payload->>'cve_id'                               AS cve_id,
+  payload->>'package_name'                         AS package_name,
+  payload->>'affected_version'                     AS affected_version,
+  occurred_at,
+  NOW() - occurred_at                              AS open_duration,
+  EXTRACT(EPOCH FROM (NOW() - occurred_at)) / 3600 AS open_hours
+FROM audit_log_events
+WHERE event_type = 'security.sca_critical_vulnerability_detected'
+  AND payload->>'remediation_status' = 'open'
+  AND occurred_at < NOW() - INTERVAL '24 hours'
+ORDER BY occurred_at ASC;
+-- rows > 0 → emit security.sca_sla_breach DEC-030 HIGH/7yr per row + fire AL-SCA-01 via pg_net
+-- rows = 0 → emit system.sca_sla_check_passed DEC-030 LOW/1yr
+```
+
+#### §52.5.2 Tables Accessed
+
+| Table | Access | Purpose |
+|---|---|---|
+| `audit_log_events` | SELECT | Query `security.sca_critical_vulnerability_detected` events for SCA-SLO-01 |
+| `audit_log_events` | INSERT | Emit `security.sca_sla_breach` HIGH/7yr or `system.sca_sla_check_passed` LOW/1yr |
+
+No application tables accessed. No `user_id`, `tenant_id`, or health data in any payload. The `cve_id`, `package_name`, and `affected_version` fields are public CVE metadata — safe for SIEM streaming without redaction.
+
+#### §52.5.3 Implementation Decision
+
+pg_cron + pg_net adopted (consistent with jobs 24, 25, 34, and 39) over a Cloudflare Worker or Sentry scheduled check (the two options noted in SOC2_READINESS §54.10 item 11). Rationale: (1) `audit_log_events` resides in Supabase Postgres — co-location avoids cross-boundary latency for the SLA enforcement query; (2) 15-min cadence matches `bdg_override_expiry_sweep` (job 34) and `row-count-monitor` — pg_cron handles this cadence reliably at production scale; (3) pg_net handles the PagerDuty P1 outbound call inline. No new infrastructure required.
+
+### §52.6 §6.2 Consolidated Alert Rules Integration
+
+Insert the `sca_vulnerability_monitoring` subsection into §6.2 Consolidated Alert Rules after the `ci_cd_pipeline_health` subsection (§38) and before the `backup_dr` subsection (§39). The canonical alert IDs established here (AL-SCA-01 through AL-SCA-05) are the authority for any cross-document reference to SCA alerting.
+
+**§6.2 `sca_vulnerability_monitoring` subsection:**
+
+| Alert ID | Condition | Severity | Routing | Dedup key | Auto-resolve | SLO link |
+|---|---|---|---|---|---|---|
+| AL-SCA-01 | ≥ 1 open Critical CVE with `occurred_at < NOW() - INTERVAL '24 hours'` (job 42 detection) | P1 | PagerDuty `form-security` → security-engineer + devops-lead | `sca-sla-critical-overdue` 1h | Yes | SCA-SLO-01 |
+| AL-SCA-02 | ≥ 1 open High CVE with `occurred_at < NOW() - INTERVAL '7 days'` | P2 | Slack `#security-alerts` | `sca-sla-high-overdue-{cve_id}` 24h | Yes | SCA-SLO-02 |
+| AL-SCA-03 | CI SCA scan infrastructure failure (`sca_failure_type = 'infrastructure'` in `security.sca_scan_failed` event) | P1 | PagerDuty `form-devops` → devops-lead | `sca-ci-scan-failure` 30 min | Yes | SCA-SLO-03 |
+| AL-SCA-04 | `security.licence_violation_detected` DEC-030 event emitted | P2 | Slack `#security-alerts` + email compliance-officer | `sca-licence-violation-{package_name}` 24h | No (manual) | — |
+| AL-SCA-05 | Risk acceptance expiry: `security.vulnerability_risk_accepted` with `risk_acceptance_expires_at < NOW()` and no resolved event for same `cve_id` | P2 | PagerDuty `form-security` (Critical) / Slack `#security-alerts` (High) | `sca-risk-acceptance-expired-{cve_id}` 24h | Yes | — |
+
+**Note on FORM-SCA-001 (SOC2_READINESS §54.10 item 11):** The alert defined in SOC2_READINESS §54.8–§54.10 as "FORM-SCA-001" is implemented here as AL-SCA-01. The §54 description specifying "Cloudflare Edge Function or Sentry scheduled check" is resolved by job 42 (pg_cron — §52.5.3 implementation decision) with routing to `form-security` → security-engineer + devops-lead (security-primary routing consistent with CC6.8/CC7.1 criteria). SOC2_READINESS §54.10 item 11 checklist item `[ ]` is closed by §52.10 item 3 of this section.
+
+### §52.7 DEC-030 Chain Health Monitor
+
+SCA events are emitted via the standard DEC-030 HMAC chain (DEC-030 §7 integrity invariant). The chain health monitor (`audit-chain-daily-check`) covers the full `audit_log_events` table including SCA events — no SCA-specific chain monitor is required.
+
+**SCA DEC-030 event retention (source: AUDIT_LOG_SCHEMA §Security; new events §52.5 noted):**
+
+| Event type | Severity | Retention | Trigger |
+|---|---|---|---|
+| `security.sca_critical_vulnerability_detected` | CRITICAL | 3 yr | Critical CVE detected by any SCA layer |
+| `security.sca_high_vulnerability_detected` | HIGH | 3 yr | High CVE detected |
+| `security.vulnerability_risk_accepted` | HIGH | 7 yr | Risk acceptance filed per SOC2_READINESS §54.7 |
+| `security.sbom_generated` | STANDARD | 3 yr | SBOM generated per §54.4 schedule |
+| `security.sbom_distributed` | STANDARD | 3 yr | SBOM distributed to enterprise tenant |
+| `security.licence_violation_detected` | HIGH | 7 yr | Licence violation flagged by SCA pipeline |
+| `security.sca_scan_failed` | HIGH | 3 yr | Any SCA layer infrastructure failure |
+| `security.dependency_pr_created` | STANDARD | 1 yr | Dependabot PR opened |
+| `security.sca_sla_breach` | HIGH | 7 yr | Job 42 detection: Critical CVE open > 24h — **new (§52.5; §52.10 item 1)** |
+| `system.sca_sla_check_passed` | LOW | 1 yr | Job 42 all-clear: no open Critical CVEs beyond 24h — **new (§52.5; §52.10 item 1)** |
+
+**Chain ordering invariant (SCA-CHAIN-01):** `security.sca_sla_breach` must be emitted and confirmed (HTTP 200 from the pg_net call) BEFORE the PagerDuty alert fires. This preserves the DEC-030 chain tail as the authoritative detection record. If the pg_net call to PagerDuty fails, the emitted DEC-030 event is the source of truth — re-fire the alert manually using the event `id` as the incident reference.
+
+**Privacy invariant:** No `user_id`, `tenant_id`, or health data in any SCA DEC-030 event. `cve_id`, `package_name`, and `affected_version` are public CVE metadata. SCA events are safe for SIEM streaming without redaction.
+
+### §52.8 SOC 2 Evidence Mapping
+
+Two evidence artefacts satisfy the auditor evidence obligations for the SCA observability layer, supplementing the SOC2_READINESS §54 primary evidence artefacts (PRE-54-E-001 through PRE-54-E-005).
+
+**SCA-OBS-E-001 — Quarterly SCA SLO Performance Report**
+
+| Attribute | Value |
+|---|---|
+| Artefact ID | SCA-OBS-E-001 |
+| Path | `compliance/evidence/sca/SCA-OBS-E-001_<YYYY-QN>.md` |
+| Cadence | Quarterly |
+| Retention | 3 years |
+| SOC 2 criteria | CC6.8, CC7.1, CC9.2 |
+| Content | (1) SCA-SLO-01 performance: zero-tolerance critical CVE count for the quarter (from §52.5.1 SQL); any risk acceptances filed (count + CVE IDs); (2) SCA-SLO-02 performance: high CVE 7d SLA achievement rate; (3) SCA-SLO-03 performance: CI scan pass rate per month of the quarter; (4) AL-SCA-01 activation log: dates, CVE IDs, resolution times. Privacy invariant: no `user_id`, no `tenant_id`, no health data — CVE IDs and package names are public metadata. |
+| Owner | security-engineer + compliance-officer |
+| Register in | SOC2_READINESS §54 evidence table (§52.10 item 4) |
+
+**SCA-OBS-E-002 — Quarterly `sca_sla_monitor` pg_cron Run History**
+
+| Attribute | Value |
+|---|---|
+| Artefact ID | SCA-OBS-E-002 |
+| Path | `compliance/evidence/sca/SCA-OBS-E-002_<YYYY-QN>.md` |
+| Cadence | Quarterly |
+| Retention | 3 years |
+| SOC 2 criteria | CC7.2, A1.1 |
+| Content | Export of `cron.job_run_details` for `sca_sla_monitor` (job 42) for the quarter: total runs, successful runs, stale-event count (freshness window breaches detected by `pg-cron-health-monitor`), any AL-SCA-01 activations attributed to job 42. Privacy invariant: pg_cron run metadata only — no `user_id`, no `tenant_id`, no CVE detail, no health data. |
+| Owner | devops-lead |
+| Register in | SOC2_READINESS §54 evidence table (§52.10 item 4) |
+
+### §52.9 Dashboard
+
+**Dashboard name:** `SCA & Dependency Vulnerability Health`
+
+**Location:** Metabase → Security → SCA Monitoring (alongside Backup & DR Readiness and SSO Fleet Health dashboards)
+
+| Panel | Signal source | Refresh |
+|---|---|---|
+| Open Critical CVEs (real-time count) | `audit_log_events` WHERE `event_type = 'security.sca_critical_vulnerability_detected'` AND `payload->>'remediation_status' = 'open'` | 15 min |
+| Critical CVE time-to-remediate P50/P95 (rolling 90d) | Detection vs. resolution timestamp delta on SCA CRITICAL events | Daily |
+| High CVE SLA compliance rate (current quarter) | Same delta, High severity — target ≥ 95% | Daily |
+| CI SCA scan pass rate (current month) | `ci_telemetry_daily` WHERE `pipeline_step = 'npm_audit'` — target ≥ 99.5% | Daily |
+| Licence violations — open count | `audit_log_events` WHERE `event_type = 'security.licence_violation_detected'` AND `payload->>'status' = 'open'` | Daily |
+| Risk acceptances active (count + oldest expiry) | `audit_log_events` WHERE `event_type = 'security.vulnerability_risk_accepted'` AND `payload->>'risk_acceptance_expires_at' > NOW()` | Daily |
+| Job 42 `sca_sla_monitor` freshness | `cron.job_run_details` — last successful run vs. 20-min freshness window | 15 min |
+| AL-SCA-01 activation log (rolling 30d) | `audit_log_events` WHERE `event_type = 'security.sca_sla_breach'` (rolling 30d) | 15 min |
+
+**Access control:** Panels restricted to `security_reviewer` and `compliance_officer` roles. No `user_id`, no `tenant_id`, no health data displayed.
+
+### §52.10 Implementation Checklist
+
+| # | Item | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Register `security.sca_sla_breach` DEC-030 HIGH/7yr and `system.sca_sla_check_passed` LOW/1yr events in `docs/AUDIT_LOG_SCHEMA.md §Security` | P0 | M4 | security-engineer | [ ] |
+| 2 | Implement pg_cron job 42 `sca_sla_monitor` (§52.5.1 SQL; pg_net AL-SCA-01 call; DEC-030 emission on breach and all-clear) | P0 | M4 | devops-lead + security-engineer | [ ] |
+| 3 | Insert AL-SCA-01 through AL-SCA-05 into §6.2 Consolidated Alert Rules (`sca_vulnerability_monitoring` subsection — §52.6); closes SOC2_READINESS §54.10 item 11 (FORM-SCA-001 configure alert) | P0 | M4 | devops-lead | [ ] |
+| 4 | Register SCA-OBS-E-001 and SCA-OBS-E-002 in `docs/SOC2_READINESS.md §54` evidence table | P1 | M5 | compliance-officer | [ ] |
+| 5 | End-to-end staging test: inject synthetic `security.sca_critical_vulnerability_detected` event with `occurred_at = NOW() - INTERVAL '25 hours'` and `remediation_status = 'open'`; confirm job 42 fires AL-SCA-01 within 20 min; confirm `security.sca_sla_breach` DEC-030 emitted and HMAC-chained (SCA-CHAIN-01); confirm auto-resolve on status update | P0 | M5 | devops-lead | [ ] |
+| 6 | Configure Metabase `SCA & Dependency Vulnerability Health` dashboard (§52.9); restrict to `security_reviewer` + `compliance_officer` roles | P1 | M5 | devops-lead | [ ] |
+| 7 | File first SCA-OBS-E-001 and SCA-OBS-E-002 evidence artefacts at end of first full operational quarter | P1 | M12 | security-engineer + compliance-officer | [ ] |
+
+### §52.11 OQ Gap Tracker
+
+| OQ | Status | Decision |
+|---|---|---|
+| — | No open questions | AL-SCA-01 through AL-SCA-05 are fully specified invariants derived from SOC2_READINESS §54.5–§54.7. Implementation approach (pg_cron job 42) is resolved in §52.5.3 in favour of pg_cron for table co-location and pattern consistency with jobs 24, 25, 34, and 39. FORM-SCA-001 nomenclature from SOC2_READINESS §54.10 item 11 is normalised to AL-SCA-01 in §52.6. No ambiguity in alert routing, DEC-030 events, SOC 2 mapping, or evidence artefacts. |
+
+---
+
+*v5.0.0 (2026-06-23): §52 Software Composition Analysis (SCA) & Dependency Vulnerability Monitoring Observability — closes the gap where §38 (CI/CD & Deployment Pipeline Observability) explicitly excluded SCA scanning with a forward reference to SOC2_READINESS §54, leaving FORM-SCA-001 (SOC2_READINESS §54.10 item 11 — `[ ]` open) without a registered pg_cron job, no §6.2 alert IDs, no SLOs, and no evidence artefacts in OBSERVABILITY.md. §52.1 scope & architecture (three-layer pipeline: Dependabot + npm audit + Snyk; DEC-030 as signal bus; privacy floor). §52.2 RED metrics (Dependabot PR pipeline, npm audit CI gate, Snyk scheduled scan, CVE remediation pipeline; signal sources: `ci_telemetry_daily`, `audit_log_events`). §52.3 three SLOs: SCA-SLO-01 (zero open Critical CVEs beyond 24h — zero-tolerance; CC6.8/CC7.1); SCA-SLO-02 (≥ 95% of High CVEs resolved within 7d — calendar quarter; CC6.8/CC7.1/CC9.2); SCA-SLO-03 (CI SCA scan pass rate ≥ 99.5%/month — infrastructure health, not vulnerability absence; CC8.1/CC7.1). §52.4 five alert rules: AL-SCA-01 (P1 PagerDuty `form-security` — Critical CVE > 24h; SCA-SLO-01 breach; dedup `sca-sla-critical-overdue` 1h; six-step runbook); AL-SCA-02 (P2 Slack — High CVE > 7d; dedup per `cve_id` 24h); AL-SCA-03 (P1 PagerDuty `form-devops` — CI scan infrastructure failure; `sca_failure_type = 'infrastructure'` guard); AL-SCA-04 (P2 Slack + email compliance-officer — licence violation; manual resolve); AL-SCA-05 (P2 PagerDuty `form-security` / Slack — risk acceptance expiry; per-CVE dedup 24h). §52.5 pg_cron job 42 `sca_sla_monitor` (schedule `*/15 * * * *`; 20-min freshness; §52.5.1 enforcement SQL from SOC2_READINESS §54.8; §52.5.2 tables: `audit_log_events` SELECT + INSERT only; §52.5.3 implementation decision: pg_cron over Cloudflare/Sentry for table co-location and pattern consistency with jobs 24/25/34/39). §52.6 §6.2 integration (`sca_vulnerability_monitoring` subsection — AL-SCA-01 through AL-SCA-05; FORM-SCA-001 mapping note closing §54.10 item 11). §52.7 DEC-030 chain: SCA-CHAIN-01 ordering invariant (sca_sla_breach emitted + HTTP 200 confirmed before PagerDuty fires); two new events registered: `security.sca_sla_breach` HIGH/7yr and `system.sca_sla_check_passed` LOW/1yr (§52.10 item 1). §52.8 two evidence artefacts: SCA-OBS-E-001 (CC6.8/CC7.1/CC9.2, quarterly, 3yr — SLO performance report; §52.10 item 4); SCA-OBS-E-002 (CC7.2/A1.1, quarterly, 3yr — job 42 pg_cron run history; §52.10 item 4). §52.9 Metabase dashboard `SCA & Dependency Vulnerability Health` (8 panels; `security_reviewer`/`compliance_officer` roles; no user/tenant/health data). §52.10 seven-item implementation checklist: 3× P0/M4 (AUDIT_LOG_SCHEMA event registration, job 42 implementation, §6.2 insertion), 1× P1/M5 (SOC2_READINESS evidence table), 1× P0/M5 (end-to-end staging test), 1× P1/M5 (Metabase dashboard), 1× P1/M12 (first evidence filing). §52.11 OQ gap tracker: no open questions. §12.6 registry: job 42 `sca_sla_monitor` row added; freshness note extended; v1.3 patch note added. Document header v4.9.6 → v5.0.0. Owner: compliance-officer + security-engineer + devops-lead.*
 
 *v4.9.5 (2026-06-22): §39.10 patch — BC-E-001 evidence artefact description extended (INCIDENT_RESPONSE R-39.11 item 3 · A1.2 / CC7.2). Closes INCIDENT_RESPONSE R-39.11 implementation checklist item 3 (P1/M11) for the §39.10 component. Change: BC-E-001 row in §39.10 SOC 2 Evidence Mapping table extended with: (1) R-39 addendum clause — any quarter in which an R-39 (Backup Age Monitor Stale) incident is IC-declared must include an addendum table appended to the BC-E-001 filing (row format: Quarter \| Incident ID \| Stale window (min) \| Severity \| Root cause \| Any store stale? \| Resolution); (2) zero-incident attestation clause — if no R-39 activation occurred in the quarter, add `r39_activations: 0` to the BC-E-001 zero-event note, confirming job 29 operated continuously throughout the quarter without an IC-declared stale incident; (3) privacy floor statement — addendum rows carry only FORM-internal operational metadata (`incident_id` UUID, aggregate integers, H-code enum); no `user_id`, no `tenant_id`, no `store` names, no health data. Document header v4.9.4 → v4.9.5. Cross-references: `docs/SOC2_READINESS.md §71.7 A1.2` (v3.25.7 — BC-E-001 registered as primary A1.2 evidence artefact); `docs/INCIDENT_RESPONSE.md R-39.11 item 3` (closed [x] Done — 2026-06-22); `docs/INCIDENT_RESPONSE.md R-39.8` (evidence preservation section — BC-E-001 addendum table row format). Owner: compliance-officer + devops-lead.*
 

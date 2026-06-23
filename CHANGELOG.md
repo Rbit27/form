@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.7.0] — 2026-06-23
+
+### Added
+- `docs/OBSERVABILITY.md §52` — Software Composition Analysis (SCA) & Dependency Vulnerability Monitoring Observability. Companion section to SOC2_READINESS §54 (CC6.8/CC7.1/CC9.2/CC8.1). Closes the documented gap where §38 (CI/CD Observability) explicitly excluded SCA and SOC2_READINESS §54.10 item 11 (FORM-SCA-001 alert) remained `[ ]` open with no pg_cron job, no §6.2 alert IDs, no SLOs, and no evidence artefacts registered in OBSERVABILITY.md. §52.1 scope & architecture (three-layer SCA pipeline: Dependabot + npm audit + Snyk; DEC-030 as signal bus; privacy floor). §52.2 RED metrics (Dependabot PR pipeline, npm audit CI gate, Snyk scheduled scan, CVE remediation pipeline). §52.3 three SLOs: SCA-SLO-01 (zero open Critical CVEs beyond 24h — zero-tolerance), SCA-SLO-02 (≥ 95% High CVEs resolved within 7d, quarterly), SCA-SLO-03 (CI scan pass rate ≥ 99.5%/month). §52.4 five alert rules AL-SCA-01–AL-SCA-05 (P1 Critical SLA breach, P2 High SLA breach, P1 CI scan failure, P2 licence violation, P2 risk acceptance expiry). §52.5 pg_cron job 42 `sca_sla_monitor` (`*/15 * * * *`; 20-min freshness; SCA-SLO-01 enforcement SQL; pg_net AL-SCA-01; two new DEC-030 events: `security.sca_sla_breach` HIGH/7yr + `system.sca_sla_check_passed` LOW/1yr). §52.6 §6.2 Consolidated Alert Rules `sca_vulnerability_monitoring` subsection (FORM-SCA-001 → AL-SCA-01 mapping; closes §54.10 item 11). §52.7 DEC-030 chain SCA-CHAIN-01 invariant. §52.8 two evidence artefacts: SCA-OBS-E-001 (CC6.8/CC7.1/CC9.2, quarterly, 3yr), SCA-OBS-E-002 (CC7.2/A1.1, quarterly, 3yr). §52.9 Metabase `SCA & Dependency Vulnerability Health` dashboard. §52.10 seven-item implementation checklist. §52.11 OQ gap tracker (no open questions).
+
+### Changed
+- `docs/OBSERVABILITY.md §12.6` — Job 42 `sca_sla_monitor` registered in pg_cron canonical registry (v1.3 patch); freshness note extended to include job 42 (20-min/15-min cadence pattern consistent with job 34). Document header v4.9.6 → v5.0.0.
+- `VERSION` — 8.6.0 → 8.7.0.
+
 ## [8.6.0] — 2026-06-23
 
 ### Added
