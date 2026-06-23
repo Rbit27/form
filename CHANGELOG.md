@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [8.34.0] — 2026-06-23
+
+### Added
+- `content/post-2386-effective-sets-mechanism-not-count.md` — Серія 2386–2395 «Навантажувальний менеджмент: операційна рамка управління обсягом» 1/10. Що таке «ефективний підхід» і чому не всі підходи рівні: механізм, а не рахунок. Stimulating reps як механізм (Size Principle, рекрутмент волокон типу II, Henneman 1965). Механічна напруга як первинний драйвер гіпертрофії (Schoenfeld 2010, Wackerhage et al. 2019). Чому перші повторення при субмаксимальних навантаженнях є субпороговими і коли підключаються швидкі волокна. Таблиця RPE/RIR vs ефективні повторення. Чому відмова — не обов'язкова умова: RPE 8–9 як оптимальна зона (Schoenfeld & Grgic 2019). Внутрішньосесійна деградація ефективності (Krieger 2010). Junk volume: визначення і ознаки у логу. Що FORM і Victor відстежують замість сирого рахунку підходів. Lasevicius et al. (2019), Baz-Valle et al. (2022). clinical-safety: NOT_REQUIRED. Blog card added.
+
+### Changed
+- `blog.html` — blog card added for post-2386 (ефективний підхід · навантажувальний менеджмент 1/10 · 13 хв · draft).
+- `STATUS.md` — content table updated: post-2386 added; Серія 2386–2395 відкрита; total posts 2060 → 2061; next priorities updated.
+
+---
+
 ## [8.33.0] — 2026-06-23
 
 ### Added
