@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.24.0] — 2026-06-23
+
+### Added
+- `docs/SOC2_READINESS.md §102` — Evidence Table Patch: DEL-E-001 / WBK-E-001 / CHN-E-001 Registration (COST_MODEL §43.9 · C1.2 / CC4.1 / CC5.2 / CC6.1 / CC7.1). Registers three post-churn lifecycle SOC 2 evidence artefacts defined in COST_MODEL §43.9 (v1.0, 2026-06-23) into the §79.4 master evidence table. Resolves WIN-E-001 ID collision: COST_MODEL §43.9 reused "WIN-E-001" for the winback programme report, colliding with the existing §87.2 deal-close WIN-E-001 (`winloss/` path); disambiguated in §79.4 by registering the winback artefact as **WBK-E-001** (alias documented in §102.2). Three new rows in §79.4 (after REN-OBS-E-001): DEL-E-001 (C1.2/CC4.1 — annual deletion certificate archive, 7yr, `deletions/`); WBK-E-001 (CC4.1/CC5.2 — annual winback programme aggregate report, 3yr, `winback/`); CHN-E-001 (CC6.1/CC7.1 — quarterly OFFBOARD-CHAIN-01 deprovisioning compliance report, 3yr, `offboarding/`). Three §80.3 R2 subfolders added (`deletions/`, `winback/`, `offboarding/`) with `form-api NO ACCESS` invariants; `offboarding/` also retroactively formalises the folder referenced by OFB-E-005/006 since §67.8 v3.9.1 (2026-06-15). §80.4 Vanta mirror list extended: DEL-E-001/WBK-E-001/CHN-E-001/OFB-E-005/OFB-E-006. Closes COST_MODEL §43.10 item 5 (P1/M11) and §101.6 item 3 (P1/M11).
+
+### Changed
+- `docs/SOC2_READINESS.md` — §79.4 three new evidence rows (DEL-E-001/WBK-E-001/CHN-E-001); §80.3 three new R2 subfolders; §80.4 Vanta list extended; §101.6 item 3 marked `[x] Done`. v3.26.0 → v3.27.0.
+- `docs/COST_MODEL.md` — §43.10 item 5 marked `[x] Done` with WBK-E-001 disambiguation note. v1.0 unchanged (patch to checklist status only).
+- `VERSION` — 8.23.0 → 8.24.0 (MINOR: new §102 evidence registration section in SOC2_READINESS).
+
 ## [8.23.0] — 2026-06-23
 
 ### Added
