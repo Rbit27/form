@@ -3183,6 +3183,8 @@ export const RenewalNoticeCheckPassedPayload = z.object({
 | `enterprise.deletion_certificate_issued` | CRITICAL | 7 yr | Compliance-officer countersigns and uploads deletion certificate PDF to R2 after verifying two-phase hard-delete completion in Admin Console "Offboarding Workflow" Step 3 (§43.10 item 4, P0/M11 — pending build); emitter: compliance-officer (manual, PAM-elevated); DELETION-CHAIN-01 terminal event; `emit-audit-event` Worker rejects HTTP 422 `DELETION_CHAIN_01_VIOLATION` if `days_since_trigger > 35`; P0 PagerDuty `form-enterprise` escalation if `trigger_type = 'gdpr_art17_request'` and `days_since_trigger > 30` | `tenant_id` (UUID), `contract_id` (UUID), `deletion_request_event_id` (UUID optional — present if `trigger_type = 'gdpr_art17_request'`), `trigger_type` (enum: `gdpr_art17_request`\|`standard_90_day`\|`early_termination`), `deletion_date` (YYYY-MM-DD), `classes_deleted` (string[] — subset of: `user_pii`\|`health_data_art9`\|`nutrition_logs`\|`workout_sessions`\|`coaching_content`\|`sso_personal_attributes`), `classes_retained` (string[] — subset of: `audit_log_chain`\|`financial_records`\|`contract_records`\|`aggregate_metrics`; basis GDPR Art. 17(3)(e)), `retained_legal_basis` (literal `'gdpr_art17_3e_legal_obligation'`), `certificate_r2_path` (string regex `^compliance/evidence/deletions/.+\.pdf$`), `compliance_officer_id` (UUID), `days_since_trigger` (int 0–35) |
 | `enterprise.deletion_sla_warning` | HIGH | 7 yr | pg_cron job 43 (`deletion_sla_monitor`, `0 */6 * * *`) detects `enterprise_churn_events` row where `now() - deletion_requested_at > INTERVAL '25 days'` AND `deletion_completed_at IS NULL` — 5-day pre-breach warning before GDPR Art. 17 30-day SLA; emitter: `form_system` (`service_role` — `form_api` REVOKED from `enterprise_churn_events`); DEC-030 event emitted on every 6h cycle until `deletion_completed_at` is populated (full audit trail preserved); PagerDuty uses 6h dedup key (alert storm suppressed); fires AL-DEL-01 P1 PagerDuty `form-enterprise` → compliance-officer + enterprise-architect | `tenant_id` (UUID — FORM-internal only; no company name, employee name, or health data), `days_since_deletion_requested` (int ≥ 0), `alert_tier` (literal `'warning'`), `check_run_at` (ISO 8601 UTC — job execution timestamp), `alert_dedup_key` (string — `deletion-sla-warning-{tenant_id}`) |
 | `enterprise.deletion_sla_critical` | CRITICAL | 7 yr | pg_cron job 43 (`deletion_sla_monitor`, `0 */6 * * *`) detects `enterprise_churn_events` row where `now() - deletion_requested_at > INTERVAL '29 days'` AND `deletion_completed_at IS NULL` — 1-day pre-breach GDPR Art. 17 SLA escalation; emitter: `form_system` (`service_role`); if `deletion_completed_at` remains NULL at day 30, GDPR Art. 17 SLA is breached — trigger INCIDENT_RESPONSE R-09 GDPR breach assessment; fires AL-DEL-01 P0 escalation PagerDuty `form-enterprise` → founder + compliance-officer | `tenant_id` (UUID — FORM-internal only; no company name, employee name, or health data), `days_since_deletion_requested` (int ≥ 0), `alert_tier` (literal `'critical'`), `check_run_at` (ISO 8601 UTC — job execution timestamp), `alert_dedup_key` (string — `deletion-sla-warning-{tenant_id}`) |
+| `enterprise.litigation_hold_declared` | HIGH | 7 yr | Compliance-officer (manual, PAM-elevated) activates a litigation hold under MSA §11.6.1 for a churned or active tenant; GDPR Art. 17(3)(e) basis; suspends §12.3 deletion timeline for non-health data only; emitter: compliance-officer (Admin Console; PAM session required); outside counsel countersign required before emission; Art. 9 health data is never subject to hold — §12.2 zero-grace-period (DEC-036) is absolute; fires no PagerDuty alert on normal activation (compliance-officer authored) | `tenant_id` (UUID — FORM-internal), `hold_reason_category` (enum: `billing_dispute`\|`legal_claim`\|`regulatory_direction`\|`anticipated_litigation`), `held_data_categories` (string[] — category names only: `billing_records`\|`contract_records`\|`audit_log_entries`\|`sla_performance_data`), `activation_date` (YYYY-MM-DD), `target_review_date` (YYYY-MM-DD — 6 months from activation), `outside_counsel_ref` (string non-null — outside counsel hold-instruction reference), `compliance_officer_id` (UUID) |
+| `enterprise.litigation_hold_released` | HIGH | 7 yr | Compliance-officer (manual, PAM-elevated) releases, withdraws, or expires a litigation hold under MSA §11.6.6; deletion of held data must complete within 10 business days; deletion certificate provided within 5 business days thereafter; emitter: compliance-officer (Admin Console; PAM session required) | `tenant_id` (UUID — FORM-internal), `hold_reason_category` (enum: `billing_dispute`\|`legal_claim`\|`regulatory_direction`\|`anticipated_litigation`), `release_reason` (enum: `dispute_resolved`\|`legal_claim_concluded`\|`regulatory_obligation_expired`\|`court_order_vacated`\|`max_duration_reached`), `activation_date` (YYYY-MM-DD — from the corresponding `enterprise.litigation_hold_declared` event), `release_date` (YYYY-MM-DD), `held_data_categories` (string[] — same categories as on declaration), `deletion_target_date` (YYYY-MM-DD — 10 business days from `release_date`), `compliance_officer_id` (UUID) |
 
 **Zod v2 schemas (canonical source: `docs/COST_MODEL.md §43.7.2` for winback and certificate events; `docs/OBSERVABILITY.md §12.6` job 43 for deletion SLA events — registered here for `emit-audit-event` Worker validation):**
 
@@ -3272,6 +3274,43 @@ export const DeletionSlaCriticalPayload = z.object({
   alert_dedup_key:               z.string(),              // "deletion-sla-warning-{tenant_id}"
   // Privacy floor: no employee user_id, name, email, health value, or Art. 9 special-category data.
 });
+
+// enterprise.litigation_hold_declared — MSA §11.6 (DEC-080, 2026-06-23)
+// Severity: HIGH · Retention: 7 yr · GDPR Art. 17(3)(e) legal-claim retention basis
+const LitigationHoldReasonEnum = z.enum([
+  'billing_dispute', 'legal_claim', 'regulatory_direction', 'anticipated_litigation',
+]);
+const HeldDataCategoryEnum = z.enum([
+  'billing_records', 'contract_records', 'audit_log_entries', 'sla_performance_data',
+]);
+export const LitigationHoldDeclaredPayload = z.object({
+  tenant_id:              z.string().uuid(),
+  hold_reason_category:   LitigationHoldReasonEnum,
+  held_data_categories:   z.array(HeldDataCategoryEnum).min(1),
+  activation_date:        z.string().date(),
+  target_review_date:     z.string().date(),   // 6 months from activation_date
+  outside_counsel_ref:    z.string().min(1),   // non-null: outside counsel hold-instruction reference
+  compliance_officer_id:  z.string().uuid(),
+  // Privacy floor: no employee user_id, health values, coaching content, or Art. 9 data.
+  // Art. 9 health data is categorically excluded from all litigation holds (MSA §11.6.2 absolute exclusion).
+});
+
+// enterprise.litigation_hold_released — MSA §11.6.6 (DEC-080, 2026-06-23)
+// Severity: HIGH · Retention: 7 yr · Hold release; deletion must complete within 10 business days
+export const LitigationHoldReleasedPayload = z.object({
+  tenant_id:              z.string().uuid(),
+  hold_reason_category:   LitigationHoldReasonEnum,
+  release_reason:         z.enum([
+    'dispute_resolved', 'legal_claim_concluded', 'regulatory_obligation_expired',
+    'court_order_vacated', 'max_duration_reached',
+  ]),
+  activation_date:        z.string().date(),   // from the corresponding declared event
+  release_date:           z.string().date(),
+  held_data_categories:   z.array(HeldDataCategoryEnum).min(1),
+  deletion_target_date:   z.string().date(),   // 10 business days from release_date
+  compliance_officer_id:  z.string().uuid(),
+  // Privacy floor: no employee user_id, health values, coaching content, or Art. 9 data.
+});
 ```
 
 **Emitter assignments:**
@@ -3280,6 +3319,8 @@ export const DeletionSlaCriticalPayload = z.object({
 - `enterprise.deletion_certificate_issued` — compliance-officer (manual, PAM-elevated) via Admin Console "Offboarding Workflow" Step 3 (§43.10 item 4, P0/M11 — pending build). `emit-audit-event` Worker validates `days_since_trigger ≤ 35`; HTTP 422 `DELETION_CHAIN_01_VIOLATION` on violation.
 - `enterprise.deletion_sla_warning` — `form_system` (`service_role`), automated, pg_cron job 43 (`0 */6 * * *`). `form_api` REVOKED from `enterprise_churn_events`; `service_role` elevation required for DELETION-SLA-01 SQL.
 - `enterprise.deletion_sla_critical` — `form_system` (`service_role`), automated, pg_cron job 43 (`0 */6 * * *`). Emitted on same cycle as `deletion_sla_warning` when `days_since_deletion_requested > 29`; both events may be emitted in the same job run when day counter crosses 29 (warning event first, then critical).
+- `enterprise.litigation_hold_declared` — compliance-officer (manual, PAM-elevated) via Admin Console "Litigation Hold" workflow. Outside counsel countersign required before emission (verified by compliance-officer; `outside_counsel_ref` non-null enforced by Zod). No automated path; no `form_api` or `form_system` emission.
+- `enterprise.litigation_hold_released` — compliance-officer (manual, PAM-elevated) via Admin Console "Litigation Hold" workflow. Emitted when hold is released, withdrawn, or expired. `deletion_target_date` field triggers compliance-officer calendar obligation for deletion certification (no automated deletion path; human-verified per MSA §11.6.6).
 
 **Alert routing:**
 - `enterprise.winback_initiated` → no alert (CSM-authored governance anchor; compliance dashboard surface only).
@@ -3287,6 +3328,8 @@ export const DeletionSlaCriticalPayload = z.object({
 - `enterprise.deletion_certificate_issued` → no alert on normal issuance; if `trigger_type = 'gdpr_art17_request'` and `days_since_trigger > 25`, DEL-CERT-01 advisory fires `#compliance-ops` Slack (non-blocking — certificate was issued within the 30-day GDPR SLA but within the 5-day warning band).
 - `enterprise.deletion_sla_warning` → AL-DEL-01 P1 PagerDuty `form-enterprise` → compliance-officer + enterprise-architect; dedup key `deletion-sla-warning-{tenant_id}` 6h cooldown; 5-day SLA to confirm deletion completion before GDPR Art. 17 breach. Auto-resolves in PagerDuty when `deletion_completed_at` is populated and next 6h job run emits no warning event. DEC-030 trail continues every 6h cycle regardless of PagerDuty dedup.
 - `enterprise.deletion_sla_critical` → AL-DEL-01 P0 escalation PagerDuty `form-enterprise` → founder + compliance-officer; same 6h dedup key `deletion-sla-warning-{tenant_id}`; if `deletion_completed_at` remains NULL at day 30, GDPR Art. 17 SLA is breached — trigger INCIDENT_RESPONSE R-09 (GDPR breach assessment). `ece_deletion_sla_respected` CHECK in `enterprise_churn_events` DDL (DATA_MODEL §44) provides the 35-day hard backstop.
+- `enterprise.litigation_hold_declared` → no automated PagerDuty alert (compliance-officer authored governance event). Visible in Admin Console compliance dashboard. Compliance-officer calendar obligation: 6-month review (`target_review_date` field) to re-confirm hold necessity per MSA §11.6.3.
+- `enterprise.litigation_hold_released` → no automated PagerDuty alert (compliance-officer authored). Compliance-officer calendar obligation: deletion of held data within 10 business days of `release_date` (`deletion_target_date` field); written certification to Customer within 5 business days of deletion completion per MSA §11.6.6.
 
 **SOC 2 evidence artefacts:**
 

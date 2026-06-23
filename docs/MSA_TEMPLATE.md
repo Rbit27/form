@@ -1,4 +1,4 @@
-# FORM · Master Service Agreement · Template v0.6
+# FORM · Master Service Agreement · Template v0.7
 
 > **Internal use only — PRE-LEGAL-REVIEW DRAFT.**
 > This template must be reviewed and approved by outside counsel before execution with any customer.
@@ -316,6 +316,74 @@ Upon termination or expiry:
 - Authorized User access is suspended on the termination effective date.
 - Data export and deletion obligations apply per §12.
 
+### 11.6 Litigation Hold and Legal Claim Retention (GDPR Art. 17(3)(e))
+
+This section documents FORM's litigation hold procedure in accordance with GDPR Art. 17(3)(e), which permits retention of personal data for "the establishment, exercise or defence of legal claims." It closes OQ-WIN-04 (`docs/COST_MODEL.md §43.11`; DEC-080, 2026-06-23).
+
+**11.6.1 Activation Conditions.** FORM may declare a litigation hold that suspends the deletion timeline in §12.3 for specific non-health data categories (§11.6.2) if any of the following conditions is met:
+
+(a) A formal legal claim, pre-litigation demand letter, or written notice of dispute has been received by FORM from or in connection with Customer;
+(b) Customer has formally raised a billing or SLA dispute under §18 (Dispute Resolution) that directly implicates specific data records;
+(c) FORM has received a valid court order or regulatory direction requiring retention of specific Customer data beyond the §12 deletion timeline; or
+(d) FORM's outside legal counsel has issued a written hold instruction on the basis that litigation involving the specific data records is reasonably anticipated within 12 months.
+
+A litigation hold is activated by a written instruction from FORM's compliance-officer, countersigned by outside counsel, referencing the applicable condition(s) above.
+
+**11.6.2 Scope of Held Data.** A litigation hold under this section is strictly limited to **non-health data** directly relevant to the legal claim or dispute:
+
+(a) Invoice records, payment history, and billing metadata for the Customer account;
+(b) Executed Order Form(s), contract amendments, and written correspondence between the parties;
+(c) DEC-030 HMAC-chained audit log entries directly related to the disputed matter (e.g., `enterprise.early_termination_fee_waived`, `enterprise.contract_amended`, offboarding lifecycle events); and
+(d) SLA performance data directly relevant to an SLA dispute under §18.3.
+
+**Absolute exclusion — Art. 9 health data:** A litigation hold shall never extend to GDPR Art. 9 special-category health data (workout records, biometric data, meal logs, AI coaching transcripts, CV pose-estimation keypoints, body composition data, ED-screening flags). The zero-grace-period deletion rule in §12.2 is an absolute product invariant per DEC-036 and cannot be suspended or modified by any litigation hold, court order interpretation, or contractual provision. Health data deletion proceeds on the §12.2 schedule regardless of any active litigation hold.
+
+**11.6.3 Duration.** A litigation hold remains in effect for the minimum period required to resolve the relevant legal claim or regulatory obligation, and no longer than:
+
+(a) 36 months from the date of the written hold activation instruction; or
+(b) Such longer period as is mandated by a valid court order or regulatory direction served on FORM.
+
+FORM will review and re-confirm hold necessity at 6-month intervals from the activation date. If the legal basis for retention lapses before the maximum period, FORM will release the hold and proceed with deletion per §12.3 within 10 business days of the lapse.
+
+**11.6.4 Notice to Customer.** Unless prohibited by a valid court order or applicable law, FORM will notify Customer's designated legal contact (or billing contact if no legal contact is specified in the Order Form) within **5 business days** of declaring a litigation hold:
+
+(a) The data categories subject to the hold (by category name — no individual data values disclosed);
+(b) The legal basis for the hold under GDPR Art. 17(3)(e);
+(c) The expected duration or next mandatory review date; and
+(d) Customer's right to raise a written objection with FORM's compliance-officer at `legal@form.coach`.
+
+If a valid court order or applicable law prohibits FORM from disclosing the existence of the specific proceedings, FORM will provide a general written notice that a retention obligation is in effect without identifying the proceedings.
+
+**11.6.5 DPA Art. 7 Processing Basis.** For EU/EEA Customers, during the litigation hold period FORM's legal basis for processing the retained non-health data transitions from GDPR Art. 6(1)(b) (performance of contract) to:
+
+- **GDPR Art. 6(1)(f)** (legitimate interests — establishment, exercise or defence of legal claims) for billing records, contract records, and SLA performance data held to defend a commercial dispute; or
+- **GDPR Art. 6(1)(c)** (legal obligation) where retention is required by a valid court order or regulatory direction.
+
+This section constitutes an amendment to the applicable legal basis declared in Exhibit C (DPA) Article 7 and is incorporated by reference as the documented processing basis for litigation hold retention. FORM will provide a written statement of the applicable processing basis upon Customer's written request within 10 business days.
+
+**11.6.6 Deletion upon Hold Release.** Within 10 business days of a litigation hold being released, expiring, or withdrawn, FORM will:
+
+1. Delete all data held under §11.6 that would otherwise have been deleted under §12.3.
+2. Provide written certification of deletion to Customer within 5 business days of completion.
+3. Emit a `enterprise.litigation_hold_released` DEC-030 HMAC-chained audit event (HIGH severity, 7-year retention) per §11.6.7.
+
+**11.6.7 DEC-030 Audit Record.** Two HMAC-chained audit events govern the litigation hold lifecycle per `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn` (DEC-080):
+
+| Event | Severity | Retention | Trigger |
+|---|---|---|---|
+| `enterprise.litigation_hold_declared` | HIGH | 7 yr | Compliance-officer activates a litigation hold per §11.6.1 |
+| `enterprise.litigation_hold_released` | HIGH | 7 yr | Litigation hold expires, is withdrawn, or data is deleted upon expiry |
+
+Both events are emitted by FORM's compliance-officer (manual, PAM-elevated) via the Admin Console. Payloads include: `tenant_id` (FORM-internal UUID), `hold_reason_category` (enum: `billing_dispute` | `legal_claim` | `regulatory_direction` | `anticipated_litigation`), `held_data_categories` (string array — category names only), `activation_date` or `release_date` (ISO 8601), and `outside_counsel_ref` (non-null on activation). **Privacy invariant:** No individual Authorized User `user_id`, no health values, no coaching content, no GDPR Art. 9 special-category data in any hold event payload. `tenant_id` is a FORM-internal UUID only.
+
+**11.6.8 Relationship to §12 (Data Export and Deletion).** §11.6 creates a limited, time-bounded exception to the deletion timeline in §12.3 (Post-Export Deletion) for the specific non-health data categories in §11.6.2. It does not affect:
+
+- The export window obligations in §12.1: Customer may export their data at any time during the applicable export window regardless of any active litigation hold;
+- The zero-grace-period for Art. 9 health data in §12.2: health data deletion is absolute and proceeds on schedule regardless of any active litigation hold; or
+- FORM's regulatory retention obligations under §12.4.
+
+**11.6.9 Outside Counsel Review Requirement.** *[⚠ OUTSIDE COUNSEL REVIEW REQUIRED before first enterprise MSA signature (M5) — OQ-WIN-04 (`docs/COST_MODEL.md §43.11`). Confirm: (a) GDPR Art. 17(3)(e) applies to billing records in the context of a churned-tenant invoice dispute; (b) maximum 36-month hold duration is proportionate under GDPR Art. 5(1)(e) storage limitation; (c) GDPR Art. 6(1)(f) legitimate interest as secondary processing basis for billing records during hold period is adequate, or whether a documented Legitimate Interest Assessment (LIA) is required before any hold can be activated; (d) whether notice obligations to individual Authorized Users under GDPR Art. 13/14 are triggered if personal data in held billing records can be attributed to individuals; (e) whether the DPA Art. 7 processing-basis amendment mechanism in §11.6.5 satisfies GDPR Art. 28 or requires a formal DPA amendment signed by both parties. Filing: outside counsel sign-off memo to `compliance/contracts/msa-litigation-hold-counsel-signoff.pdf` before first MSA execution.]*
+
 ---
 
 ## ARTICLE 12 — DATA EXPORT AND DELETION
@@ -333,7 +401,7 @@ FORM provides Customer Data export capability per the following schedule. Export
 
 ### 12.2 Art. 9 Health Data — Zero Grace Period
 
-Special category health data (workout records, biometric data, meal logs, ED-screening flags) is subject to **no grace period** for deletion upon Authorized User account closure or tenant offboarding. Within 1 hour of the data deletion trigger event: health data is hard-deleted from the primary Supabase database. Backups purge on their standard rotation schedule (maximum 7 days for daily snapshots). This zero-grace-period rule is an absolute invariant per DEC-036; it cannot be overridden by contract, Customer request, or legal hold (except for active litigation hold on non-health data). See `docs/DATA_MODEL.md §8.2`.
+Special category health data (workout records, biometric data, meal logs, ED-screening flags) is subject to **no grace period** for deletion upon Authorized User account closure or tenant offboarding. Within 1 hour of the data deletion trigger event: health data is hard-deleted from the primary Supabase database. Backups purge on their standard rotation schedule (maximum 7 days for daily snapshots). This zero-grace-period rule is an absolute invariant per DEC-036; it cannot be overridden by contract, Customer request, or any litigation hold — Art. 9 health data is categorically excluded from the litigation hold scope in §11.6.2. For litigation holds on non-health data (billing records, contract records, relevant audit log entries), see §11.6. See also `docs/DATA_MODEL.md §8.2`.
 
 ### 12.3 Post-Export Deletion
 
@@ -1064,12 +1132,17 @@ Filing path: `compliance/contracts/{CUSTOMER_SLUG}/msa-addendum-6-v1.0-counsel-s
 | AI training prohibition | §5.3 is non-negotiable. Anthropic DPA already prohibits training use; this reinforces it contractually at the customer layer. |
 | SOC 2 attestation timing | SOC 2 Type II target is Month 12 after enterprise launch. For early customers signed before attestation: offer SOC 2 bridge letter + pentest summary + DPIA as interim evidence package. |
 | Art. 9 zero-grace-period | §12.2 health data deletion zero grace period is per DEC-036. Cannot be modified by contract. Confirm customer-success has briefed IT contact on offboarding flow. |
+| Litigation hold (§11.6) | §11.6 permits FORM to hold non-health data (billing records, contract records, relevant audit log entries) when a legal claim or billing dispute arises — GDPR Art. 17(3)(e). Activation requires compliance-officer written instruction + outside counsel countersign. Art. 9 health data is categorically excluded; §12.2 zero-grace-period is absolute. Max 36-month hold; 5-business-day notice to Customer. Two DEC-030 events: `enterprise.litigation_hold_declared` / `enterprise.litigation_hold_released` (HIGH/7yr). Outside counsel review required per §11.6.9 before first MSA execution. See `docs/COST_MODEL.md §43.11 OQ-WIN-04`; DEC-080. |
 | Redline limits | Standard-term self-service redline ≤ ±10% on commercial terms only. Any redline touching §8 (Privacy Floor), §9 (AUP), §5.3 (AI training), or §12.2 (health data deletion) requires compliance-officer approval regardless of deal size. |
 | EU DPA Annex B | **Addendum 3 is required for all EU-region Customers (`eu-central-1` / `eu-west-1`).** Outside counsel review MANDATORY before execution (see Addendum 3.6). Confirm Cloudflare R2 EU jurisdiction annually (OFB-E-006). Do NOT sign EU enterprise DPA without Addendum 3 + counsel sign-off filed at `compliance/contracts/{CUSTOMER_SLUG}/eu-dpa-annex-b-counsel-signoff-v{N}.pdf`. |
 | SIEM Addendum 4 | **Addendum 4 is required before any SIEM export is activated.** SIEM-CONSENT-01 chain invariant enforces this at the Worker layer (HTTP 422 rejection if no prior signed addendum). Outside counsel review required before first production execution (see §4.8). Do NOT activate SIEM export without Addendum 4 signed and `siem.consent_addendum_signed` DEC-030 event emitted. Evidence: SIEM-CONSENT-E-001 quarterly. Full spec: `docs/OBSERVABILITY.md §47` (DEC-065). |
 | CAEP SLA Addendum 6 | **Addendum 6 applies only to Customers with Okta, Microsoft Entra ID, or Google Workspace OIDC.** Confirm CAEP PUSH capability before including in the MSA package (see `docs/ENTERPRISE_ONBOARDING.md §2.3`). Non-PUSH IdPs (other SAML 2.0) receive JWT TTL baseline (≤ 15 min) — do NOT include Addendum 6. Outside counsel review required before first execution (see §6.6). Stream must be in `active` status before Customer can rely on the < 60 s SLA. Full spec: `docs/SSO_SCIM_IMPLEMENTATION.md §23` + `§36` (DEC-072). |
 
 ---
+
+*v0.7 · 2026-06-23 · owners: compliance-officer, enterprise-architect, founder · next review: before first enterprise MSA signature (outside counsel required per §11.6.9 / OQ-WIN-04), before first EU enterprise DPA execution (outside counsel required per Addendum 3.6), before first SIEM export goes live (outside counsel required per §4.8), before first CAEP SLA Addendum 6 execution (outside counsel required per §6.6), before first enterprise multi-year contract (M10 per §11.4), and **before any Order Form containing §4.6 is executed** (outside counsel required per §4.6.7 / OQ-REN-02) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35` + `§42` + `§43` (DEC-080), `docs/DATA_MODEL.md §36` (DEC-061), `docs/OBSERVABILITY.md §47` (DEC-065), `docs/SSO_SCIM_IMPLEMENTATION.md §23` + `§36` (DEC-072)*
+
+*v0.7 (2026-06-23): §11.6 Litigation Hold and Legal Claim Retention — closes OQ-WIN-04 (`docs/COST_MODEL.md §43.11`; DEC-080). Addresses the GDPR Art. 17(3)(e) gap identified at churn: when a churned enterprise tenant disputes the final invoice, FORM must retain billing records beyond the 90-day standard deletion timeline without a documented legal basis. §11.6 provides that basis with seven sub-sections: §11.6.1 Activation Conditions — four triggers (formal legal claim, billing/SLA dispute under §18, court order/regulatory direction, outside counsel anticipated-litigation instruction); hold activated by compliance-officer written instruction countersigned by outside counsel. §11.6.2 Scope of Held Data — strictly limited to non-health data (billing records, contract records, relevant DEC-030 entries, SLA performance data); absolute exclusion: Art. 9 health data (§12.2 zero-grace-period per DEC-036 is absolute regardless of any hold). §11.6.3 Duration — 36-month maximum from activation; mandatory 6-month re-confirmation reviews; release and deletion within 10 business days of lapse. §11.6.4 Notice to Customer — 5-business-day notice to legal/billing contact: category names (no values), GDPR Art. 17(3)(e) basis, duration/review date, objection right at `legal@form.coach`; court-order confidentiality exception. §11.6.5 DPA Art. 7 Processing Basis — for EU/EEA Customers, processing basis transitions to GDPR Art. 6(1)(f) (legitimate interests — defence of legal claims) for commercial disputes or Art. 6(1)(c) (legal obligation) for court orders; incorporated as DPA Art. 7 amendment; written basis statement on Customer request within 10 business days. §11.6.6 Deletion upon Hold Release — deletion within 10 business days; written certification to Customer within 5 business days; `enterprise.litigation_hold_released` DEC-030 event. §11.6.7 DEC-030 Audit Record — two events: `enterprise.litigation_hold_declared` HIGH/7yr and `enterprise.litigation_hold_released` HIGH/7yr; payloads: `tenant_id` (UUID), `hold_reason_category` (billing_dispute|legal_claim|regulatory_direction|anticipated_litigation), `held_data_categories` (string array — category names only), `activation_date`/`release_date`, `outside_counsel_ref` (non-null on declare); privacy floor: no user_id, no health values, no coaching content, no Art. 9 data. §11.6.8 Relationship to §12 — §11.6 exception is limited to §12.3 timeline only; §12.1 export window unaffected; §12.2 zero-grace absolute; §12.4 regulatory hold unaffected. §11.6.9 Outside Counsel Review — five review points: (a) Art. 17(3)(e) scope on billing records in invoice dispute; (b) 36-month proportionality under Art. 5(1)(e); (c) Art. 6(1)(f) LIA requirement; (d) Art. 13/14 individual notice obligation if billing records attributable to individuals; (e) DPA Art. 7 amendment mechanism vs. formal DPA re-execution. Filing: `compliance/contracts/msa-litigation-hold-counsel-signoff.pdf`. §12.2 updated: parenthetical "(except for active litigation hold on non-health data)" replaced with explicit cross-reference to §11.6.2 and confirmation that Art. 9 data is categorically excluded from hold scope. Internal Notes: litigation hold guidance row added (§11.6 scope, activation requirement, health data exclusion, DEC-030 events, outside counsel gate). AUDIT_LOG_SCHEMA.md: `enterprise.litigation_hold_declared` and `enterprise.litigation_hold_released` registered in Enterprise Post-Churn section. DECISION_LOG.md: DEC-080 added. COST_MODEL.md: OQ-WIN-04 marked 🟢 Resolved (DEC-080, 2026-06-23). Privacy floor: `tenant_id` is FORM-internal UUID; no individual employee user_id, health values, body composition, coaching content, or Art. 9 special-category data in any litigation hold DEC-030 event payload or notice. Owner: compliance-officer + outside counsel.*
 
 *v0.6 · 2026-06-21 · owners: compliance-officer, enterprise-architect, founder · next review: before first EU enterprise DPA execution (outside counsel required per Addendum 3.6), before first SIEM export goes live (outside counsel required per §4.8), before first CAEP SLA Addendum 6 execution (outside counsel required per §6.6), before first enterprise multi-year contract (M10 per §11.4), and **before any Order Form containing §4.6 is executed** (outside counsel required per §4.6.7 / OQ-REN-02) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35` + `§42`, `docs/DATA_MODEL.md §36` (DEC-061), `docs/OBSERVABILITY.md §47` (DEC-065), `docs/SSO_SCIM_IMPLEMENTATION.md §23` + `§36` (DEC-072)*
 

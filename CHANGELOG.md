@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [8.36.1] — 2026-06-23
+
+### Added
+- `docs/MSA_TEMPLATE.md §11.6` — Litigation Hold and Legal Claim Retention clause (GDPR Art. 17(3)(e)). Closes OQ-WIN-04 (`docs/COST_MODEL.md §43.11`; DEC-080). Activation: compliance-officer written instruction + outside counsel countersign. Scope: non-health data only (billing records, contract records, relevant DEC-030 audit log entries, SLA performance data). Art. 9 health data categorically excluded (§12.2 zero-grace-period per DEC-036 is absolute regardless of any hold). Duration: 36-month maximum; 6-month re-confirmation reviews; 5-business-day Customer notice. DPA Art. 7 processing basis: GDPR Art. 6(1)(f) (legitimate interests) or Art. 6(1)(c) (legal obligation). Two DEC-030 events: `enterprise.litigation_hold_declared` HIGH/7yr and `enterprise.litigation_hold_released` HIGH/7yr — registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn`. Outside counsel review required before first MSA execution (§11.6.9). MSA_TEMPLATE.md v0.6 → v0.7.
+- `docs/AUDIT_LOG_SCHEMA.md` — Two new events: `enterprise.litigation_hold_declared` (HIGH/7yr) and `enterprise.litigation_hold_released` (HIGH/7yr). Zod v2 schemas: `LitigationHoldDeclaredPayload` and `LitigationHoldReleasedPayload`. Emitter: compliance-officer (manual, PAM-elevated); no automated path. Enums: `LitigationHoldReasonEnum` (billing_dispute/legal_claim/regulatory_direction/anticipated_litigation), `HeldDataCategoryEnum` (billing_records/contract_records/audit_log_entries/sla_performance_data), `release_reason` (five values). Privacy floor: no user_id, no health values, no Art. 9 data in any hold event payload.
+- `docs/DECISION_LOG.md §DEC-080` — OQ-WIN-04 resolved: litigation hold procedure documented in MSA §11.6; DPA Art. 7 amendment mechanism; health data absolute exclusion; DEC-030 events registered.
+
+### Changed
+- `docs/MSA_TEMPLATE.md §12.2` — Zero-grace-period text updated: replaced ambiguous parenthetical "(except for active litigation hold on non-health data)" with explicit cross-reference to §11.6.2 confirming Art. 9 health data is categorically excluded from all holds.
+- `docs/MSA_TEMPLATE.md` (Internal Notes) — Added litigation hold guidance row: scope, activation requirements, health data exclusion, DEC-030 events, outside counsel gate, OQ-WIN-04 reference.
+- `docs/COST_MODEL.md §43.11` — OQ-WIN-04 marked 🟢 Resolved → DEC-080 (2026-06-23).
+- `VERSION` — 8.36.0 → 8.36.1.
+
+---
+
 ## [8.36.0] — 2026-06-23
 
 ### Added
