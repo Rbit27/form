@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.9.0] — 2026-06-23
+
+### Added
+- `content/post-2336-sleep-primary-recovery-mechanism.md` — Editorial 2336–2345 «Відновлення як тренувальна змінна» post 1/10. Сон як першочерговий механізм відновлення. Van Cauter et al. (2000): 70–75% GH під час сну, основний пульс у першій SWS-фазі. Leproult & Van Cauter (2011): 7 ночей × 5 год — мінус 10–15% тестостерону. Skein et al. (2011): одна ніч < 6 год — мінус 8–11% продуктивності. Ієрархія відновлення 9 рівнів. MPS механізм: GH → IGF-1 → mTORC1. REM і консолідація рухових навичок. Що реально покращує сон (і що ні). Практичний чекліст для self-coached атлета.
+
+### Changed
+- `blog.html` — blog card додана для post-2336 (перед post-2326).
+- `README.md` — Editorial series 2336–2345 «Відновлення як тренувальна змінна» додана до roadmap; post-2336 → draft.
+- `STATUS.md` — Total posts: 2035 → 2036; Editorial 2336–2345 IN PROGRESS 1/10; Next priorities оновлено.
+- `VERSION` — 8.8.0 → 8.9.0.
+
+---
+
 ## [8.8.0] — 2026-06-23
 
 ### Added
