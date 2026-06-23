@@ -10283,10 +10283,10 @@ Evidence artefacts:
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 1 | Refactor `siem-incident-automator` Worker per §17.2.3: generate `incident_id` before all external API calls; emit `incident.opened` with `linear_ticket_url: "PENDING"`; add Linear 5× exponential-backoff retry (2 s / 4 s / 8 s / 16 s / 32 s); fire AL-IR-LINEAR-01 Slack alert on final failure. | platform-engineer | **P0** | M4 | [ ] |
-| 2 | Register `incident.linear_ticket_linked` in `docs/AUDIT_LOG_SCHEMA.md §6.Incident-Lifecycle` with Zod schema from §17.4; deploy to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+| 2 | Register `incident.linear_ticket_linked` in `docs/AUDIT_LOG_SCHEMA.md §6.Incident-Lifecycle` with Zod schema from §17.4; deploy to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M4 | [x] Done |
 | 3 | Implement `POST /internal/v1/incident/link-ticket` amendment endpoint: PAM-elevated `form_admin` role required (§24); validates `incident_id` regex; emits `incident.linear_ticket_linked` with `linked_by: "manual_ic"`. | platform-engineer | **P0** | M4 | [ ] |
 | 4 | Replace `reason` plaintext field with `reason_hash` (SHA-256, §17.3.3) in `incident.severity_changed` emitter; provision `INCIDENT_REASON_HASH_SALT` as Cloudflare Workers Secret on `emit-audit-event`; add to `docs/CRYPTOGRAPHY_POLICY.md §5` key inventory. | security-engineer + platform-engineer | **P0** | M4 | [ ] |
-| 5 | Implement runtime blocklist regex scan (§17.3.4) in emitter; register `incident.pii_risk_detected` in `AUDIT_LOG_SCHEMA.md §6.Incident-Lifecycle` (§17.4); configure Slack `#security-ops` notification with false-positive guidance. | security-engineer | **P0** | M4 | [ ] |
+| 5 | Implement runtime blocklist regex scan (§17.3.4) in emitter; register `incident.pii_risk_detected` in `AUDIT_LOG_SCHEMA.md §6.Incident-Lifecycle` (§17.4); configure Slack `#security-ops` notification with false-positive guidance. | security-engineer | **P0** | M4 | [x] Done |
 
 #### P1 — Before M5 SOC 2 pre-observation readiness
 

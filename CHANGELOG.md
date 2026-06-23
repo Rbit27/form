@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.19.1] — 2026-06-23
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.37 → v2.38: registered two DEC-030 events defined in INCIDENT_RESPONSE.md §17 but absent from the schema registry. `incident.linear_ticket_linked` (LOW, 7 yr): emitted by `siem-incident-automator` Worker within 62 s of `incident.opened` (auto) or by IC via PAM-elevated `POST /internal/v1/incident/link-ticket` (manual); payload `{ incident_id, linear_ticket_url, linked_by: "auto" | "manual_ic" }`; SOC 2 CC7.4 evidence source IR-AUTO-E-002. `incident.pii_risk_detected` (MEDIUM, 7 yr): advisory-only; emitted when runtime blocklist detects potential PII pattern in IC `reason` free-text field; payload `{ incident_id, matched_pattern_category: "email"|"national_id"|"uuid_dump"|"art9_term", false_positive_likely: bool }`; SOC 2 P3.2 evidence source IR-AUTO-E-003. Zod schemas (`IncidentLinearTicketLinkedSchema`, `IncidentPiiRiskDetectedSchema`) added. IRCHAIN-01 updated: every `incident.opened` must pair with exactly one `incident.linear_ticket_linked`. IR-PII-CHAIN-01 invariant added: `incident.pii_risk_detected` must immediately follow `incident.severity_changed` for same `incident_id`. Retention table updated. Intro blurb: "Ten events" → "Twelve events". Closes §17.6 P0/M4 checklist items 2 and 5.
+- `docs/INCIDENT_RESPONSE.md` — §17.6 checklist items 2 and 5 marked `[x] Done` (schema registration complete 2026-06-23).
+- `VERSION` — 8.19.0 → 8.19.1 (patch: AUDIT_LOG_SCHEMA.md v2.38 extension).
+
+---
+
 ## [8.19.0] — 2026-06-23
 
 ### Added
