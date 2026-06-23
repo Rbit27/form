@@ -16271,4 +16271,560 @@ Three evidence artefacts are defined in `docs/COST_MODEL.md §42.9` and cross-re
 
 *v1.23 (2026-06-21): Checklist sync — §43.8 item 4 status updated: documentation portion of REN-E-001/002/003 §79.4 registration completed (SOC2_READINESS v3.24.2, 2026-06-21); three rows added to §79.4 master evidence table; `renewals/` R2 subfolder and Vanta mirror list updated. First evidence filing remains pending first renewal cycle (est. M12). No schema or DDL changes. Document header v1.22 → v1.23. Owner: compliance-officer + enterprise-architect.*
 
-*v1.22 (2026-06-20): §43 `enterprise_renewals` Schema — Migration 0084. Closes cross-reference obligation from `docs/COST_MODEL.md §42.6` (v2.8, 2026-06-20): §42.6.1 authored the DDL inline; DATA_MODEL §43 is the canonical DATA_MODEL registration, making the chain bidirectional. §43.1 purpose + three design invariants (append-only/never-UPDATE, `floor_respected` CHECK structural enforcement, `form_api` REVOKED) + privacy floor. §43.2 migration dependency chain: 0082 → 0083 → 0084; ON DELETE RESTRICT on both FKs (tenant_id + original_contract_id) is intentional — tenant data deletion pipeline (§67) must archive renewal rows before CASCADE. §43.3.1 full DDL (canonical from COST_MODEL §42.6.1): two ENUMs (5-value `renewal_type_enum`, 4-value `rate_basis_enum`); CREATE TABLE (21 columns — UUID PK, two FK RESTRICT, `renewal_type_enum`, DATE, two INTEGER CHECK > 0, two NUMERIC(10,4) CHECK > 0, `rate_basis_enum`, BOOLEAN, two NULLable NUMERIC for escalation, NULLable NUMERIC for multi-year discount, `floor_respected` BOOLEAN DEFAULT true, two GENERATED ALWAYS AS STORED NUMERIC, SMALLINT CHECK IN (1,2,3), three soft-ref UUID NULLable, TIMESTAMPTZ); four CHECKs (escalation_fields all-or-nothing, multi_year_discount iff multi_year type, floor_always_respected = true, non_renewal_seats = 0); three indexes (UNIQUE (tenant_id, renewal_date), renewal_date DESC, renewal_type); four COMMENT ON annotations. §43.3.2 `enterprise_contracts` renewal UPDATE in single SERIALIZABLE transaction with enterprise_renewals INSERT and enterprise.contract_renewed event emission; post-renewal invariant check SQL. §43.3.3 five-item staging validation checklist (ENUM range, GENERATED arithmetic, UNIQUE violation, chk_floor violation, form_api REVOKE). §43.4 full column summary table (21 rows); CHECK constraints table (4 rows); GENERATED columns note (STORED semantics for ARR waterfall query efficiency). §43.5 RLS: `form_api` REVOKED; `compliance_reviewer` SELECT all; `form_admin` SELECT all; `form_system` SELECT + INSERT only (no UPDATE — append-only); no tenant role grants; DDL auditor proof queries. §43.6 RENEW-CHAIN-01 and ESCALATION-CHAIN-01 DDL relationship: `notice_event_id` soft-ref as per-row chain compliance attestation anchor; `chk_escalation_fields` as ESCALATION-CHAIN-01 DDL backstop; two SOC 2 evidence queries (RENEW-CHAIN-01 annual compliance, ESCALATION-CHAIN-01 quarterly audit). §43.7 SOC 2 evidence cross-references: three artefacts (REN-E-001 CC5.2/CC1.4, REN-E-002 CC4.1/CC2.2, REN-E-003 CC4.1/A1.1) with DDL-layer invariant column; CC5.2 and CC4.1 auditor narratives. §43.8 five-item implementation checklist: 3× P0/M12 (migration 0084 with staging validation, RENEW-CHAIN-01/ESCALATION-CHAIN-01 Worker integration tests, notice_event_id population test), 2× P1/M13 (REN-E-001/002/003 first filing + §79.4 master evidence table registration, DATA_ROOM entry). §43.9 three cross-reference obligations (COST_MODEL §42.6 one-way → now bidirectional ✓, SOC2_READINESS §100 DDL-layer registration ✓, COST_MODEL §42.10 item 2 back-pointer 🟡). Document header v1.21 → v1.22. Privacy floor: no individual employee `user_id`, name, email, health values (heart rate, body composition, workout load), coaching session content, or GDPR Art. 9 special category data in any column, DEC-030 event payload, or SOC 2 evidence artefact; `cpi_reference_month` date-only (never URL per COST_MODEL §42.5.1); `tenant_id` FORM-internal UUID; `form_api` REVOKED; no tenant-role SELECT on any renewal data. Cross-references: `docs/COST_MODEL.md §42` (authoritative economic spec + inline DDL authoring source + DEC-030 Zod v2 schemas + RENEW-CHAIN-01/ESCALATION-CHAIN-01 formal definitions + implementation checklist §42.10); `docs/SOC2_READINESS.md §100` (DDL-layer invariant registration for REN-E-001/002/003 — added simultaneously); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (three DEC-030 events to register — `enterprise.renewal_notice_sent` STANDARD/7yr, `enterprise.renewal_escalation_calculated` HIGH/7yr, `enterprise.contract_renewed` STANDARD/7yr — P0/M12); `docs/MSA_TEMPLATE.md §6` (auto-renewal, 90-day notice, seat reduction policy); `docs/DATA_MODEL.md §42` (migration 0083 prerequisite — expansion fields on enterprise_contracts; `current_seats` updated by §43.3.2 renewal UPDATE); `docs/DATA_MODEL.md §16` (enterprise_contracts — the table supplemented by this schema); `docs/DATA_MODEL.md §67` (tenant data deletion pipeline — ON DELETE RESTRICT boundary; renewal rows archived before tenant CASCADE); `docs/CRYPTOGRAPHY_POLICY.md §5` (no new secrets; `cpi_reference_month` is plain date, not encrypted). Owner: enterprise-architect + compliance-officer + customer-success.*
+---
+
+## §44 `enterprise_churn_events` Schema — Migration 0085
+
+> **Canonical DDL registration** for `enterprise_churn_events`. Closes the cross-reference obligation from `docs/COST_MODEL.md §43.10 item 2` (v1.0, 2026-06-23): COST_MODEL §43.8 authored the DDL summary; this section is the authoritative DATA_MODEL registration with full EXPLAIN ANALYZE, RLS verification, SOC 2 TSC mapping, and FEHS sourcing. Must be completed before migration 0085 is applied to production.
+>
+> **Authoritative economic spec:** `docs/COST_MODEL.md §43`
+> **Owner:** enterprise-architect + compliance-officer + customer-success
+
+---
+
+### 44.1 Purpose and Design Principles
+
+`enterprise_churn_events` closes the schema gap in the enterprise contract lifecycle between active contract (`enterprise_contracts`, §16), renewal (`enterprise_renewals`, §43), and post-churn operations (offboarding, GDPR deletion, winback). Before this table, when a tenant did not renew or terminated early, the only record was a `status = 'churned'` UPDATE on `enterprise_contracts` — the offboarding timeline, deletion certificate, winback journey, and final engagement health score were invisible at the DDL layer.
+
+Three design invariants distinguish `enterprise_churn_events` from other enterprise tables:
+
+1. **One row per churn event. No retroactive amendment.** Each tenant churn creates exactly one row identified by `(tenant_id, churn_date)` — the UNIQUE INDEX enforces this at the database layer. Winback and deletion fields are updated via authorized UPDATE paths (Admin Console → Cloudflare Worker → `form_system`), not by INSERT of a new row. This mirrors the operational reality: a single churn event has one offboarding timeline, one GDPR deletion record, and at most one winback outcome.
+
+2. **`ece_deletion_sla_respected` CHECK is the DDL-layer GDPR Art. 17 backstop.** The constraint `(deletion_completed_at - deletion_requested_at) <= INTERVAL '35 days'` makes it structurally impossible to record a deletion SLA breach in this table. If the deletion runs late, the `DELETION-SLA-01` pg_cron monitor (job 43, OBSERVABILITY §12.6) fires P0 PagerDuty alerts before the 30-day GDPR Art. 17 deadline; the DDL CHECK ensures the evidence record never certifies a violation. Two independent enforcement layers: the monitoring control (job 43) and the DDL constraint.
+
+3. **`form_api` REVOKED. `tenant_manager` excluded by design.** Churn data contains commercially sensitive fields (`final_acv_usd`, `churn_reason`, `fehs_at_churn`) that the HR-facing `tenant_manager` role must never access — `fehs_at_churn` in particular could correlate with identifiable employee groups. No RLS policy is granted to `tenant_manager`; absence of a policy means access denied by default under Postgres RLS.
+
+**Privacy floor:** No individual employee `user_id`, name, email, health values (heart rate, body composition, workout load), coaching session content, or GDPR Art. 9 special category data is stored in any column, DEC-030 event payload, or SOC 2 evidence artefact produced from `enterprise_churn_events`. `fehs_at_churn` is a tenant-aggregate score with a k-anonymity floor of k ≥ 10 (§33.7); it cannot be used to identify any individual. `tenant_id` is a FORM-internal UUID not shared in external reports. `deletion_certificate_r2_path` is a Cloudflare R2 object path (no PII in the path string itself).
+
+---
+
+### 44.2 Migration Dependency Chain
+
+```sql
+-- Migration order (must be applied sequentially):
+-- 0083_enterprise_contracts_expansion_fields.sql  (§42 — initial_seats / current_seats)
+-- 0084_enterprise_renewals.sql                    (§43 — enterprise_renewals table)
+-- 0085_enterprise_churn_events.sql                (this section — new table)
+
+-- Dependency graph:
+--   0085 references enterprise_contracts(id) via ON DELETE RESTRICT FK.
+--   0085 references tenants(id) via ON DELETE RESTRICT FK.
+--   The ON DELETE RESTRICT on both FKs is intentional: a tenant row or contract row
+--   must never be deleted while churn history exists; deletions must go through the
+--   tenant data deletion pipeline (§67) which archives churn rows to cold storage
+--   before issuing DELETE CASCADE on the tenants table.
+--
+--   winback_contract_id references enterprise_contracts(id) ON DELETE SET NULL —
+--   the winback contract may be deleted independently (winback that itself churns
+--   later); SET NULL preserves the churn row without a dangling FK violation.
+--
+--   0084 is listed as a prerequisite because the churn model (COST_MODEL §43) is
+--   the chronological successor of the renewal model (COST_MODEL §42), and the
+--   enterprise_contracts row referenced by contract_id must exist — which 0083
+--   expansion fields ensure. On databases where 0083 is missing, the churn row
+--   INSERT will fail FK validation on enterprise_contracts.
+--
+-- Safe to run on a live database with zero downtime:
+--   CREATE TYPE statements are metadata-only.
+--   CREATE TABLE with FK constraints is metadata-only.
+--   CREATE INDEX and CREATE UNIQUE INDEX acquire ShareLock on enterprise_churn_events —
+--   safe during low-traffic window; table is empty at migration time.
+--   REVOKE ALL FROM form_api is instantaneous.
+```
+
+---
+
+### 44.3 DDL — Migration 0085
+
+**Authoritative economic spec: `docs/COST_MODEL.md §43.8`**
+
+#### 44.3.1 `enterprise_churn_events` table
+
+```sql
+-- Migration: 0085_enterprise_churn_events.sql
+-- Depends on: 0084_enterprise_renewals.sql (§43), 0083_enterprise_contracts_expansion_fields.sql (§42)
+-- Decision: DEC-030 (HMAC-chained audit log); GDPR Art. 17 floor: ece_deletion_sla_respected CHECK
+
+CREATE TYPE churn_trigger_enum AS ENUM (
+  'contract_expired_no_renewal',  -- auto-renewal lapsed; RENEW-CHAIN-01 not completed
+  'early_termination',            -- customer triggers MSA §7 termination clause
+  'pilot_lapsed',                 -- 90-day pilot not converted; no paid contract signed
+  'mutual_termination'            -- both parties agree to end; documented in DEC-030
+);
+
+CREATE TYPE churn_reason_enum AS ENUM (
+  'low_utilization',  -- WAU health band Red sustained; fehs_at_churn < 40
+  'budget_cut',       -- customer-stated reason; no product gap implied
+  'champion_left',    -- primary internal champion departed; no successor identified
+  'product_gap',      -- specific missing feature caused churn; feed to product-manager
+  'competitor',       -- switched to named competitor; log competitor in account_churned event payload
+  'unknown'           -- CSM unable to determine; default; triggers 30-day exit interview outreach
+);
+
+CREATE TYPE winback_status_enum AS ENUM (
+  'not_attempted',         -- default at churn; winback probability not yet assessed
+  'month_3_outreach',      -- CSM first contact at 3 months post-churn
+  'month_6_outreach',      -- second outreach at 6 months; WINBACK-CHAIN-01 prerequisite
+  'month_12_outreach',     -- third outreach at 12 months; peak conversion probability window
+  'month_18_plus_outreach',-- extended outreach; diminishing returns per COST_MODEL §43.5.3
+  'converted',             -- winback succeeded; winback_acv_usd and winback_contract_id populated
+  'abandoned'              -- winback permanently abandoned; no further outreach
+);
+
+CREATE TABLE enterprise_churn_events (
+  id                             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                      UUID         NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  contract_id                    UUID         NOT NULL REFERENCES enterprise_contracts(id) ON DELETE RESTRICT,
+  churn_trigger                  churn_trigger_enum NOT NULL,
+  churn_reason                   churn_reason_enum  NOT NULL DEFAULT 'unknown',
+  churn_date                     DATE         NOT NULL,
+  final_acv_usd                  NUMERIC(12,2) CHECK (final_acv_usd > 0),
+  final_seats                    INTEGER       CHECK (final_seats > 0),
+  wau_band_at_churn              TEXT          CHECK (wau_band_at_churn IN ('green', 'amber', 'red')),
+  fehs_at_churn                  NUMERIC(5,2),          -- Fleet Engagement Health Score (§33.7, k ≥ 10)
+  offboarding_initiated_at       TIMESTAMPTZ,           -- OFFBOARD-CHAIN-01: must be ≤ 24h after churn_date
+  data_export_completed_at       TIMESTAMPTZ,           -- tenant data export delivered to R2
+  deletion_requested_at          TIMESTAMPTZ,           -- GDPR Art. 17 trigger timestamp
+  deletion_completed_at          TIMESTAMPTZ,           -- deletion certificate issued; ≤ 35d from request
+  deletion_certificate_r2_path   TEXT,                  -- R2 object path; no PII in path string
+  winback_status                 winback_status_enum NOT NULL DEFAULT 'not_attempted',
+  winback_acv_usd                NUMERIC(12,2),         -- NULL until winback_status = 'converted'
+  winback_contract_id            UUID REFERENCES enterprise_contracts(id) ON DELETE SET NULL,
+  account_churned_event_id       UUID,                  -- DEC-030 soft FK: enterprise.account_churned
+  offboarding_initiated_event_id UUID,                  -- DEC-030 soft FK: enterprise.offboarding_initiated
+  deletion_certificate_event_id  UUID,                  -- DEC-030 soft FK: enterprise.deletion_certificate_issued
+  created_at                     TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  updated_at                     TIMESTAMPTZ  NOT NULL DEFAULT now(),
+
+  CONSTRAINT ece_offboarding_before_deletion
+    CHECK (offboarding_initiated_at IS NULL OR deletion_completed_at IS NULL
+      OR offboarding_initiated_at < deletion_completed_at),
+
+  CONSTRAINT ece_winback_acv_requires_converted
+    CHECK (winback_acv_usd IS NULL OR winback_status = 'converted'),
+
+  CONSTRAINT ece_deletion_sla_respected
+    CHECK (deletion_requested_at IS NULL OR deletion_completed_at IS NULL
+      OR (deletion_completed_at - deletion_requested_at) <= INTERVAL '35 days')
+);
+
+-- Indexes
+CREATE UNIQUE INDEX idx_ece_tenant_churn_date ON enterprise_churn_events (tenant_id, churn_date);
+CREATE INDEX        idx_ece_churn_date         ON enterprise_churn_events (churn_date DESC);
+CREATE INDEX        idx_ece_winback_status     ON enterprise_churn_events (winback_status)
+  WHERE winback_status NOT IN ('converted', 'abandoned');
+
+-- Row-Level Security
+ALTER TABLE enterprise_churn_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY ece_form_admin_all ON enterprise_churn_events
+  FOR ALL TO form_admin USING (true) WITH CHECK (true);
+
+CREATE POLICY ece_compliance_read ON enterprise_churn_events
+  FOR SELECT TO compliance_officer USING (true);
+
+-- tenant_manager (HR role) has no policy — access denied by default under RLS.
+-- fehs_at_churn is a tenant-aggregate metric but could indirectly correlate
+-- with identifiable employee groups. HR must never access this table.
+REVOKE ALL ON enterprise_churn_events FROM form_api;
+
+-- COMMENT ON annotations
+COMMENT ON TABLE enterprise_churn_events IS
+  'One row per tenant churn event. Tracks the full post-churn lifecycle: '
+  'offboarding timeline, GDPR Art. 17 deletion record, winback journey, '
+  'and final engagement health score. '
+  'form_api REVOKED; tenant_manager excluded. All writes via Admin Console → '
+  'emit-audit-event Worker. ece_deletion_sla_respected CHECK is the DDL-layer '
+  'GDPR Art. 17 backstop — no deletion breach can be recorded in this table.';
+
+COMMENT ON COLUMN enterprise_churn_events.fehs_at_churn IS
+  'Fleet Engagement Health Score at the time of churn (COST_MODEL §33.7). '
+  'Tenant-aggregate only. k-anonymity floor k ≥ 10 enforced at snapshot layer. '
+  'Sourced from tenant_engagement_snapshots at churn_date (see §44.7). '
+  'NULL if FEHS system not yet active at time of churn.';
+
+COMMENT ON COLUMN enterprise_churn_events.winback_contract_id IS
+  'FK to the new enterprise_contracts row created if winback converts. '
+  'ON DELETE SET NULL preserves churn history even if the winback contract itself '
+  'later churns. NULL until winback_status = converted.';
+
+COMMENT ON COLUMN enterprise_churn_events.ece_deletion_sla_respected IS
+  'Implicit DDL invariant: ece_deletion_sla_respected CHECK ensures '
+  '(deletion_completed_at - deletion_requested_at) <= INTERVAL ''35 days''. '
+  'GDPR Art. 17 mandates 30-day completion; the 35-day CHECK window preserves a '
+  '5-day buffer for compliance-officer countersignature before DDL violation fires. '
+  'DELETION-SLA-01 pg_cron job 43 alerts at day 25 and escalates at day 29, '
+  'ensuring the DDL constraint is never the first line of defence.';
+```
+
+#### 44.3.2 Staging validation checklist
+
+Run all five checks before applying migration 0085 to production:
+
+```sql
+-- 1. Confirm all three ENUMs landed with correct value counts:
+SELECT enum_range(NULL::churn_trigger_enum);
+-- Expected: {contract_expired_no_renewal, early_termination, pilot_lapsed, mutual_termination}
+
+SELECT enum_range(NULL::churn_reason_enum);
+-- Expected: {low_utilization, budget_cut, champion_left, product_gap, competitor, unknown}
+
+SELECT enum_range(NULL::winback_status_enum);
+-- Expected: {not_attempted, month_3_outreach, month_6_outreach, month_12_outreach,
+--            month_18_plus_outreach, converted, abandoned}
+
+-- 2. Verify ece_deletion_sla_respected CHECK triggers on a day 36 test case:
+--    Insert a row where deletion took 36 days (1 day over the 35-day DDL limit).
+INSERT INTO enterprise_churn_events (
+  tenant_id, contract_id, churn_trigger, churn_reason, churn_date,
+  deletion_requested_at, deletion_completed_at
+) VALUES (
+  gen_random_uuid(), '<test_contract_id>',
+  'contract_expired_no_renewal', 'low_utilization', '2026-01-01',
+  '2026-01-15 00:00:00+00',
+  '2026-02-20 00:00:00+00'   -- 36 days after deletion_requested_at
+);
+-- Expected: ERROR: new row for relation "enterprise_churn_events" violates
+--           check constraint "ece_deletion_sla_respected"
+
+-- 3. Verify UNIQUE INDEX rejects duplicate (tenant_id, churn_date) pairs:
+--    First INSERT with a test tenant_id + churn_date must succeed.
+--    Second INSERT with the same tenant_id + churn_date must fail with UNIQUE VIOLATION.
+
+-- 4. Verify ece_winback_acv_requires_converted rejects winback_acv on non-converted rows:
+INSERT INTO enterprise_churn_events (
+  tenant_id, contract_id, churn_trigger, churn_reason, churn_date,
+  winback_acv_usd, winback_status
+) VALUES (
+  gen_random_uuid(), '<test_contract_id_2>',
+  'early_termination', 'budget_cut', '2026-02-01',
+  50000.00, 'month_3_outreach'  -- winback_acv_usd set but status is not 'converted'
+);
+-- Expected: ERROR: new row for relation "enterprise_churn_events" violates
+--           check constraint "ece_winback_acv_requires_converted"
+
+-- 5. Confirm form_api cannot SELECT any row:
+SET ROLE form_api;
+SELECT * FROM enterprise_churn_events LIMIT 1;
+-- Expected: ERROR: permission denied for table enterprise_churn_events
+RESET ROLE;
+
+-- 6. Confirm tenant_manager cannot SELECT any row:
+SET ROLE tenant_manager;
+SELECT * FROM enterprise_churn_events LIMIT 1;
+-- Expected: ERROR: permission denied for table enterprise_churn_events (no RLS policy)
+RESET ROLE;
+```
+
+---
+
+### 44.4 Column Summary
+
+| Column | Type | Nullable | Default | Notes |
+|---|---|---|---|---|
+| `id` | UUID | NOT NULL | `gen_random_uuid()` | PK |
+| `tenant_id` | UUID | NOT NULL | — | FK → `tenants(id)` ON DELETE RESTRICT |
+| `contract_id` | UUID | NOT NULL | — | FK → `enterprise_contracts(id)` ON DELETE RESTRICT; the contract that churned |
+| `churn_trigger` | churn_trigger_enum | NOT NULL | — | Structural reason for churn (contract lapse, termination, pilot, mutual) |
+| `churn_reason` | churn_reason_enum | NOT NULL | `'unknown'` | CSM-assessed root cause; feeds COST_MODEL §43.5.1 winback matrix |
+| `churn_date` | DATE | NOT NULL | — | Date churn is confirmed; UNIQUE with `tenant_id` |
+| `final_acv_usd` | NUMERIC(12,2) | NULL | — | ACV at last active billing cycle; CHECK > 0 if present |
+| `final_seats` | INTEGER | NULL | — | Seat count at churn; CHECK > 0 if present |
+| `wau_band_at_churn` | TEXT | NULL | — | WAU health band at churn: `green` / `amber` / `red` |
+| `fehs_at_churn` | NUMERIC(5,2) | NULL | — | Fleet Engagement Health Score; k ≥ 10 (§33.7); see §44.7 |
+| `offboarding_initiated_at` | TIMESTAMPTZ | NULL | — | OFFBOARD-CHAIN-01: ≤ 24h after `account_churned` event |
+| `data_export_completed_at` | TIMESTAMPTZ | NULL | — | Tenant data export delivered to R2 (customer download link) |
+| `deletion_requested_at` | TIMESTAMPTZ | NULL | — | GDPR Art. 17 deletion request timestamp; triggers 30-day SLA |
+| `deletion_completed_at` | TIMESTAMPTZ | NULL | — | Certificate issued; `ece_deletion_sla_respected` CHECK: ≤ 35d from request |
+| `deletion_certificate_r2_path` | TEXT | NULL | — | Cloudflare R2 object path to signed deletion certificate PDF |
+| `winback_status` | winback_status_enum | NOT NULL | `'not_attempted'` | Advances through outreach stages; terminal: `converted` or `abandoned` |
+| `winback_acv_usd` | NUMERIC(12,2) | NULL | — | New ACV if winback converts; NULL until `winback_status = 'converted'` |
+| `winback_contract_id` | UUID | NULL | — | FK → `enterprise_contracts(id)` ON DELETE SET NULL; new winback contract |
+| `account_churned_event_id` | UUID | NULL | — | Soft-ref to `enterprise.account_churned` DEC-030 event UUID |
+| `offboarding_initiated_event_id` | UUID | NULL | — | Soft-ref to `enterprise.offboarding_initiated` DEC-030 event UUID |
+| `deletion_certificate_event_id` | UUID | NULL | — | Soft-ref to `enterprise.deletion_certificate_issued` DEC-030 event UUID |
+| `created_at` | TIMESTAMPTZ | NOT NULL | `now()` | Row creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | `now()` | Last UPDATE timestamp; maintained by application layer trigger |
+
+**CHECK constraints summary:**
+
+| Constraint | Invariant enforced |
+|---|---|
+| `ece_offboarding_before_deletion` | `offboarding_initiated_at < deletion_completed_at` when both non-NULL — offboarding must precede deletion completion |
+| `ece_winback_acv_requires_converted` | `winback_acv_usd IS NULL OR winback_status = 'converted'` — no ACV can be recorded without a confirmed conversion |
+| `ece_deletion_sla_respected` | `(deletion_completed_at - deletion_requested_at) <= INTERVAL '35 days'` — DDL-layer GDPR Art. 17 backstop |
+
+---
+
+### 44.5 Row-Level Security (RLS)
+
+```sql
+-- RLS policy inventory for enterprise_churn_events
+
+-- form_admin: full access (Admin Console offboarding workflow, winback pipeline)
+CREATE POLICY ece_form_admin_all ON enterprise_churn_events
+  FOR ALL TO form_admin USING (true) WITH CHECK (true);
+
+-- compliance_officer: read-only access for evidence collection and SOC 2 audits
+CREATE POLICY ece_compliance_read ON enterprise_churn_events
+  FOR SELECT TO compliance_officer USING (true);
+
+-- form_system: UPDATE access for Admin Console → Worker-mediated field updates
+--   (offboarding_initiated_at, winback_status progression, deletion_completed_at)
+CREATE POLICY ece_form_system_update ON enterprise_churn_events
+  FOR ALL TO form_system USING (true) WITH CHECK (true);
+
+-- No policy for tenant_owner, tenant_admin, tenant_manager — access denied by default.
+-- No policy for form_api — access denied by default; REVOKE ALL is belt-and-suspenders.
+```
+
+**DDL auditor proof queries:**
+
+```sql
+-- Verify RLS is enabled:
+SELECT relrowsecurity FROM pg_class WHERE relname = 'enterprise_churn_events';
+-- Expected: true
+
+-- Verify form_api has no privilege:
+SELECT has_table_privilege('form_api', 'enterprise_churn_events', 'SELECT');
+-- Expected: false
+
+-- Verify tenant_manager has no policy (no rows in pg_policies for that role):
+SELECT count(*) FROM pg_policies
+WHERE tablename = 'enterprise_churn_events'
+  AND roles @> ARRAY['tenant_manager'];
+-- Expected: 0
+```
+
+---
+
+### 44.6 Chain Invariants
+
+Three DEC-030 chain invariants govern the post-churn lifecycle. The DDL layer provides backstops for each; the primary enforcement is in the `emit-audit-event` Cloudflare Worker.
+
+#### OFFBOARD-CHAIN-01 — 24-hour Offboarding SLA
+
+**Definition:** `enterprise.offboarding_initiated` must be emitted within 24 hours of `enterprise.account_churned` for the same `tenant_id`.
+
+**DDL relationship:** `offboarding_initiated_at` records the timestamp when OFFBOARD-CHAIN-01 is satisfied. The Admin Console "Offboarding Workflow" populates this column in the same SERIALIZABLE transaction as the `enterprise.offboarding_initiated` event emission.
+
+**DDL compliance check query** (run quarterly for CHN-E-001 evidence):
+
+```sql
+-- OFFBOARD-CHAIN-01 compliance: flag any tenant where offboarding was initiated
+-- more than 24 hours after churn. Expected: 0 rows.
+SELECT id, tenant_id, churn_date,
+       offboarding_initiated_at,
+       EXTRACT(EPOCH FROM (offboarding_initiated_at - churn_date::timestamptz)) / 3600
+         AS hours_to_offboard
+  FROM enterprise_churn_events
+ WHERE offboarding_initiated_at IS NOT NULL
+   AND offboarding_initiated_at > (churn_date::timestamptz + INTERVAL '24 hours');
+-- Non-zero result: each row is an OFFBOARD-CHAIN-01 SLA breach.
+-- Flag to compliance-officer; include in CHN-E-001 quarterly report with explanation.
+```
+
+#### WINBACK-CHAIN-01 — Outreach Prerequisite
+
+**Definition:** `enterprise.winback_converted` requires a prior `enterprise.winback_initiated` for the same `tenant_id` within 365 days (COST_MODEL §43.7).
+
+**DDL relationship:** `winback_status = 'converted'` is only settable via the Admin Console "Log Winback Conversion" workflow, which validates the WINBACK-CHAIN-01 prerequisite in the Worker before emitting `enterprise.winback_converted`. The `ece_winback_acv_requires_converted` CHECK constraint ensures no conversion ACV is recorded in this table without the `winback_status = 'converted'` transition — providing a DDL-layer signal that the Worker chain was satisfied.
+
+**DDL consistency check:**
+
+```sql
+-- Verify no winback_acv_usd is recorded without converted status:
+SELECT id, tenant_id, winback_status, winback_acv_usd
+  FROM enterprise_churn_events
+ WHERE winback_acv_usd IS NOT NULL
+   AND winback_status != 'converted';
+-- Expected: 0 rows. ece_winback_acv_requires_converted CHECK makes this impossible
+-- in production, but run as a belt-and-suspenders quarterly audit.
+```
+
+#### DELETION-CHAIN-01 — 35-Day GDPR Art. 17 DDL Backstop
+
+**Definition:** `deletion_completed_at - deletion_requested_at <= 35 days`. GDPR Art. 17 mandates completion within 30 days; the 5-day buffer accommodates compliance-officer countersignature before the DDL constraint fires.
+
+**DDL layer:** `ece_deletion_sla_respected CHECK` is the structural enforcement. This constraint fires at the database layer independent of the `emit-audit-event` Worker. The primary monitoring control is pg_cron job 43 (`deletion_sla_monitor`) which fires P1 PagerDuty at day 25 and escalates to P0 at day 29 — the DDL CHECK is the last-resort backstop that blocks recording a compliant-looking certificate when the SLA was actually violated.
+
+**Auditor narrative (C1.2):** The CHECK constraint proves that every row in `enterprise_churn_events` where `deletion_completed_at IS NOT NULL` completed within 35 days of `deletion_requested_at`. Rows still in progress (`deletion_completed_at IS NULL`) are surfaced by the DEL-SLA-01 monitoring queries below.
+
+**Deletion SLA monitoring queries:**
+
+```sql
+-- Open deletion requests (in-progress, not yet completed):
+SELECT id, tenant_id, deletion_requested_at,
+       now() - deletion_requested_at AS elapsed,
+       CASE WHEN now() - deletion_requested_at > INTERVAL '29 days' THEN 'P0_BREACH_IMMINENT'
+            WHEN now() - deletion_requested_at > INTERVAL '25 days' THEN 'P1_WARNING'
+            ELSE 'ON_TRACK' END AS sla_status
+  FROM enterprise_churn_events
+ WHERE deletion_requested_at IS NOT NULL
+   AND deletion_completed_at IS NULL
+ ORDER BY deletion_requested_at ASC;
+
+-- Completed deletions — SLA compliance cross-check:
+SELECT id, tenant_id,
+       deletion_requested_at,
+       deletion_completed_at,
+       deletion_completed_at - deletion_requested_at AS actual_duration
+  FROM enterprise_churn_events
+ WHERE deletion_completed_at IS NOT NULL
+ ORDER BY deletion_completed_at DESC;
+-- All rows: actual_duration <= 35 days guaranteed by ece_deletion_sla_respected CHECK.
+```
+
+---
+
+### 44.7 FEHS Sourcing from `tenant_engagement_snapshots`
+
+`fehs_at_churn` is populated at the moment the Admin Console "Mark Churn Confirmed" workflow fires. The CSM workflow calls the following query to read the most recent FEHS snapshot for the churning tenant, then writes the value into `enterprise_churn_events` in the same SERIALIZABLE transaction as the `enterprise.account_churned` DEC-030 event emission.
+
+```sql
+-- Source query for fehs_at_churn — executed within the churn confirmation transaction.
+-- tenant_engagement_snapshots is defined in COST_MODEL §33 and sourced
+-- from the aggregate-only analytics pipeline. k-anonymity floor k ≥ 10 is
+-- enforced at the snapshot-generation layer (§33.7); fehs_at_churn inherits
+-- this guarantee by sourcing from a pre-computed snapshot.
+
+SELECT fehs_score
+  FROM tenant_engagement_snapshots
+ WHERE tenant_id = $1
+ ORDER BY snapshot_date DESC
+ LIMIT 1;
+-- Write result into enterprise_churn_events.fehs_at_churn.
+-- If no snapshot exists (tenant too small for k ≥ 10 enforcement):
+--   write NULL; do not fabricate a score; note NULL in CHN-E-001 report.
+```
+
+**Privacy invariant:** `fehs_at_churn` is a scalar aggregate score — it does not contain any individual `user_id`, health metric, or personally identifiable field. The k ≥ 10 floor at the snapshot layer ensures that even tenants with fewer than 10 active users do not contribute individual-attributable scores; their `fehs_at_churn` is NULL. `compliance_officer` reads this column as part of DEL-E-001 and CHN-E-001 evidence generation; the NULL case is documented in the annual deletion certificate.
+
+---
+
+### 44.8 EXPLAIN ANALYZE — Index Performance
+
+All three indexes are analysed against a representative fleet of 500 churned tenants (est. Year 3 production scale). Run `EXPLAIN (ANALYZE, BUFFERS)` after migration 0085 is applied to staging and at least 50 test rows are loaded.
+
+#### `idx_ece_tenant_churn_date` (UNIQUE)
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM enterprise_churn_events
+ WHERE tenant_id = '00000000-0000-0000-0000-000000000001'
+   AND churn_date = '2026-06-01';
+```
+
+**Expected plan:** `Index Scan using idx_ece_tenant_churn_date` — O(log n) lookup by the unique composite key. This index serves the OFFBOARD-CHAIN-01 compliance query (§44.6) and the Admin Console offboarding workflow lookup in the same transaction as churn confirmation. Without this index the CHN-E-001 quarterly compliance query degrades to a sequential scan across all churned tenants.
+
+**Expected output at 500 rows:**
+```
+Index Scan using idx_ece_tenant_churn_date on enterprise_churn_events
+  (cost=0.28..8.29 rows=1 width=312)
+  (actual time=0.042..0.043 rows=1 loops=1)
+Buffers: shared hit=3
+```
+
+#### `idx_ece_churn_date` (DESC)
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT id, tenant_id, churn_reason, final_acv_usd, fehs_at_churn
+  FROM enterprise_churn_events
+ ORDER BY churn_date DESC
+ LIMIT 25;
+```
+
+**Expected plan:** `Index Scan Backward using idx_ece_churn_date` — serves the Admin Console fleet churn dashboard (most-recent-first ordering) and the WIN-E-001 annual winback programme report query which iterates churned tenants in reverse-chronological order.
+
+**Expected output at 500 rows:**
+```
+Limit  (cost=0.28..2.38 rows=25 width=64)
+  ->  Index Scan Backward using idx_ece_churn_date on enterprise_churn_events
+        (cost=0.28..42.28 rows=500 width=64)
+Buffers: shared hit=4
+```
+
+#### `idx_ece_winback_status` (partial — active winback pipeline only)
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT id, tenant_id, churn_reason, wau_band_at_churn, winback_status
+  FROM enterprise_churn_events
+ WHERE winback_status NOT IN ('converted', 'abandoned')
+ ORDER BY churn_date ASC;
+```
+
+**Expected plan:** `Bitmap Index Scan on idx_ece_winback_status` — partial index covers only the 5 non-terminal `winback_status` values. The Admin Console "Winback Pipeline" UI (COST_MODEL §43.10 item 6) uses this index for its live funnel view. At Year 3 scale (~500 churned tenants, ~20% in active winback pipeline), this index covers ~100 rows — avoiding a sequential scan of the full 500-row table on every CSM page load.
+
+**Expected output at 500 rows, 100 in active pipeline:**
+```
+Bitmap Heap Scan on enterprise_churn_events
+  (cost=5.21..18.43 rows=100 width=72)
+  Recheck Cond: (winback_status <> ALL ('{converted,abandoned}'::winback_status_enum[]))
+  ->  Bitmap Index Scan on idx_ece_winback_status
+        (cost=0.00..5.18 rows=100 width=0)
+Buffers: shared hit=3
+```
+
+---
+
+### 44.9 SOC 2 Evidence Cross-References
+
+Three evidence artefacts are defined in `docs/COST_MODEL.md §43.9`. This section provides the DDL-layer invariant mapping for the SOC 2 auditor.
+
+| Artefact | TSC Criteria | DDL-layer invariant from §44 | Full spec location |
+|---|---|---|---|
+| **DEL-E-001** | C1.2 / CC4.1 | `ece_deletion_sla_respected CHECK (deletion_completed_at - deletion_requested_at <= INTERVAL '35 days')` makes it structurally impossible to record a deletion that violated the SLA. Any row with `deletion_completed_at IS NOT NULL` certifies sub-35-day completion at the database layer, independent of application code. | `docs/COST_MODEL.md §43.9` |
+| **WIN-E-001** | CC4.1 / CC5.2 | `ece_winback_acv_requires_converted CHECK (winback_acv_usd IS NULL OR winback_status = 'converted')` ensures no conversion ACV is recorded without the `winback_status = 'converted'` transition — the DDL backstop for WINBACK-CHAIN-01. `idx_ece_winback_status` partial index enables the annual aggregate cross-tab (`churn_reason × wau_band_at_churn`) at query efficiency. | `docs/COST_MODEL.md §43.9` |
+| **CHN-E-001** | CC6.1 / CC7.1 | `idx_ece_tenant_churn_date UNIQUE INDEX (tenant_id, churn_date)` ensures every churn event has exactly one row — no duplicate or missing records in the quarterly OFFBOARD-CHAIN-01 compliance export. `offboarding_initiated_at` column enables elapsed-time calculation (§44.6 compliance query) without joining to the DEC-030 event chain for bulk quarterly reporting. | `docs/COST_MODEL.md §43.9` |
+
+**C1.2 auditor narrative (DEL-E-001):** C1.2 requires FORM to dispose of confidential information in accordance with contractual data protection obligations. Every row in `enterprise_churn_events` where `deletion_completed_at IS NOT NULL` was structurally constrained by `ece_deletion_sla_respected` to complete within 35 days of the Art. 17 trigger. This DDL constraint is independent of the `emit-audit-event` Worker and of the pg_cron `deletion_sla_monitor` job 43 — an auditor can verify compliance directly against the table without trusting any application-layer claim. DEL-E-001 (COST_MODEL §43.9) archives all deletion certificates issued in the observation year; this DDL section is the schema-level corroborating evidence.
+
+**CC5.2 auditor narrative (WIN-E-001):** CC5.2 requires FORM to enforce commitments and accountability. `ece_winback_acv_requires_converted` enforces that the winback revenue line in WIN-E-001 cannot be inflated by recording ACV against non-converted outreach rows. No retroactive winback recognition is possible at the DDL layer.
+
+**CC6.1 auditor narrative (CHN-E-001):** CC6.1 requires FORM to implement deprovisioning controls. `offboarding_initiated_at` is populated within the same SERIALIZABLE transaction as `enterprise.offboarding_initiated` DEC-030 emission — which triggers SSO teardown and SCIM deprovisioning. CHN-E-001 proves this control operated within 24 hours for every churned tenant. The UNIQUE INDEX on `(tenant_id, churn_date)` ensures the compliance export has exactly one row per tenant-churn event, with no gaps or duplicates.
+
+---
+
+### 44.10 Implementation Checklist
+
+Mirrors `docs/COST_MODEL.md §43.10 item 2` (this section closes that obligation).
+
+#### P0 — Before migration 0085 is applied to production (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0085_enterprise_churn_events.sql` after confirming all six staging validation checks from §44.3.2 pass: (a) ENUM value counts; (b) day 36 ece_deletion_sla_respected violation; (c) UNIQUE INDEX violation test; (d) ece_winback_acv_requires_converted violation; (e) form_api REVOKE enforcement; (f) tenant_manager no-policy enforcement. Retain staging output at `compliance/evidence/offboarding/migration-0085-validation_<YYYY-MM-DD>.txt`. Mark `docs/COST_MODEL.md §43.10 item 2` as `[x] Done` simultaneously. | platform-engineer + enterprise-architect | **P0** | M10 | [ ] |
+| 2 | Implement `fehs_at_churn` population in the Admin Console "Mark Churn Confirmed" workflow: execute the §44.7 source query within the same SERIALIZABLE transaction as the `enterprise.account_churned` DEC-030 event emission. Handle NULL case (tenant below k ≥ 10 floor) without error — write NULL and log in the CHN-E-001 quarterly report. | platform-engineer | **P0** | M10 | [ ] |
+| 3 | Register OFFBOARD-CHAIN-01, WINBACK-CHAIN-01, and DELETION-CHAIN-01 in the `emit-audit-event` Cloudflare Worker per COST_MODEL §43.7. Integration tests: (a) `enterprise.winback_converted` returns HTTP 422 `WINBACK_CHAIN_01_VIOLATION` when no prior `enterprise.winback_initiated` exists for tenant_id within 365 days; (b) Populating `offboarding_initiated_at` > 24h after `churn_date` logs an OFFBOARD-CHAIN-01 SLA breach event in DEC-030; (c) Day 36 deletion attempt returns HTTP 422 from DDL CHECK before Worker can emit `enterprise.deletion_certificate_issued`. | platform-engineer + compliance-officer | **P0** | M10 | [ ] |
+
+#### P1 — Before SOC 2 observation period (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Register DEL-E-001, WIN-E-001, CHN-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table if not already registered from COST_MODEL §43.10 item 5. Add `deletions/`, `winback/`, `offboarding/` R2 subfolders to §80.3. Update Vanta mirror list in §80.4. | compliance-officer | **P1** | M11 | [ ] |
+| 5 | Add `enterprise_churn_events` table entry to `docs/DATA_ROOM.md §Enterprise Schema`: table name, migration 0085, canonical source (DATA_MODEL §44), audience (compliance-officer + security-engineer + enterprise-architect + SOC 2 auditor). | compliance-officer | **P1** | M11 | [ ] |
+
+#### P2 — After §101 cross-reference patch
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Add `docs/SOC2_READINESS.md §101` cross-reference patch for DATA_MODEL §44 (`enterprise_churn_events`): map each column class to its TSC (C1.2, CC6.1, CC4.1) and evidence artefact (DEL-E-001, CHN-E-001), following the §84–§100 pattern. Tracked in COST_MODEL §43.10 item 10. | compliance-officer + enterprise-architect | **P2** | After DATA_MODEL §44 is written | [ ] |
+
+---
+
+### 44.11 Cross-Reference Obligations Created by §44
+
+| Obligation | Source | Status |
+|-----------|--------|--------|
+| COST_MODEL §43.10 item 2 → DATA_MODEL §44 | `docs/COST_MODEL.md §43.10 item 2` requires this section before migration 0085 is applied to production | 🟢 **Closed — §44 is the DATA_MODEL canonical registration. Mark COST_MODEL §43.10 item 2 `[x] Done` simultaneously when migration 0085 is applied to production.** |
+| SOC2_READINESS §101 cross-ref patch for DATA_MODEL §44 | `docs/COST_MODEL.md §43.10 item 10` requires SOC2_READINESS §101 cross-ref patch after DATA_MODEL §44 is written | 🟡 **Pending — §44 is now authored. COST_MODEL §43.10 item 10 (P2) can now be actioned by compliance-officer.** |
+| AUDIT_LOG_SCHEMA registration for three DEC-030 events | `docs/COST_MODEL.md §43.10 item 1` requires `enterprise.winback_initiated` (HIGH, 7yr), `enterprise.winback_converted` (CRITICAL, 7yr), `enterprise.deletion_certificate_issued` (CRITICAL, 7yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise` | 🟡 **Pending — P0/M10. Independent of §44 authoring; tracked in COST_MODEL §43.10 item 1.** |
+| OBSERVABILITY §12.6 — pg_cron job 43 registration | `docs/COST_MODEL.md §43.10 item 3` requires DELETION-SLA-01 monitoring (job 43) in OBSERVABILITY §12.6 | 🟡 **Pending — P0/M10. Independent of §44 authoring; tracked in COST_MODEL §43.10 item 3.** |
+
+---
+
+*v1.26 (2026-06-23): §44 `enterprise_churn_events` Schema — Migration 0085. Closes `docs/COST_MODEL.md §43.10 item 2` (v1.0, 2026-06-23): COST_MODEL §43.8 authored the DDL summary; this section is the authoritative DATA_MODEL registration. §44.1 purpose and three design invariants: one row per churn event per tenant (UNIQUE INDEX `(tenant_id, churn_date)`); `ece_deletion_sla_respected CHECK` as DDL-layer GDPR Art. 17 backstop (35-day window with 5-day compliance-officer buffer over the 30-day Art. 17 mandate); `form_api` REVOKED + `tenant_manager` excluded (no RLS policy). Privacy floor: `fehs_at_churn` is a tenant-aggregate score with k ≥ 10 floor (§33.7); no individual employee `user_id`, name, email, health value, or GDPR Art. 9 data in any column or evidence artefact. §44.2 migration dependency chain: 0083 → 0084 → 0085; both `tenant_id` and `contract_id` FKs use ON DELETE RESTRICT; `winback_contract_id` uses ON DELETE SET NULL (winback contract may itself churn later). §44.3.1 full DDL: three ENUMs (`churn_trigger_enum` 4 values, `churn_reason_enum` 6 values, `winback_status_enum` 7 values); 22-column table; three CHECK constraints (`ece_offboarding_before_deletion`, `ece_winback_acv_requires_converted`, `ece_deletion_sla_respected`); three indexes (UNIQUE `(tenant_id, churn_date)`, `churn_date DESC`, partial `winback_status NOT IN (converted, abandoned)`); four RLS policies (form_admin ALL, compliance_officer SELECT, form_system ALL, no policy for tenant_manager); REVOKE ALL FROM form_api; four COMMENT ON annotations. §44.3.2 six-item staging validation checklist: ENUM counts; day 36 ece_deletion_sla_respected violation (key test per COST_MODEL §43.10 item 2); UNIQUE INDEX violation; ece_winback_acv_requires_converted violation; form_api REVOKE; tenant_manager no-policy enforcement. §44.4 22-row column summary table; three CHECK constraints table. §44.5 RLS: four policies; three DDL auditor proof queries (RLS enabled, form_api no privilege, tenant_manager no policy). §44.6 three chain invariants: OFFBOARD-CHAIN-01 (24h; §44.6 compliance query for CHN-E-001); WINBACK-CHAIN-01 (365d; DDL backstop via ece_winback_acv_requires_converted; DDL consistency check); DELETION-CHAIN-01 (35d; ece_deletion_sla_respected CHECK; deletion SLA monitoring queries at day 25/29/35). §44.7 FEHS sourcing: source query from `tenant_engagement_snapshots` ORDER BY snapshot_date DESC LIMIT 1; NULL case handling (below k ≥ 10 floor); privacy invariant (scalar aggregate, not individual). §44.8 EXPLAIN ANALYZE for all three indexes at 500-row fleet scale: idx_ece_tenant_churn_date (Index Scan O(log n), hits=3); idx_ece_churn_date (Index Scan Backward, hits=4); idx_ece_winback_status (Bitmap Index Scan, partial index covering ~100 active-pipeline rows). §44.9 SOC 2 evidence cross-references: DEL-E-001 (C1.2/CC4.1 — ece_deletion_sla_respected CHECK as DDL-layer corroboration); WIN-E-001 (CC4.1/CC5.2 — ece_winback_acv_requires_converted CHECK + idx_ece_winback_status query efficiency); CHN-E-001 (CC6.1/CC7.1 — idx_ece_tenant_churn_date UNIQUE INDEX completeness + offboarding_initiated_at elapsed query); three auditor narratives (C1.2, CC5.2, CC6.1). §44.10 six-item implementation checklist: 3× P0/M10 (migration 0085 apply with staging validation, fehs_at_churn population in churn workflow, OFFBOARD/WINBACK/DELETION-CHAIN Worker integration tests), 2× P1/M11 (SOC2_READINESS §79.4 registration + R2 subfolders + Vanta, DATA_ROOM entry), 1× P2 (SOC2_READINESS §101 cross-ref patch). §44.11 four cross-reference obligations: COST_MODEL §43.10 item 2 🟢 Closed (§44 is now authored); SOC2_READINESS §101 patch 🟡 Pending (P2, can now be actioned); AUDIT_LOG_SCHEMA three DEC-030 events 🟡 Pending (P0/M10, tracked in §43.10 item 1); OBSERVABILITY §12.6 job 43 🟡 Pending (P0/M10, tracked in §43.10 item 3). Document header v1.25 → v1.26. Owner: enterprise-architect + compliance-officer + customer-success.*
+
+*v1.25 (2026-06-22): §43 `enterprise_renewals` Schema — Migration 0084. Closes cross-reference obligation from `docs/COST_MODEL.md §42.6` (v2.8, 2026-06-20): §42.6.1 authored the DDL inline; DATA_MODEL §43 is the canonical DATA_MODEL registration, making the chain bidirectional. §43.1 purpose + three design invariants (append-only/never-UPDATE, `floor_respected` CHECK structural enforcement, `form_api` REVOKED) + privacy floor. §43.2 migration dependency chain: 0082 → 0083 → 0084; ON DELETE RESTRICT on both FKs (tenant_id + original_contract_id) is intentional — tenant data deletion pipeline (§67) must archive renewal rows before CASCADE. §43.3.1 full DDL (canonical from COST_MODEL §42.6.1): two ENUMs (5-value `renewal_type_enum`, 4-value `rate_basis_enum`); CREATE TABLE (21 columns — UUID PK, two FK RESTRICT, `renewal_type_enum`, DATE, two INTEGER CHECK > 0, two NUMERIC(10,4) CHECK > 0, `rate_basis_enum`, BOOLEAN, two NULLable NUMERIC for escalation, NULLable NUMERIC for multi-year discount, `floor_respected` BOOLEAN DEFAULT true, two GENERATED ALWAYS AS STORED NUMERIC, SMALLINT CHECK IN (1,2,3), three soft-ref UUID NULLable, TIMESTAMPTZ); four CHECKs (escalation_fields all-or-nothing, multi_year_discount iff multi_year type, floor_always_respected = true, non_renewal_seats = 0); three indexes (UNIQUE (tenant_id, renewal_date), renewal_date DESC, renewal_type); four COMMENT ON annotations. §43.3.2 `enterprise_contracts` renewal UPDATE in single SERIALIZABLE transaction with enterprise_renewals INSERT and enterprise.contract_renewed event emission; post-renewal invariant check SQL. §43.3.3 five-item staging validation checklist (ENUM range, GENERATED arithmetic, UNIQUE violation, chk_floor violation, form_api REVOKE). §43.4 full column summary table (21 rows); CHECK constraints table (4 rows); GENERATED columns note (STORED semantics for ARR waterfall query efficiency). §43.5 RLS: `form_api` REVOKED; `compliance_reviewer` SELECT all; `form_admin` SELECT all; `form_system` SELECT + INSERT only (no UPDATE — append-only); no tenant role grants; DDL auditor proof queries. §43.6 RENEW-CHAIN-01 and ESCALATION-CHAIN-01 DDL relationship: `notice_event_id` soft-ref as per-row chain compliance attestation anchor; `chk_escalation_fields` as ESCALATION-CHAIN-01 DDL backstop; two SOC 2 evidence queries (RENEW-CHAIN-01 annual compliance, ESCALATION-CHAIN-01 quarterly audit). §43.7 SOC 2 evidence cross-references: three artefacts (REN-E-001 CC5.2/CC1.4, REN-E-002 CC4.1/CC2.2, REN-E-003 CC4.1/A1.1) with DDL-layer invariant column; CC5.2 and CC4.1 auditor narratives. §43.8 five-item implementation checklist: 3× P0/M12 (migration 0084 with staging validation, RENEW-CHAIN-01/ESCALATION-CHAIN-01 Worker integration tests, notice_event_id population test), 2× P1/M13 (REN-E-001/002/003 first filing + §79.4 master evidence table registration, DATA_ROOM entry). §43.9 three cross-reference obligations (COST_MODEL §42.6 one-way → now bidirectional ✓, SOC2_READINESS §100 DDL-layer registration ✓, COST_MODEL §42.10 item 2 back-pointer 🟡). Document header v1.21 → v1.22. Privacy floor: no individual employee `user_id`, name, email, health values (heart rate, body composition, workout load), coaching session content, or GDPR Art. 9 special category data in any column, DEC-030 event payload, or SOC 2 evidence artefact; `cpi_reference_month` date-only (never URL per COST_MODEL §42.5.1); `tenant_id` FORM-internal UUID; `form_api` REVOKED; no tenant-role SELECT on any renewal data. Cross-references: `docs/COST_MODEL.md §42` (authoritative economic spec + inline DDL authoring source + DEC-030 Zod v2 schemas + RENEW-CHAIN-01/ESCALATION-CHAIN-01 formal definitions + implementation checklist §42.10); `docs/SOC2_READINESS.md §100` (DDL-layer invariant registration for REN-E-001/002/003 — added simultaneously); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (three DEC-030 events to register — `enterprise.renewal_notice_sent` STANDARD/7yr, `enterprise.renewal_escalation_calculated` HIGH/7yr, `enterprise.contract_renewed` STANDARD/7yr — P0/M12); `docs/MSA_TEMPLATE.md §6` (auto-renewal, 90-day notice, seat reduction policy); `docs/DATA_MODEL.md §42` (migration 0083 prerequisite — expansion fields on enterprise_contracts; `current_seats` updated by §43.3.2 renewal UPDATE); `docs/DATA_MODEL.md §16` (enterprise_contracts — the table supplemented by this schema); `docs/DATA_MODEL.md §67` (tenant data deletion pipeline — ON DELETE RESTRICT boundary; renewal rows archived before tenant CASCADE); `docs/CRYPTOGRAPHY_POLICY.md §5` (no new secrets; `cpi_reference_month` is plain date, not encrypted). Owner: enterprise-architect + compliance-officer + customer-success.*

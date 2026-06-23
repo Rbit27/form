@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [8.13.1] — 2026-06-23
+
+### Added
+- `docs/DATA_MODEL.md §44` — `enterprise_churn_events` canonical DDL registration for migration 0085. Closes `docs/COST_MODEL.md §43.10 item 2` (v1.0, 2026-06-23). Full DDL: three ENUMs (`churn_trigger_enum` 4 values, `churn_reason_enum` 6 values, `winback_status_enum` 7 values); 22-column table; three CHECK constraints (`ece_offboarding_before_deletion`, `ece_winback_acv_requires_converted`, `ece_deletion_sla_respected` — DDL-layer GDPR Art. 17 backstop); three indexes (UNIQUE `(tenant_id, churn_date)`, `churn_date DESC`, partial `winback_status NOT IN (converted, abandoned)`); four RLS policies (form_admin ALL, compliance_officer SELECT, form_system ALL; tenant_manager no policy, form_api REVOKED); four COMMENT ON annotations. §44.2 migration dependency chain 0083 → 0084 → 0085 with FK strategy rationale (RESTRICT on tenant_id/contract_id; SET NULL on winback_contract_id). §44.3.2 six-item staging checklist including day 36 ece_deletion_sla_respected violation test. §44.4 22-row column summary + three CHECKs table. §44.5 RLS with three DDL auditor proof queries. §44.6 three chain invariants: OFFBOARD-CHAIN-01 (24h elapsed query), WINBACK-CHAIN-01 (DDL consistency check), DELETION-CHAIN-01 (SLA monitoring queries at day 25/29/35). §44.7 FEHS sourcing from `tenant_engagement_snapshots` with NULL handling and privacy invariant. §44.8 EXPLAIN ANALYZE for all three indexes at 500-row fleet scale. §44.9 SOC 2 evidence cross-references: DEL-E-001 (C1.2/CC4.1), WIN-E-001 (CC4.1/CC5.2), CHN-E-001 (CC6.1/CC7.1) with DDL-layer invariant column and auditor narratives. §44.10 six-item implementation checklist (3× P0/M10, 2× P1/M11, 1× P2). §44.11 four cross-reference obligations (COST_MODEL §43.10 item 2 🟢 Closed; SOC2_READINESS §101 patch, AUDIT_LOG_SCHEMA DEC-030 events, OBSERVABILITY §12.6 job 43 all 🟡 Pending). DATA_MODEL v1.25 → v1.26. Owner: enterprise-architect + compliance-officer.
+
+### Changed
+- `docs/COST_MODEL.md §43.10 item 2` — status updated from `[ ]` to `[x] Done (documentation)`: `docs/DATA_MODEL.md §44` authored 2026-06-23 (v1.26). Remaining: apply migration 0085 to staging + production. COST_MODEL header unchanged (checklist sync patch). Owner: enterprise-architect + compliance-officer.
+- `VERSION` — 8.13.0 → 8.13.1 (patch: §44 extension of existing DATA_MODEL.md).
+
+---
+
 ## [8.13.0] — 2026-06-23
 
 ### Added
