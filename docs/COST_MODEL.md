@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.12
+# FORM · Cost Model & Unit Economics v2.13
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -298,6 +298,28 @@
     - 42.9 SOC 2 Evidence Mapping
     - 42.10 Implementation Checklist
     - 42.11 Open Questions (OQ-REN-01 to OQ-REN-03)
+43. [Enterprise Post-Churn Economics, Offboarding Cost Model & Logo Winback Analytics](#43-enterprise-post-churn-economics-offboarding-cost-model--logo-winback-analytics)
+    - 43.1 Purpose and Scope
+    - 43.2 Post-Churn State Machine
+    - 43.3 Offboarding Cost Model
+    - 43.4 GDPR Art. 17 Deletion Economics
+    - 43.5 Logo Winback Model
+    - 43.6 Winback Unit Economics
+    - 43.7 DEC-030 HMAC-Chained Events
+    - 43.8 Migration 0085
+    - 43.9 SOC 2 Evidence Mapping
+    - 43.10 Implementation Checklist
+    - 43.11 Open Questions (OQ-WIN-01 to OQ-WIN-04)
+44. [Loyalty Re-Entry Discount: OQ-WIN-02 Resolution (DEC-081)](#44-loyalty-re-entry-discount-oq-win-02-resolution-dec-081)
+    - 44.1 Purpose and Scope
+    - 44.2 Eligibility Rules
+    - 44.3 Discount Mechanics
+    - 44.4 Approval Workflow
+    - 44.5 DEC-030 Chain Implications
+    - 44.6 NRR Accounting Treatment
+    - 44.7 SOC 2 Evidence Mapping
+    - 44.8 Implementation Checklist
+    - 44.9 OQ-WIN-02 Resolution
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -11920,7 +11942,7 @@ REVOKE ALL ON enterprise_churn_events FROM form_api;
 | ID | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
 | **OQ-WIN-01** | **What are FORM's actual winback conversion rates by `churn_reason` × `wau_band`?** §43.5.1 uses SaaS wellness sector proxies. After 5 winback attempts: cross-tab `enterprise_churn_events.winback_status` against `churn_reason` × `wau_band_at_churn`. Update §43.5.1 if actuals deviate ≥ 10 pp; create DECISION_LOG entry. | P2 | data-engineer + customer-success | After 5 winback attempts (est. M30) |
-| **OQ-WIN-02** | **Should FORM offer a "loyalty re-entry" discount to churned accounts returning within 12 months?** Benefit: reduces winback cycle from 2–4 months to 1–2 months. Risk: signals churn is reversibly "free," creating expectation of a discount that undermines standard pricing. Decision required before first winback outreach (est. M9). | P1 | customer-success + founder | Before first winback outreach (M9) |
+| **OQ-WIN-02** | ~~Should FORM offer a "loyalty re-entry" discount to churned accounts returning within 12 months?~~ **🟢 Resolved → DEC-081 (2026-06-23).** Loyalty re-entry discount adopted with five eligibility controls: `wau_band_at_churn IN ('green','amber')` only; 2–12 month post-churn window; 10% cap on Year 1 ACV at then-current list price only; WINBACK-CHAIN-01 `enterprise.winback_initiated` event prerequisite; tiered approval (CS lead < $50k ACV, founder ≥ $50k ACV). Not stackable with multi-year discount at signing. Price floors (§31.5) are absolute. Never publicly documented. Full decision in `docs/COST_MODEL.md §44` and `docs/DECISION_LOG.md §DEC-081`. | ~~P1~~ **🟢** | customer-success + founder | **Resolved.** |
 | **OQ-WIN-03** | ~~How should FORM handle `tenant_id` UUID reuse for a winback customer?~~ **🟢 Resolved → DEC-079 (2026-06-23).** Option B adopted: winback always provisions a new `tenant_id` UUID. `prior_tenant_id` added to `WinbackConvertedPayload`; WINBACK-CHAIN-01 amended to event-UUID lookup. See `docs/DECISION_LOG.md §DEC-079` and `docs/AUDIT_LOG_SCHEMA.md v2.40`. | ~~P0~~ **🟢** | enterprise-architect + compliance-officer | **Resolved.** |
 | **OQ-WIN-04** | ~~Should GDPR Art. 17 deletion be blocked for tenants in active litigation or legal hold?~~ **🟢 Resolved → DEC-080 (2026-06-23).** MSA §11.6 (Litigation Hold and Legal Claim Retention) documents the formal procedure: hold activates on compliance-officer instruction + outside counsel countersign; scope strictly limited to non-health data (billing records, contract records, relevant audit log entries); Art. 9 health data categorically excluded (§12.2 zero-grace absolute per DEC-036); DPA Art. 7 basis → GDPR Art. 6(1)(f)/(c); 36-month maximum; two DEC-030 events (`enterprise.litigation_hold_declared` HIGH/7yr, `enterprise.litigation_hold_released` HIGH/7yr) registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn`. See `docs/MSA_TEMPLATE.md §11.6` and `docs/DECISION_LOG.md §DEC-080`. | ~~P1~~ **🟢** | compliance-officer + outside counsel | **Resolved.** |
 
@@ -11929,6 +11951,180 @@ REVOKE ALL ON enterprise_churn_events FROM form_api;
 *v1.0 (2026-06-23): §43 Enterprise Post-Churn Economics, Offboarding Cost Model & Logo Winback Analytics — closes the enterprise lifecycle chain §40→§41→§42→§43. §43.1 purpose and scope: five financial questions answered post-churn (offboarding cost, churned ARR, winback economics, DEC-030 chain, SOC 2 evidence). §43.2 post-churn state machine: ten lifecycle states (active → churned → gdpr_deletion_pending / winback_in_progress); three new chain invariants (OFFBOARD-CHAIN-01 24h, WINBACK-CHAIN-01 365d, DELETION-CHAIN-01 35d/30d GDPR). §43.3 offboarding cost model: per-component breakdown across three tiers (Starter $1,000 / Growth $1,750 / Enterprise $2,900 [ESTIMATE]); offboarding cost as % ACV (Starter 6.9% — most regressive tier); blended $4,811/year at 20-account fleet maturity; −0.2 pp gross margin impact (currently unmodelled in §8.4). §43.4 GDPR Art. 17 deletion economics: data class retention table (user PII, GDPR Art. 9 health data, audit logs non-deletable per Art. 17(3)(e), contract records 7yr); deletion certificate dual-purpose (customer proof + SOC 2 C1.2 evidence); GDPR non-compliance risk cost (€20k fine floor + €30–80k legal [ESTIMATE]). §43.5 logo winback model: structural comparison (new-logo vs. winback — 2–4 month cycle, 60% CSM cost, +15–30% ACV premium); winback probability matrix by churn_reason × wau_band (Green champion_left 40–50% at 12m; Red low_utilization 3–8%); time-decay formula (−5 pp per 6 months past month 12); winback vs. new-logo economics (Green champion_left 5.8× cheaper; Red low_utilization 56% more expensive — do not pursue). §43.6 winback unit economics: ACV model with 20% premium by tier; payback period Growth tier ~16 days; NRR accounting treatment (winback at prior ACV = churned ARR reversal; premium above prior = expansion ARR; new contract_id required — prevents zero-denominator NRR inflation). §43.7 three new DEC-030 events: `enterprise.winback_initiated` (HIGH, 7yr — months_since_churn, churn_reason, wau_band_at_churn, outreach_sequence; Zod WinbackInitiatedPayload), `enterprise.winback_converted` (CRITICAL, 7yr — acv_premium_pct, winback_initiated_event_id for WINBACK-CHAIN-01; Zod WinbackConvertedPayload), `enterprise.deletion_certificate_issued` (CRITICAL, 7yr — classes_deleted/retained enums, retained_legal_basis `gdpr_art17_3e_legal_obligation`, days_since_trigger ≤ 35; Zod DeletionCertificateIssuedPayload). §43.8 migration 0085 `enterprise_churn_events` DDL summary: three ENUMs (churn_trigger, churn_reason, winback_status); full table with fehs_at_churn, deletion timeline fields, winback_status/acv/contract_id; three CHECKs (offboarding_before_deletion, winback_acv_requires_converted, deletion_sla_respected ≤ 35 days); UNIQUE (tenant_id, churn_date); two additional indexes (churn_date DESC, winback_status partial); RLS (form_admin all, compliance_officer read; form_api REVOKED; tenant_manager excluded). Cross-reference obligation: canonical DDL pending `docs/DATA_MODEL.md §44`. §43.9 three SOC 2 evidence artefacts: DEL-E-001 (C1.2/CC4.1 — annual deletion certificate archive, 7yr); WIN-E-001 (CC4.1/CC5.2 — annual winback programme aggregate report, 3yr); CHN-E-001 (CC6.1/CC7.1 — quarterly OFFBOARD-CHAIN-01 compliance report, 3yr). §43.10 ten-item implementation checklist: 4× P0/M10–M11 (DEC-030 registration + chain invariants, DATA_MODEL §44 DDL, pg_cron job 43 deletion_sla_monitor every 6h, Admin Console offboarding workflow); 3× P1/M11–M12 (SOC2_READINESS §79.4 registration + R2 subfolders + Vanta, winback pipeline UI, first CHN-E-001 filing); 3× P2/M24+ (WIN-E-001 first filing, offboarding cost actuals, SOC2_READINESS §101 cross-ref patch). §43.11 four open questions: OQ-WIN-01 (P2 — actual winback rates after 5 attempts); OQ-WIN-02 (P1 — loyalty re-entry discount decision before M9 outreach); OQ-WIN-03 (P0 — tenant_id UUID reuse policy for winback, enterprise-architect decision before M10); OQ-WIN-04 (P1 — GDPR Art. 17 block for litigation hold, outside counsel input before M5 MSA). Privacy floor: no individual employee user_id, name, email, health value, coaching content, or GDPR Art. 9 data in any §43 DEC-030 event, `enterprise_churn_events` row, or evidence artefact; fehs_at_churn is a tenant-aggregate score (k ≥ 10 per §33.7 enforcement); form_api REVOKED from enterprise_churn_events; tenant_manager role has no RLS policy (access denied by default). Cross-references: `docs/ENTERPRISE.md` (tier pricing, privacy floor, no-go criteria — insurance risk-scoring, wellness-as-punishment); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (three new events to register — P0/M10); `docs/DATA_MODEL.md §44` (canonical DDL for migration 0085 — pending obligation); `docs/SOC2_READINESS.md §79.4` (DEL-E-001/WIN-E-001/CHN-E-001 to register — P1/M11); `docs/SOC2_READINESS.md §101` (cross-ref patch for DATA_MODEL §44 — P2); `docs/OBSERVABILITY.md §12.6` (pg_cron job 43 to register — P0/M10); §8.4 (enterprise gross margin — offboarding cost line item to add — P2); §23.1 (NRR formula — winback ACV accounting treatment); §26 (CS Model — OFFBOARD-CHAIN-01 referenced, account_churned CRITICAL event); §34.8 (churn_reason enum — feeding §43.5.1 winback probability matrix); §40.3 (WAU health band at churn — winback probability input); §42 (Renewal Economics — §43 is the post-non-renewal continuation). Owner: enterprise-architect + customer-success + compliance-officer.*
 
 ---
+
+---
+
+## §44 Loyalty Re-Entry Discount: OQ-WIN-02 Resolution (DEC-081)
+
+**Section owner:** customer-success + compliance-officer + enterprise-architect | **Status:** v1.0 (2026-06-23) | **Closes:** OQ-WIN-02 (§43.11, P1) | **Decision:** DEC-081 (2026-06-23)
+
+---
+
+### 44.1 Purpose and Scope
+
+OQ-WIN-02 asked: *Should FORM offer a "loyalty re-entry" discount to churned accounts returning within 12 months?*
+
+The §43.5 winback model establishes that Green-band churns (`wau_band_at_churn = 'green'`) are 5.8× cheaper to re-acquire than new logos, with a 40–50% conversion probability at 12 months. The principal risk is that a systematically available re-entry discount signals churn is "free" — a customer can leave, extract a concession, and return — eroding the pricing floor and creating a precedent across the fleet.
+
+This section documents the formal resolution: **a conditionally adopted, CSM-discretionary loyalty re-entry discount** with five eligibility controls designed to prevent systematic abuse while preserving the winback velocity benefit for genuine re-entry situations.
+
+Scope: this section defines the discount policy, approval mechanics, DEC-030 chain requirements, NRR accounting treatment, and implementation checklist. It does not modify `enterprise.html` or `pricing-enterprise.html` — the loyalty re-entry discount is a CSM tool, not a public offer.
+
+---
+
+### 44.2 Eligibility Rules
+
+All five controls must be satisfied before a loyalty re-entry discount can be discussed with the prospect. Failing any single control disqualifies the account for the discount; standard winback pricing (§43.6) applies.
+
+| Control | Gate condition | Rationale |
+|---|---|---|
+| **WAU band at churn** | `wau_band_at_churn IN ('green', 'amber')` only | Red-band churners have ≤ 8% winback probability (§43.5.1) and their churn is product-fitness failure, not recoverable circumstance. Offering a discount rewards non-engagement with more price concessions. |
+| **Months since churn** | `months_since_churn BETWEEN 2 AND 12` (inclusive) | 2-month floor prevents day-1 "churn-and-return" gaming. 12-month ceiling aligns with the §43.5.2 time-decay model: beyond 12 months, winback probability has decayed sufficiently that a loyalty discount is statistically poor ROI. |
+| **WINBACK-CHAIN-01 prerequisite** | `enterprise.winback_initiated` DEC-030 event on file within 365 days for the same `tenant_id` (predecessor check per DEC-079) | No discount may be discussed without a logged, chain-documented outreach sequence. Prevents unilateral ACV reduction in Admin Console without CSM due diligence on winback viability. |
+| **Non-stacking with multi-year** | Loyalty re-entry discount and multi-year commitment discount (−15%/−25%, §42.4) are mutually exclusive at contract signing | Prevents discount stacking that could breach price floors (§31.5) for Growth-tier accounts at 3-year × loyalty. Year 2+ of a multi-year re-entry contract uses the standard multi-year schedule. |
+| **Price floors absolute** | Effective rate after discount ≥ $6.00/seat (Starter), $4.50/seat (Growth), $4.00/seat (Enterprise) | §31.5 floors are structural constraints — no approval level can waive them, including a founder-approved loyalty discount. If the 10% loyalty discount would breach the floor, the discount is capped at the floor. |
+
+---
+
+### 44.3 Discount Mechanics
+
+**Discount amount:** 10% off the **then-current tier list price** for Year 1 of the new contract. Applied as:
+
+```
+effective_rate_year1 = max(current_list_price × 0.90, price_floor_for_tier)
+```
+
+Where `price_floor_for_tier` is the §31.5 hard minimum ($6.00 / $4.50 / $4.00).
+
+**ACV calculation:**
+```
+re_entry_acv_year1 = effective_rate_year1 × new_seat_count × 12
+```
+
+**Year 1 only.** Year 2 and beyond revert to the then-current list price (for single-year renewals) or the standard multi-year escalation schedule (§42.5) if a multi-year contract was signed at re-entry. The loyalty discount is a one-year incentive, not a permanent rate lock.
+
+**Not a prior-rate lock.** The discount is applied to the **then-current list price**, not the customer's prior contracted rate. If list prices have increased since churn, the discount provides 10% off the new list price. This preserves pricing trajectory integrity — the loyalty discount is not a rollback of interim price changes.
+
+**Tier boundary:** If the new seat count crosses a tier boundary, the loyalty discount applies to the new tier's list price. Example: a Growth-tier account with 300 seats re-enters at 1,100 seats (Enterprise tier). The 10% discount applies to the Enterprise tier list price ($8.00 reference), not the Growth tier rate.
+
+**`enterprise_contracts` schema change:** Add `contract_discount_type VARCHAR(30) CHECK (contract_discount_type IN ('none','multi_year','upfront','loyalty_reentry'))` to the `enterprise_contracts` DDL. For winback contracts without a loyalty discount, value is `'none'`. `loyalty_reentry` is mutually exclusive with `'multi_year'` at the same year boundary (CHECK constraint enforced).
+
+---
+
+### 44.4 Approval Workflow
+
+The loyalty re-entry discount is a **CSM-discretionary tool**, not an entitlement. The following approval gates apply:
+
+| ACV threshold | Approver | Process |
+|---|---|---|
+| New ACV < $50,000 | Customer-success lead | Async Slack approval in `#enterprise-winback` channel; logged to Admin Console winback note |
+| New ACV ≥ $50,000 | Founder | Written Slack approval in `#founder-decisions`; co-signed by customer-success lead |
+
+**Sequence before contract renewal:**
+
+1. CSM verifies all five eligibility controls (§44.2).
+2. CSM calculates `effective_rate_year1` and confirms price floor compliance.
+3. CSM obtains required approval (Slack thread retained as evidence).
+4. **Compliance-officer emits `enterprise.pricing_exception_approved`** (§31.8) with `exception_type: 'loyalty_reentry'` before the Admin Console "Confirm Renewal" step.
+5. `enterprise.contract_renewed` is emitted by the Admin Console; REENTRY-CHAIN-01 (§44.5) validates the predecessor event.
+
+The `enterprise.winback_initiated` → `enterprise.pricing_exception_approved` → `enterprise.contract_renewed` sequence is the HMAC chain of record for every loyalty re-entry deal.
+
+---
+
+### 44.5 DEC-030 Chain Implications
+
+**No new DEC-030 event types are required.** The existing event schema handles loyalty re-entry fully:
+
+| Event | Trigger | Existing schema change needed |
+|---|---|---|
+| `enterprise.winback_initiated` (HIGH, 7yr) | CSM logs outreach via Admin Console "Winback Pipeline" (§43.10 item 6) | None — already includes `wau_band_at_churn`, `months_since_churn`, `churn_reason` |
+| `enterprise.pricing_exception_approved` (HIGH, 7yr) | Compliance-officer emits before contract renewal when loyalty discount applies | Add `exception_type` enum value `'loyalty_reentry'` to `PricingExceptionApprovedPayload` (see §44.8 item 2) |
+| `enterprise.contract_renewed` (STANDARD, 7yr) | Admin Console "Confirm Renewal" step | Add `contract_discount_type` field to payload to mirror `enterprise_contracts` DDL change |
+
+**REENTRY-CHAIN-01 invariant:**
+
+> `enterprise.contract_renewed` with `payload.contract_discount_type = 'loyalty_reentry'` must be preceded by `enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'` for the same `tenant_id` within 30 days. If no matching exception event is found, the `emit-audit-event` Worker returns HTTP 422 (`REENTRY_CHAIN_01_VIOLATION`).
+
+This invariant is additive to RENEW-CHAIN-01 (§42.7) — both prerequisite checks must pass for a winback renewal with loyalty discount.
+
+**Privacy floor:** No individual employee `user_id`, name, email, health value, or GDPR Art. 9 data in any §44 DEC-030 event. `tenant_id` is FORM-internal UUID. `exception_type`, `effective_rate`, and `new_seat_count` are commercial metadata only.
+
+---
+
+### 44.6 NRR Accounting Treatment
+
+The loyalty re-entry discount interacts with NRR (§23.1) in the following ways:
+
+| Scenario | NRR treatment |
+|---|---|
+| New re-entry ACV ≥ prior churned ACV | Churned ARR is fully reversed; any excess is **expansion ARR** (standard winback mechanics per §43.6.3) |
+| New re-entry ACV < prior churned ACV (discount + seat reduction) | Churned ARR is partially reversed at new ACV; the gap between prior and new ACV does **not** count as contraction ARR (it was already written off as churned ARR) |
+| New re-entry ACV < prior churned ACV, seat count higher | Loyalty discount more than offsets seat count increase — same treatment as above |
+
+**CSM modelling obligation:** Before presenting a loyalty re-entry offer, the CSM must model whether the effective new ACV (post-discount) meets the winback unit economics threshold from §43.6.2 (payback period ≤ 90 days for Growth tier at standard winback ACV). If the loyalty discount pushes payback beyond 90 days, escalate to customer-success lead before proceeding.
+
+**NRR denominator integrity:** New `contract_id` is always issued at winback (DEC-079). The re-entry ACV is recorded against the new `tenant_id` and new `contract_id` — no retroactive adjustment to prior ARR periods.
+
+---
+
+### 44.7 SOC 2 Evidence Mapping
+
+No new evidence artefacts are required. The loyalty re-entry discount is covered by existing evidence:
+
+| Evidence artefact | Coverage | §44 contribution |
+|---|---|---|
+| **REN-E-001** (CC5.2/CC1.4 — annual contract_renewed chain export) | `floor_respected: true` invariant; all renewals including winbacks | Add annual count of `contract_discount_type = 'loyalty_reentry'` rows + aggregate ACV impact note in filing narrative |
+| **§31.8 pricing exception chain** | `enterprise.pricing_exception_approved` events | `exception_type = 'loyalty_reentry'` events are included in the quarterly pricing exception audit run by compliance-officer |
+
+**CC5.2 auditor narrative:** CC5.2 requires FORM to enforce commitments and accountabilities in pricing. REENTRY-CHAIN-01 enforces that no re-entry loyalty discount is applied to a contract renewal without a prior documented CSM outreach event (`enterprise.winback_initiated`) and a compliance-officer-approved pricing exception (`enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'`). The chain prevents any retroactive or undocumented re-entry discount.
+
+**CC1.4 auditor narrative:** CC1.4 requires FORM to communicate policy changes and commitments clearly. The loyalty re-entry discount is deliberately absent from public-facing pricing materials — its scope is a documented internal CSM tool with a chain-enforced approval gate. Auditors can verify via `enterprise.pricing_exception_approved` events that the discount was applied only to qualifying accounts.
+
+---
+
+### 44.8 Implementation Checklist
+
+#### P0 — Before first winback outreach (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Add `contract_discount_type VARCHAR(30) CHECK (contract_discount_type IN ('none','multi_year','upfront','loyalty_reentry'))` to `enterprise_contracts` DDL (migration 0086 additive column); enforce mutual exclusivity constraint: `CHECK (NOT (contract_discount_type = 'loyalty_reentry' AND contract_years > 1 AND contract_discount_type = 'multi_year'))` — simplified as `CHECK (contract_discount_type <> 'loyalty_reentry' OR contract_years = 1)` (loyalty discount Year 1 only, multi-year term may be signed but Year 1 rate is loyalty-discounted; Year 2 escalation applies normally). Add to `DATA_MODEL.md §41.6` as additive column note. | platform-engineer | **P0** | M9 | [ ] |
+| 2 | Extend `PricingExceptionApprovedPayload` Zod schema in `emit-audit-event` Worker to include `exception_type: z.enum(['standard_discount','loyalty_reentry','pilot_credit','floor_exception'])` (additive field; back-fills `'standard_discount'` for prior events). Register `exception_type` enum extension in `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`enterprise.pricing_exception_approved` payload section). | platform-engineer + compliance-officer | **P0** | M9 | [ ] |
+| 3 | Implement REENTRY-CHAIN-01 in `emit-audit-event` Worker: before inserting `enterprise.contract_renewed` with `contract_discount_type = 'loyalty_reentry'`, query `audit_log_events` for `enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'` and same `tenant_id` within 30 days; HTTP 422 `REENTRY_CHAIN_01_VIOLATION` if absent. Integration test: contract_renewed with loyalty_reentry discount type + no prior exception event → 422; with exception event → 201. | platform-engineer | **P0** | M9 | [ ] |
+| 4 | Add loyalty re-entry toggle to Admin Console "Winback Contract" modal (form_admin role; customer-success lead and founder approval gating based on ACV threshold). Eligibility pre-check: disable toggle if `wau_band_at_churn = 'red'` OR `months_since_churn < 2` OR `months_since_churn > 12`. Show calculated `effective_rate_year1` and floor-check result before approval is requested. | platform-engineer + design-craft | **P0** | M9 | [ ] |
+
+#### P1 — Before SOC 2 observation period
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Compliance-officer: extend REN-E-001 evidence artefact filing template (§42.9) to include a `loyalty_reentry` discount summary table: `tenant_id` (FORM-internal UUID only), `months_since_churn`, `wau_band_at_churn`, `tier`, `list_rate`, `effective_rate`, `floor_applied` boolean, `exception_event_id`. File first updated REN-E-001 after first re-entry deal or at Year 1 annual filing (whichever comes first). | compliance-officer | **P1** | M13 | [ ] |
+
+#### P2 — After first 5 re-entry deals
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Evaluate loyalty discount utilisation: after 5 qualifying re-entry deals, cross-tab `wau_band_at_churn × churn_reason × discount_used` to assess whether the 10% cap is sufficient to close deals or whether the policy needs revision. If > 50% of Green-band approached accounts requested a higher discount (Slack approval threads reviewed), escalate policy revision to founder. | customer-success + data-engineer | **P2** | After 5 re-entry deals (est. M24–M30) | [ ] |
+
+---
+
+### 44.9 OQ-WIN-02 Resolution
+
+**Decision:** Loyalty re-entry discount **adopted** with the five eligibility controls documented in §44.2. Formal decision record: `docs/DECISION_LOG.md §DEC-081` (2026-06-23).
+
+**§43.11 OQ-WIN-02 status:** Updated to 🟢 Resolved → DEC-081 (2026-06-23).
+
+**Communication policy (binding):** The loyalty re-entry discount is a CSM-discretionary tool only. It must never appear in:
+- `enterprise.html` (pricing section or FAQ)
+- `pricing-enterprise.html` (calculator or FAQ)
+- Any MSA, order form, or DPA as a standard entitlement
+- Any outbound marketing or sales deck
+
+Violation of this communication policy is treated as an MSA pricing-exception breach requiring compliance-officer review.
+
+---
+
+*v2.13 (2026-06-23): §44 Loyalty Re-Entry Discount (OQ-WIN-02 Resolution, DEC-081) — closes the last P1 open question from §43.11. §44.1 purpose and scope: CSM-discretionary discount tool for qualifying winback situations; closes OQ-WIN-02 (P1, customer-success + founder, before M9 outreach). §44.2 five eligibility controls: (1) `wau_band_at_churn IN ('green','amber')` — red-band excluded (negative expected value per §43.5.3); (2) `months_since_churn BETWEEN 2 AND 12` — 2-month floor prevents churn-and-return gaming, 12-month ceiling caps the eligible window; (3) WINBACK-CHAIN-01 prerequisite — `enterprise.winback_initiated` must be on the DEC-030 chain before any discount is discussed; (4) not-stackable with multi-year commitment discount at contract signing (Year 1 loyalty discount OR multi-year schedule, never both simultaneously); (5) price floors from §31.5 are absolute regardless of loyalty discount — effective rate post-discount cannot breach $6.00/seat (Starter), $4.50/seat (Growth), $4.00/seat (Enterprise). §44.3 discount mechanics: 10% off Year 1 ACV at the then-current tier list price; applied as a one-time reduction on new `enterprise_contracts.rate_per_seat_usd` for Year 1 only; Year 2+ reverts to then-current list or multi-year schedule if signed at renewal; new `contract_discount_type` value `'loyalty_reentry'` added to `enterprise_contracts` DDL. §44.4 approval: ACV < $50k → customer-success lead countersign; ACV ≥ $50k → founder approval required; `enterprise.pricing_exception_approved` (§31.8) must be emitted before `enterprise.contract_renewed` — extends RENEW-CHAIN-01 prerequisite; exception event `payload.exception_type = 'loyalty_reentry'`. §44.5 DEC-030 chain: no new event types — `enterprise.pricing_exception_approved` (§31.8, HIGH/7yr) carries `exception_type: 'loyalty_reentry'`; REENTRY-CHAIN-01 invariant: `enterprise.contract_renewed` with `contract_discount_type = 'loyalty_reentry'` returns HTTP 422 unless a `enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'` exists within 30 days for the same `tenant_id`. §44.6 NRR accounting: winback at loyalty-discounted ACV = churned ARR reversal at discounted rate (not prior ACV); if new ACV < prior ACV, net negative vs. prior ARR — CSM must model this; if new ACV ≥ prior ACV after loyalty discount, standard NRR reversal applies. §44.7 SOC 2 evidence: `enterprise.pricing_exception_approved` chain events with `exception_type = 'loyalty_reentry'` are included in REN-E-001 annual chain export (§42.9); compliance-officer notes loyalty_reentry count and aggregate ACV impact in REN-E-001 filing. §44.8 five-item implementation checklist: P0/M9 (add `contract_discount_type = 'loyalty_reentry'` to enum; register REENTRY-CHAIN-01 in emit-audit-event Worker; Admin Console winback contract modal with loyalty discount toggle + approval gate); P1/M9 (compliance-officer: extend `enterprise.pricing_exception_approved` payload schema with `exception_type` enum in AUDIT_LOG_SCHEMA.md); P2/M24 (review loyalty discount usage rate at first 5 eligible winbacks — close OQ-REN-01 analogue if data is sufficient). §44.9 OQ-WIN-02 resolution: decision adopted → DEC-081 (2026-06-23). `docs/COST_MODEL.md §43.11` OQ-WIN-02 row updated to 🟢 Resolved. Communication policy: loyalty re-entry discount is a CSM tool only — never referenced in public-facing pricing pages (`enterprise.html`, `pricing-enterprise.html`), never documented in the MSA as a standard entitlement, never communicated as an automatic right. Privacy floor: no individual employee user_id, name, email, health value, coaching content, or GDPR Art. 9 data in any §44 DEC-030 event; `tenant_id` is FORM-internal UUID; `form_api` REVOKED from write paths. Cross-references: `docs/COST_MODEL.md §31.5` (price floors — absolute, not waivable by loyalty discount); `docs/COST_MODEL.md §31.8` (pricing exception chain — `enterprise.pricing_exception_approved` event spec); `docs/COST_MODEL.md §43.5` (winback probability model — eligibility wau_band logic); `docs/COST_MODEL.md §43.6` (winback unit economics — NRR accounting cross-check); `docs/COST_MODEL.md §43.7` (WINBACK-CHAIN-01 prerequisite event — `enterprise.winback_initiated`); `docs/COST_MODEL.md §42.9` (REN-E-001 evidence artefact — loyalty_reentry count included); `docs/DECISION_LOG.md §DEC-081` (formal decision record); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`enterprise.pricing_exception_approved` — `exception_type` enum to extend with `'loyalty_reentry'` P1/M9); `docs/MSA_TEMPLATE.md` (loyalty re-entry discount deliberately NOT referenced — CSM-only tool). Owner: customer-success + compliance-officer + enterprise-architect.*
 
 *v2.12 (2026-06-22): §42.10 item 2 cross-reference patch — canonical DDL source added. Closes `docs/DATA_MODEL.md §43.9` pending obligation (🟡 → 🟢). §42.10 item 2 task text extended to cite `docs/DATA_MODEL.md §43` (v1.22, 2026-06-20) as the authoritative DATA_MODEL registration for migration 0084, and to direct platform-engineer to mark `docs/DATA_MODEL.md §43.8` item 1 done simultaneously when migration is applied to production. No schema, model, or economic changes. Document header v2.11 → v2.12. Cross-references: `docs/DATA_MODEL.md §43` (v1.22 — canonical DDL registration for `enterprise_renewals`, migration 0084); `docs/DATA_MODEL.md §43.9` (cross-reference obligation row — now 🟢 Closed, v1.25); `docs/DATA_MODEL.md §43.8` item 1 (simultaneous completion target for migration 0084 apply). Owner: enterprise-architect + compliance-officer.*
 

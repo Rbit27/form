@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.41.1] — 2026-06-23
+
+### Changed
+- `docs/COST_MODEL.md` — §44 «Loyalty Re-Entry Discount: OQ-WIN-02 Resolution (DEC-081)» added. Closes OQ-WIN-02 (P1, M9 deadline). Loyalty re-entry discount adopted with five eligibility controls: `wau_band_at_churn IN ('green','amber')` only; 2–12 month post-churn window; 10% cap on Year 1 ACV at then-current list price; WINBACK-CHAIN-01 `enterprise.winback_initiated` prerequisite; tiered approval (CS lead < $50k ACV, founder ≥ $50k ACV). Non-stackable with multi-year discount. §31.5 price floors absolute. New DEC-030 chain invariant REENTRY-CHAIN-01 — HTTP 422 `REENTRY_CHAIN_01_VIOLATION` if `enterprise.contract_renewed` with `contract_discount_type = 'loyalty_reentry'` lacks a prior `enterprise.pricing_exception_approved` within 30 days. New DDL column `contract_discount_type` on `enterprise_contracts`. Communication policy (binding): MUST NEVER appear in enterprise.html, pricing-enterprise.html, or any public materials. §43.11 OQ-WIN-02 row updated: ~~P1 open~~ → 🟢 Resolved → DEC-081 (2026-06-23). COST_MODEL v2.12 → v2.13.
+- `docs/DECISION_LOG.md` — DEC-081 added: loyalty re-entry discount decision documented with full rationale and reverse cost.
+- `VERSION` — 8.41.0 → 8.41.1.
+
+---
+
 ## [8.41.0] — 2026-06-23
 
 ### Added
