@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [8.6.0] — 2026-06-23
+
+### Added
+- `content/post-2326-strength-base-vs-specialization.md` — Editorial 2326–2335, post 1/10. Силова база vs. спеціалізація: чому порядок визначає стелю прогресу. Концептуальна рамка GPP/SPP для recreational атлета без академічного словника. Stone et al. (2002): рівень SPP обмежений рівнем GPP через адаптаційний потенціал. Bompa & Haff (2009): специфічні адаптації вимагають загальної підготовки як попередньої умови. Woo et al. (1987): структурна адаптація (сухожилля) відстає від функціональної (м'яз). Issurin (2010): concentrated adaptational potential — конечний ресурс. Три стани системи: GPP-дефіцит (< 12 міс., техніка при RPE 7 нестабільна), GPP-перехід (12–24 міс.), SPP-готовність (> 18–24 міс., технічна стабільність при RPE 8+). Silові орієнтири (Rippetoe & Bradford 2011) як довідкові точки без нормативного забарвлення. Чотири типових помилки: передчасна спеціалізація, хронічна базова фаза без переходу, підміна «бази» і «базових вправ», повернення після перерви без відновлювального блоку. Мінімальний чекліст переходу (технічний/структурний/силовий аспекти, 10 пунктів). clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+
+### Changed
+- `README.md` — Editorial 2326–2335 «Силова база для recreational атлета» added as proposed (10 topics: 2326 strength base vs. specialization; 2327 three movement patterns; 2328 choosing core exercises; 2329 relative strength; 2330 muscle balance and asymmetry; 2331 weak point vs. weak muscle; 2332 technique as strength limit; 2333 when to add exercise; 2334 GPP to SPP transition; 2335 synthesis). post-2326 → draft.
+- `blog.html` — blog card for post-2326 (strength-base-vs-specialization) added at top of grid (before post-2220).
+- `STATUS.md` — Total posts 2029 → 2030; Editorial 2326–2335 registered as IN PROGRESS 1/10.
+- `VERSION` — 8.5.0 → 8.6.0.
+
 ## [8.5.0] — 2026-06-23
 
 ### Added
