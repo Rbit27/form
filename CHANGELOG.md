@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [8.32.0] — 2026-06-23
+
+### Added
+- `docs/DECISION_LOG.md §DEC-079` — OQ-WIN-03 resolved: new `tenant_id` UUID (Option B) always provisioned at winback; WINBACK-CHAIN-01 invariant amended to event-UUID lookup. Decision: `enterprise.winback_converted.tenant_id` = new provisioned UUID; `prior_tenant_id` (new field) = churned tenant UUID. Rationale: Option A (reuse prior `tenant_id`) violates DEL-E-001 deletion certificate legal representation and SOC 2 C1.2 HMAC chain integrity. Event-UUID predecessor lookup via `winback_initiated_event_id` is stricter and more tamper-resistant than `tenant_id`-based lookup. Pattern consistent with `deletion_request_event_id` FK in `DeletionCertificateIssuedPayload`. No NRR denominator risk (new UUID = clean ARR lifecycle per §43.6.3). Reverse cost: medium (DPA re-execution with EU enterprise customers if reverted). Owner: enterprise-architect + compliance-officer.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.39 → v2.40. `WinbackConvertedPayload` gains `prior_tenant_id: z.string().uuid()` (churned tenant UUID; enables HMAC chain self-audit without joining `enterprise_churn_events`); `tenant_id` clarified as new provisioned UUID per DEC-079. WINBACK-CHAIN-01 invariant description amended in event table row and introductory block: lookup by `winback_initiated_event_id` event UUID + cross-check `tenant_id` of predecessor = `prior_tenant_id` of converted event.
+- `docs/COST_MODEL.md` — §43.7.3 WINBACK-CHAIN-01 row updated to reflect DEC-079 event-UUID lookup; §43.11 OQ-WIN-03 row updated: `P0 (before first winback)` → 🟢 Resolved → DEC-079 (2026-06-23).
+- `VERSION` — 8.31.0 → 8.32.0.
+
+---
+
 ## [8.31.0] — 2026-06-23
 
 ### Added

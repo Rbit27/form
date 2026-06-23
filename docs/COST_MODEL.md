@@ -11513,7 +11513,7 @@ winback_in_progress         →  churned                  winback_abandoned (no 
 | ID | Invariant | Enforcement |
 |---|---|---|
 | **OFFBOARD-CHAIN-01** | `enterprise.offboarding_initiated` must follow `enterprise.account_churned` for the same `tenant_id` within **24 hours**. | HTTP 422 `OFFBOARD_CHAIN_01_VIOLATION`; P1 PagerDuty `form-enterprise` on breach. |
-| **WINBACK-CHAIN-01** | `enterprise.winback_converted` requires prior `enterprise.winback_initiated` for the same `tenant_id` within **365 days**. | HTTP 422 `WINBACK_CHAIN_01_VIOLATION`. |
+| **WINBACK-CHAIN-01** | `enterprise.winback_converted` requires prior `enterprise.winback_initiated` identified by `winback_initiated_event_id` within **365 days**, with that event's `tenant_id` = `prior_tenant_id` of the converted event. DEC-079: lookup by event UUID, not `tenant_id`, because winback provisions a new `tenant_id`. | HTTP 422 `WINBACK_CHAIN_01_VIOLATION`. |
 | **DELETION-CHAIN-01** | `enterprise.deletion_certificate_issued` requires prior deletion trigger within **35 days**; `days_since_trigger` ≤ 30 for GDPR Art. 17 SLA. | HTTP 422 `DELETION_CHAIN_01_VIOLATION`; **P0 escalation** if `trigger_type = 'gdpr_art17_request'`. |
 
 ---
@@ -11785,7 +11785,7 @@ const DeletionCertificateIssuedPayload = z.object({
 | ID | Rule | Enforcement | Breach consequence |
 |---|---|---|---|
 | **OFFBOARD-CHAIN-01** | `enterprise.offboarding_initiated` within 24h of `enterprise.account_churned` | HTTP 422 `OFFBOARD_CHAIN_01_VIOLATION` | P1 PagerDuty `form-enterprise`; compliance-officer SLA 4h |
-| **WINBACK-CHAIN-01** | `enterprise.winback_converted` requires prior `enterprise.winback_initiated` within 365 days | HTTP 422 `WINBACK_CHAIN_01_VIOLATION` | Compliance-officer logs exception; no P1 (non-safety control) |
+| **WINBACK-CHAIN-01** | `enterprise.winback_converted` requires a prior `enterprise.winback_initiated` identified by `winback_initiated_event_id` within 365 days, with `tenant_id` of that event = `prior_tenant_id` of the converted event — event-UUID lookup per DEC-079 (winback always provisions a new `tenant_id`) | HTTP 422 `WINBACK_CHAIN_01_VIOLATION` | Compliance-officer logs exception; no P1 (non-safety control) |
 | **DELETION-CHAIN-01** | `enterprise.deletion_certificate_issued` within 35 days of trigger; `days_since_trigger` ≤ 30 for GDPR | HTTP 422 `DELETION_CHAIN_01_VIOLATION` | **P0** if `trigger_type = 'gdpr_art17_request'`; GDPR Art. 17 SLA breach risk |
 
 ---
@@ -11921,7 +11921,7 @@ REVOKE ALL ON enterprise_churn_events FROM form_api;
 |---|---|---|---|---|
 | **OQ-WIN-01** | **What are FORM's actual winback conversion rates by `churn_reason` × `wau_band`?** §43.5.1 uses SaaS wellness sector proxies. After 5 winback attempts: cross-tab `enterprise_churn_events.winback_status` against `churn_reason` × `wau_band_at_churn`. Update §43.5.1 if actuals deviate ≥ 10 pp; create DECISION_LOG entry. | P2 | data-engineer + customer-success | After 5 winback attempts (est. M30) |
 | **OQ-WIN-02** | **Should FORM offer a "loyalty re-entry" discount to churned accounts returning within 12 months?** Benefit: reduces winback cycle from 2–4 months to 1–2 months. Risk: signals churn is reversibly "free," creating expectation of a discount that undermines standard pricing. Decision required before first winback outreach (est. M9). | P1 | customer-success + founder | Before first winback outreach (M9) |
-| **OQ-WIN-03** | **How should FORM handle `tenant_id` UUID reuse for a winback customer?** Option A: reuse prior `tenant_id` (preserves audit chain linkage). Option B: new `tenant_id` (clean slate, preserves deletion certificate integrity). Risk of Option A: re-activating a tenant_id post-GDPR-deletion violates the deletion certificate's representation. Risk of Option B: HMAC chain splits across two tenant_ids for the same legal entity. | **P0** (before first winback) | enterprise-architect + compliance-officer | enterprise-architect recommendation before migration 0085 apply (M10) |
+| **OQ-WIN-03** | ~~How should FORM handle `tenant_id` UUID reuse for a winback customer?~~ **🟢 Resolved → DEC-079 (2026-06-23).** Option B adopted: winback always provisions a new `tenant_id` UUID. `prior_tenant_id` added to `WinbackConvertedPayload`; WINBACK-CHAIN-01 amended to event-UUID lookup. See `docs/DECISION_LOG.md §DEC-079` and `docs/AUDIT_LOG_SCHEMA.md v2.40`. | ~~P0~~ **🟢** | enterprise-architect + compliance-officer | **Resolved.** |
 | **OQ-WIN-04** | **Should GDPR Art. 17 deletion be blocked for tenants in active litigation or legal hold?** Under Art. 17(3)(e) FORM may retain data "for the establishment, exercise or defence of legal claims." If a churned tenant disputes the final invoice, FORM may need to retain billing records beyond 90 days. Document in MSA §11 and DPA Art. 7. | P1 | compliance-officer + outside counsel | Before first enterprise MSA signature (M5) |
 
 ---

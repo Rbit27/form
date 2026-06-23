@@ -13,6 +13,17 @@
 
 ---
 
+## 2026-06-23
+
+### DEC-079 · OQ-WIN-03: Winback tenant_id policy — new UUID (Option B) adopted; WINBACK-CHAIN-01 amended to event-ID lookup
+
+- **Decision:** When a churned enterprise customer signs a new contract (winback), FORM always provisions a **new `tenant_id` UUID** (Option B). The prior `tenant_id` is never reused. `WinbackConvertedPayload` gains a new field `prior_tenant_id: z.string().uuid()` to make the cross-tenant HMAC chain self-auditable. WINBACK-CHAIN-01 is amended: the `emit-audit-event` Worker validates the chain by looking up the event with `id = winback_initiated_event_id` and verifying it (a) is an `enterprise.winback_initiated` event, (b) was created within 365 days, and (c) has `tenant_id` = `prior_tenant_id` of the converted event — no lookup by "same `tenant_id`". Closes OQ-WIN-03 (P0 — before migration 0085 apply, M10).
+- **Owner:** enterprise-architect + compliance-officer
+- **Why:** (1) **DEL-E-001 certificate integrity.** `enterprise.deletion_certificate_issued` (CRITICAL/7yr) asserts that all personal data associated with that `tenant_id` UUID has been purged from production systems. Re-activating the same UUID contradicts the legal representation made in the deletion certificate — a GDPR Art. 17 and SOC 2 C1.2 audit-chain integrity breach. Option A is architecturally incompatible with issuing a valid deletion certificate. (2) **HMAC chain self-auditability.** `winback_initiated_event_id` (already in payload) plus new `prior_tenant_id` allows an auditor to reconstruct the chain — `old_tenant → winback_initiated → winback_converted` — solely from the HMAC chain without joining `enterprise_churn_events`. (3) **Event-ID lookup is stricter.** The amended WINBACK-CHAIN-01 check is more tamper-resistant than a `tenant_id`-based query: it pins the predecessor to a specific event UUID, preventing any ambiguity when a customer has multiple churn events on different dates. (4) **Pattern consistency.** The `winback_initiated_event_id` FK pattern mirrors the `deletion_request_event_id` FK in `DeletionCertificateIssuedPayload` — both chain terminal events carry the predecessor event UUID for direct lookup. (5) **No NRR denominator risk.** New `tenant_id` = new contract lifecycle with clean ARR attribution; no risk of a reactivated UUID inflating or distorting NRR formula denominator (§23.1, §43.6.3).
+- **Reverse cost:** Medium. Reverting to Option A requires: (a) remove `prior_tenant_id` from `WinbackConvertedPayload`; (b) revert WINBACK-CHAIN-01 Worker to `tenant_id`-based lookup; (c) amend DPA Annex B to disclose that GDPR-deleted `tenant_id` UUIDs may be reactivated — a DPA re-execution with all EU enterprise customers. Not recommended without a specific compelling reason that cannot be addressed by the `prior_tenant_id` cross-reference.
+
+---
+
 ## 2026-06-20
 
 ### DEC-078 · Block 1681–1730 тема: Розминка та рухова підготовка для силового атлета
