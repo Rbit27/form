@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [8.11.1] — 2026-06-23
+
+### Changed
+- `docs/COST_MODEL.md` v2.13 — §43 Enterprise Post-Churn Economics, Offboarding Cost Model & Logo Winback Analytics. Closes the enterprise lifecycle chain §40→§41→§42→§43. Offboarding cost model per tier (Starter $1,000 / Growth $1,750 / Enterprise $2,900 [ESTIMATE]); GDPR Art. 17 deletion economics and non-compliance risk cost; logo winback probability matrix by churn_reason × wau_band (Green champion_left 40–50% at 12m; Red low_utilization 3–8%); winback vs. new-logo break-even analysis (5.8× cheaper for Green band); three new DEC-030 HMAC-chained events (`enterprise.winback_initiated` HIGH/7yr, `enterprise.winback_converted` CRITICAL/7yr, `enterprise.deletion_certificate_issued` CRITICAL/7yr); three chain invariants (OFFBOARD-CHAIN-01 24h, WINBACK-CHAIN-01 365d, DELETION-CHAIN-01 35d/30d GDPR); migration 0085 `enterprise_churn_events` DDL summary (cross-ref to DATA_MODEL §44 — pending); three SOC 2 evidence artefacts (DEL-E-001 C1.2/CC4.1, WIN-E-001 CC4.1/CC5.2, CHN-E-001 CC6.1/CC7.1); pg_cron job 43 `deletion_sla_monitor` (every 6h) to register in OBSERVABILITY §12.6; ten-item implementation checklist; four open questions including OQ-WIN-03 (P0 — tenant_id UUID reuse policy for winback).
+- `VERSION` — 8.11.0 → 8.11.1 (patch: extension of existing COST_MODEL doc).
+
+---
+
 ## [8.11.0] — 2026-06-23
 
 ### Added

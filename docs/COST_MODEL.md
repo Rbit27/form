@@ -11463,6 +11463,473 @@ Modelled NRR: **≈ 105–124%** [ESTIMATE] — range reflects CSM intervention 
 
 ---
 
+---
+
+## §43 Enterprise Post-Churn Economics, Offboarding Cost Model & Logo Winback Analytics
+
+**Section owner:** enterprise-architect + customer-success + compliance-officer | **Status:** v1.0 (2026-06-23) | **Depends on:** §26 (CS Model), §34 (Churn Risk), §40 (Adoption), §41 (Expansion), §42 (Renewal)
+
+---
+
+### 43.1 Purpose and Scope
+
+This section closes the enterprise customer lifecycle chain:
+
+§40 Adoption → §41 Expansion → §42 Renewal → **§43 Post-Churn & Winback**
+
+Sections §34 and §42 model *risk of churn* and *mechanics of renewal*. Neither section answers the financially important questions after a customer does not renew:
+
+1. **What does it cost to offboard a churned enterprise tenant?** (CSM time, infrastructure, GDPR Art. 17 deletion)
+2. **What does FORM do with the churned ACV?** (Churned ARR write-off, NRR impact)
+3. **When is a winback attempt economically justified?** (Time-since-churn, WAU-band-at-churn, cost-of-reacquisition vs. new logo)
+4. **What DEC-030 chain events gate the offboarding and winback state machine?** (OFFBOARD-CHAIN-01, WINBACK-CHAIN-01, DELETION-CHAIN-01)
+5. **What SOC 2 evidence does a churned tenant's data deletion generate?** (C1.2, CC4.1 — GDPR Art. 17 deletion certificate)
+
+Scope limitation: this section models *involuntary offboarding* (non-renewal, contract termination, pilot lapse). Voluntary account mergers or entity rebranding that preserves the contract are out of scope.
+
+---
+
+### 43.2 Post-Churn State Machine
+
+A tenant moves through the following states after a contract does not renew:
+
+```
+enterprise_contracts.status   lifecycle_status          Trigger
+──────────────────────────────────────────────────────────────────────────
+active                      →  active                   (normal operation)
+active                      →  at_risk                  §34 churn flag
+at_risk                     →  non_renewing             churn_confirmed event
+non_renewing                →  offboarding              offboarding_initiated (≤ 24h)
+offboarding                 →  churned                  offboarding_complete event
+churned                     →  gdpr_deletion_pending    deletion_requested event (if GDPR)
+gdpr_deletion_pending       →  deleted                  deletion_certificate_issued event
+churned                     →  winback_in_progress      winback_initiated (≥ 90 days post-churn)
+winback_in_progress         →  active                   winback_converted → new contract
+winback_in_progress         →  churned                  winback_abandoned (no close in 180 days)
+```
+
+**Timing invariants enforced by the `emit-audit-event` Worker:**
+
+| ID | Invariant | Enforcement |
+|---|---|---|
+| **OFFBOARD-CHAIN-01** | `enterprise.offboarding_initiated` must follow `enterprise.account_churned` for the same `tenant_id` within **24 hours**. | HTTP 422 `OFFBOARD_CHAIN_01_VIOLATION`; P1 PagerDuty `form-enterprise` on breach. |
+| **WINBACK-CHAIN-01** | `enterprise.winback_converted` requires prior `enterprise.winback_initiated` for the same `tenant_id` within **365 days**. | HTTP 422 `WINBACK_CHAIN_01_VIOLATION`. |
+| **DELETION-CHAIN-01** | `enterprise.deletion_certificate_issued` requires prior deletion trigger within **35 days**; `days_since_trigger` ≤ 30 for GDPR Art. 17 SLA. | HTTP 422 `DELETION_CHAIN_01_VIOLATION`; **P0 escalation** if `trigger_type = 'gdpr_art17_request'`. |
+
+---
+
+### 43.3 Offboarding Cost Model
+
+Offboarding a churned enterprise tenant requires work across three functions: CSM (customer handoff), engineering (data deletion, SSO teardown), and compliance (GDPR documentation).
+
+#### 43.3.1 Offboarding cost components
+
+| Component | Starter (50–200 seats) | Growth (200–1,000 seats) | Enterprise (1,000+ seats) |
+|---|---|---|---|
+| **CSM exit interview + handoff** | 4h × $75/h = **$300** | 8h × $75/h = **$600** | 12h × $75/h = **$900** |
+| **SSO/SCIM teardown (IdP deprovisioning)** | 1h × $150/h = **$150** | 2h × $150/h = **$300** | 3h × $150/h = **$450** |
+| **Data export package (GDPR Art. 20 portability)** | 1h × $150/h = **$150** | 2h × $150/h = **$300** | 4h × $150/h = **$600** |
+| **Data deletion engineering (purge pipeline)** | 1h × $150/h = **$150** | 2h × $150/h = **$300** | 3h × $150/h = **$450** |
+| **Deletion certificate + legal review** | 1h × $250/h = **$250** | 1h × $250/h = **$250** | 2h × $250/h = **$500** |
+| **Total offboarding cost per churned tenant** | **~$1,000** [ESTIMATE] | **~$1,750** [ESTIMATE] | **~$2,900** [ESTIMATE] |
+
+All rates are fully-loaded cost estimates (salary + benefits + tooling allocation). [ESTIMATE — replace with actuals after first 3 offboardings per §43.10 item 9.]
+
+#### 43.3.2 Offboarding cost as % of lost ACV
+
+At the fleet-level model (§34.4 tier distribution: 60% Starter / 30% Growth / 10% Enterprise at fleet maturity):
+
+| Tier | Avg seats at churn | Avg ACV at churn | Offboarding cost | Cost as % ACV |
+|---|---|---|---|---|
+| Starter | 100 | $14,400 | $1,000 | **6.9%** |
+| Growth | 500 | $54,000 | $1,750 | **3.2%** |
+| Enterprise | 1,500 | $144,000 | $2,900 | **2.0%** |
+
+Observation: offboarding cost is highly regressive — disproportionately expensive for Starter churns. A single Starter churn costs ~6.9% of the ACV it recovers in offboarding alone. This makes Starter churn prevention (§40.6 intervention budget) even more economically critical than it appears in the §34 churn risk model.
+
+#### 43.3.3 Blended offboarding cost at fleet scale
+
+At the §34.4 tier mix and §42.8.2 annual churn rate (~17% gross churn on a 20-account book = ~3.4 churns/year), blended annual offboarding cost:
+
+```
+Annual offboarding cost = (0.60 × 3.4 × $1,000) + (0.30 × 3.4 × $1,750) + (0.10 × 3.4 × $2,900)
+                        = $2,040 + $1,785 + $986
+                        ≈ $4,811/year [ESTIMATE]
+```
+
+Operationally immaterial at fleet scale but should be modelled as a COGS line item in §8.4 enterprise gross margin (currently unaccounted for). Impact: approximately −0.2 pp gross margin at a 20-account fleet [ESTIMATE].
+
+---
+
+### 43.4 GDPR Art. 17 Data Deletion Economics
+
+When an EU-based enterprise customer churns, GDPR Art. 17 ("Right to Erasure") may apply at the tenant level. Even where the customer does not invoke Art. 17, FORM's DPA with each enterprise customer specifies a 90-day data retention period post-contract-end, after which FORM initiates deletion proactively.
+
+#### 43.4.1 Deletion timeline and cost by data class
+
+| Data class | Retention post-churn | Deletion method | Cost (one-time) |
+|---|---|---|---|
+| User PII (name, email, `user_id` bindings) | 30 days (GDPR Art. 17 request) / 90 days (standard) | `DELETE CASCADE` on `tenant_users`; purge from Auth table | $50 engineering [ESTIMATE] |
+| Health data (GDPR Art. 9) | 30 days / 90 days | Separate purge job on `health_logs`, `workout_sessions`, `nutrition_logs` | $100 engineering [ESTIMATE] |
+| Audit log chain (DEC-030) | 7 years — **non-deletable** | Retained encrypted cold storage per `docs/AUDIT_LOG_SCHEMA.md §Retention` (Art. 17(3)(e) exception) | $0 (existing cold storage) |
+| SSO/SCIM provisioning records | 7 years (financial audit trail) | Retained in `tenant_sso_configs` with PII scrubbed (IdP entity ID preserved; no personal attributes) | $0 |
+| Contract records | 7 years (financial audit trail) | Retained in `enterprise_contracts`, `enterprise_renewals`; PII removed from freeform fields | $50 engineering [ESTIMATE] |
+| Backup retention (encrypted snapshots) | 90 days post-deletion | Auto-purged by pg_cron job (job 43 `deletion_sla_monitor`; see §43.10 item 3) | $50 infrastructure [ESTIMATE] |
+| **Total GDPR deletion cost per EU tenant** | — | — | **~$250** [ESTIMATE] |
+
+**Audit log and contract records are explicitly non-deletable** even under GDPR Art. 17 because they are subject to the Art. 17(3)(e) retention exception (legal obligation — financial audit requirements; SOC 2 observation period). This must be disclosed in the DPA Art. 28 sub-processor documentation and enterprise MSA.
+
+#### 43.4.2 Deletion certificate
+
+Every completed deletion produces a `deletion_certificate.pdf` stored at `compliance/evidence/deletions/<tenant_id>_<YYYY-MM-DD>.pdf`. Contents:
+
+1. Tenant UUID (no company name — privacy of reference)
+2. Contract ID
+3. Deletion request date (or proactive 90-day trigger date)
+4. Confirmation of classes deleted (enumerated)
+5. Classes retained and legal basis (Art. 17(3)(e), financial audit retention, SOC 2)
+6. Compliance-officer countersignature
+7. DEC-030 `enterprise.deletion_certificate_issued` event ID (HMAC chain anchor)
+
+The certificate is dual-purpose: (a) provided to the churned customer as proof of GDPR Art. 17 compliance; (b) retained by FORM as SOC 2 C1.2 evidence (DEL-E-001, §43.9).
+
+#### 43.4.3 GDPR non-compliance risk cost
+
+Failure to complete deletion within the Art. 17 30-day SLA:
+
+- Fine floor: 2% global annual turnover or €10M (whichever lower). At pre-Series A scale (~€1M revenue): **€20,000 fine floor** [ESTIMATE].
+- Supervisory authority investigation: 3–6 months engineering + legal distraction; legal cost **€30,000–€80,000** [ESTIMATE].
+- Reputational damage with remaining enterprise pipeline: non-quantifiable but material.
+
+DELETION-CHAIN-01 (§43.2) plus the pg_cron job 43 deletion-SLA monitor (§43.10 item 3) are the primary controls preventing this outcome.
+
+---
+
+### 43.5 Logo Winback Model
+
+"Logo winback" refers to re-signing a previously churned enterprise tenant as a new contract. Winback is structurally different from new-logo acquisition:
+
+| Dimension | New logo | Winback |
+|---|---|---|
+| Discovery / awareness | Required (SDR, marketing) | Not required (relationship exists) |
+| Product knowledge | None (full demo required) | Substantial (knows the product) |
+| Trust | Low (proof required) | Mixed (churned = prior disappointment) |
+| Sales cycle | 5–7 months (§ENTERPRISE.md) | 2–4 months [ESTIMATE] |
+| CSM cost | $2,100–$4,200 (§26.7 onboarding) | $1,200–$2,400 [ESTIMATE — existing SSO config] |
+| ACV premium | Baseline | +15–30% above prior ACV [ESTIMATE] |
+
+#### 43.5.1 Winback probability model
+
+Winback probability is primarily a function of (a) *churn reason* (§34.8) and (b) *WAU health band at time of churn* (§40.3):
+
+| Churn reason (§34.8) | WAU band at churn | 12-month winback probability | 24-month winback probability |
+|---|---|---|---|
+| `champion_left` | Green (WAU ≥ 40%) | **40–50%** | **55–65%** |
+| `budget_cut` | Green (WAU ≥ 40%) | **35–45%** | **50–60%** |
+| `competitor` | Amber (WAU 20–39%) | **15–25%** | **25–35%** |
+| `low_utilization` | Amber (WAU 20–39%) | **10–18%** | **15–22%** |
+| `low_utilization` | Red (WAU < 20%) | **3–8%** | **5–10%** |
+| `product_gap` | Any band | **5–15%** | **10–20%** (only if gap closed) |
+| `unknown` | Any band | **8–15%** | **12–20%** |
+
+All probabilities are [ESTIMATE — SaaS wellness sector proxies; no FORM-specific actuals]. Replace after first 5 winback attempts (OQ-WIN-01).
+
+**Key insight:** Green-band churns driven by `champion_left` or `budget_cut` are the highest-probability winback targets — the product worked, but a non-product event caused churn. These accounts are disproportionately worth pursuing.
+
+#### 43.5.2 Winback timing model
+
+Probability of successful winback decays over time. Estimated time-decay factor: **−5 pp per additional 6 months** past the 12-month mark [ESTIMATE]:
+
+```
+P(winback at month M) ≈ P(12-month base) × (1 − 0.10 × max(0, (M − 12) / 6))
+```
+
+Operational implication: CSM should attempt winback outreach at **months 3, 6, and 12** post-churn. After month 18, winback priority drops below new-logo acquisition unless the account was Green-band with a `champion_left` churn reason and a new champion has been identified.
+
+#### 43.5.3 Winback vs. new-logo economics
+
+At Starter tier, Green-band `champion_left` churn:
+- Winback cost: $1,400 (50% of §26.7 Starter onboarding $2,800)
+- P(winback): 45% (12-month)
+- Cost per won winback: $1,400 / 0.45 = **$3,111**
+- New-logo CAC: §19.5 blended enterprise CAC ≈ $18,000 [ESTIMATE]
+
+**Verdict:** winback is 5.8× cheaper per logo than new acquisition for Green-band `champion_left` churns. The economics strongly favour winback outreach for this segment.
+
+At Red-band `low_utilization` churn:
+- Winback cost: $1,400 | P(winback): 5%
+- Cost per won winback: $1,400 / 0.05 = **$28,000** vs. new-logo CAC $18,000.
+
+**Verdict:** Red-band `low_utilization` winback costs 56% *more* than new acquisition. Do not prioritise — close the product gap first, then re-approach.
+
+---
+
+### 43.6 Winback Unit Economics
+
+#### 43.6.1 Winback ACV model
+
+Winback ACV = Prior ACV × (1 + winback_premium), winback_premium typically **15–30%** above prior ACV [ESTIMATE]. Return buyers negotiate from a position of known product and reduced risk; FORM negotiates from a product improvement narrative.
+
+| Tier | Prior ACV | Winback ACV (20% premium) | Incremental ARR |
+|---|---|---|---|
+| Starter | $14,400 | $17,280 | +$2,880 |
+| Growth | $54,000 | $64,800 | +$10,800 |
+| Enterprise | $144,000 | $172,800 | +$28,800 |
+
+#### 43.6.2 Winback payback period
+
+```
+Winback payback = Winback cost / (Monthly gross margin from winback ACV)
+```
+
+At Growth tier, 20% ACV premium:
+- Winback cost: $2,100 | Winback ACV: $64,800
+- Monthly gross margin at 72% (§8.4): $64,800 × 0.72 / 12 = $3,888/month
+- Winback payback: $2,100 / $3,888 = **~0.54 months (≈ 16 days)**
+
+Winback payback period is consistently under 1 month across tiers. The bottleneck is not economics but *probability*: the investment is only worth making if P(winback) justifies the CSM time opportunity cost against the new-logo pipeline.
+
+#### 43.6.3 NRR treatment of winbacks
+
+To avoid inflating NRR numerator with non-comparable values:
+
+- Winback ACV at the prior-period rate = **Churned ARR reversal** (offsetting the denominator write-down)
+- Winback premium above prior ACV = **Expansion ARR** (new seats or price increase)
+- A winback creates a new `enterprise_contracts` row with a new `contract_id` — it is not an amendment to the churned contract
+
+This treatment prevents a winback from appearing as 120% NRR on a zero-revenue denominator, a common SaaS reporting error that would misrepresent the underlying performance to investors.
+
+---
+
+### 43.7 DEC-030 HMAC-Chained Audit Events
+
+#### 43.7.1 Previously registered events (referenced for chain completeness)
+
+The following events were registered in `docs/AUDIT_LOG_SCHEMA.md` as part of §26 (CS Model):
+
+| Event type | Severity | Retention | Chain role |
+|---|---|---|---|
+| `enterprise.account_churned` | **CRITICAL** | 7 yr | Anchor: triggers OFFBOARD-CHAIN-01 (24h window for `offboarding_initiated`) |
+| `enterprise.churn_confirmed` | HIGH | 7 yr | Precursor to `account_churned`; emitted by CSM when non-renewal decision is final |
+| `enterprise.offboarding_initiated` | HIGH | 7 yr | Required within 24h of `account_churned` per OFFBOARD-CHAIN-01 |
+
+#### 43.7.2 New DEC-030 events introduced in §43
+
+Register in `docs/AUDIT_LOG_SCHEMA.md §Enterprise` per §43.10 item 1.
+
+**`enterprise.winback_initiated`**
+
+```typescript
+const WinbackInitiatedPayload = z.object({
+  tenant_id:           z.string().uuid(),
+  prior_contract_id:   z.string().uuid(),   // FK to enterprise_contracts (churned)
+  churn_date:          z.string().date(),
+  months_since_churn:  z.number().int().min(1).max(60),
+  churn_reason:        ChurnReasonEnum,     // from enterprise_churn_events.churn_reason
+  wau_band_at_churn:   z.enum(['green', 'amber', 'red']),
+  prior_acv_usd:       z.number().positive(),
+  initiated_by:        z.string().uuid(),   // CSM (form_admin role)
+  outreach_sequence:   z.enum(['month_3', 'month_6', 'month_12', 'month_18_plus', 'ad_hoc']),
+  // Privacy floor: no individual employee names, user_ids, health data, or coaching content
+});
+// Severity: HIGH | Retention: 7 yr
+```
+
+**`enterprise.winback_converted`**
+
+```typescript
+const WinbackConvertedPayload = z.object({
+  tenant_id:                    z.string().uuid(),
+  winback_contract_id:          z.string().uuid(),   // FK to new enterprise_contracts row
+  prior_contract_id:            z.string().uuid(),
+  winback_initiated_event_id:   z.string().uuid(),   // satisfies WINBACK-CHAIN-01
+  months_since_churn:           z.number().int().min(1).max(60),
+  prior_acv_usd:                z.number().positive(),
+  new_acv_usd:                  z.number().positive(),
+  acv_premium_pct:              z.number().min(0).max(200),
+  new_seats:                    z.number().int().positive(),
+  new_contract_years:           z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  confirmed_by:                 z.string().uuid(),   // compliance-officer
+  // Privacy floor: no individual employee data; tenant_id is FORM-internal UUID only
+});
+// Severity: CRITICAL | Retention: 7 yr | Chain invariant: WINBACK-CHAIN-01
+```
+
+**`enterprise.deletion_certificate_issued`**
+
+```typescript
+const DeletionCertificateIssuedPayload = z.object({
+  tenant_id:                    z.string().uuid(),
+  contract_id:                  z.string().uuid(),
+  deletion_request_event_id:    z.string().uuid().optional(), // present if GDPR Art. 17
+  trigger_type:                 z.enum(['gdpr_art17_request', 'standard_90_day', 'early_termination']),
+  deletion_date:                z.string().date(),
+  classes_deleted:              z.array(z.enum([
+    'user_pii', 'health_data_art9', 'nutrition_logs',
+    'workout_sessions', 'coaching_content', 'sso_personal_attributes',
+  ])),
+  classes_retained:             z.array(z.enum([
+    'audit_log_chain', 'financial_records', 'contract_records', 'aggregate_metrics',
+  ])),
+  retained_legal_basis:         z.literal('gdpr_art17_3e_legal_obligation'),
+  certificate_r2_path:          z.string().regex(/^compliance\/evidence\/deletions\/.+\.pdf$/),
+  compliance_officer_id:        z.string().uuid(),
+  days_since_trigger:           z.number().int().min(0).max(35),
+  // Privacy floor: tenant_id is FORM-internal UUID; no company name, employee names, or health data
+});
+// Severity: CRITICAL | Retention: 7 yr | Chain invariant: DELETION-CHAIN-01
+```
+
+#### 43.7.3 Chain invariants summary
+
+| ID | Rule | Enforcement | Breach consequence |
+|---|---|---|---|
+| **OFFBOARD-CHAIN-01** | `enterprise.offboarding_initiated` within 24h of `enterprise.account_churned` | HTTP 422 `OFFBOARD_CHAIN_01_VIOLATION` | P1 PagerDuty `form-enterprise`; compliance-officer SLA 4h |
+| **WINBACK-CHAIN-01** | `enterprise.winback_converted` requires prior `enterprise.winback_initiated` within 365 days | HTTP 422 `WINBACK_CHAIN_01_VIOLATION` | Compliance-officer logs exception; no P1 (non-safety control) |
+| **DELETION-CHAIN-01** | `enterprise.deletion_certificate_issued` within 35 days of trigger; `days_since_trigger` ≤ 30 for GDPR | HTTP 422 `DELETION_CHAIN_01_VIOLATION` | **P0** if `trigger_type = 'gdpr_art17_request'`; GDPR Art. 17 SLA breach risk |
+
+---
+
+### 43.8 Data Schema: `enterprise_churn_events` (migration 0085)
+
+The operational offboarding workflow requires a structured record per churned tenant. The canonical DDL is to be registered in **`docs/DATA_MODEL.md §44`** (§43.10 item 2 tracks this obligation). Summary for reference:
+
+```sql
+-- migration 0085_enterprise_churn_events.sql
+
+CREATE TYPE churn_trigger_enum AS ENUM (
+  'contract_expired_no_renewal', 'early_termination',
+  'pilot_lapsed', 'mutual_termination'
+);
+
+CREATE TYPE churn_reason_enum AS ENUM (
+  'low_utilization', 'budget_cut', 'champion_left',
+  'product_gap', 'competitor', 'unknown'
+);
+
+CREATE TYPE winback_status_enum AS ENUM (
+  'not_attempted', 'month_3_outreach', 'month_6_outreach',
+  'month_12_outreach', 'month_18_plus_outreach', 'converted', 'abandoned'
+);
+
+CREATE TABLE enterprise_churn_events (
+  id                            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                     UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  contract_id                   UUID NOT NULL REFERENCES enterprise_contracts(id) ON DELETE RESTRICT,
+  churn_trigger                 churn_trigger_enum NOT NULL,
+  churn_reason                  churn_reason_enum NOT NULL DEFAULT 'unknown',
+  churn_date                    DATE NOT NULL,
+  final_acv_usd                 NUMERIC(12,2) CHECK (final_acv_usd > 0),
+  final_seats                   INTEGER CHECK (final_seats > 0),
+  wau_band_at_churn             TEXT CHECK (wau_band_at_churn IN ('green', 'amber', 'red')),
+  fehs_at_churn                 NUMERIC(5,2),          -- Fleet Engagement Health Score (§33.7)
+  offboarding_initiated_at      TIMESTAMPTZ,
+  data_export_completed_at      TIMESTAMPTZ,
+  deletion_requested_at         TIMESTAMPTZ,
+  deletion_completed_at         TIMESTAMPTZ,
+  deletion_certificate_r2_path  TEXT,
+  winback_status                winback_status_enum NOT NULL DEFAULT 'not_attempted',
+  winback_acv_usd               NUMERIC(12,2),         -- NULL until converted
+  winback_contract_id           UUID REFERENCES enterprise_contracts(id) ON DELETE SET NULL,
+  account_churned_event_id      UUID,                  -- DEC-030 soft FK
+  offboarding_initiated_event_id UUID,
+  deletion_certificate_event_id  UUID,
+  created_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT ece_offboarding_before_deletion
+    CHECK (offboarding_initiated_at IS NULL OR deletion_completed_at IS NULL
+      OR offboarding_initiated_at < deletion_completed_at),
+
+  CONSTRAINT ece_winback_acv_requires_converted
+    CHECK (winback_acv_usd IS NULL OR winback_status = 'converted'),
+
+  CONSTRAINT ece_deletion_sla_respected
+    CHECK (deletion_requested_at IS NULL OR deletion_completed_at IS NULL
+      OR (deletion_completed_at - deletion_requested_at) <= INTERVAL '35 days')
+);
+
+CREATE UNIQUE INDEX idx_ece_tenant_churn_date ON enterprise_churn_events (tenant_id, churn_date);
+CREATE INDEX idx_ece_churn_date ON enterprise_churn_events (churn_date DESC);
+CREATE INDEX idx_ece_winback_status ON enterprise_churn_events (winback_status)
+  WHERE winback_status NOT IN ('converted', 'abandoned');
+
+ALTER TABLE enterprise_churn_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY ece_form_admin_all ON enterprise_churn_events
+  FOR ALL TO form_admin USING (true) WITH CHECK (true);
+CREATE POLICY ece_compliance_read ON enterprise_churn_events
+  FOR SELECT TO compliance_officer USING (true);
+
+-- tenant_manager (HR role) has no policy — access denied by default.
+-- fehs_at_churn could correlate with identifiable employee groups.
+REVOKE ALL ON enterprise_churn_events FROM form_api;
+```
+
+**Cross-reference obligation:** The authoritative DDL registration — with full EXPLAIN ANALYZE, RLS verification, and SOC 2 TSC mapping — belongs in `docs/DATA_MODEL.md §44`. That document must be created before migration 0085 is applied to production. Status: **[ ] Pending — DATA_MODEL §44** (§43.10 item 2).
+
+---
+
+### 43.9 SOC 2 Evidence Mapping
+
+| Artefact ID | TSC criteria | Description | Cadence | Retention | Storage path |
+|---|---|---|---|---|---|
+| **DEL-E-001** | C1.2 / CC4.1 | Annual deletion certificate archive: all `deletion_certificate.pdf` files issued in the observation year. Cross-check: every churned tenant with `deletion_requested_at` in the year has a certificate on file; `days_since_trigger` ≤ 30 for all GDPR Art. 17 cases. Zero-delay exceptions require compliance-officer + DPO notation. | Annual | 7 years | `compliance/evidence/deletions/DEL-E-001_<YYYY>.zip` |
+| **WIN-E-001** | CC4.1 / CC5.2 | Annual winback programme report: `enterprise_churn_events` aggregate by `churn_reason` × `wau_band_at_churn`; outreach attempts; `winback_converted` count; ACV premium realised vs. §43.6.1 model. Fleet-level aggregate only — no tenant names or individual user data. Demonstrates FORM monitors customer loss patterns and evaluates commercial recovery effectiveness. | Annual | 3 years | `compliance/evidence/winback/WIN-E-001_<YYYY>.csv` |
+| **CHN-E-001** | CC6.1 / CC7.1 | Quarterly OFFBOARD-CHAIN-01 compliance report: all `enterprise.account_churned` events in the quarter; elapsed time to `enterprise.offboarding_initiated` for same tenant; flag any breach > 24h; compliance-officer explanation for flagged cases. Zero-breach quarters demonstrate FORM's deprovisioning control operates on-time for every tenant exit. | Quarterly | 3 years | `compliance/evidence/offboarding/CHN-E-001_<YYYY-QN>.csv` |
+
+**C1.2 auditor narrative:** C1.2 requires FORM to dispose of confidential information per contractual data protection obligations. DEL-E-001 demonstrates that every GDPR Art. 17 deletion request completed within 30 days, and every standard 90-day post-churn deletion completed on schedule. The `ece_deletion_sla_respected` CHECK constraint makes a SLA violation a schema-enforced blocker, not a controls failure.
+
+**CC5.2 auditor narrative:** CC5.2 requires FORM to enforce commitments and accountabilities. WINBACK-CHAIN-01 enforces that no winback conversion is recorded without a prior CSM-authorised outreach event. WIN-E-001 demonstrates the commercial recovery programme operates under chain-enforced accountability — no retroactive winback recognition is possible.
+
+**CC6.1 auditor narrative:** CC6.1 requires FORM to implement logical access controls including deprovisioning when no longer needed. CHN-E-001 proves offboarding was initiated within 24 hours of churn confirmation for every churned tenant — SSO teardown and SCIM deprovisioning begin on a chain-enforced 24h SLA, not a process-dependent one.
+
+---
+
+### 43.10 Implementation Checklist
+
+#### P0 — Before first churn event is processed
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register three new §43.7.2 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise`: `enterprise.winback_initiated` (HIGH, 7yr), `enterprise.winback_converted` (CRITICAL, 7yr), `enterprise.deletion_certificate_issued` (CRITICAL, 7yr). Write WINBACK-CHAIN-01 and DELETION-CHAIN-01 invariant blocks in `emit-audit-event` Worker. Integration test: `enterprise.winback_converted` returns HTTP 422 when no prior `enterprise.winback_initiated` exists within 365 days. | platform-engineer + compliance-officer | **P0** | M10 | [ ] |
+| 2 | Create `docs/DATA_MODEL.md §44` with canonical DDL for migration `0085_enterprise_churn_events.sql`: full EXPLAIN ANALYZE on all three indexes; RLS policy verification (form_api REVOKED, tenant_manager excluded); SOC 2 TSC mapping table; FEHS sourcing from `tenant_engagement_snapshots`. Apply migration to staging; validate `ece_deletion_sla_respected` constraint triggers on day 36 test case. | platform-engineer + enterprise-architect | **P0** | M10 | [ ] |
+| 3 | Implement DELETION-SLA-01 monitoring as pg_cron **job 43** (`deletion_sla_monitor`, every 6 hours): query `enterprise_churn_events WHERE deletion_requested_at IS NOT NULL AND deletion_completed_at IS NULL AND (now() - deletion_requested_at) > INTERVAL '25 days'`; fire P1 PagerDuty `form-enterprise` at day 25 (5-day warning before SLA); escalate to P0 at day 29 (1 day before GDPR SLA breach). Register job 43 in `docs/OBSERVABILITY.md §12.6` pg_cron registry. | devops-lead + platform-engineer | **P0** | M10 | [ ] |
+| 4 | Build Admin Console "Offboarding Workflow" (form_admin role only — tenant_manager excluded): Step 1 — Mark churn confirmed (CSM sets `churn_reason`, `wau_band_at_churn`; system emits `enterprise.account_churned`); Step 2 — Initiate offboarding (SSO teardown checklist; data export; emits `enterprise.offboarding_initiated`); Step 3 — Issue deletion certificate (compliance-officer countersigns; uploads PDF to R2; emits `enterprise.deletion_certificate_issued`). | platform-engineer + design-craft | **P0** | M11 | [ ] |
+
+#### P1 — Before SOC 2 observation period
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Register DEL-E-001, WIN-E-001, CHN-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table. Add `deletions/`, `winback/`, `offboarding/` R2 subfolders to §80.3. Update Vanta mirror list in §80.4. | compliance-officer | **P1** | M11 | [ ] |
+| 6 | Build Admin Console "Winback Pipeline" (form_admin + customer-success roles): table of `enterprise_churn_events WHERE winback_status NOT IN ('converted', 'abandoned')`; columns: tenant_id, months_since_churn, churn_reason, wau_band_at_churn, outreach_sequence status; action: "Log Outreach Attempt" (updates winback_status, emits `enterprise.winback_initiated`). No individual user data exposed. | platform-engineer | **P1** | M12 | [ ] |
+| 7 | File first CHN-E-001 after first churned tenant's offboarding completes; validate OFFBOARD-CHAIN-01 elapsed time ≤ 24h; file at `compliance/evidence/offboarding/CHN-E-001_<YYYY-QN>.csv`. | compliance-officer | **P1** | After first churn event | [ ] |
+
+#### P2 — After 5 churn events
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | File first WIN-E-001 after Year 1 of enterprise operation; compare actual winback rates by `churn_reason` × `wau_band` to §43.5.1 model; update if actuals deviate ≥ 10 pp; close OQ-WIN-01. | data-engineer + customer-success | **P2** | M24 | [ ] |
+| 9 | Log actual CSM + engineering hours for first 3 offboardings; replace [ESTIMATE] flags in §43.3.1 with actuals; update §8.4 enterprise gross margin to include offboarding cost line item. | data-engineer + customer-success | **P2** | After 3 churn events | [ ] |
+| 10 | Add `docs/SOC2_READINESS.md §101` cross-reference patch for DATA_MODEL §44 (`enterprise_churn_events`): map each column class to its TSC (C1.2, CC6.1, CC4.1) and evidence artefact (DEL-E-001, CHN-E-001), following the §84–§100 pattern. | compliance-officer + enterprise-architect | **P2** | After DATA_MODEL §44 is written | [ ] |
+
+---
+
+### 43.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-WIN-01** | **What are FORM's actual winback conversion rates by `churn_reason` × `wau_band`?** §43.5.1 uses SaaS wellness sector proxies. After 5 winback attempts: cross-tab `enterprise_churn_events.winback_status` against `churn_reason` × `wau_band_at_churn`. Update §43.5.1 if actuals deviate ≥ 10 pp; create DECISION_LOG entry. | P2 | data-engineer + customer-success | After 5 winback attempts (est. M30) |
+| **OQ-WIN-02** | **Should FORM offer a "loyalty re-entry" discount to churned accounts returning within 12 months?** Benefit: reduces winback cycle from 2–4 months to 1–2 months. Risk: signals churn is reversibly "free," creating expectation of a discount that undermines standard pricing. Decision required before first winback outreach (est. M9). | P1 | customer-success + founder | Before first winback outreach (M9) |
+| **OQ-WIN-03** | **How should FORM handle `tenant_id` UUID reuse for a winback customer?** Option A: reuse prior `tenant_id` (preserves audit chain linkage). Option B: new `tenant_id` (clean slate, preserves deletion certificate integrity). Risk of Option A: re-activating a tenant_id post-GDPR-deletion violates the deletion certificate's representation. Risk of Option B: HMAC chain splits across two tenant_ids for the same legal entity. | **P0** (before first winback) | enterprise-architect + compliance-officer | enterprise-architect recommendation before migration 0085 apply (M10) |
+| **OQ-WIN-04** | **Should GDPR Art. 17 deletion be blocked for tenants in active litigation or legal hold?** Under Art. 17(3)(e) FORM may retain data "for the establishment, exercise or defence of legal claims." If a churned tenant disputes the final invoice, FORM may need to retain billing records beyond 90 days. Document in MSA §11 and DPA Art. 7. | P1 | compliance-officer + outside counsel | Before first enterprise MSA signature (M5) |
+
+---
+
+*v1.0 (2026-06-23): §43 Enterprise Post-Churn Economics, Offboarding Cost Model & Logo Winback Analytics — closes the enterprise lifecycle chain §40→§41→§42→§43. §43.1 purpose and scope: five financial questions answered post-churn (offboarding cost, churned ARR, winback economics, DEC-030 chain, SOC 2 evidence). §43.2 post-churn state machine: ten lifecycle states (active → churned → gdpr_deletion_pending / winback_in_progress); three new chain invariants (OFFBOARD-CHAIN-01 24h, WINBACK-CHAIN-01 365d, DELETION-CHAIN-01 35d/30d GDPR). §43.3 offboarding cost model: per-component breakdown across three tiers (Starter $1,000 / Growth $1,750 / Enterprise $2,900 [ESTIMATE]); offboarding cost as % ACV (Starter 6.9% — most regressive tier); blended $4,811/year at 20-account fleet maturity; −0.2 pp gross margin impact (currently unmodelled in §8.4). §43.4 GDPR Art. 17 deletion economics: data class retention table (user PII, GDPR Art. 9 health data, audit logs non-deletable per Art. 17(3)(e), contract records 7yr); deletion certificate dual-purpose (customer proof + SOC 2 C1.2 evidence); GDPR non-compliance risk cost (€20k fine floor + €30–80k legal [ESTIMATE]). §43.5 logo winback model: structural comparison (new-logo vs. winback — 2–4 month cycle, 60% CSM cost, +15–30% ACV premium); winback probability matrix by churn_reason × wau_band (Green champion_left 40–50% at 12m; Red low_utilization 3–8%); time-decay formula (−5 pp per 6 months past month 12); winback vs. new-logo economics (Green champion_left 5.8× cheaper; Red low_utilization 56% more expensive — do not pursue). §43.6 winback unit economics: ACV model with 20% premium by tier; payback period Growth tier ~16 days; NRR accounting treatment (winback at prior ACV = churned ARR reversal; premium above prior = expansion ARR; new contract_id required — prevents zero-denominator NRR inflation). §43.7 three new DEC-030 events: `enterprise.winback_initiated` (HIGH, 7yr — months_since_churn, churn_reason, wau_band_at_churn, outreach_sequence; Zod WinbackInitiatedPayload), `enterprise.winback_converted` (CRITICAL, 7yr — acv_premium_pct, winback_initiated_event_id for WINBACK-CHAIN-01; Zod WinbackConvertedPayload), `enterprise.deletion_certificate_issued` (CRITICAL, 7yr — classes_deleted/retained enums, retained_legal_basis `gdpr_art17_3e_legal_obligation`, days_since_trigger ≤ 35; Zod DeletionCertificateIssuedPayload). §43.8 migration 0085 `enterprise_churn_events` DDL summary: three ENUMs (churn_trigger, churn_reason, winback_status); full table with fehs_at_churn, deletion timeline fields, winback_status/acv/contract_id; three CHECKs (offboarding_before_deletion, winback_acv_requires_converted, deletion_sla_respected ≤ 35 days); UNIQUE (tenant_id, churn_date); two additional indexes (churn_date DESC, winback_status partial); RLS (form_admin all, compliance_officer read; form_api REVOKED; tenant_manager excluded). Cross-reference obligation: canonical DDL pending `docs/DATA_MODEL.md §44`. §43.9 three SOC 2 evidence artefacts: DEL-E-001 (C1.2/CC4.1 — annual deletion certificate archive, 7yr); WIN-E-001 (CC4.1/CC5.2 — annual winback programme aggregate report, 3yr); CHN-E-001 (CC6.1/CC7.1 — quarterly OFFBOARD-CHAIN-01 compliance report, 3yr). §43.10 ten-item implementation checklist: 4× P0/M10–M11 (DEC-030 registration + chain invariants, DATA_MODEL §44 DDL, pg_cron job 43 deletion_sla_monitor every 6h, Admin Console offboarding workflow); 3× P1/M11–M12 (SOC2_READINESS §79.4 registration + R2 subfolders + Vanta, winback pipeline UI, first CHN-E-001 filing); 3× P2/M24+ (WIN-E-001 first filing, offboarding cost actuals, SOC2_READINESS §101 cross-ref patch). §43.11 four open questions: OQ-WIN-01 (P2 — actual winback rates after 5 attempts); OQ-WIN-02 (P1 — loyalty re-entry discount decision before M9 outreach); OQ-WIN-03 (P0 — tenant_id UUID reuse policy for winback, enterprise-architect decision before M10); OQ-WIN-04 (P1 — GDPR Art. 17 block for litigation hold, outside counsel input before M5 MSA). Privacy floor: no individual employee user_id, name, email, health value, coaching content, or GDPR Art. 9 data in any §43 DEC-030 event, `enterprise_churn_events` row, or evidence artefact; fehs_at_churn is a tenant-aggregate score (k ≥ 10 per §33.7 enforcement); form_api REVOKED from enterprise_churn_events; tenant_manager role has no RLS policy (access denied by default). Cross-references: `docs/ENTERPRISE.md` (tier pricing, privacy floor, no-go criteria — insurance risk-scoring, wellness-as-punishment); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (three new events to register — P0/M10); `docs/DATA_MODEL.md §44` (canonical DDL for migration 0085 — pending obligation); `docs/SOC2_READINESS.md §79.4` (DEL-E-001/WIN-E-001/CHN-E-001 to register — P1/M11); `docs/SOC2_READINESS.md §101` (cross-ref patch for DATA_MODEL §44 — P2); `docs/OBSERVABILITY.md §12.6` (pg_cron job 43 to register — P0/M10); §8.4 (enterprise gross margin — offboarding cost line item to add — P2); §23.1 (NRR formula — winback ACV accounting treatment); §26 (CS Model — OFFBOARD-CHAIN-01 referenced, account_churned CRITICAL event); §34.8 (churn_reason enum — feeding §43.5.1 winback probability matrix); §40.3 (WAU health band at churn — winback probability input); §42 (Renewal Economics — §43 is the post-non-renewal continuation). Owner: enterprise-architect + customer-success + compliance-officer.*
+
+---
+
 *v2.12 (2026-06-22): §42.10 item 2 cross-reference patch — canonical DDL source added. Closes `docs/DATA_MODEL.md §43.9` pending obligation (🟡 → 🟢). §42.10 item 2 task text extended to cite `docs/DATA_MODEL.md §43` (v1.22, 2026-06-20) as the authoritative DATA_MODEL registration for migration 0084, and to direct platform-engineer to mark `docs/DATA_MODEL.md §43.8` item 1 done simultaneously when migration is applied to production. No schema, model, or economic changes. Document header v2.11 → v2.12. Cross-references: `docs/DATA_MODEL.md §43` (v1.22 — canonical DDL registration for `enterprise_renewals`, migration 0084); `docs/DATA_MODEL.md §43.9` (cross-reference obligation row — now 🟢 Closed, v1.25); `docs/DATA_MODEL.md §43.8` item 1 (simultaneous completion target for migration 0084 apply). Owner: enterprise-architect + compliance-officer.*
 
 *v2.9 (2026-06-21): Checklist sync — marked four §35/§37/§38/§39 implementation checklist item 1s as [x] Done, reflecting AUDIT_LOG_SCHEMA.md registrations already completed (v1.7 for §35.10 item 1, v2.3 for §37.10 item 1, v2.7 for §38.10 item 1, v2.9 for §39.10 item 1). No schema or model changes. Document header v2.8 → v2.9. Owner: compliance-officer + enterprise-architect.*
