@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.26.0] — 2026-06-23
+
+### Added
+- `docs/SOC2_READINESS.md §103` — Evidence Table Patch: ENGAGE-E-001/002/003 / SSO-OBS-E-005/006 / WS-E-001/002/003 / CONC-E-001 Registration (SOC2_READINESS §84 · C1.1 / C1.2 / CC2.2 / CC6.1 / CC7.2 / CC4.1 / CC7.4 / A1.1 / P3.2). Registers nine evidence artefacts defined in §84 (OBSERVABILITY cross-refs: §33.11 engagement, §26.7a/b SSO/SCIM, §41.9 wearable, INCIDENT_RESPONSE §18.6 concurrent-chain) into the §79.4 master evidence table. Nine new §79.4 rows: ENGAGE-E-001 (C1.1/C1.2 — annual `tenant_engagement_snapshots` DDL/RLS/negative-privilege export, 3yr, `engagement/`); ENGAGE-E-002 (CC2.2/CC4.1 — quarterly anonymised QBR package, 3yr, `engagement/`); ENGAGE-E-003 (CC7.2/A1.1 — PagerDuty AL-ENGAGE-01..06 alert history + quarterly `tenant.churn_risk_flagged` DEC-030 export, 3yr, `engagement/`); SSO-OBS-E-005 (A1.1/CC7.2 — quarterly AL-SCIM-MASS-01 PagerDuty log; zero-count = positive non-occurrence attestation, 3yr, `sso/`); SSO-OBS-E-006 (CC7.2/CC6.1 — quarterly AL-SCIM-01..04 log; AL-SCIM-04 zero-count = SCIM-CHAIN-01 integrity attestation, 3yr, `sso/`); WS-E-001 (A1.1 — quarterly `wearable.sync_completed` DEC-030 HMAC-chained export per source, 5yr, `wearable/`); WS-E-002 (P3.2 — quarterly fleet freshness report with K-anonymity gate N<5, 5yr, `wearable/`); WS-E-003 (CC7.2 — annual AL-WS-01..07 alert rule configuration screenshots, 3yr, `wearable/`); CONC-E-001 (CC7.4/CC4.1 — quarterly §18.3.1 skip-and-verify SQL + CONC-CHAIN-01 zero-row check; zero-incident quarters filed as affirmative attestation, 7yr, `ir-chain/`). Four new §80.3 R2 subfolders: `sso/`, `engagement/`, `wearable/`, `ir-chain/` (all `form-api NO ACCESS`). §80.4 Vanta mirror list extended with all nine artefacts. Closes §84.8 items 9 (R2 folders) and 10 (§79.4 registration), and §92.6 item 1 (`sso/` subfolder documentation).
+
+### Changed
+- `docs/SOC2_READINESS.md` — §79.4 nine new evidence rows; §80.3 four new R2 subfolders (`sso/`, `engagement/`, `wearable/`, `ir-chain/`); §80.4 Vanta list extended; §84.8 items 9/10 marked `[x] Done`; §92.6 item 1 marked `[x] Done`; §103 section appended. v3.27.0 → v3.28.0.
+- `VERSION` — 8.25.0 → 8.26.0 (MINOR: new §103 evidence registration section in SOC2_READINESS).
+
 ## [8.25.0] — 2026-06-23
 
 ### Added
