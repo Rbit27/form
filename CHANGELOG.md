@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [8.39.1] — 2026-06-23
+
+### Changed
+- `docs/DATA_MODEL.md §44.11` — Cross-reference sync: AUDIT_LOG_SCHEMA obligation row updated 🟡 → 🟢. `enterprise.winback_initiated` / `enterprise.winback_converted` / `enterprise.deletion_certificate_issued` / `enterprise.deletion_sla_warning` / `enterprise.deletion_sla_critical` were registered in `docs/AUDIT_LOG_SCHEMA.md` v2.39/v2.40 (2026-06-23) simultaneously with the §44 authoring and DEC-079 amendment; the §44.11 cross-reference table row was not updated in the same commit. §44.11 is now fully 🟢. DATA_MODEL v1.27 → v1.28.
+- `VERSION` — 8.39.0 → 8.39.1.
+
+---
+
 ## [8.39.0] — 2026-06-23
 
 ### Added
