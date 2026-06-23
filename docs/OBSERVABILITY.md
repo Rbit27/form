@@ -525,6 +525,18 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 
 **SOC 2 mapping (contract_renewal_health):** CC4.1 (performance threshold monitoring for MSA §6.1 obligation), CC2.2 (external contractual commitment fulfillment), A1.1 (enterprise ARR operational risk detection).
 
+**Subsection: `sca_vulnerability_monitoring` (AL-SCA-01 through AL-SCA-05 — §52.4):**
+
+| Alert Name | Trigger Condition | Severity | Notification Channel | Runbook |
+|---|---|---|---|---|
+| **Critical CVE SLA breach** | Job 42 (`sca_sla_monitor`) detects ≥ 1 `security.sca_critical_vulnerability_detected` with `remediation_status = 'open'` AND `occurred_at < NOW() - INTERVAL '24 hours'`; emits `security.sca_sla_breach` HIGH/7yr per CVE; dedup `sca-sla-critical-overdue` 1h | P1 | PagerDuty `form-security` → security-engineer + devops-lead | §52.4 AL-SCA-01; SOC2_READINESS.md §54.5 (24h SLA) |
+| **High CVE 7-day SLA breach** | Any `security.sca_high_vulnerability_detected` with `remediation_status = 'open'` AND `occurred_at < NOW() - INTERVAL '7 days'`; dedup per `cve_id` 24h | P2 | Slack `#security-alerts` | §52.4 AL-SCA-02 |
+| **CI SCA scan infrastructure failure** | CI run where `sca_failure_type = 'infrastructure'` in `security.sca_scan_failed` DEC-030 event; dedup `sca-ci-scan-failure` 30 min | P1 | PagerDuty `form-devops` → devops-lead | §52.4 AL-SCA-03 |
+| **Licence violation detected** | Any `security.licence_violation_detected` DEC-030 event with GPL/AGPL/SSPL licence in production dependency | P2 | Slack `#security-alerts` + email compliance-officer | §52.4 AL-SCA-04 |
+| **Risk acceptance expiry** | Any `security.vulnerability_risk_accepted` with `risk_acceptance_expires_at < NOW()` and no subsequent resolution for same `cve_id`; dedup per `cve_id` 24h | P2 | PagerDuty `form-security` + Slack `#security-alerts` | §52.4 AL-SCA-05 |
+
+**SOC 2 mapping (sca_vulnerability_monitoring):** CC6.8 (AL-SCA-01 enforces zero-tolerance for open Critical CVEs > 24h), CC7.1 (AL-SCA-01 through AL-SCA-03 identify vulnerabilities in FORM's dependency tree), CC9.2 (AL-SCA-04 enforces licence compliance gate for open-source vendor risk), CC8.1 (AL-SCA-03 gates CI pipeline integrity).
+
 **Subsection: `pam_session_health` (AL-PAM-01 through AL-PAM-BG-01 — §29.5):**
 
 | Alert Name | Trigger Condition | Severity | Notification Channel | Runbook |
@@ -14473,10 +14485,10 @@ Two evidence artefacts satisfy the auditor evidence obligations for the SCA obse
 
 | # | Item | Priority | Milestone | Owner | Status |
 |---|---|---|---|---|---|
-| 1 | Register `security.sca_sla_breach` DEC-030 HIGH/7yr and `system.sca_sla_check_passed` LOW/1yr events in `docs/AUDIT_LOG_SCHEMA.md §Security` | P0 | M4 | security-engineer | [ ] |
+| 1 | Register `security.sca_sla_breach` DEC-030 HIGH/7yr and `system.sca_sla_check_passed` LOW/1yr events in `docs/AUDIT_LOG_SCHEMA.md §Security` | P0 | M4 | security-engineer | [x] Done — 2026-06-23, AUDIT_LOG_SCHEMA.md v2.37 |
 | 2 | Implement pg_cron job 42 `sca_sla_monitor` (§52.5.1 SQL; pg_net AL-SCA-01 call; DEC-030 emission on breach and all-clear) | P0 | M4 | devops-lead + security-engineer | [ ] |
-| 3 | Insert AL-SCA-01 through AL-SCA-05 into §6.2 Consolidated Alert Rules (`sca_vulnerability_monitoring` subsection — §52.6); closes SOC2_READINESS §54.10 item 11 (FORM-SCA-001 configure alert) | P0 | M4 | devops-lead | [ ] |
-| 4 | Register SCA-OBS-E-001 and SCA-OBS-E-002 in `docs/SOC2_READINESS.md §54` evidence table | P1 | M5 | compliance-officer | [ ] |
+| 3 | Insert AL-SCA-01 through AL-SCA-05 into §6.2 Consolidated Alert Rules (`sca_vulnerability_monitoring` subsection — §52.6); closes SOC2_READINESS §54.10 item 11 (FORM-SCA-001 configure alert) | P0 | M4 | devops-lead | [x] Done — 2026-06-23, §6.2 sca_vulnerability_monitoring subsection added |
+| 4 | Register SCA-OBS-E-001 and SCA-OBS-E-002 in `docs/SOC2_READINESS.md §54` evidence table | P1 | M5 | compliance-officer | [x] Done — 2026-06-23, SOC2_READINESS.md §54.9 SCA-OBS-E-001/002 registered |
 | 5 | End-to-end staging test: inject synthetic `security.sca_critical_vulnerability_detected` event with `occurred_at = NOW() - INTERVAL '25 hours'` and `remediation_status = 'open'`; confirm job 42 fires AL-SCA-01 within 20 min; confirm `security.sca_sla_breach` DEC-030 emitted and HMAC-chained (SCA-CHAIN-01); confirm auto-resolve on status update | P0 | M5 | devops-lead | [ ] |
 | 6 | Configure Metabase `SCA & Dependency Vulnerability Health` dashboard (§52.9); restrict to `security_reviewer` + `compliance_officer` roles | P1 | M5 | devops-lead | [ ] |
 | 7 | File first SCA-OBS-E-001 and SCA-OBS-E-002 evidence artefacts at end of first full operational quarter | P1 | M12 | security-engineer + compliance-officer | [ ] |

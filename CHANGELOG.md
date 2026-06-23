@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.9.1] — 2026-06-23
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.37 — SCA monitoring sentinel events registered: `security.sca_sla_breach` (HIGH/7yr, SCA-CHAIN-01 anchor) and `system.sca_sla_check_passed` (LOW/1yr, advisory). Retention table +2 rows. Document header corrected v2.35 → v2.37 (v2.36 was body-only, 2026-06-22). Closes OBSERVABILITY §52.10 item 1 (P0/M4).
+- `docs/OBSERVABILITY.md` v5.0.0 — §6.2 `sca_vulnerability_monitoring` subsection added: AL-SCA-01 through AL-SCA-05 consolidated alert rules with SOC 2 CC6.8/CC7.1/CC9.2/CC8.1 mapping. §52.10 checklist items 1, 3, 4 marked done.
+- `docs/SOC2_READINESS.md` — §54.9 evidence table: SCA-OBS-E-001 (quarterly SCA SLO performance report) and SCA-OBS-E-002 (quarterly pg_cron run history for job 42) registered. §54.11 item 11 annotated: FORM-SCA-001 documented as AL-SCA-01 per OBSERVABILITY §52, pending operational deployment.
+- `VERSION` — 8.9.0 → 8.9.1 (patch: extending existing enterprise docs).
+
+---
+
 ## [8.9.0] — 2026-06-23
 
 ### Added

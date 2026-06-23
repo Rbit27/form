@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.35
+# FORM · Audit Log Schema v2.37
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -886,6 +886,42 @@ const IntegrationApiCallSchema = z.object({
 
 ---
 
+### SCA monitoring sentinel events (DEC-030 HMAC-chained · OBSERVABILITY §52 · CC6.8/CC7.1/CC9.2/CC8.1)
+
+> Defined in `docs/OBSERVABILITY.md §52` (v5.0.0, 2026-06-23) and `docs/SOC2_READINESS.md §54`. Two events anchor the runtime monitoring layer for SCA-SLO-01 (zero open Critical CVEs beyond 24h SLA). Emitted by `sca_sla_monitor` pg_cron job 42 on every 15-minute tick. **Privacy invariant (both events):** no `user_id`, no `tenant_id`, no health data. `cve_id`, `package_name`, and `affected_version` are public CVE metadata. SCA events are safe for SIEM streaming without redaction. **SCA-CHAIN-01 ordering invariant:** `security.sca_sla_breach` must be emitted and confirmed (HTTP 200 from pg_net call) BEFORE the AL-SCA-01 PagerDuty P1 alert fires. Cross-ref: `docs/OBSERVABILITY.md §52`; `docs/SOC2_READINESS.md §54.5` (Critical 24h SLA); `docs/SOC2_READINESS.md §54.9` (PRE-54-E-005); R-05. Closes `docs/OBSERVABILITY.md §52.10` item 1 (P0/M4).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `security.sca_sla_breach` | **HIGH** | 7 yr | pg_cron job 42 (`sca_sla_monitor`, `*/15 * * * *`) detects ≥ 1 `security.sca_critical_vulnerability_detected` with `remediation_status = 'open'` AND `occurred_at < NOW() - INTERVAL '24 hours'`; emitted **per open critical CVE**; SCA-CHAIN-01 anchor | `cve_id` (e.g. `CVE-2024-12345`), `package_name`, `package_version`, `cvss_score` (float 9.0–10.0), `breach_age_hours` (positive float), `detection_event_id` (UUID — source `security.sca_critical_vulnerability_detected` event id), `check_run_at` (ISO 8601) |
+| `system.sca_sla_check_passed` | LOW | 1 yr | job 42 detects zero open critical CVEs > 24h; emitted once per 15-min tick on all-clear; no PagerDuty; advisory only | `open_critical_count: 0` (z.literal(0) — non-zero is schema violation), `check_run_at` (ISO 8601) |
+
+```typescript
+import { z } from 'zod';
+
+// security.sca_sla_breach — HIGH · 7 yr · CC6.8/CC7.1/CC9.2 · SCA-CHAIN-01
+const ScaSlaBreachSchema = z.object({
+  cve_id:               z.string().regex(/^CVE-\d{4}-\d{4,}$/),
+  package_name:         z.string().min(1).max(256),
+  package_version:      z.string().min(1).max(64),
+  cvss_score:           z.number().min(9.0).max(10.0),
+  breach_age_hours:     z.number().positive(),
+  detection_event_id:   z.string().uuid(),
+  check_run_at:         z.string().datetime(),
+});
+
+// system.sca_sla_check_passed — LOW · 1 yr · CC7.2/A1.1
+const ScaSlaCheckPassedSchema = z.object({
+  open_critical_count:  z.literal(0),
+  check_run_at:         z.string().datetime(),
+});
+```
+
+**HMAC chain requirement:** SCA-CHAIN-01: `security.sca_sla_breach` emitted and HTTP 200 confirmed from `emit-audit-event` Worker BEFORE AL-SCA-01 PagerDuty call via `pg_net.http_post`. No ordering invariant between independent CVE breach events in the same tick. `system.sca_sla_check_passed` has no ordering invariant — advisory only.
+
+**Emitter assignment:** both events emitted exclusively by `form_system` (pg_cron job 42 `sca_sla_monitor`). No human direct emission permitted.
+
+---
+
 ### Compliance operating evidence events (DEC-030 HMAC-chained · C1.1/C1.2/P5.2 · SOC2_READINESS.md §73)
 
 > Defined in `docs/SOC2_READINESS.md §73`. Four events providing the C1 Confidentiality TSC operating evidence cadence — the operational counterparts to the A1 (`system.cron_*`) and PI1 (`billing.*` / `coaching.*`) evidence streams. Privacy invariant: no `user_id`, `dsar_request_id`, tenant email, health values, or disposal serial numbers in any payload — operational counts, compliance metadata, and `device_asset_id` references only. The `erasure_sla_alert_fired` payload contains only `breach_count` (integer) and alert metadata; a chain audit that exposes individual DSAR identifiers is a privacy floor violation. Cross-ref: SOC 2 C1.1/C1.2/P5.2; `docs/OBSERVABILITY.md §6.2 c1_erasure_sla` subsection.
@@ -1142,6 +1178,8 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `security.rls_bypass_attempt` / `security.definer_function_cross_tenant` | 7 years | Tenant isolation breach evidence; SOC 2 CC6.6/PI1.5 |
 | `asset.*` (device disposal) | 7 years | SOC 2 C1.2 confidential media disposal + CC6.5 access termination evidence |
 | `vuln.*` (vulnerability management) | 7 years | SOC 2 CC7.1 threat identification + CC7.2 remediation tracking evidence; `vuln.sla_exception_granted` also maps to CC7.4 (response to identified events) |
+| `security.sca_sla_breach` | 7 years | HIGH severity — pg_cron job 42 SCA-SLO-01 breach sentinel; emitted per open Critical CVE exceeding 24h SLA; SCA-CHAIN-01 anchor; SOC 2 CC6.8 (malicious software prevention) / CC7.1 (vulnerability identification) / CC9.2 (third-party code as vendor risk); `docs/OBSERVABILITY.md §52` |
+| `system.sca_sla_check_passed` | 1 year | LOW severity — pg_cron job 42 all-clear advisory; `open_critical_count: 0` z.literal invariant; SOC 2 CC7.2/A1.1 — SCA-OBS-E-002 quarterly evidence source; 1yr sufficient as routine operational confirmation; `docs/OBSERVABILITY.md §52` |
 | `compliance.erasure_sla_alert_fired` | 7 years | SOC 2 C1.2/P5.2 GDPR Art. 17 erasure SLA monitoring evidence; belt-and-suspenders secondary signal to §70 DSAR automation |
 | `compliance.data_asset_inventory_reviewed` / `compliance.encryption_verified` / `compliance.disposal_audit_completed` | 3 years | C1 operating evidence cadence records; routine compliance audit completion records per SOC2_READINESS.md §73 |
 | `enterprise.pricing_exception_approved` / `enterprise.consumer_price_updated` / `enterprise.list_price_updated` / `enterprise.price_floor_override_requested` | 7 years | SOC 2 CC1.4 pricing integrity evidence; COST_MODEL.md §31.8 pricing governance trail; CRITICAL-severity `enterprise.price_floor_override_requested` also maps to CC5.2 |
@@ -1699,6 +1737,8 @@ const CiTelemetryRestoredSchema = z.object({
   backfill_rows_recovered:      z.number().int().nonneg().nullable(),
 });
 ```
+
+*v2.37 patch (2026-06-23): SCA monitoring sentinel events — `security.sca_sla_breach` (HIGH/7yr) and `system.sca_sla_check_passed` (LOW/1yr) registered. Anchors SCA-CHAIN-01 invariant for pg_cron job 42 (`sca_sla_monitor`) 24h Critical CVE SLA enforcement. Retention table: +2 rows. Closes `docs/OBSERVABILITY.md §52.10` item 1 (P0/M4). Document header v2.35 → v2.37 (v2.36 was body-only patch for R-40 CI telemetry events, 2026-06-22; header now corrected). Owner: security-engineer + compliance-officer.*
 
 *v2.36 patch (2026-06-22): R-40 monitoring-control events registered — `system.ci_telemetry_stale_declared` (HIGH/7yr) and `system.ci_telemetry_restored` (STANDARD/3yr) anchor the CI-TELEMETRY-STALE-CHAIN-01 ordering invariant for job 28 (`ci_telemetry_daily_sync`) incident lifecycle. Closes INCIDENT_RESPONSE.md R-40.11 item 1. Owner: compliance-officer + devops-lead.*
 
