@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [8.61.2] — 2026-06-25
+
+### Changed
+- `docs/OBSERVABILITY.md` — §26.8 `fleet_sso_health` subsection added (AL-SSO-FLEET-01 alert rule: pg_cron job 38, ≥ 3 tenants breaching SSO-SLO-01, PagerDuty `form-platform`, dedup `al-sso-fleet-01-{15min_epoch}` 30-min cooldown, `sla_credit_impact: 'none'` DEC-070 hard invariant); §6.2 consolidated alert rules table extended with `fleet_sso_health` subsection; §26.11 CC7.2 named-rule count twenty-one → twenty-two + AL-SSO-FLEET-01 added; SSO-OBS-E-007 and SSO-FLEET-E-001 artefact rows added to §26.11 evidence table; §48.8 item 4 and §49.9 items 4–5 marked done. Closes three overdue P1 documentation obligations (§48.8 item 4, §49.9 items 4–5). v5.0.2.
+- `VERSION` — 8.61.1 → 8.61.2.
+
 ## [8.61.1] — 2026-06-25
 
 ### Changed
