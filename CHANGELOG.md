@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.44.1] — 2026-06-25
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` R-41 — GDPR Deletion SLA Monitor Stale (`deletion_sla_monitor` · job 43). Forty-first runbook; closes the gap where job 43 was the only §12.6 compliance pg_cron job without an INCIDENT_RESPONSE stale runbook. Covers P1 base / P0 escalation on active danger-window tenants, four root-cause hypotheses (H1 unauthorized deletion, H2 shared pg_cron failure, H3 `enterprise_churn_events` query failure, H4 Supabase outage), six-step recovery including mandatory backfill-emission and stale-window exception note for `danger_window_tenants_affected ≥ 1`, and `art17_sla_breached` boolean → R-09 activation path. SOC 2: C1.2 / CC4.1 / CC7.2.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.41 — +2 R-41 monitoring-control events: `system.deletion_sla_monitor_stale_declared` (HIGH/7yr) and `system.deletion_sla_monitor_restored` (STANDARD/3yr). DELETION-SLA-MONITOR-STALE-CHAIN-01 ordering invariant, Zod schemas, emitter assignments, and alert routing added to §Enterprise Post-Churn & Deletion SLA events.
+- `docs/OBSERVABILITY.md` §12.6 v1.5 patch — job 43 `deletion_sla_monitor` stale-consequence cross-ref extended with `INCIDENT_RESPONSE R-41 (job 43 stale recovery runbook — §R-41.5)`.
+- `docs/INCIDENT_RESPONSE.md` — version bump v3.4 → v3.5.
+- `VERSION` — 8.44.0 → 8.44.1.
+
+---
+
 ## [8.44.0] — 2026-06-25
 
 ### Added

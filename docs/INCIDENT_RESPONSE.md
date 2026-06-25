@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.4
+# FORM · Incident Response Runbook v3.5
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -15420,6 +15420,373 @@ const CiTelemetryRestoredSchema = z.object({
 ---
 
 **v1.0 · 2026-06-22 · Owner: devops-lead + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---
+
+---
+
+## R-41: GDPR Deletion SLA Monitor Stale (`deletion_sla_monitor` · job 43)
+
+> **Trigger:** `system.cron_job_stale` (HIGH/7yr) emitted by `pg-cron-health-monitor` (§12.7) with `job_name = 'deletion_sla_monitor'` when job 43 (`0 */6 * * *`) exceeds its 7h freshness window. Alert routes to PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect.
+>
+> **Owner:** compliance-officer (IC). **Escalation:** enterprise-architect (T+30 min if no containment). **P0 escalation:** founder + compliance-officer immediately on R-41-C2 confirming any active deletion in danger window (days 25–35).
+>
+> **Compliance impact:** While stale, DELETION-CHAIN-01 monitoring is blind — a tenant whose GDPR Art. 17 deletion window reaches day 25, 29, or 30 goes undetected. `enterprise.deletion_sla_warning` and `enterprise.deletion_sla_critical` DEC-030 events are not emitted during the stale window. The `ece_deletion_sla_respected` CHECK constraint (DATA_MODEL §44) is the DDL-layer backstop at day 35 and operates independently of this job.
+>
+> **PagerDuty:** P1 `form-enterprise` base; escalates to P0 if R-41-C2 returns any active deletion row in danger window. Dedup: `deletion-sla-monitor-stale`. No auto-resolve — compliance-officer must manually resolve after job 43 confirmed healthy.
+
+---
+
+### R-41.1 Trigger Matrix
+
+| Source | Signal | Threshold | PagerDuty |
+|---|---|---|---|
+| `pg-cron-health-monitor` (§12.7) | `system.cron_job_stale` with `job_name = 'deletion_sla_monitor'` | Job 43 exceeds 7h freshness window (1-run tolerance of 6h cadence) | P1 `form-enterprise` → compliance-officer + enterprise-architect |
+| Manual discovery by IC | R-41-C1 confirms no `cron.job_run_details` row for job 43 within 7h | Any | Open R-41 manually; emit `system.deletion_sla_monitor_stale_declared` HIGH/7yr immediately |
+
+---
+
+### R-41.2 Severity Classification
+
+| Condition | Severity | Escalation |
+|---|---|---|
+| Default (stale detected, R-41-C2 not yet run) | **P1** | compliance-officer + enterprise-architect |
+| R-41-C2 returns ≥ 1 tenant in danger window (days 25–35) | **P0** | Immediate: founder + compliance-officer; enterprise-architect seconded |
+| R-41-C2 returns no active deletions, stale < 24h | **P1** | No P0 escalation; continue R-41 recovery |
+| Job 43 deleted/disabled without authorized maintenance record (H1) | **P0 co-activation** | security-engineer + R-05 activated in parallel |
+
+---
+
+### R-41.3 Immediate Actions (T+0 to T+30 min)
+
+**T+0 — IC receives PagerDuty P1 `form-enterprise`:**
+
+1. Acknowledge PagerDuty alert; assign incident to yourself in PagerDuty.
+2. Emit `system.deletion_sla_monitor_stale_declared` HIGH/7yr (see §R-41.7) with `trigger = 'pagerduty_alert'`.
+3. Open Linear ticket tagged `[R-41]` and record `incident_id` (UUID from step 2 event).
+
+**T+0 — Run R-41-C1 (pg_cron staleness confirmation):**
+
+```sql
+SELECT
+  jobname,
+  status,
+  return_message,
+  start_time,
+  end_time,
+  EXTRACT(EPOCH FROM (NOW() - end_time)) / 3600 AS hours_since_last_run
+FROM cron.job_run_details
+WHERE jobname = 'deletion_sla_monitor'
+ORDER BY start_time DESC
+LIMIT 5;
+```
+
+**R-41-C1 pass condition:** At least one row with `status = 'succeeded'` within the last 7 hours.
+
+**T+5 — Run R-41-C2 (active deletions in danger window — CRITICAL):**
+
+```sql
+SELECT
+  tenant_id,
+  deletion_requested_at,
+  EXTRACT(DAY FROM (NOW() - deletion_requested_at))::int AS days_since_deletion_requested,
+  CASE
+    WHEN NOW() - deletion_requested_at > INTERVAL '29 days' THEN 'critical'
+    WHEN NOW() - deletion_requested_at > INTERVAL '25 days' THEN 'warning'
+    ELSE 'monitor'
+  END AS alert_tier
+FROM enterprise_churn_events
+WHERE deletion_requested_at IS NOT NULL
+  AND deletion_completed_at IS NULL
+ORDER BY deletion_requested_at ASC;
+```
+
+**R-41-C2 pass condition:** Zero rows returned (no active deletions in progress). **If any row is returned with `alert_tier = 'critical'` or `alert_tier = 'warning'`: immediately escalate to P0 — page founder + compliance-officer.**
+
+**T+10 — Run R-41-C3 (peer job health — H2 discriminator):**
+
+```sql
+SELECT
+  jobname,
+  status,
+  end_time,
+  EXTRACT(EPOCH FROM (NOW() - end_time)) / 3600 AS hours_since_last_run
+FROM cron.job_run_details
+WHERE jobname IN (
+  'workout_data_purge',        -- job 26, daily 02:00 UTC
+  'audit_log_retention_purge', -- job 27, monthly
+  'backup_age_monitor',        -- job 29, every 4h
+  'sca_sla_monitor'            -- job 42, every 15min
+)
+AND start_time > NOW() - INTERVAL '8 hours'
+ORDER BY jobname, start_time DESC;
+```
+
+**H2 confirmed:** ≥ 2 peer compliance jobs also stale → shared pg_cron failure → activate R-03 in parallel.
+
+**T+15 — Run R-41-C4 (job registration check — H1 discriminator):**
+
+```sql
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'deletion_sla_monitor';
+```
+
+**H1 confirmed:** No row returned → job was deleted or never registered. If deletion occurred without an authorized maintenance window record, activate R-05 in parallel.
+
+**T+20 — P0 decision gate:** If R-41-C2 returned any active danger-window row: page founder now. Do not wait for root cause resolution.
+
+---
+
+### R-41.4 Root Cause Hypotheses
+
+| # | Hypothesis | Discriminator |
+|---|---|---|
+| **H1** | Job 43 deleted or disabled (unauthorized actor or unannounced maintenance) | R-41-C4 returns no row in `cron.job`; or `active = false` |
+| **H2** | Shared pg_cron scheduler failure (infrastructure outage) | R-41-C3 shows ≥ 2 peer compliance jobs also stale |
+| **H3** | `enterprise_churn_events` query failure — `form_system` permission revoked or schema change | `return_message` in R-41-C1 shows permission denied or missing column |
+| **H4** | Supabase platform outage — pg_cron scheduler unreachable | R-41-C3 shows all peer jobs stale; Supabase status page confirms incident |
+
+---
+
+### R-41.5 Recovery Procedure
+
+#### Step 1 — Re-register job 43 (H1: job deleted or disabled)
+
+```sql
+SELECT cron.schedule(
+  'deletion_sla_monitor',
+  '0 */6 * * *',
+  $$SELECT deletion_sla_monitor()$$  -- canonical function per migration 0085_deletion_sla_monitor.sql
+);
+```
+
+Confirm the job appears in `cron.job` with `active = true`. If the deletion was unauthorized, activate R-05 in parallel — do not restore alone.
+
+#### Step 2 — Restore `enterprise_churn_events` grants (H3)
+
+Re-apply grants per migration `0085_deletion_sla_monitor.sql`:
+
+```sql
+GRANT SELECT ON enterprise_churn_events TO form_system;
+```
+
+Verify that `form_api` and `tenant_manager` are still REVOKED (DATA_MODEL §44 invariant):
+
+```sql
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_name = 'enterprise_churn_events'
+  AND grantee IN ('form_system', 'form_api', 'tenant_manager');
+```
+
+**Required result:** `form_system` has SELECT; `form_api` has NO grants; `tenant_manager` has NO grants.
+
+#### Step 3 — Wait for Supabase recovery (H4)
+
+Check the Supabase status page for the FORM project region. If confirmed platform outage, do not attempt manual recovery — wait for Supabase resolution and monitor R-41-C1 until job 43 resumes.
+
+#### Step 4 — Manual job run and verification
+
+Run job 43 manually:
+
+```sql
+SELECT cron.run_job('deletion_sla_monitor');
+```
+
+Wait 90 seconds, then verify:
+
+```sql
+SELECT jobname, status, return_message, end_time
+FROM cron.job_run_details
+WHERE jobname = 'deletion_sla_monitor'
+ORDER BY start_time DESC
+LIMIT 3;
+```
+
+**Pass condition:** `status = 'succeeded'` for the manual run.
+
+#### Step 5 — Backfill missed warning/critical emissions
+
+If R-41-C2 returned active danger-window rows during the stale window, the missing `enterprise.deletion_sla_warning` and `enterprise.deletion_sla_critical` DEC-030 events must be accounted for:
+
+- Manually emit `enterprise.deletion_sla_warning` HIGH/7yr and/or `enterprise.deletion_sla_critical` CRITICAL/7yr (per `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events` Zod schemas) for each affected `tenant_id` using a `check_run_at` timestamp within the stale window.
+- Compliance-officer must immediately confirm whether the GDPR Art. 17 30-day SLA was breached for any affected tenant during the stale window. If yes: activate INCIDENT_RESPONSE R-09 (GDPR breach assessment).
+- File a stale-window exception note at `compliance/evidence/deletions/deletion-sla-stale/r41-<incident_id>/stale-window-note.md` documenting: stale window start/end, affected tenants (by `tenant_id` only — FORM-internal UUID), `days_since_deletion_requested` at stale-window start and end, whether any tenant crossed day 30 without detection.
+
+#### Step 6 — Resolve and emit restoration event
+
+Emit `system.deletion_sla_monitor_restored` STANDARD/3yr and resolve PagerDuty P1/P0 `deletion-sla-monitor-stale`:
+
+```json
+{
+  "event_type": "system.deletion_sla_monitor_restored",
+  "incident_id": "<same-uuid-as-stale_declared>",
+  "restored_at": "<ISO 8601 UTC>",
+  "root_cause": "<H1|H2|H3|H4>",
+  "fix_deployed_at": "<ISO 8601 UTC>",
+  "stale_window_hours": "<positive number>",
+  "danger_window_tenants_affected": "<non-negative integer>",
+  "art17_sla_breached": "<boolean>"
+}
+```
+
+---
+
+### R-41.6 Internal Communication Template
+
+No customer-facing template for R-41 — compliance impact is assessed via R-41-C2 before any customer notification is warranted. Two internal templates:
+
+**DEL-MON-INT-01 — Slack `#compliance-ops` (T+0 on any P1 activation; T+0 on P0):**
+
+```
+[R-41 {{P0|P1}}] deletion_sla_monitor (job 43) stale {{stale_hours}}h.
+GDPR Art. 17 SLA monitoring blind spot: {{danger_window_count}} tenant(s) with active deletion request in danger window (days 25–35).
+{{If danger_window_count > 0:}} ⚠️ P0 ESCALATION — paging founder. Backfill emissions required; assess Art. 17 SLA breach immediately.
+{{If danger_window_count = 0:}} No active danger-window tenants. Monitoring gap only.
+Root cause: {{H1|H2|H3|H4 or "diagnosing"}}.
+Incident ID: {{incident_id}}.
+IC: @compliance-officer.
+```
+
+**DEL-MON-INT-02 — Slack `#enterprise-health` (P0 only, danger_window_count ≥ 1):**
+
+```
+[GDPR ART. 17 P0] deletion_sla_monitor stale while {{N}} tenant(s) in active deletion danger window.
+FORM compliance-officer is assessing whether Art. 17 30-day SLA was breached during the monitoring gap.
+If Art. 17 SLA breached: INCIDENT_RESPONSE R-09 activated. 72-hour Art. 33 notification window starts from first detection.
+Incident ID: {{incident_id}}.
+```
+
+---
+
+### R-41.7 DEC-030 HMAC-Chained Events
+
+**DELETION-SLA-MONITOR-STALE-CHAIN-01 — Ordering invariant:** `system.deletion_sla_monitor_restored` MUST follow `system.deletion_sla_monitor_stale_declared` for the same `incident_id`. If `system.deletion_sla_monitor_restored` is received for an `incident_id` with no prior `system.deletion_sla_monitor_stale_declared`, the `emit-audit-event` Worker returns HTTP 422 `DELETION_SLA_MONITOR_STALE_CHAIN_01_VIOLATION` and R-05 is activated.
+
+#### `system.deletion_sla_monitor_stale_declared` — HIGH · 7 yr
+
+Emitted by IC at T+0 when R-41 is activated.
+
+| Field | Value |
+|---|---|
+| Event type | `system.deletion_sla_monitor_stale_declared` |
+| Severity | HIGH |
+| Retention | 7 yr |
+| HMAC chain | Yes — DEC-030 HMAC-chained |
+| SOC 2 mapping | C1.2 (GDPR Art. 17 SLA monitoring gap), CC4.1 (compliance monitoring control gap), CC7.2 (monitoring of system components) |
+
+```typescript
+// system.deletion_sla_monitor_stale_declared — HIGH · 7 yr
+const DeletionSlaMonitorStaleDeclaredSchema = z.object({
+  incident_id:                    z.string().uuid(),
+  confirmed_stale_since:          z.string().datetime(),   // ISO 8601 UTC — last successful run
+  stale_minutes:                  z.number().positive(),
+  missed_runs:                    z.number().int().nonneg(),
+  trigger:                        z.enum([
+    'pagerduty_alert',
+    'manual_discovery',
+    'co_active_r03',     // H2 shared pg_cron failure co-activation
+  ]),
+  initial_severity:               z.enum(['P1', 'P0']),   // P0 immediately if danger_window_tenants_affected > 0
+  danger_window_tenants_affected: z.number().int().nonneg(),  // count from R-41-C2; 0 = no active danger
+});
+```
+
+**Privacy floor:** `danger_window_tenants_affected` is an integer count only — no `tenant_id`, no employee user_id, no health data, no GDPR Art. 9 data. Affected tenant identities are preserved only in the stale-window exception note at `compliance/evidence/deletions/deletion-sla-stale/r41-<incident_id>/stale-window-note.md` (access: compliance_reviewer role; `form_api` REVOKED per §80.3).
+
+#### `system.deletion_sla_monitor_restored` — STANDARD · 3 yr
+
+Emitted by IC at Step 6 when job 43 confirmed running after restoration.
+
+| Field | Value |
+|---|---|
+| Event type | `system.deletion_sla_monitor_restored` |
+| Severity | STANDARD |
+| Retention | 3 yr |
+| HMAC chain | Yes — DEC-030 HMAC-chained |
+| SOC 2 mapping | C1.2 (GDPR Art. 17 SLA monitoring gap closure), CC4.1 (compliance monitoring restored), CC7.2 (monitoring of system components restored) |
+
+```typescript
+// system.deletion_sla_monitor_restored — STANDARD · 3 yr
+const DeletionSlaMonitorRestoredSchema = z.object({
+  incident_id:                    z.string().uuid(),
+  restored_at:                    z.string().datetime(),
+  root_cause:                     z.enum(['H1', 'H2', 'H3', 'H4']),
+  fix_deployed_at:                z.string().datetime(),
+  stale_window_hours:             z.number().positive(),
+  danger_window_tenants_affected: z.number().int().nonneg(),
+  art17_sla_breached:             z.boolean(),   // true = R-09 activated; false = no Art. 17 breach in stale window
+});
+```
+
+**Privacy floor:** `art17_sla_breached` is a boolean. No tenant names, `tenant_id`, user data, or health data in this event. If `art17_sla_breached = true`, R-09 DEC-030 chain carries the subsequent Art. 33 evidence; the `stale-window-note.md` artefact carries the affected tenant detail.
+
+---
+
+### R-41.8 Evidence Preservation
+
+| Artefact | Content | Privacy floor | SOC 2 | Retention | Storage path |
+|---|---|---|---|---|---|
+| **`system.deletion_sla_monitor_stale_declared`** DEC-030 chain export | R-41 incident anchor — `confirmed_stale_since`, `stale_minutes`, `missed_runs`, `trigger`, `initial_severity`, `danger_window_tenants_affected` | Integer counts only; no `tenant_id`, no employee PII | C1.2 / CC4.1 / CC7.2 | 7 yr | R2 `compliance/evidence/deletions/deletion-sla-stale/r41-<incident_id>/` |
+| **R-41-C1 output** `cron.job_run_details` for job 43 stale window | Confirms stale window duration, missed-run count, `return_message` from last failed run | `pg_cron` operational metadata only — no tenant data, no user data | C1.2 / CC7.2 | 3 yr | R2 `compliance/evidence/deletions/deletion-sla-stale/r41-<incident_id>/` |
+| **R-41-C2 output** *(if danger_window_tenants_affected ≥ 1)* | `enterprise_churn_events` query output — `tenant_id`, `days_since_deletion_requested`, `alert_tier` per flagged row | `tenant_id` is FORM-internal UUID only — no employee names, emails, health values | C1.2 / CC4.1 | 7 yr | R2 `compliance/evidence/deletions/deletion-sla-stale/r41-<incident_id>/` |
+| **Stale-window exception note** *(if danger_window_tenants_affected ≥ 1)* | `stale-window-note.md` — stale window start/end, affected `tenant_id` list, `days_since_deletion_requested` at start and end, whether any tenant crossed day 30 without detection, `art17_sla_breached` determination | `tenant_id` (FORM-internal UUID) only; no employee data; `form_api` REVOKED from evidence path | C1.2 / CC4.1 | 7 yr | R2 `compliance/evidence/deletions/deletion-sla-stale/r41-<incident_id>/stale-window-note.md` |
+
+> **`form_api` access:** NO ACCESS to `compliance/evidence/deletions/deletion-sla-stale/` per standard `form_api` REVOKE pattern (§80.3). Only `form_system` (compliance_reviewer) may read evidence artefacts.
+
+---
+
+### R-41.9 SOC 2 Criteria Mapping
+
+| Criterion | Control description | R-41 evidence role |
+|---|---|---|
+| **C1.2** | Confidential disposal — FORM has a contractual and regulatory obligation to delete enterprise tenant data within 30 days of a GDPR Art. 17 deletion request (ENTERPRISE_SLA §5.2); `deletion_sla_monitor` (job 43) is the sentinel that fires pre-breach warnings at day 25 (AL-DEL-01 P1) and day 29 (AL-DEL-01 P0) before the 30-day GDPR mandate | R-41 activations document periods when the C1.2 monitoring sentinel was inoperative; the stale-window exception note proves FORM detected the gap and assessed its compliance impact; `art17_sla_breached: false` in `system.deletion_sla_monitor_restored` is auditor-inspectable attestation that no GDPR Art. 17 SLA breach occurred during the stale window |
+| **CC4.1** | Compliance monitoring — FORM monitors compliance with GDPR Art. 17 deletion obligations through pg_cron job 43 (DELETION-SLA-01); the 7h freshness window ensures any monitoring gap is detected within one job-run tolerance | R-41 activation and DEC-030 event chain (`system.deletion_sla_monitor_stale_declared` → `system.deletion_sla_monitor_restored`) constitute auditor-inspectable evidence that FORM detects and responds to monitoring gaps in the GDPR deletion SLA sentinel within a defined, structured response protocol |
+| **CC7.2** | Monitoring of system components — `pg-cron-health-monitor` (§12.7) detects job 43 gaps exceeding 7h and pages compliance-officer via PagerDuty P1 `form-enterprise`; R-41 defines the IC response protocol for the monitoring gap | R-41 activation proves FORM's monitoring-of-monitoring layer (the `pg-cron-health-monitor`) detected the pg_cron staleness event; DEC-030 chain provides tamper-evident timeline of detection-to-restoration |
+
+> **Auditor narrative (C1.2 + CC4.1 + CC7.2):** FORM's `deletion_sla_monitor` (job 43, every 6h, 7h freshness window) queries `enterprise_churn_events` for active deletion requests approaching the GDPR Art. 17 30-day mandate. At day 25 it emits `enterprise.deletion_sla_warning` HIGH/7yr + AL-DEL-01 P1; at day 29 it emits `enterprise.deletion_sla_critical` CRITICAL/7yr + AL-DEL-01 P0. The `pg-cron-health-monitor` (§12.7) detects any job 43 gap exceeding 7h and pages compliance-officer via PagerDuty P1 `form-enterprise`. R-41 provides the IC with a structured response including an immediate danger-window assessment (R-41-C2) and a mandatory stale-window exception note for any activation where `danger_window_tenants_affected ≥ 1`. The DEC-030 HMAC-chained event chain anchors any stale window in the tamper-evident audit record, independently verifiable per `compliance/docs/hmac-chain-verification-algorithm.md` (HMAC-VERIFY-ALGO-001). If `art17_sla_breached = true` in `system.deletion_sla_monitor_restored`, INCIDENT_RESPONSE R-09 is activated for GDPR Art. 33 assessment; the 72-hour Art. 33 notification window is measured from `confirmed_stale_since` in the `stale_declared` event — the moment the monitoring gap was established — not from restoration.
+
+---
+
+### R-41.10 Post-Incident Controls
+
+| Control | Action | Owner | SLA |
+|---|---|---|---|
+| **H1 — Unauthorized deletion** | If H1 confirmed with no authorized maintenance record: initiate access investigation under R-05; review all `system.cron_config_changed` DEC-030 chain events from the prior 72h; rotate `form_system` pg_cron credentials as precaution if unauthorized access suspected | security-engineer | Immediately on H1 confirmation |
+| **Art. 17 SLA breach** | If `art17_sla_breached = true` in `system.deletion_sla_monitor_restored`: activate R-09 GDPR breach assessment immediately; 72-hour Art. 33 notification window starts from `confirmed_stale_since` timestamp in the `stale_declared` event | compliance-officer | Immediately on `art17_sla_breached = true` determination |
+| **Stale-window exception note** | If `danger_window_tenants_affected ≥ 1`: file `stale-window-note.md` at R2 path per §R-41.8 before resolving PagerDuty alert | compliance-officer | Before PagerDuty resolution |
+| **DEL-E-001 addendum** | If `danger_window_tenants_affected ≥ 1` and stale window crossed a day-25 or day-29 warning threshold for any affected tenant: add a note to the annual DEL-E-001 deletion certificate archive for the affected year documenting the stale window, affected tenant count, and `art17_sla_breached` determination | compliance-officer | Before annual DEL-E-001 filing |
+| **§12.6 cross-reference** | Update `docs/OBSERVABILITY.md §12.6` job 43 `deletion_sla_monitor` registry entry to include `INCIDENT_RESPONSE R-41 (job 43 stale recovery runbook — §R-41.5)` in the stale-consequence cross-ref column | devops-lead | **Done — OBSERVABILITY.md §12.6 v1.5 patch, 2026-06-25** |
+
+---
+
+### R-41.11 Implementation Checklist
+
+#### P0 — Before job 43 is deployed to production (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.deletion_sla_monitor_stale_declared` (HIGH/7yr) and `system.deletion_sla_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events`. Add DELETION-SLA-MONITOR-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-41.7. | security-engineer + compliance-officer | **P0** | M10 | [x] **Done — 2026-06-25, AUDIT_LOG_SCHEMA.md v2.41.** Two R-41 monitoring-control events added to §Enterprise Post-Churn & Deletion SLA events; both events registered with full Zod schemas; DELETION-SLA-MONITOR-STALE-CHAIN-01 ordering invariant noted. |
+| 2 | Deploy R-41 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'deletion_sla_monitor'` to PagerDuty service `form-enterprise` P1, dedup key `deletion-sla-monitor-stale`, routing to compliance-officer + enterprise-architect. Integration test: disable job 43 in staging for > 7h; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-enterprise` with correct dedup key. | devops-lead | **P0** | M10 | [ ] |
+
+#### P1 — Before first enterprise tenant offboarding (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Update `docs/OBSERVABILITY.md §12.6` job 43 `deletion_sla_monitor` registry entry: add `INCIDENT_RESPONSE R-41 (job 43 stale recovery runbook — §R-41.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M10 | [x] *(completed in OBSERVABILITY.md §12.6 v1.5 patch, 2026-06-25)* |
+| 4 | Register DEL-MON-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table: quarterly report of all R-41 activations (count, stale-window-hours, danger-window-tenants-affected, art17_sla_breached); zero-activation quarters filed as affirmative attestation; `form_api` REVOKED from evidence path. SOC 2 C1.2/CC4.1. Retention 7yr. Path: `compliance/evidence/deletions/deletion-sla-stale/del-mon-e-001-YYYY-QN.csv`. | compliance-officer | **P1** | M11 | [ ] |
+| 5 | After job 43 initial deploy in staging: run R-41-C2 against staging `enterprise_churn_events`; confirm `danger_window_tenants_affected = 0` immediately after first run (no synthetic danger-window tenants); document in a staging validation note at `compliance/evidence/deletions/deletion-sla-stale/staging-validation-YYYY-MM-DD.md`. | compliance-officer + devops-lead | **P1** | M10 | [ ] |
+
+---
+
+*v1.0 (2026-06-25): R-41 GDPR Deletion SLA Monitor Stale — forty-first runbook. Closes the documentation gap for `deletion_sla_monitor` (job 43, `0 */6 * * *`, 7h freshness window) identified in `docs/OBSERVABILITY.md §12.6` (v1.4 patch, 2026-06-23) — job 43 was registered in the canonical §12.6 registry with C1.2/CC4.1 GDPR Art. 17 deletion SLA cross-references but had no corresponding INCIDENT_RESPONSE runbook, unlike all peer compliance pg_cron jobs (R-28 through R-40) which carry explicit stale runbook cross-references in their §12.6 entries. Critical distinction from peer monitoring-control runbooks: job 43 staleness creates a live GDPR Art. 17 compliance risk — if any tenant's deletion request passes day 25, 29, or 30 while job 43 is stale, no `enterprise.deletion_sla_warning` or `enterprise.deletion_sla_critical` DEC-030 events are emitted during the stale window; the DDL backstop (`ece_deletion_sla_respected` CHECK at day 35, DATA_MODEL §44) operates independently and is unaffected by job 43 staleness. Severity: P1 base; immediate P0 escalation if R-41-C2 confirms any active deletion in danger window (days 25–35). Trigger: `system.cron_job_stale` with `job_name = 'deletion_sla_monitor'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect; dedup `deletion-sla-monitor-stale`. Four root cause hypotheses: H1 (job deleted/disabled — R-05 co-activation if unauthorized); H2 (shared pg_cron failure — R-03 co-activation); H3 (`enterprise_churn_events` SELECT failure — `form_system` grant revoked or schema change); H4 (Supabase platform outage). Four scope queries: R-41-C1 (pg_cron staleness confirmation + `return_message`), R-41-C2 (`enterprise_churn_events` danger-window scan — `danger_window_tenants_affected ≥ 1` triggers immediate P0 escalation to founder + compliance-officer), R-41-C3 (peer job health — H2 discriminator: ≥ 2 peer jobs stale), R-41-C4 (job registration check — H1 discriminator: no row in `cron.job`). Six-step recovery procedure: Step 1 (H1 — re-register via `cron.schedule()`), Step 2 (H3 — restore `form_system` SELECT on `enterprise_churn_events`; verify `form_api` and `tenant_manager` REVOKED invariants), Step 3 (H4 — wait for Supabase recovery), Step 4 (manual run + `cron.job_run_details` verification), Step 5 (backfill missed warning/critical DEC-030 emissions; mandatory stale-window exception note if any danger-window tenant), Step 6 (emit `system.deletion_sla_monitor_restored` STANDARD/3yr; resolve PagerDuty P1/P0). Two DEC-030 HMAC-chained events: `system.deletion_sla_monitor_stale_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `trigger` enum['pagerduty_alert','manual_discovery','co_active_r03'], `initial_severity` enum['P1','P0'], `danger_window_tenants_affected` nonneg int); `system.deletion_sla_monitor_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `stale_window_hours` positive, `danger_window_tenants_affected` nonneg int, `art17_sla_breached` bool); DELETION-SLA-MONITOR-STALE-CHAIN-01: `restored` must follow `stale_declared` for same `incident_id`; HTTP 422 `DELETION_SLA_MONITOR_STALE_CHAIN_01_VIOLATION` on breach → R-05 activated. Evidence: R-41-C1 `cron.job_run_details` stale window (C1.2/CC7.2, 3yr); R-41-C2 danger-window output for `danger_window_tenants_affected ≥ 1` (C1.2/CC4.1, 7yr); stale-window exception note for `danger_window_tenants_affected ≥ 1` (`stale-window-note.md`, C1.2/CC4.1, 7yr); DEL-E-001 addendum note for activations crossing day-25/29 thresholds. All at R2 `compliance/evidence/deletions/deletion-sla-stale/r41-<incident_id>/`. SOC 2 criteria: C1.2 (confidential disposal — GDPR Art. 17 SLA monitoring sentinel; `art17_sla_breached: false` in restoration event is auditor-inspectable attestation of no breach during stale window); CC4.1 (compliance monitoring — R-41 activation + DEC-030 chain proves FORM detects and responds to monitoring gaps in the GDPR deletion SLA sentinel); CC7.2 (monitoring of system components — `pg-cron-health-monitor` detected the gap; R-41 defines the structured IC response). Post-incident controls: H1 unauthorized deletion → R-05 + `form_system` credential rotation; `art17_sla_breached = true` → R-09 GDPR breach assessment (72h Art. 33 clock from `confirmed_stale_since`); stale-window exception note for `danger_window_tenants_affected ≥ 1` (before PagerDuty resolution); DEL-E-001 addendum for activations crossing day-25/29 threshold; §12.6 cross-ref [x] Done v1.5 patch 2026-06-25; DEL-MON-E-001 SOC2_READINESS §79.4 registration (P1/M11 — pending). Five-item implementation checklist: 2× P0/M10 (AUDIT_LOG_SCHEMA registration [x] Done 2026-06-25 v2.41; PagerDuty routing + integration test); 3× P1/M10–M11 (§12.6 cross-ref [x] Done v1.5 patch 2026-06-25; DEL-MON-E-001 §79.4 registration; staging validation after first deploy). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 43 `deletion_sla_monitor` registry entry — stale-consequence cross-ref updated with INCIDENT_RESPONSE R-41 per v1.5 patch [x] Done 2026-06-25); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events` (`system.deletion_sla_monitor_stale_declared` HIGH/7yr and `system.deletion_sla_monitor_restored` STANDARD/3yr registered v2.41, 2026-06-25; DELETION-SLA-MONITOR-STALE-CHAIN-01 ordering invariant); `docs/DATA_MODEL.md §44` (`enterprise_churn_events` DDL — `ece_deletion_sla_respected` CHECK DDL backstop at 35 days; `form_api` REVOKED; `tenant_manager` excluded; pg_cron reads via `form_system`); `docs/COST_MODEL.md §43` (DELETION-SLA-01 monitoring obligation source — §43.10 item 3); `docs/SOC2_READINESS.md §79.4` (DEL-E-001 annual deletion certificate archive; DEL-MON-E-001 quarterly R-41 activation report — pending §79.4 registration per R-41.11 item 4); R-03 (Infrastructure Outage — H2/H4 co-activation path); R-05 (HMAC chain break — H1 unauthorized deletion co-activation path and DELETION-SLA-MONITOR-STALE-CHAIN-01 violation escalation); R-09 (GDPR breach assessment — activated if `art17_sla_breached = true`). Owner: compliance-officer + enterprise-architect.*
+
+---
+
+**v1.0 · 2026-06-25 · Owner: compliance-officer + enterprise-architect**
 **Review: after every activation, minimum annual.**
 **Next scheduled review: June 2027 or after first activation — whichever comes first.**
 
