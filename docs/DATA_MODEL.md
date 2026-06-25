@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.30
+# FORM · Multi-Tenant Data Model v1.31
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -53,6 +53,7 @@
 43. [`enterprise_renewals` Schema — Migration 0084](#43-enterprise_renewals-schema--migration-0084)
 44. [`enterprise_churn_events` Schema — Migration 0085](#44-enterprise_churn_events-schema--migration-0085)
 45. [`enterprise_contracts` Loyalty Discount Schema Extension — Migration 0086](#45-enterprise_contracts-loyalty-discount-schema-extension--migration-0086)
+46. [`litigation_hold_records` Schema — Migration 0087](#46-litigation_hold_records-schema--migration-0087)
 
 ---
 
@@ -17048,3 +17049,468 @@ Closes `docs/COST_MODEL.md §44.8 item 1` (P0, M9).
 ---
 
 *v1.30 (2026-06-25): §45 `enterprise_contracts` Loyalty Discount Schema Extension — Migration 0086. Closes `docs/COST_MODEL.md §44.8 item 1` (P0, M9 — migration 0086 DDL canonical registration and DATA_MODEL documentation). Triggered by DEC-081 (2026-06-23, OQ-WIN-02 resolution) and COST_MODEL §44 (Loyalty Re-Entry Discount, v2.13). §45.1 purpose + four design principles (additive-only; back-fill safe; no DDL mutual-exclusivity constraint — billing_period vs contract_years discrepancy + §44.3 multi-year permitted; REENTRY-CHAIN-01 in Worker is the real gate; no user-data exposure). §45.2 migration dependency chain: 0078 → 0082 → 0083 → 0084 → 0085 → 0086; terminal in discount cluster. §45.3.1 full DDL: `ALTER TABLE enterprise_contracts ADD COLUMN IF NOT EXISTS contract_discount_type VARCHAR(30) NOT NULL DEFAULT 'none' CHECK (contract_discount_type IN ('none','multi_year','upfront','loyalty_reentry'))` + COMMENT. §45.3.2 six-item staging validation checklist: (a) column type/constraint; (b) existing rows all 'none'; (c) CHECK rejects invalid; (d) loyalty_reentry accepted; (e) form_api REVOKE confirmed; (f) tenant_manager no-policy confirmed. §45.4 column semantics: four enum values (none/multi_year/upfront/loyalty_reentry); immutability invariant; not-stackable invariant (application layer only). §45.5 RLS unchanged from §16: form_admin ALL; form_system SELECT+INSERT; tenant_admin/owner SELECT own rows; tenant_manager no policy; form_api REVOKED; compliance_officer SELECT; three DDL auditor proof queries. §45.6 REENTRY-CHAIN-01 Worker enforcement: chain invariant (authoritative COST_MODEL §44.5); DDL supporting role (valid-value CHECK only); why no DDL mutual-exclusivity; four integration test specifications (A/B/C/D). §45.7 SOC 2 evidence: REN-E-001 (CC5.2/CC1.4 — discount-type cross-tab for annual chain export); CC5.2 and CC1.4 auditor narratives; privacy floor. §45.8 implementation checklist: 2× P0/M9 (migration 0086 apply + six staging checks; REENTRY-CHAIN-01 Worker + four integration tests); 1× P1/M11 (REN-E-001 discount-type cross-tab filing template). §45.9 two cross-reference obligations: COST_MODEL §44.8 item 1 🟢 Closed; AUDIT_LOG_SCHEMA.md v2.45 `exception_type` 🟢 Closed. TOC updated (§42–§45 added). Document header v1.28 → v1.30 (v1.29 patch omitted updating the title line; v1.30 bundles the header correction and this new section). Cross-references: `docs/COST_MODEL.md §44` (DEC-081, discount mechanics, REENTRY-CHAIN-01 authoritative definition, implementation checklist §44.8); `docs/COST_MODEL.md §44.8 item 1` (obligation — now [x] Done at production migration); `docs/COST_MODEL.md §44.8 item 2` (obligation — closed by AUDIT_LOG_SCHEMA v2.45, 2026-06-25); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`enterprise.pricing_exception_approved` — `exception_type` added v2.45, 2026-06-25); `docs/DATA_MODEL.md §16` (`enterprise_contracts` baseline DDL); `docs/DATA_MODEL.md §42` (migration 0083 — expansion fields, same additive pattern); `docs/DATA_MODEL.md §43` (migration 0084 — `enterprise_renewals`); `docs/DATA_MODEL.md §44` (migration 0085 — `enterprise_churn_events`); `docs/SOC2_READINESS.md §79.4` (REN-E-001 evidence artefact); `docs/DECISION_LOG.md §DEC-081` (formal decision record); `docs/MSA_TEMPLATE.md` (loyalty re-entry discount deliberately NOT referenced — CSM-only tool). Owner: enterprise-architect + compliance-officer + platform-engineer.*
+
+---
+
+## §46 `litigation_hold_records` Schema — Migration 0087
+
+> **Decision:** DEC-080 (2026-06-23); authoritative legal procedure spec: `docs/MSA_TEMPLATE.md §11.6`; DEC-030 event registration: `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn` (`enterprise.litigation_hold_declared` HIGH/7yr, `enterprise.litigation_hold_released` HIGH/7yr).
+> **References:** `docs/DECISION_LOG.md §DEC-080` (OQ-WIN-04 resolution — GDPR Art. 17(3)(e) litigation hold procedure); `docs/COST_MODEL.md §43.11 OQ-WIN-04` (origin open question); `docs/DATA_MODEL.md §12` (GDPR Art. 17 deletion timeline — §12.3 is what this table suspends for non-health data); `docs/DATA_MODEL.md §44` (migration 0085 — `enterprise_churn_events`, the lifecycle table this hold intersects); DEC-036 (GDPR Art. 9 zero-grace-period invariant — health data categorically excluded from all holds).
+> **Owner:** compliance-officer + enterprise-architect + security-engineer
+
+---
+
+### 46.1 Purpose and Design Principles
+
+`litigation_hold_records` is the Postgres-layer registry for active and released litigation holds declared under MSA §11.6. Before this table, when a compliance-officer declared a hold under DEC-080, the only evidence was the two DEC-030 HMAC-chained events (`enterprise.litigation_hold_declared` and `enterprise.litigation_hold_released`) in `audit_log_events`. Those events are the authoritative tamper-evident record — but they are an append-only event log, not a queryable state table. The absence of a mutable state table creates three operational gaps:
+
+1. **No automated 6-month review monitoring.** MSA §11.6.3 requires a compliance-officer review at `target_review_date` (6 months from activation) to re-confirm hold necessity. Without a table, no pg_cron job can sweep for overdue reviews.
+2. **No automated 36-month maximum enforcement signal.** MSA §11.6.4 caps any hold at 36 months. The DEC-030 `enterprise.litigation_hold_declared` event carries `activation_date`, but querying the append-only event log for "oldest active hold without a corresponding `enterprise.litigation_hold_released`" is a JOIN-heavy query, not a simple sweep. A status column in a dedicated table enables a one-line monitoring query.
+3. **No post-release deletion tracking.** MSA §11.6.6 requires deletion of held non-health data within 10 business days of `release_date`. The `enterprise.litigation_hold_released` event carries `deletion_target_date`, but again: without a state table carrying `deletion_completed_date` and `status`, no pg_cron job can detect holds past their `deletion_target_date` without a complex event-chain scan.
+
+This table closes all three gaps. It is the DDL-layer foundation for `docs/OBSERVABILITY.md §54` (Litigation Hold Compliance Observability — pg_cron job 45, LITH-SLO-01/02, AL-LITH-01/02/03; pending obligation — §46.8 item 2).
+
+**Four design principles:**
+
+1. **One row per hold declaration per activation date.** `UNIQUE (tenant_id, activation_date)` enforces at the DDL layer that the same tenant cannot have two holds declared on the same calendar date. In practice, MSA §11.6 allows only one active hold per tenant at a time (compliance-officer must release a prior hold before declaring a new one); the UNIQUE constraint supports this. Each row corresponds 1:1 to a `enterprise.litigation_hold_declared` DEC-030 event.
+
+2. **Health data exclusion is a DDL invariant, not a policy toggle.** GDPR Art. 9 health data is categorically excluded from any litigation hold under DEC-036 (the zero-grace-period invariant). The `lhr_held_data_categories_valid` CHECK constraint enforces that `held_data_categories` is a non-empty subset of exactly four permitted categories (`billing_records`, `contract_records`, `audit_log_entries`, `sla_performance_data`) — any attempt to include a fifth category (including `'health_records'` or any variant) is rejected at the Postgres layer before the row is written. This is not an application-layer guard; it is a structural impossibility in the DDL.
+
+3. **Maximum hold duration enforcement is split between DDL and monitoring.** The 36-month cap (MSA §11.6.4) is partially enforced by the `lhr_release_date_within_max_duration` CHECK: when `release_date IS NOT NULL`, it must be ≤ `activation_date + INTERVAL '36 months'`. This prevents recording a belated release date that exceeds the cap. The prospective enforcement — alerting when an active hold is approaching or has passed 36 months — is the responsibility of pg_cron job 45 (`litigation_hold_compliance_monitor`, `docs/OBSERVABILITY.md §54`). The DDL handles the data-integrity side; the monitoring layer handles the operational side.
+
+4. **`form_api` REVOKED. Tenant roles excluded. Compliance-officer-only write path.** Litigation holds are a FORM-internal compliance and legal instrument. The Customer receives 5-business-day notice per MSA §11.6.2, but the hold declaration, review, and release are managed entirely by the compliance-officer through the Admin Console (PAM-elevated session). No `tenant_admin`, `tenant_owner`, or `tenant_manager` role has any RLS policy on this table. `form_api` is REVOKED. Only `form_admin` (Admin Console), `compliance_officer` (SELECT + UPDATE of `status` and completion fields), and `form_system` (SELECT for pg_cron job 45) have access.
+
+**Privacy floor (hold records):** `litigation_hold_records` carries `tenant_id` (FORM-internal UUID), dates, and categorical metadata (`hold_reason_category`, `held_data_categories`). It carries no individual employee `user_id`, name, email, health values, coaching content, or GDPR Art. 9 special-category data. The `outside_counsel_ref` column carries an opaque reference string (law firm matter number or similar) — never an employee-identifiable value. The `compliance_officer_id` is a FORM-internal staff UUID, not a tenant employee identifier. No `tenant_manager` (HR) RLS policy is issued.
+
+---
+
+### 46.2 Migration Dependency Chain
+
+```sql
+-- Migration order (must be applied sequentially):
+-- 0083_enterprise_contracts_expansion_fields.sql  (§42 — initial_seats / current_seats)
+-- 0084_enterprise_renewals.sql                    (§43 — enterprise_renewals table)
+-- 0085_enterprise_churn_events.sql                (§44 — enterprise_churn_events table)
+-- 0086_enterprise_contracts_discount_type.sql     (§45 — contract_discount_type column)
+-- 0087_litigation_hold_records.sql                (this section — new table)
+
+-- Dependency graph:
+--   0087 references tenants(id) via ON DELETE RESTRICT FK.
+--   ON DELETE RESTRICT is intentional: a tenant row must not be deleted while a
+--   litigation hold record exists. The GDPR deletion pipeline (§12.3 / §67) handles
+--   the sequenced teardown — holds must be formally released and held-data deletion
+--   certified before the tenant row itself can be removed.
+--
+--   0087 does NOT reference enterprise_contracts(id) or enterprise_churn_events(id)
+--   with hard FKs. A litigation hold may be declared against an active tenant
+--   (billing dispute in progress, even before churn) or against a churned tenant.
+--   Requiring a FK to enterprise_contracts would make the hold creation path depend
+--   on the contract's existence at the time of hold declaration — which may not hold
+--   if the contract was already archived. Hard coupling is avoided; the relationship
+--   is captured in the DEC-030 soft FK columns (declared_event_id, release_event_id).
+--
+-- Safe to run on a live database with zero downtime:
+--   CREATE TYPE is metadata-only.
+--   CREATE TABLE with FK constraint on tenants(id) acquires ShareRowExclusiveLock
+--   on tenants — safe during a low-traffic migration window (tenants table is rarely
+--   written during off-peak hours).
+--   CREATE INDEX and CREATE UNIQUE INDEX on the new (empty) table: instantaneous.
+--   REVOKE ALL FROM form_api is instantaneous.
+```
+
+---
+
+### 46.3 DDL — Migration 0087
+
+**Authoritative legal procedure spec:** `docs/MSA_TEMPLATE.md §11.6`
+**Authoritative DEC-030 event spec:** `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn` (`enterprise.litigation_hold_declared`, `enterprise.litigation_hold_released`)
+
+#### 46.3.1 Migration Script
+
+```sql
+-- Migration: 0087_litigation_hold_records.sql
+-- Depends on: 0086_enterprise_contracts_discount_type.sql (§45)
+-- Decision: DEC-080 (2026-06-23) — GDPR Art. 17(3)(e) litigation hold procedure
+-- Health data exclusion invariant: lhr_held_data_categories_valid CHECK (structural, not application-layer)
+-- Max duration enforcement: split — DDL enforces retrospective cap; pg_cron job 45 enforces prospective alert
+-- DEC-030 anchors: declared_event_id + release_event_id (soft FKs to audit_log_events)
+
+BEGIN;
+
+CREATE TYPE litigation_hold_status_enum AS ENUM (
+  'declared',           -- hold is active; §12.3 deletion timeline suspended for held_data_categories
+  'released',           -- hold released per MSA §11.6.6; deletion_target_date obligation running
+  'deletion_completed'  -- held non-health data deleted and certified; deletion_completed_date populated
+);
+
+CREATE TYPE hold_reason_category_enum AS ENUM (
+  'billing_dispute',        -- churned tenant disputes final invoice or ETF under MSA §11.4
+  'legal_claim',            -- formal legal claim (arbitration or court proceeding initiated)
+  'regulatory_direction',   -- regulatory body directs retention under applicable law
+  'anticipated_litigation'  -- compliance-officer + outside counsel conclude litigation is reasonably anticipated
+);
+
+CREATE TYPE hold_release_reason_enum AS ENUM (
+  'dispute_resolved',             -- billing dispute settled; hold no longer required
+  'legal_claim_concluded',        -- arbitration or court proceeding concluded; final award/settlement
+  'regulatory_obligation_expired',-- regulatory direction's retention period has expired
+  'court_order_vacated',          -- court order requiring retention has been vacated or quashed
+  'max_duration_reached'          -- 36-month maximum duration (MSA §11.6.4) has been reached
+);
+
+CREATE TABLE litigation_hold_records (
+  id                        UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 UUID         NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+
+  -- Hold classification (mirrors enterprise.litigation_hold_declared DEC-030 payload)
+  hold_reason_category      hold_reason_category_enum NOT NULL,
+  held_data_categories      TEXT[]       NOT NULL,              -- subset of: billing_records, contract_records, audit_log_entries, sla_performance_data
+  outside_counsel_ref       TEXT         NOT NULL,              -- law firm / outside counsel matter reference (non-null enforced by Zod at event emission)
+  compliance_officer_id     UUID         NOT NULL,              -- FORM staff UUID; not a tenant employee identifier
+
+  -- Timeline fields
+  activation_date           DATE         NOT NULL,              -- date hold was declared; from DEC-030 event payload
+  target_review_date        DATE         NOT NULL,              -- 6 months from activation; compliance-officer must re-confirm necessity by this date
+  max_expiry_date           DATE         NOT NULL,              -- activation_date + 36 months; absolute maximum per MSA §11.6.4
+  release_date              DATE,                               -- populated when status transitions to 'released'
+  deletion_target_date      DATE,                               -- 10 business days from release_date; from enterprise.litigation_hold_released payload
+  deletion_completed_date   DATE,                               -- populated when compliance-officer certifies deletion completion per MSA §11.6.6
+
+  -- Lifecycle state
+  status                    litigation_hold_status_enum NOT NULL DEFAULT 'declared',
+  release_reason            hold_release_reason_enum,           -- NULL until status = 'released'
+
+  -- DEC-030 soft FKs (UUID of the corresponding audit_log_events rows)
+  declared_event_id         UUID,   -- soft FK: enterprise.litigation_hold_declared
+  release_event_id          UUID,   -- soft FK: enterprise.litigation_hold_released; NULL until released
+
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- ── Structural invariants ──────────────────────────────────────────────────
+
+  -- Health data exclusion: held_data_categories must be a non-empty subset of the four
+  -- permitted categories. Any value not in this list — including 'health_records',
+  -- 'user_pii', 'coaching_content', or any other category — is rejected at the DDL layer.
+  -- This implements the DEC-036 zero-grace-period invariant at the schema layer.
+  CONSTRAINT lhr_held_data_categories_valid
+    CHECK (
+      array_length(held_data_categories, 1) >= 1
+      AND held_data_categories <@ ARRAY[
+        'billing_records',
+        'contract_records',
+        'audit_log_entries',
+        'sla_performance_data'
+      ]::TEXT[]
+    ),
+
+  -- Review date must be set at or after one month from activation (preventing
+  -- nonsensical same-day or past review dates at insert time).
+  CONSTRAINT lhr_review_date_after_activation
+    CHECK (target_review_date >= activation_date + INTERVAL '1 month'),
+
+  -- Max expiry date must equal exactly activation_date + 36 months.
+  -- Enforced at write time by the Admin Console + Worker; this CHECK provides the
+  -- DDL-layer structural guarantee that no row can record a max_expiry_date that
+  -- extends beyond the MSA §11.6.4 cap.
+  CONSTRAINT lhr_max_expiry_equals_36_months
+    CHECK (max_expiry_date = activation_date + INTERVAL '36 months'),
+
+  -- Release date, when present, must not exceed the 36-month cap.
+  -- This prevents recording a belated release that certifies a hold beyond the cap.
+  CONSTRAINT lhr_release_date_within_max_duration
+    CHECK (release_date IS NULL OR release_date <= activation_date + INTERVAL '36 months'),
+
+  -- Release fields coherence: when status = 'released' or 'deletion_completed',
+  -- release_date and release_reason must be populated.
+  CONSTRAINT lhr_release_fields_complete
+    CHECK (
+      status = 'declared'
+      OR (release_date IS NOT NULL AND release_reason IS NOT NULL AND deletion_target_date IS NOT NULL)
+    ),
+
+  -- Deletion completion requires release: deletion_completed_date can only be
+  -- populated when the status has reached 'deletion_completed' (i.e. release has
+  -- already occurred — release_date IS NOT NULL is implied by lhr_release_fields_complete).
+  CONSTRAINT lhr_deletion_completed_requires_release
+    CHECK (
+      deletion_completed_date IS NULL
+      OR (release_date IS NOT NULL AND status = 'deletion_completed')
+    )
+);
+
+-- One active (or recently released) hold per tenant per activation date.
+-- In practice, MSA §11.6 allows only one active hold per tenant at a time;
+-- this constraint prevents accidental double-insertion of the same hold event.
+CREATE UNIQUE INDEX litigation_hold_records_tenant_activation_idx
+  ON litigation_hold_records (tenant_id, activation_date);
+
+-- Monitoring index: pg_cron job 45 sweeps for holds where:
+--   status = 'declared' AND (target_review_date < now() OR max_expiry_date < now())
+-- or
+--   status = 'released' AND deletion_target_date < now()
+-- This partial index on status accelerates both sweep patterns.
+CREATE INDEX litigation_hold_records_status_idx
+  ON litigation_hold_records (status)
+  WHERE status IN ('declared', 'released');
+
+-- Covering index for the 6-month review sweep (job 45 AL-LITH-01 path).
+CREATE INDEX litigation_hold_records_review_sweep_idx
+  ON litigation_hold_records (target_review_date, tenant_id)
+  WHERE status = 'declared';
+
+-- Covering index for the max-duration sweep (job 45 AL-LITH-02 path).
+CREATE INDEX litigation_hold_records_expiry_sweep_idx
+  ON litigation_hold_records (max_expiry_date, tenant_id)
+  WHERE status = 'declared';
+
+-- Covering index for the post-release deletion deadline sweep (job 45 AL-LITH-03 path).
+CREATE INDEX litigation_hold_records_deletion_deadline_idx
+  ON litigation_hold_records (deletion_target_date, tenant_id)
+  WHERE status = 'released';
+
+COMMENT ON TABLE litigation_hold_records
+  IS 'Litigation hold registry — one row per declared hold. Structural health-data exclusion via lhr_held_data_categories_valid CHECK. Companion monitoring: OBSERVABILITY §54 (pg_cron job 45). DEC-080, MSA §11.6. RLS: form_admin ALL; compliance_officer SELECT+UPDATE; form_system SELECT. form_api REVOKED; tenant_manager no policy.';
+
+-- ── Row-Level Security ─────────────────────────────────────────────────────
+
+ALTER TABLE litigation_hold_records ENABLE ROW LEVEL SECURITY;
+
+-- form_admin: full access (Admin Console + PAM-elevated compliance-officer sessions)
+CREATE POLICY lhr_form_admin_all ON litigation_hold_records
+  FOR ALL
+  TO form_admin
+  USING (true)
+  WITH CHECK (true);
+
+-- compliance_officer: SELECT all rows + UPDATE (status lifecycle transitions,
+-- deletion_completed_date, release fields). INSERT and DELETE via form_admin only.
+CREATE POLICY lhr_compliance_officer_select ON litigation_hold_records
+  FOR SELECT
+  TO compliance_officer
+  USING (true);
+
+CREATE POLICY lhr_compliance_officer_update ON litigation_hold_records
+  FOR UPDATE
+  TO compliance_officer
+  USING (true)
+  WITH CHECK (true);
+
+-- form_system: SELECT only (pg_cron job 45 monitoring sweeps).
+-- No INSERT, UPDATE, or DELETE — monitoring is read-only.
+CREATE POLICY lhr_form_system_select ON litigation_hold_records
+  FOR SELECT
+  TO form_system
+  USING (true);
+
+-- Explicitly revoke all privileges from form_api.
+REVOKE ALL ON litigation_hold_records FROM form_api;
+
+-- No policy for tenant_admin, tenant_owner, tenant_manager:
+-- absence of a policy = access denied under Postgres RLS.
+-- Litigation hold records are FORM-internal compliance instruments;
+-- tenant roles have no visibility into hold status or reason.
+
+COMMIT;
+```
+
+#### 46.3.2 Staging Validation Checklist
+
+| # | Check | SQL | Expected result |
+|---|---|---|---|
+| 1 | Table exists and all columns present | `SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = 'litigation_hold_records' ORDER BY ordinal_position;` | Rows for all 18 columns; `tenant_id`, `hold_reason_category`, `held_data_categories`, `outside_counsel_ref`, `compliance_officer_id`, `activation_date`, `target_review_date`, `max_expiry_date`, `status` all NOT NULL |
+| 2 | Health data exclusion CHECK rejects invalid category | `INSERT INTO litigation_hold_records (tenant_id, hold_reason_category, held_data_categories, outside_counsel_ref, compliance_officer_id, activation_date, target_review_date, max_expiry_date, status) VALUES (gen_random_uuid(), 'billing_dispute', ARRAY['billing_records','health_records'], 'ref-001', gen_random_uuid(), CURRENT_DATE, CURRENT_DATE + 30, CURRENT_DATE + 1095, 'declared'); ROLLBACK;` | `ERROR: new row for relation "litigation_hold_records" violates check constraint "lhr_held_data_categories_valid"` |
+| 3 | Valid held_data_categories accepted | `INSERT INTO litigation_hold_records (tenant_id, hold_reason_category, held_data_categories, outside_counsel_ref, compliance_officer_id, activation_date, target_review_date, max_expiry_date, status) VALUES (gen_random_uuid(), 'billing_dispute', ARRAY['billing_records','contract_records'], 'ref-002', gen_random_uuid(), CURRENT_DATE, CURRENT_DATE + 182, CURRENT_DATE + 1095, 'declared'); ROLLBACK;` | Insert succeeds before ROLLBACK |
+| 4 | Max expiry CHECK rejects wrong date | `INSERT INTO litigation_hold_records (..., activation_date, max_expiry_date, ...) VALUES (..., CURRENT_DATE, CURRENT_DATE + 1000, ...); ROLLBACK;` | `ERROR: ... violates check constraint "lhr_max_expiry_equals_36_months"` |
+| 5 | Release fields CHECK: status='released' without release_date rejected | `INSERT INTO litigation_hold_records (..., status, release_date) VALUES (..., 'released', NULL); ROLLBACK;` | `ERROR: ... violates check constraint "lhr_release_fields_complete"` |
+| 6 | UNIQUE constraint: duplicate (tenant_id, activation_date) rejected | Insert same `tenant_id` + `activation_date` twice; second INSERT should fail. | `ERROR: duplicate key value violates unique constraint "litigation_hold_records_tenant_activation_idx"` |
+| 7 | `form_api` has no privilege | `SET ROLE form_api; SELECT id FROM litigation_hold_records LIMIT 1;` | `ERROR: permission denied for table litigation_hold_records` |
+| 8 | `tenant_manager` has no RLS policy | `SET ROLE tenant_manager; SELECT id FROM litigation_hold_records LIMIT 1;` | 0 rows (RLS no-policy = access denied by default) or `ERROR: permission denied` |
+| 9 | `form_system` can SELECT | `SET ROLE form_system; SELECT COUNT(*) FROM litigation_hold_records WHERE status = 'declared';` | `0` (or integer — no error) |
+
+Retain staging output at `compliance/evidence/litigation-hold/migration-0087-validation_<YYYY-MM-DD>.txt`. Mark §46.8 item 1 as `[x] Done` simultaneously when this checklist passes in production.
+
+---
+
+### 46.4 Column Semantics
+
+| Column | Type | Nullability | Default | Semantics |
+|---|---|---|---|---|
+| `id` | UUID | NOT NULL | `gen_random_uuid()` | FORM-internal hold record identifier. Not shared externally. |
+| `tenant_id` | UUID | NOT NULL | — | FORM-internal tenant UUID. References `tenants(id)` ON DELETE RESTRICT. No employee PII. |
+| `hold_reason_category` | `hold_reason_category_enum` | NOT NULL | — | Categorical reason for the hold. Must match the `hold_reason_category` field of the corresponding `enterprise.litigation_hold_declared` DEC-030 event. Immutable after INSERT. |
+| `held_data_categories` | TEXT[] | NOT NULL | — | Array of data category names subject to the hold. Constrained by `lhr_held_data_categories_valid` to a subset of `{billing_records, contract_records, audit_log_entries, sla_performance_data}`. GDPR Art. 9 health data is structurally excluded. Immutable after INSERT. |
+| `outside_counsel_ref` | TEXT | NOT NULL | — | Outside counsel hold-instruction reference (e.g. matter number). Non-null enforced at both DDL layer and Zod schema in the Admin Console — compliance-officer must provide this before declaring a hold. Not an employee-identifiable value. |
+| `compliance_officer_id` | UUID | NOT NULL | — | FORM staff UUID of the compliance-officer who declared the hold via PAM-elevated Admin Console session. |
+| `activation_date` | DATE | NOT NULL | — | Calendar date the hold was declared. Sourced from `enterprise.litigation_hold_declared` payload `activation_date` field. Immutable. |
+| `target_review_date` | DATE | NOT NULL | — | Six months from `activation_date`. The compliance-officer must re-confirm hold necessity by this date per MSA §11.6.3. Monitored by pg_cron job 45 (OBSERVABILITY §54 AL-LITH-01). |
+| `max_expiry_date` | DATE | NOT NULL | — | `activation_date + INTERVAL '36 months'` — absolute maximum hold duration per MSA §11.6.4. The `lhr_max_expiry_equals_36_months` CHECK enforces exact equality at write time. Monitored by pg_cron job 45 (OBSERVABILITY §54 AL-LITH-02). |
+| `release_date` | DATE | NULL | — | Calendar date the hold was released. Populated by Admin Console on `enterprise.litigation_hold_released` event emission. NULL while `status = 'declared'`. |
+| `deletion_target_date` | DATE | NULL | — | The deadline for deleting held non-health data after release — 10 business days from `release_date`. Sourced from `enterprise.litigation_hold_released` payload `deletion_target_date` field. Monitored by pg_cron job 45 (OBSERVABILITY §54 AL-LITH-03). |
+| `deletion_completed_date` | DATE | NULL | — | Calendar date the compliance-officer certified that held data deletion was completed per MSA §11.6.6. Also triggers the 5-business-day clock for the written deletion certificate to Customer. NULL until `status = 'deletion_completed'`. |
+| `status` | `litigation_hold_status_enum` | NOT NULL | `'declared'` | Lifecycle state: `declared` → `released` → `deletion_completed`. The `lhr_release_fields_complete` and `lhr_deletion_completed_requires_release` CHECKs enforce forward-only state transitions at the DDL layer. |
+| `release_reason` | `hold_release_reason_enum` | NULL | — | Categorical reason for hold release. NULL while `status = 'declared'`; required by `lhr_release_fields_complete` when `status ≠ 'declared'`. |
+| `declared_event_id` | UUID | NULL | — | Soft FK to `audit_log_events.id` for the `enterprise.litigation_hold_declared` DEC-030 event. Written by the Admin Console after confirming HTTP 200 from `emit-audit-event`. Used for auditor chain-trace queries without a hard FK (audit_log_events append-only; hard FK would prevent maintenance vacuuming patterns). |
+| `release_event_id` | UUID | NULL | — | Soft FK to `audit_log_events.id` for the `enterprise.litigation_hold_released` DEC-030 event. NULL until `status = 'released'`. |
+| `created_at` | TIMESTAMPTZ | NOT NULL | `now()` | Row creation timestamp. |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | `now()` | Last UPDATE timestamp. Admin Console sets this on every status transition. |
+
+**Enum value meanings — `litigation_hold_status_enum`:**
+
+| Value | Meaning | §12.3 deletion timeline |
+|---|---|---|
+| `'declared'` | Hold is active. Compliance-officer has declared under MSA §11.6.1. | Suspended for `held_data_categories` only. Art. 9 health data continues on standard §12.2 zero-grace timeline (DEC-036). |
+| `'released'` | Hold released per MSA §11.6.6. Deletion of held non-health data pending by `deletion_target_date`. | Deletion of held data must begin immediately; `deletion_target_date` is the hard deadline. |
+| `'deletion_completed'` | Held non-health data deleted. `deletion_completed_date` certified by compliance-officer. Deletion certificate issued to Customer within 5 business days. | Standard retention schedule (if any) resumes for any surviving records; most held data is deleted in full. |
+
+---
+
+### 46.5 RLS Behaviour
+
+Migration 0087 introduces the first table in the enterprise data model with **no tenant-role read access**. Unlike `enterprise_contracts` (§16) or `enterprise_churn_events` (§44), `litigation_hold_records` is a FORM-internal compliance instrument — tenant administrators have no visibility into whether or how a hold is active.
+
+| Role | Policy | Notes |
+|---|---|---|
+| `form_admin` | SELECT + INSERT + UPDATE + DELETE (all) | Admin Console + PAM-elevated compliance-officer sessions. INSERT/DELETE restricted to form_admin (not compliance_officer) to ensure all hold creation/deletion goes through the Admin Console workflow with PAM audit trail. |
+| `compliance_officer` | SELECT + UPDATE | Can read all hold records and update status-transition fields (status, release_date, release_reason, deletion_target_date, deletion_completed_date, release_event_id, updated_at). Cannot INSERT or DELETE — those paths go through the Admin Console as `form_admin`. |
+| `form_system` | SELECT | pg_cron job 45 (`litigation_hold_compliance_monitor`) reads the table for monitoring sweeps. No write access. |
+| `tenant_admin` | No policy | Access denied by RLS default (no policy = no access). |
+| `tenant_owner` | No policy | Access denied by RLS default. |
+| `tenant_manager` (HR) | No policy | Access denied by RLS default. This is the privacy floor — HR has no visibility into litigation hold status, reason, or held data categories for their own tenant. |
+| `form_api` | REVOKED | Not an oversight — explicitly revoked to prevent any API-path access to litigation hold data. |
+
+**DDL auditor proof queries:**
+
+```sql
+-- 1. Verify form_api is REVOKED
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_name = 'litigation_hold_records'
+  AND grantee = 'form_api';
+-- Expected: 0 rows
+
+-- 2. Verify tenant_manager has no RLS policy
+SELECT policyname, roles, cmd
+FROM pg_policies
+WHERE tablename = 'litigation_hold_records'
+  AND 'tenant_manager' = ANY(roles);
+-- Expected: 0 rows
+
+-- 3. Verify RLS is enabled
+SELECT relname, relrowsecurity
+FROM pg_class
+WHERE relname = 'litigation_hold_records';
+-- Expected: relrowsecurity = true
+
+-- 4. Verify compliance_officer cannot INSERT (must use form_admin path)
+SET ROLE compliance_officer;
+INSERT INTO litigation_hold_records (tenant_id, hold_reason_category, held_data_categories,
+  outside_counsel_ref, compliance_officer_id, activation_date, target_review_date,
+  max_expiry_date, status)
+VALUES (gen_random_uuid(), 'billing_dispute', ARRAY['billing_records']::TEXT[],
+  'ref-test', gen_random_uuid(), CURRENT_DATE, CURRENT_DATE + 182, CURRENT_DATE + 1095, 'declared');
+-- Expected: ERROR: permission denied (INSERT not granted to compliance_officer policy)
+ROLLBACK;
+
+-- 5. Verify form_system can SELECT
+SET ROLE form_system;
+SELECT COUNT(*) FROM litigation_hold_records WHERE status = 'declared';
+-- Expected: integer result, no permission error
+```
+
+---
+
+### 46.6 Health Data Exclusion Invariant
+
+The `lhr_held_data_categories_valid` CHECK constraint is the DDL-layer implementation of the DEC-036 zero-grace-period invariant applied to litigation holds. DEC-036 states: *GDPR Art. 9 health data deletion is never delayed, deferred, or suspended under any circumstance — including a litigation hold under MSA §11.6.* The constraint achieves this by limiting `held_data_categories` to a closed set of four non-health categories:
+
+```
+ARRAY['billing_records', 'contract_records', 'audit_log_entries', 'sla_performance_data']
+```
+
+The `@<` operator (`is contained by`) enforces subset membership at the Postgres layer: every element of `held_data_categories` must appear in the permitted set. If an application bug, Admin Console regression, or direct SQL injection attempt inserts `'health_records'`, `'user_health_data'`, `'coaching_content'`, `'biometric_data'`, or any other value not in the permitted four, the INSERT is rejected with a CHECK constraint violation before the row is written. This is unconditional — there is no `IF` clause, no bypass parameter, and no role exception.
+
+**Why DDL, not application logic:**
+
+- Application-layer guards (Admin Console validation, Worker Zod schema) are necessary but not sufficient. A misconfigured release, a direct-to-DB admin action, or a future code regression could bypass application-layer guards. The DDL CHECK is the fail-closed backstop.
+- GDPR Art. 9 special category data carries the highest regulatory risk in the FORM data model (§5). A litigation hold applied to health data would constitute a GDPR Art. 17(3)(e) misuse — that provision permits retention only of non-special-category data for legal claim defence. DDL enforcement is proportionate to the severity.
+- The DEC-030 `enterprise.litigation_hold_declared` event Zod schema (AUDIT_LOG_SCHEMA.md) enforces the same restriction at event emission time. Both layers must be consistent; the DDL CHECK is the authoritative backstop if the Zod schema is ever incorrectly extended.
+
+**GDPR Art. 9 data continues on its standard lifecycle regardless of hold status:**
+
+`enterprise_churn_events.deletion_requested_at` and the standard §12.2/§12.3 deletion pipeline for Art. 9 data are not affected by rows in `litigation_hold_records`. When a hold is declared, the compliance-officer must explicitly exclude health data from `held_data_categories` — the DDL forces this — and confirm in the Admin Console that the Art. 9 deletion pipeline has not been altered. The `lhr_held_data_categories_valid` constraint makes a "compliant hold that accidentally includes health data" structurally impossible.
+
+---
+
+### 46.7 SOC 2 Evidence Cross-References
+
+Three SOC 2 Trust Service Criteria are served by `litigation_hold_records`:
+
+**CC5.3 (Control Activities — Implemented at Multiple Levels)**
+
+The litigation hold control is implemented at three independent levels: (1) Admin Console PAM session requirement (process control), (2) DEC-030 HMAC-chained event pair (audit trail control), and (3) `litigation_hold_records` DDL CHECKs (structural data-layer control). CC5.3 auditors can verify the structural layer by examining the `lhr_held_data_categories_valid`, `lhr_max_expiry_equals_36_months`, and `lhr_release_fields_complete` constraints in `pg_constraint` — independent of application code.
+
+**C1.2 (Confidential Information Protected Through Disposal)**
+
+`litigation_hold_records` provides the operational evidence that held non-health data was disposed of within 10 business days of hold release. The `deletion_completed_date` column, combined with `release_date`, gives auditors a computable `(deletion_completed_date - release_date)` duration for each hold. Auditors can verify no row shows a duration > 14 calendar days (the outer bound for 10 business days including weekends). This is the DDL-layer anchor for LITH-E-001.
+
+**CC4.1 (Monitoring — Evaluate Compliance)**
+
+The three monitoring indexes (`litigation_hold_records_review_sweep_idx`, `litigation_hold_records_expiry_sweep_idx`, `litigation_hold_records_deletion_deadline_idx`) exist to support pg_cron job 45 automated sweeps. Their existence in production is auditor-verifiable evidence that FORM has implemented programmatic monitoring of hold compliance — not just a human-process obligation. Companion evidence artefact: LITH-OBS-E-001 (OBSERVABILITY §54 — pending).
+
+**New evidence artefact: LITH-E-001 — Annual Litigation Hold Compliance Report**
+
+| Attribute | Value |
+|---|---|
+| Artefact ID | LITH-E-001 |
+| Path | `compliance/evidence/litigation-hold/LITH-E-001_<YYYY>.md` |
+| Cadence | Annual |
+| Retention | 7 years (matches DEC-030 event retention for `enterprise.litigation_hold_declared` HIGH/7yr) |
+| SOC 2 criteria | C1.2 (disposal), CC5.3 (structural controls), CC4.1 (monitoring) |
+| Content | (1) Count of holds declared in the year: `hold_reason_category` distribution, `held_data_categories` distribution (categorical, no tenant names). (2) For each hold released in the year: `tenant_id` UUID only; days between `activation_date` and `release_date`; `release_reason`; days between `release_date` and `deletion_completed_date` (target ≤ 10 business days); any AL-LITH-03 activation (deletion deadline breach detection). (3) Any holds that crossed `target_review_date` without re-confirmation: count and days overdue; any AL-LITH-01 activations. (4) Any hold that approached `max_expiry_date` (within 30 days): count; any AL-LITH-02 activations. (5) pg_cron job 45 run statistics for the year: total runs, freshness-window breaches. |
+| Privacy invariant | `tenant_id` UUID only — no tenant company name, individual employee `user_id`, name, email, health value, or GDPR Art. 9 data. |
+| Owner | compliance-officer |
+| Register in | SOC2_READINESS §79.4 master consolidated evidence table + compliance/evidence/litigation-hold/ R2 subfolder (§46.8 item 4) + §80.4 Vanta mirror list |
+
+**CC5.3 auditor narrative:** CC5.3 requires FORM to implement controls at multiple levels. The `lhr_held_data_categories_valid` DDL CHECK ensures that no row — regardless of application code — can record a hold covering GDPR Art. 9 health data. The auditor can verify this at the database layer by inspecting `pg_constraint` for `litigation_hold_records` and confirming the `@<` operator limits `held_data_categories` to the four non-health categories. This structural control operates independently of the Admin Console, the Zod schema, and the DEC-030 event emitter — satisfying the "multiple levels" requirement.
+
+**C1.2 auditor narrative:** C1.2 requires FORM to protect confidential information through disposal according to its policies. `deletion_completed_date` provides a computable, per-hold record that held non-health data was disposed of within 10 business days of hold release. LITH-E-001 aggregates this for the observation year without exposing individual employee data.
+
+---
+
+### 46.8 Implementation Checklist
+
+#### P0 — Before first MSA execution (prerequisite established in DEC-080)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0087_litigation_hold_records.sql` after confirming all nine staging validation checks from §46.3.2 pass: (a) all columns present; (b) health data exclusion rejects invalid category; (c) valid categories accepted; (d) max expiry CHECK rejects wrong date; (e) release fields coherence enforced; (f) UNIQUE constraint on (tenant_id, activation_date); (g) form_api REVOKE confirmed; (h) tenant_manager no-policy confirmed; (i) form_system SELECT confirmed. Retain staging output at `compliance/evidence/litigation-hold/migration-0087-validation_<YYYY-MM-DD>.txt`. | platform-engineer + enterprise-architect | **P0** | M5 | [ ] |
+| 2 | Implement Admin Console "Litigation Hold" workflow: PAM-elevated session gate; form fields for `hold_reason_category`, `held_data_categories` (checkboxes — health categories hidden, not greyed), `outside_counsel_ref` (required); emit `enterprise.litigation_hold_declared` DEC-030 event + INSERT into `litigation_hold_records` (form_admin role) atomically in the same Worker transaction; confirm HTTP 200 from `emit-audit-event` before returning success. Also implement "Release Hold" and "Certify Deletion" sub-flows that UPDATE `status`, `release_date`, `release_reason`, `deletion_target_date`, `deletion_completed_date` and emit corresponding DEC-030 events. | enterprise-architect + platform-engineer | **P0** | M5 | [ ] |
+
+#### P1 — Before SOC 2 observation period
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Author `docs/OBSERVABILITY.md §54` — Litigation Hold Compliance Observability: three SLOs (LITH-SLO-01: 6-month review not overdue; LITH-SLO-02: 36-month max duration not breached; LITH-SLO-03: post-release deletion not overdue); three alert rules (AL-LITH-01/02/03); pg_cron job 45 `litigation_hold_compliance_monitor` spec (schedule `0 0 * * *` or `0 8 * * *` — daily sweep; SELECT from `litigation_hold_records` with the three monitoring indexes; pg_net emit per detected condition; all-clear LOW/1yr event); DEC-030 monitoring events; LITH-OBS-E-001 evidence artefact; §6.2 integration. | compliance-officer + devops-lead | **P1** | M6 | [ ] |
+| 4 | Create R2 subfolder `compliance/evidence/litigation-hold/` and register LITH-E-001 artefact path in `docs/SOC2_READINESS.md §79.4` master consolidated evidence table + §80.4 Vanta mirror list. Confirm subfolder is in the EU-region R2 bucket routing policy (DATA_MODEL §36 — GDPR Art. 46 Standard Contractual Clauses compliance for EU enterprise tenants). | compliance-officer | **P1** | M6 | [ ] |
+
+#### P2 — Before first litigation hold is actually declared
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | End-to-end staging test: (a) INSERT a `litigation_hold_records` row with `status = 'declared'` and `target_review_date = CURRENT_DATE - 7` (simulating overdue review); confirm job 45 AL-LITH-01 fires within 24h of its next run; confirm `enterprise.litigation_hold_review_overdue` DEC-030 event emitted. (b) UPDATE `target_review_date` to future date; confirm alert auto-resolves on next run. (c) Test deletion deadline breach: UPDATE a row to `status = 'released'`, `deletion_target_date = CURRENT_DATE - 2`; confirm AL-LITH-03 fires. | devops-lead | **P2** | M7 | [ ] |
+
+---
+
+### 46.9 Cross-Reference Obligations Created by §46
+
+| Obligation | Source | Status |
+|---|---|--------|
+| `docs/OBSERVABILITY.md §54` — Litigation Hold Compliance Observability (pg_cron job 45, LITH-SLO-01/02/03, AL-LITH-01/02/03, LITH-OBS-E-001) | §46.8 item 3 (P1, M6) | 🟡 **Pending — §46.8 item 3 not yet authored. `litigation_hold_records` table is the DDL prerequisite for §54 monitoring queries. §54 must be authored before SOC 2 observation period begins.** |
+| `docs/SOC2_READINESS.md §79.4` — register LITH-E-001 evidence artefact | §46.8 item 4 (P1, M6) | 🟡 **Pending — §46.8 item 4.** |
+| Admin Console "Litigation Hold" workflow (PAM-gated; form_admin INSERT path + DEC-030 emission) | §46.8 item 2 (P0, M5) | 🟡 **Pending — §46.8 item 2. Must be implemented before first MSA execution.** |
+| `compliance/evidence/litigation-hold/migration-0087-validation_<YYYY-MM-DD>.txt` — staging output retention | §46.3.2 / §46.8 item 1 | 🟡 **Pending — §46.8 item 1 (migration not yet applied).** |
+
+---
+
+*v1.31 (2026-06-25): §46 `litigation_hold_records` Schema — Migration 0087. Closes the schema gap created by DEC-080 (2026-06-23, OQ-WIN-04 resolution): DEC-080 registered `enterprise.litigation_hold_declared` (HIGH/7yr) and `enterprise.litigation_hold_released` (HIGH/7yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn` and established MSA §11.6 (Litigation Hold and Legal Claim Retention), but no Postgres table was specified to track the lifecycle state of active and released holds — leaving three operational gaps: (1) no automated 6-month review monitoring (MSA §11.6.3 `target_review_date` obligation); (2) no automated 36-month maximum enforcement signal (MSA §11.6.4 cap); (3) no post-release deletion deadline tracking (MSA §11.6.6 10-business-day obligation). §46 closes all three gaps via the new `litigation_hold_records` table as the DDL-layer foundation for `docs/OBSERVABILITY.md §54` (pg_cron job 45, pending obligation — §46.8 item 3). §46.1 purpose + four design principles: (1) one row per hold per activation date (UNIQUE constraint); (2) health data exclusion is a DDL invariant (`lhr_held_data_categories_valid` CHECK enforcing `held_data_categories <@ ARRAY['billing_records','contract_records','audit_log_entries','sla_performance_data']::TEXT[]` — structural impossibility of including Art. 9 health data, implements DEC-036 zero-grace-period at schema layer); (3) max duration split between DDL (retrospective `lhr_release_date_within_max_duration` CHECK) and monitoring (prospective job 45 AL-LITH-02); (4) form_api REVOKED, all tenant roles excluded, compliance_officer SELECT+UPDATE only, form_system SELECT (pg_cron). §46.2 migration dependency chain: 0083 → 0084 → 0085 → 0086 → 0087; tenant(id) FK ON DELETE RESTRICT; no hard FK to enterprise_contracts (active-tenant holds must be possible). §46.3.1 full DDL: two ENUMs (`litigation_hold_status_enum`: declared/released/deletion_completed; `hold_reason_category_enum`: billing_dispute/legal_claim/regulatory_direction/anticipated_litigation; `hold_release_reason_enum`: 5 values); CREATE TABLE with 18 columns; six CHECK constraints (`lhr_held_data_categories_valid` health exclusion, `lhr_review_date_after_activation`, `lhr_max_expiry_equals_36_months`, `lhr_release_date_within_max_duration`, `lhr_release_fields_complete`, `lhr_deletion_completed_requires_release`); five indexes (UNIQUE on tenant_id+activation_date; partial on status; covering on target_review_date/tenant_id WHERE declared; covering on max_expiry_date/tenant_id WHERE declared; covering on deletion_target_date/tenant_id WHERE released); five RLS policies (form_admin ALL; compliance_officer SELECT + UPDATE; form_system SELECT; REVOKE form_api); COMMENT on table. §46.3.2 nine-item staging validation checklist (columns present; health exclusion CHECK; valid categories accepted; max expiry CHECK; release fields coherence; UNIQUE constraint; form_api REVOKE; tenant_manager no-policy; form_system SELECT). §46.4 full column semantics table: 18 columns with type, nullability, default, semantics; enum value meanings for `litigation_hold_status_enum` + §12.3 deletion timeline impact. §46.5 RLS: seven-role policy table; note that this is the first enterprise table with NO tenant-role read access (litigation holds are FORM-internal instruments); five DDL auditor proof queries (form_api REVOKE; tenant_manager no-policy; RLS enabled; compliance_officer cannot INSERT; form_system can SELECT). §46.6 health data exclusion invariant: why DDL not application logic (three reasons — application bypass risk; GDPR Art. 9 severity; Zod + DDL must be consistent); how Art. 9 data continues on standard §12.2/§12.3 lifecycle regardless of hold status. §46.7 SOC 2 evidence: CC5.3 (multiple-level structural controls — `pg_constraint` verifiable); C1.2 (disposal — `deletion_completed_date` computable duration); CC4.1 (monitoring — three dedicated indexes for job 45 sweeps); LITH-E-001 new evidence artefact (annual, 7yr, compliance/evidence/litigation-hold/, C1.2/CC5.3/CC4.1; content: hold count by reason/category, per-hold disposal duration, review overdue count, max-duration approach count, job 45 run stats; privacy: tenant_id UUID only). §46.8 implementation checklist: 2× P0/M5 (migration 0087 apply + nine staging checks; Admin Console PAM-gated Litigation Hold / Release Hold / Certify Deletion workflows + DEC-030 emission); 2× P1/M6 (OBSERVABILITY §54 authorship; SOC2_READINESS §79.4 LITH-E-001 registration + R2 subfolder + Vanta); 1× P2/M7 (end-to-end staging test: review-overdue AL-LITH-01, deletion-deadline-breach AL-LITH-03). §46.9 four cross-reference obligations created: OBSERVABILITY §54 🟡 pending (§46.8 item 3, P1/M6 — DDL prerequisite met by this section); SOC2_READINESS §79.4 LITH-E-001 🟡 pending (§46.8 item 4); Admin Console Litigation Hold workflow 🟡 pending (§46.8 item 2); migration-0087 staging output 🟡 pending (§46.8 item 1). TOC updated (§46 added). Document header v1.30 → v1.31. Cross-references: `docs/DECISION_LOG.md §DEC-080` (OQ-WIN-04 resolution, 2026-06-23 — authoritative decision record); `docs/COST_MODEL.md §43.11 OQ-WIN-04` (origin open question, now 🟢 Resolved via DEC-080); `docs/MSA_TEMPLATE.md §11.6` (authoritative litigation hold legal procedure: activation requirements, scope limitations, 5-business-day notice, 36-month cap, 6-month review, 10-business-day post-release deletion, deletion certificate); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn` (`enterprise.litigation_hold_declared` HIGH/7yr + `enterprise.litigation_hold_released` HIGH/7yr — payload schemas that feed this table's columns); `docs/DATA_MODEL.md §12` (GDPR Art. 17 deletion timeline — §12.3 is suspended for held data categories by an active hold); `docs/DATA_MODEL.md §44` (migration 0085 — `enterprise_churn_events`, lifecycle table intersecting with hold activation on churned tenants); `docs/OBSERVABILITY.md §54` (companion monitoring section — pg_cron job 45, SLOs, alert rules; pending §46.8 item 3); DEC-036 (GDPR Art. 9 zero-grace-period invariant — health data exclusion basis). Owner: compliance-officer + enterprise-architect + security-engineer.*

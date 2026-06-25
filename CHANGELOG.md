@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.79.1] — 2026-06-25
+
+### Added
+- `docs/DATA_MODEL.md §46` — `litigation_hold_records` Schema · Migration 0087. Closes the DDL gap from DEC-080 (2026-06-23, OQ-WIN-04): the litigation hold procedure (MSA §11.6) and two DEC-030 events (`enterprise.litigation_hold_declared` HIGH/7yr, `enterprise.litigation_hold_released` HIGH/7yr) were registered without a Postgres state table to support automated compliance monitoring. §46 defines migration 0087: new table with three ENUMs (status: declared/released/deletion_completed; hold_reason_category: 4 values; hold_release_reason: 5 values); 18 columns including `held_data_categories TEXT[]`, `target_review_date`, `max_expiry_date`, `deletion_target_date`, `deletion_completed_date`; six CHECK constraints — `lhr_held_data_categories_valid` structurally excludes GDPR Art. 9 health data via `@<` operator (implements DEC-036 zero-grace invariant at DDL layer), `lhr_max_expiry_equals_36_months` (MSA §11.6.4 cap), `lhr_release_date_within_max_duration`, `lhr_release_fields_complete`, `lhr_deletion_completed_requires_release`; five indexes including three covering indexes for pg_cron job 45 monitoring sweeps (review overdue, max-duration approach, post-release deletion deadline); RLS: form_admin ALL, compliance_officer SELECT+UPDATE, form_system SELECT, form_api REVOKED, no tenant role access. New evidence artefact LITH-E-001 (annual, 7yr, C1.2/CC5.3/CC4.1). Cross-reference obligation: OBSERVABILITY §54 (pg_cron job 45, LITH-SLO-01/02/03, AL-LITH-01/02/03) pending as §46.8 item 3.
+
+### Changed
+- `VERSION` — 8.79.0 → 8.79.1.
+- `docs/DATA_MODEL.md` — v1.30 → v1.31; TOC updated (§46 added).
+
 ## [8.79.0] — 2026-06-25
 
 ### Added
