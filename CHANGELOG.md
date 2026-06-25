@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.48.1] — 2026-06-25
+
+### Changed
+- `docs/SOC2_READINESS.md §104` — Cross-Reference Patch: INCIDENT_RESPONSE R-41 (`deletion_sla_monitor` job 43 · DEL-MON-E-001 CC7.2 Extension · C1.2 / CC4.1 / CC7.2). Closes the CC7.2 criterion gap in the DEL-MON-E-001 §79.4 registration (v8.45.0, 2026-06-25 registered C1.2/CC4.1 only; INCIDENT_RESPONSE R-41.9 maps CC7.2 via `pg-cron-health-monitor` §12.7 detection + DEC-030 detection-to-restoration timeline + HMAC-VERIFY-ALGO-001). §104.2 full artefact table with auditor narratives for all three criteria. §104.3 criteria mapping: CC7.2 added. §104.4 §79.4 row amendment: `C1/CC4 | C1.2/CC4.1` → `C1/CC4/CC7 | C1.2/CC4.1/CC7.2`. §104.5 cross-reference obligations closed (CC7.2 gap 🟢; R-41.11 item 6 🟢). §104.6 one-item P1 checklist (M11 first quarterly filing). SOC2_READINESS v3.28.0 → v3.29.0.
+- `docs/INCIDENT_RESPONSE.md R-41` — R-41.10 §104 cross-reference row added. R-41.11 item 6 added [x] Done (SOC2_READINESS §104 v3.29.0). Footer v1.0 → v1.1. Document header v3.5 → v3.6.
+- `VERSION` — 8.48.0 → 8.48.1.
+
+---
+
 ## [8.48.0] — 2026-06-25
 
 ### Added
