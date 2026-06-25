@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.60.0] — 2026-06-25
+
+### Added
+- `content/post-44-training-age-identity.md` — Editorial series post 44. «Тренувальний вік: ким ти є як атлет — насправді». Тренувальний вік як функціональна змінна (Zatsiorsky & Kraemer 1995/2006): рівень накопиченої структурної адаптації і здатність тіла відповідати на прогресуючий стимул. Три рівні (beginner/intermediate/advanced) з операційними маркерами розпізнавання: реакція на лінійну прогресію, швидкість прогресії, відновлення між сесіями, технічна стабільність під навантаженням, здатність до авторегуляції (Zourdos et al. 2016). Пастка «просунутого початківця»: термінологічна грамотність без відповідного адаптивного базису. Нейром'язова адаптація у початківців — Sale (1988): 20–40% сили за 6–8 тижнів без структурних змін. Meeusen et al. (2013) ECSS/ACSM: механізм overreaching при невідповідності стимулу рівню адаптованості. Hubal et al. (2005): варіабельність відгуку -2% → +59% в однорідній групі. Schoenfeld, Ogborn & Krieger (2016): частота vs. об'єм і залежність від рівня. Halson (2014): деловантаження як рівнезалежна змінна. Практичний 3-крок для чесної оцінки рівня + зв'язок з програмною логікою FORM/Victor. clinical-safety: PASS. sports-scientist review pending. Blog card date updated.
+- `README.md` — Editorial series header updated: 11–42 → 11–44 drafted. Post-44 → draft · v8.60.0. Editorial series 2476–2485 (Рішення self-coached атлета: коли і як змінювати курс) proposed.
+
+### Changed
+- `STATUS.md` — post-44 written noted in content library row 11–50.
+- `blog.html` — post-44 card date updated 2026-06-15 → 2026-06-25.
+- `VERSION` — 8.59.0 → 8.60.0.
+
+---
+
 ## [8.59.0] — 2026-06-25
 
 ### Added
