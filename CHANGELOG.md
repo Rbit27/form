@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.84.1] — 2026-06-25
+
+### Added
+- `docs/INCIDENT_RESPONSE.md R-46` — Pricing Exception Compliance Monitor Stale (`pricing_exception_compliance_monitor` · job 46). Forty-sixth runbook. Closes `docs/OBSERVABILITY.md §55.10` item 6. Trigger: AL-PRICE-03 PagerDuty P1 `form-devops` → devops-lead; dedup `pricing-exception-check-stale` 26h; auto-resolves on `system.pricing_exception_check_passed`. Two escalation paths: §R-46.5 REENTRY-CHAIN-01 blind spot (P0 — manual `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr emission per violation preserving REENTRY-MONITOR-CHAIN-01 ordering invariant; corrective pricing review per COST_MODEL §44.7); §R-46.6 quarterly trigger miss (P1 — manual sweep 2 SQL + `system.pricing_exception_quarterly_audit_triggered` emission + audit initiation). Five scope queries (R-46-C1 staleness; R-46-C2 REENTRY-CHAIN-01 P0 gate; R-46-C3 quarterly trigger miss gate; R-46-C4 H4 peer discriminator; R-46-C5 H1 job registration). Four root cause hypotheses H1–H4. Six-step recovery procedure. Two DEC-030 HMAC-chained events: `system.pricing_exception_monitor_stale_declared` HIGH/7yr + `system.pricing_exception_monitor_restored` STANDARD/3yr; PRICING-MONITOR-STALE-CHAIN-01 ordering invariant (HTTP 422 `PRICING_MONITOR_STALE_CHAIN_01_VIOLATION` on breach → R-05). SOC 2: CC5.2 (REENTRY-CHAIN-01 monitoring blind spot coverage; `reentry_violations_found_during_stale = 0` attestation); CC1.4 (pricing exception approval control completeness; §R-46.5 compensating control); CC4.1 (quarterly audit trigger COST_MODEL §44.7; `quarterly_trigger_manually_fired` attestation); CC7.1/CC7.2. Privacy floor: both DEC-030 event payloads carry integer counts, booleans, and timestamps only — no `tenant_id`, employee PII, or GDPR Art. 9 data. PRICE-STALE-E-001 annual evidence artefact defined (§R-46.13 item 4, pending). Four-item implementation checklist (items 1–2 pending P0/M9; item 3 `[x] Done — this commit`; item 4 pending P1/M11). Three Slack communication templates.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.10 → v3.11. R-46 appended (forty-sixth runbook).
+- `docs/OBSERVABILITY.md` — v5.2.3 → v5.2.4. §6.2 AL-PRICE-03 stale-consequence cross-ref updated to `INCIDENT_RESPONSE R-46 (§R-46.5/R-46.6; v1.0, 2026-06-25)` (was "to be authored"). §12.6 job 46 stale-consequence cross-ref updated to same. §55.10 item 6 marked `[x] Done — 2026-06-25 (INCIDENT_RESPONSE.md v3.11, this commit)`. v5.2.4 patch note added.
+- `VERSION` — 8.84.0 → 8.84.1.
+
 ## [8.84.0] — 2026-06-25
 
 ### Added

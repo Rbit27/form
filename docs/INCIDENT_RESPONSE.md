@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.10
+# FORM · Incident Response Runbook v3.11
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -16876,6 +16876,470 @@ LitigationHoldMonitorRestoredPayload: z.object({
 *v1.1 (2026-06-25): R-45.14 item 4 closed. LITH-STALE-E-001 registered in `docs/SOC2_READINESS.md §79.4` (§113 v3.38.0, 2026-06-25). Compliance-officer decision: separate quarterly stale-activation artefact warranted beyond LITH-OBS-E-001 (annual); quarterly cadence captures per-incident `max_duration_breach_count_at_declared` as CC5.3 auditor-inspectable evidence for MSA §11.6.4 36-month cap monitoring. Document header v3.9 → v3.10.*
 
 *v1.0 (2026-06-25): R-45 Litigation Hold Compliance Monitor Stale — forty-fifth runbook. Closes `docs/OBSERVABILITY.md §54.10` item 6 (P1/M7 — author R-45 stale recovery runbook). Job 45 `litigation_hold_compliance_monitor` (`0 8 * * *`, 26h freshness window) was registered in §12.6 (v1.8 patch, 2026-06-25) and §54 (v5.2.0, 2026-06-25) as the authoritative spec for LITH-SLO-01/02/03 monitoring, but the stale-recovery runbook was explicitly deferred as §54.10 item 6. Critical characteristic: job 45 staleness creates a simultaneous LITH-SLO-01/02/03 detection blind spot — unlike peer stale runbooks (R-41 for job 43 single deletion-SLA obligation; R-44 for job 44 single offboarding obligation), R-45 monitors three distinct MSA §11.6 obligations requiring three independent breach gates (R-45-C2a/C2b/C2c) and three escalation paths (§R-45.5/§R-45.6/§R-45.7). The LITH-SLO-02 max-duration breach (C2b positive) is the most critical: a hold past `max_expiry_date` is an unconditional MSA contractual breach requiring immediate P0, founder notification, CSM escalation, and legal determination of release-or-waiver. Privacy floor: `litigation_hold_records` carries `tenant_id` UUID (FORM-internal) only — no employee `user_id`, name, email, health value, or GDPR Art. 9 data in any R-45 event payload; both DEC-030 event payloads carry only integer counts, timestamps, and enum values (no `tenant_id`), consistent with `system.offboard_chain_check_passed` privacy pattern. Trigger: `system.cron_job_stale` with `job_name = 'litigation_hold_compliance_monitor'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-compliance` → compliance-officer; dedup `litigation-hold-monitor-stale`. H1–H4 root cause hypotheses follow R-44 pattern (H1: job deleted; H2: `form_system` permissions; H3: pg_net degraded; H4: Supabase outage → R-03). Five scope queries: R-45-C1 (pg_cron staleness confirmation — last 5 job 45 runs); R-45-C2a (LITH-SLO-01 review-overdue breach gate); R-45-C2b (LITH-SLO-02 max-duration breach gate — P0 trigger); R-45-C2c (LITH-SLO-03 deletion-overdue breach gate); R-45-C3 (peer job health — H4 discriminator ≥ 2 daily peers stale); R-45-C4 (job registration check — H1 discriminator). Six-step recovery: Step 1 (H1 — re-register + R-05 if unauthorized); Step 2 (H2 — restore `form_system` SELECT, confirm `form_api` REVOKED); Step 3 (H3 — Supabase support for pg_net); Step 4 (H4 — R-03 co-activation); Step 5 (active breach — execute §R-45.5/R-45.6/R-45.7 per C2a/C2b/C2c); Step 6 (manual run + all-clear confirm + emit `stale_restored` + resolve PagerDuty). Two DEC-030 HMAC-chained events: `system.litigation_hold_monitor_stale_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_hours` positive, `missed_runs` nonneg int, `trigger` enum, `initial_severity` enum P1|P0, three `_count_at_declared` nonneg ints); `system.litigation_hold_monitor_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `stale_window_hours` positive, six `_count_at_declared/_at_restored` nonneg ints); LITH-MONITOR-STALE-CHAIN-01: `restored` requires prior `declared` for same `incident_id`; HTTP 422 `LITH_MONITOR_STALE_CHAIN_01_VIOLATION` on breach → R-05. Three-escalation-path structure: §R-45.5 (LITH-SLO-01 review-overdue — manual emit `enterprise.litigation_hold_review_overdue` HIGH/7yr + stale-window note `review-overdue/r45-<id>/stale-window-note.md`); §R-45.6 (LITH-SLO-02 max-duration breach — P0 founder page + CSM notification + legal waiver-or-release + manual emit `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr + stale-window note `max-duration-breach/r45-<id>/stale-window-note.md`; DDL backstop `lhr_release_date_within_max_duration` enforces at release); §R-45.7 (LITH-SLO-03 deletion-overdue — manual deletion workflow initiation + `deletion_completed_date` population + manual emit `enterprise.litigation_hold_deletion_overdue` HIGH/7yr + stale-window note `deletion-overdue/r45-<id>/stale-window-note.md`). Evidence: R-45-C1 stale-window job run export (CC7.2, 3yr); three R-45-C2 scope outputs at declaration (CC5.3/C1.1/C1.2, 7yr); three R-45-C2 scope outputs at restoration (CC5.3/C1.1/C1.2/A1.1, 7yr); per-path stale-window notes (C1.1/C1.2/CC7.2, 7yr — only when breach confirmed); DEC-030 event pair chain-verifiable per HMAC-VERIFY-ALGO-001. SOC 2: CC5.3 (three-layer structural controls IC protocol for monitoring-layer failure; §R-45.5/R-45.6/R-45.7 compensating controls); C1.1 (MSA §11.6.4 36-month cap — `max_duration_breach_count_at_declared = 0` auditor-inspectable attestation); C1.2 (MSA §11.6.6 deletion + LITH-E-001 dual evidence path); CC7.1 (structured IC response to monitoring system failure); CC7.2 (`pg-cron-health-monitor` + HMAC chain tamper-evident timeline). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 45 entry updated — [x] Done this commit); `docs/OBSERVABILITY.md §54.4` (AL-LITH-01/02/03 runbook rows updated — [x] Done this commit); `docs/OBSERVABILITY.md §54.10` item 6 (closed — [x] Done this commit); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Litigation Hold Monitoring events` (two new R-45 events to register — §R-45.14 item 1, P0/M6); `docs/DATA_MODEL.md §46` (`litigation_hold_records` — three covering indexes; RLS `form_api` REVOKED; MSA §11.6 procedure; LITH-E-001 §46.7); `docs/MSA_TEMPLATE.md §11.6` (litigation hold lifecycle: 6-month review §11.6.3, 36-month cap §11.6.4, 10-business-day deletion §11.6.6); R-03 (H4 co-activation); R-05 (H1 unauthorized deletion co-activation; LITH-MONITOR-STALE-CHAIN-01 violation escalation); R-41 (GDPR Deletion SLA Monitor Stale — structural peer, single-obligation); R-44 (Offboard Chain Monitor Stale — structural peer, single-obligation). Owner: devops-lead + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-25 · Owner: devops-lead + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---
+
+## R-46: Pricing Exception Compliance Monitor Stale (`pricing_exception_compliance_monitor` · job 46)
+
+> **Trigger:** AL-PRICE-03 — `system.cron_job_stale` (HIGH/7yr) emitted by `pg-cron-health-monitor` (§12.7) with `job_name = 'pricing_exception_compliance_monitor'` when job 46 (`0 9 * * *`) exceeds its 26h freshness window. Alert routes to PagerDuty P1 `form-devops` → devops-lead; dedup key `pricing-exception-check-stale`; auto-resolves on `system.pricing_exception_check_passed` receipt.
+>
+> **Owner:** devops-lead (IC). **Escalation:** compliance-officer (T+5 min; must run R-46-C2 immediately). **P0 escalation:** founder + compliance-officer immediately on R-46-C2 confirming any REENTRY-CHAIN-01 violation during the stale window.
+>
+> **Compliance impact:** While stale, two monitoring obligations are at risk. (1) PRICE-SLO-01 monitoring gap: job 46 sweep 1 is the monitoring-layer verification of REENTRY-CHAIN-01 (REENTRY-MONITOR-CHAIN-01 invariant: `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr must emit before AL-PRICE-01 P0 fires). The `emit-audit-event` Worker's HTTP 422 write-path guard continues to reject out-of-order `enterprise.contract_renewed` events during the stale window, but cannot detect cases where a loyalty renewal was fraudulently or erroneously committed outside the Worker path. (2) PRICE-SLO-02 quarterly trigger: if the stale window overlaps the first 7 days of a quarter (Jan/Apr/Jul/Oct), the automated `system.pricing_exception_quarterly_audit_triggered` event will not fire, creating a COST_MODEL §44.7 audit-trigger gap.
+>
+> **PagerDuty:** P1 `form-devops` base (AL-PRICE-03); auto-resolves when next `system.pricing_exception_check_passed` event is received. Escalates to P0 immediately if R-46-C2 returns any REENTRY-CHAIN-01 violation row during the stale window — AL-PRICE-01 P0 `form-compliance` is then dispatched (REENTRY-MONITOR-CHAIN-01: `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr must receive HTTP 200 before AL-PRICE-01 fires). Manual PagerDuty resolution still required for the R-46 IC incident record even after auto-resolve.
+
+---
+
+### R-46.1 Trigger Matrix
+
+| Source | Signal | Threshold | PagerDuty |
+|---|---|---|---|
+| `pg-cron-health-monitor` (§12.7) | `system.cron_job_stale` with `job_name = 'pricing_exception_compliance_monitor'` | Job 46 exceeds 26h freshness window (1-run tolerance of daily cadence) | P1 `form-devops` → devops-lead; dedup `pricing-exception-check-stale`; auto-resolves |
+| Manual discovery by IC | R-46-C1 confirms no `cron.job_run_details` row for job 46 within 26h | Any | Open R-46 manually; emit `system.pricing_exception_monitor_stale_declared` HIGH/7yr immediately |
+
+---
+
+### R-46.2 Severity Classification
+
+| Condition | Severity | Escalation |
+|---|---|---|
+| Default (stale detected, R-46-C2 not yet run) | **P1** | devops-lead + compliance-officer |
+| R-46-C2 returns ≥ 1 REENTRY-CHAIN-01 violation during stale window | **P0** | Immediate: founder + compliance-officer; devops-lead continues job recovery in parallel |
+| R-46-C3 returns ≥ 1 quarter-start trigger window within stale window (PRICE-SLO-02 miss) | **P1+** | compliance-officer must manually fire quarterly audit trigger per §R-46.6 before job recovery |
+| Job 46 deleted/disabled without authorized maintenance record (H1) | **P0 co-activation** | security-engineer + R-05 activated in parallel |
+
+---
+
+### R-46.3 Immediate Actions (T+0 to T+30 min)
+
+**T+0 — IC receives PagerDuty P1 AL-PRICE-03 `form-devops`:**
+
+1. Acknowledge PagerDuty alert; assign incident to yourself.
+2. Notify compliance-officer immediately — they must run R-46-C2 and R-46-C3 in parallel with your job diagnosis.
+3. Emit `system.pricing_exception_monitor_stale_declared` HIGH/7yr (see §R-46.9) with `trigger = 'pagerduty_alert'`.
+4. Open Linear ticket tagged `[R-46]` and record `incident_id` (UUID from step 3 event).
+
+**T+0 — Run R-46-C1 (pg_cron staleness confirmation):**
+
+```sql
+SELECT
+  jobname,
+  status,
+  return_message,
+  start_time,
+  end_time,
+  EXTRACT(EPOCH FROM (NOW() - end_time)) / 3600 AS hours_since_last_run
+FROM cron.job_run_details
+WHERE jobname = 'pricing_exception_compliance_monitor'
+ORDER BY start_time DESC
+LIMIT 5;
+```
+
+**R-46-C1 pass condition:** At least one row with `status = 'succeeded'` within the last 26 hours. Record the `end_time` of the most recent successful run as `<confirmed_stale_since>` for use in R-46-C2 and R-46-C3.
+
+**T+5 — Run R-46-C2 (REENTRY-CHAIN-01 violations during stale window — CRITICAL P0 gate):**
+
+Substitute `<confirmed_stale_since>` with the ISO 8601 UTC timestamp from R-46-C1:
+
+```sql
+WITH loyalty_renewals AS (
+  SELECT
+    id                                        AS renewed_event_id,
+    (payload->>'tenant_id')::uuid             AS tenant_id,
+    (payload->>'renewal_date')::date          AS renewal_date,
+    created_at                                AS renewed_at
+  FROM audit_log_events
+  WHERE event_type  = 'enterprise.contract_renewed'
+    AND payload->>'contract_discount_type' = 'loyalty_reentry'
+    AND created_at > '<confirmed_stale_since>'::timestamptz
+)
+SELECT lr.renewed_event_id, lr.tenant_id, lr.renewal_date, lr.renewed_at
+FROM   loyalty_renewals lr
+WHERE  NOT EXISTS (
+  SELECT 1
+  FROM   audit_log_events ex
+  WHERE  ex.event_type                    = 'enterprise.pricing_exception_approved'
+    AND  ex.payload->>'exception_type'    = 'loyalty_reentry'
+    AND  (ex.payload->>'tenant_id')::uuid = lr.tenant_id
+    AND  ex.created_at BETWEEN lr.renewed_at - INTERVAL '30 days'
+                           AND lr.renewed_at
+);
+```
+
+**R-46-C2 pass condition:** Zero rows returned. **If any row is returned: immediately escalate to P0 — page founder + compliance-officer. Execute §R-46.5. Do not wait for root cause resolution.**
+
+**T+10 — Run R-46-C3 (quarterly trigger miss gate — PRICE-SLO-02):**
+
+Substitute `<confirmed_stale_since>` with the timestamp from R-46-C1:
+
+```sql
+SELECT
+  gs::date                                                           AS day_in_stale_window,
+  DATE_TRUNC('quarter', gs::date)                                    AS quarter_start,
+  DATE_TRUNC('quarter', gs::date) + INTERVAL '6 days 23:59:59'      AS trigger_window_end,
+  TO_CHAR(DATE_TRUNC('quarter', gs::date - INTERVAL '1 day'), 'YYYY')
+    || '-Q' || CEIL(EXTRACT(MONTH FROM DATE_TRUNC('quarter', gs::date - INTERVAL '1 day'))::numeric / 3)
+                                                                     AS prior_quarter_label
+FROM GENERATE_SERIES(
+  '<confirmed_stale_since>'::timestamptz::date,
+  NOW()::date,
+  INTERVAL '1 day'
+) gs
+WHERE EXTRACT(MONTH FROM gs::date) IN (1, 4, 7, 10)
+  AND EXTRACT(DAY  FROM gs::date) BETWEEN 1 AND 7;
+```
+
+**R-46-C3 pass condition:** Zero rows returned (no quarter-start trigger window overlaps the stale window). **If any row is returned: execute §R-46.6 before completing job recovery.**
+
+**T+15 — Run R-46-C4 (peer job health — H4 discriminator):**
+
+```sql
+SELECT
+  jobname,
+  status,
+  end_time,
+  EXTRACT(EPOCH FROM (NOW() - end_time)) / 3600 AS hours_since_last_run
+FROM cron.job_run_details
+WHERE jobname IN (
+  'workout_data_purge',                      -- job 26, daily 02:00 UTC
+  'audit_log_retention_purge',               -- job 27, monthly
+  'backup_age_monitor',                      -- job 29, every 4h
+  'litigation_hold_compliance_monitor'       -- job 45, daily 08:00 UTC
+)
+AND start_time > NOW() - INTERVAL '30 hours'
+ORDER BY jobname, start_time DESC;
+```
+
+**H4 confirmed:** ≥ 2 peer daily jobs also stale → shared pg_cron or Supabase failure → activate R-03 in parallel.
+
+**T+20 — Run R-46-C5 (job registration check — H1 discriminator):**
+
+```sql
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'pricing_exception_compliance_monitor';
+```
+
+**H1 confirmed:** No row returned, or `active = false`. If deletion occurred without an authorized maintenance window record, activate R-05 in parallel.
+
+**T+25 — P0 decision gate:** If R-46-C2 returned any violation row: page founder now. If R-46-C3 returned any trigger-window row: confirm compliance-officer is executing §R-46.6.
+
+---
+
+### R-46.4 Root Cause Hypotheses
+
+| # | Hypothesis | Discriminator |
+|---|---|---|
+| **H1** | Job 46 deleted or disabled (unauthorized actor or unannounced maintenance) | R-46-C5 returns no row in `cron.job`; or `active = false` |
+| **H2** | `audit_log_events` query failure — `form_system` permission revoked or schema change | `return_message` in R-46-C1 shows `permission denied` or column mismatch error |
+| **H3** | pg_net degraded — job ran but DEC-030 emit or PagerDuty call silently failed | R-46-C1 shows `status = 'succeeded'` but no `system.pricing_exception_check_passed` or `enterprise.reentry_chain_integrity_violation` DEC-030 events in `audit_log_events` within the stale window |
+| **H4** | Supabase platform outage — pg_cron scheduler unreachable | R-46-C4 shows ≥ 2 peer daily jobs also stale; Supabase status page confirms incident |
+
+---
+
+### R-46.5 REENTRY-CHAIN-01 Blind Spot Escalation Path (PRICE-SLO-01 Monitoring Gap During Stale Window)
+
+**Activated when:** R-46-C2 returns ≥ 1 row (loyalty renewal during stale window lacks prior `enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'`).
+
+**Severity:** P0 immediately. Page founder + compliance-officer. devops-lead continues job 46 recovery in parallel.
+
+1. For each `renewed_event_id` returned by R-46-C2: emit `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr via the `emit-audit-event` Worker (Admin Console PAM session). **REENTRY-MONITOR-CHAIN-01 invariant:** this event must receive HTTP 200 before AL-PRICE-01 P0 is dispatched. Do not proceed to step 2 until HTTP 200 is confirmed for each violation.
+
+2. After HTTP 200 confirmed for all violation events: AL-PRICE-01 PagerDuty P0 (`form-compliance`) dispatches automatically (OBSERVABILITY §55.4). If AL-PRICE-01 does not fire within 5 minutes, manually escalate to devops-lead + Cloudflare Worker on-call to confirm `emit-audit-event` → PagerDuty routing is functioning.
+
+3. Compliance-officer and enterprise-architect jointly review each `(renewed_event_id, tenant_id, renewal_date)` returned by R-46-C2:
+   - Confirm whether a `enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'` genuinely does not exist within 30 days prior (stale-window violation) or was emitted but not captured by the sweep (timing edge case).
+   - For genuine violations: initiate corrective pricing review per COST_MODEL §44.7 (quarterly pricing exception audit, compliance-officer-led).
+   - Document per-violation disposition in the stale-window exception note.
+
+4. File stale-window exception note at `compliance/evidence/pricing-exceptions/reentry-chain-stale/r46-<incident_id>/stale-window-note.md` — include: stale window start/end, `renewed_event_id` list (FORM-internal UUIDs; `form_api` REVOKED per OBSERVABILITY §55.5 role spec), violation count, disposition per violation (genuine/timing edge case), corrective action status.
+
+5. Update `reentry_violations_found_during_stale` in the `system.pricing_exception_monitor_stale_declared` DEC-030 event payload (or emit an amendment note in the stale-window note if the event was already emitted at T+0 before R-46-C2 was run). Privacy floor: no `tenant_id`, no employee data in the event payload itself — violation count only.
+
+---
+
+### R-46.6 Quarterly Trigger Miss Escalation Path (PRICE-SLO-02 Breach During Stale Window)
+
+**Activated when:** R-46-C3 returns ≥ 1 row (a quarter-start trigger window [day 1–7 of Jan/Apr/Jul/Oct] fell within the stale window).
+
+**Severity:** P1 (no P0 escalation for PRICE-SLO-02 miss alone, unless R-46-C2 also fires). Compliance-officer leads this path. devops-lead completes job 46 recovery in parallel.
+
+1. Compliance-officer manually runs sweep 2 SQL from OBSERVABILITY §55.5 to collect the prior quarter's `enterprise.pricing_exception_approved` event counts:
+
+```sql
+SELECT
+  TO_CHAR(DATE_TRUNC('quarter', CURRENT_DATE - INTERVAL '1 day'), 'YYYY')
+    || '-Q' || CEIL(EXTRACT(MONTH FROM DATE_TRUNC('quarter', CURRENT_DATE - INTERVAL '1 day'))::numeric / 3)
+                                                                                    AS prior_quarter,
+  COUNT(*)                                                                          AS event_count,
+  COUNT(*) FILTER (WHERE payload->>'exception_type' = 'loyalty_reentry')           AS loyalty_reentry_count,
+  COUNT(*) FILTER (WHERE payload->>'exception_type' = 'standard_discount')         AS standard_discount_count,
+  COUNT(*) FILTER (WHERE payload->>'exception_type' = 'floor_exception')           AS floor_exception_count,
+  COUNT(*) FILTER (WHERE payload->>'exception_type' = 'pilot_credit')              AS pilot_credit_count
+FROM audit_log_events
+WHERE event_type = 'enterprise.pricing_exception_approved'
+  AND created_at >= DATE_TRUNC('quarter', CURRENT_DATE - INTERVAL '1 day')
+  AND created_at <  DATE_TRUNC('quarter', CURRENT_DATE);
+```
+
+2. Emit `system.pricing_exception_quarterly_audit_triggered` STANDARD/7yr (OBSERVABILITY §55.7 schema) via `emit-audit-event` Worker (Admin Console PAM session). Use the `quarter` value from R-46-C3's `prior_quarter_label` and the counts from step 1. Set `check_run_at` to the current timestamp (manual emission replaces the automated trigger). Privacy floor: aggregate counts only — no `tenant_id` in payload.
+
+3. Compliance-officer initiates the quarterly pricing exception audit manually per COST_MODEL §44.7. Record in Linear ticket `[R-46]` that the audit was triggered manually due to PRICE-SLO-02 stale-window miss.
+
+4. Update `stale_window_overlaps_quarter_start = true` in the DEC-030 `stale_declared` event payload note (or record in stale-window note if event already emitted).
+
+5. File stale-window exception note at `compliance/evidence/pricing-exceptions/quarterly-trigger-stale/r46-<incident_id>/stale-window-note.md` — include: stale window start/end, quarter(s) affected, manual audit trigger timestamp, compliance-officer attestation that the audit was completed.
+
+---
+
+### R-46.7 Recovery Procedure
+
+#### Step 1 — Re-register job 46 (H1: job deleted or disabled)
+
+```sql
+SELECT cron.schedule(
+  'pricing_exception_compliance_monitor',
+  '0 9 * * *',
+  $$SELECT pricing_exception_compliance_monitor()$$  -- canonical function per migration 0087 (OBSERVABILITY §55.5)
+);
+```
+
+Confirm the job appears in `cron.job` with `active = true`. If the deletion was unauthorized, activate R-05 in parallel — do not restore alone.
+
+#### Step 2 — Restore `audit_log_events` grants (H2)
+
+Re-apply grants per migration `0087` (or the canonical pricing exception monitoring migration):
+
+```sql
+GRANT SELECT ON audit_log_events TO form_system;
+```
+
+Verify that `form_api` and `tenant_manager` remain REVOKED (OBSERVABILITY §55.5 role invariant):
+
+```sql
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_name = 'audit_log_events'
+  AND grantee IN ('form_system', 'form_api', 'tenant_manager');
+```
+
+**Required result:** `form_system` has SELECT; `form_api` has NO grants; `tenant_manager` has NO grants.
+
+#### Step 3 — Escalate pg_net degradation (H3)
+
+If R-46-C1 shows `status = 'succeeded'` but no `system.pricing_exception_check_passed` or `enterprise.reentry_chain_integrity_violation` DEC-030 events appear in `audit_log_events` within the stale window: escalate to Supabase support for pg_net infrastructure investigation. Do not attempt manual pg_net restart — await Supabase resolution. Monitor `audit_log_events` for `system.pricing_exception_check_passed` events after recovery.
+
+#### Step 4 — Wait for Supabase recovery (H4: Supabase platform outage)
+
+If R-46-C4 confirms ≥ 2 peer daily jobs stale:
+
+- Co-activate R-03 as the primary runbook.
+- R-46 continues in parallel: complete R-46-C2 and R-46-C3 breach gates and §R-46.5/R-46.6 escalation paths now.
+- Await Supabase platform recovery; pg_cron resumes automatically on next 09:00 UTC run.
+
+#### Step 5 — Active breach paths (any R-46-C2/C3 positive)
+
+Execute the applicable escalation paths before proceeding to Step 6:
+- R-46-C2 positive → §R-46.5 (REENTRY-CHAIN-01 blind spot — P0)
+- R-46-C3 positive → §R-46.6 (quarterly trigger miss — P1)
+- Both positive → execute both paths in parallel; compliance-officer coordinates.
+
+#### Step 6 — Post-recovery verification and restoration
+
+After restoring the job (Steps 1–4) and completing all active-breach paths (Step 5):
+
+```sql
+-- Manually trigger job 46 to confirm healthy execution
+SELECT cron.run_job(
+  (SELECT jobid FROM cron.job WHERE jobname = 'pricing_exception_compliance_monitor')
+);
+-- Confirm within 90 seconds:
+SELECT status, return_message, run_at
+FROM cron.job_run_details
+WHERE job_name = 'pricing_exception_compliance_monitor'
+ORDER BY run_at DESC LIMIT 1;
+```
+
+1. Verify `system.pricing_exception_check_passed` LOW/1yr was emitted (confirms all-clear sweep ran with zero violations; no `tenant_id` in payload — privacy floor).
+2. Re-run R-46-C2 to confirm zero violations (or all detected violations are resolved via §R-46.5).
+3. Emit `system.pricing_exception_monitor_restored` STANDARD/3yr (see §R-46.9) with final counts from R-46-C2 at restoration.
+4. Resolve PagerDuty AL-PRICE-03 `pricing-exception-check-stale` IC record (note: AL-PRICE-03 auto-resolves on `system.pricing_exception_check_passed` receipt, but the R-46 incident record in Linear must be manually closed).
+5. Close Linear ticket `[R-46]`.
+
+---
+
+### R-46.8 Internal Communication Template
+
+**Template PRICE-MON-INT-01 — P1 (no R-46-C2 violations, no R-46-C3 quarterly miss):**
+
+```
+Channel: #compliance (Slack)
+Subject: [P1] job 46 pricing_exception_compliance_monitor stale — PRICE-SLO-01/02 monitoring blind spot
+
+Status: job 46 exceeded 26h freshness window. Stale since: <confirmed_stale_since>.
+Active breach sweep:
+  REENTRY-CHAIN-01 violations (R-46-C2): 0 — PRICE-SLO-01 not breached
+  Quarterly trigger miss (R-46-C3): 0 quarters — PRICE-SLO-02 not breached
+Root cause under investigation (H<n>). Job recovery ETA: <ETA or 'next 09:00 UTC run after recovery'>.
+Incident ID: <incident_id> (Linear [R-46])
+```
+
+**Template PRICE-MON-INT-02 — P0 (REENTRY-CHAIN-01 violations confirmed):**
+
+```
+Channel: #compliance (Slack) + founder paged via PagerDuty AL-PRICE-01
+Subject: [P0] job 46 stale — REENTRY-CHAIN-01 VIOLATION: <N> loyalty renewal(s) without prior pricing exception approval
+
+CRITICAL: <N> loyalty renewal(s) during stale window lack prior enterprise.pricing_exception_approved with exception_type = 'loyalty_reentry' within 30 days.
+enterprise.reentry_chain_integrity_violation CRITICAL/7yr emitted for all <N> violation(s) — HTTP 200 confirmed.
+AL-PRICE-01 P0 dispatched per REENTRY-MONITOR-CHAIN-01.
+Affected renewed_event_ids: <UUIDs — FORM-internal only; no company names in this channel>
+Corrective pricing review per COST_MODEL §44.7: in progress.
+Incident ID: <incident_id> (Linear [R-46])
+```
+
+**Template PRICE-MON-INT-03 — P1+ (quarterly trigger miss):**
+
+```
+Channel: #compliance (Slack)
+Subject: [P1] job 46 stale — PRICE-SLO-02 MISS: quarterly audit trigger not fired for <quarter>
+
+Stale window overlapped Q-start trigger window (days 1-7 of <month>).
+system.pricing_exception_quarterly_audit_triggered manually emitted at <timestamp>.
+Prior quarter <quarter> audit initiated manually per COST_MODEL §44.7.
+Incident ID: <incident_id> (Linear [R-46])
+```
+
+---
+
+### R-46.9 DEC-030 HMAC-Chained Events
+
+These two events anchor the R-46 activation in the HMAC-chained audit record. Both must be registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pricing Exception Monitoring events` (§55.10 item 1 obligation).
+
+**`system.pricing_exception_monitor_stale_declared`** — HIGH · 7 yr
+
+| Field | Value |
+|---|---|
+| Emitter | devops-lead (IC) via Admin Console PAM session at T+0 |
+| Timing | R-46 T+0 — on receipt of AL-PRICE-03 PagerDuty P1 or manual discovery |
+| Chain role | PRICING-MONITOR-STALE-CHAIN-01 prerequisite |
+| Privacy floor | Integer counts and booleans only — no `tenant_id`, no employee `user_id`, no health data, no GDPR Art. 9 data |
+
+Zod schema (`PricingExceptionMonitorStaleDeclaredPayload`):
+
+```typescript
+z.object({
+  incident_id:                          z.string().uuid(),
+  confirmed_stale_since:                z.string().datetime(),   // ISO 8601 UTC — last successful job 46 run
+  stale_hours:                          z.number().positive(),
+  missed_runs:                          z.number().int().nonnegative(),
+  trigger:                              z.enum(['pagerduty_alert', 'manual_discovery', 'co_active_r03']),
+  initial_severity:                     z.enum(['P1', 'P0']),    // P0 if reentry_violations_found_during_stale > 0
+  stale_window_overlaps_quarter_start:  z.boolean(),
+  reentry_violations_found_during_stale: z.number().int().nonnegative(),
+})
+```
+
+**`system.pricing_exception_monitor_restored`** — STANDARD · 3 yr
+
+| Field | Value |
+|---|---|
+| Emitter | devops-lead (IC) at R-46 Step 6 |
+| Timing | R-46 Step 6 — after job 46 confirmed healthy and R-46-C2 re-run returns zero rows |
+| Chain role | PRICING-MONITOR-STALE-CHAIN-01 terminal event |
+| Privacy floor | Integer counts and booleans only — no `tenant_id`, no employee `user_id`, no health data, no GDPR Art. 9 data |
+
+Zod schema (`PricingExceptionMonitorRestoredPayload`):
+
+```typescript
+z.object({
+  incident_id:                            z.string().uuid(),   // must match stale_declared incident_id
+  restored_at:                            z.string().datetime(),
+  root_cause:                             z.enum(['H1', 'H2', 'H3', 'H4']),
+  fix_deployed_at:                        z.string().datetime(),
+  stale_window_hours:                     z.number().positive(),
+  stale_window_overlaps_quarter_start:    z.boolean(),
+  reentry_violations_found_during_stale:  z.number().int().nonnegative(),
+  reentry_violations_at_restored:         z.number().int().nonnegative(),   // must be 0 or all §R-46.5 actioned
+  quarterly_trigger_manually_fired:       z.boolean(),
+})
+```
+
+**PRICING-MONITOR-STALE-CHAIN-01 — Ordering invariant:**
+
+`system.pricing_exception_monitor_restored` is blocked (HTTP 422 `PRICING_MONITOR_STALE_CHAIN_01_VIOLATION`) if no prior `system.pricing_exception_monitor_stale_declared` exists for the same `incident_id`; violation → R-05 activated. Privacy floor (both events): integer counts, booleans, and timestamps only — no `tenant_id`, no employee `user_id`, no health data, no GDPR Art. 9 special-category data. Violation details preserved only in the stale-window exception note at `compliance/evidence/pricing-exceptions/{reentry-chain-stale,quarterly-trigger-stale}/r46-<incident_id>/stale-window-note.md` (access: compliance_reviewer; `form_api` REVOKED per OBSERVABILITY §55.5 role spec).
+
+---
+
+### R-46.10 Evidence Preservation
+
+| Evidence item | Content | SOC 2 | Retention | Path |
+|---|---|---|---|---|
+| R-46-C1 output | `cron.job_run_details` for job 46 covering stale window — `status`, `run_at`, `return_message` from `confirmed_stale_since` to `restored_at` | CC7.2 | 3 yr | `compliance/evidence/pricing-exceptions/r46-<incident_id>/stale-window-job-runs.csv` |
+| R-46-C2 output at declaration | REENTRY-CHAIN-01 violation rows (renewed_event_id UUIDs only) at T+5 | CC5.2 / CC1.4 | 7 yr | `compliance/evidence/pricing-exceptions/r46-<incident_id>/reentry-violations-at-declared.csv` |
+| R-46-C2 output at restoration | REENTRY-CHAIN-01 violation count post-recovery (must be 0 or all violations actioned via §R-46.5) | CC5.2 / CC1.4 / A1.1 | 7 yr | `compliance/evidence/pricing-exceptions/r46-<incident_id>/reentry-violations-at-restored.csv` |
+| R-46-C3 output | Quarter-start trigger window overlap confirmation (or zero-row attestation) | CC4.1 | 3 yr | `compliance/evidence/pricing-exceptions/r46-<incident_id>/quarterly-trigger-gate.csv` |
+| Reentry-chain stale-window note | Per-violation disposition when R-46-C2 positive (renewed_event_id UUIDs only; `form_api` REVOKED) | CC5.2 / CC1.4 / CC7.2 | 7 yr | `compliance/evidence/pricing-exceptions/reentry-chain-stale/r46-<incident_id>/stale-window-note.md` |
+| Quarterly trigger stale-window note | Manual quarterly audit trigger record when R-46-C3 positive | CC4.1 / A1.1 | 3 yr | `compliance/evidence/pricing-exceptions/quarterly-trigger-stale/r46-<incident_id>/stale-window-note.md` |
+| DEC-030 event pair | `system.pricing_exception_monitor_stale_declared` (HIGH/7yr) + `system.pricing_exception_monitor_restored` (STANDARD/3yr) in `audit_log_events` — HMAC-chained, independently verifiable per HMAC-VERIFY-ALGO-001 | CC7.2 | per event | `audit_log_events` table (tamper-evident via DEC-030) |
+
+**Annual artefact:** PRICE-STALE-E-001 (CC5.2/CC4.1/CC7.2, annual, 3yr — `compliance/evidence/pricing-exceptions/PRICE-STALE-E-001_<YYYY>.md`). Covers job 46 run statistics, R-46 stale-window activation log, `reentry_violations_found_during_stale` totals, and PRICE-SLO-01/02 performance. Zero-activation years filed as affirmative attestation. Registration in `docs/SOC2_READINESS.md §79.4` per §R-46.13 item 4 (P1/M11 — pending).
+
+---
+
+### R-46.11 SOC 2 Criteria Mapping
+
+| Criterion | Narrative |
+|---|---|
+| **CC5.2** | R-46 is the IC response when `pricing_exception_compliance_monitor` (job 46) goes stale, creating a PRICE-SLO-01 monitoring blind spot for REENTRY-CHAIN-01. R-46-C2 is the immediate manual sweep that replicates job 46 sweep 1 for the stale window. `reentry_violations_found_during_stale = 0` in the `stale_declared` event is the auditor-inspectable attestation that no REENTRY-CHAIN-01 integrity breach occurred undetected during the stale window. §R-46.5 (REENTRY-CHAIN-01 blind spot escalation) is the compensating control: REENTRY-MONITOR-CHAIN-01 ordering is preserved even when the automated monitoring layer is offline, because the IC manually emits `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr before AL-PRICE-01 P0 fires. |
+| **CC1.4** | R-46 §R-46.5 is the IC response to the pricing exception approval control failure scenario: a loyalty renewal committed without prior approval during the monitoring blind spot. The per-violation compliance review and corrective pricing action per COST_MODEL §44.7 ensures the compensating control closes the gap. `reentry_violations_at_restored = 0` in the `stale_restored` event (or all positives documented as actioned in the stale-window note) provides the auditor-inspectable completion attestation. |
+| **CC4.1** | R-46 §R-46.6 is the IC response to PRICE-SLO-02 quarterly audit trigger miss. Manual `system.pricing_exception_quarterly_audit_triggered` emission and manual quarterly audit initiation per COST_MODEL §44.7 constitute the compensating control for the automated trigger's staleness. `quarterly_trigger_manually_fired = true` in `stale_restored` payload is the auditor-inspectable attestation. |
+| **CC7.1** | R-46 is activated by AL-PRICE-03, which is a `pg-cron-health-monitor`-derived CC7.1 monitoring control. The five-query structured IC response (R-46-C1 staleness confirmation, R-46-C2 REENTRY-CHAIN-01 gate, R-46-C3 quarterly trigger gate, R-46-C4 H4 peer discriminator, R-46-C5 H1 job registration) demonstrates defined procedures for responding to monitoring system failures independent of the breaches those systems monitor. |
+| **CC7.2** | `pg-cron-health-monitor` (§12.7) detects the `pricing_exception_compliance_monitor` gap and emits `system.cron_job_stale` (AL-PRICE-03). R-46 activates. DEC-030 HMAC chain (`stale_declared` → `stale_restored`) provides the tamper-evident detection-to-restoration timeline independently verifiable per HMAC-VERIFY-ALGO-001. |
+
+> **Auditor narrative (CC5.2 + CC1.4 + CC4.1 + CC7.1 + CC7.2):** FORM's `pricing_exception_compliance_monitor` (job 46, `0 9 * * *`, 26h freshness window) performs a daily two-sweep compliance check: sweep 1 verifies REENTRY-CHAIN-01 integrity (no loyalty renewal in `audit_log_events` without prior `enterprise.pricing_exception_approved` within 30 days — PRICE-SLO-01 zero-tolerance); sweep 2 triggers the quarterly pricing exception audit on the first 7 days of each quarter (PRICE-SLO-02 — CC4.1/COST_MODEL §44.7). `pg-cron-health-monitor` (§12.7) detects any job 46 gap exceeding 26h and pages devops-lead via PagerDuty P1 `form-devops` AL-PRICE-03. R-46 provides the IC with five scope queries including immediate REENTRY-CHAIN-01 breach assessment (R-46-C2) and quarterly trigger miss assessment (R-46-C3). The DEC-030 HMAC-chained event pair (`system.pricing_exception_monitor_stale_declared` HIGH/7yr → `system.pricing_exception_monitor_restored` STANDARD/3yr) anchors the stale window in the tamper-evident audit record with violation counts and quarterly-trigger flags preserved in both event payloads. `reentry_violations_found_during_stale = 0` in the `stale_declared` payload is the auditor-inspectable attestation that no REENTRY-CHAIN-01 breach occurred undetected during the stale window; `quarterly_trigger_manually_fired = true` is the CC4.1 attestation that PRICE-SLO-02 was satisfied via compensating control when the automated trigger missed.
+
+---
+
+### R-46.12 Post-Incident Controls
+
+| Control | Action | Owner | Timing |
+|---|---|---|---|
+| **H1 unauthorized deletion** | Activate R-05 + rotate `form_system` credentials; confirm no other pg_cron jobs modified in the same maintenance window | security-engineer | Before PagerDuty resolution |
+| **Active REENTRY-CHAIN-01 violations** | Confirm all `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr events emitted (HTTP 200 each); confirm AL-PRICE-01 P0 dispatched; confirm corrective pricing review per COST_MODEL §44.7 initiated; file reentry-chain stale-window note; P0 post-mortem within 72h of resolution | compliance-officer + enterprise-architect | Before PagerDuty resolution + T+72h |
+| **Quarterly trigger miss** | Confirm `system.pricing_exception_quarterly_audit_triggered` manually emitted; confirm quarterly audit initiated; file quarterly-trigger stale-window note | compliance-officer | Before Linear ticket closure |
+| **§12.6 + §55.10 cross-references** | `docs/OBSERVABILITY.md §12.6` job 46 entry shows `INCIDENT_RESPONSE R-46 (§R-46.5/R-46.6; v1.0, 2026-06-25)`; §55.10 item 6 marked Done | devops-lead | This §55.10 item 6 closure — [x] Done 2026-06-25 (this commit) |
+| **PRICE-STALE-E-001 annual artefact** | Include R-46 activations in the annual PRICE-STALE-E-001 filing | compliance-officer | End of relevant annual collection period |
+| **P0 post-mortem** | File PIR within 72h of P0 resolution if REENTRY-CHAIN-01 violations confirmed during stale window; distribute to compliance-officer + enterprise-architect + founder | compliance-officer | T+72h from P0 resolution |
+
+---
+
+### R-46.13 Implementation Checklist
+
+#### P0 — Before job 46 is deployed to production (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.pricing_exception_monitor_stale_declared` (HIGH/7yr) and `system.pricing_exception_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pricing Exception Monitoring events`. Add PRICING-MONITOR-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-46.9. | security-engineer + compliance-officer | **P0** | M9 | [ ] |
+| 2 | Deploy R-46 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'pricing_exception_compliance_monitor'` to PagerDuty service `form-devops` P1, dedup key `pricing-exception-check-stale`, auto-resolve on `system.pricing_exception_check_passed`. Integration test: disable job 46 in staging for > 26h (or inject `system.cron_job_stale`); confirm P1 fires on `form-devops` with correct dedup key; confirm auto-resolve fires after manual job trigger emits `system.pricing_exception_check_passed`. | devops-lead | **P0** | M9 | [ ] |
+
+#### P1 — Before first SOC 2 Type II audit period begins (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Confirm `docs/OBSERVABILITY.md §12.6` job 46 entry shows `INCIDENT_RESPONSE R-46 (§R-46.5/R-46.6; v1.0, 2026-06-25)` and §55.4 AL-PRICE-03 runbook row no longer says "to be authored". | devops-lead | **P1** | M10 | [x] Done — 2026-06-25 (this commit) |
+| 4 | Register PRICE-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` (annual, 3yr, CC5.2/CC4.1/CC7.2 — `compliance/evidence/pricing-exceptions/PRICE-STALE-E-001_<YYYY>.md`). Zero-activation years filed as affirmative attestation. | compliance-officer | **P1** | M11 | [ ] |
+
+---
+
+*v1.0 (2026-06-25): R-46 Pricing Exception Compliance Monitor Stale — forty-sixth runbook. Closes `docs/OBSERVABILITY.md §55.10` item 6 (P1/M10 — author R-46 stale recovery runbook). Job 46 `pricing_exception_compliance_monitor` (`0 9 * * *`, 26h freshness window) was registered in OBSERVABILITY.md §12.6 (v1.9 patch, 2026-06-25) and §55 (v5.2.3, 2026-06-25) as the authoritative spec for PRICE-SLO-01 REENTRY-CHAIN-01 integrity monitoring and PRICE-SLO-02 quarterly audit trigger, but the stale-recovery runbook was explicitly deferred as §55.10 item 6. Critical characteristic: job 46 staleness creates two simultaneous monitoring gaps — (1) PRICE-SLO-01 blind spot: REENTRY-CHAIN-01 violations occurring during the stale window are not detected by the monitoring layer; REENTRY-MONITOR-CHAIN-01 ordering invariant (§55.5) requires `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr to receive HTTP 200 before AL-PRICE-01 P0 fires, so staleness suppresses both the DEC-030 event and the P0 alert until the IC manually runs R-46-C2 and §R-46.5; (2) PRICE-SLO-02 miss: if the stale window overlaps the first 7 days of a quarter (Jan/Apr/Jul/Oct), the automated quarterly pricing exception audit trigger per COST_MODEL §44.7 is not fired, requiring IC manual emission of `system.pricing_exception_quarterly_audit_triggered` per §R-46.6. Privacy floor: `audit_log_events` is queried by `form_system` only; `form_api` REVOKED; both DEC-030 event payloads carry only integer counts, booleans, and timestamps — no `tenant_id`, no employee `user_id`, no health data, no GDPR Art. 9 data; violation detail confined to stale-window exception notes (access: compliance_reviewer). Trigger: AL-PRICE-03 PagerDuty P1 `form-devops` → devops-lead; dedup `pricing-exception-check-stale` 26h; auto-resolves on `system.pricing_exception_check_passed`. Five scope queries: R-46-C1 (pg_cron staleness confirmation — last 5 job 46 runs); R-46-C2 (REENTRY-CHAIN-01 violations during stale window — P0 gate; mirrors §55.5 sweep 1 SQL parameterised by `<confirmed_stale_since>`); R-46-C3 (quarter-start trigger window overlap — PRICE-SLO-02 gate; GENERATE_SERIES over stale window dates); R-46-C4 (peer job health — H4 discriminator: ≥ 2 daily peers stale); R-46-C5 (job registration check — H1 discriminator). Four root cause hypotheses: H1 (job deleted/disabled — R-05 co-activation if unauthorized); H2 (`form_system` permission revoked from `audit_log_events` or schema change); H3 (pg_net degraded — job ran but DEC-030 emit or PagerDuty call silently failed); H4 (Supabase platform outage — R-03 co-activation). Two escalation paths: §R-46.5 (REENTRY-CHAIN-01 blind spot: per-violation `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr emission maintaining REENTRY-MONITOR-CHAIN-01 ordering → AL-PRICE-01 P0 dispatch → corrective pricing review per COST_MODEL §44.7 → stale-window note); §R-46.6 (quarterly trigger miss: manual sweep 2 SQL → `system.pricing_exception_quarterly_audit_triggered` STANDARD/7yr emission → manual quarterly audit initiation → stale-window note). Six-step recovery: Step 1 (H1 — re-register via `cron.schedule()`; R-05 if unauthorized); Step 2 (H2 — restore `form_system` SELECT on `audit_log_events`; confirm `form_api` REVOKED); Step 3 (H3 — Supabase support for pg_net); Step 4 (H4 — R-03 co-activation); Step 5 (active breach — §R-46.5 and/or §R-46.6); Step 6 (manual run + all-clear confirm + emit `stale_restored` + close Linear ticket). Two DEC-030 HMAC-chained events: `system.pricing_exception_monitor_stale_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_hours` positive, `missed_runs` nonneg int, `trigger` enum pagerduty_alert|manual_discovery|co_active_r03, `initial_severity` P1|P0, `stale_window_overlaps_quarter_start` boolean, `reentry_violations_found_during_stale` nonneg int); `system.pricing_exception_monitor_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `stale_window_hours` positive, `stale_window_overlaps_quarter_start` boolean, `reentry_violations_found_during_stale` nonneg int, `reentry_violations_at_restored` nonneg int, `quarterly_trigger_manually_fired` boolean); PRICING-MONITOR-STALE-CHAIN-01: `restored` requires prior `declared` for same `incident_id`; HTTP 422 `PRICING_MONITOR_STALE_CHAIN_01_VIOLATION` on breach → R-05. Evidence: R-46-C1 stale-window job run export (CC7.2, 3yr); R-46-C2 at declaration (CC5.2/CC1.4, 7yr); R-46-C2 at restoration (CC5.2/CC1.4/A1.1, 7yr); R-46-C3 quarterly trigger gate (CC4.1, 3yr); reentry-chain stale-window note (CC5.2/CC1.4/CC7.2, 7yr — only when R-46-C2 positive); quarterly-trigger stale-window note (CC4.1/A1.1, 3yr — only when R-46-C3 positive); DEC-030 event pair chain-verifiable per HMAC-VERIFY-ALGO-001. SOC 2: CC5.2 (REENTRY-CHAIN-01 monitoring blind-spot coverage; `reentry_violations_found_during_stale = 0` auditor-inspectable attestation); CC1.4 (pricing exception approval control completeness during stale window; §R-46.5 compensating control maintains REENTRY-MONITOR-CHAIN-01 ordering); CC4.1 (quarterly audit trigger COST_MODEL §44.7 — §R-46.6 compensating control; `quarterly_trigger_manually_fired` attestation); CC7.1 (structured IC response to monitoring system failure); CC7.2 (`pg-cron-health-monitor` detection + HMAC chain = tamper-evident stale timeline). Post-incident controls: H1 unauthorized deletion → R-05 + `form_system` credential rotation; active REENTRY-CHAIN-01 violations → §R-46.5 REENTRY-MONITOR-CHAIN-01 ordering maintained + corrective review + P0 post-mortem; quarterly trigger miss → §R-46.6 manual trigger + audit initiation. Annual evidence artefact: PRICE-STALE-E-001 (CC5.2/CC4.1/CC7.2, 3yr — §R-46.13 item 4, P1/M11 — pending). Three communication templates: PRICE-MON-INT-01 (P1 all-clear); PRICE-MON-INT-02 (P0 violations); PRICE-MON-INT-03 (P1+ quarterly trigger miss). Four-item implementation checklist: 2× P0/M9 (AUDIT_LOG_SCHEMA DEC-030 event registration; PagerDuty routing + integration test); 2× P1/M10–M11 (§12.6 cross-ref update — [x] Done this commit; SOC2_READINESS §79.4 PRICE-STALE-E-001 registration). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 46 entry — stale-consequence cross-ref `INCIDENT_RESPONSE R-46 (§R-46.5/R-46.6)` to be updated per R-46.13 item 3 — [x] Done this commit); `docs/OBSERVABILITY.md §55` (PRICE-SLO-01/02/03, AL-PRICE-01/02/03, pg_cron job 46 spec, REENTRY-MONITOR-CHAIN-01, §55.7 DEC-030 events, §55.10 item 6 this runbook closes); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pricing Exception Monitoring events` (two new R-46 events to register — §R-46.13 item 1, P0/M9); `docs/COST_MODEL.md §44.7` (quarterly pricing exception audit trigger); `docs/COST_MODEL.md §44.5` (REENTRY-CHAIN-01 write-path enforcement — HTTP 422 from `emit-audit-event` Worker; distinct from R-46 monitoring layer); R-03 (Infrastructure Outage — H4 co-activation); R-05 (HMAC chain break — H1 unauthorized deletion co-activation and PRICING-MONITOR-STALE-CHAIN-01 violation escalation); R-44 (Offboard Chain Monitor Stale — structural peer); R-45 (Litigation Hold Compliance Monitor Stale — structural peer, two-path escalation). Owner: devops-lead + compliance-officer.*
 
 ---
 
