@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.45.0] — 2026-06-25
+
+### Added
+- `content/post-2417-program-abandonment-self-coached.md` — Серія 2416–2425 «Тренувальна самостійність» пост 2/10. Program hopping як системна пастка self-coached атлета: хронологія адаптації (нейром'язовий мінімум 4–6 тижнів — Häkkinen et al. 1985; структурний 8–12 тижнів — Hubal et al. 2005); три тригери зміни та їх справжня природа; різниця між авторегуляцією в межах програми і program hopping; мінімальні часові горизонти (4/8/12–16 тижнів); три елементи системи захисту (визначений горизонт блоку, контрольні питання, журнал циклів); умови, за яких зміна виправдана. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `docs/SOC2_READINESS.md §79.4` — DEL-MON-E-001 evidence artefact registered. Quarterly R-41 activation aggregate report: `activation_count`, `stale_window_hours`, `danger_window_tenants_affected`, `art17_sla_breached` per quarter; zero-activation quarters filed as affirmative attestation; `form_api` REVOKED from evidence path; C1.2/CC4.1; 7yr retention; path `compliance/evidence/deletions/deletion-sla-stale/del-mon-e-001-YYYY-QN.csv`. Closes R-41 implementation checklist item 4 (P1/M11).
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md §R-41.11` — item 4 marked [x] Done (2026-06-25). Footer updated: DEL-MON-E-001 §79.4 cross-reference updated from "pending" to registered.
+- `blog.html` — post-2417 card added at top of feed.
+- `VERSION` — 8.44.1 → 8.45.0.
+
+---
+
 ## [8.44.1] — 2026-06-25
 
 ### Added
