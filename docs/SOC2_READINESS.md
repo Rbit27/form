@@ -26664,6 +26664,9 @@ The table below provides a cross-TSC view of the primary evidence artefacts. Eac
 | SCA-OBS-E-002 | CC7/A | CC7.2 / A1.1 | Quarterly `sca_sla_monitor` pg_cron job 42 run history: export of `cron.job_run_details WHERE jobname = 'sca_sla_monitor'` for the quarter — total runs, successful runs, stale-event count (freshness window breaches > 20 min detected by `pg-cron-health-monitor` §12.7), AL-SCA-01 activations attributed to job 42. **Zero stale-event quarters demonstrate the SCA monitoring sentinel operated without interruption** — no 15-min monitoring gap occurred during the period. Privacy floor: pg_cron run metadata only — no `user_id`, `tenant_id`, CVE detail, or GDPR Art. 9 health data; `cron.job_run_details` carries only operational fields (jobname, runid, started, ended, status, return_message). Full spec: `docs/OBSERVABILITY.md §52.8`. 3yr retention. **Added by §106 (2026-06-25).** | Auto | Quarterly from M12 | devops-lead | `sca/` |
 | SCA-STALE-E-001 | CC6/CC7 | CC7.2 / CC6.8 / CC7.1 | Quarterly `sca_sla_monitor` pg_cron job 42 stale-monitoring health report: R-42 activation count, maximum stale duration (minutes), `open_critical_sla_breached_at_declared` for each R-42 activation (integer — zero means no Critical CVE SLA breach occurred during the stale window). **Zero-activation quarters filed as affirmative attestation** that the SCA monitoring sentinel operated without interruption — no SCA-SLO-01 monitoring blind-spot during the period. Full spec: `docs/INCIDENT_RESPONSE.md R-42.8`. 3yr retention. **Added by §108 (2026-06-25).** | Manual-periodic | Quarterly from M10 | devops-lead + compliance-officer | `security/sca-sla-monitor-stale/` |
 
+| IR-AUTO-E-001 | CC7 | CC7.4 / CC7.3 | Quarterly `incident.opened` T+0 latency sample: `SELECT incident_id, (emitted_at - webhook_received_at) AS t0_latency_ms FROM audit_log_events WHERE action = 'incident.opened' AND emitted_at BETWEEN :obs_start AND :obs_end`. Proves every SIEM-triggered incident has a DEC-030 chain anchor < 3 s of webhook receipt (CC7.4 — incident response activities documented) and stable `incident_id` from T+0 regardless of Linear API availability (CC7.3 — responds to detected events). **Zero-incident quarters filed as affirmative attestation** that no SIEM-triggered P0/P1 incident was declared — absence of chain events confirms SIEM pipeline did not fire. Privacy floor: `incident_id` UUID + `emitted_at` timestamp + derived `t0_latency_ms` integer only — no user identity, no alert payload content, no GDPR Art. 9 health data. Full spec: INCIDENT_RESPONSE §17.8. 7yr retention. **Added by §110 (2026-06-25).** | Auto | Quarterly from M5 | compliance-officer | `cc7/ir-auto-e-001-YYYY-QN.csv` |
+| IR-AUTO-E-002 | CC7 | CC7.4 | Quarterly cross-join of `incident.opened` and `incident.linear_ticket_linked` DEC-030 events on `incident_id`; computes `linked_at − opened_at` linkage latency; reports P95 latency and count of `linked_by = "manual_ic"` amendments (incidents where Linear was unavailable at `incident.opened` emission). Proves P95 Linear-ticket linkage latency < 62 s (CC7.4 — incident response activities documented); amendment count proves the DEC-030 pre-generation design (OQ-IR-02 resolution) handled Linear unavailability without losing incident traceability. **Zero-incident quarters filed as affirmative attestation** with zero-row SQL attestation for both event types. Privacy floor: `incident_id` UUID + derived latency integers + `linked_by` enum string only — no user identity, no alert payload, no GDPR Art. 9 health data. Full spec: INCIDENT_RESPONSE §17.8. 7yr retention. **Added by §110 (2026-06-25).** | Auto | Quarterly from M5 | compliance-officer | `cc7/ir-auto-e-002-YYYY-QN.csv` |
+
 This table is exhaustive for the primary evidence set. Individual control sections (§1–§78) define supplemental or domain-specific evidence artefacts not listed here.
 
 ---
@@ -26979,6 +26982,8 @@ ENGAGE-E-001 (SOC2_READINESS §84.2 — annual `tenant_engagement_snapshots` DDL
 APIKEY-E-001 (SOC2_READINESS §105 — manual-event CC6.2 `api-key-auth.ts` scope enforcement code review; upload on first enterprise API key issuance and annually), APIKEY-E-002 (SOC2_READINESS §105 — quarterly CC6.4 DEC-030 rotation chain export; upload quarterly from M6; zero-rotation quarters as affirmative attestation), APIKEY-E-003 (SOC2_READINESS §105 — monthly CC6.8 IP enforcement change audit; upload monthly from M6; zero-change months as positive evidence of configuration stability), APIKEY-E-004 (SOC2_READINESS §105 — quarterly CC7.2 PagerDuty `api_key_health` incident export; upload quarterly from M6; zero-incident quarters as positive non-occurrence attestation), APIKEY-E-005 (SOC2_READINESS §105 — monthly CC6.1 IP block events export; upload monthly from M6; zero-block months filed with `ip_enforcement_enabled = true` tenant count attestation), VSAFETY-E-001 (SOC2_READINESS §105 — quarterly CC7.2 FORM-VICTOR-001 PagerDuty config + 90-day incident history; upload quarterly from M6; zero-incident periods as VICTOR-SLO-01/SLO-02 attestation), VSAFETY-E-002 (SOC2_READINESS §105 — quarterly CC7.3 `VICTOR_SAFETY_TELEMETRY` observation export; upload quarterly from M6 as JSONL), VSAFETY-E-003 (SOC2_READINESS §105 — annual CC7.4 VSAFETY-CHAIN-01/02/03 attestation; upload annually from M6 or on any VSAFETY-CHAIN-03 HTTP 422 firing), VSAFETY-E-004 (SOC2_READINESS §105 — quarterly A1.2 Cloudflare KV `victor_coach_enabled` audit log + DEC-030 `ai.victor_disabled`/`ai.victor_reenabled` export; upload quarterly from M6; zero-change quarters as continuous-availability attestation). Added by §105 (2026-06-25).
 SCA-OBS-E-001 (SOC2_READINESS §106 — quarterly CC6.8/CC7.1/CC9.2 SCA SLO performance report; upload quarterly from M12; zero-breach quarters filed as positive SCA-SLO-01 zero-tolerance attestation — no AL-SCA-01 activation = no Critical CVE exceeded the 24h SLA), SCA-OBS-E-002 (SOC2_READINESS §106 — quarterly CC7.2/A1.1 `sca_sla_monitor` job 42 pg_cron run history; upload quarterly from M12; zero-stale-event quarters confirm the 15-min SCA monitoring sentinel operated without interruption — no SCA detection blind-spot occurred during the period). Added by §106 (2026-06-25).
 SCA-STALE-E-001 (SOC2_READINESS §108 — quarterly CC7.2/CC6.8/CC7.1 `sca_sla_monitor` stale-incident health report: R-42 activation count, maximum stale duration (minutes), `open_critical_sla_breached_at_declared` per activation; upload quarterly from M10; zero-activation quarters filed as affirmative attestation that the SCA monitoring sentinel operated without interruption — no SCA-SLO-01 monitoring blind-spot during the period). Added by §108 (2026-06-25).
+IR-AUTO-E-001 (SOC2_READINESS §110 — quarterly CC7.4/CC7.3 `incident.opened` T+0 latency sample from `audit_log_events`; upload quarterly from M5; zero-incident quarters filed as affirmative attestation — absence of chain events confirms SIEM pipeline did not fire). Added by §110 (2026-06-25).
+IR-AUTO-E-002 (SOC2_READINESS §110 — quarterly CC7.4 cross-join linkage latency report (`incident.opened` × `incident.linear_ticket_linked` DEC-030 events): P95 `linked_at − opened_at` latency + `linked_by = "manual_ic"` amendment count; upload quarterly from M5; zero-incident quarters filed as affirmative attestation). Added by §110 (2026-06-25).
 
 **What stays R2-only (never uploaded to Vanta):**
 
@@ -31156,3 +31161,79 @@ No Vanta mirror additions required — all six artefacts are already registered.
 ---
 
 *v3.34.0 (2026-06-25): §109 Cross-Reference Patch — CAEP & SSO Fleet Evidence §79.4 Master Table Registration. Gaps closed: three deferred §79.4 registration obligations created during the v3.19.0–v3.21.2 sprint (2026-06-19–2026-06-20) — §94.6 item 8 (CAEP-E-001 CC6.3/A1.1/CC7.4, deferred 2026-06-19), §95.6 item 5 (SSO-FLEET-E-001 CC7.2/CC7.3, deferred 2026-06-19), §97.6 item 1 (CC6-E-CAEP-001/002/003/004 multi-criteria rows, deferred 2026-06-20). §109.1 source table: 6 sources (SSO_SCIM §23.10, §94, §95, §97, AUDIT_LOG_SCHEMA §SSO sso.caep_* family, §80.3/§80.4). §109.2 artefact summary: 6 artefacts (CAEP-E-001 CC6.3/A1.1/CC7.4; CC6-E-CAEP-001 CC6.3/CC6.6; CC6-E-CAEP-002 CC6.3/CC7.3; CC6-E-CAEP-003 CC6.3; CC6-E-CAEP-004 CC7.2/CC7.3; SSO-FLEET-E-001 CC7.2/CC7.3). §109.3 §79.4 row additions: 6 rows; pre-§109 count 57; post-§109 count 63. §109.4 §80.3 folder confirmations: both `caep/` (created §94 v3.19.0) and `sso/` (pre-existing) confirmed — no new folders needed. §109.5 §80.4 Vanta mirror confirmations: all 6 artefacts already mirrored from prior patches (§94, §95, §97) — no new entries needed. §109.6 cross-reference obligations closed: 7 items all 🟢 (§94.6 items 7-8, §95.6 items 4-5, §97.6 items 1-3). §109.7 implementation checklist: 4× P1 (caep/ folder verification + CAEP-E-001 first collection + CC6-E-CAEP-001/002/003/004 first collection + sso/ folder verification + SSO-FLEET-E-001 first collection), 2× P2 (§15 calendar updates). Privacy floor: all 6 artefacts contain operational monitoring metadata only — CAEP event counts, re-registration pipeline metrics, fleet health scores, SLO breach indicators; no `user_id`, no employee identifiers, no GDPR Art. 9 health data; `form_api` REVOKED from all `compliance/evidence/` prefixes (DEC-030). Checklist items updated in-place: §94.6 item 7 → `[x] Done`, §94.6 item 8 → `[x] Done`, §95.6 item 4 → `[x] Done`, §95.6 item 5 → `[x] Done`, §97.6 item 1 → `[x] Done`, §97.6 item 2 → `[x] Done`, §97.6 item 3 → `[x] Done`.*
+
+---
+
+## §110 · Cross-Reference Patch — SIEM Incident Automator Evidence §79.4 Registration (IR-AUTO-E-001 / IR-AUTO-E-002 · INCIDENT_RESPONSE §17 · CC7.4 / CC7.3)
+
+**Date:** 2026-06-25 · **SOC2_READINESS version:** v3.35.0
+
+### §110.1 Source Table
+
+| Source Document | Section | Deferred Obligation | Deferred Since |
+|---|---|---|---|
+| `docs/INCIDENT_RESPONSE.md` | §17.7 SOC 2 Evidence Mapping | IR-AUTO-E-001 and IR-AUTO-E-002 not registered in §79.4 master evidence table | R-27 authoring (2026-06-14) |
+| `docs/INCIDENT_RESPONSE.md` | §17.8 Evidence Collection Table | Full artefact specs for IR-AUTO-E-001/002 defined; §79.4 registration deferred | R-27 authoring (2026-06-14) |
+| `docs/INCIDENT_RESPONSE.md` | §17.11 item 11 | P2/M9 obligation: "Update `docs/SOC2_READINESS.md §CC7.4` evidence table to reference IR-AUTO-E-001 and IR-AUTO-E-002" | R-27 authoring (2026-06-14) |
+| `docs/INCIDENT_RESPONSE.md` | R-27.11 item 6 | P2/Month O-1 obligation: update §81.12 OQ-EVD-02 status (already 🟢 Resolved in §81.12; checkbox unticked) | R-27 authoring (2026-06-14) |
+| `docs/SOC2_READINESS.md` | §80.3 R2 folder map | `cc7/` subfolder already present in base R2 structure — no new subfolder needed | Pre-existing |
+| `docs/SOC2_READINESS.md` | §80.4 Vanta mirror list | IR-AUTO-E-001/002 absent from mirror list | Pre-existing gap |
+
+### §110.2 Artefact Summary
+
+| Artefact ID | TSC Criteria | Collection Type | Cadence | Owner | Storage Path |
+|---|---|---|---|---|---|
+| IR-AUTO-E-001 | CC7.4 / CC7.3 | Auto (SQL export from `audit_log_events`) | Quarterly from M5 | compliance-officer | `compliance/evidence/cc7/ir-auto-e-001-YYYY-QN.csv` |
+| IR-AUTO-E-002 | CC7.4 | Auto (cross-join SQL export) | Quarterly from M5 | compliance-officer | `compliance/evidence/cc7/ir-auto-e-002-YYYY-QN.csv` |
+
+**IR-AUTO-E-001:** Quarterly `incident.opened` T+0 latency sample from `audit_log_events`. SQL: `SELECT incident_id, (emitted_at - webhook_received_at) AS t0_latency_ms FROM audit_log_events WHERE action = 'incident.opened' AND emitted_at BETWEEN :obs_start AND :obs_end`. Zero-incident quarters filed as affirmative attestation. Privacy floor: `incident_id` UUID + `emitted_at` timestamp + derived integer — no user identity, no alert payload, no GDPR Art. 9 health data. 7yr retention.
+
+**IR-AUTO-E-002:** Quarterly cross-join of `incident.opened` and `incident.linear_ticket_linked` DEC-030 events on `incident_id`; computes `linked_at − opened_at` linkage latency; reports P95 latency and count of `linked_by = "manual_ic"` amendments. Zero-incident quarters filed as affirmative attestation with zero-row SQL attestation for both event types. Privacy floor: `incident_id` UUID + derived latency integers + `linked_by` enum string — no user identity, no alert payload, no GDPR Art. 9 health data. 7yr retention.
+
+### §110.3 §79.4 Row Additions
+
+**Pre-§110 count:** 63 rows (per §109 stated count).
+**Post-§110 count:** 65 rows (+2: IR-AUTO-E-001, IR-AUTO-E-002).
+
+Rows physically inserted into §79.4 master evidence table above the exhaustive-table footer. Both rows placed after SCA-STALE-E-001 (the prior last row, added by §108).
+
+### §110.4 §80.3 R2 Folder Map Confirmation
+
+| Folder | Status | Note |
+|---|---|---|
+| `cc7/` | 🟢 Pre-existing | Base R2 structure already includes `cc7/` — confirmed in §80.3. No new subfolder required. Files `ir-auto-e-001-YYYY-QN.csv` and `ir-auto-e-002-YYYY-QN.csv` store directly under `cc7/`. |
+
+No §80.3 edits required.
+
+### §110.5 §80.4 Vanta Mirror List Additions
+
+Two entries appended to §80.4 Vanta mirror list after SCA-STALE-E-001:
+
+- `IR-AUTO-E-001` — quarterly CC7.4/CC7.3 `incident.opened` T+0 latency sample; upload quarterly from M5; zero-incident quarters as affirmative attestation.
+- `IR-AUTO-E-002` — quarterly CC7.4 cross-join linkage latency report; upload quarterly from M5; zero-incident quarters as affirmative attestation.
+
+### §110.6 Cross-Reference Obligations Closed
+
+| Source | Item | Status |
+|---|---|---|
+| INCIDENT_RESPONSE §17.11 item 11 | "Update `docs/SOC2_READINESS.md §CC7.4` evidence table to reference IR-AUTO-E-001 and IR-AUTO-E-002 as the primary CC7.4 automation evidence corpus." | 🟢 Done — 2026-06-25, §110 (v8.60.2) |
+| INCIDENT_RESPONSE R-27.11 item 6 | "Update `docs/SOC2_READINESS.md §81.12 OQ-EVD-02` status to 🟢 Resolved with reference to this runbook (R-27)." | 🟢 Done — 2026-06-25, §81.12 OQ-EVD-02 confirmed 🟢 Resolved (R-27 authoring 2026-06-14); §110 (v8.60.2) |
+
+### §110.7 Implementation Checklist
+
+#### P1 — Initial evidence collection
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Verify `compliance/evidence/cc7/` folder exists in `form-soc2-evidence` R2 bucket; confirm `form_api` NO ACCESS; collect first IR-AUTO-E-001 for M5 quarter: run `SELECT incident_id, (emitted_at - webhook_received_at) AS t0_latency_ms FROM audit_log_events WHERE action = 'incident.opened' AND emitted_at BETWEEN :obs_start AND :obs_end`; file to `compliance/evidence/cc7/ir-auto-e-001-<YYYY-QN>.csv`; upload to Vanta as CC7.4/CC7.3 evidence; add to MASTER-INDEX-YYYY.csv | compliance-officer | **P1** | M5 | [ ] |
+| 2 | Collect first IR-AUTO-E-002 for M5 quarter: cross-join `incident.opened` × `incident.linear_ticket_linked` DEC-030 events on `incident_id`; compute `linked_at − opened_at`; report P95 latency and `linked_by = "manual_ic"` count; file to `compliance/evidence/cc7/ir-auto-e-002-<YYYY-QN>.csv`; upload to Vanta as CC7.4 evidence; add to MASTER-INDEX-YYYY.csv | compliance-officer | **P1** | M5 | [ ] |
+
+#### P2 — Quarterly recurring (observation period)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Add quarterly IR-AUTO-E-001 and IR-AUTO-E-002 collection to §15 compliance calendar (within 5 business days of quarter end, starting M5); note: zero-incident quarters require affirmative attestation CSV (headers + attestation note confirming no SIEM-triggered P0/P1 incident was declared — absence of chain events confirms SIEM pipeline did not fire during the period) | compliance-officer | **P2** | After §15 update | [ ] |
+
+---
+
+*v3.35.0 (2026-06-25): §110 Cross-Reference Patch — SIEM Incident Automator Evidence §79.4 Registration. Gaps closed: two deferred §79.4 registration obligations created at R-27 authoring (2026-06-14) — INCIDENT_RESPONSE §17.11 item 11 (IR-AUTO-E-001 CC7.4/CC7.3 + IR-AUTO-E-002 CC7.4, P2/M9) and R-27.11 item 6 (§81.12 OQ-EVD-02 checkbox, P2/Month O-1). §110.1 source table: 4 sources (INCIDENT_RESPONSE §17.7, §17.8, §17.11 item 11, R-27.11 item 6). §110.2 artefact summary: 2 artefacts (IR-AUTO-E-001 CC7.4/CC7.3; IR-AUTO-E-002 CC7.4). §110.3 §79.4 row additions: 2 rows; pre-§110 count 63; post-§110 count 65. §110.4 §80.3 folder confirmations: `cc7/` pre-existing — no new subfolder needed. §110.5 §80.4 Vanta mirror additions: 2 new entries (IR-AUTO-E-001, IR-AUTO-E-002). §110.6 cross-reference obligations closed: 2 items all 🟢 (§17.11 item 11, R-27.11 item 6). §110.7 implementation checklist: 2× P1 (first evidence collection for each artefact at M5), 1× P2 (§15 calendar update). Privacy floor: both artefacts contain DEC-030 operational metadata only — `incident_id` UUID, derived latency integers, `linked_by` enum string; no `user_id`, no employee identifiers, no alert payload content, no GDPR Art. 9 health data; `form_api` REVOKED from all `compliance/evidence/` prefixes (DEC-030). Checklist items updated in-place: INCIDENT_RESPONSE §17.11 item 11 → `[x] Done — 2026-06-25, SOC2_READINESS.md §110 (v8.61.1)`; INCIDENT_RESPONSE R-27.11 item 6 → `[x] Done — 2026-06-25, §81.12 OQ-EVD-02 confirmed 🟢 Resolved (R-27 authoring 2026-06-14); §110 (v8.61.1)`.*

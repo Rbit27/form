@@ -10050,7 +10050,7 @@ Store artefacts at `compliance/evidence/incident-evidence-automation/<incident_i
 | 3 | Store Template EVD-01 at `compliance/evidence/ir-templates/r27-evd-01.md`; Template EVD-02 at `compliance/evidence/ir-templates/r27-evd-02.md`. Review by compliance-officer. | compliance-officer | **P1** | Month O-1 | [ ] |
 | 4 | Add Scenario P (evidence cron failure) to §9.4 tabletop catalog; schedule in Q4 2026 drill set (pre-observation-period). | security-engineer + compliance-officer | **P1** | Month O-1 | [ ] |
 | 5 | Add quarterly synthetic dry-run calendar entry to `compliance/calendar/` (first Monday of Jan/Apr/Jul/Oct); document procedure at `compliance/evidence/ir-templates/r27-dry-run.md`. | devops-lead | **P2** | Month O+1 | [ ] |
-| 6 | Update `docs/SOC2_READINESS.md §81.12 OQ-EVD-02` status to 🟢 Resolved with reference to this runbook (R-27). | compliance-officer | **P2** | Month O-1 | [ ] |
+| 6 | Update `docs/SOC2_READINESS.md §81.12 OQ-EVD-02` status to 🟢 Resolved with reference to this runbook (R-27). | compliance-officer | **P2** | Month O-1 | [x] Done — 2026-06-25, §81.12 OQ-EVD-02 confirmed 🟢 Resolved (R-27 authoring 2026-06-14); §110 (v8.61.1) |
 
 ---
 
@@ -10302,7 +10302,7 @@ Evidence artefacts:
 |---|---|---|---|---|---|
 | 9 | Collect IR-AUTO-E-002 (linkage latency distribution); confirm P95 < 62 s for auto-linked incidents; report count of `manual_ic` amendments. | compliance-officer | **P2** | M9 | [ ] |
 | 10 | Collect IR-AUTO-E-003 (`incident.pii_risk_detected` by category); review false-positive rate; tune blocklist if `art9_term` category > 30% false-positive rate (consider removing terms that match common runbook names). | security-engineer | **P2** | M9 | [ ] |
-| 11 | Update `docs/SOC2_READINESS.md §CC7.4` evidence table to reference IR-AUTO-E-001 and IR-AUTO-E-002 as the primary CC7.4 automation evidence corpus. | compliance-officer | **P2** | M9 | [ ] |
+| 11 | Update `docs/SOC2_READINESS.md §CC7.4` evidence table to reference IR-AUTO-E-001 and IR-AUTO-E-002 as the primary CC7.4 automation evidence corpus. | compliance-officer | **P2** | M9 | [x] Done — 2026-06-25, SOC2_READINESS.md §110 (v8.61.1) |
 
 ---
 

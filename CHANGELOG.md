@@ -1,15 +1,13 @@
 # Changelog · FORM
 
-## [8.61.0] — 2026-06-25
-
-### Added
-- `content/post-2440-training-parallel-stressors.md` — Editorial series 2436–2445, пост 5/10. «Планування тренувань при паралельних стресорах: де є місце для залу, а де — немає». Операційна рамка рішення «іти/не іти» без мотиваційної риторики. Алостатичне навантаження (McEwen 1998) — HPA-вісь і конкурентний пул відновлювального ресурсу. Stults-Kolehmainen & Sinha (2014): хронічний стрес → знижений анаболічний відгук, прискорений catabolism, уповільнене відновлення. Reilly & Piercy (1994) + Walker (2017): дефіцит сну → ↑ кортизол, ↓ тестостерон, ↓ GH. Martin (2009): ментальна втома → зниження витривалості (силове тренування менш чутливе). Bartholomew et al. (2008): помірна активність після гострого стресу прискорює нейроендокринне відновлення. Чотири запитання рамки: тип стресору (гострий/хронічний, фізіологічний/когнітивний), відновлювальний ресурс ночі, фаза тренувального блоку, реалістична версія сесії. Матриця рішень для 8 кейсів. Bickel et al. (2011): 1/3 об'єму підтримує адаптацію 32 тижні. Moran et al. (2012); Sampson & Groeller (2016): технічна деградація під навантаженням при стресі → ризик травм. clinical-safety: CONDITIONAL PASS — без стигматизації відпочинку або нормалізації ігнорування сигналів відновлення. sports-scientist review pending.
-- `README.md` — Editorial series 2486–2495 «Тренування і зовнішній контекст» додана до roadmap (10 proposed тем: хронічний недосип, батько першого року, shift work, peak сезон роботи, повернення після тривалої перерви, тренування за кордоном, AI-тренер vs PT, когнітивне навантаження, сезонна адаптація, синтез).
+## [8.61.1] — 2026-06-25
 
 ### Changed
-- `blog.html` — card for post-2440 added.
-- `README.md` — post-2440 updated: proposed → draft · v8.61.0.
-- `VERSION` — 8.60.1 → 8.61.0.
+- `docs/SOC2_READINESS.md` — §110 Cross-Reference Patch: registered IR-AUTO-E-001 (CC7.4/CC7.3, quarterly `incident.opened` T+0 latency sample) and IR-AUTO-E-002 (CC7.4, quarterly linkage latency distribution) in §79.4 master evidence table; added both to §80.4 Vanta mirror list; appended §110 section. §79.4 count: 63 → 65 rows. Closes INCIDENT_RESPONSE §17.11 item 11 and R-27.11 item 6.
+- `docs/INCIDENT_RESPONSE.md` — §17.11 item 11 marked `[x] Done — 2026-06-25, SOC2_READINESS.md §110 (v8.61.1)`; R-27.11 item 6 marked `[x] Done — 2026-06-25, §81.12 OQ-EVD-02 confirmed 🟢 Resolved (R-27 authoring 2026-06-14); §110 (v8.61.1)`.
+- `VERSION` — 8.61.0 → 8.61.1.
+
+## [8.61.0] — 2026-06-25
 
 ## [8.60.1] — 2026-06-25
 
