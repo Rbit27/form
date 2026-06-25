@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.28
+# FORM · Multi-Tenant Data Model v1.30
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -49,6 +49,10 @@
 39. [Enterprise Deal Outcomes Schema — `enterprise_deal_outcomes`](#39-enterprise-deal-outcomes-schema--enterprise_deal_outcomes)
 40. [SIEM Integration Configuration Schema — `tenant_siem_configs`](#40-siem-integration-configuration-schema--tenant_siem_configs)
 41. [Enterprise Customer Adoption Snapshots Schema — `enterprise_adoption_snapshots`](#41-enterprise-customer-adoption-snapshots-schema--enterprise_adoption_snapshots)
+42. [`enterprise_contracts` Expansion Tracking Schema Extension — Migration 0083](#42-enterprise_contracts-expansion-tracking-schema-extension--migration-0083)
+43. [`enterprise_renewals` Schema — Migration 0084](#43-enterprise_renewals-schema--migration-0084)
+44. [`enterprise_churn_events` Schema — Migration 0085](#44-enterprise_churn_events-schema--migration-0085)
+45. [`enterprise_contracts` Loyalty Discount Schema Extension — Migration 0086](#45-enterprise_contracts-loyalty-discount-schema-extension--migration-0086)
 
 ---
 
@@ -16834,3 +16838,213 @@ Mirrors `docs/COST_MODEL.md §43.10 item 2` (this section closes that obligation
 *v1.26 (2026-06-23): §44 `enterprise_churn_events` Schema — Migration 0085. Closes `docs/COST_MODEL.md §43.10 item 2` (v1.0, 2026-06-23): COST_MODEL §43.8 authored the DDL summary; this section is the authoritative DATA_MODEL registration. §44.1 purpose and three design invariants: one row per churn event per tenant (UNIQUE INDEX `(tenant_id, churn_date)`); `ece_deletion_sla_respected CHECK` as DDL-layer GDPR Art. 17 backstop (35-day window with 5-day compliance-officer buffer over the 30-day Art. 17 mandate); `form_api` REVOKED + `tenant_manager` excluded (no RLS policy). Privacy floor: `fehs_at_churn` is a tenant-aggregate score with k ≥ 10 floor (§33.7); no individual employee `user_id`, name, email, health value, or GDPR Art. 9 data in any column or evidence artefact. §44.2 migration dependency chain: 0083 → 0084 → 0085; both `tenant_id` and `contract_id` FKs use ON DELETE RESTRICT; `winback_contract_id` uses ON DELETE SET NULL (winback contract may itself churn later). §44.3.1 full DDL: three ENUMs (`churn_trigger_enum` 4 values, `churn_reason_enum` 6 values, `winback_status_enum` 7 values); 22-column table; three CHECK constraints (`ece_offboarding_before_deletion`, `ece_winback_acv_requires_converted`, `ece_deletion_sla_respected`); three indexes (UNIQUE `(tenant_id, churn_date)`, `churn_date DESC`, partial `winback_status NOT IN (converted, abandoned)`); four RLS policies (form_admin ALL, compliance_officer SELECT, form_system ALL, no policy for tenant_manager); REVOKE ALL FROM form_api; four COMMENT ON annotations. §44.3.2 six-item staging validation checklist: ENUM counts; day 36 ece_deletion_sla_respected violation (key test per COST_MODEL §43.10 item 2); UNIQUE INDEX violation; ece_winback_acv_requires_converted violation; form_api REVOKE; tenant_manager no-policy enforcement. §44.4 22-row column summary table; three CHECK constraints table. §44.5 RLS: four policies; three DDL auditor proof queries (RLS enabled, form_api no privilege, tenant_manager no policy). §44.6 three chain invariants: OFFBOARD-CHAIN-01 (24h; §44.6 compliance query for CHN-E-001); WINBACK-CHAIN-01 (365d; DDL backstop via ece_winback_acv_requires_converted; DDL consistency check); DELETION-CHAIN-01 (35d; ece_deletion_sla_respected CHECK; deletion SLA monitoring queries at day 25/29/35). §44.7 FEHS sourcing: source query from `tenant_engagement_snapshots` ORDER BY snapshot_date DESC LIMIT 1; NULL case handling (below k ≥ 10 floor); privacy invariant (scalar aggregate, not individual). §44.8 EXPLAIN ANALYZE for all three indexes at 500-row fleet scale: idx_ece_tenant_churn_date (Index Scan O(log n), hits=3); idx_ece_churn_date (Index Scan Backward, hits=4); idx_ece_winback_status (Bitmap Index Scan, partial index covering ~100 active-pipeline rows). §44.9 SOC 2 evidence cross-references: DEL-E-001 (C1.2/CC4.1 — ece_deletion_sla_respected CHECK as DDL-layer corroboration); WIN-E-001 (CC4.1/CC5.2 — ece_winback_acv_requires_converted CHECK + idx_ece_winback_status query efficiency); CHN-E-001 (CC6.1/CC7.1 — idx_ece_tenant_churn_date UNIQUE INDEX completeness + offboarding_initiated_at elapsed query); three auditor narratives (C1.2, CC5.2, CC6.1). §44.10 six-item implementation checklist: 3× P0/M10 (migration 0085 apply with staging validation, fehs_at_churn population in churn workflow, OFFBOARD/WINBACK/DELETION-CHAIN Worker integration tests), 2× P1/M11 (SOC2_READINESS §79.4 registration + R2 subfolders + Vanta, DATA_ROOM entry), 1× P2 (SOC2_READINESS §101 cross-ref patch). §44.11 four cross-reference obligations: COST_MODEL §43.10 item 2 🟢 Closed (§44 is now authored); SOC2_READINESS §101 patch 🟡 Pending (P2, can now be actioned); AUDIT_LOG_SCHEMA three DEC-030 events 🟡 Pending (P0/M10, tracked in §43.10 item 1); OBSERVABILITY §12.6 job 43 🟡 Pending (P0/M10, tracked in §43.10 item 3). Document header v1.25 → v1.26. Owner: enterprise-architect + compliance-officer + customer-success.*
 
 *v1.25 (2026-06-22): §43 `enterprise_renewals` Schema — Migration 0084. Closes cross-reference obligation from `docs/COST_MODEL.md §42.6` (v2.8, 2026-06-20): §42.6.1 authored the DDL inline; DATA_MODEL §43 is the canonical DATA_MODEL registration, making the chain bidirectional. §43.1 purpose + three design invariants (append-only/never-UPDATE, `floor_respected` CHECK structural enforcement, `form_api` REVOKED) + privacy floor. §43.2 migration dependency chain: 0082 → 0083 → 0084; ON DELETE RESTRICT on both FKs (tenant_id + original_contract_id) is intentional — tenant data deletion pipeline (§67) must archive renewal rows before CASCADE. §43.3.1 full DDL (canonical from COST_MODEL §42.6.1): two ENUMs (5-value `renewal_type_enum`, 4-value `rate_basis_enum`); CREATE TABLE (21 columns — UUID PK, two FK RESTRICT, `renewal_type_enum`, DATE, two INTEGER CHECK > 0, two NUMERIC(10,4) CHECK > 0, `rate_basis_enum`, BOOLEAN, two NULLable NUMERIC for escalation, NULLable NUMERIC for multi-year discount, `floor_respected` BOOLEAN DEFAULT true, two GENERATED ALWAYS AS STORED NUMERIC, SMALLINT CHECK IN (1,2,3), three soft-ref UUID NULLable, TIMESTAMPTZ); four CHECKs (escalation_fields all-or-nothing, multi_year_discount iff multi_year type, floor_always_respected = true, non_renewal_seats = 0); three indexes (UNIQUE (tenant_id, renewal_date), renewal_date DESC, renewal_type); four COMMENT ON annotations. §43.3.2 `enterprise_contracts` renewal UPDATE in single SERIALIZABLE transaction with enterprise_renewals INSERT and enterprise.contract_renewed event emission; post-renewal invariant check SQL. §43.3.3 five-item staging validation checklist (ENUM range, GENERATED arithmetic, UNIQUE violation, chk_floor violation, form_api REVOKE). §43.4 full column summary table (21 rows); CHECK constraints table (4 rows); GENERATED columns note (STORED semantics for ARR waterfall query efficiency). §43.5 RLS: `form_api` REVOKED; `compliance_reviewer` SELECT all; `form_admin` SELECT all; `form_system` SELECT + INSERT only (no UPDATE — append-only); no tenant role grants; DDL auditor proof queries. §43.6 RENEW-CHAIN-01 and ESCALATION-CHAIN-01 DDL relationship: `notice_event_id` soft-ref as per-row chain compliance attestation anchor; `chk_escalation_fields` as ESCALATION-CHAIN-01 DDL backstop; two SOC 2 evidence queries (RENEW-CHAIN-01 annual compliance, ESCALATION-CHAIN-01 quarterly audit). §43.7 SOC 2 evidence cross-references: three artefacts (REN-E-001 CC5.2/CC1.4, REN-E-002 CC4.1/CC2.2, REN-E-003 CC4.1/A1.1) with DDL-layer invariant column; CC5.2 and CC4.1 auditor narratives. §43.8 five-item implementation checklist: 3× P0/M12 (migration 0084 with staging validation, RENEW-CHAIN-01/ESCALATION-CHAIN-01 Worker integration tests, notice_event_id population test), 2× P1/M13 (REN-E-001/002/003 first filing + §79.4 master evidence table registration, DATA_ROOM entry). §43.9 three cross-reference obligations (COST_MODEL §42.6 one-way → now bidirectional ✓, SOC2_READINESS §100 DDL-layer registration ✓, COST_MODEL §42.10 item 2 back-pointer 🟡). Document header v1.21 → v1.22. Privacy floor: no individual employee `user_id`, name, email, health values (heart rate, body composition, workout load), coaching session content, or GDPR Art. 9 special category data in any column, DEC-030 event payload, or SOC 2 evidence artefact; `cpi_reference_month` date-only (never URL per COST_MODEL §42.5.1); `tenant_id` FORM-internal UUID; `form_api` REVOKED; no tenant-role SELECT on any renewal data. Cross-references: `docs/COST_MODEL.md §42` (authoritative economic spec + inline DDL authoring source + DEC-030 Zod v2 schemas + RENEW-CHAIN-01/ESCALATION-CHAIN-01 formal definitions + implementation checklist §42.10); `docs/SOC2_READINESS.md §100` (DDL-layer invariant registration for REN-E-001/002/003 — added simultaneously); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (three DEC-030 events to register — `enterprise.renewal_notice_sent` STANDARD/7yr, `enterprise.renewal_escalation_calculated` HIGH/7yr, `enterprise.contract_renewed` STANDARD/7yr — P0/M12); `docs/MSA_TEMPLATE.md §6` (auto-renewal, 90-day notice, seat reduction policy); `docs/DATA_MODEL.md §42` (migration 0083 prerequisite — expansion fields on enterprise_contracts; `current_seats` updated by §43.3.2 renewal UPDATE); `docs/DATA_MODEL.md §16` (enterprise_contracts — the table supplemented by this schema); `docs/DATA_MODEL.md §67` (tenant data deletion pipeline — ON DELETE RESTRICT boundary; renewal rows archived before tenant CASCADE); `docs/CRYPTOGRAPHY_POLICY.md §5` (no new secrets; `cpi_reference_month` is plain date, not encrypted). Owner: enterprise-architect + compliance-officer + customer-success.*
+
+## §45. `enterprise_contracts` Loyalty Discount Schema Extension — Migration 0086
+
+> **Decision:** DEC-081 (2026-06-23); `docs/COST_MODEL.md §44` (authoritative economic spec + REENTRY-CHAIN-01 definition).
+> **References:** `docs/COST_MODEL.md §44.8 item 1` (this section closes that obligation); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`enterprise.pricing_exception_approved` — `exception_type` field added v2.45, 2026-06-25); `docs/DATA_MODEL.md §16` (`enterprise_contracts` baseline DDL); `docs/DATA_MODEL.md §42` (migration 0083 — expansion fields, same additive pattern); DEC-030 (HMAC-chained audit log).
+
+### 45.1 Purpose and Design Principles
+
+Migration `0086_enterprise_contracts_discount_type.sql` closes the schema gap between COST_MODEL §44 (loyalty re-entry discount economics, DEC-081) and the `enterprise_contracts` table defined in §16. Before this migration, there was no DDL-layer record of which discount type was applied at contract signing — the distinction between a standard deal, a multi-year discount, an upfront payment discount, and a loyalty re-entry discount existed only in CRM notes. The `contract_discount_type` column makes the discount classification an immutable schema-level attribute of each contract row, enabling:
+
+- **REENTRY-CHAIN-01 enforcement** in the `emit-audit-event` Worker: the Worker can query `contract_discount_type = 'loyalty_reentry'` on the incoming `enterprise.contract_renewed` payload to validate the prerequisite `enterprise.pricing_exception_approved` event before appending the chain event (COST_MODEL §44.5).
+- **REN-E-001 SOC 2 evidence** for loyalty discount count: the annual `enterprise.contract_renewed` chain export can be cross-tabbed against `contract_discount_type` without joining to CRM (COST_MODEL §44.7).
+- **NRR decomposition** separating organic renewals from loyalty-discounted winbacks in COST_MODEL §44.6 analysis.
+
+**Four design principles:**
+
+1. **Additive-only migration.** `ALTER TABLE enterprise_contracts ADD COLUMN IF NOT EXISTS` — no existing columns modified, no RLS changes, no FK additions. Rolling back leaves the table at its pre-0086 state without data loss.
+2. **Back-fill safe.** `NOT NULL DEFAULT 'none'` ensures all existing `enterprise_contracts` rows receive `'none'` atomically at column addition with no separate `UPDATE` pass required. A defensive verification step is included in the staging checklist (§45.3.2), not as a correctness requirement.
+3. **No DDL mutual-exclusivity constraint.** COST_MODEL §44.8 item 1 specifies `CHECK (contract_discount_type <> 'loyalty_reentry' OR contract_years = 1)`, but `enterprise_contracts` carries `billing_period TEXT` (`'annual'`|`'2year'`|`'3year'`), not `contract_years INTEGER`. More critically, COST_MODEL §44.3 permits a loyalty-discounted contract to carry a multi-year `billing_period` (Year 1 rate is discounted; Year 2+ escalates to current list). A DDL constraint blocking `loyalty_reentry` on `2year` or `3year` rows would contradict the approved economic model. **REENTRY-CHAIN-01 in the `emit-audit-event` Worker is the real enforcement gate** (COST_MODEL §44.5). The DDL CHECK on `contract_discount_type` is limited to valid-value enforcement only.
+4. **No user-data exposure.** `contract_discount_type` is commercial contract metadata — an enumerated classification with no link to individual employee `user_id`, health metric, coaching content, or GDPR Art. 9 special category data. `tenant_manager` (HR) role is excluded from `enterprise_contracts` (no RLS policy for tenant_manager in §16; unchanged by this migration).
+
+### 45.2 Migration Dependency Chain
+
+```sql
+-- 0078_enterprise_adoption_snapshots.sql         (§41 — new table)
+-- 0082_enterprise_contracts_caep_columns.sql      (§42 prerequisite — CAEP re-registration columns)
+-- 0083_enterprise_contracts_expansion_fields.sql  (§42 — initial_seats, current_seats, expansion_count)
+-- 0084_enterprise_renewals.sql                    (§43 — new table)
+-- 0085_enterprise_churn_events.sql               (§44 — new table)
+-- 0086_enterprise_contracts_discount_type.sql    ← THIS MIGRATION (§45)
+```
+
+Migration 0086 is terminal in the discount-tracking cluster. It depends on 0085 only by convention (linear migration history); it has no structural FK dependency on `enterprise_churn_events`. The `enterprise_contracts` table (§16) is the sole DDL dependency.
+
+**On DELETE RESTRICT:** `enterprise_contracts` rows are referenced by `enterprise_renewals.original_contract_id` (ON DELETE RESTRICT, migration 0084) and `enterprise_churn_events.contract_id` (ON DELETE RESTRICT, migration 0085). Adding `contract_discount_type` does not alter these FK relationships.
+
+### 45.3 DDL — Migration 0086
+
+**Authoritative economic spec:** `docs/COST_MODEL.md §44.3` (discount mechanics) and `docs/COST_MODEL.md §44.8 item 1` (migration specification).
+
+#### 45.3.1 Migration Script
+
+```sql
+-- Migration: 0086_enterprise_contracts_discount_type.sql
+-- Depends on: 0085_enterprise_churn_events.sql (§44)
+-- Decision: DEC-081 (2026-06-23)
+-- Chain invariant: REENTRY-CHAIN-01 enforced in emit-audit-event Worker (COST_MODEL §44.5)
+-- DDL mutual-exclusivity constraint omitted — see DATA_MODEL §45.1 design principle 3
+
+BEGIN;
+
+ALTER TABLE enterprise_contracts
+  ADD COLUMN IF NOT EXISTS contract_discount_type VARCHAR(30)
+    NOT NULL
+    DEFAULT 'none'
+    CHECK (contract_discount_type IN ('none', 'multi_year', 'upfront', 'loyalty_reentry'));
+
+COMMENT ON COLUMN enterprise_contracts.contract_discount_type
+  IS 'Discount type applied at contract signing. ''loyalty_reentry'' governed by REENTRY-CHAIN-01 in the emit-audit-event Worker (DEC-081, COST_MODEL §44.5). DDL enforces valid values only; mutual-exclusivity with billing_period is Worker-enforced.';
+
+COMMIT;
+```
+
+**Default behaviour:** Postgres applies `DEFAULT 'none'` to all pre-existing rows atomically during `ALTER TABLE` — no separate back-fill pass is required for correctness. The defensive check in §45.3.2 confirms zero NULL or `''` survivors.
+
+#### 45.3.2 Staging Validation Checklist
+
+| # | Check | SQL | Expected result |
+|---|---|---|---|
+| 1 | Column exists with correct type and constraint | `SELECT column_name, data_type, character_maximum_length, column_default, is_nullable FROM information_schema.columns WHERE table_name = 'enterprise_contracts' AND column_name = 'contract_discount_type';` | 1 row: `character varying`, `30`, `'none'::character varying`, `NO` |
+| 2 | All existing rows back-filled to `'none'` | `SELECT COUNT(*) FROM enterprise_contracts WHERE contract_discount_type <> 'none';` | `0` |
+| 3 | CHECK constraint rejects invalid value | `UPDATE enterprise_contracts SET contract_discount_type = 'invalid_type' WHERE id = (SELECT id FROM enterprise_contracts LIMIT 1);` | `ERROR: new row for relation "enterprise_contracts" violates check constraint` |
+| 4 | Valid `loyalty_reentry` value accepted | `UPDATE enterprise_contracts SET contract_discount_type = 'loyalty_reentry' WHERE id = (SELECT id FROM enterprise_contracts LIMIT 1); ROLLBACK;` | No error before ROLLBACK |
+| 5 | `form_api` still has no privilege on `enterprise_contracts` | `SET ROLE form_api; UPDATE enterprise_contracts SET contract_discount_type = 'none' WHERE id = (SELECT id FROM enterprise_contracts LIMIT 1);` | `ERROR: permission denied for table enterprise_contracts` |
+| 6 | `tenant_manager` still has no SELECT policy on `enterprise_contracts` | `SET ROLE tenant_manager; SELECT contract_discount_type FROM enterprise_contracts LIMIT 1;` | `ERROR: permission denied` or 0 rows (RLS no-policy behaviour) |
+
+Retain staging output at `compliance/evidence/discount-type/migration-0086-validation_<YYYY-MM-DD>.txt`. Mark `docs/COST_MODEL.md §44.8 item 1` as `[x] Done` simultaneously when this checklist passes in production.
+
+### 45.4 Column Semantics
+
+| Column | Type | Nullability | Default | Semantics |
+|---|---|---|---|---|
+| `contract_discount_type` (new) | VARCHAR(30) | NOT NULL | `'none'` | Discount classification applied at contract signing. Should be treated as immutable after contract activation — changes require a compliance-officer–approved amendment event in the DEC-030 chain. |
+
+**Enum value meanings:**
+
+| Value | Meaning | Governed by |
+|---|---|---|
+| `'none'` | Standard list-price contract; no discount applied | Default; all pre-0086 rows |
+| `'multi_year'` | Multi-year commitment discount (−15% 2yr / −25% 3yr per `enterprise.html` §Multi-Year) | `enterprise.contract_signed` payload; founder approval required for > 25% |
+| `'upfront'` | Upfront annual payment discount (per §31.6 pre-approved pricing schedule) | Pre-approved; no additional approval needed |
+| `'loyalty_reentry'` | Loyalty re-entry discount — 10% off Year 1 ACV for qualifying winback (DEC-081) | REENTRY-CHAIN-01 (Worker); `enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'` required within 30 days before `enterprise.contract_renewed` |
+
+**Immutability invariant:** `contract_discount_type` must not be updated after the contract row is written. The `emit-audit-event` Worker must guard against UPDATE after the `enterprise.contract_signed` or `enterprise.contract_renewed` event has been emitted.
+
+**Not-stackable invariant (application layer):** A single `enterprise_contracts` row must not combine `contract_discount_type = 'loyalty_reentry'` with a concurrent multi-year commitment discount. Enforced at the Admin Console "Winback Contract" modal layer (disable loyalty toggle if multi-year term is selected, and vice versa) per COST_MODEL §44.2 control 4. No DDL CHECK enforces this.
+
+### 45.5 RLS Behaviour
+
+Migration 0086 adds one column to `enterprise_contracts`. The four RLS policies defined in §16 (and unchanged by migrations 0083–0085) continue to apply without modification:
+
+| Role | Policy | Change from §16 |
+|---|---|---|
+| `form_admin` | SELECT + UPDATE + INSERT + DELETE | No change — `contract_discount_type` included in all-column SELECT |
+| `form_system` | SELECT + INSERT (no UPDATE) | No change |
+| `tenant_admin` / `tenant_owner` | SELECT on own tenant rows | No change — includes `contract_discount_type` |
+| `tenant_manager` (HR) | **No policy** | No change — HR excluded from all `enterprise_contracts` data, including discount type |
+| `form_api` | **REVOKED** | No change |
+| `compliance_officer` | SELECT | No change |
+
+**Privacy floor (unchanged):** `contract_discount_type` is commercial contract metadata. HR (`tenant_manager`) cannot read contract discount terms. This is not individual health data, but the privacy floor excludes HR from all contract-tier commercial data. Unchanged by this migration.
+
+**DDL auditor proof queries:**
+
+```sql
+-- 1. Verify form_api is still REVOKED from enterprise_contracts
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_name = 'enterprise_contracts'
+  AND grantee = 'form_api';
+-- Expected: 0 rows
+
+-- 2. Verify tenant_manager has no RLS policy on enterprise_contracts
+SELECT policyname, roles, cmd
+FROM pg_policies
+WHERE tablename = 'enterprise_contracts'
+  AND 'tenant_manager' = ANY(roles);
+-- Expected: 0 rows
+
+-- 3. Verify RLS is enabled on enterprise_contracts
+SELECT relname, relrowsecurity
+FROM pg_class
+WHERE relname = 'enterprise_contracts';
+-- Expected: relrowsecurity = true
+```
+
+### 45.6 REENTRY-CHAIN-01 — Worker Enforcement
+
+REENTRY-CHAIN-01 is the critical control gate for `contract_discount_type = 'loyalty_reentry'`. It lives entirely in the `emit-audit-event` Cloudflare Worker — **not** in Postgres DDL. This section documents the DDL-layer supporting role.
+
+**Chain invariant (authoritative source: COST_MODEL §44.5):**
+
+> `enterprise.contract_renewed` with `contract_discount_type = 'loyalty_reentry'` in the payload returns HTTP 422 `REENTRY_CHAIN_01_VIOLATION` if no `enterprise.pricing_exception_approved` event with `exception_type = 'loyalty_reentry'` exists in `audit_log_events` for the same `tenant_id` within 30 days.
+
+**DDL-layer supporting role:**
+
+- The DDL CHECK (`contract_discount_type IN ('none', 'multi_year', 'upfront', 'loyalty_reentry')`) ensures the Worker cannot write an unrecognised discount type — any typo or variant is rejected at the Postgres layer before the chain event is appended.
+- `contract_discount_type` on `enterprise_contracts` is the column the Worker writes when inserting the new contract row during a winback renewal. The Worker reads this value from the incoming `enterprise.contract_renewed` payload to decide whether REENTRY-CHAIN-01 applies.
+
+**Why no DDL mutual-exclusivity CHECK:**
+
+COST_MODEL §44.8 item 1 specifies `CHECK (contract_discount_type <> 'loyalty_reentry' OR contract_years = 1)`. This constraint cannot be implemented verbatim because `enterprise_contracts` uses `billing_period TEXT` (`'annual'`|`'2year'`|`'3year'`), not `contract_years INTEGER`. More importantly, COST_MODEL §44.3 explicitly permits loyalty-discounted contracts with multi-year `billing_period` — "multi-year term may be signed but Year 1 rate is loyalty-discounted." A DDL CHECK blocking `loyalty_reentry` on `billing_period = '2year'` would violate this policy.
+
+The correct enforcement is the Admin Console "Winback Contract" modal (COST_MODEL §44.8 item 4) plus REENTRY-CHAIN-01 in the Worker — a stronger control than any DDL CHECK.
+
+**Integration test specification (COST_MODEL §44.8 item 3):**
+
+```
+Test A: contract_renewed (loyalty_reentry) + no prior pricing_exception_approved
+        → HTTP 422 REENTRY_CHAIN_01_VIOLATION
+
+Test B: contract_renewed (loyalty_reentry) + pricing_exception_approved (loyalty_reentry) within 30 days
+        → HTTP 201
+
+Test C: contract_renewed (loyalty_reentry) + pricing_exception_approved (standard_discount) within 30 days
+        → HTTP 422 REENTRY_CHAIN_01_VIOLATION  (exception_type mismatch)
+
+Test D: contract_renewed (none) + no prior pricing_exception_approved
+        → HTTP 201  (REENTRY-CHAIN-01 does not apply)
+```
+
+### 45.7 SOC 2 Evidence Cross-References
+
+| Artefact | TSC Criteria | DDL-layer invariant from §45 | Full spec location |
+|---|---|---|---|
+| **REN-E-001** | CC5.2 / CC1.4 | `contract_discount_type CHECK (IN ('none','multi_year','upfront','loyalty_reentry'))` ensures the annual `enterprise.contract_renewed` chain export includes a verifiable discount-type field for every renewal. Auditor can cross-tab `loyalty_reentry` count vs. `enterprise.pricing_exception_approved` events with `exception_type = 'loyalty_reentry'` to verify REENTRY-CHAIN-01 operated without gaps. No `loyalty_reentry` row may exist without a prior exception event — this structural guarantee is Worker-level, but the DDL column enables the auditor query. | `docs/COST_MODEL.md §44.7` |
+
+**CC5.2 auditor narrative (REN-E-001):** CC5.2 requires FORM to implement and enforce enterprise pricing controls. `contract_discount_type` on `enterprise_contracts` is the schema-layer record that a loyalty re-entry discount was authorised at contract signing. Combined with REENTRY-CHAIN-01 in the Worker, auditors can verify — without trusting application-layer claims — that every `loyalty_reentry` contract row in the observation year was preceded by a `enterprise.pricing_exception_approved` event with `exception_type = 'loyalty_reentry'`. The DDL `CHECK` constraint eliminates the possibility of an unclassified discount type being recorded.
+
+**CC1.4 auditor narrative:** CC1.4 requires FORM to demonstrate commitment to integrity through its discount-approval chain. The `contract_discount_type` column, populated only at contract signing and immutable thereafter, provides the DDL-layer anchor for the integrity of the REENTRY-CHAIN-01 audit trail.
+
+**Privacy floor (all evidence queries):** aggregate `COUNT(*)` and `SUM(acv_usd)` only — no `user_id`, employee name, email, health metric, coaching content, or GDPR Art. 9 special category data in any REN-E-001 export row.
+
+### 45.8 Implementation Checklist
+
+Closes `docs/COST_MODEL.md §44.8 item 1` (P0, M9).
+
+#### P0 — Before first winback outreach (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0086_enterprise_contracts_discount_type.sql` after confirming all six staging validation checks from §45.3.2 pass: (a) column exists with correct type; (b) all existing rows have `'none'`; (c) CHECK rejects invalid value; (d) `loyalty_reentry` value accepted; (e) `form_api` REVOKE confirmed; (f) `tenant_manager` no-policy confirmed. Retain staging output at `compliance/evidence/discount-type/migration-0086-validation_<YYYY-MM-DD>.txt`. Mark `docs/COST_MODEL.md §44.8 item 1` as `[x] Done` simultaneously. | platform-engineer + enterprise-architect | **P0** | M9 | [ ] |
+| 2 | Implement REENTRY-CHAIN-01 in `emit-audit-event` Worker (COST_MODEL §44.8 item 3): before inserting `enterprise.contract_renewed` with `contract_discount_type = 'loyalty_reentry'`, query `audit_log_events` for `enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'` and same `tenant_id` within 30 days; HTTP 422 `REENTRY_CHAIN_01_VIOLATION` if absent. Four integration tests from §45.6 must pass. | platform-engineer | **P0** | M9 | [ ] |
+
+#### P1 — Before SOC 2 observation period
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Register REN-E-001 `loyalty_reentry` discount-type cross-tab query in `docs/SOC2_READINESS.md §79.4` master evidence table (if not already covered by §43.7 registration). Add `discount_type` breakdown column to the REN-E-001 filing template. | compliance-officer | **P1** | M11 | [ ] |
+
+### 45.9 Cross-Reference Obligations Created by §45
+
+| Obligation | Source | Status |
+|-----------|--------|--------|
+| COST_MODEL §44.8 item 1 → DATA_MODEL §45 | `docs/COST_MODEL.md §44.8 item 1` requires migration 0086 DDL and DATA_MODEL canonical registration | 🟢 **Closed — §45 is the DATA_MODEL canonical registration. Mark COST_MODEL §44.8 item 1 `[x] Done` simultaneously when migration 0086 is applied to production.** |
+| AUDIT_LOG_SCHEMA §Enterprise → `exception_type` field | `docs/COST_MODEL.md §44.8 item 2` requires `exception_type` enum (`standard_discount`\|`loyalty_reentry`\|`pilot_credit`\|`floor_exception`) on `enterprise.pricing_exception_approved` | 🟢 **Closed — AUDIT_LOG_SCHEMA.md v2.45 (2026-06-25): `exception_type` field added to `enterprise.pricing_exception_approved` payload. COST_MODEL §44.8 item 2 marked `[x] Done` simultaneously.** |
+
+---
+
+*v1.30 (2026-06-25): §45 `enterprise_contracts` Loyalty Discount Schema Extension — Migration 0086. Closes `docs/COST_MODEL.md §44.8 item 1` (P0, M9 — migration 0086 DDL canonical registration and DATA_MODEL documentation). Triggered by DEC-081 (2026-06-23, OQ-WIN-02 resolution) and COST_MODEL §44 (Loyalty Re-Entry Discount, v2.13). §45.1 purpose + four design principles (additive-only; back-fill safe; no DDL mutual-exclusivity constraint — billing_period vs contract_years discrepancy + §44.3 multi-year permitted; REENTRY-CHAIN-01 in Worker is the real gate; no user-data exposure). §45.2 migration dependency chain: 0078 → 0082 → 0083 → 0084 → 0085 → 0086; terminal in discount cluster. §45.3.1 full DDL: `ALTER TABLE enterprise_contracts ADD COLUMN IF NOT EXISTS contract_discount_type VARCHAR(30) NOT NULL DEFAULT 'none' CHECK (contract_discount_type IN ('none','multi_year','upfront','loyalty_reentry'))` + COMMENT. §45.3.2 six-item staging validation checklist: (a) column type/constraint; (b) existing rows all 'none'; (c) CHECK rejects invalid; (d) loyalty_reentry accepted; (e) form_api REVOKE confirmed; (f) tenant_manager no-policy confirmed. §45.4 column semantics: four enum values (none/multi_year/upfront/loyalty_reentry); immutability invariant; not-stackable invariant (application layer only). §45.5 RLS unchanged from §16: form_admin ALL; form_system SELECT+INSERT; tenant_admin/owner SELECT own rows; tenant_manager no policy; form_api REVOKED; compliance_officer SELECT; three DDL auditor proof queries. §45.6 REENTRY-CHAIN-01 Worker enforcement: chain invariant (authoritative COST_MODEL §44.5); DDL supporting role (valid-value CHECK only); why no DDL mutual-exclusivity; four integration test specifications (A/B/C/D). §45.7 SOC 2 evidence: REN-E-001 (CC5.2/CC1.4 — discount-type cross-tab for annual chain export); CC5.2 and CC1.4 auditor narratives; privacy floor. §45.8 implementation checklist: 2× P0/M9 (migration 0086 apply + six staging checks; REENTRY-CHAIN-01 Worker + four integration tests); 1× P1/M11 (REN-E-001 discount-type cross-tab filing template). §45.9 two cross-reference obligations: COST_MODEL §44.8 item 1 🟢 Closed; AUDIT_LOG_SCHEMA.md v2.45 `exception_type` 🟢 Closed. TOC updated (§42–§45 added). Document header v1.28 → v1.30 (v1.29 patch omitted updating the title line; v1.30 bundles the header correction and this new section). Cross-references: `docs/COST_MODEL.md §44` (DEC-081, discount mechanics, REENTRY-CHAIN-01 authoritative definition, implementation checklist §44.8); `docs/COST_MODEL.md §44.8 item 1` (obligation — now [x] Done at production migration); `docs/COST_MODEL.md §44.8 item 2` (obligation — closed by AUDIT_LOG_SCHEMA v2.45, 2026-06-25); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`enterprise.pricing_exception_approved` — `exception_type` added v2.45, 2026-06-25); `docs/DATA_MODEL.md §16` (`enterprise_contracts` baseline DDL); `docs/DATA_MODEL.md §42` (migration 0083 — expansion fields, same additive pattern); `docs/DATA_MODEL.md §43` (migration 0084 — `enterprise_renewals`); `docs/DATA_MODEL.md §44` (migration 0085 — `enterprise_churn_events`); `docs/SOC2_READINESS.md §79.4` (REN-E-001 evidence artefact); `docs/DECISION_LOG.md §DEC-081` (formal decision record); `docs/MSA_TEMPLATE.md` (loyalty re-entry discount deliberately NOT referenced — CSM-only tool). Owner: enterprise-architect + compliance-officer + platform-engineer.*

@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.75.0] — 2026-06-25
+
+### Added
+- `docs/DATA_MODEL.md` — v1.30: §45 `enterprise_contracts` Loyalty Discount Schema Extension — Migration 0086. Closes `docs/COST_MODEL.md §44.8 item 1` (P0, M9). Triggered by DEC-081 (2026-06-23, OQ-WIN-02 resolution). New additive migration `0086_enterprise_contracts_discount_type.sql`: `ALTER TABLE enterprise_contracts ADD COLUMN IF NOT EXISTS contract_discount_type VARCHAR(30) NOT NULL DEFAULT 'none' CHECK (IN 'none','multi_year','upfront','loyalty_reentry')`. No DDL mutual-exclusivity constraint (billing_period vs contract_years discrepancy; REENTRY-CHAIN-01 in Worker is the real gate per §45.1 principle 3). Six-item staging validation checklist (§45.3.2). RLS unchanged from §16 (§45.5). REENTRY-CHAIN-01 Worker enforcement documented with four integration test specs (§45.6). SOC 2 REN-E-001 CC5.2/CC1.4 auditor narratives (§45.7). Two-item P0/M9 implementation checklist + one P1/M11 item (§45.8). Two cross-reference obligations closed: COST_MODEL §44.8 item 1 🟢 and AUDIT_LOG_SCHEMA v2.45 exception_type 🟢 (§45.9). TOC extended §42–§45. Header corrected v1.28 → v1.30 (v1.29 omitted title update; bundled here).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.45: `exception_type` field (`standard_discount`\|`loyalty_reentry`\|`pilot_credit`\|`floor_exception`) added to `enterprise.pricing_exception_approved` payload. Required and must equal `loyalty_reentry` when `contract_discount_type = 'loyalty_reentry'` on the associated `enterprise_contracts` row, per REENTRY-CHAIN-01 (DEC-081, COST_MODEL §44.5). Optional for pre-DEC-081 events (back-fills to `standard_discount`). Closes `docs/COST_MODEL.md §44.8 item 2` (P0, M9).
+- `docs/COST_MODEL.md` — §44.8 item 1 `[ ]` → `[x] Done` (DATA_MODEL §45 authored, migration 0086 DDL canonical registration complete). §44.8 item 2 `[ ]` → `[x] Done` (AUDIT_LOG_SCHEMA.md v2.45 `exception_type` registered).
+- `VERSION` — 8.74.0 → 8.75.0.
+
 ## [8.74.0] — 2026-06-25
 
 ### Added
