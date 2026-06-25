@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.80.1] — 2026-06-25
+
+### Added
+- `docs/INCIDENT_RESPONSE.md R-45` — Litigation Hold Compliance Monitor Stale runbook (v3.9). Closes `docs/OBSERVABILITY.md §54.10` item 6 (P1/M7). Forty-fifth runbook; first with three-type obligation breach coverage. R-45 is the IC protocol for `litigation_hold_compliance_monitor` (job 45, `0 8 * * *`, 26h freshness window) staleness. Three independent breach gates: R-45-C2a (LITH-SLO-01 review-overdue), R-45-C2b (LITH-SLO-02 max-duration cap — P0 trigger), R-45-C2c (LITH-SLO-03 deletion-overdue). Three escalation paths: §R-45.5 (review-overdue — manual `enterprise.litigation_hold_review_overdue` HIGH/7yr emit + stale-window note), §R-45.6 (max-duration breach — P0 founder page + CSM + legal waiver-or-release + manual `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr emit), §R-45.7 (deletion-overdue — manual deletion workflow + `deletion_completed_date` population + manual `enterprise.litigation_hold_deletion_overdue` HIGH/7yr emit). Six-step recovery (H1–H4 root cause). Two DEC-030 HMAC-chained events: `system.litigation_hold_monitor_stale_declared` HIGH/7yr + `system.litigation_hold_monitor_restored` STANDARD/3yr; LITH-MONITOR-STALE-CHAIN-01 ordering invariant. Privacy floor: both payloads carry integer counts and timestamps only — no `tenant_id`, no employee PII, no GDPR Art. 9 data. SOC 2: CC5.3 + C1.1 + C1.2 + CC7.1 + CC7.2.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.8 → v3.9. R-45 appended.
+- `docs/OBSERVABILITY.md` — v5.2.0 → v5.2.2. §54.10 item 6 marked `[x] Done — 2026-06-25 (INCIDENT_RESPONSE.md v3.9)`. §12.6 job 45 stale-consequence cross-ref updated: "to be authored" → `§R-45.5/R-45.6/R-45.7; v1.0, 2026-06-25`. §54.4 AL-LITH-01/02/03 runbook rows updated. §54.5 cross-ref updated.
+- `VERSION` — 8.80.0 → 8.80.1.
+
 ## [8.80.0] — 2026-06-25
 
 ### Added

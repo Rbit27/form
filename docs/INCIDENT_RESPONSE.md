@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.8
+# FORM · Incident Response Runbook v3.9
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -16419,6 +16419,459 @@ z.object({
 *v1.1 (2026-06-25): R-44.11 checklist sync — items 1 and 3 closed. Item 1 (`[ ]` → `[x] Done — 2026-06-25, AUDIT_LOG_SCHEMA.md v2.44`): `system.offboard_chain_monitor_stale_declared` (HIGH/7yr) and `system.offboard_chain_monitor_restored` (STANDARD/3yr) were registered in AUDIT_LOG_SCHEMA.md v2.44 (2026-06-25) during the R-44 authoring sprint but the checklist checkbox was not updated in that commit. Item 3 (`[ ]` → `[x] Done — 2026-06-25, OBSERVABILITY.md v5.1.5`): OBSERVABILITY.md three stale "to be authored" R-44 cross-references updated (§6.2 AL-OFFL-01 row, §12.6 job 44 row, §53.5 Cross-ref table row) to `§R-44.5; v1.0, 2026-06-25`. Document header v3.7 → v3.8. Owner: devops-lead + compliance-officer.*
 
 *v1.0 (2026-06-25): R-44 Offboard Chain Monitor Stale — forty-fourth runbook. Closes `docs/OBSERVABILITY.md §53.10` item 6 (P1/M10 — author R-44 runbook). Job 44 `offboard_chain_monitor` (`0 * * * *`, 2h freshness window) was registered in §12.6 (v1.7 patch, 2026-06-25) and the corresponding DEC-030 breach/all-clear events registered in AUDIT_LOG_SCHEMA.md (v2.43, 2026-06-25), but the stale-recovery runbook was explicitly deferred as §53.10 item 6. Critical characteristic: job 44 staleness creates an OFFBOARD-CHAIN-01 detection blind spot — each missed hourly run extends breach-detection latency by 1h against the 24h MSA contractual window; unlike DELETION-SLA-01 (day-25 warning tier), OFFBOARD-CHAIN-01 is a 24h hard commitment, making each missed run materially more time-sensitive. Privacy floor: `enterprise_churn_events` carries `tenant_id` (FORM-internal UUID) only — no employee `user_id`, name, email, health value, or GDPR Art. 9 data in any R-44 event payload or scope query result set. Severity: P1 base; immediate P0 escalation if R-44-C2 confirms any active OFFBOARD-CHAIN-01 breach at time of stale declaration. Trigger: `system.cron_job_stale` with `job_name = 'offboard_chain_monitor'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect; dedup `offboard-chain-monitor-stale`. Four root cause hypotheses: H1 (job deleted/disabled — R-05 co-activation if unauthorized); H2 (`form_system` permission revoked from `enterprise_churn_events` or schema change); H3 (pg_net degraded — job ran but DEC-030 emit or PagerDuty call silently failed); H4 (Supabase platform outage — R-03 co-activation). Four scope queries: R-44-C1 (pg_cron staleness confirmation — last 5 job 44 runs); R-44-C2 (P0 gate — `enterprise_churn_events` breach count at declaration and restoration); R-44-C3 (peer job health — H4 discriminator: ≥ 2 peer jobs stale); R-44-C4 (job registration check — H1 discriminator). Six-step recovery procedure: Step 1 (H1 — re-register via `cron.schedule()` or re-enable; R-05 if unauthorized); Step 2 (H2 — restore `form_system` SELECT on `enterprise_churn_events`; confirm `form_api` REVOKED); Step 3 (H3 — escalate to Supabase support for pg_net; auto-recovery when pg_net resumes); Step 4 (H4 — co-activate R-03, await platform recovery); Step 5 (active breach — manual sweep and backfill: force `enterprise.offboarding_initiated` for affected tenants; manually emit `enterprise.offboard_chain_sla_breach` for stale window; file stale-window note); Step 6 (post-recovery: manual run verification; emit `system.offboard_chain_monitor_restored` STANDARD/3yr; resolve PagerDuty). Two DEC-030 HMAC-chained events: `system.offboard_chain_monitor_stale_declared` HIGH/7yr (Zod `OffboardChainMonitorStaleDeclaredPayload`: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive int, `missed_runs` nonneg int, `trigger` enum pagerduty_alert|manual_discovery|co_active_r03, `initial_severity` enum P1|P0, `offboard_chain_breaches_at_declared` nonneg int); `system.offboard_chain_monitor_restored` STANDARD/3yr (Zod `OffboardChainMonitorRestoredPayload`: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `stale_window_hours` positive, `offboard_chain_breaches_at_declared` nonneg int, `offboard_chain_breaches_at_restored` nonneg int); OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01: `restored` requires prior `declared` for same `incident_id`; HTTP 422 `OFFBOARD_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION` on breach → R-05. Evidence: stale-window `cron.job_run_details` export (CC7.2, 3yr); R-44-C2 at declaration (CC6.1/CC7.1, 7yr); R-44-C2 at restoration (CC6.1/CC7.1/A1.1, 7yr); stale-window exception note (C1.1/CC7.2, 7yr — only when active breach confirmed); DEC-030 event pair in `audit_log_events` (chain-verifiable per HMAC-VERIFY-ALGO-001). SOC 2 criteria: CC6.1 (OFFBOARD-CHAIN-01 MSA contractual deprovisioning SLA blind-spot coverage; `offboard_chain_breaches_at_declared = 0` is auditor-inspectable attestation of no undetected breach); CC7.1 (structured IC response to monitoring system failure); CC7.2 (`pg-cron-health-monitor` detection + DEC-030 HMAC chain `stale_declared` → `stale_restored` = tamper-evident detection-to-restoration timeline). Post-incident controls: H1 unauthorized deletion → R-05 + `form_system` credential rotation; active OFFBOARD-CHAIN-01 breach → manual offboarding initiation + stale-window note + CSM notification. Four-item implementation checklist: 2× P0/M10 (AUDIT_LOG_SCHEMA DEC-030 event registration; PagerDuty routing + integration test); 2× P1/M10–M11 (§12.6 cross-ref; SOC2_READINESS §79.4 CHN-STALE-E-001 registration if required). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 44 `offboard_chain_monitor` registry entry — stale-consequence cross-ref to be updated per R-44.11 item 3); `docs/OBSERVABILITY.md §53` (OFFL-SLO-01/02, AL-OFFL-01, pg_cron job 44 spec, §53.7.2 OFFL-CHAIN-01 DEC-030 events, §53.10 item 6 this runbook closes); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events` (companion DEC-030 events to be registered — R-44.11 item 1, P0/M10); `docs/DATA_MODEL.md §44` (`enterprise_churn_events` — `form_api` REVOKED; `tenant_manager` excluded; OFFBOARD-CHAIN-01 compliance query §44.6); `docs/COST_MODEL.md §43.8` (OFFBOARD-CHAIN-01 definition: `enterprise.offboarding_initiated` within 24h of `enterprise.account_churned`); R-03 (Infrastructure Outage — H4 co-activation path); R-05 (HMAC chain break — H1 unauthorized deletion co-activation and OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 violation escalation); R-41 (GDPR Deletion SLA Monitor Stale — structural peer: job 43 stale recovery, same pattern). Owner: devops-lead + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-25 · Owner: devops-lead + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---
+
+## R-45: Litigation Hold Compliance Monitor Stale (`litigation_hold_compliance_monitor` · job 45)
+
+> **Runbook type:** pg_cron monitoring control staleness — compliance blind spot recovery.
+> **Owner:** compliance-officer (IC). **Escalation:** devops-lead (T+30 min if no containment). **P0 escalation:** founder + compliance-officer immediately on R-45-C2b confirming any active LITH-SLO-02 breach (holds past 36-month MSA §11.6.4 cap).
+
+> **Trigger:** `system.cron_job_stale` with `job_name = 'litigation_hold_compliance_monitor'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-compliance` → compliance-officer; dedup `litigation-hold-monitor-stale`. No auto-resolve — compliance-officer must manually resolve after job 45 confirmed healthy.
+
+> **Stale consequence:** job 45 staleness creates a simultaneous LITH-SLO-01/02/03 detection blind spot — a single missed 08:00 UTC run extends breach-detection latency by 24h for all three monitoring obligations (6-month review MSA §11.6.3, 36-month cap MSA §11.6.4, 10-business-day deletion MSA §11.6.6). Unlike peer stale runbooks (R-41 for job 43, R-44 for job 44) which monitor a single obligation type, R-45 monitors three; each obligation type has its own breach gate (R-45-C2a/C2b/C2c) and escalation path (§R-45.5/R-45.6/R-45.7).
+
+---
+
+### R-45.1 Trigger Matrix
+
+| Trigger | Detection path | Severity |
+|---|---|---|
+| `system.cron_job_stale` (`job_name = 'litigation_hold_compliance_monitor'`) | `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-compliance` | P1 base; escalate to P0 if R-45-C2b confirms any active LITH-SLO-02 breach |
+| Manual discovery by IC | R-45-C1 confirms no `cron.job_run_details` row for job 45 within 26h | Any severity | Open R-45 manually; emit `system.litigation_hold_monitor_stale_declared` HIGH/7yr immediately |
+
+---
+
+### R-45.2 Severity Classification
+
+| Condition | Severity | Escalation |
+|---|---|---|
+| Default (stale detected, C2a/C2b/C2c not yet run) | **P1** | compliance-officer + devops-lead |
+| R-45-C2b returns ≥ 1 hold past `max_expiry_date` (LITH-SLO-02 breach) | **P0** | Immediate: founder + compliance-officer; devops-lead seconded |
+| R-45-C2a or R-45-C2c return ≥ 1 row; R-45-C2b = 0 (LITH-SLO-01 or LITH-SLO-03 breach only) | **P1** | compliance-officer + devops-lead |
+| R-45-C2a/C2b/C2c all return 0, stale < 48h | **P1** | No P0 escalation; continue R-45 recovery |
+
+---
+
+### R-45.3 Immediate Actions (T+0 to T+30 min)
+
+**T+0:**
+1. Acknowledge PagerDuty P1 `form-compliance` alert (dedup `litigation-hold-monitor-stale`).
+2. Emit `system.litigation_hold_monitor_stale_declared` HIGH/7yr (see §R-45.10) with `trigger = 'pagerduty_alert'`.
+3. Open Linear ticket tagged `[R-45]` and record `incident_id` (UUID from step 2 event).
+
+**T+0 — Run R-45-C1 (pg_cron staleness confirmation):**
+
+```sql
+SELECT
+  job_name,
+  status,
+  run_at,
+  return_message,
+  NOW() - run_at AS age
+FROM cron.job_run_details
+WHERE job_name = 'litigation_hold_compliance_monitor'
+ORDER BY run_at DESC
+LIMIT 5;
+```
+
+**R-45-C1 pass condition:** At least one row with `status = 'succeeded'` within the last 26 hours.
+
+**T+5 — Run R-45-C2a (LITH-SLO-01 breach gate — review overdue):**
+
+```sql
+SELECT
+  tenant_id,
+  activation_date,
+  target_review_date,
+  CURRENT_DATE - target_review_date AS days_overdue
+FROM litigation_hold_records
+WHERE target_review_date < CURRENT_DATE
+  AND status = 'declared'
+ORDER BY days_overdue DESC;
+```
+
+**R-45-C2a result:** If any rows returned: LITH-SLO-01 breach detected during stale window — follow §R-45.5.
+
+**T+5 — Run R-45-C2b (LITH-SLO-02 breach gate — max-duration cap — P0 escalation gate):**
+
+```sql
+SELECT
+  tenant_id,
+  activation_date,
+  max_expiry_date,
+  CURRENT_DATE - max_expiry_date AS days_over_limit
+FROM litigation_hold_records
+WHERE max_expiry_date < CURRENT_DATE
+  AND status = 'declared'
+ORDER BY days_over_limit DESC;
+```
+
+**R-45-C2b pass condition:** Zero rows returned (no holds past 36-month MSA §11.6.4 cap). **If any row is returned: immediately escalate to P0 — page founder + compliance-officer now. Follow §R-45.6.**
+
+**T+10 — Run R-45-C2c (LITH-SLO-03 breach gate — deletion overdue):**
+
+```sql
+SELECT
+  tenant_id,
+  activation_date,
+  deletion_target_date,
+  CURRENT_DATE - deletion_target_date AS days_overdue,
+  release_date
+FROM litigation_hold_records
+WHERE deletion_target_date < CURRENT_DATE
+  AND status = 'released'
+  AND deletion_completed_date IS NULL
+ORDER BY days_overdue DESC;
+```
+
+**R-45-C2c result:** If any rows returned: LITH-SLO-03 breach detected during stale window — follow §R-45.7.
+
+**T+15 — Run R-45-C3 (peer job health — H4 discriminator):**
+
+```sql
+SELECT
+  job_name,
+  MAX(run_at) AS last_run,
+  NOW() - MAX(run_at) AS age
+FROM cron.job_run_details
+WHERE job_name IN (
+  'deletion_sla_monitor',        -- job 43
+  'offboard_chain_monitor',      -- job 44
+  'renewal_notice_check',        -- job 39
+  'white_label_cert_check'       -- job 40
+)
+GROUP BY job_name
+HAVING NOW() - MAX(run_at) > INTERVAL '26 hours'
+ORDER BY age DESC;
+```
+
+**R-45-C3 interpretation:** If ≥ 2 peer daily jobs are also stale → H4 (Supabase platform outage) likely → co-activate R-03.
+
+**T+20 — Run R-45-C4 (job registration check — H1 discriminator):**
+
+```sql
+SELECT jobid, jobname, schedule, active
+FROM cron.job
+WHERE jobname = 'litigation_hold_compliance_monitor';
+```
+
+**R-45-C4 interpretation:** No row → job deleted/disabled (H1 — re-register; if unauthorized → R-05). Row with `active = false` → job manually disabled (investigate authorization before re-enabling).
+
+**T+25 — P0 decision gate:** If R-45-C2b returned any row: page founder now. Do not wait for root cause resolution — LITH-SLO-02 breach means a hold has exceeded the 36-month MSA §11.6.4 cap.
+
+---
+
+### R-45.4 Root Cause Hypotheses
+
+| ID | Hypothesis | Discriminator | Primary fix |
+|---|---|---|---|
+| **H1** | Job deleted or disabled — scheduled slot absent or `active = false` in `cron.job` | R-45-C4: no row or `active = false` | Re-register via `cron.schedule()` in `form_system` DB session; if unauthorized deletion → co-activate R-05 immediately |
+| **H2** | `form_system` role permissions revoked from `litigation_hold_records` — job runs but fails with permission denied | R-45-C1 `return_message` contains `permission denied for table litigation_hold_records` | `GRANT SELECT ON litigation_hold_records TO form_system;` + confirm `REVOKE ALL ON litigation_hold_records FROM form_api;` still in force |
+| **H3** | pg_net degraded — job executes SQL sweeps but fails to emit DEC-030 events or fire PagerDuty | R-45-C1 shows `status = 'failed'` with pg_net `return_message`; check `pg_net.http_request_queue` | Escalate to Supabase support; auto-recovery when pg_net resumes; no manual data action required unless C2a/C2b/C2c positive |
+| **H4** | Supabase platform outage — all pg_cron jobs stale simultaneously | R-45-C3: ≥ 2 peer daily jobs also stale | Co-activate R-03 (Infrastructure Outage) as primary; R-45 continues in parallel for the three-breach gate; await platform recovery |
+
+---
+
+### R-45.5 Review-Overdue Escalation Path (LITH-SLO-01 Breach During Stale Window)
+
+Activated when **R-45-C2a returns ≥ 1 row** (`target_review_date < CURRENT_DATE AND status = 'declared'`).
+
+**Impact:** One or more litigation holds have passed their 6-month review date (MSA §11.6.3) while job 45 monitoring was inactive. No automated AL-LITH-01 alert fired during the stale window.
+
+**Escalation path:**
+1. Notify compliance-officer immediately (already IC — no additional page required unless IC is a delegate).
+2. For each affected hold (row from R-45-C2a):
+   - Confirm the hold is still active: `SELECT status FROM litigation_hold_records WHERE tenant_id = :id AND activation_date = :date`.
+   - Initiate the 6-month compliance review: compliance-officer schedules a review of hold scope, held data categories, and necessity with the relevant legal team.
+   - Update `target_review_date` with the confirmed or extended review date in `litigation_hold_records`.
+   - Emit `enterprise.litigation_hold_review_overdue` HIGH/7yr manually to cover the stale-window gap: payload `tenant_id`, `activation_date`, `target_review_date`, `days_overdue`, `check_run_at = NOW()`. Use the emit-audit-event Worker; confirm HTTP 200 + LITH-REVIEW-CHAIN-01 (prior `enterprise.litigation_hold_declared` for same `(tenant_id, activation_date)` must exist in HMAC chain).
+3. File a stale-window exception note at `compliance/evidence/litigation-hold/review-overdue/r45-<incident_id>/stale-window-note.md`. Content: `tenant_id` UUID, `activation_date`, `target_review_date`, `days_overdue`, `review_initiated_at`, `reviewer_id` (compliance-officer identifier — no employee PII of any tenant user). Privacy floor: no employee `user_id`, name, email, held data content, or GDPR Art. 9 data.
+4. Document in Linear `[R-45]` ticket: LITH-SLO-01 breach count at declaration, manual emit confirmation, stale-window note path.
+
+**SOC 2 auditor note (CC5.3 / C1.1):** The manually emitted `enterprise.litigation_hold_review_overdue` event preserves the detection of the review obligation in the HMAC chain even while the automated monitor was stale. The stale-window exception note documents the compensating manual control.
+
+---
+
+### R-45.6 Max-Duration Breach Escalation Path (LITH-SLO-02 Breach During Stale Window)
+
+Activated when **R-45-C2b returns ≥ 1 row** (`max_expiry_date < CURRENT_DATE AND status = 'declared'`). Severity: **P0**.
+
+**Impact:** One or more litigation holds have exceeded the 36-month maximum duration cap (MSA §11.6.4) while job 45 monitoring was inactive. This is a contractual MSA breach requiring immediate founder notification.
+
+**Escalation path:**
+1. **Immediately page founder** — do not wait for root cause resolution.
+2. For each affected hold (row from R-45-C2b):
+   - Notify the relevant enterprise tenant's CSM. CSM notifies the tenant's legal contact per MSA §11.6.4. Communication includes only `tenant_id` UUID and the MSA §11.6.4 citation — no employee-level PII or hold content.
+   - Compliance-officer and legal team determine the path: immediate hold release, or a documented extension waiver with external counsel sign-off. Note: the DDL constraint `lhr_release_date_within_max_duration` enforces the 36-month limit at the database layer on release — no override without a schema migration.
+   - Emit `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr manually: `tenant_id`, `activation_date`, `max_expiry_date`, `days_over_limit`, `check_run_at = NOW()`. Use the emit-audit-event Worker; confirm HTTP 200 + LITH-MAX-CHAIN-01 (prior `enterprise.litigation_hold_declared` for same `(tenant_id, activation_date)` must exist in HMAC chain).
+3. File a stale-window exception note at `compliance/evidence/litigation-hold/max-duration-breach/r45-<incident_id>/stale-window-note.md`. Content: `tenant_id` UUID, `activation_date`, `max_expiry_date`, `days_over_limit`, `csm_notified_at`, `tenant_legal_notified_at`, `resolution_path` (release | waiver). Privacy floor: no employee `user_id`, name, email, held data content, or GDPR Art. 9 data.
+4. Document in Linear `[R-45]` ticket: LITH-SLO-02 breach count at declaration, manual emit confirmation, stale-window note path.
+5. **P0 post-mortem required within 72 hours** of P0 resolution (§R-45.13).
+
+**SOC 2 auditor note (C1.1 / CC5.3):** The CRITICAL/7yr `enterprise.litigation_hold_max_duration_breached` event anchors the breach in the tamper-evident HMAC chain with `days_over_limit` at the moment of detection, independent of the stale monitoring window. Combined with the stale-window note, auditors can verify that FORM detected, escalated, and documented the breach promptly upon runbook activation.
+
+---
+
+### R-45.7 Deletion-Overdue Escalation Path (LITH-SLO-03 Breach During Stale Window)
+
+Activated when **R-45-C2c returns ≥ 1 row** (`deletion_target_date < CURRENT_DATE AND status = 'released' AND deletion_completed_date IS NULL`).
+
+**Impact:** One or more released litigation holds have passed the 10-business-day deletion deadline (MSA §11.6.6) while job 45 monitoring was inactive. Held data that should have been deleted remains retained.
+
+**Escalation path:**
+1. Notify compliance-officer immediately (already IC) and devops-lead.
+2. For each affected hold (row from R-45-C2c):
+   - Confirm `deletion_completed_date IS NULL` — deletion has not yet been certified.
+   - Initiate the deletion workflow: compliance-officer coordinates with devops-lead and data-engineer to execute the per-tenant data deletion (see `docs/DATA_MODEL.md §35` DSAR deletion procedure as a structural reference). Document the deletion scope in a hold-specific erasure note.
+   - Emit `enterprise.litigation_hold_deletion_overdue` HIGH/7yr manually: `tenant_id`, `activation_date`, `deletion_target_date`, `days_overdue`, `release_date`, `check_run_at = NOW()`. Use the emit-audit-event Worker; confirm HTTP 200 + LITH-DEL-CHAIN-01 (prior `enterprise.litigation_hold_released` for same `(tenant_id, activation_date)` must exist in HMAC chain).
+   - Once deletion is certified: update `deletion_completed_date` in `litigation_hold_records`. This auto-resolves LITH-SLO-03 on the next job 45 run.
+3. File a stale-window exception note at `compliance/evidence/litigation-hold/deletion-overdue/r45-<incident_id>/stale-window-note.md`. Content: `tenant_id` UUID, `activation_date`, `deletion_target_date`, `days_overdue`, `deletion_initiated_at`, `deletion_certified_at`, `deletion_scope_artefact_path`. Privacy floor: no employee `user_id`, name, email, held data content, or GDPR Art. 9 data beyond `tenant_id` UUID.
+4. Document in Linear `[R-45]` ticket: LITH-SLO-03 breach count at declaration, manual emit confirmation, `deletion_completed_date` populated.
+
+**SOC 2 auditor note (C1.2 / CC5.3):** The HIGH/7yr `enterprise.litigation_hold_deletion_overdue` event documents the gap between `deletion_target_date` and actual detection in the HMAC chain. Combined with LITH-E-001 (DATA_MODEL §46.7 — per-hold disposal outcome record), auditors have two independent C1.2 evidence paths for the disposal obligation.
+
+---
+
+### R-45.8 Six-Step Recovery Procedure
+
+After completing R-45-C1 through R-45-C4 and the active-breach escalation paths (§R-45.5/R-45.6/R-45.7) in parallel, restore job 45:
+
+**Step 1 — H1: Job deleted or disabled**
+
+If R-45-C4 returned no row or `active = false`:
+```sql
+-- Re-register (run as superuser or form_system session)
+SELECT cron.schedule(
+  'litigation_hold_compliance_monitor',
+  '0 8 * * *',
+  $$SELECT litigation_hold_compliance_monitor()$$
+);
+-- Verify registration
+SELECT jobid, jobname, schedule, active
+FROM cron.job WHERE jobname = 'litigation_hold_compliance_monitor';
+```
+If the deletion was unauthorized (not by devops-lead per a documented change): **co-activate R-05 immediately** and rotate `form_system` credentials.
+
+**Step 2 — H2: `form_system` permissions revoked**
+
+If R-45-C1 `return_message` contains `permission denied for table litigation_hold_records`:
+```sql
+-- Run as superuser
+GRANT SELECT ON litigation_hold_records TO form_system;
+-- Confirm form_api REVOKED
+REVOKE ALL ON litigation_hold_records FROM form_api;
+-- Verify
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_name = 'litigation_hold_records'
+  AND grantee IN ('form_system', 'form_api');
+-- Expected: form_system → SELECT; form_api → no rows
+```
+
+**Step 3 — H3: pg_net degraded**
+
+If R-45-C1 shows the job registered and ran but `return_message` indicates pg_net HTTP failures:
+- Check `pg_net.http_request_queue` for stuck requests.
+- Escalate to Supabase support ticket referencing pg_net degradation.
+- Job auto-recovers on the next 08:00 UTC run when pg_net is restored — no manual data action required unless C2a/C2b/C2c are positive.
+
+**Step 4 — H4: Supabase platform outage**
+
+If R-45-C3 shows ≥ 2 peer daily jobs also stale:
+- Co-activate R-03 as the primary runbook.
+- R-45 continues in parallel: complete C2a/C2b/C2c breach gates and §R-45.5/R-45.6/R-45.7 escalation paths now.
+- Await Supabase platform recovery; pg_cron resumes automatically on next 08:00 UTC run.
+
+**Step 5 — Active compliance breach (any C2a/C2b/C2c positive)**
+
+Execute the applicable escalation paths before proceeding to Step 6:
+- C2a positive → §R-45.5 (LITH-SLO-01 review-overdue)
+- C2b positive → §R-45.6 (LITH-SLO-02 max-duration breach — P0)
+- C2c positive → §R-45.7 (LITH-SLO-03 deletion-overdue)
+- Multiple positive → execute all applicable paths in parallel; compliance-officer coordinates.
+
+**Step 6 — Post-recovery verification and restoration**
+
+After restoring the job (Steps 1–4) and completing all active-breach paths (Step 5):
+```sql
+-- Manually trigger job 45 to confirm healthy execution
+SELECT cron.run_job(
+  (SELECT jobid FROM cron.job WHERE jobname = 'litigation_hold_compliance_monitor')
+);
+-- Confirm within 60 seconds:
+SELECT status, return_message, run_at
+FROM cron.job_run_details
+WHERE job_name = 'litigation_hold_compliance_monitor'
+ORDER BY run_at DESC LIMIT 1;
+```
+1. Verify `system.litigation_hold_check_passed` LOW/1yr was emitted (confirms all-clear sweep ran; no `tenant_id` in payload — privacy floor).
+2. Re-run R-45-C2a/C2b/C2c to confirm all breach counts are now 0 or all active holds have been actioned.
+3. Emit `system.litigation_hold_monitor_restored` STANDARD/3yr (see §R-45.10) with final breach counts from C2a/C2b/C2c at restoration.
+4. Resolve PagerDuty P1 or P0 alert — dedup `litigation-hold-monitor-stale`.
+5. Close Linear ticket `[R-45]`.
+
+---
+
+### R-45.9 Internal Communication Template
+
+**Template LITH-MON-INT-01 — P1 (no LITH-SLO-02 breach):**
+
+```
+Channel: #legal-compliance (Slack)
+Subject: [P1] job 45 litigation_hold_compliance_monitor stale — LITH-SLO-01/02/03 monitoring blind spot
+
+Status: job 45 exceeded 26h freshness window. Stale since: <confirmed_stale_since>.
+Active breach sweep (C2a/C2b/C2c):
+  LITH-SLO-01 review-overdue: <count> hold(s) — §R-45.5 <in progress|complete>
+  LITH-SLO-02 max-duration breach: 0 holds — P0 not triggered
+  LITH-SLO-03 deletion-overdue: <count> hold(s) — §R-45.7 <in progress|complete>
+Root cause under investigation (H<n>). Job recovery ETA: <ETA or 'next 08:00 UTC run after recovery'>.
+Incident ID: <incident_id> (Linear [R-45])
+```
+
+**Template LITH-MON-INT-02 — P0 (LITH-SLO-02 max-duration breach):**
+
+```
+Channel: #legal-compliance (Slack) + founder paged via PagerDuty
+Subject: [P0] job 45 stale — LITH-SLO-02 BREACH: <N> hold(s) past 36-month MSA §11.6.4 cap
+
+CRITICAL: <N> litigation hold(s) have exceeded the 36-month MSA §11.6.4 maximum duration cap.
+Monitoring sentinel (job 45) was stale for <stale_hours>h. Manual breach escalation per §R-45.6 in progress.
+Affected tenants: <tenant_id_uuid_list> (FORM-internal UUIDs only — no employee PII)
+CSM notification: <in progress | complete>
+Compliance-officer + legal team assessing hold release / extension waiver path.
+P0 post-mortem required within 72h of resolution.
+Incident ID: <incident_id> (Linear [R-45])
+```
+
+---
+
+### R-45.10 DEC-030 HMAC-Chained Events
+
+These two events anchor the R-45 activation in the HMAC-chained audit record. Both must be registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Litigation Hold Monitoring events` (§54.10 item 1 obligation).
+
+**`system.litigation_hold_monitor_stale_declared`** — HIGH / 7 yr
+
+| Attribute | Value |
+|---|---|
+| Emitter | compliance-officer (IC) via Admin Console PAM session at T+0 |
+| Timing | R-45 T+0 — on receipt of `system.cron_job_stale` PagerDuty or manual discovery |
+| Privacy floor | Integer counts and timestamps only — no `tenant_id`, no employee `user_id`, no health data, no GDPR Art. 9 data |
+
+```typescript
+LitigationHoldMonitorStaleDeclaredPayload: z.object({
+  incident_id:                          z.string().uuid(),
+  confirmed_stale_since:                z.string().datetime(),
+  stale_hours:                          z.number().positive(),
+  missed_runs:                          z.number().int().nonnegative(),
+  trigger:                              z.enum(['pagerduty_alert', 'manual_discovery', 'co_active_r03']),
+  initial_severity:                     z.enum(['P1', 'P0']),
+  review_overdue_count_at_declared:      z.number().int().nonnegative(),
+  max_duration_breach_count_at_declared: z.number().int().nonnegative(),
+  deletion_overdue_count_at_declared:    z.number().int().nonnegative(),
+})
+```
+
+**`system.litigation_hold_monitor_restored`** — STANDARD / 3 yr
+
+| Attribute | Value |
+|---|---|
+| Emitter | compliance-officer (IC) at R-45 Step 6 |
+| Timing | R-45 Step 6 — after job 45 confirmed healthy and C2a/C2b/C2c re-run passes |
+| Privacy floor | Integer counts and timestamps only — no `tenant_id`, no employee `user_id`, no health data, no GDPR Art. 9 data |
+
+```typescript
+LitigationHoldMonitorRestoredPayload: z.object({
+  incident_id:                           z.string().uuid(),
+  restored_at:                           z.string().datetime(),
+  root_cause:                            z.enum(['H1', 'H2', 'H3', 'H4']),
+  fix_deployed_at:                       z.string().datetime(),
+  stale_window_hours:                    z.number().positive(),
+  review_overdue_count_at_declared:       z.number().int().nonnegative(),
+  max_duration_breach_count_at_declared:  z.number().int().nonnegative(),
+  deletion_overdue_count_at_declared:     z.number().int().nonnegative(),
+  review_overdue_count_at_restored:       z.number().int().nonnegative(),
+  max_duration_breach_count_at_restored:  z.number().int().nonnegative(),
+  deletion_overdue_count_at_restored:     z.number().int().nonnegative(),
+})
+```
+
+**LITH-MONITOR-STALE-CHAIN-01 — Ordering invariant:**
+
+`system.litigation_hold_monitor_restored` is blocked (HTTP 422 `LITH_MONITOR_STALE_CHAIN_01_VIOLATION`) if no prior `system.litigation_hold_monitor_stale_declared` exists for the same `incident_id`; violation → R-05 activated. Privacy floor (both events): integer counts and timestamps only — no `tenant_id`, no employee `user_id`, no health data, no GDPR Art. 9 special-category data. Affected hold details live only in per-path stale-window exception notes under `compliance/evidence/litigation-hold/*/r45-<incident_id>/` (access: compliance_reviewer; `form_api` REVOKED per §80.3).
+
+---
+
+### R-45.11 Evidence Preservation
+
+| Evidence item | Content | SOC 2 | Retention | Path |
+|---|---|---|---|---|
+| R-45-C1 output | `cron.job_run_details` for job 45 covering stale window — `status`, `run_at`, `return_message` from `confirmed_stale_since` to `restored_at` | CC7.2 | 3 yr | `compliance/evidence/litigation-hold/r45-<incident_id>/stale-window-job-runs.csv` |
+| R-45-C2a at declaration | LITH-SLO-01 breach count + `(tenant_id, activation_date)` list at T+0 | CC5.3 / C1.1 | 7 yr | `compliance/evidence/litigation-hold/r45-<incident_id>/review-overdue-at-declared.csv` |
+| R-45-C2b at declaration | LITH-SLO-02 breach count + `(tenant_id, activation_date)` list at T+0 | C1.1 / CC5.3 | 7 yr | `compliance/evidence/litigation-hold/r45-<incident_id>/max-duration-breach-at-declared.csv` |
+| R-45-C2c at declaration | LITH-SLO-03 breach count + `(tenant_id, activation_date)` list at T+0 | C1.2 / CC5.3 | 7 yr | `compliance/evidence/litigation-hold/r45-<incident_id>/deletion-overdue-at-declared.csv` |
+| C2a/C2b/C2c at restoration | All three breach counts post-recovery (must be 0 or all affected holds actioned) | CC5.3 / C1.1 / C1.2 / A1.1 | 7 yr | `compliance/evidence/litigation-hold/r45-<incident_id>/breach-counts-at-restored.csv` |
+| Stale-window exception notes | Per-path hold detail when breach confirmed (§R-45.5/R-45.6/R-45.7; `tenant_id` UUID only; `form_api` REVOKED) | C1.1 / C1.2 / CC7.2 | 7 yr | `compliance/evidence/litigation-hold/{review-overdue,max-duration-breach,deletion-overdue}/r45-<incident_id>/stale-window-note.md` |
+| DEC-030 event pair | `system.litigation_hold_monitor_stale_declared` (HIGH/7yr) + `system.litigation_hold_monitor_restored` (STANDARD/3yr) in `audit_log_events` — HMAC-chained, independently verifiable per HMAC-VERIFY-ALGO-001 | CC7.2 | per event | `audit_log_events` table (tamper-evident via DEC-030) |
+
+**Annual artefact:** LITH-OBS-E-001 (CC5.3/CC4.1/C1.2, annual, 3yr — `compliance/evidence/litigation-hold/LITH-OBS-E-001_<YYYY>.md`). R-45 activations are included in the AL-LITH-01/02/03 activation log sections. Registered in `docs/SOC2_READINESS.md §79.4` per §54.8.
+
+---
+
+### R-45.12 SOC 2 Criteria Mapping
+
+| Criterion | Narrative |
+|---|---|
+| **CC5.3** | R-45 demonstrates that FORM's three-layer structural controls for litigation hold compliance (DDL CHECK constraints via DATA_MODEL §46, automated pg_cron monitoring via job 45, compliance-officer Admin Console PAM workflow) include an IC protocol for when the automated layer fails. The §R-45.5/R-45.6/R-45.7 escalation paths with manual DEC-030 event emission provide the compensating control: detection and response continue even when the automated sentinel is stale. |
+| **C1.1** | R-45 §R-45.6 (LITH-SLO-02) is the IC response to the MSA §11.6.4 36-month cap. `max_duration_breach_count_at_declared = 0` in the `stale_declared` event is the auditor-inspectable attestation that no C1.1 breach occurred undetected during the stale window. |
+| **C1.2** | R-45 §R-45.7 (LITH-SLO-03) is the IC response to the MSA §11.6.6 10-business-day deletion obligation. `deletion_overdue_count_at_declared = 0` confirms no C1.2 breach occurred undetected. Combined with LITH-E-001 (DATA_MODEL §46.7), auditors have two independent C1.2 evidence paths. |
+| **CC7.1** | R-45 is activated by `pg-cron-health-monitor` (§12.7), a CC7.1 monitoring control. The structured response (five scope queries, three breach gates, H1–H4 root cause classification, DEC-030 HMAC-chained pair) demonstrates defined procedures for responding to monitoring system failures, not just to the breaches those systems monitor. |
+| **CC7.2** | `pg-cron-health-monitor` detects the `litigation_hold_compliance_monitor` gap and emits `system.cron_job_stale`. R-45 activates. DEC-030 HMAC chain (`stale_declared` → `stale_restored`) provides the tamper-evident detection-to-restoration timeline independently verifiable per HMAC-VERIFY-ALGO-001. |
+
+> **Auditor narrative (CC5.3 + C1.1 + C1.2 + CC7.1 + CC7.2):** FORM's `litigation_hold_compliance_monitor` (job 45, `0 8 * * *`, 26h freshness window) performs a daily sweep of `litigation_hold_records` for three MSA §11.6 compliance obligations: LITH-SLO-01 (6-month review, CC5.3/MSA §11.6.3), LITH-SLO-02 (36-month cap, C1.1/MSA §11.6.4), and LITH-SLO-03 (10-business-day deletion, C1.2/MSA §11.6.6). `pg-cron-health-monitor` (§12.7) detects any gap exceeding 26h and pages compliance-officer via PagerDuty P1 `form-compliance`. R-45 provides the IC with a structured response including immediate breach assessment across all three obligation types (R-45-C2a/C2b/C2c). The DEC-030 HMAC-chained event pair (`system.litigation_hold_monitor_stale_declared` HIGH/7yr → `system.litigation_hold_monitor_restored` STANDARD/3yr) anchors the stale window in the tamper-evident audit record with all six breach counts (at declaration and restoration) preserved in both event payloads. The three zero-values at declaration (`review_overdue_count_at_declared = 0`, `max_duration_breach_count_at_declared = 0`, `deletion_overdue_count_at_declared = 0`) together constitute the auditor-inspectable attestation that no CC5.3/C1.1/C1.2 obligation breach occurred undetected during the stale window.
+
+---
+
+### R-45.13 Post-Incident Controls
+
+| Control | Action | Owner | Timing |
+|---|---|---|---|
+| **H1 unauthorized deletion** | Activate R-05 + rotate `form_system` credentials; confirm no other pg_cron jobs modified in the same maintenance window | security-engineer | Before PagerDuty resolution |
+| **Active LITH-SLO-02 breach (P0)** | Confirm all affected holds have been released or a documented waiver filed with external counsel; notify CSM and tenant legal contact per §R-45.6; file per-hold stale-window note; P0 post-mortem within 72h | compliance-officer + devops-lead | Before PagerDuty resolution + T+72h |
+| **Active LITH-SLO-01 breach** | Confirm all affected holds have had reviews initiated and `target_review_date` updated; file per-hold stale-window note | compliance-officer | Before PagerDuty resolution |
+| **Active LITH-SLO-03 breach** | Confirm `deletion_completed_date` populated for all affected holds; file per-hold stale-window note | compliance-officer + devops-lead | Before PagerDuty resolution |
+| **§12.6 + §54.4 cross-references** | `docs/OBSERVABILITY.md §12.6` job 45 entry shows `INCIDENT_RESPONSE R-45 (§R-45.5/R-45.6/R-45.7; v1.0, 2026-06-25)`; §54.4 AL-LITH-01/02/03 runbook rows updated; §54.10 item 6 marked Done | devops-lead | This §54.10 item 6 closure — [x] Done 2026-06-25 (this commit) |
+| **LITH-OBS-E-001 annual artefact** | Include R-45 activations in AL-LITH-01/02/03 activation log sections of the annual LITH-OBS-E-001 filing | compliance-officer | End of the relevant annual collection period |
+| **P0 post-mortem** | File PIR within 72h of P0 resolution if LITH-SLO-02 breach confirmed during stale window; distribute to compliance-officer + devops-lead + founder | compliance-officer | T+72h from P0 resolution |
+
+---
+
+### R-45.14 Implementation Checklist
+
+#### P0 — Before job 45 is deployed to production (M6)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.litigation_hold_monitor_stale_declared` (HIGH/7yr) and `system.litigation_hold_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Litigation Hold Monitoring events`. Add LITH-MONITOR-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-45.10. | security-engineer + compliance-officer | **P0** | M6 | [ ] |
+| 2 | Deploy R-45 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'litigation_hold_compliance_monitor'` to PagerDuty service `form-compliance` P1, dedup key `litigation-hold-monitor-stale`, routing to compliance-officer. Integration test: disable job 45 in staging for > 26h (or inject a `system.cron_job_stale` event); confirm PagerDuty P1 fires on `form-compliance` with correct dedup key. | devops-lead | **P0** | M6 | [ ] |
+
+#### P1 — Before first enterprise tenant with a litigation hold is onboarded (M7)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Confirm `docs/OBSERVABILITY.md §12.6` job 45 entry shows `INCIDENT_RESPONSE R-45 (§R-45.5/R-45.6/R-45.7; v1.0, 2026-06-25)` and §54.4 AL-LITH-01/02/03 runbook rows no longer say "to be authored". | devops-lead | **P1** | M7 | [x] Done — 2026-06-25 (OBSERVABILITY.md v5.2.2, this commit) |
+| 4 | Register LITH-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` if compliance-officer determines a separate stale-activation artefact is warranted beyond LITH-OBS-E-001 (§54.8). LITH-OBS-E-001 already includes R-45 activation log rows in AL-LITH-01/02/03 sections — evaluate overlap before creating a separate LITH-STALE-E-001. | compliance-officer | **P1** | M8 | [ ] |
+
+---
+
+*v1.0 (2026-06-25): R-45 Litigation Hold Compliance Monitor Stale — forty-fifth runbook. Closes `docs/OBSERVABILITY.md §54.10` item 6 (P1/M7 — author R-45 stale recovery runbook). Job 45 `litigation_hold_compliance_monitor` (`0 8 * * *`, 26h freshness window) was registered in §12.6 (v1.8 patch, 2026-06-25) and §54 (v5.2.0, 2026-06-25) as the authoritative spec for LITH-SLO-01/02/03 monitoring, but the stale-recovery runbook was explicitly deferred as §54.10 item 6. Critical characteristic: job 45 staleness creates a simultaneous LITH-SLO-01/02/03 detection blind spot — unlike peer stale runbooks (R-41 for job 43 single deletion-SLA obligation; R-44 for job 44 single offboarding obligation), R-45 monitors three distinct MSA §11.6 obligations requiring three independent breach gates (R-45-C2a/C2b/C2c) and three escalation paths (§R-45.5/§R-45.6/§R-45.7). The LITH-SLO-02 max-duration breach (C2b positive) is the most critical: a hold past `max_expiry_date` is an unconditional MSA contractual breach requiring immediate P0, founder notification, CSM escalation, and legal determination of release-or-waiver. Privacy floor: `litigation_hold_records` carries `tenant_id` UUID (FORM-internal) only — no employee `user_id`, name, email, health value, or GDPR Art. 9 data in any R-45 event payload; both DEC-030 event payloads carry only integer counts, timestamps, and enum values (no `tenant_id`), consistent with `system.offboard_chain_check_passed` privacy pattern. Trigger: `system.cron_job_stale` with `job_name = 'litigation_hold_compliance_monitor'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-compliance` → compliance-officer; dedup `litigation-hold-monitor-stale`. H1–H4 root cause hypotheses follow R-44 pattern (H1: job deleted; H2: `form_system` permissions; H3: pg_net degraded; H4: Supabase outage → R-03). Five scope queries: R-45-C1 (pg_cron staleness confirmation — last 5 job 45 runs); R-45-C2a (LITH-SLO-01 review-overdue breach gate); R-45-C2b (LITH-SLO-02 max-duration breach gate — P0 trigger); R-45-C2c (LITH-SLO-03 deletion-overdue breach gate); R-45-C3 (peer job health — H4 discriminator ≥ 2 daily peers stale); R-45-C4 (job registration check — H1 discriminator). Six-step recovery: Step 1 (H1 — re-register + R-05 if unauthorized); Step 2 (H2 — restore `form_system` SELECT, confirm `form_api` REVOKED); Step 3 (H3 — Supabase support for pg_net); Step 4 (H4 — R-03 co-activation); Step 5 (active breach — execute §R-45.5/R-45.6/R-45.7 per C2a/C2b/C2c); Step 6 (manual run + all-clear confirm + emit `stale_restored` + resolve PagerDuty). Two DEC-030 HMAC-chained events: `system.litigation_hold_monitor_stale_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_hours` positive, `missed_runs` nonneg int, `trigger` enum, `initial_severity` enum P1|P0, three `_count_at_declared` nonneg ints); `system.litigation_hold_monitor_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `stale_window_hours` positive, six `_count_at_declared/_at_restored` nonneg ints); LITH-MONITOR-STALE-CHAIN-01: `restored` requires prior `declared` for same `incident_id`; HTTP 422 `LITH_MONITOR_STALE_CHAIN_01_VIOLATION` on breach → R-05. Three-escalation-path structure: §R-45.5 (LITH-SLO-01 review-overdue — manual emit `enterprise.litigation_hold_review_overdue` HIGH/7yr + stale-window note `review-overdue/r45-<id>/stale-window-note.md`); §R-45.6 (LITH-SLO-02 max-duration breach — P0 founder page + CSM notification + legal waiver-or-release + manual emit `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr + stale-window note `max-duration-breach/r45-<id>/stale-window-note.md`; DDL backstop `lhr_release_date_within_max_duration` enforces at release); §R-45.7 (LITH-SLO-03 deletion-overdue — manual deletion workflow initiation + `deletion_completed_date` population + manual emit `enterprise.litigation_hold_deletion_overdue` HIGH/7yr + stale-window note `deletion-overdue/r45-<id>/stale-window-note.md`). Evidence: R-45-C1 stale-window job run export (CC7.2, 3yr); three R-45-C2 scope outputs at declaration (CC5.3/C1.1/C1.2, 7yr); three R-45-C2 scope outputs at restoration (CC5.3/C1.1/C1.2/A1.1, 7yr); per-path stale-window notes (C1.1/C1.2/CC7.2, 7yr — only when breach confirmed); DEC-030 event pair chain-verifiable per HMAC-VERIFY-ALGO-001. SOC 2: CC5.3 (three-layer structural controls IC protocol for monitoring-layer failure; §R-45.5/R-45.6/R-45.7 compensating controls); C1.1 (MSA §11.6.4 36-month cap — `max_duration_breach_count_at_declared = 0` auditor-inspectable attestation); C1.2 (MSA §11.6.6 deletion + LITH-E-001 dual evidence path); CC7.1 (structured IC response to monitoring system failure); CC7.2 (`pg-cron-health-monitor` + HMAC chain tamper-evident timeline). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 45 entry updated — [x] Done this commit); `docs/OBSERVABILITY.md §54.4` (AL-LITH-01/02/03 runbook rows updated — [x] Done this commit); `docs/OBSERVABILITY.md §54.10` item 6 (closed — [x] Done this commit); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Litigation Hold Monitoring events` (two new R-45 events to register — §R-45.14 item 1, P0/M6); `docs/DATA_MODEL.md §46` (`litigation_hold_records` — three covering indexes; RLS `form_api` REVOKED; MSA §11.6 procedure; LITH-E-001 §46.7); `docs/MSA_TEMPLATE.md §11.6` (litigation hold lifecycle: 6-month review §11.6.3, 36-month cap §11.6.4, 10-business-day deletion §11.6.6); R-03 (H4 co-activation); R-05 (H1 unauthorized deletion co-activation; LITH-MONITOR-STALE-CHAIN-01 violation escalation); R-41 (GDPR Deletion SLA Monitor Stale — structural peer, single-obligation); R-44 (Offboard Chain Monitor Stale — structural peer, single-obligation). Owner: devops-lead + compliance-officer.*
 
 ---
 
