@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [8.80.0] — 2026-06-25
+
+### Added
+- `docs/OBSERVABILITY.md §54` — Litigation Hold Compliance Observability (v5.2.0). Closes DATA_MODEL §46.8 item 3 (P1/M6). Three SLOs (LITH-SLO-01: 6-month review; LITH-SLO-02: 36-month max duration; LITH-SLO-03: 10-business-day post-release deletion), three alert rules (AL-LITH-01/02/03), pg_cron job 45 `litigation_hold_compliance_monitor` (`0 8 * * *`, 3 enforcement SQL sweeps via covering indexes, 3 DEC-030 chain invariants), LITH-OBS-E-001 monitoring-layer evidence artefact (annual, 3yr, CC5.3/CC4.1/C1.2). §6.2 `litigation_hold_health` subsection inserted; §12.6 job 45 registered.
+- `docs/SOC2_READINESS.md §112` — Cross-Reference Patch (v3.37.0). Closes DATA_MODEL §46.8 item 4 + OBSERVABILITY §54.10 item 5. Registers LITH-E-001 (C1.2/CC5.3/CC4.1, annual 7yr) + LITH-OBS-E-001 (CC5.3/CC4.1/C1.2, annual 3yr) in §79.4 master consolidated evidence table (count 67 → 69); creates R2 subfolder `compliance/evidence/litigation-hold/` (EU-region, form_api NO ACCESS); adds 2 entries to §80.4 Vanta mirror.
+
+### Changed
+- `docs/DATA_MODEL.md` — v1.31 → v1.32. §46.9 cross-reference table updated: OBSERVABILITY §54 🟡 → 🟢 (v5.2.0); SOC2_READINESS §79.4 LITH-E-001+LITH-OBS-E-001 🟡 → 🟢 (§112 v3.37.0). §46.8 checklist items 3+4 marked Done.
+- `docs/OBSERVABILITY.md` — v5.1.5 → v5.2.0/v5.2.1. §54 appended; §6.2 `litigation_hold_health` subsection inserted; §12.6 job 45 `litigation_hold_compliance_monitor` registered; freshness window note extended; v1.8 patch note added.
+- `docs/SOC2_READINESS.md` — v3.36.0 → v3.37.0. §112 appended.
+
 ## [8.79.1] — 2026-06-25
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.1.5
+# FORM · Observability & Monitoring Taxonomy v5.2.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -541,6 +541,17 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 | **GDPR deletion SLA warning / critical** | `deletion_sla_monitor` pg_cron (job 43, `0 */6 * * *`): `enterprise_churn_events WHERE deletion_requested_at IS NOT NULL AND deletion_completed_at IS NULL`; at day 25 (`now() - deletion_requested_at > INTERVAL '25 days'`): emits `enterprise.deletion_sla_warning` HIGH/7yr + fires P1 per flagged tenant; at day 29: emits `enterprise.deletion_sla_critical` CRITICAL/7yr + escalates to P0; dedup `deletion-sla-warning-{tenant_id}` 6h cooldown (re-alerts every 6h until resolved); auto-resolves on `deletion_completed_at` populated at next job 43 run; 7h freshness window (1-run tolerance of 6h cadence); `form_api` REVOKED — job runs via `form_system` role; privacy: payload carries only `tenant_id` UUID, `days_since_deletion_requested` int, `alert_tier` enum — no employee PII or GDPR Art. 9 data | P1 (day 25 warning) → P0 (day 29 critical escalation) | P1: PagerDuty `form-enterprise` → compliance-officer + enterprise-architect; P0 escalation → founder + compliance-officer; 6h dedup | §53.4 AL-DEL-01 (formalised from §12.6 job 43 annotation); INCIDENT_RESPONSE.md R-41 (§R-41.5); COST_MODEL.md §43.10 item 3 (obligation source) |
 
 **SOC 2 mapping (enterprise_post_churn_health):** CC6.1 / CC7.1 (AL-OFFL-01 — OFFBOARD-CHAIN-01 MSA §7 deprovisioning SLA; `offboard_chain_monitor` job 44 hourly fleet-sweep; CHN-OBS-E-001 quarterly monitoring evidence — `compliance/evidence/offboarding/`); C1.2 / CC4.1 / P8 (AL-DEL-01 — GDPR Art. 17 deletion SLA sentinel; `deletion_sla_monitor` job 43; DEL-OBS-E-001 quarterly monitoring evidence — `compliance/evidence/deletions/`). Privacy floor: both alert payloads carry only `tenant_id` UUID + derived integer fields — no individual employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data.
+
+**Subsection: `litigation_hold_health` (AL-LITH-01/02/03 — §54.4):**
+
+| Condition | Signal source | Severity | Routing | Cross-ref |
+|---|---|---|---|---|
+| **6-month review overdue** | `litigation_hold_compliance_monitor` pg_cron (job 45, `0 8 * * *`): `litigation_hold_records WHERE target_review_date < CURRENT_DATE AND status = 'declared'`; emits `enterprise.litigation_hold_review_overdue` HIGH/7yr per flagged hold (LITH-REVIEW-CHAIN-01 ordering invariant: audit event HTTP 200 confirmed before PagerDuty fires); dedup `lith-review-overdue-{tenant_id}-{activation_date_iso}` 24h cooldown; auto-resolves on `target_review_date` extended past CURRENT_DATE at next daily run; 26h freshness window; `form_api` REVOKED from `litigation_hold_records` — job runs via `form_system` role | P1 | PagerDuty `form-compliance` → compliance-officer; Slack `#legal-compliance` HIGH | §54.4 AL-LITH-01; §54.5 (job 45 spec + sweep 1 SQL); INCIDENT_RESPONSE R-45 (to be authored — §54.10 item 6) |
+| **36-month maximum duration approaching (30-day pre-breach warning)** | `litigation_hold_compliance_monitor` pg_cron (job 45, `0 8 * * *`): sweep 2a — `litigation_hold_records WHERE max_expiry_date <= CURRENT_DATE + 30 AND max_expiry_date >= CURRENT_DATE AND status = 'declared'`; emits `enterprise.litigation_hold_max_duration_approaching` STANDARD/3yr; Slack advisory only; dedup `lith-max-duration-{tenant_id}-{activation_date_iso}` 24h; auto-resolves on `status = 'released'`; `form_api` REVOKED | P2 | Slack `#legal-compliance` WARNING only (no PagerDuty) | §54.4 AL-LITH-02 (approaching tier); §54.5 sweep 2a; MSA §11.6.4 |
+| **36-month maximum duration breached** | `litigation_hold_compliance_monitor` pg_cron (job 45, `0 8 * * *`): sweep 2b — `litigation_hold_records WHERE max_expiry_date < CURRENT_DATE AND status = 'declared'`; emits `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr (LITH-MAX-CHAIN-01 ordering invariant: audit event HTTP 200 confirmed before PagerDuty fires); dedup `lith-max-duration-{tenant_id}-{activation_date_iso}` 24h cooldown; auto-resolves on `status = 'released'`; `form_api` REVOKED | P1 | PagerDuty `form-compliance` → compliance-officer + founder; Slack `#legal-compliance` HIGH | §54.4 AL-LITH-02 (breach tier); §54.5 sweep 2b; DATA_MODEL §46 `lhr_release_date_within_max_duration` CHECK (DDL-layer backstop at release time); MSA §11.6.4 |
+| **Post-release deletion overdue** | `litigation_hold_compliance_monitor` pg_cron (job 45, `0 8 * * *`): sweep 3 — `litigation_hold_records WHERE deletion_target_date < CURRENT_DATE AND status = 'released' AND deletion_completed_date IS NULL`; emits `enterprise.litigation_hold_deletion_overdue` HIGH/7yr per flagged hold (LITH-DEL-CHAIN-01 ordering invariant: audit event HTTP 200 confirmed before PagerDuty fires); dedup `lith-deletion-overdue-{tenant_id}-{activation_date_iso}` 24h cooldown; auto-resolves on `deletion_completed_date` populated at next daily run; `form_api` REVOKED | P1 | PagerDuty `form-compliance` → compliance-officer + devops-lead; Slack `#legal-compliance` HIGH | §54.4 AL-LITH-03; §54.5 sweep 3; DATA_MODEL §46 `lhr_deletion_completed_requires_release` CHECK (DDL coherence); MSA §11.6.6 |
+
+**SOC 2 mapping (litigation_hold_health):** CC5.3 (multiple-level structural controls — DDL CHECK constraints (DATA_MODEL §46) + pg_cron automated monitoring (job 45) + compliance-officer Admin Console PAM workflow; three distinct enforcement layers; auditor-verifiable via `pg_constraint` + `pg_cron.job_run_details`); C1.2 (disposal of confidential information — AL-LITH-03 detects post-release deletion SLA breaches; LITH-OBS-E-001 annual monitoring evidence — `compliance/evidence/litigation-hold/`); C1.1 (obligations to handle confidential information — AL-LITH-02 breach detection; MSA §11.6.4 36-month cap enforcement at monitoring layer). Privacy floor: all alert payloads carry only `tenant_id` UUID (FORM-internal) + derived integer fields (`days_overdue`, `days_remaining`, `days_over_limit`) + `activation_date` DATE — no individual employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data. The `system.litigation_hold_check_passed` all-clear omits `tenant_id` entirely (aggregate fleet counts only).
 
 **Subsection: `sca_vulnerability_monitoring` (AL-SCA-01 through AL-SCA-05 — §52.4):**
 
@@ -1237,6 +1248,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `sca_sla_monitor` | `*/15 * * * *` | 20 min | CC6.8/CC7.1 — 24h critical CVE SLA enforcement sentinel; queries `audit_log_events` for `security.sca_critical_vulnerability_detected` events with `remediation_status = 'open'` and `occurred_at < NOW() - INTERVAL '24 hours'`; on breach: emits `security.sca_sla_breach` DEC-030 HIGH/7yr per open critical CVE + fires AL-SCA-01 via pg_net (PagerDuty P1 `form-security`); on all-clear: emits `system.sca_sla_check_passed` LOW/1yr (`{ open_critical_count: 0, check_run_at: datetime }`); stale = AL-SCA-01 detection blind spot — open critical CVEs could exceed the 24h SLA (SOC2_READINESS §54.5) without automated alert; SCA-SLO-01 monitoring gap | PagerDuty P1 `form-security` → security-engineer + devops-lead; dedup `sca-sla-critical-overdue` 1h; 20-min freshness (3-run tolerance of 15-min cadence — consistent with `bdg_override_expiry_sweep` (job 34) pattern); cross-ref: §52 AL-SCA-01; SOC2_READINESS §54.5 (Critical 24h SLA); SCA-OBS-E-002 (CC7.2/A1.1, quarterly 3yr); INCIDENT_RESPONSE R-42 (job 42 stale recovery runbook — §R-42.5) — **job 42** |
 | `deletion_sla_monitor` | `0 */6 * * *` | 7 h | C1.2/CC4.1 — GDPR Art. 17 deletion SLA sentinel (DELETION-SLA-01); queries `enterprise_churn_events WHERE deletion_requested_at IS NOT NULL AND deletion_completed_at IS NULL`; at `now() - deletion_requested_at > INTERVAL '25 days'` (day 25 — 5-day compliance-officer warning before GDPR Art. 17 30-day mandate): emits `enterprise.deletion_sla_warning` DEC-030 HIGH/7yr per flagged tenant + fires AL-DEL-01 PagerDuty P1 `form-enterprise`; at `> INTERVAL '29 days'` (day 29 — 1-day pre-breach): emits `enterprise.deletion_sla_critical` DEC-030 CRITICAL/7yr + escalates AL-DEL-01 to P0; stale = DELETION-CHAIN-01 monitoring blind spot — a tenant whose GDPR Art. 17 deletion window expires goes undetected until ece_deletion_sla_respected CHECK fires at day 35 (DATA_MODEL §44 DDL backstop); `form_api` REVOKED from `enterprise_churn_events`; pg_cron reads via `form_system` role | PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect (day-25 warning); P0 escalation at day 29 → founder + compliance-officer; dedup `deletion-sla-warning-{tenant_id}` 6h cooldown (re-alerts every 6h until deletion_completed_at populated); 7h freshness window (1-run tolerance of 6-hour cadence); privacy invariant: event payload contains only `tenant_id` (FORM-internal UUID), `days_since_deletion_requested` (integer), `alert_tier` ('warning'/'critical') — no employee `user_id`, name, email, health value, or GDPR Art. 9 data; cross-ref: `docs/COST_MODEL.md §43.10 item 3` (obligation source — P0/M10); `docs/DATA_MODEL.md §44.6` (DELETION-CHAIN-01 chain invariant — day-25/29/35 monitoring tiers); `docs/DATA_MODEL.md §44` `ece_deletion_sla_respected` CHECK (DDL-layer backstop at 35 days — pg_cron is the pre-breach warning layer); DEL-E-001 (C1.2/CC4.1, annual 7yr — annual deletion certificate archive); `docs/SOC2_READINESS.md §101` (DDL-layer corroboration cross-ref patch for `enterprise_churn_events`); INCIDENT_RESPONSE R-41 (job 43 stale recovery runbook — §R-41.5) — **job 43** |
 | `offboard_chain_monitor` | `0 * * * *` | 2 h | CC6.1/CC7.1 — OFFBOARD-CHAIN-01 SLA sentinel; queries `enterprise_churn_events WHERE offboarding_initiated_at IS NULL AND churn_date::timestamptz < now() - INTERVAL '24 hours'`; on detection: emits `enterprise.offboard_chain_sla_breach` DEC-030 HIGH/7yr per flagged tenant + fires AL-OFFL-01 PagerDuty P1 `form-enterprise`; dedup `offboard-chain-breach-{tenant_id}` 4h cooldown; on all-clear: emits `system.offboard_chain_check_passed` LOW/1yr (no `tenant_id` — privacy floor); stale = OFFBOARD-CHAIN-01 detection blind spot — a churned tenant's offboarding may slip past the 24h window undetected; unlike DELETION-SLA-01 (day-scale, job 43), OFFBOARD-CHAIN-01 is a 24h MSA contractual obligation; each hourly missed run extends breach-detection latency by 1h; `form_api` REVOKED from `enterprise_churn_events`; pg_cron reads via `form_system` role | PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect; dedup `offboard-chain-breach-{tenant_id}` 4h cooldown (re-alerts every 4h until `offboarding_initiated_at` populated); 2h freshness window (1-run tolerance of hourly cadence); privacy invariant: breach event payload contains only `tenant_id` (FORM-internal UUID), `hours_since_churn` (integer), `churn_date` (DATE) — no employee `user_id`, name, email, health value, or GDPR Art. 9 data; cross-ref: §53.4 (AL-OFFL-01 alert spec); §53.5 (job spec — §53.5.2 enforcement SQL); §53.7 (OFFL-CHAIN-01 DEC-030 chain invariant); `docs/COST_MODEL.md §43.8` (OFFBOARD-CHAIN-01 definition: `enterprise.offboarding_initiated` within 24h of `enterprise.account_churned`); `docs/DATA_MODEL.md §44.6` (OFFBOARD-CHAIN-01 compliance query); CHN-OBS-E-001 (CC6.1/CC7.1/CC7.2, quarterly 3yr — OFFBOARD-CHAIN-01 SLO performance report); INCIDENT_RESPONSE R-44 (job 44 stale recovery runbook — §R-44.5; v1.0, 2026-06-25) — **job 44** |
+| `litigation_hold_compliance_monitor` | `0 8 * * *` | 26 h | CC5.3/CC4.1/C1.2 — daily litigation hold compliance sweep (three SLO conditions from `litigation_hold_records`); sweep 1 (AL-LITH-01): `target_review_date < CURRENT_DATE AND status = 'declared'` → emits `enterprise.litigation_hold_review_overdue` HIGH/7yr per flagged hold + fires AL-LITH-01 PagerDuty P1 `form-compliance` (LITH-REVIEW-CHAIN-01 ordering invariant: audit event HTTP 200 confirmed before PagerDuty); sweep 2a (AL-LITH-02 approaching): `max_expiry_date <= CURRENT_DATE + 30 AND max_expiry_date >= CURRENT_DATE AND status = 'declared'` → emits `enterprise.litigation_hold_max_duration_approaching` STANDARD/3yr + Slack advisory only; sweep 2b (AL-LITH-02 breach): `max_expiry_date < CURRENT_DATE AND status = 'declared'` → emits `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr + fires AL-LITH-02 P1 (LITH-MAX-CHAIN-01 ordering invariant); sweep 3 (AL-LITH-03): `deletion_target_date < CURRENT_DATE AND status = 'released' AND deletion_completed_date IS NULL` → emits `enterprise.litigation_hold_deletion_overdue` HIGH/7yr per flagged hold + fires AL-LITH-03 (LITH-DEL-CHAIN-01 ordering invariant); all-clear: `system.litigation_hold_check_passed` LOW/1yr emitted after all sweeps (no `tenant_id` — privacy floor; aggregate counts only); DDL prerequisite: `litigation_hold_records` table + three covering indexes (DATA_MODEL §46.3.1); `form_api` REVOKED from `litigation_hold_records`; pg_cron reads via `form_system` role | PagerDuty `form-compliance` → compliance-officer (AL-LITH-01 review overdue, P1); compliance-officer + founder (AL-LITH-02 breach, P1); compliance-officer + devops-lead (AL-LITH-03 deletion overdue, P1); dedup `lith-review-overdue-{tenant_id}-{activation_date_iso}` 24h (AL-LITH-01) / `lith-max-duration-{tenant_id}-{activation_date_iso}` 24h (AL-LITH-02) / `lith-deletion-overdue-{tenant_id}-{activation_date_iso}` 24h (AL-LITH-03); 26h freshness window (1-day tolerance — daily cadence appropriate for day-scale compliance deadlines: 6-month review, 36-month cap, 10-business-day deletion; single missed run extends detection latency by 24h, tolerated); stale consequence: LITH-SLO-01/02/03 detection blind spot — holds approaching or exceeding 6-month review date, 36-month cap, or 10-business-day deletion deadline go undetected until next 08:00 UTC run; privacy invariant: per-hold alert payloads carry only `tenant_id` UUID + `activation_date` DATE + derived integers (`days_overdue`, `days_remaining`, `days_over_limit`) — no employee `user_id`, name, email, health value, or GDPR Art. 9 data; `system.litigation_hold_check_passed` all-clear omits `tenant_id` entirely (fleet-count aggregate only); cross-ref: §54.4 (AL-LITH-01/02/03 alert specs); §54.5 (job spec — §54.5.2 three enforcement SQL sweeps, §54.5.5 implementation decision); §54.6 (§6.2 `litigation_hold_health` subsection — this commit v5.2.1); DATA_MODEL §46 (table DDL + three covering indexes + MSA §11.6 procedure); MSA §11.6 (6-month review §11.6.3, 36-month cap §11.6.4, 10-business-day deletion §11.6.6); LITH-OBS-E-001 (CC5.3/CC4.1/C1.2, annual 3yr — §54.8); INCIDENT_RESPONSE R-45 (job 45 stale recovery runbook — to be authored; §54.10 item 6) — **job 45** |
 
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
@@ -1244,7 +1256,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 
 **Job-number conflict resolution (v0.9, 2026-06-22):** Two sections within OBSERVABILITY.md independently claimed job numbers already assigned in this §12.6 canonical registry: (1) `docs/OBSERVABILITY.md §42.7` (v3.9, 2026-06-14) referenced `white_label_cert_check` as "job 32" — but job 32 was already assigned to `turh_retention_purge` when the v0.4 patch was published (2026-06-19); (2) `docs/OBSERVABILITY.md §43.7` (v4.0, 2026-06-14) referenced `webhook_degraded_escalation_check` as "job 34" — but job 34 was already assigned to `bdg_override_expiry_sweep` in the same v0.4 patch. Both are renumbered in this registry: `white_label_cert_check` → **job 40**; `webhook_degraded_escalation_check` → **job 41**. In-text citations in §42.7, §42.14 item 3, §43.7, and §43.15 items 6–8 corrected in this v0.9 patch (since both sections reside within OBSERVABILITY.md, consistent with the v0.5 precedent of correcting §49 in-text citations). This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
-*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle.
+*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days.
 
 **DEC-030 events emitted by `pg-cron-health-monitor`** — registered in `docs/AUDIT_LOG_SCHEMA.md §System`:
 
@@ -14935,3 +14947,325 @@ Two new artefacts cover the **monitoring layer** for the enterprise post-churn l
 *v5.1.4 (2026-06-25): §53.10 item 5 closed — CHN-OBS-E-001 and DEL-OBS-E-001 registered in `docs/SOC2_READINESS.md §79.4` master consolidated evidence table (SOC2_READINESS.md §111 v3.36.0, 2026-06-25). Both artefacts confirmed to map to R2 subfolders already created by §102 (`offboarding/` and `deletions/`); both added to §80.4 Vanta mirror list. §53.10 item 5 marked `[x] Done — 2026-06-25 (SOC2_READINESS.md §111 v3.36.0)`. Document header v5.1.3 → v5.1.4. Owner: compliance-officer + enterprise-architect.*
 
 *v5.1.5 (2026-06-25): R-44.11 item 3 cross-reference patch — closes `docs/INCIDENT_RESPONSE.md R-44.11` item 3 (P1/M10 — update §12.6 job 44 `offboard_chain_monitor` registry entry with R-44 stale-consequence cross-ref). Three stale "to be authored" R-44 references updated to `§R-44.5; v1.0, 2026-06-25`: (1) §6.2 `enterprise_post_churn_health` Offboarding chain SLA breach row stale-consequence cross-ref; (2) §12.6 pg_cron registry job 44 `offboard_chain_monitor` row cross-ref column; (3) §53.5 pg_cron Job 44 spec table Cross-ref row. All three references previously read "to be authored; §53.10 item 6" or "to be authored per §53.10 item 6" — INCIDENT_RESPONSE R-44 v1.0 was authored 2026-06-25 (commit 230cd96) but these upstream cross-references were not retroactively updated in that sprint. No schema, model, metric, alert rule, or evidence artefact changes. Document header v5.1.4 → v5.1.5. Cross-reference closure: `docs/INCIDENT_RESPONSE.md R-44.11` item 3 → `[x] Done — 2026-06-25 (OBSERVABILITY.md v5.1.5)`. Owner: devops-lead + compliance-officer.*
+
+*v1.8 patch (2026-06-25): §12.6 job 45 `litigation_hold_compliance_monitor` registered — closes DATA_MODEL §46.8 item 3 partial obligation (§12.6 registration component): the `litigation_hold_records` table (DATA_MODEL §46, migration 0087, v1.31) was authored with three covering indexes (`litigation_hold_records_review_sweep_idx`, `litigation_hold_records_expiry_sweep_idx`, `litigation_hold_records_deletion_deadline_idx`) expressly designed for job 45 sweeps, but no pg_cron job existed in this registry. Job 45 schedule `0 8 * * *` (daily 08:00 UTC); 26h freshness window (1-day tolerance — all three monitored obligations are day-scale compliance deadlines, not sub-hour contractual SLAs). CC5.3/CC4.1/C1.2 compliance relevance (MSA §11.6 litigation hold lifecycle: 6-month review §11.6.3, 36-month cap §11.6.4, 10-business-day deletion §11.6.6). Three sweeps: AL-LITH-01 (review overdue, P1 PagerDuty `form-compliance`), AL-LITH-02 (max duration approaching P2 Slack / breach P1 PagerDuty), AL-LITH-03 (deletion overdue, P1 PagerDuty). Emits five DEC-030 events (to be registered in AUDIT_LOG_SCHEMA.md per §54.10 item 1, P0/M6). All-clear: `system.litigation_hold_check_passed` LOW/1yr (no `tenant_id` — privacy floor when fleet is clean). Tables accessed: `litigation_hold_records` SELECT via `form_system` role (`form_api` REVOKED per DATA_MODEL §46.5 RLS). Freshness window note extended to cover job 45. Canonical section: §54. No other §12.6 rows modified.*
+
+*v5.2.1 (2026-06-25): §6.2 `litigation_hold_health` subsection integrated — closes §54.10 item 4 (P0/M6). Four alert condition rows physically inserted into §6.2 Consolidated Alert Rules after `enterprise_post_churn_health` (§53.6): AL-LITH-01 (review overdue P1 PagerDuty `form-compliance`), AL-LITH-02 approaching (P2 Slack advisory), AL-LITH-02 breach (P1 PagerDuty `form-compliance` + founder), AL-LITH-03 (deletion overdue P1 PagerDuty `form-compliance` + devops-lead). SOC 2 mapping block added for `litigation_hold_health` covering CC5.3/C1.2/C1.1 criteria sets and LITH-OBS-E-001 annual monitoring evidence artefact (`compliance/evidence/litigation-hold/`). §54.10 item 4 marked `[x] Done`. Document header v5.2.0 → v5.2.1. Owner: devops-lead + compliance-officer.*
+
+*v5.2.0 (2026-06-25): §54 Litigation Hold Compliance Observability — closes DATA_MODEL §46.8 item 3 (P1/M6 — author `docs/OBSERVABILITY.md §54`): the `litigation_hold_records` table (DATA_MODEL §46, migration 0087, v1.31, 2026-06-25) was authored as the DDL-layer foundation for §54 monitoring, establishing three covering indexes for job 45 sweeps and designating this section as the authoritative specification for pg_cron job 45, LITH-SLO-01/02/03, AL-LITH-01/02/03, and LITH-OBS-E-001. Before §54, no OBSERVABILITY section existed for the three compliance obligations MSA §11.6 imposes on litigation holds: 6-month review (§11.6.3 `target_review_date`), 36-month maximum duration cap (§11.6.4 `max_expiry_date`), and 10-business-day post-release deletion (§11.6.6 `deletion_target_date`). §54.1 purpose and scope: three operational gaps in DATA_MODEL §46 (review overdue undetected, max duration approaching undetected, deletion deadline overdue undetected) each requiring a prospective monitoring sweep that DDL CHECK constraints cannot provide (DDL enforces retrospective data integrity, not prospective alerting). §54.2 RED metrics: three rate signals (holds declared/released/deletion-certified per month); four error signals (review overdue count, max duration approaching/breach count, deletion overdue count); two duration signals (median declared→released, median released→deletion_completed_date); one health signal (job 45 freshness vs. 26h window); signal sources: `litigation_hold_records` + `audit_log_events`. §54.3 three zero-tolerance SLOs: LITH-SLO-01 (zero holds with review overdue — CC5.3/MSA §11.6.3); LITH-SLO-02 (zero holds past max_expiry_date — C1.1/MSA §11.6.4) + 30-day pre-breach warning tier; LITH-SLO-03 (zero released holds with deletion_target_date past and deletion_completed_date null — C1.2/MSA §11.6.6). §54.4 three alert rules: AL-LITH-01 (P1 PagerDuty `form-compliance` → compliance-officer, 24h dedup per `(tenant_id, activation_date_iso)`, auto-resolve on review date extended); AL-LITH-02 (two tiers: approaching P2 Slack advisory; breach P1 PagerDuty `form-compliance` → compliance-officer + founder, auto-resolve on status = released); AL-LITH-03 (P1 PagerDuty `form-compliance` → compliance-officer + devops-lead, 24h dedup, auto-resolve on `deletion_completed_date` populated). §54.5 pg_cron job 45 `litigation_hold_compliance_monitor`: schedule `0 8 * * *`; 26h freshness; form_system role; three enforcement SQL sweeps using the three covering indexes (sweep 1: review overdue; sweep 2a: approaching; sweep 2b: breach; sweep 3: deletion overdue); three ordering invariants (LITH-REVIEW-CHAIN-01, LITH-MAX-CHAIN-01, LITH-DEL-CHAIN-01 — audit event emitted + HTTP 200 confirmed before PagerDuty fires per breach); all-clear `system.litigation_hold_check_passed` LOW/1yr after all sweeps (no `tenant_id` — privacy floor); §54.5.5 implementation decision: pg_cron over Cloudflare Worker (table co-location + pattern consistency with jobs 43/44 + RLS enforcement via form_system role). §54.6 §6.2 integration: `litigation_hold_health` subsection spec (four rows + SOC 2 mapping; after `enterprise_post_churn_health` §53.6; §54.10 item 4). §54.7 DEC-030 chain: §54.7.1 two existing events (`enterprise.litigation_hold_declared` CRITICAL/7yr + `enterprise.litigation_hold_released` CRITICAL/7yr — registered DEC-080 2026-06-23 AUDIT_LOG_SCHEMA §Enterprise Post-Churn); §54.7.2 five new monitoring events (to be registered — §54.10 item 1, P0/M6): `enterprise.litigation_hold_review_overdue` HIGH/7yr, `enterprise.litigation_hold_max_duration_approaching` STANDARD/3yr, `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr, `enterprise.litigation_hold_deletion_overdue` HIGH/7yr, `system.litigation_hold_check_passed` LOW/1yr; Zod v2 payload schemas for all five; three chain invariant blocks. §54.8 one monitoring-layer evidence artefact: LITH-OBS-E-001 (CC5.3/CC4.1/C1.2, annual, 3yr — `compliance/evidence/litigation-hold/LITH-OBS-E-001_<YYYY>.md`; job 45 run statistics + AL-LITH-01/02/03 activation logs + affirmative attestation for zero-alert years; distinct from LITH-E-001 DATA_MODEL §46.7 which covers the compliance outcome per hold); full auditor narratives for CC5.3 (three-layer control evidence), CC4.1 (continuous automated monitoring), C1.2 (dual evidence path with LITH-E-001 for disposal obligation). §54.9 Metabase `Litigation Hold Compliance` dashboard (8 panels; `compliance_officer` + `form_admin` only; `enterprise_admin` + `tenant_manager` excluded; no individual employee identifiers). §54.10 nine-item implementation checklist: 3× P0/M6 (AUDIT_LOG_SCHEMA event registration; job 45 implement; §6.2 insertion [x] Done this commit); 1× P0/M6 [x] Done (§12.6 v1.8 patch — this commit); 1× P1/M6 [x] Done (SOC2_READINESS §79.4 LITH-E-001 + LITH-OBS-E-001 — SOC2_READINESS.md §112 v3.37.0 this commit); 1× P1/M7 (R-45 stale runbook); 1× P2/M7 (end-to-end staging test); 1× P1/M7 (Metabase dashboard); 1× P1/M12 (first LITH-OBS-E-001 annual filing). §54.11 OQ gap tracker: no open questions — all three monitoring obligations fully specified; pg_cron + pg_net adopted (jobs 42–44 pattern); daily 08:00 UTC cadence appropriate for day-scale obligations; three chain invariants follow established OFFL-CHAIN-01/SCA-CHAIN-01 pattern; all-clear privacy floor follows `system.offboard_chain_check_passed` pattern; LITH-OBS-E-001 naming follows *-OBS-E-001 monitoring-layer convention; R2 subfolder `litigation-hold/` created by SOC2_READINESS §112 (this commit); AL-LITH-02 two-tier split (approaching P2 Slack / breach P1 PagerDuty) documented. §12.6 registry: job 45 `litigation_hold_compliance_monitor` row added; freshness window note extended; v1.8 patch note added. Document header v5.1.5 → v5.2.0. Owner: compliance-officer + devops-lead + security-engineer.*
+
+---
+
+## §54 Litigation Hold Compliance Observability
+
+> **DDL prerequisite:** `docs/DATA_MODEL.md §46` (`litigation_hold_records` — migration 0087). **Decision:** DEC-080 (2026-06-23). **Authoritative legal procedure:** `docs/MSA_TEMPLATE.md §11.6`.
+
+### §54.1 Purpose and Scope
+
+This section is the automated monitoring layer for `litigation_hold_records` (DATA_MODEL §46), the Postgres-layer registry for holds declared under MSA §11.6. DATA_MODEL §46 closed three operational gaps at the DDL layer — but prospective enforcement (detecting violations before they become irreversible) requires a continuous monitoring sweep. Three obligations are covered:
+
+1. **LITH-SLO-01 — 6-month review (MSA §11.6.3).** `target_review_date` is set to 6 months from `activation_date`. Without automated monitoring, a hold can silently pass its review date without re-confirmation — a potential SOC 2 CC5.3 finding.
+2. **LITH-SLO-02 — 36-month maximum duration cap (MSA §11.6.4).** DDL CHECK `lhr_release_date_within_max_duration` prevents recording a release date past the cap, but cannot detect an active hold approaching or already past `max_expiry_date`.
+3. **LITH-SLO-03 — 10-business-day post-release deletion (MSA §11.6.6).** `deletion_target_date` is sourced from the `enterprise.litigation_hold_released` DEC-030 event payload. DDL CHECK enforces `deletion_completed_date` coherence but cannot detect `deletion_target_date` passed without `deletion_completed_date` populated.
+
+pg_cron job 45 `litigation_hold_compliance_monitor` is the single daily sweep covering all three conditions using the three covering indexes in `litigation_hold_records` (`litigation_hold_records_review_sweep_idx`, `litigation_hold_records_expiry_sweep_idx`, `litigation_hold_records_deletion_deadline_idx`).
+
+### §54.2 RED Metrics
+
+**Rate signals** (source: `audit_log_events` event counts per month):
+- Holds declared: `enterprise.litigation_hold_declared` HIGH/7yr events
+- Holds released: `enterprise.litigation_hold_released` HIGH/7yr events
+- Deletion certified: `litigation_hold_records WHERE deletion_completed_date IS NOT NULL` new rows per month
+
+**Error signals** (source: `litigation_hold_records` daily sweep):
+- LITH-SLO-01 breach count: `target_review_date < CURRENT_DATE AND status = 'declared'`
+- LITH-SLO-02 approaching count: `max_expiry_date <= CURRENT_DATE + 30 AND max_expiry_date >= CURRENT_DATE AND status = 'declared'`
+- LITH-SLO-02 breach count: `max_expiry_date < CURRENT_DATE AND status = 'declared'`
+- LITH-SLO-03 breach count: `deletion_target_date < CURRENT_DATE AND status = 'released' AND deletion_completed_date IS NULL`
+
+**Duration signals** (source: `litigation_hold_records` aggregate):
+- Median hold duration (`activation_date` → `release_date`), rolling 12 months — released holds only
+- Median deletion completion time (`release_date` → `deletion_completed_date`), rolling 12 months — deletion_completed holds only
+
+**Health signals:**
+- Job 45 freshness vs. 26h window (`cron.job_run_details WHERE jobname = 'litigation_hold_compliance_monitor'`)
+
+**Privacy floor:** All RED metrics derived from `tenant_id` UUID + categorical metadata (hold_reason_category, held_data_categories, status) + derived integers. No individual employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data. `compliance_officer_id` is a FORM-internal staff UUID — excluded from all dashboards and evidence artefacts.
+
+### §54.3 Three SLOs
+
+All three are zero-tolerance compliance controls. No SLA credit implications — holds are FORM-internal instruments with no tenant-facing SLA.
+
+| SLO ID | Obligation | Target | SOC 2 | Basis |
+|---|---|---|---|---|
+| LITH-SLO-01 | Zero holds with `target_review_date < CURRENT_DATE AND status = 'declared'` | Zero violations | CC5.3 | MSA §11.6.3 — compliance-officer must re-confirm hold necessity before 6-month date |
+| LITH-SLO-02 | Zero holds with `max_expiry_date < CURRENT_DATE AND status = 'declared'` | Zero violations | C1.1 | MSA §11.6.4 — absolute 36-month maximum hold duration; also carries 30-day pre-breach warning tier (approaching state) |
+| LITH-SLO-03 | Zero holds with `deletion_target_date < CURRENT_DATE AND status = 'released' AND deletion_completed_date IS NULL` | Zero violations | C1.2 | MSA §11.6.6 — held non-health data must be deleted within 10 business days of release |
+
+**LITH-SLO-02 30-day pre-breach warning tier:** When `max_expiry_date <= CURRENT_DATE + 30 AND max_expiry_date >= CURRENT_DATE AND status = 'declared'`, job 45 fires a P2 Slack advisory (not a PagerDuty P1). This gives the compliance-officer 30 days to release the hold before it becomes a LITH-SLO-02 breach. The approaching tier is a governance signal; the breach tier is the operational alert.
+
+### §54.4 Alert Rules (AL-LITH-01/02/03)
+
+**AL-LITH-01 — 6-Month Review Overdue**
+
+| Attribute | Value |
+|---|---|
+| ID | AL-LITH-01 |
+| Trigger | `litigation_hold_records WHERE target_review_date < CURRENT_DATE AND status = 'declared'` (job 45 daily sweep 1) |
+| Severity | P1 |
+| Routing | PagerDuty `form-compliance` → compliance-officer; Slack `#legal-compliance` HIGH |
+| Dedup | `lith-review-overdue-{tenant_id}-{activation_date_iso}` — 24h cooldown (re-alerts daily until `target_review_date` extended to future date or hold released) |
+| Auto-resolve | On next job 45 run when `target_review_date >= CURRENT_DATE` (review confirmed, date extended) |
+| DEC-030 | `enterprise.litigation_hold_review_overdue` HIGH/7yr emitted per flagged hold before PagerDuty fires (LITH-REVIEW-CHAIN-01 invariant) |
+| Runbook | INCIDENT_RESPONSE R-45 §R-45.5 (to be authored — §54.10 item 6) |
+
+**AL-LITH-02 — 36-Month Maximum Duration (Two Tiers)**
+
+| Attribute | Approaching tier | Breach tier |
+|---|---|---|
+| Trigger | `max_expiry_date <= CURRENT_DATE + 30 AND max_expiry_date >= CURRENT_DATE AND status = 'declared'` | `max_expiry_date < CURRENT_DATE AND status = 'declared'` |
+| Severity | P2 | P1 |
+| Routing | Slack `#legal-compliance` WARNING only (no PagerDuty) | PagerDuty `form-compliance` → compliance-officer + founder; Slack `#legal-compliance` HIGH |
+| Dedup | `lith-max-duration-{tenant_id}-{activation_date_iso}` 24h | `lith-max-duration-{tenant_id}-{activation_date_iso}` 24h |
+| Auto-resolve | On `status = 'released'` at next job 45 run | On `status = 'released'` at next job 45 run |
+| DEC-030 | `enterprise.litigation_hold_max_duration_approaching` STANDARD/3yr | `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr + LITH-MAX-CHAIN-01 invariant |
+| Runbook | — (advisory; compliance-officer action: release hold or document extension waiver) | INCIDENT_RESPONSE R-45 §R-45.6 (to be authored — §54.10 item 6) |
+
+**AL-LITH-03 — Post-Release Deletion Overdue**
+
+| Attribute | Value |
+|---|---|
+| ID | AL-LITH-03 |
+| Trigger | `litigation_hold_records WHERE deletion_target_date < CURRENT_DATE AND status = 'released' AND deletion_completed_date IS NULL` (job 45 daily sweep 3) |
+| Severity | P1 |
+| Routing | PagerDuty `form-compliance` → compliance-officer + devops-lead; Slack `#legal-compliance` HIGH |
+| Dedup | `lith-deletion-overdue-{tenant_id}-{activation_date_iso}` — 24h cooldown (re-alerts daily until `deletion_completed_date` populated) |
+| Auto-resolve | On next job 45 run when `deletion_completed_date IS NOT NULL` (deletion certified) |
+| DEC-030 | `enterprise.litigation_hold_deletion_overdue` HIGH/7yr emitted per flagged hold before PagerDuty fires (LITH-DEL-CHAIN-01 invariant) |
+| Runbook | INCIDENT_RESPONSE R-45 §R-45.7 (to be authored — §54.10 item 6) |
+
+### §54.5 pg_cron Job 45: `litigation_hold_compliance_monitor`
+
+**Job spec:**
+
+| Attribute | Value |
+|---|---|
+| Job name | `litigation_hold_compliance_monitor` |
+| Schedule | `0 8 * * *` (08:00 UTC daily — working-hours alignment for compliance-officer response) |
+| Freshness window | 26 h (1-day tolerance; consistent with all daily compliance pg_cron jobs) |
+| Role | `form_system` (SELECT only on `litigation_hold_records`; `form_api` REVOKED per DATA_MODEL §46.5 RLS) |
+| Tables accessed | `litigation_hold_records` SELECT via `form_system`; `audit_log_events` INSERT via DEC-030 emit-audit-event Worker (separate pg_net call) |
+| Canonical section | §54 |
+| Cross-ref | DATA_MODEL §46 (table DDL + three covering indexes); MSA §11.6; §54.4 AL-LITH-01/02/03; INCIDENT_RESPONSE R-45 (to be authored) |
+
+#### §54.5.2 Enforcement SQL (Three Sweeps)
+
+```sql
+-- Sweep 1: LITH-SLO-01 review overdue (uses litigation_hold_records_review_sweep_idx)
+-- Emits enterprise.litigation_hold_review_overdue HIGH/7yr + fires AL-LITH-01
+SELECT tenant_id, activation_date, target_review_date,
+       CURRENT_DATE - target_review_date AS days_overdue
+FROM litigation_hold_records
+WHERE status = 'declared'
+  AND target_review_date < CURRENT_DATE;
+
+-- Sweep 2a: LITH-SLO-02 approaching (uses litigation_hold_records_expiry_sweep_idx)
+-- Emits enterprise.litigation_hold_max_duration_approaching STANDARD/3yr; Slack only
+SELECT tenant_id, activation_date, max_expiry_date,
+       max_expiry_date - CURRENT_DATE AS days_remaining
+FROM litigation_hold_records
+WHERE status = 'declared'
+  AND max_expiry_date <= CURRENT_DATE + 30
+  AND max_expiry_date >= CURRENT_DATE;
+
+-- Sweep 2b: LITH-SLO-02 breach (uses litigation_hold_records_expiry_sweep_idx)
+-- Emits enterprise.litigation_hold_max_duration_breached CRITICAL/7yr + fires AL-LITH-02 P1
+SELECT tenant_id, activation_date, max_expiry_date,
+       CURRENT_DATE - max_expiry_date AS days_over_limit
+FROM litigation_hold_records
+WHERE status = 'declared'
+  AND max_expiry_date < CURRENT_DATE;
+
+-- Sweep 3: LITH-SLO-03 deletion overdue (uses litigation_hold_records_deletion_deadline_idx)
+-- Emits enterprise.litigation_hold_deletion_overdue HIGH/7yr + fires AL-LITH-03
+SELECT tenant_id, activation_date, deletion_target_date, release_date,
+       CURRENT_DATE - deletion_target_date AS days_overdue
+FROM litigation_hold_records
+WHERE status = 'released'
+  AND deletion_target_date < CURRENT_DATE
+  AND deletion_completed_date IS NULL;
+
+-- All-clear: emitted after all sweeps complete (no tenant_id — privacy floor)
+-- system.litigation_hold_check_passed LOW/1yr
+-- Payload: holds_checked INT, review_overdue_count INT,
+--          max_duration_breach_count INT, deletion_overdue_count INT, check_run_at TIMESTAMPTZ
+```
+
+#### §54.5.3 DEC-030 Ordering Invariants
+
+Three invariants govern the ordering of audit event emission vs. PagerDuty alert for per-hold P1 alerts:
+
+**LITH-REVIEW-CHAIN-01 (AL-LITH-01):**
+1. For each row returned by sweep 1: call `emit-audit-event` Worker → `enterprise.litigation_hold_review_overdue` HIGH/7yr; receive HTTP 200.
+2. Only after HTTP 200 confirmed: fire PagerDuty `form-compliance` P1 via pg_net.
+3. If emit returns HTTP 4xx/5xx: DO NOT fire PagerDuty; emit `system.lith_monitor_emission_failed` STANDARD/3yr (circuit-breaker). Never page without a persisted audit trail.
+
+**LITH-MAX-CHAIN-01 (AL-LITH-02 breach tier only):** Same sequence for `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr → PagerDuty P1. The approaching tier (sweep 2a) has no PagerDuty and no ordering constraint.
+
+**LITH-DEL-CHAIN-01 (AL-LITH-03):** Same sequence for `enterprise.litigation_hold_deletion_overdue` HIGH/7yr → PagerDuty P1.
+
+The `system.litigation_hold_check_passed` all-clear has no ordering constraint (it is not an alert trigger).
+
+#### §54.5.4 Tables and Access
+
+| Table | Access | Role | Notes |
+|---|---|---|---|
+| `litigation_hold_records` | SELECT | `form_system` | RLS: `form_admin` ALL; `compliance_officer` SELECT+UPDATE; `form_system` SELECT; `form_api` REVOKED; no tenant roles. |
+| `audit_log_events` | INSERT (via Worker) | DEC-030 emit-audit-event Worker | pg_net calls the Worker per breach event per the established pattern (jobs 42–44). |
+
+#### §54.5.5 Implementation Decision: pg_cron Daily 08:00 UTC
+
+Daily cadence is appropriate because all three obligations are day-scale compliance deadlines, not sub-hour contractual SLAs. pg_cron over Cloudflare Worker: `litigation_hold_records` resides in Supabase Postgres — co-location avoids cross-boundary latency; consistent with jobs 43 and 44 for day-scale compliance sweeps. 08:00 UTC aligns with EU business hours to maximize compliance-officer response time within the same working day.
+
+### §54.6 §6.2 Integration
+
+`litigation_hold_health` subsection physically inserted into `docs/OBSERVABILITY.md §6.2` Consolidated Alert Rules after `enterprise_post_churn_health` (§53.6) — four rows (AL-LITH-01 review overdue; AL-LITH-02 approaching; AL-LITH-02 breach; AL-LITH-03 deletion overdue) + SOC 2 mapping block. Status: **[x] Done — 2026-06-25 (OBSERVABILITY.md v5.2.1, this commit).**
+
+### §54.7 DEC-030 Chain
+
+#### §54.7.1 Existing Events
+
+Two events registered at DEC-080 (2026-06-23) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn`:
+- `enterprise.litigation_hold_declared` — CRITICAL/7yr (compliance-officer declares hold via Admin Console PAM session)
+- `enterprise.litigation_hold_released` — CRITICAL/7yr (compliance-officer releases hold; payload carries `deletion_target_date`)
+
+These are the authoritative tamper-evident lifecycle events. `litigation_hold_records` is the mutable state table derived from them.
+
+#### §54.7.2 New Monitoring Events (Pending Registration — §54.10 item 1)
+
+| Event type | Severity | Retention | Chain invariant |
+|---|---|---|---|
+| `enterprise.litigation_hold_review_overdue` | HIGH | 7 yr | LITH-REVIEW-CHAIN-01 — emitted before AL-LITH-01 PagerDuty |
+| `enterprise.litigation_hold_max_duration_approaching` | STANDARD | 3 yr | None (Slack advisory only) |
+| `enterprise.litigation_hold_max_duration_breached` | CRITICAL | 7 yr | LITH-MAX-CHAIN-01 — emitted before AL-LITH-02 P1 PagerDuty |
+| `enterprise.litigation_hold_deletion_overdue` | HIGH | 7 yr | LITH-DEL-CHAIN-01 — emitted before AL-LITH-03 PagerDuty |
+| `system.litigation_hold_check_passed` | LOW | 1 yr | None (all-clear; no `tenant_id`) |
+
+**Zod v2 payload schemas:**
+
+```typescript
+// enterprise.litigation_hold_review_overdue
+LitigationHoldReviewOverduePayload: {
+  tenant_id: z.string().uuid(),
+  activation_date: z.string().date(),
+  target_review_date: z.string().date(),
+  days_overdue: z.number().int().positive(),
+  check_run_at: z.string().datetime()
+}
+
+// enterprise.litigation_hold_max_duration_approaching
+LitigationHoldMaxDurationApproachingPayload: {
+  tenant_id: z.string().uuid(),
+  activation_date: z.string().date(),
+  max_expiry_date: z.string().date(),
+  days_remaining: z.number().int().min(0).max(30),
+  check_run_at: z.string().datetime()
+}
+
+// enterprise.litigation_hold_max_duration_breached
+LitigationHoldMaxDurationBreachedPayload: {
+  tenant_id: z.string().uuid(),
+  activation_date: z.string().date(),
+  max_expiry_date: z.string().date(),
+  days_over_limit: z.number().int().positive(),
+  check_run_at: z.string().datetime()
+}
+
+// enterprise.litigation_hold_deletion_overdue
+LitigationHoldDeletionOverduePayload: {
+  tenant_id: z.string().uuid(),
+  activation_date: z.string().date(),
+  deletion_target_date: z.string().date(),
+  days_overdue: z.number().int().positive(),
+  release_date: z.string().date(),
+  check_run_at: z.string().datetime()
+}
+
+// system.litigation_hold_check_passed (no tenant_id — privacy floor)
+LitigationHoldCheckPassedPayload: {
+  holds_checked: z.number().int().nonnegative(),
+  review_overdue_count: z.number().int().nonnegative(),
+  max_duration_breach_count: z.number().int().nonnegative(),
+  deletion_overdue_count: z.number().int().nonnegative(),
+  check_run_at: z.string().datetime()
+}
+```
+
+### §54.8 Evidence Artefacts
+
+**LITH-OBS-E-001 — Annual `litigation_hold_compliance_monitor` pg_cron Run History**
+
+This is the **monitoring-layer** artefact. The **compliance outcome** artefact (LITH-E-001) is defined in `docs/DATA_MODEL.md §46.7` — they are distinct evidence paths (consistent with CHN-OBS-E-001 / CHN-E-001 separation in §53.8).
+
+| Attribute | Value |
+|---|---|
+| Artefact ID | LITH-OBS-E-001 |
+| Path | `compliance/evidence/litigation-hold/LITH-OBS-E-001_<YYYY>.md` |
+| Cadence | Annual |
+| Retention | 3 years |
+| SOC 2 criteria | CC5.3, CC4.1, C1.2 |
+| Content | (1) Job 45 run statistics for the year: total runs, successful runs, freshness-window breaches (26h) detected by `pg-cron-health-monitor`. (2) AL-LITH-01 activation log: any review-overdue alerts — `tenant_id` UUID, `activation_date` DATE, `target_review_date` DATE, `days_overdue` INT, resolution timestamp. (3) AL-LITH-02 activation log: approaching count + breach count — any P1 breaches: `tenant_id` UUID, `activation_date` DATE, `max_expiry_date` DATE, `days_over_limit` INT. (4) AL-LITH-03 activation log: any deletion-overdue alerts — `tenant_id` UUID, `activation_date` DATE, `deletion_target_date` DATE, `days_overdue` INT, resolution timestamp. (5) Disposition: zero-alert years require an affirmative attestation paragraph confirming all-clear. |
+| Owner | compliance-officer + devops-lead |
+| Distinct from | LITH-E-001 (DATA_MODEL §46.7 — annual compliance outcome report: hold count by reason/category, per-hold disposal duration, deletion certificate completeness; covers the *outcome*; LITH-OBS-E-001 covers the *monitoring infrastructure* that enforced the outcome) |
+| Register in | SOC2_READINESS §79.4 master consolidated evidence table + §80.3 `litigation-hold/` subfolder + §80.4 Vanta mirror list |
+| Privacy floor | `tenant_id` UUID only for AL-LITH-01/02/03 rows; no employee `user_id`, name, email, health value, or GDPR Art. 9 data; `compliance_officer_id` excluded from artefact |
+
+**SOC 2 auditor narratives:**
+
+**CC5.3 (multiple-level structural controls):** LITH-OBS-E-001 demonstrates three distinct enforcement layers for litigation hold compliance: (1) DDL CHECK constraints (DATA_MODEL §46 — `lhr_held_data_categories_valid`, `lhr_max_expiry_equals_36_months`, `lhr_release_date_within_max_duration` — verifiable via `pg_constraint`); (2) automated pg_cron monitoring (job 45 — daily sweep, run history verifiable via `pg_cron.job_run_details`); (3) compliance-officer Admin Console PAM workflow (manual declaration, review, and release). Auditors cannot rely on LITH-E-001 alone to verify monitoring infrastructure — LITH-OBS-E-001 provides the operational control evidence.
+
+**CC4.1 (monitoring activities):** LITH-OBS-E-001 demonstrates continuous automated monitoring of litigation hold compliance throughout the observation period. Job 45 swept `litigation_hold_records` daily; the run history shows the monitoring control operated without extended freshness-window gaps.
+
+**C1.2 (disposal of confidential information):** LITH-OBS-E-001 AL-LITH-03 activation log demonstrates that the 10-business-day deletion obligation (MSA §11.6.6) was actively monitored and any breach detected within 26 hours. Combined with LITH-E-001 (per-hold `deletion_completed_date` disposal record), C1.2 has two evidence paths: compliance outcome and monitoring control.
+
+### §54.9 Dashboard
+
+**Dashboard name:** `Litigation Hold Compliance`
+**Location:** Metabase → Enterprise → Compliance
+
+| Panel | Signal source | Refresh |
+|---|---|---|
+| Active hold count | `litigation_hold_records WHERE status = 'declared'` | 1 hr |
+| Review overdue count | Sweep 1 condition | Daily |
+| Max duration approaching (≤ 30 days) | Sweep 2a condition | Daily |
+| Max duration breached | Sweep 2b condition | Daily |
+| Deletion overdue | Sweep 3 condition | Daily |
+| Job 45 freshness | `cron.job_run_details WHERE jobname = 'litigation_hold_compliance_monitor'` — last run vs. 26h window | 1 hr |
+| AL-LITH-01/02/03 activation log (rolling 90d) | `audit_log_events WHERE event_type IN ('enterprise.litigation_hold_review_overdue', 'enterprise.litigation_hold_max_duration_breached', 'enterprise.litigation_hold_deletion_overdue')` | Daily |
+| Hold duration distribution (median declared → released, rolling 12 months) | Released holds; `PERCENTILE_CONT(0.5)` on `(release_date - activation_date)` | Daily |
+
+**Access control:** `compliance_officer` + `form_admin` only. `enterprise_admin` and `tenant_manager` (HR) excluded — litigation holds are FORM-internal compliance instruments. No individual employee identifiers in any panel.
+
+### §54.10 Implementation Checklist
+
+| # | Item | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Register five new DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` — new `§Enterprise Litigation Hold Monitoring events` subsection after `§Enterprise Post-Churn`: `enterprise.litigation_hold_review_overdue` HIGH/7yr; `enterprise.litigation_hold_max_duration_approaching` STANDARD/3yr; `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr; `enterprise.litigation_hold_deletion_overdue` HIGH/7yr; `system.litigation_hold_check_passed` LOW/1yr. Include Zod v2 schemas (§54.7.2), emitter assignments, three chain invariant blocks (LITH-REVIEW-CHAIN-01, LITH-MAX-CHAIN-01, LITH-DEL-CHAIN-01), and SOC 2 auditor narratives. | P0 | M6 | security-engineer + compliance-officer | [ ] |
+| 2 | Implement pg_cron job 45 `litigation_hold_compliance_monitor` (§54.5.2 three SQL sweeps; `0 8 * * *`; pg_net → emit-audit-event Worker per breach; pg_net PagerDuty per P1 alert; all-clear `system.litigation_hold_check_passed` after all sweeps; three ordering invariants enforced per sweep; `form_system` role; `form_api` REVOKED from `litigation_hold_records` confirmed). | P0 | M6 | devops-lead + platform-engineer | [ ] |
+| 3 | Register job 45 in `docs/OBSERVABILITY.md §12.6` pg_cron canonical registry. | P0 | M6 | devops-lead | [x] Done — 2026-06-25 (§12.6 v1.8 patch, this section) |
+| 4 | Insert `litigation_hold_health` subsection into `docs/OBSERVABILITY.md §6.2` Consolidated Alert Rules after `enterprise_post_churn_health` (§53.6). | P0 | M6 | devops-lead | [x] Done — 2026-06-25 (OBSERVABILITY.md v5.2.1, this commit) |
+| 5 | Register LITH-E-001 (DATA_MODEL §46.7) and LITH-OBS-E-001 (§54.8) in `docs/SOC2_READINESS.md §79.4` master consolidated evidence table; create R2 subfolder `compliance/evidence/litigation-hold/` with `form_api` NO ACCESS; add both artefacts to §80.4 Vanta mirror list. | P1 | M6 | compliance-officer | [x] Done — 2026-06-25 (SOC2_READINESS.md §112 v3.37.0, this commit) |
+| 6 | Author INCIDENT_RESPONSE R-45 (job 45 `litigation_hold_compliance_monitor` stale recovery runbook): six-step runbook; §R-45.5 review-overdue escalation path; §R-45.6 max-duration breach path; §R-45.7 deletion-overdue path; companion DEC-030 events `system.litigation_hold_monitor_stale_declared` (HIGH/7yr) + `system.litigation_hold_monitor_restored` (STANDARD/3yr); `LITH-MONITOR-STALE-CHAIN-01` ordering invariant; update §12.6 job 45 stale-consequence cross-ref to reference R-45. | P1 | M7 | devops-lead + compliance-officer | [ ] |
+| 7 | End-to-end staging test: (a) INSERT `litigation_hold_records` row with `status = 'declared'`, `target_review_date = CURRENT_DATE - 3`; confirm job 45 fires AL-LITH-01 on next 08:00 UTC run; confirm `enterprise.litigation_hold_review_overdue` emitted + HMAC-chained (LITH-REVIEW-CHAIN-01 verified — audit event HTTP 200 before PagerDuty). (b) UPDATE `target_review_date = CURRENT_DATE + 180`; confirm auto-resolve. (c) INSERT row with `max_expiry_date = CURRENT_DATE - 1`; confirm AL-LITH-02 breach fires + `enterprise.litigation_hold_max_duration_breached` CRITICAL emitted. (d) UPDATE row `status = 'released'`, `deletion_target_date = CURRENT_DATE - 2`; confirm AL-LITH-03 fires + `enterprise.litigation_hold_deletion_overdue` HIGH emitted. | P2 | M7 | devops-lead | [ ] |
+| 8 | Configure Metabase `Litigation Hold Compliance` dashboard (§54.9 — 8 panels); restrict to `compliance_officer` + `form_admin`; confirm `enterprise_admin` + `tenant_manager` excluded; verify no individual employee identifiers in any panel. | P1 | M7 | data-engineer | [ ] |
+| 9 | File first LITH-OBS-E-001 at end of first full year of job 45 in production: collect `pg_cron.job_run_details WHERE jobname = 'litigation_hold_compliance_monitor'` for the year + AL-LITH-01/02/03 activation log from `audit_log_events`; compile `LITH-OBS-E-001_<YYYY>.md`; SHA-256; upload to R2 `litigation-hold/`; upload to Vanta (CC5.3/CC4.1/C1.2); add to MASTER-INDEX. Privacy check: `tenant_id` UUID only; `compliance_officer_id` excluded. | P1 | M12 | compliance-officer + devops-lead | [ ] |
+
+### §54.11 OQ Gap Tracker
+
+| OQ | Status | Decision |
+|---|---|---|
+| — | No open questions | All three monitoring obligations specified against covering indexes in DATA_MODEL §46.3.1. pg_cron + pg_net adopted (consistent with jobs 42–44). Daily 08:00 UTC cadence appropriate for day-scale compliance deadlines. Three chain invariants follow OFFL-CHAIN-01 (§53.7) and SCA-CHAIN-01 (§52.7) pattern. `system.litigation_hold_check_passed` privacy floor follows `system.offboard_chain_check_passed` pattern (aggregate fleet counts, no `tenant_id`). LITH-OBS-E-001 naming follows *-OBS-E-001 monitoring-layer convention (SCA-OBS-E-001/002, CHN-OBS-E-001, DEL-OBS-E-001). R2 subfolder `litigation-hold/` created by SOC2_READINESS §112 (this commit). AL-LITH-02 two-tier split (approaching P2 Slack / breach P1 PagerDuty) documented to prevent paging for holds that can be released within the 30-day window — governance signal vs. operational alert distinction. |
+
+---
+
+*v5.2.0 (2026-06-25): §54 Litigation Hold Compliance Observability — see version notes above. Owner: compliance-officer + devops-lead + security-engineer.*

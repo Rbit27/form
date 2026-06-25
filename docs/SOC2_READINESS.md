@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.36.0
+# FORM · SOC 2 Type II Readiness v3.37.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -31319,3 +31319,95 @@ Two entries added after IR-AUTO-E-002:
 ---
 
 *v3.36.0 (2026-06-25): §111 Cross-Reference Patch — OBSERVABILITY §53.8 (CHN-OBS-E-001 / DEL-OBS-E-001 · CC6.1 / CC7.1 / CC7.2 / C1.2 / A1.1). Gap closed: `docs/OBSERVABILITY.md §53.10 item 5` (P1/M11, open since 2026-06-25 §53 authoring) — CHN-OBS-E-001 and DEL-OBS-E-001 were defined in OBSERVABILITY §53.8 as the monitoring-layer companions to CHN-E-001 (quarterly OFFBOARD-CHAIN-01 compliance outcome, registered §102) and DEL-E-001 / DEL-MON-E-001 (deletion SLA outcome + R-41 stale aggregate, registered §102 and §104). §111.1 gap description: §53.10 item 5 flagged both artefacts for §79.4 + §80.4 registration; they were absent from the master evidence table since §53 authoring. §111.2 source table: 4 sources (OBSERVABILITY §53.8 — artefact definitions; OBSERVABILITY §53.10 item 5 — obligation; SOC2_READINESS §102 — primary companion artefacts; SOC2_READINESS §80.3 — pre-existing R2 subfolders). §111.3 artefact summary: 2 artefacts registered (CHN-OBS-E-001 CC6.1/CC7.1/CC7.2 quarterly monitoring-layer; DEL-OBS-E-001 C1.2/CC7.2/A1.1 quarterly monitoring-layer); §79.4 count pre-§111 65 → post-§111 67. §111.4 §79.4 row additions: CHN-OBS-E-001 (after CHN-E-001; full CC6.1/CC7.1/CC7.2 auditor narratives; OFFL-SLO-01 performance + job 44 run stats + AL-OFFL-01 activation log; `offboarding/`; 3yr; privacy floor: `tenant_id` UUID only); DEL-OBS-E-001 (after CHN-OBS-E-001; full CC7.2/C1.2/A1.1 auditor narratives including dual-evidence-path C1.2 with DEL-E-001; job 43 pg_cron run history + AL-DEL-01 activation log; `deletions/`; 3yr; privacy floor: `tenant_id` UUID for AL-DEL-01 only). §111.5 §80.3 folder annotations: `deletions/` updated to include DEL-MON-E-001 + DEL-OBS-E-001; `offboarding/` updated to include CHN-OBS-E-001; no new folders needed (both pre-existing from §102). §111.6 §80.4 Vanta mirror list: 2 new entries (CHN-OBS-E-001; DEL-OBS-E-001) appended after IR-AUTO-E-002. §111.7 cross-reference closure: OBSERVABILITY §53.10 item 5 → 🟢 Done. §111.8 four-item implementation checklist: 1× P1 (R2 folder verification), 2× P1 (first quarterly evidence filing per artefact at M11), 1× P2 (§15 calendar addition). Document header v3.31.0 → v3.36.0 (header was stale — correcting to reflect current version inclusive of §106–§111 patches applied 2026-06-25). Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §111 artefact row, SOC 2 narrative, or evidence path; CHN-OBS-E-001 and DEL-OBS-E-001 carry only FORM-internal `tenant_id` UUIDs and operational aggregate integers; all-clear events in CHN-OBS-E-001 omit `tenant_id` entirely (fleet-count only); `form_api` has NO ACCESS to `compliance/evidence/offboarding/` and `compliance/evidence/deletions/`. Cross-references: `docs/OBSERVABILITY.md §53.8` (CHN-OBS-E-001/DEL-OBS-E-001 authoritative artefact definitions — content, collection queries, privacy invariants, CC7.2 combined auditor narrative); `docs/OBSERVABILITY.md §53.10 item 5` (obligation closed 🟢 — 2026-06-25); `docs/SOC2_READINESS.md §102` (CHN-E-001/DEL-E-001 companion primary artefacts); `docs/SOC2_READINESS.md §104` (DEL-MON-E-001 R-41 stale aggregate — distinct from DEL-OBS-E-001); `docs/INCIDENT_RESPONSE.md R-41` (job 43 stale recovery runbook — DEL-OBS-E-001 source for stale-event count); `docs/INCIDENT_RESPONSE.md R-44` (job 44 stale recovery runbook — CHN-OBS-E-001 source for stale-event count); `docs/COST_MODEL.md §43.9` (OFFBOARD-CHAIN-01/DELETION-CHAIN-01 definitions). Owner: compliance-officer + enterprise-architect + devops-lead.*
+
+---
+
+## §112 · Cross-Reference Patch — DATA_MODEL §46.8 item 4 + OBSERVABILITY §54.10 item 5 (LITH-E-001 + LITH-OBS-E-001 · C1.2 / CC4.1 / CC5.3)
+
+### §112.1 Gap Description
+
+Two P1/M6 registration obligations were created on 2026-06-25 by the `litigation_hold_records` authoring sprint:
+
+| Obligation | Source | Status before §112 |
+|---|---|---|
+| Register LITH-E-001 in §79.4 master consolidated evidence table + create R2 subfolder `litigation-hold/` + add to §80.4 Vanta mirror | DATA_MODEL §46.8 item 4 (P1/M6) | 🟡 Pending — §46.8 item 4 open since 2026-06-25 |
+| Register LITH-E-001 + LITH-OBS-E-001 in §79.4 + R2 subfolder + §80.4 Vanta | OBSERVABILITY §54.10 item 5 (P1/M6) | 🟡 Pending — §54.10 item 5 open since 2026-06-25 §54 authoring |
+
+LITH-E-001 was defined in DATA_MODEL §46.7 (annual Litigation Hold Compliance Report — the compliance outcome artefact). LITH-OBS-E-001 was defined in OBSERVABILITY §54.8 (annual `litigation_hold_compliance_monitor` pg_cron run history — the monitoring-layer artefact). Both require a new R2 subfolder `litigation-hold/` distinct from the existing enterprise evidence subfolders (`offboarding/`, `deletions/`, etc. created by §102).
+
+### §112.2 Source Table
+
+| Source | Artefact | Obligation |
+|---|---|---|
+| DATA_MODEL §46.7 | LITH-E-001 — Annual Litigation Hold Compliance Report | Compliance outcome artefact; §46.8 item 4 |
+| OBSERVABILITY §54.8 | LITH-OBS-E-001 — Annual pg_cron Run History | Monitoring-layer artefact; §54.10 item 5 |
+| DATA_MODEL §46.8 item 4 | R2 subfolder `litigation-hold/` creation | `form_api` NO ACCESS; EU-region bucket |
+| SOC2_READINESS §80.3 | §80.3 folder registry update | Add `litigation-hold/` + both artefact annotations |
+| SOC2_READINESS §80.4 | §80.4 Vanta mirror list update | 2 new entries |
+
+### §112.3 Artefact Summary
+
+| Artefact ID | Type | SOC 2 | Cadence | Retention | Path |
+|---|---|---|---|---|---|
+| LITH-E-001 | Compliance outcome | C1.2 / CC5.3 / CC4.1 | Annual | 7 yr | `compliance/evidence/litigation-hold/LITH-E-001_<YYYY>.md` |
+| LITH-OBS-E-001 | Monitoring-layer | CC5.3 / CC4.1 / C1.2 | Annual | 3 yr | `compliance/evidence/litigation-hold/LITH-OBS-E-001_<YYYY>.md` |
+
+§79.4 count: pre-§112 **67** → post-§112 **69**.
+
+### §112.4 §79.4 Row Additions
+
+**LITH-E-001** — Annual Litigation Hold Compliance Report:
+- TSC domain: C1/CC5/CC4 · Criteria: C1.2 / CC5.3 / CC4.1
+- Content: (1) Count of holds declared in the year: `hold_reason_category` distribution, `held_data_categories` distribution (categorical, no tenant names). (2) Per released hold: `tenant_id` UUID only; days `activation_date` → `release_date`; `release_reason`; days `release_date` → `deletion_completed_date` (target ≤ 10 business days); any AL-LITH-03 activation. (3) Any holds crossing `target_review_date` without re-confirmation: count + days overdue + any AL-LITH-01 activations. (4) Any hold approaching `max_expiry_date` (≤ 30 days): count + any AL-LITH-02 activations. (5) pg_cron job 45 run statistics for the year.
+- Collection: `litigation_hold_records` WHERE status IN ('released','deletion_completed') + `audit_log_events` WHERE event_type IN ('enterprise.litigation_hold_declared','enterprise.litigation_hold_released','enterprise.litigation_hold_review_overdue','enterprise.litigation_hold_max_duration_breached','enterprise.litigation_hold_deletion_overdue')
+- Retention: 7 yr (consistent with the underlying DEC-030 events: `enterprise.litigation_hold_declared` CRITICAL/7yr + `enterprise.litigation_hold_released` CRITICAL/7yr)
+- Owner: compliance-officer + enterprise-architect · Path: `litigation-hold/`
+- **C1.2 auditor narrative:** `deletion_completed_date` provides a computable per-hold record that held non-health data was disposed of within 10 business days of release. LITH-E-001 aggregates this for the observation year — auditors can verify no row shows `(deletion_completed_date - release_date) > 14 calendar days` (outer bound for 10 business days including weekends) without exposing individual employee data.
+- **CC5.3 auditor narrative:** LITH-E-001 references the three DDL-layer CHECK constraints (`lhr_held_data_categories_valid`, `lhr_max_expiry_equals_36_months`, `lhr_release_date_within_max_duration`) as the structural control layer. The annual report demonstrates that FORM's litigation hold compliance is enforced at the DDL layer (verifiable via `pg_constraint`) — not solely by process documentation.
+- **CC4.1 auditor narrative:** Hold count by reason and category + pg_cron job 45 run statistics in one artefact demonstrate both the monitoring activity (job 45 sweeps) and the compliance outcome (hold lifecycle data). LITH-E-001 is the primary annual evidence; LITH-OBS-E-001 is the monitoring-layer companion.
+
+**LITH-OBS-E-001** — Annual `litigation_hold_compliance_monitor` pg_cron Run History:
+- TSC domain: CC5/CC4/C1 · Criteria: CC5.3 / CC4.1 / C1.2
+- Content: (1) Job 45 run statistics for the year: total runs, successful runs, freshness-window breaches (26h). (2) AL-LITH-01 activation log (review overdue). (3) AL-LITH-02 activation log (approaching + breach). (4) AL-LITH-03 activation log (deletion overdue). (5) Affirmative attestation for zero-alert years.
+- Collection: `pg_cron.job_run_details WHERE jobname = 'litigation_hold_compliance_monitor'` + `audit_log_events WHERE event_type IN ('enterprise.litigation_hold_review_overdue','enterprise.litigation_hold_max_duration_breached','enterprise.litigation_hold_deletion_overdue')`
+- Retention: 3 yr (monitoring-layer artefact — consistent with SCA-OBS-E-001/002, CHN-OBS-E-001, DEL-OBS-E-001)
+- Owner: compliance-officer + devops-lead · Path: `litigation-hold/`
+- **Distinct from LITH-E-001:** LITH-E-001 evidences the compliance outcome per hold; LITH-OBS-E-001 evidences the monitoring infrastructure that detected any violations. Same distinction as CHN-OBS-E-001 / CHN-E-001 (§53.8 / §102).
+- **CC5.3 + CC4.1 auditor narrative:** LITH-OBS-E-001 demonstrates that the automated monitoring control (job 45) operated continuously throughout the observation period. Auditors cannot rely on LITH-E-001 alone (compliance outcome) to verify monitoring infrastructure — LITH-OBS-E-001 closes the monitoring-evidence gap.
+- Privacy floor: `tenant_id` UUID only for AL-LITH-01/02/03 rows; no employee `user_id`, name, email, health value, or GDPR Art. 9 data; `compliance_officer_id` excluded.
+
+### §112.5 §80.3 Folder Additions
+
+New R2 subfolder `compliance/evidence/litigation-hold/` created:
+
+| Folder | Artefacts | `form_api` access |
+|---|---|---|
+| `litigation-hold/` *(new — §112)* | LITH-E-001 [annual Litigation Hold Compliance Report — DATA_MODEL §46.7]; LITH-OBS-E-001 [annual job 45 pg_cron run history + AL-LITH-01/02/03 log — OBSERVABILITY §54.8] | NO ACCESS (bucket-level `form_api` credential exclusion) |
+
+**EU-region routing:** `litigation-hold/` inherits the EU-region Cloudflare R2 bucket routing policy established by DATA_MODEL §36 (GDPR Art. 46 Standard Contractual Clauses compliance for EU enterprise tenants — same routing as all other `compliance/evidence/` subfolders).
+
+### §112.6 §80.4 Vanta Mirror List Additions
+
+Two entries added after DEL-OBS-E-001:
+- **LITH-E-001** — DATA_MODEL §46.7; annual from M6 (first full year after migration 0087 in production); annual filing within 30 days of year-end. Zero-hold or zero-release years require affirmative attestation confirming no holds active during the observation year.
+- **LITH-OBS-E-001** — OBSERVABILITY §54.8; annual from M12 (first full year after job 45 in production); annual filing within 30 days of year-end. Zero-alert years require affirmative attestation confirming all-clear.
+
+### §112.7 Cross-Reference Obligations Closed
+
+| Source | Item | Status |
+|---|---|---|
+| `docs/DATA_MODEL.md §46.8 item 4` | Create R2 subfolder `litigation-hold/` + register LITH-E-001 in §79.4 + §80.4 Vanta | 🟢 Done — 2026-06-25, SOC2_READINESS.md §112 (v3.37.0) |
+| `docs/OBSERVABILITY.md §54.10 item 5` | Register LITH-E-001 + LITH-OBS-E-001 in §79.4 + R2 subfolder + §80.4 Vanta | 🟢 Done — 2026-06-25, SOC2_READINESS.md §112 (v3.37.0) |
+
+### §112.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Verify R2 bucket `form-soc2-evidence`: confirm `litigation-hold/` subfolder exists with `form_api` NO ACCESS (bucket-level credential exclusion). Confirm subfolder is in EU-region routing per DATA_MODEL §36. `wrangler r2 bucket get form-soc2-evidence` + bucket policy review. | devops-lead + compliance-officer | **P1** | M6 | [ ] |
+| 2 | File first LITH-E-001 at end of first full year with migration 0087 in production: collect `litigation_hold_records` aggregate (hold count, category distribution, per-released-hold disposal duration, any overdue alerts from `audit_log_events`) + job 45 run stats; compile `LITH-E-001_<YYYY>.md`; SHA-256; upload to R2 `litigation-hold/`; upload to Vanta (C1.2/CC5.3/CC4.1); add to MASTER-INDEX. Privacy: `tenant_id` UUID only; `compliance_officer_id` excluded. | compliance-officer + enterprise-architect | **P1** | M6 (first year-end after launch) | [ ] |
+| 3 | File first LITH-OBS-E-001 at end of first full year with job 45 in production: collect `pg_cron.job_run_details WHERE jobname = 'litigation_hold_compliance_monitor'` + AL-LITH-01/02/03 activation log from `audit_log_events`; compile `LITH-OBS-E-001_<YYYY>.md`; SHA-256; upload to R2 `litigation-hold/`; upload to Vanta (CC5.3/CC4.1/C1.2); add to MASTER-INDEX. Privacy: `tenant_id` UUID only; `compliance_officer_id` excluded. | compliance-officer + devops-lead | **P1** | M12 | [ ] |
+| 4 | Add LITH-E-001 and LITH-OBS-E-001 annual filing tasks to §15 compliance calendar (within 30 days of each year-end, starting M6 and M12 respectively). Note: zero-hold or zero-alert years require affirmative attestation files. | compliance-officer | **P2** | After §15 update | [ ] |
+
+---
+
+*v3.37.0 (2026-06-25): §112 Cross-Reference Patch — DATA_MODEL §46.8 item 4 + OBSERVABILITY §54.10 item 5 (LITH-E-001 + LITH-OBS-E-001 · C1.2 / CC4.1 / CC5.3). Two P1/M6 obligations closed simultaneously: DATA_MODEL §46.8 item 4 (P1/M6 — create R2 subfolder `litigation-hold/` + register LITH-E-001 in §79.4 + §80.4 Vanta, open since 2026-06-25 §46 authoring) and OBSERVABILITY §54.10 item 5 (P1/M6 — register LITH-E-001 + LITH-OBS-E-001 in §79.4 + R2 subfolder + Vanta, open since 2026-06-25 §54 authoring, same commit). §112.1 gap description: both artefacts defined but not registered; LITH-E-001 (DATA_MODEL §46.7 — annual compliance outcome report: hold count by reason/category, per-hold disposal duration, deletion certificate completeness; C1.2/CC5.3/CC4.1, annual, 7yr) and LITH-OBS-E-001 (OBSERVABILITY §54.8 — annual job 45 pg_cron run history + AL-LITH-01/02/03 activation log; CC5.3/CC4.1/C1.2, annual, 3yr). §112.2 source table: 5 sources (DATA_MODEL §46.7, OBSERVABILITY §54.8, DATA_MODEL §46.8 item 4, §80.3, §80.4). §112.3 artefact summary: 2 artefacts (LITH-E-001 C1.2/CC5.3/CC4.1 annual 7yr; LITH-OBS-E-001 CC5.3/CC4.1/C1.2 annual 3yr); §79.4 count pre-§112 67 → post-§112 69. §112.4 §79.4 row additions: LITH-E-001 (after CHN-OBS-E-001 and DEL-OBS-E-001; C1.2 auditor narrative on `deletion_completed_date` computable disposal duration; CC5.3 narrative on DDL CHECK layer verification via `pg_constraint`; CC4.1 narrative on hold count + job 45 stats in one artefact); LITH-OBS-E-001 (after LITH-E-001; CC5.3+CC4.1 monitoring infrastructure evidence; distinct-from-LITH-E-001 note; privacy floor `tenant_id` UUID only + `compliance_officer_id` excluded). §112.5 §80.3 folder: new `litigation-hold/` subfolder (LITH-E-001 + LITH-OBS-E-001 annotations; `form_api` NO ACCESS; EU-region routing per DATA_MODEL §36). §112.6 §80.4 Vanta mirror: 2 new entries (LITH-E-001 from M6; LITH-OBS-E-001 from M12; zero-hold/zero-alert years require affirmative attestation). §112.7 cross-reference closure: DATA_MODEL §46.8 item 4 → 🟢 Done; OBSERVABILITY §54.10 item 5 → 🟢 Done. §112.8 four-item implementation checklist: 1× P1 (R2 folder verification), 2× P1 (first annual filings per artefact), 1× P2 (§15 calendar addition). Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §112 artefact row, SOC 2 narrative, or evidence path; all-clear LITH-OBS-E-001 entries are aggregate-only; `form_api` has NO ACCESS to `compliance/evidence/litigation-hold/`; `compliance_officer_id` is a FORM-internal staff UUID and is excluded from all evidence artefact content. Cross-references: `docs/DATA_MODEL.md §46.7` (LITH-E-001 authoritative artefact definition); `docs/DATA_MODEL.md §46.8 item 4` (obligation source — 🟢 closed); `docs/OBSERVABILITY.md §54.8` (LITH-OBS-E-001 authoritative artefact definition); `docs/OBSERVABILITY.md §54.10 item 5` (obligation source — 🟢 closed); `docs/MSA_TEMPLATE.md §11.6` (authoritative legal procedure: 6-month review §11.6.3, 36-month cap §11.6.4, 10-business-day deletion §11.6.6, deletion certificate §11.6.7); `docs/DATA_MODEL.md §46.3.1` (DDL — three monitoring indexes that enable job 45 sweeps; three CHECK constraints verifiable via `pg_constraint`); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn` (`enterprise.litigation_hold_declared` CRITICAL/7yr + `enterprise.litigation_hold_released` CRITICAL/7yr — collection sources for LITH-E-001); `docs/SOC2_READINESS.md §102` (prior R2 subfolder precedent: `offboarding/`, `deletions/`); `docs/DECISION_LOG.md §DEC-080` (authoritative decision record); DEC-036 (GDPR Art. 9 zero-grace-period invariant — health data exclusion basis for LITH-E-001 content scope). Owner: compliance-officer + enterprise-architect + devops-lead.*
