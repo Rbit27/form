@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.48.2] — 2026-06-25
+
+### Changed
+- `docs/SOC2_READINESS.md §105` — Cross-Reference Patch: OBSERVABILITY §31 + §32 (APIKEY-E-001/002/003/004/005 + VSAFETY-E-001/002/003/004 · CC6.1 / CC6.2 / CC6.4 / CC6.8 / CC7.2 / CC7.3 / CC7.4 / A1.2). Closes two P1/M6 cross-reference obligations unfulfilled since OBSERVABILITY v2.1/v2.2 (2026-06-10). §105.1 source: OBSERVABILITY §31.9 (APIKEY-E) and §32.9 (VSAFETY-E). §105.2 APIKEY-E artefact table: CC6.2 scope enforcement code review (E-001), CC6.4 DEC-030 rotation chain (E-002), CC6.8 IP enforcement change audit (E-003), CC7.2 PagerDuty `api_key_health` incident history (E-004), CC6.1 IP block events export (E-005). §105.3 VSAFETY-E artefact table: CC7.2 FORM-VICTOR-001 PagerDuty config + incident history (E-001), CC7.3 `VICTOR_SAFETY_TELEMETRY` observation export (E-002), CC7.4 VSAFETY-CHAIN attestation (E-003), A1.2 KV + `ai.victor_*` DEC-030 export (E-004). §105.4 §79.4 additions: 9 rows; pre-§105 count 40 → post-§105 count 49. §105.5 cross-reference obligations closed: §31.10 item 12 🟢; §32.10 item 11 🟢; VSAFETY-E absent from MASTER-INDEX 🟢. §105.6 four-item P1 checklist (M6 calendar wiring + annual chain attestation). SOC2_READINESS v3.29.0 → v3.30.0.
+- `docs/OBSERVABILITY.md §31.10 item 12` — Status `[ ]` → `[x] Done` (SOC2_READINESS §105, 2026-06-25).
+- `docs/OBSERVABILITY.md §32.10 item 11` — Status `[ ]` → `[x] Done` (SOC2_READINESS §105, 2026-06-25).
+- `VERSION` — 8.48.1 → 8.48.2.
+
+---
+
 ## [8.48.1] — 2026-06-25
 
 ### Changed
