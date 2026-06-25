@@ -16066,3 +16066,362 @@ Quarterly export of all `cron.job_run_details` for job 42: run count, failure co
 **Next scheduled review: June 2027 or after first activation — whichever comes first.**
 
 ---
+
+## R-44: Offboard Chain Monitor Stale (`offboard_chain_monitor` · job 44)
+
+> **Trigger:** `system.cron_job_stale` (HIGH/7yr) emitted by `pg-cron-health-monitor` (§12.7) with `job_name = 'offboard_chain_monitor'` when job 44 (`0 * * * *`) exceeds its 2h freshness window. Alert routes to PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect.
+>
+> **Owner:** compliance-officer (IC). **Escalation:** enterprise-architect (T+30 min if no containment). **P0 escalation:** founder + compliance-officer immediately on R-44-C2 confirming any active OFFBOARD-CHAIN-01 breach (churned tenant with `offboarding_initiated_at IS NULL` past 24h).
+>
+> **Compliance impact:** While stale, OFFBOARD-CHAIN-01 monitoring is blind — a tenant that churns during the stale window with no `offboarding_initiated_at` populated will not trigger AL-OFFL-01 PagerDuty P1 `form-enterprise` until job 44 resumes. The `emit-audit-event` Worker's HTTP 422 OFFBOARD-CHAIN-01 guard (§53.5.2) operates independently and continues to reject out-of-order events during the stale window — but cannot detect process failures where `enterprise.offboarding_initiated` is never emitted at all. Each missed hourly run extends OFFBOARD-CHAIN-01 breach-detection latency by 1h against the 24h MSA contractual window.
+>
+> **PagerDuty:** P1 `form-enterprise` base; escalates to P0 immediately if R-44-C2 returns any tenant row with `offboarding_initiated_at IS NULL AND churn_date::timestamptz < now() - INTERVAL '24 hours'`. Dedup: `offboard-chain-monitor-stale`. No auto-resolve — compliance-officer must manually resolve after job 44 confirmed healthy.
+
+---
+
+### R-44.1 Trigger Matrix
+
+| Source | Signal | Threshold | PagerDuty |
+|---|---|---|---|
+| `pg-cron-health-monitor` (§12.7) | `system.cron_job_stale` with `job_name = 'offboard_chain_monitor'` | Job 44 exceeds 2h freshness window (1-run tolerance of hourly cadence) | P1 `form-enterprise` → compliance-officer + enterprise-architect |
+| Manual discovery by IC | R-44-C1 confirms no `cron.job_run_details` row for job 44 within 2h | Any | Open R-44 manually; emit `system.offboard_chain_monitor_stale_declared` HIGH/7yr immediately |
+
+---
+
+### R-44.2 Severity Classification
+
+| Condition | Severity | Escalation |
+|---|---|---|
+| Default (stale detected, R-44-C2 not yet run) | **P1** | compliance-officer + enterprise-architect |
+| R-44-C2 returns ≥ 1 tenant in active OFFBOARD-CHAIN-01 breach | **P0** | Immediate: founder + compliance-officer; enterprise-architect seconded |
+| R-44-C2 returns no active breaches, stale window < 2h | **P1** | No P0 escalation; continue R-44 recovery |
+| Job 44 deleted/disabled without authorized maintenance record (H1) | **P0 co-activation** | security-engineer + R-05 activated in parallel |
+
+---
+
+### R-44.3 Immediate Actions (T+0 to T+30 min)
+
+**T+0 — IC receives PagerDuty P1 `form-enterprise`:**
+
+1. Acknowledge PagerDuty alert; assign incident to yourself in PagerDuty.
+2. Emit `system.offboard_chain_monitor_stale_declared` HIGH/7yr (see §R-44.7) with `trigger = 'pagerduty_alert'`.
+3. Open Linear ticket tagged `[R-44]` and record `incident_id` (UUID from step 2 event).
+
+**T+0 — Run R-44-C1 (pg_cron staleness confirmation):**
+
+```sql
+SELECT
+  jobname,
+  status,
+  return_message,
+  start_time,
+  end_time,
+  EXTRACT(EPOCH FROM (NOW() - end_time)) / 3600 AS hours_since_last_run
+FROM cron.job_run_details
+WHERE jobname = 'offboard_chain_monitor'
+ORDER BY start_time DESC
+LIMIT 5;
+```
+
+**R-44-C1 pass condition:** At least one row with `status = 'succeeded'` within the last 2 hours.
+
+**T+5 — Run R-44-C2 (active OFFBOARD-CHAIN-01 breaches — CRITICAL P0 gate):**
+
+```sql
+SELECT
+  tenant_id,
+  churn_date,
+  EXTRACT(EPOCH FROM (NOW() - churn_date::timestamptz)) / 3600 AS hours_since_churn,
+  offboarding_initiated_at
+FROM enterprise_churn_events
+WHERE offboarding_initiated_at IS NULL
+  AND churn_date::timestamptz < NOW() - INTERVAL '24 hours'
+ORDER BY churn_date ASC;
+```
+
+**R-44-C2 pass condition:** Zero rows returned (no active OFFBOARD-CHAIN-01 breaches). **If any row is returned: immediately escalate to P0 — page founder + compliance-officer. Do not wait for root cause resolution.**
+
+**T+10 — Run R-44-C3 (peer job health — H4 discriminator):**
+
+```sql
+SELECT
+  jobname,
+  status,
+  end_time,
+  EXTRACT(EPOCH FROM (NOW() - end_time)) / 3600 AS hours_since_last_run
+FROM cron.job_run_details
+WHERE jobname IN (
+  'workout_data_purge',        -- job 26, daily 02:00 UTC
+  'audit_log_retention_purge', -- job 27, monthly
+  'backup_age_monitor',        -- job 29, every 4h
+  'deletion_sla_monitor'       -- job 43, every 6h
+)
+AND start_time > NOW() - INTERVAL '8 hours'
+ORDER BY jobname, start_time DESC;
+```
+
+**H4 confirmed:** ≥ 2 peer compliance jobs also stale → shared pg_cron failure → activate R-03 in parallel.
+
+**T+15 — Run R-44-C4 (job registration check — H1 discriminator):**
+
+```sql
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'offboard_chain_monitor';
+```
+
+**H1 confirmed:** No row returned → job was deleted or never registered. If deletion occurred without an authorized maintenance window record, activate R-05 in parallel.
+
+**T+20 — P0 decision gate:** If R-44-C2 returned any active breach row: page founder now. Do not wait for root cause resolution.
+
+---
+
+### R-44.4 Root Cause Hypotheses
+
+| # | Hypothesis | Discriminator |
+|---|---|---|
+| **H1** | Job 44 deleted or disabled (unauthorized actor or unannounced maintenance) | R-44-C4 returns no row in `cron.job`; or `active = false` |
+| **H2** | `enterprise_churn_events` query failure — `form_system` permission revoked or schema change | `return_message` in R-44-C1 shows permission denied or missing column |
+| **H3** | pg_net degraded — job ran but DEC-030 emit or AL-OFFL-01 PagerDuty call silently failed | R-44-C1 shows `status = 'succeeded'` but no `enterprise.offboard_chain_sla_breach` or `system.offboard_chain_check_passed` DEC-030 events in `audit_log_events` within the stale window |
+| **H4** | Supabase platform outage — pg_cron scheduler unreachable | R-44-C3 shows ≥ 2 peer compliance jobs also stale; Supabase status page confirms incident |
+
+---
+
+### R-44.5 Recovery Procedure
+
+#### Step 1 — Re-register job 44 (H1: job deleted or disabled)
+
+```sql
+SELECT cron.schedule(
+  'offboard_chain_monitor',
+  '0 * * * *',
+  $$SELECT offboard_chain_monitor()$$  -- canonical function per migration 0076 (OBSERVABILITY §53.5.2)
+);
+```
+
+Confirm the job appears in `cron.job` with `active = true`. If the deletion was unauthorized, activate R-05 in parallel — do not restore alone.
+
+#### Step 2 — Restore `enterprise_churn_events` grants (H2)
+
+Re-apply grants per migration `0076` (or the canonical SCIM IP enforcement migration):
+
+```sql
+GRANT SELECT ON enterprise_churn_events TO form_system;
+```
+
+Verify that `form_api` and `tenant_manager` are still REVOKED (DATA_MODEL §44 invariant):
+
+```sql
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_name = 'enterprise_churn_events'
+  AND grantee IN ('form_system', 'form_api', 'tenant_manager');
+```
+
+**Required result:** `form_system` has SELECT; `form_api` has NO grants; `tenant_manager` has NO grants.
+
+#### Step 3 — Escalate pg_net degradation (H3)
+
+If R-44-C1 shows `status = 'succeeded'` but DEC-030 events are absent from `audit_log_events` for the stale window: escalate to Supabase support for pg_net infrastructure investigation. Do not attempt manual pg_net restart — await Supabase resolution. Monitor `audit_log_events` for `system.offboard_chain_check_passed` events after recovery.
+
+#### Step 4 — Wait for Supabase recovery (H4)
+
+Check the Supabase status page for the FORM project region. If confirmed platform outage, do not attempt manual recovery — wait for Supabase resolution and monitor R-44-C1 until job 44 resumes.
+
+#### Step 5 — Manual breach sweep and backfill (if R-44-C2 returned active breaches)
+
+If R-44-C2 returned any tenant row with `offboarding_initiated_at IS NULL AND hours_since_churn > 24`:
+
+- For each affected `tenant_id`: manually trigger the offboarding initiation workflow via the Enterprise Admin API (`POST /api/admin/tenants/:tenantId/offboard`). Confirm `enterprise.offboarding_initiated` DEC-030 event emits successfully for each.
+- Manually emit `enterprise.offboard_chain_sla_breach` HIGH/7yr (per `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events` Zod schema `OffboardChainSlaBreachPayload`) for each affected tenant using the `check_run_at` timestamp within the stale window — this preserves the HMAC chain record of the breach detection even when the automated emission missed it.
+- Compliance-officer must confirm whether any breach exceeds the MSA §7 deprovisioning SLA window. If yes: notify enterprise-architect and customer-success; document per-tenant disposition in the stale-window note (step below).
+- File a stale-window exception note at `compliance/evidence/offboarding/offboard-chain-monitor-stale/r44-<incident_id>/stale-window-note.md` documenting: stale window start/end, affected tenants (by `tenant_id` only — FORM-internal UUID), `hours_since_churn` at stale-window start and end, whether any tenant exceeded the 24h OFFBOARD-CHAIN-01 MSA window without prior detection.
+
+#### Step 6 — Manual job run, verification, and resolution
+
+Run job 44 manually:
+
+```sql
+SELECT cron.run_job('offboard_chain_monitor');
+```
+
+Wait 90 seconds, then verify:
+
+```sql
+SELECT jobname, status, return_message, end_time
+FROM cron.job_run_details
+WHERE jobname = 'offboard_chain_monitor'
+ORDER BY start_time DESC
+LIMIT 3;
+```
+
+**Pass condition:** `status = 'succeeded'` for the manual run AND R-44-C2 re-run returns zero rows (or all previously breached tenants now have `offboarding_initiated_at` populated).
+
+Emit `system.offboard_chain_monitor_restored` STANDARD/3yr (see §R-44.7) and resolve PagerDuty P1/P0 `offboard-chain-monitor-stale`:
+
+```json
+{
+  "event_type": "system.offboard_chain_monitor_restored",
+  "incident_id": "<same-uuid-as-stale_declared>",
+  "restored_at": "<ISO 8601 UTC>",
+  "root_cause": "<H1|H2|H3|H4>",
+  "fix_deployed_at": "<ISO 8601 UTC>",
+  "stale_window_hours": <positive float>,
+  "offboard_chain_breaches_at_declared": <nonneg int>,
+  "offboard_chain_breaches_at_restored": <nonneg int>
+}
+```
+
+---
+
+### R-44.6 Internal Communication Template
+
+**P1 (no active OFFBOARD-CHAIN-01 breaches):**
+
+```
+[FORM Incident P1] Job 44 (offboard_chain_monitor) stale
+IC: [name] | Declared: [time UTC] | Incident: [linear-id]
+
+Status: job 44 exceeded 2h freshness window. No active OFFBOARD-CHAIN-01 breaches detected (R-44-C2: 0 rows). Root cause under investigation.
+
+Current hypothesis: [H1|H2|H3|H4]
+Recovery ETA: [time UTC]
+Next update: T+30 min
+```
+
+**P0 (active OFFBOARD-CHAIN-01 breaches confirmed):**
+
+```
+[FORM Incident P0] Job 44 stale + active OFFBOARD-CHAIN-01 breach
+IC: [name] | Declared: [time UTC] | Incident: [linear-id]
+Affected tenants (by tenant_id): [UUIDs — no company names in this channel]
+
+R-44-C2 returned [N] tenant(s) with offboarding_initiated_at IS NULL past 24h.
+Manual offboarding initiation required per R-44 Step 5.
+
+Founder + compliance-officer: please acknowledge.
+Enterprise-architect: confirm offboarding API availability.
+```
+
+---
+
+### R-44.7 DEC-030 HMAC-Chained Events
+
+These two events anchor the R-44 activation in the HMAC-chained audit record. Both must be registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events` (§53.10 item 6 obligation).
+
+**`system.offboard_chain_monitor_stale_declared`** — HIGH · 7 yr
+
+| Field | Value |
+|---|---|
+| Emitter | compliance-officer (manual, PAM-elevated, `emit-audit-event` Worker) |
+| Timing | R-44 T+0 — on receipt of `system.cron_job_stale` PagerDuty P1 or manual discovery |
+| Chain role | OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 prerequisite |
+| Privacy floor | `offboard_chain_breaches_at_declared` is integer count only — no `tenant_id`, no employee data |
+
+Zod schema (`OffboardChainMonitorStaleDeclaredPayload`):
+
+```typescript
+z.object({
+  incident_id: z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),   // ISO 8601 UTC — last successful job run
+  stale_minutes: z.number().int().positive(),
+  missed_runs: z.number().int().nonnegative(),
+  trigger: z.enum(['pagerduty_alert', 'manual_discovery', 'co_active_r03']),
+  initial_severity: z.enum(['P1', 'P0']),         // P0 if offboard_chain_breaches_at_declared > 0
+  offboard_chain_breaches_at_declared: z.number().int().nonnegative(),
+})
+```
+
+**`system.offboard_chain_monitor_restored`** — STANDARD · 3 yr
+
+| Field | Value |
+|---|---|
+| Emitter | compliance-officer (manual, PAM-elevated, `emit-audit-event` Worker) |
+| Timing | R-44 Step 6 — after job 44 confirmed healthy and R-44-C2 re-run passes |
+| Chain role | OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 terminal event |
+| Privacy floor | Integer counts only — no `tenant_id`, no employee data |
+
+Zod schema (`OffboardChainMonitorRestoredPayload`):
+
+```typescript
+z.object({
+  incident_id: z.string().uuid(),                 // must match stale_declared incident_id
+  restored_at: z.string().datetime(),
+  root_cause: z.enum(['H1', 'H2', 'H3', 'H4']),
+  fix_deployed_at: z.string().datetime(),
+  stale_window_hours: z.number().positive(),
+  offboard_chain_breaches_at_declared: z.number().int().nonnegative(),
+  offboard_chain_breaches_at_restored: z.number().int().nonnegative(),
+})
+```
+
+**OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 — Ordering invariant:**
+
+`system.offboard_chain_monitor_restored` is blocked (HTTP 422 `OFFBOARD_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION`) if no prior `system.offboard_chain_monitor_stale_declared` exists for the same `incident_id`; violation → R-05 activated. Privacy floor (both events): integer counts and timestamps only — no `tenant_id`, no employee `user_id`, no health data, no GDPR Art. 9 special-category data. Affected tenant details preserved only in the stale-window exception note at `compliance/evidence/offboarding/offboard-chain-monitor-stale/r44-<incident_id>/stale-window-note.md` (access: compliance_reviewer; `form_api` REVOKED per §80.3).
+
+---
+
+### R-44.8 Evidence Preservation
+
+| Evidence item | Content | SOC 2 | Retention | Path |
+|---|---|---|---|---|
+| R-44-C1 output | `cron.job_run_details` for job 44 covering stale window — `status`, `run_at`, `return_message` for all rows from `confirmed_stale_since` to `restored_at` | CC7.2 | 3 yr | `compliance/evidence/offboarding/offboard-chain-monitor-stale/r44-<incident_id>/stale-window-job-runs.csv` |
+| R-44-C2 output at declaration | `enterprise_churn_events` breach count and tenant list (tenant_id only) at T+0 | CC6.1 / CC7.1 | 7 yr | `compliance/evidence/offboarding/offboard-chain-monitor-stale/r44-<incident_id>/p0-gate-at-declared.csv` |
+| R-44-C2 output at restoration | `enterprise_churn_events` breach count post-recovery (must be 0 or all tenants have `offboarding_initiated_at` populated) | CC6.1 / CC7.1 / A1.1 | 7 yr | `compliance/evidence/offboarding/offboard-chain-monitor-stale/r44-<incident_id>/p0-gate-at-restored.csv` |
+| Stale-window exception note | Per-tenant exception detail when any breach confirmed (tenant_id UUIDs only; `form_api` REVOKED) | C1.1 / CC7.2 | 7 yr | `compliance/evidence/offboarding/offboard-chain-monitor-stale/r44-<incident_id>/stale-window-note.md` |
+| DEC-030 event pair | `system.offboard_chain_monitor_stale_declared` (HIGH/7yr) + `system.offboard_chain_monitor_restored` (STANDARD/3yr) in `audit_log_events` — HMAC-chained, independently verifiable per HMAC-VERIFY-ALGO-001 | CC7.2 | per event | `audit_log_events` table (tamper-evident via DEC-030) |
+
+**Quarterly evidence artefact:** CHN-OBS-E-001 (CC6.1/CC7.1/CC7.2, quarterly, 3yr — `compliance/evidence/offboarding/CHN-OBS-E-001_<YYYY-QN>.md`). Covers OFFL-SLO-01 performance, job 44 run statistics, and AL-OFFL-01 activation log. R-44 activations are included as stale-window incidents in the AL-OFFL-01 activation log section. Registration in `docs/SOC2_READINESS.md §79.4` per §53.10 item 5 (P1/M11 — pending).
+
+---
+
+### R-44.9 SOC 2 Criteria Mapping
+
+| Criterion | Narrative |
+|---|---|
+| **CC6.1** | R-44 is the IC response to `offboard_chain_monitor` (job 44) staleness. Job 44 is the automated sentinel for OFFBOARD-CHAIN-01 — the MSA §7 contractual deprovisioning obligation that FORM will initiate offboarding within 24h of `enterprise.account_churned`. A stale job 44 creates a detection blind spot for this contractual obligation. R-44 Step 5 (manual breach sweep and backfill) is the compensating control: IC confirms no tenant has entered OFFBOARD-CHAIN-01 breach during the stale window undetected, and manually initiates offboarding if any have. `offboard_chain_breaches_at_declared = 0` in the `stale_declared` event is the auditor-inspectable attestation that no OFFBOARD-CHAIN-01 breach occurred during the stale window. |
+| **CC7.1** | R-44 is activated by `pg-cron-health-monitor` (§12.7), which is itself a CC7.1 system monitoring control. The structured IC response (R-44-C1 through R-44-C4 scope queries, H1–H4 root cause classification, DEC-030 HMAC-chained chain) demonstrates that FORM has defined procedures for responding to monitoring system failures, not just to the breaches those systems monitor. |
+| **CC7.2** | `pg-cron-health-monitor` detects the `offboard_chain_monitor` gap and emits `system.cron_job_stale`. R-44 runbook activates. DEC-030 HMAC chain (`stale_declared` → `stale_restored`) provides the tamper-evident detection-to-restoration timeline independently verifiable per HMAC-VERIFY-ALGO-001. |
+
+> **Auditor narrative (CC6.1 + CC7.1 + CC7.2):** FORM's `offboard_chain_monitor` (job 44, `0 * * * *`, 2h freshness window) performs an hourly fleet-sweep for churned tenants whose `offboarding_initiated_at IS NULL` past 24h, emitting `enterprise.offboard_chain_sla_breach` HIGH/7yr per breach (OFFL-CHAIN-01 ordering invariant: audit event HTTP 200 before AL-OFFL-01 PagerDuty fires). The `pg-cron-health-monitor` (§12.7) detects any job 44 gap exceeding 2h and pages compliance-officer + enterprise-architect via PagerDuty P1 `form-enterprise`. R-44 provides the IC with a structured response including an immediate OFFBOARD-CHAIN-01 breach assessment (R-44-C2) — if any active breach row is found at declaration, severity escalates to P0 and manual offboarding initiation begins in parallel with job recovery. The DEC-030 HMAC-chained event pair (`system.offboard_chain_monitor_stale_declared` HIGH/7yr → `system.offboard_chain_monitor_restored` STANDARD/3yr) anchors the stale window in the tamper-evident audit record, independently verifiable per HMAC-VERIFY-ALGO-001. `offboard_chain_breaches_at_declared = 0` in the `stale_declared` event is the auditor-inspectable attestation that no OFFBOARD-CHAIN-01 breach occurred undetected during the stale window.
+
+---
+
+### R-44.10 Post-Incident Controls
+
+| Control | Action | Owner | Timing |
+|---|---|---|---|
+| **H1 unauthorized deletion** | Activate R-05 + rotate `form_system` credentials; confirm no other pg_cron jobs modified in the same maintenance window | security-engineer | Before PagerDuty resolution |
+| **Active OFFBOARD-CHAIN-01 breach** | Confirm all affected tenants have `offboarding_initiated_at` populated (manual R-44 Step 5); notify enterprise-architect and customer-success if any MSA SLA window was exceeded; document per-tenant disposition in stale-window note | compliance-officer + enterprise-architect | Before PagerDuty resolution |
+| **§12.6 cross-reference** | Update `docs/OBSERVABILITY.md §12.6` job 44 `offboard_chain_monitor` registry entry to include `INCIDENT_RESPONSE R-44 (job 44 stale recovery runbook — §R-44.5)` in the stale-consequence cross-ref column | devops-lead | **This §53.10 item 6 closure (see R-44.11 item 3)** |
+| **CHN-OBS-E-001 quarterly artefact** | Include R-44 activation in AL-OFFL-01 activation log section of the next CHN-OBS-E-001 quarterly filing | compliance-officer | End of next full operational quarter |
+
+---
+
+### R-44.11 Implementation Checklist
+
+#### P0 — Before job 44 is deployed to production (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.offboard_chain_monitor_stale_declared` (HIGH/7yr) and `system.offboard_chain_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events`. Add OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-44.7. | security-engineer + compliance-officer | **P0** | M10 | [ ] |
+| 2 | Deploy R-44 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'offboard_chain_monitor'` to PagerDuty service `form-enterprise` P1, dedup key `offboard-chain-monitor-stale`, routing to compliance-officer + enterprise-architect. Integration test: disable job 44 in staging for > 2h; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-enterprise` with correct dedup key. | devops-lead | **P0** | M10 | [ ] |
+
+#### P1 — Before first SOC 2 Type II audit period begins (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Update `docs/OBSERVABILITY.md §12.6` job 44 `offboard_chain_monitor` registry entry: add `INCIDENT_RESPONSE R-44 (job 44 stale recovery runbook — §R-44.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M10 | [ ] |
+| 4 | Register CHN-STALE-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table (if deemed necessary by compliance-officer): quarterly pg_cron job 44 health report (run count, failure count, stale-window activations, `offboard_chain_breaches_at_declared` for any R-44 activations); zero-activation quarters filed as affirmative attestation; `form_api` REVOKED; CC7.2/CC6.1; retention 3yr; path: `compliance/evidence/offboarding/offboard-chain-monitor-stale/chn-stale-e-001-YYYY-QN.csv`. Note: CHN-OBS-E-001 (§53.8) already covers OFFL-SLO-01 performance and job 44 statistics — compliance-officer to confirm whether a separate CHN-STALE-E-001 is required or if CHN-OBS-E-001 is sufficient. | compliance-officer | **P1** | M11 | [ ] |
+
+---
+
+*v1.0 (2026-06-25): R-44 Offboard Chain Monitor Stale — forty-fourth runbook. Closes `docs/OBSERVABILITY.md §53.10` item 6 (P1/M10 — author R-44 runbook). Job 44 `offboard_chain_monitor` (`0 * * * *`, 2h freshness window) was registered in §12.6 (v1.7 patch, 2026-06-25) and the corresponding DEC-030 breach/all-clear events registered in AUDIT_LOG_SCHEMA.md (v2.43, 2026-06-25), but the stale-recovery runbook was explicitly deferred as §53.10 item 6. Critical characteristic: job 44 staleness creates an OFFBOARD-CHAIN-01 detection blind spot — each missed hourly run extends breach-detection latency by 1h against the 24h MSA contractual window; unlike DELETION-SLA-01 (day-25 warning tier), OFFBOARD-CHAIN-01 is a 24h hard commitment, making each missed run materially more time-sensitive. Privacy floor: `enterprise_churn_events` carries `tenant_id` (FORM-internal UUID) only — no employee `user_id`, name, email, health value, or GDPR Art. 9 data in any R-44 event payload or scope query result set. Severity: P1 base; immediate P0 escalation if R-44-C2 confirms any active OFFBOARD-CHAIN-01 breach at time of stale declaration. Trigger: `system.cron_job_stale` with `job_name = 'offboard_chain_monitor'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect; dedup `offboard-chain-monitor-stale`. Four root cause hypotheses: H1 (job deleted/disabled — R-05 co-activation if unauthorized); H2 (`form_system` permission revoked from `enterprise_churn_events` or schema change); H3 (pg_net degraded — job ran but DEC-030 emit or PagerDuty call silently failed); H4 (Supabase platform outage — R-03 co-activation). Four scope queries: R-44-C1 (pg_cron staleness confirmation — last 5 job 44 runs); R-44-C2 (P0 gate — `enterprise_churn_events` breach count at declaration and restoration); R-44-C3 (peer job health — H4 discriminator: ≥ 2 peer jobs stale); R-44-C4 (job registration check — H1 discriminator). Six-step recovery procedure: Step 1 (H1 — re-register via `cron.schedule()` or re-enable; R-05 if unauthorized); Step 2 (H2 — restore `form_system` SELECT on `enterprise_churn_events`; confirm `form_api` REVOKED); Step 3 (H3 — escalate to Supabase support for pg_net; auto-recovery when pg_net resumes); Step 4 (H4 — co-activate R-03, await platform recovery); Step 5 (active breach — manual sweep and backfill: force `enterprise.offboarding_initiated` for affected tenants; manually emit `enterprise.offboard_chain_sla_breach` for stale window; file stale-window note); Step 6 (post-recovery: manual run verification; emit `system.offboard_chain_monitor_restored` STANDARD/3yr; resolve PagerDuty). Two DEC-030 HMAC-chained events: `system.offboard_chain_monitor_stale_declared` HIGH/7yr (Zod `OffboardChainMonitorStaleDeclaredPayload`: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive int, `missed_runs` nonneg int, `trigger` enum pagerduty_alert|manual_discovery|co_active_r03, `initial_severity` enum P1|P0, `offboard_chain_breaches_at_declared` nonneg int); `system.offboard_chain_monitor_restored` STANDARD/3yr (Zod `OffboardChainMonitorRestoredPayload`: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `stale_window_hours` positive, `offboard_chain_breaches_at_declared` nonneg int, `offboard_chain_breaches_at_restored` nonneg int); OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01: `restored` requires prior `declared` for same `incident_id`; HTTP 422 `OFFBOARD_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION` on breach → R-05. Evidence: stale-window `cron.job_run_details` export (CC7.2, 3yr); R-44-C2 at declaration (CC6.1/CC7.1, 7yr); R-44-C2 at restoration (CC6.1/CC7.1/A1.1, 7yr); stale-window exception note (C1.1/CC7.2, 7yr — only when active breach confirmed); DEC-030 event pair in `audit_log_events` (chain-verifiable per HMAC-VERIFY-ALGO-001). SOC 2 criteria: CC6.1 (OFFBOARD-CHAIN-01 MSA contractual deprovisioning SLA blind-spot coverage; `offboard_chain_breaches_at_declared = 0` is auditor-inspectable attestation of no undetected breach); CC7.1 (structured IC response to monitoring system failure); CC7.2 (`pg-cron-health-monitor` detection + DEC-030 HMAC chain `stale_declared` → `stale_restored` = tamper-evident detection-to-restoration timeline). Post-incident controls: H1 unauthorized deletion → R-05 + `form_system` credential rotation; active OFFBOARD-CHAIN-01 breach → manual offboarding initiation + stale-window note + CSM notification. Four-item implementation checklist: 2× P0/M10 (AUDIT_LOG_SCHEMA DEC-030 event registration; PagerDuty routing + integration test); 2× P1/M10–M11 (§12.6 cross-ref; SOC2_READINESS §79.4 CHN-STALE-E-001 registration if required). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 44 `offboard_chain_monitor` registry entry — stale-consequence cross-ref to be updated per R-44.11 item 3); `docs/OBSERVABILITY.md §53` (OFFL-SLO-01/02, AL-OFFL-01, pg_cron job 44 spec, §53.7.2 OFFL-CHAIN-01 DEC-030 events, §53.10 item 6 this runbook closes); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events` (companion DEC-030 events to be registered — R-44.11 item 1, P0/M10); `docs/DATA_MODEL.md §44` (`enterprise_churn_events` — `form_api` REVOKED; `tenant_manager` excluded; OFFBOARD-CHAIN-01 compliance query §44.6); `docs/COST_MODEL.md §43.8` (OFFBOARD-CHAIN-01 definition: `enterprise.offboarding_initiated` within 24h of `enterprise.account_churned`); R-03 (Infrastructure Outage — H4 co-activation path); R-05 (HMAC chain break — H1 unauthorized deletion co-activation and OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 violation escalation); R-41 (GDPR Deletion SLA Monitor Stale — structural peer: job 43 stale recovery, same pattern). Owner: devops-lead + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-25 · Owner: devops-lead + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---

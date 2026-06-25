@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [8.67.0] — 2026-06-25
+
+### Added
+- `content/post-2445-training-resilience-synthesis.md` — Series 2436–2445 «Тренування в реальних умовах» post 10/10 **SYNTHESIS**. Тренувальна стійкість self-coached атлета: синтез серії. Три рівні перешкод: фізіологічні (хвороба/детренінг — Mujika & Padilla 2000, Bruusgaard et al. 2010), логістичні (час/місце — Bickel et al. 2011 MEV), системні (паралельні стресори — Stults-Kolehmainen & Sinha 2014, McEwen алостатичне навантаження). П'ятикроковий класифікаційний протокол: тип перешкоди → сигнали тіла (RPE/HRV/sleep) → мінімальна доза (повна/50–70%/символічна/зупинка) → ціна пропуску (Mujika & Padilla: -7–12% сили за 2–4 тижні, відновлення 6–8 тижнів) → паттерн чи епізод. Три компоненти стійкості: правильна оцінка реальних втрат; системне мислення (Deci & Ryan 2000 ідентифікаційна мотивація: «я тренуюсь у вівторок», не бажання); оперативна гнучкість (символічна сесія — законне рішення). Анонс серії 2446–2455. **EDITORIAL SERIES 2436–2445 COMPLETE.** clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `docs/INCIDENT_RESPONSE.md §R-44` — R-44: Offboard Chain Monitor Stale (`offboard_chain_monitor` · job 44) — forty-fourth runbook. Closes `docs/OBSERVABILITY.md §53.10` item 6 (P1/M10). Job 44 (`0 * * * *`, 2h freshness) OFFBOARD-CHAIN-01 fleet-sweep stale recovery: P1 base → P0 on R-44-C2 confirming active breach (`offboarding_initiated_at IS NULL` past 24h). Four scope queries (R-44-C1 staleness, R-44-C2 P0 gate, R-44-C3 peer health, R-44-C4 job registration). Four root cause hypotheses (H1 job deleted/disabled, H2 form_system permission revoked, H3 pg_net degraded, H4 Supabase outage). Six-step recovery including Step 5 manual breach sweep and backfill (force offboarding initiation for affected tenants; manually emit `enterprise.offboard_chain_sla_breach` for stale-window record). Two DEC-030 HMAC-chained companion events: `system.offboard_chain_monitor_stale_declared` (HIGH/7yr — OffboardChainMonitorStaleDeclaredPayload) and `system.offboard_chain_monitor_restored` (STANDARD/3yr — OffboardChainMonitorRestoredPayload). OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant. SOC 2 CC6.1 (OFFBOARD-CHAIN-01 MSA contractual SLA blind-spot coverage) + CC7.1 + CC7.2. R-44.11 four-item implementation checklist: 2× P0/M10 (AUDIT_LOG_SCHEMA registration + PagerDuty routing), 2× P1/M10–M11 (§12.6 cross-ref, SOC2_READINESS registration). Owner: devops-lead + compliance-officer.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.43 → v2.44: +2 R-44 companion DEC-030 events in `§Enterprise Post-Churn & Deletion SLA events`, closes R-44.11 item 1 (P0/M10). (1) `system.offboard_chain_monitor_stale_declared` (HIGH, 7yr): IC-emitted at R-44 T+0; OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 prerequisite; `OffboardChainMonitorStaleDeclaredPayload` Zod schema. (2) `system.offboard_chain_monitor_restored` (STANDARD, 3yr): IC-emitted at R-44 Step 6; OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 terminal event; `OffboardChainMonitorRestoredPayload` Zod schema. OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant added. Emitter assignments: +2 rows. Alert routing: +2 rows. OFFL-CHAIN-01 note updated ("to be authored" → "authored 2026-06-25"). Privacy floor: integer counts only — no tenant_id, no employee data.
+- `docs/OBSERVABILITY.md` — v5.1.2 → v5.1.3: §53.10 item 6 marked `[x] Done — 2026-06-25 (INCIDENT_RESPONSE.md R-44 v1.0; AUDIT_LOG_SCHEMA.md v2.44)`.
+- `blog.html` — post-2445 card added at top of feed.
+- `README.md` — post-2445 → draft · v8.67.0.
+- `STATUS.md` — Current version v8.66.1 → v8.67.0; Series 2436–2445 marked **COMPLETE 10/10**; next: Editorial 2446–2455.
+- `VERSION` — 8.66.1 → 8.67.0.
+
+---
+
 ## [8.66.1] — 2026-06-25
 
 ### Changed
