@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.84.0] — 2026-06-25
+
+### Added
+- `content/post-2525-between-sessions-synthesis.md` — Editorial series «Між сесіями · 2516–2525» post 10/10 · СЕРІЯ ЗАВЕРШЕНА. Синтез: десять принципів між-сесійного контексту — від фізіології адаптації до між-сесійної системи. Ієрархія впливу (сон → об'єм/інтервал → когнітивний стрес → NEAT → ВСР → активне відновлення → cool-down → mobility). Мінімальна між-сесійна операційна система (пост-тренувальний протокол, дні відпочинку, тижневе планування). Що серія не охопила: харчування, психологія мотивації, специфіка видів тренувань, реабілітаційний контекст. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `content/post-2524-neat-daily-activity-between-sessions.md` — Editorial series «Між сесіями · 2516–2525» post 9/10. NEAT (Non-Exercise Activity Thermogenesis) як між-сесійна змінна відновлення і адаптації. Levine et al. (2006): різниця між людьми до 2000 ккал/день. Три механізми впливу: кровотік і доставка субстратів, інсулінова чутливість (Duvivier et al., 2017: розподілена ходьба > 1 год тренування + 13 год сидіння), АНС-тонус і ВСР. Парадокс компенсаторного зниження: King et al. (2008, 2012) — введення тренувальної програми систематично знижує NEAT протягом решти дня. Biddle & Asare (2011): ходьба прискорює когнітивне відновлення. Операційні орієнтири по ситуаціях. Нерухомість між тренуваннями ≠ відновлення. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `content/post-2523-cool-down-transition-to-recovery.md` — Editorial series «Між сесіями · 2516–2525» post 8/10. Фізіологія перших 30 хвилин після тренування: ЧСС-відновлення (Farah et al., 2016), лактатний кліренс (Menzies et al., 2010: активне охолодження −30% лактату за 20 хв), парасимпатична реактивація (Buchheit et al., 2007: ВСР-відновлення 30 хв – кілька годин). Активне vs. пасивне охолодження: перевага при ацидозі, мінімальна різниця при стандартному силовому. Cool-down не знижує DOMS (Law et al., 2009). Чотири операційних ситуації з логікою рішення. Що не є cool-down (стретчинг, сауна, CWI). Van Someren (2006): прохолодний душ при пізньому тренуванні. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+
+### Changed
+- `blog.html` — картки post-2523, post-2524, post-2525 додані на початок стрічки (над post-2522).
+- `README.md` — серія 2516–2525 header: proposed → COMPLETE · v8.84.0; posts 2523–2525 → draft.
+- `STATUS.md` — series 2516–2525 progress 7/10 → 10/10 COMPLETE; post-2523, post-2524, post-2525 summaries appended; next series: 2526–2535.
+- `VERSION` — 8.81.3 → 8.84.0.
+
 ## [8.81.3] — 2026-06-25
 
 ### Added
