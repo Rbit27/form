@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.54.0] — 2026-06-25
+
+### Added
+- `content/post-2433-video-mirror-or-nothing-feedback-without-coach.md` — Block 2426–2435 series post 8/10. «Відео, дзеркало або нічого: три підходи до зворотного зв'язку без тренера». Три рівні зворотного зв'язку (cueing / feedback / evaluation) та їх відображення на доступні інструменти. Ste-Marie et al. (2012): одночасний відеозворотний зв'язок погіршує моторне навчання, відкладений — ефективний. Peh et al. (2011): дзеркало під час складних рухів порушує моторне програмування. Tran et al. (2010): точність RPE формується систематичним логуванням. Таблиця кутів камери per ліфт; операційна карта 5 ситуацій. clinical-safety: NOT_REQUIRED. Blog card added.
+- `content/post-2434-conflicting-training-goals-priority-algorithm.md` — Block 2426–2435 series post 9/10. «Коли дві тренувальні цілі суперечать одна одній: алгоритм пріоритету». Wilson et al. (2012): конкурентне тренування знижує гіпертрофію ~31%, силу ~18%. Atherton et al. (2005): AMPK-mTOR молекулярний перемикач. Три рівні конфліктів (сумісні / частковий / жорсткий) + Schumann et al. (2014). П'ятикроковий алгоритм пріоритету: назвати ціль у метриці → класифікувати конфлікт → структурне рішення → розподіл 80/20 → переоцінка в кінці блоку. Maintenance dose: Ralston et al. (2017). clinical-safety: NOT_REQUIRED. Blog cards added.
+
+### Changed
+- `blog.html` — posts 2433–2434 added at top of feed.
+- `STATUS.md` — series 2426–2435 progress updated to 9/10; next: post-2435 synthesis (Синтез 2426–2435: мінімальна інфраструктура self-coached атлета).
+- `VERSION` — 8.53.1 → 8.54.0.
+
+---
+
 ## [8.53.1] — 2026-06-25
 
 ### Added
