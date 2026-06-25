@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [8.46.1] — 2026-06-25
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` v2.8.2 — job-number correction and IR cross-reference backfill. (1) `bdg_override_expiry_sweep` job number corrected "job 33" → **"job 34"** in §34.3 (SQL comment + COMMENT ON COLUMN) and §34.11 (checklist items 1 and 6), per `docs/OBSERVABILITY.md §12.6` v0.4 canonical registry obligation (2026-06-19): "authors should update those references at next authoring pass." (2) §29.10 item 9 added: R-34 cross-reference as operational recovery runbook for `turh_retention_purge` (job 32) stale — P1/M9 [x] Done (OBSERVABILITY §12.6 v4.9.3 fulfils). (3) §34.11 item 10 added: R-33 cross-reference as operational recovery runbook for `bdg_override_expiry_sweep` (job 34) stale — P1/M13 [x] Done (OBSERVABILITY §12.6 v0.8 fulfils). §34.11 P2 items renumbered 10–11 → 11–12.
+- `VERSION` — 8.46.0 → 8.46.1.
+
+---
+
 ## [8.46.0] — 2026-06-25
 
 ### Added
