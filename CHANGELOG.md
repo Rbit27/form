@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [8.49.0] — 2026-06-25
+
+### Added
+- `content/post-2429-strength-standards-as-reference.md` — Editorial series 2426–2435 «Інструментарій self-coached атлета» post 4/10. Strength standards як орієнтир: Symmetry Strength, ExRx, кратні BW — грубий контекст відносної сили. Три типові помилки: стандарт як ціль, порівняння між різними системами, ігнорування антропометрії і тренувального контексту. Де реально корисні: фільтр фази прогресії (novice → лінійна прогресія; intermediate → мезоцикли; advanced → блокова модель); виявлення диспропорцій між вправами. Практичний алгоритм: одна система, перевірка раз на блок, профіль диспропорцій, не окремий ліфт. Обмеження: selection bias у даних, відсутність контролю техніки та антропометрії, тренувальний вік не врахований. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `blog.html` — post-2429 card added at top of feed.
+
+### Changed
+- `VERSION` — 8.48.2 → 8.49.0.
+
+---
+
 ## [8.48.2] — 2026-06-25
 
 ### Changed
