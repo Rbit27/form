@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [8.68.1] — 2026-06-25
+
+### Added
+- `docs/SOC2_READINESS.md §111` — Cross-Reference Patch: CHN-OBS-E-001 (CC6.1/CC7.1/CC7.2) and DEL-OBS-E-001 (C1.2/CC7.2/A1.1) registered in §79.4 master consolidated evidence table; §80.3 `offboarding/` and `deletions/` folder annotations updated; §80.4 Vanta mirror list extended with both artefacts. Closes `docs/OBSERVABILITY.md §53.10 item 5` (P1/M11). §79.4 count: 65 → 67. SOC2_READINESS.md v3.31.0 → v3.36.0 (header corrected to reflect v3.32–v3.35 patches applied 2026-06-25). compliance-officer + enterprise-architect + devops-lead.
+
+### Changed
+- `docs/OBSERVABILITY.md §53.10` — item 5 marked `[x] Done — 2026-06-25 (SOC2_READINESS.md §111 v3.36.0)`. v5.1.3 → v5.1.4.
+- `VERSION` — 8.68.0 → 8.68.1.
+
+---
+
 ## [8.68.0] — 2026-06-25
 
 ### Added
