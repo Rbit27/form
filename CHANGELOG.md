@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.81.0] — 2026-06-25
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §Enterprise Litigation Hold Monitoring events` — new section with two DEC-030 HMAC-chained events: `system.litigation_hold_monitor_stale_declared` (HIGH/7yr) and `system.litigation_hold_monitor_restored` (STANDARD/3yr). Full event table, Zod v2 schemas (`LitigationHoldMonitorStaleDeclaredPayload` + `LitigationHoldMonitorRestoredPayload`), emitter assignments, alert routing, LITH-MONITOR-STALE-CHAIN-01 ordering invariant, and SOC 2 auditor narratives (CC5.3/C1.1/C1.2/CC7.2). Closes `docs/INCIDENT_RESPONSE.md R-45.14` item 1 (P0/M6).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — header v2.45 → v2.46; v2.46 changelog entry added.
+- `docs/INCIDENT_RESPONSE.md R-45.14` — item 1 status `[ ]` → `[x] Done — 2026-06-25 (AUDIT_LOG_SCHEMA.md v2.46)`.
+- `VERSION` — 8.80.1 → 8.81.0.
+
 ## [8.80.1] — 2026-06-25
 
 ### Added

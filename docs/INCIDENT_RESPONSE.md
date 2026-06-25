@@ -16859,7 +16859,7 @@ LitigationHoldMonitorRestoredPayload: z.object({
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register `system.litigation_hold_monitor_stale_declared` (HIGH/7yr) and `system.litigation_hold_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Litigation Hold Monitoring events`. Add LITH-MONITOR-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-45.10. | security-engineer + compliance-officer | **P0** | M6 | [ ] |
+| 1 | Register `system.litigation_hold_monitor_stale_declared` (HIGH/7yr) and `system.litigation_hold_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Litigation Hold Monitoring events`. Add LITH-MONITOR-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-45.10. | security-engineer + compliance-officer | **P0** | M6 | [x] Done — 2026-06-25 (AUDIT_LOG_SCHEMA.md v2.46; new §Enterprise Litigation Hold Monitoring events section with event table, full Zod schemas, emitter assignments, alert routing, LITH-MONITOR-STALE-CHAIN-01 invariant, and SOC 2 auditor narratives) |
 | 2 | Deploy R-45 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'litigation_hold_compliance_monitor'` to PagerDuty service `form-compliance` P1, dedup key `litigation-hold-monitor-stale`, routing to compliance-officer. Integration test: disable job 45 in staging for > 26h (or inject a `system.cron_job_stale` event); confirm PagerDuty P1 fires on `form-compliance` with correct dedup key. | devops-lead | **P0** | M6 | [ ] |
 
 #### P1 — Before first enterprise tenant with a litigation hold is onboarded (M7)
