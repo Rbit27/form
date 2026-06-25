@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.58.1] — 2026-06-25
+
+### Changed
+- `docs/SOC2_READINESS.md` — §108 Cross-Reference Patch: registered `SCA-STALE-E-001` (quarterly `sca_sla_monitor` stale-incident health report, CC7.2/CC6.8/CC7.1) in §79.4 master evidence table (row 57); added `security/sca-sla-monitor-stale/` to §80.3 R2 folder map; added SCA-STALE-E-001 to §80.4 Vanta mirror list. Closes INCIDENT_RESPONSE R-42.11 item 4 (P1/M10).
+- `docs/INCIDENT_RESPONSE.md` — R-42.11 item 4 marked `[x] Done — 2026-06-25, SOC2_READINESS.md §108 (v3.33.0)`.
+- `VERSION` — 8.58.0 → 8.58.1.
+
+---
+
 ## [8.58.0] — 2026-06-25
 
 ### Added

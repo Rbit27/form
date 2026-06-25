@@ -26662,6 +26662,7 @@ The table below provides a cross-TSC view of the primary evidence artefacts. Eac
 | VSAFETY-E-004 | A | A1.2 | Cloudflare KV `victor_coach_enabled` key access log for SOC 2 observation window (timestamp + changed_by_user_id for each change) + DEC-030 `ai.victor_disabled` and `ai.victor_reenabled` HMAC chain export confirming Victor availability was actively managed and each disable/re-enable had a documented owner and incident reference. **Zero-change quarters filed as positive attestation** that Victor remained continuously available without unplanned disable events. Privacy floor: `changed_by_user_id` is a PAM-elevation session UUID — no raw employee identity; KV audit log contains no coaching content or GDPR Art. 9 health data. 7yr retention. **Added by §105 (2026-06-25).** | Auto | Quarterly from M6 | compliance-officer | `victor-safety/` |
 | SCA-OBS-E-001 | CC6/CC7/CC9 | CC6.8 / CC7.1 / CC9.2 | Quarterly SCA SLO performance report: (1) SCA-SLO-01 — `security.sca_sla_breach` event count + Critical CVE risk acceptances filed during the quarter (zero-tolerance; any non-zero AL-SCA-01 activation requires root-cause note); (2) SCA-SLO-02 — High CVE 7d SLA achievement rate (target ≥ 95%); (3) SCA-SLO-03 — CI SCA scan pass rate per month (target ≥ 99.5%); (4) AL-SCA-01 PagerDuty `form-security` activation log. **Zero-breach quarters demonstrate SCA-SLO-01 zero-tolerance was maintained** — no AL-SCA-01 activation = no open Critical CVE exceeded the 24h remediation SLA during the quarter. Privacy floor: CVE IDs and package names are public CVE metadata — safe for auditor delivery without redaction; no `user_id`, `tenant_id`, or GDPR Art. 9 health data. Full spec: `docs/OBSERVABILITY.md §52.8`. 3yr retention. **Added by §106 (2026-06-25).** | Auto | Quarterly from M12 | security-engineer + compliance-officer | `sca/` |
 | SCA-OBS-E-002 | CC7/A | CC7.2 / A1.1 | Quarterly `sca_sla_monitor` pg_cron job 42 run history: export of `cron.job_run_details WHERE jobname = 'sca_sla_monitor'` for the quarter — total runs, successful runs, stale-event count (freshness window breaches > 20 min detected by `pg-cron-health-monitor` §12.7), AL-SCA-01 activations attributed to job 42. **Zero stale-event quarters demonstrate the SCA monitoring sentinel operated without interruption** — no 15-min monitoring gap occurred during the period. Privacy floor: pg_cron run metadata only — no `user_id`, `tenant_id`, CVE detail, or GDPR Art. 9 health data; `cron.job_run_details` carries only operational fields (jobname, runid, started, ended, status, return_message). Full spec: `docs/OBSERVABILITY.md §52.8`. 3yr retention. **Added by §106 (2026-06-25).** | Auto | Quarterly from M12 | devops-lead | `sca/` |
+| SCA-STALE-E-001 | CC6/CC7 | CC7.2 / CC6.8 / CC7.1 | Quarterly `sca_sla_monitor` pg_cron job 42 stale-monitoring health report: R-42 activation count, maximum stale duration (minutes), `open_critical_sla_breached_at_declared` for each R-42 activation (integer — zero means no Critical CVE SLA breach occurred during the stale window). **Zero-activation quarters filed as affirmative attestation** that the SCA monitoring sentinel operated without interruption — no SCA-SLO-01 monitoring blind-spot during the period. Full spec: `docs/INCIDENT_RESPONSE.md R-42.8`. 3yr retention. **Added by §108 (2026-06-25).** | Manual-periodic | Quarterly from M10 | devops-lead + compliance-officer | `security/sca-sla-monitor-stale/` |
 
 This table is exhaustive for the primary evidence set. Individual control sections (§1–§78) define supplemental or domain-specific evidence artefacts not listed here.
 
@@ -26920,6 +26921,8 @@ compliance/evidence/
   api-key-auth/  (API key authentication observability — APIKEY-E-001/002/003/004/005 [manual-event + periodic]; form-api NO ACCESS) — §105 reference; §80.3 entry added retroactively by §106 (2026-06-25)
   victor-safety/ (Victor AI clinical safety observability — VSAFETY-E-001/002/003/004 [periodic]; form-api NO ACCESS) — §105 reference; §80.3 entry added retroactively by §106 (2026-06-25)
   sca/           (SCA & dependency vulnerability monitoring observability — SCA-OBS-E-001/002 [quarterly from M12]; PRE-54-E-001/002/003/004/005 [§54.9]; form-api NO ACCESS) — added by §106 (2026-06-25)
+  security/
+    sca-sla-monitor-stale/  (SCA SLA monitor stale-incident quarterly health reports — SCA-STALE-E-001 [quarterly from M10]; form-api NO ACCESS) — added by §108 (2026-06-25)
   pre-obs/       (design-phase evidence — NOT observation window)
   mirror-log/    (Vanta upload receipt log — internal only)
   MASTER-INDEX-YYYY.csv
@@ -26975,6 +26978,7 @@ DEL-E-001 (COST_MODEL §43.9 — annual deletion certificate archive; upload ann
 ENGAGE-E-001 (SOC2_READINESS §84.2 — annual `tenant_engagement_snapshots` DDL/RLS/negative-privilege export; upload annually from M13 migration 0057 deploy), ENGAGE-E-002 (SOC2_READINESS §84.2 — quarterly anonymised QBR package; upload quarterly from first QBR generation est. M14), ENGAGE-E-003 (SOC2_READINESS §84.2 — annual AL-ENGAGE-01..06 PagerDuty alert history + quarterly `tenant.churn_risk_flagged` DEC-030 export; upload annually/quarterly from M13 alert deployment), SSO-OBS-E-005 (SOC2_READINESS §84.3 — quarterly AL-SCIM-MASS-01 PagerDuty log; upload quarterly from M5; zero-count quarters as positive non-occurrence attestation), SSO-OBS-E-006 (SOC2_READINESS §84.3 — quarterly AL-SCIM-01..04 PagerDuty log; upload quarterly from M5; AL-SCIM-04 zero-count = SCIM-CHAIN-01 integrity), WS-E-001 (SOC2_READINESS §84.4 — quarterly `wearable.sync_completed` DEC-030 export; upload quarterly from M9), WS-E-002 (SOC2_READINESS §84.4 — quarterly `wearable.fleet_freshness_assessed` DEC-030 export; upload quarterly from M9; zero-count quarters filed as zero-fleet attestation pre-launch), WS-E-003 (SOC2_READINESS §84.4 — annual AL-WS-01..07 alert rule configuration screenshots; upload annually from M7), CONC-E-001 (SOC2_READINESS §84.5 — quarterly §18.3.1 per-incident SQL output + §18.3.3 CONC-CHAIN-01 zero-row check; upload quarterly from M7; zero-concurrent-incident quarters filed as affirmative attestation). Added by §103 (2026-06-23).
 APIKEY-E-001 (SOC2_READINESS §105 — manual-event CC6.2 `api-key-auth.ts` scope enforcement code review; upload on first enterprise API key issuance and annually), APIKEY-E-002 (SOC2_READINESS §105 — quarterly CC6.4 DEC-030 rotation chain export; upload quarterly from M6; zero-rotation quarters as affirmative attestation), APIKEY-E-003 (SOC2_READINESS §105 — monthly CC6.8 IP enforcement change audit; upload monthly from M6; zero-change months as positive evidence of configuration stability), APIKEY-E-004 (SOC2_READINESS §105 — quarterly CC7.2 PagerDuty `api_key_health` incident export; upload quarterly from M6; zero-incident quarters as positive non-occurrence attestation), APIKEY-E-005 (SOC2_READINESS §105 — monthly CC6.1 IP block events export; upload monthly from M6; zero-block months filed with `ip_enforcement_enabled = true` tenant count attestation), VSAFETY-E-001 (SOC2_READINESS §105 — quarterly CC7.2 FORM-VICTOR-001 PagerDuty config + 90-day incident history; upload quarterly from M6; zero-incident periods as VICTOR-SLO-01/SLO-02 attestation), VSAFETY-E-002 (SOC2_READINESS §105 — quarterly CC7.3 `VICTOR_SAFETY_TELEMETRY` observation export; upload quarterly from M6 as JSONL), VSAFETY-E-003 (SOC2_READINESS §105 — annual CC7.4 VSAFETY-CHAIN-01/02/03 attestation; upload annually from M6 or on any VSAFETY-CHAIN-03 HTTP 422 firing), VSAFETY-E-004 (SOC2_READINESS §105 — quarterly A1.2 Cloudflare KV `victor_coach_enabled` audit log + DEC-030 `ai.victor_disabled`/`ai.victor_reenabled` export; upload quarterly from M6; zero-change quarters as continuous-availability attestation). Added by §105 (2026-06-25).
 SCA-OBS-E-001 (SOC2_READINESS §106 — quarterly CC6.8/CC7.1/CC9.2 SCA SLO performance report; upload quarterly from M12; zero-breach quarters filed as positive SCA-SLO-01 zero-tolerance attestation — no AL-SCA-01 activation = no Critical CVE exceeded the 24h SLA), SCA-OBS-E-002 (SOC2_READINESS §106 — quarterly CC7.2/A1.1 `sca_sla_monitor` job 42 pg_cron run history; upload quarterly from M12; zero-stale-event quarters confirm the 15-min SCA monitoring sentinel operated without interruption — no SCA detection blind-spot occurred during the period). Added by §106 (2026-06-25).
+SCA-STALE-E-001 (SOC2_READINESS §108 — quarterly CC7.2/CC6.8/CC7.1 `sca_sla_monitor` stale-incident health report: R-42 activation count, maximum stale duration (minutes), `open_critical_sla_breached_at_declared` per activation; upload quarterly from M10; zero-activation quarters filed as affirmative attestation that the SCA monitoring sentinel operated without interruption — no SCA-SLO-01 monitoring blind-spot during the period). Added by §108 (2026-06-25).
 
 **What stays R2-only (never uploaded to Vanta):**
 
@@ -30933,3 +30937,102 @@ Five artefacts added to the §80.4 Vanta auditor portal mirror list by this patc
 ---
 
 *v3.32.0 (2026-06-25): §107 Cross-Reference Patch — OBSERVABILITY §29 (PAM / Privileged Access Management Observability · `CC6-E-PAM-001/002/003/004` + `CC7-E-PAM-001` · CC6.1 / CC6.2 / CC6.3 / CC6.6 / CC6.7 / CC7.2 / CC7.3). Gap: `docs/OBSERVABILITY.md §29.9` defined five PAM evidence artefacts (CC6-E-PAM-001 — elevation approval/denial DEC-030 audit export; CC6-E-PAM-002 — session auto-expiry DEC-030 export; CC6-E-PAM-003 — KV TTL config screenshot + `constants.ts` sanitized excerpt; CC6-E-PAM-004 — break-glass Terraform policy export + quarterly identity-list review; CC7-E-PAM-001 — PagerDuty "FORM PAM" service incident log AL-PAM-01/02/03) with an explicit SOC2_READINESS cross-reference obligation at §29.10 item 10 (P1, Observation-period start): "create entries in `docs/SOC2_READINESS.md` CC6.1/CC6.2/CC6.3/CC6.7 control evidence rows." No §79.4 rows, no cross-reference patch, and no `pam/` R2 folder existed. §107.1 source table: OBSERVABILITY §29.9 (v5.0.1, 2026-06-25 — authoritative artefact definitions). §107.2 PAM artefact table with full auditor narratives: CC6-E-PAM-001 (CC6.1/CC6.2 — quarterly DEC-030 elevation-approval/denial export; PAM-CHAIN-01 `approver_user_id ≠ requester_user_id` invariant; HMAC-VERIFY-ALGO-001 tamper-evidence; zero-denial quarters as positive CC6.2 no-credential-attack attestation; 7yr; `admin_user_id` UUID only — no employee PII, no health data); CC6-E-PAM-002 (CC6.1/CC6.3 — quarterly DEC-030 session-expiry export; `COUNT(approved) = COUNT(expired)` one-to-one lifecycle proof; PAM-SLO-02 TTL compliance; automatic deprovisioning evidence; 3yr); CC6-E-PAM-003 (CC6.1/CC6.7 — manual-event PAM KV TTL config screenshot + sanitized `constants.ts` excerpt; `READ_WRITE_TTL_MS` and `DESTRUCTIVE_TTL_MS` constants visible; architectural zero-standing-access proof; 3yr; recollected on any TTL modification deploy); CC6-E-PAM-004 (CC6.1/CC6.6 — annual Terraform break-glass policy output sanitized [role labels, no emails] + quarterly identity-list review GitHub Issue / Slack thread with compliance-officer sign-off, max 5 identities; 7yr; quarterly review is primary SOC 2 evidence trigger); CC7-E-PAM-001 (CC7.2/CC7.3 — quarterly PagerDuty "FORM PAM" service incident log AL-PAM-01/02/03; `opened_at`, `acknowledged_at`, `resolved_at`, `alert_key` columns; PAM-SLO-01 ≤60s acknowledgement-SLA cross-check; zero-incident quarters filed as positive armed-and-no-anomaly CC7.2 attestation; 3yr). §107.3 §79.4 row additions: 5 rows (CC6-E-PAM-001 CC6.1/CC6.2 quarterly, CC6-E-PAM-002 CC6.1/CC6.3 quarterly, CC6-E-PAM-003 CC6.1/CC6.7 manual-event, CC6-E-PAM-004 CC6.1/CC6.6 annual+quarterly, CC7-E-PAM-001 CC7.2/CC7.3 quarterly); pre-§107 count 51; post-§107 count 56. §107.4 §80.3 folder addition: `pam/` (CC6-E-PAM-001/002/003/004 + CC7-E-PAM-001; `form_api NO ACCESS`; consistent with all restricted evidence prefix invariants). §107.5 §80.4 Vanta mirror additions: all 5 PAM artefacts added (quarterly cadence for 001/002/004/001-7; manual-event for 003; zero-incident/zero-denial quarterly notes are positive attestations). §107.6 two cross-reference obligations closed: §29.10 item 10 (🟢 all 5 artefacts registered in §79.4 with full criterion mapping and auditor narratives — obligation fulfilled); `pam/` §80.3 (🟢 added). §107.7 seven-item implementation checklist: 5× P1 (initial collection of CC6-E-PAM-001/002/003/004 and CC7-E-PAM-001 at observation period start; items 3 and 4 gated on M4 PAM Worker deploy), 2× P2 (§15 quarterly calendar update for four recurring artefacts + deploy-checklist note for CC6-E-PAM-003; `pam/` R2 folder creation with `form_api NO ACCESS` verification). Privacy floor: CC6-E-PAM-001/002 contain `admin_user_id` and `pam_session_id` UUIDs (internal administrative pseudonyms — not employee `user_id`, not GDPR Art. 9 health data; restricted to `form_admin`, `security_engineer`, `compliance_officer` roles per OBSERVABILITY §29.12.2); CC6-E-PAM-003 sanitized (no internal IDs, TTL constants only); CC6-E-PAM-004 sanitized (email addresses replaced with role labels); CC7-E-PAM-001 PagerDuty operational metadata only (no `user_id`, no employee name, no health value, no coaching content); `form_api` NO ACCESS to `compliance/evidence/pam/`. Owner: compliance-officer + security-engineer + devops-lead.*
+
+---
+
+## §108 · Cross-Reference Patch — INCIDENT_RESPONSE R-42 (SCA-STALE-E-001 · CC7.2 / CC6.8 / CC7.1)
+
+**Gap identified:** `docs/INCIDENT_RESPONSE.md R-42` (v1.0, 2026-06-25) defined the `sca_sla_monitor` pg_cron job 42 stale-incident runbook and at R-42.11 item 4 (P1, M10) created an explicit obligation: *"Register SCA-STALE-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table."* The artefact `SCA-STALE-E-001` was absent from §79.4, no `security/sca-sla-monitor-stale/` R2 folder existed in §80.3, and no §80.4 Vanta mirror entry existed. This section closes all three obligations.
+
+### §108.1 Source
+
+| Document | Section | Version | Date |
+|---|---|---|---|
+| `docs/INCIDENT_RESPONSE.md` | R-42 (`sca_sla_monitor` stale runbook) | v1.0 | 2026-06-25 |
+| `docs/OBSERVABILITY.md` | §12.6 pg_cron job registry (job 42) | v5.0.0 | 2026-06-23 |
+| `docs/OBSERVABILITY.md` | §52 SCA monitoring observability | v5.0.0 | 2026-06-23 |
+
+Cross-reference obligation source: R-42.11 item 4 (P1, M10).
+
+### §108.2 SCA-STALE-E-001 Artefact
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | `SCA-STALE-E-001` |
+| **Full name** | `sca_sla_monitor` stale-incident quarterly health report |
+| **TSC families** | CC6 / CC7 |
+| **Criteria** | CC7.2 / CC6.8 / CC7.1 |
+| **Collection cadence** | Quarterly from M10 |
+| **Collection trigger** | Calendar (3rd business day after quarter end) |
+| **Retention** | 3 years |
+| **R2 path pattern** | `compliance/evidence/security/sca-sla-monitor-stale/SCA-STALE-E-001_<YYYY-QN>_sca-monitor-stale-health.csv` |
+| **Owners** | devops-lead + compliance-officer |
+| **Privacy floor** | No `user_id`, no health data, no GDPR Art. 9 content — operational monitoring metadata only |
+
+**Auditor narrative — CC7.2 (System Monitoring):**
+
+`SCA-STALE-E-001` demonstrates that FORM's SCA monitoring sentinel (`sca_sla_monitor`, pg_cron job 42, 15-minute cadence) was itself monitored for liveness throughout the observation window. Each quarterly report records: R-42 activation count, maximum stale duration (minutes) per activation, and `open_critical_sla_breached_at_declared` (integer — zero means no Critical CVE SLA breach occurred during the stale window). Zero-activation quarters are filed as affirmative attestation that the SCA monitoring sentinel operated without interruption — no SCA-SLO-01 monitoring blind-spot during the period. Non-zero activation quarters carry `open_critical_sla_breached_at_declared = 0` (no breach) or a positive integer (breach count, triggering escalation per R-42.9 item 3). This satisfies CC7.2 continuous monitoring requirements at the meta-monitoring layer.
+
+**Auditor narrative — CC6.8 (Change Management — Monitoring):**
+
+The `sca_sla_monitor` job monitors FORM's SCA scanning pipeline for Critical CVE SLA compliance (SCA-SLO-01: every Critical CVE remediated within 24h). When the sentinel goes stale (>45 min gap in pg_cron execution history), R-42 activates; `system.sca_monitor_stale_declared` (DEC-030 HMAC-chained, HIGH severity, 7yr retention) is emitted, halting all production deployments until the sentinel is restored. `SCA-STALE-E-001` provides quarterly evidence that this monitoring-of-the-monitoring mechanism functioned, ensuring no change could bypass the SCA enforcement gate undetected.
+
+**Auditor narrative — CC7.1 (Logical and Physical Access Controls — Monitoring):**
+
+The SCA monitoring sentinel is an automated control protecting the security of FORM's production software supply chain. `SCA-STALE-E-001` provides quarterly evidence that the sentinel was alive and functional, complementing `SCA-OBS-E-002` (pg_cron run history) with incident-level detail: when the sentinel did stall, how long it was stale, and whether any Critical CVE SLA breach occurred during the blind window. Together with `SCA-OBS-E-001` (SCA SLO performance) and `SCA-OBS-E-002` (sentinel run history), the three artefacts form a complete CC7.1/CC7.2 evidence chain for FORM's software supply chain security controls.
+
+### §108.3 §79.4 Master Evidence Table — Row Additions
+
+Pre-§108 count: **56** rows. Post-§108 count: **57** rows.
+
+Row added (immediately after `SCA-OBS-E-002`):
+
+| Artefact ID | TSC Families | Criteria | Description | Trigger | Cadence | Owners | R2 Path Prefix |
+|---|---|---|---|---|---|---|---|
+| SCA-STALE-E-001 | CC6/CC7 | CC7.2 / CC6.8 / CC7.1 | Quarterly `sca_sla_monitor` pg_cron job 42 stale-monitoring health report: R-42 activation count, maximum stale duration (minutes), `open_critical_sla_breached_at_declared` for each R-42 activation (integer — zero means no Critical CVE SLA breach occurred during the stale window). **Zero-activation quarters filed as affirmative attestation** that the SCA monitoring sentinel operated without interruption — no SCA-SLO-01 monitoring blind-spot during the period. Full spec: `docs/INCIDENT_RESPONSE.md R-42.8`. 3yr retention. **Added by §108 (2026-06-25).** | Manual-periodic | Quarterly from M10 | devops-lead + compliance-officer | `security/sca-sla-monitor-stale/` |
+
+### §108.4 §80.3 R2 Folder Map — Addition
+
+New top-level prefix `security/` added under `form-soc2-evidence` bucket, with sub-folder:
+
+```
+security/
+  sca-sla-monitor-stale/  (SCA SLA monitor stale-incident quarterly health reports — SCA-STALE-E-001 [quarterly from M10]; form-api NO ACCESS) — added by §108 (2026-06-25)
+```
+
+**Access control:** `r2:form-api` — **NO ACCESS** (consistent with all restricted evidence prefix invariants). `r2:compliance-officer` — Read + Write. `r2:vanta-sync` — Read-only. `r2:devops-lead` — Read-only.
+
+### §108.5 §80.4 Vanta Mirror — Addition
+
+Mirror entry added:
+
+> SCA-STALE-E-001 (SOC2_READINESS §108 — quarterly CC7.2/CC6.8/CC7.1 `sca_sla_monitor` stale-incident health report: R-42 activation count, maximum stale duration (minutes), `open_critical_sla_breached_at_declared` per activation; upload quarterly from M10; zero-activation quarters filed as affirmative attestation that the SCA monitoring sentinel operated without interruption — no SCA-SLO-01 monitoring blind-spot during the period). Added by §108 (2026-06-25).
+
+### §108.6 Cross-Reference Obligation Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register `SCA-STALE-E-001` in `§79.4` master evidence table | INCIDENT_RESPONSE R-42.11 item 4 (P1, M10) | 🟢 Done — 2026-06-25, §108 (v3.33.0) |
+| Add `security/sca-sla-monitor-stale/` to §80.3 R2 folder map | §108.4 | 🟢 Done — 2026-06-25 |
+| Add `SCA-STALE-E-001` to §80.4 Vanta mirror list | §108.5 | 🟢 Done — 2026-06-25 |
+
+Corresponding update: `docs/INCIDENT_RESPONSE.md R-42.11 item 4` updated from `[ ]` to `[x] Done — 2026-06-25, SOC2_READINESS.md §108 (v3.33.0)`.
+
+### §108.7 Implementation Checklist
+
+#### P1 — Before first evidence collection (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `compliance/evidence/security/sca-sla-monitor-stale/` R2 folder in `form-soc2-evidence` bucket; apply `form_api` NO ACCESS bucket policy to the `security/` prefix; verify enforcement by running `aws s3 ls s3://form-soc2-evidence/security/` with the `form_api` token (must return AccessDenied); record creation in MASTER-INDEX-YYYY.csv | devops-lead | **P1** | M10 | [ ] |
+| 2 | Collect first SCA-STALE-E-001 for the quarter opening M10: run R-42.8 evidence-collection SQL to extract pg_cron job 42 stale-event history; record R-42 activation count, max stale duration, `open_critical_sla_breached_at_declared` per activation; file to `compliance/evidence/security/sca-sla-monitor-stale/SCA-STALE-E-001_<YYYY-QN>_sca-monitor-stale-health.csv`; upload to Vanta as CC7.2/CC6.8/CC7.1 evidence; add to MASTER-INDEX-YYYY.csv | devops-lead + compliance-officer | **P1** | M10 | [ ] |
+
+#### P2 — Quarterly recurring (observation period)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Add quarterly SCA-STALE-E-001 collection to §15 compliance calendar (within 5 business days of quarter end, starting M10); note: zero-activation quarters require affirmative attestation CSV (headers + attestation note), not a zero-row skip | compliance-officer | **P2** | After §15 update | [ ] |
+
+---
+
+*v3.33.0 (2026-06-25): §108 Cross-Reference Patch — INCIDENT_RESPONSE R-42 (`sca_sla_monitor` stale · `SCA-STALE-E-001` · CC7.2 / CC6.8 / CC7.1). Gap: `docs/INCIDENT_RESPONSE.md R-42` (v1.0, 2026-06-25) defined the `sca_sla_monitor` pg_cron job 42 stale-incident runbook and at R-42.11 item 4 (P1, M10) created an explicit obligation to register `SCA-STALE-E-001` in `docs/SOC2_READINESS.md §79.4`. The artefact was absent from §79.4, no `security/sca-sla-monitor-stale/` R2 folder existed in §80.3, and no §80.4 Vanta mirror entry existed. §108.1 source table: INCIDENT_RESPONSE R-42 (v1.0, 2026-06-25 — authoritative runbook), OBSERVABILITY §12.6 (job 42 registry), OBSERVABILITY §52 (SCA monitoring observability). §108.2 artefact: SCA-STALE-E-001 (CC7.2/CC6.8/CC7.1 — quarterly `sca_sla_monitor` stale-incident health report; R-42 activation count, max stale duration, `open_critical_sla_breached_at_declared` per activation; zero-activation quarters as affirmative no-blind-spot attestation; 3yr; no `user_id`, no health data, no GDPR Art. 9 content). §108.3 §79.4 row addition: 1 row (SCA-STALE-E-001 CC7.2/CC6.8/CC7.1 quarterly); pre-§108 count 56; post-§108 count 57. §108.4 §80.3 folder addition: new top-level `security/` prefix with `sca-sla-monitor-stale/` sub-folder (`form_api NO ACCESS`). §108.5 §80.4 Vanta mirror addition: SCA-STALE-E-001 (quarterly from M10; zero-activation affirmative attestation pattern). §108.6 cross-reference obligations closed: R-42.11 item 4 (🟢 SCA-STALE-E-001 registered in §79.4); §80.3 `security/sca-sla-monitor-stale/` (🟢 added); §80.4 Vanta mirror (🟢 added). INCIDENT_RESPONSE R-42.11 item 4 updated from `[ ]` to `[x] Done — 2026-06-25, SOC2_READINESS.md §108 (v3.33.0)`. §108.7 three-item implementation checklist: 2× P1 (R2 folder creation with `form_api NO ACCESS` verification; first quarterly SCA-STALE-E-001 collection at M10), 1× P2 (§15 calendar update). Privacy floor: SCA-STALE-E-001 contains operational monitoring metadata only (R-42 activation counts, stale duration, SLA breach integers) — no `user_id`, no employee identifiers, no GDPR Art. 9 health data; `form_api` NO ACCESS to `compliance/evidence/security/`. Owner: devops-lead + compliance-officer.*

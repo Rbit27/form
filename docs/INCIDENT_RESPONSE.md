@@ -16053,7 +16053,7 @@ Quarterly export of all `cron.job_run_details` for job 42: run count, failure co
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 3 | Update `docs/OBSERVABILITY.md §12.6` job 42 `sca_sla_monitor` registry entry: add `INCIDENT_RESPONSE R-42 (job 42 stale recovery runbook — §R-42.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M9 | [x] *(completed in OBSERVABILITY.md §12.6 v1.6 patch, 2026-06-25)* |
-| 4 | Register SCA-STALE-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table: quarterly pg_cron job 42 health report (run count, failure count, stale-window activations, `open_critical_sla_breached_at_declared` for any R-42 activations); zero-activation quarters filed as affirmative attestation; `form_api` REVOKED from evidence path; SOC 2 CC7.2/CC6.8; retention 3yr; path: `compliance/evidence/security/sca-sla-monitor-stale/sca-stale-e-001-YYYY-QN.csv`. | compliance-officer | **P1** | M10 | [ ] |
+| 4 | Register SCA-STALE-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table: quarterly pg_cron job 42 health report (run count, failure count, stale-window activations, `open_critical_sla_breached_at_declared` for any R-42 activations); zero-activation quarters filed as affirmative attestation; `form_api` REVOKED from evidence path; SOC 2 CC7.2/CC6.8; retention 3yr; path: `compliance/evidence/security/sca-sla-monitor-stale/sca-stale-e-001-YYYY-QN.csv`. | compliance-officer | **P1** | M10 | [x] Done — 2026-06-25, SOC2_READINESS.md §108 (v3.33.0) |
 
 ---
 
