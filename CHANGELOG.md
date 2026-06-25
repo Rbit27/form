@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [8.86.1] — 2026-06-25
+
+### Added
+- `docs/SOC2_READINESS.md §114` — Cross-reference patch: PRICE-OBS-E-001 and PRICE-OBS-E-002 registered in §79.4 master consolidated evidence table (2 new rows after LITH-STALE-E-001; §79.4 count 73 → 75). R2 subfolder `compliance/evidence/pricing-exceptions/` entry added to §80.3 (`form_api` NO ACCESS). Both artefacts added to §80.4 Vanta mirror protocol (PRICE-OBS-E-001 quarterly from M9; PRICE-OBS-E-002 annual from M9). Closes `docs/OBSERVABILITY.md §55.10 item 5` (P1/M9). SOC2_READINESS.md v3.38.0 → v3.39.0.
+
+### Changed
+- `docs/OBSERVABILITY.md §55.10 item 5` — Status updated: `[ ]` → `[x] Done — 2026-06-25 (SOC2_READINESS.md §114 (v3.39.0), this commit)`.
+- `VERSION` — 8.86.0 → 8.86.1.
+
+---
+
 ## [8.86.0] — 2026-06-25
 
 ### Added
