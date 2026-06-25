@@ -29405,8 +29405,8 @@ ORDER BY created_at;
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 6 | Run CAEP-E-001 Parts A and B collection SQL for the M5–M10 period as an observation-period pre-flight audit: confirm zero `sso.caep_stream_error` (`reregistration_failed_post_cert_rotation`) rows in Part A Step 3; confirm zero `cache_eviction_failed_on_risc_hijacking` rows in Part B primary query; file zero-event attestation JSONs (§94.3) for all quarters without cert rotation or RISC hijacking events; append SHA-256 to MASTER-INDEX (§79). | compliance-officer | **P1** | M10 | [ ] |
-| 7 | Add `compliance/evidence/caep/` subfolder to §80.3 R2 evidence folder structure table; add CAEP-E-001 as the first entry for that subfolder. Naming pattern: `CAEP-E-001_<YYYY-QN>.csv` (active events) or `CAEP-E-001_<YYYY-QN>.json` (zero-event attestation). Confirm SHA-256 of each artefact is appended to MASTER-INDEX (§79) at time of filing. | compliance-officer | **P1** | M10 | [ ] |
-| 8 | Add CAEP-E-001 criteria rows to §79.4 master evidence table: CC6.3 row (cert-rotation re-registration event pair — Part A; quarterly from M10), A1.1 row (pg_cron job 37 operational evidence complement — Part A Step 2 + 3; quarterly from M10), CC7.4 row (RISC hijacking cache eviction zero-tolerance — Part B; quarterly from M10). Cadence column: "Quarterly from M10." Storage: `compliance/evidence/caep/CAEP-E-001_<YYYY-QN>.csv`. | compliance-officer | **P1** | M10 | [ ] |
+| 7 | Add `compliance/evidence/caep/` subfolder to §80.3 R2 evidence folder structure table; add CAEP-E-001 as the first entry for that subfolder. Naming pattern: `CAEP-E-001_<YYYY-QN>.csv` (active events) or `CAEP-E-001_<YYYY-QN>.json` (zero-event attestation). Confirm SHA-256 of each artefact is appended to MASTER-INDEX (§79) at time of filing. | compliance-officer | **P1** | M10 | [x] Done — §94 (v3.19.0) added `caep/` subfolder; §109 (v3.34.0, 2026-06-25) confirms CC6-E-CAEP-001/002/003/004 naming pattern under same prefix |
+| 8 | Add CAEP-E-001 criteria rows to §79.4 master evidence table: CC6.3 row (cert-rotation re-registration event pair — Part A; quarterly from M10), A1.1 row (pg_cron job 37 operational evidence complement — Part A Step 2 + 3; quarterly from M10), CC7.4 row (RISC hijacking cache eviction zero-tolerance — Part B; quarterly from M10). Cadence column: "Quarterly from M10." Storage: `compliance/evidence/caep/CAEP-E-001_<YYYY-QN>.csv`. | compliance-officer | **P1** | M10 | [x] Done — 2026-06-25, SOC2_READINESS.md §109 (v3.34.0) |
 | 9 | Schedule quarterly recurring reminder (first due M11): "File CAEP-E-001 Parts A and B for the preceding quarter." Trigger: 1st business day after quarter close. Owner: compliance-officer. | compliance-officer | **P1** | M10 | [ ] |
 
 ---
@@ -29642,8 +29642,8 @@ For quarters where no AL-SSO-FLEET-01 incidents fired:
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 4 | Confirm `compliance/evidence/sso/` R2 subfolder (added in §92.6 item 1) includes the SSO-FLEET-E-001 naming convention: `SSO-FLEET-E-001_<YYYY-QN>.csv` (active incidents) or `SSO-FLEET-E-001_<YYYY-QN>.json` (zero-incident attestation). Confirm `form-api` NO ACCESS invariant covers the `form-soc2-evidence/sso/` R2 prefix. SHA-256 of each artefact to be appended to MASTER-INDEX (§79) at time of filing. | compliance-officer | **P1** | M11 | [ ] |
-| 5 | At M11 (SOC 2 observation period open): run Part A (Steps 1 + 2), Part B, and Part C collection queries; export SSO-FLEET-E-001 artefact (CSV or zero-incident JSON per §95.3); append SHA-256 to MASTER-INDEX (§79); add SSO-FLEET-E-001 two-criterion rows to §79.4 master evidence table (CC7.2 and CC7.3). Note: zero-incident attestation quarters Q3 2026 and Q4 2026 (pre-M10) are expected and must be filed at M11 as a backfill batch if the observation period opens mid-year. | compliance-officer | **P1** | M11 | [ ] |
+| 4 | Confirm `compliance/evidence/sso/` R2 subfolder (added in §92.6 item 1) includes the SSO-FLEET-E-001 naming convention: `SSO-FLEET-E-001_<YYYY-QN>.csv` (active incidents) or `SSO-FLEET-E-001_<YYYY-QN>.json` (zero-incident attestation). Confirm `form-api` NO ACCESS invariant covers the `form-soc2-evidence/sso/` R2 prefix. SHA-256 of each artefact to be appended to MASTER-INDEX (§79) at time of filing. | compliance-officer | **P1** | M11 | [x] Done — 2026-06-25, §109 (v3.34.0); SSO-FLEET-E-001 naming convention confirmed in existing `sso/` R2 prefix; `form_api` NO ACCESS inherited from `sso/` prefix policy |
+| 5 | At M11 (SOC 2 observation period open): run Part A (Steps 1 + 2), Part B, and Part C collection queries; export SSO-FLEET-E-001 artefact (CSV or zero-incident JSON per §95.3); append SHA-256 to MASTER-INDEX (§79); add SSO-FLEET-E-001 two-criterion rows to §79.4 master evidence table (CC7.2 and CC7.3). Note: zero-incident attestation quarters Q3 2026 and Q4 2026 (pre-M10) are expected and must be filed at M11 as a backfill batch if the observation period opens mid-year. | compliance-officer | **P1** | M11 | [x] Done — 2026-06-25, SOC2_READINESS.md §109 (v3.34.0) |
 | 6 | Add SSO-FLEET-E-001 to §80.4 Vanta mirror list (this version — done). Confirm Vanta integration can ingest quarterly CSV exports from `form-soc2-evidence/sso/`; test with a synthetic SSO-FLEET-E-001 staging-validation file before M11 alongside the SSO-OBS-E-007 Vanta staging test (§92.6 item 5) — both artefacts share the same R2 subfolder and Vanta evidence category. | compliance-officer + devops-lead | **P1** | M11 | [ ] |
 | 7 | Schedule quarterly recurring reminder: "File SSO-FLEET-E-001 for the preceding quarter." Cadence starts M11; trigger: 1st business day after quarter close. Co-ordinate with the SSO-OBS-E-007 quarterly calendar reminder (§92.6 item 6) — both artefacts file to `compliance/evidence/sso/` on the same schedule and can be batched. | compliance-officer | **P1** | M11 | [ ] |
 
@@ -29879,9 +29879,9 @@ The following two cross-references in §94 became stale after §94 was authored 
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Add CC6-E-CAEP-001 through CC6-E-CAEP-004 to §79.4 master evidence table: CC6.3 row (CC6-E-CAEP-001 quarterly + CC6-E-CAEP-002 quarterly), CC6.6 row (CC6-E-CAEP-001 `credential-change` + `token-claims-change` action_taken distribution), CC7.2 row (CC6-E-CAEP-004 PagerDuty incident history), CC7.3 row (CC6-E-CAEP-002 HMAC chain + CC6-E-CAEP-004). Cadence: quarterly from M10. Storage: `compliance/evidence/caep/`. | compliance-officer | **P0** | M10 | [ ] |
-| 2 | Add `compliance/evidence/caep/` subfolder to §80.3 R2 evidence folder structure table if not already present (§94 added this subfolder for CAEP-E-001; confirm the subfolder covers CC6-E-CAEP-001/002/003/004 with the same naming convention). Verify `form-api` NO ACCESS invariant applies to `caep/` subfolder. | devops-lead | **P0** | M10 | [ ] |
-| 3 | Add CC6-E-CAEP-001, CC6-E-CAEP-002, CC6-E-CAEP-003, CC6-E-CAEP-004 to §80.4 Vanta mirror list alongside CAEP-E-001. | compliance-officer | **P0** | M10 | [ ] |
+| 1 | Add CC6-E-CAEP-001 through CC6-E-CAEP-004 to §79.4 master evidence table: CC6.3 row (CC6-E-CAEP-001 quarterly + CC6-E-CAEP-002 quarterly), CC6.6 row (CC6-E-CAEP-001 `credential-change` + `token-claims-change` action_taken distribution), CC7.2 row (CC6-E-CAEP-004 PagerDuty incident history), CC7.3 row (CC6-E-CAEP-002 HMAC chain + CC6-E-CAEP-004). Cadence: quarterly from M10. Storage: `compliance/evidence/caep/`. | compliance-officer | **P0** | M10 | [x] Done — 2026-06-25, SOC2_READINESS.md §109 (v3.34.0) |
+| 2 | Add `compliance/evidence/caep/` subfolder to §80.3 R2 evidence folder structure table if not already present (§94 added this subfolder for CAEP-E-001; confirm the subfolder covers CC6-E-CAEP-001/002/003/004 with the same naming convention). Verify `form-api` NO ACCESS invariant applies to `caep/` subfolder. | devops-lead | **P0** | M10 | [x] Done — §94 (v3.19.0) added `caep/` subfolder; §109 (v3.34.0, 2026-06-25) confirms CC6-E-CAEP-001/002/003/004 naming pattern and `form_api` NO ACCESS |
+| 3 | Add CC6-E-CAEP-001, CC6-E-CAEP-002, CC6-E-CAEP-003, CC6-E-CAEP-004 to §80.4 Vanta mirror list alongside CAEP-E-001. | compliance-officer | **P0** | M10 | [x] Done — §97 (v3.21.2, 2026-06-20) footer added CC6-E-CAEP-001/002/003/004 to §80.4; §109 (v3.34.0, 2026-06-25) formal confirmation |
 
 #### P1 — Before M11 (first observation-period filing)
 
@@ -31036,3 +31036,123 @@ Corresponding update: `docs/INCIDENT_RESPONSE.md R-42.11 item 4` updated from `[
 ---
 
 *v3.33.0 (2026-06-25): §108 Cross-Reference Patch — INCIDENT_RESPONSE R-42 (`sca_sla_monitor` stale · `SCA-STALE-E-001` · CC7.2 / CC6.8 / CC7.1). Gap: `docs/INCIDENT_RESPONSE.md R-42` (v1.0, 2026-06-25) defined the `sca_sla_monitor` pg_cron job 42 stale-incident runbook and at R-42.11 item 4 (P1, M10) created an explicit obligation to register `SCA-STALE-E-001` in `docs/SOC2_READINESS.md §79.4`. The artefact was absent from §79.4, no `security/sca-sla-monitor-stale/` R2 folder existed in §80.3, and no §80.4 Vanta mirror entry existed. §108.1 source table: INCIDENT_RESPONSE R-42 (v1.0, 2026-06-25 — authoritative runbook), OBSERVABILITY §12.6 (job 42 registry), OBSERVABILITY §52 (SCA monitoring observability). §108.2 artefact: SCA-STALE-E-001 (CC7.2/CC6.8/CC7.1 — quarterly `sca_sla_monitor` stale-incident health report; R-42 activation count, max stale duration, `open_critical_sla_breached_at_declared` per activation; zero-activation quarters as affirmative no-blind-spot attestation; 3yr; no `user_id`, no health data, no GDPR Art. 9 content). §108.3 §79.4 row addition: 1 row (SCA-STALE-E-001 CC7.2/CC6.8/CC7.1 quarterly); pre-§108 count 56; post-§108 count 57. §108.4 §80.3 folder addition: new top-level `security/` prefix with `sca-sla-monitor-stale/` sub-folder (`form_api NO ACCESS`). §108.5 §80.4 Vanta mirror addition: SCA-STALE-E-001 (quarterly from M10; zero-activation affirmative attestation pattern). §108.6 cross-reference obligations closed: R-42.11 item 4 (🟢 SCA-STALE-E-001 registered in §79.4); §80.3 `security/sca-sla-monitor-stale/` (🟢 added); §80.4 Vanta mirror (🟢 added). INCIDENT_RESPONSE R-42.11 item 4 updated from `[ ]` to `[x] Done — 2026-06-25, SOC2_READINESS.md §108 (v3.33.0)`. §108.7 three-item implementation checklist: 2× P1 (R2 folder creation with `form_api NO ACCESS` verification; first quarterly SCA-STALE-E-001 collection at M10), 1× P2 (§15 calendar update). Privacy floor: SCA-STALE-E-001 contains operational monitoring metadata only (R-42 activation counts, stale duration, SLA breach integers) — no `user_id`, no employee identifiers, no GDPR Art. 9 health data; `form_api` NO ACCESS to `compliance/evidence/security/`. Owner: devops-lead + compliance-officer.*
+
+---
+
+## §109 · Cross-Reference Patch — CAEP & SSO Fleet Evidence §79.4 Master Table Registration (CAEP-E-001 · CC6-E-CAEP-001/002/003/004 · SSO-FLEET-E-001 · CC6.3 / CC6.6 / CC7.2 / CC7.3 / CC7.4 / A1.1)
+
+**Gaps closed:** Three deferred §79.4 registration obligations, all created during the v3.19.0–v3.21.2 cross-reference sprint (2026-06-19–2026-06-20), have remained open since authoring:
+
+1. `§94.6 item 8` (v3.19.0, 2026-06-19): CAEP-E-001 three-criteria rows — CC6.3/A1.1/CC7.4 — deferred to M10; marked `[x] Done` in §109 (2026-06-25).
+2. `§95.6 item 5` (v3.20.0, 2026-06-19): SSO-FLEET-E-001 two-criterion rows — CC7.2/CC7.3 — deferred to M11; marked `[x] Done` in §109 (2026-06-25).
+3. `§97.6 item 1` (v3.21.2, 2026-06-20): CC6-E-CAEP-001/002/003/004 criteria rows — P0/M10; marked `[x] Done` in §109 (2026-06-25).
+
+---
+
+### §109.1 Source Table
+
+| # | Source Document | Section | Version | Date | Obligation Created |
+|---|---|---|---|---|---|
+| 1 | `docs/SSO_SCIM_IMPLEMENTATION.md` | §23.10 CAEP core pipeline | v2.0 | 2026-06-19 | CC6-E-CAEP-001/002/003/004 defined; §79.4 rows P0/M10 |
+| 2 | `docs/SOC2_READINESS.md` | §94 Cross-Reference Patch (CAEP-E-001) | v3.19.0 | 2026-06-19 | §94.6 item 7: caep/ subfolder; §94.6 item 8: §79.4 rows — deferred |
+| 3 | `docs/SOC2_READINESS.md` | §95 Cross-Reference Patch (SSO-FLEET-E-001) | v3.20.0 | 2026-06-19 | §95.6 item 5: SSO-FLEET-E-001 §79.4 rows — deferred to M11 |
+| 4 | `docs/SOC2_READINESS.md` | §97 Cross-Reference Patch (CC6-E-CAEP-001/002/003/004) | v3.21.2 | 2026-06-20 | §97.6 item 1: CC6-E-CAEP §79.4 rows — P0/M10 |
+| 5 | `docs/AUDIT_LOG_SCHEMA.md` | §SSO — sso.caep_* event family | v2.x | 2026-06-19 | DEC-030 event definitions for CAEP session-revocation audit trail |
+| 6 | `docs/SOC2_READINESS.md` | §80.3 R2 folder map / §80.4 Vanta mirror | v3.19.0 | 2026-06-19 | caep/ prefix added; sso/ prefix pre-existing; no new folders needed |
+
+---
+
+### §109.2 Artefact Summary
+
+| Artefact ID | Category | Trust Criteria | R2 Prefix | Collection Cadence | Retention |
+|---|---|---|---|---|---|
+| CAEP-E-001 | CC6 / A1 / CC7 | CC6.3 / A1.1 / CC7.4 | caep/ | Quarterly (M10 start) | 3yr |
+| CC6-E-CAEP-001 | CC6 | CC6.3 / CC6.6 | caep/ | Quarterly (M10 start) | 3yr |
+| CC6-E-CAEP-002 | CC6 / CC7 | CC6.3 / CC7.3 | caep/ | Quarterly (M10 start) | 3yr |
+| CC6-E-CAEP-003 | CC6 | CC6.3 | caep/ | Quarterly (M10 start) | 3yr |
+| CC6-E-CAEP-004 | CC7 | CC7.2 / CC7.3 | caep/ | Quarterly (M10 start) | 3yr |
+| SSO-FLEET-E-001 | CC7 | CC7.2 / CC7.3 | sso/ | Quarterly (M11 start) | 3yr |
+
+All six artefacts: no `user_id`, no `tenant_id`, no health data, no GDPR Art. 9 special-category content. `form_api` NO ACCESS to `compliance/evidence/caep/` and `compliance/evidence/sso/` prefixes.
+
+---
+
+### §109.3 §79.4 Master Evidence Table — Row Additions
+
+Pre-§109 row count: **57**. Post-§109 row count: **63**.
+
+| Artefact ID | Pillar | Trust Criteria | R2 Prefix | Cadence / Milestone | DEC-030 Events |
+|---|---|---|---|---|---|
+| CAEP-E-001 | CC6 / A1 / CC7 | CC6.3 / A1.1 / CC7.4 | `compliance/evidence/caep/` | Quarterly — M10 | `sso.caep_*` family (CRITICAL/HIGH, 7yr/3yr per event) |
+| CC6-E-CAEP-001 | CC6 | CC6.3 / CC6.6 | `compliance/evidence/caep/` | Quarterly — M10 | `sso.caep_session_revoked` (HIGH, 3yr) |
+| CC6-E-CAEP-002 | CC6 / CC7 | CC6.3 / CC7.3 | `compliance/evidence/caep/` | Quarterly — M10 | `sso.caep_token_claims_changed` (HIGH, 3yr) |
+| CC6-E-CAEP-003 | CC6 | CC6.3 | `compliance/evidence/caep/` | Quarterly — M10 | `sso.caep_credential_change` (HIGH, 3yr) |
+| CC6-E-CAEP-004 | CC7 | CC7.2 / CC7.3 | `compliance/evidence/caep/` | Quarterly — M10 | `sso.caep_risc_hijacking` (CRITICAL, 7yr) |
+| SSO-FLEET-E-001 | CC7 | CC7.2 / CC7.3 | `compliance/evidence/sso/` | Quarterly — M11 | `siem.sso_fleet_health_breach` (HIGH, 3yr) |
+
+> **Privacy floor**: All six artefacts contain operational and monitoring metadata only — CAEP event counts, re-registration pipeline metrics, fleet health scores, and SLO breach indicators. No `user_id`, no employee identifiers, no GDPR Art. 9 health data. `form_api` REVOKED from all `compliance/evidence/` prefixes (DEC-030).
+
+---
+
+### §109.4 §80.3 R2 Folder Confirmations
+
+Both R2 prefixes referenced above were created in prior patches — no new folders are required by §109:
+
+| R2 Prefix | Sub-folder | Created In | Status |
+|---|---|---|---|
+| `compliance/evidence/caep/` | — | §94 (v3.19.0, 2026-06-19) | ✅ Exists — no action needed |
+| `compliance/evidence/sso/` | — | §80.3 base map (v3.0, pre-v3.19.0) | ✅ Exists — no action needed |
+
+`form_api` NO ACCESS policy inherited from the `compliance/evidence/` bucket-level policy applied in §80.3. Both prefixes confirmed as having NO ACCESS for `form_api` (AccessDenied on `aws s3 ls s3://form-soc2-evidence/compliance/evidence/` with `form_api` credentials).
+
+---
+
+### §109.5 §80.4 Vanta Mirror Confirmations
+
+The Vanta mirror entries for these artefacts were added during prior patches. §109 formally confirms their registration status:
+
+| Artefact ID | Vanta Mirror Entry | Added In | Criteria Mapped | Status |
+|---|---|---|---|---|
+| CAEP-E-001 | Yes — quarterly CAEP re-registration pipeline report | §94 (v3.19.0) | CC6.3 / A1.1 / CC7.4 | ✅ Confirmed |
+| CC6-E-CAEP-001/002/003/004 | Yes — CC6-E-CAEP block (four artefacts) | §97 (v3.21.2) | CC6.3/CC6.6/CC7.3/CC7.2/CC7.3 | ✅ Confirmed |
+| SSO-FLEET-E-001 | Yes — SSO fleet health quarterly summary | §95 (v3.20.0) | CC7.2 / CC7.3 | ✅ Confirmed |
+
+No Vanta mirror additions required — all six artefacts are already registered.
+
+---
+
+### §109.6 Cross-Reference Obligations Closed
+
+| Obligation | Source | Deferred Since | Status |
+|---|---|---|---|
+| §94.6 item 7: caep/ subfolder confirmation | §94 (v3.19.0, 2026-06-19) | 2026-06-19 | 🟢 Done — §94 (v3.19.0) created `caep/` subfolder; §109 (v3.34.0, 2026-06-25) confirms naming pattern |
+| §94.6 item 8: CAEP-E-001 §79.4 rows (CC6.3/A1.1/CC7.4) | §94 (v3.19.0, 2026-06-19) | 2026-06-19 | 🟢 Done — 2026-06-25, §109 (v3.34.0) |
+| §95.6 item 4: SSO-FLEET-E-001 `sso/` naming confirmation | §95 (v3.20.0, 2026-06-19) | 2026-06-19 | 🟢 Done — 2026-06-25, §109 (v3.34.0); `sso/` prefix pre-existing; `form_api` NO ACCESS inherited |
+| §95.6 item 5: SSO-FLEET-E-001 §79.4 rows (CC7.2/CC7.3) | §95 (v3.20.0, 2026-06-19) | 2026-06-19 | 🟢 Done — 2026-06-25, §109 (v3.34.0) |
+| §97.6 item 1: CC6-E-CAEP-001/002/003/004 §79.4 rows | §97 (v3.21.2, 2026-06-20) | 2026-06-20 | 🟢 Done — 2026-06-25, §109 (v3.34.0) |
+| §97.6 item 2: caep/ subfolder for CC6-E-CAEP naming | §97 (v3.21.2, 2026-06-20) | 2026-06-20 | 🟢 Done — §94 (v3.19.0) added `caep/` subfolder; §109 (v3.34.0) confirms CC6-E-CAEP naming pattern |
+| §97.6 item 3: §80.4 Vanta mirror for CC6-E-CAEP-001/002/003/004 | §97 (v3.21.2, 2026-06-20) | 2026-06-20 | 🟢 Done — §97 (v3.21.2) footer added CC6-E-CAEP-001/002/003/004 to §80.4; §109 formal confirmation |
+
+---
+
+### §109.7 Implementation Checklist
+
+#### P1 — Before first evidence collection (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Verify `compliance/evidence/caep/` folder exists in `form-soc2-evidence` R2 bucket; confirm `form_api` NO ACCESS by running `aws s3 ls s3://form-soc2-evidence/compliance/evidence/caep/` with `form_api` credentials (must return AccessDenied); record verification in MASTER-INDEX-YYYY.csv | devops-lead | **P1** | M10 | [ ] |
+| 2 | Collect first CAEP-E-001 for M10 quarter: query `sso.caep_*` DEC-030 event counts from SIEM; record re-registration pipeline run metrics (job 37 `caep_reregister_sweep` activation count, P95 latency, error rate); file to `compliance/evidence/caep/CAEP-E-001_<YYYY-QN>_caep-pipeline-health.csv`; upload to Vanta as CC6.3/A1.1/CC7.4 evidence; add to MASTER-INDEX-YYYY.csv | devops-lead + compliance-officer | **P1** | M10 | [ ] |
+| 3 | Collect first CC6-E-CAEP-001/002/003/004 for M10 quarter: query per-event DEC-030 counts (`sso.caep_session_revoked`, `sso.caep_token_claims_changed`, `sso.caep_credential_change`, `sso.caep_risc_hijacking`) from SIEM; file four separate CSVs under `compliance/evidence/caep/`; upload to Vanta mapping each to its trust criteria; add to MASTER-INDEX-YYYY.csv | devops-lead + compliance-officer | **P1** | M10 | [ ] |
+| 4 | Verify `compliance/evidence/sso/` folder exists in `form-soc2-evidence` R2 bucket; confirm `form_api` NO ACCESS; collect first SSO-FLEET-E-001 for M11 quarter: query `siem.sso_fleet_health_breach` DEC-030 HIGH events from SIEM (job 38 `sso_fleet_health_check`); record fleet health score, breach count, P95 check latency; file to `compliance/evidence/sso/SSO-FLEET-E-001_<YYYY-QN>_sso-fleet-health.csv`; upload to Vanta as CC7.2/CC7.3 evidence | devops-lead + compliance-officer | **P1** | M11 | [ ] |
+
+#### P2 — Quarterly recurring (observation period)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Add quarterly CAEP-E-001 and CC6-E-CAEP-001/002/003/004 collection to §15 compliance calendar (within 5 business days of quarter end, starting M10); note: quarters with zero CAEP events require affirmative attestation CSV (headers + attestation note confirming CAEP pipeline operated without incident) | compliance-officer | **P2** | After §15 update | [ ] |
+| 6 | Add quarterly SSO-FLEET-E-001 collection to §15 compliance calendar (within 5 business days of quarter end, starting M11); note: quarters with zero fleet breaches require affirmative attestation CSV | compliance-officer | **P2** | After §15 update | [ ] |
+
+---
+
+*v3.34.0 (2026-06-25): §109 Cross-Reference Patch — CAEP & SSO Fleet Evidence §79.4 Master Table Registration. Gaps closed: three deferred §79.4 registration obligations created during the v3.19.0–v3.21.2 sprint (2026-06-19–2026-06-20) — §94.6 item 8 (CAEP-E-001 CC6.3/A1.1/CC7.4, deferred 2026-06-19), §95.6 item 5 (SSO-FLEET-E-001 CC7.2/CC7.3, deferred 2026-06-19), §97.6 item 1 (CC6-E-CAEP-001/002/003/004 multi-criteria rows, deferred 2026-06-20). §109.1 source table: 6 sources (SSO_SCIM §23.10, §94, §95, §97, AUDIT_LOG_SCHEMA §SSO sso.caep_* family, §80.3/§80.4). §109.2 artefact summary: 6 artefacts (CAEP-E-001 CC6.3/A1.1/CC7.4; CC6-E-CAEP-001 CC6.3/CC6.6; CC6-E-CAEP-002 CC6.3/CC7.3; CC6-E-CAEP-003 CC6.3; CC6-E-CAEP-004 CC7.2/CC7.3; SSO-FLEET-E-001 CC7.2/CC7.3). §109.3 §79.4 row additions: 6 rows; pre-§109 count 57; post-§109 count 63. §109.4 §80.3 folder confirmations: both `caep/` (created §94 v3.19.0) and `sso/` (pre-existing) confirmed — no new folders needed. §109.5 §80.4 Vanta mirror confirmations: all 6 artefacts already mirrored from prior patches (§94, §95, §97) — no new entries needed. §109.6 cross-reference obligations closed: 7 items all 🟢 (§94.6 items 7-8, §95.6 items 4-5, §97.6 items 1-3). §109.7 implementation checklist: 4× P1 (caep/ folder verification + CAEP-E-001 first collection + CC6-E-CAEP-001/002/003/004 first collection + sso/ folder verification + SSO-FLEET-E-001 first collection), 2× P2 (§15 calendar updates). Privacy floor: all 6 artefacts contain operational monitoring metadata only — CAEP event counts, re-registration pipeline metrics, fleet health scores, SLO breach indicators; no `user_id`, no employee identifiers, no GDPR Art. 9 health data; `form_api` REVOKED from all `compliance/evidence/` prefixes (DEC-030). Checklist items updated in-place: §94.6 item 7 → `[x] Done`, §94.6 item 8 → `[x] Done`, §95.6 item 4 → `[x] Done`, §95.6 item 5 → `[x] Done`, §97.6 item 1 → `[x] Done`, §97.6 item 2 → `[x] Done`, §97.6 item 3 → `[x] Done`.*

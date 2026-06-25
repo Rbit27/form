@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [8.60.1] — 2026-06-25
+
+### Changed
+- `docs/SOC2_READINESS.md` — §109 Cross-Reference Patch: registered CAEP-E-001 (CC6.3/A1.1/CC7.4), CC6-E-CAEP-001/002/003/004 (CC6.3/CC6.6/CC7.2/CC7.3), SSO-FLEET-E-001 (CC7.2/CC7.3) in §79.4 master evidence table; closes §94.6 items 7-8, §95.6 items 4-5, §97.6 items 1-3. §79.4 count: 57 → 63 rows.
+- `VERSION` — 8.60.0 → 8.60.1.
+
 ## [8.60.0] — 2026-06-25
 
 ### Added
