@@ -16045,7 +16045,7 @@ Quarterly export of all `cron.job_run_details` for job 42: run count, failure co
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register `system.sca_monitor_stale_declared` (HIGH/7yr) and `system.sca_monitor_stale_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §SCA & Dependency Vulnerability events`. Add SCA-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-42.7. | security-engineer + compliance-officer | **P0** | M9 | [ ] |
+| 1 | Register `system.sca_monitor_stale_declared` (HIGH/7yr) and `system.sca_monitor_stale_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §SCA & Dependency Vulnerability events`. Add SCA-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-42.7. | security-engineer + compliance-officer | **P0** | M9 | [x] *(completed in AUDIT_LOG_SCHEMA.md v2.42 patch, 2026-06-25)* |
 | 2 | Deploy R-42 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'sca_sla_monitor'` to PagerDuty service `form-security` P1, dedup key `sca-sla-monitor-stale`, routing to security-engineer + devops-lead. Integration test: disable job 42 in staging for > 20 min; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-security` with correct dedup key. | devops-lead | **P0** | M9 | [ ] |
 
 #### P1 — Before first SOC 2 Type II audit period begins (M10)

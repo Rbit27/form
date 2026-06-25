@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [8.52.0] — 2026-06-25
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §SCA stale-monitor incident events` — new section with `system.sca_monitor_stale_declared` (HIGH/7yr) and `system.sca_monitor_stale_restored` (STANDARD/3yr); Zod v2 schemas (ScaMonitorStaleDeclaredSchema, ScaMonitorStaleRestoredSchema); SCA-STALE-CHAIN-01 ordering invariant (HTTP 422 `SCA_STALE_CHAIN_01_VIOLATION` on inversion → R-05); retention table +2 rows. Closes `docs/INCIDENT_RESPONSE.md R-42.11` item 1 (P0/M9). Document header v2.40 → v2.42 (corrects v2.41 header gap).
+- `content/post-2431-solo-vs-training-partner.md` — Editorial series 2426–2435 post 6/10. «Соло проти партнера: що насправді впливає на результат self-coached атлета». Три механізми де партнер реально важливий: (1) підстраховка у важких підходах зі штангою — Barbalho et al. (2017, JSCR): атлети без страхувальника залишають 1.3–1.8 зайвих повторень «в запасі»; (2) accountability для атлетів з проблемою послідовності — Annesi (1999): +16 відсоткових пунктів retention через 6 місяців; (3) зворотний зв'язок по техніці, але лише від технічно грамотного партнера. Підтверджуючі дослідження: Zajonc (1965) соціальна фасилітація; Rhea et al. (2003) +8% обсяг у групі з партнером, але різниця у наближенні до відмови, не базовому навантаженні; Strother et al. (2022) змагальний контекст значимий при RPE 8–9, незначний при RPE 6–7. Операційна карта рішення: два питання (пресовані штангові рухи + RPE 9+? послідовність — реальна проблема?). Логістичні trade-offs: узгодження розкладу, темп тренування, ризик залежності. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2431 card added at top of feed.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md R-42.11` — item 1 status updated [ ] → [x] *(AUDIT_LOG_SCHEMA.md v2.42 patch, 2026-06-25)*.
+- `STATUS.md` — Editorial series 2426–2435 progress updated; post-2431 → draft.
+- `VERSION` — 8.51.0 → 8.52.0.
+
+---
+
 ## [8.51.0] — 2026-06-25
 
 ### Added
