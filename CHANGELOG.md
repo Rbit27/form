@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [8.76.0] — 2026-06-25
+
+### Added
+- `content/post-2351-block-transition-planning.md` — Editorial series 2346–2355 · пост 6/10. «Планування переходу між блоками: операційний протокол без тренера». П'ятикроковий протокол: (1) ретроспектива блоку (compliance, e1RM тренд, RPE-тренд, технічна якість, обмеження); (2) benchmark session під час деловантажного тижня — стандартизований протокол для міжблокового порівняння; (3) вибір теми наступного блоку за трьома сигналами даних (технічна деградація → технічний блок; RPE не знижується → деакумуляція; compliance <75% → реструктурування); (4) структурні рішення (вправи/обсяг/інтенсивність) на основі Issurin (2010) блокова модель, Israetel et al. (2019) прогресія обсягу, Schoenfeld (2016) спеціалізація; (5) фіксація плану з метрикою успіху. Деловантажний тиждень: три рівні ролі (відновлення + діагностика + когнітивний простір). Три типові помилки переходу. Fitts (1994), Meeusen et al. (2013), Helms et al. (2014), Halson (2014), Wulf et al. (2010), Rippetoe (2009). clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `content/post-346-invisible-adaptation.md` — перейменований з `post-291-invisible-adaptation.md` (усунено конфлікт нумерації з post-291-technical-drift-hidden-plateau.md, доданим v8.74.0). «Ти платиш за адаптацію, яку не бачиш». Blog card added. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `content/post-291-invisible-adaptation.md` → `content/post-346-invisible-adaptation.md` — git mv для усунення конфлікту нумерації post-291. Технічний дрейф залишається канонічним post-291 (blog card, v8.74.0).
+- `blog.html` — картка post-2351 додана на початок стрічки (над post-2350); картка post-346 додана після post-291.
+- `VERSION` — 8.75.0 → 8.76.0.
+
 ## [8.75.0] — 2026-06-25
 
 ### Added
