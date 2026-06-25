@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.66.1] — 2026-06-25
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.42 → v2.43: +2 DEC-030 events in `§Enterprise Post-Churn & Deletion SLA events` closing `docs/OBSERVABILITY.md §53.10` item 1 (P0/M10). (1) `enterprise.offboard_chain_sla_breach` (HIGH, 7yr): pg_cron job 44 `offboard_chain_monitor` emits per flagged tenant (`offboarding_initiated_at IS NULL` past 24h); `OffboardChainSlaBreachPayload` Zod schema: `tenant_id`, `churn_date`, `hours_since_churn`, `check_run_at`, `alert_dedup_key`; routes AL-OFFL-01 P1 PagerDuty `form-enterprise`; OFFL-CHAIN-01 ordering invariant (emit + HTTP 200 before PagerDuty). (2) `system.offboard_chain_check_passed` (LOW, 1yr): all-clear path, no `tenant_id` (privacy floor); `OffboardChainCheckPassedPayload`: `tenants_checked`, `check_run_at`; no alert. OFFL-CHAIN-01 invariant block, CC7.2 auditor narrative, and emitter/alert routing entries added. Section header updated to include `+ §53` and `CC7.2`.
+- `docs/OBSERVABILITY.md` — v5.1.0 → v5.1.2: §53.10 item 1 marked `[x] Done — 2026-06-25 (AUDIT_LOG_SCHEMA.md v2.43)`; document header corrected (v5.1.1 was applied 2026-06-25 but title line not updated; corrected to v5.1.2).
+- `STATUS.md` — Current version v8.66.0 → v8.66.1.
+- `VERSION` — 8.66.0 → 8.66.1.
+
+---
+
 ## [8.66.0] — 2026-06-25
 
 ### Added
