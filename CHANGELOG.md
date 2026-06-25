@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [8.53.1] — 2026-06-25
+
+### Added
+- `docs/SOC2_READINESS.md §106` — Cross-Reference Patch: OBSERVABILITY §52 (`SCA-OBS-E-001/002` · CC6.8 / CC7.1 / CC7.2 / CC9.2 / A1.1) + §80.3 R2 folder retroactive additions (`api-key-auth/`, `victor-safety/`, `sca/`). Closes gap where OBSERVABILITY §52.8 (v5.0.0, 2026-06-23) defined SCA-OBS-E-001 and SCA-OBS-E-002 with §54.9 registration but §79.4 master consolidated evidence table was never updated. §79.4: +2 rows (count 49 → 51). §80.3: +3 folders (`api-key-auth/` and `victor-safety/` retroactive from §105; `sca/` new). §80.4: SCA-OBS-E-001/002 added to Vanta mirror list. SCA-OBS-E-001 (CC6.8/CC7.1/CC9.2 — quarterly SCA SLO report with SCA-SLO-01 zero-tolerance breach count, SCA-SLO-02 High CVE 7d SLA rate, SCA-SLO-03 CI pass rate, AL-SCA-01 activation log; zero-breach quarters = positive zero-tolerance attestation). SCA-OBS-E-002 (CC7.2/A1.1 — quarterly job 42 `sca_sla_monitor` pg_cron run history; zero-stale-event quarters confirm no SCA detection blind-spot). Document header v3.30.0 → v3.31.0.
+
+### Changed
+- `docs/OBSERVABILITY.md §52.10 item 4` — updated to note §79.4 registration via §106 (2026-06-25) in addition to §54.9 registration (2026-06-23).
+- `VERSION` — 8.53.0 → 8.53.1.
+
+---
+
 ## [8.53.0] — 2026-06-25
 
 ### Added
