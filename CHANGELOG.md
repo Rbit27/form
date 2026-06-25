@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.81.3] — 2026-06-25
+
+### Added
+- `docs/OBSERVABILITY.md §55` — Pricing Exception Compliance Observability (v5.2.3). Closes three monitoring gaps: (1) no daily sentinel for REENTRY-CHAIN-01 chain integrity (Worker-layer HTTP 422 enforcement per COST_MODEL §44.5 existed but had no monitoring-layer verification); (2) no automated trigger for the quarterly pricing exception audit (COST_MODEL §44.7 obligation); (3) no PRICE-SLO-* or PRICE-OBS-E-* evidence artefacts. Adds: pg_cron job 46 `pricing_exception_compliance_monitor` (daily 09:00 UTC; two sweeps — REENTRY-CHAIN-01 correlated subquery + quarterly aggregate trigger; REENTRY-MONITOR-CHAIN-01 ordering invariant); three new DEC-030 monitoring events (`enterprise.reentry_chain_integrity_violation` CRITICAL/7yr; `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr; `system.pricing_exception_check_passed` LOW/1yr); three SLOs (PRICE-SLO-01 zero-tolerance; PRICE-SLO-02 quarterly cadence; PRICE-SLO-03 1-business-day floor override review); three alert rules (AL-PRICE-01/02/03); two evidence artefacts (PRICE-OBS-E-001 quarterly outcome CC5.2/CC1.4/CC4.1 7yr; PRICE-OBS-E-002 annual monitoring run history CC4.1/A1.1 3yr); `pricing_exception_health` subsection inserted into §6.2; job 46 registered in §12.6 (v1.9 patch); Metabase `Pricing Exception Compliance` dashboard (7 panels). Privacy floor: aggregate counts only in all monitoring events and artefacts; `tenant_id` UUID only in violation events; no `approver_user_id`, employee PII, or GDPR Art. 9 data anywhere in §55. `tenant_manager` (HR) and `enterprise_admin` excluded from dashboard.
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.2.2 → v5.2.3. §55 appended; §6.2 `pricing_exception_health` subsection inserted after `litigation_hold_health`; §12.6 job 46 row added; §12.6 freshness window note extended; §12.6 v1.9 patch note added.
+- `VERSION` — 8.81.2 → 8.81.3.
+
 ## [8.81.2] — 2026-06-25
 
 ### Added

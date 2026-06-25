@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.2.2
+# FORM · Observability & Monitoring Taxonomy v5.2.3
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -552,6 +552,16 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 | **Post-release deletion overdue** | `litigation_hold_compliance_monitor` pg_cron (job 45, `0 8 * * *`): sweep 3 — `litigation_hold_records WHERE deletion_target_date < CURRENT_DATE AND status = 'released' AND deletion_completed_date IS NULL`; emits `enterprise.litigation_hold_deletion_overdue` HIGH/7yr per flagged hold (LITH-DEL-CHAIN-01 ordering invariant: audit event HTTP 200 confirmed before PagerDuty fires); dedup `lith-deletion-overdue-{tenant_id}-{activation_date_iso}` 24h cooldown; auto-resolves on `deletion_completed_date` populated at next daily run; `form_api` REVOKED | P1 | PagerDuty `form-compliance` → compliance-officer + devops-lead; Slack `#legal-compliance` HIGH | §54.4 AL-LITH-03; §54.5 sweep 3; DATA_MODEL §46 `lhr_deletion_completed_requires_release` CHECK (DDL coherence); MSA §11.6.6 |
 
 **SOC 2 mapping (litigation_hold_health):** CC5.3 (multiple-level structural controls — DDL CHECK constraints (DATA_MODEL §46) + pg_cron automated monitoring (job 45) + compliance-officer Admin Console PAM workflow; three distinct enforcement layers; auditor-verifiable via `pg_constraint` + `pg_cron.job_run_details`); C1.2 (disposal of confidential information — AL-LITH-03 detects post-release deletion SLA breaches; LITH-OBS-E-001 annual monitoring evidence — `compliance/evidence/litigation-hold/`); C1.1 (obligations to handle confidential information — AL-LITH-02 breach detection; MSA §11.6.4 36-month cap enforcement at monitoring layer). Privacy floor: all alert payloads carry only `tenant_id` UUID (FORM-internal) + derived integer fields (`days_overdue`, `days_remaining`, `days_over_limit`) + `activation_date` DATE — no individual employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data. The `system.litigation_hold_check_passed` all-clear omits `tenant_id` entirely (aggregate fleet counts only).
+
+**Subsection: `pricing_exception_health` (AL-PRICE-01/02/03 — §55.4):**
+
+| Condition | Signal source | Severity | Routing | Cross-ref |
+|---|---|---|---|---|
+| **REENTRY-CHAIN-01 integrity violation** | `pricing_exception_compliance_monitor` pg_cron (job 46, `0 9 * * *`): sweep 1 — query `audit_log_events` for `enterprise.contract_renewed` events with `payload->>'contract_discount_type' = 'loyalty_reentry'` in the last 25h that lack a matching `enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'` for the same `tenant_id` within the prior 30 days (REENTRY-CHAIN-01, COST_MODEL §44.5); on detection: emits `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr (REENTRY-MONITOR-CHAIN-01 ordering invariant: audit event HTTP 200 confirmed before PagerDuty fires); dedup `reentry-chain-violation-{tenant_id}-{renewal_date_iso}` no-expiry; no auto-resolve — IC must close after full chain investigation and remediation; `form_api` REVOKED from `audit_log_events` — job runs via `form_system` role | P0 | PagerDuty `form-compliance` → founder + compliance-officer + enterprise-architect; no dedup; immediate founder escalation | §55.4 AL-PRICE-01; §55.5 (job 46 sweep 1 SQL); COST_MODEL §44.5 (REENTRY-CHAIN-01 definition); INCIDENT_RESPONSE R-46 (stale recovery runbook — to be authored; §55.10 item 6) |
+| **Price floor override approved or restructured** | Event-driven (not job-driven): any `enterprise.price_floor_override_requested` DEC-030 event (COST_MODEL §31.8) with `payload->>'decision' IN ('approved','restructured')`; emitted in real time by Admin Console / pricing workflow; CRITICAL severity; requires compliance-officer review within 1 business day (PRICE-SLO-03) | P1 | PagerDuty `form-compliance` → compliance-officer; Slack `#compliance` HIGH; no dedup (every approved floor override is unique); no auto-resolve — IC closes after compliance-officer review confirmed within 1 business day | §55.4 AL-PRICE-02; COST_MODEL §31.8 (event spec); COST_MODEL §32 (approval procedure) |
+| **Job 46 freshness dead-man's switch** | No `system.pricing_exception_check_passed` LOW event in `audit_log_events` for > 26h; detected by `pg-cron-health-monitor` (§12.6) | P1 | PagerDuty `form-devops` → devops-lead; dedup `pricing-exception-check-stale` 26h cooldown; auto-resolves on next `system.pricing_exception_check_passed` emission | §55.4 AL-PRICE-03; §12.6 (freshness window note — job 46 daily 09:00 UTC) |
+
+**SOC 2 mapping (pricing_exception_health):** CC5.2 (pricing commitments enforcement — AL-PRICE-01 detects any REENTRY-CHAIN-01 bypass surviving the Worker-layer enforcement in COST_MODEL §44.5; REENTRY-MONITOR-CHAIN-01 ordering invariant provides auditable DEC-030 evidence for every violation notice — auditors can verify no P0 alert was dispatched without a chain anchor); CC1.4 (accountability — AL-PRICE-02 ensures every approved or restructured price floor override is reviewed by compliance-officer within 1 business day per COST_MODEL §32; quarterly PRICE-OBS-E-001 artefact provides the CC5.2/CC1.4 audit record); CC4.1 (monitoring activities — job 46 daily sweep 1 + quarterly sweep 2 demonstrate continuous automated monitoring of the loyalty re-entry pricing exception chain throughout the observation period). Privacy floor: `enterprise.reentry_chain_integrity_violation` event payload carries only `tenant_id` UUID (FORM-internal), `renewed_event_id` UUID, and `renewal_date` DATE — no individual employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data. `system.pricing_exception_quarterly_audit_triggered` and `system.pricing_exception_check_passed` carry aggregate fleet counts only — no `tenant_id`. `tenant_manager` (HR) and `enterprise_admin` excluded from dashboard visibility.
 
 **Subsection: `sca_vulnerability_monitoring` (AL-SCA-01 through AL-SCA-05 — §52.4):**
 
@@ -1249,6 +1259,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `deletion_sla_monitor` | `0 */6 * * *` | 7 h | C1.2/CC4.1 — GDPR Art. 17 deletion SLA sentinel (DELETION-SLA-01); queries `enterprise_churn_events WHERE deletion_requested_at IS NOT NULL AND deletion_completed_at IS NULL`; at `now() - deletion_requested_at > INTERVAL '25 days'` (day 25 — 5-day compliance-officer warning before GDPR Art. 17 30-day mandate): emits `enterprise.deletion_sla_warning` DEC-030 HIGH/7yr per flagged tenant + fires AL-DEL-01 PagerDuty P1 `form-enterprise`; at `> INTERVAL '29 days'` (day 29 — 1-day pre-breach): emits `enterprise.deletion_sla_critical` DEC-030 CRITICAL/7yr + escalates AL-DEL-01 to P0; stale = DELETION-CHAIN-01 monitoring blind spot — a tenant whose GDPR Art. 17 deletion window expires goes undetected until ece_deletion_sla_respected CHECK fires at day 35 (DATA_MODEL §44 DDL backstop); `form_api` REVOKED from `enterprise_churn_events`; pg_cron reads via `form_system` role | PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect (day-25 warning); P0 escalation at day 29 → founder + compliance-officer; dedup `deletion-sla-warning-{tenant_id}` 6h cooldown (re-alerts every 6h until deletion_completed_at populated); 7h freshness window (1-run tolerance of 6-hour cadence); privacy invariant: event payload contains only `tenant_id` (FORM-internal UUID), `days_since_deletion_requested` (integer), `alert_tier` ('warning'/'critical') — no employee `user_id`, name, email, health value, or GDPR Art. 9 data; cross-ref: `docs/COST_MODEL.md §43.10 item 3` (obligation source — P0/M10); `docs/DATA_MODEL.md §44.6` (DELETION-CHAIN-01 chain invariant — day-25/29/35 monitoring tiers); `docs/DATA_MODEL.md §44` `ece_deletion_sla_respected` CHECK (DDL-layer backstop at 35 days — pg_cron is the pre-breach warning layer); DEL-E-001 (C1.2/CC4.1, annual 7yr — annual deletion certificate archive); `docs/SOC2_READINESS.md §101` (DDL-layer corroboration cross-ref patch for `enterprise_churn_events`); INCIDENT_RESPONSE R-41 (job 43 stale recovery runbook — §R-41.5) — **job 43** |
 | `offboard_chain_monitor` | `0 * * * *` | 2 h | CC6.1/CC7.1 — OFFBOARD-CHAIN-01 SLA sentinel; queries `enterprise_churn_events WHERE offboarding_initiated_at IS NULL AND churn_date::timestamptz < now() - INTERVAL '24 hours'`; on detection: emits `enterprise.offboard_chain_sla_breach` DEC-030 HIGH/7yr per flagged tenant + fires AL-OFFL-01 PagerDuty P1 `form-enterprise`; dedup `offboard-chain-breach-{tenant_id}` 4h cooldown; on all-clear: emits `system.offboard_chain_check_passed` LOW/1yr (no `tenant_id` — privacy floor); stale = OFFBOARD-CHAIN-01 detection blind spot — a churned tenant's offboarding may slip past the 24h window undetected; unlike DELETION-SLA-01 (day-scale, job 43), OFFBOARD-CHAIN-01 is a 24h MSA contractual obligation; each hourly missed run extends breach-detection latency by 1h; `form_api` REVOKED from `enterprise_churn_events`; pg_cron reads via `form_system` role | PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect; dedup `offboard-chain-breach-{tenant_id}` 4h cooldown (re-alerts every 4h until `offboarding_initiated_at` populated); 2h freshness window (1-run tolerance of hourly cadence); privacy invariant: breach event payload contains only `tenant_id` (FORM-internal UUID), `hours_since_churn` (integer), `churn_date` (DATE) — no employee `user_id`, name, email, health value, or GDPR Art. 9 data; cross-ref: §53.4 (AL-OFFL-01 alert spec); §53.5 (job spec — §53.5.2 enforcement SQL); §53.7 (OFFL-CHAIN-01 DEC-030 chain invariant); `docs/COST_MODEL.md §43.8` (OFFBOARD-CHAIN-01 definition: `enterprise.offboarding_initiated` within 24h of `enterprise.account_churned`); `docs/DATA_MODEL.md §44.6` (OFFBOARD-CHAIN-01 compliance query); CHN-OBS-E-001 (CC6.1/CC7.1/CC7.2, quarterly 3yr — OFFBOARD-CHAIN-01 SLO performance report); INCIDENT_RESPONSE R-44 (job 44 stale recovery runbook — §R-44.5; v1.0, 2026-06-25) — **job 44** |
 | `litigation_hold_compliance_monitor` | `0 8 * * *` | 26 h | CC5.3/CC4.1/C1.2 — daily litigation hold compliance sweep (three SLO conditions from `litigation_hold_records`); sweep 1 (AL-LITH-01): `target_review_date < CURRENT_DATE AND status = 'declared'` → emits `enterprise.litigation_hold_review_overdue` HIGH/7yr per flagged hold + fires AL-LITH-01 PagerDuty P1 `form-compliance` (LITH-REVIEW-CHAIN-01 ordering invariant: audit event HTTP 200 confirmed before PagerDuty); sweep 2a (AL-LITH-02 approaching): `max_expiry_date <= CURRENT_DATE + 30 AND max_expiry_date >= CURRENT_DATE AND status = 'declared'` → emits `enterprise.litigation_hold_max_duration_approaching` STANDARD/3yr + Slack advisory only; sweep 2b (AL-LITH-02 breach): `max_expiry_date < CURRENT_DATE AND status = 'declared'` → emits `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr + fires AL-LITH-02 P1 (LITH-MAX-CHAIN-01 ordering invariant); sweep 3 (AL-LITH-03): `deletion_target_date < CURRENT_DATE AND status = 'released' AND deletion_completed_date IS NULL` → emits `enterprise.litigation_hold_deletion_overdue` HIGH/7yr per flagged hold + fires AL-LITH-03 (LITH-DEL-CHAIN-01 ordering invariant); all-clear: `system.litigation_hold_check_passed` LOW/1yr emitted after all sweeps (no `tenant_id` — privacy floor; aggregate counts only); DDL prerequisite: `litigation_hold_records` table + three covering indexes (DATA_MODEL §46.3.1); `form_api` REVOKED from `litigation_hold_records`; pg_cron reads via `form_system` role | PagerDuty `form-compliance` → compliance-officer (AL-LITH-01 review overdue, P1); compliance-officer + founder (AL-LITH-02 breach, P1); compliance-officer + devops-lead (AL-LITH-03 deletion overdue, P1); dedup `lith-review-overdue-{tenant_id}-{activation_date_iso}` 24h (AL-LITH-01) / `lith-max-duration-{tenant_id}-{activation_date_iso}` 24h (AL-LITH-02) / `lith-deletion-overdue-{tenant_id}-{activation_date_iso}` 24h (AL-LITH-03); 26h freshness window (1-day tolerance — daily cadence appropriate for day-scale compliance deadlines: 6-month review, 36-month cap, 10-business-day deletion; single missed run extends detection latency by 24h, tolerated); stale consequence: LITH-SLO-01/02/03 detection blind spot — holds approaching or exceeding 6-month review date, 36-month cap, or 10-business-day deletion deadline go undetected until next 08:00 UTC run; privacy invariant: per-hold alert payloads carry only `tenant_id` UUID + `activation_date` DATE + derived integers (`days_overdue`, `days_remaining`, `days_over_limit`) — no employee `user_id`, name, email, health value, or GDPR Art. 9 data; `system.litigation_hold_check_passed` all-clear omits `tenant_id` entirely (fleet-count aggregate only); cross-ref: §54.4 (AL-LITH-01/02/03 alert specs); §54.5 (job spec — §54.5.2 three enforcement SQL sweeps, §54.5.5 implementation decision); §54.6 (§6.2 `litigation_hold_health` subsection — this commit v5.2.1); DATA_MODEL §46 (table DDL + three covering indexes + MSA §11.6 procedure); MSA §11.6 (6-month review §11.6.3, 36-month cap §11.6.4, 10-business-day deletion §11.6.6); LITH-OBS-E-001 (CC5.3/CC4.1/C1.2, annual 3yr — §54.8); INCIDENT_RESPONSE R-45 (job 45 stale recovery runbook — §R-45.5/R-45.6/R-45.7; v1.0, 2026-06-25) — **job 45** |
+| `pricing_exception_compliance_monitor` | `0 9 * * *` | 26 h | CC5.2/CC1.4/CC4.1 — daily REENTRY-CHAIN-01 chain integrity sweep (sweep 1) + quarterly pricing exception audit trigger (sweep 2); sweep 1: query `audit_log_events` for `enterprise.contract_renewed` events with `contract_discount_type = 'loyalty_reentry'` in last 25h lacking a matching `enterprise.pricing_exception_approved` (`exception_type = 'loyalty_reentry'`, same `tenant_id`, within prior 30 days — REENTRY-CHAIN-01 per COST_MODEL §44.5); on violation: emits `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr (REENTRY-MONITOR-CHAIN-01 ordering invariant: DEC-030 HTTP 200 confirmed before PagerDuty P0 fires) + fires AL-PRICE-01 P0 `form-compliance` → founder + compliance-officer + enterprise-architect; sweep 2: fires only in first 7 days of Jan/Apr/Jul/Oct — aggregate count of `enterprise.pricing_exception_approved` events for prior quarter by `exception_type` → emits `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr (aggregate, no `tenant_id`) + Slack `#compliance` advisory (P3, no PagerDuty); always emits `system.pricing_exception_check_passed` LOW/1yr after all sweeps (aggregate counts, no `tenant_id` — privacy floor); `form_system` role; `form_api` REVOKED from `audit_log_events`; stale = PRICE-SLO-01 REENTRY-CHAIN-01 monitoring blind spot (loyalty re-entry renewal bypassing Worker-layer enforcement undetected for up to 24h) + PRICE-SLO-02 quarterly audit trigger miss (compliance-officer PRICE-OBS-E-001 filing obligation not triggered) | PagerDuty P1 `form-devops` → devops-lead; dedup `pricing-exception-check-stale`; 26h freshness window (1-day tolerance — daily cadence appropriate per §55.11 OQ-PRICE-MON-01: REENTRY-CHAIN-01 is a commercial governance control with no immediate safety implication; Worker-layer real-time enforcement is already in place; daily monitoring-layer verification is consistent with jobs 39 and 45); cross-ref: §55.4 (AL-PRICE-01/02/03 alert specs); §55.5 (job spec — §55.5.2 two sweep SQL specs, §55.5.3 implementation decision, §55.5.5 REENTRY-MONITOR-CHAIN-01 invariant); §55.6 (§6.2 `pricing_exception_health` subsection — this commit v5.2.3); COST_MODEL §44.5 (REENTRY-CHAIN-01 source definition); COST_MODEL §31.8 (four pricing audit DEC-030 events); COST_MODEL §44.7 (quarterly pricing exception audit obligation — this section formalises the automated trigger); PRICE-OBS-E-001 (CC5.2/CC1.4/CC4.1, quarterly 7yr); PRICE-OBS-E-002 (CC4.1/A1.1, annual 3yr); INCIDENT_RESPONSE R-46 (job 46 stale recovery runbook — to be authored; §55.10 item 6) — **job 46** |
 
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
@@ -1256,7 +1267,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 
 **Job-number conflict resolution (v0.9, 2026-06-22):** Two sections within OBSERVABILITY.md independently claimed job numbers already assigned in this §12.6 canonical registry: (1) `docs/OBSERVABILITY.md §42.7` (v3.9, 2026-06-14) referenced `white_label_cert_check` as "job 32" — but job 32 was already assigned to `turh_retention_purge` when the v0.4 patch was published (2026-06-19); (2) `docs/OBSERVABILITY.md §43.7` (v4.0, 2026-06-14) referenced `webhook_degraded_escalation_check` as "job 34" — but job 34 was already assigned to `bdg_override_expiry_sweep` in the same v0.4 patch. Both are renumbered in this registry: `white_label_cert_check` → **job 40**; `webhook_degraded_escalation_check` → **job 41**. In-text citations in §42.7, §42.14 item 3, §43.7, and §43.15 items 6–8 corrected in this v0.9 patch (since both sections reside within OBSERVABILITY.md, consistent with the v0.5 precedent of correcting §49 in-text citations). This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
-*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days.
+*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days. `pricing_exception_compliance_monitor` (job 46) is daily at 09:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the REENTRY-CHAIN-01 commercial governance control has no immediate safety implication; Worker-layer real-time enforcement (COST_MODEL §44.5 HTTP 422) is the primary gate; daily monitoring-layer verification (sweep 1) is a belt-and-suspenders sentinel; quarterly trigger (sweep 2) is activated by date arithmetic, not a tight compliance deadline.
 
 **DEC-030 events emitted by `pg-cron-health-monitor`** — registered in `docs/AUDIT_LOG_SCHEMA.md §System`:
 
@@ -1277,6 +1288,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 **v0.5 · 2026-06-20 · Owner: devops-lead**
 **Review: quarterly or on architecture change. Next scheduled review: August 2026.**
 **SOC 2 evidence: CC7.2 (system monitoring). See also INCIDENT_RESPONSE.md for CC7.3–CC7.5.**
+*v1.9 patch (2026-06-25): §12.6 job 46 `pricing_exception_compliance_monitor` registered — closes COST_MODEL §44.7 observability gap (quarterly pricing exception audit obligation had no automated trigger, no pg_cron job, no SLO, and no evidence artefact). Schedule `0 9 * * *`; 26h freshness window (daily cadence — daily monitoring-layer verification of Worker-layer REENTRY-CHAIN-01 enforcement per COST_MODEL §44.5; consistent with jobs 39 and 45 daily-cadence compliance sentinels). Sweep 1: REENTRY-CHAIN-01 chain integrity — correlated subquery on `audit_log_events` for `enterprise.contract_renewed` with `loyalty_reentry` discount lacking a matching exception approval in prior 30 days; violation → `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr + AL-PRICE-01 P0 PagerDuty (REENTRY-MONITOR-CHAIN-01 ordering invariant). Sweep 2: quarterly audit trigger — fires first 7 days of Jan/Apr/Jul/Oct; aggregate `enterprise.pricing_exception_approved` count by `exception_type` for prior quarter → `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr + Slack `#compliance` advisory. All-clear: `system.pricing_exception_check_passed` LOW/1yr (aggregate, no `tenant_id` — privacy floor). Three evidence artefacts: PRICE-OBS-E-001 (quarterly outcome, CC5.2/CC1.4/CC4.1, 7yr), PRICE-OBS-E-002 (annual run history, CC4.1/A1.1, 3yr). R2 subfolder `compliance/evidence/pricing-exceptions/`. Freshness window note extended to cover job 46. Note: v1.8 registered job 45 `litigation_hold_compliance_monitor` (§54.10 item 3, 2026-06-25) — the v1.8 row is in the canonical table; this v1.9 note immediately follows. Canonical section: §55.*
 *v1.7 patch (2026-06-25): §12.6 job 44 `offboard_chain_monitor` registered — closes the OFFBOARD-CHAIN-01 monitoring gap identified in OBSERVABILITY §53 (v5.1.0, 2026-06-25): no pg_cron job existed to perform a fleet-sweep detecting churned tenants whose `offboarding_initiated_at IS NULL` past the 24h OFFBOARD-CHAIN-01 window. `emit-audit-event` Worker enforces OFFBOARD-CHAIN-01 at emission time (HTTP 422 `OFFBOARD_CHAIN_01_VIOLATION`) but cannot detect cases where the `enterprise.offboarding_initiated` event is simply never emitted (process failure, not chain violation). Job 44 schedule `0 * * * *` (hourly); 2h freshness window (1-run tolerance of hourly cadence — tolerated because the 24h OFFBOARD-CHAIN-01 window is a multi-hour commitment). CC6.1/CC7.1 compliance relevance (MSA §7 deprovisioning SLA monitoring; CHN-E-001 quarterly evidence obligation from COST_MODEL §43.9). On detection: emits `enterprise.offboard_chain_sla_breach` HIGH/7yr per flagged tenant (to be registered in AUDIT_LOG_SCHEMA.md per §53.10 item 1, P0/M10); fires AL-OFFL-01 PagerDuty P1 `form-enterprise`; dedup `offboard-chain-breach-{tenant_id}` 4h cooldown. On all-clear: emits `system.offboard_chain_check_passed` LOW/1yr (no `tenant_id` — privacy floor when fleet is clean). Tables accessed: `enterprise_churn_events` SELECT via `form_system` role (`form_api` REVOKED per DATA_MODEL §44 RLS). Freshness window note extended to cover job 44. Canonical section: §53. No other §12.6 rows modified.*
 *v1.6 patch (2026-06-25): §12.6 job 42 `sca_sla_monitor` stale-consequence cross-ref extended — appended `INCIDENT_RESPONSE R-42 (job 42 stale recovery runbook — §R-42.5)` to the cross-ref column. Closes R-42.10 post-incident control "§12.6 cross-reference" and R-42.11 implementation checklist item 3 (P1/M9). Job 42 was registered in the §12.6 canonical registry (v1.3 patch, 2026-06-23) with CC6.8/CC7.1 SCA SLA monitoring coverage, but was the only §12.6 compliance job whose stale-consequence cross-ref column lacked an INCIDENT_RESPONSE runbook reference — unlike all peer jobs (R-28 through R-41) which all carry explicit stale runbook cross-references. R-42 is now the forty-second runbook in `docs/INCIDENT_RESPONSE.md`. Companion DEC-030 events `system.sca_monitor_stale_declared` (HIGH/7yr) and `system.sca_monitor_stale_restored` (STANDARD/3yr) are to be registered in `docs/AUDIT_LOG_SCHEMA.md §SCA & Dependency Vulnerability events` (R-42.11 item 1, P0/M9); SCA-STALE-CHAIN-01 ordering invariant noted in §R-42.7. No other §12.6 rows modified.*
 *v1.5 patch (2026-06-25): §12.6 job 43 `deletion_sla_monitor` stale-consequence cross-ref extended — appended `INCIDENT_RESPONSE R-41 (job 43 stale recovery runbook — §R-41.5)` to the cross-ref column. Closes R-41.10 post-incident control "§12.6 cross-reference" and R-41.11 implementation checklist item 3 (P1/M10). Job 43 was registered in the §12.6 canonical registry (v1.4 patch, 2026-06-23) with C1.2/CC4.1 GDPR Art. 17 deletion SLA monitoring coverage, but was the only §12.6 compliance job whose stale-consequence cross-ref column lacked an INCIDENT_RESPONSE runbook reference — unlike all peer jobs (R-28 through R-40) which all carry explicit stale runbook cross-references. R-41 is now the forty-first runbook in `docs/INCIDENT_RESPONSE.md`. Companion DEC-030 events `system.deletion_sla_monitor_stale_declared` (HIGH/7yr) and `system.deletion_sla_monitor_restored` (STANDARD/3yr) registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events` v2.41 (2026-06-25); DELETION-SLA-MONITOR-STALE-CHAIN-01 ordering invariant noted. No other §12.6 rows modified.*
@@ -15271,3 +15283,386 @@ This is the **monitoring-layer** artefact. The **compliance outcome** artefact (
 *v5.2.2 (2026-06-25): §54.10 item 6 cross-reference patch — INCIDENT_RESPONSE R-45 authored. §12.6 job 45 stale-consequence cross-ref updated from "to be authored" to `§R-45.5/R-45.6/R-45.7; v1.0, 2026-06-25`. §54.4 AL-LITH-01/02/03 runbook rows updated. §54.5 cross-ref updated. §54.10 item 6 status: `[ ]` → `[x] Done — 2026-06-25 (INCIDENT_RESPONSE.md v3.9)`. Owner: devops-lead + compliance-officer.*
 
 *v5.2.0 (2026-06-25): §54 Litigation Hold Compliance Observability — see version notes above. Owner: compliance-officer + devops-lead + security-engineer.*
+
+---
+
+## §55 Pricing Exception Compliance Observability
+
+> Owner: compliance-officer + devops-lead + security-engineer. Review: quarterly or on architecture change.
+> References: `docs/COST_MODEL.md §31.8` (pricing audit events), `docs/COST_MODEL.md §31.5` (price floors), `docs/COST_MODEL.md §32` (exception approval procedure), `docs/COST_MODEL.md §44.5` (REENTRY-CHAIN-01 invariant), `docs/COST_MODEL.md §44.7` (quarterly pricing exception audit obligation — formalised here), `docs/AUDIT_LOG_SCHEMA.md`, DEC-030, DEC-081.
+
+---
+
+### §55.1 Purpose and Scope
+
+`docs/COST_MODEL.md §31.8` defines four DEC-030 pricing audit events that must be emitted before any non-standard pricing decision is executed. `docs/COST_MODEL.md §44.5` defines REENTRY-CHAIN-01 — the ordering invariant enforced in the `emit-audit-event` Cloudflare Worker at write time (HTTP 422 `REENTRY_CHAIN_01_VIOLATION`) — requiring that every `enterprise.contract_renewed` event carrying `contract_discount_type = 'loyalty_reentry'` is preceded by a `enterprise.pricing_exception_approved` event with `exception_type = 'loyalty_reentry'` for the same `tenant_id` within 30 days. `docs/COST_MODEL.md §44.7` references a quarterly compliance-officer pricing exception audit but specifies no automated trigger, pg_cron job, SLO, or evidence artefact.
+
+**This section fills three observability gaps:**
+
+1. **REENTRY-CHAIN-01 chain integrity monitoring** — the Worker enforces the chain at write time, but there is no monitoring layer that confirms no violation has slipped through (e.g., via a direct database write, migration error, or Worker bypass). Job 46 sweep 1 provides this daily sentinel, consistent with the monitoring-layer sentinel pattern of jobs 43–45.
+
+2. **Automated quarterly pricing exception audit trigger** — `COST_MODEL §44.7` mandates that compliance-officer conduct a quarterly audit of `enterprise.pricing_exception_approved` events. Job 46 sweep 2 provides the automated trigger that fires on the quarter boundary and emits a DEC-030 signal prompting the audit, consistent with the quarterly trigger pattern of job 36 `dsar_slo_miss_counter_reset`.
+
+3. **Evidence artefacts and SLO governance** — no PRICE-SLO-* or PRICE-OBS-E-* evidence artefacts exist. §55.3, §55.4, and §55.8 establish these.
+
+**Compliance scope:** SOC 2 CC5.2 (commitments enforcement — pricing floor and chain integrity), CC1.4 (accountability — compliance-officer review of approved floor overrides), CC4.1 (monitoring activities — automated daily + quarterly sweep).
+
+**Out of scope:** `enterprise.consumer_price_updated` and `enterprise.list_price_updated` events (COST_MODEL §31.8 HIGH/7yr) are infrequent strategic decisions subject to founder approval; their DEC-030 audit trail is the primary control. A dedicated monitoring section is not warranted until three or more list price updates have occurred. See §55.11 OQ-PRICE-MON-03.
+
+---
+
+### §55.2 RED Metrics
+
+Dataset: `audit_log_events` (Supabase Postgres). All §55 metrics are aggregate — no `tenant_id` in fleet-level signals.
+
+| Signal | Metric | Source | Retention |
+|---|---|---|---|
+| **Rate** | `pricing_exception_events_per_quarter` — count of `enterprise.pricing_exception_approved` events per calendar quarter by `exception_type` | job 46 sweep 2 + compliance-officer quarterly audit | 7 yr (DEC-030 retention) |
+| **Rate** | `loyalty_reentry_renewals_checked_per_day` — count of `enterprise.contract_renewed` events with `contract_discount_type = 'loyalty_reentry'` evaluated in each sweep 1 run | job 46 via `system.pricing_exception_check_passed` `loyalty_renewals_checked` field | 1 yr |
+| **Errors** | `reentry_chain_violations_detected` — count of `enterprise.reentry_chain_integrity_violation` CRITICAL events (PRICE-SLO-01 zero-tolerance metric) | job 46 sweep 1 | 7 yr |
+| **Errors** | `price_floor_override_approved_count` — count of `enterprise.price_floor_override_requested` events with `decision IN ('approved','restructured')` per observation period | `audit_log_events` filter on CRITICAL severity + `decision` payload field | 7 yr |
+| **Duration** | `quarterly_audit_response_business_days` — days from `system.pricing_exception_quarterly_audit_triggered` emission to PRICE-OBS-E-001 filing in R2 (PRICE-SLO-02/PRICE-SLO-03 latency) | R2 object creation timestamp vs. `check_run_at` in triggered event | 3 yr |
+
+**Privacy enforcement:** All §55 metrics carry aggregate counts or UUIDs only. No `deal_id`, `approver_user_id`, employee `user_id`, name, email, health value, or GDPR Art. 9 data appears in any metric signal.
+
+---
+
+### §55.3 SLOs
+
+Register in §2.1 master SLO table.
+
+| SLO ID | Description | Target | Measurement window | SOC 2 criterion |
+|---|---|---|---|---|
+| **PRICE-SLO-01** | Zero REENTRY-CHAIN-01 violations — `enterprise.reentry_chain_integrity_violation` event count = 0 per observation period | Zero-tolerance | Per SOC 2 observation period (annual) | CC5.2 |
+| **PRICE-SLO-02** | Quarterly pricing exception audit triggered within the first 7 calendar days of each quarter — `system.pricing_exception_quarterly_audit_triggered` emitted in the first 7 days of Jan, Apr, Jul, and Oct | 100% — 4 of 4 triggers per calendar year | Per calendar year | CC4.1 |
+| **PRICE-SLO-03** | All `enterprise.price_floor_override_requested` events with `decision IN ('approved','restructured')` reviewed and documented by compliance-officer within 1 business day | 100% per event | Per event | CC5.2 / CC1.4 |
+
+**PRICE-SLO-01 is zero-tolerance.** Any confirmed violation indicates a REENTRY-CHAIN-01 bypass of the Worker-layer enforcement — a P0 incident requiring founder notification and forensic chain review. A PRICE-SLO-01 breach during the SOC 2 observation period must be disclosed to auditors with a full remediation record.
+
+---
+
+### §55.4 Alert Rules
+
+Add a `pricing_exception_health` subsection to §6.2 master alert table (§55.10 item 4 — inserted as part of this version, see §55.6).
+
+| Alert ID | Trigger | Severity | Channel | Dedup key | Auto-resolve |
+|---|---|---|---|---|---|
+| **AL-PRICE-01** | `enterprise.reentry_chain_integrity_violation` CRITICAL event emitted by job 46 sweep 1 | P0 | PagerDuty `form-compliance` → founder + compliance-officer + enterprise-architect | None — every violation is unique and requires IC | No — IC must close after full chain investigation and remediation |
+| **AL-PRICE-02** | Any `enterprise.price_floor_override_requested` DEC-030 event with `payload->>'decision' IN ('approved','restructured')` — event-driven, not job-driven | P1 | PagerDuty `form-compliance` → compliance-officer; Slack `#compliance` HIGH | None — every approved/restructured floor override is unique | No — IC closes after compliance-officer review documented within 1 business day (PRICE-SLO-03) |
+| **AL-PRICE-03** | No `system.pricing_exception_check_passed` event in `audit_log_events` for > 26h — job 46 dead-man's switch, detected by `pg-cron-health-monitor` (§12.6) | P1 | PagerDuty `form-devops` → devops-lead | `pricing-exception-check-stale` (26h cooldown) | Yes — on next `system.pricing_exception_check_passed` emission |
+
+**AL-PRICE-01 escalation path:** P0 alert immediately pages founder. No grace period. IC declares a Sev-1 incident and queries `audit_log_events` for the violating `enterprise.contract_renewed` event to assess whether the renewal is commercially valid (exception event omitted by process error) or fraudulent. If commercially valid and the exception was omitted: compliance-officer must issue a retroactive `enterprise.pricing_exception_approved` event with `rationale_text` noting the retroactive nature, and the deviation is documented in the SOC 2 observation-period exception log.
+
+---
+
+### §55.5 pg_cron Job 46 Specification
+
+#### §55.5.1 Registration
+
+| Attribute | Value |
+|---|---|
+| Job name | `pricing_exception_compliance_monitor` |
+| Schedule | `0 9 * * *` — daily 09:00 UTC |
+| Role | `form_system` |
+| Tables accessed | `audit_log_events` (SELECT only — `form_api` REVOKED) |
+| Freshness window | 26 h (1-day tolerance — daily cadence appropriate per §55.11 OQ-PRICE-MON-01) |
+| Dead-man's switch event | `system.pricing_exception_check_passed` LOW/1yr |
+| §12.6 registration | v1.9 patch, 2026-06-25 (this section) |
+| SOC 2 criteria | CC5.2 (sweep 1 — REENTRY-CHAIN-01 integrity), CC4.1 (sweep 2 — quarterly audit trigger), CC1.4 (AL-PRICE-02 floor override review) |
+| Canonical section | §55 |
+
+#### §55.5.2 SQL Sweeps
+
+**Sweep 1 — REENTRY-CHAIN-01 chain integrity check** (always runs):
+
+```sql
+-- Detect loyalty_reentry contract renewals lacking a prior exception approval
+-- Runs as form_system role; form_api REVOKED from audit_log_events
+-- REENTRY-MONITOR-CHAIN-01: emit enterprise.reentry_chain_integrity_violation
+--   and confirm HTTP 200 from emit-audit-event Worker BEFORE dispatching PagerDuty P0
+WITH loyalty_renewals AS (
+  SELECT
+    id                                        AS renewed_event_id,
+    (payload->>'tenant_id')::uuid             AS tenant_id,
+    (payload->>'renewal_date')::date          AS renewal_date,
+    created_at                                AS renewed_at
+  FROM audit_log_events
+  WHERE event_type  = 'enterprise.contract_renewed'
+    AND payload->>'contract_discount_type' = 'loyalty_reentry'
+    AND created_at   > NOW() - INTERVAL '25 hours'
+)
+SELECT lr.renewed_event_id,
+       lr.tenant_id,
+       lr.renewal_date,
+       lr.renewed_at
+FROM   loyalty_renewals lr
+WHERE  NOT EXISTS (
+  SELECT 1
+  FROM   audit_log_events ex
+  WHERE  ex.event_type                    = 'enterprise.pricing_exception_approved'
+    AND  ex.payload->>'exception_type'    = 'loyalty_reentry'
+    AND  (ex.payload->>'tenant_id')::uuid = lr.tenant_id
+    AND  ex.created_at BETWEEN lr.renewed_at - INTERVAL '30 days'
+                           AND lr.renewed_at
+);
+-- Each row returned = one REENTRY-CHAIN-01 violation:
+--   1. emit enterprise.reentry_chain_integrity_violation CRITICAL/7yr via pg_net
+--      (§55.7.2 payload: tenant_id, renewed_event_id, renewal_date, check_run_at)
+--   2. confirm emit-audit-event Worker HTTP 200 (REENTRY-MONITOR-CHAIN-01)
+--   3. fire AL-PRICE-01 P0 PagerDuty (form-compliance → founder + compliance-officer +
+--      enterprise-architect) only after step 2 HTTP 200 confirmed
+```
+
+**Sweep 2 — Quarterly pricing exception audit trigger** (conditional; runs after sweep 1):
+
+```sql
+-- Quarter-boundary check: fires in first 7 days of Jan, Apr, Jul, Oct only
+-- Prior quarter aggregate: no tenant_id in payload (privacy floor)
+SELECT
+  (EXTRACT(MONTH FROM CURRENT_DATE) IN (1,4,7,10)
+   AND EXTRACT(DAY FROM CURRENT_DATE) BETWEEN 1 AND 7)          AS trigger_quarter,
+
+  -- Prior quarter identifier (e.g. '2026-Q1')
+  TO_CHAR(
+    DATE_TRUNC('quarter', CURRENT_DATE - INTERVAL '1 day'),
+    'YYYY'
+  ) || '-Q' || CEIL(
+    EXTRACT(MONTH FROM
+      DATE_TRUNC('quarter', CURRENT_DATE - INTERVAL '1 day'))::numeric / 3
+  )                                                               AS prior_quarter,
+
+  COUNT(*)                                                        AS event_count,
+  COUNT(*) FILTER (WHERE payload->>'exception_type' = 'loyalty_reentry')
+                                                                  AS loyalty_reentry_count,
+  COUNT(*) FILTER (WHERE payload->>'exception_type' = 'standard_discount')
+                                                                  AS standard_discount_count,
+  COUNT(*) FILTER (WHERE payload->>'exception_type' = 'floor_exception')
+                                                                  AS floor_exception_count,
+  COUNT(*) FILTER (WHERE payload->>'exception_type' = 'pilot_credit')
+                                                                  AS pilot_credit_count
+
+FROM audit_log_events
+WHERE event_type = 'enterprise.pricing_exception_approved'
+  AND created_at >= DATE_TRUNC('quarter', CURRENT_DATE - INTERVAL '1 day')
+  AND created_at <  DATE_TRUNC('quarter', CURRENT_DATE);
+
+-- If trigger_quarter = TRUE:
+--   emit system.pricing_exception_quarterly_audit_triggered STANDARD/3yr via pg_net
+--     payload: { prior_quarter, event_count, loyalty_reentry_count,
+--               standard_discount_count, floor_exception_count,
+--               pilot_credit_count, check_run_at }
+--   fire Slack #compliance advisory (P3, no PagerDuty): quarter boundary reached,
+--     compliance-officer must file PRICE-OBS-E-001 within 5 business days
+-- Privacy floor: aggregate counts only — no tenant_id in emit payload
+```
+
+**All-clear emission** (runs after both sweeps complete, regardless of violations):
+
+```sql
+-- system.pricing_exception_check_passed LOW/1yr via pg_net → emit-audit-event Worker
+-- Payload: { loyalty_renewals_checked: int, violations_found: int,
+--             quarterly_trigger_fired: bool, check_run_at: datetime }
+-- No tenant_id — privacy floor applies even when violations_found > 0
+-- (violation tenant_id is carried in enterprise.reentry_chain_integrity_violation)
+```
+
+#### §55.5.3 Implementation Decision — pg_cron + pg_net
+
+Job 46 follows the pattern of jobs 39–45: pg_cron scheduled function + pg_net HTTP post to `emit-audit-event` Worker. Sweep 1 is a correlated subquery on `audit_log_events` that co-locates with the Supabase Postgres instance, avoiding a separate Cloudflare Worker Cron trigger with additional DB connections. Sweep 2 extends naturally from sweep 1 within the same job invocation — both sweeps read `audit_log_events` and the quarter-boundary check is a pure SQL DATE computation requiring no additional tables.
+
+The sweep 1 outer CTE filter benefits from the existing `idx_ale_event_type_created_at` index on `(event_type, created_at)`. The correlated subquery additionally benefits from a composite index on `(event_type, (payload->>'tenant_id'), created_at)` if one exists (§55.10 item 2 includes index verification).
+
+#### §55.5.4 Role and Access Control
+
+| Role | `audit_log_events` access | Rationale |
+|---|---|---|
+| `form_system` | SELECT — pg_cron reads via this role | Job execution principal |
+| `form_api` | REVOKED | DEC-030 append-only architecture; consistent with jobs 43–45 |
+| `compliance_officer` | SELECT via PAM elevation | Quarterly audit queries |
+| `tenant_manager` (HR) | NO ACCESS | Pricing governance is a FORM-internal compliance instrument, not tenant-facing |
+| `enterprise_admin` | NO ACCESS to `enterprise.pricing_exception_approved` payloads | Internal pricing governance; `form_admin` + `compliance_officer` only |
+
+#### §55.5.5 Ordering Invariants
+
+**REENTRY-MONITOR-CHAIN-01:**
+
+```
+REENTRY-MONITOR-CHAIN-01 (monitoring layer — job 46 sweep 1)
+
+CONDITION:   job 46 sweep 1 detects ≥ 1 REENTRY-CHAIN-01 violation row
+BEFORE:      enterprise.reentry_chain_integrity_violation CRITICAL/7yr DEC-030
+             event emitted via emit-audit-event Worker → HTTP 200 confirmed
+AFTER:       AL-PRICE-01 PagerDuty P0 dispatched (form-compliance →
+             founder + compliance-officer + enterprise-architect)
+VIOLATION:   emit returns non-200 → PagerDuty P0 SUPPRESSED for this run;
+             system.cron_job_stale HIGH from pg-cron-health-monitor (§12.6)
+             handles monitoring degradation independently
+HTTP 422:    NOT emitted for this invariant — 422 is the write-path
+             REENTRY-CHAIN-01 enforcement in the emit-audit-event Worker
+             per COST_MODEL §44.5; this invariant governs the monitoring
+             path only
+```
+
+This invariant follows the same ordering pattern as OFFL-CHAIN-01 (§53.7), LITH-REVIEW-CHAIN-01 (§54.7.3), and their sibling invariants — ensuring that every P0 alert has a HMAC-chained DEC-030 anchor that auditors can independently verify.
+
+---
+
+### §55.6 §6.2 Integration
+
+The `pricing_exception_health` subsection has been physically inserted into `docs/OBSERVABILITY.md §6.2` Consolidated Alert Rules after `litigation_hold_health` (§54.6) and before `sca_vulnerability_monitoring` (§52.4). The full spec is reproduced in §55.4. Implementation: §55.10 item 4 — `[x] Done — 2026-06-25 (OBSERVABILITY.md v5.2.3, this commit)`.
+
+---
+
+### §55.7 DEC-030 Chain Events
+
+#### §55.7.1 Event Overview
+
+Three new DEC-030 monitoring events are introduced by job 46. All three are emitted exclusively by job 46 via the `emit-audit-event` Worker — they are monitoring-layer signals, not write-path enforcement events (the write-path HTTP 422 enforcement is handled by REENTRY-CHAIN-01 per COST_MODEL §44.5).
+
+| Event type | Severity | Retention | Emitter | Trigger |
+|---|---|---|---|---|
+| `enterprise.reentry_chain_integrity_violation` | CRITICAL | 7 yr | job 46 sweep 1 via emit-audit-event Worker | `enterprise.contract_renewed` with `loyalty_reentry` discount found in last 25h without prior exception approval within 30-day window for same `tenant_id` |
+| `system.pricing_exception_quarterly_audit_triggered` | STANDARD | 3 yr | job 46 sweep 2 via emit-audit-event Worker | First 7 days of Jan/Apr/Jul/Oct — aggregate prior-quarter exception event counts; no `tenant_id` |
+| `system.pricing_exception_check_passed` | LOW | 1 yr | job 46 all-clear via emit-audit-event Worker | After both sweeps complete — aggregate counts; no `tenant_id` |
+
+#### §55.7.2 Zod v2 Payload Schemas
+
+```typescript
+// enterprise.reentry_chain_integrity_violation
+// Privacy: tenant_id UUID only; no deal_id, approver_user_id, employee PII
+ReentryChainIntegrityViolationPayload: {
+  tenant_id:         z.string().uuid(),
+  renewed_event_id:  z.string().uuid(),
+  renewal_date:      z.string().date(),
+  check_run_at:      z.string().datetime()
+}
+
+// system.pricing_exception_quarterly_audit_triggered
+// Privacy: aggregate counts only — no tenant_id, deal_id, or approver_user_id
+PricingExceptionQuarterlyAuditTriggeredPayload: {
+  quarter:                  z.string().regex(/^\d{4}-Q[1-4]$/),
+  event_count:              z.number().int().nonnegative(),
+  loyalty_reentry_count:    z.number().int().nonnegative(),
+  standard_discount_count:  z.number().int().nonnegative(),
+  floor_exception_count:    z.number().int().nonnegative(),
+  pilot_credit_count:       z.number().int().nonnegative(),
+  check_run_at:             z.string().datetime()
+}
+
+// system.pricing_exception_check_passed
+// Privacy: aggregate counts only — no tenant_id
+PricingExceptionCheckPassedPayload: {
+  loyalty_renewals_checked: z.number().int().nonnegative(),
+  violations_found:         z.number().int().nonnegative(),
+  quarterly_trigger_fired:  z.boolean(),
+  check_run_at:             z.string().datetime()
+}
+```
+
+#### §55.7.3 Chain Invariant — REENTRY-MONITOR-CHAIN-01
+
+See §55.5.5 for the full invariant block. Summary: `enterprise.reentry_chain_integrity_violation` CRITICAL DEC-030 event must receive HTTP 200 from `emit-audit-event` Worker before AL-PRICE-01 PagerDuty P0 fires. If non-200: PagerDuty suppressed; `system.cron_job_stale` HIGH handles monitoring degradation independently via §12.6 `pg-cron-health-monitor`.
+
+---
+
+### §55.8 Evidence Artefacts
+
+**PRICE-OBS-E-001 — Quarterly Pricing Exception Audit Export**
+
+This is the **compliance outcome** artefact. The **monitoring infrastructure** artefact (PRICE-OBS-E-002) is a separate evidence path, consistent with the *-OBS-E-001 / *-OBS-E-002 convention across §52 (SCA-OBS-E-001/002), §53 (CHN-OBS-E-001, DEL-OBS-E-001), and §54 (LITH-OBS-E-001).
+
+| Attribute | Value |
+|---|---|
+| Artefact ID | PRICE-OBS-E-001 |
+| Path | `compliance/evidence/pricing-exceptions/PRICE-OBS-E-001_<YYYY>-Q<N>.md` |
+| Cadence | Quarterly — filed within 5 business days of `system.pricing_exception_quarterly_audit_triggered` emission |
+| Retention | 7 years |
+| SOC 2 criteria | CC5.2, CC1.4, CC4.1 |
+| Content | (1) Total `enterprise.pricing_exception_approved` event count for the prior quarter, broken down by `exception_type` (`loyalty_reentry`, `standard_discount`, `floor_exception`, `pilot_credit`) — aggregate counts only, no `tenant_id` or `deal_id`. (2) `enterprise.price_floor_override_requested` event count for the quarter by `decision` outcome (`approved`, `denied`, `restructured`) — aggregate only. (3) PRICE-SLO-03 attestation: confirm all `approved`/`restructured` floor override events were reviewed by compliance-officer within 1 business day — if any breach: remediation steps and root-cause documented. (4) REENTRY-CHAIN-01 sweep 1 attestation for the quarter: confirm zero `enterprise.reentry_chain_integrity_violation` events — if any: full incident resolution summary. (5) Compliance-officer sign-off date; PAM session UUID referenced (not included in artefact file — compliance-officer name excluded from artefact per privacy floor). |
+| Owner | compliance-officer |
+| Distinct from | PRICE-OBS-E-002 (annual job 46 run history — monitoring infrastructure evidence; PRICE-OBS-E-001 covers compliance outcomes) |
+| Register in | SOC2_READINESS §79.4 master consolidated evidence table + §80.3 `pricing-exceptions/` subfolder + §80.4 Vanta mirror list |
+| Privacy floor | Aggregate counts only — no `tenant_id`, `deal_id`, `approver_user_id`, employee `user_id`, name, email, health value, or GDPR Art. 9 data |
+
+**SOC 2 auditor narratives:**
+
+**CC5.2 (commitments enforcement):** PRICE-OBS-E-001 demonstrates that FORM's pricing commitment enforcement (REENTRY-CHAIN-01) operated without violation during the quarter. Combined with REN-E-001 (CC5.2/CC1.4 — annual `contract_renewed` chain export per COST_MODEL §42.9), CC5.2 has two evidence paths: (1) the per-event DEC-030 chain export (REN-E-001) and (2) the automated monitoring confirmation and compliance-officer attestation (PRICE-OBS-E-001). Auditors cannot rely on REN-E-001 alone to verify monitoring infrastructure — PRICE-OBS-E-001 provides the operational control evidence.
+
+**CC1.4 (accountability):** PRICE-OBS-E-001 demonstrates that every approved or restructured price floor override was reviewed and documented by compliance-officer within 1 business day. The quarterly cadence ensures this review obligation is periodically confirmed, not just implicitly assumed from the DEC-030 event record.
+
+**CC4.1 (monitoring activities):** PRICE-OBS-E-001 demonstrates that the quarterly pricing exception audit trigger fired within the first 7 days of the quarter (PRICE-SLO-02 compliance); the `system.pricing_exception_quarterly_audit_triggered` event timestamp in `audit_log_events` is the primary verification source.
+
+---
+
+**PRICE-OBS-E-002 — Annual `pricing_exception_compliance_monitor` pg_cron Run History**
+
+This is the **monitoring infrastructure** artefact. The **compliance outcome** artefact (PRICE-OBS-E-001) is defined above — they are distinct evidence paths.
+
+| Attribute | Value |
+|---|---|
+| Artefact ID | PRICE-OBS-E-002 |
+| Path | `compliance/evidence/pricing-exceptions/PRICE-OBS-E-002_<YYYY>.md` |
+| Cadence | Annual |
+| Retention | 3 years |
+| SOC 2 criteria | CC4.1, A1.1 |
+| Content | (1) Job 46 run statistics for the year: total runs, successful runs, freshness-window breaches (> 26h gaps) detected by `pg-cron-health-monitor`. (2) AL-PRICE-01 activation log: any `enterprise.reentry_chain_integrity_violation` CRITICAL events during the year — `tenant_id` UUID, `renewed_event_id` UUID, `renewal_date` DATE, resolution timestamp, IC number. (3) PRICE-SLO-02 compliance: confirm `system.pricing_exception_quarterly_audit_triggered` emitted in Q1–Q4 (`EXTRACT(YEAR FROM created_at) = <YYYY>` — four rows required). (4) AL-PRICE-03 activation log: any `system.pricing_exception_check_passed` gaps > 26h — `start_gap_at`, `end_gap_at`, `gap_hours`, resolution notes. (5) Zero-violation years: affirmative attestation confirming PRICE-SLO-01 (zero REENTRY-CHAIN-01 violations) and PRICE-SLO-02 (all four quarterly triggers fired). |
+| Owner | compliance-officer + devops-lead |
+| Distinct from | PRICE-OBS-E-001 (quarterly compliance outcome reports — PRICE-OBS-E-002 covers monitoring infrastructure that enforced those outcomes) |
+| Register in | SOC2_READINESS §79.4 master consolidated evidence table + §80.3 `pricing-exceptions/` subfolder + §80.4 Vanta mirror list |
+| Privacy floor | `tenant_id` UUID only in AL-PRICE-01 rows; no `approver_user_id`, employee `user_id`, name, email, health value, or GDPR Art. 9 data |
+
+**SOC 2 auditor narratives:**
+
+**CC4.1 (monitoring activities):** PRICE-OBS-E-002 demonstrates continuous automated monitoring of the REENTRY-CHAIN-01 pricing exception chain throughout the observation year. Job 46 swept `audit_log_events` daily; the run history shows the monitoring control operated without extended freshness-window gaps. Where gaps occurred, the AL-PRICE-03 activation log documents detection and remediation.
+
+**A1.1 (capacity management — background job health):** PRICE-OBS-E-002 provides auditor-verifiable evidence that job 46 was operational throughout the year (verifiable via `pg_cron.job_run_details WHERE jobname = 'pricing_exception_compliance_monitor'`). Any freshness breach gaps are documented with their resolution, demonstrating that the §12.6 `pg-cron-health-monitor` freshness sentinel (AL-PRICE-03) detected and triggered remediation.
+
+---
+
+### §55.9 Dashboard
+
+**Dashboard name:** `Pricing Exception Compliance`
+**Location:** Metabase → Enterprise → Compliance
+
+| Panel | Signal source | Refresh |
+|---|---|---|
+| Quarterly exception count by type (current quarter) | `audit_log_events WHERE event_type = 'enterprise.pricing_exception_approved' AND created_at >= DATE_TRUNC('quarter', NOW())` — grouped by `payload->>'exception_type'` | Daily |
+| Price floor override decisions (current quarter) | `audit_log_events WHERE event_type = 'enterprise.price_floor_override_requested' AND created_at >= DATE_TRUNC('quarter', NOW())` — grouped by `payload->>'decision'` | Daily |
+| REENTRY-CHAIN-01 violations (rolling 12 months) | `audit_log_events WHERE event_type = 'enterprise.reentry_chain_integrity_violation'` | Daily |
+| PRICE-SLO-01 status | `enterprise.reentry_chain_integrity_violation` count in current observation period: 0 = green / > 0 = red | Daily |
+| PRICE-SLO-02 quarterly trigger log | `audit_log_events WHERE event_type = 'system.pricing_exception_quarterly_audit_triggered' AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW())` — 4 rows per year required | Daily |
+| Job 46 freshness | `pg_cron.job_run_details WHERE jobname = 'pricing_exception_compliance_monitor'` — last run vs. 26h window | 1 hr |
+| PRICE-OBS-E-001 filing latency (rolling year) | Days from `system.pricing_exception_quarterly_audit_triggered` created_at to PRICE-OBS-E-001 R2 object `LastModified` — SLO target ≤ 5 business days | Daily |
+
+**Access control:** `compliance_officer` + `form_admin` only. `enterprise_admin`, `tenant_admin`, and `tenant_manager` (HR) excluded — pricing exception governance is a FORM-internal compliance instrument. No individual `tenant_id`, `deal_id`, or `approver_user_id` in any panel.
+
+---
+
+### §55.10 Implementation Checklist
+
+| # | Item | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Register three new DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` — new `§Enterprise Pricing Exception Monitoring events` subsection after `§Enterprise Litigation Hold Monitoring events`: `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr; `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr; `system.pricing_exception_check_passed` LOW/1yr. Include Zod v2 schemas (§55.7.2), REENTRY-MONITOR-CHAIN-01 ordering invariant block, and SOC 2 auditor narratives. | P0 | M9 | security-engineer + compliance-officer | [ ] |
+| 2 | Implement pg_cron job 46 `pricing_exception_compliance_monitor` (`0 9 * * *`; §55.5.2 two SQL sweeps; pg_net → emit-audit-event Worker per event; pg_net → PagerDuty P0 for sweep 1 violation after DEC-030 HTTP 200 confirmed; pg_net → Slack `#compliance` advisory for sweep 2 trigger; `system.pricing_exception_check_passed` all-clear after both sweeps; REENTRY-MONITOR-CHAIN-01 ordering invariant enforced; `form_system` role; `form_api` REVOKED from `audit_log_events` confirmed). Verify `idx_ale_event_type_created_at` covers sweep 1 outer CTE; add composite index on `(event_type, (payload->>'tenant_id'), created_at)` if absent. | P0 | M9 | devops-lead + platform-engineer | [ ] |
+| 3 | Register job 46 in `docs/OBSERVABILITY.md §12.6` pg_cron canonical registry. | P0 | M9 | devops-lead | [x] Done — 2026-06-25 (§12.6 v1.9 patch, this section) |
+| 4 | Insert `pricing_exception_health` subsection into `docs/OBSERVABILITY.md §6.2` Consolidated Alert Rules after `litigation_hold_health` (§54.6) and before `sca_vulnerability_monitoring` (§52.4). | P0 | M9 | devops-lead | [x] Done — 2026-06-25 (OBSERVABILITY.md v5.2.3, this commit) |
+| 5 | Register PRICE-OBS-E-001 and PRICE-OBS-E-002 (§55.8) in `docs/SOC2_READINESS.md §79.4` master consolidated evidence table; create R2 subfolder `compliance/evidence/pricing-exceptions/` with `form_api` NO ACCESS; add both artefacts to §80.4 Vanta mirror list. | P1 | M9 | compliance-officer | [ ] |
+| 6 | Author INCIDENT_RESPONSE R-46 (job 46 `pricing_exception_compliance_monitor` stale recovery runbook): six-step runbook; §R-46.5 REENTRY-CHAIN-01 violation escalation path (IC forensic chain investigation steps; retroactive exception event issuance process); §R-46.6 quarterly audit trigger miss path (manual trigger via compliance-officer PAM session); companion DEC-030 events `system.pricing_exception_monitor_stale_declared` (HIGH/7yr) + `system.pricing_exception_monitor_restored` (STANDARD/3yr); `PRICING-MONITOR-STALE-CHAIN-01` ordering invariant; update §12.6 job 46 stale-consequence cross-ref to reference R-46. | P1 | M10 | devops-lead + compliance-officer | [ ] |
+| 7 | End-to-end staging test: (a) INSERT `enterprise.contract_renewed` event with `contract_discount_type = 'loyalty_reentry'` and NO preceding `enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'` for same `tenant_id` within 30 days; confirm job 46 sweep 1 detects violation at next 09:00 UTC run; confirm `enterprise.reentry_chain_integrity_violation` CRITICAL emitted (REENTRY-MONITOR-CHAIN-01 verified: HTTP 200 before PagerDuty P0). (b) INSERT `enterprise.pricing_exception_approved` with `exception_type = 'loyalty_reentry'` for same `tenant_id` within 30 days before the renewal; confirm violation no longer detected at next run. (c) Override `CURRENT_DATE` to first day of a calendar quarter in staging; confirm sweep 2 fires `system.pricing_exception_quarterly_audit_triggered` STANDARD + Slack `#compliance` advisory. | P2 | M10 | devops-lead | [ ] |
+| 8 | Configure Metabase `Pricing Exception Compliance` dashboard (§55.9 — 7 panels); restrict to `compliance_officer` + `form_admin`; confirm `enterprise_admin`, `tenant_admin`, and `tenant_manager` excluded; verify no individual `tenant_id`, `deal_id`, or `approver_user_id` in any panel. | P1 | M10 | data-engineer | [ ] |
+| 9 | File first PRICE-OBS-E-001 at end of first complete quarter where job 46 has run: retrieve `system.pricing_exception_quarterly_audit_triggered` payload from `audit_log_events`; compile PRICE-OBS-E-001 from §55.8 template; SHA-256 hash; upload to R2 `compliance/evidence/pricing-exceptions/`; upload to Vanta (CC5.2/CC1.4/CC4.1); add to MASTER-INDEX. Privacy check: aggregate counts only; no `tenant_id`, `deal_id`, `approver_user_id`. | P1 | M12 | compliance-officer | [ ] |
+| 10 | File first PRICE-OBS-E-002 at end of first full year of job 46 in production: collect `pg_cron.job_run_details WHERE jobname = 'pricing_exception_compliance_monitor'` for the year + AL-PRICE-01 activation log + PRICE-SLO-02 trigger log from `audit_log_events`; compile PRICE-OBS-E-002 from §55.8 template; SHA-256 hash; upload to R2; upload to Vanta (CC4.1/A1.1); add to MASTER-INDEX. Privacy check: `tenant_id` UUID only in AL-PRICE-01 rows; `approver_user_id` excluded. | P1 | M12 | compliance-officer + devops-lead | [ ] |
+
+---
+
+### §55.11 OQ Gap Tracker
+
+| OQ | Status | Decision |
+|---|---|---|
+| OQ-PRICE-MON-01: Why daily sweep for REENTRY-CHAIN-01 monitoring rather than real-time? | 🟢 No open question — resolved in §55.5.3 | The `emit-audit-event` Worker enforces REENTRY-CHAIN-01 at write time (HTTP 422 `REENTRY_CHAIN_01_VIOLATION` per COST_MODEL §44.5 + DATA_MODEL §45.6). Real-time enforcement is already in place. Job 46 sweep 1 is the monitoring-layer sentinel that confirms the Worker enforcement is operating without bypass — a daily verification cadence is consistent with jobs 39 and 45, which also provide daily monitoring of enforcement controls (renewal notice and litigation hold) at day-scale obligation windows. A REENTRY-CHAIN-01 bypass has no immediate safety or legal implication; a 24h detection latency is acceptable. If future analysis shows violations are occurring (PRICE-SLO-01 breach), sweep 1 cadence can be changed to every 6h (consistent with job 43 `deletion_sla_monitor`) via a §12.6 patch at that time. |
+| OQ-PRICE-MON-02: Should `system.pricing_exception_quarterly_audit_triggered` include per-`tenant_id` exception breakdown? | 🟢 No open question — privacy floor applied | No. COST_MODEL §44.7 specifies that the quarterly audit covers aggregate exception event counts. Including `tenant_id` in this monitoring event would expose individual commercial deal metadata in the system-level monitoring channel — a privacy floor violation. Compliance-officer queries `audit_log_events` directly with `form_admin` PAM elevation for per-`tenant_id` detail during the quarterly audit. The monitoring trigger event is intentionally aggregate-only, following `system.litigation_hold_check_passed` and `system.offboard_chain_check_passed` precedent. |
+| OQ-PRICE-MON-03: Should `enterprise.consumer_price_updated` and `enterprise.list_price_updated` (COST_MODEL §31.8) have dedicated monitoring? | 🟡 Deferred — awaiting first list price event | These events are emitted at most annually (list price review per §31.9 item 8) and require founder approval; their DEC-030 HMAC chain is the primary control. A pg_cron sentinel is not warranted for events occurring ≤ 1 per year. Revisit if list price update cadence increases to > 1 per year or if a SOC 2 audit finding surfaces a monitoring gap. |
+
+---
+
+*v5.2.3 (2026-06-25): §55 Pricing Exception Compliance Observability. Three monitoring gaps closed: (1) REENTRY-CHAIN-01 chain integrity monitoring — no daily sentinel existed; Worker-layer HTTP 422 enforcement (COST_MODEL §44.5) is the primary gate but had no monitoring-layer verification; (2) automated quarterly pricing exception audit trigger — COST_MODEL §44.7 obligation formalised with pg_cron job 46 sweep 2 + DEC-030 signal; (3) evidence artefacts and SLO governance — no PRICE-SLO-* or PRICE-OBS-E-* existed. §55.2: five RED metrics (aggregate fleet-level; no `tenant_id`). §55.3: three SLOs — PRICE-SLO-01 zero-tolerance REENTRY-CHAIN-01 chain integrity; PRICE-SLO-02 quarterly trigger cadence 100%; PRICE-SLO-03 floor override review 1 business day. §55.4: three alert rules — AL-PRICE-01 P0 chain violation (PagerDuty founder + compliance-officer + enterprise-architect); AL-PRICE-02 P1 price floor override approved/restructured (compliance-officer 1-business-day review); AL-PRICE-03 P1 job 46 dead-man's switch 26h freshness. §55.5: pg_cron job 46 `pricing_exception_compliance_monitor` (`0 9 * * *`; daily 09:00 UTC; 26h freshness; sweep 1 correlated subquery REENTRY-CHAIN-01; sweep 2 quarter-boundary conditional aggregate; `system.pricing_exception_check_passed` LOW/1yr all-clear; REENTRY-MONITOR-CHAIN-01 ordering invariant following OFFL-CHAIN-01/LITH-REVIEW-CHAIN-01 pattern; `form_system` role; `form_api` REVOKED from `audit_log_events`; registered in §12.6 v1.9 patch this commit). §55.6: §6.2 `pricing_exception_health` subsection inserted (this commit). §55.7: three DEC-030 monitoring events — `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr; `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr; `system.pricing_exception_check_passed` LOW/1yr; Zod v2 schemas; REENTRY-MONITOR-CHAIN-01 invariant block. §55.8: two evidence artefacts — PRICE-OBS-E-001 (quarterly compliance outcome 7yr CC5.2/CC1.4/CC4.1; aggregate counts only); PRICE-OBS-E-002 (annual monitoring run history 3yr CC4.1/A1.1; `tenant_id` UUID only in AL-PRICE-01 rows); R2 subfolder `compliance/evidence/pricing-exceptions/`. §55.9: Metabase `Pricing Exception Compliance` dashboard (7 panels; `compliance_officer` + `form_admin` only; `enterprise_admin`, `tenant_admin`, `tenant_manager` excluded). §55.10: ten-item implementation checklist (items 3 and 4 `[x] Done — 2026-06-25`; items 1, 2, 5–10 pending M9–M12). §55.11: OQ gap tracker (OQ-PRICE-MON-01/02 🟢 resolved; OQ-PRICE-MON-03 🟡 deferred). §12.6 job 46 registered (v1.9 patch, this commit). §6.2 `pricing_exception_health` subsection inserted (this commit). Privacy floor: `enterprise.reentry_chain_integrity_violation` carries `tenant_id` UUID (FORM-internal) + `renewed_event_id` UUID + `renewal_date` DATE only — no employee `user_id`, name, email, health value, GDPR Art. 9 data; `system.pricing_exception_quarterly_audit_triggered` and `system.pricing_exception_check_passed` carry aggregate fleet counts only (no `tenant_id`); PRICE-OBS-E-001 aggregate counts only; PRICE-OBS-E-002 `tenant_id` UUID in AL-PRICE-01 rows only; no `approver_user_id` in any artefact. Cross-references: `docs/COST_MODEL.md §31.5` (price floors); `docs/COST_MODEL.md §31.8` (four pricing DEC-030 audit events); `docs/COST_MODEL.md §32` (exception approval procedure); `docs/COST_MODEL.md §44.5` (REENTRY-CHAIN-01 Worker-layer enforcement — job 46 is the monitoring-layer complement); `docs/COST_MODEL.md §44.7` (quarterly pricing exception audit obligation — formalised by this section); `docs/DATA_MODEL.md §45.6` (REENTRY-CHAIN-01 Worker cross-ref); `docs/SOC2_READINESS.md §79.4` (PRICE-OBS-E-001/002 to register — §55.10 item 5); `docs/INCIDENT_RESPONSE.md R-46` (job 46 stale recovery runbook — to be authored; §55.10 item 6). Owner: compliance-officer + devops-lead + security-engineer.*
