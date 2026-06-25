@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [8.51.0] — 2026-06-25
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` R-42 — SCA SLA Monitor Stale (`sca_sla_monitor` · job 42 · `*/15 * * * *` · 20-min freshness). Forty-second IC runbook. Closes the §12.6 documentation gap: job 42 was the only pg_cron compliance job registered in OBSERVABILITY §12.6 (v1.3 patch, 2026-06-23) without a corresponding INCIDENT_RESPONSE stale runbook. R-42 covers the blind-spot scenario where job 42 exceeds its 20-min freshness threshold, disabling AL-SCA-01 detection and allowing open Critical CVEs to exceed the 24h SCA-SLO-01 remediation SLA without automated alert. P1 base severity; P0 escalation if R-42-C1 (`open_critical_sla_breached ≥ 1`) at declaration. Five root cause hypotheses (H1 deleted/disabled, H2 SQL exception, H3 pg_net degraded, H4 `form_system` permission revoked, H5 Supabase outage). Four scope queries (R-42-C1 P0 gate, R-42-C2 stale window, R-42-C3 peer health, R-42-C4 registration). DEC-030 HMAC-chained events: `system.sca_monitor_stale_declared` HIGH/7yr and `system.sca_monitor_stale_restored` STANDARD/3yr; SCA-STALE-CHAIN-01 ordering invariant (HTTP 422 `SCA_STALE_CHAIN_01_VIOLATION` on breach → R-05). Evidence: SCA-STALE-E-001 quarterly pg_cron job 42 health report (CC7.2/CC6.8, 3yr). SOC 2: CC6.8 / CC7.1 / CC7.2. Owner: security-engineer + compliance-officer.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — header v3.6 → v3.7.
+- `docs/OBSERVABILITY.md` — §12.6 job 42 `sca_sla_monitor` stale-consequence cross-ref column extended with `INCIDENT_RESPONSE R-42 (job 42 stale recovery runbook — §R-42.5)`; v1.6 patch note added. Closes R-42.10 post-incident control and R-42.11 item 3.
+- `VERSION` — 8.50.0 → 8.51.0.
+
+---
+
 ## [8.50.0] — 2026-06-25
 
 ### Added

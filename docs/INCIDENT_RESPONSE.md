@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.6
+# FORM · Incident Response Runbook v3.7
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -15795,5 +15795,274 @@ const DeletionSlaMonitorRestoredSchema = z.object({
 **Next scheduled review: June 2027 or after first activation — whichever comes first.**
 
 ---
+
+---
+## R-42 SCA SLA Monitor Stale — `sca_sla_monitor` (job 42) — SCA-SLO-01 / 24h Critical CVE SLA detection gap
+
+> Scope: Covers the failure mode where `sca_sla_monitor` (pg_cron job 42, `*/15 * * * *`,
+> 20-min freshness window) exceeds its freshness threshold, creating a blind spot in
+> AL-SCA-01 detection. During a stale window, open Critical CVEs may exceed the 24h
+> remediation SLA (SCA-SLO-01) without triggering PagerDuty P1 or emitting
+> `security.sca_sla_breach` DEC-030 events. This runbook is activated by
+> `pg-cron-health-monitor` (§12.7) emitting `system.cron_job_stale` for
+> `job_name = 'sca_sla_monitor'` and is the security-engineer's structured response to
+> restoring AL-SCA-01 sentinel coverage.
+
+### R-42.1 Trigger Matrix
+
+| Source | Signal | Threshold | Severity |
+|---|---|---|---|
+| `pg-cron-health-monitor` (§12.7) | `system.cron_job_stale` with `job_name = 'sca_sla_monitor'` | No successful run in `cron.job_run_details` within prior 20 min | P1 base; P0 if R-42-C1 > 0 |
+| Manual discovery | security-engineer or devops-lead observes missing `system.sca_sla_check_passed` events in daily review | > 20 min gap in `system.sca_sla_check_passed` DEC-030 events in `audit_log_events` | P1 → assess R-42-C1 for P0 escalation |
+
+### R-42.2 Severity Classification
+
+| Condition | Severity |
+|---|---|
+| Job stale, R-42-C1 = 0 (no open Critical CVE at or past 24h SLA during stale window) | P1 — SCA-SLO-01 monitoring gap; no confirmed SLA breach during stale window |
+| Job stale, R-42-C1 ≥ 1 (≥ 1 open Critical CVE has exceeded 24h SLA during stale window) | P0 — SCA-SLO-01 breach confirmed; immediate compensating control required; escalate to security-engineer + devops-lead + CTO |
+
+### R-42.3 Immediate Actions (T+0 through T+30)
+
+| Time | Action | Owner |
+|---|---|---|
+| T+0 | Acknowledge PagerDuty P1 `form-security` alert. Note `confirmed_stale_since` timestamp (last successful `cron.job_run_details` entry for `sca_sla_monitor`). | security-engineer |
+| T+0 | Run R-42-C1 (open Critical CVE P0 gate). If `open_critical_sla_breached ≥ 1`: immediately escalate to P0, page devops-lead + CTO; begin compensating control (manual Snyk scan or Dependabot PR review) in parallel with job recovery. | security-engineer |
+| T+0 | Run R-42-C2 (last 10 run records for job 42). Inspect `status` and `return_message` fields. | security-engineer |
+| T+5 | Run R-42-C4 (job 42 registration check). If no row in `cron.job WHERE jobname = 'sca_sla_monitor'`: confirm H1 (job deleted/disabled). | security-engineer |
+| T+5 | Run R-42-C3 (peer job health — H2/H5 shared failure discriminator). If ≥ 2 peer security jobs stale: suspect H5 (Supabase outage) — co-activate R-03 and pause individual job diagnostics. | security-engineer + devops-lead |
+| T+10 | If H1 not confirmed and no platform outage: inspect `return_message` in R-42-C2 for SQL exceptions → H2; check `pg_net` queue depth for pg_net degradation → H3. | security-engineer |
+| T+15 | If H2 suspected (SQL exception in job): connect to Supabase SQL editor; run `SELECT event_type FROM audit_log_events LIMIT 1` as `form_system` to confirm schema access. If permission denied: H4 confirmed (`form_system` SELECT revoked on `audit_log_events`). | security-engineer |
+| T+20 | Execute recovery procedure per §R-42.5. | security-engineer + devops-lead |
+| T+30 | Emit `system.sca_monitor_stale_declared` DEC-030 HIGH/7yr (§R-42.7). Verify recovery: confirm `sca_sla_monitor` run appears in `cron.job_run_details` with `status = 'succeeded'` within 15 min of fix. | security-engineer |
+
+### R-42.4 Root Cause Hypotheses
+
+| ID | Hypothesis | Discriminator |
+|---|---|---|
+| H1 | pg_cron job deleted or disabled — `sca_sla_monitor` row absent from `cron.job` or `active = false` | R-42-C4: `SELECT jobid FROM cron.job WHERE jobname = 'sca_sla_monitor'` returns no row, or `active = false` |
+| H2 | SQL exception in `sca_sla_monitor` body — DDL change on `audit_log_events` (column rename, table drop) or `payload` field rename (e.g. `remediation_status` → `status`) causes the job query to throw; pg_cron marks `status = 'failed'` in `job_run_details` | R-42-C2 `return_message` contains SQL error text (e.g. `column "remediation_status" does not exist`); `status = 'failed'` for all recent runs |
+| H3 | `pg_net` degraded — job ran and evaluated CVE status correctly but failed to emit DEC-030 event or fire PagerDuty call via `pg_net`; `status = 'succeeded'` in `job_run_details` but no `system.sca_sla_check_passed` or `security.sca_sla_breach` events in `audit_log_events` after `run_at` | R-42-C2 `status = 'succeeded'`; no corresponding DEC-030 events in `audit_log_events` after `run_at`; cross-check `pg_net.http_response_queue` for queued/failed requests |
+| H4 | `form_system` permission revoked from `audit_log_events` — job query fails on `SELECT` or `INSERT` | R-42-C2 `return_message` contains permission-denied error; confirmed by direct `form_system` query attempt |
+| H5 | Supabase platform outage — pg_cron scheduler itself is suspended; all jobs stale simultaneously | R-42-C3: ≥ 2 peer security/compliance jobs also stale (e.g. `deletion_sla_monitor`, `webhook_degraded_escalation_check`); Supabase status page confirms incident; co-activate R-03 |
+
+### R-42.5 Recovery Procedure
+
+**Step 1 — H1: Job deleted or disabled**
+
+```sql
+-- Re-register sca_sla_monitor
+SELECT cron.schedule(
+  'sca_sla_monitor',
+  '*/15 * * * *',
+  $$
+    SELECT form_system.run_sca_sla_monitor();
+  $$
+);
+-- Or re-enable if disabled:
+UPDATE cron.job SET active = true WHERE jobname = 'sca_sla_monitor';
+```
+
+If unauthorized deletion confirmed (no authorized maintenance record): co-activate R-05 (HMAC chain break / unauthorized system change); review all `system.cron_config_changed` DEC-030 events from prior 72h; rotate `form_system` pg_cron credentials if unauthorized access suspected.
+
+**Step 2 — H2: SQL exception (schema change)**
+
+Identify the breaking DDL change from `audit_log_events` or Supabase migration logs. Options:
+- (a) Revert the breaking DDL change (preferred if migration was erroneous).
+- (b) Update `sca_sla_monitor` function body to use the new column/field name and redeploy via Supabase migration.
+
+Verify `form_api` and `tenant_manager` are NOT granted SELECT on `audit_log_events` (invariant: only `form_system` and `service_role` have SELECT; `form_api` is REVOKED — confirms privacy floor on CVE audit events).
+
+**Step 3 — H3: pg_net degraded**
+
+Check `pg_net.http_response_queue` for queued or errored requests. If pg_net infrastructure is degraded, escalate to Supabase support. No code change required; recovery is automatic once pg_net resumes processing.
+
+**Step 4 — H4: Permission revoked**
+
+```sql
+-- Restore form_system SELECT on audit_log_events
+GRANT SELECT ON audit_log_events TO form_system;
+-- Confirm form_api is still REVOKED (privacy floor invariant)
+REVOKE SELECT ON audit_log_events FROM form_api;
+```
+
+**Step 5 — H5: Platform outage**
+
+Monitor Supabase status page. Co-activate R-03 (Infrastructure Outage). No action on `sca_sla_monitor` specifically until platform recovers; pg_cron will auto-resume on platform restoration.
+
+**Step 6 — Post-recovery: verify and close**
+
+After fix deployed (all hypotheses):
+
+```sql
+-- Confirm job ran successfully
+SELECT run_at, status, return_message
+FROM cron.job_run_details
+WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'sca_sla_monitor')
+ORDER BY run_at DESC LIMIT 3;
+```
+
+Confirm `status = 'succeeded'` for at least one post-fix run. Then emit `system.sca_monitor_stale_restored` DEC-030 STANDARD/3yr (§R-42.7). Resolve PagerDuty P1/P0. If R-42-C1 was ≥ 1 at activation: re-run R-42-C1 post-recovery to confirm all open Critical CVEs are now ≤ 24h or have active Dependabot PRs; document in `system.sca_monitor_stale_restored` payload `open_critical_remaining_at_restored` field.
+
+### R-42.6 Recovery Scope Queries
+
+**R-42-C1 — P0 gate (open Critical CVE past 24h SLA)**
+
+```sql
+SELECT COUNT(*) AS open_critical_sla_breached
+FROM audit_log_events
+WHERE event_type = 'security.sca_critical_vulnerability_detected'
+  AND (payload->>'remediation_status') = 'open'
+  AND occurred_at < NOW() - INTERVAL '24 hours';
+```
+
+`open_critical_sla_breached ≥ 1` → P0 escalation required immediately; SCA-SLO-01 breach confirmed.
+
+**R-42-C2 — Stale window (last 10 job 42 runs)**
+
+```sql
+SELECT run_at, status, return_message
+FROM cron.job_run_details
+WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'sca_sla_monitor')
+ORDER BY run_at DESC
+LIMIT 10;
+```
+
+`status = 'failed'` with SQL error → H2. `status = 'succeeded'` but no DEC-030 events in `audit_log_events` after `run_at` → H3. No rows returned → H1 or H5.
+
+**R-42-C3 — Peer job health (H5 discriminator)**
+
+```sql
+SELECT jobname, MAX(run_at) AS last_run,
+       COUNT(*) FILTER (WHERE status = 'failed') AS recent_failures
+FROM cron.job_run_details jrd
+JOIN cron.job j USING (jobid)
+WHERE j.jobname IN (
+  'deletion_sla_monitor',
+  'webhook_degraded_escalation_check',
+  'bdg_override_expiry_sweep',
+  'white_label_cert_check',
+  'google_directory_alert_check'
+)
+GROUP BY jobname
+ORDER BY last_run ASC;
+```
+
+≥ 2 peer jobs with `last_run < NOW() - INTERVAL '30 minutes'` → H5 (Supabase outage); co-activate R-03.
+
+**R-42-C4 — Job 42 registration check (H1 discriminator)**
+
+```sql
+SELECT jobid, jobname, schedule, active
+FROM cron.job
+WHERE jobname = 'sca_sla_monitor';
+```
+
+No row → H1 (job deleted). `active = false` → H1 (job disabled).
+
+### R-42.7 DEC-030 Event Chain
+
+All events are HMAC-chained per DEC-030 (see `docs/AUDIT_LOG_SCHEMA.md`).
+
+**`system.sca_monitor_stale_declared`** — severity HIGH / retention 7yr
+
+Emitted at T+30 (or earlier if root cause is clear) to anchor the stale window in the tamper-evident audit record.
+
+```typescript
+// Zod schema — system.sca_monitor_stale_declared
+const ScaMonitorStaleDeclaredSchema = z.object({
+  incident_id: z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),              // ISO 8601 — last successful job_run_details run_at
+  stale_minutes: z.number().positive(),                      // NOW() - confirmed_stale_since in minutes
+  missed_runs: z.number().int().nonnegative(),               // floor(stale_minutes / 15)
+  trigger: z.enum(['pagerduty_alert', 'manual_discovery', 'co_active_r03']),
+  initial_severity: z.enum(['P1', 'P0']),
+  open_critical_sla_breached_at_declared: z.number().int().nonnegative(), // R-42-C1 count at declaration
+});
+```
+
+**`system.sca_monitor_stale_restored`** — severity STANDARD / retention 3yr
+
+Emitted after confirmed successful recovery run (Step 6). Closes the SCA-STALE-CHAIN-01 pair.
+
+```typescript
+// Zod schema — system.sca_monitor_stale_restored
+const ScaMonitorStaleRestoredSchema = z.object({
+  incident_id: z.string().uuid(),                            // must match stale_declared incident_id
+  restored_at: z.string().datetime(),                        // ISO 8601 — first successful post-fix run_at
+  root_cause: z.enum(['H1', 'H2', 'H3', 'H4', 'H5']),
+  fix_deployed_at: z.string().datetime(),
+  stale_window_hours: z.number().positive(),                 // restored_at - confirmed_stale_since in hours
+  open_critical_sla_breached_at_declared: z.number().int().nonnegative(), // from stale_declared event
+  open_critical_remaining_at_restored: z.number().int().nonnegative(),    // R-42-C1 re-run at restoration
+});
+```
+
+**SCA-STALE-CHAIN-01 ordering invariant:**
+
+`system.sca_monitor_stale_restored` MUST follow `system.sca_monitor_stale_declared` for the same `incident_id`. If the chain emitter receives a `restored` event with no matching `declared` in the HMAC chain: return HTTP 422 `SCA_STALE_CHAIN_01_VIOLATION` → activate R-05 (HMAC chain break).
+
+### R-42.8 Evidence Preservation
+
+| Artefact | Content | SOC 2 | Retention | Path |
+|---|---|---|---|---|
+| R-42-C2 output | `cron.job_run_details` for job 42 covering stale window — `status`, `run_at`, `return_message` for all rows from `confirmed_stale_since` to `restored_at` | CC7.2 | 3yr | `compliance/evidence/security/sca-sla-monitor-stale/r42-<incident_id>/stale-window-job-runs.csv` |
+| R-42-C1 output at declaration | `open_critical_sla_breached` count at T+0 | CC6.8 / CC7.1 | 7yr | `compliance/evidence/security/sca-sla-monitor-stale/r42-<incident_id>/p0-gate-at-declared.txt` |
+| R-42-C1 output at restoration | `open_critical_sla_breached` count post-recovery (must be 0 or accompanied by active Dependabot PR references) | CC6.8 / CC7.1 / A1.1 | 7yr | `compliance/evidence/security/sca-sla-monitor-stale/r42-<incident_id>/p0-gate-at-restored.txt` |
+| `stale_declared` DEC-030 event | `system.sca_monitor_stale_declared` HIGH/7yr — HMAC chain entry anchoring stale window | CC7.2 / CC6.8 | 7yr | `audit_log_events` (chain-verifiable per HMAC-VERIFY-ALGO-001) |
+| `stale_restored` DEC-030 event | `system.sca_monitor_stale_restored` STANDARD/3yr — HMAC chain closure | CC7.2 | 3yr | `audit_log_events` (chain-verifiable per HMAC-VERIFY-ALGO-001) |
+
+**SCA-STALE-E-001 — Quarterly pg_cron job 42 health report (CC7.2/CC6.8, 3yr)**
+
+Quarterly export of all `cron.job_run_details` for job 42: run count, failure count, stale-window activations (count and max-stale-minutes), `open_critical_sla_breached_at_declared` for any R-42 activations. Zero-activation quarters filed as affirmative attestation. Path: `compliance/evidence/security/sca-sla-monitor-stale/sca-stale-e-001-YYYY-QN.csv`. Cross-ref: SOC2_READINESS §79.4 (pending registration — R-42.11 item 4).
+
+### R-42.9 SOC 2 Criteria Mapping
+
+| Criterion | Coverage |
+|---|---|
+| **CC6.8** | `sca_sla_monitor` (job 42) enforces the 24h Critical CVE remediation SLA (SCA-SLO-01). A stale window creates a blind spot where a Critical CVE could exceed the 24h SLA without triggering PagerDuty P1 or emitting `security.sca_sla_breach`. R-42 defines the IC's structured response to detect and close that blind spot. `open_critical_sla_breached_at_declared = 0` in the `stale_declared` event is the auditor-inspectable attestation that no SLA breach occurred during the stale window. |
+| **CC7.1** | R-42 is activated by `pg-cron-health-monitor` (§12.7), which is itself a CC7.1 system monitoring control. The structured IC response (R-42-C1 through R-42-C4 scope queries, H1–H5 root cause classification, DEC-030 HMAC-chained chain) demonstrates that FORM has defined procedures for responding to monitoring system failures, not just to the threats those systems monitor. |
+| **CC7.2** | `pg-cron-health-monitor` detects the `sca_sla_monitor` gap and emits `system.cron_job_stale`. R-42 runbook activates. DEC-030 HMAC chain (`stale_declared` → `stale_restored`) provides the tamper-evident detection-to-restoration timeline independently verifiable per `compliance/docs/hmac-chain-verification-algorithm.md` (HMAC-VERIFY-ALGO-001). |
+
+> **Auditor narrative (CC6.8 + CC7.1 + CC7.2):** FORM's `sca_sla_monitor` (job 42, every 15 min, 20-min freshness window) queries `audit_log_events` for open Critical CVEs past the 24h remediation SLA. The `pg-cron-health-monitor` (§12.7) detects any job 42 gap exceeding 20 min and pages security-engineer via PagerDuty P1 `form-security`. R-42 provides the IC with a structured response including an immediate SCA-SLO-01 breach assessment (R-42-C1) — if `open_critical_sla_breached ≥ 1` at declaration, severity escalates to P0 and compensating manual controls begin in parallel with job recovery. The DEC-030 HMAC-chained event pair (`system.sca_monitor_stale_declared` HIGH/7yr → `system.sca_monitor_stale_restored` STANDARD/3yr) anchors any stale window in the tamper-evident audit record, independently verifiable per HMAC-VERIFY-ALGO-001. `open_critical_sla_breached_at_declared = 0` in the `stale_declared` event is the auditor-inspectable attestation that no SCA-SLO-01 breach occurred during the stale window.
+
+---
+
+### R-42.10 Post-Incident Controls
+
+| Control | Action | Owner | SLA |
+|---|---|---|---|
+| **H1 — Unauthorized deletion** | If H1 confirmed with no authorized maintenance record: co-activate R-05 (unauthorized system change); review all `system.cron_config_changed` DEC-030 events from prior 72h; rotate `form_system` pg_cron credentials if unauthorized access suspected | security-engineer | Immediately on H1 confirmation |
+| **SCA-SLO-01 breach** | If `open_critical_sla_breached_at_declared ≥ 1` in `system.sca_monitor_stale_declared`: confirm all open Critical CVEs have active Dependabot PRs or approved risk acceptances (§54.7); document per-CVE disposition in R-42-C1 post-recovery output before resolving PagerDuty P0 | security-engineer | Before PagerDuty resolution |
+| **§12.6 cross-reference** | Update `docs/OBSERVABILITY.md §12.6` job 42 `sca_sla_monitor` registry entry to include `INCIDENT_RESPONSE R-42 (job 42 stale recovery runbook — §R-42.5)` in the stale-consequence cross-ref column | devops-lead | **Done — OBSERVABILITY.md §12.6 v1.6 patch, 2026-06-25** |
+| **SOC2_READINESS §79.4 registration** | Register SCA-STALE-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table: quarterly pg_cron job 42 health report (run count, failure count, stale-window activations, `open_critical_sla_breached_at_declared` for any R-42 activations); zero-activation quarters filed as affirmative attestation; CC7.2/CC6.8; 3yr retention; `form_api` REVOKED from evidence path | compliance-officer | R-42.11 item 4 (P1 obligation) |
+
+---
+
+### R-42.11 Implementation Checklist
+
+#### P0 — Before job 42 is deployed to production (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.sca_monitor_stale_declared` (HIGH/7yr) and `system.sca_monitor_stale_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §SCA & Dependency Vulnerability events`. Add SCA-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-42.7. | security-engineer + compliance-officer | **P0** | M9 | [ ] |
+| 2 | Deploy R-42 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'sca_sla_monitor'` to PagerDuty service `form-security` P1, dedup key `sca-sla-monitor-stale`, routing to security-engineer + devops-lead. Integration test: disable job 42 in staging for > 20 min; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-security` with correct dedup key. | devops-lead | **P0** | M9 | [ ] |
+
+#### P1 — Before first SOC 2 Type II audit period begins (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Update `docs/OBSERVABILITY.md §12.6` job 42 `sca_sla_monitor` registry entry: add `INCIDENT_RESPONSE R-42 (job 42 stale recovery runbook — §R-42.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M9 | [x] *(completed in OBSERVABILITY.md §12.6 v1.6 patch, 2026-06-25)* |
+| 4 | Register SCA-STALE-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table: quarterly pg_cron job 42 health report (run count, failure count, stale-window activations, `open_critical_sla_breached_at_declared` for any R-42 activations); zero-activation quarters filed as affirmative attestation; `form_api` REVOKED from evidence path; SOC 2 CC7.2/CC6.8; retention 3yr; path: `compliance/evidence/security/sca-sla-monitor-stale/sca-stale-e-001-YYYY-QN.csv`. | compliance-officer | **P1** | M10 | [ ] |
+
+---
+
+*v1.0 (2026-06-25): R-42 SCA SLA Monitor Stale — forty-second runbook. Closes the documentation gap for `sca_sla_monitor` (job 42, `*/15 * * * *`, 20-min freshness window) identified in `docs/OBSERVABILITY.md §12.6` (v1.3 patch, 2026-06-23) — job 42 was registered in the canonical §12.6 registry with CC6.8/CC7.1 SCA SLA monitoring coverage but had no corresponding INCIDENT_RESPONSE runbook, unlike all peer compliance pg_cron jobs (R-28 through R-41) which carry explicit stale runbook cross-references in their §12.6 entries. Critical characteristic: job 42 staleness creates a potential SCA-SLO-01 breach risk — if any open Critical CVE was detected before the stale window and the 24h SLA expires during the stale window, no `security.sca_sla_breach` DEC-030 events are emitted and no PagerDuty P1 fires during that period; the R-42-C1 P0 gate query immediately classifies this condition at IC activation. Privacy floor: no `user_id`, no `tenant_id`, no health data in any SCA event payload (CVE identifiers are public; payloads contain only CVE IDs and `remediation_status`). Severity: P1 base; immediate P0 escalation if R-42-C1 confirms `open_critical_sla_breached ≥ 1` at time of stale declaration. Trigger: `system.cron_job_stale` with `job_name = 'sca_sla_monitor'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-security` → security-engineer + devops-lead; dedup `sca-sla-monitor-stale`. Five root cause hypotheses: H1 (job deleted/disabled — R-05 co-activation if unauthorized); H2 (SQL exception in job body — DDL change on `audit_log_events` or `payload` field rename); H3 (pg_net degraded — job ran but DEC-030 emit or PagerDuty call silently failed); H4 (`form_system` permission revoked from `audit_log_events`); H5 (Supabase platform outage — R-03 co-activation). Four scope queries: R-42-C1 (P0 gate — `open_critical_sla_breached` count at declaration and restoration), R-42-C2 (last 10 job 42 run records — stale window + `return_message`), R-42-C3 (peer job health — H5 discriminator: ≥ 2 peer jobs stale), R-42-C4 (job registration check — H1 discriminator: no row in `cron.job`). Six-step recovery procedure: Step 1 (H1 — re-register via `cron.schedule()` or re-enable; R-05 co-activation if unauthorized); Step 2 (H2 — identify breaking DDL change, revert or update job body; confirm `form_api` REVOKED invariant on `audit_log_events`); Step 3 (H3 — escalate to Supabase support for pg_net infrastructure; auto-recovery when pg_net resumes); Step 4 (H4 — restore `form_system` SELECT on `audit_log_events`; confirm `form_api` REVOKED); Step 5 (H5 — co-activate R-03, await platform recovery); Step 6 (post-recovery: confirm `status = 'succeeded'` in `job_run_details`; re-run R-42-C1; emit `system.sca_monitor_stale_restored` STANDARD/3yr; resolve PagerDuty). Two DEC-030 HMAC-chained events: `system.sca_monitor_stale_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `trigger` enum['pagerduty_alert','manual_discovery','co_active_r03'], `initial_severity` enum['P1','P0'], `open_critical_sla_breached_at_declared` nonneg int); `system.sca_monitor_stale_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H5, `fix_deployed_at` datetime, `stale_window_hours` positive, `open_critical_sla_breached_at_declared` nonneg int, `open_critical_remaining_at_restored` nonneg int); SCA-STALE-CHAIN-01: `restored` must follow `declared` for same `incident_id`; HTTP 422 `SCA_STALE_CHAIN_01_VIOLATION` on breach → R-05 activated. Evidence: stale-window `cron.job_run_details` export (CC7.2, 3yr); R-42-C1 at declaration (CC6.8/CC7.1, 7yr); R-42-C1 at restoration (CC6.8/CC7.1/A1.1, 7yr); DEC-030 events in `audit_log_events` (chain-verifiable per HMAC-VERIFY-ALGO-001); SCA-STALE-E-001 quarterly job 42 health report (CC7.2/CC6.8, 3yr — pending §79.4 registration per R-42.11 item 4). SOC 2 criteria: CC6.8 (SCA-SLO-01 blind-spot coverage; `open_critical_sla_breached_at_declared = 0` is auditor-inspectable attestation of no SLA breach during stale window); CC7.1 (structured IC response to monitoring system failure); CC7.2 (`pg-cron-health-monitor` detection + DEC-030 HMAC chain `stale_declared` → `stale_restored` = tamper-evident detection-to-restoration timeline independently verifiable per HMAC-VERIFY-ALGO-001). Post-incident controls: H1 unauthorized deletion → R-05 + `form_system` credential rotation; `open_critical_sla_breached_at_declared ≥ 1` → confirm all open Critical CVEs have active Dependabot PRs or approved risk acceptances (§54.7); §12.6 cross-ref [x] Done v1.6 patch 2026-06-25; SCA-STALE-E-001 §79.4 registration (P1 — R-42.11 item 4). Four-item implementation checklist: 2× P0/M9 (AUDIT_LOG_SCHEMA registration; PagerDuty routing + integration test); 2× P1/M9–M10 (§12.6 cross-ref [x] Done v1.6 patch 2026-06-25; SCA-STALE-E-001 §79.4 registration). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 42 `sca_sla_monitor` registry entry — stale-consequence cross-ref updated with INCIDENT_RESPONSE R-42 per v1.6 patch [x] Done 2026-06-25); `docs/OBSERVABILITY.md §52` (SCA & Dependency Vulnerability Monitoring — AL-SCA-01 alert rule; SCA-SLO-01; canonical job 42 spec; SCA-OBS-E-002 quarterly evidence artefact); `docs/AUDIT_LOG_SCHEMA.md §SCA & Dependency Vulnerability events` (companion DEC-030 events to be registered — R-42.11 item 1, P0/M9); `docs/SOC2_READINESS.md §54.5` (Critical 24h CVE remediation SLA — SCA-SLO-01 source); `docs/SOC2_READINESS.md §54.10 item 11` (FORM-SCA-001 implementation as AL-SCA-01 via job 42 — closed); `docs/SOC2_READINESS.md §79.4` (SCA-STALE-E-001 quarterly job 42 health report — pending R-42.11 item 4 registration); R-03 (Infrastructure Outage — H5 co-activation path); R-05 (HMAC chain break — H1 unauthorized deletion co-activation and SCA-STALE-CHAIN-01 violation escalation). Owner: security-engineer + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-25 · Owner: security-engineer + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
 
 ---
