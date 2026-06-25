@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.0.2
+# FORM · Observability & Monitoring Taxonomy v5.1.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -1227,6 +1227,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `webhook_degraded_escalation_check` | `*/30 * * * *` | 35 min | CC9.2 / CC7.2 — every-30-min sweep identifying `tenant_webhooks` rows in `degraded` state for ≥ 2 h; dispatches WH-NOTIF-01 Resend email + emits `integration.webhook_delivery_slo_breach` STANDARD/3yr at 2 h mark; at 48 h sets `status = 'suspended'` + emits `integration.webhook_suspended` HIGH/7yr + dispatches WH-NOTIF-02; stale = AL-WH-02/AL-WH-04 detection blind spot — degraded webhooks are not auto-escalated to suspended within the defined 48 h window; WH-NOTIF-01/02 customer notifications not sent; WH-SLO-04 (degraded notification ≤ 2 h) in breach | PagerDuty P1 `form-platform` → platform-engineer; dedup `webhook-degraded-escalation-stale`; 35-min freshness window (one-run tolerance of 30-min cadence — consistent with `bdg_override_expiry_sweep` (job 34) pattern at 20-min for 15-min cadence); cross-ref: §43.7 (job spec); §43.5 AL-WH-02/AL-WH-04; WH-SLO-04; §43.11 WH-NOTIF-01/WH-NOTIF-02; INCIDENT_RESPONSE R-36 (job 41 stale recovery runbook — §R-36.5) — **job 41** *(renumbered from §43.7 draft "job 34" — see conflict resolution note v0.9 below; §12.6 job 34 = `bdg_override_expiry_sweep` was already canonical)* |
 | `sca_sla_monitor` | `*/15 * * * *` | 20 min | CC6.8/CC7.1 — 24h critical CVE SLA enforcement sentinel; queries `audit_log_events` for `security.sca_critical_vulnerability_detected` events with `remediation_status = 'open'` and `occurred_at < NOW() - INTERVAL '24 hours'`; on breach: emits `security.sca_sla_breach` DEC-030 HIGH/7yr per open critical CVE + fires AL-SCA-01 via pg_net (PagerDuty P1 `form-security`); on all-clear: emits `system.sca_sla_check_passed` LOW/1yr (`{ open_critical_count: 0, check_run_at: datetime }`); stale = AL-SCA-01 detection blind spot — open critical CVEs could exceed the 24h SLA (SOC2_READINESS §54.5) without automated alert; SCA-SLO-01 monitoring gap | PagerDuty P1 `form-security` → security-engineer + devops-lead; dedup `sca-sla-critical-overdue` 1h; 20-min freshness (3-run tolerance of 15-min cadence — consistent with `bdg_override_expiry_sweep` (job 34) pattern); cross-ref: §52 AL-SCA-01; SOC2_READINESS §54.5 (Critical 24h SLA); SCA-OBS-E-002 (CC7.2/A1.1, quarterly 3yr); INCIDENT_RESPONSE R-42 (job 42 stale recovery runbook — §R-42.5) — **job 42** |
 | `deletion_sla_monitor` | `0 */6 * * *` | 7 h | C1.2/CC4.1 — GDPR Art. 17 deletion SLA sentinel (DELETION-SLA-01); queries `enterprise_churn_events WHERE deletion_requested_at IS NOT NULL AND deletion_completed_at IS NULL`; at `now() - deletion_requested_at > INTERVAL '25 days'` (day 25 — 5-day compliance-officer warning before GDPR Art. 17 30-day mandate): emits `enterprise.deletion_sla_warning` DEC-030 HIGH/7yr per flagged tenant + fires AL-DEL-01 PagerDuty P1 `form-enterprise`; at `> INTERVAL '29 days'` (day 29 — 1-day pre-breach): emits `enterprise.deletion_sla_critical` DEC-030 CRITICAL/7yr + escalates AL-DEL-01 to P0; stale = DELETION-CHAIN-01 monitoring blind spot — a tenant whose GDPR Art. 17 deletion window expires goes undetected until ece_deletion_sla_respected CHECK fires at day 35 (DATA_MODEL §44 DDL backstop); `form_api` REVOKED from `enterprise_churn_events`; pg_cron reads via `form_system` role | PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect (day-25 warning); P0 escalation at day 29 → founder + compliance-officer; dedup `deletion-sla-warning-{tenant_id}` 6h cooldown (re-alerts every 6h until deletion_completed_at populated); 7h freshness window (1-run tolerance of 6-hour cadence); privacy invariant: event payload contains only `tenant_id` (FORM-internal UUID), `days_since_deletion_requested` (integer), `alert_tier` ('warning'/'critical') — no employee `user_id`, name, email, health value, or GDPR Art. 9 data; cross-ref: `docs/COST_MODEL.md §43.10 item 3` (obligation source — P0/M10); `docs/DATA_MODEL.md §44.6` (DELETION-CHAIN-01 chain invariant — day-25/29/35 monitoring tiers); `docs/DATA_MODEL.md §44` `ece_deletion_sla_respected` CHECK (DDL-layer backstop at 35 days — pg_cron is the pre-breach warning layer); DEL-E-001 (C1.2/CC4.1, annual 7yr — annual deletion certificate archive); `docs/SOC2_READINESS.md §101` (DDL-layer corroboration cross-ref patch for `enterprise_churn_events`); INCIDENT_RESPONSE R-41 (job 43 stale recovery runbook — §R-41.5) — **job 43** |
+| `offboard_chain_monitor` | `0 * * * *` | 2 h | CC6.1/CC7.1 — OFFBOARD-CHAIN-01 SLA sentinel; queries `enterprise_churn_events WHERE offboarding_initiated_at IS NULL AND churn_date::timestamptz < now() - INTERVAL '24 hours'`; on detection: emits `enterprise.offboard_chain_sla_breach` DEC-030 HIGH/7yr per flagged tenant + fires AL-OFFL-01 PagerDuty P1 `form-enterprise`; dedup `offboard-chain-breach-{tenant_id}` 4h cooldown; on all-clear: emits `system.offboard_chain_check_passed` LOW/1yr (no `tenant_id` — privacy floor); stale = OFFBOARD-CHAIN-01 detection blind spot — a churned tenant's offboarding may slip past the 24h window undetected; unlike DELETION-SLA-01 (day-scale, job 43), OFFBOARD-CHAIN-01 is a 24h MSA contractual obligation; each hourly missed run extends breach-detection latency by 1h; `form_api` REVOKED from `enterprise_churn_events`; pg_cron reads via `form_system` role | PagerDuty P1 `form-enterprise` → compliance-officer + enterprise-architect; dedup `offboard-chain-breach-{tenant_id}` 4h cooldown (re-alerts every 4h until `offboarding_initiated_at` populated); 2h freshness window (1-run tolerance of hourly cadence); privacy invariant: breach event payload contains only `tenant_id` (FORM-internal UUID), `hours_since_churn` (integer), `churn_date` (DATE) — no employee `user_id`, name, email, health value, or GDPR Art. 9 data; cross-ref: §53.4 (AL-OFFL-01 alert spec); §53.5 (job spec — §53.5.2 enforcement SQL); §53.7 (OFFL-CHAIN-01 DEC-030 chain invariant); `docs/COST_MODEL.md §43.8` (OFFBOARD-CHAIN-01 definition: `enterprise.offboarding_initiated` within 24h of `enterprise.account_churned`); `docs/DATA_MODEL.md §44.6` (OFFBOARD-CHAIN-01 compliance query); CHN-OBS-E-001 (CC6.1/CC7.1/CC7.2, quarterly 3yr — OFFBOARD-CHAIN-01 SLO performance report); INCIDENT_RESPONSE R-44 (job 44 stale recovery runbook — to be authored; §53.10 item 6) — **job 44** |
 
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
@@ -1234,7 +1235,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 
 **Job-number conflict resolution (v0.9, 2026-06-22):** Two sections within OBSERVABILITY.md independently claimed job numbers already assigned in this §12.6 canonical registry: (1) `docs/OBSERVABILITY.md §42.7` (v3.9, 2026-06-14) referenced `white_label_cert_check` as "job 32" — but job 32 was already assigned to `turh_retention_purge` when the v0.4 patch was published (2026-06-19); (2) `docs/OBSERVABILITY.md §43.7` (v4.0, 2026-06-14) referenced `webhook_degraded_escalation_check` as "job 34" — but job 34 was already assigned to `bdg_override_expiry_sweep` in the same v0.4 patch. Both are renumbered in this registry: `white_label_cert_check` → **job 40**; `webhook_degraded_escalation_check` → **job 41**. In-text citations in §42.7, §42.14 item 3, §43.7, and §43.15 items 6–8 corrected in this v0.9 patch (since both sections reside within OBSERVABILITY.md, consistent with the v0.5 precedent of correcting §49 in-text citations). This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
-*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle.
+*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle.
 
 **DEC-030 events emitted by `pg-cron-health-monitor`** — registered in `docs/AUDIT_LOG_SCHEMA.md §System`:
 
@@ -1255,6 +1256,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 **v0.5 · 2026-06-20 · Owner: devops-lead**
 **Review: quarterly or on architecture change. Next scheduled review: August 2026.**
 **SOC 2 evidence: CC7.2 (system monitoring). See also INCIDENT_RESPONSE.md for CC7.3–CC7.5.**
+*v1.7 patch (2026-06-25): §12.6 job 44 `offboard_chain_monitor` registered — closes the OFFBOARD-CHAIN-01 monitoring gap identified in OBSERVABILITY §53 (v5.1.0, 2026-06-25): no pg_cron job existed to perform a fleet-sweep detecting churned tenants whose `offboarding_initiated_at IS NULL` past the 24h OFFBOARD-CHAIN-01 window. `emit-audit-event` Worker enforces OFFBOARD-CHAIN-01 at emission time (HTTP 422 `OFFBOARD_CHAIN_01_VIOLATION`) but cannot detect cases where the `enterprise.offboarding_initiated` event is simply never emitted (process failure, not chain violation). Job 44 schedule `0 * * * *` (hourly); 2h freshness window (1-run tolerance of hourly cadence — tolerated because the 24h OFFBOARD-CHAIN-01 window is a multi-hour commitment). CC6.1/CC7.1 compliance relevance (MSA §7 deprovisioning SLA monitoring; CHN-E-001 quarterly evidence obligation from COST_MODEL §43.9). On detection: emits `enterprise.offboard_chain_sla_breach` HIGH/7yr per flagged tenant (to be registered in AUDIT_LOG_SCHEMA.md per §53.10 item 1, P0/M10); fires AL-OFFL-01 PagerDuty P1 `form-enterprise`; dedup `offboard-chain-breach-{tenant_id}` 4h cooldown. On all-clear: emits `system.offboard_chain_check_passed` LOW/1yr (no `tenant_id` — privacy floor when fleet is clean). Tables accessed: `enterprise_churn_events` SELECT via `form_system` role (`form_api` REVOKED per DATA_MODEL §44 RLS). Freshness window note extended to cover job 44. Canonical section: §53. No other §12.6 rows modified.*
 *v1.6 patch (2026-06-25): §12.6 job 42 `sca_sla_monitor` stale-consequence cross-ref extended — appended `INCIDENT_RESPONSE R-42 (job 42 stale recovery runbook — §R-42.5)` to the cross-ref column. Closes R-42.10 post-incident control "§12.6 cross-reference" and R-42.11 implementation checklist item 3 (P1/M9). Job 42 was registered in the §12.6 canonical registry (v1.3 patch, 2026-06-23) with CC6.8/CC7.1 SCA SLA monitoring coverage, but was the only §12.6 compliance job whose stale-consequence cross-ref column lacked an INCIDENT_RESPONSE runbook reference — unlike all peer jobs (R-28 through R-41) which all carry explicit stale runbook cross-references. R-42 is now the forty-second runbook in `docs/INCIDENT_RESPONSE.md`. Companion DEC-030 events `system.sca_monitor_stale_declared` (HIGH/7yr) and `system.sca_monitor_stale_restored` (STANDARD/3yr) are to be registered in `docs/AUDIT_LOG_SCHEMA.md §SCA & Dependency Vulnerability events` (R-42.11 item 1, P0/M9); SCA-STALE-CHAIN-01 ordering invariant noted in §R-42.7. No other §12.6 rows modified.*
 *v1.5 patch (2026-06-25): §12.6 job 43 `deletion_sla_monitor` stale-consequence cross-ref extended — appended `INCIDENT_RESPONSE R-41 (job 43 stale recovery runbook — §R-41.5)` to the cross-ref column. Closes R-41.10 post-incident control "§12.6 cross-reference" and R-41.11 implementation checklist item 3 (P1/M10). Job 43 was registered in the §12.6 canonical registry (v1.4 patch, 2026-06-23) with C1.2/CC4.1 GDPR Art. 17 deletion SLA monitoring coverage, but was the only §12.6 compliance job whose stale-consequence cross-ref column lacked an INCIDENT_RESPONSE runbook reference — unlike all peer jobs (R-28 through R-40) which all carry explicit stale runbook cross-references. R-41 is now the forty-first runbook in `docs/INCIDENT_RESPONSE.md`. Companion DEC-030 events `system.deletion_sla_monitor_stale_declared` (HIGH/7yr) and `system.deletion_sla_monitor_restored` (STANDARD/3yr) registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events` v2.41 (2026-06-25); DELETION-SLA-MONITOR-STALE-CHAIN-01 ordering invariant noted. No other §12.6 rows modified.*
 *v1.4 patch (2026-06-23): §12.6 job 43 `deletion_sla_monitor` registered — closes `docs/COST_MODEL.md §43.10 item 3` (v1.0, 2026-06-23) P0/M10 obligation: DELETION-SLA-01 monitoring as pg_cron job 43. Schedule `0 */6 * * *`; 7h freshness window (1-run tolerance of 6-hour cadence — tolerated because the monitored obligation is a day-scale GDPR Art. 17 35-day SLA, not a sub-hour SLA). CC2/CC4.1 compliance relevance (GDPR Art. 17 deletion obligation monitoring). P1 alert at day 25 (5-day warning); P0 escalation at day 29 (1-day pre-breach); emits `enterprise.deletion_sla_warning` HIGH/7yr and `enterprise.deletion_sla_critical` CRITICAL/7yr per flagged tenant. Privacy invariant: payload contains only `tenant_id` (FORM-internal UUID), `days_since_deletion_requested`, `alert_tier` — no individual user data. Closes `docs/DATA_MODEL.md §44.11` OBSERVABILITY §12.6 cross-reference obligation (🟡 → 🟢). Freshness window note extended to cover job 43. Canonical obligation source: COST_MODEL §43.10 item 3; DDL backstop: DATA_MODEL §44 `ece_deletion_sla_respected` CHECK (35-day hard DDL guard). No other §12.6 rows modified.*
@@ -14530,3 +14532,387 @@ Two evidence artefacts satisfy the auditor evidence obligations for the SCA obse
 *v4.9.3 (2026-06-21): §12.6 patch — job 32 `turh_retention_purge` stale-consequence cross-ref updated. Added `INCIDENT_RESPONSE R-34 (job 32 stale recovery runbook — §R-34.5)` to the cross-ref column of job 32 in the pg_cron job registry (§12.6). This closes the documentation gap that existed since job 32 was first registered: every peer daily-cadence job (R-28 through R-33) carried an explicit INCIDENT_RESPONSE cross-reference in its §12.6 registry entry; job 32 was the sole exception. The cross-reference was deferred pending authoring of the runbook; R-34 is now authored (INCIDENT_RESPONSE.md v3.2, 2026-06-21). No other §12.6 rows modified. Document header v4.9.2 → v4.9.3. Owner: compliance-officer.*
 
 *v4.8.0 (2026-06-21): §51 Enterprise Contract Renewal Monitoring Observability — closes COST_MODEL §42.10 item 4 documentation obligation (RENEW-NOTICE-01 monitoring invariant not yet registered in OBSERVABILITY.md as of COST_MODEL v2.10). §51.1 purpose and scope (RENEW-NOTICE-01; MSA §6.1 90-day notice requirement; privacy floor). §51.2 pg_cron job 39 `renewal_notice_check` (daily 09:00 UTC, 26h freshness window): §51.2.1 implementation decision — pg_cron + pg_net adopted in preference to Cloudflare Worker extension for table co-location and pattern consistency with jobs 24/25; §51.2.2 job specification table (schedule, freshness, compliance relevance, on-detection, on-all-clear, stale consequence, run context); §51.2.3 RENEW-NOTICE-01 SQL (reproduced from COST_MODEL §42.3.2 — SELECT active contracts with renewal_date in 85–95 days and no notice event within 100 days; per-tenant DEC-030 emission + AL-RENEW-01 + 72h dedup; all-clear emission); §51.2.4 tables accessed (`enterprise_contracts` SELECT, `audit_log_events` SELECT + INSERT; `service_role`; no write to `enterprise_contracts`). §51.3 AL-RENEW-01 alert rule (P1, PagerDuty `form-enterprise` → compliance-officer, dedup `renew-notice-missing-{tenant_id}` 72h, 5-day SLA, auto-resolve on notice filed); §51.3.1 six-step runbook (confirm validity → check event → emit notice → verify resolution → MSA §6.1 exception handling → dedup window advisory); §51.3.2 §6.2 integration note (insert after AL-ETF-01, before AL-PAM-01). §51.4 two DEC-030 events: `enterprise.renewal_notice_overdue` HIGH/7yr (Zod `RenewalNoticeOverduePayload`: `tenant_id` UUID, `renewal_date` date-regex, `days_until_renewal` int 85–95, `acv_usd` positive, `check_run_at` datetime, `alert_dedup_key` string; registered per §51.7 item 1 P0/M11); `system.renewal_notice_check_passed` LOW/1yr (Zod `RenewalNoticeCheckPassedPayload`: `contracts_checked` nonneg int, `check_run_at` datetime; no tenant_id — privacy floor; registered per §51.7 item 1 P0/M11). §51.5 two evidence artefacts: REN-E-002 (CC4.1/CC2.2, quarterly, 3yr — already in SOC2_READINESS §79.4, COST_MODEL v2.10); REN-OBS-E-001 (CC4.1/A1.1, quarterly, 3yr — new; `compliance/evidence/renewals/REN-OBS-E-001_<YYYY-QN>.md`; §51.7 item 4 to register in SOC2_READINESS §79.4). §51.6 §6.2 consolidated alert rules `contract_renewal_health` subsection (insert after AL-ETF-01, before AL-PAM-01). §51.7 seven-item implementation checklist: 5× P0/M11 (AUDIT_LOG_SCHEMA event registration, pg_cron job 39 implementation, §6.2 insertion, SOC2_READINESS REN-OBS-E-001 registration, COST_MODEL §42.10 item 4 status update), 2× P1/M12 (end-to-end staging test, first REN-OBS-E-001 evidence filing). §51.8 OQ gap tracker: no open questions. §12.6 registry: job 39 `renewal_notice_check` row added; freshness note updated; v0.6 patch note. Document header v4.7.3 → v4.8.0. Owner: devops-lead + compliance-officer + security-engineer.*
+
+---
+
+## §53 Enterprise Post-Churn Lifecycle & GDPR Deletion SLA Observability
+
+### §53.1 Purpose and Scope
+
+This section provides the observability companion to the enterprise post-churn lifecycle defined across `docs/COST_MODEL.md §43` (Post-Churn Economics, Offboarding Cost Model & Logo Winback Analytics), `docs/DATA_MODEL.md §44` (`enterprise_churn_events` schema — migration 0085), and `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events`. Those documents specify the post-churn state machine (active → churned → offboarding → gdpr_deletion_pending / winback_in_progress → closed), three HMAC chain invariants (OFFBOARD-CHAIN-01, WINBACK-CHAIN-01, DELETION-CHAIN-01), and the primary compliance evidence artefacts (DEL-E-001, WBK-E-001, CHN-E-001). This section registers the **monitoring infrastructure** — the RED metrics, SLOs, alert rules, pg_cron jobs, DEC-030 chain health invariants, and monitoring-layer evidence artefacts that surface operational failures before they become compliance breaches.
+
+**Three monitoring obligations drive this section:**
+
+1. **OFFBOARD-CHAIN-01 (24h SLA — monitoring gap):** The `emit-audit-event` Worker enforces OFFBOARD-CHAIN-01 at event emission time (HTTP 422 `OFFBOARD_CHAIN_01_VIOLATION`) but cannot detect cases where the `enterprise.offboarding_initiated` event is simply *never* emitted — a process failure rather than a chain violation. No automated fleet-sweep existed to catch this. pg_cron job 44 `offboard_chain_monitor` (§53.5) closes this gap.
+2. **DELETION-SLA-01 (GDPR Art. 17 30-day mandate — formalisation):** pg_cron job 43 `deletion_sla_monitor` (§12.6; COST_MODEL §43.10 item 3; INCIDENT_RESPONSE R-41) already monitors this obligation. §53 provides the dedicated observability section that §12.6 does not — SLOs, formal §6.2 alert rule registration, and monitoring-layer evidence artefacts.
+3. **Winback Pipeline Coverage:** `wau_band_at_churn IN ('green', 'amber')` accounts have ≥ 40% winback probability within 12 months (COST_MODEL §43.5.1). No monitoring ensures the CSM pipeline opens winback outreach within the 2–4 month optimal window. WBKO-SLO-01 (§53.3) establishes the coverage target; the §53.9 dashboard provides the visibility layer.
+
+**Relationship to upstream sections:** §40 (Customer Health Score) → §26 (CS Model) → COST_MODEL §43 (post-churn economics) → **§53** (post-churn observability). §53 is intentionally distinct from §37 (GDPR Data Retention Observability — consumer-tier Art. 17 erasure) and §51 (Contract Renewal Monitoring): §53 monitors the post-churn *lifecycle state machine*, §37 monitors the consumer *data retention pipeline*, §51 monitors pre-churn *renewal notice SLAs*.
+
+**Privacy floor:** No individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data appears in any §53 DEC-030 event, alert payload, or evidence artefact. `enterprise_churn_events` carries `tenant_id` (FORM-internal UUID), aggregate `fehs_at_churn` (k ≥ 10 per §33.7 enforcement), and lifecycle timestamps. `form_api` is REVOKED from `enterprise_churn_events`; `tenant_manager` has no RLS policy (access denied by default). All §53 pg_cron jobs execute as `form_system` role — consistent with job 43 (`deletion_sla_monitor`).
+
+### §53.2 RED Metrics
+
+**Post-churn pipeline signal sources:**
+- `enterprise_churn_events` (Supabase Postgres — `form_system` SELECT; `form_api` REVOKED)
+- `audit_log_events` (Supabase Postgres — SELECT on enterprise post-churn event types)
+- `cron.job_run_details` (Supabase Postgres — pg_cron execution history for jobs 43 and 44)
+
+| Signal | Type | Query / Source | Privacy |
+|---|---|---|---|
+| `enterprise.account_churned` events per week | Rate | `audit_log_events WHERE event_type = 'enterprise.account_churned'` GROUP BY week | `tenant_id` UUID only |
+| `enterprise.offboarding_initiated` events per week | Rate | `audit_log_events WHERE event_type = 'enterprise.offboarding_initiated'` GROUP BY week | `tenant_id` UUID only |
+| OFFBOARD-CHAIN-01 breach count — current fleet | Error | `enterprise_churn_events WHERE offboarding_initiated_at IS NULL AND churn_date::timestamptz < now() - INTERVAL '24 hours'` | `tenant_id` UUID only |
+| OFFBOARD-CHAIN-01 median elapsed time (churn → offboarding, rolling 90d) | Duration | `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY offboarding_initiated_at - churn_date::timestamptz)` for non-NULL rows in last 90d — target ≤ 24h | Aggregate only |
+| Deletion pipeline at-risk count (> 25 days pending) | Error | `enterprise_churn_events WHERE deletion_requested_at IS NOT NULL AND deletion_completed_at IS NULL AND now() - deletion_requested_at > INTERVAL '25 days'` | `tenant_id` UUID only |
+| GDPR deletion SLA compliance rate — current quarter (%) | Rate | Completed rows where `deletion_completed_at - deletion_requested_at ≤ INTERVAL '30 days'` / total completed — target 100% | Aggregate % |
+| `enterprise.deletion_certificate_issued` events per month | Rate | `audit_log_events WHERE event_type = 'enterprise.deletion_certificate_issued'` GROUP BY month | `tenant_id` UUID only |
+| `enterprise.winback_initiated` events per quarter | Rate | `audit_log_events WHERE event_type = 'enterprise.winback_initiated'` GROUP BY quarter | `tenant_id` UUID only |
+| `enterprise.winback_converted` events per quarter | Rate | `audit_log_events WHERE event_type = 'enterprise.winback_converted'` GROUP BY quarter | `tenant_id` UUID only |
+| Winback pipeline coverage (% Green/Amber churns with outreach ≤ 90d, rolling quarter) | Rate | Cross-tab `enterprise_churn_events WHERE wau_band_at_churn IN ('green','amber')` vs first `enterprise.winback_initiated` within 90d of `churn_date` — target ≥ 90% | Aggregate % |
+| Job 43 `deletion_sla_monitor` freshness | Health | `cron.job_run_details` — last successful run vs. 7h freshness window | None |
+| Job 44 `offboard_chain_monitor` freshness | Health | `cron.job_run_details` — last successful run vs. 2h freshness window | None |
+
+### §53.3 Service Level Objectives
+
+Three SLOs govern the post-churn lifecycle. OFFL-SLO-01 and OFFL-SLO-02 are zero-tolerance, reflecting contractual (MSA §7) and statutory (GDPR Art. 17) obligations. WBKO-SLO-01 is a commercial coverage target.
+
+**OFFL-SLO-01 — Offboarding Initiated Within 24h (OFFBOARD-CHAIN-01)**
+
+| Attribute | Value |
+|---|---|
+| ID | OFFL-SLO-01 |
+| Definition | 100% of `enterprise.account_churned` events must be followed by `enterprise.offboarding_initiated` for the same `tenant_id` within **24 hours** of `churn_date` |
+| Target | **100% — zero-tolerance.** A single breach is a deprovisioning SLA failure under MSA §7 Data Processing Agreement; triggers OFFBOARD-CHAIN-01 compliance finding |
+| Measurement window | Rolling calendar quarter (sourced from CHN-E-001 quarterly filing and `enterprise_churn_events` OFFBOARD-CHAIN-01 compliance query — DATA_MODEL §44.6) |
+| Breach detection | pg_cron job 44 `offboard_chain_monitor` (§53.5) — hourly sweep; AL-OFFL-01 (§53.4) fires when breach detected |
+| SOC 2 criteria | CC6.1 (access restriction terminated on contract end), CC7.1 (anomaly detection) |
+| Evidence | CHN-E-001 (quarterly OFFBOARD-CHAIN-01 chain compliance CSV — COST_MODEL §43.9); CHN-OBS-E-001 (§53.8 — monitoring SLO performance report; new) |
+
+**OFFL-SLO-02 — GDPR Art. 17 Deletion Completed Within 30 Days**
+
+| Attribute | Value |
+|---|---|
+| ID | OFFL-SLO-02 |
+| Definition | 100% of deletion requests (`deletion_requested_at IS NOT NULL`) must result in `deletion_completed_at` within **30 calendar days** of `deletion_requested_at` |
+| Target | **100% — statutory obligation (GDPR Art. 17).** The DDL-layer backstop (`ece_deletion_sla_respected` CHECK — 35-day hard limit per DATA_MODEL §44) is structural enforcement; OFFL-SLO-02 targets the legally mandated 30-day threshold (5-day buffer before DDL fires) |
+| Measurement window | Per deletion request (point-in-time per tenant) |
+| Breach detection | pg_cron job 43 `deletion_sla_monitor` (§12.6) — AL-DEL-01 at day 25 (P1 warning), P0 escalation at day 29 (pre-breach) |
+| SOC 2 criteria | C1.2 (confidential information protected through disposal), CC4.1 (monitoring obligations), P8 (privacy — right of disposal) |
+| Evidence | DEL-E-001 (annual deletion certificate archive — COST_MODEL §43.9); DEL-OBS-E-001 (§53.8 — job 43 pg_cron run history; new) |
+
+**WBKO-SLO-01 — Winback Outreach Coverage for Green/Amber Accounts**
+
+| Attribute | Value |
+|---|---|
+| ID | WBKO-SLO-01 |
+| Definition | ≥ 90% of churned accounts with `wau_band_at_churn IN ('green', 'amber')` must have at least one `enterprise.winback_initiated` DEC-030 event recorded within **90 days** of `churn_date` |
+| Target | ≥ 90%. Red-band accounts excluded — §43.5.1 probability matrix shows ≤ 8% winback probability for red-band; economics do not justify mandatory outreach |
+| Measurement window | Rolling calendar quarter |
+| Breach detection | No automated alert. WBKO-SLO-01 breach surfaced in §53.9 dashboard "Winback Pipeline Coverage" panel; raised in QBR review. Deliberate design: CSM pipeline coverage is a commercial discipline metric; automated P1 paging disproportionate to risk (see §53.11 OQ gap tracker) |
+| SOC 2 criteria | CC4.1 (monitoring commitments) — commercial obligation, not statutory |
+| Evidence | WBK-E-001 (annual winback programme aggregate report — COST_MODEL §43.9); §53.9 dashboard |
+
+### §53.4 Alert Rules
+
+**AL-OFFL-01 — OFFBOARD-CHAIN-01 SLA Breach** *(new)*
+
+| Attribute | Value |
+|---|---|
+| Alert ID | AL-OFFL-01 |
+| Trigger | pg_cron job 44 `offboard_chain_monitor` (§53.5) detects any `enterprise_churn_events` row where `offboarding_initiated_at IS NULL AND churn_date::timestamptz < now() - INTERVAL '24 hours'` |
+| Severity | P1 (deprovisioning SLA failure under MSA §7; CC6.1 control gap) |
+| Channel | PagerDuty `form-enterprise` → compliance-officer + enterprise-architect |
+| SLA | 4h to remediate (initiate offboarding workflow for flagged tenant) |
+| Auto-resolve | On `offboarding_initiated_at` populated for the flagged `tenant_id` (verified by next job 44 run) |
+| Dedup key | `offboard-chain-breach-{tenant_id}` — 4h cooldown (re-alerts every 4h until resolved; prevents alert fatigue on multi-hour remediations) |
+| Runbook | (1) Confirm `enterprise_churn_events` row for the flagged `tenant_id` and `churn_date`; (2) Check `audit_log_events` for `enterprise.offboarding_initiated` with same `tenant_id` — the event may exist but `offboarding_initiated_at` column not yet reconciled (transaction race); (3) If event exists: run Admin Console "Reconcile Offboarding" action (`form_admin` role) to populate `offboarding_initiated_at`; (4) If event absent: initiate offboarding workflow in Admin Console for the flagged tenant; escalate to founder if ACV > $50k; (5) Confirm `enterprise.offboarding_initiated` emitted and HMAC-chained (DEC-030 chain tail check — verify HTTP 200 from emit-audit-event); (6) Document breach in CHN-E-001 quarterly filing (elapsed hours, root cause, remediation action); (7) If recurring: raise OFFBOARD-CHAIN-01 process gap to enterprise-architect for Admin Console workflow hardening |
+| SOC 2 criteria | CC6.1, CC7.1 |
+
+**AL-DEL-01 — GDPR Art. 17 Deletion SLA Warning / Critical** *(formalises §12.6 job 43 alert — see INCIDENT_RESPONSE R-41)*
+
+| Attribute | Value |
+|---|---|
+| Alert ID | AL-DEL-01 |
+| Trigger | pg_cron job 43 `deletion_sla_monitor` (`0 */6 * * *`) detects any `enterprise_churn_events` row where `deletion_requested_at IS NOT NULL AND deletion_completed_at IS NULL AND now() - deletion_requested_at > INTERVAL '25 days'` |
+| Severity | **P1** at day 25 (5-day warning before GDPR Art. 17 30-day mandate); **P0** escalation at day 29 (1-day pre-breach) |
+| Channel | P1: PagerDuty `form-enterprise` → compliance-officer + enterprise-architect. P0 escalation: PagerDuty P0 → founder + compliance-officer (all channels) |
+| SLA | P1: 24h to initiate active deletion steps. P0: immediate remediation — deletion must complete within 24h to avoid GDPR Art. 17 breach |
+| Auto-resolve | On `deletion_completed_at` populated for the flagged `tenant_id`; verified by next job 43 run |
+| Dedup key | `deletion-sla-warning-{tenant_id}` — 6h cooldown (re-alerts every 6h until resolved) |
+| Runbook | INCIDENT_RESPONSE R-41 (§R-41.5) |
+| SOC 2 criteria | C1.2, CC4.1, P8 |
+
+**§6.2 Integration:** AL-OFFL-01 and AL-DEL-01 are to be inserted into `docs/OBSERVABILITY.md §6.2` Consolidated Alert Rules under a new `enterprise_post_churn_health` subsection (§53.10 item 4). Insert after the `contract_renewal_health` subsection (§51.6) and before the `webhook_health` subsection (§43.5).
+
+```
+#### enterprise_post_churn_health
+
+| Alert ID   | Condition                                                              | Severity     | Channel                                           | Dedup                                    | Auto-resolve                        | SOC 2          |
+|------------|------------------------------------------------------------------------|--------------|---------------------------------------------------|------------------------------------------|-------------------------------------|----------------|
+| AL-OFFL-01 | Job 44 detects offboarding_initiated_at IS NULL > 24h after churn_date | P1           | PagerDuty form-enterprise → compliance-officer + enterprise-architect | offboard-chain-breach-{tenant_id} 4h | On offboarding_initiated_at populated | CC6.1, CC7.1   |
+| AL-DEL-01  | Job 43 detects deletion_requested_at elapsed > 25d (warning) / > 29d (critical) | P1 → P0 | P1: form-enterprise → compliance-officer + enterprise-architect; P0 → founder + compliance-officer | deletion-sla-warning-{tenant_id} 6h | On deletion_completed_at populated | C1.2, CC4.1, P8 |
+```
+
+### §53.5 pg_cron Job 44 — `offboard_chain_monitor`
+
+#### §53.5.1 Job Specification
+
+| Attribute | Value |
+|---|---|
+| Job number | 44 |
+| Job name | `offboard_chain_monitor` |
+| Schedule | `0 * * * *` (top of every hour) |
+| Freshness window | 2 h (1-run tolerance; tolerated because the monitored obligation is a 24h window, not a sub-hour SLA; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour) |
+| Compliance relevance | CC6.1 / CC7.1 — OFFBOARD-CHAIN-01 SLA monitoring: detects churned tenants whose offboarding workflow has not been initiated within 24h of `churn_date` |
+| On detection | Emits `enterprise.offboard_chain_sla_breach` DEC-030 HIGH/7yr per flagged tenant + fires AL-OFFL-01 PagerDuty P1 `form-enterprise`; dedup `offboard-chain-breach-{tenant_id}` 4h cooldown |
+| On all-clear | Emits `system.offboard_chain_check_passed` DEC-030 LOW/1yr — no `tenant_id` (privacy floor: all-clear signal broadcasts no per-tenant information) |
+| Stale consequence | OFFBOARD-CHAIN-01 detection blind spot — a churned tenant's offboarding may slip past the 24h MSA contractual obligation undetected until the next successful run. Unlike DELETION-SLA-01 (day-scale GDPR Art. 17 obligation monitored by job 43), OFFBOARD-CHAIN-01 is a 24h window; extended stale periods materially increase breach probability for any account that churns during the outage. |
+| Run context | `form_system` role (elevated — required because `form_api` is REVOKED from `enterprise_churn_events` per DATA_MODEL §44 RLS); no write access to `enterprise_churn_events` |
+| Cross-ref | §53.4 (AL-OFFL-01); §53.7 (OFFL-CHAIN-01 chain invariant); `docs/COST_MODEL.md §43.8` (OFFBOARD-CHAIN-01 definition); `docs/DATA_MODEL.md §44.6` (OFFBOARD-CHAIN-01 compliance query); CHN-OBS-E-001 (§53.8); INCIDENT_RESPONSE R-44 (job 44 stale recovery runbook — to be authored per §53.10 item 6) |
+
+#### §53.5.2 Enforcement SQL
+
+```sql
+-- pg_cron job 44: offboard_chain_monitor
+-- Schedule: 0 * * * *  |  Freshness: 2h  |  Role: form_system
+-- Detects churned tenants with offboarding_initiated_at IS NULL beyond the 24h OFFBOARD-CHAIN-01 window.
+-- Emits enterprise.offboard_chain_sla_breach DEC-030 HIGH/7yr per flagged tenant.
+-- Privacy: payload carries only tenant_id UUID, integer elapsed hours, churn_date DATE.
+-- OFFL-CHAIN-01 ordering invariant: audit event PERFORM must precede PagerDuty PERFORM.
+
+DO $$
+DECLARE
+  r                   RECORD;
+  v_hours_since_churn INTEGER;
+  v_alert_dedup_key   TEXT;
+  v_breach_count      INTEGER := 0;
+  v_tenants_checked   INTEGER;
+BEGIN
+  -- Sweep: any churn_date older than 24h with no offboarding_initiated_at
+  FOR r IN
+    SELECT
+      id,
+      tenant_id,
+      churn_date,
+      EXTRACT(EPOCH FROM (now() - churn_date::timestamptz)) / 3600 AS hours_since_churn
+    FROM enterprise_churn_events
+    WHERE offboarding_initiated_at IS NULL
+      AND churn_date::timestamptz < now() - INTERVAL '24 hours'
+    ORDER BY churn_date ASC
+  LOOP
+    v_hours_since_churn := FLOOR(r.hours_since_churn);
+    v_alert_dedup_key   := 'offboard-chain-breach-' || r.tenant_id::text;
+
+    -- OFFL-CHAIN-01: emit DEC-030 HIGH event FIRST (audit worker HTTP 200 must precede PagerDuty call)
+    PERFORM pg_net.http_post(
+      url     := current_setting('app.audit_worker_url'),
+      body    := json_build_object(
+        'event_type',        'enterprise.offboard_chain_sla_breach',
+        'occurred_at',       now(),
+        'severity',          'HIGH',
+        'retention_years',   7,
+        'payload', json_build_object(
+          'tenant_id',          r.tenant_id,
+          'churn_date',         r.churn_date,
+          'hours_since_churn',  v_hours_since_churn,
+          'check_run_at',       now(),
+          'alert_dedup_key',    v_alert_dedup_key
+        )
+      )::text,
+      headers := '{"Content-Type": "application/json"}'::jsonb
+    );
+
+    -- Fire AL-OFFL-01: PagerDuty P1 form-enterprise (4h dedup cooldown)
+    PERFORM pg_net.http_post(
+      url     := current_setting('app.pagerduty_url'),
+      body    := json_build_object(
+        'routing_key',  current_setting('app.pd_routing_key_form_enterprise'),
+        'event_action', 'trigger',
+        'dedup_key',    v_alert_dedup_key,
+        'payload', json_build_object(
+          'summary',   'OFFBOARD-CHAIN-01 breach: tenant ' || r.tenant_id::text ||
+                       ' — offboarding not initiated ' || v_hours_since_churn || 'h after churn',
+          'severity',  'error',
+          'source',    'pg-cron-offboard-chain-monitor',
+          'custom_details', json_build_object(
+            'tenant_id',         r.tenant_id,
+            'churn_date',        r.churn_date,
+            'hours_since_churn', v_hours_since_churn,
+            'slo',               'OFFL-SLO-01',
+            'chain_invariant',   'OFFBOARD-CHAIN-01',
+            'runbook',           'INCIDENT_RESPONSE R-44'
+          )
+        )
+      )::text,
+      headers := '{"Content-Type": "application/json"}'::jsonb
+    );
+
+    v_breach_count := v_breach_count + 1;
+  END LOOP;
+
+  -- All-clear: emit system.offboard_chain_check_passed (no tenant_id — privacy floor)
+  IF v_breach_count = 0 THEN
+    SELECT COUNT(*) INTO v_tenants_checked
+    FROM enterprise_churn_events
+    WHERE churn_date::timestamptz < now() - INTERVAL '24 hours';
+
+    PERFORM pg_net.http_post(
+      url     := current_setting('app.audit_worker_url'),
+      body    := json_build_object(
+        'event_type',      'system.offboard_chain_check_passed',
+        'occurred_at',     now(),
+        'severity',        'LOW',
+        'retention_years', 1,
+        'payload', json_build_object(
+          'tenants_checked',  v_tenants_checked,
+          'check_run_at',     now()
+        )
+      )::text,
+      headers := '{"Content-Type": "application/json"}'::jsonb
+    );
+  END IF;
+END;
+$$;
+```
+
+**OFFL-CHAIN-01 ordering invariant:** `enterprise.offboard_chain_sla_breach` must be emitted and confirmed (HTTP 200 from `app.audit_worker_url`) BEFORE the AL-OFFL-01 PagerDuty alert fires. The SQL above enforces this ordering within each loop iteration — the audit event `PERFORM` precedes the PagerDuty `PERFORM`. If the audit event pg_net call returns non-200, DEC-030 is the source of truth for the detection; re-fire PagerDuty manually using the `audit_log_events` row `id` as the incident reference. This invariant is analogous to SCA-CHAIN-01 (§52.7) and the pattern established across all post-churn chain monitors.
+
+#### §53.5.3 Tables Accessed
+
+| Table | Operation | Role | Notes |
+|---|---|---|---|
+| `enterprise_churn_events` | SELECT | `form_system` | `form_api` REVOKED per DATA_MODEL §44 RLS; reads `offboarding_initiated_at`, `churn_date`, `tenant_id` — no individual employee data |
+| `audit_log_events` | INSERT (via pg_net → `emit-audit-event` Worker) | `service_role` (Worker) | DEC-030 chain events written by the Worker, not directly by pg_cron |
+
+#### §53.5.4 Implementation Decision
+
+pg_cron is adopted for `offboard_chain_monitor` (job 44) over a Cloudflare Worker cron for the same reasons as `deletion_sla_monitor` (job 43), `renewal_notice_check` (job 39), and `sca_sla_monitor` (job 42): (1) table co-location — `enterprise_churn_events` lives in Supabase Postgres; pg_cron reads it with zero network latency; (2) pattern consistency — all enterprise post-churn compliance monitors follow the pg_cron + pg_net pattern, simplifying observability of the monitoring layer itself (§12.6 registry); (3) RLS enforcement — `form_api` REVOKED from `enterprise_churn_events`; `form_system` role is the only authenticated path available to pg_cron without Worker involvement.
+
+### §53.6 §6.2 Consolidated Alert Rules Integration
+
+Insert a new `enterprise_post_churn_health` subsection into `docs/OBSERVABILITY.md §6.2` Consolidated Alert Rules after the `contract_renewal_health` subsection (§51.6) and before the `webhook_health` subsection (§43.5). The spec is reproduced in §53.4 for reference. Implementation: §53.10 item 4.
+
+### §53.7 DEC-030 Chain Events
+
+#### §53.7.1 Existing events (registered in AUDIT_LOG_SCHEMA.md v2.39 — 2026-06-23)
+
+| Event type | Severity | Retention | Emitter | Chain anchor |
+|---|---|---|---|---|
+| `enterprise.account_churned` | CRITICAL | 7 yr | Admin Console | OFFBOARD-CHAIN-01 anchor: requires `offboarding_initiated` within 24h for same `tenant_id` |
+| `enterprise.offboarding_initiated` | HIGH | 7 yr | Admin Console | Satisfies OFFBOARD-CHAIN-01 |
+| `enterprise.winback_initiated` | HIGH | 7 yr | Admin Console (CSM) | WINBACK-CHAIN-01 prerequisite |
+| `enterprise.winback_converted` | CRITICAL | 7 yr | Admin Console | WINBACK-CHAIN-01: requires prior `winback_initiated` via `winback_initiated_event_id` (DEC-079) |
+| `enterprise.deletion_certificate_issued` | CRITICAL | 7 yr | Admin Console | DELETION-CHAIN-01: `days_since_trigger ≤ 35` |
+| `enterprise.deletion_sla_warning` | HIGH | 7 yr | Job 43 `deletion_sla_monitor` | DELETION-SLA-01 day-25 alert anchor |
+| `enterprise.deletion_sla_critical` | CRITICAL | 7 yr | Job 43 `deletion_sla_monitor` | DELETION-SLA-01 day-29 pre-breach escalation |
+
+#### §53.7.2 New events introduced in §53
+
+Register in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events` per §53.10 item 1.
+
+```typescript
+// enterprise.offboard_chain_sla_breach
+// Emitted by: pg_cron job 44 offboard_chain_monitor
+// Severity: HIGH | Retention: 7 yr
+// OFFL-CHAIN-01: this event must be emitted + HTTP 200 confirmed BEFORE AL-OFFL-01 PagerDuty fires.
+const OffboardChainSlaBreachPayload = z.object({
+  tenant_id:          z.string().uuid(),                           // FORM-internal UUID — no employee PII
+  churn_date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),    // ISO 8601 date of confirmed churn
+  hours_since_churn:  z.number().int().nonnegative(),              // integer hours elapsed since churn_date
+  check_run_at:       z.string().datetime(),                       // job 44 run timestamp
+  alert_dedup_key:    z.string(),                                  // offboard-chain-breach-{tenant_id}
+});
+
+// system.offboard_chain_check_passed
+// Emitted by: pg_cron job 44 offboard_chain_monitor (all-clear path only — breach_count === 0)
+// Severity: LOW | Retention: 1 yr
+// Privacy: no tenant_id — broadcast only when fleet is fully clean; no per-tenant information disclosed.
+const OffboardChainCheckPassedPayload = z.object({
+  tenants_checked:  z.number().int().nonnegative(), // total rows checked (no individual identifiers)
+  check_run_at:     z.string().datetime(),
+});
+```
+
+**Privacy invariant:** `OffboardChainSlaBreachPayload` carries only `tenant_id` (FORM-internal UUID), an integer hour count, and timestamps. No individual employee `user_id`, name, email, health value, or GDPR Art. 9 data. `OffboardChainCheckPassedPayload` carries no `tenant_id` — emitted only when no breach is detected; a zero-breach signal reveals no per-tenant information.
+
+**OFFL-CHAIN-01 ordering invariant:** `enterprise.offboard_chain_sla_breach` confirmed (HTTP 200 from `emit-audit-event`) BEFORE AL-OFFL-01 PagerDuty alert fires. DEC-030 is authoritative detection record for OFFBOARD-CHAIN-01 breaches in the SOC 2 audit trail. Pattern consistent with SCA-CHAIN-01 (§52.7), BAM-STALE-CHAIN-01 (§39), and all peer pg_cron monitoring chains.
+
+### §53.8 SOC 2 Evidence Mapping
+
+Two new artefacts cover the **monitoring layer** for the enterprise post-churn lifecycle. They supplement the primary compliance evidence artefacts (DEL-E-001 / WBK-E-001 / CHN-E-001) defined in `docs/COST_MODEL.md §43.9` and registered in `docs/SOC2_READINESS.md §102` (2026-06-23).
+
+**CHN-OBS-E-001 — Quarterly OFFBOARD-CHAIN-01 SLO Performance Report**
+
+| Attribute | Value |
+|---|---|
+| Artefact ID | CHN-OBS-E-001 |
+| Path | `compliance/evidence/offboarding/CHN-OBS-E-001_<YYYY-QN>.md` |
+| Cadence | Quarterly |
+| Retention | 3 years |
+| SOC 2 criteria | CC6.1, CC7.1, CC7.2 |
+| Content | (1) OFFL-SLO-01 performance for the quarter: count of `enterprise.account_churned` events; count with `offboarding_initiated_at` populated within 24h; SLA achievement rate (target 100%); any breach rows — `tenant_id` UUID only, `hours_since_churn`, root cause, remediation action; (2) job 44 `offboard_chain_monitor` run statistics: total runs, successful runs, stale-event count (freshness window breaches detected by `pg-cron-health-monitor`); (3) AL-OFFL-01 activation log: any P1 activations in the quarter — date, `tenant_id` UUID, hours elapsed, resolution timestamp. Privacy invariant: `tenant_id` UUID only — no employee `user_id`, name, email, health value, or GDPR Art. 9 data. |
+| Owner | compliance-officer + enterprise-architect |
+| Distinct from | CHN-E-001 (COST_MODEL §43.9 — primary quarterly OFFBOARD-CHAIN-01 chain compliance CSV evidencing the SLA outcome; CHN-OBS-E-001 evidences the monitoring infrastructure that detected any breaches) |
+| Register in | SOC2_READINESS §79.4 master consolidated evidence table + §80.3 `offboarding/` subfolder (already added by §102) + §80.4 Vanta mirror list (§53.10 item 5) |
+
+**DEL-OBS-E-001 — Quarterly `deletion_sla_monitor` pg_cron Run History**
+
+| Attribute | Value |
+|---|---|
+| Artefact ID | DEL-OBS-E-001 |
+| Path | `compliance/evidence/deletions/DEL-OBS-E-001_<YYYY-QN>.md` |
+| Cadence | Quarterly |
+| Retention | 3 years |
+| SOC 2 criteria | CC7.2, C1.2, A1.1 |
+| Content | Export of `cron.job_run_details` for `deletion_sla_monitor` (job 43) for the quarter: total runs, successful runs, stale-event count (freshness window breaches — pg_cron health monitor activations per R-41), any AL-DEL-01 activations attributed to job 43 (date, `tenant_id` UUID, `alert_tier` 'warning'/'critical', resolution timestamp). Privacy invariant: pg_cron operational metadata and alert log only — `tenant_id` UUID for AL-DEL-01 activations; no employee `user_id`, name, email, health value, or GDPR Art. 9 data. |
+| Owner | devops-lead + compliance-officer |
+| Distinct from | DEL-E-001 (COST_MODEL §43.9 — annual deletion certificate archive evidencing the deletion outcome per tenant; DEL-OBS-E-001 evidences the monitoring control that fired the pre-breach warnings) |
+| Register in | SOC2_READINESS §79.4 master consolidated evidence table + §80.3 `deletions/` subfolder (already added by §102) + §80.4 Vanta mirror list (§53.10 item 5) |
+
+**CC7.2 auditor narrative:** CC7.2 requires FORM to monitor system components for anomalies that could indicate operational errors. CHN-OBS-E-001 demonstrates that OFFBOARD-CHAIN-01 breaches are detected within 2 hours (job 44 freshness window) rather than discovered retroactively at the next CHN-E-001 quarterly review. DEL-OBS-E-001 demonstrates that the GDPR Art. 17 deletion SLA pre-breach warning control (job 43) operated continuously throughout the quarter with no unexplained stale windows. Together, the two monitoring-layer artefacts close the auditor evidence gap between the compliance outcome (CHN-E-001 / DEL-E-001) and the operational control that ensured that outcome.
+
+### §53.9 Dashboard
+
+**Dashboard name:** `Enterprise Post-Churn Lifecycle Health`
+
+**Location:** Metabase → Enterprise → Post-Churn Monitoring (alongside SSO Fleet Health and SCA & Dependency Vulnerability Health dashboards)
+
+| Panel | Signal source | Refresh |
+|---|---|---|
+| OFFBOARD-CHAIN-01 breach count (current fleet) | `enterprise_churn_events WHERE offboarding_initiated_at IS NULL AND churn_date::timestamptz < now() - INTERVAL '24 hours'` | 15 min |
+| OFFBOARD-CHAIN-01 median elapsed time (churn → offboarding, rolling 90d) | `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY offboarding_initiated_at - churn_date::timestamptz)` for non-NULL rows — target ≤ 24h P50 | Daily |
+| Job 44 `offboard_chain_monitor` freshness | `cron.job_run_details` — last successful run vs. 2h window | 15 min |
+| Deletion pipeline at-risk count (> 25 days pending) | `enterprise_churn_events WHERE deletion_requested_at IS NOT NULL AND deletion_completed_at IS NULL AND now() - deletion_requested_at > INTERVAL '25 days'` | 1 hr |
+| GDPR deletion SLA compliance rate — current quarter (%) | Completed rows: `(deletion_completed_at - deletion_requested_at) ≤ INTERVAL '30 days'` / total completed — target 100% | Daily |
+| Job 43 `deletion_sla_monitor` freshness | `cron.job_run_details` — last successful run vs. 7h window | 1 hr |
+| Winback pipeline coverage rate — Green/Amber (rolling 90d) | % of `wau_band_at_churn IN ('green','amber')` churns with first `enterprise.winback_initiated` within 90d of `churn_date` — target ≥ 90% | Daily |
+| Winback conversion rate — current quarter | `enterprise.winback_converted` count / `enterprise.winback_initiated` count for same quarter | Daily |
+| AL-OFFL-01 activation log (rolling 30d) | `audit_log_events WHERE event_type = 'enterprise.offboard_chain_sla_breach'` rolling 30d | 15 min |
+| AL-DEL-01 activation log (rolling 30d) | `audit_log_events WHERE event_type IN ('enterprise.deletion_sla_warning','enterprise.deletion_sla_critical')` rolling 30d | 1 hr |
+
+**Access control:** All panels restricted to `compliance_officer` and `enterprise_admin` roles. `tenant_manager` (HR) is explicitly excluded — the privacy floor prohibits HR from viewing individual tenant post-churn lifecycle status. `tenant_id` UUIDs are displayed as FORM-internal identifiers (no employee PII mapping visible in the dashboard).
+
+### §53.10 Implementation Checklist
+
+| # | Item | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Register two new DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn & Deletion SLA events`: `enterprise.offboard_chain_sla_breach` (HIGH, 7yr — `OffboardChainSlaBreachPayload` Zod v2 schema from §53.7.2); `system.offboard_chain_check_passed` (LOW, 1yr — `OffboardChainCheckPassedPayload` from §53.7.2). Add OFFL-CHAIN-01 ordering invariant block (emit + HTTP 200 confirmed before PagerDuty fires) | P0 | M10 | security-engineer + compliance-officer | [ ] |
+| 2 | Implement pg_cron job 44 `offboard_chain_monitor` (§53.5.2 SQL; `0 * * * *`; pg_net AL-OFFL-01 PagerDuty P1 call; DEC-030 emission per breach and all-clear; OFFL-CHAIN-01 ordering invariant enforced within loop iteration) | P0 | M10 | devops-lead + platform-engineer | [ ] |
+| 3 | Register job 44 in `docs/OBSERVABILITY.md §12.6` pg_cron canonical registry: row with `offboard_chain_monitor` / `0 * * * *` / 2h freshness / CC6.1/CC7.1 compliance relevance / stale-consequence cross-ref; extend freshness window note for job 44; add v1.7 patch note | P0 | M10 | devops-lead | [x] Done — 2026-06-25 (§12.6 v1.7 patch, this section) |
+| 4 | Insert AL-OFFL-01 and AL-DEL-01 into `docs/OBSERVABILITY.md §6.2` Consolidated Alert Rules under new `enterprise_post_churn_health` subsection (§53.6 spec) after `contract_renewal_health` (§51.6) and before `webhook_health` (§43.5) | P0 | M10 | devops-lead | [ ] |
+| 5 | Register CHN-OBS-E-001 and DEL-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master consolidated evidence table; confirm both artefacts map to R2 subfolders already added by §102 (`offboarding/` and `deletions/`) and §80.4 Vanta mirror list | P1 | M11 | compliance-officer | [ ] |
+| 6 | Author INCIDENT_RESPONSE R-44 (job 44 `offboard_chain_monitor` stale recovery runbook): six-step runbook (confirm freshness breach → sweep `enterprise_churn_events` for churns in stale window → manual OFFBOARD-CHAIN-01 compliance check → escalate if breach found → pg_cron restart → post-incident close); register companion DEC-030 events `system.offboard_chain_monitor_stale_declared` (HIGH/7yr) and `system.offboard_chain_monitor_restored` (STANDARD/3yr) in AUDIT_LOG_SCHEMA.md; add `OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01` ordering invariant | P1 | M10 | devops-lead + compliance-officer | [ ] |
+| 7 | End-to-end staging test: insert synthetic `enterprise_churn_events` row with `churn_date = now() - INTERVAL '25 hours'` and `offboarding_initiated_at = NULL`; confirm job 44 fires AL-OFFL-01 within 2h; confirm `enterprise.offboard_chain_sla_breach` DEC-030 emitted and HMAC-chained (OFFL-CHAIN-01 ordering verified — audit event HTTP 200 before PagerDuty); confirm `system.offboard_chain_check_passed` emitted after row update; also run deletion-SLA staging test from COST_MODEL §43.10 item 3 remaining obligation (inject `deletion_requested_at = now() - INTERVAL '26 days'` row; confirm AL-DEL-01 P1 fires; confirm `enterprise.deletion_sla_warning` emitted) | P0 | M11 | devops-lead | [ ] |
+| 8 | Configure Metabase `Enterprise Post-Churn Lifecycle Health` dashboard (§53.9 — 10 panels); restrict to `compliance_officer` + `enterprise_admin`; confirm `tenant_manager` (HR) excluded from all panels; verify no individual employee PII visible | P1 | M11 | data-engineer | [ ] |
+| 9 | File first CHN-OBS-E-001 and DEL-OBS-E-001 evidence artefacts at end of first full operational quarter after jobs 43 and 44 are live in production | P1 | M12 | compliance-officer | [ ] |
+
+### §53.11 OQ Gap Tracker
+
+| OQ | Status | Decision |
+|---|---|---|
+| — | No open questions | The three monitoring obligations are fully specified. pg_cron + pg_net is the adopted implementation pattern, consistent with jobs 39–43. AL-DEL-01 formally migrates from an implicit §12.6 job 43 annotation to a named §6.2 alert rule with this section — closing the gap where the alert existed operationally but had no §6.2 ID for auditor cross-reference. WBKO-SLO-01 is deliberately not backed by an automated P1 alert: CSM pipeline coverage is a commercial discipline metric, not a statutory or contractual compliance control — automated paging for every missed 90-day outreach window would create alert fatigue disproportionate to the risk, and QBR review cadence is the appropriate governance layer for a P2 revenue risk (consistent with the §43.11 OQ-WIN-01 disposition for winback rate monitoring). Evidence artefact naming follows the `*-OBS-E-001` convention established by SCA-OBS-E-001/002 (§52.8) and REN-OBS-E-001 (§51.5): monitoring-layer artefacts are distinct from primary compliance evidence artefacts (CHN-E-001, DEL-E-001). CHN-OBS-E-001 and DEL-OBS-E-001 are registered in `compliance/evidence/offboarding/` and `compliance/evidence/deletions/` respectively — R2 subfolders already created by SOC2_READINESS §102 (2026-06-23). No ambiguity in alert routing, DEC-030 events, SOC 2 mapping, or evidence artefacts. |
+
+---
+
+*v5.1.0 (2026-06-25): §53 Enterprise Post-Churn Lifecycle & GDPR Deletion SLA Observability — closes the monitoring gap where COST_MODEL §43 (post-churn economics, OFFBOARD-CHAIN-01/WINBACK-CHAIN-01/DELETION-CHAIN-01 invariants), DATA_MODEL §44 (`enterprise_churn_events` schema, migration 0085), and INCIDENT_RESPONSE R-41 (job 43 stale recovery) were all authored without a dedicated OBSERVABILITY section providing SLOs, alert rules, pg_cron job specification, DEC-030 chain health, and monitoring-layer evidence artefacts. §53.1 purpose and scope: three monitoring obligations — OFFBOARD-CHAIN-01 gap (no automated fleet-sweep; `emit-audit-event` HTTP 422 guard alone insufficient for process failures), DELETION-SLA-01 formalisation (job 43 existed without a §-level home), WBKO-SLO-01 coverage target (no visibility layer for winback outreach pipeline). §53.2 twelve RED metrics: rate signals (`account_churned`, `offboarding_initiated`, `deletion_certificate_issued`, `winback_initiated`, `winback_converted` per week/month/quarter), error signals (OFFBOARD-CHAIN-01 breach count, deletion at-risk count), duration signals (OFFBOARD-CHAIN-01 median elapsed time, deletion SLA compliance rate), health signals (job 43 and job 44 freshness vs. windows). §53.3 three SLOs: OFFL-SLO-01 (100% offboarding initiated within 24h — zero-tolerance, CC6.1/CC7.1); OFFL-SLO-02 (100% GDPR deletions completed within 30d — zero-tolerance, C1.2/CC4.1/P8); WBKO-SLO-01 (≥ 90% Green/Amber churns with winback outreach within 90d — commercial, no automated alert, QBR governance). §53.4 two alert rules: AL-OFFL-01 (NEW — P1 PagerDuty `form-enterprise`, 4h dedup, auto-resolve on `offboarding_initiated_at` populated, seven-step runbook); AL-DEL-01 (formalised from §12.6 job 43 annotation — P1→P0 escalation, 6h cooldown, runbook: R-41). §53.5 pg_cron job 44 `offboard_chain_monitor`: schedule `0 * * * *`; 2h freshness (1-run tolerance); §53.5.2 enforcement SQL (form_system role; SELECT `enterprise_churn_events WHERE offboarding_initiated_at IS NULL AND churn_date::timestamptz < now() - INTERVAL '24 hours'`; pg_net emit + pg_net PagerDuty per breach; all-clear emission with aggregate count only — no tenant_id); OFFL-CHAIN-01 ordering invariant (audit event emitted + HTTP 200 confirmed before PagerDuty fires); §53.5.3 tables (enterprise_churn_events SELECT via form_system — form_api REVOKED); §53.5.4 implementation decision (pg_cron over Cloudflare Worker for table co-location + pattern consistency + RLS enforcement). §53.6 §6.2 integration: new `enterprise_post_churn_health` subsection spec (AL-OFFL-01 + AL-DEL-01; insert after `contract_renewal_health` §51.6, before `webhook_health` §43.5; §53.10 item 4). §53.7 DEC-030 chain events: §53.7.1 seven existing events (account_churned CRITICAL/7yr, offboarding_initiated HIGH/7yr, winback_initiated HIGH/7yr, winback_converted CRITICAL/7yr, deletion_certificate_issued CRITICAL/7yr, deletion_sla_warning HIGH/7yr, deletion_sla_critical CRITICAL/7yr — all registered AUDIT_LOG_SCHEMA v2.39 2026-06-23); §53.7.2 two new events (`enterprise.offboard_chain_sla_breach` HIGH/7yr — OffboardChainSlaBreachPayload Zod v2 schema: tenant_id UUID, churn_date date, hours_since_churn int, check_run_at datetime, alert_dedup_key string; `system.offboard_chain_check_passed` LOW/1yr — OffboardChainCheckPassedPayload: tenants_checked int, check_run_at datetime; no tenant_id — privacy floor); OFFL-CHAIN-01 invariant block. §53.8 two SOC 2 evidence artefacts: CHN-OBS-E-001 (CC6.1/CC7.1/CC7.2, quarterly, 3yr — `compliance/evidence/offboarding/CHN-OBS-E-001_<YYYY-QN>.md`; OFFL-SLO-01 performance + job 44 run statistics + AL-OFFL-01 activation log; distinct from CHN-E-001 which covers the compliance outcome); DEL-OBS-E-001 (CC7.2/C1.2/A1.1, quarterly, 3yr — `compliance/evidence/deletions/DEL-OBS-E-001_<YYYY-QN>.md`; job 43 pg_cron run history + AL-DEL-01 activation log; distinct from DEL-E-001 which covers the deletion outcome). CC7.2 auditor narrative: monitoring-layer artefacts close the gap between compliance outcome evidence and operational control evidence. §53.9 Metabase `Enterprise Post-Churn Lifecycle Health` dashboard (10 panels; `compliance_officer` + `enterprise_admin`; `tenant_manager` HR excluded; no individual employee PII). §53.10 nine-item implementation checklist: 3× P0/M10 (AUDIT_LOG_SCHEMA event registration, job 44 implement, §6.2 insertion), 1× P0/M10 [x] Done (§12.6 v1.7 patch — this commit), 1× P1/M11 (SOC2_READINESS §79.4 CHN-OBS-E-001 + DEL-OBS-E-001 registration), 1× P1/M10 (R-44 runbook), 1× P0/M11 (end-to-end staging test), 1× P1/M11 (Metabase dashboard), 1× P1/M12 (first evidence filings). §53.11 OQ gap tracker: no open questions — pg_cron pattern confirmed; WBKO-SLO-01 no-alert disposition documented; *-OBS-E-001 naming convention followed; R2 subfolder pre-existence from §102 confirmed. §12.6 registry: job 44 `offboard_chain_monitor` row added; freshness window note extended; v1.7 patch note added. Document header v5.0.2 → v5.1.0. Owner: compliance-officer + enterprise-architect + devops-lead.*

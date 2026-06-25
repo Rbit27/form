@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.64.0] — 2026-06-25
+
+### Added
+- `docs/OBSERVABILITY.md` — §53 Enterprise Post-Churn Lifecycle & GDPR Deletion SLA Observability. Closes the monitoring gap where COST_MODEL §43 (OFFBOARD-CHAIN-01/WINBACK-CHAIN-01/DELETION-CHAIN-01 invariants) and DATA_MODEL §44 (`enterprise_churn_events`) had no dedicated observability section. Three monitoring obligations addressed: (1) OFFBOARD-CHAIN-01 fleet-sweep gap — pg_cron job 44 `offboard_chain_monitor` (hourly; 2h freshness; AL-OFFL-01 P1 PagerDuty `form-enterprise`; emits `enterprise.offboard_chain_sla_breach` HIGH/7yr per breach, `system.offboard_chain_check_passed` LOW/1yr on all-clear; OFFL-CHAIN-01 ordering invariant); (2) DELETION-SLA-01 formalisation — AL-DEL-01 formally defined (formalises existing §12.6 job 43 alert); (3) WBKO-SLO-01 winback coverage target (≥ 90% Green/Amber churns with outreach within 90d; QBR governance, no automated P1). Twelve RED metrics, three SLOs (OFFL-SLO-01 zero-tolerance / OFFL-SLO-02 zero-tolerance / WBKO-SLO-01 commercial), two new evidence artefacts (CHN-OBS-E-001 CC6.1/CC7.1/CC7.2 quarterly; DEL-OBS-E-001 CC7.2/C1.2/A1.1 quarterly), Metabase `Enterprise Post-Churn Lifecycle Health` dashboard spec (10 panels; compliance_officer + enterprise_admin; tenant_manager HR excluded). §12.6 registry: job 44 row added; freshness window note extended; v1.7 patch note. v5.1.0.
+
+### Changed
+- `VERSION` — 8.63.0 → 8.64.0.
+
+---
+
 ## [8.63.0] — 2026-06-25
 
 ### Added
