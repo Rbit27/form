@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [8.56.1] — 2026-06-25
+
+### Changed
+- `docs/SOC2_READINESS.md` — §107 Cross-Reference Patch: registered 5 PAM evidence artefacts (CC6-E-PAM-001 through CC6-E-PAM-004 + CC7-E-PAM-001) from OBSERVABILITY §29.9 into §79.4 master evidence table (rows 52–56), added `pam/` subfolder to §80.3 R2 folder map with `form_api NO ACCESS`, updated §80.4 Vanta mirror protocol, and closed open obligations OQ-PAM-OBS-01 + OQ-PAM-OBS-02. Criteria covered: CC6.1 / CC6.2 / CC6.3 / CC6.6 / CC6.7 / CC7.2 / CC7.3. Doc version v3.31.0 → v3.32.0.
+- `VERSION` — 8.56.0 → 8.56.1.
+
+---
+
 ## [8.56.0] — 2026-06-25
 
 ### Added
