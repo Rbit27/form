@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.85.1] — 2026-06-25
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pricing Exception Monitoring events` — New subsection (v2.47): three DEC-030 HMAC-chained events covering the pg_cron job 46 (`pricing_exception_compliance_monitor`) monitoring-layer lifecycle. `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr: daily monitoring sentinel that detects REENTRY-CHAIN-01 bypasses (loyalty re-entry contract renewed without prior `enterprise.pricing_exception_approved`); REENTRY-MONITOR-CHAIN-01 ordering invariant (DEC-030 HTTP 200 confirmed before AL-PRICE-01 PagerDuty P0); Zod `ReentryChainIntegrityViolationPayload` (`tenant_id` UUID, `renewed_event_id` UUID, `renewal_date` date, `check_run_at`). `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr: quarterly audit trigger emitted by sweep 2 on first 7 days of each calendar quarter; triggers compliance-officer PRICE-OBS-E-001 filing obligation; Zod `PricingExceptionQuarterlyAuditTriggeredPayload` (aggregate `exception_type` breakdown; no `tenant_id`). `system.pricing_exception_check_passed` LOW/1yr: all-clear baseline for AL-PRICE-03 26h dead-man's switch; Zod `PricingExceptionCheckPassedPayload` (aggregate counts only; no `tenant_id`). REENTRY-MONITOR-CHAIN-01 invariant block, emitter assignments, alert routing, CC5.2/CC1.4/CC4.1 SOC 2 auditor narratives included. Retention table extended (+3 rows). Closes `docs/OBSERVABILITY.md §55.10` item 1 (P0/M9).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.46 → v2.47. New `§Enterprise Pricing Exception Monitoring events` subsection added. Retention table: +3 rows for `enterprise.reentry_chain_integrity_violation` (7yr CC5.2/CC1.4), `system.pricing_exception_quarterly_audit_triggered` (3yr CC1.4/CC4.1), `system.pricing_exception_check_passed` (1yr CC4.1).
+- `docs/OBSERVABILITY.md` — v5.2.4 → v5.2.5. §55.10 item 1 status: `[ ]` → `[x] Done — 2026-06-25 (AUDIT_LOG_SCHEMA.md v2.47, this commit)`. v5.2.5 patch note added.
+- `VERSION` — 8.85.0 → 8.85.1.
+
 ## [8.85.0] — 2026-06-25
 
 ### Added

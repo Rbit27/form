@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.2.4
+# FORM · Observability & Monitoring Taxonomy v5.2.5
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -15642,7 +15642,7 @@ This is the **monitoring infrastructure** artefact. The **compliance outcome** a
 
 | # | Item | Priority | Milestone | Owner | Status |
 |---|---|---|---|---|---|
-| 1 | Register three new DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` — new `§Enterprise Pricing Exception Monitoring events` subsection after `§Enterprise Litigation Hold Monitoring events`: `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr; `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr; `system.pricing_exception_check_passed` LOW/1yr. Include Zod v2 schemas (§55.7.2), REENTRY-MONITOR-CHAIN-01 ordering invariant block, and SOC 2 auditor narratives. | P0 | M9 | security-engineer + compliance-officer | [ ] |
+| 1 | Register three new DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` — new `§Enterprise Pricing Exception Monitoring events` subsection after `§Enterprise Litigation Hold Monitoring events`: `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr; `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr; `system.pricing_exception_check_passed` LOW/1yr. Include Zod v2 schemas (§55.7.2), REENTRY-MONITOR-CHAIN-01 ordering invariant block, and SOC 2 auditor narratives. | P0 | M9 | security-engineer + compliance-officer | [x] Done — 2026-06-25 (AUDIT_LOG_SCHEMA.md v2.47, this commit) |
 | 2 | Implement pg_cron job 46 `pricing_exception_compliance_monitor` (`0 9 * * *`; §55.5.2 two SQL sweeps; pg_net → emit-audit-event Worker per event; pg_net → PagerDuty P0 for sweep 1 violation after DEC-030 HTTP 200 confirmed; pg_net → Slack `#compliance` advisory for sweep 2 trigger; `system.pricing_exception_check_passed` all-clear after both sweeps; REENTRY-MONITOR-CHAIN-01 ordering invariant enforced; `form_system` role; `form_api` REVOKED from `audit_log_events` confirmed). Verify `idx_ale_event_type_created_at` covers sweep 1 outer CTE; add composite index on `(event_type, (payload->>'tenant_id'), created_at)` if absent. | P0 | M9 | devops-lead + platform-engineer | [ ] |
 | 3 | Register job 46 in `docs/OBSERVABILITY.md §12.6` pg_cron canonical registry. | P0 | M9 | devops-lead | [x] Done — 2026-06-25 (§12.6 v1.9 patch, this section) |
 | 4 | Insert `pricing_exception_health` subsection into `docs/OBSERVABILITY.md §6.2` Consolidated Alert Rules after `litigation_hold_health` (§54.6) and before `sca_vulnerability_monitoring` (§52.4). | P0 | M9 | devops-lead | [x] Done — 2026-06-25 (OBSERVABILITY.md v5.2.3, this commit) |
@@ -15664,6 +15664,8 @@ This is the **monitoring infrastructure** artefact. The **compliance outcome** a
 | OQ-PRICE-MON-03: Should `enterprise.consumer_price_updated` and `enterprise.list_price_updated` (COST_MODEL §31.8) have dedicated monitoring? | 🟡 Deferred — awaiting first list price event | These events are emitted at most annually (list price review per §31.9 item 8) and require founder approval; their DEC-030 HMAC chain is the primary control. A pg_cron sentinel is not warranted for events occurring ≤ 1 per year. Revisit if list price update cadence increases to > 1 per year or if a SOC 2 audit finding surfaces a monitoring gap. |
 
 ---
+
+*v5.2.5 (2026-06-25): §55.10 item 1 cross-reference patch — AUDIT_LOG_SCHEMA.md v2.47 authored. Three DEC-030 monitoring events registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pricing Exception Monitoring events`: `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr, `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr, `system.pricing_exception_check_passed` LOW/1yr. Zod v2 schemas (canonical source: §55.7.2), REENTRY-MONITOR-CHAIN-01 ordering invariant block, CC5.2/CC1.4/CC4.1 SOC 2 auditor narratives, emitter assignments, and alert routing included. §55.10 item 1 status: `[ ]` → `[x] Done — 2026-06-25 (AUDIT_LOG_SCHEMA.md v2.47, this commit)`. Document header v5.2.4 → v5.2.5. Owner: compliance-officer + security-engineer.*
 
 *v5.2.4 (2026-06-25): §55.10 item 6 cross-reference patch — INCIDENT_RESPONSE R-46 authored. §6.2 AL-PRICE-03 stale-consequence cross-ref updated from "to be authored; §55.10 item 6" to `INCIDENT_RESPONSE R-46 (§R-46.5/R-46.6; v1.0, 2026-06-25)`. §12.6 job 46 stale-consequence cross-ref updated to same. §55.10 item 6 status: `[ ]` → `[x] Done — 2026-06-25 (INCIDENT_RESPONSE.md v3.11, this commit)`. Document header v5.2.3 → v5.2.4. Owner: devops-lead + compliance-officer.*
 
