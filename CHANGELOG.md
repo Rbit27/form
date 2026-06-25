@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [8.85.0] — 2026-06-25
+
+### Added
+- `content/post-2526-training-readiness-morning-feeling.md` — Editorial series «Сигнали готовності · 2526–2535» post 1/10. Що таке готовність до тренування фізіологічно: три незалежні виміри (нейром'язовий, периферійний, автономний). Чому ранкове відчуття систематично занижує готовність: sleep inertia (Naëgelé et al., 2003), Cortisol Awakening Response (нормальна фізіологія, не стрес-маркер), незалежність мотивації від фізичного стану (Marcora et al., 2009). Broussard et al. (2015): суб'єктивна готовність після 5.5 год сну знижується помітніше за об'єктивну силову продуктивність. Pilcher & Huffcutt (1996): ми переоцінюємо, наскільки погано нам насправді. Три надійніші маркери: накопичений сон за 48 год, специфічна болісність цільових м'язів, перші підходи в залі як діагностика. Базове правило серії. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+
+### Changed
+- `blog.html` — post-2526 card added (top of grid).
+- `STATUS.md` — v8.84.1 → v8.85.0; content library row updated (series 2526–2535 progress 1/10; series 2536–2545 proposed).
+- `VERSION` — 8.84.1 → 8.85.0.
+- `README.md` — Editorial series 2536–2545 «Прийняття рішень без тренера: алгоритми замість відчуттів» proposed.
+
 ## [8.84.1] — 2026-06-25
 
 ### Added
