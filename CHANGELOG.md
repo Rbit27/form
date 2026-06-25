@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.70.1] — 2026-06-25
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.1.5: R-44.11 item 3 cross-reference patch. Three stale "to be authored" R-44 references updated to `§R-44.5; v1.0, 2026-06-25` (§6.2 alert table, §12.6 pg_cron registry, §53.5 job spec cross-ref). v5.1.5 patch note added. Header v5.1.4 → v5.1.5.
+- `docs/INCIDENT_RESPONSE.md` — v3.8: R-44.11 items 1 and 3 closed. Item 1 `[x] Done — AUDIT_LOG_SCHEMA.md v2.44`; item 3 `[x] Done — OBSERVABILITY.md v5.1.5`. R-44 v1.1 patch note added. Header v3.7 → v3.8.
+- `VERSION` — 8.70.0 → 8.70.1.
+
+---
+
 ## [8.70.0] — 2026-06-25
 
 ### Added
