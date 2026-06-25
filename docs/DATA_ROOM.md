@@ -210,5 +210,21 @@ Cross-reference: `docs/SECURITY_QUESTIONNAIRE.md LOG-04` (standard response for 
 
 ---
 
+## Enterprise Schema
+
+Enterprise-tier Postgres tables registered with SOC 2 auditors and compliance-officer. Not investor-facing. Shared under NDA with enterprise customers during due-diligence.
+
+| Table | Migration | Canonical source | Audience | SOC 2 artefacts | When to share |
+|---|---|---|---|---|---|
+| **`enterprise_renewals`** | 0084 | `docs/DATA_MODEL.md §43` | compliance-officer + security-engineer + enterprise-architect + SOC 2 auditor | REN-E-001 (CC5.2/CC1.4), REN-E-002 (CC4.1/CC2.2), REN-E-003 (CC4.1/A1.1) | SOC 2 observation period; enterprise customer due-diligence package |
+| **`enterprise_churn_events`** | 0085 | `docs/DATA_MODEL.md §44` | compliance-officer + security-engineer + enterprise-architect + SOC 2 auditor | DEL-E-001 (C1.2/CC4.1), WBK-E-001/WIN-E-001 (CC4.1/CC5.2), CHN-E-001 (CC6.1/CC7.1) | SOC 2 observation period; GDPR Art. 17 deletion audit; enterprise offboarding review |
+
+Privacy floor: no individual employee `user_id`, name, email, health values, or GDPR Art. 9 special-category data in any column or SOC 2 evidence artefact exported from either table. `form_api` REVOKED from both tables. Audience is compliance and audit roles only — `tenant_manager` has no SELECT policy on either table.
+
+Cross-references: `docs/DATA_MODEL.md §43` (enterprise_renewals DDL, chain invariants RENEW-CHAIN-01/ESCALATION-CHAIN-01, RLS); `docs/DATA_MODEL.md §44` (enterprise_churn_events DDL, chain invariants OFFBOARD-CHAIN-01/WINBACK-CHAIN-01/DELETION-CHAIN-01, RLS); `docs/SOC2_READINESS.md §79.4` (master evidence table — REN-E-001/002/003 registered v3.24.2; DEL-E-001/WBK-E-001/CHN-E-001 registered v3.27.0 §102); `docs/COST_MODEL.md §42` (renewal economic spec); `docs/COST_MODEL.md §43` (churn/winback/deletion economic spec).
+
+---
+
 **v0.1 · травень 2026 · оновлюється з кожним etapом**  
-*v0.2 (2026-06-20): §Technical Security added — HMAC-VERIFY-ALGO-001 entry (DEC-071, `docs/OBSERVABILITY.md §50.10` item 2).*
+*v0.2 (2026-06-20): §Technical Security added — HMAC-VERIFY-ALGO-001 entry (DEC-071, `docs/OBSERVABILITY.md §50.10` item 2).*  
+*v0.3 (2026-06-25): §Enterprise Schema added — enterprise_renewals (migration 0084, DATA_MODEL §43) and enterprise_churn_events (migration 0085, DATA_MODEL §44) registered. Closes DATA_MODEL §43.8 item 5 and DATA_MODEL §44.10 item 5.*

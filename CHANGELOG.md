@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.72.1] — 2026-06-25
+
+### Changed
+- `docs/DATA_ROOM.md` — v0.3: §Enterprise Schema added. Two enterprise-tier Postgres tables registered: `enterprise_renewals` (migration 0084, DATA_MODEL §43, SOC 2 artefacts REN-E-001/002/003) and `enterprise_churn_events` (migration 0085, DATA_MODEL §44, SOC 2 artefacts DEL-E-001/WBK-E-001/CHN-E-001). Closes DATA_MODEL §43.8 item 5 and §44.10 item 5.
+- `docs/DATA_MODEL.md` — v1.29: §43.8 item 5 + §44.10 items 4–5 checklist sync. (1) §43.8 item 5 → `[x] Done` (DATA_ROOM §Enterprise Schema created). (2) §44.10 item 4 → `[x] Done` (DEL-E-001/WBK-E-001/CHN-E-001 confirmed registered in SOC2_READINESS v3.27.0 §102; R2 subfolders and Vanta mirror list confirmed). (3) §44.10 item 5 → `[x] Done` (DATA_ROOM §Enterprise Schema created).
+- `VERSION` — 8.72.0 → 8.72.1.
+
+---
+
 ## [8.72.0] — 2026-06-25
 
 ### Added
