@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.81.1] — 2026-06-25
+
+### Added
+- `docs/SOC2_READINESS.md §113` — §79.4 Evidence Table Artefact Registration + §112 Omission Fix (v3.38.0). Inserts four missing rows into §79.4 Consolidated Evidence Collection Table (count 69 → 71 net, correcting §112's overclaim): **LITH-E-001** (Annual Litigation Hold Compliance Report — C1.2/CC5.3/CC4.1, annual, 7yr, `compliance/evidence/litigation-hold/LITH-E-001_<YYYY>.md`); **LITH-OBS-E-001** (Annual `litigation_hold_compliance_monitor` pg_cron run history + AL-LITH-01/02/03 — CC5.3/CC4.1/C1.2, annual, 3yr); **CHN-STALE-E-001** (Quarterly `offboard_chain_monitor` job 44 stale-monitoring health report — CC6.1/CC7.2, quarterly from M11, 3yr, closes R-44.11 item 4); **LITH-STALE-E-001** (Quarterly `litigation_hold_compliance_monitor` job 45 stale-monitoring health report — CC5.3/CC7.2/C1.1/C1.2, quarterly from M8, 3yr, closes R-45.14 item 4). §112 omission: §112 (v3.37.0) claimed LITH-E-001 and LITH-OBS-E-001 rows were inserted (count 67→69) but they were described in prose only and never written into the markdown table — §113 corrects this. Privacy floor confirmed: all four artefacts carry aggregate integers and `tenant_id` UUID only; no employee `user_id`, name, email, health value, or GDPR Art. 9 data. HMAC-chain cross-references: LITH-MONITOR-STALE-CHAIN-01 (R-45) and OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 (R-44) ordering invariants documented.
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.37.0 → v3.38.0. §113 appended; four §79.4 rows inserted.
+- `docs/INCIDENT_RESPONSE.md` — v3.9 → v3.10. R-44.11 item 4 marked `[x] Done — 2026-06-25`; R-45.14 item 4 marked `[x] Done — 2026-06-25`; v1.2 note added to R-44; v1.1 note added to R-45.
+- `VERSION` — 8.81.0 → 8.81.1.
+
 ## [8.81.0] — 2026-06-25
 
 ### Added
