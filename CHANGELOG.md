@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [8.77.1] — 2026-06-25
+
+### Changed
+- `enterprise.html` — Sub-processor list compliance badge added to the security posture section (after Shared responsibility model badge). Links to `/subprocessors.html`; label: "Full vendor registry · 30-day advance notice of changes · DPA/SCC status per processor". Closes `docs/SOC2_READINESS.md` P1 obligation: add sub-processor list link to `enterprise.html` security section.
+- `pricing-enterprise.html` — Sub-processor list row added to the Compliance & audit section of the feature comparison table. Row: "Sub-processor list (30-day notice)" · ✓ all tiers · links to `/subprocessors.html`. Closes `docs/SOC2_READINESS.md` P1 obligation: add sub-processor list link to `pricing-enterprise.html` compliance table.
+
 ## [8.77.0] — 2026-06-25
 
 ### Added
