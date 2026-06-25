@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.50.0] — 2026-06-25
+
+### Added
+- `content/post-2430-autoregulation-when-premature-when-necessary.md` — Editorial series 2426–2435 «Інструментарій self-coached атлета» post 5/10. Авторегуляція (RPE/RIR): не краща версія відсоткового тренінгу, а інший інструмент. Чому для новачка передчасна: суб'єктивне сприйняття зусилля — навичка, яка напрацьовується (Ludbrook & Bhatt 2022: значна розбіжність RPE vs. об'єктивних показників у атлетів < 1 року). Де стає необхідною: intermediate-рівень де лінійна прогресія вичерпується, висока добова варіабельність відновлення (Hamacher et al. 2019), перехід до блокової моделі. Алгоритм поступової інтеграції: фіксовані числа (рік 1) → hybrid ±5% (intermediate рано) → RPE з журналом калібрування (deep intermediate) → повна авторегуляція (advanced, блокова модель). Colquhoun et al. (2017), Zourdos et al. (2016). clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `blog.html` — post-2430 card added at top of feed.
+- `README.md` — Editorial series 2446–2455 «Якість тренувального рішення: як self-coached атлет перестає угадувати» proposed (10 posts). README: post-2429 → draft, post-2430 → draft.
+
+### Changed
+- `STATUS.md` — content engine row updated: post-2430 draft · series 2446–2455 proposed · next: post-2431.
+- `VERSION` — 8.49.0 → 8.50.0.
+
+---
+
 ## [8.49.0] — 2026-06-25
 
 ### Added
