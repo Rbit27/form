@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [8.65.1] — 2026-06-25
+
+### Changed
+- `docs/OBSERVABILITY.md` — §6.2 Consolidated Alert Rules: new `enterprise_post_churn_health` subsection inserted after `contract_renewal_health` (§51.6). Two alert rules: AL-OFFL-01 (job 44 `offboard_chain_monitor` hourly fleet-sweep; P1 `form-enterprise`; 4h dedup; CC6.1/CC7.1) and AL-DEL-01 (job 43 `deletion_sla_monitor` P1→P0 day-25/29 escalation; 6h dedup; C1.2/CC4.1/P8). SOC 2 mapping block for both criteria sets and monitoring-layer evidence artefacts (CHN-OBS-E-001, DEL-OBS-E-001). §53.10 item 4 marked `[x] Done`. OBSERVABILITY.md v5.1.0 → v5.1.1. Closes P0/M10 obligation from §53.10 item 4.
+- `STATUS.md` — version v8.65.0 → v8.65.1.
+- `VERSION` — 8.65.0 → 8.65.1.
+
+---
+
 ## [8.65.0] — 2026-06-25
 
 ### Added
