@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [8.81.2] — 2026-06-25
+
+### Added
+- `content/post-2522-mobility-tissue-work-between-sessions.md` — editorial series «Між сесіями · 2516–2525» post 7/10. Тема: мобільна та тканинна робота між тренуваннями — що підтверджує доказова база (foam rolling, статичний стретчинг, structured mobility), де межа ефективного і ритуального, операційний алгоритм. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `README.md` — topics for posts 2519–2521 corrected to match actual written content (HRV monitoring, training frequency, cognitive load); post-2522 added as draft.
+- `STATUS.md` — content engine range 11–50: post-2522 added; series 2516–2525 progress 6/10 → 7/10.
+- `VERSION` — 8.81.1 → 8.81.2.
+
 ## [8.81.1] — 2026-06-25
 
 ### Added
