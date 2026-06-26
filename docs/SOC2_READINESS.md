@@ -31857,3 +31857,109 @@ Note: evidence collection (first ADM-E-001 and ADM-E-002 filings) remains pendin
 ---
 
 *v3.43.0 (2026-06-26): §118 Cross-Reference Patch — COST_MODEL §45.8 item 8 (ADM-E-001 + ADM-E-002 · CC5.2 / CC6.1 / A1.1 / CC1.4). Two P1/M13 evidence artefacts registered: ADM-E-001 (CC5.2/CC6.1/A1.1 — annual `enterprise.contract_amended` DEC-030 HMAC-chain export filtered to `amendment_type = 'tier_upgrade'`; 7yr; TU-CHAIN-01 authorization evidence; zero-event years filed as affirmative attestation; `amendments/ADM-E-001_<YYYY>.csv`) and ADM-E-002 (CC5.2/CC1.4 — annual `billing.rate_updated` × `enterprise.contract_amended` TU-CHAIN-01 cross-reference; confirms `floor_respected: true` invariant and `contract_id` unchanged (Option A/DEC-082); 7yr; `amendments/ADM-E-002_<YYYY>.csv`). §79.4 count 79 → 81. §80.3 `amendments/` subfolder added. §80.4 Vanta mirror list updated. COST_MODEL §45.8 item 8 → [x] Done. Owner: compliance-officer + enterprise-architect.*
+
+---
+
+## §119 · Cross-Reference Patch — SSO_SCIM §27.14 Items 14 + 17 (SCIM-PROV-E-001 · SCIM-PROV-E-002 · SCIM-PROV-E-003 · SCIM-PROV-E-004 · CC6.1 / CC6.3 / CC6.4 / CC7.2)
+
+**Date:** 2026-06-26  **Author:** cloud-agent  **Trigger:** SSO_SCIM §38 (v2.10, 2026-06-26) confirmed AUDIT_LOG_SCHEMA v2.49 §SCIM-Lifecycle registration and explicitly noted SCIM-PROV-E-001/002 §79.4 registration as pending.
+
+### §119.1 Gap Description
+
+`docs/SSO_SCIM_IMPLEMENTATION.md §27.12` (v1.9, 2026-06-13) defined four SOC 2 evidence artefacts — SCIM-PROV-E-001 through SCIM-PROV-E-004 — covering the SCIM v2.0 provisioning lifecycle. §27.14 item 14 (P1/M6) created the obligation to register SCIM-PROV-E-001 and SCIM-PROV-E-002 in `docs/SOC2_READINESS.md §CC6.1` and `§CC6.3` evidence tables. §27.14 item 17 (P2/M9) created the parallel obligation for SCIM-PROV-E-003 and SCIM-PROV-E-004. The documentation prerequisite — all six DEC-030 SCIM lifecycle events registered in AUDIT_LOG_SCHEMA v2.49 — was confirmed by SSO_SCIM §38.2 (v2.10, 2026-06-26). This §119 patch closes the **documentation portion** of both §27.14 obligations; first evidence collection remains pending production SCIM Worker deploy (§27.14 P0 checklist, M4/M5) plus 30 days of SCIM activity (items 14 and 17).
+
+### §119.2 Source Table
+
+| Source | Reference | What it provides |
+|---|---|---|
+| SSO_SCIM §27.12 | v1.9, 2026-06-13 | Authoritative definitions of SCIM-PROV-E-001 through SCIM-PROV-E-004: criteria, content, filing path `compliance/evidence/scim-provisioning/SCIM-PROV-E-00{1..4}_<YYYY-QN>.pdf`, 7yr/3yr retention |
+| SSO_SCIM §27.14 item 14 | v1.9, P1/M6 | Obligation: register SCIM-PROV-E-001/002 in SOC2_READINESS §CC6.1 and §CC6.3 evidence tables |
+| SSO_SCIM §27.14 item 17 | v1.9, P2/M9 | Obligation: register SCIM-PROV-E-003/004 for SOC 2 observation period start |
+| SSO_SCIM §38.2 | v2.10, 2026-06-26 | Prerequisite closure: six DEC-030 SCIM lifecycle events confirmed registered in AUDIT_LOG_SCHEMA v2.49 §SCIM-Lifecycle (lines 440–445); SCIM-CHAIN-01 invariant confirmed; SCIM-PROV-E-001/002 §79.4 registration explicitly noted as pending |
+| AUDIT_LOG_SCHEMA v2.49 | §SCIM-Lifecycle | `scim.user_provisioned` (HIGH/7yr/CC6.1), `scim.user_deprovisioned` (HIGH/7yr/CC6.3), `scim.rejected_sensitive_attribute` (HIGH/7yr/CC6.4); SCIM-CHAIN-01 ordering invariant |
+| SSO_SCIM §27.11 + OBSERVABILITY §26.7b | v1.3.2 patch | AL-SCIM-01 through AL-SCIM-04 alert rule canonical registration (source for SCIM-PROV-E-004 alert configuration screenshot artefact) |
+
+### §119.3 Artefact Summary
+
+| ID | SOC 2 Criteria | Cadence | Retention | Owner | Path |
+|---|---|---|---|---|---|
+| SCIM-PROV-E-001 | CC6.1 / PI1.1 | Quarterly from M6 (30 days post-production SCIM deploy) | 7yr | compliance-officer | `scim-provisioning/SCIM-PROV-E-001_<YYYY-QN>.pdf` |
+| SCIM-PROV-E-002 | CC6.3 | Quarterly from M6 | 7yr | compliance-officer | `scim-provisioning/SCIM-PROV-E-002_<YYYY-QN>.pdf` |
+| SCIM-PROV-E-003 | CC6.4 | Quarterly from M9 (SOC 2 observation period start) | 7yr | compliance-officer | `scim-provisioning/SCIM-PROV-E-003_<YYYY-QN>.pdf` |
+| SCIM-PROV-E-004 | CC7.2 | Annual from M9 (SOC 2 observation period start) | 3yr | compliance-officer | `scim-provisioning/SCIM-PROV-E-004_<YYYY>.pdf` |
+
+§79.4 count pre-§119: **81**. Post-§119: **85**.
+
+### §119.4 §79.4 Row Additions
+
+**SCIM-PROV-E-001** (inserted in CC6.1 evidence group, after SSO-OBS-E-006):
+
+Quarterly export of `scim.user_provisioned` DEC-030 HMAC-chained events from `audit_log_events` for the observation quarter; HMAC-VERIFY-ALGO-001 chain head verification required at collection. Each row: `user_id` UUID (FORM-internal), `external_user_id` (IdP opaque stable identifier), `tenant_id` UUID, `scim_request_id` UUID, `provisioned_at` timestamp, `initial_role` string. **CC6.1 auditor narrative:** `scim.user_provisioned` chain export provides tamper-evident evidence that every SCIM-provisioned user received an authorized role assignment at provisioning time; SCIM-CHAIN-01 ordering invariant enforced at `emit-audit-event` Worker (a `scim.user_deprovisioned` cannot precede `scim.user_provisioned` for the same `user_id`; violation triggers AL-SCIM-04 P1 + R-05 co-activation). **PI1.1 auditor narrative:** SCIM-PROV-E-001 confirms that every SCIM provisioning input was authorized (IdP bearer-token authenticated per SSO_SCIM §27.3) and resulted in a complete `users` + `scim_users` row pair (PIC-04 atomicity invariant per SOC2_READINESS §37). Zero-provisioning quarters filed as affirmative attestation. Privacy floor: `user_id` FORM-internal UUID; `external_user_id` IdP-side opaque stable identifier — no plaintext employee name, email, or GDPR Art. 9 health value in any SCIM lifecycle chain event (AUDIT_LOG_SCHEMA v2.49 §SCIM-Lifecycle privacy invariant); `form_api` REVOKED from `audit_log_events`. Source: SSO_SCIM §27.12 (primary definition); SSO_SCIM §38.2 (v2.10, 2026-06-26 — confirms AUDIT_LOG_SCHEMA v2.49 line 440 registration). 7yr retention. **Registered §119 (2026-06-26). Closes SSO_SCIM §27.14 item 14 documentation portion.**
+
+**SCIM-PROV-E-002** (inserted after SCIM-PROV-E-001, in CC6.3 evidence group):
+
+Quarterly export of `scim.user_deprovisioned` DEC-030 HMAC-chained events from `audit_log_events`; for each event, verify: (1) `sessions_revoked_count ≥ 0`; (2) delta between `scim.user_deprovisioned` timestamp and subsequent `session.bulk_revocation_complete` timestamp is ≤ 60 seconds (ENTERPRISE_SLA §3.7 session revocation SLA — enforced by §22 KV-backed revocation layer). Complement to SSO-OBS-E-006 (§84.3 — SCIM endpoint operations PagerDuty log): SSO-OBS-E-006 evidences monitoring-rule operation; SCIM-PROV-E-002 evidences per-event revocation-SLA compliance at the chain level. **CC6.3 auditor narrative:** `scim.user_deprovisioned` chain export provides tamper-evident evidence that every SCIM-deprovisioned user had active sessions revoked within 60 seconds — satisfying the "timely removal" obligation of CC6.3; `sessions_revoked_count` field is auditor-inspectable per event. Zero-deprovisioning quarters filed as affirmative attestation. Privacy floor: `user_id` FORM-internal UUID; `external_user_id` IdP-side opaque identifier; no plaintext employee name, email, or GDPR Art. 9 health value; `form_api` REVOKED from `audit_log_events`. Source: SSO_SCIM §27.12; SSO_SCIM §38.2 (v2.10, 2026-06-26). 7yr retention. **Registered §119 (2026-06-26). Closes SSO_SCIM §27.14 item 14 documentation portion.**
+
+**SCIM-PROV-E-003** (inserted in CC6.4 evidence group):
+
+Quarterly assertion: count of `scim.rejected_sensitive_attribute` DEC-030 HMAC-chained events from `audit_log_events` for the observation quarter. **Target count: 0** — GDPR Art. 9 special-category attribute scanner with `BLOCKED_ATTRIBUTE_PATTERNS` blocklist (SSO_SCIM §14) rejects health-data attributes at the SCIM write boundary before any DB write. If count > 0: each occurrence requires a linked incident report (severity: HIGH; owner: compliance-officer + security-engineer; escalation to R-05 if the rejected payload reached any downstream processor before rejection). Available payload fields for incident investigation: `tenant_id` UUID, `scim_request_id` UUID, `rejected_attribute_name` (blocked attribute name — attribute value is never logged). **CC6.4 auditor narrative:** SCIM-PROV-E-003 zero-count attestation provides positive evidence that FORM's SCIM sensitive-attribute guard operated without Art. 9 health data reaching the provisioning boundary during the quarter. Combined with the `BLOCKED_ATTRIBUTE_PATTERNS` blocklist (SSO_SCIM §14), this provides two independent evidence paths for CC6.4 — application-layer rejection + DEC-030 chain proof of rejection event. Privacy floor: rejected attribute value never logged (attribute name only — schema metadata, not personal data); `tenant_id` FORM-internal UUID; `form_api` REVOKED from `audit_log_events`. Source: SSO_SCIM §27.12; AUDIT_LOG_SCHEMA v2.49 line 445 (`scim.rejected_sensitive_attribute` HIGH/7yr). 7yr retention. **Registered §119 (2026-06-26). Closes SSO_SCIM §27.14 item 17 documentation portion.**
+
+**SCIM-PROV-E-004** (inserted in CC7.2 evidence group, alongside SSO-OBS-E-006):
+
+Annual export of AL-SCIM-01 through AL-SCIM-04 PagerDuty alert configuration screenshots; verify all four rules active before and throughout the SOC 2 observation period. **Distinct from SSO-OBS-E-006** (§84.3 — operational PagerDuty incident log showing what fired): SCIM-PROV-E-004 is the configuration evidence (that monitoring controls exist and are active); SSO-OBS-E-006 is the operational evidence (what events they produced). **CC7.2 auditor narrative:** SCIM-PROV-E-004 demonstrates that FORM's SCIM anomaly monitoring infrastructure was configured and active throughout the SOC 2 observation year — satisfying CC7.2 requirement that monitoring systems are in place and operational. AL-SCIM-01 (P1: sensitive attribute rejection burst > 3/h — CC6.4 enforcement monitoring, OBSERVABILITY §26.7b); AL-SCIM-02 (P2: SCIM endpoint 5xx > 5%/10-min — endpoint reliability, Cloudflare AE); AL-SCIM-03 (P2: SCIM sync stall — provisioning drops to 0 for 24h when 7-day average > 5/day — integration health); AL-SCIM-04 (P1: SCIM-CHAIN-01 ordering invariant violation — `scim.user_deprovisioned` precedes `scim.user_provisioned` for same `user_id`; R-05 co-activation — chain integrity). Privacy floor: configuration screenshots contain alert condition logic and PagerDuty routing targets — no `user_id`, `tenant_id`, employee name, email, or GDPR Art. 9 data. Source: SSO_SCIM §27.11 (AL-SCIM-01..04 canonical spec); OBSERVABILITY §26.7b (v1.3.2 patch — canonical registration). 3yr retention. **Registered §119 (2026-06-26). Closes SSO_SCIM §27.14 item 17 documentation portion.**
+
+### §119.5 §80.3 R2 Folder Addition
+
+New `scim-provisioning/` subfolder added to `compliance/evidence/` R2 primary store (placed after `sso/` in logical identity-layer ordering):
+
+```
+scim-provisioning/  (SCIM v2.0 lifecycle chain evidence — SCIM-PROV-E-001 [quarterly
+                    scim.user_provisioned DEC-030 HMAC-chain export; HMAC-VERIFY-ALGO-001
+                    chain head verification required; 7yr WORM Object Lock; quarterly from M6
+                    (30 days post-production SCIM Worker deploy)]; SCIM-PROV-E-002 [quarterly
+                    scim.user_deprovisioned DEC-030 HMAC-chain export; per-event revocation
+                    SLA ≤ 60s verification per ENTERPRISE_SLA §3.7; 7yr WORM Object Lock;
+                    quarterly from M6]; SCIM-PROV-E-003 [quarterly
+                    scim.rejected_sensitive_attribute count assertion; 0-count target; incident
+                    report required for any count > 0; 7yr WORM Object Lock; quarterly from
+                    M9]; SCIM-PROV-E-004 [annual AL-SCIM-01..04 PagerDuty alert configuration
+                    screenshots; 3yr WORM Object Lock; annual from M9]; form-api NO ACCESS;
+                    EU-region routing per DATA_MODEL §36)
+```
+
+Access control: `r2:compliance-officer` collection-write; `r2:security-engineer` read (SCIM-PROV-E-003 incident-investigation access); `r2:vanta-sync` read; `form_api` NO ACCESS. WORM Object Lock: 7yr for SCIM-PROV-E-001/002/003, 3yr for SCIM-PROV-E-004. EU-region routing per DATA_MODEL §36 (GDPR Art. 46 SCC compliance for EU enterprise tenants).
+
+### §119.6 §80.4 Vanta Mirror Update
+
+Four new entries added to the Vanta mirror list:
+
+- **SCIM-PROV-E-001**: quarterly CC6.1/PI1.1; upload quarterly from M6 (30 days post-production SCIM Worker deploy); zero-provisioning quarters filed as affirmative attestation; HMAC-VERIFY-ALGO-001 chain head verification required before upload; privacy floor: `user_id` + `external_user_id` + `tenant_id` UUIDs only — no employee name, email, or GDPR Art. 9 data; `form_api` REVOKED from `audit_log_events`.
+- **SCIM-PROV-E-002**: quarterly CC6.3; upload quarterly from M6; include per-event revocation SLA ≤ 60s verification (`session.bulk_revocation_complete` delta per ENTERPRISE_SLA §3.7); zero-deprovisioning quarters filed as affirmative attestation; privacy floor: `user_id` + `external_user_id` + `tenant_id` UUIDs + `sessions_revoked_count` int — no employee name, email, or GDPR Art. 9 data.
+- **SCIM-PROV-E-003**: quarterly CC6.4; upload quarterly from M9 (SOC 2 observation period start); zero-count quarters are the expected and affirmative-attestation outcome; any count > 0 requires linked incident report before upload; privacy floor: `rejected_attribute_name` (schema metadata only) + `tenant_id` UUID — no attribute value, no employee PII, no GDPR Art. 9 data.
+- **SCIM-PROV-E-004**: annual CC7.2; upload annually from M9; AL-SCIM-01..04 PagerDuty alert configuration screenshots taken at SOC 2 observation period open and at each annual renewal; distinct from SSO-OBS-E-006 (operational incident log) — SCIM-PROV-E-004 is configuration evidence; privacy floor: alert condition logic + routing targets only — no individual identity data.
+
+### §119.7 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register SCIM-PROV-E-001 + SCIM-PROV-E-002 in §79.4 and add §CC6.1 + §CC6.3 evidence rows | SSO_SCIM §27.14 item 14 (P1/M6) | 🟢 Done — 2026-06-26 (documentation portion; §79.4 rows added) |
+| Register SCIM-PROV-E-003 + SCIM-PROV-E-004 for SOC 2 observation period start | SSO_SCIM §27.14 item 17 (P2/M9) | 🟢 Done — 2026-06-26 (documentation portion; §79.4 rows added) |
+| `docs/SOC2_READINESS.md §CC6.1/CC6.3` to reference SCIM-PROV-E-001/002 post-observation | SSO_SCIM §38.5 cross-ref note | 🟢 Done — 2026-06-26 (§79.4 CC6.1/CC6.3 group rows added; collection pending M6) |
+| Add `scim-provisioning/` R2 subfolder in §80.3 | This patch | 🟢 Done — 2026-06-26 |
+| Add Vanta mirror list entries in §80.4 | This patch | 🟢 Done — 2026-06-26 |
+
+Note: first evidence collection (SCIM-PROV-E-001/002 quarterly filings) remains pending production SCIM Worker deploy (§27.14 P0 checklist, M4/M5) + 30 days of SCIM activity. SSO_SCIM §27.14 items 14 and 17 collection portions remain open.
+
+### §119.8 Implementation Checklist
+
+| # | Action | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Verify `compliance/evidence/scim-provisioning/` R2 subfolder created with WORM Object Lock (7yr for E-001/002/003, 3yr for E-004), EU-region routing, `form_api` NO ACCESS — before M6 first filing | devops-lead + compliance-officer | **P1** | M5 (before M6 first filing) | [ ] |
+| 2 | File first SCIM-PROV-E-001 quarterly export 30 days after production SCIM Worker deploy (§27.14 P0 checklist, M4/M5); run HMAC-VERIFY-ALGO-001 chain head verification; upload to `scim-provisioning/SCIM-PROV-E-001_<YYYY-QN>.pdf` + Vanta (CC6.1/PI1.1). Zero-provisioning quarter valid if no SCIM events yet — file as affirmative attestation. | compliance-officer | **P1** | M6 | [ ] |
+| 3 | File first SCIM-PROV-E-002 quarterly export at same time as SCIM-PROV-E-001; include per-event revocation SLA verification (`session.bulk_revocation_complete` delta ≤ 60s per ENTERPRISE_SLA §3.7); upload to `scim-provisioning/SCIM-PROV-E-002_<YYYY-QN>.pdf` + Vanta (CC6.3). | compliance-officer | **P1** | M6 | [ ] |
+| 4 | At SOC 2 observation period start (M9): file first SCIM-PROV-E-003 quarterly assertion (zero-count expected; if > 0, file linked incident report per §119.4 before upload); upload to `scim-provisioning/SCIM-PROV-E-003_<YYYY-QN>.pdf` + Vanta (CC6.4). | compliance-officer | **P2** | M9 | [ ] |
+| 5 | At SOC 2 observation period start (M9): take AL-SCIM-01..04 PagerDuty configuration screenshots (verify all four rules active per OBSERVABILITY §26.7b); upload to `scim-provisioning/SCIM-PROV-E-004_<YYYY>.pdf` + Vanta (CC7.2). | compliance-officer + devops-lead | **P2** | M9 | [ ] |
+
+---
+
+*v3.44.0 (2026-06-26): §119 Cross-Reference Patch — SSO_SCIM §27.14 items 14 + 17 (SCIM-PROV-E-001 · SCIM-PROV-E-002 · SCIM-PROV-E-003 · SCIM-PROV-E-004 · CC6.1 / CC6.3 / CC6.4 / CC7.2). Four SCIM provisioning lifecycle evidence artefacts registered: SCIM-PROV-E-001 (CC6.1/PI1.1 — quarterly `scim.user_provisioned` DEC-030 HMAC-chain export; HMAC-VERIFY-ALGO-001 chain head verification; 7yr; zero-provisioning quarters as affirmative attestation; `scim-provisioning/SCIM-PROV-E-001_<YYYY-QN>.pdf`), SCIM-PROV-E-002 (CC6.3 — quarterly `scim.user_deprovisioned` DEC-030 HMAC-chain export with per-event revocation SLA ≤ 60s verification per ENTERPRISE_SLA §3.7; 7yr; `scim-provisioning/SCIM-PROV-E-002_<YYYY-QN>.pdf`), SCIM-PROV-E-003 (CC6.4 — quarterly `scim.rejected_sensitive_attribute` count assertion; 0-count target; incident report required for > 0; 7yr; `scim-provisioning/SCIM-PROV-E-003_<YYYY-QN>.pdf`), SCIM-PROV-E-004 (CC7.2 — annual AL-SCIM-01..04 PagerDuty alert configuration screenshots; distinct from SSO-OBS-E-006 operational log; 3yr; `scim-provisioning/SCIM-PROV-E-004_<YYYY>.pdf`). §79.4 count 81 → 85. §80.3 `scim-provisioning/` subfolder added after `sso/`. §80.4 Vanta mirror list updated with four entries. SSO_SCIM §27.14 item 14 documentation portion → [x] Done. SSO_SCIM §27.14 item 17 documentation portion → [x] Done. Collection portions remain pending M6/M9. Owner: compliance-officer + security-engineer.*

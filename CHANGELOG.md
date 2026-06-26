@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [9.15.3] — 2026-06-26
+
+### Changed
+- `docs/SOC2_READINESS.md` — document version v3.43.0 → v3.44.0; §119 Cross-Reference Patch added: SCIM-PROV-E-001 (CC6.1/PI1.1, quarterly, 7yr — `scim.user_provisioned` DEC-030 HMAC-chain export; HMAC-VERIFY-ALGO-001 required), SCIM-PROV-E-002 (CC6.3, quarterly, 7yr — `scim.user_deprovisioned` DEC-030 HMAC-chain export; per-event SLA ≤ 60 s per ENTERPRISE_SLA §3.7), SCIM-PROV-E-003 (CC6.4, quarterly, 7yr — `scim.rejected_sensitive_attribute` count assertion; 0-count target; rejected VALUE never logged), SCIM-PROV-E-004 (CC7.2, annual, 3yr — AL-SCIM-01..04 PagerDuty alert configuration screenshots; distinct from SSO-OBS-E-006 operational log) registered in §79.4 master evidence table (count 81→85); `scim-provisioning/` subfolder added to §80.3 R2 folder structure; four entries added to §80.4 Vanta mirror list; closes SSO_SCIM_IMPLEMENTATION.md §27.14 items 14 (P1/M6) and 17 (P2/M9) documentation portions.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — document version v2.10 → v2.11; §39 Cross-Reference Patch added (SOC2_READINESS §119 closure from SSO_SCIM side): §39.1 purpose and scope, §39.2 SCIM-PROV-E-001..004 registration confirmation table with §79.4 row numbers and collection notes, §39.3 §27.14 item status confirmation, §39.4 four-item implementation checklist (all Done — this patch), §39.5 two-row cross-reference obligations closed table; §27.14 item 14 status `[ ]` → `[x] Done (documentation portion — SOC2_READINESS §119, 2026-06-26); [ ] (collection — pending M6)`; §27.14 item 17 status `[ ]` → `[x] Done (documentation portion — SOC2_READINESS §119, 2026-06-26); [ ] (collection — pending M9)`; TOC entry 39 added.
+- `VERSION` — 9.15.2 → 9.15.3.
+
+---
+
 ## [9.15.2] — 2026-06-26
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.10
+# FORM · SSO/SCIM Implementation v2.11
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -44,6 +44,7 @@
 36. [OQ-SSO-23.1 · OQ-SSO-23.3 · OQ-SSO-23.4 Resolution — CAEP Cert-Rotation Re-Registration, SSF Polling Fallback SLA & RISC Hijacking Group Cache Eviction (DEC-072)](#36-oq-sso-231--oq-sso-233--oq-sso-234-resolution--caep-cert-rotation-re-registration-ssf-polling-fallback-sla--risc-hijacking-group-cache-eviction-dec-072)
 37. [Cross-Reference Patch — R-37 · R-38 · §36.6 Item 1 Closure (SSO Monitoring Recovery Runbooks)](#37-cross-reference-patch--r-37--r-38--366-item-1-closure-sso-monitoring-recovery-runbooks)
 38. [Cross-Reference Patch — AUDIT_LOG_SCHEMA SCIM-Lifecycle Registration (§27.14 Item 1 Closure)](#38-cross-reference-patch--audit_log_schema-scim-lifecycle-registration-2714-item-1-closure)
+39. [Cross-Reference Patch — SOC2_READINESS §119 (§27.14 Items 14 + 17 Documentation Closure)](#39-cross-reference-patch--soc2_readiness-119-2714-items-14--17-documentation-closure)
 
 ---
 
@@ -9791,7 +9792,7 @@ Filing path: `compliance/evidence/scim-provisioning/SCIM-PROV-E-00{1..4}_<YYYY-Q
 | 11 | End-to-end SCIM smoke test per §7.4: configure test tenant with Okta SCIM; provision three users; verify `scim.user_provisioned` events in chain; deactivate one user via Okta; verify session revocation within 60 s; check `scim.user_deprovisioned.sessions_revoked_count` = 1. Emit `enterprise.sso_scim_setup_verified` (AUDIT_LOG_SCHEMA §Enterprise Implementation) after test passes. | platform-engineer | **P1** | M5 | [ ] |
 | 12 | Repeat smoke test with Azure AD SCIM connector; verify group sync (`scim.group_synced`) fires with correct `role_changes` count after adding test user to mapped group. | platform-engineer | **P1** | M5 | [ ] |
 | 13 | Load test `POST /scim/v2/Users` at 100 req/min burst (§3.6 burst limit) for 5 minutes using k6; verify no 5xx responses and that AL-SCIM-02 does not fire falsely; confirm `sessions_revoked_count` accuracy under concurrent deprovisioning. | devops-lead | **P1** | M5 | [ ] |
-| 14 | After 30 days of production SCIM activity: collect SCIM-PROV-E-001 and SCIM-PROV-E-002 artefacts; file in `compliance/evidence/scim-provisioning/`; add cross-references to `docs/SOC2_READINESS.md §CC6.1` and `§CC6.3` evidence tables. | compliance-officer | **P1** | M6 | [ ] |
+| 14 | After 30 days of production SCIM activity: collect SCIM-PROV-E-001 and SCIM-PROV-E-002 artefacts; file in `compliance/evidence/scim-provisioning/`; add cross-references to `docs/SOC2_READINESS.md §CC6.1` and `§CC6.3` evidence tables. | compliance-officer | **P1** | M6 | [x] Done (documentation portion — SOC2_READINESS §119, 2026-06-26); [ ] (collection — pending production SCIM Worker deploy + 30 days, M6) |
 
 #### P2 — Post-GA and SOC 2 observation prep
 
@@ -9799,7 +9800,7 @@ Filing path: `compliance/evidence/scim-provisioning/SCIM-PROV-E-00{1..4}_<YYYY-Q
 |---|---|---|---|---|---|
 | 15 | Update `docs/SOC2_READINESS.md §9 G-001` from 🔴 → 🟢 Closed once §27.14 P0 tasks deploy to production. | compliance-officer | **P2** | M5 | [ ] |
 | 16 | Evaluate `bulk: true` SCIM support for large-directory customers (> 10,000 seats) where sequential CRUD creates excessive latency. Decision: defer to post-Series A or if first enterprise customer requires > 10,000-seat directory sync. Document in `docs/DECISION_LOG.md`. | enterprise-architect | **P2** | M12 | [ ] |
-| 17 | Collect SCIM-PROV-E-003 (zero `scim.rejected_sensitive_attribute`) and SCIM-PROV-E-004 (alert rule screenshots) artefacts for SOC 2 observation period start. | compliance-officer | **P2** | M9 | [ ] |
+| 17 | Collect SCIM-PROV-E-003 (zero `scim.rejected_sensitive_attribute`) and SCIM-PROV-E-004 (alert rule screenshots) artefacts for SOC 2 observation period start. | compliance-officer | **P2** | M9 | [x] Done (documentation portion — SOC2_READINESS §119, 2026-06-26); [ ] (collection — pending M9 SOC 2 observation period start) |
 
 ---
 
@@ -13085,6 +13086,74 @@ The following table confirms all six DEC-030 SCIM lifecycle events from §27.10 
 ---
 
 *v2.10 (2026-06-26): §38 Cross-Reference Patch — AUDIT_LOG_SCHEMA SCIM-Lifecycle Registration (§27.14 item 1 Closure). One cross-reference obligation closed. §38.1 purpose and scope: §27.14 item 1 docs-side — `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (v2.49, line 436) already registers all six DEC-030 SCIM lifecycle events defined in §27.10 and explicitly closes this obligation; §27.14 item 1 updated `[ ]` → `[x] Done (AUDIT_LOG_SCHEMA v2.49, 2026-06-26)`. §38.2 six-event registration confirmation table: `scim.user_provisioned` (HIGH/7yr/CC6.1 — line 440), `scim.user_reactivated` (HIGH/7yr/CC6.1 — line 441), `scim.user_deprovisioned` (HIGH/7yr/CC6.3 — line 442), `scim.user_updated` (STANDARD/7yr/CC6.3/CC6.6 — line 443), `scim.group_synced` (STANDARD/5yr/CC6.6/PI1.1 — line 444), `scim.rejected_sensitive_attribute` (HIGH/7yr/CC6.4 — line 445); Zod v2 schemas noted (AUDIT_LOG_SCHEMA lines 454–530); SCIM-CHAIN-01 invariant confirmed (AL-SCIM-04 P1 + R-05 on `scim.user_deprovisioned` preceding `scim.user_provisioned`); four SOC 2 evidence artefacts SCIM-PROV-E-001 through SCIM-PROV-E-004. §38.3 canonical name enforcement: `scim.user_deactivated` (§3.5 interim) deprecated (🔴); `scim.user_deprovisioned` (§27.10 canonical) active (🟢); staging rename pending platform-engineer M4 (🟡); R-24 and AUDIT_LOG_SCHEMA v2.49 already use canonical name. §38.4 four-item implementation checklist (all [x] Done — this patch). §38.5 one-row cross-reference obligations closed table. §27.14 item 1 status: `[ ]` → `[x] Done`. TOC entry 38 added. Document header v2.8.2 → v2.10 (v2.9 header update was omitted at §37 authoring time; corrected here — mirrors the v2.8.1 correction pattern for the §36 header lag). Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §38 content; all six SCIM lifecycle events carry the AUDIT_LOG_SCHEMA v2.49 privacy invariant (no employee name, email, or health data in any payload; `external_user_id` is IdP-side opaque stable identifier; `user_id` is FORM-internal UUID; no health data linkage in any SCIM chain event). Cross-references: `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (v2.49 lines 434–452 — six-event registration; closes §27.14 item 1; `scim.user_deactivated` deprecation note; SCIM-CHAIN-01 invariant; Zod schemas lines 454–530); `docs/SSO_SCIM_IMPLEMENTATION.md §27.10` (canonical DEC-030 event definitions — source for AUDIT_LOG_SCHEMA registration); `docs/SSO_SCIM_IMPLEMENTATION.md §3.5` (interim `scim.user_deactivated` name — deprecated; §38.3 preserves as historical context); `docs/INCIDENT_RESPONSE.md R-24` (mass deprovisioning detection — canonical `scim.user_deprovisioned` source and consumer); `docs/SOC2_READINESS.md §CC6.1/CC6.3` (SCIM-PROV-E-001/002 evidence artefacts — AUDIT_LOG_SCHEMA event registration is the prerequisite; collection pending production SCIM Worker deploy). Owner: compliance-officer.*
+
+---
+
+## §39 · Cross-Reference Patch — SOC2_READINESS §119 (§27.14 Items 14 + 17 Documentation Closure)
+
+### §39.1 Purpose and Scope
+
+This patch closes the **documentation portion** of `docs/SSO_SCIM_IMPLEMENTATION.md §27.14` items 14 (P1/M6) and 17 (P2/M9) from the SSO_SCIM side.
+
+**Trigger:** `docs/SOC2_READINESS.md §119` (v3.44.0, 2026-06-26) was appended by the enterprise-builder cloud-agent, registering SCIM-PROV-E-001, SCIM-PROV-E-002, SCIM-PROV-E-003, and SCIM-PROV-E-004 in the §79.4 master evidence table (count 81 → 85), the §80.3 R2 folder registry (`scim-provisioning/` subfolder), and the §80.4 Vanta mirror list. These four artefacts were originally defined in this document at §27.12 (v1.9, 2026-06-13) but had not yet been registered in SOC2_READINESS §79.4. SOC2_READINESS §119 closes that gap.
+
+**Scope:** Documentation closure only. Collection milestones (M6 for SCIM-PROV-E-001/002; M9 for SCIM-PROV-E-003/004) remain pending production SCIM Worker deployment and SOC 2 observation period start, respectively. §27.14 items 14 and 17 each carry a split status: `[x] Done` (documentation portion) and `[ ]` (collection portion, deferred to milestone).
+
+**Prerequisite satisfied:** SOC2_READINESS §119 was only possible after SSO_SCIM §38 (v2.10, 2026-06-26) confirmed that `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (v2.49) had registered all six DEC-030 SCIM lifecycle events — the prerequisite for the HMAC-chain export artefacts SCIM-PROV-E-001 and SCIM-PROV-E-002.
+
+---
+
+### §39.2 SOC2_READINESS §119 — SCIM-PROV-E-001..004 Evidence Registration Confirmation
+
+| Evidence ID | SOC 2 Criteria | Frequency | Retention | §79.4 Row | §80.3 R2 Path | §80.4 Vanta Key |
+|---|---|---|---|---|---|---|
+| **SCIM-PROV-E-001** | CC6.1 / PI1.1 | Quarterly | 7 yr | 82 | `scim-provisioning/SCIM-PROV-E-001_<YYYY-QN>.pdf` | `scim-provisioning/SCIM-PROV-E-001` |
+| **SCIM-PROV-E-002** | CC6.3 | Quarterly | 7 yr | 83 | `scim-provisioning/SCIM-PROV-E-002_<YYYY-QN>.pdf` | `scim-provisioning/SCIM-PROV-E-002` |
+| **SCIM-PROV-E-003** | CC6.4 | Quarterly | 7 yr | 84 | `scim-provisioning/SCIM-PROV-E-003_<YYYY-QN>.pdf` | `scim-provisioning/SCIM-PROV-E-003` |
+| **SCIM-PROV-E-004** | CC7.2 | Annual | 3 yr | 85 | `scim-provisioning/SCIM-PROV-E-004_<YYYY>.pdf` | `scim-provisioning/SCIM-PROV-E-004` |
+
+**Privacy invariant (all four artefacts):** No employee name, email, `health_metric.*`, coaching content, or GDPR Art. 9 special-category data in any exported record. `external_user_id` is an IdP-side opaque stable identifier; `user_id` is a FORM-internal UUID; no health data linkage in any SCIM chain event.
+
+**SCIM-PROV-E-001 collection notes:** Requires HMAC-chain export of `scim.user_provisioned` DEC-030 events. HMAC-VERIFY-ALGO-001 chain verification required. Earliest eligible collection: 30 days after production SCIM Worker deploy + one full quarter of activity. Path pattern: `compliance/evidence/scim-provisioning/SCIM-PROV-E-001_<YYYY-QN>.pdf`.
+
+**SCIM-PROV-E-002 collection notes:** Requires HMAC-chain export of `scim.user_deprovisioned` DEC-030 events. Per-event session revocation SLA ≤ 60 s must be verified (ENTERPRISE_SLA §3.7). `sessions_revoked_count` field must be present and > 0 for each deprovisioned user. Path pattern: `compliance/evidence/scim-provisioning/SCIM-PROV-E-002_<YYYY-QN>.pdf`.
+
+**SCIM-PROV-E-003 collection notes:** Count-assertion-only artefact — `scim.rejected_sensitive_attribute` event count for the quarter, with 0-count target. Rejected attribute VALUE is never logged (Art. 9 constraint). If count > 0 for any quarter, an incident report is required. Path pattern: `compliance/evidence/scim-provisioning/SCIM-PROV-E-003_<YYYY-QN>.pdf`.
+
+**SCIM-PROV-E-004 distinctness note:** SCIM-PROV-E-004 is the AL-SCIM-01..04 PagerDuty alert **configuration** screenshot artefact (annual/CC7.2). It is distinct from **SSO-OBS-E-006**, which is the AL-SCIM-01..04 operational PagerDuty **incident log** artefact (quarterly/CC7.2/CC7.4, registered in SOC2_READINESS §84.3). Both must be collected independently; one does not satisfy the other. AL-SCIM-01 (sensitive-attr rejection burst), AL-SCIM-02 (5xx spike), AL-SCIM-03 (sync stall), AL-SCIM-04 (SCIM-CHAIN-01 invariant violation) — all four alert rules must appear in the SCIM-PROV-E-004 screenshot. Path pattern: `compliance/evidence/scim-provisioning/SCIM-PROV-E-004_<YYYY>.pdf`.
+
+---
+
+### §39.3 §27.14 Item Status Confirmation
+
+| Item | Task (abbreviated) | Prior Status | New Status |
+|---|---|---|---|
+| **14** (P1 / M6) | Collect SCIM-PROV-E-001 + SCIM-PROV-E-002; file in `compliance/evidence/scim-provisioning/`; cross-reference SOC2_READINESS §CC6.1 + §CC6.3 | `[ ]` | `[x]` Documentation portion — SOC2_READINESS §119, 2026-06-26; `[ ]` collection — pending production SCIM Worker deploy + 30 days, M6 |
+| **17** (P2 / M9) | Collect SCIM-PROV-E-003 + SCIM-PROV-E-004 for SOC 2 observation period start | `[ ]` | `[x]` Documentation portion — SOC2_READINESS §119, 2026-06-26; `[ ]` collection — pending M9 SOC 2 observation period start |
+
+---
+
+### §39.4 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update §27.14 item 14 status: `[ ]` → `[x] Done (documentation portion — SOC2_READINESS §119, 2026-06-26); [ ] (collection — pending production SCIM Worker deploy + 30 days, M6)` | compliance-officer | **P1** | M5 | [x] **Done — this patch (v2.11, 2026-06-26).** |
+| 2 | Update §27.14 item 17 status: `[ ]` → `[x] Done (documentation portion — SOC2_READINESS §119, 2026-06-26); [ ] (collection — pending M9 SOC 2 observation period start)` | compliance-officer | **P2** | M5 | [x] **Done — this patch (v2.11, 2026-06-26).** |
+| 3 | Publish §39.2 SCIM-PROV-E-001..004 registration confirmation table with §79.4 row numbers, §80.3 R2 paths, §80.4 Vanta keys, and collection notes | compliance-officer | **P1** | M5 | [x] **Done — this patch (v2.11, 2026-06-26).** |
+| 4 | Add TOC entry 39 to document table of contents | compliance-officer | **P1** | M5 | [x] **Done — this patch (v2.11, 2026-06-26).** |
+
+---
+
+### §39.5 Cross-Reference Obligations Closed
+
+| Prior obligation | Source | Closed by |
+|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md §27.14` item 14 (P1/M6) documentation portion: register SCIM-PROV-E-001 and SCIM-PROV-E-002 in SOC2_READINESS §79.4 master evidence table, §80.3 R2 folder registry, and §80.4 Vanta mirror list | §27.14 item 14 + §27.12 (SCIM-PROV-E-001/002 definitions, v1.9, 2026-06-13) | 🟢 **SOC2_READINESS §119 (v3.44.0, 2026-06-26) + §39 this patch (v2.11, 2026-06-26).** §27.14 item 14 status: `[ ]` → `[x] Done (documentation portion)`. |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §27.14` item 17 (P2/M9) documentation portion: register SCIM-PROV-E-003 and SCIM-PROV-E-004 in SOC2_READINESS §79.4 master evidence table, §80.3 R2 folder registry, and §80.4 Vanta mirror list | §27.14 item 17 + §27.12 (SCIM-PROV-E-003/004 definitions, v1.9, 2026-06-13) | 🟢 **SOC2_READINESS §119 (v3.44.0, 2026-06-26) + §39 this patch (v2.11, 2026-06-26).** §27.14 item 17 status: `[ ]` → `[x] Done (documentation portion)`. |
+
+---
+
+*v2.11 (2026-06-26): §39 Cross-Reference Patch — SOC2_READINESS §119 (§27.14 Items 14 + 17 Documentation Closure). Two cross-reference obligation documentation portions closed. §39.1 purpose and scope: SOC2_READINESS §119 (v3.44.0, 2026-06-26) registered SCIM-PROV-E-001..004 in §79.4 master evidence table (count 81→85), §80.3 R2 folder registry (`scim-provisioning/` subfolder), and §80.4 Vanta mirror list; prerequisite was SSO_SCIM §38 (v2.10, 2026-06-26) confirming AUDIT_LOG_SCHEMA v2.49 §SCIM-Lifecycle registered all six DEC-030 events. §39.2 four-artefact registration confirmation table: SCIM-PROV-E-001 (§79.4 row 82, CC6.1/PI1.1, quarterly/7yr, HMAC-chain export, HMAC-VERIFY-ALGO-001 required), SCIM-PROV-E-002 (§79.4 row 83, CC6.3, quarterly/7yr, HMAC-chain export, per-event SLA ≤ 60 s per ENTERPRISE_SLA §3.7), SCIM-PROV-E-003 (§79.4 row 84, CC6.4, quarterly/7yr, count-assertion-only, 0-count target, rejected VALUE never logged), SCIM-PROV-E-004 (§79.4 row 85, CC7.2, annual/3yr, AL-SCIM-01..04 PagerDuty configuration screenshots; DISTINCT from SSO-OBS-E-006 operational log). §39.3 §27.14 item status confirmation: items 14 and 17 `[ ]` → `[x]` documentation portion / `[ ]` collection deferred. §39.4 four-item implementation checklist (all [x] Done — this patch). §39.5 two-row cross-reference obligations closed table. §27.14 item 14 updated `[ ]` → `[x] Done (documentation portion — SOC2_READINESS §119, 2026-06-26); [ ] (collection — pending production SCIM Worker deploy + 30 days, M6)`. §27.14 item 17 updated `[ ]` → `[x] Done (documentation portion — SOC2_READINESS §119, 2026-06-26); [ ] (collection — pending M9 SOC 2 observation period start)`. TOC entry 39 added. Document header v2.10 → v2.11. Privacy floor: no employee name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §39 content. Cross-references: `docs/SOC2_READINESS.md §119` (v3.44.0, 2026-06-26 — SCIM-PROV-E-001..004 §79.4 registration; scim-provisioning/ §80.3 R2 subfolder; §80.4 Vanta mirror entries; closes SSO_SCIM §27.14 items 14+17 documentation portions); `docs/SSO_SCIM_IMPLEMENTATION.md §27.12` (v1.9, 2026-06-13 — SCIM-PROV-E-001..004 authoritative definitions); `docs/SSO_SCIM_IMPLEMENTATION.md §27.14` (items 14 and 17 — status updated this patch); `docs/SSO_SCIM_IMPLEMENTATION.md §38` (v2.10, 2026-06-26 — prerequisite: AUDIT_LOG_SCHEMA v2.49 §SCIM-Lifecycle six-event registration; noted SCIM-PROV-E-001/002 §79.4 collection as pending — that pending state now closed by §119); `docs/ENTERPRISE_SLA.md §3.7` (60-second session revocation SLA — SCIM-PROV-E-002 per-event SLA verification requirement); `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (v2.49 lines 434–530 — DEC-030 event schemas and Zod v2 schemas; prerequisite for SCIM-PROV-E-001/002 HMAC-chain export); `docs/SOC2_READINESS.md §84.3` (SSO-OBS-E-006 — AL-SCIM-01..04 operational PagerDuty incident log; distinct from SCIM-PROV-E-004 configuration screenshots). Owner: compliance-officer.*
 
 ---
 
