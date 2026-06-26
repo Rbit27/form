@@ -2481,10 +2481,10 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: навички
 | 2529 | Мотивація і фізична готовність — не одне і те ж: як їх розрізнити оперативно | **draft · v8.87.0 → post-2529-motivation-vs-physical-readiness.md** |
 | 2530 | DOMS як сигнал: що болісність говорить про відновлення — і чого не говорить | **⚠️ clinical-safety REVIEW REQUIRED — тема DOMS/болісність (біль) · blocked pending review** |
 | 2531 | Якість руху під час розминки як діагностика готовності: три перевірні маркери | **draft · v8.88.0 → post-2531-warmup-movement-quality-readiness-diagnostic.md** |
-| 2532 | Ранковий пульс спокою без HRV-девайсу: як і коли він інформативний | proposed |
-| 2533 | Тижневий ритм готовності: як виявити свій природний паттерн відновлення | proposed |
-| 2534 | Коли ігнорувати сигнали тіла — і коли це помилка: операційна межа | proposed |
-| 2535 | Синтез 2526–2535: операційна система читання сигналів готовності без wearables | proposed |
+| 2532 | Ранковий пульс спокою без HRV-девайсу: як і коли він інформативний | **draft · v8.89.0 → post-2532-morning-resting-hr-readiness-signal.md** |
+| 2533 | Тижневий ритм готовності: як виявити свій природний паттерн відновлення | **draft · v8.89.0 → post-2533-weekly-readiness-rhythm.md** |
+| 2534 | Коли ігнорувати сигнали тіла — і коли це помилка: операційна межа | **draft · v8.89.0 · ⚠️ clinical-safety CONDITIONAL PASS pending review → post-2534-when-to-override-readiness-signals.md** |
+| 2535 | Синтез 2526–2535: операційна система читання сигналів готовності без wearables | **draft · v8.89.0 → post-2535-readiness-signals-synthesis.md · СЕРІЯ ЗАВЕРШЕНА 9/10 (2530 pending clinical-safety)** |
 
 ### Editorial series: 2536–2545 · Прийняття рішень без тренера: алгоритми замість відчуттів (proposed · v8.85.0)
 
