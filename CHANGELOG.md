@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [9.17.1] — 2026-06-26
+
+### Added
+- `docs/OBSERVABILITY.md §56` — SCIM Provisioning Compliance Observability. Closes three monitoring gaps after SOC2_READINESS §119 registered SCIM-PROV-E-001..004 (2026-06-26): (1) no proactive daily baseline sentinel for `scim.rejected_sensitive_attribute` events — AL-SCIM-01 (§26.7b) is reactive burst-only and misses single isolated violations below the burst threshold; (2) SCIM-PROV-E-003 quarterly zero-count assertion (CC6.4) had no automated collection trigger; (3) no monitoring infrastructure evidence artefact (SCIM-PROV-MON-E-001) to complement SCIM-PROV-E-001..004. New pg_cron job 47 `scim_provisioning_compliance_monitor` (schedule `0 6 * * *`; 26h freshness; sweep 1 COUNT `scim.rejected_sensitive_attribute` last 26h; sweep 2 quarterly aggregate trigger first week of Jan/Apr/Jul/Oct; `system.scim_provisioning_check_passed` all-clear; SCIM-ATTR-CHAIN-01 ordering invariant — DEC-030 HTTP 200 before PagerDuty P0). Two new SLOs: SCIM-PROV-SLO-01 (zero-tolerance CC6.4) and SCIM-PROV-SLO-02 (job 47 freshness CC4.1/A1.1). Two new alert rules: AL-SCIM-PROV-01 (P0; PagerDuty `form-security` → security-engineer + compliance-officer) and AL-SCIM-PROV-02 (P1 stale; PagerDuty `form-devops`). Three new DEC-030 events specified (AUDIT_LOG_SCHEMA.md registration pending §56.10 item 1 P0/M5). Evidence artefact SCIM-PROV-MON-E-001 (annual run history, CC4.1/A1.1/CC7.2, 3yr; SOC2_READINESS registration pending item 5 P1/M6). §6.2 `scim_provisioning_compliance` alert subsection inserted (this commit). §12.6 job 47 registered (v2.1 patch, this commit). TOC entry added.
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.2.6 → v5.3.0; §6.2 consolidated alert rules extended with `scim_provisioning_compliance` subsection; §12.6 pg_cron registry extended with job 47; freshness window note extended; TOC extended with §56.
+- `VERSION` — 9.17.0 → 9.17.1.
+
+---
+
 ## [9.17.0] — 2026-06-26
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.2.6
+# FORM · Observability & Monitoring Taxonomy v5.3.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -60,6 +60,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §35 | Rate Limiting, Quota Enforcement & Abuse Prevention Observability |
 | §36 | Mid-Contract Termination Risk Monitoring |
 | §37 | Data Retention, Erasure & GDPR Compliance Pipeline Observability |
+| §56 | SCIM Provisioning Compliance Observability |
 
 ---
 
@@ -562,6 +563,15 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 | **Job 46 freshness dead-man's switch** | No `system.pricing_exception_check_passed` LOW event in `audit_log_events` for > 26h; detected by `pg-cron-health-monitor` (§12.6) | P1 | PagerDuty `form-devops` → devops-lead; dedup `pricing-exception-check-stale` 26h cooldown; auto-resolves on next `system.pricing_exception_check_passed` emission | §55.4 AL-PRICE-03; §12.6 (freshness window note — job 46 daily 09:00 UTC) |
 
 **SOC 2 mapping (pricing_exception_health):** CC5.2 (pricing commitments enforcement — AL-PRICE-01 detects any REENTRY-CHAIN-01 bypass surviving the Worker-layer enforcement in COST_MODEL §44.5; REENTRY-MONITOR-CHAIN-01 ordering invariant provides auditable DEC-030 evidence for every violation notice — auditors can verify no P0 alert was dispatched without a chain anchor); CC1.4 (accountability — AL-PRICE-02 ensures every approved or restructured price floor override is reviewed by compliance-officer within 1 business day per COST_MODEL §32; quarterly PRICE-OBS-E-001 artefact provides the CC5.2/CC1.4 audit record); CC4.1 (monitoring activities — job 46 daily sweep 1 + quarterly sweep 2 demonstrate continuous automated monitoring of the loyalty re-entry pricing exception chain throughout the observation period). Privacy floor: `enterprise.reentry_chain_integrity_violation` event payload carries only `tenant_id` UUID (FORM-internal), `renewed_event_id` UUID, and `renewal_date` DATE — no individual employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data. `system.pricing_exception_quarterly_audit_triggered` and `system.pricing_exception_check_passed` carry aggregate fleet counts only — no `tenant_id`. `tenant_manager` (HR) and `enterprise_admin` excluded from dashboard visibility.
+
+**Subsection: `scim_provisioning_compliance` (AL-SCIM-PROV-01/02 — §56.4):**
+
+| Condition | Signal source | Severity | Routing | Cross-ref |
+|---|---|---|---|---|
+| **Sensitive attribute violation detected** | `scim_provisioning_compliance_monitor` pg_cron (job 47, `0 6 * * *`): sweep 1 — `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'scim.rejected_sensitive_attribute' AND created_at >= NOW() - INTERVAL '26 hours'`; on count > 0: emits `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr (SCIM-ATTR-CHAIN-01 ordering invariant: audit event HTTP 200 confirmed before PagerDuty fires); dedup `scim-prov-sensitive-attr-{YYYY-MM-DD}` 24h; no auto-resolve — IC must close after full investigation and remediation; `form_api` REVOKED from `audit_log_events` — job runs via `form_system` role | P0 | PagerDuty `form-security` → security-engineer + compliance-officer; no auto-resolve | §56.4 AL-SCIM-PROV-01; §56.5 (job 47 sweep 1 SQL); SSO_SCIM §26.7b (AL-SCIM-01 reactive burst complement); INCIDENT_RESPONSE R-47 (§R-47.5; P1/M7 — to be authored) |
+| **Job 47 freshness dead-man's switch** | No `system.scim_provisioning_check_passed` LOW event in `audit_log_events` for > 26h; detected by `pg-cron-health-monitor` (§12.6) | P1 | PagerDuty `form-devops` → devops-lead; dedup `scim-prov-check-stale` 26h cooldown; auto-resolves on next `system.scim_provisioning_check_passed` emission | §56.4 AL-SCIM-PROV-02; §12.6 (freshness window note — job 47 daily 06:00 UTC) |
+
+**SOC 2 mapping (scim_provisioning_compliance):** CC6.4 (sensitive attribute access control — AL-SCIM-PROV-01 provides a proactive daily baseline sentinel for `scim.rejected_sensitive_attribute` events, complementing the reactive burst-detection in AL-SCIM-01 (§26.7b); SCIM-PROV-E-003 quarterly zero-count assertion (CC6.4) requires automated baseline confirmation to support compliance-officer attestation); CC4.1 (monitoring activities — job 47 daily sweep 1 + quarterly sweep 2 demonstrate continuous automated monitoring of SCIM sensitive attribute controls throughout the observation period); CC7.2 (anomaly detection — daily proactive sweep detects any `scim.rejected_sensitive_attribute` event indicating a SCIM IdP misconfiguration or malicious attribute injection attempt before the next quarterly compliance review). Privacy floor: `security.scim_sensitive_attr_violation_detected` event payload carries only `event_count` int, `window_start` timestamptz, `window_end` timestamptz, `check_run_at` timestamptz — no `tenant_id`, no rejected attribute VALUE, no `user_id`, no employee name, email, health value, or GDPR Art. 9 data. The `system.scim_provisioning_quarterly_check_triggered` and `system.scim_provisioning_check_passed` events carry aggregate fleet counts only. `tenant_manager` (HR) and `enterprise_admin` excluded from dashboard visibility.
 
 **Subsection: `sca_vulnerability_monitoring` (AL-SCA-01 through AL-SCA-05 — §52.4):**
 
@@ -1261,13 +1271,15 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `litigation_hold_compliance_monitor` | `0 8 * * *` | 26 h | CC5.3/CC4.1/C1.2 — daily litigation hold compliance sweep (three SLO conditions from `litigation_hold_records`); sweep 1 (AL-LITH-01): `target_review_date < CURRENT_DATE AND status = 'declared'` → emits `enterprise.litigation_hold_review_overdue` HIGH/7yr per flagged hold + fires AL-LITH-01 PagerDuty P1 `form-compliance` (LITH-REVIEW-CHAIN-01 ordering invariant: audit event HTTP 200 confirmed before PagerDuty); sweep 2a (AL-LITH-02 approaching): `max_expiry_date <= CURRENT_DATE + 30 AND max_expiry_date >= CURRENT_DATE AND status = 'declared'` → emits `enterprise.litigation_hold_max_duration_approaching` STANDARD/3yr + Slack advisory only; sweep 2b (AL-LITH-02 breach): `max_expiry_date < CURRENT_DATE AND status = 'declared'` → emits `enterprise.litigation_hold_max_duration_breached` CRITICAL/7yr + fires AL-LITH-02 P1 (LITH-MAX-CHAIN-01 ordering invariant); sweep 3 (AL-LITH-03): `deletion_target_date < CURRENT_DATE AND status = 'released' AND deletion_completed_date IS NULL` → emits `enterprise.litigation_hold_deletion_overdue` HIGH/7yr per flagged hold + fires AL-LITH-03 (LITH-DEL-CHAIN-01 ordering invariant); all-clear: `system.litigation_hold_check_passed` LOW/1yr emitted after all sweeps (no `tenant_id` — privacy floor; aggregate counts only); DDL prerequisite: `litigation_hold_records` table + three covering indexes (DATA_MODEL §46.3.1); `form_api` REVOKED from `litigation_hold_records`; pg_cron reads via `form_system` role | PagerDuty `form-compliance` → compliance-officer (AL-LITH-01 review overdue, P1); compliance-officer + founder (AL-LITH-02 breach, P1); compliance-officer + devops-lead (AL-LITH-03 deletion overdue, P1); dedup `lith-review-overdue-{tenant_id}-{activation_date_iso}` 24h (AL-LITH-01) / `lith-max-duration-{tenant_id}-{activation_date_iso}` 24h (AL-LITH-02) / `lith-deletion-overdue-{tenant_id}-{activation_date_iso}` 24h (AL-LITH-03); 26h freshness window (1-day tolerance — daily cadence appropriate for day-scale compliance deadlines: 6-month review, 36-month cap, 10-business-day deletion; single missed run extends detection latency by 24h, tolerated); stale consequence: LITH-SLO-01/02/03 detection blind spot — holds approaching or exceeding 6-month review date, 36-month cap, or 10-business-day deletion deadline go undetected until next 08:00 UTC run; privacy invariant: per-hold alert payloads carry only `tenant_id` UUID + `activation_date` DATE + derived integers (`days_overdue`, `days_remaining`, `days_over_limit`) — no employee `user_id`, name, email, health value, or GDPR Art. 9 data; `system.litigation_hold_check_passed` all-clear omits `tenant_id` entirely (fleet-count aggregate only); cross-ref: §54.4 (AL-LITH-01/02/03 alert specs); §54.5 (job spec — §54.5.2 three enforcement SQL sweeps, §54.5.5 implementation decision); §54.6 (§6.2 `litigation_hold_health` subsection — this commit v5.2.1); DATA_MODEL §46 (table DDL + three covering indexes + MSA §11.6 procedure); MSA §11.6 (6-month review §11.6.3, 36-month cap §11.6.4, 10-business-day deletion §11.6.6); LITH-OBS-E-001 (CC5.3/CC4.1/C1.2, annual 3yr — §54.8); INCIDENT_RESPONSE R-45 (job 45 stale recovery runbook — §R-45.5/R-45.6/R-45.7; v1.0, 2026-06-25) — **job 45** |
 | `pricing_exception_compliance_monitor` | `0 9 * * *` | 26 h | CC5.2/CC1.4/CC4.1 — daily REENTRY-CHAIN-01 chain integrity sweep (sweep 1) + quarterly pricing exception audit trigger (sweep 2); sweep 1: query `audit_log_events` for `enterprise.contract_renewed` events with `contract_discount_type = 'loyalty_reentry'` in last 25h lacking a matching `enterprise.pricing_exception_approved` (`exception_type = 'loyalty_reentry'`, same `tenant_id`, within prior 30 days — REENTRY-CHAIN-01 per COST_MODEL §44.5); on violation: emits `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr (REENTRY-MONITOR-CHAIN-01 ordering invariant: DEC-030 HTTP 200 confirmed before PagerDuty P0 fires) + fires AL-PRICE-01 P0 `form-compliance` → founder + compliance-officer + enterprise-architect; sweep 2: fires only in first 7 days of Jan/Apr/Jul/Oct — aggregate count of `enterprise.pricing_exception_approved` events for prior quarter by `exception_type` → emits `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr (aggregate, no `tenant_id`) + Slack `#compliance` advisory (P3, no PagerDuty); always emits `system.pricing_exception_check_passed` LOW/1yr after all sweeps (aggregate counts, no `tenant_id` — privacy floor); `form_system` role; `form_api` REVOKED from `audit_log_events`; stale = PRICE-SLO-01 REENTRY-CHAIN-01 monitoring blind spot (loyalty re-entry renewal bypassing Worker-layer enforcement undetected for up to 24h) + PRICE-SLO-02 quarterly audit trigger miss (compliance-officer PRICE-OBS-E-001 filing obligation not triggered) | PagerDuty P1 `form-devops` → devops-lead; dedup `pricing-exception-check-stale`; 26h freshness window (1-day tolerance — daily cadence appropriate per §55.11 OQ-PRICE-MON-01: REENTRY-CHAIN-01 is a commercial governance control with no immediate safety implication; Worker-layer real-time enforcement is already in place; daily monitoring-layer verification is consistent with jobs 39 and 45); cross-ref: §55.4 (AL-PRICE-01/02/03 alert specs); §55.5 (job spec — §55.5.2 two sweep SQL specs, §55.5.3 implementation decision, §55.5.5 REENTRY-MONITOR-CHAIN-01 invariant); §55.6 (§6.2 `pricing_exception_health` subsection — this commit v5.2.3); COST_MODEL §44.5 (REENTRY-CHAIN-01 source definition); COST_MODEL §31.8 (four pricing audit DEC-030 events); COST_MODEL §44.7 (quarterly pricing exception audit obligation — this section formalises the automated trigger); PRICE-OBS-E-001 (CC5.2/CC1.4/CC4.1, quarterly 7yr); PRICE-OBS-E-002 (CC4.1/A1.1, annual 3yr); INCIDENT_RESPONSE R-46 (§R-46.5/R-46.6; v1.0, 2026-06-25) — **job 46** |
 
+| `scim_provisioning_compliance_monitor` | `0 6 * * *` | 26 h | CC6.4/CC4.1/CC7.2 — daily SCIM sensitive attribute violation sentinel (sweep 1) + quarterly SCIM provisioning compliance trigger (sweep 2); sweep 1: `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'scim.rejected_sensitive_attribute' AND created_at >= NOW() - INTERVAL '26 hours'`; on count > 0: emits `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr (SCIM-ATTR-CHAIN-01 ordering invariant: DEC-030 HTTP 200 confirmed before AL-SCIM-PROV-01 PagerDuty P0 fires); sweep 2: fires only in first 7 days of Jan/Apr/Jul/Oct — aggregate `scim.rejected_sensitive_attribute` count for prior quarter → emits `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr (aggregate, no `tenant_id`) + Slack `#compliance` advisory; always emits `system.scim_provisioning_check_passed` LOW/1yr after all sweeps (aggregate counts, no `tenant_id` — privacy floor); `form_system` role; `form_api` REVOKED from `audit_log_events`; stale = SCIM-PROV-SLO-01 (zero sensitive attribute violations) monitoring blind spot + SCIM-PROV-E-003 quarterly zero-count assertion collection baseline unavailable | PagerDuty P1 `form-devops` → devops-lead; dedup `scim-prov-check-stale`; 26h freshness window (daily cadence appropriate for CC6.4 zero-tolerance baseline — reactive burst AL-SCIM-01 (§26.7b) handles real-time spike detection; job 47 provides proactive daily confirmation and quarterly evidence trigger); cross-ref: §56.4 (AL-SCIM-PROV-01/02 alert specs); §56.5 (job spec — §56.5.2 sweep 1 SQL, §56.5.3 sweep 2 SQL, §56.5.5 SCIM-ATTR-CHAIN-01 invariant); §56.6 (§6.2 `scim_provisioning_compliance` subsection — this commit v5.3.0); SSO_SCIM §26.7b (AL-SCIM-01 reactive burst complement); SCIM-PROV-MON-E-001 (CC4.1/A1.1/CC7.2, annual 3yr — §56.8); INCIDENT_RESPONSE R-47 (job 47 stale recovery runbook — §R-47.5; P1/M7 — to be authored) — **job 47** |
+
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
 **Job-number conflict resolution (v0.5, 2026-06-20):** `docs/OBSERVABILITY.md §49` (v4.6.0, 2026-06-19) authored `sso_fleet_health_check` as "job 36". At the time §49 was written, the v0.4 §12.6 patch (same date) had already assigned job 36 to `dsar_slo_miss_counter_reset`. Since §12.6 is the canonical authority for job numbers, `sso_fleet_health_check` is renumbered to **job 38** (next available after job 37 `caep_reregister_sweep`). All §49 in-text citations corrected in this v0.5 patch. All `docs/SOC2_READINESS.md §95` cross-references updated to job 38 accordingly.
 
 **Job-number conflict resolution (v0.9, 2026-06-22):** Two sections within OBSERVABILITY.md independently claimed job numbers already assigned in this §12.6 canonical registry: (1) `docs/OBSERVABILITY.md §42.7` (v3.9, 2026-06-14) referenced `white_label_cert_check` as "job 32" — but job 32 was already assigned to `turh_retention_purge` when the v0.4 patch was published (2026-06-19); (2) `docs/OBSERVABILITY.md §43.7` (v4.0, 2026-06-14) referenced `webhook_degraded_escalation_check` as "job 34" — but job 34 was already assigned to `bdg_override_expiry_sweep` in the same v0.4 patch. Both are renumbered in this registry: `white_label_cert_check` → **job 40**; `webhook_degraded_escalation_check` → **job 41**. In-text citations in §42.7, §42.14 item 3, §43.7, and §43.15 items 6–8 corrected in this v0.9 patch (since both sections reside within OBSERVABILITY.md, consistent with the v0.5 precedent of correcting §49 in-text citations). This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
-*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days. `pricing_exception_compliance_monitor` (job 46) is daily at 09:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the REENTRY-CHAIN-01 commercial governance control has no immediate safety implication; Worker-layer real-time enforcement (COST_MODEL §44.5 HTTP 422) is the primary gate; daily monitoring-layer verification (sweep 1) is a belt-and-suspenders sentinel; quarterly trigger (sweep 2) is activated by date arithmetic, not a tight compliance deadline.
+*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days. `pricing_exception_compliance_monitor` (job 46) is daily at 09:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the REENTRY-CHAIN-01 commercial governance control has no immediate safety implication; Worker-layer real-time enforcement (COST_MODEL §44.5 HTTP 422) is the primary gate; daily monitoring-layer verification (sweep 1) is a belt-and-suspenders sentinel; quarterly trigger (sweep 2) is activated by date arithmetic, not a tight compliance deadline. `scim_provisioning_compliance_monitor` (job 47) is daily at 06:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the SCIM-PROV-SLO-01 zero-tolerance CC6.4 target is enforced at SCIM Worker write time (HTTP 422 on sensitive attribute push per SSO_SCIM §27.12); job 47 provides the proactive daily monitoring-layer confirmation and quarterly evidence trigger; the AL-SCIM-01 reactive burst detector (§26.7b, job 24, every 5 min) handles real-time anomaly detection; a single missed job 47 run extends daily-baseline detection latency by 24h, tolerated for a day-scale compliance evidence obligation.
 
 **DEC-030 events emitted by `pg-cron-health-monitor`** — registered in `docs/AUDIT_LOG_SCHEMA.md §System`:
 
@@ -1288,6 +1300,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 **v0.5 · 2026-06-20 · Owner: devops-lead**
 **Review: quarterly or on architecture change. Next scheduled review: August 2026.**
 **SOC 2 evidence: CC7.2 (system monitoring). See also INCIDENT_RESPONSE.md for CC7.3–CC7.5.**
+*v2.1 patch (2026-06-26): §12.6 job 47 `scim_provisioning_compliance_monitor` registered — closes the SCIM provisioning compliance monitoring gap identified in OBSERVABILITY §56 (v5.3.0, 2026-06-26): no proactive daily baseline sentinel existed for `scim.rejected_sensitive_attribute` events; AL-SCIM-01 (§26.7b, job 24) provides reactive burst detection only; SCIM-PROV-E-003 quarterly zero-count assertion (SOC2_READINESS §119) had no automated collection trigger. Schedule `0 6 * * *` (06:00 UTC daily — offset from jobs 45/46 at 08:00/09:00 to distribute pg_cron load); 26h freshness window (consistent with jobs 39, 45, 46; reactive burst detection via AL-SCIM-01 handles real-time anomalies; daily monitoring-layer verification is the CC6.4 compliance baseline). Sweep 1: COUNT `scim.rejected_sensitive_attribute` events in last 26h; count > 0 → `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr + AL-SCIM-PROV-01 P0 PagerDuty (SCIM-ATTR-CHAIN-01 ordering invariant: HTTP 200 before dispatch). Sweep 2: quarterly trigger first 7 days of Jan/Apr/Jul/Oct → `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr + Slack `#compliance` advisory. All-clear: `system.scim_provisioning_check_passed` LOW/1yr (aggregate, no `tenant_id`). Evidence artefact: SCIM-PROV-MON-E-001 (annual run history, CC4.1/A1.1/CC7.2, 3yr). Freshness window note extended to cover job 47. Canonical section: §56.*
 *v2.0 patch (2026-06-26): retroactive registration record for jobs 16, 17, 22, and 23 — these four jobs were inserted into the §12.6 canonical registry table when §35 (Rate Limiting, Quota Enforcement & Abuse Prevention Observability, 2026-06-11) was authored, but no §12.6 version patch note was written at the time. This patch formalises the registration date. Jobs 16 (`rate_limit_violations_cleanup`, `0 3 * * *`, 26 h, CC6.6/CC4.1) and 17 (`api_quota_usage_archive`, `30 0 1 * *`, 48 h, CC6.1/CC4.1) were added as the primary closure of DATA_MODEL §28.9 checklist item 8 (P1/M5 — "Add pg_cron jobs 16 and 17 to §12.6 registry with expected row counts, alert thresholds, and runbook links"); §35.6 is the canonical authoring section. Jobs 22 (`siem_bridge_cr02_impossible_travel`, `*/5 * * * *`, 6 min, CC7.2) and 23 (`siem_bridge_cr03_priv_escalation`, `*/5 * * * *`, 6 min, CC7.2/CC6.6) were added as a secondary closure of §34.5 SIEM Bridge Observability gap (§35 §"Also closes" note, 2026-06-11). Physical production deployment for jobs 16 and 17 (migration `0055b_rate_limit_cron.sql` against production Supabase `cron.schedule()`) remains pending platform-engineer + devops-lead (OBSERVABILITY §35.10 items 6–7, M5). No §12.6 table rows modified by this patch — documentation record only. DATA_MODEL §28.9 item 8 updated to `[x] (docs — §12.6 v2.0 patch, 2026-06-26); [ ] (production deploy — §35.10 items 6–7, M5)` per DATA_MODEL v1.34 (2026-06-26).*
 *v1.9 patch (2026-06-25): §12.6 job 46 `pricing_exception_compliance_monitor` registered — closes COST_MODEL §44.7 observability gap (quarterly pricing exception audit obligation had no automated trigger, no pg_cron job, no SLO, and no evidence artefact). Schedule `0 9 * * *`; 26h freshness window (daily cadence — daily monitoring-layer verification of Worker-layer REENTRY-CHAIN-01 enforcement per COST_MODEL §44.5; consistent with jobs 39 and 45 daily-cadence compliance sentinels). Sweep 1: REENTRY-CHAIN-01 chain integrity — correlated subquery on `audit_log_events` for `enterprise.contract_renewed` with `loyalty_reentry` discount lacking a matching exception approval in prior 30 days; violation → `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr + AL-PRICE-01 P0 PagerDuty (REENTRY-MONITOR-CHAIN-01 ordering invariant). Sweep 2: quarterly audit trigger — fires first 7 days of Jan/Apr/Jul/Oct; aggregate `enterprise.pricing_exception_approved` count by `exception_type` for prior quarter → `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr + Slack `#compliance` advisory. All-clear: `system.pricing_exception_check_passed` LOW/1yr (aggregate, no `tenant_id` — privacy floor). Three evidence artefacts: PRICE-OBS-E-001 (quarterly outcome, CC5.2/CC1.4/CC4.1, 7yr), PRICE-OBS-E-002 (annual run history, CC4.1/A1.1, 3yr). R2 subfolder `compliance/evidence/pricing-exceptions/`. Freshness window note extended to cover job 46. Note: v1.8 registered job 45 `litigation_hold_compliance_monitor` (§54.10 item 3, 2026-06-25) — the v1.8 row is in the canonical table; this v1.9 note immediately follows. Canonical section: §55.*
 *v1.7 patch (2026-06-25): §12.6 job 44 `offboard_chain_monitor` registered — closes the OFFBOARD-CHAIN-01 monitoring gap identified in OBSERVABILITY §53 (v5.1.0, 2026-06-25): no pg_cron job existed to perform a fleet-sweep detecting churned tenants whose `offboarding_initiated_at IS NULL` past the 24h OFFBOARD-CHAIN-01 window. `emit-audit-event` Worker enforces OFFBOARD-CHAIN-01 at emission time (HTTP 422 `OFFBOARD_CHAIN_01_VIOLATION`) but cannot detect cases where the `enterprise.offboarding_initiated` event is simply never emitted (process failure, not chain violation). Job 44 schedule `0 * * * *` (hourly); 2h freshness window (1-run tolerance of hourly cadence — tolerated because the 24h OFFBOARD-CHAIN-01 window is a multi-hour commitment). CC6.1/CC7.1 compliance relevance (MSA §7 deprovisioning SLA monitoring; CHN-E-001 quarterly evidence obligation from COST_MODEL §43.9). On detection: emits `enterprise.offboard_chain_sla_breach` HIGH/7yr per flagged tenant (to be registered in AUDIT_LOG_SCHEMA.md per §53.10 item 1, P0/M10); fires AL-OFFL-01 PagerDuty P1 `form-enterprise`; dedup `offboard-chain-breach-{tenant_id}` 4h cooldown. On all-clear: emits `system.offboard_chain_check_passed` LOW/1yr (no `tenant_id` — privacy floor when fleet is clean). Tables accessed: `enterprise_churn_events` SELECT via `form_system` role (`form_api` REVOKED per DATA_MODEL §44 RLS). Freshness window note extended to cover job 44. Canonical section: §53. No other §12.6 rows modified.*
@@ -15671,3 +15684,295 @@ This is the **monitoring infrastructure** artefact. The **compliance outcome** a
 *v5.2.4 (2026-06-25): §55.10 item 6 cross-reference patch — INCIDENT_RESPONSE R-46 authored. §6.2 AL-PRICE-03 stale-consequence cross-ref updated from "to be authored; §55.10 item 6" to `INCIDENT_RESPONSE R-46 (§R-46.5/R-46.6; v1.0, 2026-06-25)`. §12.6 job 46 stale-consequence cross-ref updated to same. §55.10 item 6 status: `[ ]` → `[x] Done — 2026-06-25 (INCIDENT_RESPONSE.md v3.11, this commit)`. Document header v5.2.3 → v5.2.4. Owner: devops-lead + compliance-officer.*
 
 *v5.2.3 (2026-06-25): §55 Pricing Exception Compliance Observability. Three monitoring gaps closed: (1) REENTRY-CHAIN-01 chain integrity monitoring — no daily sentinel existed; Worker-layer HTTP 422 enforcement (COST_MODEL §44.5) is the primary gate but had no monitoring-layer verification; (2) automated quarterly pricing exception audit trigger — COST_MODEL §44.7 obligation formalised with pg_cron job 46 sweep 2 + DEC-030 signal; (3) evidence artefacts and SLO governance — no PRICE-SLO-* or PRICE-OBS-E-* existed. §55.2: five RED metrics (aggregate fleet-level; no `tenant_id`). §55.3: three SLOs — PRICE-SLO-01 zero-tolerance REENTRY-CHAIN-01 chain integrity; PRICE-SLO-02 quarterly trigger cadence 100%; PRICE-SLO-03 floor override review 1 business day. §55.4: three alert rules — AL-PRICE-01 P0 chain violation (PagerDuty founder + compliance-officer + enterprise-architect); AL-PRICE-02 P1 price floor override approved/restructured (compliance-officer 1-business-day review); AL-PRICE-03 P1 job 46 dead-man's switch 26h freshness. §55.5: pg_cron job 46 `pricing_exception_compliance_monitor` (`0 9 * * *`; daily 09:00 UTC; 26h freshness; sweep 1 correlated subquery REENTRY-CHAIN-01; sweep 2 quarter-boundary conditional aggregate; `system.pricing_exception_check_passed` LOW/1yr all-clear; REENTRY-MONITOR-CHAIN-01 ordering invariant following OFFL-CHAIN-01/LITH-REVIEW-CHAIN-01 pattern; `form_system` role; `form_api` REVOKED from `audit_log_events`; registered in §12.6 v1.9 patch this commit). §55.6: §6.2 `pricing_exception_health` subsection inserted (this commit). §55.7: three DEC-030 monitoring events — `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr; `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr; `system.pricing_exception_check_passed` LOW/1yr; Zod v2 schemas; REENTRY-MONITOR-CHAIN-01 invariant block. §55.8: two evidence artefacts — PRICE-OBS-E-001 (quarterly compliance outcome 7yr CC5.2/CC1.4/CC4.1; aggregate counts only); PRICE-OBS-E-002 (annual monitoring run history 3yr CC4.1/A1.1; `tenant_id` UUID only in AL-PRICE-01 rows); R2 subfolder `compliance/evidence/pricing-exceptions/`. §55.9: Metabase `Pricing Exception Compliance` dashboard (7 panels; `compliance_officer` + `form_admin` only; `enterprise_admin`, `tenant_admin`, `tenant_manager` excluded). §55.10: ten-item implementation checklist (items 3, 4, and 6 `[x] Done — 2026-06-25`; items 1, 2, 5, 7–10 pending M9–M12). §55.11: OQ gap tracker (OQ-PRICE-MON-01/02 🟢 resolved; OQ-PRICE-MON-03 🟡 deferred). §12.6 job 46 registered (v1.9 patch, this commit). §6.2 `pricing_exception_health` subsection inserted (this commit). Privacy floor: `enterprise.reentry_chain_integrity_violation` carries `tenant_id` UUID (FORM-internal) + `renewed_event_id` UUID + `renewal_date` DATE only — no employee `user_id`, name, email, health value, GDPR Art. 9 data; `system.pricing_exception_quarterly_audit_triggered` and `system.pricing_exception_check_passed` carry aggregate fleet counts only (no `tenant_id`); PRICE-OBS-E-001 aggregate counts only; PRICE-OBS-E-002 `tenant_id` UUID in AL-PRICE-01 rows only; no `approver_user_id` in any artefact. Cross-references: `docs/COST_MODEL.md §31.5` (price floors); `docs/COST_MODEL.md §31.8` (four pricing DEC-030 audit events); `docs/COST_MODEL.md §32` (exception approval procedure); `docs/COST_MODEL.md §44.5` (REENTRY-CHAIN-01 Worker-layer enforcement — job 46 is the monitoring-layer complement); `docs/COST_MODEL.md §44.7` (quarterly pricing exception audit obligation — formalised by this section); `docs/DATA_MODEL.md §45.6` (REENTRY-CHAIN-01 Worker cross-ref); `docs/SOC2_READINESS.md §79.4` (PRICE-OBS-E-001/002 to register — §55.10 item 5); `docs/INCIDENT_RESPONSE.md R-46` (§R-46.5/R-46.6; v1.0, 2026-06-25). Owner: compliance-officer + devops-lead + security-engineer.*
+
+---
+
+## §56. SCIM Provisioning Compliance Observability
+
+### §56.1 Purpose and Scope
+
+This section closes three monitoring gaps in FORM's SCIM provisioning compliance framework:
+
+1. **Reactive-only burst detection**: AL-SCIM-01 (§26.7b) detects `scim.rejected_sensitive_attribute` bursts only when > 3 events occur per tenant within any rolling 1h window. No proactive daily baseline sentinel exists — a single isolated sensitive attribute violation (count = 1, below the burst threshold) goes undetected between quarterly reviews.
+
+2. **SCIM-PROV-E-003 collection baseline**: SCIM-PROV-E-003 (SSO_SCIM §27.12, SOC2_READINESS §119) requires a quarterly zero-count assertion for `scim.rejected_sensitive_attribute` (CC6.4). No automated trigger exists to initiate evidence collection or confirm the zero-count baseline before compliance-officer files the quarterly artefact.
+
+3. **Monitoring infrastructure evidence gap**: SCIM-PROV-E-001..004 (SOC2_READINESS §119) cover SCIM provisioning lifecycle outcomes. No monitoring infrastructure artefact (SCIM-PROV-MON-E-001) exists to demonstrate that automated compliance monitoring of SCIM sensitive attribute controls operated throughout the observation year — a CC4.1/A1.1/CC7.2 gap.
+
+**In scope:** `audit_log_events` SCIM event stream — specifically `scim.rejected_sensitive_attribute` events emitted by the SCIM Worker when an IdP PUSH or REPLACE request includes a sensitive attribute (`groups`, `manager`, `costCenter`, `healthData`, or any custom FORM extension attribute); aggregate quarterly counts. **Not in scope:** individual SCIM sync correctness (SSO_SCIM §27) or mass-deprovisioning detection (§26.7a / job 24).
+
+---
+
+### §56.2 RED Metrics — SCIM Provisioning
+
+| Signal | Metric | Normal range |
+|---|---|---|
+| **Rate** | `scim_rejected_sensitive_attr_total` — `scim.rejected_sensitive_attribute` event count per hour across all tenants | 0 (zero is the target — any non-zero count is an anomaly) |
+| **Errors** | `scim_prov_check_errors_total` — job 47 sweep execution failures (pg_net transport error, `emit-audit-event` non-200) | 0 |
+| **Duration (job 47 freshness)** | Hours since last `system.scim_provisioning_check_passed` LOW event in `audit_log_events` | ≤ 26 h |
+
+---
+
+### §56.3 SLOs
+
+| SLO ID | Measurement | Target | Alerting threshold | Window | SOC 2 | Owner |
+|---|---|---|---|---|---|---|
+| **SCIM-PROV-SLO-01** | Count of `scim.rejected_sensitive_attribute` events in any 26h observation window; sourced from `audit_log_events` via job 47 sweep 1 | **Zero — zero-tolerance** (CC6.4 sensitive attribute access control; any single event constitutes an immediate SLO breach with no error budget to burn) | Any event detected by sweep 1 (AL-SCIM-PROV-01 fires) | 26h rolling (daily) | CC6.4 | security-engineer + compliance-officer |
+| **SCIM-PROV-SLO-02** | Hours elapsed since last `system.scim_provisioning_check_passed` LOW event in `audit_log_events`; verifiable via `pg_cron.job_run_details WHERE jobname = 'scim_provisioning_compliance_monitor'` | ≤ 26 h (job 47 daily 06:00 UTC) | > 26 h elapsed (AL-SCIM-PROV-02 fires via `pg-cron-health-monitor`) | Daily | CC4.1 / A1.1 | devops-lead |
+
+**SCIM-PROV-SLO-01 vs SCIM-PROV-SLO-02 relationship:** SCIM-PROV-SLO-01 is a zero-tolerance compliance target (no sensitive attribute violations permitted — any breach is a P0). SCIM-PROV-SLO-02 is a monitoring infrastructure SLO (the detection mechanism itself must not go stale). SCIM-PROV-SLO-02 breach is a P1 monitoring-layer degradation; it does not directly imply a SCIM-PROV-SLO-01 violation, but creates a blind spot window during which a violation could go undetected.
+
+---
+
+### §56.4 Alert Rules
+
+#### AL-SCIM-PROV-01 — Sensitive Attribute Violation Detected
+
+| Attribute | Value |
+|---|---|
+| Alert ID | AL-SCIM-PROV-01 |
+| Trigger | `scim_provisioning_compliance_monitor` (job 47) sweep 1 detects COUNT > 0 of `scim.rejected_sensitive_attribute` events in last 26h |
+| Severity | P0 |
+| Routing | PagerDuty `form-security` → security-engineer + compliance-officer; no auto-resolve |
+| Dedup key | `scim-prov-sensitive-attr-{YYYY-MM-DD}` — 24h cooldown (per-day dedup; a single page per day covers all violations within the 24h window; a new P0 fires on each subsequent day if the violation persists) |
+| Auto-resolve | No — IC must close after full investigation and remediation (confirmed zero-count in subsequent job 47 sweep 1 run) |
+| Ordering invariant | **SCIM-ATTR-CHAIN-01**: `security.scim_sensitive_attr_violation_detected` CRITICAL DEC-030 event must receive HTTP 200 from `emit-audit-event` Worker before AL-SCIM-PROV-01 PagerDuty P0 fires. If non-200 (Worker error, network timeout): PagerDuty is suppressed; `system.cron_job_stale` HIGH event handles monitoring-layer degradation independently via §12.6 `pg-cron-health-monitor`. |
+| Complement | AL-SCIM-01 (§26.7b) is reactive burst-detection (> 3 `scim.rejected_sensitive_attribute` events per tenant per 1h); AL-SCIM-PROV-01 is proactive daily confirmation (any count > 0 in the prior 26h window). A single isolated violation triggers AL-SCIM-PROV-01 but not AL-SCIM-01. Both must be operational for full CC6.4 monitoring coverage. See §56.11 OQ-SCIM-PROV-01 for the distinction rationale. |
+| SOC 2 | CC6.4, CC7.2 |
+
+#### AL-SCIM-PROV-02 — Job 47 Freshness Dead-Man's Switch
+
+| Attribute | Value |
+|---|---|
+| Alert ID | AL-SCIM-PROV-02 |
+| Trigger | No `system.scim_provisioning_check_passed` LOW event in `audit_log_events` for > 26h; detected by `pg-cron-health-monitor` Edge Function (§12.6) at each top-of-hour run |
+| Severity | P1 |
+| Routing | PagerDuty `form-devops` → devops-lead; Slack `#observability` HIGH |
+| Dedup key | `scim-prov-check-stale` — 26h cooldown |
+| Auto-resolve | Yes — on next `system.scim_provisioning_check_passed` emission at the following 06:00 UTC job 47 run |
+| Stale recovery runbook | INCIDENT_RESPONSE R-47 (§R-47.5 — to be authored; §56.10 item 6, P1/M7) |
+| SOC 2 | CC4.1, A1.1 |
+
+---
+
+### §56.5 pg_cron Job 47 Specification
+
+#### §56.5.1 Job Metadata
+
+| Attribute | Value |
+|---|---|
+| Job name | `scim_provisioning_compliance_monitor` |
+| Job number | **47** (canonical §12.6 registry) |
+| Schedule | `0 6 * * *` — 06:00 UTC daily |
+| Schedule rationale | Offset from jobs 45 (`litigation_hold_compliance_monitor`, 08:00 UTC) and 46 (`pricing_exception_compliance_monitor`, 09:00 UTC) to distribute Supabase pg_cron load across the morning window. |
+| Execution role | `form_system` |
+| REVOKE | `form_api` REVOKED from `audit_log_events` — only `form_system` may query this table for compliance sweeps |
+| Freshness window | 26 h (1-day tolerance — consistent with jobs 39, 45, 46; reactive burst detection via AL-SCIM-01 handles real-time anomalies; daily monitoring-layer verification is the CC6.4 compliance baseline) |
+
+#### §56.5.2 Sweep 1 — Sensitive Attribute Zero-Count Baseline
+
+```sql
+-- Sweep 1: detect any scim.rejected_sensitive_attribute events in the last 26 hours
+-- Run via form_system role; form_api REVOKED from audit_log_events
+-- Privacy invariant: COUNT(*) only — no tenant_id, user_id, or rejected value exposed
+SELECT COUNT(*) AS violation_count
+FROM audit_log_events
+WHERE event_type = 'scim.rejected_sensitive_attribute'
+  AND created_at >= NOW() - INTERVAL '26 hours';
+
+-- On violation_count > 0:
+--   1. Emit security.scim_sensitive_attr_violation_detected CRITICAL/7yr via emit-audit-event Worker
+--      (SCIM-ATTR-CHAIN-01: HTTP 200 must be confirmed before step 2)
+--   2. Fire AL-SCIM-PROV-01 via pg_net → PagerDuty form-security P0
+-- On violation_count = 0: proceed to sweep 2 / all-clear
+```
+
+#### §56.5.3 Sweep 2 — Quarterly Provisioning Compliance Trigger
+
+Fires only in the first 7 days of January, April, July, October (first calendar week of each quarter):
+
+```sql
+-- Sweep 2: aggregate quarterly scim.rejected_sensitive_attribute count for prior quarter
+-- Guard: EXTRACT(DAY FROM CURRENT_DATE) <= 7
+--   AND EXTRACT(MONTH FROM CURRENT_DATE) IN (1, 4, 7, 10)
+SELECT COUNT(*) AS quarterly_rejection_count
+FROM audit_log_events
+WHERE event_type = 'scim.rejected_sensitive_attribute'
+  AND created_at >= DATE_TRUNC('quarter', CURRENT_DATE) - INTERVAL '3 months'
+  AND created_at <  DATE_TRUNC('quarter', CURRENT_DATE);
+
+-- Emits system.scim_provisioning_quarterly_check_triggered STANDARD/3yr
+-- (aggregate count only — no tenant_id per privacy floor)
+-- + Slack #compliance advisory (P3 — no PagerDuty)
+-- This event is the automated collection trigger for SCIM-PROV-E-003
+```
+
+#### §56.5.4 All-Clear Emission
+
+After all sweeps complete (regardless of sweep 1 and sweep 2 outcomes):
+
+```sql
+-- Emit system.scim_provisioning_check_passed LOW/1yr
+-- Privacy invariant: aggregate counts only — no tenant_id
+-- Payload: { violations_found, quarterly_trigger_fired, check_run_at }
+```
+
+#### §56.5.5 SCIM-ATTR-CHAIN-01 Ordering Invariant
+
+```
+SCIM-ATTR-CHAIN-01:
+  security.scim_sensitive_attr_violation_detected (CRITICAL, 7yr)
+  must receive HTTP 200 from emit-audit-event Worker
+  BEFORE AL-SCIM-PROV-01 PagerDuty P0 fires.
+
+If emit-audit-event responds non-200:
+  - PagerDuty dispatch SUPPRESSED for this run
+  - system.cron_job_stale HIGH event handles monitoring degradation
+    via §12.6 pg-cron-health-monitor (AL-SCIM-PROV-02 fires when
+    the all-clear emission gap > 26h is detected at next hourly check)
+  - No silent failure: monitoring degradation surfaces via AL-SCIM-PROV-02
+    rather than a misfired P0 alert without an audit anchor
+
+Rationale: Consistent with LITH-REVIEW-CHAIN-01 (§54.5),
+REENTRY-MONITOR-CHAIN-01 (§55.5.5), and OFFL-CHAIN-01 (§53.7).
+Every P0 alert must have a DEC-030 HMAC-chained anchor in audit_log_events
+before the external notification fires — DEC-030 principle applied
+at the monitoring layer, not just the application layer.
+```
+
+#### §56.5.6 Index Prerequisites
+
+Sweep 1 (`event_type = 'scim.rejected_sensitive_attribute' AND created_at >= NOW() - INTERVAL '26 hours'`) must be served by `idx_ale_event_type_created_at` (composite covering `(event_type, created_at)`). Verify this index exists and covers the query before deploying job 47 (§56.10 item 2 prerequisite).
+
+---
+
+### §56.6 §6.2 Integration
+
+The `scim_provisioning_compliance` alert subsection has been inserted into §6.2 (Consolidated Alert Rules) after `pricing_exception_health` (§55.4) and before `sca_vulnerability_monitoring` (§52.4). Status: **[x] Done — 2026-06-26 (OBSERVABILITY.md v5.3.0, this commit)**.
+
+---
+
+### §56.7 DEC-030 Chain Events
+
+Three new events must be registered in `docs/AUDIT_LOG_SCHEMA.md` as a new `§SCIM Provisioning Compliance Monitoring events` subsection (§56.10 item 1 — P0/M5):
+
+#### §56.7.1 Event Specifications
+
+| Event name | Severity | Retention | Emitter | SOC 2 |
+|---|---|---|---|---|
+| `security.scim_sensitive_attr_violation_detected` | CRITICAL | 7 years | job 47 sweep 1 via `emit-audit-event` Worker | CC6.4, CC7.2 |
+| `system.scim_provisioning_quarterly_check_triggered` | STANDARD | 3 years | job 47 sweep 2 via `emit-audit-event` Worker | CC4.1 |
+| `system.scim_provisioning_check_passed` | LOW | 1 year | job 47 all-clear via `emit-audit-event` Worker | CC4.1, A1.1 |
+
+#### §56.7.2 Zod v2 Schemas
+
+```typescript
+// security.scim_sensitive_attr_violation_detected
+// CRITICAL / 7yr — CC6.4 sensitive attribute access control violation
+// Privacy invariant: COUNT(*) only — no tenant_id, no rejected VALUE,
+// no user_id, no employee name/email/health data
+ScimSensitiveAttrViolationDetectedPayload: {
+  violation_count: z.number().int().positive(),
+  window_start:    z.string().datetime(),
+  window_end:      z.string().datetime(),
+  check_run_at:    z.string().datetime()
+}
+
+// system.scim_provisioning_quarterly_check_triggered
+// STANDARD / 3yr — CC6.4 quarterly zero-count assertion evidence trigger
+// Privacy invariant: aggregate quarterly count only — no tenant_id
+ScimProvisioningQuarterlyCheckTriggeredPayload: {
+  quarter_label:             z.string().regex(/^\d{4}-Q[1-4]$/),
+  quarterly_rejection_count: z.number().int().nonnegative(),
+  quarter_start:             z.string().date(),
+  quarter_end:               z.string().date(),
+  check_run_at:              z.string().datetime()
+}
+
+// system.scim_provisioning_check_passed
+// LOW / 1yr — all-clear after all sweeps complete
+// Privacy invariant: aggregate counts only — no tenant_id
+ScimProvisioningCheckPassedPayload: {
+  violations_found:        z.number().int().nonnegative(),
+  quarterly_trigger_fired: z.boolean(),
+  check_run_at:            z.string().datetime()
+}
+```
+
+#### §56.7.3 Chain Invariant — SCIM-ATTR-CHAIN-01
+
+See §56.5.5 for the full invariant block. Summary: `security.scim_sensitive_attr_violation_detected` CRITICAL DEC-030 event must receive HTTP 200 from `emit-audit-event` Worker before AL-SCIM-PROV-01 PagerDuty P0 fires. If non-200: PagerDuty suppressed; `system.cron_job_stale` HIGH handles monitoring degradation independently via §12.6 `pg-cron-health-monitor`.
+
+---
+
+### §56.8 Evidence Artefacts
+
+**SCIM-PROV-MON-E-001 — Annual `scim_provisioning_compliance_monitor` pg_cron Run History**
+
+This is the **monitoring infrastructure** artefact, distinct from the compliance-outcome artefacts SCIM-PROV-E-001..004 (SSO_SCIM §27.12; SOC2_READINESS §119). SCIM-PROV-E-001..004 cover SCIM provisioning lifecycle outcomes (user provisioned, deprovisioned, sensitive attribute rejection count, alert config screenshots); SCIM-PROV-MON-E-001 demonstrates that the automated daily monitoring control that enforces those outcomes operated throughout the observation year — consistent with the *-OBS-E-001 / *-OBS-E-002 convention across §52 (SCA-OBS-E-001/002), §54 (LITH-OBS-E-001), and §55 (PRICE-OBS-E-001/002).
+
+| Attribute | Value |
+|---|---|
+| Artefact ID | SCIM-PROV-MON-E-001 |
+| Path | `compliance/evidence/scim-provisioning/SCIM-PROV-MON-E-001_<YYYY>.md` |
+| Cadence | Annual |
+| Retention | 3 years |
+| SOC 2 criteria | CC4.1, A1.1, CC7.2 |
+| Content | (1) Job 47 run statistics for the year: total runs, successful runs, freshness-window breaches (> 26h gaps) detected by `pg-cron-health-monitor`. (2) AL-SCIM-PROV-01 activation log: any `security.scim_sensitive_attr_violation_detected` CRITICAL events during the year — `violation_count`, `window_start`, `window_end`, `check_run_at`; IC number and resolution timestamp. (3) SCIM-PROV-SLO-01 compliance: confirm zero violations for the year — if any: SCIM-PROV-SLO-01 breach count, IC resolution summaries. (4) Quarterly trigger log: confirm `system.scim_provisioning_quarterly_check_triggered` emitted in Q1–Q4 (`EXTRACT(YEAR FROM created_at) = <YYYY>` — four rows required); `quarterly_rejection_count` per quarter. (5) SCIM-PROV-E-003 supporting data: per-quarter `quarterly_rejection_count` from sweep 2 events — automated pre-computed baseline for compliance-officer SCIM-PROV-E-003 quarterly count assertion. (6) Zero-violation year attestation: affirmative confirmation of SCIM-PROV-SLO-01 (zero violations) and SCIM-PROV-SLO-02 (all four quarterly triggers fired). |
+| Owner | compliance-officer + devops-lead |
+| Distinct from | SCIM-PROV-E-001..004 (SSO_SCIM §27.12 / SOC2_READINESS §119 — SCIM provisioning lifecycle outcome artefacts; SCIM-PROV-MON-E-001 covers the monitoring infrastructure that supports those outcomes) |
+| Register in | SOC2_READINESS §79.4 master consolidated evidence table (§56.10 item 5 — P1/M6); R2 subfolder `compliance/evidence/scim-provisioning/` with `form_api` NO ACCESS |
+| Privacy floor | `violation_count` integer, `window_start`/`window_end`/`check_run_at` timestamps, `quarterly_rejection_count` integer in sweep 2 rows — no `tenant_id`, no rejected attribute VALUE, no `user_id`, name, email, health value, or GDPR Art. 9 data |
+
+**SOC 2 auditor narratives:**
+
+**CC4.1 (monitoring activities):** SCIM-PROV-MON-E-001 demonstrates that FORM operated a daily automated baseline sweep for SCIM sensitive attribute violations throughout the observation year. Job 47 ran daily at 06:00 UTC; the run history shows the monitoring control operated without extended freshness-window gaps. Where gaps occurred, the AL-SCIM-PROV-02 activation log documents detection and remediation per INCIDENT_RESPONSE R-47.
+
+**A1.1 (capacity management — background job health):** SCIM-PROV-MON-E-001 provides auditor-verifiable evidence that job 47 was operational throughout the year (verifiable via `pg_cron.job_run_details WHERE jobname = 'scim_provisioning_compliance_monitor'`). Any freshness breach gaps are documented with their resolution, demonstrating that the §12.6 `pg-cron-health-monitor` freshness sentinel (AL-SCIM-PROV-02) detected and triggered remediation.
+
+**CC7.2 (anomaly detection):** SCIM-PROV-MON-E-001 demonstrates that FORM proactively monitored for SCIM sensitive attribute anomalies on a daily basis, complementing the reactive burst-detection mechanism AL-SCIM-01 (§26.7b). The quarterly trigger log (sweep 2 events) provides the automated pre-computed baseline for compliance-officer SCIM-PROV-E-003 attestation, closing the evidence collection loop between automated monitoring (this section) and compliance-outcome filing (SCIM-PROV-E-003 per SSO_SCIM §27.12).
+
+---
+
+### §56.9 Dashboard
+
+**Dashboard name:** `SCIM Provisioning Compliance`
+**Location:** Metabase → Enterprise → Compliance
+
+| Panel | Signal source | Refresh |
+|---|---|---|
+| Sensitive attribute violation count (rolling 12 months) | `audit_log_events WHERE event_type = 'security.scim_sensitive_attr_violation_detected' AND created_at >= NOW() - INTERVAL '12 months'` — aggregate `payload->>'violation_count'` | Daily |
+| SCIM-PROV-SLO-01 status | `security.scim_sensitive_attr_violation_detected` count in current observation window: 0 = green / > 0 = red | Daily |
+| Quarterly rejection count log (current year) | `audit_log_events WHERE event_type = 'system.scim_provisioning_quarterly_check_triggered' AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW())` — `payload->>'quarterly_rejection_count'` per quarter | Daily |
+| SCIM-PROV-SLO-02 quarterly trigger compliance | Four rows required per year: `system.scim_provisioning_quarterly_check_triggered` in Q1–Q4 | Daily |
+| Job 47 freshness | `pg_cron.job_run_details WHERE jobname = 'scim_provisioning_compliance_monitor'` — last run vs. 26h window | 1 hr |
+| AL-SCIM-01 reactive burst log (rolling 12 months) | `audit_log_events WHERE event_type = 'security.scim_sensitive_attr_burst_detected'` — AL-SCIM-01 (§26.7b) reactive complement signal | Daily |
+
+**Access control:** `compliance_officer` + `form_admin` only. `enterprise_admin`, `tenant_admin`, and `tenant_manager` (HR) excluded — SCIM sensitive attribute governance is a FORM-internal compliance instrument. No `tenant_id`, `user_id`, or rejected attribute value in any panel.
+
+---
+
+### §56.10 Implementation Checklist
+
+| # | Item | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Register three new DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` — new `§SCIM Provisioning Compliance Monitoring events` subsection after `§Enterprise Pricing Exception Monitoring events`: `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr; `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr; `system.scim_provisioning_check_passed` LOW/1yr. Include Zod v2 schemas (§56.7.2), SCIM-ATTR-CHAIN-01 ordering invariant block (§56.5.5), and SOC 2 auditor narratives (CC6.4/CC4.1/CC7.2). | P0 | M5 | security-engineer + compliance-officer | [ ] |
+| 2 | Implement pg_cron job 47 `scim_provisioning_compliance_monitor` (`0 6 * * *`; §56.5.1 spec; §56.5.2 sweep 1 zero-count check; §56.5.3 sweep 2 quarterly trigger; §56.5.4 all-clear emission; SCIM-ATTR-CHAIN-01 ordering invariant; `form_system` role; `form_api` REVOKED from `audit_log_events`). Verify `idx_ale_event_type_created_at` covers sweep 1 query (§56.5.6). Prerequisite: `scim.rejected_sensitive_attribute` event type registered in `audit_log_events` (SSO_SCIM §27.12 item 4 — AL-SCIM-01 pg_cron deploy P0/M5). | P0 | M5 | devops-lead + platform-engineer | [ ] |
+| 3 | Register job 47 in `docs/OBSERVABILITY.md §12.6` pg_cron canonical registry. | P0 | M5 | devops-lead | [x] Done — 2026-06-26 (§12.6 v2.1 patch, this commit) |
+| 4 | Insert `scim_provisioning_compliance` subsection into `docs/OBSERVABILITY.md §6.2` Consolidated Alert Rules after `pricing_exception_health` (§55.4) and before `sca_vulnerability_monitoring` (§52.4). | P0 | M5 | devops-lead | [x] Done — 2026-06-26 (OBSERVABILITY.md v5.3.0, this commit) |
+| 5 | Register SCIM-PROV-MON-E-001 (§56.8) in `docs/SOC2_READINESS.md §79.4` master consolidated evidence table; create R2 subfolder `compliance/evidence/scim-provisioning/` with `form_api` NO ACCESS; add to §80.4 Vanta mirror list. Author §120 cross-reference patch in SOC2_READINESS.md cross-referencing SCIM-PROV-MON-E-001 against §119 (SCIM-PROV-E-001..004). | P1 | M6 | compliance-officer | [ ] |
+| 6 | Author INCIDENT_RESPONSE R-47 (job 47 `scim_provisioning_compliance_monitor` stale recovery runbook): six-step runbook; §R-47.5 SCIM-ATTR-CHAIN-01 violation escalation path (IC forensic investigation — `scim.rejected_sensitive_attribute` audit trail review, IdP attribute mapping remediation); companion DEC-030 events `system.scim_provisioning_monitor_stale_declared` (HIGH/7yr) + `system.scim_provisioning_monitor_restored` (STANDARD/3yr); SCIM-PROV-MONITOR-STALE-CHAIN-01 ordering invariant; update §12.6 job 47 stale-consequence cross-ref to reference R-47. | P1 | M7 | devops-lead + compliance-officer | [ ] |
+| 7 | End-to-end staging test: (a) INSERT `audit_log_events` row `event_type = 'scim.rejected_sensitive_attribute'` `created_at >= NOW() - INTERVAL '26 hours'`; confirm job 47 sweep 1 detects violation at next 06:00 UTC run; confirm `security.scim_sensitive_attr_violation_detected` CRITICAL emitted (SCIM-ATTR-CHAIN-01 verified: HTTP 200 before PagerDuty P0). (b) DELETE the test row; confirm zero-count all-clear at next run; confirm `system.scim_provisioning_check_passed` emitted. (c) Override `CURRENT_DATE` to first day of a calendar quarter in staging; confirm sweep 2 fires `system.scim_provisioning_quarterly_check_triggered` STANDARD + Slack `#compliance` advisory. | P2 | M8 | devops-lead | [ ] |
+| 8 | Configure Metabase `SCIM Provisioning Compliance` dashboard (§56.9 — 6 panels); restrict to `compliance_officer` + `form_admin`; confirm `enterprise_admin`, `tenant_admin`, and `tenant_manager` excluded; verify no `tenant_id`, `user_id`, or rejected attribute value in any panel. | P1 | M8 | data-engineer | [ ] |
+
+---
+
+### §56.11 OQ Gap Tracker
+
+| OQ | Status | Decision |
+|---|---|---|
+| OQ-SCIM-PROV-01: Why is AL-SCIM-PROV-01 (proactive daily) needed when AL-SCIM-01 (§26.7b, reactive burst) already monitors `scim.rejected_sensitive_attribute`? | 🟢 Resolved — complementary tracks, not redundant | AL-SCIM-01 (§26.7b) is a *reactive* burst detector: fires when > 3 `scim.rejected_sensitive_attribute` events occur for a single tenant within any rolling 1h window. It detects a *spike* in violations. AL-SCIM-PROV-01 is a *proactive* daily baseline sentinel: fires on any non-zero count in the prior 26h window, regardless of per-tenant concentration. A single isolated violation — one IdP misconfiguration pushing one sensitive attribute for one tenant — yields count = 1, below AL-SCIM-01's burst threshold, and goes undetected by AL-SCIM-01. SCIM-PROV-E-003 (CC6.4) requires compliance-officer to attest a zero-count target quarterly; that attestation requires a daily automated baseline, not a burst detector. The two alerts are complementary and cover distinct threat profiles: AL-SCIM-01 detects volume anomalies (mass misconfiguration or malicious injection campaign); AL-SCIM-PROV-01 enforces the CC6.4 zero-tolerance policy for any violation, regardless of volume. |
+
+---
+
+*v5.3.0 (2026-06-26): §56 SCIM Provisioning Compliance Observability — closes three monitoring gaps identified after SOC2_READINESS §119 registered SCIM-PROV-E-001..004 (2026-06-26): (1) no proactive daily baseline sentinel for `scim.rejected_sensitive_attribute` events (AL-SCIM-01 §26.7b is reactive burst-only; a single isolated violation was undetectable between quarterly reviews); (2) SCIM-PROV-E-003 quarterly zero-count assertion (SOC2_READINESS §119, CC6.4) had no automated collection trigger; (3) no monitoring infrastructure evidence artefact (SCIM-PROV-MON-E-001) to complement SCIM-PROV-E-001..004. New pg_cron job 47 `scim_provisioning_compliance_monitor` (`0 6 * * *`; 26h freshness; sweep 1 zero-count check; sweep 2 quarterly trigger; `system.scim_provisioning_check_passed` all-clear; SCIM-ATTR-CHAIN-01 ordering invariant). Two new SLOs: SCIM-PROV-SLO-01 (zero-tolerance CC6.4; any event = P0) and SCIM-PROV-SLO-02 (job 47 freshness CC4.1/A1.1). Two new alert rules: AL-SCIM-PROV-01 (P0 violation; PagerDuty `form-security`) and AL-SCIM-PROV-02 (P1 stale; PagerDuty `form-devops`). Three new DEC-030 events specified in §56.7 (AUDIT_LOG_SCHEMA.md registration pending §56.10 item 1 P0/M5). Evidence artefact SCIM-PROV-MON-E-001 (annual run history, CC4.1/A1.1/CC7.2, 3yr; SOC2_READINESS §79.4 registration pending §56.10 item 5 P1/M6). §6.2 `scim_provisioning_compliance` subsection inserted (this commit, item 4 done). §12.6 job 47 registered (v2.1 patch, this commit, item 3 done). TOC entry added. Privacy floor throughout: `security.scim_sensitive_attr_violation_detected` carries aggregate `violation_count` + timestamps only — no `tenant_id`, no rejected attribute VALUE, no `user_id`, name, email, health value, or GDPR Art. 9 data; `system.scim_provisioning_quarterly_check_triggered` and `system.scim_provisioning_check_passed` carry aggregate counts only. Pending obligations: AUDIT_LOG_SCHEMA.md DEC-030 registration (item 1 P0/M5), job 47 implementation (item 2 P0/M5), SOC2_READINESS §120 cross-ref patch + SCIM-PROV-MON-E-001 registration (item 5 P1/M6), INCIDENT_RESPONSE R-47 (item 6 P1/M7), staging test (item 7 P2/M8), Metabase dashboard (item 8 P1/M8). Owner: compliance-officer + security-engineer + enterprise-architect. Document v5.2.6 → v5.3.0.*
