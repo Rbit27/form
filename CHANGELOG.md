@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [9.19.1] — 2026-06-26
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §SCIM Provisioning Compliance Monitoring events` — Five new DEC-030 HMAC-chained events registered (v2.51 + v2.52): `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr, `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr, `system.scim_provisioning_check_passed` LOW/1yr (v2.51; closes OBSERVABILITY §56.10 item 1 P0/M5); `system.scim_provisioning_monitor_stale_declared` HIGH/7yr and `system.scim_provisioning_monitor_restored` STANDARD/3yr (v2.52; companion R-47 stale-monitor chain). Zod v4 schemas for all five events. SCIM-ATTR-CHAIN-01 and SCIM-PROV-MONITOR-STALE-CHAIN-01 ordering invariants. SOC 2 auditor narratives CC6.4/CC4.1/CC7.2/A1.1. Privacy floor: all events carry aggregate counts + timestamps only — no `tenant_id`, no rejected attribute value, no `user_id`, no GDPR Art. 9 data.
+- `docs/SOC2_READINESS.md §120` — SCIM-PROV-MON-E-001 monitoring infrastructure evidence artefact registered (CC4.1/A1.1/CC7.2; annual; 3yr retention). §79.4 evidence count 85 → 86. §80.4 Vanta mirror entry added. Closes §56.10 item 5 documentation phase (v3.45.0).
+- `docs/INCIDENT_RESPONSE.md R-47` — Job 47 stale recovery runbook (v1.0; closes OBSERVABILITY §56.10 item 6 P1/M7). Structural peer to R-46 (two-SLO pattern). Five scope queries R-47-C1..C5, four hypotheses H1-H4, SCIM-ATTR-CHAIN-01 escalation path §R-47.5, quarterly trigger compensating control §R-47.6, three communication templates, DEC-030 event table, Zod schemas, five SOC 2 evidence artefacts, full cross-reference table.
+
+### Changed
+- `docs/OBSERVABILITY.md` — §56.10 items 1 and 6 marked Done 2026-06-26; §12.6 job 47 cross-ref updated from "to be authored" to v1.0; §6.2 AL-SCIM-PROV-01 cross-ref updated; §56.4 AL-SCIM-PROV-02 stale recovery runbook row updated to R-47 v1.0.
+- `docs/AUDIT_LOG_SCHEMA.md` — R-47 cross-ref in SCIM monitoring section updated from "pending §56.10 item 6" to v1.0 2026-06-26.
+- `VERSION` — 9.19.0 → 9.19.1.
+
+---
+
 ## [9.19.0] — 2026-06-26
 
 ### Added

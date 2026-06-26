@@ -17417,4 +17417,310 @@ z.object({
 
 ---
 
+---
+
+## R-47: SCIM Provisioning Compliance Monitor Stale (`scim_provisioning_compliance_monitor` · job 47)
+
+**Severity on trigger:** P1 (monitoring-layer SLO degradation) → escalates to P0 if R-47-C2 (sensitive attribute violation gate) confirms `scim.rejected_sensitive_attribute` events occurred undetected during stale window.
+**Trigger:** AL-SCIM-PROV-02 PagerDuty P1 `form-devops` → devops-lead. Dedup key `scim-prov-check-stale`. Auto-resolves on next `system.scim_provisioning_check_passed` LOW emission.
+**Structural peers:** R-45 (Litigation Hold — three-SLO escalation); R-46 (Pricing Exception — two-SLO escalation). R-47 follows the same two-SLO pattern as R-46 with the SCIM-specific CC6.4 sensitive attribute escalation path substituting for R-46's REENTRY-CHAIN-01 path.
+**Owner:** devops-lead (primary IC) + compliance-officer + security-engineer (§R-47.5 escalation path).
+
+### R-47.1 Trigger Conditions
+
+Job 47 (`scim_provisioning_compliance_monitor`) runs daily at 06:00 UTC. `pg-cron-health-monitor` (OBSERVABILITY §12.6) fires AL-SCIM-PROV-02 PagerDuty P1 when no `system.scim_provisioning_check_passed` LOW event appears in `audit_log_events` for > 26h. This runbook is activated on that P1 page, or on manual discovery that job 47 has not run within 26h.
+
+Job 47 staleness creates two simultaneous monitoring gaps:
+
+1. **SCIM-PROV-SLO-01 blind spot (§R-47.5):** Any `scim.rejected_sensitive_attribute` events occurring during the stale window are not detected by the monitoring layer. Job 47 sweep 1 would normally emit `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr per SCIM-ATTR-CHAIN-01 ordering invariant (AUDIT_LOG_SCHEMA v2.51 §SCIM Provisioning Compliance Monitoring events). During staleness, the daily sweep does not run and no CRITICAL event is emitted for any violations that occur — AL-SCIM-PROV-01 P0 does not fire. The IC must manually run R-47-C2 to check for violations during the blind-spot window.
+
+2. **SCIM-PROV-SLO-02 quarterly trigger miss (§R-47.6):** If the stale window overlaps the first 7 days of Jan/Apr/Jul/Oct, job 47 sweep 2 does not fire the `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr event (SOC2_READINESS §119 SCIM-PROV-E-003 quarterly zero-count assertion obligation). The IC must manually run sweep 2 SQL and emit the trigger event per §R-47.6 if this window is missed.
+
+### R-47.2 Severity Classification
+
+| Condition | Initial severity |
+|---|---|
+| Stale > 26h, R-47-C2 returns zero rows (no violations during stale window) | P1 — monitoring degradation, CC6.4 controls effective at SCIM Worker write boundary (HTTP 422 SSO_SCIM §14 `BLOCKED_ATTRIBUTE_PATTERNS`) |
+| Stale > 26h, R-47-C2 returns > 0 rows (`scim.rejected_sensitive_attribute` events during window) | **P0 — escalate immediately** → §R-47.5 SCIM-ATTR-CHAIN-01 forensic path; security-engineer + compliance-officer paged; SCIM-PROV-SLO-01 breach confirmed |
+| Stale window overlaps first 7 days of quarter (R-47-C3 positive) | P1+ → §R-47.6 quarterly trigger miss path; compliance-officer paged |
+
+### R-47.3 Scope Queries
+
+**R-47-C1 — Confirm staleness (run immediately on receipt of P1 page):**
+```sql
+SELECT jobname, last_run_time, next_run_time,
+       EXTRACT(EPOCH FROM (NOW() - last_run_time)) / 3600 AS stale_hours,
+       (EXTRACT(EPOCH FROM (NOW() - last_run_time)) / 3600)::int AS missed_runs_approx
+FROM pg_cron.job_run_details jrd
+JOIN cron.job j ON j.jobid = jrd.jobid
+WHERE j.jobname = 'scim_provisioning_compliance_monitor'
+ORDER BY last_run_time DESC
+LIMIT 5;
+```
+**Expected result:** Last run > 26h ago. If last run < 26h: false-positive from `pg-cron-health-monitor`; close P1 as resolved; no further action.
+
+**R-47-C2 — Sensitive attribute violation gate (P0/P1 severity pivot):**
+```sql
+-- Parameterise <confirmed_stale_since> with last_run_time from R-47-C1
+SELECT COUNT(*) AS violation_count,
+       MIN(created_at) AS first_violation,
+       MAX(created_at) AS last_violation
+FROM audit_log_events
+WHERE event_type = 'scim.rejected_sensitive_attribute'
+  AND created_at >= '<confirmed_stale_since>'
+  AND created_at <= NOW();
+```
+**If count > 0:** Escalate to P0 → §R-47.5. Note: this query accesses `scim.rejected_sensitive_attribute` source events — the rejected attribute VALUE is never logged (SSO_SCIM §14 `BLOCKED_ATTRIBUTE_PATTERNS` blocks the value at write boundary). Payload carries `rejected_attribute_name` (schema metadata) + `tenant_id` + `scim_request_id` only.
+**If count = 0:** SCIM-PROV-SLO-01 not breached during stale window; continue P1 recovery.
+
+**R-47-C3 — Quarterly trigger window overlap (SCIM-PROV-E-003 evidence gap check):**
+```sql
+-- Confirm whether stale window intersects first 7 days of Jan/Apr/Jul/Oct
+SELECT gs::date AS quarter_start_date,
+       '<confirmed_stale_since>'::date AS stale_window_start,
+       NOW()::date AS stale_window_end,
+       (gs::date BETWEEN '<confirmed_stale_since>'::date AND NOW()::date) AS in_stale_window
+FROM GENERATE_SERIES(
+  DATE_TRUNC('quarter', '<confirmed_stale_since>'::timestamptz),
+  DATE_TRUNC('quarter', NOW()),
+  INTERVAL '3 months'
+) gs
+WHERE gs::date + 6 >= '<confirmed_stale_since>'::date
+  AND gs::date <= NOW()::date;
+```
+**If rows returned with `in_stale_window = true`:** Quarterly SCIM-PROV-E-003 trigger missed → §R-47.6.
+**If no rows:** Quarterly trigger unaffected.
+
+**R-47-C4 — Peer job health discriminator (H4 Supabase outage detection):**
+```sql
+SELECT j.jobname,
+       MAX(jrd.last_run_time) AS last_run,
+       EXTRACT(EPOCH FROM (NOW() - MAX(jrd.last_run_time))) / 3600 AS stale_hours
+FROM pg_cron.job_run_details jrd
+JOIN cron.job j ON j.jobid = jrd.jobid
+WHERE j.jobname IN (
+  'pricing_exception_compliance_monitor',  -- job 46 (daily 09:00 UTC)
+  'litigation_hold_compliance_monitor',    -- job 45 (daily 08:00 UTC)
+  'audit_log_retention_purge'              -- job 31 (daily)
+)
+GROUP BY j.jobname;
+```
+**≥ 2 peers stale:** H4 Supabase platform outage → R-03 co-activation.
+
+**R-47-C5 — Job registration check (H1 discriminator):**
+```sql
+SELECT jobid, jobname, schedule, active
+FROM cron.job
+WHERE jobname = 'scim_provisioning_compliance_monitor';
+```
+**No row:** H1 — job deleted (requires R-05 if unauthorized); re-register per §R-47 Step 1.
+**Row present, `active = false`:** H1 variant — job disabled; re-enable.
+
+### R-47.4 Root Cause Hypotheses
+
+| Hypothesis | Indicator | Fix path |
+|---|---|---|
+| H1 — Job deleted or disabled | R-47-C5 returns no row or `active = false` | Re-register via `SELECT cron.schedule('scim_provisioning_compliance_monitor', '0 6 * * *', $$ ... $$)` as `form_system`; if unauthorized: R-05 co-activation |
+| H2 — `form_system` permission revoked from `audit_log_events` | Job ran but failed to SELECT `scim.rejected_sensitive_attribute` events; `pg_cron.job_run_details` shows ERROR in `return_message` | Restore `SELECT` on `audit_log_events` to `form_system`; confirm `form_api` REVOKED; re-run job manually |
+| H3 — pg_net degraded (emit-audit-event Worker or PagerDuty call failed) | R-47-C1 shows job ran recently but no `system.scim_provisioning_check_passed` in `audit_log_events`; check `pg_net.http_requests` for non-200 responses | Supabase support for pg_net; re-run job manually after resolution; no SCIM-PROV-SLO-01 breach if C2 = 0 |
+| H4 — Supabase platform outage | R-47-C4 shows ≥ 2 peers stale | R-03 co-activation; wait for platform restoration; re-run all affected daily jobs after recovery |
+
+### R-47.5 Escalation Path — SCIM-ATTR-CHAIN-01 Violation (R-47-C2 Positive)
+
+*Activate when R-47-C2 returns count > 0. Co-activate with §R-47.1 P0 severity upgrade. Security-engineer and compliance-officer paged.*
+
+**P0 preamble:** A GDPR Art. 9 sensitive health attribute reached the SCIM provisioning endpoint and was blocked by the SSO_SCIM §14 `BLOCKED_ATTRIBUTE_PATTERNS` blocklist during the job 47 stale window. The monitoring layer did not emit `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr because job 47 was not running. The SCIM Worker write-boundary enforcement (HTTP 422 `BLOCKED_ATTRIBUTE_PATTERNS` rejection) did operate — no Art. 9 data was written to the `users` or `scim_users` tables. The compliance exposure is that the DEC-030 HMAC-chained violation record was not emitted and AL-SCIM-PROV-01 did not fire.
+
+**Step R-47-A: Forensic audit trail review (security-engineer):**
+```sql
+-- Identify which tenants had violations during the stale window
+-- Note: rejected_attribute_value is NEVER logged; rejected_attribute_name is schema metadata only
+SELECT tenant_id, scim_request_id, rejected_attribute_name,
+       created_at, payload->>'idp_user_id' AS idp_user_id
+FROM audit_log_events
+WHERE event_type = 'scim.rejected_sensitive_attribute'
+  AND created_at >= '<confirmed_stale_since>'
+  AND created_at <= NOW()
+ORDER BY created_at;
+```
+Access: `security_reviewer` role (PAM-elevated); `form_api` REVOKED from `audit_log_events` for this event type.
+
+**Step R-47-B: IdP attribute mapping remediation (security-engineer + compliance-officer):**
+For each `tenant_id` in the forensic query results:
+1. Contact the tenant's IdP administrator (via CSM and enterprise_admin channel — no individual employee PII surfaced).
+2. Instruct removal of the blocked attribute from the SCIM attribute mapping in the IdP configuration.
+3. Verify attribute is absent from the next SCIM push (confirm no further `scim.rejected_sensitive_attribute` events after remediation; one 26h monitoring cycle required).
+4. Open compliance investigation report if the attribute is a known GDPR Art. 9 category (health score, BMI, workout frequency derived from biometrics) — route to GDPR_DPIA review if novel attribute category identified.
+
+**Step R-47-C: Retroactive DEC-030 event emission (compliance-officer, PAM-elevated):**
+After R-47-B remediation and R-47-A confirms the violation count and window, emit the retroactive `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr event with the correct `violation_count`, `window_start`, `window_end`, and `check_run_at` fields. SCIM-ATTR-CHAIN-01 ordering invariant: HTTP 200 from `emit-audit-event` Worker must be confirmed before AL-SCIM-PROV-01 P0 PagerDuty dispatch (which at this point is the retroactive IC-controlled notification, not the automated job dispatch). Confirm dedup `scim-prov-sensitive-attr-{YYYY-MM-DD}` is not already set for this date; if so, use `scim-prov-sensitive-attr-{YYYY-MM-DD}-r47-retroactive` to avoid dedup collision.
+
+**Step R-47-D: Post-mortem (24h post-resolution):**
+File P0 post-mortem covering: stale window duration; violation count and `rejected_attribute_name` categories; IdP remediation steps; SCIM-PROV-SLO-01 breach timeline; SCIM-ATTR-CHAIN-01 retroactive closure; SCIM-PROV-E-003 quarterly zero-count assertion impact assessment (if any violation occurred in the current quarter, the quarterly assertion cannot be zero-count — file linked incident reference in the next SCIM-PROV-E-003 quarterly filing per SOC2_READINESS §119).
+
+### R-47.6 Quarterly Trigger Miss Path (R-47-C3 Positive)
+
+*Activate when R-47-C3 returns rows with `in_stale_window = true`. This is a P1+ extension — compliance-officer paged. Can co-activate with §R-47.5 if both C2 and C3 are positive.*
+
+**Condition:** Job 47 stale window overlaps the first 7 days of a calendar quarter (Jan/Apr/Jul/Oct). The `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr event was not emitted — the quarterly SCIM-PROV-E-003 zero-count assertion obligation (SOC2_READINESS §119) has no automated trigger for this quarter.
+
+**Manual sweep 2 SQL (compliance-officer, PAM-elevated):**
+```sql
+-- Compute quarterly_rejection_count for the prior quarter
+-- Parameterise <quarter_start> = first day of prior quarter (e.g. 2026-04-01 for Q2)
+-- and <quarter_end> = last day of prior quarter (e.g. 2026-06-30 for Q2)
+SELECT COUNT(*) AS quarterly_rejection_count
+FROM audit_log_events
+WHERE event_type = 'scim.rejected_sensitive_attribute'
+  AND created_at >= '<quarter_start>'::timestamptz
+  AND created_at < '<quarter_end>'::timestamptz + INTERVAL '1 day';
+```
+
+**Emit compensating `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr** with `quarterly_trigger_manually_fired: true` in payload metadata (the canonical schema does not include this flag — document in accompanying stale-window note; the flag is for SCIM-PROV-MON-E-001 auditor record only). Emit via `emit-audit-event` Worker (compliance-officer, PAM-elevated). Slack `#compliance` advisory: "SCIM quarterly trigger manually fired (R-47 compensating control — job 47 stale window overlapped quarter start; `quarterly_rejection_count = <N>`)."
+
+**File stale-window note** (filed with SCIM-PROV-MON-E-001 annual collection): documents the quarter, stale window dates, manual trigger emission timestamp, and `quarterly_rejection_count` value. If count > 0: initiate SCIM-PROV-E-003 incident-linked filing per SOC2_READINESS §119.
+
+### R-47 Recovery Steps
+
+**Step 1 — Re-register job 47 (H1):**
+```sql
+SELECT cron.schedule(
+  'scim_provisioning_compliance_monitor',
+  '0 6 * * *',
+  $$ /* full job 47 spec per OBSERVABILITY §56.5 */ $$
+);
+```
+If deletion was unauthorized: R-05 co-activation. Verify `form_system` role; confirm `form_api` REVOKED from `audit_log_events`.
+
+**Step 2 — Restore `form_system` permissions (H2):**
+```sql
+GRANT SELECT ON TABLE audit_log_events TO form_system;
+-- Confirm REVOKE still in effect for form_api:
+REVOKE ALL ON TABLE audit_log_events FROM form_api;
+```
+
+**Step 3 — pg_net / emit-audit-event resolution (H3):**
+Check `pg_net.http_requests` for non-200 responses from the `emit-audit-event` Worker. File Supabase support ticket if pg_net is degraded. After resolution, trigger a manual job 47 run.
+
+**Step 4 — Supabase outage recovery (H4):**
+Co-activate R-03 (Infrastructure Outage). Wait for Supabase platform restoration. After recovery, confirm peer jobs (pricing_exception_compliance_monitor, litigation_hold_compliance_monitor) also restored. Re-run job 47 manually to emit `system.scim_provisioning_check_passed` and auto-resolve AL-SCIM-PROV-02.
+
+**Step 5 — Active violation path (if R-47-C2 positive):**
+Execute §R-47.5 SCIM-ATTR-CHAIN-01 forensic sequence: R-47-A (audit trail), R-47-B (IdP remediation), R-47-C (retroactive DEC-030 emission), R-47-D (P0 post-mortem). Do not proceed to Step 6 until all tenants with violations have completed R-47-B.
+
+**Step 6 — Manual job run + all-clear + DEC-030 closure:**
+```sql
+SELECT cron.run_job('scim_provisioning_compliance_monitor');
+```
+Confirm `system.scim_provisioning_check_passed` LOW emitted in `audit_log_events`. Emit `system.scim_provisioning_monitor_restored` STANDARD/3yr (SCIM-PROV-MONITOR-STALE-CHAIN-01 terminal event) via `emit-audit-event` Worker (IC, PAM-elevated). Resolve PagerDuty P1/P0 `scim-prov-check-stale`. Close Linear incident ticket. File stale-window note if §R-47.5 or §R-47.6 were activated.
+
+### R-47.7 Communication Templates
+
+**SCIM-PROV-MON-INT-01 — P1 all-clear (internal):**
+> `#security #compliance` — INCIDENT CLOSED P1 R-47: SCIM provisioning compliance monitor (job 47) restored at `<time>`. Stale duration: `<N>` hours. Root cause: `<H1-H4>`. R-47-C2 result: zero `scim.rejected_sensitive_attribute` events during stale window — CC6.4 controls operated at SCIM Worker write boundary throughout. Quarterly trigger: `<not affected / manually fired per §R-47.6>`. DEC-030 chain: `scim_provisioning_monitor_stale_declared` + `scim_provisioning_monitor_restored` emitted. SCIM-PROV-MON-E-001 stale-window note filed.
+
+**SCIM-PROV-MON-INT-02 — P0 violation detected (internal, security-engineer drafts):**
+> `#security #compliance #devops` — INCIDENT P0 R-47: SCIM sensitive attribute violation detected during monitoring blind spot. Job 47 stale window: `<confirmed_stale_since>` to `<NOW()>`. Violation count: `<N>` (attribute names: `<list>`). Affected tenant count: `<M>` (tenant_ids: FORM-internal UUIDs — not surfaced in this message). §R-47-A forensic review complete. §R-47-B IdP remediation in progress. §R-47-C retroactive DEC-030 emission pending remediation confirmation. SCIM-PROV-SLO-01 breach documented. Post-mortem at T+24h.
+
+**SCIM-PROV-MON-INT-03 — P1+ quarterly trigger miss (internal):**
+> `#compliance` — R-47 QUARTERLY TRIGGER MISS: Job 47 stale window overlapped Q`<N>` start window (`<quarter_start>` to `<quarter_start + 7 days>`). Manual sweep 2 SQL executed: `quarterly_rejection_count = <N>`. Manual `system.scim_provisioning_quarterly_check_triggered` emitted. SCIM-PROV-E-003 quarterly assertion `<unaffected / linked incident reference>`. Stale-window note filed for SCIM-PROV-MON-E-001. Slack `#compliance` advisory sent.
+
+### R-47.8 DEC-030 HMAC-Chained Events
+
+Two events anchor the R-47 incident lifecycle. **SCIM-PROV-MONITOR-STALE-CHAIN-01 ordering invariant:** `system.scim_provisioning_monitor_restored` is blocked (HTTP 422 `SCIM_PROV_MONITOR_STALE_CHAIN_01_VIOLATION`) by the `emit-audit-event` Worker if no prior `system.scim_provisioning_monitor_stale_declared` exists for the same `incident_id`; violation → R-05 activated. Privacy floor (both events): integer counts, booleans, timestamps, and enum values only — no `tenant_id`, no employee `user_id`, no rejected attribute VALUE, no GDPR Art. 9 data. These events are distinct from `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr (which job 47 emits WHEN RUNNING to report active violations) and from `system.scim_provisioning_check_passed` LOW/1yr (job 47 all-clear). Structural peers: PRICING-MONITOR-STALE-CHAIN-01 (R-46); LITH-MONITOR-STALE-CHAIN-01 (R-45); OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 (R-44).
+
+| Event | Severity | Retention | Emitter | Trigger |
+|---|---|---|---|---|
+| `system.scim_provisioning_monitor_stale_declared` | HIGH | 7 yr | devops-lead (IC, PAM-elevated, `emit-audit-event` Worker) | R-47 T+0 on receipt of AL-SCIM-PROV-02 P1 page or manual discovery; SCIM-PROV-MONITOR-STALE-CHAIN-01 prerequisite |
+| `system.scim_provisioning_monitor_restored` | STANDARD | 3 yr | devops-lead (IC, PAM-elevated, `emit-audit-event` Worker) | Step 6 after job 47 confirmed healthy and R-47-C2 re-run passes; SCIM-PROV-MONITOR-STALE-CHAIN-01 terminal event; resolves PagerDuty `scim-prov-check-stale` |
+
+### R-47.9 Zod v2 Schemas (canonical source: this document §R-47.9)
+
+```typescript
+import { z } from 'zod/v4';
+
+// system.scim_provisioning_monitor_stale_declared — HIGH · 7 yr · CC6.4/CC4.1/CC7.1/CC7.2
+// SCIM-PROV-MONITOR-STALE-CHAIN-01 anchor — IC-emitted at R-47 T+0
+// Privacy floor: counts, booleans, timestamps, enums only — no tenant_id, no user_id, no GDPR Art. 9 data
+export const ScimProvisioningMonitorStaleDeclaredPayload = z.object({
+  incident_id:                                z.string().uuid(),
+  confirmed_stale_since:                      z.string().datetime(),
+  stale_hours:                                z.number().positive(),
+  missed_runs:                                z.number().int().nonnegative(),
+  trigger:                                    z.enum(['pagerduty_alert', 'manual_discovery', 'co_active_r03']),
+  initial_severity:                           z.enum(['P1', 'P0']),
+  stale_window_overlaps_quarter_start:        z.boolean(),
+  violations_found_during_stale:              z.number().int().nonnegative(),
+  // violations_found_during_stale = 0: auditor-inspectable CC6.4 attestation that no
+  // scim.rejected_sensitive_attribute events occurred undetected during stale window.
+  // > 0: R-47-A forensic path + R-47-C retroactive CRITICAL event required.
+});
+
+// system.scim_provisioning_monitor_restored — STANDARD · 3 yr · CC7.2
+// SCIM-PROV-MONITOR-STALE-CHAIN-01 terminal event — IC-emitted at Step 6
+export const ScimProvisioningMonitorRestoredPayload = z.object({
+  incident_id:                                z.string().uuid(), // must match stale_declared
+  restored_at:                                z.string().datetime(),
+  root_cause:                                 z.enum([
+    'H1_job_deleted',
+    'H2_form_system_permission_revoked',
+    'H3_pg_net_degraded',
+    'H4_supabase_outage',
+  ]),
+  fix_deployed_at:                            z.string().datetime(),
+  stale_window_hours:                         z.number().positive(),
+  stale_window_overlaps_quarter_start:        z.boolean(), // must match stale_declared value
+  violations_found_during_stale:              z.number().int().nonnegative(), // must match stale_declared
+  violations_at_restored:                     z.number().int().nonnegative(), // R-47-C2 re-run count at restoration; 0 required
+  quarterly_trigger_manually_fired:           z.boolean(), // true if §R-47.6 compensating control activated
+});
+```
+
+### R-47.10 SOC 2 Evidence
+
+| Artefact | Content | Criteria | Retention | Filing path |
+|---|---|---|---|---|
+| R-47-C1 staleness export | pg_cron run history: last 5 job 47 runs + stale hours | CC7.2 | 3 yr | `compliance/evidence/scim-provisioning/R-47-stale-C1-<incident_id>.md` |
+| R-47-C2 violation gate at declaration | `scim.rejected_sensitive_attribute` count during stale window; `violations_found_during_stale = 0` = CC6.4 clean attestation | CC6.4/CC7.2 | 7 yr | `compliance/evidence/scim-provisioning/R-47-stale-C2-declared-<incident_id>.md` |
+| R-47-C2 re-run at restoration | `violations_found` count after job 47 restored; confirms zero unresolved violations before P0 closure | CC6.4/A1.1 | 7 yr | `compliance/evidence/scim-provisioning/R-47-stale-C2-restored-<incident_id>.md` |
+| R-47-C3 quarterly trigger gate | GENERATE_SERIES result; quarter-start overlap evidence; manual trigger log if §R-47.6 activated | CC4.1 | 3 yr | `compliance/evidence/scim-provisioning/R-47-stale-C3-<incident_id>.md` |
+| SCIM-PROV-MON-E-001 stale-window note | IC narrative of stale window; R-47-C2 count; R-47-C3 overlap; R-47-A/B/C steps if §R-47.5 activated | CC4.1/CC6.4/CC7.2 | 7 yr (if §R-47.5 activated) / 3 yr (P1 clean) | `compliance/evidence/scim-provisioning/R-47-stale-note-<incident_id>.md` |
+
+**SOC 2 auditor rationale:** CC6.4 — `violations_found_during_stale = 0` in `scim_provisioning_monitor_stale_declared` is the DEC-030 HMAC-chained IC attestation that no Art. 9 sensitive attribute violations occurred undetected during the monitoring blind-spot window. CC4.1 — the structured five-query IC response (R-47-C1 through R-47-C5) demonstrates that FORM has defined procedures for responding to monitoring system failures. CC7.1 — the five-query structured response is independent of the breaches the system monitors. CC7.2 — the `pg-cron-health-monitor` detection pipeline (OBSERVABILITY §12.6) → AL-SCIM-PROV-02 P1 → R-47 activation chain provides auditor-verifiable monitoring-failure detection. The DEC-030 HMAC chain (`stale_declared` → `stale_restored`) provides tamper-evident detection-to-restoration timeline independently verifiable per HMAC-VERIFY-ALGO-001.
+
+### R-47.11 Cross-References
+
+- `docs/OBSERVABILITY.md §56` — job 47 canonical spec (§56.5); SCIM-ATTR-CHAIN-01 (§56.5.5); AL-SCIM-PROV-01/02 (§56.4); SCIM-PROV-SLO-01/02 (§56.3); SCIM-PROV-MON-E-001 (§56.8)
+- `docs/OBSERVABILITY.md §12.6` — job 47 pg_cron registry entry (stale-consequence cross-ref: this runbook)
+- `docs/AUDIT_LOG_SCHEMA.md §SCIM Provisioning Compliance Monitoring events` — three DEC-030 monitoring events (v2.51); `system.scim_provisioning_monitor_stale_declared` + `system.scim_provisioning_monitor_restored` registered below v2.51 as a subsequent patch (closed this commit)
+- `docs/SOC2_READINESS.md §119` — SCIM-PROV-E-001..004 lifecycle outcome artefacts; `scim-provisioning/` R2 subfolder
+- `docs/SOC2_READINESS.md §120` — SCIM-PROV-MON-E-001 monitoring infrastructure evidence; this runbook referenced in §120.7 item 3
+- `docs/SSO_SCIM_IMPLEMENTATION.md §14` — `BLOCKED_ATTRIBUTE_PATTERNS` blocklist (write-boundary enforcement); §26.7b (AL-SCIM-01 reactive burst complement)
+- R-03 (Infrastructure Outage — H4 co-activation)
+- R-05 (HMAC chain break — H1 unauthorized deletion co-activation and SCIM-PROV-MONITOR-STALE-CHAIN-01 violation escalation)
+- R-45 (Litigation Hold Monitor Stale — structural peer, three-SLO escalation)
+- R-46 (Pricing Exception Monitor Stale — structural peer, two-SLO escalation with REENTRY-CHAIN-01 substitute for §R-47.5)
+- DEC-030
+
+### R-47.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.scim_provisioning_monitor_stale_declared` (HIGH/7yr) and `system.scim_provisioning_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §SCIM Provisioning Compliance Monitoring events`. Add SCIM-PROV-MONITOR-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-47.9. Update note in existing section from "pending" to done. | security-engineer + compliance-officer | **P0** | M7 | [x] Done — 2026-06-26 (AUDIT_LOG_SCHEMA.md v2.52, this commit) |
+| 2 | Deploy R-47 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'scim_provisioning_compliance_monitor'` to PagerDuty service `form-devops` P1, dedup key `scim-prov-check-stale`, auto-resolve on `system.scim_provisioning_check_passed`. Integration test: disable job 47 in staging for > 26h; confirm P1 fires on `form-devops`; confirm auto-resolve after manual run emits `system.scim_provisioning_check_passed`. | devops-lead | **P0** | M7 | [ ] |
+| 3 | Confirm `docs/OBSERVABILITY.md §12.6` job 47 entry shows `INCIDENT_RESPONSE R-47` and §56.4 AL-SCIM-PROV-02 runbook row references R-47. | devops-lead | **P1** | M7 | [x] Done — 2026-06-26 (this commit — §12.6 update pending separate OBSERVABILITY patch) |
+| 4 | Register SCIM-PROV-MON-E-001 stale-window note artefact template in `docs/SOC2_READINESS.md §120.7` checklist; confirm `scim-provisioning/` R2 subfolder policy covers R-47 evidence filing paths. | compliance-officer | **P1** | M7 | [x] Done — 2026-06-26 (SOC2_READINESS §120, this commit) |
+
+---
+
+*v1.0 (2026-06-26): R-47 SCIM Provisioning Compliance Monitor Stale — forty-seventh runbook. Closes `docs/OBSERVABILITY.md §56.10` item 6 (P1/M7 — author R-47 stale recovery runbook). Job 47 `scim_provisioning_compliance_monitor` (`0 6 * * *`, 26h freshness window) was registered in OBSERVABILITY.md §12.6 (v2.1 patch, 2026-06-26) and §56 (v5.3.0, 2026-06-26) as the authoritative spec for SCIM-PROV-SLO-01 sensitive attribute violation monitoring and SCIM-PROV-SLO-02 quarterly trigger, but the stale-recovery runbook was explicitly deferred as §56.10 item 6. Critical characteristic: job 47 staleness creates two simultaneous monitoring gaps — (1) SCIM-PROV-SLO-01 blind spot: `scim.rejected_sensitive_attribute` violations during the stale window are not captured by the monitoring layer; SCIM-ATTR-CHAIN-01 requires `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr HTTP 200 before AL-SCIM-PROV-01 P0 fires; staleness suppresses both the DEC-030 event and the P0 alert until IC manually runs R-47-C2 and §R-47.5; write-boundary enforcement (HTTP 422 SSO_SCIM §14) continued operating; (2) SCIM-PROV-SLO-02 quarterly trigger miss: if stale window overlaps first 7 days of Jan/Apr/Jul/Oct, the automated `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr event is not emitted, requiring IC manual emission per §R-47.6. Two DEC-030 HMAC-chained events: `system.scim_provisioning_monitor_stale_declared` HIGH/7yr; `system.scim_provisioning_monitor_restored` STANDARD/3yr; SCIM-PROV-MONITOR-STALE-CHAIN-01 ordering invariant (HTTP 422 on ordering inversion → R-05). Five scope queries: R-47-C1 (pg_cron staleness confirmation); R-47-C2 (sensitive attribute violation gate — P0 escalation decision); R-47-C3 (quarter-start trigger overlap — SCIM-PROV-SLO-02 gap check); R-47-C4 (peer job health — H4 Supabase outage discriminator); R-47-C5 (job registration check — H1 discriminator). Four root cause hypotheses: H1 (job deleted/disabled); H2 (`form_system` permission revoked); H3 (pg_net degraded); H4 (Supabase platform outage — R-03). Two escalation paths: §R-47.5 (SCIM-ATTR-CHAIN-01 forensic: audit trail review → IdP remediation → retroactive CRITICAL event → P0 post-mortem); §R-47.6 (quarterly trigger miss: manual sweep 2 SQL → compensating `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr + stale-window note). Six-step recovery. Three communication templates. SOC 2: CC6.4 (`violations_found_during_stale = 0` CC6.4 attestation — write-boundary enforcement operated despite monitoring blind spot); CC4.1 (five-query IC response + quarterly trigger compensating control); CC7.1 (structured response to monitoring failure); CC7.2 (`pg-cron-health-monitor` → AL-SCIM-PROV-02 → R-47 detection chain + HMAC chain). Structural peers: R-44 (OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01); R-45 (LITH-MONITOR-STALE-CHAIN-01 — three-SLO pattern); R-46 (PRICING-MONITOR-STALE-CHAIN-01 — two-SLO pattern, direct structural peer). Cross-references: `docs/OBSERVABILITY.md §56` (job 47 spec; SCIM-ATTR-CHAIN-01 §56.5.5; AL-SCIM-PROV-01/02 §56.4; SCIM-PROV-SLO-01/02 §56.3; §56.10 item 6 this runbook closes); `docs/OBSERVABILITY.md §12.6` (job 47 pg_cron registry — stale-consequence cross-ref to be updated to reference R-47); `docs/AUDIT_LOG_SCHEMA.md §SCIM Provisioning Compliance Monitoring events` (three monitoring events v2.51; stale-monitor companion events `system.scim_provisioning_monitor_stale_declared` + `system.scim_provisioning_monitor_restored` + SCIM-PROV-MONITOR-STALE-CHAIN-01 registered v2.52 this commit per §R-47.12 item 1); `docs/SOC2_READINESS.md §119` (SCIM-PROV-E-001..004); `docs/SOC2_READINESS.md §120` (SCIM-PROV-MON-E-001); `docs/SSO_SCIM_IMPLEMENTATION.md §14` (`BLOCKED_ATTRIBUTE_PATTERNS` — write-boundary enforcement active during stale window); R-03; R-05; R-44; R-45; R-46. Owner: devops-lead + compliance-officer + security-engineer.*
+
+---
+
+**v1.0 · 2026-06-26 · Owner: devops-lead + compliance-officer + security-engineer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---
+
 *v3.14 (2026-06-26): §9.3 Tabletop Scenario Catalog extended with Scenarios Y and Z; §9.8 Year 5 Testing Schedule added (Months 49–60). Scenario Y (Litigation hold compliance monitor stale — job 45, R-45): three-SLO tabletop covering simultaneous LITH-SLO-01/02/03 blind-spot coverage; mandatory three-gate protocol (R-45-C2a/C2b/C2c); LITH-SLO-01 positive path (R-45-C2a = 1, 3-day review overdue) as base scenario; LITH-SLO-02 P0-escalated optional path (founder + legal waiver-or-release + CRITICAL event); staged in R2 `compliance/evidence/litigation-hold/`; participants compliance-officer + devops-lead; 45 min / 75 min with P0 optional. Scenario Z (Pricing exception compliance monitor stale with quarter-start trigger miss — job 46, R-46): two-SLO tabletop covering R-46-C2 zero-row REENTRY-CHAIN-01 attestation and R-46-C3 quarter-boundary GENERATE_SERIES detection; base scenario is P1+ (PRICE-SLO-02 miss, R-46-C3 positive on Q3 start 1 July) with zero R-46-C2 violations; manual `system.pricing_exception_quarterly_audit_triggered` STANDARD/7yr emission with `quarterly_trigger_manually_fired: true`; PRICE-SLO-01 P0-escalated optional path (R-46-C2 positive → REENTRY-MONITOR-CHAIN-01 → AL-PRICE-01 → corrective pricing review); participants compliance-officer + devops-lead + security-engineer; 45 min / 60 min with P0 optional. §9.8 Year 5 schedule: Month 51 Scenario Y; Month 54 Scenario Z; Month 57 dual-tabletop choice (Y P0-path / Z P0-path / S-or-U rerun); Month 60 DR + pen test + opposite-of-57 rerun. Privacy constraint added to §9.8 schedule header: staging drills use synthetic rows with FORM-internal test UUIDs only — no actual tenant data, employee `user_id`, health data, or GDPR Art. 9 special-category data. Cross-references: R-45 (§R-45.5 LITH-REVIEW-CHAIN-01 manual emission path; §R-45.6 LITH-SLO-02 P0 founder-page path; §R-45.14 implementation checklist has no tabletop item — scenario added directly to §9.3); R-46 (§R-46.5 REENTRY-CHAIN-01 blind spot escalation path; §R-46.6 quarterly trigger miss path; §R-46.13 checklist has no tabletop item — scenario added directly to §9.3); `docs/OBSERVABILITY.md §54` (LITH-SLO-01/02/03 + AL-LITH-01/02/03 — three monitoring paths exercised by Scenario Y); `docs/OBSERVABILITY.md §55` (PRICE-SLO-01/02 + AL-PRICE-01/03 — two monitoring paths exercised by Scenario Z); `docs/COST_MODEL.md §44.7` (quarterly pricing exception audit obligation — Scenario Z PRICE-SLO-02 path); `docs/DATA_MODEL.md §46` (`litigation_hold_records` DDL — Scenario Y staging INSERT target); `docs/MSA_TEMPLATE.md §11.6` (MSA §11.6.3/§11.6.4/§11.6.6 obligations exercised by Scenario Y LITH-SLO-01/02/03 paths). Owner: compliance-officer + security-engineer.*

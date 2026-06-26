@@ -31963,3 +31963,78 @@ Note: first evidence collection (SCIM-PROV-E-001/002 quarterly filings) remains 
 ---
 
 *v3.44.0 (2026-06-26): §119 Cross-Reference Patch — SSO_SCIM §27.14 items 14 + 17 (SCIM-PROV-E-001 · SCIM-PROV-E-002 · SCIM-PROV-E-003 · SCIM-PROV-E-004 · CC6.1 / CC6.3 / CC6.4 / CC7.2). Four SCIM provisioning lifecycle evidence artefacts registered: SCIM-PROV-E-001 (CC6.1/PI1.1 — quarterly `scim.user_provisioned` DEC-030 HMAC-chain export; HMAC-VERIFY-ALGO-001 chain head verification; 7yr; zero-provisioning quarters as affirmative attestation; `scim-provisioning/SCIM-PROV-E-001_<YYYY-QN>.pdf`), SCIM-PROV-E-002 (CC6.3 — quarterly `scim.user_deprovisioned` DEC-030 HMAC-chain export with per-event revocation SLA ≤ 60s verification per ENTERPRISE_SLA §3.7; 7yr; `scim-provisioning/SCIM-PROV-E-002_<YYYY-QN>.pdf`), SCIM-PROV-E-003 (CC6.4 — quarterly `scim.rejected_sensitive_attribute` count assertion; 0-count target; incident report required for > 0; 7yr; `scim-provisioning/SCIM-PROV-E-003_<YYYY-QN>.pdf`), SCIM-PROV-E-004 (CC7.2 — annual AL-SCIM-01..04 PagerDuty alert configuration screenshots; distinct from SSO-OBS-E-006 operational log; 3yr; `scim-provisioning/SCIM-PROV-E-004_<YYYY>.pdf`). §79.4 count 81 → 85. §80.3 `scim-provisioning/` subfolder added after `sso/`. §80.4 Vanta mirror list updated with four entries. SSO_SCIM §27.14 item 14 documentation portion → [x] Done. SSO_SCIM §27.14 item 17 documentation portion → [x] Done. Collection portions remain pending M6/M9. Owner: compliance-officer + security-engineer.*
+
+---
+
+## §120 · Cross-Reference Patch — OBSERVABILITY §56.10 Item 5 (SCIM-PROV-MON-E-001 · CC4.1 / A1.1 / CC7.2)
+
+**Date:** 2026-06-26  **Author:** cloud-agent  **Trigger:** OBSERVABILITY §56 (v5.3.0, 2026-06-26) §56.10 item 5 (P1/M6) created the obligation to register SCIM-PROV-MON-E-001 in `docs/SOC2_READINESS.md §79.4` and author a §120 cross-reference patch linking SCIM-PROV-MON-E-001 against §119 (SCIM-PROV-E-001..004). AUDIT_LOG_SCHEMA.md v2.51 (this commit) closed §56.10 item 1 (P0/M5), enabling the item 5 documentation work to proceed.
+
+### §120.1 Gap Description
+
+`docs/OBSERVABILITY.md §56.8` (v5.3.0, 2026-06-26) defined SCIM-PROV-MON-E-001 — the annual monitoring infrastructure artefact for pg_cron job 47 (`scim_provisioning_compliance_monitor`). OBSERVABILITY §56.10 item 5 (P1/M6) created the obligation to register SCIM-PROV-MON-E-001 in `docs/SOC2_READINESS.md §79.4` and to author a §120 cross-reference patch linking the monitoring-infrastructure artefact against the four SCIM provisioning lifecycle outcome artefacts registered in §119 (SCIM-PROV-E-001..004). This §120 patch closes the documentation portion of §56.10 item 5; first evidence collection (SCIM-PROV-MON-E-001 first annual filing) remains pending SOC 2 observation period start (M9) plus one full observation year.
+
+**Relationship between §119 (SCIM-PROV-E-001..004) and §120 (SCIM-PROV-MON-E-001):**
+
+| Artefact group | What it evidences | Cadence | SOC 2 mapping |
+|---|---|---|---|
+| SCIM-PROV-E-001..004 (§119) | SCIM provisioning lifecycle outcomes — who was provisioned/deprovisioned, sensitive attribute rejection counts, monitoring rule configuration | Quarterly (E-001..003) + Annual (E-004) | CC6.1 / CC6.3 / CC6.4 / CC7.2 |
+| SCIM-PROV-MON-E-001 (§120) | Monitoring infrastructure health — that job 47 ran daily throughout the observation year, that freshness gaps were detected and remediated, that quarterly triggers fired in Q1–Q4 | Annual | CC4.1 / A1.1 / CC7.2 |
+
+The two artefact groups are **complementary, not redundant**: SCIM-PROV-E-001..004 cover what happened at the SCIM provisioning boundary (outcomes); SCIM-PROV-MON-E-001 covers whether the automated daily monitoring that checks for those outcomes was itself operational (infrastructure). A SOC 2 auditor needs both: CC6.4 outcome evidence (SCIM-PROV-E-003 quarterly zero-count) and CC4.1 monitoring-continuity evidence (SCIM-PROV-MON-E-001 annual run history).
+
+### §120.2 Source Table
+
+| Source | Version | Relevance |
+|---|---|---|
+| OBSERVABILITY §56 | v5.3.0, 2026-06-26 | Authoritative definition of SCIM-PROV-MON-E-001 (§56.8): content, filing path, retention, SOC 2 mapping, CC4.1/A1.1/CC7.2 auditor narratives |
+| OBSERVABILITY §56.10 | v5.3.0, 2026-06-26 | Item 5 (P1/M6) creates §79.4 registration + §120 authoring obligation |
+| OBSERVABILITY §12.6 | v2.1 patch, 2026-06-26 | Job 47 pg_cron registry entry confirming 26h freshness window, `form_api` REVOKED |
+| AUDIT_LOG_SCHEMA §SCIM Provisioning Compliance Monitoring events | v2.51, 2026-06-26 | Three DEC-030 events registered (items 1 P0/M5 — done); `system.scim_provisioning_check_passed` LOW/1yr is the freshness signal that powers AL-SCIM-PROV-02 26h dead-man's switch (SCIM-PROV-SLO-02) and serves as the daily health signal underlying SCIM-PROV-MON-E-001 |
+| SOC2_READINESS §119 | v3.44.0, 2026-06-26 | SCIM-PROV-E-001..004 lifecycle outcome artefacts; `scim-provisioning/` R2 subfolder established; §80.4 Vanta mirror list seeded |
+
+### §120.3 Artefact Registration
+
+| Artefact ID | SOC 2 criteria | Cadence | Retention | Owner | Filing path |
+|---|---|---|---|---|---|
+| SCIM-PROV-MON-E-001 | CC4.1 / A1.1 / CC7.2 | Annual (from M9 + 1yr observation) | 3 years | compliance-officer + devops-lead | `scim-provisioning/SCIM-PROV-MON-E-001_<YYYY>.md` |
+
+§79.4 count pre-§120: **85**. Post-§120: **86**.
+
+### §120.4 §79.4 Row Addition
+
+**SCIM-PROV-MON-E-001** (Annual · 3yr · CC4.1 / A1.1 / CC7.2):
+
+Annual export of pg_cron job 47 (`scim_provisioning_compliance_monitor`) run history and compliance outcomes for the SOC 2 observation year. Content (per OBSERVABILITY §56.8): (1) Job 47 run statistics: total runs, successful runs, freshness-window breaches (> 26h gaps between `system.scim_provisioning_check_passed` LOW events) detected by `pg-cron-health-monitor` AL-SCIM-PROV-02; (2) AL-SCIM-PROV-01 activation log — any `security.scim_sensitive_attr_violation_detected` CRITICAL events during the year (`violation_count`, `window_start`, `window_end`, `check_run_at`; IC number and resolution timestamp per INCIDENT_RESPONSE R-47 — pending §56.10 item 6 P1/M7); (3) SCIM-PROV-SLO-01 compliance — zero violations for the year (zero-count = CC6.4 clean; any positive count documented with IC resolution summary before filing); (4) Quarterly trigger log — `system.scim_provisioning_quarterly_check_triggered` emitted in Q1–Q4 (`EXTRACT(YEAR FROM created_at) = <YYYY>` — four rows required per year per SCIM-PROV-SLO-02); (5) SCIM-PROV-E-003 supporting data — per-quarter `quarterly_rejection_count` from sweep 2 events (automated baseline for compliance-officer quarterly assertion); (6) Zero-violation year attestation — affirmative confirmation of SCIM-PROV-SLO-01 (zero violations in observation year) and SCIM-PROV-SLO-02 (four quarterly triggers fired). **Distinct from SCIM-PROV-E-001..004** (§119 — SCIM provisioning lifecycle outcome artefacts): SCIM-PROV-MON-E-001 evidences the monitoring infrastructure that produced the SCIM-PROV-E-003 quarterly zero-count attestations, not the provisioning outcomes themselves. **CC4.1 auditor narrative:** Demonstrates that FORM operated a daily automated baseline sweep for SCIM sensitive attribute violations throughout the observation year — complementary to the SCIM-PROV-E-003 quarterly outcome attestation. CC4.1 requires FORM to implement monitoring activities; SCIM-PROV-MON-E-001 provides the year-level evidence that job 47 ran without extended freshness-window gaps. **A1.1 auditor narrative:** Provides auditor-verifiable evidence that job 47 was operational throughout the year (`pg_cron.job_run_details WHERE jobname = 'scim_provisioning_compliance_monitor'`); any freshness breach gaps documented with AL-SCIM-PROV-02 activation log and remediation per INCIDENT_RESPONSE R-47. **CC7.2 auditor narrative:** Demonstrates proactive daily monitoring coverage for SCIM sensitive attribute anomalies; the quarterly trigger log (four `system.scim_provisioning_quarterly_check_triggered` rows per year) closes the evidence collection loop between automated monitoring (SCIM-PROV-MON-E-001) and compliance-outcome filing (SCIM-PROV-E-003). Privacy floor: `violation_count` integer, timestamps, `quarterly_rejection_count` integer — no `tenant_id`, no rejected attribute VALUE, no `user_id`, no employee name, email, health value, or GDPR Art. 9 data; `form_api` REVOKED from `audit_log_events`. Source: OBSERVABILITY §56.8 (primary definition); AUDIT_LOG_SCHEMA v2.51 §SCIM Provisioning Compliance Monitoring events. 3yr retention (SOC 2 multi-cycle evidence — monitoring infrastructure record, not a financial document; primary outcome evidence carried by 7yr SCIM-PROV-E-003). **Registered §120 (2026-06-26). Closes OBSERVABILITY §56.10 item 5 documentation portion.**
+
+### §120.5 §80.4 Vanta Mirror Update
+
+One new entry added to the Vanta mirror list (using `scim-provisioning/` subfolder established in §119):
+
+| Artefact | Vanta path | Criteria |
+|---|---|---|
+| SCIM-PROV-MON-E-001 | `scim-provisioning/SCIM-PROV-MON-E-001_<YYYY>.md` | CC4.1 / A1.1 / CC7.2 |
+
+Note: `scim-provisioning/` subfolder and `form_api` NO ACCESS R2 policy established in §119 (v3.44.0, 2026-06-26). SCIM-PROV-MON-E-001 uses the same subfolder and access policy. WORM Object Lock: 3yr (matching 3yr retention). EU-region routing: inherited from `scim-provisioning/` folder policy.
+
+### §120.6 Cross-Reference Closure Table
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register SCIM-PROV-MON-E-001 in §79.4 master evidence table | OBSERVABILITY §56.10 item 5 (P1/M6) | 🟢 Done — 2026-06-26 (documentation portion; §79.4 row added, count 85 → 86) |
+| Author §120 cross-reference patch linking SCIM-PROV-MON-E-001 to §119 | OBSERVABILITY §56.10 item 5 (P1/M6) | 🟢 Done — 2026-06-26 (this patch) |
+| Add SCIM-PROV-MON-E-001 to §80.4 Vanta mirror list | OBSERVABILITY §56.10 item 5 (P1/M6) | 🟢 Done — 2026-06-26 (§120.5) |
+| Confirm `scim-provisioning/` R2 subfolder includes SCIM-PROV-MON-E-001 WORM Object Lock 3yr | OBSERVABILITY §56.10 item 5 prerequisite | 🔴 Pending — devops-lead before M9 first filing |
+| File first SCIM-PROV-MON-E-001 annual report | SOC 2 observation period start (M9) + 1yr | 🔴 Pending — compliance-officer + devops-lead at M9+12mo |
+
+### §120.7 Implementation Checklist
+
+| # | Action | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Verify `compliance/evidence/scim-provisioning/` R2 subfolder WORM Object Lock policy includes 3yr lock for `SCIM-PROV-MON-E-001_*.md` files (existing 7yr lock for SCIM-PROV-E-001..003 is separate) | devops-lead | **P1** | M5 (before M9 first filing) | [ ] |
+| 2 | At SOC 2 observation period start (M9) + 12 months: compile first SCIM-PROV-MON-E-001 annual report per OBSERVABILITY §56.8 content spec (six sections; `pg_cron.job_run_details` export; AL-SCIM-PROV-01/02 activation logs; quarterly trigger log four rows required; SCIM-PROV-SLO-01/02 attestations); upload to `scim-provisioning/SCIM-PROV-MON-E-001_<YYYY>.md` + Vanta (CC4.1/A1.1/CC7.2). | compliance-officer + devops-lead | **P1** | M9+12mo | [ ] |
+| 3 | Update INCIDENT_RESPONSE R-47 §R-47.5 (once authored per §56.10 item 6 P1/M7) to reference SCIM-PROV-MON-E-001 as the annual evidence artefact that captures any AL-SCIM-PROV-01/02 activations and their resolutions; confirm §R-47 runbook cross-references SCIM-PROV-MON-E-001 §56.8 section 2 (AL-SCIM-PROV-01 activation log). | devops-lead + compliance-officer | **P2** | M7 | [ ] |
+
+---
+
+*v3.45.0 (2026-06-26): §120 Cross-Reference Patch — OBSERVABILITY §56.10 item 5 (SCIM-PROV-MON-E-001 · CC4.1 / A1.1 / CC7.2). One annual monitoring-infrastructure evidence artefact registered: SCIM-PROV-MON-E-001 (CC4.1/A1.1/CC7.2 — annual pg_cron job 47 `scim_provisioning_compliance_monitor` run history; job 47 freshness log; AL-SCIM-PROV-01/02 activation records; SCIM-PROV-SLO-01 zero-violation attestation; SCIM-PROV-SLO-02 four-quarterly-trigger attestation; SCIM-PROV-E-003 supporting baseline data; 3yr; `scim-provisioning/SCIM-PROV-MON-E-001_<YYYY>.md`). Distinct from SCIM-PROV-E-001..004 (§119 — outcome artefacts): SCIM-PROV-MON-E-001 evidences monitoring infrastructure continuity, not provisioning lifecycle outcomes. §79.4 count 85 → 86. §80.4 Vanta mirror list updated with one entry (using `scim-provisioning/` subfolder established §119). OBSERVABILITY §56.10 item 5 documentation portion → 🟢 Done. First evidence collection pending M9+12mo. Owner: compliance-officer + devops-lead.*
