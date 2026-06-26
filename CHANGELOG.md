@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [9.20.0] — 2026-06-26
+
+### Added
+- `content/post-2630-systemic-vs-local-fatigue.md` — Block 2626–2635 «Тіло як система» пост 5/10. Системна втома проти локальної: два різних ліміти і два різних вікна відновлення. Bigland-Ritchie & Woods (1984) периферійна vs центральна втома; локальні механізми: субстратне виснаження PCr/глікоген (Hultman 1967; Robergs 1991), Pi/H⁺/Ca²⁺-чутливість (Allen et al. 2008), SR-дисфункція (Westerblad et al. 2002); системна: voluntary activation, twitch interpolation (Gandevia 2001; Behm et al. 1996), Kohn (2011) спінальна депресія, Marcora et al. (2009) психобіологічна модель. Meeusen et al. (2013) functional/non-functional overreaching. Israetel et al. (2019) MEV/MAV/MRV: системний MRV < суми локальних MRV. Bohm et al. (2014) deload-протокол. Діагностична таблиця. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `content/post-2631-hormonal-response-training-anabolic-window.md` — Block 2626–2635 «Тіло як система» пост 6/10. Гормональна відповідь на тренування і розвінчання «анаболічного вікна». West et al. (2009) і Rønnestad et al. (2011): однакова гіпертрофія ізольованої ноги незалежно від системного гормонального піку. mTORC1 і механотрансдукція: Hornberger et al. (2006) FAK → TSC2 → mTORC1; Wolfson & Sabatini (2017) лейцин → RAG GTPases. Aragon & Schoenfeld (2013) — добовий білок > тайминг. Burd et al. (2011) — MPS підвищений 24–48 год. Кортизол: гостра відповідь нормальна; хронічний — overreaching. Viru & Viru (2001): хронічний базальний рівень анаболічних гормонів vs гострий пік. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `blog.html` — posts 2630–2631 added at top of feed.
+
+### Changed
+- `VERSION` — 9.19.1 → 9.20.0.
+
+---
+
 ## [9.19.1] — 2026-06-26
 
 ### Added
