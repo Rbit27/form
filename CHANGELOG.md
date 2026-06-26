@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.15.2] — 2026-06-26
+
+### Added
+- `content/post-2608-reading-rpe-journal-patterns.md` — Series 2606–2615 «Практичний інструментарій self-coached атлета» post 3/10. Як читати власний RPE-журнал: патерни, які стають видимими лише через 4 тижні. Мінімум 4 точок для будь-якого висновку (Atkinson & Nevill, 1998); три типи патернів: дрейф session RPE вгору без зростання ваг (Foster et al., 2001), вправо-специфічний RPE-дрейф при стабільному E1RM (Meeusen et al., 2013 — субклінічний маркер functional overreaching), дрейф RPE першого підходу як маркер тижневого відновлення (Impellizzeri et al., 2004); три пастки інтерпретації (одиночний RPE 9, habituation-зниження без адаптації — Borg 1982, порівняння між вправами); мінімальний протокол 5 хв/тиждень; калібрування RPE як окрема навичка; інтеграція з E1RM і суб'єктивним відновленням — мультимаркерний контекст Meeusen (2013); Saw et al. (2016): суб'єктивні маркери перевершують об'єктивні при систематичному застосуванні. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2608 card added at top of feed.
+
+### Changed
+- `README.md` — post-2607 status updated proposed → draft; post-2608 status updated proposed → draft.
+- `STATUS.md` — Total posts 2081 → 2082; Series 2606–2615 progress 2/10 → 3/10.
+- `VERSION` — 9.15.1 → 9.15.2.
+
+---
+
 ## [9.15.1] — 2026-06-26
 
 ### Changed
