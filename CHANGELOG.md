@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.35.0] — 2026-06-26
+
+### Added
+- `content/post-2652-block-effectiveness-self-assessment.md` — Block 2646–2655 series «Методологія самокоучингу» пост 7/10. «Як самостійно оцінити ефективність блоку без зовнішнього тренера». Чотири категорії: числова динаміка, технічна якість (відео-порівняння), RPE-дрейф, відновлювальна здатність. Протокол 30-хвилинного блок-рев'ю (6 питань + 1 конкретний висновок). Три результати блоку. Zourdos et al. 2016 (RPE); Gabbett 2016 (контекст). clinical-safety: NOT_REQUIRED.
+- `blog.html` — картка post-2652 додана на початок блогу.
+
+### Changed
+- `README.md` — post-2652 → draft · v9.35.0 → post-2652-block-effectiveness-self-assessment.md.
+- `STATUS.md` — post-2652 додано; version v9.34.0 → v9.35.0.
+- `VERSION` — 9.34.0 → 9.35.0.
+
+---
+
 ## [9.34.0] — 2026-06-26
 
 ### Added
