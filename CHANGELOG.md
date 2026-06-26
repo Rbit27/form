@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.27.1] — 2026-06-26
+
+### Changed
+- `docs/SOC2_READINESS.md §121` — Cross-reference patch closing the last open documentation-side item from the SCIM provisioning compliance monitoring sprint. (1) §120.7 item 3 closed: INCIDENT_RESPONSE R-47 v1.0 (2026-06-26) confirmed to reference SCIM-PROV-MON-E-001 via R-47.10 SOC 2 Evidence `SCIM-PROV-MON-E-001 stale-window note` row and R-47.11 Cross-References §120 entry; inline status `[ ]` → `[x] Done`. (2) §120.4 inline update: "pending §56.10 item 6 P1/M7" placeholder → "v1.0, 2026-06-26" in AL-SCIM-PROV-01 activation log IC reference. (3) §119.5 R2 subfolder extended (§121.3): six additional filing paths documented — `SCIM-PROV-MON-E-001_<YYYY>.md` (3yr WORM; CC4.1/A1.1/CC7.2) + five R-47 incident evidence files (`R-47-stale-C1/C2-declared/C2-restored/C3/note-<incident_id>.md`; 7yr WORM for CC6.4 forensic files; 3yr for operational records; `form_api` NO ACCESS; EU-region routing; privacy floor: aggregate counts + IC UUIDs only). Document header v3.43.0 → v3.46.0.
+- `VERSION` — 9.27.0 → 9.27.1.
+
+---
+
 ## [9.27.0] — 2026-06-26
 
 ### Added
