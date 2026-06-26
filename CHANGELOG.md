@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [8.90.1] — 2026-06-26
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pricing Exception Monitoring events` — R-46 monitoring-control event pair (v2.48): `system.pricing_exception_monitor_stale_declared` HIGH/7yr and `system.pricing_exception_monitor_restored` STANDARD/3yr. Both events anchor the PRICING-MONITOR-STALE-CHAIN-01 DEC-030 HMAC chain for pg_cron job 46 (`pricing_exception_compliance_monitor`, `0 9 * * *`, 26h freshness) stale incidents. `stale_declared` payload: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_hours` positive, `missed_runs` nonneg int, `trigger` enum pagerduty_alert|manual_discovery|co_active_r03, `initial_severity` enum P1|P0 (P0 if `reentry_violations_found_during_stale ≥ 1`), `stale_window_overlaps_quarter_start` bool (PRICE-SLO-02 gap flag), `reentry_violations_found_during_stale` nonneg int (0 = CC5.2/CC1.4 auditor-inspectable attestation). `stale_restored` payload: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `stale_window_hours` positive, `stale_window_overlaps_quarter_start` bool, `reentry_violations_found_during_stale` nonneg int, `reentry_violations_at_restored` nonneg int (0 required or all violations actioned per §R-46.5), `quarterly_trigger_manually_fired` bool (CC4.1 compensating-control record for PRICE-SLO-02 miss). PRICING-MONITOR-STALE-CHAIN-01: `restored` blocked HTTP 422 `PRICING_MONITOR_STALE_CHAIN_01_VIOLATION` without prior `declared` for same `incident_id` → R-05. Retention table: +2 rows. Section header updated with CC7.1/CC7.2 and INCIDENT_RESPONSE R-46 reference. Emitter: devops-lead (IC, manual, PAM-elevated) for both events. Privacy floor: integer counts, booleans, timestamps, enum values only — no `tenant_id`, no employee `user_id`, no health data, no GDPR Art. 9 data. SOC 2: CC5.2 (`reentry_violations_found_during_stale = 0` attestation — no REENTRY-CHAIN-01 breach during stale window); CC1.4 (`quarterly_trigger_manually_fired` — PRICE-SLO-02 compensating control record); CC4.1 (structured monitoring-failure response); CC7.1 (five-query IC protocol for monitoring system failure); CC7.2 (HMAC chain + `pg-cron-health-monitor` detection = tamper-evident stale timeline). Structural peers: LITH-MONITOR-STALE-CHAIN-01 (R-45, v2.46) and OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 (R-44, v2.44). Closes `docs/INCIDENT_RESPONSE.md R-46.13` item 1 (P0/M9). compliance-officer + security-engineer + devops-lead.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.47 → v2.48. Two R-46 monitoring-control events added to `§Enterprise Pricing Exception Monitoring events`. Section header updated to include CC7.1/CC7.2 and INCIDENT_RESPONSE R-46. Retention table: +2 rows.
+- `docs/INCIDENT_RESPONSE.md` — R-46.13 item 1 status: `[ ]` → `[x] Done — 2026-06-26 (AUDIT_LOG_SCHEMA.md v2.48)`.
+- `VERSION` — 8.90.0 → 8.90.1.
+
+---
+
 ## [8.90.0] — 2026-06-26
 
 ### Added

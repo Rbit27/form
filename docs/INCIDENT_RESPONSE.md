@@ -17327,7 +17327,7 @@ z.object({
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register `system.pricing_exception_monitor_stale_declared` (HIGH/7yr) and `system.pricing_exception_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pricing Exception Monitoring events`. Add PRICING-MONITOR-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-46.9. | security-engineer + compliance-officer | **P0** | M9 | [ ] |
+| 1 | Register `system.pricing_exception_monitor_stale_declared` (HIGH/7yr) and `system.pricing_exception_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pricing Exception Monitoring events`. Add PRICING-MONITOR-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-46.9. | security-engineer + compliance-officer | **P0** | M9 | [x] Done — 2026-06-26 (AUDIT_LOG_SCHEMA.md v2.48) |
 | 2 | Deploy R-46 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'pricing_exception_compliance_monitor'` to PagerDuty service `form-devops` P1, dedup key `pricing-exception-check-stale`, auto-resolve on `system.pricing_exception_check_passed`. Integration test: disable job 46 in staging for > 26h (or inject `system.cron_job_stale`); confirm P1 fires on `form-devops` with correct dedup key; confirm auto-resolve fires after manual job trigger emits `system.pricing_exception_check_passed`. | devops-lead | **P0** | M9 | [ ] |
 
 #### P1 — Before first SOC 2 Type II audit period begins (M10)
