@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [8.96.1] — 2026-06-26
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.13 → v3.14: §9.3 Tabletop Exercise Scenario Catalog extended with Scenario Y (litigation hold compliance monitor stale, job 45, R-45, Year 5 Q1) and Scenario Z (pricing exception compliance monitor stale with quarter-start trigger miss, job 46, R-46, Year 5 Q2). Scenario Y covers three-gate protocol (R-45-C2a/C2b/C2c), base P1 path (LITH-SLO-01 breach), and optional LITH-SLO-02 P0 path (36-month cap breach → founder notification → legal waiver-or-release → CRITICAL/7yr event). Scenario Z covers two-gate protocol (R-46-C2/C3), base P1+ path (PRICE-SLO-02 miss on quarter-start day), and optional PRICE-SLO-01 P0 path (REENTRY-CHAIN-01 violation → REENTRY-MONITOR-CHAIN-01 ordering → AL-PRICE-01 P0). §9.8 Year 5 Testing Schedule (Months 49–60) added: Month 51 Scenario Y, Month 54 Scenario Z, Month 57 dual choice, Month 60 annual DR + pen test year 5. Privacy constraint: staging drills use synthetic rows with FORM-internal test UUIDs only — no actual tenant data, employee user_id, health data, or GDPR Art. 9 special-category data. v3.14 footer appended with cross-references to R-45, R-46, OBSERVABILITY §54/§55, COST_MODEL §44.7, DATA_MODEL §46, MSA_TEMPLATE §11.6.
+- `VERSION` — 8.96.0 → 8.96.1.
+
+---
+
 ## [8.96.0] — 2026-06-26
 
 ### Added
