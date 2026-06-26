@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [8.92.1] — 2026-06-26
+
+### Changed
+- `docs/SOC2_READINESS.md` — §115 cross-reference patch: PRICE-STALE-E-001 registered in §79.4 master evidence table (row 76, after PRICE-OBS-E-002; CC5.2/CC4.1/CC7.2, annual from M9, 3yr); §80.3 `pricing-exceptions/` folder annotation updated to include PRICE-STALE-E-001; §80.4 Vanta mirror list extended with PRICE-STALE-E-001 (annual from M9; zero-activation years require affirmative attestation). Closes INCIDENT_RESPONSE R-46.13 item 4 (P1/M11). v3.39.0 → v3.40.0.
+- `docs/INCIDENT_RESPONSE.md` — R-46.13 item 4 marked `[x] Done — 2026-06-26, SOC2_READINESS.md §115 (v3.40.0)`. v3.11 → v3.12.
+- `VERSION` — 8.92.0 → 8.92.1.
+
 ## [8.92.0] — 2026-06-26
 
 ### Added

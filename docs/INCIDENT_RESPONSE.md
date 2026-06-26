@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.11
+# FORM · Incident Response Runbook v3.12
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -17335,7 +17335,7 @@ z.object({
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 3 | Confirm `docs/OBSERVABILITY.md §12.6` job 46 entry shows `INCIDENT_RESPONSE R-46 (§R-46.5/R-46.6; v1.0, 2026-06-25)` and §55.4 AL-PRICE-03 runbook row no longer says "to be authored". | devops-lead | **P1** | M10 | [x] Done — 2026-06-25 (this commit) |
-| 4 | Register PRICE-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` (annual, 3yr, CC5.2/CC4.1/CC7.2 — `compliance/evidence/pricing-exceptions/PRICE-STALE-E-001_<YYYY>.md`). Zero-activation years filed as affirmative attestation. | compliance-officer | **P1** | M11 | [ ] |
+| 4 | Register PRICE-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` (annual, 3yr, CC5.2/CC4.1/CC7.2 — `compliance/evidence/pricing-exceptions/PRICE-STALE-E-001_<YYYY>.md`). Zero-activation years filed as affirmative attestation. | compliance-officer | **P1** | M11 | [x] Done — 2026-06-26, SOC2_READINESS.md §115 (v3.40.0) |
 
 ---
 
