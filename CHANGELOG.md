@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [9.14.1] — 2026-06-26
+
+### Added
+- `docs/DECISION_LOG.md DEC-082` — OQ-EXP-03 Resolution: Pure tier upgrade governance — Option A (contract amendment, ASC 606 prospective Type 2 treatment) adopted. Closes `docs/COST_MODEL.md §45.8` item 2 (P0 — "this authoring pass"). Decision: pure tier upgrades (same seat count, lower per-seat rate) processed as contract amendments under ASC 606 prospective Type 2 modification treatment per §45. Gate remains: §41 blocker (≥ 25-seat expansion required) stays active until outside counsel confirms ASC 606 treatment in writing (§45.8 item 1 — P0/M12–M15). TU-CHAIN-01 price floor invariant: HTTP 422 `TU_CHAIN_01_FLOOR_VIOLATION` if `new_rate_per_seat_usd` < §31.5 floor. Approval authority: standard list $8.00 → CSM countersign; below $8.00 ≥ floor → CS lead + compliance-officer dual countersign; below floor → §32 exception. OQ-EXP-03 → 🟡 Partial. Owner: enterprise-architect + compliance-officer + founder.
+- `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pure Tier Upgrade events` — new section (v2.50). Closes `docs/COST_MODEL.md §45.8` items 5 and 10 (P0/M12 docs registration + P1/M12 cross-reference confirmation). `billing.rate_updated` (HIGH, 7yr, CC5.2/CC6.1): emitted by `amend_contract_tier()` Supabase RPC (SECURITY DEFINER, `form_system` role) as the terminal event in the two-event pure tier upgrade pair (`enterprise.contract_amended` §45.5.1 → `billing.rate_updated` §45.5.2); TU-CHAIN-01 invariant block; Zod v2 `RateUpdatedPayload` (canonical source: COST_MODEL §45.5.2); CC5.2 auditor narrative (ADM-E-001 + ADM-E-002 two-path evidence); CC6.1 auditor narrative (SECURITY DEFINER exclusivity + dual countersign + `floor_respected` invariant); retention table row after `billing.seats_expanded`. Structural peers: REENTRY-CHAIN-01 (§44.5), RENEW-CHAIN-01 (§42.7). Privacy floor: no employee `user_id`, name, email, health value, or GDPR Art. 9 data; `form_api` REVOKED.
+
+### Changed
+- `docs/DECISION_LOG.md` — DEC-082 added (2026-06-26); `## 2026-06-26` date section created.
+- `docs/AUDIT_LOG_SCHEMA.md` — document version v2.49 → v2.50; retention table +1 row (`billing.rate_updated` HIGH 7yr CC5.2/CC6.1 after `billing.seats_expanded`).
+- `docs/COST_MODEL.md` — document version v2.15 → v2.16; §45.8 items 2 (`[ ]` → `[x] Done — DECISION_LOG DEC-082`), 5 (`[ ]` → `[x] Done — AUDIT_LOG_SCHEMA.md v2.50, docs registration`), and 10 (`[ ]` → `[x] Done — AUDIT_LOG_SCHEMA.md v2.50`) updated.
+- `VERSION` — 9.14.0 → 9.14.1.
+
+---
+
 ## [9.14.0] — 2026-06-26
 
 ### Added
