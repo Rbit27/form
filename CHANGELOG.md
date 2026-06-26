@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.9.1] — 2026-06-26
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §38 added: Cross-Reference Patch — AUDIT_LOG_SCHEMA SCIM-Lifecycle Registration (§27.14 item 1 Closure). Six-event registration confirmation table (`scim.user_provisioned`, `scim.user_reactivated`, `scim.user_deprovisioned`, `scim.user_updated`, `scim.group_synced`, `scim.rejected_sensitive_attribute` — all confirmed registered in `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` v2.49 lines 440–445). §27.14 item 1 status `[ ]` → `[x] Done`. Canonical name enforcement: `scim.user_deactivated` (§3.5 interim) deprecated; `scim.user_deprovisioned` canonical. TOC entry 38 added. Document header v2.8.2 → v2.10 (corrects header lag from §37 authoring omission).
+- `VERSION` — 9.9.0 → 9.9.1.
+
+---
+
 ## [9.9.0] — 2026-06-26
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.8.2
+# FORM · SSO/SCIM Implementation v2.10
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -43,6 +43,7 @@
 35. [OQ-SSO-34.2 Resolution — BDG `getGuardConfig()` Seat Source: `enterprise_contracts` with Event-Refreshed 1-Hour KV Cache (DEC-069)](#35-oq-sso-342-resolution--bdg-getguardconfig-seat-source-enterprise_contracts-with-event-refreshed-1-hour-kv-cache-dec-069)
 36. [OQ-SSO-23.1 · OQ-SSO-23.3 · OQ-SSO-23.4 Resolution — CAEP Cert-Rotation Re-Registration, SSF Polling Fallback SLA & RISC Hijacking Group Cache Eviction (DEC-072)](#36-oq-sso-231--oq-sso-233--oq-sso-234-resolution--caep-cert-rotation-re-registration-ssf-polling-fallback-sla--risc-hijacking-group-cache-eviction-dec-072)
 37. [Cross-Reference Patch — R-37 · R-38 · §36.6 Item 1 Closure (SSO Monitoring Recovery Runbooks)](#37-cross-reference-patch--r-37--r-38--366-item-1-closure-sso-monitoring-recovery-runbooks)
+38. [Cross-Reference Patch — AUDIT_LOG_SCHEMA SCIM-Lifecycle Registration (§27.14 Item 1 Closure)](#38-cross-reference-patch--audit_log_schema-scim-lifecycle-registration-2714-item-1-closure)
 
 ---
 
@@ -9772,7 +9773,7 @@ Filing path: `compliance/evidence/scim-provisioning/SCIM-PROV-E-00{1..4}_<YYYY-Q
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register all six DEC-030 events from §27.10 in `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` with Zod v2 schemas and retention labels. Deprecate `scim.user_deactivated` (§3.5 interim name) — update all references to `scim.user_deprovisioned`. | compliance-officer + platform-engineer | **P0** | M4 | [ ] |
+| 1 | Register all six DEC-030 events from §27.10 in `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` with Zod v2 schemas and retention labels. Deprecate `scim.user_deactivated` (§3.5 interim name) — update all references to `scim.user_deprovisioned`. | compliance-officer + platform-engineer | **P0** | M4 | [x] **Done — AUDIT_LOG_SCHEMA v2.49 (2026-06-26).** All six events registered in `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (lines 440–445); `scim.user_deactivated` deprecated with canonical name note; Zod schemas present (`ScimUserProvisionedSchema` etc.). AUDIT_LOG_SCHEMA §SCIM-Lifecycle section header explicitly states "closes SSO_SCIM_IMPLEMENTATION.md §27.14 checklist item 1 (P0 M4)". See §38 for cross-reference closure documentation. |
 | 2 | Scaffold `apps/scim-worker/` directory structure per §27.2. Configure `wrangler.toml` with `SCIM_KV` namespace binding (new; separate from `SSO_KV`), `SCIM_TOKEN_HASH_SECRET` Workers Secret, and `AUDIT_QUEUE` binding. | platform-engineer | **P0** | M4 | [ ] |
 | 3 | Add `SCIM_TOKEN_HASH_SECRET` to `docs/CRYPTOGRAPHY_POLICY.md §5` Key Rotation Schedule (180-day cycle; re-hash `tenant_scim_tokens.token_hash` on rotation). Add to `docs/SOC2_READINESS.md` key inventory. | security-engineer | **P0** | M4 | [x] ✅ 2026-06-14 — §5 + §6 + §12 updated in CRYPTOGRAPHY_POLICY v1.2; §56.3 row added in SOC2_READINESS |
 | 4 | Implement `auth.ts` token authentication pipeline (§27.3): HMAC-SHA256 hash, KV lookup with 5-minute TTL, Supabase fallback, IP enforcement call to shared `enforceScimIpAllowlist()`. | platform-engineer | **P0** | M4 | [ ] |
@@ -13003,6 +13004,87 @@ The following item is appended to the §21.15 implementation checklist (Google W
 ---
 
 *v2.8.1 (2026-06-20): §35.9 item 4 closure — `system.scim_guard_cfg_cache_stale` docs-side obligation marked done. `docs/SOC2_READINESS.md §98.5` item 2 directed that §35.9 item 4 be marked `[x] Done (2026-06-20, SOC2_READINESS §98)` once `docs/SOC2_READINESS.md §91.2` was extended with the contracted-seats assertion SQL (§98.2) and stale-advisory cross-check SQL (§98.3). Both SQL blocks added to §91.2 in this patch (SOC 2 v3.22.1). The docs obligation is complete: CC7.2 monitoring role and GUARD-E-001 quarterly collection procedure fully documented. Physical `docs/AUDIT_LOG_SCHEMA.md §System` registration of `system.scim_guard_cfg_cache_stale` (LOW/1yr; payload: `{ tenant_id, kv_key, error_message, emitted_at }`) remains pending per SOC2_READINESS §98.5 item 1 (P1/M13 — compliance-officer + platform-engineer). Document header: v2.7 → v2.8.1 (v2.8 header update was omitted at §36 authoring time; corrected here). Cross-references: `docs/SOC2_READINESS.md §98.5` item 2 (🟢 Done 2026-06-20); `docs/SOC2_READINESS.md §91.2` (GUARD-E-001 collection SQL — two new SQL blocks appended); `docs/SOC2_READINESS.md §98.3` (CC7.2 monitoring rationale for `system.scim_guard_cfg_cache_stale`); `docs/SSO_SCIM_IMPLEMENTATION.md §35.5` (`billing-event-relay` KV invalidation path — source of stale advisory). Owner: compliance-officer.*
+
+---
+
+## §38 Cross-Reference Patch — AUDIT_LOG_SCHEMA SCIM-Lifecycle Registration (§27.14 Item 1 Closure)
+
+### §38.1 Purpose and Scope
+
+One cross-reference obligation is closed in this section:
+
+**§27.14 item 1 (docs-side)** — `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (v2.49) already registers all six DEC-030 SCIM lifecycle events defined in §27.10. The AUDIT_LOG_SCHEMA section header at line 436 explicitly states it "closes SSO_SCIM_IMPLEMENTATION.md §27.14 checklist item 1 (P0 M4)." The docs-side obligation is fulfilled; §27.14 item 1 is updated to `[x] Done` in this patch. Physical SCIM Worker implementation (`apps/scim-worker/`) and G-013 DPA gate remain separate pending obligations per §27.14 items 2–10.
+
+**Privacy floor:** No individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §38 content. The six SCIM lifecycle events carry a strict privacy invariant (AUDIT_LOG_SCHEMA v2.49 §SCIM-Lifecycle): no employee name, email address, or health/coaching data in any payload. `external_user_id` is the IdP-side opaque stable identifier; `user_id` is a FORM-internal UUID. No health data linkage in any SCIM chain event.
+
+---
+
+### §38.2 Six-Event Registration Confirmation
+
+The following table confirms all six DEC-030 SCIM lifecycle events from §27.10 are registered in `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (v2.49, lines 440–445). These are the canonical operational events emitted by the SCIM endpoint Worker (`apps/scim-worker/`).
+
+| Event name | Classification | Retention | SCIM trigger | SOC 2 criteria | AUDIT_LOG_SCHEMA v2.49 |
+|---|---|---|---|---|---|
+| `scim.user_provisioned` | HIGH | 7 yr | `POST /scim/v2/Users` — new user INSERT | CC6.1, CC7.2 | 🟢 Registered — line 440 |
+| `scim.user_reactivated` | HIGH | 7 yr | `POST /scim/v2/Users` idempotent replay for inactive user; or `PATCH /Groups` member-add for inactive user | CC6.1, CC7.2 | 🟢 Registered — line 441 |
+| `scim.user_deprovisioned` | HIGH | 7 yr | `PATCH /scim/v2/Users/:id` with `active: false`, or `DELETE /scim/v2/Users/:id` | CC6.3, CC7.2 | 🟢 Registered — line 442 |
+| `scim.user_updated` | STANDARD | 7 yr | `PUT` or `PATCH /scim/v2/Users/:id` updating non-activation attributes | CC6.3, CC6.6 | 🟢 Registered — line 443 |
+| `scim.group_synced` | STANDARD | 5 yr | `PATCH /scim/v2/Groups/:id` processed; role re-evaluation via §19.3 `group_member_effective_role` view | CC6.6, PI1.1 | 🟢 Registered — line 444 |
+| `scim.rejected_sensitive_attribute` | HIGH | 7 yr | SCIM write body contains GDPR Art. 9 special-category attribute; request rejected before any DB write | CC6.4, CC7.2 | 🟢 Registered — line 445 |
+
+**Retention note:** `scim.group_synced` is 5yr (role management rather than identity lifecycle — lower regulatory importance; Supabase storage optimisation at scale per §27.10 retention rationale). All other five events are 7yr as direct user identity lifecycle records per §27.10 HMAC chain requirement and SOC 2 CC6.1/CC6.3 evidence obligations.
+
+**Zod v2 schemas:** `ScimUserProvisionedSchema`, `ScimUserReactivatedSchema`, `ScimUserDeprovisionedSchema`, `ScimUserUpdatedSchema`, `ScimGroupSyncedSchema`, `ScimRejectedSensitiveAttributeSchema` — defined in AUDIT_LOG_SCHEMA v2.49 (lines 454–530) and to be deployed to `apps/audit-worker/src/schemas/scim-lifecycle.ts` per §27.14 checklist item 4 (P0/M4, platform-engineer, pending).
+
+**SCIM-CHAIN-01 (HMAC ordering invariant):** For a given `user_id`, `scim.user_deprovisioned` must not precede `scim.user_provisioned` in the chain. Violation triggers HIGH-severity WARNING (non-blocking) and AL-SCIM-04 P1 (PagerDuty `form-platform` + `form-compliance`) + R-05 co-activation. Enforced at `emit-audit-event` Worker. Confirmed present in AUDIT_LOG_SCHEMA v2.49 §SCIM-Lifecycle section header.
+
+**SOC 2 evidence artefacts enabled by this registration:**
+
+| Artefact ID | Criteria | Description |
+|---|---|---|
+| SCIM-PROV-E-001 | CC6.1, CC6.3 | Quarterly export of `scim.user_provisioned` + `scim.user_deprovisioned` chains — verifies every access grant and revocation is HMAC-evidenced |
+| SCIM-PROV-E-002 | CC6.3 | Quarterly export of `scim.user_deprovisioned` events; for each, verify `sessions_revoked_count ≥ 0` and delta to `session.bulk_revocation_complete` ≤ 60 s (`ENTERPRISE_SLA.md §3.7`) |
+| SCIM-PROV-E-003 | CC6.4 | Quarterly export of `scim.rejected_sensitive_attribute` events; verify zero GDPR Art. 9 data ingested |
+| SCIM-PROV-E-004 | CC7.2 | Quarterly AL-SCIM-01/AL-SCIM-04 alert history; verify no unresolved P1 alerts without R-05 follow-through |
+
+---
+
+### §38.3 Canonical Name Enforcement — `scim.user_deactivated` Deprecated
+
+§3.5 used the interim event name `scim.user_deactivated` for the SCIM PATCH deactivation path. The canonical name is `scim.user_deprovisioned`, established in §27.10 (v1.9, 2026-06-13) and confirmed as the registered name in `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (v2.49).
+
+| Item | Status |
+|---|---|
+| `scim.user_deactivated` (§3.5 interim name) | 🔴 **Deprecated** — must not be used in new code or new audit log registrations |
+| `scim.user_deprovisioned` (§27.10 canonical name) | 🟢 **Active** — registered in AUDIT_LOG_SCHEMA v2.49 line 442 |
+| Staging instrumentation rename (`scim.user_deactivated` → `scim.user_deprovisioned`) | 🟡 **Pending** — platform-engineer, M4. AUDIT_LOG_SCHEMA v2.49 §SCIM-Lifecycle: "All existing staging instrumentation using `scim.user_deactivated` must be renamed." |
+| `docs/INCIDENT_RESPONSE.md R-24` mass deprovisioning detection | 🟢 **Uses canonical name** — `scim.user_deprovisioned` throughout (R-24 was the original source for the canonical name per §27.10) |
+| `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` section header | 🟢 **Deprecation note present** — v2.49 line 436: "`scim.user_deactivated`…is deprecated; the canonical name is `scim.user_deprovisioned`…consistent with INCIDENT_RESPONSE.md R-24" |
+
+**Where `scim.user_deactivated` still appears in this document:** §3.5 (legacy flow diagram label preserving the interim name for historical context), §27.5 v1.9 changelog footnote, and §28 v2.0 changelog footnote. These occurrences are intentionally preserved as documentation of the naming transition. No new code, new audit events, or new documentation sections should reference `scim.user_deactivated`.
+
+---
+
+### §38.4 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update §27.14 item 1 status: `[ ]` → `[x] Done` — AUDIT_LOG_SCHEMA v2.49 §SCIM-Lifecycle registers all six DEC-030 events with retention labels; `scim.user_deactivated` deprecated; section header explicitly closes this obligation | compliance-officer | **P0** | M4 | [x] **Done — this patch (v2.10, 2026-06-26).** |
+| 2 | Publish §38.2 six-event registration confirmation table with SOC 2 criteria and AUDIT_LOG_SCHEMA line citations | compliance-officer | **P1** | M4 | [x] **Done — this patch (v2.10, 2026-06-26).** |
+| 3 | Publish §38.3 canonical name enforcement status table; document `scim.user_deactivated` deprecation scope and remaining pending staging rename | compliance-officer | **P1** | M4 | [x] **Done — this patch (v2.10, 2026-06-26).** |
+| 4 | Add TOC entry 38 to document table of contents | compliance-officer | **P1** | M4 | [x] **Done — this patch (v2.10, 2026-06-26).** |
+
+---
+
+### §38.5 Cross-Reference Obligations Closed
+
+| Prior obligation | Source | Closed by |
+|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (v2.49) section header (line 436): "closes SSO_SCIM_IMPLEMENTATION.md §27.14 checklist item 1 (P0 M4)" — six DEC-030 SCIM lifecycle events registered with Zod v2 schemas, retention labels, and `scim.user_deactivated` deprecation note | §27.14 item 1 docs-side obligation (P0/M4) | 🟢 **§38.4 this patch (v2.10, 2026-06-26).** §27.14 item 1 status updated `[ ]` → `[x] Done`. |
+
+---
+
+*v2.10 (2026-06-26): §38 Cross-Reference Patch — AUDIT_LOG_SCHEMA SCIM-Lifecycle Registration (§27.14 item 1 Closure). One cross-reference obligation closed. §38.1 purpose and scope: §27.14 item 1 docs-side — `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (v2.49, line 436) already registers all six DEC-030 SCIM lifecycle events defined in §27.10 and explicitly closes this obligation; §27.14 item 1 updated `[ ]` → `[x] Done (AUDIT_LOG_SCHEMA v2.49, 2026-06-26)`. §38.2 six-event registration confirmation table: `scim.user_provisioned` (HIGH/7yr/CC6.1 — line 440), `scim.user_reactivated` (HIGH/7yr/CC6.1 — line 441), `scim.user_deprovisioned` (HIGH/7yr/CC6.3 — line 442), `scim.user_updated` (STANDARD/7yr/CC6.3/CC6.6 — line 443), `scim.group_synced` (STANDARD/5yr/CC6.6/PI1.1 — line 444), `scim.rejected_sensitive_attribute` (HIGH/7yr/CC6.4 — line 445); Zod v2 schemas noted (AUDIT_LOG_SCHEMA lines 454–530); SCIM-CHAIN-01 invariant confirmed (AL-SCIM-04 P1 + R-05 on `scim.user_deprovisioned` preceding `scim.user_provisioned`); four SOC 2 evidence artefacts SCIM-PROV-E-001 through SCIM-PROV-E-004. §38.3 canonical name enforcement: `scim.user_deactivated` (§3.5 interim) deprecated (🔴); `scim.user_deprovisioned` (§27.10 canonical) active (🟢); staging rename pending platform-engineer M4 (🟡); R-24 and AUDIT_LOG_SCHEMA v2.49 already use canonical name. §38.4 four-item implementation checklist (all [x] Done — this patch). §38.5 one-row cross-reference obligations closed table. §27.14 item 1 status: `[ ]` → `[x] Done`. TOC entry 38 added. Document header v2.8.2 → v2.10 (v2.9 header update was omitted at §37 authoring time; corrected here — mirrors the v2.8.1 correction pattern for the §36 header lag). Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §38 content; all six SCIM lifecycle events carry the AUDIT_LOG_SCHEMA v2.49 privacy invariant (no employee name, email, or health data in any payload; `external_user_id` is IdP-side opaque stable identifier; `user_id` is FORM-internal UUID; no health data linkage in any SCIM chain event). Cross-references: `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (v2.49 lines 434–452 — six-event registration; closes §27.14 item 1; `scim.user_deactivated` deprecation note; SCIM-CHAIN-01 invariant; Zod schemas lines 454–530); `docs/SSO_SCIM_IMPLEMENTATION.md §27.10` (canonical DEC-030 event definitions — source for AUDIT_LOG_SCHEMA registration); `docs/SSO_SCIM_IMPLEMENTATION.md §3.5` (interim `scim.user_deactivated` name — deprecated; §38.3 preserves as historical context); `docs/INCIDENT_RESPONSE.md R-24` (mass deprovisioning detection — canonical `scim.user_deprovisioned` source and consumer); `docs/SOC2_READINESS.md §CC6.1/CC6.3` (SCIM-PROV-E-001/002 evidence artefacts — AUDIT_LOG_SCHEMA event registration is the prerequisite; collection pending production SCIM Worker deploy). Owner: compliance-officer.*
 
 ---
 
