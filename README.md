@@ -343,23 +343,11 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 501–559 | Self-programming mastery | 59 | Published |
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
+| 591–600 | Training with tech block | 10 | **COMPLETE** — review_pending: sports-scientist · v9.37.0 |
 
-### Next block: 591–600 — Training with tech
+### Block 591–600 — Training with tech (COMPLETE · 10/10 written · v9.37.0)
 
-Honest trade-off analysis of tools, devices, and AI in the training context. No hype, no marketing copy.
-
-| Post | Topic |
-|---|---|
-| 591 | Wearables: що вони вимірюють, що вигадують — PPG accuracy, HRV consumer vs gold-standard, sleep staging PSG gap |
-| 592 | HRV-guided training — протокол, алгоритм рішень, що робити коли score суперечить відчуттям |
-| 593 | Відеоаналіз техніки — що можна виявити зі смартфону, де потрібна лабораторія |
-| 594 | AI-coach проти GPT-wrapper — як відрізнити продукт від автозаповнення |
-| 595 | Силові блоки в застосунках — що вважати «прогресом» у даних проти у штанзі |
-| 596 | Гравітаційний score і readiness — як не будувати тренування навколо dashboardа |
-| 597 | Нотатки тренувального журналу як первинний data source |
-| 598 | Коли технологія заважає — ознаки tech-залежності в тренуванні |
-| 599 | VO2max estimate longitudinal tracking — методологія і обмеження |
-| 600 | Synthesis: self-coached athlete technology stack 2026 |
+Honest trade-off analysis of tools, devices, and AI in the training context. No hype, no marketing copy. All posts present (post-591 through post-600). sports-scientist review pending before publish.
 
 ### Block 601–650 — Programming edge cases (COMPLETE · 49/50 written · post-639 blocked clinical-safety HARD VETO)
 
@@ -2689,7 +2677,7 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2651 | Де Victor корисний, де атлет мусить вирішувати сам: операційна межа AI-coach | **draft · v9.34.0 → post-2651-victor-operational-boundary.md** |
 | 2652 | Як самостійно оцінити ефективність блоку без зовнішнього тренера | **draft · v9.35.0 → post-2652-block-effectiveness-self-assessment.md** |
 | 2653 | Тренувальна ідентичність і прийняття рішень: хто ти як атлет — і чому це має значення | **draft · v9.36.0 → post-2653-training-identity-decision-making.md** |
-| 2654 | Від виконання до розуміння: де в self-coached практиці виникає реальна компетентність | proposed · v9.21.0 |
+| 2654 | Від виконання до розуміння: де в self-coached практиці виникає реальна компетентність | **draft · v9.37.0 → post-2654-execution-to-understanding.md** |
 | 2655 | Синтез 2646–2655: компас self-coached атлета — десять питань без правильних відповідей | proposed · v9.21.0 |
 
 ### Editorial series: 2656–2665 · Тренувальний аналіз у реальному часі: що читати з власних даних без тренера (proposed · v9.23.0)

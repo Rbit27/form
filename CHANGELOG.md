@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.37.0] — 2026-06-26
+
+### Added
+- `content/post-2654-execution-to-understanding.md` — Editorial series 2646–2655 post 9/10. «Від виконання до розуміння: де в self-coached практиці виникає реальна компетентність». Три рівні компетентності (декларативне / процедурне / метакогнітивне); механізм переходу: передбачення → виконання → порівняння → оновлення моделі (Ericsson et al. deliberate practice; Fitts & Posner skill acquisition stages); чому self-coached атлет особливо вразливий без зовнішнього feedback-loop; три точки де компетентність реально виникає; три рівні рефлексії (пост-сесійна, блок-рев'ю, річна ретроспектива); п'ять практичних практик для прискорення переходу. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `blog.html` — post-2654 card added at top of feed.
+
+### Changed
+- `README.md` — block 591–600 (Training with tech) marked COMPLETE (10/10 posts written, all present); "Next block" label updated accordingly. Post-2654 → draft in roadmap table.
+- `STATUS.md` — v9.36.0 → v9.37.0; post-2654 editorial series note appended; series 2646–2655 progress 8/10 → 9/10.
+- `VERSION` — 9.36.1 → 9.37.0.
+
+---
+
 ## [9.36.1] — 2026-06-26
 
 ### Fixed
