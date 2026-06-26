@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [9.0.1] — 2026-06-26
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.40.0 → v3.41.0: §116 Cross-Reference Patch — DATA_MODEL §45.8 item 3 (REN-E-001 `contract_discount_type` breakdown · CC5.2 / CC1.4). Extends REN-E-001 §79.4 row description with annual `contract_discount_type` cross-tab SQL (GROUP BY across all four enum values: `none`, `multi_year`, `upfront`, `loyalty_reentry`); CC5.2 auditor narrative establishing dual evidence path with PRICE-OBS-E-001 (§114) — together proving REENTRY-CHAIN-01 operated without bypass; CC1.4 auditor narrative extension covering approved-discount traceability alongside `floor_respected: true` floor-compliance attestation. §79.4 count unchanged at 76 (row description extension only). DATA_MODEL §45.8 item 3 (P1/M11) → 🟢 Done.
+- `docs/DATA_MODEL.md` — v1.32 → v1.33: §45.8 item 3 checklist status updated [x] Done — 2026-06-26, SOC2_READINESS §116 (v3.41.0). No schema or DDL changes.
+- `VERSION` — 9.0.0 → 9.0.1.
+
+---
+
 ## [9.0.0] — 2026-06-26
 
 ### Added

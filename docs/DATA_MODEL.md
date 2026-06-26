@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.32
+# FORM · Multi-Tenant Data Model v1.33
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -17037,7 +17037,7 @@ Closes `docs/COST_MODEL.md §44.8 item 1` (P0, M9).
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 3 | Register REN-E-001 `loyalty_reentry` discount-type cross-tab query in `docs/SOC2_READINESS.md §79.4` master evidence table (if not already covered by §43.7 registration). Add `discount_type` breakdown column to the REN-E-001 filing template. | compliance-officer | **P1** | M11 | [ ] |
+| 3 | Register REN-E-001 `loyalty_reentry` discount-type cross-tab query in `docs/SOC2_READINESS.md §79.4` master evidence table (if not already covered by §43.7 registration). Add `discount_type` breakdown column to the REN-E-001 filing template. | compliance-officer | **P1** | M11 | [x] Done — 2026-06-26, SOC2_READINESS §116 (v3.41.0) |
 
 ### 45.9 Cross-Reference Obligations Created by §45
 
@@ -17512,6 +17512,8 @@ The three monitoring indexes (`litigation_hold_records_review_sweep_idx`, `litig
 | `compliance/evidence/litigation-hold/migration-0087-validation_<YYYY-MM-DD>.txt` — staging output retention | §46.3.2 / §46.8 item 1 | 🟡 **Pending — §46.8 item 1 (migration not yet applied).** |
 
 ---
+
+*v1.33 (2026-06-26): §45.8 item 3 cross-reference closure — SOC2_READINESS §116 (v3.41.0) authored (2026-06-26): REN-E-001 `contract_discount_type` cross-tab registered in §79.4; `discount_type` breakdown column added to REN-E-001 filing template; DATA_MODEL §45.8 item 3 (P1/M11) → [x] Done. Document header v1.32 → v1.33. No schema, DDL, or model changes. Owner: compliance-officer.*
 
 *v1.32 (2026-06-25): §46.8 items 3 + 4 cross-reference closure — OBSERVABILITY §54 authored (v5.2.0, 2026-06-25) + SOC2_READINESS §112 registered LITH-E-001 + LITH-OBS-E-001 (v3.37.0, 2026-06-25). §46.9 cross-reference status updated: OBSERVABILITY §54 🟡 → 🟢 Done (OBSERVABILITY.md §54 v5.2.0, 2026-06-25); SOC2_READINESS §79.4 LITH-E-001 + LITH-OBS-E-001 🟡 → 🟢 Done (SOC2_READINESS.md §112 v3.37.0, 2026-06-25; §79.4 count 67 → 69; `litigation-hold/` R2 subfolder created; §80.4 Vanta 2 new entries). §46.8 checklist items 3 and 4 marked 🟢 in §46.9 cross-reference table. Remaining open: §46.8 item 1 (migration 0087 apply + staging checks, P0/M5), §46.8 item 2 (Admin Console PAM workflow, P0/M5), §46.8 item 5 (end-to-end staging test, P2/M7). Document header v1.31 → v1.32. No schema, model, or index changes. Owner: compliance-officer + enterprise-architect.*
 

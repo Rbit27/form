@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.40.0
+# FORM · SOC 2 Type II Readiness v3.41.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -31600,6 +31600,67 @@ One new entry added to §80.4 Vanta mirror protocol (upload schedule):
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 1 | File first PRICE-STALE-E-001 at end of first full year with job 46 in production (M9 onward, coinciding with PRICE-OBS-E-002 collection): compile R-46 activation log from `system.pricing_exception_monitor_stale_declared` and `system.pricing_exception_monitor_restored` HMAC-chained DEC-030 events; tally `reentry_violations_found_during_stale` total, `stale_window_overlaps_quarter_start` count, and quarterly-trigger miss count (`quarterly_trigger_manually_fired = true`) across all activations; file as `pricing-exceptions/PRICE-STALE-E-001_<YYYY>.md`; upload to Vanta (CC5.2/CC4.1/CC7.2); add to MASTER-INDEX-YYYY.csv. Zero-activation years: file affirmative attestation confirming no R-46 activations (absence of PRICING-MONITOR-STALE-CHAIN-01 `stale_declared` events in `audit_log_events` is the proof — `form_api` REVOKED, collection via `form_admin` PAM elevation). Privacy check: aggregate integers + stale duration + boolean counts only — no `tenant_id`, `deal_id`, `approver_user_id`, employee `user_id`, or GDPR Art. 9 data. | compliance-officer + devops-lead | **P1** | M9 (first annual period-end after job 46 launch) | [ ] |
+
+*v3.41.0 (2026-06-26): §116 Cross-Reference Patch — DATA_MODEL §45.8 item 3 (REN-E-001 `contract_discount_type` breakdown · CC5.2 / CC1.4). One P1/M11 obligation closed: DATA_MODEL §45.8 item 3 (register REN-E-001 `loyalty_reentry` discount-type cross-tab query in §79.4; add `discount_type` breakdown column to REN-E-001 filing template; open since DATA_MODEL §45 authoring 2026-06-25). §116.1 gap description: REN-E-001 §79.4 entry (v3.40.0) describes only `floor_respected: true` attestation and RENEW-CHAIN-01 zero-row compliance query; COST_MODEL §44.7 specifies that `contract_discount_type = 'loyalty_reentry'` count + aggregate ACV impact note must be included in the REN-E-001 annual filing narrative; DATA_MODEL §45.7 CC5.2 auditor narrative establishes `contract_discount_type` as the DDL-layer anchor for REENTRY-CHAIN-01 audit-trail integrity; DATA_MODEL §45.8 item 3 (P1/M11) explicitly requires cross-tab registration in §79.4. §116.2 source table: 3 sources (DATA_MODEL §45.7 CC5.2/CC1.4 auditor narratives; COST_MODEL §44.7 SOC 2 evidence mapping; DATA_MODEL §45.8 item 3 obligation). §116.3 §79.4 REN-E-001 row extension: no new §79.4 row — extends existing REN-E-001 description with (a) annual `contract_discount_type` cross-tab SQL (`GROUP BY contract_discount_type` across all four enum values; `loyalty_reentry` rows imply validated `enterprise.pricing_exception_approved` predecessor via REENTRY-CHAIN-01 Worker 422 invariant — COST_MODEL §44.5); (b) CC5.2 auditor narrative: dual evidence path with PRICE-OBS-E-001 (§114, quarterly approval-chain) + REN-E-001 cross-tab (annual renewal-chain) — together prove REENTRY-CHAIN-01 operated without bypass during the entire observation period; (c) CC1.4 auditor narrative extension: `floor_respected: true` + discount-type cross-tab together cover both floor compliance (RENEW-CHAIN-01) and approved-discount traceability (`contract_discount_type` immutability post-contract-signing — DATA_MODEL §45.3). §79.4 count unchanged at 76 (row description extension only — no new row). §116.4 cross-reference closure: DATA_MODEL §45.8 item 3 → 🟢 Done. §116.5 implementation checklist: one P1 item (REN-E-001 annual filing template update — include §116.3 `contract_discount_type` cross-tab section at M12, compliance-officer; privacy check: aggregate counts + ACV sums only — no `tenant_id`, `deal_id`, `approver_user_id`, GDPR Art. 9 data; `form_api` REVOKED; upload to R2 `renewals/` + Vanta CC5.2/CC1.4). Cross-references: `docs/DATA_MODEL.md §45.7` (CC5.2/CC1.4 auditor narratives — `contract_discount_type` DDL-layer anchor and REENTRY-CHAIN-01 audit-trail integrity); `docs/DATA_MODEL.md §45.8 item 3` (obligation source — 🟢 closed); `docs/COST_MODEL.md §44.7` (SOC 2 evidence mapping — `loyalty_reentry` count + ACV impact note in REN-E-001); `docs/COST_MODEL.md §44.5` (REENTRY-CHAIN-01 Worker enforcement — HTTP 422 `REENTRY_CHAIN_01_VIOLATION` guarantees predecessor invariant); `docs/SOC2_READINESS.md §114` (PRICE-OBS-E-001 — dual CC5.2 evidence path companion). Owner: compliance-officer.*
+
+---
+
+## §116 · Cross-Reference Patch — DATA_MODEL §45.8 item 3 (REN-E-001 `contract_discount_type` breakdown · CC5.2 / CC1.4)
+
+### §116.1 Gap Description
+
+One P1/M11 documentation gap closed in this patch:
+
+| Gap | Source | Status before §116 |
+|---|---|---|
+| REN-E-001 §79.4 entry describes only `floor_respected: true` attestation and RENEW-CHAIN-01 zero-row compliance query; does not include `contract_discount_type` breakdown cross-tab required by COST_MODEL §44.7 and established as the CC5.2 DDL-layer anchor in DATA_MODEL §45.7 | DATA_MODEL §45.8 item 3 (P1/M11, 2026-06-25) | 🔴 Open — `contract_discount_type` column added in DATA_MODEL §45 / migration 0085 (2026-06-25); §79.4 cross-tab registration deferred as P1/M11 checklist item; COST_MODEL §44.7 describes the filing requirement but no §79.4 row extension was authored |
+
+### §116.2 Source Table
+
+| Source | Type | Obligation |
+|---|---|---|
+| `docs/DATA_MODEL.md §45.7` | CC5.2 / CC1.4 auditor narrative | `contract_discount_type` is the DDL-layer anchor for REENTRY-CHAIN-01 audit-trail integrity; CC1.4 requires traceability of approved discounts through the DEC-030 chain; column populated only at contract signing and immutable thereafter |
+| `docs/COST_MODEL.md §44.7` | SOC 2 evidence mapping | REN-E-001 annual filing must include count of `contract_discount_type = 'loyalty_reentry'` rows + aggregate ACV impact note in filing narrative |
+| `docs/DATA_MODEL.md §45.8 item 3` | Open obligation (P1/M11) | Register REN-E-001 `loyalty_reentry` discount-type cross-tab query in `docs/SOC2_READINESS.md §79.4`; add `discount_type` breakdown column to the REN-E-001 filing template |
+
+### §116.3 §79.4 REN-E-001 Row Extension
+
+No new §79.4 row is added. The existing REN-E-001 description is extended by appending the following content after the existing `7yr retention (COST_MODEL §42.9).` clause:
+
+**Cross-tab addition:** Annual `contract_discount_type` breakdown appended to the standard REN-E-001 chain export and RENEW-CHAIN-01 compliance query:
+
+```sql
+SELECT contract_discount_type,
+       COUNT(*)              AS renewals,
+       SUM(contract_arr_usd) AS arr_impact_usd
+FROM   audit_log_events
+WHERE  event_type = 'enterprise.contract_renewed'
+  AND  event_time BETWEEN '<obs_period_start>' AND '<obs_period_end>'
+GROUP  BY contract_discount_type
+ORDER  BY renewals DESC;
+```
+
+All four `contract_discount_type` enum values (`none`, `multi_year`, `upfront`, `loyalty_reentry`) must be represented in the cross-tab (zero-count values filed as `0`, not omitted). `loyalty_reentry` row count + `arr_impact_usd` constitute the primary CC5.2 REENTRY-CHAIN-01 evidence: each `loyalty_reentry` row implies a validated predecessor `enterprise.pricing_exception_approved` event with `exception_type = 'loyalty_reentry'` for the same `tenant_id` (the emit-audit-event Worker enforces this via HTTP 422 `REENTRY_CHAIN_01_VIOLATION` — COST_MODEL §44.5). Zero `loyalty_reentry` rows in the observation period filed as affirmative attestation that no loyalty re-entry renewals occurred.
+
+**CC5.2 auditor narrative (added):** REN-E-001 `loyalty_reentry` cross-tab count provides the renewal-stage half of the dual CC5.2 REENTRY-CHAIN-01 evidence path. PRICE-OBS-E-001 (§114) evidences the quarterly approval-chain stage (`enterprise.pricing_exception_approved` aggregate counts by `exception_type`). REN-E-001 cross-tab evidences the renewal stage: every `loyalty_reentry` renewal in the DEC-030 HMAC chain is chain-verifiable (HMAC-VERIFY-ALGO-001) and implies a prior approval-chain event — no `contract_renewed` with `contract_discount_type = 'loyalty_reentry'` can be inserted without a valid predecessor (Worker 422 invariant). Together, PRICE-OBS-E-001 (approval gate) + REN-E-001 cross-tab (renewal gate) prove REENTRY-CHAIN-01 operated without bypass during the entire observation period.
+
+**CC1.4 auditor narrative (extended):** Pre-§116 REN-E-001 established `floor_respected: true` on every renewal row (RENEW-CHAIN-01 zero-row compliance query; `chk_floor_always_respected` DDL backstop in migration 0084 — DATA_MODEL §43). §116 adds the discount-type traceability layer: approved discounts (`multi_year`, `upfront`, `loyalty_reentry`) are identified and their aggregate ACV impact quantified; no discount type outside the four allowed enum values is present (DDL enforced); `loyalty_reentry` rows are each backed by a DEC-030-registered `enterprise.pricing_exception_approved` event with compliance-officer approval (DEC-030 HIGH/7yr). The `contract_discount_type` immutability post-contract-signing (DATA_MODEL §45.3) ensures the cross-tab cannot be retroactively modified.
+
+**Privacy floor:** `contract_discount_type` is a schema-level enum (`none`, `multi_year`, `upfront`, `loyalty_reentry`) — not PII; no `tenant_id`, `deal_id`, `approver_user_id`, `user_id`, or GDPR Art. 9 data in the cross-tab. `form_api` REVOKED from `audit_log_events`; collection via `form_admin` PAM elevation session (compliance-officer). R2 path unchanged: `renewals/`.
+
+§79.4 count: unchanged at **76** (row description extension only — no new artefact row).
+
+### §116.4 Cross-Reference Obligations Closed
+
+| Source | Obligation | Status |
+|---|---|---|
+| `docs/DATA_MODEL.md §45.8 item 3` | Register REN-E-001 `loyalty_reentry` discount-type cross-tab query in `docs/SOC2_READINESS.md §79.4` master evidence table; add `discount_type` breakdown column to the REN-E-001 filing template | 🟢 Done — 2026-06-26, §116 (v3.41.0) |
+
+### §116.5 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update the REN-E-001 annual filing template (first collection at M12, first full renewal cycle) to include the §116.3 `contract_discount_type` cross-tab section: execute the §116.3 SQL query against `audit_log_events` for the observation period; include all four `contract_discount_type` enum values (zero counts as `0`); prepend CC5.2 + CC1.4 auditor narrative paragraphs per §116.3 to the filing document. Privacy check: cross-tab is aggregate counts + ACV sums only — no `tenant_id`, `deal_id`, `approver_user_id`, employee `user_id`, or GDPR Art. 9 data. Collection via `form_admin` PAM elevation; `form_api` REVOKED. Upload to R2 `renewals/` and Vanta (CC5.2/CC1.4). | compliance-officer | **P1** | M12 (first annual renewal cycle period-end) | [ ] |
 
 ---
 
