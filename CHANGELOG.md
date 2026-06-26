@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.23.1] — 2026-06-26
+
+### Changed
+- `docs/OBSERVABILITY.md §56.10` — Item 5 marked `[x] Done — 2026-06-26 (SOC2_READINESS.md §120, v9.19.1 · §79.4 count 85→86 · §80.4 Vanta mirror updated)`. The SOC2_READINESS §120 cross-reference patch and §79.4 SCIM-PROV-MON-E-001 registration were completed in v9.19.1 but the OBSERVABILITY §56.10 checklist was not updated to reflect that closure. Stale `[ ]` corrected; items 2 (pg_cron job 47 implementation), 7 (staging test), and 8 (Metabase dashboard) remain open as implementation milestones.
+- `VERSION` — 9.23.0 → 9.23.1.
+
+---
+
 ## [9.23.0] — 2026-06-26
 
 ### Added
