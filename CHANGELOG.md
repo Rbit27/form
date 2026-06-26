@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [9.3.0] — 2026-06-26
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — v2.8.2 → v2.9: §37 Cross-Reference Patch — R-37 · R-38 · §36.6 Item 1 Closure (SSO Monitoring Recovery Runbooks). Closes three outstanding obligations: (1) §36.6 item 1 docs-side (OBSERVABILITY §12.6 registration of pg_cron jobs 35/37/38, DEC-070); (2) §21.15 item 13 — R-38 cross-reference back to §21.7/§21.9 as source spec for `google_directory_alert_check` (job 35); (3) R-37 cross-reference to OBSERVABILITY §49 as source spec for `sso_fleet_health_check` (job 38). Adds §37.2 cross-reference registry table (all 6 enterprise pg_cron jobs, canonical runbook IDs, cadences, freshness windows). §37.3 two-row status table for §36.6 item 1 (docs-side 🟢 Done / physical migration 0082 DDL 🟡 Pending). Shared 5-min cadence group (jobs 35/37/38) co-activation guidance → R-03. TOC entry 37 added.
+
+### Changed
+- `VERSION` — 9.2.0 → 9.3.0.
+
+---
+
 ## [9.2.0] — 2026-06-26
 
 ### Added

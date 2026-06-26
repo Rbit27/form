@@ -42,6 +42,7 @@
 34. [SCIM Bulk Deprovision Guard — Per-Tenant Configurable Threshold & CSM-Countersigned Override (Closes OQ-R24-01, DEC-066)](#34-scim-bulk-deprovision-guard--per-tenant-configurable-threshold--csm-countersigned-override)
 35. [OQ-SSO-34.2 Resolution — BDG `getGuardConfig()` Seat Source: `enterprise_contracts` with Event-Refreshed 1-Hour KV Cache (DEC-069)](#35-oq-sso-342-resolution--bdg-getguardconfig-seat-source-enterprise_contracts-with-event-refreshed-1-hour-kv-cache-dec-069)
 36. [OQ-SSO-23.1 · OQ-SSO-23.3 · OQ-SSO-23.4 Resolution — CAEP Cert-Rotation Re-Registration, SSF Polling Fallback SLA & RISC Hijacking Group Cache Eviction (DEC-072)](#36-oq-sso-231--oq-sso-233--oq-sso-234-resolution--caep-cert-rotation-re-registration-ssf-polling-fallback-sla--risc-hijacking-group-cache-eviction-dec-072)
+37. [Cross-Reference Patch — R-37 · R-38 · §36.6 Item 1 Closure (SSO Monitoring Recovery Runbooks)](#37-cross-reference-patch--r-37--r-38--366-item-1-closure-sso-monitoring-recovery-runbooks)
 
 ---
 
@@ -12901,7 +12902,7 @@ The guard `tenant.google_directory_sync_enabled === true` ensures this branch is
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Apply migration 0082: `caep_reregistration_required BOOLEAN NOT NULL DEFAULT FALSE`, `caep_last_reregistered_at TIMESTAMPTZ`, `caep_reregistration_trigger TEXT CHECK(...)` columns on `tenant_sso_configs`; partial index `idx_tsc_caep_reregister`; pg_cron job `caep_reregister_sweep` (`*/5 * * * *`) — register as job 37 in `docs/OBSERVABILITY.md §12.6` | platform-engineer | **P0** | M5 | [ ] |
+| 1 | Apply migration 0082: `caep_reregistration_required BOOLEAN NOT NULL DEFAULT FALSE`, `caep_last_reregistered_at TIMESTAMPTZ`, `caep_reregistration_trigger TEXT CHECK(...)` columns on `tenant_sso_configs`; partial index `idx_tsc_caep_reregister`; pg_cron job `caep_reregister_sweep` (`*/5 * * * *`) — register as job 37 in `docs/OBSERVABILITY.md §12.6` | platform-engineer | **P0** | M5 | [x] **Done (docs-side, 2026-06-19) — `docs/OBSERVABILITY.md §12.6` v0.4 (2026-06-19) registered job 37 `caep_reregister_sweep` with full stale-consequence cross-reference to R-32 (`form-security` PagerDuty P1, dedup `caep-sweep-stale`, 6-min freshness). Physical migration 0082 DDL deploy to production remains pending (platform-engineer, M5). See §37.3.** |
 | 2 | Add cert-rotation hook to `cert-expiry-check` cron (§36.2.4): after `cert_rotation_state → 'complete'` write, update `caep_reregistration_required = TRUE` + `caep_reregistration_trigger = 'cert_rotation'` for tenants with `caep_status IN ('active', 'error')`; emit `sso.caep_reregistration_queued` (STANDARD, 7yr) | platform-engineer | **P0** | M5 | [ ] |
 | 3 | Implement `POST /internal/v1/caep/reregister` route in `caep-stream-manager` Cloudflare Worker: accepts `{ tenant_ids: string[] }`; processes serially with 200ms yield; on success: `caep_reregistration_required = FALSE`, `caep_last_reregistered_at = NOW()`, `caep_stream_id = {new_stream_id}`, emit `sso.caep_stream_registered` (HIGH, 7yr) with sentinel `admin_user_id_hash`; on 3-retry failure: `caep_status = 'error'`, emit `sso.caep_stream_error` with `error_type: 'reregistration_failed_post_cert_rotation'`, trigger AL-CAEP-01 | platform-engineer + security-engineer | **P0** | M5 | [ ] |
 | 4 | Register `sso.caep_reregistration_queued` (STANDARD, 7yr) in `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF`; extend `sso.google_directory_sync_error` controlled vocabulary with `'cache_eviction_failed_on_risc_hijacking'` | compliance-officer | **P0** | M5 | [x] **Done — 2026-06-20.** `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF` (v2.21) registers `sso.caep_reregistration_queued` (STANDARD, 7yr; payload: `tenant_id`, `trigger` enum, `caep_status_at_queue_time` enum); `sso.google_directory_sync_error` vocabulary extended with `'cache_eviction_failed_on_risc_hijacking'` in both the `### Google Directory Sync events` vocabulary note and the CAEP/SSF section. |
@@ -12910,6 +12911,90 @@ The guard `tenant.google_directory_sync_enabled === true` ensures this branch is
 | 7 | Update `docs/ENTERPRISE_ONBOARDING.md §2.4`: add CAEP PUSH capability as explicit prerequisite; add non-PUSH fallback note (JWT TTL baseline, no CAEP SLA addendum) | customer-success | **P1** | M5 | [x] **Done — 2026-06-20.** `docs/ENTERPRISE_ONBOARDING.md` v0.2 → v0.3: **§2.3 CAEP/SSF IdP prerequisite verification** added within Section 2 (Contract week). Five-row IdP compatibility table (Okta/Entra/Google Workspace OIDC → Addendum 6 PUSH path; OneLogin/other SAML → JWT TTL baseline). Two SLA path descriptions. Five-item CSM action checklist (IdP confirmation script, Linear tracker `idp_type`, Addendum 6 gate for PUSH-capable IdPs, baseline note for non-PUSH, post-go-live CAEP stream status check in Admin Dashboard). Privacy floor note. Added as §2.3 rather than §2.4 since only §2.1 and §2.2 existed previously (§2.4 in the checklist was a drafting placeholder for the correct §2.3 insertion point). |
 | 8 | Integration tests — `src/tests/sso/caep-edge-cases.test.ts`: (a) cert-rotation-state → 'complete' sets `caep_reregistration_required = TRUE` in Supabase; (b) sweep picks up flagged tenant and emits `sso.caep_stream_registered`; (c) 3-retry failure → `caep_status = 'error'` + `sso.caep_stream_error`; (d) RISC hijacking event on `google_directory_sync_enabled = true` tenant → `google_directory_group_cache` row deleted; (e) cache eviction DB error → `sso.google_directory_sync_error` with `error_type: 'cache_eviction_failed_on_risc_hijacking'`; main session revocation path unaffected | qa-lead | **P1** | M5 | [ ] |
 | 9 | Cross-reference `docs/INCIDENT_RESPONSE.md R-32` as the operational recovery runbook for `caep_reregister_sweep` stale condition: when `system.cron_job_stale` fires for `job_name = 'caep_reregister_sweep'` (job 37, `*/5 * * * *`, 6-min freshness), IC follows R-32 in full. Recovery procedure is §R-32.5 (Steps 1–5: diagnose H1–H5, execute manual re-registration via `POST /internal/v1/caep/reregister` under PAM elevation, verify, restore job 37, confirm). Two-severity matrix applies: P1 (stale, zero tenants with `caep_reregistration_required = TRUE` AND zero `caep_status = 'error'`), P0 (stale AND ≥ 1 tenant with `caep_reregistration_required = TRUE` OR `caep_status = 'error'`). | compliance-officer | **P1** | M7 | [x] **Done — 2026-06-21.** R-32.11 item 6 cross-reference obligation fulfilled. `docs/INCIDENT_RESPONSE.md R-32` is the authoritative recovery runbook; R-32.11 item 6 Status updated to Done. |
+
+---
+
+## §37 Cross-Reference Patch — R-37 · R-38 · §36.6 Item 1 Closure (SSO Monitoring Recovery Runbooks)
+
+### §37.1 Purpose and Scope
+
+Three cross-reference obligations are closed in this section:
+
+1. **§36.6 item 1 (docs-side)** — pg_cron job 37 `caep_reregister_sweep` registration in `docs/OBSERVABILITY.md §12.6` was completed by OBSERVABILITY v0.4 patch (2026-06-19) — the same date §36 was authored. The OBSERVABILITY v0.4 note explicitly stated it "closes SSO_SCIM §36.6 item 1 P0/M5 obligation." The docs-side registration obligation is fulfilled; §36.6 item 1 is updated to `[x] Done (docs-side)` in this patch. Physical migration 0082 DDL deploy remains a separate pending obligation for platform-engineer (M5).
+
+2. **R-38 → §21 (Google Directory Sync)** — `docs/INCIDENT_RESPONSE.md R-38` (v1.0, 2026-06-22) is the operational recovery runbook for `google_directory_alert_check` (job 35, `*/5 * * * *`, 6-min freshness) stale conditions. R-38 explicitly cross-references `docs/SSO_SCIM_IMPLEMENTATION.md §21.7` and `§21.9` as the canonical DEC-030 event emission spec and alert rule definitions that R-38's scope queries (R-38-C1 and R-38-C2) are built against. §21.15 checklist item 13 is added in §37.4 to document this cross-reference from SSO_SCIM's perspective.
+
+3. **R-37 → SSO fleet health** — `docs/INCIDENT_RESPONSE.md R-37` (v1.1, 2026-06-22) is the operational recovery runbook for `sso_fleet_health_check` (job 38, `*/5 * * * *`, 6-min freshness) stale conditions (OBSERVABILITY §49, DEC-070, OQ-SSO-OBS-01 Resolution). R-37 cross-references this document's per-tenant SSO login-success foundation (the per-tenant SSO-SLO-01 monitoring baseline that §49's fleet companion signal supplements). §37.2 consolidates all SSO monitoring recovery runbook cross-references into a single operator-facing registry.
+
+**Privacy floor:** No individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §37 content. All pg_cron monitoring jobs covered by this section operate on aggregate counts (`failing_tenant_count`, `error_count`) or flag columns (`caep_reregistration_required`); `tenant_id` is a FORM-internal UUID that does not exit the pg_cron execution context into alert payloads (SSO-SLO-01b per DEC-070 hard invariant `sla_credit_impact: 'none'`) or is included in HMAC-chained audit events only with no individual identity dimension (GDIR error-count aggregate in §21.9; CAEP flag in §36.2).
+
+---
+
+### §37.2 SSO Monitoring Recovery Runbook Cross-Reference Registry
+
+The following table consolidates all SSO/SCIM-related pg_cron monitoring jobs registered in `docs/OBSERVABILITY.md §12.6`, their canonical specification sections in this document, and their stale-condition recovery runbooks in `docs/INCIDENT_RESPONSE.md`. IC operators should use this table as the first lookup when a `system.cron_job_stale` alert fires for any of these jobs.
+
+| Job name | Job # | Cadence | Freshness window | Source spec (this document) | INCIDENT_RESPONSE runbook |
+|---|---|---|---|---|---|
+| `scim_mass_deprovision_check` | 24 | `*/5 * * * *` | 6 min | §15 (SCIM 2.0 Groups Provisioning — bulk delete threshold); §34 (SCIM Bulk Deprovision Guard — preventive layer, DEC-066) | R-24 |
+| `bdg_override_expiry_sweep` | 34 | `*/15 * * * *` | 20 min | §34.3 (SCIM Bulk Deprovision Guard — `bdg_override_expiry_sweep` SQL; DEC-066) | R-33 |
+| `turh_retention_purge` | 32 | `0 4 * * *` | 26h | §29 (`tenant_users_role_history` retention, DEC-051) | R-34 |
+| `google_directory_alert_check` | 35 | `*/5 * * * *` | 6 min | §21.7 (DEC-030 events: `sso.google_directory_sync_error` / `sso.google_directory_sync_success`); §21.9 (AL-SSO-GDIR-01 through AL-SSO-GDIR-05 alert rules); §21.15 item 13 (R-38 cross-ref — added by this §37.4) | **R-38** (v1.0, 2026-06-22) |
+| `caep_reregister_sweep` | 37 | `*/5 * * * *` | 6 min | §36.2 (CAEP stream re-registration after SAML cert rotation; DEC-072); §36.2.4 (cert-expiry-check hook at `cert_rotation_state → 'complete'`) | R-32 |
+| `sso_fleet_health_check` | 38 | `*/5 * * * *` | 6 min | OBSERVABILITY §49 is the primary spec (SSO-SLO-01b, DEC-070); this document provides the per-tenant SSO foundation (§21 GDir sync; §23 CAEP/SSF; §26.3 API Key auth — SSO-SLO-01 per-tenant login-success rate definition) | **R-37** (v1.1, 2026-06-22) |
+
+**Shared-infrastructure failure protocol:** Jobs 35, 37, and 38 share the same 5-minute cadence and the same Supabase pg_cron execution infrastructure. Simultaneous stale of two or more of these jobs strongly indicates a shared pg_cron infrastructure failure (root cause hypothesis H2/H4 in each runbook — Supabase platform degradation or pg_cron scheduler restart). When investigating R-32, R-37, or R-38, the IC must cross-check the other two jobs' freshness status in `pg_cron.job_run_details` at T+5 before diagnosing the failure as job-specific. If H2/H4 is confirmed, co-activate `docs/INCIDENT_RESPONSE.md R-03` (Infrastructure Outage) as the primary resolution path; individual stale runbooks (R-32, R-37, R-38) handle the SSO-specific evidence chain on top of R-03.
+
+---
+
+### §37.3 §36.6 Item 1 Closure — Job 37 OBSERVABILITY Registration
+
+**Background:** §36.6 item 1 specified two combined obligations: (a) apply migration 0082 DDL to production; and (b) register pg_cron job 37 `caep_reregister_sweep` in `docs/OBSERVABILITY.md §12.6`. At the time §36 was authored (v2.8, 2026-06-19), the OBSERVABILITY v0.4 patch was issued on the same date and registered job 37 with the full stale-consequence cross-reference to R-32 (`form-security` PagerDuty P1, dedup key `caep-sweep-stale`, 6-min freshness window). The docs-side obligation (b) is therefore complete as of 2026-06-19. The physical migration 0082 DDL deploy (obligation a) remains pending for platform-engineer at M5.
+
+**Closure status:**
+
+| Obligation | Type | Status |
+|---|---|---|
+| Register job 37 `caep_reregister_sweep` in `docs/OBSERVABILITY.md §12.6` | **Documentation** | 🟢 **Done — OBSERVABILITY v0.4 (2026-06-19).** Full registry row with stale-consequence cross-reference to R-32 (`form-security` P1, `caep-sweep-stale` dedup, 6-min freshness). OBSERVABILITY v0.4 note: "closes SSO_SCIM §36.6 item 1 P0/M5 obligation." |
+| Apply migration 0082 DDL to production (`caep_reregistration_required`, `caep_last_reregistered_at`, `caep_reregistration_trigger` on `tenant_sso_configs`; `idx_tsc_caep_reregister` partial index; pg_cron job 37 physical deploy) | **Physical implementation** | 🟡 **Pending — platform-engineer, M5.** No schema or model changes. Physical deploy is the remaining obligation from §36.6 item 1. |
+
+**§36.6 item 1 status change:** `[ ]` → `[x] Done (docs-side: OBSERVABILITY v0.4, 2026-06-19; physical migration 0082 DDL deploy remains pending — platform-engineer, M5)`.
+
+---
+
+### §37.4 §21.15 Item 13 — R-38 Recovery Runbook Cross-Reference
+
+The following item is appended to the §21.15 implementation checklist (Google Workspace Directory API Integration for Group Sync):
+
+| # | Action | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 13 | Cross-reference `docs/INCIDENT_RESPONSE.md R-38` as the operational recovery runbook for `google_directory_alert_check` stale condition (job 35, `*/5 * * * *`, 6-min freshness): when `pg-cron-health-monitor` (§12.7) emits `system.cron_job_stale` for `job_name = 'google_directory_alert_check'`, IC follows R-38 in full. Two-severity matrix: P1 (stale; R-38-C1 returns zero rows — no AL-SSO-GDIR-01 threshold met during stale window; detection gap only; emit `system.gdir_alert_stale_declared` HIGH/7yr; restore job 35), P0 (stale AND R-38-C1 returns ≥ 1 row — at least one tenant had ≥ 3 `sso.google_directory_sync_error` events in any rolling 15-min window during the stale period; per-tenant scope assessment per §R-38.3 T+15; IC determination on enterprise tenant notification required). Co-stale with jobs 37 (`caep_reregister_sweep`) and/or 38 (`sso_fleet_health_check`) → shared infrastructure failure H2/H4; co-activate R-03. AL-SSO-GDIR-01 P2 PagerDuty alert `form-platform` is the operational SLA signal; AL-SSO-GDIR-02 P3 Slack `#alerts-sso` is the latency trend signal. Both are in detection-gap state for the duration of the stale window. | compliance-officer | **P1** | M4 | [x] **Done — 2026-06-22 (R-38.11 item 4); §37.4 this patch (v2.9, 2026-06-26).** R-38.11 item 4 was marked Done in the OBSERVABILITY v1.1 patch (2026-06-22), which updated the job 35 registry entry stale-consequence column in `docs/OBSERVABILITY.md §12.6` with `INCIDENT_RESPONSE R-38 (§R-38.5; v1.0, 2026-06-22)`. §37.4 is the complementary SSO_SCIM-side documentation of the same cross-reference, confirming §21.7 (`sso.google_directory_sync_error` / `sso.google_directory_sync_success` DEC-030 events) and §21.9 (AL-SSO-GDIR-01 through AL-SSO-GDIR-05 alert rules) as the canonical source specifications for R-38-C1 and R-38-C2 scope queries. SSO-OBS-E-007 quarterly evidence artefact (`docs/SOC2_READINESS.md §92`, v3.17.0) includes R-38 activation addenda where applicable (§92.2 Part D). |
+
+---
+
+### §37.5 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update §36.6 item 1 status: `[ ]` → `[x] Done (docs-side)` with note that physical migration 0082 production deploy remains a separate pending obligation (platform-engineer, M5) | compliance-officer | **P1** | M5 | [x] **Done — this patch (v2.9, 2026-06-26).** |
+| 2 | Append §21.15 item 13: R-38 recovery runbook cross-reference for Google Directory Sync (`google_directory_alert_check`, job 35) (§37.4) | compliance-officer | **P1** | M4 | [x] **Done — this patch (v2.9, 2026-06-26).** |
+| 3 | Publish §37.2 SSO monitoring recovery runbook registry: six-row consolidated table for IC operators (jobs 24/32/34/35/37/38 × source spec × runbook); shared-failure cross-reference for jobs 35/37/38 (5-min cadence group) | compliance-officer | **P1** | M5 | [x] **Done — this patch (v2.9, 2026-06-26).** |
+| 4 | Add TOC entry 37 to document table of contents | compliance-officer | **P1** | M5 | [x] **Done — this patch (v2.9, 2026-06-26).** |
+
+---
+
+### §37.6 Cross-Reference Obligations Closed
+
+| Prior obligation | Source | Closed by |
+|---|---|---|
+| `docs/OBSERVABILITY.md §12.6` v0.4 (2026-06-19) note: "closes SSO_SCIM §36.6 item 1 P0/M5 obligation" — job 37 `caep_reregister_sweep` registration | §36.6 item 1 (docs-side) | 🟢 **§37.3 this patch (v2.9, 2026-06-26).** §36.6 item 1 status updated. |
+| R-38 (`docs/INCIDENT_RESPONSE.md R-38`, v1.0, 2026-06-22) cross-reference to §21.7 + §21.9 source specs (Google Directory sync DEC-030 events and alert rules) | R-38.11 item 4 (`docs/OBSERVABILITY.md §12.6` registry cross-ref — `[x] Done 2026-06-22`) | 🟢 **§37.4 this patch (v2.9, 2026-06-26).** §21.15 item 13 added. |
+| R-37 (`docs/INCIDENT_RESPONSE.md R-37`, v1.1, 2026-06-22) narrative link to SSO foundation in this document (per-tenant SSO basis for SSO-SLO-01b fleet companion signal, OBSERVABILITY §49 / DEC-070) | §37.2 consolidated registry | 🟢 **§37.2 this patch (v2.9, 2026-06-26).** Documented in SSO monitoring recovery runbook registry. |
+| `docs/OBSERVABILITY.md §12.6` v0.4 footnote: "The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at '33'..." (job 34 `bdg_override_expiry_sweep` renumbering) | OBSERVABILITY v0.4 obligation | 🟢 **Previously closed — SSO_SCIM v2.8.2 (2026-06-25).** §34.3 and §34.11 corrected job 33 → job 34 throughout. Documented here for completeness. |
+
+---
+
+*v2.9 (2026-06-26): §37 Cross-Reference Patch — R-37 · R-38 · §36.6 Item 1 Closure (SSO Monitoring Recovery Runbooks). Three cross-reference obligations closed simultaneously. §37.1 purpose and scope: three obligations — §36.6 item 1 docs-side (job 37 `caep_reregister_sweep` registration in OBSERVABILITY §12.6 done by OBSERVABILITY v0.4, 2026-06-19); R-38 (`google_directory_alert_check` / job 35 stale recovery) cross-reference to §21.7/§21.9 source specs; R-37 (`sso_fleet_health_check` / job 38 stale recovery) narrative link to per-tenant SSO foundation. §37.2 SSO monitoring recovery runbook registry: six-row consolidated table (jobs 24/34/32/35/37/38 × source spec × IR runbook); shared-infrastructure failure protocol for 5-min cadence group (jobs 35/37/38 → H2/H4 → co-activate R-03). §37.3 §36.6 item 1 closure: docs obligation fulfilled (OBSERVABILITY v0.4); physical migration 0082 DDL deploy remains pending platform-engineer (M5); two-row closure table (docs-side 🟢 / physical 🟡). §37.4 §21.15 item 13: R-38 two-severity matrix (P1 zero rows — detection gap only; P0 ≥ 1 row — per-tenant GDIR-01 scope assessment + IC notification decision); co-stale protocol (jobs 35/37/38 → R-03); source spec cross-references to §21.7 DEC-030 events and §21.9 AL-SSO-GDIR-01/05 alert rules; marked [x] Done (R-38.11 item 4 OBSERVABILITY §12.6 registry update — [x] Done 2026-06-22). §37.5 four-item implementation checklist (all [x] Done — this patch). §37.6 four-row cross-reference obligations closed table. §36.6 item 1 status updated: `[ ]` → `[x] Done (docs-side: OBSERVABILITY v0.4, 2026-06-19; physical migration 0082 pending)`. TOC entry 37 added. Document header v2.8.2 → v2.9. Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §37 cross-reference addition; all monitoring jobs operate on aggregate counts (`failing_tenant_count`, `error_count`) or flag columns (`caep_reregistration_required`); `tenant_id` is FORM-internal UUID not exiting pg_cron execution context into SSO-SLO-01b alert payloads (DEC-070 hard invariant `sla_credit_impact: 'none'`) or included in HMAC-chained audit events only with no individual identity dimension (GDIR). Cross-references: `docs/INCIDENT_RESPONSE.md R-37` (job 38 `sso_fleet_health_check` stale recovery — v1.1, 2026-06-22; T+5 peer-check references jobs 35 and 37); `docs/INCIDENT_RESPONSE.md R-38` (job 35 `google_directory_alert_check` stale recovery — v1.0, 2026-06-22; R-38.11 item 4 [x] Done 2026-06-22; source specs §21.7 + §21.9); `docs/OBSERVABILITY.md §12.6` (canonical pg_cron job registry — v0.4 job 37 registration closes §36.6 item 1 docs-side); `docs/OBSERVABILITY.md §48` (AL-SSO-GDIR-01/02 canonical alert definitions — DEC-067; R-38 primary spec); `docs/OBSERVABILITY.md §49` (SSO-SLO-01b / AL-SSO-FLEET-01 / job 38 fleet health spec — DEC-070; R-37 primary spec); `docs/SOC2_READINESS.md §92` (SSO-OBS-E-007 — quarterly R-38 activation addendum per §92.2 Part D; v3.25.5, 2026-06-22); `docs/SOC2_READINESS.md §95` (SSO-FLEET-E-001 — quarterly R-37 activation addendum per §95.2 Part D; v3.25.3, 2026-06-22). Owner: compliance-officer.*
 
 ---
 
