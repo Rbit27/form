@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.13.0] — 2026-06-26
+
+### Added
+- `content/post-2619-n-of-1-personal-evidence.md` — Block 2616–2625 «Критичне мислення у тренуванні» пост 4/10. «Як читати n=1 у власному досвіді: коли особистого результату достатньо для висновку». Hubal et al. (2005): варіабельність відповіді на тренування (−2% до +59% приросту м'язів, n=585) — популяційні дані описують середнє, не тебе. П'ять загроз валідності особистого досвіду: відсутній baseline, multiple confounders, регресія до середнього, короткий горизонт, відсутній критерій спростування. Single-case experimental design (SCED, Barker et al., 2011) — п'ять умов валідного n=1: операційний критерій до старту, ізоляція змінної, ≥4–6 точок даних (Atkinson & Nevill, 1998), реплікація в 2–3 блоках, ефект достатньо великий для вимірювального шуму. Практичний алгоритм 6 кроків. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `content/post-2620-selection-bias-in-training.md` — Block 2616–2625 «Критичне мислення у тренуванні» пост 5/10. «Помилка вибірки у тренувальному контексті: чому «всі хто довго тренується» — упереджена вибірка». Survivorship bias через аналогію Вальда (1943 — бомбардувальники). Три форми: survivorship у порадах досвідчених атлетів; attrition у дослідженнях (Dishman, 1994; Choi et al., 2012 — completers vs. intention-to-treat; drop-out rates 30–50%); availability bias у контенті. «Natural selection» підходів у спортивній культурі — методи виживають не тому, що оптимальні. Чотири питання до кожного «це спрацювало» + три операційних кроки. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `blog.html` — cards 2619 і 2620 додані до топу фіду.
+
+### Changed
+- `README.md` — posts 2619 і 2620: proposed → draft · v9.13.0.
+- `VERSION` — 9.12.0 → 9.13.0.
+
+---
+
 ## [9.12.0] — 2026-06-26
 
 ### Added
