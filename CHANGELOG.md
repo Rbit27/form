@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [9.33.1] — 2026-06-26
+
+### Changed
+- `docs/ENTERPRISE_SLA.md` — v1.2: §3.8 CAEP/SSF Real-Time Session Control SLA (< 60 s for PUSH-capable IdPs via Addendum 6; AL-CAEP-03 dead-man's switch; four DEC-030 events; CC6-E-CAEP-002 SOC 2 artefact); §3.9 SSO Login Availability — per-tenant SSO-SLO-01 ≥ 99% 15-min window with credit impact; fleet companion SSO-SLO-01b → AL-SSO-FLEET-01 P1 operational-only (sla_credit_impact: 'none' hard invariant per DEC-073); §16 CC6.3 added, CC7.2/CC7.3 updated; §17 items 11–12 P1 checklist; §18 OQ-SLA-01 → 🟢 RESOLVED per DEC-073. References: MSA_TEMPLATE.md §Addendum 6; SSO_SCIM_IMPLEMENTATION.md §23; ENTERPRISE_ONBOARDING.md §2.3; OBSERVABILITY.md §49; DECISION_LOG DEC-072, DEC-073.
+- `VERSION` — 9.33.0 → 9.33.1.
+
+---
+
+## [9.33.0] — 2026-06-26
+
+### Added
+- `content/post-2650-self-coached-mistakes-that-look-like-decisions.md` — Block 2646–2655 series «Методологія самокоучингу» пост 5/10. Помилки self-coached атлета, які виглядають як тренувальні рішення. clinical-safety: NOT_REQUIRED.
+- `blog.html` — картка post-2650 додана на початок блогу.
+
+### Changed
+- `README.md` — post-2650 → draft; series 2676–2685 proposed.
+- `STATUS.md` — Block 2646–2655 progress updated to 5/10.
+- `VERSION` — 9.32.0 → 9.33.0.
+
+---
+
 ## [9.32.0] — 2026-06-26
 
 ### Added
