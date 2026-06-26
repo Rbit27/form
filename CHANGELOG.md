@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [9.22.0] — 2026-06-26
+
+### Added
+- `content/post-2633-mtor-ampk-signaling-pathways.md` — Block 2626–2635 «Тіло як система» пост 8/10. Сигнальні шляхи адаптації: mTOR, AMPK і чому «strength vs endurance» не є простим перемикачем. mTORC1-активація: механічне навантаження незалежно від гормонів (Hornberger et al. 2006 — FAK/PLD/phosphatidic acid шлях); Goodman et al. (2011): конститутивна активація достатня для гіпертрофії. AMPK-активація: Atherton et al. (2005) «AMPK/Akt switching hypothesis»; Thomson et al. (2008) — два механізми інгібування mTOR (TSC2-шлях і Raptor-Ser792). Churchley et al. (2007): низький глікоген → вищий AMPK. PGC-1α4 (Ruas et al. 2012): ізоформа від резистентного тренування → незалежний гіпертрофічний шлях. Практика: вуглеводна доступність, порядок тренувань (силове до аеробного), ≥6 год між сесіями (Leveritt et al. 1999). clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `content/post-2634-concurrent-training-interference.md` — Block 2626–2635 «Тіло як система» пост 9/10. Конкурентне тренування і «інтерференційний ефект». Hickson (1980) — оригінал: конкурентна група програє по силі, але при подвійному обсязі тренувань. Coffey & Hawley (2007) молекулярний конфлікт; Nader (2006) PGC-1α vs рибосомальна трансляція. Wilson et al. (2012) мета-аналіз: −0.32 SD сила, −0.48 SD гіпертрофія; модератор — тип аеробного. Murlasits et al. (2017): велосипед замість бігу → −0.21 SD (несуттєво). Schumann et al. (2014): HIIT замість LISS → незначна різниця в гіпертрофії. Leveritt et al. (1999): ≥6 год між сесіями усуває AMPK-конфлікт. Gallagher et al. (2017): 2 HIIT/тиждень не знизили гіпертрофію. Хто реально страждає: змагальні силові атлети; recreational — незначно. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `content/post-2635-body-as-system-series-synthesis.md` — Block 2626–2635 «Тіло як система» пост 10/10 · СЕРІЯ ЗАВЕРШЕНА. Синтез дев'яти принципів в одну операційну модель: SRA (2626) → SAID (2627) → нейральна/структурна адаптація (2628) → таймлайни (2629) → системна/локальна втома (2630) → гормональна відповідь (2631) → тренувальний вік (2632) → mTOR/AMPK (2633) → конкурентне тренування (2634) → синтез (2635). Три системні помилки популярної фітнес-думки: (1) «більше = краще»; (2) «відчуваю — отже, ефективно»; (3) «роки = рівень». П'ять операційних питань self-coached атлета. Anons наступної серії: «Навантажувальний менеджмент». clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `blog.html` — posts 2633–2635 added at top of feed. **EDITORIAL SERIES 2626–2635 «Тіло як система: фізіологія адаптації без популярного спрощення» COMPLETE 10/10 · v9.22.0.**
+
+### Changed
+- `VERSION` — 9.21.0 → 9.22.0.
+- `STATUS.md` — current version updated to v9.22.0; Block 2626–2635 progress updated to COMPLETE 10/10; total posts updated to 2094; next series: Editorial 2636–2645 «Навантажувальний менеджмент — як self-coached атлет будує прогресію без тренера».
+
+---
+
 ## [9.20.0] — 2026-06-26
 
 ### Added
