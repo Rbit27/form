@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [9.6.0] — 2026-06-26
+
+### Added
+- `docs/SOC2_READINESS.md` §117 — Cross-Reference Patch registering RL-E-001 (CC6.1 annual `security.quota_hard_block` DEC-030 export, 3yr), RL-E-002 (CC6.6/CC7.2 90-day rolling `security.abuse_flag_raised` DEC-030 export, 7yr, `security_reviewer` PAM-exclusive), and RL-E-003 (CC7.2 quarterly `security.abuse_action_taken` DEC-030 export, 7yr, zero-row unreviewed-manual-actions compliance query) in: §79.4 master evidence table (76→79 rows), §80.3 R2 folder registry (new `rate-limiting/` subfolder, EU-region WORM Object Lock, `form_api` NO ACCESS), §80.4 Vanta mirror protocol. Synthesises DATA_MODEL §28.8 (table-supplement path) with AUDIT_LOG_SCHEMA v2.49 (DEC-030 primary path). Four-item implementation checklist (P1/M4–M5).
+- `docs/SOC2_READINESS.md` — version header v3.41.0 → v3.42.0.
+
+### Changed
+- `docs/DATA_MODEL.md` §28.7 item 7 — documentation cross-reference portion `[ ]` → `[x] Done — 2026-06-26 (SOC2_READINESS §117, v3.42.0)`; evidence collection portion remains pending migration 0055 production deploy (compliance-officer, M5).
+- `VERSION` — 9.5.0 → 9.6.0.
+
+---
+
 ## [9.5.0] — 2026-06-26
 
 ### Added
