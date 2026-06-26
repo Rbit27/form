@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [9.31.0] — 2026-06-26
+
+### Added
+- `content/post-2648-training-journal-as-feedback.md` — Block 2646–2655 series «Методологія самокоучингу» post 3/10. Тренувальний журнал як зворотний зв'язок: що читати, а не просто записувати. Два рівні роботи: тижневий огляд (5–10 хв, 3 питання) і блоковий огляд (20–30 хв, 6 питань). RPE-тренд на незмінному навантаженні як ключовий маркер адаптації (Zourdos et al. 2016). Технічні нотатки як паттерн vs. разова деградація. Confirmation bias у суб'єктивній оцінці прогресу (Nickerson 1998). Систематичні відхилення від плану як діагноз невідповідності програми контексту. Gabbett et al. 2010; Hopkins et al. 1999; Skein et al. 2011; Schoenfeld et al. 2017. clinical-safety: NOT_REQUIRED.
+- `blog.html` — картка post-2648 додана на початок блогу.
+- `README.md` — Editorial series 2666–2675 «Від атлета-виконавця до атлета-архітектора» proposed · v9.31.0 (10 постів).
+
+### Changed
+- `STATUS.md` — Block 2646–2655 progress updated to 3/10; next: post-2649. Version → 9.31.0.
+- `VERSION` — 9.30.0 → 9.31.0.
+
 ## [9.30.0] — 2026-06-26
 
 ### Added
