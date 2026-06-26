@@ -2637,7 +2637,7 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2622 | Ефект Даннінга-Крюгера у тренуванні: де він проявляється і як його обходити | **draft · v9.15.0 → post-2622-dunning-kruger-in-training.md** |
 | 2623 | Що означає «доказова база»: як читати дослідження без PhD в спортивній науці | **draft · v9.16.0 → post-2623-what-evidence-base-means.md** |
 | 2624 | Пастка «розумного пояснення»: чому переконливе обгрунтування ≠ правильне рішення | **draft · v9.16.0 → post-2624-smart-explanation-trap.md** |
-| 2625 | Синтез 2616–2625: картка критичного мислення self-coached атлета | proposed |
+| 2625 | Синтез 2616–2625: картка критичного мислення self-coached атлета | **draft · v9.17.0 → post-2625-critical-thinking-synthesis-card.md** |
 
 ---
 
