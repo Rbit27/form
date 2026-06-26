@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [9.12.0] — 2026-06-26
+
+### Added
+- `docs/COST_MODEL.md §45` — Pure Tier Upgrade: Amendment vs. New Contract Governance (OQ-EXP-03 Resolution, DEC-082). Resolves P1 open question on whether a pure seat tier upgrade (Starter → Growth → Enterprise, no seat count change) requires a new contract or can be processed as an amendment. Option A (amendment, ASC 606 prospective Type 2 modification) recommended. Covers: Option A/B analysis, Migration 0087 DDL (4 additive columns on `enterprise_contracts`), DEC-030 event schema extensions (`enterprise.contract_amended` + new `billing.rate_updated`), chain invariant TU-CHAIN-01 (price floor guard, HTTP 422 on violation), Admin Console 3-step workflow with dual sign-off, SOC 2 evidence artefacts ADM-E-001 and ADM-E-002 (CC5.2, CC6.1, A1.1), and 12-item implementation checklist (7×P0, 3×P1, 2×P2). OQ-EXP-03 status: 🟡 Partial — pending outside counsel ASC 606 confirmation (§45.8 item 1). compliance-officer + security-engineer + enterprise-architect reviewed.
+
+### Changed
+- `docs/COST_MODEL.md` — document version v2.14 → v2.15; §41.11 OQ-EXP-03 updated to 🟡 Partial with §45 cross-reference.
+- `VERSION` — 9.11.0 → 9.12.0.
+
+---
+
 ## [9.11.0] — 2026-06-26
 
 ### Added

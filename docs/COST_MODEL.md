@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.14
+# FORM · Cost Model & Unit Economics v2.15
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -11047,7 +11047,7 @@ Two evidence artefacts are required to demonstrate that expansion pricing contro
 |---|---|---|---|---|
 | **OQ-EXP-01** | **What are FORM's actual seat expansion probabilities by adoption band?** §41.8.2 uses §40.3.3 proxies (Green 35%, Amber 12%, Red 2%). These are SaaS wellness sector estimates. After the first 5 expansion events, run a cross-tab of `expansion_count > 0` on `enterprise_contracts` against `wau_health_band` from `enterprise_adoption_snapshots` for the same quarter. Update the probability table and the expected NRR contribution calculation. | **P2** | data-engineer + founder | After Deal 5 expansion event (est. M18) |
 | **OQ-EXP-02** | **Should mid-contract seat expansions below a threshold (e.g. ≤ 50 seats, no tier crossing, 0% discount) be self-serve via the Admin Console without CSM countersignature?** Benefit: reduces CSM time per expansion from 2–4 hrs to ~30 min (review + billing trigger only). Risk: removes human check on discount authority and floor compliance for small deals; mitigated by system-enforced floor and automated discount cap. Resolution: evaluate after first 5 T2 (tenant-initiated) expansions to assess whether CSM involvement added material value. | **P2** | platform-engineer + customer-success | After 5 T2 expansions (est. M14–M16) |
-| **OQ-EXP-03** | **For a mid-contract tier upgrade (same seat count, lower per-seat rate), should FORM structure the change as a contract amendment to the existing term or as a new contract?** Amendment path: simpler for the tenant, preserves anniversary date, but requires careful ASC 606 contract modification treatment (cumulative catch-up vs. prospective). New contract path: clean revenue recognition boundary, but creates two contract records and complicates the SCIM provisioning (BDG must reference correct contract). Resolution: outside counsel (ASC 606 specialist) input required; OQ to be evaluated before the first Growth→Enterprise pure upgrade request. Until resolved, pure tier upgrades must be accompanied by a seat count increase (≥ 25 seats) to anchor the amendment in a clear incremental goods/services framework. | **P1** | founder + outside counsel (ASC 606) | Before first pure tier upgrade request (est. M12–M15) |
+| **OQ-EXP-03** | **For a mid-contract tier upgrade (same seat count, lower per-seat rate), should FORM structure the change as a contract amendment to the existing term or as a new contract?** Amendment path: simpler for the tenant, preserves anniversary date, but requires careful ASC 606 contract modification treatment (cumulative catch-up vs. prospective). New contract path: clean revenue recognition boundary, but creates two contract records and complicates the SCIM provisioning (BDG must reference correct contract). Resolution: outside counsel (ASC 606 specialist) input required; OQ to be evaluated before the first Growth→Enterprise pure upgrade request. Until resolved, pure tier upgrades must be accompanied by a seat count increase (≥ 25 seats) to anchor the amendment in a clear incremental goods/services framework. | **P1** | founder + outside counsel (ASC 606) | Before first pure tier upgrade request (est. M12–M15) | 🟡 **Partial → §45 authored 2026-06-26.** Option A (amendment, prospective ASC 606 Type 2) recommended; outside counsel confirmation outstanding (§45.8 item 1). Gate remains until §45.8 item 1 closes. |
 
 ---
 
@@ -12137,3 +12137,296 @@ Violation of this communication policy is treated as an MSA pricing-exception br
 *v2.10 (2026-06-21): Checklist sync — §42.10 item 5 status updated: §79.4 master evidence table registration for REN-E-001/002/003 completed (SOC2_READINESS v3.24.2, 2026-06-21) — three rows added (REN-E-001 CC5.2/CC1.4, REN-E-002 CC4.1/CC2.2, REN-E-003 CC4.1/A1.1) plus §80.3 `renewals/` R2 subfolder and §80.4 Vanta mirror list update. First evidence filing remains pending first renewal cycle (est. M12). No schema or model changes. Document header v2.9 → v2.10. Owner: compliance-officer + enterprise-architect.*
 
 *v2.8 (2026-06-20): §42 Enterprise Contract Renewal Economics: Multi-Year Commitment Pricing, Price Escalation & Renewal ARR Waterfall — closes the documentation gap between §34 (churn risk classification) and §23 (NRR engine formula) by modeling the full financial mechanics of the contract renewal event. §42.1 purpose and scope: five operational gaps filled (renewal rate determination, multi-year commitment at renewal, 90-day notice operationalisation, Renewal ARR waterfall construction, SOC 2 renewal pricing evidence). §42.2 renewal pricing mechanics: four-row rate-outcome table (standard annual → current list; multi-year Year 2+ → CPI+1%; retention discount → §32 approval; non-renewal → unit price renegotiation); seat reduction thresholds (≤ 10% no renegotiation; > 10% triggers unit price reset; below tier minimum forces downgrade or exit); renewal invoice formula. §42.3 renewal notice protocol: three notice states (standard / price_escalation / non_renewal); RENEW-NOTICE-01 monitoring invariant — `evidence-collection-cron` pg_cron SQL fires P1 PagerDuty if no notice event 85–95 days before renewal_date. §42.4 multi-year commitment at renewal: same −15%/−25% discount schedule as new-deal (per `enterprise.html`); applied to renewal rate base; NRR-accretive at Green-band churn probability < 10% because logo lock-in value exceeds discount cost; founder approval required for > 25%. §42.5 price escalation model: formula `min(prior_rate × (1 + CPI + 0.01), prior_rate × 1.05)`; CPI-U reference; hard 5% annual cap; floor check on escalated rate; `bls_report_date` (not URL) in event payload for audit traceability without PII-adjacent URL tracking. §42.6 migration 0084: `enterprise_renewals` CREATE TABLE (UUID PK, `tenant_id` FK RESTRICT, `original_contract_id` FK RESTRICT, `renewal_type_enum`, `renewal_date` DATE, `prior_seats`/`renewed_seats` CHECK > 0, `prior_rate_per_seat_usd`/`new_rate_per_seat_usd` CHECK > 0, `rate_basis_enum`, `escalation_applied`/`escalation_pct`/`cpi_reference_month`, `multi_year_discount_pct`, `floor_respected` CHECK = true, `new_acv_usd` GENERATED, `new_contract_years` CHECK IN (1,2,3), `new_tcv_usd` GENERATED, `pricing_exception_event_id` soft-ref, `notice_event_id` soft-ref, `dec030_renewal_event_id` soft-ref); four CHECKs (escalation_fields, multi_year_discount, floor_always_respected, non_renewal_seats); UNIQUE INDEX `(tenant_id, renewal_date)`; two additional indexes; four RLS policies; form_api REVOKED. §42.7 three DEC-030 HMAC-chained events: `enterprise.renewal_notice_sent` (STANDARD, 7yr — `notice_type` enum: standard/price_escalation/non_renewal; `days_until_renewal` 85–100 range validated; Zod `RenewalNoticeSentPayload`), `enterprise.renewal_escalation_calculated` (HIGH, 7yr — full CPI calculation audit trail; `cap_triggered` bool; `bls_report_date` date-only; ESCALATION-CHAIN-01 prerequisite for `contract_renewed` with `rate_basis='escalation'`; Zod `RenewalEscalationCalculatedPayload`), `enterprise.contract_renewed` (STANDARD, 7yr — complete renewal terms; `floor_respected: z.literal(true)` chain invariant; `notice_event_id` FK to RENEW-CHAIN-01; Zod `ContractRenewedPayload`). Two chain invariants: RENEW-CHAIN-01 (`contract_renewed` requires `renewal_notice_sent` within 120 days → HTTP 422 `RENEW_CHAIN_01_VIOLATION`); ESCALATION-CHAIN-01 (`contract_renewed` with `rate_basis='escalation'` requires `renewal_escalation_calculated` within 150 days → HTTP 422). §42.8 renewal ARR waterfall: four-component decomposition (Retained ARR, Escalation Uplift → Expansion ARR, Contraction ARR, Churned ARR); renewal conversion rate model by WAU health band (Green ~92%, Amber ~68%, Red ~38% [ESTIMATE]); blended rate ≈ 74% raw / ~83% with CSM intervention — within 2pp of 85% gross retention target; NRR range 105–124% [ESTIMATE] depending on fleet band distribution and expansion realisation. §42.9 three SOC 2 evidence artefacts: REN-E-001 (CC5.2/CC1.4 — annual `contract_renewed` chain export with `floor_respected: true` attestation + RENEW-CHAIN-01 compliance; 7yr), REN-E-002 (CC4.1/CC2.2 — quarterly renewal notice compliance export with `days_until_renewal` distribution; 3yr), REN-E-003 (CC4.1/A1.1 — annual renewal conversion rate analysis; fleet-level aggregate, no tenant names; 3yr). §42.10 ten-item implementation checklist: 4× P0/M11–M12 (DEC-030 registration + RENEW-CHAIN-01/ESCALATION-CHAIN-01 integration tests, migration 0084 DDL, Admin Console renewal workflow 3-step, RENEW-NOTICE-01 monitoring cron), 4× P1/M12–M13 (REN-E-001/002 first filings, Admin Console renewal panel, MSA §8.6 price escalation clause update with outside counsel), 2× P2/M24–M30 (OQ-REN-01 actual conversion rate calibration, OQ-REN-02 CPI index decision, OQ-REN-03 self-serve renewal evaluation). §42.11 three open questions: OQ-REN-01 (P2 — actual renewal conversion rates by band after 5 cycles; est. M24); OQ-REN-02 (P1 — CPI index selection before first escalation notice; default CPI-U; EU customers may require HICP); OQ-REN-03 (P2 — self-serve renewal option in Admin Console after 10 cycles). Document header v2.7 → v2.8. Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 data in any §42 DEC-030 event, `enterprise_renewals` row, or evidence artefact; `tenant_id` is FORM-internal UUID; `form_api` REVOKED from `enterprise_renewals`; `bls_report_date` date-only (never raw URL). Cross-references: `docs/ENTERPRISE.md` (tier pricing $6–12/seat; multi-year discounts −15%/−25%; no-go criteria); `docs/MSA_TEMPLATE.md §6` (auto-renewal; 90-day notice; §8.5 seat reduction policy); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (three new DEC-030 events to register — P0/M12); `docs/SOC2_READINESS.md §79.4` (REN-E-001/002/003 to register — P1/M13); §23.1 (NRR formula — Renewal ARR = NRR denominator); §23.5 (NRR target 120%); §26.10 (`enterprise.renewal_negotiation_started` — companion event emitted by CSM at renewal kick-off, 30–60 days before notice); §31.5 (COGS-anchored price floor — applies at renewal); §31.6 (discount authority matrix — retention discount approval chain); §32 (Pricing Exception Approval — retention discount ≥ §32 threshold requires same flow); §34 (Renewal Risk Register — churn classification feeding renewal type selection); §35.3 (seat reduction at renewal — mirrors §42.2.2); §40.3 (WAU health band at renewal — §42.8.2 conversion rate inputs); §41 (Seat Expansion Economics — expansion mid-contract distinct from renewal seat change). Owner: enterprise-architect + customer-success + compliance-officer + data-engineer.*
+
+---
+
+## §45 · Pure Tier Upgrade: Amendment vs. New Contract Governance (OQ-EXP-03 Resolution, DEC-082)
+
+> Owner: enterprise-architect + customer-success + compliance-officer + founder. Review: before first Growth→Enterprise pure upgrade request; at each subsequent upgrade. Audience: founder, compliance-officer, enterprise-architect, future VP Sales.
+
+### 45.1 Purpose and Scope
+
+This section resolves **OQ-EXP-03** (P1, §41.11) — the documented gate condition blocking pure tier upgrades until the amendment-vs.-new-contract governance question is answered. **No pure tier upgrade may be agreed or invoiced until DEC-082 is created** (§45.8 item 2).
+
+**Definition — pure tier upgrade:** A mid-contract change where a tenant moves from a higher per-seat rate tier (Starter $12, Growth $9) to a lower per-seat rate tier (Growth $9, Enterprise $6–8) with **no change in contracted seat count**. Combined tier-upgrade + seat-expansion events are handled by §41.4 and are out of scope here.
+
+**Out of scope:** Renewal-period tier changes (§42.2); seat reductions (§35.3); contract terminations (§43); below-floor rate exceptions (§32).
+
+**Gate condition:** This section lifts the §41 blocker on pure tier upgrades. Until outside counsel confirms the ASC 606 prospective treatment (§45.8 item 1), the original §41 constraint applies: *pure tier upgrades must be accompanied by ≥ 25 seat expansion* to anchor the amendment in a clear incremental goods/services framework.
+
+---
+
+### 45.2 Option Analysis
+
+| | **Option A — Contract Amendment** | **Option B — New Contract** |
+|---|---|---|
+| **Mechanism** | Modify existing `enterprise_contracts` row (rate_per_seat_usd, tier, amendment_date); prior term continues; contract_id and anniversary date unchanged | Close existing contract; open new `enterprise_contracts` row at Enterprise tier; new contract_id; new anniversary date |
+| **ASC 606 treatment** | Prospective Type 2 modification — remaining performance obligations are distinct; no cumulative catch-up (§45.3.1) | Full contract termination + new contract inception; clean revenue recognition boundary |
+| **Revenue recognition** | Prior deferred revenue balance unaffected; future periods recognized at new rate from modification date | Close prior deferred revenue; begin new deferred revenue balance at inception |
+| **BDG / SCIM** | `contract_id` unchanged; BDG KV cache invalidated on `billing.rate_updated` event; no SCIM provisioning gap | New `contract_id`; BDG Worker must be updated; estimated 5–30 minute SCIM guard exposure between contract close and new activation |
+| **Audit log chain** | `enterprise.contract_amended` (amendment_type = 'tier_upgrade') + `billing.rate_updated`; existing DEC-030 chain continues unbroken | `enterprise.contract_terminated` (new) + `enterprise.contract_signed` (new); breaks existing chain segment |
+| **Tenant experience** | One contract record; same expiry date; same invoice number series | Two records in Admin Console history; may require MSA amendment review adding 2–4 weeks |
+| **Billing mechanics** | Pro-rata credit `(old_rate − new_rate) × seats × months_remaining`; net applied to next invoice (§45.3.3) | New invoice at new rate from inception; separate credit memo on pre-paid balance |
+| **ASC 606 risk** | Auditor may challenge prospective treatment if modification is not "distinct" — mitigated by §45.3.1 documentation requirements | No ASC 606 ambiguity; lowest-risk recognition treatment |
+| **Operational complexity** | Lower — one record across all systems | Higher — two records, two contract_ids, migration risk |
+
+**Decision: Option A (Contract Amendment) — adopted with conditions.** See §45.3.1 for ASC 606 analysis. Option B is required in the four scenarios listed in §45.3.2.
+
+**Rationale:**
+
+1. **ASC 606 prospective treatment is supportable.** A pure tier upgrade provides the same coaching service (AI coaching, CV pose estimation, admin dashboard, SSO/SCIM) at a lower rate — the *nature* of the service is unchanged. The modification does not add distinct goods or services; it reprices the remaining performance obligation for the same deliverables. ASC 606-10-25-13(b) prospective treatment applies when remaining goods/services are distinct and the modification price reflects their standalone selling price. The lower tier rate *is* FORM's standard list price for the same service scope (as published on enterprise.html and pricing-enterprise.html). Outside counsel must confirm this analysis for FORM's specific contract structure (§45.8 item 1).
+
+2. **BDG contract_id continuity.** Option B would require BDG to be updated with a new `contract_id`. Between contract close and new activation, `getGuardConfig()` would return stale seat limit data — creating an unacceptable SCIM over-provisioning window. Option A avoids this entirely.
+
+3. **Audit chain integrity.** The existing HMAC-chained audit log for the tenant continues unbroken. Option B would create a new chain segment — not prohibited by DEC-030, but adds evidence collection complexity for SOC 2 CC6.1/CC6.3 (two chain exports per tenant-year instead of one).
+
+4. **Tenant administrative simplicity.** Enterprise procurement teams prefer single contract records. Option B creates two records and may trigger MSA amendment review, adding weeks of delay for what is operationally a pricing improvement for the tenant.
+
+---
+
+### 45.3 Amendment Path — Mechanics
+
+#### 45.3.1 ASC 606 Modification Treatment
+
+A pure tier upgrade is classified as a **Type 2 contract modification** under ASC 606-10-25-13(b): the remaining performance obligations are distinct, and the modification reprices them at a rate consistent with FORM's standalone selling price for the same service scope.
+
+**Accounting entries:**
+
+| Period | Treatment |
+|---|---|
+| Months before modification date | No adjustment — deferred revenue continues to be recognized at original rate as earned |
+| Modification date | No cumulative catch-up; no retrospective adjustment to prior periods |
+| Remaining months (modification → anniversary) | Revenue recognized at new (lower) rate; billing uses §45.3.3 credit formula |
+
+**Required auditor documentation (ADM-E-001, §45.7):**
+
+- `enterprise.contract_amended` DEC-030 event with `amendment_type = 'tier_upgrade'` (§45.5.1) — provides immutable timestamped record of modification date, prior rate, new rate, and remaining months
+- Written ASC 606 business justification (plaintext, SHA-256 hash → `amendment_justification_hash` column) confirming: (a) the service delivered in remaining months is substantively identical to Enterprise-tier scope; (b) the new rate reflects FORM's standalone selling price for that scope; (c) no additional distinct goods or services are being promised
+- Compliance-officer countersign on dual-approval workflow (§45.6) — serves as §45.3.1 attestation record
+
+**Fallback trigger:** If outside counsel determines the modification constitutes an extinguishment of the original contract (rather than a Type 2 modification), fall back to Option B. The `enterprise.contract_amended` event's `asc_606_treatment` field must be set to `'fallback_new_contract'` and the fallback reason recorded in the compliance/evidence/amendments/ folder.
+
+#### 45.3.2 When Option B Is Required
+
+Option A (amendment path) is **not available** in the following scenarios:
+
+| Scenario | Reason | Required action |
+|---|---|---|
+| New Enterprise rate after amendment would breach §31.5 price floor | TU-CHAIN-01 blocks: HTTP 422 `TU_CHAIN_01_FLOOR_VIOLATION` | Engage §32 pricing exception approval before attempting amendment |
+| Tenant requests a new anniversary date at the time of upgrade | Amendment preserves existing anniversary date; new date requires new contract | Use Option B; document chain break reason in DEC-030 `enterprise.contract_terminated` payload |
+| Outside counsel determines ASC 606 extinguishment applies | Prospective Type 2 treatment not available | Use Option B |
+| Upgrade includes materially new scope (custom SLA addendum not in standard MSA, custom DPA terms, white-label activation) | New distinct goods/services → not a pure price modification | Evaluate under §35.2 contract amendment taxonomy; escalate to compliance-officer if scope addition is material |
+
+#### 45.3.3 Billing Formula
+
+For a pure tier upgrade processed as an amendment (Option A):
+
+```
+credit_amount = (old_rate_per_seat − new_rate_per_seat) × contracted_seats × months_remaining
+```
+
+**Application rules:**
+
+| Payment model | Credit application |
+|---|---|
+| Monthly invoicing | Next monthly invoice adjusted to `new_rate × contracted_seats`; credit absorbed in rate change; no separate credit memo |
+| Annual upfront (pre-paid) | Issue credit memo for `credit_amount`; apply against next renewal invoice by default; if `credit_amount > $1,000` AND `months_remaining > 12`: cash refund at tenant's written request within 30 days |
+
+**Floor check on credit:** `new_rate_per_seat` must satisfy the price floor (§31.5). If the negotiated Enterprise rate is above the floor, credit proceeds normally. If below floor, the floor is applied and `credit_amount = (old_rate − floor_rate) × contracted_seats × months_remaining` — the below-floor portion is absorbed, not credited.
+
+---
+
+### 45.4 DDL — Migration 0087
+
+No new table. Four additive columns on `enterprise_contracts`:
+
+```sql
+-- Migration 0087: pure tier upgrade amendment columns
+ALTER TABLE enterprise_contracts
+  ADD COLUMN amendment_date              TIMESTAMPTZ,
+  ADD COLUMN amendment_type              VARCHAR(30)
+    CHECK (amendment_type IN (
+      'tier_upgrade',
+      'seat_reduction',
+      'price_lock',
+      'custom_terms'
+    )),
+  ADD COLUMN prior_rate_per_seat_usd     NUMERIC(10,4),
+  ADD COLUMN amendment_justification_hash TEXT;
+
+COMMENT ON COLUMN enterprise_contracts.amendment_date
+  IS 'Timestamp of mid-contract amendment; NULL for original contracts';
+COMMENT ON COLUMN enterprise_contracts.amendment_type
+  IS 'Controlled vocabulary matching enterprise.contract_amended event amendment_type field';
+COMMENT ON COLUMN enterprise_contracts.prior_rate_per_seat_usd
+  IS 'Rate per seat before amendment; NULL for unamended contracts';
+COMMENT ON COLUMN enterprise_contracts.amendment_justification_hash
+  IS 'SHA-256 of compliance-officer written ASC 606 justification; plaintext filed in compliance/evidence/amendments/';
+```
+
+**RLS:** Unchanged — existing four-policy model on `enterprise_contracts` applies. `form_api` remains REVOKED from INSERT/UPDATE on all columns including the four new ones (enforced via existing REVOKE on the table; additive columns inherit).
+
+**Staging checklist for migration 0087:**
+
+| # | Step | Gate |
+|---|---|---|
+| 1 | Apply DDL in staging Supabase project; confirm all four columns nullable (no constraint violation on existing rows) | `\d enterprise_contracts` shows four new nullable columns |
+| 2 | Confirm existing RLS policies still pass for `tenant_admin`, `tenant_owner`, `compliance_reviewer`, `form_admin`, `form_system` after column addition | `SELECT` on own-tenant rows succeeds for `tenant_admin`; `form_api` INSERT returns 403 |
+| 3 | Confirm `COST_MODEL_§31.5` price floor values are still enforced by `amend_contract_tier()` RPC (§45.6) — not by DDL constraint (floor enforcement is in Worker logic, not schema) | Integration test: `new_rate_per_seat_usd = 3.00` returns HTTP 422 `TU_CHAIN_01_FLOOR_VIOLATION` |
+| 4 | Deploy to production at M12 (before first pure upgrade, per §45.8 item 3) | No active contracts at Starter tier have `amendment_type IS NOT NULL` before migration |
+
+**Privacy floor:** No individual employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data in any migration 0087 column. `tenant_id` is FORM-internal UUID. `amendment_justification_hash` is SHA-256 of compliance-officer text — plaintext never in the database.
+
+---
+
+### 45.5 DEC-030 HMAC-Chained Events
+
+#### 45.5.1 Extension to `enterprise.contract_amended` (§35.6)
+
+Extend `ContractAmendedPayload` with a `tier_upgrade` sub-object (additive; present only when `amendment_type = 'tier_upgrade'`):
+
+```typescript
+// Additive extension to ContractAmendedPayload (AUDIT_LOG_SCHEMA §Enterprise)
+tier_upgrade?: {
+  prior_tier:              'starter' | 'growth' | 'enterprise';
+  new_tier:                'growth' | 'enterprise';
+  prior_rate_per_seat_usd: number;   // four decimal places, e.g. 9.0000
+  new_rate_per_seat_usd:   number;   // four decimal places, e.g. 7.5000
+  credit_amount_usd:       number;   // positive = credit to tenant; zero = monthly billing
+  floor_applied:           boolean;  // true if new_rate was clamped to price floor
+  asc_606_treatment:       'prospective_type2' | 'fallback_new_contract';
+  remaining_months:        number;   // integer, 1–11
+  modification_date:       string;   // ISO 8601 date-only, e.g. "2026-06-26"
+  justification_hash:      string;   // SHA-256 of compliance-officer written justification
+};
+```
+
+**TU-CHAIN-01 invariant:** `enterprise.contract_amended` with `amendment_type = 'tier_upgrade'` is rejected by the `emit-audit-event` Worker if `tier_upgrade.new_rate_per_seat_usd` is below the §31.5 price floor for the new tier. Response: HTTP 422 `TU_CHAIN_01_FLOOR_VIOLATION`. The floor values are hard-coded in the Worker from §31.5 ($6.00 Starter / $4.50 Growth / $4.00 Enterprise — same source as REENTRY-CHAIN-01 and RENEW-CHAIN-01).
+
+#### 45.5.2 New Event: `billing.rate_updated`
+
+Register in `docs/AUDIT_LOG_SCHEMA.md §Billing` alongside the existing `billing.seats_expanded` event (§41.7):
+
+| Field | Type | Description |
+|---|---|---|
+| `tenant_id` | UUID | FORM-internal UUID |
+| `contract_id` | UUID | Same as pre-amendment (Option A invariant) |
+| `prior_rate_per_seat_usd` | number | Four decimal places |
+| `new_rate_per_seat_usd` | number | Four decimal places |
+| `effective_date` | string | ISO 8601 date-only |
+| `amendment_event_id` | UUID | Soft-ref to `enterprise.contract_amended` event UUID |
+| `floor_respected` | `true` | Literal chain invariant — Worker returns 422 if absent or false |
+
+**Classification:** HIGH · 7 yr · CC5.2 · CC6.1
+
+**Privacy floor:** No individual employee `user_id`, name, email, health value, or GDPR Art. 9 data. `tenant_id` is FORM-internal UUID. Rate figures are commercial metadata only.
+
+#### 45.5.3 Advisory: BDG KV Cache Staleness
+
+Following the §35.9 stale-advisory pattern, if the BDG KV cache key `scim:guard_cfg:{tenant_id}` is not invalidated within 60 seconds of `enterprise.contract_amended` with `amendment_type = 'tier_upgrade'` (detected by `evidence-collection-cron` monitoring job), emit `system.scim_guard_cfg_cache_stale` (LOW, 1yr) per the existing event registration in AUDIT_LOG_SCHEMA §System. A pure tier upgrade does not change `contracted_seats` (seat count is unchanged), so the SCIM guard seat limit is unaffected — but cache invalidation confirms `getGuardConfig()` reflects the new `tier` field for any downstream tier-dependent logic.
+
+---
+
+### 45.6 Admin Console Workflow
+
+**Actors:** `tenant_owner` (initiates request) + customer-success lead or compliance-officer (countersigns).
+
+**Three-step pure upgrade flow:**
+
+**Step 1 — Tenant Request**
+
+`tenant_owner` navigates to Admin Console → Contract → "Request Tier Upgrade" → selects target tier. System displays:
+- Current tier, current rate, contracted seats
+- Target tier rate (auto-populated from current list price; CSM may override to negotiated Enterprise rate)
+- Credit amount (calculated from §45.3.3 formula)
+- Remaining months to anniversary
+- Modification date (today's date, non-editable)
+- Floor check result (pass / TU-CHAIN-01 block)
+
+**Step 2 — CSM / Compliance-Officer Review (Internal Admin Console)**
+
+Internal view shows the pending request with:
+- Pre-populated ASC 606 treatment classification (`prospective_type2`, set by system; compliance-officer may override to `fallback_new_contract` with written reason)
+- Credit calculation breakdown
+- Floor check result with §31.5 floor rate reference
+- Justification text field (SHA-256 hashed before storage; plaintext to `compliance/evidence/amendments/{tenant_id}/{date}/`)
+- Negotiated rate input (CSM enters `new_rate_per_seat_usd`)
+
+**Step 3 — Dual Sign-Off**
+
+On both tenant_owner request and CSM/compliance-officer countersign, the Admin Console calls `PATCH /internal/v1/contracts/:id/amend-tier` → `amend_contract_tier()` Supabase RPC (SECURITY DEFINER), which:
+1. Validates floor check (§31.5; aborts with 422 if breached)
+2. Updates `enterprise_contracts` row (tier, rate_per_seat_usd, amendment_date, amendment_type, prior_rate_per_seat_usd, amendment_justification_hash)
+3. Emits `enterprise.contract_amended` (with `tier_upgrade` sub-object) via `emit-audit-event` Worker
+4. Emits `billing.rate_updated` via `emit-audit-event` Worker
+5. Invalidates BDG KV cache key `scim:guard_cfg:{tenant_id}`
+
+**Approval authority matrix:**
+
+| Negotiated `new_rate_per_seat_usd` | Approval required |
+|---|---|
+| Standard Enterprise list rate ($8.00/seat) | Customer-success lead countersign sufficient |
+| < $8.00 but ≥ price floor ($4.00/seat for Enterprise tier) | Customer-success lead + compliance-officer dual countersign |
+| < price floor for any tier | Blocked — §32 pricing exception approval required before amendment can proceed |
+
+---
+
+### 45.7 SOC 2 Evidence Mapping
+
+| Evidence artefact | Criteria | Description | Cadence | Retention |
+|---|---|---|---|---|
+| **ADM-E-001** | CC5.2, CC6.1, A1.1 | Annual export of `enterprise.contract_amended` events with `amendment_type = 'tier_upgrade'`; for each: `prior_rate`, `new_rate`, `floor_respected: true` attestation, `asc_606_treatment`, `credit_amount_usd`, `modification_date`. Zero-event years filed as affirmative attestation (no pure tier upgrades in period — auditor-inspectable absence of unauthorized rate changes). | Annual (Q4) | 7 yr |
+| **ADM-E-002** | CC5.2, CC1.4 | Annual cross-reference of `billing.rate_updated` events against `enterprise.contract_amended` chain (TU-CHAIN-01 compliance). Confirms every rate reduction has a corresponding amendment event; no `billing.rate_updated` event without a prior `enterprise.contract_amended` event for the same `tenant_id` within 24 hours. | Annual (Q4) | 7 yr |
+
+**CC5.2 auditor narrative:** TU-CHAIN-01 enforces that no rate reduction is applied to an enterprise contract without a prior `enterprise.contract_amended` event with `asc_606_treatment` documented and a compliance-officer countersign on record. The price floor HTTP 422 ensures no amendment can push the effective rate below §31.5 floors — providing a system control equivalent to the pricing exception approval gate in §32. `amendment_justification_hash` in `enterprise_contracts` links each rate change to a written business rationale (plaintext in compliance/evidence/amendments/).
+
+**CC6.1 auditor narrative:** `billing.rate_updated` with `floor_respected: z.literal(true)` chain invariant provides auditor-inspectable evidence that all billing rate changes were authorized within approved pricing parameters. Combined with ADM-E-001 chain export, this satisfies CC6.1 requirement that changes to logical access (here: pricing terms governing the system) are authorized, logged, and reviewable.
+
+**A1.1 auditor narrative:** Rate changes that lower per-seat cost for the tenant could theoretically affect FORM's ability to meet the 99.9% SLA at the revenue-per-account level — the evidence export confirms that no amendment reduced the effective contract value below FORM's COGS-anchored floor, ensuring service delivery remains economically viable for the contracted term.
+
+---
+
+### 45.8 Implementation Checklist
+
+#### P0 — Before first pure tier upgrade agreement (est. M12–M15)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Outside counsel (ASC 606 specialist + Ukrainian Civil Code) confirmation that Option A (prospective Type 2 modification, §45.3.1) applies to FORM's tier upgrade scenario; written opinion filed in `compliance/evidence/amendments/asc606-opinion/`. Until confirmed: §41 blocker remains — pure tier upgrades must be accompanied by ≥ 25 seat expansion. | compliance-officer + founder | **P0** | Before first pure upgrade (est. M12–M15) | [ ] |
+| 2 | Register DEC-082 in `docs/DECISION_LOG.md`: "Pure tier upgrade governance: Option A (contract amendment, prospective ASC 606 Type 2 treatment) adopted pending outside counsel confirmation (§45.8 item 1). OQ-EXP-03 → 🟡 Partial. Gate: §41 blocker lifted upon §45.8 item 1 closure." | compliance-officer | **P0** | This authoring pass (2026-06-26) | [ ] |
+| 3 | Apply migration 0087 to production (`amendment_date`, `amendment_type`, `prior_rate_per_seat_usd`, `amendment_justification_hash` on `enterprise_contracts`). Staging checklist: §45.4. | platform-engineer | **P0** | M12 | [ ] |
+| 4 | Extend `ContractAmendedPayload` Zod schema in `emit-audit-event` Worker with `tier_upgrade` sub-object (§45.5.1). Implement TU-CHAIN-01 floor check: if `tier_upgrade.new_rate_per_seat_usd < floor_for_tier`, return HTTP 422 `TU_CHAIN_01_FLOOR_VIOLATION`. Integration tests: (a) `new_rate < floor` → 422; (b) `new_rate ≥ floor` → 201 + chain event recorded; (c) `amendment_type = 'tier_upgrade'` without `tier_upgrade` sub-object → 422 schema validation failure. | platform-engineer | **P0** | M12 | [ ] |
+| 5 | Register `billing.rate_updated` (§45.5.2) in `docs/AUDIT_LOG_SCHEMA.md §Billing`; implement in `emit-audit-event` Worker with `floor_respected: z.literal(true)` invariant. Integration test: `floor_respected: false` → 422. | platform-engineer + compliance-officer | **P0** | M12 | [ ] |
+| 6 | Implement `amend_contract_tier()` Supabase RPC (SECURITY DEFINER): (a) floor check via §31.5 constants; (b) UPDATE `enterprise_contracts` (tier, rate_per_seat_usd, amendment_date, amendment_type, prior_rate_per_seat_usd, amendment_justification_hash) atomically with two DEC-030 event emissions; (c) BDG KV invalidation call (`SCIM_KV.delete('scim:guard_cfg:' + tenant_id)`); (d) `form_api` REVOKED from calling this RPC (SECURITY DEFINER — only callable by `form_system` or internal Admin Console service role). | platform-engineer | **P0** | M12 | [ ] |
+| 7 | Admin Console "Request Tier Upgrade" three-step flow (§45.6): tenant_owner modal + CSM/compliance-officer countersign + dual sign-off confirmation; floor check display; credit calculation; `asc_606_treatment` pre-classification with override path. | platform-engineer + design-craft | **P0** | M13 | [ ] |
+
+#### P1 — Before SOC 2 observation period
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Register ADM-E-001 and ADM-E-002 in `docs/SOC2_READINESS.md §79.4` master evidence table (two rows, after ADO-E-003 group); add `compliance/evidence/amendments/` R2 subfolder in §80.3; add Vanta mirror list entries in §80.4. | compliance-officer | **P1** | M13 | [ ] |
+| 9 | File first ADM-E-001 after the first pure tier upgrade event OR at Year 1 annual SOC 2 evidence cycle — whichever comes first. File as zero-event affirmative attestation if no pure tier upgrades occur in Year 1. | compliance-officer | **P1** | M13 (Year 1 annual) | [ ] |
+| 10 | Update `docs/AUDIT_LOG_SCHEMA.md §45.5` cross-reference — confirm `billing.rate_updated` registered alongside existing `billing.seats_expanded` (§41.7) in the §Billing event group. | compliance-officer | **P1** | M12 | [ ] |
+
+#### P2 — After first 5 pure tier upgrades
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | Evaluate credit issuance experience: if ≥ 2 of first 5 tenants requested cash refund on credit (vs. next-renewal application), add cash refund flow to Admin Console ("Request Cash Refund" button for credits > $1,000 with > 12 months remaining). | customer-success + platform-engineer | **P2** | After 5 upgrades (est. M24+) | [ ] |
+| 12 | Assess Option B fallback frequency: if outside counsel required Option B for ≥ 1 of first 5 pure upgrade requests, evaluate whether §45.2 guardrails are correctly scoped and update §45.3.2 with additional scenarios. | compliance-officer + enterprise-architect | **P2** | After 5 upgrades (est. M24+) | [ ] |
+
+---
+
+### 45.9 OQ-EXP-03 Resolution
+
+**Decision:** Pure tier upgrade governance adopts **Option A (Contract Amendment) with ASC 606 prospective Type 2 modification treatment** (§45.3.1), pending outside counsel confirmation (§45.8 item 1, P0/M12–M15). Until counsel confirms:
+- The §41 blocker remains active: pure tier upgrades must include ≥ 25 seat expansion
+- Compliance-officer may grant a one-time exception (written, filed in DECISION_LOG) if a pure upgrade is commercially urgent and the ASC 606 risk is explicitly accepted by the founder
+
+**§41.11 OQ-EXP-03 status:** 🟡 **Partial → §45 authored 2026-06-26.** Framework documented; outside counsel confirmation outstanding (§45.8 item 1). Full resolution (`🟢 Resolved`) upon §45.8 item 1 closure.
+
+**Communication policy:** The amendment-vs.-new-contract distinction is internal governance. It must not appear in enterprise.html, pricing-enterprise.html, MSA customer-facing sections, or any sales deck.
+
+---
+
+*v2.15 (2026-06-26): §45 Pure Tier Upgrade: Amendment vs. New Contract Governance — resolves OQ-EXP-03 (P1, §41.11), the documented gate condition blocking pure Growth→Enterprise tier upgrades. §45.1 purpose and scope: pure tier upgrade = same seat count, lower per-seat rate; combined seat-expansion + tier changes remain §41.4; gate condition partially lifted (outside counsel confirmation still required per §45.8 item 1). §45.2 option analysis: Option A (contract amendment, prospective ASC 606 Type 2 modification) vs. Option B (new contract, clean termination); five-row comparison table (mechanism, ASC 606, revenue recognition, BDG/SCIM, audit chain, tenant experience, billing, risk, complexity); Option A adopted for four reasons — prospective treatment supportable, BDG contract_id continuity, audit chain integrity, tenant administrative simplicity; Option B required in four scenarios (floor breach, new anniversary date, counsel extinguishment, materially new scope). §45.3 amendment mechanics: §45.3.1 ASC 606 Type 2 prospective treatment — three-row accounting table (prior months unchanged, modification date no catch-up, remaining months at new rate); three required auditor documentation artefacts (DEC-030 event + written justification + compliance-officer countersign); fallback trigger if counsel determines extinguishment. §45.3.2 four Option B scenarios. §45.3.3 billing formula (credit = (old_rate − new_rate) × seats × months_remaining; monthly vs. annual upfront application rules; cash refund threshold $1,000 + > 12 months). §45.4 migration 0087: four additive columns on `enterprise_contracts` (amendment_date TIMESTAMPTZ, amendment_type CHECK enum with four values, prior_rate_per_seat_usd NUMERIC(10,4), amendment_justification_hash TEXT/SHA-256); RLS unchanged; form_api REVOKED; four-step staging checklist. §45.5 DEC-030 events: §45.5.1 extension to `enterprise.contract_amended` with `tier_upgrade` sub-object (prior_tier, new_tier, prior_rate, new_rate, credit_amount, floor_applied, asc_606_treatment, remaining_months, modification_date, justification_hash); TU-CHAIN-01 floor invariant (HTTP 422 TU_CHAIN_01_FLOOR_VIOLATION if new_rate < §31.5 floor for new tier); §45.5.2 new `billing.rate_updated` event (HIGH/7yr/CC5.2/CC6.1 — contract_id unchanged, floor_respected literal true chain invariant; registration in AUDIT_LOG_SCHEMA §Billing); §45.5.3 advisory `system.scim_guard_cfg_cache_stale` (LOW/1yr) if BDG KV not invalidated within 60s (reuses §35.9 pattern). §45.6 Admin Console: three-step upgrade flow (tenant_owner request with credit display → CSM/compliance-officer review with ASC 606 auto-classification + negotiated rate input + justification text → dual sign-off triggering `amend_contract_tier()` RPC); three-tier approval authority (standard list $8 → CSM countersign; below $8 ≥ floor → CS lead + compliance-officer dual countersign; below floor → §32 exception required). §45.7 two SOC 2 evidence artefacts: ADM-E-001 (CC5.2/CC6.1/A1.1 — annual contract_amended tier_upgrade chain export with floor_respected attestation and asc_606_treatment; 7yr; zero-event affirmative attestation in gap years); ADM-E-002 (CC5.2/CC1.4 — annual billing.rate_updated cross-reference to contract_amended chain confirming no unauthorized rate reduction; 7yr). §45.8 twelve-item checklist: 7× P0/M12–M15 (outside counsel ASC 606 confirmation + compliance/evidence filing, DEC-082 DECISION_LOG registration, migration 0087 production deploy, ContractAmendedPayload Zod extension + TU-CHAIN-01 integration tests, billing.rate_updated Worker registration + integration tests, amend_contract_tier() SECURITY DEFINER RPC, Admin Console three-step upgrade flow); 3× P1/M12–M13 (SOC2_READINESS §79.4 + §80.3 + §80.4 registration of ADM-E-001/E-002, ADM-E-001 first filing or zero-event attestation, AUDIT_LOG_SCHEMA §Billing cross-reference confirmation); 2× P2/M24+ (cash refund flow evaluation after 5 upgrades, Option B fallback frequency assessment). §45.9 OQ-EXP-03 resolution: Option A adopted pending counsel (§45.8 item 1 P0); §41.11 OQ-EXP-03 → 🟡 Partial; full 🟢 on §45.8 item 1 closure. Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §45 DEC-030 event, migration 0087 column, or evidence artefact; `amendment_justification_hash` is SHA-256 of compliance-officer justification (plaintext in compliance/evidence/amendments/); `tenant_id` is FORM-internal UUID; `form_api` REVOKED from `enterprise_contracts` amendment columns; rate figures and credit amounts are commercial-metadata-only aggregate integers at the contract level. Cross-references: `docs/ENTERPRISE.md` (tier pricing $6–12/seat; no-go criteria — insurance risk-scoring, wellness-as-punishment); `docs/COST_MODEL.md §31.5` (COGS-anchored price floors — TU-CHAIN-01 source constants: Starter $6.00, Growth $4.50, Enterprise $4.00); `docs/COST_MODEL.md §32` (pricing exception approval — below-floor amendment escalation path); `docs/COST_MODEL.md §35.6` (`enterprise.contract_amended` event baseline — §45.5.1 extends ContractAmendedPayload); `docs/COST_MODEL.md §41.4` (combined tier-upgrade + seat-expansion — §45 handles pure upgrade only); `docs/COST_MODEL.md §41.11` (OQ-EXP-03 — 🟡 Partial via this section); `docs/DATA_MODEL.md §24` (`billing.seats_expanded` companion event in §Billing — `billing.rate_updated` registers alongside); `docs/SSO_SCIM_IMPLEMENTATION.md §35` (BDG `contracted_seats` source — unchanged in pure tier upgrade; KV cache invalidated by `amend_contract_tier()` RPC); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`enterprise.contract_amended` payload extension — P0/M12); `docs/AUDIT_LOG_SCHEMA.md §Billing` (`billing.rate_updated` registration — P0/M12); `docs/SOC2_READINESS.md §79.4` (master evidence table — ADM-E-001/ADM-E-002 to be added — P1/M13); `docs/DECISION_LOG.md DEC-082` (formal adoption record — P0 this authoring pass). Owner: enterprise-architect + customer-success + compliance-officer + founder.*
