@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.38.0] — 2026-06-26
+
+### Added
+- `content/post-2655-self-coached-synthesis.md` — Фінальний пост серії 2646–2655 (10/10). «Самокоучинг без ілюзій: синтез десяти принципів — і межа, де система стає чесною». Десять операційних принципів серії: модель важливіша за дані; невизначеність — нормальний стан; журнал читають; проблема рідко там, де здається; уникання виглядає як рішення; AI-coach — інструмент, не замінник; блок оцінюють; ідентичність формує рішення; компетентність — це передбачення; система має чесну межу. Де self-coached атлет отримує перевагу. Де система не компенсує зовнішнє. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `blog.html` — post-2655 card added at top of feed.
+
+### Changed
+- `README.md` — серія 2646–2655 marked COMPLETE (10/10); post-2655 → draft in roadmap table.
+- `STATUS.md` — v9.37.0 → v9.38.0; post-2655 finale note appended; series 2646–2655 progress 9/10 → 10/10 COMPLETE.
+- `VERSION` — 9.37.0 → 9.38.0.
+
+---
+
 ## [9.37.0] — 2026-06-26
 
 ### Added
