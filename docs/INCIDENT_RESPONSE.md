@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.12
+# FORM · Incident Response Runbook v3.13
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -2389,6 +2389,26 @@ Key discussion points: Is `incident_id = INC-20260622-A4F2B1` locked in the DEC-
 
 Key discussion points: Run R-34-C1 scope query — what aggregate count confirms P1 (zero `user_id IS NOT NULL` rows past 7yr, SOC 2 evidence gap only) vs. P0 (count > 0, concurrent Erasure Worker failure and GDPR Art. 5(1)(e) overcollection)? Diagnose across H1–H5 root cause hypotheses. At P0: what is the 60-min pseudonymisation SLA and when does the 72-h Art. 33 assessment window open? How does the `user_id IS NULL AND user_id_pseudonym IS NOT NULL` safety gate constrain risk during the stale window at P1? **Full scenario: R-34. Staging drill: devops-lead disables job 32; compliance-officer runs R-34-C1; restores job 32; confirms `system.turh_purge_restored` emitted. Optional P0 path: insert synthetic row with `user_id IS NOT NULL, changed_at = NOW() - INTERVAL '8 years'`; confirm count = 1 → P0 upgrade; execute pseudonymisation; confirm zero-count all-clear. Participants:** compliance-officer, devops-lead, platform-engineer. Target: 60 minutes; 90 minutes for full P0 path.
 
+**Scenario S — GDPR workout data purge cron stale (Year 4, Q2):**
+*"The `pg-cron-health-monitor` fires at 07:00 UTC: `system.cron_job_stale` detected for `workout_data_purge` (job 26, daily 03:00 UTC, 26-h freshness window). Devops-lead receives PagerDuty P1 `form-devops`; dedup key `purge-job-26-stale`. The job has missed its last two daily runs."*
+
+Key discussion points: R-30-C1 aggregate returns count — confirm P1 (zero deleted users with overdue workout data, monitoring gap only) vs. P0 (count > 0, GDPR Art. 5(1)(e) active overcollection; manual purge required promptly). Is `body_metrics` affected (R-30-C3 count > 0)? If so, does Art. 9 risk require outside counsel notification assessment under the P0-escalated path? Manual purge sequence: three DELETE statements under PAM elevation; what does PURGE-CRON-CHAIN-01 require — must `system.purge_cron_failure_declared` precede all `purge_cron_manual_run_completed` for the same `incident_id`? When does an ordering inversion co-activate R-05? When is PURGE-INT-01 compensating control memo required, and who signs it? **Full scenario: R-30. Staging drill:** compliance-officer disables job 26 in staging; IC runs R-30-C1 (confirms aggregate count > 0 with synthetic deleted-user cohort); executes manual purge SQL (three DELETE statements under PAM elevation); confirms `data.workout_data_purged` and `system.purge_cron_manual_run_completed` DEC-030 events emitted with `all_clear_after_purge: true`; restores job 26; confirms `system.purge_cron_restored` emitted and R-30-C1 re-run returns 0. **Participants:** compliance-officer, devops-lead. **Target:** 45 minutes; 75 minutes for Art. 9 P0-escalated path.
+
+**Scenario U — Audit log retention purge cron stale (Year 4, Q3):**
+*"The `pg-cron-health-monitor` fires at 03:45 UTC: `system.cron_job_stale` detected for `audit_log_retention_purge` (job 27, monthly 1st 02:00 UTC, 48-h freshness window). Dual PagerDuty P1 routing fires: `form-devops` → devops-lead AND `form-compliance` → compliance-officer; dedup key `purge-job-27-stale`. The job has missed its last monthly run. R-31-C1 returns 0 eligible rows — expected, since FORM launched in 2026 and no `audit_log_events` row will reach the 7-year ceiling until ~2033."*
+
+Key discussion points: R-31-C1 returns 0 at P1 (expected) — what does the zero-row attestation prove for SOC 2 PI1.2 evidence (AUDIT-PURGE-E-003)? What is the self-referential DEC-030 ordering constraint — why must `data.audit_log_purge_completed` be emitted and HTTP 200 confirmed *before* the DELETE executes, and what does `dec030_ordering_respected: true` in `system.audit_log_purge_manual_run_completed` prove to auditors? In the H6 path (emit-audit-event returns 422), why is the DELETE intentionally blocked, and which runbook must co-activate before any purge can proceed? How does the R-31 DEC-030 self-referential constraint differ from PURGE-CRON-CHAIN-01 (R-30)? **Full scenario: R-31. Staging drill:** compliance-officer disables job 27 in staging; IC runs R-31-C1 (confirms 0 eligible rows — expected); executes manual emit-audit-event call for `data.audit_log_purge_completed`; confirms HTTP 200; executes manual DELETE for synthetic `audit_log_events` rows with `emitted_at < NOW() - INTERVAL '2557 days'`; confirms `system.audit_log_purge_manual_run_completed` emitted with `dec030_ordering_respected: true`; restores job 27; confirms `system.audit_log_purge_restored` emitted. **Optional H6 path:** force emit-audit-event to return 422; confirm DELETE is blocked; confirm R-05 activation path is triggered. **Participants:** compliance-officer, devops-lead, security-engineer. **Target:** 45 minutes; 60 minutes for H6 optional path.
+
+**Scenario V — CAEP sweep stale during cert rotation (Year 4, Q4):**
+*"The `pg-cron-health-monitor` fires at 11:23 UTC: `system.cron_job_stale` detected for `caep_reregister_sweep` (job 37, `*/5 * * * *`, 6-min freshness window). Security-engineer receives PagerDuty P1 `form-security`; dedup key `caep-sweep-stale`. Three enterprise tenants have `caep_reregistration_required = TRUE` following a SAML SP cert rotation completed 22 minutes prior. Their CAEP stream subscriptions are stale — `token-claims-change` and `session-revoked` RISC events are being silently dropped."*
+
+Key discussion points: R-32-C1 aggregate returns count = 3 — confirm P0 upgrade (active CC6.3 session-integrity gap; manual re-registration required within 30 min). What PAM elevation does `POST /internal/v1/caep/reregister` require? Confirm `sso.caep_stream_registered` HIGH/7yr is emitted per tenant and `caep_reregistration_required = FALSE` per Step 3 verification. Does the 30-min P0 SLA clock start at T+0 (`system.caep_sweep_failure_declared`) or at alert receipt? If H4 (IdP SSF rate-limiting — 429 responses) prevents re-registration, what is the escalation path and when does AL-CAEP-01 co-activate? **Full scenario: R-32. Staging drill:** devops-lead disables job 37 in staging; security-engineer sets `caep_reregistration_required = TRUE` for a synthetic test tenant; IC runs R-32-C1 (aggregate counts, no tenant names); executes Step 2b curl call to `POST /internal/v1/caep/reregister` under PAM elevation; confirms `sso.caep_stream_registered` DEC-030 HIGH/7yr emitted; confirms `caep_reregistration_required = FALSE` per Step 3 verification; restores job 37; confirms `system.caep_sweep_restored` STANDARD/3yr emitted. **Participants:** security-engineer, devops-lead, compliance-officer. **Target:** 45 minutes.
+
+**Scenario W — BDG override expiry sweep stale (Year 4, Q4, paired with Scenario V):**
+*"The `pg-cron-health-monitor` fires at 14:07 UTC: `system.cron_job_stale` detected for `bdg_override_expiry_sweep` (job 34, `*/15 * * * *`, 20-min freshness window). Security-engineer receives PagerDuty P1 `form-security`; dedup key `bdg-sweep-stale`. R-33-C1 returns count = 1: a tenant's `bulk_deprovision_override_exp` lapsed 2 hours ago; no SCIM sync has fired in the intervening window."*
+
+Key discussion points: R-33-C1 count = 1 — confirm P0 upgrade (expired DB override active; manual UPDATE required within 15 min). Unlike R-30/R-31 (GDPR overcollection risk) and R-32 (SSO session-integrity gap), R-33 is a **belt-and-suspenders failure** — what does this mean for risk framing, and when would the SCIM Worker's `revokeActiveOverride()` path clear the override on its own (no SCIM sync fired during the stale window)? Manual UPDATE sequence under PAM elevation: Step 2a (scope SQL for expired rows), Step 2b (UPDATE), Step 2c (zero-count all-clear), Step 2d (emit `system.bdg_sweep_override_cleared` STANDARD/7yr). BDG-SWEEP-CHAIN-01 requires `bdg_sweep_failure_declared` to precede `bdg_sweep_override_cleared` — what does an inversion trigger? When is BDG-INT-01 memo required, and who signs it? **Full scenario: R-33. Staging drill:** devops-lead disables job 34 in staging; security-engineer inserts synthetic row in `tenant_sso_configs` with `bulk_deprovision_override_exp = NOW() - INTERVAL '2 hours'`; IC runs R-33-C1 (confirms count = 1 → P0 condition); executes Step 2b UPDATE under PAM elevation; confirms zero-count in Step 2c all-clear; emits `system.bdg_sweep_override_cleared` STANDARD/7yr test event; restores job 34; confirms `system.bdg_sweep_restored` STANDARD/3yr emitted. **Optional belt-and-suspenders path:** instead of Step 2 manual UPDATE, confirm `revokeActiveOverride()` fires on the next synthetic SCIM sync request for the test tenant; confirm `scim.bulk_deprovision_override_used` HIGH/7yr emitted. **Participants:** security-engineer, devops-lead, compliance-officer. **Target:** 45 minutes; 60 minutes for optional belt-and-suspenders path.
+
 ### 9.4 Year 1 Testing Schedule
 
 | Month | Activity |
@@ -2444,6 +2464,25 @@ Expand to 9 distinct scenario types; complete coverage of legal, DSAR, AI availa
 | Month 34 | Alert verification |
 | Month 35 | Alert verification |
 | Month 36 | Annual DR test (PITR full restore to new project) + External pen test year 3 + Tabletop — Scenario X (turh purge job stale) in staging environment; compliance-officer + devops-lead run full P0 optional path |
+
+### 9.7 Year 4 Testing Schedule
+
+Expand to 13 distinct scenario types; add cron-job compliance failure drills (Scenarios S, U, V, W) covering GDPR purge staleness, audit-log self-referential DEC-030 chain constraints, CAEP session-integrity sweeps, and BDG guard-maintenance failures. Staging drill component mandatory for all cron-stale scenarios. Security-engineer joins all Q4 drills.
+
+| Month | Activity |
+|---|---|
+| Month 37 | Alert verification + Year 3 PIR review; update runbooks; external pen test year 3 debrief |
+| Month 38 | Alert verification |
+| Month 39 | Tabletop — Scenario S (workout data purge cron stale) in staging environment; compliance-officer + devops-lead; Art. 9 P0-escalated optional path |
+| Month 40 | Alert verification |
+| Month 41 | Alert verification |
+| Month 42 | Tabletop — Scenario U (audit log retention purge cron stale) in staging environment; compliance-officer + devops-lead + security-engineer; H6 optional path (force emit-audit-event 422 → confirm DELETE blocked + R-05 activation) |
+| Month 43 | Alert verification |
+| Month 44 | Alert verification |
+| Month 45 | Dual tabletop — Scenario V (CAEP sweep stale during cert rotation) + Scenario W (BDG override expiry sweep stale); staging drills run in sequence; security-engineer + devops-lead + compliance-officer; optional belt-and-suspenders path for Scenario W |
+| Month 46 | Alert verification |
+| Month 47 | Alert verification |
+| Month 48 | Annual DR test (PITR full restore to new project) + External pen test year 4 + Tabletop review — choose from: Scenario S P0-escalated Art. 9 path, Scenario U H6 chain-failure path, or Scenario X rerun — select based on PIR gap prioritisation |
 
 ---
 
@@ -11699,7 +11738,7 @@ Store artefacts at `compliance/evidence/purge-cron/r30-<incident_id>/` with `MAN
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 6 | Add Scenario S (workout data purge cron failure) to §9.4 tabletop catalog: compliance-officer disables job 26 in staging; IC runs R-30-C1; executes manual purge SQL for a synthetic deleted-user cohort; confirms `data.workout_data_purged` and `system.purge_cron_manual_run_completed` DEC-030 events emitted; restores job; confirms `system.purge_cron_restored` emitted and R-30-C1 returns 0. | security-engineer + compliance-officer | **P2** | M12 | [ ] |
+| 6 | Add Scenario S (workout data purge cron failure) to §9.4 tabletop catalog: compliance-officer disables job 26 in staging; IC runs R-30-C1; executes manual purge SQL for a synthetic deleted-user cohort; confirms `data.workout_data_purged` and `system.purge_cron_manual_run_completed` DEC-030 events emitted; restores job; confirms `system.purge_cron_restored` emitted and R-30-C1 returns 0. | security-engineer + compliance-officer | **P2** | M12 | [x] **Done — INCIDENT_RESPONSE.md v3.13, 2026-06-26: Scenario S added to §9.3 tabletop catalog with full staging drill; §9.7 Year 4 Testing Schedule (Month 39) schedules staging drill.** |
 
 ---
 
@@ -12192,7 +12231,7 @@ Store artefacts at `compliance/evidence/audit-log-purge/r31-<incident_id>/` with
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 6 | Add Scenario U (audit log purge cron failure) to §9.4 tabletop catalog: compliance-officer disables job 27 in staging; IC runs R-31-C1 (confirms 0 eligible rows — expected); executes manual emit-audit-event call for `data.audit_log_purge_completed`; confirms HTTP 200; executes manual DELETE for synthetic `audit_log_events` rows with `emitted_at < NOW() - INTERVAL '2557 days'`; confirms `system.audit_log_purge_manual_run_completed` emitted with `dec030_ordering_respected: true`; restores job; confirms `system.audit_log_purge_restored` emitted. Optional H6 path: force emit-audit-event to return 422; confirm DELETE is blocked; confirm R-05 activation path. | security-engineer + compliance-officer | **P2** | M12 | [ ] |
+| 6 | Add Scenario U (audit log purge cron failure) to §9.4 tabletop catalog: compliance-officer disables job 27 in staging; IC runs R-31-C1 (confirms 0 eligible rows — expected); executes manual emit-audit-event call for `data.audit_log_purge_completed`; confirms HTTP 200; executes manual DELETE for synthetic `audit_log_events` rows with `emitted_at < NOW() - INTERVAL '2557 days'`; confirms `system.audit_log_purge_manual_run_completed` emitted with `dec030_ordering_respected: true`; restores job; confirms `system.audit_log_purge_restored` emitted. Optional H6 path: force emit-audit-event to return 422; confirm DELETE is blocked; confirm R-05 activation path. | security-engineer + compliance-officer | **P2** | M12 | [x] **Done — INCIDENT_RESPONSE.md v3.13, 2026-06-26: Scenario U added to §9.3 tabletop catalog with H6 optional path; §9.7 Year 4 Testing Schedule (Month 42) schedules staging drill.** |
 
 ---
 
@@ -12684,7 +12723,7 @@ Store artefacts at `compliance/evidence/caep-sweep/r32-<incident_id>/` with `MAN
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 7 | Add Scenario V (CAEP sweep stale during cert rotation) to §9.4 tabletop catalog: devops-lead disables job 37 in staging; security-engineer sets `caep_reregistration_required = TRUE` for a synthetic test tenant; runs R-32-C1; executes Step 2b curl call to `POST /internal/v1/caep/reregister`; confirms `sso.caep_stream_registered` DEC-030 HIGH/7yr emitted; confirms `caep_reregistration_required = FALSE`; restores job 37; emits `system.caep_sweep_restored`. | security-engineer + devops-lead | **P2** | M12 | [ ] |
+| 7 | Add Scenario V (CAEP sweep stale during cert rotation) to §9.4 tabletop catalog: devops-lead disables job 37 in staging; security-engineer sets `caep_reregistration_required = TRUE` for a synthetic test tenant; runs R-32-C1; executes Step 2b curl call to `POST /internal/v1/caep/reregister`; confirms `sso.caep_stream_registered` DEC-030 HIGH/7yr emitted; confirms `caep_reregistration_required = FALSE`; restores job 37; emits `system.caep_sweep_restored`. | security-engineer + devops-lead | **P2** | M12 | [x] **Done — INCIDENT_RESPONSE.md v3.13, 2026-06-26: Scenario V added to §9.3 tabletop catalog; §9.7 Year 4 Testing Schedule (Month 45) schedules dual staging drill with Scenario W.** |
 
 ---
 
@@ -13083,7 +13122,7 @@ Four evidence artefacts. Store in `compliance/evidence/bdg-sweep/r33-<incident_i
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 6 | Add Scenario W (BDG override expiry sweep stale) to §9.4 tabletop catalog: devops-lead disables job 34 in staging; security-engineer inserts synthetic row with `bulk_deprovision_override_exp = NOW() - INTERVAL '2 hours'`; runs R-33-C1 (confirms count = 1 → P0); executes Step 2b UPDATE in staging; confirms zero-count in Step 2c; emits `system.bdg_sweep_override_cleared` test event; restores job 34; confirms `system.bdg_sweep_restored` emitted. Optional belt-and-suspenders path test: instead of Step 2 manual UPDATE, confirm `revokeActiveOverride()` fires on next synthetic SCIM sync request for the test tenant. | security-engineer + devops-lead | **P2** | M12 | [ ] |
+| 6 | Add Scenario W (BDG override expiry sweep stale) to §9.4 tabletop catalog: devops-lead disables job 34 in staging; security-engineer inserts synthetic row with `bulk_deprovision_override_exp = NOW() - INTERVAL '2 hours'`; runs R-33-C1 (confirms count = 1 → P0); executes Step 2b UPDATE in staging; confirms zero-count in Step 2c; emits `system.bdg_sweep_override_cleared` test event; restores job 34; confirms `system.bdg_sweep_restored` emitted. Optional belt-and-suspenders path test: instead of Step 2 manual UPDATE, confirm `revokeActiveOverride()` fires on next synthetic SCIM sync request for the test tenant. | security-engineer + devops-lead | **P2** | M12 | [x] **Done — INCIDENT_RESPONSE.md v3.13, 2026-06-26: Scenario W added to §9.3 tabletop catalog with belt-and-suspenders optional path; §9.7 Year 4 Testing Schedule (Month 45) schedules dual staging drill with Scenario V.** |
 
 ---
 

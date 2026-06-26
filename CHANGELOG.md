@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [8.94.1] — 2026-06-26
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.12 → v3.13: §9.3 Tabletop Exercise Scenario Catalog extended with Scenarios S (GDPR workout data purge cron stale, job 26), U (audit log retention purge cron stale, job 27), V (CAEP sweep stale during cert rotation, job 37), and W (BDG override expiry sweep stale, job 34). Each scenario includes narrative, key discussion points, and mandatory staging drill. §9.7 Year 4 Testing Schedule (Months 37–48) added scheduling dual cron-stale drills. Runbook checklists R-30.11/6, R-31.11/6, R-32.11/7, R-33.11/6 marked [x] Done.
+- `VERSION` — 8.94.0 → 8.94.1.
+
+---
+
 ## [8.94.0] — 2026-06-26
 
 ### Added
