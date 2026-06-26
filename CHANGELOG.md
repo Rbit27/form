@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [9.30.0] — 2026-06-26
+
+### Added
+- `content/post-2647-decision-under-uncertainty.md` — Block 2646–2655 series «Методологія самокоучингу» post 2/10. Рішення в умовах невизначеності: чому «не знаю точно» не є причиною не тренуватись. Два типи структурної невизначеності (даних vs. інтерпретації); satisficing vs. maximizing (Simon 1956); асиметрія помилок типу I/II; omission bias (Spranca et al. 1991); алгоритм 5 кроків для рішень з неповними даними; 4 конкретні сценарії (важкий тиждень, невизначений RPE, плато без причини, перетренованість vs. сон) з посиланнями на Marcora et al. 2009, Meeusen et al. 2013, Ralston et al. 2017. clinical-safety: NOT_REQUIRED.
+- `blog.html` — картка post-2647 додана на початок блогу.
+
+### Changed
+- `STATUS.md` — Block 2646–2655 progress updated to 2/10; next: post-2648.
+- `VERSION` — 9.29.0 → 9.30.0.
+
 ## [9.29.0] — 2026-06-26
 
 ### Added
