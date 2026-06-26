@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [9.5.0] — 2026-06-26
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md` v2.49 — new `§Rate limiting and abuse events` section: four DEC-030 HMAC-chained events (`security.quota_hard_block` HIGH/3yr, `security.abuse_flag_raised` HIGH/7yr, `security.abuse_action_taken` HIGH/7yr, `data.quota_records_archived` STANDARD/1yr) with Zod v2 schemas, SOC 2 evidence artefacts RL-E-001–003, privacy floor notes, and emitter restrictions. Closes `docs/DATA_MODEL.md §28.7` checklist item 4 (P0/M4).
+
+### Changed
+- `docs/DATA_MODEL.md` §28.7 item 4 — status `[ ]` → `[x] Done — 2026-06-26 (AUDIT_LOG_SCHEMA.md v2.49)`.
+- `VERSION` — 9.4.1 → 9.5.0.
+
+---
+
 ## [9.4.1] — 2026-06-26
 
 ### Added

@@ -11764,7 +11764,7 @@ SELECT COUNT(*) AS archived_count FROM archived;
 | 1 | Run migration `0055_rate_limiting_schema.sql` (Parts 1–4): CREATE `api_quota_usage`, `rate_limit_violations`, `abuse_flags`; CREATE all indexes; CREATE all RLS policies. CI test: `form_api` SELECT on `abuse_flags` returns zero rows; cross-tenant SELECT on `api_quota_usage` returns zero rows. | platform-engineer | **P0** | M4 | [ ] |
 | 2 | Implement `workers/middleware/quota-check.ts`: UPSERT `api_quota_usage`; overage grace logic; `hard_blocked_at` SET; HTTP 429 response with `Retry-After`; `X-Quota-Warning` header; 80% threshold notification; `waitUntil` violation log write. | platform-engineer | **P0** | M4 | [ ] |
 | 3 | Define `FORM-RL-001` KV limits config (Cloudflare Workers environment): tier-to-limit mapping for all five endpoint categories; load into tenant-limits KV cache keyed on `tenant_limits:{tenant_id}` with 5-minute TTL. | platform-engineer + enterprise-architect | **P0** | M4 | [ ] |
-| 4 | Register three DEC-030 events (`security.quota_hard_block`, `security.abuse_flag_raised`, `security.abuse_action_taken`) in `docs/AUDIT_LOG_SCHEMA.md` under new "Rate limiting and abuse events" subsection with severity, retention, and payload fields. | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+| 4 | Register three DEC-030 events (`security.quota_hard_block`, `security.abuse_flag_raised`, `security.abuse_action_taken`) in `docs/AUDIT_LOG_SCHEMA.md` under new "Rate limiting and abuse events" subsection with severity, retention, and payload fields. | platform-engineer + compliance-officer | **P0** | M4 | [x] Done — 2026-06-26 (AUDIT_LOG_SCHEMA.md v2.49) |
 
 #### P1 — M5: Abuse detection and admin visibility
 
