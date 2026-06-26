@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.16
+# FORM · Cost Model & Unit Economics v2.17
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -12404,7 +12404,7 @@ On both tenant_owner request and CSM/compliance-officer countersign, the Admin C
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 8 | Register ADM-E-001 and ADM-E-002 in `docs/SOC2_READINESS.md §79.4` master evidence table (two rows, after ADO-E-003 group); add `compliance/evidence/amendments/` R2 subfolder in §80.3; add Vanta mirror list entries in §80.4. | compliance-officer | **P1** | M13 | [ ] |
+| 8 | Register ADM-E-001 and ADM-E-002 in `docs/SOC2_READINESS.md §79.4` master evidence table (two rows, after ADO-E-003 group); add `compliance/evidence/amendments/` R2 subfolder in §80.3; add Vanta mirror list entries in §80.4. | compliance-officer | **P1** | M13 | [x] Done — 2026-06-26 (SOC2_READINESS.md v3.43.0 §118) |
 | 9 | File first ADM-E-001 after the first pure tier upgrade event OR at Year 1 annual SOC 2 evidence cycle — whichever comes first. File as zero-event affirmative attestation if no pure tier upgrades occur in Year 1. | compliance-officer | **P1** | M13 (Year 1 annual) | [ ] |
 | 10 | Update `docs/AUDIT_LOG_SCHEMA.md §45.5` cross-reference — confirm `billing.rate_updated` registered alongside existing `billing.seats_expanded` (§41.7) in the §Billing event group. | compliance-officer | **P1** | M12 | [x] Done — 2026-06-26 (AUDIT_LOG_SCHEMA.md v2.50 `### Enterprise Pure Tier Upgrade events` section; retention table row after `billing.seats_expanded`) |
 
@@ -12428,6 +12428,8 @@ On both tenant_owner request and CSM/compliance-officer countersign, the Admin C
 **Communication policy:** The amendment-vs.-new-contract distinction is internal governance. It must not appear in enterprise.html, pricing-enterprise.html, MSA customer-facing sections, or any sales deck.
 
 ---
+
+*v2.17 (2026-06-26): §45.8 checklist sync — item 8 marked `[x] Done`. Item 8 (SOC2_READINESS §79.4/§80.3/§80.4 registration of ADM-E-001 + ADM-E-002): 🟢 Done — SOC2_READINESS.md v3.43.0 §118 (two artefacts registered; §79.4 count 79→81; `amendments/` R2 subfolder added in §80.3; Vanta mirror list updated in §80.4; documentation portion complete; evidence collection pending first pure tier upgrade event, est. M13+). Document header v2.16 → v2.17. compliance-officer + enterprise-architect.*
 
 *v2.16 (2026-06-26): §45.8 checklist sync — items 2, 5, and 10 marked `[x] Done`. Item 2 (DEC-082 registration in DECISION_LOG.md): 🟢 Done — DECISION_LOG DEC-082 authored 2026-06-26; OQ-EXP-03 governance decision formally recorded. Item 5 (`billing.rate_updated` AUDIT_LOG_SCHEMA registration): 🟢 Done — AUDIT_LOG_SCHEMA.md v2.50 new `### Enterprise Pure Tier Upgrade events` section; Zod v2 `RateUpdatedPayload`, TU-CHAIN-01 invariant block, CC5.2/CC6.1 auditor narratives, retention table row. Item 10 (AUDIT_LOG_SCHEMA §Billing cross-reference confirmation): 🟢 Done — `billing.rate_updated` retention table row inserted after `billing.seats_expanded` (AUDIT_LOG_SCHEMA.md v2.50, retention table line). Document header v2.15 → v2.16. compliance-officer + enterprise-architect.*
 

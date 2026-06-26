@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [9.15.1] — 2026-06-26
+
+### Changed
+- `docs/SOC2_READINESS.md` — document version v3.42.0 → v3.43.0; §118 Cross-Reference Patch added (COST_MODEL §45.8 item 8): ADM-E-001 (CC5.2/CC6.1/A1.1 — annual `enterprise.contract_amended` DEC-030 HMAC-chain export filtered to `amendment_type = 'tier_upgrade'`; 7yr; `amendments/ADM-E-001_<YYYY>.csv`) and ADM-E-002 (CC5.2/CC1.4 — annual `billing.rate_updated` × `enterprise.contract_amended` TU-CHAIN-01 cross-reference; confirms `floor_respected: true` invariant and `contract_id` unchanged (Option A/DEC-082); 7yr; `amendments/ADM-E-002_<YYYY>.csv`) registered in §79.4 master evidence table (count 79→81); `amendments/` subfolder added to §80.3 R2 folder structure; Vanta mirror list updated in §80.4; §118.8 implementation checklist (3 items: R2 folder verification M13; ADM-E-001/ADM-E-002 first filings or zero-event attestations M13+).
+- `docs/COST_MODEL.md` — document version v2.16 → v2.17; §45.8 item 8 marked `[x] Done — 2026-06-26 (SOC2_READINESS.md v3.43.0 §118)`.
+- `VERSION` — 9.15.0 → 9.15.1.
+
+---
+
 ## [9.15.0] — 2026-06-26
 
 ### Added
