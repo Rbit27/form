@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [8.94.0] — 2026-06-26
+
+### Added
+- `content/post-2572-meta-decision-system.md` — Серія 2566–2575 «Прийняття рішень у тренуванні», пост 7/10. Мета-рішення: як побудувати власну систему прийняття рішень замість набору правил. Три рівні архітектури: політика (незмінна), правила (ситуативні if-then), параметри (гнучкі налаштування). Ієрархія вирішує конфлікти до того, як вони виникли. Implementation intentions (Gollwitzer & Sheeran, 2006): специфічне if-then знижує когнітивне навантаження у момент виконання. Метаправило перекидання: три законних умови для виходу з протоколу і що записувати в цьому разі. Практичний протокол побудови архітектури в шість кроків (інвентаризація, класифікація, if-then формулювання, ієрархія, метаправило, ретроспектива). Simon (1956) bounded rationality, Kahneman (2011), Marcora (2009) cognitive fatigue. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2572 card added at top of feed.
+
+### Changed
+- `README.md` — post-2572 → draft · v8.94.0; Editorial series 2576–2585 (Тренувальна адаптація без ілюзій) proposed.
+- `STATUS.md` — серія 2566–2575 progress 7/10; post-2572 entry added; version → v8.94.0.
+- `VERSION` — 8.93.0 → 8.94.0.
+
+---
+
 ## [8.93.0] — 2026-06-26
 
 ### Added
