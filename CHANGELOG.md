@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [9.0.0] — 2026-06-26
+
+### Added
+- `content/post-2578-hypertrophy-realistic-numbers-and-optimal-stimulus.md` — Editorial 2576–2585 post 3/10. «Гіпертрофія: реальні числа, фактори впливу і де проходить межа оптимального стимулу». Максимальні темпи гіпертрофії для натурального атлета (McDonald, 2003): 1-й рік до 0.9 кг/міс, 2-й — 0.45 кг/міс, 3-й — 0.25 кг/міс. Три фактори гіпертрофії: об'єм (Krieger, 2010; Schoenfeld et al., 2017), інтенсивність (Lasevicius et al., 2018 — широкий діапазон при близькості до відмови), частота (Ralston et al., 2017). MEV/MAV/MRV як концептуальний інструмент. Сигнали перетину MRV. Роль сну (Dattilo et al., 2011). MEV для збереження (Bickel et al., 2011). clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2578 card added at top of feed.
+
+### Changed
+- `STATUS.md` — v9.0.0; Series 2576–2585 progress: 3/10; next: post-2579 (силова адаптація паралельно з гіпертрофією).
+- `VERSION` — 8.99.0 → 9.0.0.
+
+---
+
 ## [8.99.0] — 2026-06-26
 
 ### Added
