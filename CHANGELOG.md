@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [8.98.1] — 2026-06-26
+
+### Changed
+- `docs/COST_MODEL.md` — v2.13 → v2.14: §35.10 checklist sync — items 2 and 3 marked `[x] Done`, reflecting documentation obligations fulfilled by prior sprints. Item 2 (ETF clause to `docs/MSA_TEMPLATE.md`): closed by MSA_TEMPLATE.md v0.2 (2026-06-12), §11.4 ETF clause (liquidated damages framing §8.1, contracted-ACV basis §8.2, declining balance schedule M1–M36+ §8.3, floor §8.4, seat reduction policy §8.5, waiver authority §8.6, outside counsel checkpoint §8.7, DEC-030 audit record §8.8); outside counsel enforceability review (DE/US) remains required before first multi-year contract (M10). Item 3 (Add `enterprise.mid_contract_termination_risk_flagged` to `docs/OBSERVABILITY.md §12.6` pg_cron registry): closed by OBSERVABILITY.md §36 v0.1 (2026-06-12) — job 25 `mid_contract_termination_risk_check` registered in §12.6 (Mondays 09:00 UTC, 8-day freshness, CC5.2/CC7.2, PagerDuty P1 `form-customer-success`, Slack `#enterprise-health` HIGH, `enterprise.mid_contract_termination_risk_flagged` DEC-030 HIGH 7yr, 30-day per-tenant dedup); INCIDENT_RESPONSE R-29 cross-reference added v4.8.3 (2026-06-21); physical deploy remains pending M10. No schema or economic changes. compliance-officer + enterprise-architect.
+- `VERSION` — 8.98.0 → 8.98.1.
+
+---
+
 ## [8.98.0] — 2026-06-26
 
 ### Added
