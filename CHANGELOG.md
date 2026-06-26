@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [9.7.1] — 2026-06-26
+
+### Changed
+- `docs/DATA_MODEL.md` §28.9 item 8 — documentation portion `[ ]` → `[x] Done (2026-06-26)`: pg_cron jobs 16 (`rate_limit_violations_cleanup`) and 17 (`api_quota_usage_archive`) confirmed registered in OBSERVABILITY §12.6 via §35.6 (Rate Limiting Observability, 2026-06-11). Status updated to `[x] (docs — §12.6 v2.0 patch); [ ] (production deploy — OBSERVABILITY §35.10 items 6–7, M5)`. Document header v1.33 → v1.34.
+- `docs/OBSERVABILITY.md` §12.6 — v2.0 patch note added, formalising the 2026-06-11 registration date of jobs 16, 17, 22, and 23 (inserted when §35 was authored, no prior patch note existed). Document header v5.2.5 → v5.2.6.
+- `VERSION` — 9.7.0 → 9.7.1.
+
+---
+
 ## [9.7.0] — 2026-06-26
 
 ### Added

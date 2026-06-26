@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.33
+# FORM · Multi-Tenant Data Model v1.34
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -11773,7 +11773,7 @@ SELECT COUNT(*) AS archived_count FROM archived;
 | 5 | Implement abuse detection Workers: credential-stuffing detector (N failed auths from single api_key in T seconds → INSERT `abuse_flags`); scraping detector (M distinct endpoints in W seconds → INSERT); prompt-injection-pattern classifier (statistical signal from coaching turn metadata — never content). | security-engineer + platform-engineer | **P1** | M5 | [ ] |
 | 6 | Admin dashboard quota panel: per-tenant monthly `request_count` vs. `quota_limit` bar chart; overage indicator; `hard_blocked_at` alert banner; top-5 endpoint categories by usage. Gate on `enterprise.quota_panel_enabled` feature flag. | platform-engineer + design-craft | **P1** | M5 | [ ] |
 | 7 | Collect RL-E-001 through RL-E-003 evidence artefacts (§28.8) after 30 days of production usage; store in `compliance/evidence/rate-limiting/`; cross-reference in `docs/SOC2_READINESS.md` CC6.1, CC6.6, CC7.2 evidence tables. **Documentation cross-reference portion: 🟢 Done — 2026-06-26 (SOC2_READINESS §117, v3.42.0): RL-E-001/002/003 registered in §79.4 master evidence table (76→79 rows), §80.3 R2 folder registry (`rate-limiting/` subfolder), §80.4 Vanta mirror protocol. Evidence collection portion remains pending migration 0055 production deploy (compliance-officer, M5).** | compliance-officer | **P1** | M5 | [x] (docs cross-ref); [ ] (evidence collection — pending migration 0055) |
-| 8 | Add pg_cron jobs 16 (`rate_limit_violations_cleanup`, daily 03:00 UTC) and 17 (`api_quota_usage_archive`, monthly 00:30 UTC) to `docs/OBSERVABILITY.md §12.6` registry with expected row counts, alert thresholds, and runbook links. | devops-lead | **P1** | M5 | [ ] |
+| 8 | Add pg_cron jobs 16 (`rate_limit_violations_cleanup`, daily 03:00 UTC) and 17 (`api_quota_usage_archive`, monthly 00:30 UTC) to `docs/OBSERVABILITY.md §12.6` registry with expected row counts, alert thresholds, and runbook links. **Documentation portion: 🟢 Done — 2026-06-26: jobs 16 and 17 formally registered in §12.6 via §35.6 (Rate Limiting Observability, 2026-06-11); OBSERVABILITY §12.6 v2.0 patch note formalises registration date and closes this item's documentation obligation. Physical production deployment (`0055b_rate_limit_cron.sql` against production Supabase `cron.schedule()`) tracked separately in OBSERVABILITY §35.10 items 6–7 (platform-engineer + devops-lead, M5).** | devops-lead | **P1** | M5 | [x] (docs — §12.6 v2.0 patch, 2026-06-26); [ ] (production deploy — OBSERVABILITY §35.10 items 6–7, M5) |
 
 #### P2 — Post-GA
 
@@ -17512,6 +17512,8 @@ The three monitoring indexes (`litigation_hold_records_review_sweep_idx`, `litig
 | `compliance/evidence/litigation-hold/migration-0087-validation_<YYYY-MM-DD>.txt` — staging output retention | §46.3.2 / §46.8 item 1 | 🟡 **Pending — §46.8 item 1 (migration not yet applied).** |
 
 ---
+
+*v1.34 (2026-06-26): §28.9 item 8 cross-reference closure (documentation portion) — pg_cron jobs 16 (`rate_limit_violations_cleanup`) and 17 (`api_quota_usage_archive`) were registered in OBSERVABILITY §12.6 when §35 (Rate Limiting Observability) was authored (2026-06-11), fulfilling the documentation obligation of §28.9 item 8. Item 8 status updated to `[x] (docs — §12.6 v2.0 patch, 2026-06-26); [ ] (production deploy — OBSERVABILITY §35.10 items 6–7, M5)`. OBSERVABILITY §12.6 v2.0 patch note added to formalise the registration date of jobs 16, 17, 22, and 23. Document header v1.33 → v1.34. No schema, DDL, or model changes. Owner: devops-lead + compliance-officer.*
 
 *v1.33 (2026-06-26): §45.8 item 3 cross-reference closure — SOC2_READINESS §116 (v3.41.0) authored (2026-06-26): REN-E-001 `contract_discount_type` cross-tab registered in §79.4; `discount_type` breakdown column added to REN-E-001 filing template; DATA_MODEL §45.8 item 3 (P1/M11) → [x] Done. Document header v1.32 → v1.33. No schema, DDL, or model changes. Owner: compliance-officer.*
 
