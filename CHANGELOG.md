@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.25.1] — 2026-06-26
+
+### Changed
+- `docs/OBSERVABILITY.md §12.6` — job 47 (`scim_provisioning_compliance_monitor`) cross-ref corrected: `INCIDENT_RESPONSE R-47` updated from "P1/M7 — to be authored" to "v1.0, 2026-06-26". CHANGELOG v9.19.1 recorded this update as done, but the §12.6 table row retained the stale "to be authored" text. Correction aligns the row with §56.4 AL-SCIM-PROV-02 (which already carried the correct v1.0 reference since v9.19.1). Document header: v5.3.0 → v5.3.1. Patch note v2.2 added to §12.6 patch log.
+- `VERSION` — 9.25.0 → 9.25.1.
+
+---
+
 ## [9.25.0] — 2026-06-26
 
 ### Added
