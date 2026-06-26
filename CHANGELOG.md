@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [9.36.1] — 2026-06-26
+
+### Fixed
+- `docs/COST_MODEL.md` — migration number collision in §45.4: `enterprise_contracts` amendment columns (pure tier upgrade, DEC-082) were incorrectly assigned migration 0087, which was already claimed by `docs/DATA_MODEL.md §46` (`litigation_hold_records`, M5). Renumbered to migration 0088 throughout COST_MODEL §45 (section heading, SQL comment, staging checklist, privacy-floor note, §45.8 checklist item 3, v2.15 version note). Document header v2.17 → v2.18.
+- `docs/DECISION_LOG.md` — DEC-082 two occurrences of "migration 0087" corrected to "migration 0088" (mechanics description + reverse-cost reversion path).
+- `docs/AUDIT_LOG_SCHEMA.md` — §Enterprise Pure Tier Upgrade cross-reference patched: "migration 0087 §45.4" → "migration 0088 §45.4".
+
+---
+
 ## [9.36.0] — 2026-06-26
 
 ### Added
