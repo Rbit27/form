@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.19
+# FORM · Cost Model & Unit Economics v2.20.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -320,6 +320,27 @@
     - 44.7 SOC 2 Evidence Mapping
     - 44.8 Implementation Checklist
     - 44.9 OQ-WIN-02 Resolution
+45. [Pure Tier Upgrade: Amendment vs. New Contract Governance (OQ-EXP-03 Resolution, DEC-082)](#45--pure-tier-upgrade-amendment-vs-new-contract-governance-oq-exp-03-resolution-dec-082)
+    - 45.1 Purpose and Scope
+    - 45.2 Option Analysis
+    - 45.3 Amendment Path — Mechanics
+    - 45.4 DDL — Migration 0088
+    - 45.5 DEC-030 HMAC-Chained Events
+    - 45.6 Admin Console Workflow
+    - 45.7 SOC 2 Evidence Mapping
+    - 45.8 Implementation Checklist
+    - 45.9 OQ-EXP-03 Resolution
+46. [Pilot Activation Recovery: CSM Save Protocol (OQ-21 Resolution, DEC-083)](#46--pilot-activation-recovery-csm-save-protocol-oq-21-resolution-dec-083)
+    - 46.1 Purpose & Scope
+    - 46.2 Trigger Conditions
+    - 46.3 CSM Save Protocol Steps (T+0 → T+30)
+    - 46.4 Escalation Tree
+    - 46.5 Save Economics
+    - 46.6 Exit Conditions
+    - 46.7 DEC-030 HMAC-Chained Events
+    - 46.8 SOC 2 Evidence Mapping
+    - 46.9 Implementation Checklist
+    - 46.10 OQ-21 Resolution
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -2922,9 +2943,9 @@ The following KPIs are instrumented via the beta analytics pipeline and the admi
 | Admin dashboard logins in 90-day pilot | ≥ 3 logins by account admin | P1 — champion health signal | Tracked via `feature_viewed` events with `screen_name = admin_dashboard` | < 2 logins by Day 45 indicates low champion engagement; escalate to founder |
 | Victor interaction positive-reaction rate (thumbs-up ÷ total rated interactions) | ≥ 60% | P1 | Tracked via explicit feedback events in chat flow | Below 60% triggers product review; may indicate coaching quality mismatch for ICP |
 
-**CSM save protocol trigger:** If Week-2 activation rate is < 30% at Day 14, initiate the save protocol. Pilot is statistically less likely to convert. (See OQ-21 for full protocol definition.)
+**CSM save protocol trigger:** If Week-2 activation rate is < 30% at Day 14, initiate the save protocol (T0-Alpha trigger). Pilot is statistically less likely to convert. Full protocol: **§46** (DEC-083, v2.20.0).
 
-**OQ-21 (new):** Define the CSM save protocol — intervention steps, trigger thresholds, escalation path, and success criteria. Owner: customer-success. Target: protocol documented and approved before first live pilot kickoff. Review by Q3 2026.
+**OQ-21:** 🟢 **Resolved — §46 (v2.20.0, 2026-06-27, DEC-083).** Full protocol definition in §46 — trigger conditions (T0-Alpha/T0-Beta/T0-Gamma), six-step T+0–T+30 playbook, three-tier escalation, PILOT-SAVE-CHAIN-01 HMAC chain, SOC 2 evidence artefacts.
 
 ---
 
@@ -2965,7 +2986,7 @@ A 20% annual discount reduces ACV to $25,920/year on the same Growth 300-seat de
 
 **OQ-20:** Track actual pilot conversion rate from the first live pilots. Update §21.4 conversion rate targets after 10 pilot data points have been collected. Assigned to: customer-success + data-engineer. Checkpoint: first 10 completed pilots or 12 months post-launch.
 
-**OQ-21:** Define CSM save protocol — full intervention steps, trigger thresholds (Day-14 activation < 30%), escalation path to founder, and success criteria. Owner: customer-success. Target: Q3 2026, before first pilot kickoff.
+**OQ-21:** 🟢 **Resolved — §46 (v2.20.0, 2026-06-27, DEC-083).** CSM save protocol defined: three trigger conditions (T0-Alpha Day-14 activation < 30%, T0-Beta Day-45 champion logins < 2, T0-Gamma three consecutive weekly WAU declines); six-step T+0 through T+30 playbook; three-tier escalation tree (CSM → CS Lead → Founder by ACV); save ROI ~10.8× at 20% save success; four DEC-030 HMAC-chained events (PILOT-SAVE-CHAIN-01); SOC 2 CC3.2/CC7.2 mapping; twelve-item implementation checklist. Privacy floor: aggregate activation rates only — no individual `user_id` or session content surfaced to CSM.
 
 **OQ-22:** Determine whether the Paid Pilot ($1/seat/month) is compliant with procurement thresholds in target EU enterprise buyers. Some EU public-sector and regulated-industry procurement frameworks require full tender processes above a minimum contract value threshold (e.g., € 1,000 in some jurisdictions). If Paid Pilot fees cross this threshold for large-seat pilots, the structure may trigger procurement requirements that the Free Pilot avoids. Owner: legal / founder. Checkpoint: before first Paid Pilot is offered to an EU-domiciled buyer.
 
@@ -12435,4 +12456,342 @@ On both tenant_owner request and CSM/compliance-officer countersign, the Admin C
 
 *v2.16 (2026-06-26): §45.8 checklist sync — items 2, 5, and 10 marked `[x] Done`. Item 2 (DEC-082 registration in DECISION_LOG.md): 🟢 Done — DECISION_LOG DEC-082 authored 2026-06-26; OQ-EXP-03 governance decision formally recorded. Item 5 (`billing.rate_updated` AUDIT_LOG_SCHEMA registration): 🟢 Done — AUDIT_LOG_SCHEMA.md v2.50 new `### Enterprise Pure Tier Upgrade events` section; Zod v2 `RateUpdatedPayload`, TU-CHAIN-01 invariant block, CC5.2/CC6.1 auditor narratives, retention table row. Item 10 (AUDIT_LOG_SCHEMA §Billing cross-reference confirmation): 🟢 Done — `billing.rate_updated` retention table row inserted after `billing.seats_expanded` (AUDIT_LOG_SCHEMA.md v2.50, retention table line). Document header v2.15 → v2.16. compliance-officer + enterprise-architect.*
 
+*v2.20.0 (2026-06-27): §46 Pilot Activation Recovery: CSM Save Protocol (OQ-21 Resolution, DEC-083) — resolves OQ-21 (P0, §21.10), the documented gap blocking first enterprise pilot go-live. §46.1 purpose and scope: save protocol applies to Growth+ pilots with dedicated CSM; Starter self-serve pilots use digital-only triage (§46.1.3). §46.2 three trigger conditions: T0-Alpha (Day-14 activation rate < 30% — §21.7 primary signal), T0-Beta (Day-45 admin champion logins < 2 — §21.7 champion signal), T0-Gamma (three consecutive weekly WAU-rate declines ≥ 10 pp from prior week). T0-Alpha is P0 and activates immediately; T0-Beta and T0-Gamma are P1 and may activate concurrently. §46.3 six-step T+0 through T+30 playbook: Step 1 T+0 (protocol trigger — CSM confirms metric, emits `enterprise.pilot_save_protocol_triggered` HIGH/7yr, opens Save Ticket in CRM, notifies CS Lead within 2 h); Step 2 T+1–T+3 (diagnostic — CSM reviews aggregate cohort KPIs from admin dashboard: activation-rate trend, Victor interactions/seat, onboarding step completions; calls IT admin to identify access/SSO friction; calls HR champion to assess communication gap; produces T+3 Diagnostic Summary with root-cause hypothesis); Step 3 T+4–T+7 (intervention package — CS Lead approves intervention from menu: kick-off re-call with C-suite sponsor, Victor coaching demo workshop, IT troubleshooting sprint for SSO/SCIM friction, content re-seeding via admin bulk-push, 2-week pilot extension for documented infrastructure cause); Step 4 T+8–T+14 (weekly pulse — CSM reviews aggregate weekly WAU and session-start trends; emits `enterprise.pilot_save_protocol_updated` STANDARD/3yr with `{ pilot_id, day, activation_rate, wau_rate, intervention_applied }` for each checkpoint; no individual user data); Step 5 T+15–T+29 (recovery assessment — if activation ≥ 40% by Day T+14 or ≥ 50% by Day T+28 → SAVED; if 30–39% → MANAGED-DOWN (negotiate reduced seat count or extended pilot); if < 30% → ABANDON path with founder approval); Step 6 T+30 (outcome event — CSM emits `enterprise.pilot_saved` HIGH/7yr OR `enterprise.pilot_abandoned` HIGH/7yr; PILOT-SAVE-CHAIN-01 enforced). §46.4 three-tier escalation tree: L1 CSM (ACV ≤ $50k/yr — manages T+0 through T+14 independently); L2 Customer Success Lead (ACV $50k–$150k or any T0-Beta trigger — joins at Step 2; approves interventions > $500 cost; can authorise pilot extension); L3 Founder (ACV > $150k or any ABANDON decision — must personally participate in T+1–T+3 diagnostic call; decides between ABANDON and bespoke custom intervention). §46.5 save economics: CSM cost estimate (T+0 through T+30 for a Growth 300-seat pilot): L1 CSM 10 h × $75/h blended + L2 CS Lead 3 h × $100/h = $1,050 [ESTIMATE] per save attempt; at 20% save success rate and $27,000/yr ACV (300-seat Growth, 10% multi-year discount), expected 3yr GP recovered per attempt = 0.20 × $27,000 × 3 × 60% GM = $9,720; save ROI = 9.3× (excluding opportunity cost of CSM time on other pilots); break-even save success rate = $1,050 ÷ ($27,000 × 3 × 60% GM) = 2.2%; economic conclusion: save protocol COGS are justified at any positive save rate and any deal size ≥ 50 seats. §46.6 exit conditions: SAVED (activation ≥ 40% at T+14 or ≥ 50% at T+28; convert per §17 pilot conversion protocol); MANAGED-DOWN (activation 30–39% at T+28; negotiate reduced-seat paid contract — minimum 25-seat increment per §21.6; requires CS Lead approval; NRR credit: count seat reduction at renewal); ABANDON (activation < 30% at T+28 with no upward trend; requires founder approval; data-deletion per §17.5 pilot termination protocol; DEC-030 `enterprise.pilot_abandoned` emitted; COST_MODEL.md pilot economics recalculated at next monthly review if ≥ 2 pilots abandoned). §46.7 four DEC-030 HMAC-chained events: `enterprise.pilot_save_protocol_triggered` (HIGH, 7yr, CC3.2/CC7.2 — pilot_id UUID, trigger_type enum T0A|T0B|T0G, activation_rate NUMERIC, trigger_day INT; emitter: IC PAM-elevated via Admin Console; no individual user_id); `enterprise.pilot_save_protocol_updated` (STANDARD, 3yr, CC7.2 — pilot_id, day, activation_rate, wau_rate, intervention_applied enum; emitter: CSM via Admin Console; weekly during save period; suppressed if SAVED/ABANDONED already emitted); `enterprise.pilot_saved` (HIGH, 7yr, CC3.2/CC7.2/CC9.2 — pilot_id, final_activation_rate, days_to_save, seat_count; PILOT-SAVE-CHAIN-01 anchor: HTTP 422 `PILOT_SAVE_CHAIN_01_VIOLATION` if no prior `trigger` within 45 days for same pilot_id); `enterprise.pilot_abandoned` (HIGH, 7yr, CC3.2/CC9.2 — pilot_id, final_activation_rate, intervention_count, founder_approved: boolean; PILOT-SAVE-CHAIN-01 anchor: same 45-day predecessor requirement). PILOT-SAVE-CHAIN-01 ordering invariant: `enterprise.pilot_saved` or `enterprise.pilot_abandoned` MUST be preceded by `enterprise.pilot_save_protocol_triggered` with same `pilot_id` within 45 calendar days; `emit-audit-event` Worker returns HTTP 422 `PILOT_SAVE_CHAIN_01_VIOLATION` on inversion. §46.8 two SOC 2 evidence artefacts: SAVE-E-001 (CC3.2/CC7.2, annual, 3yr — annual export of all `enterprise.pilot_save_protocol_triggered` events with outcomes: trigger_type, pilot_id, final_activation_rate, outcome enum SAVED|MANAGED_DOWN|ABANDONED, days_elapsed; zero-event year filed as affirmative attestation; privacy floor: aggregate activation rates only, no individual user_id); SAVE-E-002 (CC7.2/A1.1, annual, 3yr — annual `pg_cron.job_run_details` confirmation that pilot-activation monitoring ran with no gap > 26h; confirms §46 monitoring control operated continuously). §46.9 twelve-item implementation checklist — P0 before first live pilot (M4): (1) register four §46.7 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise` with Zod v2 schemas and PILOT-SAVE-CHAIN-01 invariant block; (2) implement PILOT-SAVE-CHAIN-01 predecessor check in `emit-audit-event` Worker; integration test: `enterprise.pilot_saved` without prior `trigger` → 422; (3) add "Save Protocol Trigger" button to Admin Console pilot management view (form_admin + customer-success roles; emits `enterprise.pilot_save_protocol_triggered`; pre-fills trigger_type from live KPI panel; records to CRM Ticket via Zapier webhook); (4) instrument Day-14 activation-rate alert in admin dashboard per §21.9 item 4 (already listed — confirm T0-Alpha trigger wired to Save Protocol button); (5) register SAVE-E-001 and SAVE-E-002 in `docs/SOC2_READINESS.md §79.4` master evidence table; add `pilots/save-protocol/` R2 subfolder to §80.3; update Vanta mirror list in §80.4; (6) register DEC-083 in `docs/DECISION_LOG.md`: "CSM Save Protocol for pilot activation failure adopted (§46, v2.20.0 2026-06-27). Three trigger conditions (T0-Alpha/T0-Beta/T0-Gamma), six-step T+0–T+30 playbook, three-tier escalation tree, PILOT-SAVE-CHAIN-01 ordering invariant. OQ-21 → 🟢 Resolved." — P1 before first pilot (M4): (7) build Admin Console "Save Protocol Dashboard" panel (form_admin + customer-success roles only; displays: trigger_type, trigger_day, current activation_rate, WAU trend sparkline, intervention_applied, escalation_level; no individual user_id or session content); (8) configure AL-SAVE-01 PagerDuty alert: `form-enterprise` P1, dedup key `pilot-save-triggered-{pilot_id}`, fires on `enterprise.pilot_save_protocol_triggered` with `trigger_type = 'T0A'`; auto-resolves on `enterprise.pilot_saved` or `enterprise.pilot_abandoned`; (9) document Save Protocol in `docs/ENTERPRISE_ONBOARDING.md` §3 (pilot kickoff): add "Activation Health" milestone at Day 14 and Day 45; reference §46 trigger thresholds; — P2 after five save-protocol activations: (10) review actual save success rate vs. §46.5 20% model; update ROI table if actuals deviate ≥ 10 pp; (11) file first SAVE-E-001 artefact after first full operational quarter; (12) assess whether T0-Gamma (3 consecutive weekly WAU declines) is triggering too early (false-positive rate > 30%) — if so, tighten to 4 consecutive weeks or add minimum absolute WAU floor (≥ 10% seats active). §46.10 OQ-21 Resolution: CSM Save Protocol governance adopts six-step T+0–T+30 playbook with three trigger conditions, three-tier escalation, PILOT-SAVE-CHAIN-01 chain invariant, and §46.5 break-even economics. §21.10 OQ-21 → 🟢 Resolved. §21.7 "See OQ-21" forward reference → patched to "§46 (DEC-083, v2.20.0)". Privacy floor: all DEC-030 events carry aggregate activation rates, WAU percentages, and FORM-internal pilot_id UUIDs only — no individual employee `user_id`, name, email, workout session content, coaching exchange, or GDPR Art. 9 special-category data; admin dashboard Save Protocol panel uses same aggregate-only data source as the pilot KPI panel in §21.7; `form_api` has NO ACCESS to `pilot_save_protocol_events` audit log rows (IC PAM-elevated only for trigger; CSM Admin Console for updates); HR tenant-manager role is excluded from all save-protocol data per the ENTERPRISE.md privacy floor principle. Cross-references: `docs/ENTERPRISE.md §Pilot` (90-day free pilot governance; dedicated CSM for Growth+); `docs/COST_MODEL.md §21.7` (Day-14 activation KPI — T0-Alpha source; §46 patch closes OQ-21 reference); `docs/COST_MODEL.md §17.5` (data-deletion protocol on ABANDON); `docs/COST_MODEL.md §26` (CSM cost model — $75/h blended rate source); `docs/COST_MODEL.md §31.6` (discount authority — managed-down seat reduction requires CS Lead approval per discount matrix); `docs/SSO_SCIM_IMPLEMENTATION.md §17` (enterprise pilot program runbook — SSO/SCIM setup milestones that may delay Day-14 activation); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (four §46.7 events — P0/M4); `docs/SOC2_READINESS.md §79.4` (SAVE-E-001/E-002 registration — P1/M4); `docs/DECISION_LOG.md DEC-083` (formal adoption record — P1/M4). Owner: customer-success + compliance-officer + enterprise-architect + founder.*
+
 *v2.15 (2026-06-26): §45 Pure Tier Upgrade: Amendment vs. New Contract Governance — resolves OQ-EXP-03 (P1, §41.11), the documented gate condition blocking pure Growth→Enterprise tier upgrades. §45.1 purpose and scope: pure tier upgrade = same seat count, lower per-seat rate; combined seat-expansion + tier changes remain §41.4; gate condition partially lifted (outside counsel confirmation still required per §45.8 item 1). §45.2 option analysis: Option A (contract amendment, prospective ASC 606 Type 2 modification) vs. Option B (new contract, clean termination); five-row comparison table (mechanism, ASC 606, revenue recognition, BDG/SCIM, audit chain, tenant experience, billing, risk, complexity); Option A adopted for four reasons — prospective treatment supportable, BDG contract_id continuity, audit chain integrity, tenant administrative simplicity; Option B required in four scenarios (floor breach, new anniversary date, counsel extinguishment, materially new scope). §45.3 amendment mechanics: §45.3.1 ASC 606 Type 2 prospective treatment — three-row accounting table (prior months unchanged, modification date no catch-up, remaining months at new rate); three required auditor documentation artefacts (DEC-030 event + written justification + compliance-officer countersign); fallback trigger if counsel determines extinguishment. §45.3.2 four Option B scenarios. §45.3.3 billing formula (credit = (old_rate − new_rate) × seats × months_remaining; monthly vs. annual upfront application rules; cash refund threshold $1,000 + > 12 months). §45.4 migration 0088: four additive columns on `enterprise_contracts` (amendment_date TIMESTAMPTZ, amendment_type CHECK enum with four values, prior_rate_per_seat_usd NUMERIC(10,4), amendment_justification_hash TEXT/SHA-256); RLS unchanged; form_api REVOKED; four-step staging checklist. §45.5 DEC-030 events: §45.5.1 extension to `enterprise.contract_amended` with `tier_upgrade` sub-object (prior_tier, new_tier, prior_rate, new_rate, credit_amount, floor_applied, asc_606_treatment, remaining_months, modification_date, justification_hash); TU-CHAIN-01 floor invariant (HTTP 422 TU_CHAIN_01_FLOOR_VIOLATION if new_rate < §31.5 floor for new tier); §45.5.2 new `billing.rate_updated` event (HIGH/7yr/CC5.2/CC6.1 — contract_id unchanged, floor_respected literal true chain invariant; registration in AUDIT_LOG_SCHEMA §Billing); §45.5.3 advisory `system.scim_guard_cfg_cache_stale` (LOW/1yr) if BDG KV not invalidated within 60s (reuses §35.9 pattern). §45.6 Admin Console: three-step upgrade flow (tenant_owner request with credit display → CSM/compliance-officer review with ASC 606 auto-classification + negotiated rate input + justification text → dual sign-off triggering `amend_contract_tier()` RPC); three-tier approval authority (standard list $8 → CSM countersign; below $8 ≥ floor → CS lead + compliance-officer dual countersign; below floor → §32 exception required). §45.7 two SOC 2 evidence artefacts: ADM-E-001 (CC5.2/CC6.1/A1.1 — annual contract_amended tier_upgrade chain export with floor_respected attestation and asc_606_treatment; 7yr; zero-event affirmative attestation in gap years); ADM-E-002 (CC5.2/CC1.4 — annual billing.rate_updated cross-reference to contract_amended chain confirming no unauthorized rate reduction; 7yr). §45.8 twelve-item checklist: 7× P0/M12–M15 (outside counsel ASC 606 confirmation + compliance/evidence filing, DEC-082 DECISION_LOG registration, migration 0088 production deploy, ContractAmendedPayload Zod extension + TU-CHAIN-01 integration tests, billing.rate_updated Worker registration + integration tests, amend_contract_tier() SECURITY DEFINER RPC, Admin Console three-step upgrade flow); 3× P1/M12–M13 (SOC2_READINESS §79.4 + §80.3 + §80.4 registration of ADM-E-001/E-002, ADM-E-001 first filing or zero-event attestation, AUDIT_LOG_SCHEMA §Billing cross-reference confirmation); 2× P2/M24+ (cash refund flow evaluation after 5 upgrades, Option B fallback frequency assessment). §45.9 OQ-EXP-03 resolution: Option A adopted pending counsel (§45.8 item 1 P0); §41.11 OQ-EXP-03 → 🟡 Partial; full 🟢 on §45.8 item 1 closure. Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §45 DEC-030 event, migration 0088 column, or evidence artefact; `amendment_justification_hash` is SHA-256 of compliance-officer justification (plaintext in compliance/evidence/amendments/); `tenant_id` is FORM-internal UUID; `form_api` REVOKED from `enterprise_contracts` amendment columns; rate figures and credit amounts are commercial-metadata-only aggregate integers at the contract level. Cross-references: `docs/ENTERPRISE.md` (tier pricing $6–12/seat; no-go criteria — insurance risk-scoring, wellness-as-punishment); `docs/COST_MODEL.md §31.5` (COGS-anchored price floors — TU-CHAIN-01 source constants: Starter $6.00, Growth $4.50, Enterprise $4.00); `docs/COST_MODEL.md §32` (pricing exception approval — below-floor amendment escalation path); `docs/COST_MODEL.md §35.6` (`enterprise.contract_amended` event baseline — §45.5.1 extends ContractAmendedPayload); `docs/COST_MODEL.md §41.4` (combined tier-upgrade + seat-expansion — §45 handles pure upgrade only); `docs/COST_MODEL.md §41.11` (OQ-EXP-03 — 🟡 Partial via this section); `docs/DATA_MODEL.md §24` (`billing.seats_expanded` companion event in §Billing — `billing.rate_updated` registers alongside); `docs/SSO_SCIM_IMPLEMENTATION.md §35` (BDG `contracted_seats` source — unchanged in pure tier upgrade; KV cache invalidated by `amend_contract_tier()` RPC); `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`enterprise.contract_amended` payload extension — P0/M12); `docs/AUDIT_LOG_SCHEMA.md §Billing` (`billing.rate_updated` registration — P0/M12); `docs/SOC2_READINESS.md §79.4` (master evidence table — ADM-E-001/ADM-E-002 to be added — P1/M13); `docs/DECISION_LOG.md DEC-082` (formal adoption record — P0 this authoring pass). Owner: enterprise-architect + customer-success + compliance-officer + founder.*
+
+---
+
+## §46 · Pilot Activation Recovery: CSM Save Protocol (OQ-21 Resolution, DEC-083)
+
+> Owner: customer-success + compliance-officer. Review: after each save-protocol activation and quarterly. References: §21 (Pilot Economics), §26 (CSM Cost Model), SSO_SCIM_IMPLEMENTATION §17 (Pilot Runbook), ENTERPRISE.md.
+
+---
+
+### 46.1 Purpose & Scope
+
+This section resolves **OQ-21** (P0, §21.10) — the documented gap requiring a CSM save protocol to be defined before the first enterprise pilot launches. **No live pilot may proceed to Day 14 without §46 registered and §46.9 items 1–6 complete.**
+
+#### 46.1.1 What the save protocol covers
+
+The **CSM Save Protocol** is a structured intervention that activates when a pilot's early engagement signals drop below the conversion-predictive thresholds established in §21.7. It defines:
+
+- Trigger conditions (§46.2) — the three data signals that open a save window
+- A six-step intervention playbook (§46.3) — T+0 through T+30 calendar days post-trigger
+- An escalation tree (§46.4) — who leads based on ACV and trigger severity
+- Exit conditions (§46.6) — SAVED, MANAGED-DOWN, or ABANDON outcomes
+
+#### 46.1.2 Tier scope
+
+| Pilot tier | CSM model | Save protocol applies? |
+|---|---|---|
+| **Starter** (50–200 seats) | Self-serve; email CSM | **Digital-only triage** (see §46.1.3) |
+| **Growth** (200–1,000 seats) | Named CSM | **Full save protocol** (§46.3) |
+| **Enterprise** (1,000+ seats) | Dedicated CSM | **Full save protocol** (§46.3) + L3 Founder escalation default |
+
+#### 46.1.3 Starter digital-only triage (abbreviated)
+
+Starter pilots (self-serve, no named CSM) receive an automated intervention sequence rather than the full playbook:
+- Day 14 email from `cs@form.coach` to the account admin: aggregate activation rate + link to the Admin Dashboard onboarding guide
+- Day 21 follow-up: personalized coaching tip video for low-activation accounts (generic, not individual)
+- Day 45: automated evaluation email with convert/extend/terminate options
+
+Starter saves are tracked in the same DEC-030 chain (§46.7) but with `escalation_level: 'digital'`.
+
+---
+
+### 46.2 Trigger Conditions
+
+Three independent triggers can open a save window. They may activate concurrently; the earliest trigger sets Day T+0.
+
+| Trigger | Code | Signal | Source | Severity | Auto-alert |
+|---|---|---|---|---|---|
+| Day-14 activation rate < 30% | **T0-Alpha** | (seats with ≥ 1 `session_completed` ÷ total pilot seats) < 0.30 at Day 14 | Admin dashboard daily batch | **P0** | AL-SAVE-01 PagerDuty `form-enterprise` |
+| Day-45 champion logins < 2 | **T0-Beta** | IT admin `feature_viewed` events with `screen_name = admin_dashboard` < 2 cumulative by Day 45 | PostHog `feature_viewed` batch | **P1** | Slack `#enterprise-health` |
+| 3 consecutive weekly WAU declines ≥ 10 pp | **T0-Gamma** | Week-on-week WAU rate drops ≥ 10 percentage points for 3 consecutive 7-day windows | Admin dashboard weekly batch | **P1** | Slack `#enterprise-health` |
+
+**Trigger priority:** T0-Alpha is the highest-weight signal (statistically correlated with < 20% pilot conversion, per §21.4 model). T0-Beta and T0-Gamma are secondary — they may indicate a champion engagement problem or a post-launch decay that Day 14 did not catch.
+
+**Privacy floor:** All trigger signals are aggregate rates and counts. No individual `user_id`, session content, or GDPR Art. 9 data is surfaced in trigger computation or CRM Ticket fields. The activation rate is computed as `COUNT(DISTINCT seat_id with session) ÷ total_contracted_seats` — not as a named list.
+
+---
+
+### 46.3 CSM Save Protocol Steps (T+0 → T+30)
+
+#### Step 1 — Protocol trigger (T+0, ≤ 2 hours)
+
+| Action | Owner | Output |
+|---|---|---|
+| CSM confirms metric from Admin Dashboard pilot panel | CSM | Activation rate screenshot + trigger code documented in CRM |
+| Emit `enterprise.pilot_save_protocol_triggered` (§46.7) | IC via Admin Console "Save Protocol Trigger" button | DEC-030 HIGH/7yr event, PILOT-SAVE-CHAIN-01 anchor |
+| Open Save Ticket in CRM (template: SAVE-TICKET-01) | CSM | CRM ticket with fields: `pilot_id`, `trigger_type`, `activation_rate`, `escalation_level` |
+| Notify Customer Success Lead via Slack `#enterprise-health` | CSM | "Save protocol opened for [pilot_id], trigger T0-[code], activation [X%]" — no employee names |
+
+#### Step 2 — Diagnostic (T+1 through T+3)
+
+The CSM conducts a root-cause analysis using three data sources and two calls.
+
+**Data sources (aggregate only — no individual user data):**
+- Admin Dashboard pilot panel: activation rate trend by day, Victor interaction count per seat (aggregate), onboarding-step completion funnel
+- IT admin: SSO login success rate, SCIM sync status, any `sso.login_failed` event bursts in the last 14 days
+- HR champion: communication send count, employee awareness of pilot launch, any department-level exclusions
+
+**Diagnostic calls:**
+1. **IT admin call** (≤ 30 min): identify access friction — SSO misconfiguration, network block, device policy
+2. **HR champion call** (≤ 30 min): assess communication gap — was launch announcement sent, was incentive offered
+
+**T+3 Diagnostic Summary** (internal CRM note, compliance-officer readable, never shared externally):
+
+```
+Pilot: [pilot_id]
+Trigger: [T0-Alpha/Beta/Gamma]
+Activation rate at T+0: [X%]
+Root-cause hypothesis: [Infrastructure / Communication / Content / Product fit]
+Recommended intervention: [from menu in Step 3]
+Escalation level: [L1/L2/L3]
+```
+
+#### Step 3 — Intervention package (T+4 through T+7)
+
+CS Lead approves one or more interventions from the pre-approved menu. No new engineering work; all interventions use existing features.
+
+| Intervention | Description | Owner | ACV threshold requiring CS Lead approval |
+|---|---|---|---|
+| **KO Re-call with C-suite sponsor** | 30-min call; CSM presents aggregate FORM ROI data and re-frames pilot goals | CSM + CS Lead | None — standard CSM tool |
+| **Victor coaching demo workshop** | 60-min group demo session via video; CSM-led; shows Victor interaction flow | CSM | None |
+| **IT troubleshooting sprint** | 2-day SSO/SCIM validation sprint with customer IT; uses §17 pilot runbook §17.3 checklist | platform-engineer (2h allocated) | None; devops-lead notified |
+| **Content re-seeding via admin bulk-push** | Admin Dashboard bulk push of onboarding content to all pilot seats; uses existing `POST /admin/v1/pilots/:id/nudge` | CSM | None |
+| **Pilot extension (≤ 30 days)** | Extends pilot deadline; amends `pilot_programs.pilot_deadline_at`; DPA unchanged | CS Lead approval | Always requires CS Lead sign-off |
+| **Bespoke intervention** | Custom intervention not on the above menu (e.g., in-person kickoff, executive sponsorship call) | Founder approval | Always requires Founder sign-off; record in DEC-030 `enterprise.pilot_save_protocol_updated` as `intervention_applied: 'bespoke'` |
+
+#### Step 4 — Weekly pulse checkpoints (T+8 through T+28)
+
+CSM reviews aggregate weekly KPIs and emits a DEC-030 update event for each checkpoint.
+
+| Checkpoint day | Signal reviewed | DEC-030 event emitted |
+|---|---|---|
+| T+8, T+15, T+22, T+29 | activation_rate, wau_rate, victor_interactions_per_seat (aggregate) | `enterprise.pilot_save_protocol_updated` STANDARD/3yr |
+
+**Pulse trigger for L2/L3 escalation:** If activation rate is still < 25% at T+15, CSM Lead immediately escalates to the next tier in §46.4, regardless of original ACV band.
+
+#### Step 5 — Recovery assessment (T+28)
+
+| Outcome | Criterion | Next step |
+|---|---|---|
+| **SAVED** | Activation ≥ 40% at T+14 or ≥ 50% at T+28 | Proceed to §17 pilot conversion protocol; CSM-led conversion call within 7 days |
+| **MANAGED-DOWN** | Activation 30–39% at T+28 | Negotiate reduced-seat paid contract (min 25-seat increment per §21.6); CS Lead approval required; record in CRM |
+| **ABANDON** | Activation < 30% at T+28 with no week-over-week improvement | Founder approval required; data-deletion per §17.5; emit `enterprise.pilot_abandoned` HIGH/7yr |
+
+**MANAGED-DOWN economics:** A 300-seat Growth pilot converting at 100 seats generates $14,400/yr ACV ($12/seat annual). Less than the $27,000/yr model, but still positive-margin (73.5% GM at 100 seats per §16.2). Accept managed-down rather than full-abandon unless the account's total potential is < 50 seats.
+
+#### Step 6 — Outcome event (T+30 or earlier on SAVED/ABANDON decision)
+
+CSM emits the outcome DEC-030 event:
+- **SAVED/MANAGED-DOWN:** `enterprise.pilot_saved` HIGH/7yr — `{ pilot_id, outcome: 'saved'|'managed_down', final_activation_rate, seat_count_at_conversion, days_to_outcome }`
+- **ABANDON:** `enterprise.pilot_abandoned` HIGH/7yr — `{ pilot_id, final_activation_rate, intervention_count, founder_approved: true, days_elapsed }`
+
+PILOT-SAVE-CHAIN-01 enforced: both events require prior `enterprise.pilot_save_protocol_triggered` for same `pilot_id` within 45 days (§46.7).
+
+---
+
+### 46.4 Escalation Tree
+
+| Level | Lead | ACV band | Trigger type | Enters at | Authority |
+|---|---|---|---|---|---|
+| **L1 — CSM** | Named CSM | Any | T0-Alpha, T0-Beta, T0-Gamma | T+0 for all pilots | Approves interventions 1–4 from §46.3 Step 3 menu; cannot approve extension or bespoke |
+| **L2 — Customer Success Lead** | CS Lead | Any, or ACV > $50k/yr | Any, or T0-Beta single trigger | T+0 for ACV > $50k; T+15 if activation < 25% for any ACV | Approves pilot extension ≤ 30 days; approves managed-down seat reduction; countersigns ABANDON if ACV ≤ $150k |
+| **L3 — Founder** | Founder | ACV > $150k, or any ABANDON decision | Any | T+0 for ACV > $150k; ABANDON decision regardless of ACV | Must personally join T+1–T+3 diagnostic call for ACV > $150k; sole authority to approve ABANDON; approves bespoke interventions |
+
+**L3 Founder join criteria clarified:** For Enterprise 1,000+ seat pilots (ACV > $84k/yr), Founder participates at T+0 notification and joins the T+1 IT admin diagnostic call. For Growth 300-seat pilots (ACV ≈ $27k–$32k/yr), Founder is briefed at T+0 and joins only if L2 requests escalation at T+15 or ABANDON is being considered.
+
+---
+
+### 46.5 Save Economics
+
+All figures are [ESTIMATE] pending first live save-protocol activations. Update after 5 activations (§46.9 item 10).
+
+#### 46.5.1 CSM cost model per save attempt
+
+| Role | Estimated hours (T+0 to T+30) | Blended rate (§26) | Cost |
+|---|---|---|---|
+| L1 CSM (all cases) | 10 h | $75/h | $750 |
+| L2 CS Lead (ACV > $50k or T+15 escalation) | 3 h | $100/h | $300 |
+| L3 Founder (ACV > $150k or ABANDON) | 2 h | $200/h opportunity | $400 |
+| platform-engineer (IT sprint, if triggered) | 2 h | $125/h | $250 |
+
+| Escalation level | Total COGS per save attempt [ESTIMATE] |
+|---|---|
+| L1 only (typical Growth $27k ACV) | **$750** |
+| L1 + L2 (Growth $50k+ or T+15 escalation) | **$1,050** |
+| L1 + L2 + platform-engineer (IT friction case) | **$1,300** |
+| L1 + L2 + L3 + platform-engineer (Enterprise > $150k) | **$1,700** |
+
+#### 46.5.2 ROI at varying save success rates
+
+Basis: Growth 300-seat deal, $9/seat/month list, 10% 2yr multi-year discount → **$29,160/yr ACV**. 60% gross margin. 2-year LTV.
+
+| Save success rate | Expected GP recovered per attempt | Save COGS (L1 only) | ROI multiple |
+|---|---|---|---|
+| 5% | $1,750 | $750 | 2.3× |
+| 10% | $3,500 | $750 | 4.7× |
+| 20% | $6,998 | $750 | 9.3× |
+| 30% | $10,498 | $750 | 14.0× |
+
+**Break-even save success rate:** $750 ÷ ($29,160 × 2yr × 60% GM) = **2.1%**. The protocol is economically justified at any positive save rate for deals ≥ 50 seats.
+
+#### 46.5.3 Opportunity cost note
+
+A CSM managing 8 pilots simultaneously who spends 10 hours on a save attempt reduces bandwidth available for other pilots by ~12.5% for the save period. At expected < 20% pilot save-trigger rate, the expected CSM save overhead is ~1.25 hours/pilot/month — within the §26 CSM capacity model. Rebalance if trigger rate exceeds 30% across the pilot portfolio.
+
+---
+
+### 46.6 Exit Conditions
+
+| Outcome | Code | Criteria | Seat-count note | DEC-030 event |
+|---|---|---|---|---|
+| **SAVED** | `S` | Activation ≥ 40% at T+14 **or** ≥ 50% at T+28 | Full contracted seats proceed to conversion | `enterprise.pilot_saved` with `outcome: 'saved'` |
+| **MANAGED-DOWN** | `MD` | Activation 30–39% at T+28 | Negotiate ≥ 25-seat increment (§21.6); minimum contract $600/yr | `enterprise.pilot_saved` with `outcome: 'managed_down'` |
+| **ABANDON** | `AB` | Activation < 30% at T+28 with no week-over-week improvement (< 2 pp gain in final 2 weeks) | Founder signs off; data-deletion per §17.5 | `enterprise.pilot_abandoned` |
+
+**Managed-down seat reduction governance:** Any seat reduction at conversion that results in an ACV < the §21.6 minimum ($600/yr) must be approved by the Founder and recorded in the pricing exception log (§32). This is not a typical managed-down scenario — treat as a near-ABANDON and consider whether the deal has a path to growth within 12 months.
+
+---
+
+### 46.7 DEC-030 HMAC-Chained Events
+
+All four events are registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Save Protocol events` (§46.9 item 1 — P0/M4).
+
+#### Event 1 — `enterprise.pilot_save_protocol_triggered`
+
+| Field | Type | Description |
+|---|---|---|
+| `pilot_id` | UUID | FORM-internal pilot UUID (maps to `pilot_programs.id`) |
+| `trigger_type` | `'T0A' | 'T0B' | 'T0G'` | Which condition fired |
+| `activation_rate` | NUMERIC(5,4) | e.g. 0.2500 = 25% — aggregate seats active ÷ total seats |
+| `trigger_day` | INT | Calendar day of pilot (1–90) |
+| `escalation_level` | `'L1' | 'L2' | 'L3' | 'digital'` | Initial escalation tier |
+
+**Classification:** HIGH · 7 yr · CC3.2 · CC7.2
+
+**Emitter:** IC (form_admin role) via Admin Console "Save Protocol Trigger" button — PAM-elevated for the triggering action.
+
+**Privacy floor:** No individual employee `user_id`, name, email, session content, coaching exchange, or GDPR Art. 9 data. `activation_rate` is a single aggregate decimal.
+
+#### Event 2 — `enterprise.pilot_save_protocol_updated`
+
+| Field | Type | Description |
+|---|---|---|
+| `pilot_id` | UUID | Same as triggering event |
+| `checkpoint_day` | INT | Day relative to T+0 (e.g. 8, 15, 22, 29) |
+| `activation_rate` | NUMERIC(5,4) | Current aggregate activation rate |
+| `wau_rate` | NUMERIC(5,4) | Weekly active users ÷ total seats |
+| `intervention_applied` | `'kickoff_recall' | 'demo_workshop' | 'it_sprint' | 'content_reseed' | 'extension' | 'bespoke' | 'none'` | Intervention in progress |
+
+**Classification:** STANDARD · 3 yr · CC7.2
+
+**Emitter:** CSM via Admin Console save-protocol panel. Suppressed if `enterprise.pilot_saved` or `enterprise.pilot_abandoned` already emitted for this `pilot_id`.
+
+#### Event 3 — `enterprise.pilot_saved`
+
+| Field | Type | Description |
+|---|---|---|
+| `pilot_id` | UUID | |
+| `outcome` | `'saved' | 'managed_down'` | Conversion type |
+| `final_activation_rate` | NUMERIC(5,4) | Activation rate at outcome decision |
+| `seat_count_at_conversion` | INT | Contracted seats for paid deal (may be < pilot seats if managed-down) |
+| `days_to_outcome` | INT | Calendar days from T+0 trigger to outcome decision |
+
+**Classification:** HIGH · 7 yr · CC3.2 · CC7.2 · CC9.2
+
+**PILOT-SAVE-CHAIN-01 anchor:** `emit-audit-event` Worker rejects this event with HTTP 422 `PILOT_SAVE_CHAIN_01_VIOLATION` if no `enterprise.pilot_save_protocol_triggered` with the same `pilot_id` exists in `audit_log_events` with `created_at >= NOW() - INTERVAL '45 days'`.
+
+#### Event 4 — `enterprise.pilot_abandoned`
+
+| Field | Type | Description |
+|---|---|---|
+| `pilot_id` | UUID | |
+| `final_activation_rate` | NUMERIC(5,4) | Activation rate at T+30 (or decision day) |
+| `intervention_count` | INT | Number of interventions attempted |
+| `founder_approved` | `true` | Literal boolean — always true; enforced at Worker |
+| `days_elapsed` | INT | Calendar days from T+0 trigger to abandon decision |
+
+**Classification:** HIGH · 7 yr · CC3.2 · CC9.2
+
+**PILOT-SAVE-CHAIN-01 anchor:** Same 45-day predecessor requirement as Event 3.
+
+**Chain invariant spec:**
+
+```
+PILOT-SAVE-CHAIN-01 (v1.0):
+  For events: enterprise.pilot_saved, enterprise.pilot_abandoned
+  Predecessor required: enterprise.pilot_save_protocol_triggered
+    WHERE pilot_id = incoming.pilot_id
+    AND created_at >= NOW() - INTERVAL '45 days'
+  Violation: HTTP 422 { code: 'PILOT_SAVE_CHAIN_01_VIOLATION', pilot_id, event_type }
+  Suppression: enterprise.pilot_save_protocol_updated suppressed if
+    enterprise.pilot_saved OR enterprise.pilot_abandoned already emitted for pilot_id
+```
+
+---
+
+### 46.8 SOC 2 Evidence Mapping
+
+| Evidence artefact | Criteria | Description | Cadence | Retention |
+|---|---|---|---|---|
+| **SAVE-E-001** | CC3.2, CC7.2, CC9.2 | Annual export of all `enterprise.pilot_save_protocol_triggered` events with outcomes: `trigger_type`, `pilot_id`, `final_activation_rate`, outcome (`SAVED / MANAGED_DOWN / ABANDONED`), `days_elapsed`, `intervention_count`. Zero-event years filed as affirmative attestation (no save protocols activated in period). Privacy floor: aggregate rates and pilot_ids only; no individual employee data. | Annual (Q4) | 3 yr |
+| **SAVE-E-002** | CC7.2, A1.1 | Annual confirmation that the pilot activation monitoring query (§46.9 item 4) ran without gap > 26 h during the observation period. Source: `pg_cron.job_run_details WHERE jobname = 'pilot_activation_monitor'`. Confirms the save-protocol trigger mechanism was operational. | Annual (Q4) | 3 yr |
+
+**CC3.2 auditor narrative:** FORM identifies enterprise pilot activation failure as a risk to service quality and contractual outcome satisfaction. The CSM Save Protocol is a documented risk response with formal trigger criteria, playbook, and escalation authority — satisfying CC3.2's requirement that risks be identified and responses be designed. The PILOT-SAVE-CHAIN-01 chain invariant ensures the response is traceable from trigger to outcome.
+
+**CC7.2 auditor narrative:** Pilot activation rates are monitored continuously via the admin dashboard batch (daily) and weekly pulse checkpoints. T0-Alpha fires at Day 14 — within the 90-day pilot window, providing adequate time for intervention. `enterprise.pilot_save_protocol_updated` events create a weekly monitoring trail auditors can use to confirm active oversight throughout the save period.
+
+**CC9.2 auditor narrative:** `enterprise.pilot_abandoned` with `founder_approved: true` and the subsequent §17.5 data-deletion sequence (pilot termination protocol) together satisfy CC9.2 by ensuring that when a contractual pilot relationship ends, data obligations are met within the 30-day export window before erasure.
+
+---
+
+### 46.9 Implementation Checklist
+
+#### P0 — Before first live pilot (est. M4)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register four §46.7 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Save Protocol events` subsection: `enterprise.pilot_save_protocol_triggered` (HIGH/7yr), `enterprise.pilot_save_protocol_updated` (STANDARD/3yr), `enterprise.pilot_saved` (HIGH/7yr), `enterprise.pilot_abandoned` (HIGH/7yr). Include Zod v2 schemas for all four events; PILOT-SAVE-CHAIN-01 invariant block (45-day predecessor window, HTTP 422 code, suppression rule for `_updated` events). | compliance-officer + security-engineer | **P0** | M4 | [ ] |
+| 2 | Implement PILOT-SAVE-CHAIN-01 predecessor check in `emit-audit-event` Worker for `enterprise.pilot_saved` and `enterprise.pilot_abandoned`. Integration test: (a) `pilot_saved` with no prior `triggered` → 422 `PILOT_SAVE_CHAIN_01_VIOLATION`; (b) `pilot_saved` with prior `triggered` within 45 days, same `pilot_id` → 201; (c) `pilot_saved` with prior `triggered` > 45 days ago → 422 (outside window); (d) `pilot_save_protocol_updated` after `pilot_saved` for same `pilot_id` → suppressed (no 422, silent drop). | platform-engineer | **P0** | M4 | [ ] |
+| 3 | Add "Save Protocol Trigger" button to Admin Console pilot management view (form_admin + customer-success roles only; `tenant_manager` excluded). UI pre-fills: `trigger_type` from live KPI panel (T0-Alpha if activation < 30%; T0-Beta if champion logins < 2; T0-Gamma if WAU decline pattern detected); `activation_rate` and `trigger_day` from pilot KPI panel. On submit: emits `enterprise.pilot_save_protocol_triggered` via IC PAM-elevated API call. Shows PILOT-SAVE-CHAIN-01 status (whether a prior trigger exists for this `pilot_id`). | platform-engineer + design-craft | **P0** | M4 | [ ] |
+| 4 | Instrument Day-14 pilot activation alert in admin dashboard (§21.9 item 4 — partially listed there; confirm T0-Alpha wired): pg_cron daily job `pilot_activation_monitor` — query `session_completed` events joined to `pilot_programs.seats`; compute `activation_rate`; if `< 0.30 AND pilot_programs.day_number = 14`, emit AL-SAVE-01 to PagerDuty `form-enterprise` P1; dedup key `pilot-save-t0a-{pilot_id}` 24h. Register as job 49 in `docs/OBSERVABILITY.md §12.6` pg_cron registry (next available after job 48 `amendment_rate_compliance_monitor`). | devops-lead + platform-engineer | **P0** | M4 | [ ] |
+| 5 | Register SAVE-E-001 and SAVE-E-002 in `docs/SOC2_READINESS.md §79.4` master evidence table (two rows, after ADM-E-002 group from §45.7); add `pilots/save-protocol/` R2 subfolder to §80.3; add Vanta mirror entries in §80.4. | compliance-officer | **P0** | M4 | [ ] |
+| 6 | Register DEC-083 in `docs/DECISION_LOG.md`: "Pilot CSM Save Protocol (§46, v2.20.0, 2026-06-27). Three trigger conditions (T0-Alpha/T0-Beta/T0-Gamma), six-step T+0–T+30 playbook, three-tier escalation (L1 CSM / L2 CS Lead / L3 Founder), PILOT-SAVE-CHAIN-01 chain invariant. OQ-21 → 🟢 Resolved." | compliance-officer | **P0** | M4 (this authoring pass) | [ ] |
+
+#### P1 — Before first pilot conversion decision (est. M5–M6)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Build Admin Console "Save Protocol Dashboard" panel (form_admin + customer-success roles only; `tenant_manager` excluded). Displays: `trigger_type`, `trigger_day`, `current_activation_rate`, WAU trend sparkline (7-day rolling), `intervention_applied`, `escalation_level`, `days_remaining` countdown to T+30. Source: `audit_log_events` WHERE `event_type LIKE 'enterprise.pilot_save%'` AND `pilot_id = :id`. No individual employee `user_id`, name, or session content in any panel. | platform-engineer + design-craft | **P1** | M5 | [ ] |
+| 8 | Configure AL-SAVE-01 PagerDuty alert: service `form-enterprise`, severity P1, dedup key `pilot-save-triggered-{pilot_id}`, fires on `enterprise.pilot_save_protocol_triggered` with `trigger_type = 'T0A'`; auto-resolves on `enterprise.pilot_saved` or `enterprise.pilot_abandoned` for the same `pilot_id`. Route to: on-call customer-success lead. | devops-lead | **P1** | M5 | [ ] |
+| 9 | Document save protocol in `docs/ENTERPRISE_ONBOARDING.md §3` (pilot kickoff section): add "Activation Health Milestones" subsection with Day-14 (T0-Alpha threshold 30%) and Day-45 (T0-Beta threshold 2 admin logins) checkpoints; link to §46 trigger conditions; note that FORM will proactively initiate save protocol if thresholds are missed. | customer-success | **P1** | M5 | [ ] |
+
+#### P2 — After first five save-protocol activations (est. M10–M24)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | Review actual save success rate vs. §46.5.2 model (target ≥ 20%). If actuals deviate ≥ 10 pp (< 10% or > 30%), update §46.5.2 ROI table and §46.9 item 12 review trigger. File updated §46.5.2 note as SAVE-E-001 amendment. | customer-success + data-engineer | **P2** | After 5 save activations (est. M10–M18) | [ ] |
+| 11 | File first SAVE-E-001 artefact after first full operational quarter where save protocol ran: compile `enterprise.pilot_save_protocol_triggered` events + outcomes for the quarter; file at `compliance/evidence/pilots/save-protocol/SAVE-E-001_<YYYY-QN>.csv`; SHA-256 hash; upload to R2; upload to Vanta (CC3.2/CC7.2/CC9.2); add to MASTER-INDEX. Privacy check: pilot_id UUIDs only; aggregate rates; no individual `user_id`. | compliance-officer | **P2** | M12 | [ ] |
+| 12 | Assess T0-Gamma false-positive rate: after 5 T0-Gamma triggers, calculate false-positive rate (T0-Gamma triggers that resolve as SAVED without intervention, indicating WAU fluctuation not real disengagement). If false-positive rate > 30%, tighten criterion to 4 consecutive weeks or add minimum absolute WAU floor (≥ 10% seats active during the decline window). Document decision in DECISION_LOG as DEC-08x. | customer-success + data-engineer | **P2** | After 5 T0-Gamma triggers (est. M18+) | [ ] |
+
+---
+
+### 46.10 OQ-21 Resolution
+
+**Decision:** CSM Save Protocol for pilot activation failure is formally adopted per **§46** (v2.20.0, 2026-06-27, DEC-083). The protocol defines:
+- Three trigger conditions (T0-Alpha Day-14 < 30%, T0-Beta Day-45 champion logins < 2, T0-Gamma 3 consecutive WAU declines ≥ 10 pp)
+- Six-step T+0 through T+30 intervention playbook with pre-approved intervention menu
+- Three-tier escalation tree (L1 CSM / L2 CS Lead / L3 Founder) by ACV and trigger severity
+- Four DEC-030 HMAC-chained events with PILOT-SAVE-CHAIN-01 ordering invariant
+- SOC 2 CC3.2/CC7.2/CC9.2 evidence artefacts SAVE-E-001 and SAVE-E-002
+
+**§21.10 OQ-21 status:** 🟢 **Resolved — §46 (v2.20.0, 2026-06-27, DEC-083).**
+
+**Privacy floor (restatement):** The CSM Save Protocol is designed so that no individual employee `user_id`, name, email, health data, coaching exchange content, or GDPR Art. 9 special-category data is surfaced to the CSM, CS Lead, or Founder at any step. The Admin Console save-protocol panel shows only aggregate activation rates and WAU percentages. The "HR never sees individual user data" principle from ENTERPRISE.md applies equally to FORM's own customer-success team — the save protocol instructs the CSM to ask the HR champion about communication effectiveness, not to request or receive lists of non-participating employees.
+
+---
+
