@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.46.1] — 2026-06-27
+
+### Changed
+- `docs/COST_MODEL.md` v2.18 → v2.19 — §42.10 items 3 and 7 marked `[x] Done (design/mockup — admin-dashboard.html v0.47.2, 2026-06-27)`: Renewal Workflow 3-step stepper (item 3, P0/M12) and Renewal Economics fleet panel (item 7, P1/M13) both fully rendered in admin-dashboard.html Renewal screen. Engineering implementation remains pending (platform-engineer, platform-engineer + design-craft).
+- `VERSION` — 9.46.0 → 9.46.1.
+
+---
+
 ## [9.46.0] — 2026-06-27
 
 ### Added
