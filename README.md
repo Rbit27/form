@@ -2759,10 +2759,10 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2698 | Пропріоцептивна точність: чому «відчуття техніки» і технічна якість не одне і те саме | **draft · v9.63.0 → post-2698-proprioceptive-accuracy.md** |
 | 2699 | Як читати м'язову болісність: що вона вимірює і де ти читаєш її неправильно | **draft · v9.64.0 → post-2699-reading-muscle-soreness.md** |
 | 2700 | Суб'єктивна оцінка відновлення: три питання, що дають більше ніж Readiness Score | **draft · v9.65.0 → post-2700-subjective-recovery-three-questions.md** |
-| 2701 | Як тіло сигналізує про накопичену перевантагу: ранні ознаки, які зникають, якщо їх не читати | proposed · v9.50.0 |
-| 2702 | Breath as data: що зміна дихального патерну говорить про стан під час підходу | proposed · v9.50.0 |
-| 2703 | Хронічний стрес і суб'єктивна готовність: чому тіло може «брехати» системно | proposed · v9.50.0 |
-| 2704 | Коли суб'єктивна оцінка надійніша за об'єктивну — і коли навпаки | proposed · v9.50.0 |
+| 2701 | Як тіло сигналізує про накопичену перевантагу: ранні ознаки, які зникають, якщо їх не читати | **draft · v9.66.0 → post-2701-accumulated-overload-early-signals.md** · clinical-safety CONDITIONAL PASS · sports-scientist review pending |
+| 2702 | Breath as data: що зміна дихального патерну говорить про стан під час підходу | **draft · v9.66.0 → post-2702-breath-as-data-training-signals.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2703 | Хронічний стрес і суб'єктивна готовність: чому тіло може «брехати» системно | **draft · v9.66.0 → post-2703-chronic-stress-subjective-readiness.md** · clinical-safety CONDITIONAL PASS · sports-scientist review pending |
+| 2704 | Коли суб'єктивна оцінка надійніша за об'єктивну — і коли навпаки | **draft · v9.66.0 → post-2704-subjective-vs-objective-when-to-trust.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2705 | Синтез 2696–2705: як self-coached атлет будує власну систему читання сигналів тіла | proposed · v9.50.0 |
 
 ### Editorial series: 2706–2715 · Мінімалістична практика: принцип ефективного мінімуму для self-coached атлета (proposed · v9.56.0)
