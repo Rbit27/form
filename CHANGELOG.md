@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [9.81.0] — 2026-06-27
+
+### Added
+- `content/post-2722-long-term-autoregulation-between-blocks.md` — Editorial series 2716–2725 post 7/10. «Авторегуляція в довгостроковій перспективі: як адаптивна логіка змінюється між блоками». Три фази блоку з різною пріоритизацією авторегуляції: акумулятивна (об'єм > інтенсивність), інтенсифікаційна (інтенсивність > об'єм), деловантаження (легкість = ціль). Чотири рішення при переході між блоками. Три маркери готовності до нового блоку. Чотири речі для фіксації наприкінці блоку. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-2723-autoregulation-traps-flexibility-vs-avoidance.md` — Editorial series 2716–2725 post 8/10. «Типові пастки авторегуляції: де гнучкість стає виправданням для уникнення роботи». Шість пасток: RPE-маніпуляція, calibration drift (Zourdos et al. 2016; Hackett et al. 2012), асиметрична авторегуляція (лише вниз), DEC-013 як ліцензія на плановий пропуск, надмірна деталізація між підходами (Beilock & Carr 2001), технічний брейкдаун vs. технічне зусилля. Тест п'яти секунд. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-2724-autoregulation-busy-life-stress-breaks.md` — Editorial series 2716–2725 post 9/10. «Авторегуляція для різних тренувальних контекстів: зайнятість, стрес, перерви». Три контексти: хронічна зайнятість (два незнижувані тижневі сеанси + скорочений шаблон), підвищений стрес (алостатичне навантаження McEwen 1998; Stults-Kolehmainen & Sinha 2014; знизити об'єм до 60–70% до нормалізації), повернення після перерви (Mujika & Padilla 2001; трьохтижнева схема 60%→80%→100%). Спільний принцип: MEV/MV → підтримка → MAV при нормалізації. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-2725-autoregulation-system-synthesis.md` — Editorial series 2716–2725 post 10/10 · **SERIES COMPLETE**. «Синтез 2716–2725: авторегуляція як система, а не тактика». Три часових горизонти (сесія, між сесіями, між блоками) з принципом кожного. Матриця рішень (6 рівнів від підходу до між блоками). Де авторегуляція не замінює план (адаптивний шар поверх базової структури). Чотири специфічних вимоги самодисципліни: вимірювання, журнал, симетрія, межі. Зведений тижневий приклад. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — posts 2722–2725 added at top of feed.
+
+### Changed
+- `README.md` — Editorial series 2716–2725 header: «in progress» → «COMPLETE · v9.81.0». Posts 2722–2725: proposed → draft with file references.
+- `STATUS.md` — series 2716–2725: 6/10 → 10/10 COMPLETE · v9.81.0. Current version v9.78.0 → v9.81.0.
+- `VERSION` — 9.80.0 → 9.81.0.
+
+---
+
 ## [9.80.0] — 2026-06-27
 
 ### Added

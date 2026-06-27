@@ -2782,7 +2782,7 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2714 | Стабільна рутина проти постійної оптимізації: чому незмінна структура частіше перемагає | **draft · v9.74.0 → post-2714-stable-routine-vs-constant-optimization.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2715 | Синтез 2706–2715: мінімалістична практика як системний вибір, а не тимчасова стратегія | **draft · v9.75.0 → post-2715-minimalist-practice-synthesis.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending · **SERIES COMPLETE** |
 
-### Editorial series: 2716–2725 · Авторегуляція тренування: адаптивне налаштування навантаження для self-coached атлета (in progress · v9.76.0)
+### Editorial series: 2716–2725 · Авторегуляція тренування: адаптивне налаштування навантаження для self-coached атлета (COMPLETE · v9.81.0)
 
 Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-brutalist. Фокус: авторегуляція як системний підхід до управління навантаженням — від принципу адаптивного виконання до практичних алгоритмів вибору ваги, об'єму і інтенсивності у реальних умовах тренування. Не «слухати тіло» — вимірювані сигнали і структуровані правила рішення.
 
@@ -2794,10 +2794,10 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2719 | Авторегуляція об'єму: як self-coached атлет коригує кількість підходів, не зламавши план | **draft · v9.78.0 → post-2719-volume-autoregulation-set-count-adjustment.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2720 | Авторегуляція між сесіями: як планувати наступне тренування на основі відновлення | **draft · v9.78.0 → post-2720-between-session-autoregulation-recovery-planning.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2721 | Авторегуляція інтенсивності: коли план каже «важко», а тіло — ні | **draft · v9.79.0 → post-2721-intensity-autoregulation-when-plan-says-heavy.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2722 | Авторегуляція в довгостроковій перспективі: як адаптивна логіка змінюється між блоками | proposed |
-| 2723 | Типові пастки авторегуляції: де гнучкість стає виправданням для уникнення роботи | proposed |
-| 2724 | Авторегуляція для різних тренувальних контекстів: зайнятість, стрес, перерви | proposed |
-| 2725 | Синтез 2716–2725: авторегуляція як система, а не тактика | proposed |
+| 2722 | Авторегуляція в довгостроковій перспективі: як адаптивна логіка змінюється між блоками | **draft · v9.81.0 → post-2722-long-term-autoregulation-between-blocks.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2723 | Типові пастки авторегуляції: де гнучкість стає виправданням для уникнення роботи | **draft · v9.81.0 → post-2723-autoregulation-traps-flexibility-vs-avoidance.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2724 | Авторегуляція для різних тренувальних контекстів: зайнятість, стрес, перерви | **draft · v9.81.0 → post-2724-autoregulation-busy-life-stress-breaks.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2725 | Синтез 2716–2725: авторегуляція як система, а не тактика | **draft · v9.81.0 → post-2725-autoregulation-system-synthesis.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending · **SERIES COMPLETE** |
 
 ### Editorial series: 2721–2730 · Тренувальна ідентичність: як self-coached атлет думає про себе як про атлета — і чому це має значення (proposed · v9.65.0)
 
