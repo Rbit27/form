@@ -17714,7 +17714,7 @@ Migration 0088 provides three SOC 2 criteria with DDL-layer evidence, supplement
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 7 | Author `docs/SOC2_READINESS.md §122` DDL-supplement patch: register migration 0088 DDL-layer invariants (§47.3.2 auditor proof queries, §47.5 REVOKE proof, CC5.2/CC6.1/CC1.4 DDL narrative) to supplement ADM-E-001/ADM-E-002 already registered in §118. Pattern: same as §99 (DATA_MODEL §42 → EXP-E-001/002 supplement) and §100 (DATA_MODEL §43 → REN-E-001/002/003 supplement). | compliance-officer | **P2** | M13+ (after first amendment) | [ ] |
+| 7 | Author `docs/SOC2_READINESS.md §122` DDL-supplement patch: register migration 0088 DDL-layer invariants (§47.3.2 auditor proof queries, §47.5 REVOKE proof, CC5.2/CC6.1/CC1.4 DDL narrative) to supplement ADM-E-001/ADM-E-002 already registered in §118. Pattern: same as §99 (DATA_MODEL §42 → EXP-E-001/002 supplement) and §100 (DATA_MODEL §43 → REN-E-001/002/003 supplement). | compliance-officer | **P2** | M13+ (after first amendment) | [x] **Done — 2026-06-27 (SOC2_READINESS §122, v3.47.0)** |
 | 8 | If ≥ 1 of first 5 pure tier upgrades results in a `prior_rate_per_seat_usd` discrepancy between the `enterprise_contracts` column and the `enterprise.contract_amended` DEC-030 event `prior_rate` field, investigate for RPC bypass; escalate to `security-engineer` for R-05 (unauthorised write path) review. | compliance-officer | **P2** | After 5 amendments | [ ] |
 
 ### 47.9 Cross-Reference Obligations Created by §47

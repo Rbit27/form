@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [9.43.0] — 2026-06-27
+
+### Added
+- `docs/SOC2_READINESS.md §122` — Cross-Reference Patch: DATA_MODEL §47 (`enterprise_contracts` Amendment Columns · migration 0088 · CC5.2 / CC6.1 / CC1.4). Closes DATA_MODEL §47.8 item 7 (P2/M13+). Pattern: §99 (DATA_MODEL §42 → EXP-E-001/002) and §100 (DATA_MODEL §43 → REN-E-001/002/003). Three-document chain registered (§122.1): COST_MODEL §45 economics spec → SOC2_READINESS §118 evidence registration → DATA_MODEL §47 canonical DDL. Seven DDL invariants mapped to SOC 2 (§122.2): `amendment_type` CHECK constraint (CC1.4), all-nullable `NULL`=no-amendment design (CC1.4), four-or-none atomicity in RPC (CC5.2), `prior_rate_per_seat_usd NUMERIC(10,4)` exact decimal (CC1.4), `amendment_justification_hash` SHA-256 tamper-evident link (CC5.2), `form_api` REVOKE + SECURITY DEFINER single write path (CC6.1/CC5.2), `tenant_manager` no-RLS-policy coverage (CC6.1). Three-row criteria mapping supplement for ADM-E-001/002 (§122.3). Five-column privacy floor table (§122.4). §79.4 count: unchanged at 86.
+
+### Changed
+- `docs/DATA_MODEL.md §47.8 item 7` — `[ ]` → `[x] Done — 2026-06-27 (SOC2_READINESS §122, v3.47.0)`.
+- `docs/SOC2_READINESS.md` — v3.46.0 → v3.47.0.
+- `VERSION` — 9.42.1 → 9.43.0.
+
+---
+
 ## [9.42.1] — 2026-06-27
 
 ### Added
