@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [9.62.1] — 2026-06-27
+
+### Changed
+- `docs/SOC2_READINESS.md` — §125 Cross-Reference Patch: registered six R-48 incident-triggered SOC 2 evidence artefacts (AMEND-STALE-E-001 through AMEND-STALE-E-006) in §79.4 master evidence table (count 87 → 93); extended §80.3 `amendments/monitoring/` R2 subfolder entry to cover R-48 incident scope (variable retention 3yr/7yr; AMEND-STALE-CHAIN-01 ordering invariant noted); added AMEND-STALE-E-001 through AMEND-STALE-E-006 to §80.4 Vanta mirror list (incident-triggered; upload on each R-48 activation). Document v3.48.0 → v3.49.0.
+- `docs/INCIDENT_RESPONSE.md` — R-48.12 item 4 status `[ ]` → `[x] Done — 2026-06-27 (SOC2_READINESS.md §125 · v3.49.0)`. Document v3.16.0 → v3.16.1.
+- `VERSION` — 9.62.0 → 9.62.1.
+
+---
+
 ## [9.62.0] — 2026-06-27
 
 ### Added
