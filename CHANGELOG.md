@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.67.0] — 2026-06-27
+
+### Added
+- `content/post-2705-body-signals-system-synthesis.md` — Block 2696–2705 series 10/10 · SERIES COMPLETE. «Синтез 2696–2705: як self-coached атлет будує власну систему читання сигналів тіла». Трирівнева система сигналів (сесія · день · тиждень/цикл). Чотири режими збою суб'єктивної оцінки: базовий дрейф (алостатичний), мотиваційний override, recency bias, бінарне мислення. Калібрувальна дуга 12–24 місяці. Мінімальне логування як умова системи. Закриваючий аргумент серії: читання тіла — навик категорії техніки, не природній процес. Zourdos et al. 2016; Claudino et al. 2017; Saw et al. 2016; Meeusen et al. 2013. clinical-safety NOT_REQUIRED.
+- `blog.html` — post-2705 added at top of feed. **EDITORIAL SERIES 2696–2705 COMPLETE 10/10.**
+
+### Changed
+- `README.md` — post-2705: proposed → draft; series 2696–2705 marked COMPLETE.
+- `STATUS.md` — series 2696–2705: 9/10 → 10/10 COMPLETE; current version v9.66.0 → v9.67.0.
+- `VERSION` — 9.66.0 → 9.67.0.
+
+---
+
 ## [9.66.0] — 2026-06-27
 
 ### Added

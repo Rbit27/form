@@ -2763,7 +2763,7 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2702 | Breath as data: що зміна дихального патерну говорить про стан під час підходу | **draft · v9.66.0 → post-2702-breath-as-data-training-signals.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2703 | Хронічний стрес і суб'єктивна готовність: чому тіло може «брехати» системно | **draft · v9.66.0 → post-2703-chronic-stress-subjective-readiness.md** · clinical-safety CONDITIONAL PASS · sports-scientist review pending |
 | 2704 | Коли суб'єктивна оцінка надійніша за об'єктивну — і коли навпаки | **draft · v9.66.0 → post-2704-subjective-vs-objective-when-to-trust.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2705 | Синтез 2696–2705: як self-coached атлет будує власну систему читання сигналів тіла | proposed · v9.50.0 |
+| 2705 | Синтез 2696–2705: як self-coached атлет будує власну систему читання сигналів тіла | **draft · v9.67.0 → post-2705-body-signals-system-synthesis.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending · **SERIES COMPLETE** |
 
 ### Editorial series: 2706–2715 · Мінімалістична практика: принцип ефективного мінімуму для self-coached атлета (proposed · v9.56.0)
 
