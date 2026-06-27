@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [9.65.1] — 2026-06-27
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.53 → v2.54: registered `system.amendment_rate_monitor_stale_declared` (HIGH/7yr, CC5.2/CC6.1/A1.1/CC4.1) and `system.amendment_rate_monitor_restored` (STANDARD/3yr, CC7.2) as DEC-030 HMAC-chained IC-emitted monitoring-control events in `§Contract Amendment Rate Compliance Monitoring events`. Added AMEND-STALE-CHAIN-01 ordering invariant (HTTP 422 `AMEND_STALE_CHAIN_01_VIOLATION` on inversion → R-05 co-activated), Zod v2 schemas, emitter restriction (IC-only PAM-elevated), alert routing, and auditor narratives (CC7.2 operational continuity, CC5.2 chain-gap IC attestation, CC6.1 price-floor IC attestation). Retention table +2 rows. Structural peers: SCIM v2.52, PRICING v2.48, LITH v2.46, OFFBOARD v2.44. Closes `docs/INCIDENT_RESPONSE.md R-48.12` item 1 (P0/M7).
+- `docs/INCIDENT_RESPONSE.md` — v3.16.1 → v3.16.2: R-48.12 item 1 status `[ ]` → `[x] Done — 2026-06-27 (AUDIT_LOG_SCHEMA.md v2.54)`. R-48.11 cross-reference updated: pending note → 🟢 Done v2.54.
+- `docs/OBSERVABILITY.md` — v5.4.4 → v5.4.5: §57.12 trailing note updated — AUDIT_LOG_SCHEMA.md registration of AMEND-STALE-CHAIN-01 events marked 🟢 complete (R-48.12 item 1 closed 2026-06-27 · v2.54).
+- `VERSION` — 9.65.0 → 9.65.1.
+
+---
+
 ## [9.65.0] — 2026-06-27
 
 ### Added
