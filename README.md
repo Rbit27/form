@@ -2775,8 +2775,8 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2707 | Як self-coached атлет відрізняє «необхідне» від «звичного»: аудит тренувального тижня | **draft · v9.70.0 → post-2707-necessary-vs-habitual-weekly-training-audit.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2708 | Скорочення без деградації: як зменшити обсяг і зберегти адаптацію | **draft · v9.70.0 → post-2708-volume-reduction-without-detraining.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2709 | Мінімальний ефективний тиждень: структура, що підтримує силу і гіпертрофію при стиснутому часі | **draft · v9.71.0 → post-2709-minimum-effective-week.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2710 | Складність програми проти ефективності програми: де надмірна деталізація починає шкодити | proposed · v9.56.0 |
-| 2711 | Мінімалізм у виборі вправ: скільки рухових патернів реально потрібно для всебічного розвитку | proposed · v9.56.0 |
+| 2710 | Складність програми проти ефективності програми: де надмірна деталізація починає шкодити | **draft · v9.72.0 → post-2710-program-complexity-vs-effectiveness.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2711 | Мінімалізм у виборі вправ: скільки рухових патернів реально потрібно для всебічного розвитку | **draft · v9.72.0 → post-2711-exercise-selection-minimalism-movement-patterns.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2712 | Прогресія без накопичення хаосу: як додавати навантаження не додаючи складності | proposed · v9.56.0 |
 | 2713 | Мінімалістичний технологічний стек: один надійний інструмент проти повної екосистеми | proposed · v9.56.0 |
 | 2714 | Коли «більше» перестає бути «краще»: ознаки перевантаженої програми у власних даних | proposed · v9.56.0 |
