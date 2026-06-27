@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.50.1] — 2026-06-27
+
+### Changed
+- `docs/SOC2_READINESS.md` — §123 retroactive closure patch: four stale `pending` references in §101 (DEC-030 event registration) patched to reflect AUDIT_LOG_SCHEMA.md v2.39 (2026-06-23) completion; five DEC-030 post-churn events confirmed registered (winback_initiated, winback_converted, deletion_certificate_issued, deletion_sla_warning, deletion_sla_critical); OFFBOARD-CHAIN-01/WINBACK-CHAIN-01/DELETION-CHAIN-01 chain invariants confirmed with HTTP 422 enforcement; v2.40 WinbackConvertedPayload `prior_tenant_id` DEC-079 Option B confirmed; COST_MODEL §43.10 items 1 and 3 both `[x] Done — 2026-06-23`. Document header v3.47.0 → v3.47.1.
+- `VERSION` — 9.50.0 → 9.50.1.
+
+---
+
 ## [9.50.0] — 2026-06-27
 
 ### Added
