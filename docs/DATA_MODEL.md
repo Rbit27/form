@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.34
+# FORM · Multi-Tenant Data Model v1.35
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -17512,6 +17512,223 @@ The three monitoring indexes (`litigation_hold_records_review_sweep_idx`, `litig
 | `compliance/evidence/litigation-hold/migration-0087-validation_<YYYY-MM-DD>.txt` — staging output retention | §46.3.2 / §46.8 item 1 | 🟡 **Pending — §46.8 item 1 (migration not yet applied).** |
 
 ---
+
+---
+
+## §47 `enterprise_contracts` Amendment Columns — Migration 0088
+
+> **Decision:** DEC-082 (2026-06-26); `docs/COST_MODEL.md §45` (authoritative governance spec, ASC 606 mechanics, TU-CHAIN-01 invariant).
+> **References:** `docs/COST_MODEL.md §45.4` (migration specification — this section closes the DATA_MODEL registration obligation); `docs/COST_MODEL.md §45.8 item 3` (production deploy prerequisite); `docs/DATA_MODEL.md §16` (`enterprise_contracts` baseline DDL — sole table modified by this migration); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pure Tier Upgrade events` (v2.50 — `enterprise.contract_amended` payload extension + `billing.rate_updated` event, both consummated by `amend_contract_tier()` RPC); `docs/SOC2_READINESS.md §118` (ADM-E-001/ADM-E-002 SOC 2 evidence registration); DEC-030 (HMAC-chained audit log).
+
+### 47.1 Purpose and Design Principles
+
+Migration `0088_enterprise_contracts_amendment_columns.sql` closes the schema gap between `docs/COST_MODEL.md §45` (pure tier upgrade governance, DEC-082) and the `enterprise_contracts` table defined in §16. Before this migration, a pure tier upgrade — same seat count, lower per-seat rate — produced DEC-030 chain events (`enterprise.contract_amended` + `billing.rate_updated`) but the `enterprise_contracts` row itself carried no DDL-layer record of the amendment's existence, prior rate, or justification hash. The four additive columns make the amendment lifecycle a first-class attribute of the contract row:
+
+- **`amendment_date`** — when the amendment was executed (set atomically by `amend_contract_tier()` SECURITY DEFINER RPC; auditor can cross-check against the `enterprise.contract_amended` DEC-030 chain event `modification_date` field).
+- **`amendment_type`** — what governance path was followed (`'tier_upgrade'` for COST_MODEL §45; reserved values for future amendment categories); enables auditors to enumerate pure tier upgrades via SQL without joining to the HMAC audit chain.
+- **`prior_rate_per_seat_usd`** — rate before amendment; provides the DDL-layer anchor for the `(old_rate − new_rate) × seats × months_remaining` credit formula (COST_MODEL §45.3.3) and a verifiable audit trail for CC5.2 prospective ASC 606 treatment.
+- **`amendment_justification_hash`** — SHA-256 of the compliance-officer justification text (plaintext stored in `compliance/evidence/amendments/`); creates a tamper-evident link between the immutable DEC-030 chain and the human-readable justification document.
+
+**Four design principles:**
+
+1. **Additive-only migration.** `ALTER TABLE enterprise_contracts ADD COLUMN IF NOT EXISTS` — no existing columns modified, no RLS changes, no new FK. All four columns are nullable, reflecting that the overwhelming majority of `enterprise_contracts` rows will never have an amendment; `NULL` is the correct representation of "no amendment" (not a sentinel value like `'none'`).
+2. **Single-write path.** `amend_contract_tier()` SECURITY DEFINER RPC (COST_MODEL §45.6 + §45.8 item 6) is the only mechanism that may write these four columns. `form_api` REVOKED from `enterprise_contracts` since §16 and unchanged by this migration; `amend_contract_tier()` executes as `form_system` (SECURITY DEFINER). Admin Console invoking the RPC is the only user-facing entry point, requiring compliance-officer countersign.
+3. **TU-CHAIN-01 enforced at the Worker layer.** The CHECK constraint on `amendment_type` enforces valid-value integrity at DDL level. TU-CHAIN-01 (price floor: HTTP 422 `TU_CHAIN_01_FLOOR_VIOLATION` if `new_rate_per_seat_usd < §31.5 floor`) is enforced in the `emit-audit-event` Worker at DEC-030 emission time — prior to the RPC calling any `UPDATE`. The DDL layer does not duplicate this business-rule check because a failed Worker call is expected to abort the entire RPC transaction.
+4. **Privacy floor — commercial metadata only.** `amendment_date`, `amendment_type`, `prior_rate_per_seat_usd`, and `amendment_justification_hash` are commercial contract metadata. `amendment_justification_hash` is a SHA-256 opaque token — the plaintext justification is stored only in `compliance/evidence/amendments/` under `r2:compliance-officer` write-only access. No individual employee `user_id`, name, email, health metric, coaching transcript, or GDPR Art. 9 special-category data appears in any of these columns or in any evidence artefact derived from them.
+
+### 47.2 Migration Dependency Chain
+
+```
+0078_enterprise_adoption_snapshots.sql       (§41 — new table)
+0082_enterprise_contracts_caep_columns.sql   (§36 prerequisite — CAEP re-registration columns)
+0083_enterprise_contracts_expansion_fields.sql   (§42 — initial_seats, current_seats, expansion_count)
+0084_enterprise_renewals.sql                 (§43 — new table)
+0085_enterprise_churn_events.sql             (§44 — new table)
+0086_enterprise_contracts_discount_type.sql  (§45 — contract_discount_type column)
+0087_litigation_hold_records.sql             (§46 — new table)
+0088_enterprise_contracts_amendment_columns.sql  ← THIS MIGRATION (§47)
+```
+
+Migration 0088 is additive to `enterprise_contracts` and has no structural FK dependency on migrations 0085–0087. It depends on 0087 only by convention (linear migration history). Existing FK relationships — `enterprise_renewals.original_contract_id ON DELETE RESTRICT` (0084) and `enterprise_churn_events.contract_id ON DELETE RESTRICT` (0085) — are unchanged.
+
+**Production deploy gate (§45.8 item 1):** Migration 0088 must not be deployed to production until outside counsel confirms ASC 606 prospective Type 2 modification treatment in writing (COST_MODEL §45.8 item 1, P0/M12). The staging validation checklist (§47.3.2) may be executed independently of this gate.
+
+### 47.3 DDL — Migration 0088
+
+**Authoritative economic spec:** `docs/COST_MODEL.md §45` (pure tier upgrade governance, amendment mechanics, credit formula, approval authority, TU-CHAIN-01 chain invariant). This section is the DDL-layer registration for that spec.
+
+#### 47.3.1 Migration Script
+
+```sql
+-- Migration: 0088_enterprise_contracts_amendment_columns.sql
+-- Depends on: 0087_litigation_hold_records.sql (§46) by convention; no structural FK
+-- Decision: DEC-082 (2026-06-26)
+-- Governance spec: docs/COST_MODEL.md §45 (Pure Tier Upgrade: Amendment vs. New Contract)
+-- Chain invariant: TU-CHAIN-01 enforced in emit-audit-event Worker (COST_MODEL §45.5.1)
+-- Write path: amend_contract_tier() SECURITY DEFINER RPC only (COST_MODEL §45.6 / §45.8 item 6)
+-- Production gate: outside counsel ASC 606 confirmation required (COST_MODEL §45.8 item 1)
+
+BEGIN;
+
+ALTER TABLE enterprise_contracts
+  ADD COLUMN IF NOT EXISTS amendment_date              TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS amendment_type              VARCHAR(30)
+    CHECK (amendment_type IN ('tier_upgrade', 'scope_expansion', 'term_extension', 'other')),
+  ADD COLUMN IF NOT EXISTS prior_rate_per_seat_usd     NUMERIC(10,4),
+  ADD COLUMN IF NOT EXISTS amendment_justification_hash TEXT;
+
+COMMENT ON COLUMN enterprise_contracts.amendment_date
+  IS 'Timestamp when the contract amendment was executed by amend_contract_tier() RPC (DEC-082). NULL = no amendment on this contract. Must match modification_date in enterprise.contract_amended DEC-030 event.';
+
+COMMENT ON COLUMN enterprise_contracts.amendment_type
+  IS 'Amendment governance path. ''tier_upgrade'' = pure rate reduction, same seats, ASC 606 prospective Type 2 (COST_MODEL §45). NULL = no amendment. Reserved values: scope_expansion, term_extension, other.';
+
+COMMENT ON COLUMN enterprise_contracts.prior_rate_per_seat_usd
+  IS 'Per-seat rate immediately before amendment (NUMERIC(10,4) — four decimal places match rate_per_seat_usd precision in §16). Used for credit formula: (prior_rate - new_rate) × seats × months_remaining (COST_MODEL §45.3.3). NULL = no amendment.';
+
+COMMENT ON COLUMN enterprise_contracts.amendment_justification_hash
+  IS 'SHA-256 of compliance-officer justification text for the amendment. Plaintext stored in compliance/evidence/amendments/ under r2:compliance-officer write-only access. NULL = no amendment.';
+
+COMMIT;
+```
+
+**All-nullable design:** `NULL` on all four columns is the authoritative signal that the contract has never been amended. There is no `DEFAULT` value — not even `DEFAULT NULL` — because that is Postgres behaviour for nullable columns. A row where `amendment_date IS NULL AND amendment_type IS NULL AND prior_rate_per_seat_usd IS NULL AND amendment_justification_hash IS NULL` is a standard unmodified contract.
+
+**Corollary constraint — four-or-none invariant:** `amend_contract_tier()` SECURITY DEFINER RPC (§45.8 item 6) must write all four columns atomically or none of them. The RPC is a single `UPDATE enterprise_contracts SET amendment_date = ..., amendment_type = ..., prior_rate_per_seat_usd = ..., amendment_justification_hash = ...` wrapped in the same transaction as the two `emit-audit-event` Worker HTTP calls. No separate partial-update path exists.
+
+#### 47.3.2 Staging Validation Checklist
+
+| # | Check | SQL | Expected result |
+|---|---|---|---|
+| 1 | All four columns present with correct types | `SELECT column_name, data_type, character_maximum_length, is_nullable FROM information_schema.columns WHERE table_name = 'enterprise_contracts' AND column_name IN ('amendment_date','amendment_type','prior_rate_per_seat_usd','amendment_justification_hash') ORDER BY column_name;` | 4 rows: `amendment_date` timestamptz nullable; `amendment_justification_hash` text nullable; `amendment_type` varchar(30) nullable; `prior_rate_per_seat_usd` numeric nullable |
+| 2 | All existing rows have NULL in new columns | `SELECT COUNT(*) FROM enterprise_contracts WHERE amendment_date IS NOT NULL OR amendment_type IS NOT NULL OR prior_rate_per_seat_usd IS NOT NULL OR amendment_justification_hash IS NOT NULL;` | `0` |
+| 3 | CHECK constraint rejects invalid amendment_type | `UPDATE enterprise_contracts SET amendment_type = 'invalid_value' WHERE id = (SELECT id FROM enterprise_contracts LIMIT 1);` | `ERROR: new row for relation "enterprise_contracts" violates check constraint "enterprise_contracts_amendment_type_check"` |
+| 4 | Valid amendment_type accepted | `UPDATE enterprise_contracts SET amendment_type = 'tier_upgrade', amendment_date = NOW(), prior_rate_per_seat_usd = 9.00, amendment_justification_hash = 'abc123hash' WHERE id = (SELECT id FROM enterprise_contracts LIMIT 1); ROLLBACK;` | No error before ROLLBACK; all four columns writable together |
+| 5 | `form_api` still REVOKED from `enterprise_contracts` | `SET ROLE form_api; UPDATE enterprise_contracts SET amendment_type = 'tier_upgrade' WHERE id = (SELECT id FROM enterprise_contracts LIMIT 1);` | `ERROR: permission denied for table enterprise_contracts` |
+| 6 | `tenant_manager` still has no policy on `enterprise_contracts` | `SET ROLE tenant_manager; SELECT amendment_type FROM enterprise_contracts LIMIT 1;` | `ERROR: permission denied` or 0 rows (RLS no-policy behaviour per §16) |
+
+Retain staging output at `compliance/evidence/amendments/migration-0088-validation_<YYYY-MM-DD>.txt`. Mark `docs/COST_MODEL.md §45.8 item 3` as `[x] Done` simultaneously when this checklist passes in production.
+
+### 47.4 Column Semantics
+
+| Column | Type | Nullability | Default | Semantics |
+|---|---|---|---|---|
+| `amendment_date` (new) | TIMESTAMPTZ | NULL | — | Timestamp of amendment execution by `amend_contract_tier()` RPC. Must equal `modification_date` field in `enterprise.contract_amended` DEC-030 event for the same contract. NULL = no amendment has been applied. |
+| `amendment_type` (new) | VARCHAR(30) | NULL | — | Amendment governance path. `'tier_upgrade'` = pure rate reduction at same seat count per COST_MODEL §45; reserved values (`'scope_expansion'`, `'term_extension'`, `'other'`) for future amendment categories. NULL = no amendment. CHECK constraint enforces valid-value set. |
+| `prior_rate_per_seat_usd` (new) | NUMERIC(10,4) | NULL | — | Per-seat rate immediately before the amendment, captured at write time by `amend_contract_tier()`. Enables credit formula computation (COST_MODEL §45.3.3) and ADM-E-001 auditor cross-check without joining to the DEC-030 chain. NULL = no amendment. |
+| `amendment_justification_hash` (new) | TEXT | NULL | — | SHA-256 hex digest of the compliance-officer's written justification for the amendment. Plaintext resides in `compliance/evidence/amendments/` (r2:compliance-officer write-only). Auditors can verify by running `sha256(plaintext_file)` and comparing to this column. NULL = no amendment. |
+
+**Enum value meanings for `amendment_type`:**
+
+| Value | Meaning | Governed by |
+|---|---|---|
+| `'tier_upgrade'` | Pure rate reduction, same seat count; ASC 606 prospective Type 2 modification (DEC-082) | COST_MODEL §45; TU-CHAIN-01; `amend_contract_tier()` RPC |
+| `'scope_expansion'` | Reserved for future amendment combining new services or product scope | Future spec; must not be used until governed by a Decision Log entry |
+| `'term_extension'` | Reserved for future amendment extending contract end date without rate change | Future spec; must not be used until governed by a Decision Log entry |
+| `'other'` | Compliance-officer–documented edge cases requiring outside counsel opinion | Requires DEC-082-style decision before use; highest approval authority |
+
+**Immutability invariant:** Once written by `amend_contract_tier()`, these four columns represent a historical fact. They must not be overwritten — a second amendment to the same contract must follow Option B (new contract per COST_MODEL §45.3.2) or be governed by a new Decision Log entry expanding the single-amendment constraint.
+
+### 47.5 RLS Behaviour
+
+Migration 0088 adds four columns to `enterprise_contracts`. The RLS policies defined in §16 — and unchanged by migrations 0082–0087 — continue to apply without modification:
+
+| Role | Policy on `enterprise_contracts` | Behaviour on new columns |
+|---|---|---|
+| `form_api` | REVOKED (`REVOKE ALL ON enterprise_contracts FROM form_api` in §16) | No access — unchanged. `amend_contract_tier()` SECURITY DEFINER runs as `form_system`, bypassing this REVOKE. |
+| `form_system` | ALL via service role (SECURITY DEFINER context) | Can SELECT + UPDATE all columns, including the four new amendment columns. |
+| `form_admin` | SELECT + UPDATE on non-financial columns per §16 RLS policy | SELECT visible; UPDATE restricted per §16 existing column policies. The new amendment columns should be treated as financial metadata — `form_admin` SELECT is permitted; UPDATE must be routed through `amend_contract_tier()` RPC, not direct UPDATE. |
+| `compliance_reviewer` | SELECT only | Can read all four new columns for audit queries and ADM-E-001 evidence collection. |
+| `tenant_owner` / `tenant_admin` / `tenant_manager` | No RLS policy on `enterprise_contracts` (row-level or column-level) | No access — unchanged. Amendment columns contain FORM-internal commercial metadata; tenant roles must never read amendment rates or justification hashes. |
+
+**DDL auditor proof queries (run after migration 0088):**
+
+```sql
+-- Confirm form_api cannot read amendment columns
+SET ROLE form_api;
+SELECT amendment_type FROM enterprise_contracts LIMIT 1;
+-- Expected: ERROR: permission denied for table enterprise_contracts
+
+-- Confirm tenant_manager has no policy on enterprise_contracts
+SET ROLE tenant_manager;
+SELECT amendment_date FROM enterprise_contracts LIMIT 1;
+-- Expected: ERROR or 0 rows (RLS no-policy = no rows visible)
+
+-- Confirm compliance_reviewer can SELECT
+SET ROLE compliance_reviewer;
+SELECT amendment_date, amendment_type, prior_rate_per_seat_usd FROM enterprise_contracts LIMIT 5;
+-- Expected: up to 5 rows (all NULLs before first amendment), no error
+```
+
+### 47.6 Privacy Floor
+
+All four columns introduced by migration 0088 contain commercial contract metadata only. The privacy floor extends the §16 baseline without new risks:
+
+| Column | Privacy classification | GDPR relevance | PHI / Art. 9 risk |
+|---|---|---|---|
+| `amendment_date` | Commercial metadata — timestamp | None | None — a timestamp of a contract event |
+| `amendment_type` | Commercial metadata — controlled enum | None | None — an enumerated business category |
+| `prior_rate_per_seat_usd` | Commercial metadata — aggregate financial figure | None | None — a per-seat pricing number at the contract level |
+| `amendment_justification_hash` | Commercial metadata — SHA-256 opaque token | None (plaintext never in DB) | None — the hash reveals nothing about individuals |
+
+**Justification plaintext governance:** The compliance-officer justification text (the input to `SHA-256`) must be stored at `compliance/evidence/amendments/ADM-E-001_<YYYY>_<contract_id>_justification.txt`. Access is `r2:compliance-officer` write-only + `r2:vanta-sync` read-only. The justification text may reference `tenant_id` UUID and commercial terms but must never include individual employee names, email addresses, health records, coaching transcripts, or GDPR Art. 9 special-category data.
+
+**Evidence artefacts ADM-E-001 and ADM-E-002** (registered in `docs/SOC2_READINESS.md §118`, 2026-06-26): both export DEC-030 chain events and metadata at the `tenant_id`/`contract_id` level. No individual employee `user_id`, name, email, or health value appears in either artefact. `amendment_justification_hash` appears in ADM-E-001 as a cross-reference key to the plaintext file in `compliance/evidence/amendments/`.
+
+### 47.7 SOC 2 Evidence Mapping
+
+Migration 0088 provides three SOC 2 criteria with DDL-layer evidence, supplementing the DEC-030 chain evidence already documented in `docs/SOC2_READINESS.md §118`:
+
+| Criterion | DDL mechanism | Auditor proof |
+|---|---|---|
+| **CC5.2** — Control activities enforcing authorised access | `form_api` REVOKE (§16) + SECURITY DEFINER single write path | `\dp enterprise_contracts` confirms no `form_api` privilege; `\df amend_contract_tier` shows SECURITY DEFINER + `form_system` owner |
+| **CC6.1** — Logical access restricted to authorised users | SECURITY DEFINER RPC is the only `UPDATE` path for amendment columns; tenant roles have no RLS policy | Auditor query: `SET ROLE form_api; SELECT amendment_type FROM enterprise_contracts LIMIT 1` → `ERROR: permission denied` |
+| **CC1.4** — Commitment to competence (price floor governance) | `amendment_type CHECK (...)` enforces valid amendment categories at DDL layer; `prior_rate_per_seat_usd NUMERIC(10,4)` captures pre-amendment rate for credit formula cross-check | ADM-E-001 cross-check: `prior_rate_per_seat_usd` in `enterprise_contracts` must equal `prior_rate` field in `enterprise.contract_amended` DEC-030 event — any discrepancy indicates a Write bypass |
+
+**Evidence artefacts cross-reference:**
+
+| Artefact | Source | DDL supplement from §47 |
+|---|---|---|
+| ADM-E-001 (CC5.2 / CC6.1 / A1.1) | COST_MODEL §45.7; registered SOC2_READINESS §118 | `prior_rate_per_seat_usd` DDL column enables auditor to verify `credit_amount_usd` calculation without RPC access; `amendment_justification_hash` cross-reference to plaintext in R2 |
+| ADM-E-002 (CC5.2 / CC1.4) | COST_MODEL §45.7; registered SOC2_READINESS §118 | `amendment_type = 'tier_upgrade'` DDL column enables SQL cross-tab of all pure tier upgrades without HMAC chain traversal; `prior_rate_per_seat_usd` confirms `floor_respected: true` chain invariant is internally consistent |
+
+### 47.8 Implementation Checklist
+
+#### P0 — Before first pure tier upgrade request (COST_MODEL §45.8 item 1 gate must close first)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Confirm outside counsel ASC 606 prospective Type 2 confirmation in writing (COST_MODEL §45.8 item 1 — production gate for migration 0088). File counsel letter to `compliance/evidence/amendments/asc606-counsel-confirmation_<YYYY-MM-DD>.pdf`. | founder + outside counsel | **P0** | M12 | [ ] |
+| 2 | Apply migration `0088_enterprise_contracts_amendment_columns.sql` to staging; run all six §47.3.2 validation checks; retain output at `compliance/evidence/amendments/migration-0088-validation_<YYYY-MM-DD>.txt`. | platform-engineer + enterprise-architect | **P0** | M12 | [ ] |
+| 3 | Deploy migration 0088 to production after §47.8 item 1 (ASC 606 gate) closes and item 2 (staging validation) passes. Mark `docs/COST_MODEL.md §45.8 item 3` as `[x] Done` simultaneously. | platform-engineer | **P0** | M12 (after items 1–2) | [ ] |
+
+#### P1 — Before first amend_contract_tier() RPC call in production
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Implement `amend_contract_tier()` SECURITY DEFINER RPC (COST_MODEL §45.8 item 6): (a) validate `new_rate_per_seat_usd ≥ §31.5 floor` (TU-CHAIN-01; HTTP 422 on violation); (b) call `emit-audit-event` Worker with `enterprise.contract_amended` + `billing.rate_updated` payloads (HTTP 200 required before proceeding); (c) atomically `UPDATE enterprise_contracts SET amendment_date, amendment_type, prior_rate_per_seat_usd, amendment_justification_hash`; (d) call `SCIM_KV.delete('scim:guard_cfg:' + tenant_id)` (BDG cache invalidation). | platform-engineer | **P1** | M12 | [ ] |
+| 5 | Add integration test: `amend_contract_tier()` with `new_rate_per_seat_usd < §31.5 floor` must return HTTP 422 `TU_CHAIN_01_FLOOR_VIOLATION` and leave `enterprise_contracts` row unchanged (four amendment columns still NULL). | platform-engineer + security-engineer | **P1** | M12 | [ ] |
+| 6 | Add integration test: successful amendment must write all four columns atomically — verify with a post-call `SELECT amendment_date, amendment_type, prior_rate_per_seat_usd, amendment_justification_hash FROM enterprise_contracts WHERE id = $1` returning all non-NULL values. | platform-engineer | **P1** | M12 | [ ] |
+
+#### P2 — After first 5 pure tier upgrades
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Author `docs/SOC2_READINESS.md §122` DDL-supplement patch: register migration 0088 DDL-layer invariants (§47.3.2 auditor proof queries, §47.5 REVOKE proof, CC5.2/CC6.1/CC1.4 DDL narrative) to supplement ADM-E-001/ADM-E-002 already registered in §118. Pattern: same as §99 (DATA_MODEL §42 → EXP-E-001/002 supplement) and §100 (DATA_MODEL §43 → REN-E-001/002/003 supplement). | compliance-officer | **P2** | M13+ (after first amendment) | [ ] |
+| 8 | If ≥ 1 of first 5 pure tier upgrades results in a `prior_rate_per_seat_usd` discrepancy between the `enterprise_contracts` column and the `enterprise.contract_amended` DEC-030 event `prior_rate` field, investigate for RPC bypass; escalate to `security-engineer` for R-05 (unauthorised write path) review. | compliance-officer | **P2** | After 5 amendments | [ ] |
+
+### 47.9 Cross-Reference Obligations Created by §47
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/SOC2_READINESS.md §122` — DDL-supplement patch for migration 0088 (CC5.2/CC6.1/CC1.4 DDL invariants supplementing ADM-E-001/ADM-E-002 from §118; auditor proof queries; `amend_contract_tier()` SECURITY DEFINER proof) | §47.8 item 7 (P2, M13+) | 🟡 **Pending — §47.8 item 7. Authorship deferred until first amendment validates the workflow.** |
+| `compliance/evidence/amendments/migration-0088-validation_<YYYY-MM-DD>.txt` — staging validation output | §47.3.2 / §47.8 item 2 | 🟡 **Pending — §47.8 item 2 (migration not yet applied).** |
+| `compliance/evidence/amendments/asc606-counsel-confirmation_<YYYY-MM-DD>.pdf` — outside counsel ASC 606 confirmation | §47.8 item 1 (production gate) | 🟡 **Pending — §47.8 item 1. Gate remains active until counsel letter filed.** |
+| `docs/COST_MODEL.md §45.8 item 3` — mark `[x] Done` when migration 0088 deployed to production | §47.8 item 3 (simultaneous close) | 🟡 **Pending — §47.8 item 3.** |
+
+---
+
+*v1.35 (2026-06-27): §47 `enterprise_contracts` Amendment Columns — Migration 0088. Closes the DATA_MODEL registration gap created when `docs/COST_MODEL.md §45` (v2.15, 2026-06-26) specified migration 0088 DDL inline as part of the pure tier upgrade governance spec (DEC-082) without a companion DATA_MODEL section — the same gap pattern resolved by DATA_MODEL §42 → COST_MODEL §41 (expansion columns), §43 → §42 (enterprise_renewals), §44 → §43.9 (enterprise_churn_events), and §45 → §44 (contract_discount_type). §47.1 purpose + four design principles: (1) additive-only migration (ALTER TABLE ADD COLUMN IF NOT EXISTS — four nullable columns, no DDL mutual-exclusivity constraint, no DEFAULT); (2) single-write path (`amend_contract_tier()` SECURITY DEFINER RPC — only mechanism writing all four columns atomically; `form_api` REVOKED from `enterprise_contracts` since §16); (3) TU-CHAIN-01 enforced at Worker layer (HTTP 422 on `new_rate < §31.5 floor`); (4) privacy floor — all four columns are commercial metadata only (`amendment_justification_hash` is SHA-256 opaque token; plaintext in R2 only). §47.2 migration dependency chain: 0083→0084→0085→0086→0087→0088; no structural FK dependency on 0086/0087; production gate = COST_MODEL §45.8 item 1 (outside counsel ASC 606 confirmation, P0/M12). §47.3.1 full DDL: `ALTER TABLE enterprise_contracts ADD COLUMN IF NOT EXISTS` for four columns — `amendment_date TIMESTAMPTZ`, `amendment_type VARCHAR(30) CHECK (IN ('tier_upgrade','scope_expansion','term_extension','other'))`, `prior_rate_per_seat_usd NUMERIC(10,4)`, `amendment_justification_hash TEXT`; four `COMMENT ON COLUMN` entries; all-nullable design rationale; four-or-none atomicity invariant. §47.3.2 six-item staging validation checklist (columns present with correct types; existing rows all NULL; CHECK constraint rejects invalid amendment_type; valid tier_upgrade write accepted + ROLLBACK; form_api REVOKE confirmed; tenant_manager no-policy confirmed). §47.4 column semantics table: four columns with type, nullability, semantics; enum value meanings for amendment_type (tier_upgrade / scope_expansion / term_extension / other — three are reserved-future); immutability invariant (single-amendment per contract_id; second amendment requires new contract per Option B or new Decision Log entry). §47.5 RLS: five-role policy table (form_api REVOKED; form_system ALL via SECURITY DEFINER; form_admin SELECT + routed UPDATE; compliance_reviewer SELECT; tenant roles no access); three DDL auditor proof queries (form_api REVOKE, tenant_manager no-policy, compliance_reviewer SELECT). §47.6 privacy floor: four-column classification table (all commercial metadata; amendment_justification_hash SHA-256 opaque); justification plaintext governance (R2 path, r2:compliance-officer write-only, no employee PII or Art. 9 data). §47.7 SOC 2 evidence mapping: CC5.2 (REVOKE + SECURITY DEFINER proof), CC6.1 (RPC-only write path), CC1.4 (CHECK constraint valid-values + prior_rate_per_seat_usd discrepancy cross-check); ADM-E-001/ADM-E-002 DDL supplement cross-reference (registered SOC2_READINESS §118 — §47 adds DDL-layer proofs not yet in §118). §47.8 implementation checklist: 3× P0/M12 (outside counsel gate + staging validation + production deploy); 3× P1/M12 (amend_contract_tier() RPC implementation + two integration tests); 2× P2/M13+ (SOC2_READINESS §122 DDL supplement authorship; discrepancy-detection protocol). §47.9 four cross-reference obligations created: SOC2_READINESS §122 DDL supplement 🟡 pending (P2/M13+); migration-0088 staging validation file 🟡 pending (P0/M12); ASC 606 counsel letter 🟡 pending (P0/M12 gate); COST_MODEL §45.8 item 3 mark-done 🟡 pending (simultaneous with production deploy). Document header v1.34 → v1.35. No schema applied — documentation only. Cross-references: `docs/COST_MODEL.md §45` (authoritative governance spec — DEC-082, Option A amendment mechanics, TU-CHAIN-01, credit formula, `amend_contract_tier()` RPC spec, §45.8 item 3 production deploy obligation); `docs/COST_MODEL.md §45.4` (migration 0088 DDL spec — this section is the DATA_MODEL registration; §45.8 item 3 simultaneous close); `docs/DATA_MODEL.md §16` (`enterprise_contracts` baseline DDL — sole table modified; `form_api` REVOKE established here); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pure Tier Upgrade events` (v2.50 — `enterprise.contract_amended` + `billing.rate_updated` DEC-030 events; TU-CHAIN-01 chain invariant); `docs/SOC2_READINESS.md §118` (ADM-E-001/ADM-E-002 registered 2026-06-26 — §47.7 adds DDL supplement not yet captured in §118); `docs/DECISION_LOG.md DEC-082` (formal adoption record — Option A amendment, ASC 606 prospective Type 2 treatment, outside counsel gate). Owner: enterprise-architect + compliance-officer.*
 
 *v1.34 (2026-06-26): §28.9 item 8 cross-reference closure (documentation portion) — pg_cron jobs 16 (`rate_limit_violations_cleanup`) and 17 (`api_quota_usage_archive`) were registered in OBSERVABILITY §12.6 when §35 (Rate Limiting Observability) was authored (2026-06-11), fulfilling the documentation obligation of §28.9 item 8. Item 8 status updated to `[x] (docs — §12.6 v2.0 patch, 2026-06-26); [ ] (production deploy — OBSERVABILITY §35.10 items 6–7, M5)`. OBSERVABILITY §12.6 v2.0 patch note added to formalise the registration date of jobs 16, 17, 22, and 23. Document header v1.33 → v1.34. No schema, DDL, or model changes. Owner: devops-lead + compliance-officer.*
 

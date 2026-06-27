@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [9.42.1] — 2026-06-27
+
+### Added
+- `docs/DATA_MODEL.md §47` — `enterprise_contracts` Amendment Columns (Migration 0088). Closes DATA_MODEL cross-reference gap for COST_MODEL §45 / DEC-082 (pure tier upgrade governance). Documents 4 nullable columns (`amendment_date`, `amendment_type`, `prior_rate_per_seat_usd`, `amendment_justification_hash`) added by migration 0088. Includes DDL (§47.3.1), 6-item staging validation checklist (§47.3.2), column semantics table (§47.4), RLS unchanged confirmation (§47.5), privacy floor analysis (§47.6), SOC 2 CC5.2/CC6.1/CC1.4 mapping (§47.7), implementation checklist with P0/P1/P2 milestones (§47.8), and cross-reference obligations (§47.9). Production gate: outside counsel ASC 606 confirmation required before migration 0088 ships (COST_MODEL §45.8 item 1). Write path: `amend_contract_tier()` SECURITY DEFINER RPC only; `form_api` REVOKED from table.
+
+### Changed
+- `docs/DATA_MODEL.md` — v1.34 → v1.35; §47 appended.
+- `VERSION` — 9.42.0 → 9.42.1.
+
+---
+
 ## [9.42.0] — 2026-06-27
 
 ### Added
