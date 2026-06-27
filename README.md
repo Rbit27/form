@@ -2774,7 +2774,7 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2706 | Мінімально ефективна доза у тренуванні: що наука каже про нижню межу стимулу | **draft · v9.68.0 → post-2706-minimum-effective-dose-training.md** · clinical-safety PASS · sports-scientist review pending |
 | 2707 | Як self-coached атлет відрізняє «необхідне» від «звичного»: аудит тренувального тижня | **draft · v9.70.0 → post-2707-necessary-vs-habitual-weekly-training-audit.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2708 | Скорочення без деградації: як зменшити обсяг і зберегти адаптацію | **draft · v9.70.0 → post-2708-volume-reduction-without-detraining.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2709 | Мінімальний ефективний тиждень: структура, що підтримує силу і гіпертрофію при стиснутому часі | proposed · v9.56.0 |
+| 2709 | Мінімальний ефективний тиждень: структура, що підтримує силу і гіпертрофію при стиснутому часі | **draft · v9.71.0 → post-2709-minimum-effective-week.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2710 | Складність програми проти ефективності програми: де надмірна деталізація починає шкодити | proposed · v9.56.0 |
 | 2711 | Мінімалізм у виборі вправ: скільки рухових патернів реально потрібно для всебічного розвитку | proposed · v9.56.0 |
 | 2712 | Прогресія без накопичення хаосу: як додавати навантаження не додаючи складності | proposed · v9.56.0 |
