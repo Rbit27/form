@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.3.1
+# FORM · Observability & Monitoring Taxonomy v5.4.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -61,6 +61,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §36 | Mid-Contract Termination Risk Monitoring |
 | §37 | Data Retention, Erasure & GDPR Compliance Pipeline Observability |
 | §56 | SCIM Provisioning Compliance Observability |
+| §57 | Amendment Rate Change Compliance Observability |
 
 ---
 
@@ -572,6 +573,16 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 | **Job 47 freshness dead-man's switch** | No `system.scim_provisioning_check_passed` LOW event in `audit_log_events` for > 26h; detected by `pg-cron-health-monitor` (§12.6) | P1 | PagerDuty `form-devops` → devops-lead; dedup `scim-prov-check-stale` 26h cooldown; auto-resolves on next `system.scim_provisioning_check_passed` emission | §56.4 AL-SCIM-PROV-02; §12.6 (freshness window note — job 47 daily 06:00 UTC) |
 
 **SOC 2 mapping (scim_provisioning_compliance):** CC6.4 (sensitive attribute access control — AL-SCIM-PROV-01 provides a proactive daily baseline sentinel for `scim.rejected_sensitive_attribute` events, complementing the reactive burst-detection in AL-SCIM-01 (§26.7b); SCIM-PROV-E-003 quarterly zero-count assertion (CC6.4) requires automated baseline confirmation to support compliance-officer attestation); CC4.1 (monitoring activities — job 47 daily sweep 1 + quarterly sweep 2 demonstrate continuous automated monitoring of SCIM sensitive attribute controls throughout the observation period); CC7.2 (anomaly detection — daily proactive sweep detects any `scim.rejected_sensitive_attribute` event indicating a SCIM IdP misconfiguration or malicious attribute injection attempt before the next quarterly compliance review). Privacy floor: `security.scim_sensitive_attr_violation_detected` event payload carries only `event_count` int, `window_start` timestamptz, `window_end` timestamptz, `check_run_at` timestamptz — no `tenant_id`, no rejected attribute VALUE, no `user_id`, no employee name, email, health value, or GDPR Art. 9 data. The `system.scim_provisioning_quarterly_check_triggered` and `system.scim_provisioning_check_passed` events carry aggregate fleet counts only. `tenant_manager` (HR) and `enterprise_admin` excluded from dashboard visibility.
+
+**Subsection: `amendment_rate_health` (AL-AMEND-01/02/03 — §57.4):**
+
+| Condition | Signal source | Severity | Routing | Cross-ref |
+|---|---|---|---|---|
+| **TU-CHAIN-01 chain gap detected** | `amendment_rate_compliance_monitor` pg_cron (job 48, `0 7 1 * *`): sweep 1 — correlated subquery for `billing.rate_updated` events in last 32 days without matching `enterprise.contract_amended` for same `tenant_id` within ±24h; on gap_count > 0: emits `security.amendment_chain_gap_detected` CRITICAL/7yr (AMEND-MONITOR-CHAIN-01: DEC-030 HTTP 200 confirmed before AL-AMEND-01 PagerDuty P0 fires); dedup `amend-chain-gap-{YYYY-MM}` no-expiry; no auto-resolve — IC must close after full forensic investigation | P0 | PagerDuty `form-security` + `form-compliance` → security-engineer + compliance-officer + enterprise-architect | §57.4 AL-AMEND-01; COST_MODEL §45.5 (TU-CHAIN-01); INCIDENT_RESPONSE R-48 (pending §57.10 item 6) |
+| **Price floor breach detected** | job 48 sweep 2: `SELECT id FROM enterprise_contracts WHERE amendment_type IS NOT NULL AND rate_per_seat_usd < CASE tier WHEN 'starter' THEN 6.00 WHEN 'growth' THEN 4.50 WHEN 'enterprise' THEN 4.00 END`; on breach_count > 0: emits `security.amendment_floor_breach_detected` CRITICAL/7yr (AMEND-MONITOR-CHAIN-01: DEC-030 HTTP 200 confirmed before AL-AMEND-02 PagerDuty P0 fires); dedup `amend-floor-breach-{YYYY-MM}` no-expiry; no auto-resolve | P0 | PagerDuty `form-security` + `form-compliance` → security-engineer + compliance-officer | §57.4 AL-AMEND-02; COST_MODEL §31.5 (floors); INCIDENT_RESPONSE R-48 (pending §57.10 item 6) |
+| **Job 48 stale** | `pg-cron-health-monitor` freshness sentinel: last run of `amendment_rate_compliance_monitor` > 33 days ago | P1 | PagerDuty `form-devops` → devops-lead; dedup `amend-check-stale` 33-day cooldown; auto-resolves on next `system.amendment_rate_check_passed` emission | §57.4 AL-AMEND-03; §12.6 job 48 |
+
+**SOC 2 mapping (amendment_rate_health):** CC5.2 (accountability for rate changes — AL-AMEND-01 detects any TU-CHAIN-01 bypass surviving the Worker-layer HTTP 422 enforcement in `amend_contract_tier()` SECURITY DEFINER RPC; AMEND-MONITOR-CHAIN-01 ordering invariant provides auditable DEC-030 evidence for every chain gap — auditors can verify no P0 alert was dispatched without a confirmed chain event); CC6.1 (authorised write paths — AL-AMEND-02 detects any `enterprise_contracts` row with `amendment_type IS NOT NULL` and `rate_per_seat_usd` below the §31.5 floor, indicating possible bypass of `amend_contract_tier()` write path or DDL floor CHECK constraint); A1.1 (AMEND-OBS-E-001 annual run history demonstrates job 48 was operational throughout the observation year — CC4.1 monitoring activities; monthly sweep provides continuous automated verification of commercial governance controls between annual ADM-E-001/ADM-E-002 filings). Privacy floor: `security.amendment_chain_gap_detected` carries `chain_gap_count` integer, `billing_event_ids` UUID[] (FORM-internal `audit_log_events` PKs), `check_run_at` — no employee `user_id`, name, email, health value, rate value, or GDPR Art. 9 special-category data; `security.amendment_floor_breach_detected` carries `breach_count` integer, `breaching_contract_ids` UUID[] (FORM-internal `enterprise_contracts` PKs), `check_run_at`; `system.amendment_rate_check_passed` carries aggregate counts only (`chain_gap_count: 0`, `floor_breach_count: 0`, `contracts_checked`, `events_checked`, `check_run_at`); AMEND-MONITOR-CHAIN-01: `system.amendment_rate_check_passed` suppressed when any CRITICAL event emitted this run; `tenant_manager` (HR) and `enterprise_admin` excluded from dashboard visibility.
 
 **Subsection: `sca_vulnerability_monitoring` (AL-SCA-01 through AL-SCA-05 — §52.4):**
 
@@ -1272,6 +1283,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `pricing_exception_compliance_monitor` | `0 9 * * *` | 26 h | CC5.2/CC1.4/CC4.1 — daily REENTRY-CHAIN-01 chain integrity sweep (sweep 1) + quarterly pricing exception audit trigger (sweep 2); sweep 1: query `audit_log_events` for `enterprise.contract_renewed` events with `contract_discount_type = 'loyalty_reentry'` in last 25h lacking a matching `enterprise.pricing_exception_approved` (`exception_type = 'loyalty_reentry'`, same `tenant_id`, within prior 30 days — REENTRY-CHAIN-01 per COST_MODEL §44.5); on violation: emits `enterprise.reentry_chain_integrity_violation` CRITICAL/7yr (REENTRY-MONITOR-CHAIN-01 ordering invariant: DEC-030 HTTP 200 confirmed before PagerDuty P0 fires) + fires AL-PRICE-01 P0 `form-compliance` → founder + compliance-officer + enterprise-architect; sweep 2: fires only in first 7 days of Jan/Apr/Jul/Oct — aggregate count of `enterprise.pricing_exception_approved` events for prior quarter by `exception_type` → emits `system.pricing_exception_quarterly_audit_triggered` STANDARD/3yr (aggregate, no `tenant_id`) + Slack `#compliance` advisory (P3, no PagerDuty); always emits `system.pricing_exception_check_passed` LOW/1yr after all sweeps (aggregate counts, no `tenant_id` — privacy floor); `form_system` role; `form_api` REVOKED from `audit_log_events`; stale = PRICE-SLO-01 REENTRY-CHAIN-01 monitoring blind spot (loyalty re-entry renewal bypassing Worker-layer enforcement undetected for up to 24h) + PRICE-SLO-02 quarterly audit trigger miss (compliance-officer PRICE-OBS-E-001 filing obligation not triggered) | PagerDuty P1 `form-devops` → devops-lead; dedup `pricing-exception-check-stale`; 26h freshness window (1-day tolerance — daily cadence appropriate per §55.11 OQ-PRICE-MON-01: REENTRY-CHAIN-01 is a commercial governance control with no immediate safety implication; Worker-layer real-time enforcement is already in place; daily monitoring-layer verification is consistent with jobs 39 and 45); cross-ref: §55.4 (AL-PRICE-01/02/03 alert specs); §55.5 (job spec — §55.5.2 two sweep SQL specs, §55.5.3 implementation decision, §55.5.5 REENTRY-MONITOR-CHAIN-01 invariant); §55.6 (§6.2 `pricing_exception_health` subsection — this commit v5.2.3); COST_MODEL §44.5 (REENTRY-CHAIN-01 source definition); COST_MODEL §31.8 (four pricing audit DEC-030 events); COST_MODEL §44.7 (quarterly pricing exception audit obligation — this section formalises the automated trigger); PRICE-OBS-E-001 (CC5.2/CC1.4/CC4.1, quarterly 7yr); PRICE-OBS-E-002 (CC4.1/A1.1, annual 3yr); INCIDENT_RESPONSE R-46 (§R-46.5/R-46.6; v1.0, 2026-06-25) — **job 46** |
 
 | `scim_provisioning_compliance_monitor` | `0 6 * * *` | 26 h | CC6.4/CC4.1/CC7.2 — daily SCIM sensitive attribute violation sentinel (sweep 1) + quarterly SCIM provisioning compliance trigger (sweep 2); sweep 1: `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'scim.rejected_sensitive_attribute' AND created_at >= NOW() - INTERVAL '26 hours'`; on count > 0: emits `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr (SCIM-ATTR-CHAIN-01 ordering invariant: DEC-030 HTTP 200 confirmed before AL-SCIM-PROV-01 PagerDuty P0 fires); sweep 2: fires only in first 7 days of Jan/Apr/Jul/Oct — aggregate `scim.rejected_sensitive_attribute` count for prior quarter → emits `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr (aggregate, no `tenant_id`) + Slack `#compliance` advisory; always emits `system.scim_provisioning_check_passed` LOW/1yr after all sweeps (aggregate counts, no `tenant_id` — privacy floor); `form_system` role; `form_api` REVOKED from `audit_log_events`; stale = SCIM-PROV-SLO-01 (zero sensitive attribute violations) monitoring blind spot + SCIM-PROV-E-003 quarterly zero-count assertion collection baseline unavailable | PagerDuty P1 `form-devops` → devops-lead; dedup `scim-prov-check-stale`; 26h freshness window (daily cadence appropriate for CC6.4 zero-tolerance baseline — reactive burst AL-SCIM-01 (§26.7b) handles real-time spike detection; job 47 provides proactive daily confirmation and quarterly evidence trigger); cross-ref: §56.4 (AL-SCIM-PROV-01/02 alert specs); §56.5 (job spec — §56.5.2 sweep 1 SQL, §56.5.3 sweep 2 SQL, §56.5.5 SCIM-ATTR-CHAIN-01 invariant); §56.6 (§6.2 `scim_provisioning_compliance` subsection — this commit v5.3.0); SSO_SCIM §26.7b (AL-SCIM-01 reactive burst complement); SCIM-PROV-MON-E-001 (CC4.1/A1.1/CC7.2, annual 3yr — §56.8); INCIDENT_RESPONSE R-47 (job 47 stale recovery runbook — §R-47.5; v1.0, 2026-06-26) — **job 47** |
+| `amendment_rate_compliance_monitor` | `0 7 1 * *` | 33 days | CC5.2/CC6.1/A1.1 — monthly TU-CHAIN-01 chain integrity cross-check (sweep 1) + price floor forensic verification (sweep 2); sweep 1: correlated subquery on `audit_log_events` for `billing.rate_updated` events in last 32 days lacking matching `enterprise.contract_amended` for same `tenant_id` within ±24h (TU-CHAIN-01 per COST_MODEL §45.5); on gap_count > 0: emits `security.amendment_chain_gap_detected` CRITICAL/7yr (AMEND-MONITOR-CHAIN-01 ordering invariant: DEC-030 HTTP 200 confirmed before AL-AMEND-01 PagerDuty P0 fires); sweep 2: `SELECT id FROM enterprise_contracts WHERE amendment_type IS NOT NULL AND rate_per_seat_usd < CASE tier WHEN 'starter' THEN 6.00 WHEN 'growth' THEN 4.50 WHEN 'enterprise' THEN 4.00 END`; on breach_count > 0: emits `security.amendment_floor_breach_detected` CRITICAL/7yr (AMEND-MONITOR-CHAIN-01: DEC-030 HTTP 200 confirmed before AL-AMEND-02 PagerDuty P0 fires); unknown-tier NULL bypass protection: rows with unrecognised `tier` excluded from breach set → `system.amendment_unknown_tier_detected` STANDARD/3yr for devops-lead review; always emits `system.amendment_rate_check_passed` LOW/1yr after both clean sweeps (aggregate counts — privacy floor; suppressed when CRITICAL emitted — AMEND-MONITOR-CHAIN-01); `form_system` role; `form_api` REVOKED from `audit_log_events` and `enterprise_contracts`; stale = AMEND-SLO-01 TU-CHAIN-01 chain gap monitoring blind spot + AMEND-SLO-02 price floor forensic cross-check unavailable | PagerDuty P1 `form-devops` → devops-lead; dedup `amend-check-stale`; 33-day freshness window (monthly cadence — 1-day tolerance; tolerated because TU-CHAIN-01 is enforced at Worker layer in real time via HTTP 422 in `amend_contract_tier()` SECURITY DEFINER RPC; price floor enforced at DDL layer via CHECK constraint (DATA_MODEL §47); job 48 is monthly belt-and-suspenders forensic cross-check, not primary enforcement gate; a missed run means at most 64 days between verifications — acceptable for a commercial governance control, well within the annual ADM-E-002 filing cycle); cross-ref: §57.4 (AL-AMEND-01/02/03 alert specs); §57.5 (job spec — §57.5.2 sweep 1 SQL, §57.5.3 sweep 2 SQL, §57.5.5 AMEND-MONITOR-CHAIN-01 invariant); §57.6 (§6.2 `amendment_rate_health` subsection — v5.4.0, this commit); COST_MODEL §45.5 (TU-CHAIN-01 source definition); COST_MODEL §31.5 (price floors: Starter $6.00, Growth $4.50, Enterprise $4.00); DATA_MODEL §47 (migration 0088 — amendment columns + floor CHECK constraint); SOC2_READINESS §118 (ADM-E-001/ADM-E-002 annual evidence artefacts); AMEND-OBS-E-001 (CC5.2/CC6.1/A1.1, annual 3yr — §57.8; SOC2_READINESS §124 registration pending §57.10 item 5 P1/M6); INCIDENT_RESPONSE R-48 (job 48 stale recovery runbook — pending §57.10 item 6 P1/M7) — **job 48** |
 
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
@@ -1279,7 +1291,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 
 **Job-number conflict resolution (v0.9, 2026-06-22):** Two sections within OBSERVABILITY.md independently claimed job numbers already assigned in this §12.6 canonical registry: (1) `docs/OBSERVABILITY.md §42.7` (v3.9, 2026-06-14) referenced `white_label_cert_check` as "job 32" — but job 32 was already assigned to `turh_retention_purge` when the v0.4 patch was published (2026-06-19); (2) `docs/OBSERVABILITY.md §43.7` (v4.0, 2026-06-14) referenced `webhook_degraded_escalation_check` as "job 34" — but job 34 was already assigned to `bdg_override_expiry_sweep` in the same v0.4 patch. Both are renumbered in this registry: `white_label_cert_check` → **job 40**; `webhook_degraded_escalation_check` → **job 41**. In-text citations in §42.7, §42.14 item 3, §43.7, and §43.15 items 6–8 corrected in this v0.9 patch (since both sections reside within OBSERVABILITY.md, consistent with the v0.5 precedent of correcting §49 in-text citations). This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
-*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days. `pricing_exception_compliance_monitor` (job 46) is daily at 09:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the REENTRY-CHAIN-01 commercial governance control has no immediate safety implication; Worker-layer real-time enforcement (COST_MODEL §44.5 HTTP 422) is the primary gate; daily monitoring-layer verification (sweep 1) is a belt-and-suspenders sentinel; quarterly trigger (sweep 2) is activated by date arithmetic, not a tight compliance deadline. `scim_provisioning_compliance_monitor` (job 47) is daily at 06:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the SCIM-PROV-SLO-01 zero-tolerance CC6.4 target is enforced at SCIM Worker write time (HTTP 422 on sensitive attribute push per SSO_SCIM §27.12); job 47 provides the proactive daily monitoring-layer confirmation and quarterly evidence trigger; the AL-SCIM-01 reactive burst detector (§26.7b, job 24, every 5 min) handles real-time anomaly detection; a single missed job 47 run extends daily-baseline detection latency by 24h, tolerated for a day-scale compliance evidence obligation.
+*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days. `pricing_exception_compliance_monitor` (job 46) is daily at 09:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the REENTRY-CHAIN-01 commercial governance control has no immediate safety implication; Worker-layer real-time enforcement (COST_MODEL §44.5 HTTP 422) is the primary gate; daily monitoring-layer verification (sweep 1) is a belt-and-suspenders sentinel; quarterly trigger (sweep 2) is activated by date arithmetic, not a tight compliance deadline. `scim_provisioning_compliance_monitor` (job 47) is daily at 06:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the SCIM-PROV-SLO-01 zero-tolerance CC6.4 target is enforced at SCIM Worker write time (HTTP 422 on sensitive attribute push per SSO_SCIM §27.12); job 47 provides the proactive daily monitoring-layer confirmation and quarterly evidence trigger; the AL-SCIM-01 reactive burst detector (§26.7b, job 24, every 5 min) handles real-time anomaly detection; a single missed job 47 run extends daily-baseline detection latency by 24h, tolerated for a day-scale compliance evidence obligation. `amendment_rate_compliance_monitor` (job 48) is monthly at 07:00 UTC on the 1st — 33-day freshness window gives 1-day tolerance for scheduling jitter; tolerated because TU-CHAIN-01 is enforced at Worker layer in real time via HTTP 422 in `amend_contract_tier()` SECURITY DEFINER RPC (COST_MODEL §45.5), and the price floor is enforced at the DDL layer via CHECK constraint (DATA_MODEL §47); job 48 is a monthly belt-and-suspenders forensic cross-check, not the primary enforcement gate; a missed run means at most 64 days between verifications — acceptable for a commercial governance control without an immediate safety implication, well within the annual ADM-E-002 evidence filing cycle (SOC2_READINESS §118).
 
 **DEC-030 events emitted by `pg-cron-health-monitor`** — registered in `docs/AUDIT_LOG_SCHEMA.md §System`:
 
@@ -1300,6 +1312,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 **v0.5 · 2026-06-20 · Owner: devops-lead**
 **Review: quarterly or on architecture change. Next scheduled review: August 2026.**
 **SOC 2 evidence: CC7.2 (system monitoring). See also INCIDENT_RESPONSE.md for CC7.3–CC7.5.**
+*v2.3 patch (2026-06-27): §12.6 job 48 `amendment_rate_compliance_monitor` registered — closes the amendment rate compliance monitoring gap identified in OBSERVABILITY §57 (v5.4.0, 2026-06-27): no automated monthly cross-check existed for TU-CHAIN-01 chain integrity (`billing.rate_updated` → `enterprise.contract_amended` pairing per COST_MODEL §45.5) or price floor compliance (`enterprise_contracts.rate_per_seat_usd ≥ §31.5 floor`) between annual ADM-E-002 filings (SOC2_READINESS §118). Schedule `0 7 1 * *` (07:00 UTC on 1st of each month — offset from jobs 45/46/47 at 08:00/09:00/06:00 UTC); 33-day freshness window (monthly + 1-day tolerance). Sweep 1: correlated subquery for `billing.rate_updated` events in last 32 days without `enterprise.contract_amended` chain partner for same `tenant_id` within ±24h; gap_count > 0 → `security.amendment_chain_gap_detected` CRITICAL/7yr + AL-AMEND-01 P0 (AMEND-MONITOR-CHAIN-01 ordering invariant: HTTP 200 before PagerDuty). Sweep 2: `enterprise_contracts` floor check against §31.5 tier floors (Starter $6.00, Growth $4.50, Enterprise $4.00); breach_count > 0 → `security.amendment_floor_breach_detected` CRITICAL/7yr + AL-AMEND-02 P0. Unknown-tier NULL bypass protection: unrecognised `tier` excluded from breach set → `system.amendment_unknown_tier_detected` STANDARD/3yr. All-clear: `system.amendment_rate_check_passed` LOW/1yr (aggregate counts only — privacy floor; suppressed when CRITICAL emitted — AMEND-MONITOR-CHAIN-01). Evidence artefact: AMEND-OBS-E-001 (annual run history, CC5.2/CC6.1/A1.1, 3yr; SOC2_READINESS §124 registration pending §57.10 item 5). Freshness window note extended to cover job 48. Canonical section: §57.*
 *v2.2 patch (2026-06-26): §12.6 job 47 cross-ref corrected — `INCIDENT_RESPONSE R-47` updated from "P1/M7 — to be authored" to "v1.0, 2026-06-26". R-47 was authored in `docs/INCIDENT_RESPONSE.md` as part of v9.19.1 (2026-06-26), closing OBSERVABILITY §56.10 item 6 (P1/M7). The CHANGELOG v9.19.1 "Changed" entry stated the §12.6 job 47 cross-ref was updated, but the table row at line 1274 retained the original "to be authored" text. This patch corrects the stale reference to match §56.4 AL-SCIM-PROV-02 (which already carried the correct "v1.0, 2026-06-26" reference since v9.19.1). No other §12.6 rows modified. Document header: v5.3.0 → v5.3.1. Owner: devops-lead + compliance-officer.*
 
 *v2.1 patch (2026-06-26): §12.6 job 47 `scim_provisioning_compliance_monitor` registered — closes the SCIM provisioning compliance monitoring gap identified in OBSERVABILITY §56 (v5.3.0, 2026-06-26): no proactive daily baseline sentinel existed for `scim.rejected_sensitive_attribute` events; AL-SCIM-01 (§26.7b, job 24) provides reactive burst detection only; SCIM-PROV-E-003 quarterly zero-count assertion (SOC2_READINESS §119) had no automated collection trigger. Schedule `0 6 * * *` (06:00 UTC daily — offset from jobs 45/46 at 08:00/09:00 to distribute pg_cron load); 26h freshness window (consistent with jobs 39, 45, 46; reactive burst detection via AL-SCIM-01 handles real-time anomalies; daily monitoring-layer verification is the CC6.4 compliance baseline). Sweep 1: COUNT `scim.rejected_sensitive_attribute` events in last 26h; count > 0 → `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr + AL-SCIM-PROV-01 P0 PagerDuty (SCIM-ATTR-CHAIN-01 ordering invariant: HTTP 200 before dispatch). Sweep 2: quarterly trigger first 7 days of Jan/Apr/Jul/Oct → `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr + Slack `#compliance` advisory. All-clear: `system.scim_provisioning_check_passed` LOW/1yr (aggregate, no `tenant_id`). Evidence artefact: SCIM-PROV-MON-E-001 (annual run history, CC4.1/A1.1/CC7.2, 3yr). Freshness window note extended to cover job 47. Canonical section: §56.*
@@ -15978,3 +15991,315 @@ This is the **monitoring infrastructure** artefact, distinct from the compliance
 ---
 
 *v5.3.0 (2026-06-26): §56 SCIM Provisioning Compliance Observability — closes three monitoring gaps identified after SOC2_READINESS §119 registered SCIM-PROV-E-001..004 (2026-06-26): (1) no proactive daily baseline sentinel for `scim.rejected_sensitive_attribute` events (AL-SCIM-01 §26.7b is reactive burst-only; a single isolated violation was undetectable between quarterly reviews); (2) SCIM-PROV-E-003 quarterly zero-count assertion (SOC2_READINESS §119, CC6.4) had no automated collection trigger; (3) no monitoring infrastructure evidence artefact (SCIM-PROV-MON-E-001) to complement SCIM-PROV-E-001..004. New pg_cron job 47 `scim_provisioning_compliance_monitor` (`0 6 * * *`; 26h freshness; sweep 1 zero-count check; sweep 2 quarterly trigger; `system.scim_provisioning_check_passed` all-clear; SCIM-ATTR-CHAIN-01 ordering invariant). Two new SLOs: SCIM-PROV-SLO-01 (zero-tolerance CC6.4; any event = P0) and SCIM-PROV-SLO-02 (job 47 freshness CC4.1/A1.1). Two new alert rules: AL-SCIM-PROV-01 (P0 violation; PagerDuty `form-security`) and AL-SCIM-PROV-02 (P1 stale; PagerDuty `form-devops`). Three new DEC-030 events specified in §56.7 (AUDIT_LOG_SCHEMA.md registration pending §56.10 item 1 P0/M5). Evidence artefact SCIM-PROV-MON-E-001 (annual run history, CC4.1/A1.1/CC7.2, 3yr; SOC2_READINESS §79.4 registration pending §56.10 item 5 P1/M6). §6.2 `scim_provisioning_compliance` subsection inserted (this commit, item 4 done). §12.6 job 47 registered (v2.1 patch, this commit, item 3 done). TOC entry added. Privacy floor throughout: `security.scim_sensitive_attr_violation_detected` carries aggregate `violation_count` + timestamps only — no `tenant_id`, no rejected attribute VALUE, no `user_id`, name, email, health value, or GDPR Art. 9 data; `system.scim_provisioning_quarterly_check_triggered` and `system.scim_provisioning_check_passed` carry aggregate counts only. Pending obligations: AUDIT_LOG_SCHEMA.md DEC-030 registration (item 1 P0/M5), job 47 implementation (item 2 P0/M5), SOC2_READINESS §120 cross-ref patch + SCIM-PROV-MON-E-001 registration (item 5 P1/M6), INCIDENT_RESPONSE R-47 (item 6 P1/M7), staging test (item 7 P2/M8), Metabase dashboard (item 8 P1/M8). Owner: compliance-officer + security-engineer + enterprise-architect. Document v5.2.6 → v5.3.0.*
+
+---
+
+## §57. Amendment Rate Change Compliance Observability
+
+**Owner:** compliance-officer + security-engineer + enterprise-architect
+**Review:** Monthly or on schema change to `enterprise_contracts` amendment columns.
+**SOC 2 Criteria:** CC5.2, CC6.1, A1.1
+**Prerequisite docs:** COST_MODEL §45.5 (TU-CHAIN-01 invariant); COST_MODEL §31.5 (price floors); DATA_MODEL §47 (migration 0088, amendment columns); SOC2_READINESS §118 (ADM-E-001/ADM-E-002)
+
+---
+
+### §57.1 Context and Monitoring Gap
+
+`docs/COST_MODEL.md §45` (DEC-082, 2026-06-26) established the Pure Tier Upgrade governance framework: the `amend_contract_tier()` SECURITY DEFINER RPC is the only authorised write path to `enterprise_contracts.rate_per_seat_usd` on amendment; `form_api` is REVOKED from `enterprise_contracts`; TU-CHAIN-01 enforces that every `billing.rate_updated` DEC-030 event has a matching `enterprise.contract_amended` for the same `tenant_id` within ±24h (violation → HTTP 422 `TU_CHAIN_01_FLOOR_VIOLATION` at Worker layer). `docs/DATA_MODEL.md §47` (migration 0088, 2026-06-27) added four amendment columns (`amendment_date TIMESTAMPTZ`, `amendment_type VARCHAR(30) CHECK (IN ('tier_upgrade','scope_expansion','term_extension','other'))`, `prior_rate_per_seat_usd NUMERIC(10,4)`, `amendment_justification_hash TEXT`) and a DDL-layer price floor CHECK constraint.
+
+Two compliance evidence artefacts were established in SOC2_READINESS §118:
+
+- **ADM-E-001** (CC5.2/CC6.1/A1.1, annual, 7yr) — annual SOC 2 auditor-facing summary of all amendment events in the observation year
+- **ADM-E-002** (CC5.2/CC1.4, annual, 7yr) — annual compliance-officer certification that all amendments satisfied TU-CHAIN-01 and §31.5 floor requirements
+
+Both artefacts are **annual manual filings**. No automated monitoring existed between filings to verify: (1) every `billing.rate_updated` event has a chain partner `enterprise.contract_amended` within ±24h (TU-CHAIN-01 chain integrity), or (2) every `enterprise_contracts` row with `amendment_type IS NOT NULL` has `rate_per_seat_usd ≥ §31.5 floor` (price floor forensic verification). A bug in `amend_contract_tier()` that emits `billing.rate_updated` without the paired DEC-030 chain event, or a row inserted below the floor, would not surface until the next annual ADM-E-002 review.
+
+This section closes that gap with a monthly pg_cron job (`amendment_rate_compliance_monitor`, job 48) performing two forensic sweeps. It follows the exact pattern of §55 (Pricing Exception Compliance) and §56 (SCIM Provisioning Compliance).
+
+---
+
+### §57.2 SLOs
+
+| SLO ID | Target | Measurement | SOC 2 Criteria |
+|---|---|---|---|
+| AMEND-SLO-01 | Zero TU-CHAIN-01 chain gaps in any 32-day rolling window | Monthly job 48 sweep 1: `COUNT(billing.rate_updated events in last 32 days without matching enterprise.contract_amended for same tenant_id within ±24h) = 0` | CC5.2, CC6.1 |
+| AMEND-SLO-02 | Zero price floor breaches at any point in `enterprise_contracts` | Monthly job 48 sweep 2: `COUNT(enterprise_contracts WHERE amendment_type IS NOT NULL AND rate_per_seat_usd < §31.5 floor) = 0` | CC6.1 |
+| AMEND-SLO-03 | Job 48 freshness < 33 days | `pg_cron.job_run_details WHERE jobname = 'amendment_rate_compliance_monitor'` last run within 33-day window | A1.1, CC4.1 |
+
+---
+
+### §57.3 Monitoring Architecture
+
+```
+amend_contract_tier() SECURITY DEFINER RPC
+  └─ TU-CHAIN-01 (COST_MODEL §45.5): billing.rate_updated + enterprise.contract_amended within ±24h
+  └─ DDL floor CHECK (DATA_MODEL §47): rate_per_seat_usd ≥ §31.5 floor for tier
+       └─ amendment_rate_compliance_monitor (job 48, 0 7 1 * *)
+            ├─ Sweep 1: billing.rate_updated events in last 32 days without enterprise.contract_amended chain partner
+            │    └─ gap_count > 0 → security.amendment_chain_gap_detected CRITICAL/7yr → AL-AMEND-01 P0
+            ├─ Sweep 2: enterprise_contracts WHERE amendment_type IS NOT NULL AND rate < §31.5 floor
+            │    └─ breach_count > 0 → security.amendment_floor_breach_detected CRITICAL/7yr → AL-AMEND-02 P0
+            └─ All clear → system.amendment_rate_check_passed LOW/1yr (aggregate counts only — AMEND-MONITOR-CHAIN-01)
+```
+
+**Chain invariant — AMEND-MONITOR-CHAIN-01:** `system.amendment_rate_check_passed` MUST NOT be emitted in the same job 48 run as either `security.amendment_chain_gap_detected` CRITICAL or `security.amendment_floor_breach_detected` CRITICAL. All-clear is suppressed if either CRITICAL event is emitted this run. `form_system` role confirms DEC-030 HTTP 200 before dispatching AL-AMEND-01 or AL-AMEND-02 PagerDuty P0.
+
+---
+
+### §57.4 Alert Rules
+
+| Alert | Condition | Severity | Routing | Dedup | Auto-resolve |
+|---|---|---|---|---|---|
+| **AL-AMEND-01** TU-CHAIN-01 chain gap | `security.amendment_chain_gap_detected` emitted by job 48 sweep 1 (gap_count > 0) | P0 | PagerDuty `form-security` + `form-compliance` → security-engineer + compliance-officer + enterprise-architect | `amend-chain-gap-{YYYY-MM}` no-expiry | No — IC must close after full forensic investigation and remediation |
+| **AL-AMEND-02** Price floor breach | `security.amendment_floor_breach_detected` emitted by job 48 sweep 2 (breach_count > 0) | P0 | PagerDuty `form-security` + `form-compliance` → security-engineer + compliance-officer | `amend-floor-breach-{YYYY-MM}` no-expiry | No — IC must close after full forensic investigation and remediation |
+| **AL-AMEND-03** Job 48 stale | `pg-cron-health-monitor` freshness sentinel: last run of `amendment_rate_compliance_monitor` > 33 days ago | P1 | PagerDuty `form-devops` → devops-lead | `amend-check-stale` 33-day cooldown | Auto-resolves on next `system.amendment_rate_check_passed` emission |
+
+**SOC 2 mapping (amendment_rate_health):**
+- **AL-AMEND-01 → CC5.2** (commitment and accountability for rate changes): detects any TU-CHAIN-01 bypass surviving Worker-layer HTTP 422 enforcement in `amend_contract_tier()`. AMEND-MONITOR-CHAIN-01 ordering invariant provides auditable DEC-030 evidence: auditors can verify no P0 alert was dispatched without a confirmed chain event.
+- **AL-AMEND-02 → CC6.1** (authorised write paths): detects any `enterprise_contracts` row with `amendment_type IS NOT NULL` and `rate_per_seat_usd` below the §31.5 floor, indicating possible bypass of the `amend_contract_tier()` SECURITY DEFINER write path or DDL floor CHECK constraint.
+- **AL-AMEND-03 → A1.1** (availability assurance): AMEND-OBS-E-001 annual run history demonstrates job 48 was operational throughout the SOC 2 observation year. CC4.1 (monitoring activities): monthly sweep provides continuous automated verification between annual ADM-E-001/ADM-E-002 filings.
+
+**Privacy floor:** `security.amendment_chain_gap_detected` carries `chain_gap_count` integer, `billing_event_ids` UUID[] (FORM-internal `audit_log_events` PKs), `check_run_at` timestamptz — no employee `user_id`, name, email, health value, rate value, or GDPR Art. 9 special-category data. `security.amendment_floor_breach_detected` carries `breach_count` integer, `breaching_contract_ids` UUID[] (FORM-internal `enterprise_contracts` PKs), `check_run_at` timestamptz. `system.amendment_rate_check_passed` carries aggregate counts only (`chain_gap_count: 0`, `floor_breach_count: 0`, `contracts_checked`, `events_checked`, `check_run_at`). `tenant_manager` (HR) and `enterprise_admin` excluded from dashboard visibility. No rate value, tenant name, employee identity, or contract terms in any event payload.
+
+---
+
+### §57.5 Job Specification — `amendment_rate_compliance_monitor` (job 48)
+
+#### §57.5.1 Schedule and Role
+
+| Attribute | Value |
+|---|---|
+| Job name | `amendment_rate_compliance_monitor` |
+| Canonical job number | **48** (§12.6 registry, v2.3 patch 2026-06-27) |
+| Schedule | `0 7 1 * *` (07:00 UTC on the 1st of each month) |
+| Schedule rationale | Monthly cadence — offset from jobs 45/46/47 at 08:00/09:00/06:00 UTC; 07:00 UTC distributes pg_cron load on the 1st |
+| Freshness window | 33 days (monthly cadence + 1-day tolerance for scheduling jitter) |
+| Role | `form_system` |
+| Access revoked | `form_api` REVOKED from `audit_log_events` and `enterprise_contracts` |
+
+#### §57.5.2 Sweep 1 — TU-CHAIN-01 Chain Integrity
+
+```sql
+-- AMEND-CHAIN-01: billing.rate_updated events in last 32 days without
+-- a matching enterprise.contract_amended for same tenant_id within ±24h
+-- (TU-CHAIN-01 per COST_MODEL §45.5)
+SELECT
+  ale_rate.id            AS billing_event_id,
+  ale_rate.tenant_id,
+  ale_rate.created_at    AS rate_updated_at
+FROM audit_log_events ale_rate
+WHERE ale_rate.event_type = 'billing.rate_updated'
+  AND ale_rate.created_at >= NOW() - INTERVAL '32 days'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events ale_amend
+    WHERE ale_amend.event_type   = 'enterprise.contract_amended'
+      AND ale_amend.tenant_id    = ale_rate.tenant_id
+      AND ale_amend.created_at   BETWEEN ale_rate.created_at - INTERVAL '24 hours'
+                                      AND ale_rate.created_at + INTERVAL '24 hours'
+  );
+-- gap_count = COUNT(*) of above result set
+-- If gap_count > 0:
+--   emit security.amendment_chain_gap_detected CRITICAL/7yr
+--   payload: { chain_gap_count: gap_count, billing_event_ids: [UUIDs], check_run_at: NOW() }
+--   AMEND-MONITOR-CHAIN-01: DEC-030 HTTP 200 confirmed before AL-AMEND-01 PagerDuty P0
+-- Privacy: billing_event_ids are FORM-internal audit_log_events PKs — no employee identity
+```
+
+**Index prerequisite:** `idx_ale_event_type_created_at` (on `audit_log_events(event_type, created_at)`) and `idx_ale_tenant_id_event_type` (on `audit_log_events(tenant_id, event_type, created_at)`) must exist. Verify in staging before deploy.
+
+#### §57.5.3 Sweep 2 — Price Floor Forensic Verification
+
+```sql
+-- AMEND-FLOOR-01: enterprise_contracts with amendment_type set but
+-- rate_per_seat_usd below the §31.5 floor for the contract's tier
+-- (floors: Starter $6.00, Growth $4.50, Enterprise $4.00)
+SELECT id AS contract_id
+FROM enterprise_contracts
+WHERE amendment_type IS NOT NULL
+  AND rate_per_seat_usd < CASE tier
+    WHEN 'starter'    THEN 6.00
+    WHEN 'growth'     THEN 4.50
+    WHEN 'enterprise' THEN 4.00
+    ELSE NULL  -- unknown tier: excluded from breach set; triggers amendment_unknown_tier_detected
+  END;
+-- breach_count = COUNT(*) of above result set
+-- If breach_count > 0:
+--   emit security.amendment_floor_breach_detected CRITICAL/7yr
+--   payload: { breach_count: breach_count, breaching_contract_ids: [UUIDs], check_run_at: NOW() }
+--   AMEND-MONITOR-CHAIN-01: DEC-030 HTTP 200 confirmed before AL-AMEND-02 PagerDuty P0
+-- Privacy: breaching_contract_ids are FORM-internal enterprise_contracts PKs — no rate value, no tenant name
+```
+
+**Unknown-tier NULL bypass protection:** A row with `tier` not in (`starter`, `growth`, `enterprise`) yields `CASE ... ELSE NULL END` — the `< NULL` comparison evaluates to NULL (unknown), so the row is NOT included in the breach result set. Job 48 must emit a separate `system.amendment_unknown_tier_detected` STANDARD/3yr event with the `contract_ids` of unknown-tier rows for devops-lead review. This prevents a NULL-comparison bypass of the floor check.
+
+#### §57.5.4 All-Clear Emission
+
+After both sweeps complete with zero detections (AMEND-MONITOR-CHAIN-01: no CRITICAL event emitted this run):
+
+```
+Emit: system.amendment_rate_check_passed LOW/1yr
+Payload: {
+  chain_gap_count:    0,
+  floor_breach_count: 0,
+  contracts_checked:  <COUNT of enterprise_contracts WHERE amendment_type IS NOT NULL>,
+  events_checked:     <COUNT of billing.rate_updated events in last 32 days>,
+  check_run_at:       NOW()
+}
+```
+
+Privacy floor: no `tenant_id`, `user_id`, rate value, or contract terms in payload — aggregate counts only.
+
+#### §57.5.5 AMEND-MONITOR-CHAIN-01 Ordering Invariant
+
+Execution sequence enforced by job 48:
+
+1. Execute sweep 1 (TU-CHAIN-01 chain integrity).
+2. If gap_count > 0: emit `security.amendment_chain_gap_detected` CRITICAL/7yr via DEC-030 Worker. Confirm HTTP 200 before dispatching AL-AMEND-01 PagerDuty P0. Set `critical_emitted = true`.
+3. Execute sweep 2 (price floor forensic verification).
+4. If breach_count > 0: emit `security.amendment_floor_breach_detected` CRITICAL/7yr via DEC-030 Worker. Confirm HTTP 200 before dispatching AL-AMEND-02 PagerDuty P0. Set `critical_emitted = true`.
+5. Handle unknown-tier rows: if any rows with unrecognised `tier` found, emit `system.amendment_unknown_tier_detected` STANDARD/3yr.
+6. If `critical_emitted = false`: emit `system.amendment_rate_check_passed` LOW/1yr (all-clear).
+7. If `critical_emitted = true`: suppress `system.amendment_rate_check_passed` for this run.
+
+---
+
+### §57.6 §6.2 Cross-Reference
+
+`amendment_rate_health` subsection inserted into §6.2 Consolidated Alert Rules after `scim_provisioning_compliance` (§56.4) and before `sca_vulnerability_monitoring` (§52.4). See §6.2 above (this commit, v5.4.0, item 4 done).
+
+---
+
+### §57.7 DEC-030 Event Specifications
+
+Three new DEC-030 events for `docs/AUDIT_LOG_SCHEMA.md` registration (§57.10 item 1 P0/M5):
+
+#### §57.7.1 `security.amendment_chain_gap_detected`
+
+| Field | Value |
+|---|---|
+| Event type | `security.amendment_chain_gap_detected` |
+| Severity | CRITICAL |
+| Retention | 7 years |
+| Trigger | Job 48 sweep 1: ≥ 1 `billing.rate_updated` event in last 32 days without matching `enterprise.contract_amended` for same `tenant_id` within ±24h |
+| SOC 2 criteria | CC5.2, CC6.1 |
+| Chain invariant | AMEND-MONITOR-CHAIN-01: DEC-030 HTTP 200 confirmed before AL-AMEND-01 PagerDuty P0 dispatched; `system.amendment_rate_check_passed` suppressed this run |
+
+Zod v2 schema:
+```typescript
+z.object({
+  chain_gap_count:   z.number().int().positive(),           // count of billing.rate_updated events without chain partner
+  billing_event_ids: z.array(z.string().uuid()).nonempty(), // FORM-internal audit_log_events PKs
+  check_run_at:      z.string().datetime(),
+})
+```
+
+**Privacy floor:** No `tenant_id`, `user_id`, employee name, email, health value, or GDPR Art. 9 data. `billing_event_ids` are FORM-internal `audit_log_events` PKs — UUID references only.
+
+#### §57.7.2 `security.amendment_floor_breach_detected`
+
+| Field | Value |
+|---|---|
+| Event type | `security.amendment_floor_breach_detected` |
+| Severity | CRITICAL |
+| Retention | 7 years |
+| Trigger | Job 48 sweep 2: ≥ 1 `enterprise_contracts` row with `amendment_type IS NOT NULL` and `rate_per_seat_usd < §31.5 floor` for the row's tier |
+| SOC 2 criteria | CC5.2, CC6.1 |
+| Chain invariant | AMEND-MONITOR-CHAIN-01: DEC-030 HTTP 200 confirmed before AL-AMEND-02 PagerDuty P0 dispatched; `system.amendment_rate_check_passed` suppressed this run |
+
+Zod v2 schema:
+```typescript
+z.object({
+  breach_count:           z.number().int().positive(),           // count of enterprise_contracts rows below floor
+  breaching_contract_ids: z.array(z.string().uuid()).nonempty(), // FORM-internal enterprise_contracts PKs
+  check_run_at:           z.string().datetime(),
+})
+```
+
+**Privacy floor:** No tenant name, `user_id`, employee identity, health value, rate value, or contract terms. `breaching_contract_ids` are FORM-internal `enterprise_contracts` PKs — UUID references only.
+
+#### §57.7.3 `system.amendment_rate_check_passed`
+
+| Field | Value |
+|---|---|
+| Event type | `system.amendment_rate_check_passed` |
+| Severity | LOW |
+| Retention | 1 year |
+| Trigger | Job 48: both sweeps completed with zero detections; AMEND-MONITOR-CHAIN-01 satisfied (no CRITICAL emitted this run) |
+| SOC 2 criteria | A1.1 (monitoring operational), CC4.1 (monitoring activities) |
+| Chain invariant | AMEND-MONITOR-CHAIN-01: suppressed when CRITICAL event emitted this run |
+
+Zod v2 schema:
+```typescript
+z.object({
+  chain_gap_count:    z.literal(0),
+  floor_breach_count: z.literal(0),
+  contracts_checked:  z.number().int().nonnegative(),
+  events_checked:     z.number().int().nonnegative(),
+  check_run_at:       z.string().datetime(),
+})
+```
+
+**Privacy floor:** Aggregate counts only — no `tenant_id`, `user_id`, rate value, or contract terms.
+
+---
+
+### §57.8 Evidence Artefact — AMEND-OBS-E-001
+
+| Field | Value |
+|---|---|
+| Artefact ID | AMEND-OBS-E-001 |
+| Description | Annual run history of `amendment_rate_compliance_monitor` (job 48) — monthly pass/fail log with `chain_gap_count`, `floor_breach_count`, `contracts_checked`, `events_checked` per run throughout the observation year |
+| SOC 2 criteria | CC5.2, CC6.1, A1.1 |
+| Retention | 3 years |
+| Filing cadence | Annual — compliance-officer compiles prior calendar year's `system.amendment_rate_check_passed` + `security.amendment_chain_gap_detected` + `security.amendment_floor_breach_detected` events from `audit_log_events` |
+| R2 path | `compliance/evidence/amendments/monitoring/AMEND-OBS-E-001_<YYYY>.md` |
+| R2 subfolder | `compliance/evidence/amendments/monitoring/` — note: `amendments/` parent exists from ADM-E-001/ADM-E-002 at `compliance/evidence/amendments/` (SOC2_READINESS §118) |
+| `form_api` access | NO ACCESS — `form_system` role only |
+| Registration status | Pending SOC2_READINESS §124 (§57.10 item 5 P1/M6) |
+
+---
+
+### §57.9 Metabase Dashboard — Amendment Rate Compliance Monitor
+
+**Dashboard name:** Amendment Rate Compliance Monitor
+**Access:** `compliance_officer` + `form_admin` only. `enterprise_admin`, `tenant_admin`, and `tenant_manager` (HR) excluded — amendment rate governance is a FORM-internal compliance instrument.
+
+| Panel | Query | Refresh |
+|---|---|---|
+| Job 48 last run | `pg_cron.job_run_details WHERE jobname = 'amendment_rate_compliance_monitor'` — most recent `start_time` | 1 hr |
+| Chain gap events (rolling 12 months) | `audit_log_events WHERE event_type = 'security.amendment_chain_gap_detected'` — monthly count | Daily |
+| Floor breach events (rolling 12 months) | `audit_log_events WHERE event_type = 'security.amendment_floor_breach_detected'` — monthly count | Daily |
+| All-clear run history (rolling 12 months) | `audit_log_events WHERE event_type = 'system.amendment_rate_check_passed'` — `chain_gap_count`, `floor_breach_count`, `contracts_checked`, `events_checked` per run | Daily |
+| Amended contracts summary | `SELECT COUNT(*), amendment_type FROM enterprise_contracts WHERE amendment_type IS NOT NULL GROUP BY amendment_type` — aggregate by type | Daily |
+| SLO status | AMEND-SLO-01/02/03 current status derived from last 33-day window | 1 hr |
+
+**Access control:** `compliance_officer` + `form_admin` only. No `rate_per_seat_usd` value, no tenant name, no employee identity in any panel.
+
+---
+
+### §57.10 Implementation Checklist
+
+| # | Item | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Register three new DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` — new `§Contract Amendment Rate Compliance Monitoring events` subsection after `§SCIM Provisioning Compliance Monitoring events`: `security.amendment_chain_gap_detected` CRITICAL/7yr; `security.amendment_floor_breach_detected` CRITICAL/7yr; `system.amendment_rate_check_passed` LOW/1yr. Include Zod v2 schemas (§57.7), AMEND-MONITOR-CHAIN-01 ordering invariant block (§57.5.5), and SOC 2 auditor narratives (CC5.2/CC6.1/A1.1). | P0 | M5 | security-engineer + compliance-officer | [ ] |
+| 2 | Implement pg_cron job 48 `amendment_rate_compliance_monitor` (`0 7 1 * *`; §57.5.1 spec; §57.5.2 sweep 1 correlated subquery; §57.5.3 sweep 2 floor check + unknown-tier NULL bypass protection; §57.5.4 all-clear emission; AMEND-MONITOR-CHAIN-01 ordering invariant; `form_system` role; `form_api` REVOKED from `audit_log_events` and `enterprise_contracts`). Prerequisite: `billing.rate_updated` and `enterprise.contract_amended` event types registered in `audit_log_events` (COST_MODEL §45.5). | P0 | M5 | devops-lead + platform-engineer | [ ] |
+| 3 | Register job 48 in `docs/OBSERVABILITY.md §12.6` pg_cron canonical registry. | P0 | M5 | devops-lead | [x] Done — 2026-06-27 (§12.6 v2.3 patch, this commit) |
+| 4 | Insert `amendment_rate_health` subsection into `docs/OBSERVABILITY.md §6.2` Consolidated Alert Rules after `scim_provisioning_compliance` (§56) and before `sca_vulnerability_monitoring` (§52). | P0 | M5 | devops-lead | [x] Done — 2026-06-27 (OBSERVABILITY.md v5.4.0, this commit) |
+| 5 | Register AMEND-OBS-E-001 (§57.8) in `docs/SOC2_READINESS.md §79.4` master consolidated evidence table (count 86 → 87); create R2 subfolder `compliance/evidence/amendments/monitoring/` (parent `amendments/` already exists from §118); add to §80.4 Vanta mirror list. Author §124 cross-reference patch. | P1 | M6 | compliance-officer | [ ] |
+| 6 | Author INCIDENT_RESPONSE R-48 (job 48 stale recovery runbook): six-step runbook; §R-48.5 TU-CHAIN-01 chain gap escalation (IC forensic review of `billing.rate_updated` / `enterprise.contract_amended` audit trail, `amend_contract_tier()` RPC stack trace); §R-48.6 price floor breach escalation (IC forensic review of `enterprise_contracts` amendment columns + DDL CHECK verification); companion DEC-030 events `system.amendment_rate_monitor_stale_declared` HIGH/7yr + `system.amendment_rate_monitor_restored` STANDARD/3yr; AMEND-STALE-CHAIN-01 ordering invariant. | P1 | M7 | devops-lead + compliance-officer | [ ] |
+| 7 | End-to-end staging test: (a) INSERT `audit_log_events` row `event_type = 'billing.rate_updated'` with no chain partner; confirm sweep 1 detects gap; confirm `security.amendment_chain_gap_detected` CRITICAL emitted + `system.amendment_rate_check_passed` suppressed (AMEND-MONITOR-CHAIN-01). (b) INSERT `enterprise_contracts` row with `amendment_type = 'tier_upgrade'` and `rate_per_seat_usd = 3.00`; confirm sweep 2 detects breach; confirm `security.amendment_floor_breach_detected` CRITICAL emitted. (c) Clean up test rows; confirm zero-count all-clear at next run; confirm `system.amendment_rate_check_passed` LOW/1yr emitted. (d) Verify unknown-tier NULL bypass: INSERT row with `tier = 'unknown'`; confirm `system.amendment_unknown_tier_detected` STANDARD emitted (not included in breach result set). | P2 | M8 | devops-lead | [ ] |
+| 8 | Configure Metabase Amendment Rate Compliance Monitor dashboard (§57.9 — 6 panels); restrict to `compliance_officer` + `form_admin`; confirm `enterprise_admin`, `tenant_admin`, and `tenant_manager` excluded; verify no rate value, tenant name, or employee identity in any panel. | P1 | M8 | data-engineer | [ ] |
+
+---
+
+### §57.11 OQ Gap Tracker
+
+| OQ | Status | Decision |
+|---|---|---|
+| OQ-AMEND-MON-01: Why monthly cadence for job 48 rather than daily (like jobs 45/46/47)? | 🟢 Resolved | TU-CHAIN-01 is enforced in real time at the Worker layer via HTTP 422 in `amend_contract_tier()` SECURITY DEFINER RPC (COST_MODEL §45.5). The price floor is enforced at the DDL layer via CHECK constraint on `enterprise_contracts` (DATA_MODEL §47). Job 48 is a belt-and-suspenders forensic cross-check — not the primary enforcement gate. Amendment events are low-frequency commercial governance actions (distinct from SCIM provisioning events, which occur on every user lifecycle change). A monthly forensic sweep is proportionate: matches the ADM-E-001/ADM-E-002 annual filing rhythm, consistent with the §45 DEC-082 governance framework timeline. Monthly cadence is justified by real-time enforcement at two independent layers; daily cadence would provide no additional protection while adding unnecessary load. |
+| OQ-AMEND-MON-02: Why 32-day sweep window for sweep 1 rather than 31 days (one calendar month) or 33 days (matching freshness window)? | 🟢 Resolved | Freshness window is 33 days (monthly + 1-day scheduling jitter tolerance). Using 32 days for the sweep window provides 1-day overlap: if the job runs on the 1st and the previous run was on the 1st of the prior month (28–31 days ago depending on month length), a 31-day window might miss the final day of the prior month's events in February (28 days) or March (31 days). A 32-day window guarantees full prior-month coverage regardless of month length. Using the full 33-day freshness window for the sweep would cause ~1-day double-counting between consecutive runs. 32 days is the balanced choice: full prior-month coverage without systematic double-counting. |
+
+---
+
+*v5.4.0 (2026-06-27): §57 Amendment Rate Change Compliance Observability — closes the amendment rate compliance monitoring gap identified after COST_MODEL §45 (DEC-082, 2026-06-26) established the Pure Tier Upgrade governance framework and DATA_MODEL §47 (migration 0088, 2026-06-27) added amendment columns to `enterprise_contracts`: no automated monitoring existed between annual ADM-E-001/ADM-E-002 filings (SOC2_READINESS §118) to verify TU-CHAIN-01 chain integrity or price floor compliance. New pg_cron job 48 `amendment_rate_compliance_monitor` (`0 7 1 * *`; monthly; 33-day freshness window; sweep 1: correlated subquery for `billing.rate_updated` events in last 32 days without matching `enterprise.contract_amended` for same `tenant_id` within ±24h; sweep 2: `enterprise_contracts` floor check against §31.5 tier floors: Starter $6.00, Growth $4.50, Enterprise $4.00; unknown-tier NULL bypass protection → `system.amendment_unknown_tier_detected` STANDARD/3yr). Three new DEC-030 events: `security.amendment_chain_gap_detected` CRITICAL/7yr (AL-AMEND-01 P0; AMEND-MONITOR-CHAIN-01 ordering invariant), `security.amendment_floor_breach_detected` CRITICAL/7yr (AL-AMEND-02 P0), `system.amendment_rate_check_passed` LOW/1yr (suppressed when CRITICAL emitted — AMEND-MONITOR-CHAIN-01). Three alert rules: AL-AMEND-01 (P0 chain gap; PagerDuty `form-security` + `form-compliance` → security-engineer + compliance-officer + enterprise-architect), AL-AMEND-02 (P0 floor breach), AL-AMEND-03 (P1 job 48 stale; PagerDuty `form-devops`). Three SLOs: AMEND-SLO-01/02/03. Evidence artefact AMEND-OBS-E-001 (annual run history, CC5.2/CC6.1/A1.1, 3yr; R2 path `compliance/evidence/amendments/monitoring/AMEND-OBS-E-001_<YYYY>.md`; SOC2_READINESS §79.4 registration pending §57.10 item 5 P1/M6). TOC entry added. §6.2 `amendment_rate_health` subsection inserted after `scim_provisioning_compliance` and before `sca_vulnerability_monitoring` (item 4 done). §12.6 job 48 registered (v2.3 patch, item 3 done). Freshness window note extended for job 48. Privacy floor throughout: all event payloads carry aggregate counts or FORM-internal UUIDs only — no employee `user_id`, name, email, health value, rate value, or GDPR Art. 9 special-category data. Pending obligations: AUDIT_LOG_SCHEMA.md DEC-030 registration (item 1 P0/M5); job 48 implementation (item 2 P0/M5); SOC2_READINESS §124 AMEND-OBS-E-001 registration (item 5 P1/M6); INCIDENT_RESPONSE R-48 (item 6 P1/M7); staging test (item 7 P2/M8); Metabase dashboard (item 8 P1/M8). Owner: compliance-officer + security-engineer + enterprise-architect. Document v5.3.1 → v5.4.0.*
