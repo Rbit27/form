@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [9.77.1] — 2026-06-27
+
+### Added
+- `compliance/evidence/ir-templates/r30-purge-int-01.md` — Template PURGE-INT-01 (v1.0). GDPR `workout_data_purge` pg_cron failure compensating control memo template. Six sections: (1) Control Failure — job 26 stale window + root cause H1–H5; (2) Impact Assessment — aggregate counts only (affected users, `workout_sets`, `workout_sessions`, `body_metrics`), Art. 9 risk flag, DPA notification gate; (3) Compensating Control Executed — manual purge SQL details, PAM session ID, DEC-030 `system.purge_cron_manual_run_completed` chain record; (4) Restoration — job 26 restore confirmation, R-30-C1 re-run (must be 0 rows), `system.purge_cron_restored` DEC-030 emission; (5) Art. 33 DPA Notification Assessment (P0 escalated only — `body_metrics` affected AND stale > 72h; outside counsel required before any determination); (6) Sign-off (founder signature required if P0 escalated). Privacy floor enforced: no `user_id`, no email, no health values in any field. Filed as evidence artefact PURGE-CRON-COMP-E-001 under TSC CC6.5 / PI1.2; retention 7 years; R2 path `compliance/evidence/purge-cron/r30-<incident_id>/`. Closes INCIDENT_RESPONSE.md R-30.11 item 3 (P1/M7).
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.16.2 → v3.16.3. R-30.11 item 3 marked `[x] Done — 2026-06-27`.
+- `VERSION` — 9.77.0 → 9.77.1.
+
+---
+
 ## [9.77.0] — 2026-06-27
 
 ### Added
