@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [9.57.0] — 2026-06-27
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §Contract Amendment Rate Compliance Monitoring events` — new DEC-030 section. Three HMAC-chained events registered: `security.amendment_chain_gap_detected` CRITICAL/7yr (job 48 sweep 1 — TU-CHAIN-01 bypass indicator; AMEND-MONITOR-CHAIN-01; AL-AMEND-01 P0; INCIDENT_RESPONSE R-48 §R-48.5); `security.amendment_floor_breach_detected` CRITICAL/7yr (job 48 sweep 2 — price floor forensic; AMEND-MONITOR-CHAIN-01; AL-AMEND-02 P0; INCIDENT_RESPONSE R-48 §R-48.6); `system.amendment_rate_check_passed` LOW/1yr (job 48 all-clear; suppressed when CRITICAL emitted per AMEND-MONITOR-CHAIN-01; powers AL-AMEND-03 33-day freshness dead-man's switch). Full Zod v2 schemas, AMEND-MONITOR-CHAIN-01 ordering invariant, emitter assignments, alert routing, CC5.2/CC6.1/A1.1 SOC 2 auditor narratives included. Retention table: +3 rows. Closes `docs/OBSERVABILITY.md §57.10` item 1 (P0/M5 — [x] Done 2026-06-27).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.52 → v2.53. New §Contract Amendment Rate Compliance Monitoring events section; retention table +3 rows.
+- `docs/OBSERVABILITY.md` — v5.4.1 → v5.4.2. §57.10 item 1 status `[ ]` → `[x] Done — 2026-06-27 (AUDIT_LOG_SCHEMA.md v2.53)`; document header updated.
+- `VERSION` — 9.56.1 → 9.57.0.
+
+---
+
 ## [9.56.1] — 2026-06-27
 
 ### Added
