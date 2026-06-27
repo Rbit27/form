@@ -2791,9 +2791,9 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2716 | Авторегуляція тренування: від фіксованого плану до адаптивного виконання | **draft · v9.76.0 → post-2716-autoregulation-principle-adaptive-training.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2717 | RPE і RIR як мова авторегуляції: точність, помилки і протокол calibration | **draft · v9.76.0 → post-2717-rpe-rir-autoregulation-language.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2718 | Авторегуляція вибору ваги: рішення у залі крок за кроком | **draft · v9.77.0 → post-2718-weight-selection-algorithm-in-session.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2719 | Авторегуляція об'єму: як self-coached атлет коригує кількість підходів, не зламавши план | proposed |
-| 2720 | Авторегуляція між сесіями: сигнали, що змінюють наступне тренування ще до входу в зал | proposed |
-| 2721 | Деловий тиждень як авторегуляційний інструмент: коли і як вбудовувати розвантаження | proposed |
+| 2719 | Авторегуляція об'єму: як self-coached атлет коригує кількість підходів, не зламавши план | **draft · v9.78.0 → post-2719-volume-autoregulation-set-count-adjustment.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2720 | Авторегуляція між сесіями: як планувати наступне тренування на основі відновлення | **draft · v9.78.0 → post-2720-between-session-autoregulation-recovery-planning.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2721 | Авторегуляція інтенсивності: коли план каже «важко», а тіло — ні | **draft · v9.79.0 → post-2721-intensity-autoregulation-when-plan-says-heavy.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2722 | Авторегуляція в довгостроковій перспективі: як адаптивна логіка змінюється між блоками | proposed |
 | 2723 | Типові пастки авторегуляції: де гнучкість стає виправданням для уникнення роботи | proposed |
 | 2724 | Авторегуляція для різних тренувальних контекстів: зайнятість, стрес, перерви | proposed |
