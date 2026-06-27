@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.53.0] — 2026-06-27
+
+### Added
+- `content/post-2690-how-to-choose-training-app-functional-criteria.md` — Series 2686–2695 «Технологічна грамотність self-coached атлета» post 5/10. «Як вибрати додаток для тренувань: функціональні критерії без маркетингових обіцянок». П'ять критеріїв: швидкість введення, контроль структури, власність даних, мінімалізм, поведінкова модель. Категорії: простий журнал, алгоритмічна програма, комплексна платформа, spreadsheet. clinical_safety_review: NOT_REQUIRED.
+- `blog.html` — post-2690 card added at top of feed.
+
+### Changed
+- `STATUS.md` — Block 1051–1100: 45/50 → **50/50 COMPLETE** (cluster 10 posts 1096–1100 APL/EPB, EPL, FPL/AIN, TFCC, block synthesis were already published; STATUS corrected). Block 1101–1150 row added: 9/50 (posts 1101–1109 hip hinge biomechanics cluster 1). Series 2686–2695 progress updated 4/10 → 5/10. Current version v9.52.0 → v9.53.0.
+- `README.md` — post-2690 status: proposed → draft · v9.53.0.
+- `VERSION` — 9.52.1 → 9.53.0.
+
+---
+
 ## [9.52.1] — 2026-06-27
 
 ### Changed
