@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [9.82.1] — 2026-06-27
+
+### Added
+- `docs/DECISION_LOG.md` — DEC-083 (2026-06-27): Pilot CSM Save Protocol adopted (§46, v2.20.0, 2026-06-27). Three trigger conditions (T0-Alpha Day-14 activation < 30% / T0-Beta Day-45 champion logins < 2 / T0-Gamma three consecutive weekly WAU declines ≥ 10 pp), six-step T+0–T+30 playbook, three-tier escalation (L1 CSM / L2 CS Lead / L3 Founder), PILOT-SAVE-CHAIN-01 ordering invariant. Closes COST_MODEL §46.9 item 6 (P0/M4). OQ-21 → 🟢 Resolved.
+- `docs/OBSERVABILITY.md §12.6` — job 49 `pilot_activation_monitor` registered (daily `0 10 * * *`, 26h freshness window, CC3.2/CC7.2/A1.1). Daily Day-14 pilot activation sentinel: fires AL-SAVE-01 PagerDuty P1 `form-enterprise` → customer-success when `activation_rate < 0.30` for Growth or Enterprise tier pilots; dedup `pilot-save-t0a-{pilot_id}` 24h; all-clear `system.pilot_activation_check_passed` LOW/1yr. Freshness note extended to cover job 49. Version patch note v2.4 added. Closes COST_MODEL §46.9 item 4 (P0/M4).
+- `docs/SOC2_READINESS.md §79.4` — SAVE-E-001 (CC3.2/CC7.2/CC9.2, annual Q4, 3yr — `enterprise.pilot_save_protocol_triggered` DEC-030 HMAC-chain export with outcomes) and SAVE-E-002 (CC7.2/A1.1, annual Q4, 3yr — job 49 `pg_cron.job_run_details` run history) registered in master evidence table after ADM-E-002.
+- `docs/SOC2_READINESS.md §80.3` — `pilots/save-protocol/` R2 subfolder added (WORM Object Lock Governance, `form_api` NO ACCESS, `form_system` role only; covers SAVE-E-001 + SAVE-E-002).
+- `docs/SOC2_READINESS.md §80.4` — SAVE-E-001 and SAVE-E-002 Vanta mirror entries added (annual upload from M5+ and M12+ respectively; privacy floor: `pilot_id` UUID + aggregate rates only).
+- `docs/SOC2_READINESS.md §126` — new cross-reference section created documenting SAVE-E-001/002 registration (count 93 → 95), §80.3/§80.4 additions, §126.4 implementation checklist (4 items), §126.5 privacy floor summary. Closes COST_MODEL §46.9 item 5 (P0/M4).
+
+### Changed
+- `docs/COST_MODEL.md §46.9` — checklist items 4, 5, 6 marked `[x] Done — 2026-06-27`. All three P0/M4 documentation registration tasks complete: job 49 registered (item 4), SAVE-E-001/002 + §80.3 + §80.4 + §126 registered (item 5), DEC-083 registered (item 6).
+- `VERSION` — 9.82.0 → 9.82.1.
+
+---
+
 ## [9.82.0] — 2026-06-27
 
 ### Added
