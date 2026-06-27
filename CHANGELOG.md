@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.54.0] — 2026-06-27
+
+### Added
+- `content/post-2691-self-coached-ai-five-tasks-help-hurt.md` — Series 2686–2695 «Технологічна грамотність self-coached атлета» post 6/10. «Self-coached з AI: п'ять завдань де штучний інтелект реально допомагає і п'ять де шкодить». П'ять де допомагає: початкова структура блоку, підбір замінників при обмеженому обладнанні, відстеження прогресії по даних журналу, пояснення нових рухів, відповіді на наукові питання. П'ять де шкодить: авторегуляція в реальному часі, корекція техніки без відео, вирішення коли закінчувати підхід, больовий контекст і травми, accountability. clinical_safety_review: NOT_REQUIRED.
+- `blog.html` — post-2691 card added at top of feed.
+
+### Changed
+- `README.md` — post-2691 status: proposed → draft · v9.54.0.
+- `STATUS.md` — Series 2686–2695 progress updated 5/10 → 6/10. Current version v9.53.0 → v9.54.0.
+- `VERSION` — 9.53.0 → 9.54.0.
+
+---
+
 ## [9.53.0] — 2026-06-27
 
 ### Added
