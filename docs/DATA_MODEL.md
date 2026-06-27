@@ -17721,7 +17721,7 @@ Migration 0088 provides three SOC 2 criteria with DDL-layer evidence, supplement
 
 | Obligation | Source | Status |
 |---|---|---|
-| `docs/SOC2_READINESS.md §122` — DDL-supplement patch for migration 0088 (CC5.2/CC6.1/CC1.4 DDL invariants supplementing ADM-E-001/ADM-E-002 from §118; auditor proof queries; `amend_contract_tier()` SECURITY DEFINER proof) | §47.8 item 7 (P2, M13+) | 🟡 **Pending — §47.8 item 7. Authorship deferred until first amendment validates the workflow.** |
+| `docs/SOC2_READINESS.md §122` — DDL-supplement patch for migration 0088 (CC5.2/CC6.1/CC1.4 DDL invariants supplementing ADM-E-001/ADM-E-002 from §118; auditor proof queries; `amend_contract_tier()` SECURITY DEFINER proof) | §47.8 item 7 (P2, M13+) | 🟢 **Done — 2026-06-27 (SOC2_READINESS §122, v3.47.0; DATA_MODEL §47.8 item 7 closed simultaneously)** |
 | `compliance/evidence/amendments/migration-0088-validation_<YYYY-MM-DD>.txt` — staging validation output | §47.3.2 / §47.8 item 2 | 🟡 **Pending — §47.8 item 2 (migration not yet applied).** |
 | `compliance/evidence/amendments/asc606-counsel-confirmation_<YYYY-MM-DD>.pdf` — outside counsel ASC 606 confirmation | §47.8 item 1 (production gate) | 🟡 **Pending — §47.8 item 1. Gate remains active until counsel letter filed.** |
 | `docs/COST_MODEL.md §45.8 item 3` — mark `[x] Done` when migration 0088 deployed to production | §47.8 item 3 (simultaneous close) | 🟡 **Pending — §47.8 item 3.** |

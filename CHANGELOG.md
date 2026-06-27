@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.44.1] — 2026-06-27
+
+### Changed
+- `docs/DATA_MODEL.md §47.9` — cross-reference obligation row for `SOC2_READINESS §122` updated from 🟡 Pending to 🟢 Done (2026-06-27, v3.47.0). Closes the one-way-reference inconsistency left after v9.43.0: §47.8 item 7 was marked Done but the §47.9 obligations table still showed Pending.
+- `VERSION` — 9.44.0 → 9.44.1.
+
+---
+
 ## [9.44.0] — 2026-06-27
 
 ### Added
