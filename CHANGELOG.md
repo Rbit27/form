@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [9.56.1] — 2026-06-27
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-48` — Amendment Rate Compliance Monitor Stale runbook (`amendment_rate_compliance_monitor` · job 48). Closes `docs/OBSERVABILITY.md §57.10` item 6 (P1/M7). Six-step runbook with two independent P0 escalation paths: §R-48.5 TU-CHAIN-01 chain gap forensic (R-48-C2 gate: `billing.rate_updated` / `enterprise.contract_amended` pairing audit; R-48-A audit trail; R-48-B direct write bypass check; R-48-C RPC stack trace; R-48-D retroactive CRITICAL event + post-mortem) and §R-48.6 price floor breach forensic (R-48-C3 gate: `enterprise_contracts` floor scan; R-48-E DDL CHECK verification; R-48-F COST_MODEL §32 exception review; R-48-G retroactive CRITICAL event + post-mortem). Both R-48-C2 and R-48-C3 positive results are independent P0 triggers; dual-positive triggers all four owners + founder page. Two companion DEC-030 HMAC-chained events: `system.amendment_rate_monitor_stale_declared` HIGH/7yr + `system.amendment_rate_monitor_restored` STANDARD/3yr; AMEND-STALE-CHAIN-01 ordering invariant (HTTP 422 on ordering inversion → R-05). Five scope queries (R-48-C1 staleness; R-48-C2 chain gap; R-48-C3 floor breach; R-48-C4 peer health; R-48-C5 registration). Four communication templates. Zod v2 schemas (§R-48.9). SOC 2 evidence table (§R-48.10 — six artefacts, CC5.2/CC6.1/CC4.1/CC7.2). Key distinction from structural peers R-46/R-47: monthly cadence (33-day freshness vs. daily 26h); both escalation paths are P0 (no P1+ intermediate). Structural peers: R-44/R-45/R-46/R-47. Privacy floor: `stale_declared` and `stale_restored` carry counts, booleans, timestamps, enums only — no employee `user_id`, rate value, tenant name, or GDPR Art. 9 data; R-48-C2 surfaces FORM-internal UUIDs only; R-48-C3 rate values restricted to `#security-restricted` channel.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.15 → v3.16.0. R-48 added.
+- `docs/OBSERVABILITY.md` — v5.4.0 → v5.4.1. §57.10 item 6 cross-reference patch: AL-AMEND-01/02 runbook columns + §12.6 job 48 stale-consequence cross-ref updated from "pending §57.10 item 6" to "R-48 (v1.0, 2026-06-27)"; §57.10 item 6 status `[ ]` → `[x] Done — 2026-06-27 (INCIDENT_RESPONSE.md v3.16.0)`.
+- `VERSION` — 9.56.0 → 9.56.1.
+
+---
+
 ## [9.56.0] — 2026-06-27
 
 ### Added

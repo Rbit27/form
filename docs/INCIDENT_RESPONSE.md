@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.15
+# FORM · Incident Response Runbook v3.16.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -17750,3 +17750,372 @@ export const ScimProvisioningMonitorRestoredPayload = z.object({
 *v3.15 (2026-06-27): §9.3 Tabletop Scenario Catalog extended with Scenario AA; §9.9 Year 6 Testing Schedule added (Months 61–72). Scenario AA (SCIM provisioning compliance monitor stale with quarter-start trigger miss — job 47, R-47): two-SLO tabletop covering R-47-C2 zero-row SCIM-ATTR-CHAIN-01 attestation and R-47-C3 quarter-boundary GENERATE_SERIES detection; base scenario is P1+ (SCIM-PROV-SLO-02 miss, R-47-C3 positive on quarter-start day) with zero R-47-C2 violations; manual `system.scim_provisioning_quarterly_check_triggered` STANDARD/7yr emission with `quarterly_trigger_manually_fired: true`; SCIM-PROV-SLO-01 P0-escalated optional path (R-47-C2 positive → synthetic `scim.rejected_sensitive_attribute` CRITICAL/7yr → SCIM-ATTR-CHAIN-01 ordering → AL-SCIM-PROV-01 P0 to `form-security` + `form-compliance` → BLOCKED_ATTRIBUTE_PATTERNS §14 coverage review); privacy floor: R-47-C2 surfaces only `tenant_id`, never individual `user_id`, health data, or GDPR Art. 9 special-category data; participants compliance-officer + devops-lead + security-engineer; 45 min / 75 min with P0 optional. §9.9 Year 6 schedule: Month 63 Scenario AA base drill; Month 66 Scenario Y LITH-SLO-02 or Z PRICE-SLO-01 P0-escalated rerun (choice); Month 69 dual-tabletop (Scenario AA P0-escalated + S/U rerun); Month 72 DR + pen test + Scenario AA rerun (rotate opposite from Month 69 choice). Cross-references: R-47 (§R-47.5 SCIM-ATTR-CHAIN-01 blind spot escalation path; §R-47.6 quarterly trigger miss path; R-47.12 checklist item 2 tabletop item — scenario added directly to §9.3); `docs/OBSERVABILITY.md §56` (SCIM-PROV-SLO-01/02 + AL-SCIM-PROV-01/02 — two monitoring paths exercised by Scenario AA); `docs/SSO_SCIM_IMPLEMENTATION.md §14` (BLOCKED_ATTRIBUTE_PATTERNS — write-path enforcement exercised by Scenario AA P0 path); `docs/AUDIT_LOG_SCHEMA.md v2.52` (`system.scim_provisioning_quarterly_check_triggered`, `system.scim_provisioning_monitor_restored`, `scim.rejected_sensitive_attribute` events); DEC-030 (HMAC chain ordering invariants: SCIM-ATTR-CHAIN-01 for P0 dispatch; SCIM-MONITOR-STALE-CHAIN-01 for restored emission); `docs/SOC2_READINESS.md §121` (R-47 closure patch — all SCIM provisioning monitoring SOC 2 obligations closed). Owner: compliance-officer + security-engineer.*
 
 *v3.14 (2026-06-26): §9.3 Tabletop Scenario Catalog extended with Scenarios Y and Z; §9.8 Year 5 Testing Schedule added (Months 49–60). Scenario Y (Litigation hold compliance monitor stale — job 45, R-45): three-SLO tabletop covering simultaneous LITH-SLO-01/02/03 blind-spot coverage; mandatory three-gate protocol (R-45-C2a/C2b/C2c); LITH-SLO-01 positive path (R-45-C2a = 1, 3-day review overdue) as base scenario; LITH-SLO-02 P0-escalated optional path (founder + legal waiver-or-release + CRITICAL event); staged in R2 `compliance/evidence/litigation-hold/`; participants compliance-officer + devops-lead; 45 min / 75 min with P0 optional. Scenario Z (Pricing exception compliance monitor stale with quarter-start trigger miss — job 46, R-46): two-SLO tabletop covering R-46-C2 zero-row REENTRY-CHAIN-01 attestation and R-46-C3 quarter-boundary GENERATE_SERIES detection; base scenario is P1+ (PRICE-SLO-02 miss, R-46-C3 positive on Q3 start 1 July) with zero R-46-C2 violations; manual `system.pricing_exception_quarterly_audit_triggered` STANDARD/7yr emission with `quarterly_trigger_manually_fired: true`; PRICE-SLO-01 P0-escalated optional path (R-46-C2 positive → REENTRY-MONITOR-CHAIN-01 → AL-PRICE-01 → corrective pricing review); participants compliance-officer + devops-lead + security-engineer; 45 min / 60 min with P0 optional. §9.8 Year 5 schedule: Month 51 Scenario Y; Month 54 Scenario Z; Month 57 dual-tabletop choice (Y P0-path / Z P0-path / S-or-U rerun); Month 60 DR + pen test + opposite-of-57 rerun. Privacy constraint added to §9.8 schedule header: staging drills use synthetic rows with FORM-internal test UUIDs only — no actual tenant data, employee `user_id`, health data, or GDPR Art. 9 special-category data. Cross-references: R-45 (§R-45.5 LITH-REVIEW-CHAIN-01 manual emission path; §R-45.6 LITH-SLO-02 P0 founder-page path; §R-45.14 implementation checklist has no tabletop item — scenario added directly to §9.3); R-46 (§R-46.5 REENTRY-CHAIN-01 blind spot escalation path; §R-46.6 quarterly trigger miss path; §R-46.13 checklist has no tabletop item — scenario added directly to §9.3); `docs/OBSERVABILITY.md §54` (LITH-SLO-01/02/03 + AL-LITH-01/02/03 — three monitoring paths exercised by Scenario Y); `docs/OBSERVABILITY.md §55` (PRICE-SLO-01/02 + AL-PRICE-01/03 — two monitoring paths exercised by Scenario Z); `docs/COST_MODEL.md §44.7` (quarterly pricing exception audit obligation — Scenario Z PRICE-SLO-02 path); `docs/DATA_MODEL.md §46` (`litigation_hold_records` DDL — Scenario Y staging INSERT target); `docs/MSA_TEMPLATE.md §11.6` (MSA §11.6.3/§11.6.4/§11.6.6 obligations exercised by Scenario Y LITH-SLO-01/02/03 paths). Owner: compliance-officer + security-engineer.*
+
+---
+
+## R-48: Amendment Rate Compliance Monitor Stale (`amendment_rate_compliance_monitor` · job 48)
+
+**Severity on trigger:** P1 (monitoring-layer SLO degradation) → escalates to P0 if R-48-C2 (TU-CHAIN-01 chain gap gate) or R-48-C3 (price floor breach gate) confirms active breach during stale window.
+**Trigger:** AL-AMEND-03 PagerDuty P1 `form-devops` → devops-lead. Dedup key `amend-check-stale`. Auto-resolves on next `system.amendment_rate_check_passed` LOW emission.
+**Structural peers:** R-46 (Pricing Exception — PRICING-MONITOR-STALE-CHAIN-01, two-SLO escalation); R-47 (SCIM Provisioning — SCIM-PROV-MONITOR-STALE-CHAIN-01, two-SLO escalation). R-48 follows the same two-SLO pattern but with two independent P0 paths (both R-48-C2 TU-CHAIN-01 and R-48-C3 floor breach are P0, unlike R-47 where only C2 is P0).
+**Owner:** devops-lead (primary IC) + compliance-officer + security-engineer (§R-48.5/§R-48.6 P0 escalation) + enterprise-architect (§R-48.5 TU-CHAIN-01 escalation).
+
+### R-48.1 Trigger Conditions
+
+Job 48 (`amendment_rate_compliance_monitor`) runs monthly at 07:00 UTC on the 1st of each month. `pg-cron-health-monitor` (OBSERVABILITY §12.6) fires AL-AMEND-03 PagerDuty P1 when no `system.amendment_rate_check_passed` LOW event appears in `audit_log_events` for > 33 days. This runbook is activated on that P1 page, or on manual discovery that job 48 has not run within 33 days.
+
+Job 48 staleness creates two simultaneous monitoring gaps:
+
+1. **AMEND-SLO-01 blind spot (§R-48.5):** Any TU-CHAIN-01 chain gaps occurring during the stale window are not detected by the monitoring layer. Job 48 sweep 1 would normally emit `security.amendment_chain_gap_detected` CRITICAL/7yr per AMEND-MONITOR-CHAIN-01 on any `billing.rate_updated` event lacking a matching `enterprise.contract_amended` within ±24h for the same `tenant_id`. During staleness, the monthly sweep does not run — AL-AMEND-01 P0 does not fire for any chain gap that occurs. The IC must manually run R-48-C2 to check for chain gaps during the stale window. Note: the primary TU-CHAIN-01 enforcement gate operates at the `amend_contract_tier()` SECURITY DEFINER RPC (COST_MODEL §45.5 HTTP 422), independently of job 48.
+
+2. **AMEND-SLO-02 blind spot (§R-48.6):** Any price floor breaches in `enterprise_contracts` are not detected by the monitoring layer during the stale window. Job 48 sweep 2 would normally emit `security.amendment_floor_breach_detected` CRITICAL/7yr on any row with `amendment_type IS NOT NULL` and `rate_per_seat_usd` below the §31.5 tier floor. The IC must manually run R-48-C3 to check for floor breaches. Note: the DDL-layer CHECK constraint (DATA_MODEL §47) continues enforcing the floor at the database layer independently of job 48.
+
+### R-48.2 Severity Classification
+
+| Condition | Initial severity |
+|---|---|
+| Stale > 33 days, R-48-C2 returns zero rows and R-48-C3 returns zero rows | P1 — monitoring degradation; primary enforcement gates (Worker HTTP 422 + DDL CHECK) remained effective throughout stale window |
+| Stale > 33 days, R-48-C2 returns > 0 rows (TU-CHAIN-01 chain gap during stale window) | **P0 — escalate immediately** → §R-48.5 TU-CHAIN-01 forensic path; security-engineer + compliance-officer + enterprise-architect paged; AMEND-SLO-01 breach confirmed |
+| Stale > 33 days, R-48-C3 returns > 0 rows (price floor breach in enterprise_contracts) | **P0 — escalate immediately** → §R-48.6 price floor forensic path; security-engineer + compliance-officer paged; AMEND-SLO-02 breach confirmed |
+| Both C2 and C3 positive | **Dual P0** — execute §R-48.5 and §R-48.6 concurrently; escalate to founder; all four owners paged |
+
+### R-48.3 Scope Queries
+
+**R-48-C1 — Confirm staleness (run immediately on receipt of P1 page):**
+```sql
+SELECT jobname, last_run_time, next_run_time,
+       EXTRACT(EPOCH FROM (NOW() - last_run_time)) / 86400 AS stale_days,
+       FLOOR(EXTRACT(EPOCH FROM (NOW() - last_run_time)) / (86400 * 30))::int
+         AS missed_months_approx
+FROM pg_cron.job_run_details jrd
+JOIN cron.job j ON j.jobid = jrd.jobid
+WHERE j.jobname = 'amendment_rate_compliance_monitor'
+ORDER BY last_run_time DESC
+LIMIT 5;
+```
+**Expected result:** Last run > 33 days ago. If last run < 33 days: false-positive from `pg-cron-health-monitor`; close P1 as resolved; no further action. Note `last_run_time` as `<confirmed_stale_since>` and `stale_days` as `<confirmed_stale_days>`.
+
+**R-48-C2 — TU-CHAIN-01 chain gap gate (P0 severity pivot for §R-48.5):**
+```sql
+-- Identifies billing.rate_updated events in the stale window
+-- without a matching enterprise.contract_amended for the same tenant_id within ±24h.
+-- Parameterise <confirmed_stale_since> with last_run_time from R-48-C1.
+SELECT
+  billing_event.id                          AS billing_event_id,
+  billing_event.tenant_id,
+  billing_event.created_at                  AS rate_updated_at,
+  contract_event.id                         AS contract_amended_id,
+  contract_event.created_at                 AS contract_amended_at
+FROM audit_log_events billing_event
+LEFT JOIN audit_log_events contract_event
+  ON  contract_event.tenant_id    = billing_event.tenant_id
+  AND contract_event.event_type   = 'enterprise.contract_amended'
+  AND contract_event.created_at
+        BETWEEN billing_event.created_at - INTERVAL '24 hours'
+            AND billing_event.created_at + INTERVAL '24 hours'
+  AND contract_event.payload->>'amendment_type' = 'tier_upgrade'
+WHERE billing_event.event_type = 'billing.rate_updated'
+  AND billing_event.created_at >= '<confirmed_stale_since>'
+  AND billing_event.created_at <= NOW()
+  AND contract_event.id IS NULL;
+```
+**If rows returned (gap_count > 0):** TU-CHAIN-01 chain gap confirmed — escalate to P0 → §R-48.5. `billing_event.tenant_id` is a FORM-internal UUID; no rate values, employee names, or health data appear in this query result.
+**If zero rows:** AMEND-SLO-01 not breached during stale window; continue P1 recovery.
+
+**R-48-C3 — Price floor breach gate (P0 severity pivot for §R-48.6):**
+```sql
+-- Checks current enterprise_contracts rows with amendment columns for floor compliance.
+-- Floors per COST_MODEL §31.5: Starter $6.00, Growth $4.50, Enterprise $4.00.
+-- Unknown/NULL tier rows excluded (unknown-tier NULL bypass protection — OBSERVABILITY §57.5.3).
+SELECT id AS contract_id, tier, amendment_type, amendment_date,
+       rate_per_seat_usd,
+       CASE tier
+         WHEN 'starter'    THEN 6.00
+         WHEN 'growth'     THEN 4.50
+         WHEN 'enterprise' THEN 4.00
+       END AS required_floor
+FROM enterprise_contracts
+WHERE amendment_type IS NOT NULL
+  AND tier IN ('starter', 'growth', 'enterprise')
+  AND CASE tier
+        WHEN 'starter'    THEN rate_per_seat_usd < 6.00
+        WHEN 'growth'     THEN rate_per_seat_usd < 4.50
+        WHEN 'enterprise' THEN rate_per_seat_usd < 4.00
+      END;
+```
+**If rows returned (breach_count > 0):** Price floor breach confirmed — escalate to P0 → §R-48.6. `contract_id` is a FORM-internal UUID. Do not log `rate_per_seat_usd` values in Slack or external channels; treat as commercially sensitive internal metadata.
+**If zero rows:** AMEND-SLO-02 not breached; continue P1 recovery.
+
+**R-48-C4 — Peer job health discriminator (H4 Supabase outage detection):**
+```sql
+SELECT j.jobname,
+       MAX(jrd.last_run_time) AS last_run,
+       EXTRACT(EPOCH FROM (NOW() - MAX(jrd.last_run_time))) / 3600 AS stale_hours
+FROM pg_cron.job_run_details jrd
+JOIN cron.job j ON j.jobid = jrd.jobid
+WHERE j.jobname IN (
+  'scim_provisioning_compliance_monitor',  -- job 47 (daily 06:00 UTC)
+  'pricing_exception_compliance_monitor',  -- job 46 (daily 09:00 UTC)
+  'litigation_hold_compliance_monitor'     -- job 45 (daily 08:00 UTC)
+)
+GROUP BY j.jobname;
+```
+**≥ 2 peers stale (> 26h each):** H4 Supabase platform outage — R-03 co-activation. Note: peer jobs 45/46/47 are daily; staleness > 26h indicates a platform-level pg_cron failure.
+
+**R-48-C5 — Job registration check (H1 discriminator):**
+```sql
+SELECT jobid, jobname, schedule, active
+FROM cron.job
+WHERE jobname = 'amendment_rate_compliance_monitor';
+```
+**No row:** H1 — job deleted. If unauthorized: R-05 co-activation. Re-register per §R-48 Step 1.
+**Row present, `active = false`:** H1 variant — job disabled; re-enable per §R-48 Step 1.
+
+### R-48.4 Root Cause Hypotheses
+
+| Hypothesis | Indicator | Fix path |
+|---|---|---|
+| H1 — Job deleted or disabled | R-48-C5 returns no row or `active = false` | Re-register or re-enable as `form_system`; if unauthorized deletion: R-05 co-activation |
+| H2 — `form_system` permission revoked from `audit_log_events` or `enterprise_contracts` | Job ran but failed SELECT; `pg_cron.job_run_details` shows ERROR in `return_message` | Restore SELECT on both tables to `form_system`; confirm `form_api` REVOKED; re-run job manually |
+| H3 — pg_net degraded (emit-audit-event Worker or PagerDuty call failed) | R-48-C1 shows job ran recently but no `system.amendment_rate_check_passed` in `audit_log_events`; check `pg_net.http_requests` for non-200 responses | Supabase support for pg_net; re-run job manually after resolution |
+| H4 — Supabase platform outage | R-48-C4 shows ≥ 2 daily peer jobs stale (> 26h) | R-03 co-activation; wait for platform restoration; re-run all affected jobs after recovery |
+
+### R-48.5 Escalation Path — TU-CHAIN-01 Chain Gap (R-48-C2 Positive)
+
+*Activate when R-48-C2 returns rows with gap_count > 0. Upgrade to P0. Security-engineer + compliance-officer + enterprise-architect paged.*
+
+**P0 preamble:** One or more `billing.rate_updated` events occurred during the job 48 stale window without a matching `enterprise.contract_amended` event for the same `tenant_id` within ±24h. This violates TU-CHAIN-01 (COST_MODEL §45.5.1). The primary `amend_contract_tier()` SECURITY DEFINER RPC enforces this via HTTP 422 at the Worker layer — a chain gap therefore indicates either (a) a partial transactional failure in `amend_contract_tier()` (billing event emitted but `enterprise.contract_amended` emission failed), or (b) a direct `enterprise_contracts` rate modification bypassing the SECURITY DEFINER write path. AMEND-MONITOR-CHAIN-01 was not triggered because job 48 was not running.
+
+**Step R-48-A: Identify gaps and affected contracts (security-engineer + enterprise-architect):**
+```sql
+-- For each billing_event_id returned by R-48-C2, retrieve billing event payload context.
+-- Access: security_reviewer role (PAM-elevated).
+SELECT
+  ale.id, ale.tenant_id, ale.event_type, ale.created_at,
+  ale.payload->>'contract_id'             AS contract_id,
+  ale.payload->>'prior_rate_per_seat_usd' AS prior_rate,
+  ale.payload->>'new_rate_per_seat_usd'   AS new_rate
+FROM audit_log_events ale
+WHERE ale.id IN ('<billing_event_ids from R-48-C2>')
+  AND ale.event_type = 'billing.rate_updated';
+```
+Do not log `prior_rate` or `new_rate` values in public Slack channels; handle in `#security-restricted`. `contract_id` is a FORM-internal UUID.
+
+**Step R-48-B: Check for direct enterprise_contracts write bypass (security-engineer):**
+```sql
+-- Verify amendment_date alignment with billing event timestamp.
+-- Discrepancy > 24h suggests a direct UPDATE bypassing amend_contract_tier().
+-- Access: security_reviewer role (PAM-elevated).
+SELECT id AS contract_id, tenant_id, amendment_type, amendment_date,
+       rate_per_seat_usd, prior_rate_per_seat_usd, amendment_justification_hash
+FROM enterprise_contracts
+WHERE id IN ('<contract_ids from R-48-A>')
+  AND amendment_type IS NOT NULL;
+```
+If `amendment_date` is NULL while `billing.rate_updated` event exists: strong indicator of write bypass via direct UPDATE. Escalate immediately to security-engineer + founder. File FORM-INSIDER-001 assessment (INCIDENT_RESPONSE §R-20) if any direct write is confirmed without `amendment_justification_hash`.
+
+**Step R-48-C: `amend_contract_tier()` RPC stack trace review (enterprise-architect + devops-lead):**
+1. Pull Cloudflare Worker logs for the `amend-contract-tier` Worker execution around each `billing.rate_updated` event timestamp.
+2. Identify whether `enterprise.contract_amended` emission failed (HTTP 422 from `emit-audit-event` Worker, pg_net timeout, or transactional rollback after billing event was written).
+3. If partial failure (billing emitted, enterprise lost to `emit-audit-event` failure): emit retroactive `enterprise.contract_amended` event with correct payload; set `amendment_date` in `enterprise_contracts` to reflect actual RPC execution time; document in incident report.
+4. If direct bypass confirmed: open P0 security investigation; co-activate R-20 (Insider Threat) and R-05 (HMAC chain break); retain forensic evidence; dispatch founder page.
+
+**Step R-48-D: Retroactive DEC-030 event emission and post-mortem (compliance-officer, PAM-elevated):**
+After R-48-B and R-48-C complete: emit `security.amendment_chain_gap_detected` CRITICAL/7yr retroactively with `chain_gap_count`, `billing_event_ids` from R-48-C2, and `check_run_at = now()`. AMEND-MONITOR-CHAIN-01: DEC-030 HTTP 200 confirmed before closing this step. File P0 post-mortem (within 24h): stale window; chain gap count; root cause; retroactive event emission; TU-CHAIN-01 remediation; ADM-E-001 evidence impact (if chain gap falls within current SOC2_READINESS §118 collection year, attach incident reference to the annual export).
+
+### R-48.6 Escalation Path — Price Floor Breach (R-48-C3 Positive)
+
+*Activate when R-48-C3 returns rows with breach_count > 0. Upgrade to P0. Security-engineer + compliance-officer paged.*
+
+**P0 preamble:** One or more `enterprise_contracts` rows with `amendment_type IS NOT NULL` have `rate_per_seat_usd` below the §31.5 COGS-anchored floor (Starter $6.00, Growth $4.50, Enterprise $4.00). The DDL-layer CHECK constraint (DATA_MODEL §47) should prevent this at the database write layer — a breach therefore indicates either (a) the CHECK constraint was not present at amendment time (pre-migration 0088 legacy row), (b) a SECURITY DEFINER write path bug that bypassed the constraint, or (c) a direct UPDATE to `enterprise_contracts` under a higher-privilege role. The COST_MODEL §32 pricing exception approval process must be invoked retroactively for every below-floor contract discovered here.
+
+**Step R-48-E: Determine breach origin (compliance-officer + enterprise-architect):**
+```sql
+-- Confirm whether migration 0088 floor CHECK constraint is active on enterprise_contracts.
+SELECT conname, pg_get_constraintdef(oid) AS constraint_def
+FROM pg_constraint
+WHERE conrelid = 'enterprise_contracts'::regclass
+  AND contype = 'c'
+  AND conname LIKE '%rate%';
+```
+If CHECK constraint absent: migration 0088 (DATA_MODEL §47) was not deployed to production. Follow DATA_MODEL §47.8 staging checklist items 1–4 before applying to production. Breach set from R-48-C3 represents pre-constraint legacy rows — treat as compliance disclosure to SOC 2 auditor with corrective action note.
+
+**Step R-48-F: COST_MODEL §32 exception review (compliance-officer + CSM lead):**
+For each `contract_id` in the breach set:
+1. Identify the contract CSM and tenant owner.
+2. Determine whether a pricing exception approval was obtained via COST_MODEL §32 matrix (CS lead + compliance-officer dual countersign for below-floor rates; founder approval if below COGS).
+3. If exception was properly approved but not reflected in `enterprise_contracts.amendment_justification_hash`: correct the hash reference to the approval documentation; no rate change required.
+4. If no exception exists: initiate repricing negotiation with the tenant owner via CSM channel. Target: 30 days to corrected contract or escalation to founder for exception decision.
+
+**Step R-48-G: Retroactive DEC-030 event emission and post-mortem (compliance-officer, PAM-elevated):**
+After R-48-E and R-48-F complete: emit `security.amendment_floor_breach_detected` CRITICAL/7yr retroactively with `breach_count`, `breaching_contract_ids` from R-48-C3, and `check_run_at = now()`. AMEND-MONITOR-CHAIN-01: DEC-030 HTTP 200 confirmed before closing this step. File ADM-E-002 supplement note: if breach falls within current SOC2_READINESS §118 collection year, attach incident reference to the annual `billing.rate_updated` cross-reference export. Post-mortem (24h): breach count; contract IDs (FORM-internal UUIDs only in external artefacts); DDL constraint status from R-48-E; §32 exception review outcome; repricing timeline.
+
+### R-48 Recovery Steps
+
+**Step 1 — Emit stale-declared event and re-register / re-enable job 48 (all cases):**
+Emit `system.amendment_rate_monitor_stale_declared` HIGH/7yr via `emit-audit-event` Worker (devops-lead IC, PAM-elevated). AMEND-STALE-CHAIN-01: this event must precede `system.amendment_rate_monitor_restored`. Payload per §R-48.9 Zod schema: `incident_id` (new UUID), `confirmed_stale_since`, `stale_days`, `missed_months`, `trigger`, `initial_severity`, `chain_gap_found` (R-48-C2 result), `floor_breach_found` (R-48-C3 result).
+
+Re-register if H1 (job deleted):
+```sql
+SELECT cron.schedule(
+  'amendment_rate_compliance_monitor',
+  '0 7 1 * *',
+  $$ /* full job 48 spec per OBSERVABILITY §57.5 */ $$
+);
+```
+Re-enable if H1 variant (job disabled):
+```sql
+SELECT cron.alter_job(
+  job_id := (SELECT jobid FROM cron.job
+             WHERE jobname = 'amendment_rate_compliance_monitor'),
+  active := TRUE
+);
+```
+If deletion was unauthorized: co-activate R-05. Verify `form_system` role; confirm `form_api` REVOKED from `audit_log_events` and `enterprise_contracts`.
+
+**Step 2 — Restore `form_system` permissions (H2):**
+```sql
+GRANT SELECT ON TABLE audit_log_events TO form_system;
+GRANT SELECT ON TABLE enterprise_contracts TO form_system;
+-- Confirm REVOKE still in effect for form_api:
+REVOKE ALL ON TABLE audit_log_events FROM form_api;
+REVOKE ALL ON TABLE enterprise_contracts FROM form_api;
+```
+
+**Step 3 — pg_net / emit-audit-event resolution (H3):**
+Check `pg_net.http_requests` for non-200 responses from the `emit-audit-event` Worker and PagerDuty endpoint. File Supabase support ticket if pg_net is degraded. After resolution, trigger a manual job 48 run.
+
+**Step 4 — Supabase outage recovery (H4):**
+Co-activate R-03 (Infrastructure Outage). Wait for Supabase platform restoration. After recovery, confirm peer daily jobs (45/46/47) also restored. Re-run job 48 manually after peer jobs confirm healthy.
+
+**Step 5 — P0 escalation paths (if R-48-C2 or R-48-C3 positive):**
+If R-48-C2 positive: execute §R-48.5 (R-48-A → R-48-B → R-48-C → R-48-D). Do not proceed to Step 6 until R-48-D retroactive DEC-030 emission is confirmed. If R-48-C3 positive: execute §R-48.6 (R-48-E → R-48-F → R-48-G). Do not proceed to Step 6 until R-48-G DEC-030 emission is confirmed. If both positive: execute §R-48.5 and §R-48.6 concurrently with separate IC sub-assignments; both must reach DEC-030 confirmation before Step 6.
+
+**Step 6 — Manual job run + all-clear + DEC-030 closure:**
+```sql
+SELECT cron.run_job('amendment_rate_compliance_monitor');
+```
+Confirm `system.amendment_rate_check_passed` LOW/1yr emitted in `audit_log_events` (verifying both sweep 1 and sweep 2 return zero on the fresh run). Confirm the all-clear was NOT suppressed by AMEND-MONITOR-CHAIN-01 (i.e., no new CRITICAL event in this run — both sweeps genuinely clean). Emit `system.amendment_rate_monitor_restored` STANDARD/3yr (AMEND-STALE-CHAIN-01 terminal event) via `emit-audit-event` Worker (devops-lead IC, PAM-elevated). Resolve PagerDuty P1/P0 `amend-check-stale`. Close Linear incident ticket. File stale-window note in `compliance/evidence/amendments/monitoring/R-48-stale-note-<incident_id>.md`.
+
+### R-48.7 Communication Templates
+
+**AMEND-MON-INT-01 — P1 all-clear (internal):**
+> `#security #compliance` — INCIDENT CLOSED P1 R-48: Amendment rate compliance monitor (job 48) restored at `<time>`. Stale duration: `<N>` days (`<M>` missed monthly runs). Root cause: `<H1-H4>`. R-48-C2: zero TU-CHAIN-01 chain gaps — `amend_contract_tier()` HTTP 422 enforcement operated at Worker + DDL layers throughout. R-48-C3: zero price floor breaches — DATA_MODEL §47 DDL CHECK constraint remained active. DEC-030 chain: `amendment_rate_monitor_stale_declared` + `amendment_rate_monitor_restored` emitted (AMEND-STALE-CHAIN-01). AMEND-OBS-E-001 stale-window note filed.
+
+**AMEND-MON-INT-02 — P0 TU-CHAIN-01 chain gap (internal):**
+> `#security #compliance` — **P0 ESCALATED — R-48 TU-CHAIN-01 CHAIN GAP DETECTED.** Stale window: `<confirmed_stale_since>` to `<now>`. Chain gap count: `<N>`. §R-48.5 forensic path activated. security-engineer + compliance-officer + enterprise-architect required. Founder notified. Do not log rate values in this channel — handle in `#security-restricted`.
+
+**AMEND-MON-INT-03 — P0 price floor breach (internal):**
+> `#security #compliance` — **P0 ESCALATED — R-48 PRICE FLOOR BREACH DETECTED.** Stale window: `<confirmed_stale_since>` to `<now>`. Breach count: `<N>`. §R-48.6 floor forensic path activated. security-engineer + compliance-officer required. §32 exception review mandatory before closing. No contract IDs or rate details in this channel — handle in `#security-restricted`.
+
+**AMEND-MON-INT-04 — Dual P0 (internal):**
+> `#security #compliance` — **DUAL P0 ESCALATED — R-48: TU-CHAIN-01 CHAIN GAP + PRICE FLOOR BREACH BOTH CONFIRMED.** §R-48.5 and §R-48.6 executing concurrently. All four owners required. Founder page dispatched. Both DEC-030 retroactive events must be confirmed before P0 resolution.
+
+### R-48.8 DEC-030 Events
+
+Two events anchor the R-48 incident lifecycle. **AMEND-STALE-CHAIN-01 ordering invariant:** `system.amendment_rate_monitor_restored` is blocked (HTTP 422 `AMEND_STALE_CHAIN_01_VIOLATION`) by the `emit-audit-event` Worker if no prior `system.amendment_rate_monitor_stale_declared` exists for the same `incident_id`; ordering inversion → R-05 activated. Privacy floor (both events): integer counts, booleans, timestamps, and enum values only — no employee `user_id`, no rate value, no tenant name, no GDPR Art. 9 data. These events are distinct from `security.amendment_chain_gap_detected` CRITICAL/7yr and `security.amendment_floor_breach_detected` CRITICAL/7yr (which job 48 emits WHEN RUNNING to report active commercial governance breaches) and from `system.amendment_rate_check_passed` LOW/1yr (job 48 all-clear). Structural peers: PRICING-MONITOR-STALE-CHAIN-01 (R-46); SCIM-PROV-MONITOR-STALE-CHAIN-01 (R-47); LITH-MONITOR-STALE-CHAIN-01 (R-45); OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 (R-44).
+
+| Event | Severity | Retention | Emitter | Trigger |
+|---|---|---|---|---|
+| `system.amendment_rate_monitor_stale_declared` | HIGH | 7 yr | devops-lead (IC, PAM-elevated, `emit-audit-event` Worker) | Step 1, T+0 on receipt of AL-AMEND-03 P1 page or manual discovery; AMEND-STALE-CHAIN-01 prerequisite |
+| `system.amendment_rate_monitor_restored` | STANDARD | 3 yr | devops-lead (IC, PAM-elevated, `emit-audit-event` Worker) | Step 6 after job 48 confirmed healthy and R-48-C2 + R-48-C3 re-runs both return zero; AMEND-STALE-CHAIN-01 terminal event; resolves PagerDuty `amend-check-stale` |
+
+### R-48.9 Zod v2 Schemas (canonical source: this document §R-48.9)
+
+```typescript
+import { z } from 'zod/v4';
+
+// system.amendment_rate_monitor_stale_declared — HIGH · 7 yr · CC5.2/CC6.1/A1.1/CC4.1
+// AMEND-STALE-CHAIN-01 anchor — IC-emitted at R-48 Step 1
+// Privacy floor: counts, booleans, timestamps, enums only — no user_id, rate value, GDPR Art. 9 data
+export const AmendmentRateMonitorStaleDeclaredPayload = z.object({
+  incident_id:             z.string().uuid(),
+  confirmed_stale_since:   z.string().datetime(),
+  stale_days:              z.number().positive(),
+  missed_months:           z.number().int().nonnegative(),
+  trigger:                 z.enum(['pagerduty_alert', 'manual_discovery', 'co_active_r03']),
+  initial_severity:        z.enum(['P1', 'P0']),
+  chain_gap_found:         z.boolean(),
+  // chain_gap_found: IC-confirmed result of R-48-C2 at declaration time.
+  // true → §R-48.5 TU-CHAIN-01 forensic path activated; AMEND-SLO-01 breach.
+  floor_breach_found:      z.boolean(),
+  // floor_breach_found: IC-confirmed result of R-48-C3 at declaration time.
+  // true → §R-48.6 price floor forensic path activated; AMEND-SLO-02 breach.
+});
+
+// system.amendment_rate_monitor_restored — STANDARD · 3 yr · CC7.2
+// AMEND-STALE-CHAIN-01 terminal event — IC-emitted at Step 6
+export const AmendmentRateMonitorRestoredPayload = z.object({
+  incident_id:                     z.string().uuid(), // must match stale_declared
+  restored_at:                     z.string().datetime(),
+  root_cause:                      z.enum([
+    'H1_job_deleted',
+    'H2_form_system_permission_revoked',
+    'H3_pg_net_degraded',
+    'H4_supabase_outage',
+  ]),
+  fix_deployed_at:                 z.string().datetime(),
+  stale_days:                      z.number().positive(),        // must match stale_declared
+  chain_gap_found:                 z.boolean(),                  // must match stale_declared
+  floor_breach_found:              z.boolean(),                  // must match stale_declared
+  chain_gap_resolved:              z.boolean(),                  // true if §R-48.5 completed
+  floor_breach_resolved:           z.boolean(),                  // true if §R-48.6 completed
+  chain_gaps_at_restoration:       z.number().int().nonnegative(), // R-48-C2 re-run count; 0 required
+  floor_breaches_at_restoration:   z.number().int().nonnegative(), // R-48-C3 re-run count; 0 required
+});
+```
+
+### R-48.10 SOC 2 Evidence
+
+| Artefact | Content | Criteria | Retention | Filing path |
+|---|---|---|---|---|
+| R-48-C1 staleness export | pg_cron run history: last 5 job 48 runs + stale days | CC7.2/A1.1 | 3 yr | `compliance/evidence/amendments/monitoring/R-48-stale-C1-<incident_id>.md` |
+| R-48-C2 chain gap gate at declaration | `billing.rate_updated` / `enterprise.contract_amended` pairing result; `chain_gap_found = false` = CC5.2 IC attestation that no TU-CHAIN-01 gaps occurred undetected during stale window | CC5.2/CC7.2 | 7 yr | `compliance/evidence/amendments/monitoring/R-48-stale-C2-declared-<incident_id>.md` |
+| R-48-C3 floor breach gate at declaration | `enterprise_contracts` breach scan; `floor_breach_found = false` = CC6.1 IC attestation that no below-floor amended contracts existed during stale window | CC6.1/CC7.2 | 7 yr | `compliance/evidence/amendments/monitoring/R-48-stale-C3-declared-<incident_id>.md` |
+| R-48-C2 re-run at restoration | Second pairing scan after job 48 restored; confirms zero unresolved chain gaps before P0/P1 closure | CC5.2/A1.1 | 7 yr | `compliance/evidence/amendments/monitoring/R-48-stale-C2-restored-<incident_id>.md` |
+| R-48-C3 re-run at restoration | Second floor breach scan after job 48 restored; confirms zero breaches before P0/P1 closure | CC6.1/A1.1 | 7 yr | `compliance/evidence/amendments/monitoring/R-48-stale-C3-restored-<incident_id>.md` |
+| AMEND-OBS-E-001 stale-window note | IC narrative: stale window; C2/C3 counts; H-classification; §R-48.5/§R-48.6 activation steps if P0 triggered | CC5.2/CC6.1/CC4.1/CC7.2 | 7 yr (if P0) / 3 yr (P1 clean) | `compliance/evidence/amendments/monitoring/R-48-stale-note-<incident_id>.md` |
+
+**SOC 2 auditor rationale:** CC5.2 — `chain_gap_found = false` in `amendment_rate_monitor_stale_declared` is the HMAC-chained IC attestation that no TU-CHAIN-01 gaps occurred undetected; the primary `amend_contract_tier()` HTTP 422 enforcement was active throughout. CC6.1 — `floor_breach_found = false` is the IC attestation that no below-floor `enterprise_contracts` amendment rows existed; DDL CHECK constraint (DATA_MODEL §47) was active throughout. CC4.1 — the structured five-query IC response (R-48-C1 through R-48-C5) demonstrates FORM has defined procedures for responding to commercial governance monitoring failures. CC7.2 — the `pg-cron-health-monitor` → AL-AMEND-03 → R-48 detection chain provides auditor-verifiable monitoring-failure detection. The DEC-030 HMAC chain (`stale_declared` → `stale_restored`) provides tamper-evident detection-to-restoration timeline independently verifiable per HMAC-VERIFY-ALGO-001.
+
+### R-48.11 Cross-References
+
+- `docs/OBSERVABILITY.md §57` — job 48 canonical spec (§57.5); AMEND-MONITOR-CHAIN-01 (§57.5.5); AL-AMEND-01/02/03 (§57.4); AMEND-SLO-01/02/03 (§57.2); AMEND-OBS-E-001 (§57.8); §57.10 item 6 — this runbook closes
+- `docs/OBSERVABILITY.md §12.6` — job 48 pg_cron registry entry (stale-consequence cross-ref: this runbook)
+- `docs/COST_MODEL.md §45.5` — TU-CHAIN-01 chain invariant (authoritative definition); `amend_contract_tier()` SECURITY DEFINER RPC; HTTP 422 `TU_CHAIN_01_FLOOR_VIOLATION`
+- `docs/COST_MODEL.md §31.5` — COGS-anchored price floors (Starter $6.00, Growth $4.50, Enterprise $4.00)
+- `docs/COST_MODEL.md §32` — pricing exception approval matrix (retroactive §32 review required for any R-48-C3 breach)
+- `docs/DATA_MODEL.md §47` — migration 0088 DDL; amendment columns; floor CHECK constraint; six-step staging checklist
+- `docs/SOC2_READINESS.md §118` — ADM-E-001/ADM-E-002 annual evidence artefacts; TU-CHAIN-01 chain gap and floor breach impact on annual filing
+- `docs/AUDIT_LOG_SCHEMA.md §Contract Amendment Rate Compliance Monitoring events` — `security.amendment_chain_gap_detected`, `security.amendment_floor_breach_detected`, `system.amendment_rate_check_passed` (§57.10 item 1 P0/M5 pending); `system.amendment_rate_monitor_stale_declared` + `system.amendment_rate_monitor_restored` + AMEND-STALE-CHAIN-01 (to register per R-48.12 item 1 P0/M7)
+- R-03 (Infrastructure Outage — H4 co-activation)
+- R-05 (HMAC chain break — H1 unauthorized deletion co-activation; AMEND-STALE-CHAIN-01 ordering inversion escalation)
+- R-20 (Insider Threat — §R-48-B direct write bypass path)
+- R-44 (Offboard Chain Monitor Stale — structural peer, OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01)
+- R-45 (Litigation Hold Monitor Stale — structural peer, three-SLO escalation)
+- R-46 (Pricing Exception Monitor Stale — structural peer, two-SLO two-P0 pattern, direct structural peer)
+- R-47 (SCIM Provisioning Monitor Stale — structural peer, two-SLO escalation)
+- DEC-030
+
+### R-48.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.amendment_rate_monitor_stale_declared` (HIGH/7yr) and `system.amendment_rate_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Contract Amendment Rate Compliance Monitoring events` (append after existing three-event section). Add AMEND-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-48.9. | security-engineer + compliance-officer | **P0** | M7 | [ ] |
+| 2 | Deploy R-48 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'amendment_rate_compliance_monitor'` to PagerDuty service `form-devops` P1, dedup key `amend-check-stale`, auto-resolve on `system.amendment_rate_check_passed`. Integration test: simulate job 48 > 33-day staleness in staging (alter `last_run_time` in `pg_cron.job_run_details`); confirm P1 fires; confirm auto-resolve after manual run. | devops-lead | **P0** | M7 | [ ] |
+| 3 | Confirm `docs/OBSERVABILITY.md §12.6` job 48 entry references `INCIDENT_RESPONSE R-48` (not "pending"); confirm §57.4 AL-AMEND-01/02/03 runbook rows reference R-48; confirm §57.10 item 6 marked `[x] Done`. | devops-lead | **P1** | M7 | [x] Done — 2026-06-27 (INCIDENT_RESPONSE.md v3.16.0 + OBSERVABILITY.md v5.4.1 cross-reference patch, this commit) |
+| 4 | Register AMEND-OBS-E-001 stale-window note artefact template path (`compliance/evidence/amendments/monitoring/R-48-stale-note-<incident_id>.md`) in `docs/SOC2_READINESS.md §124.7` checklist; confirm `amendments/monitoring/` R2 subfolder policy covers R-48 evidence filing paths. | compliance-officer | **P1** | M7 | [ ] |
+
+---
+
+*v1.0 (2026-06-27): R-48 Amendment Rate Compliance Monitor Stale — forty-eighth runbook. Closes `docs/OBSERVABILITY.md §57.10` item 6 (P1/M7 — author R-48 stale recovery runbook). Job 48 `amendment_rate_compliance_monitor` (`0 7 1 * *`; 33-day freshness window; monthly) was registered in OBSERVABILITY.md §12.6 (v2.3 patch, 2026-06-27) and §57 (v5.4.0, 2026-06-27) as the authoritative spec for AMEND-SLO-01 TU-CHAIN-01 chain integrity monitoring and AMEND-SLO-02 price floor forensic cross-check, but the stale-recovery runbook was explicitly deferred as §57.10 item 6. Critical characteristic: unlike daily jobs (R-44 through R-47), job 48 runs monthly — a stale window may represent 33–64+ days of unmonitored commercial governance period; stale_days (not stale_hours) is the primary staleness metric. Job 48 staleness creates two simultaneous P0-capable monitoring gaps — (1) AMEND-SLO-01 blind spot: `billing.rate_updated` events without a `enterprise.contract_amended` chain partner during the stale window are not detected by the monitoring layer; AMEND-MONITOR-CHAIN-01 requires `security.amendment_chain_gap_detected` CRITICAL/7yr HTTP 200 before AL-AMEND-01 P0 fires; staleness suppresses both the DEC-030 event and the P0 alert until IC manually runs R-48-C2 and §R-48.5; primary enforcement (`amend_contract_tier()` HTTP 422 at Worker layer + DDL layer) continued operating independently; (2) AMEND-SLO-02 blind spot: `enterprise_contracts` rows with `rate_per_seat_usd` below the §31.5 floor are not detected during the stale window; DDL CHECK constraint (DATA_MODEL §47) continues operating; IC must manually run R-48-C3 and §R-48.6 if breach found. Both R-48-C2 and R-48-C3 positive results trigger independent P0 paths; dual-positive triggers all four owners + founder page. Two DEC-030 HMAC-chained events: `system.amendment_rate_monitor_stale_declared` HIGH/7yr; `system.amendment_rate_monitor_restored` STANDARD/3yr; AMEND-STALE-CHAIN-01 ordering invariant (HTTP 422 on ordering inversion → R-05). Five scope queries: R-48-C1 (staleness confirmation — stale_days); R-48-C2 (TU-CHAIN-01 chain gap gate — P0 escalation pivot); R-48-C3 (price floor breach gate — P0 escalation pivot); R-48-C4 (peer daily job health — H4 Supabase discriminator); R-48-C5 (job registration check — H1 discriminator). Four root cause hypotheses: H1 (deleted/disabled); H2 (form_system permission revoked); H3 (pg_net degraded); H4 (Supabase outage — R-03). Two P0 escalation paths: §R-48.5 (TU-CHAIN-01 forensic: R-48-A audit trail → R-48-B write bypass check → R-48-C RPC stack trace → R-48-D retroactive CRITICAL event + post-mortem); §R-48.6 (price floor forensic: R-48-E DDL CHECK verification → R-48-F §32 exception review → R-48-G retroactive CRITICAL event + post-mortem). Six-step recovery. Four communication templates. SOC 2: CC5.2 (`chain_gap_found = false` — TU-CHAIN-01 IC attestation; Worker + DDL enforcement active despite monitoring blind spot); CC6.1 (`floor_breach_found = false` — floor compliance IC attestation; DDL CHECK active); CC4.1 (five-query structured IC response to commercial governance monitoring failure); CC7.2 (`pg-cron-health-monitor` → AL-AMEND-03 → R-48 detection chain + HMAC chain). Key distinction from structural peers R-46/R-47: both R-48-C2 and R-48-C3 are independent P0 triggers; there is no intermediate P1+ escalation for either path. Cross-references: `docs/OBSERVABILITY.md §57` (job 48 spec; AMEND-MONITOR-CHAIN-01 §57.5.5; AL-AMEND-01/02/03 §57.4; AMEND-SLO-01/02/03 §57.2; §57.10 item 6 — this runbook closes); `docs/OBSERVABILITY.md §12.6` (job 48 registry — stale-consequence cross-ref updated to R-48); `docs/COST_MODEL.md §45.5` (TU-CHAIN-01 + amend_contract_tier() RPC); `docs/COST_MODEL.md §31.5` (price floors); `docs/COST_MODEL.md §32` (exception approval matrix); `docs/DATA_MODEL.md §47` (migration 0088 — amendment columns + floor CHECK constraint); `docs/SOC2_READINESS.md §118` (ADM-E-001/ADM-E-002); R-03; R-05; R-20; R-44; R-45; R-46; R-47. Owner: devops-lead + compliance-officer + security-engineer + enterprise-architect.*
+
+---
+
+**v1.0 · 2026-06-27 · Owner: devops-lead + compliance-officer + security-engineer + enterprise-architect**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---
+
+*v3.16.0 (2026-06-27): R-48 Amendment Rate Compliance Monitor Stale (`amendment_rate_compliance_monitor` · job 48) — closes `docs/OBSERVABILITY.md §57.10` item 6 (P1/M7). Job 48 monthly forensic monitor stale-recovery runbook: two P0-capable escalation paths (§R-48.5 TU-CHAIN-01 chain gap forensic + §R-48.6 price floor DDL breach forensic); two companion DEC-030 events (`system.amendment_rate_monitor_stale_declared` HIGH/7yr + `system.amendment_rate_monitor_restored` STANDARD/3yr); AMEND-STALE-CHAIN-01 ordering invariant. Five scope queries (R-48-C1 staleness; R-48-C2 chain gap gate; R-48-C3 floor breach gate; R-48-C4 peer health; R-48-C5 job registration). Six-step recovery. OBSERVABILITY.md v5.4.1 cross-reference patch: §6.2 `amendment_rate_health` AL-AMEND-01/02/03 runbook columns updated from "pending §57.10 item 6" to "R-48 (§R-48.5/R-48.6/§R-48.1; v1.0, 2026-06-27)"; §12.6 job 48 stale-consequence cross-ref updated from "pending §57.10 item 6 P1/M7" to "R-48 (§R-48.5/R-48.6; v1.0, 2026-06-27)"; §57.10 item 6 status `[ ]` → `[x] Done — 2026-06-27 (INCIDENT_RESPONSE.md v3.16.0)`. Privacy floor: `system.amendment_rate_monitor_stale_declared` and `system.amendment_rate_monitor_restored` carry counts, booleans, timestamps, and enums only — no employee `user_id`, rate value, tenant name, or GDPR Art. 9 special-category data. R-48-C2 surfaces `billing_event_id` UUIDs (FORM-internal `audit_log_events` PKs) and `tenant_id` UUIDs only — no rate values, employee identities, or health data. R-48-C3 surfaces `contract_id` UUIDs (FORM-internal `enterprise_contracts` PKs) — rate values are commercially sensitive and must not be logged outside `#security-restricted`. Owner: devops-lead + compliance-officer + security-engineer + enterprise-architect.*
