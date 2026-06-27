@@ -2745,7 +2745,7 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2691 | Self-coached з AI: п'ять завдань де штучний інтелект реально допомагає і п'ять де шкодить | **draft · v9.54.0 → post-2691-self-coached-ai-five-tasks-help-hurt.md** |
 | 2692 | Коли алгоритм помиляється: де autoregulation-логіка не спрацьовує на живих даних | **draft · v9.55.0 → post-2692-when-algorithm-fails-autoregulation-logic.md** |
 | 2693 | Технологічна залежність у тренуванні: де вона корисна, де стає перешкодою | **draft · v9.56.0 → post-2693-technology-dependency-training.md** |
-| 2694 | Майбутнє AI-коучингу: що вже реально, що залишається маркетингом | proposed · v9.48.0 |
+| 2694 | Майбутнє AI-коучингу: що вже реально, що залишається маркетингом | **draft · v9.58.0 → post-2694-ai-coaching-future-reality-vs-marketing.md** |
 | 2695 | Синтез 2686–2695: технологічна грамотність self-coached атлета — десять принципів без хайпу | proposed · v9.48.0 |
 
 ### Editorial series: 2696–2705 · Тіло як інструмент вимірювання: суб'єктивні сигнали без приладів (proposed · v9.50.0)
