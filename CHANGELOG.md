@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [9.59.0] — 2026-06-27
+
+### Added
+- `docs/SOC2_READINESS.md §124` — Cross-Reference Patch: AMEND-OBS-E-001 registered in §79.4 master evidence table (count 86 → 87). Annual `amendment_rate_compliance_monitor` job 48 pg_cron run history + AL-AMEND-01/02/03 activation log; CC5.2/CC6.1/A1.1; 3yr; `amendments/monitoring/AMEND-OBS-E-001_<YYYY>.md`. Monitoring-layer companion to ADM-E-001/ADM-E-002 (§118): outcome evidence (amendment chain + billing rate cross-reference) + monitoring evidence (job 48 continuity + AMEND-MONITOR-CHAIN-01 ordering verification per run) together satisfy the evidence-completeness pattern established by CHN-OBS-E-001/DEL-OBS-E-001/LITH-OBS-E-001. §80.3 `amendments/monitoring/` subfolder added. §80.4 Vanta mirror list updated. Closes OBSERVABILITY §57.10 item 5 (P1/M6). Privacy floor: aggregate counts and FORM-internal UUIDs only — no `tenant_name`, employee `user_id`, name, email, health value, rate value, or GDPR Art. 9 data; `form_api` NO ACCESS.
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.47.1 → v3.48.0. §124 added; §79.4 AMEND-OBS-E-001 row inserted after ADM-E-002; §80.3 `amendments/monitoring/` subfolder entry added; §80.4 Vanta mirror AMEND-OBS-E-001 entry added.
+- `docs/OBSERVABILITY.md` — v5.4.2 → v5.4.3. §57.10 item 5 status `[ ]` → `[x] Done — 2026-06-27 (SOC2_READINESS.md §124 · v3.48.0)`.
+- `VERSION` — 9.58.0 → 9.59.0.
+
+---
+
 ## [9.58.0] — 2026-06-27
 
 ### Added
