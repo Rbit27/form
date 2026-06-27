@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [9.52.1] — 2026-06-27
+
+### Changed
+- `docs/ENTERPRISE_SLA.md` — document header v1.1 → v1.2. §3.8 (CAEP/SSF Real-Time Session Control SLA) and §3.9 (SSO Login Availability — per-tenant SSO-SLO-01) were authored in v1.2 (2026-06-26) but the document title line was not updated at that time. This patch closes the discrepancy; content is unchanged.
+- `VERSION` — 9.52.0 → 9.52.1.
+
+---
+
+## [9.52.0] — 2026-06-27
+
+### Added
+- `content/post-2689-ai-cannot-replace-context.md` — Series 2686–2695 cluster «Технологічна грамотність self-coached атлета» post 4/10. «Чому AI не може замінити контекст: що program logic не враховує за замовчуванням». clinical_safety_review: NOT_REQUIRED.
+- `blog.html` — post-2689 card added.
+
+### Changed
+- `STATUS.md` — Series 2686–2695 progress updated to 4/10.
+- `VERSION` — 9.51.0 → 9.52.0.
+
+---
+
 ## [9.51.0] — 2026-06-27
 
 ### Added

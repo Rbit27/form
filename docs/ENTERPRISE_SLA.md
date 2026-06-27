@@ -1,4 +1,4 @@
-# FORM · Enterprise Service Level Agreement v1.1
+# FORM · Enterprise Service Level Agreement v1.2
 
 > Customer-facing SLA Terms. Attached to the Master Service Agreement (MSA) as **Exhibit B — Service Level Agreement**.
 > Owner: `compliance-officer` + `enterprise-architect`. Review: annually or after any P0 incident that results in a credit dispute.
