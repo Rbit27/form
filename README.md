@@ -2743,7 +2743,7 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2689 | Чому AI не може замінити контекст: що program logic не враховує за замовчуванням | **draft · v9.52.0 → post-2689-ai-cannot-replace-context.md** |
 | 2690 | Як вибрати додаток для тренувань: функціональні критерії без маркетингових обіцянок | **draft · v9.53.0 → post-2690-how-to-choose-training-app-functional-criteria.md** |
 | 2691 | Self-coached з AI: п'ять завдань де штучний інтелект реально допомагає і п'ять де шкодить | **draft · v9.54.0 → post-2691-self-coached-ai-five-tasks-help-hurt.md** |
-| 2692 | Коли алгоритм помиляється: де autoregulation-логіка не спрацьовує на живих даних | proposed · v9.48.0 |
+| 2692 | Коли алгоритм помиляється: де autoregulation-логіка не спрацьовує на живих даних | **draft · v9.55.0 → post-2692-when-algorithm-fails-autoregulation-logic.md** |
 | 2693 | Технологічна залежність у тренуванні: де вона корисна, де стає перешкодою | proposed · v9.48.0 |
 | 2694 | Майбутнє AI-коучингу: що вже реально, що залишається маркетингом | proposed · v9.48.0 |
 | 2695 | Синтез 2686–2695: технологічна грамотність self-coached атлета — десять принципів без хайпу | proposed · v9.48.0 |
