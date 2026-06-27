@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v9.41.0** — 2026-06-27
+**v9.42.0** — 2026-06-27
 
 ---
 
@@ -36,4 +36,5 @@
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
 | 751–800 | Athlete lifecycle & context | 50 | **BLOCK COMPLETE** — all 50 posts written v5.1.0: posts 791 (athletes with movement limitations · clinical-safety CONDITIONAL PASS), 793 (sustained high stress training · clinical-safety CONDITIONAL PASS), 794 (medically-restricted diet · clinical-safety CONDITIONAL PASS) now written with embedded guard rails. Blog cards added for posts 785–800. sports-scientist review required for all 50 before publish |
+| 2666–2675 | Від атлета-виконавця до атлета-архітектора | 1/10 | **post-2666 (executor-vs-architect · editorial) added v9.42.0 · clinical-safety NOT_REQUIRED · sports-scientist review pending. Blog card added. README: post-2666 → draft; posts 2667–2675 proposed.** |
 | 801–850 | Evidence-based deep dives | 50 | **BLOCK COMPLETE v5.14.0** — all 50 posts written. Posts 801–840 (prev batches). **Batch 841–850 COMPLETE v5.14.0:** post-841 electrolytes performance science (PASS), post-842 nitrate/beetroot (PASS — guard rail: drug interactions with nitroglycerin), post-843 sodium bicarbonate buffering (PASS), post-844 adaptogen comparison (PASS), post-845 rhodiola rosea (CONDITIONAL PASS — guard rail: SSRI/SNRI/MAOI interactions, serotonin syndrome risk), post-846 tart cherry/recovery (PASS), post-847 glutathione/antioxidant paradox (PASS), post-848 NAC (CONDITIONAL PASS — guard rail: nitroglycerin interaction + antioxidant paradox for trained athletes), post-849 phosphatidylserine/cortisol (PASS), post-850 cordyceps/C.militaris (PASS — block synthesis). All sports-scientist review required before publish. |
