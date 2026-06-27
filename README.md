@@ -2778,9 +2778,9 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2710 | Складність програми проти ефективності програми: де надмірна деталізація починає шкодити | **draft · v9.72.0 → post-2710-program-complexity-vs-effectiveness.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2711 | Мінімалізм у виборі вправ: скільки рухових патернів реально потрібно для всебічного розвитку | **draft · v9.72.0 → post-2711-exercise-selection-minimalism-movement-patterns.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2712 | Прогресія без накопичення хаосу: як додавати навантаження не додаючи складності | **draft · v9.73.0 → post-2712-progression-without-chaos-accumulation.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2713 | Мінімалістичний технологічний стек: один надійний інструмент проти повної екосистеми | proposed · v9.56.0 |
-| 2714 | Коли «більше» перестає бути «краще»: ознаки перевантаженої програми у власних даних | proposed · v9.56.0 |
-| 2715 | Синтез 2706–2715: чеклист мінімалістичної практики — десять питань перед наступним блоком | proposed · v9.56.0 |
+| 2713 | Мінімалістичний технологічний стек: один надійний інструмент проти повної екосистеми | **draft · v9.74.0 → post-2713-minimalist-tech-stack-one-tool.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2714 | Стабільна рутина проти постійної оптимізації: чому незмінна структура частіше перемагає | **draft · v9.74.0 → post-2714-stable-routine-vs-constant-optimization.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2715 | Синтез 2706–2715: мінімалістична практика як системний вибір, а не тимчасова стратегія | **draft · v9.75.0 → post-2715-minimalist-practice-synthesis.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending · **SERIES COMPLETE** |
 
 ### Editorial series: 2716–2720 · Тренування як конкурентний вибір: де self-coached атлет систематично обирає неоптимально (proposed · v9.61.0)
 
@@ -2844,6 +2844,11 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2748 | Силове тренування і кардіо в одному тижні: що дослідження кажуть про роздільне vs. паралельне | proposed · v9.73.0 |
 | 2749 | Тренування як система зворотного зв'язку: чому без читання даних прогресія — не прогресія | proposed · v9.73.0 |
 | 2750 | Синтез 2741–2750: що відрізняє тренувальну логіку від тренувального звичаю | proposed · v9.73.0 |
+| 2751 | Що таке тренувальна стійкість: різниця між атлетом, що тренується рік, і атлетом, що тренується рік ефективно | proposed · v9.75.0 |
+| 2752 | Як читати власний тренувальний архів: що минулорічні дані кажуть про поточну програму | proposed · v9.75.0 |
+| 2753 | Тренувальні рішення під тиском: що відбувається з якістю планування при стресі і як це компенсувати | proposed · v9.75.0 |
+| 2754 | Коли зупинятись під час підходу: технічна відмова, м'язова відмова і де між ними правильна точка | proposed · v9.75.0 |
+| 2755 | Синтез 2751–2755: п'ять принципів атлета, що вчиться з власної практики, а не повторює її | proposed · v9.75.0 |
 
 ---
 
