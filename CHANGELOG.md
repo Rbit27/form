@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.63.1] — 2026-06-27
+
+### Changed
+- `docs/OBSERVABILITY.md` — §57.12 AMEND-STALE-CHAIN-01 stale-window event specifications: §57.12.1 ordering invariant (HTTP 422 `AMEND_STALE_CHAIN_01_VIOLATION` on inversion → R-05); §57.12.2 `system.amendment_rate_monitor_stale_declared` HIGH/7yr (AMEND-STALE-CHAIN-01 anchor, R-48 Step 1, CC5.2/CC6.1/A1.1/CC4.1, Zod v2 schema from §R-48.9); §57.12.3 `system.amendment_rate_monitor_restored` STANDARD/3yr (AMEND-STALE-CHAIN-01 terminal event, R-48 Step 6, CC7.2, Zod v2 schema from §R-48.9). §57.8 AMEND-OBS-E-001 registration status updated to reflect SOC2_READINESS §124 registration (item 5 done, 2026-06-27 · v3.48.0). Version note v5.4.3 added (item 5 cross-reference closure). Document v5.4.3 → v5.4.4.
+- `VERSION` — 9.63.0 → 9.63.1.
+
+---
+
 ## [9.63.0] — 2026-06-27
 
 ### Added
