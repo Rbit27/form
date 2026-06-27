@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.54
+# FORM · Audit Log Schema v2.55
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -4021,6 +4021,78 @@ export const AmendmentRateMonitorRestoredPayload = z.object({
 **CC7.2 auditor narrative (R-48 stale events):** CC7.2 requires FORM to demonstrate timely detection and response to monitoring failures. The `system.amendment_rate_monitor_stale_declared` → `system.amendment_rate_monitor_restored` AMEND-STALE-CHAIN-01 pair provides a tamper-evident, auditor-verifiable detection-to-restoration timeline, independently verifiable per HMAC-VERIFY-ALGO-001 (OBSERVABILITY §50). `chain_gaps_at_restoration = 0` and `floor_breaches_at_restoration = 0` in the terminal `restored` event confirm zero open commercial governance issues at P0/P1 incident closure. Retention 7yr for `stale_declared` (primary IC attestation — `chain_gap_found = false` CC5.2 + `floor_breach_found = false` CC6.1 in a single HMAC-chained record); 3yr for `restored` (operational completion record — primary attestations already captured in 7yr `stale_declared`).
 
 **CC5.2 / CC6.1 IC attestation (R-48 stale events):** When `chain_gap_found = false` in `stale_declared`, the IC attests — in an HMAC-chained, tamper-evident audit record — that no TU-CHAIN-01 chain gaps occurred undetected during the job 48 stale window: the primary `amend_contract_tier()` HTTP 422 enforcement (COST_MODEL §45.5) and the DDL-layer `ec_amendment_rate_floor_check` CHECK constraint (DATA_MODEL §47) were operational throughout the blind-spot period. When `floor_breach_found = false`, the IC attests that no below-floor `enterprise_contracts` amendment rows existed during the stale window. These IC attestations are the monitoring-gap compensating controls for CC5.2 and CC6.1 during periods when job 48 was not running. The `chain_gap_found / floor_breach_found` boolean pair in `stale_declared` is the SOC 2 auditor's primary evidence for the stale-window governance assurance.
+
+---
+
+### Enterprise Mid-Contract Termination Risk Monitoring events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-29 · CC4.1/CC5.2/CC7.2/A1.1)
+
+> Three DEC-030 HMAC-chained events covering the pg_cron job 25 (`mid_contract_termination_risk_check`) stale-window recovery protocol defined in `docs/INCIDENT_RESPONSE.md R-29`. Job 25 runs weekly on Mondays at 09:00 UTC, detects tenants with CHS < 20 for ≥4 consecutive weekly snapshots AND `days_remaining > 180` AND `contract_acv_usd ≥ $50k`, and emits `enterprise.mid_contract_termination_risk_flagged` (HIGH, 7yr — `docs/COST_MODEL.md §35.9.1`). When job 25 becomes stale (8-day freshness window, `docs/OBSERVABILITY.md §12.6`), `pg-cron-health-monitor` (§12.7) emits `system.cron_job_stale` → PagerDuty P1 `form-customer-success` dedup `mid-contract-risk-check-stale` → IC activates R-29. These three events are the HMAC-chained bookend and backfill record for R-29 incidents: `system.etf_cron_failure_declared` (anchor, IC-authored at T+0), `system.etf_cron_manual_check_completed` (per missed-Monday backfill — may be emitted multiple times per incident, one per missed Monday window), `system.etf_cron_restored` (terminal, IC-authored after job 25 restoration confirmed). ETF-CRON-CHAIN-01 ordering invariant: `system.etf_cron_failure_declared` must precede all `system.etf_cron_manual_check_completed` and `system.etf_cron_restored` events for the same `incident_id`; inversion returns HTTP 422 `ETF_CRON_CHAIN_01_VIOLATION` and co-activates R-05. Three-severity matrix (R-29.4): P1 (stale, no high-ACV at-risk tenant), P0 (stale AND ≥1 tenant ACV ≥ $50k at CHS < 20 ≥4 weeks AND `days_remaining > 180`), P0 escalated (at-risk tenant terminated during stale period). **Privacy floor:** all three events carry only FORM-internal operational metadata — stale duration, timestamps, root cause enum, counts; `tenants_flagged[]` in `manual_check_completed` carries tenant UUIDs only (same data class as `enterprise.mid_contract_termination_risk_flagged.tenant_id`); no individual employee `user_id`, name, email, CHS score, body composition, coaching session content, or GDPR Art. 9 special-category data in any event; `form_api` must never route any R-29 event to any tenant-facing endpoint. **Closes `docs/INCIDENT_RESPONSE.md R-29.11` checklist item 1 (P0/M10).**
+
+| Event type | Severity | Retention | Emitter | Payload fields |
+|---|---|---|---|---|
+| `system.etf_cron_failure_declared` | HIGH | 7 yr | `incident-commander` (PAM-elevated) at R-29 T+0 | `incident_id` (UUID), `confirmed_stale_since` (datetime), `stale_hours` (positive number), `monday_runs_missed` (nonneg int), `trigger` (enum: `cron_job_stale`\|`manual_observation`\|`job_run_details_gap`), `initial_severity` (enum: `P0`\|`P1`\|`P0_escalated`) |
+| `system.etf_cron_manual_check_completed` | STANDARD | 7 yr | `incident-commander` per missed-Monday backfill (R-29 Step 2) — one emission per missed Monday window; multiple per incident possible | `incident_id` (UUID), `check_window_monday` (datetime), `tenants_checked` (nonneg int), `tenants_flagged` (UUID[] — tenant UUIDs only), `max_acv_flagged_usd` (nonneg int), `all_clear` (bool), `data_gap_acknowledged` (bool) |
+| `system.etf_cron_restored` | STANDARD | 3 yr | `incident-commander` at R-29 Step 4 after test manual run confirms job 25 healthy | `incident_id` (UUID), `restored_at` (datetime), `root_cause_category` (enum: `H1_job_deleted`\|`H2_sql_exception`\|`H3_pg_net_degraded`\|`H4_permission_revoked`\|`H5_supabase_outage`), `fix_deployed_at` (datetime), `monday_runs_missed` (nonneg int), `p0_tenants_flagged` (nonneg int), `terminations_during_stale` (nonneg int) |
+
+**Zod v2 schemas (canonical source: `docs/INCIDENT_RESPONSE.md §R-29.7`):**
+
+```ts
+import { z } from 'zod/v4';
+
+// system.etf_cron_failure_declared — HIGH · 7yr
+// ETF-CRON-CHAIN-01 anchor — IC-emitted at R-29 T+0
+export const EtfCronFailureDeclaredPayload = z.object({
+  incident_id:           z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),
+  stale_hours:           z.number().positive(),
+  monday_runs_missed:    z.number().int().nonnegative(),
+  trigger:               z.enum(['cron_job_stale', 'manual_observation', 'job_run_details_gap']),
+  initial_severity:      z.enum(['P0', 'P1', 'P0_escalated']),
+});
+
+// system.etf_cron_manual_check_completed — STANDARD · 7yr
+// ETF-CRON-CHAIN-01: must follow etf_cron_failure_declared for same incident_id
+// One emission per missed-Monday backfill window (multiple per incident possible)
+export const EtfCronManualCheckCompletedPayload = z.object({
+  incident_id:           z.string().uuid(),
+  check_window_monday:   z.string().datetime(),
+  tenants_checked:       z.number().int().nonnegative(),
+  tenants_flagged:       z.array(z.string().uuid()),  // tenant UUIDs only — no personal data
+  max_acv_flagged_usd:   z.number().int().nonnegative(),
+  all_clear:             z.boolean(),
+  data_gap_acknowledged: z.boolean(),
+});
+
+// system.etf_cron_restored — STANDARD · 3yr
+// ETF-CRON-CHAIN-01 terminal event — IC-emitted at R-29 Step 4
+export const EtfCronRestoredPayload = z.object({
+  incident_id:               z.string().uuid(),
+  restored_at:               z.string().datetime(),
+  root_cause_category:       z.enum(['H1_job_deleted', 'H2_sql_exception', 'H3_pg_net_degraded', 'H4_permission_revoked', 'H5_supabase_outage']),
+  fix_deployed_at:           z.string().datetime(),
+  monday_runs_missed:        z.number().int().nonnegative(),
+  p0_tenants_flagged:        z.number().int().nonnegative(),
+  terminations_during_stale: z.number().int().nonnegative(),
+});
+```
+
+**Emitter assignments:**
+- `system.etf_cron_failure_declared` → `incident-commander` (PAM-elevated IC role); `form_api` has zero INSERT grant for R-29 HMAC-chain events (`emit-audit-event` Worker validates IC session token); emitted exactly once per incident at T+0; ETF-CRON-CHAIN-01 anchor.
+- `system.etf_cron_manual_check_completed` → `incident-commander`; emitted once per missed-Monday window during R-29 Step 2 backfill loop; `incident_id` must match an open `etf_cron_failure_declared` record or `emit-audit-event` returns HTTP 422 `ETF_CRON_CHAIN_01_VIOLATION`; multiple emissions per incident are valid.
+- `system.etf_cron_restored` → `incident-commander`; emitted once at R-29 Step 4 after test manual run confirms job 25 healthy; ETF-CRON-CHAIN-01 terminal event — `emit-audit-event` blocks further `etf_cron_manual_check_completed` events for the same `incident_id` after `restored` is recorded.
+
+**Alert routing:**
+- `system.etf_cron_failure_declared` → no additional PagerDuty on emission (parent `system.cron_job_stale` P1 `form-customer-success` alert from `pg-cron-health-monitor` §12.7 with dedup `mid-contract-risk-check-stale` already fired; AL-ETF-01 per OBSERVABILITY §36.3). DEC-030 event serves as the tamper-evident IC response anchor in the HMAC chain; opens the ETF-CRON-CHAIN-01 chain.
+- `system.etf_cron_manual_check_completed` → no PagerDuty; Slack `#customer-success` summary per window if `all_clear = false` and `tenants_flagged` non-empty (CSM escalation per R-29-C3); `max_acv_flagged_usd` surfaced in `#security-restricted` only — not written to the HMAC chain.
+- `system.etf_cron_restored` → resolves PagerDuty `mid-contract-risk-check-stale`; if `terminations_during_stale > 0`: IC confirms outside counsel ETF force-majeure review scheduled within 45 days (R-29.10) before P0 escalated closure; if `p0_tenants_flagged > 0`: IC confirms CSM intervention case opened for all flagged tenants before P0 closure.
+
+**ETF-CRON-CHAIN-01 — Ordering invariant (R-29 monitoring-control chain):** `system.etf_cron_manual_check_completed` and `system.etf_cron_restored` are blocked (HTTP 422 `ETF_CRON_CHAIN_01_VIOLATION`) if no prior `system.etf_cron_failure_declared` exists in the HMAC chain for the same `incident_id`; violation → R-05 co-activated. Additionally, `system.etf_cron_manual_check_completed` is blocked after `system.etf_cron_restored` has been emitted for the same `incident_id` (terminal enforcement — incident is closed). These three events are independent of `enterprise.mid_contract_termination_risk_flagged` (COST_MODEL §35.9.1 — operational detection event emitted by healthy job 25); ETF-CRON-CHAIN-01 governs the IC-authored bookend and backfill events for R-29 stale incidents exclusively. Privacy floor (all three R-29 events): `incident_id` is a FORM-internal UUID; `root_cause_category` is H1–H5 enum; `tenants_flagged[]` carries tenant UUIDs only (same data class as `enterprise_contracts.tenant_id` — no personally identifiable data, no individual CHS scores, no personal health data); all remaining fields are counts, booleans, timestamps, or enums. Structural peers: AMEND-STALE-CHAIN-01 (R-48); SCIM-PROV-MONITOR-STALE-CHAIN-01 (R-47); PRICING-MONITOR-STALE-CHAIN-01 (R-46); LITH-MONITOR-STALE-CHAIN-01 (R-45); OFFBOARD-CHAIN-MONITOR-STALE-CHAIN-01 (R-44). Registered v2.55 (2026-06-27 — [x] Done, AUDIT_LOG_SCHEMA.md v2.55, closes R-29.11 item 1).
+
+**CC4.1 / CC7.2 auditor narrative (R-29 events):** CC4.1 requires FORM to demonstrate ongoing monitoring evaluations with timely remediation. The `system.etf_cron_failure_declared` → `system.etf_cron_manual_check_completed` (per window) → `system.etf_cron_restored` ETF-CRON-CHAIN-01 chain provides a tamper-evident, auditor-verifiable detection-to-restoration timeline, independently verifiable per HMAC-VERIFY-ALGO-001 (OBSERVABILITY §50). The 8-day freshness threshold (OBSERVABILITY §12.6) represents FORM's defined monitoring tolerance for the weekly job 25 cycle; `pg-cron-health-monitor` (§12.7) enforces the threshold automatically — satisfying CC7.2 anomaly detection. `terminations_during_stale` in the terminal `restored` event provides auditor evidence for worst-case scope: zero value confirms no commercial harm during the detection gap; non-zero value triggers the outside counsel review trail (R-29.10). Retention 7yr for `failure_declared` and `manual_check_completed` (primary IC attestation and per-window backfill evidence); 3yr for `restored` (operational completion record — primary attestations already captured in 7yr events). Evidence artefacts: ETF-CRON-E-001 (failure declared chain export, CC4.1/CC7.2, 7yr); ETF-CRON-E-004 (manual check chain exports per missed window, CC4.1/CC5.2, 7yr); ETF-CRON-E-003 (pg_cron.job_run_details export, CC4.1/A1.1, 3yr).
+
+**CC5.2 IC attestation (R-29 events):** CC5.2 requires FORM to demonstrate risk identification and response activities for mid-contract termination risk. When `all_clear = true` in `system.etf_cron_manual_check_completed`, the IC attests — in an HMAC-chained, tamper-evident record — that the manual CHS detection query (R-29-C1) returned no qualifying at-risk tenants for that Monday's window despite the job 25 outage; this is the compensating control for CC5.2 during the stale window. When `all_clear = false`, `tenants_flagged[]` (UUID-only) provides the evidence basis for R-29-C3 CSM intervention scope, supporting CC5.2 risk remediation. The `all_clear` boolean in `manual_check_completed` is the SOC 2 auditor's primary per-window evidence for stale-window risk assessment assurance. Evidence artefacts: ETF-CRON-E-002 (R-29-C1/C3 query outputs, CC5.2/CC7.2, 7yr); ETF-CRON-COMP-E-001 (signed compensating control memo ETF-INT-01, CC4.1/CC5.2, 7yr — required whenever R-29 Step 2 or Step 3 executed, or R-29-C1 returned any row).
+
+**A1.1 auditor narrative (R-29 events):** A1.1 requires FORM to demonstrate that enterprise risk monitoring services meet stated availability commitments. The `system.etf_cron_restored.monday_runs_missed` field provides the auditor with the exact scope of the availability gap for job 25; `root_cause_category` (H1–H5 enum) provides the causal evidence for control improvement. For H5 (Supabase platform outage): R-03 is co-activated and A1.1 evidence is drawn from the R-03 post-incident report; `etf_cron_restored` remains in the ETF-CRON chain as the operational restoration record. Evidence artefact ETF-CRON-E-003 (pg_cron.job_run_details export, CC4.1/A1.1, 3yr) provides the raw availability evidence for auditor review.
 
 ---
 

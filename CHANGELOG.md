@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [9.73.1] — 2026-06-27
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.54 → v2.55. New section: Enterprise Mid-Contract Termination Risk Monitoring events (ETF-CRON-CHAIN-01). Registers three DEC-030 HMAC-chained events: `system.etf_cron_failure_declared` (HIGH, 7yr), `system.etf_cron_manual_check_completed` (STANDARD, 7yr), `system.etf_cron_restored` (STANDARD, 3yr). Full Zod v2 schemas, emitter assignments, alert routing, ETF-CRON-CHAIN-01 ordering invariant, and CC4.1/CC5.2/CC7.2/A1.1 SOC 2 auditor narratives. Closes `docs/INCIDENT_RESPONSE.md R-29.11` checklist item 1 (P0/M10).
+- `docs/INCIDENT_RESPONSE.md` — R-29.11 checklist item 1 status: `[ ]` → `[x] Done — 2026-06-27 (AUDIT_LOG_SCHEMA.md v2.55)`.
+- `VERSION` — 9.73.0 → 9.73.1.
+
+---
+
 ## [9.73.0] — 2026-06-27
 
 ### Added

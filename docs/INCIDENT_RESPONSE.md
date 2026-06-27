@@ -11343,7 +11343,7 @@ Store artefacts at `compliance/evidence/etf-cron/r29-<incident_id>/` with `MANIF
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register three DEC-030 events from §R-29.7 in `docs/AUDIT_LOG_SCHEMA.md §System`: `system.etf_cron_failure_declared` (HIGH, 7yr), `system.etf_cron_manual_check_completed` (STANDARD, 7yr), `system.etf_cron_restored` (STANDARD, 3yr). Add Zod v2 schemas per §R-29.7 payload definitions. Add ETF-CRON-CHAIN-01 ordering invariant to the `emit-audit-event` Worker chain-invariant registry. | compliance-officer + platform-engineer | **P0** | M10 | [ ] |
+| 1 | Register three DEC-030 events from §R-29.7 in `docs/AUDIT_LOG_SCHEMA.md §System`: `system.etf_cron_failure_declared` (HIGH, 7yr), `system.etf_cron_manual_check_completed` (STANDARD, 7yr), `system.etf_cron_restored` (STANDARD, 3yr). Add Zod v2 schemas per §R-29.7 payload definitions. Add ETF-CRON-CHAIN-01 ordering invariant to the `emit-audit-event` Worker chain-invariant registry. | compliance-officer + platform-engineer | **P0** | M10 | [x] **Done — 2026-06-27 (AUDIT_LOG_SCHEMA.md v2.55).** |
 | 2 | Confirm `pg-cron-health-monitor` (§12.7) routes `system.cron_job_stale` for `jobname = 'mid_contract_termination_risk_check'` to PagerDuty `form-customer-success` P1 HIGH urgency with dedup key `mid-contract-risk-check-stale` per §12.6 registry entry. Write integration test: simulate job 25 gap > 8 days in staging; confirm `system.cron_job_stale` is emitted with `job_name = 'mid_contract_termination_risk_check'` and PagerDuty test payload is generated. | devops-lead + platform-engineer | **P0** | M10 | [ ] |
 
 #### P1 — Before first enterprise contract reaches M10 + 28 days (first possible CHS-4-week detection window)
