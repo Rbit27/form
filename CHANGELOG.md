@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.48.1] — 2026-06-27
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.14 → v3.15. §9.3 Tabletop Exercise Scenario Catalog extended with Scenario AA (SCIM provisioning compliance monitor stale with quarter-start trigger miss, job 47, R-47): two-SLO tabletop (SCIM-PROV-SLO-01 sensitive-attribute write-path integrity CC6.4; SCIM-PROV-SLO-02 quarterly provisioning audit trigger CC4.1); base scenario P1+ (R-47-C3 positive, R-47-C2 = 0); P0-escalated optional path (synthetic `scim.rejected_sensitive_attribute` CRITICAL/7yr → SCIM-ATTR-CHAIN-01 → AL-SCIM-PROV-01 to `form-security`+`form-compliance`); DEC-030 HMAC chain invariants (SCIM-ATTR-CHAIN-01 for P0 dispatch; SCIM-MONITOR-STALE-CHAIN-01 for stale-restored emission); privacy floor enforced (R-47-C2 surfaces only `tenant_id`); participants compliance-officer + devops-lead + security-engineer; 45 min / 75 min with P0 path. §9.9 Year 6 Testing Schedule added (Months 61–72): Month 63 Scenario AA base drill; Month 66 Scenario Y/Z P0-escalated rerun; Month 69 dual-tabletop Scenario AA P0 + S/U rerun; Month 72 annual DR + pen test + Scenario AA rerun.
+- `VERSION` — 9.48.0 → 9.48.1.
+
+---
+
 ## [9.48.0] — 2026-06-27
 
 ### Added
