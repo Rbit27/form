@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.75.1] — 2026-06-27
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.4.5 → v5.4.6. §47.4 stale cross-reference patch. `docs/MSA_TEMPLATE.md §Addendum 4` storage-location note corrected: "(to be authored per §47.11 item 6)" → "authored 2026-06-18 · MSA_TEMPLATE.md v0.4 · §47.11 item 5 done". Two errors fixed: (1) wrong item number (item 5, not 6, covers authoring the Addendum); (2) stale status (§47.11 item 5 was marked [x] Done 2026-06-18). No new controls, events, or evidence artefacts.
+- `VERSION` — 9.75.0 → 9.75.1.
+
+---
+
 ## [9.75.0] — 2026-06-27
 
 ### Added

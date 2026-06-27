@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.4.5
+# FORM · Observability & Monitoring Taxonomy v5.4.6
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -12949,7 +12949,7 @@ This section resolves **OQ-SIEM-02** (from §27.12, v1.4, 2026-06-01): *"Does th
 ### §47.4 MSA Addendum 4 — SIEM Data Processing Addendum Template
 
 **Template version:** Addendum 4 v1.0 (2026-06-18).
-**Storage location:** `docs/MSA_TEMPLATE.md §Addendum 4` (to be authored per §47.11 item 6).
+**Storage location:** `docs/MSA_TEMPLATE.md §Addendum 4` (authored 2026-06-18 · MSA_TEMPLATE.md v0.4 · §47.11 item 5 done).
 **Signing mechanism:** DocuSign envelope initiated from Admin Dashboard consent capture UI gate (§47.6).
 
 #### Addendum 4 — Five Clauses
@@ -16408,6 +16408,8 @@ export const AmendmentRateMonitorRestoredPayload = z.object({
 ---
 
 *v5.4.3 (2026-06-27): §57.10 item 5 cross-reference closure — AMEND-OBS-E-001 registered in `docs/SOC2_READINESS.md §124` (§79.4 master evidence table count 86 → 87; R2 subfolder `compliance/evidence/amendments/monitoring/` created; §80.4 Vanta mirror extended; SOC2_READINESS.md v3.48.0, 2026-06-27). §57.8 AMEND-OBS-E-001 registration status updated from "Pending SOC2_READINESS §124 (§57.10 item 5 P1/M6)" to "Registered — SOC2_READINESS.md §124 (§57.10 item 5 done, 2026-06-27 · v3.48.0)". Document header v5.4.2 → v5.4.3. No new alert rules, SLOs, sections, or event specs. Owner: compliance-officer.*
+
+*v5.4.6 (2026-06-27): §47.4 stale cross-reference patch — `docs/MSA_TEMPLATE.md §Addendum 4` storage-location note corrected. Original text read "(to be authored per §47.11 item 6)" — two errors: (1) wrong item number: item 5 (not 6) covers authoring MSA_TEMPLATE.md §Addendum 4; (2) stale status: §47.11 item 5 was marked `[x] Done — 2026-06-18` when Addendum 4 v1.0 was authored in `docs/MSA_TEMPLATE.md`. Text updated to "authored 2026-06-18 · MSA_TEMPLATE.md v0.4 · §47.11 item 5 done". No new alert rules, SLOs, metrics, events, or evidence artefacts. §47.11 checklist unchanged — the stale-reference fix in §47.4 is a text annotation only. Privacy floor: no employee PII or GDPR Art. 9 data involved. Cross-references: `docs/MSA_TEMPLATE.md §Addendum 4` (SIEM Data Processing Addendum v1.0 — authored 2026-06-18; outside counsel review required before first production signing per §47.4 §Clause 4); `docs/OBSERVABILITY.md §47.11 item 5` ([x] Done — 2026-06-18); version note v4.4.0 (correctly names item 5 in cross-reference list — §47.4 body had incorrect "item 6"). Owner: compliance-officer + enterprise-architect.*
 
 *v5.4.5 (2026-06-27): §57.12 AUDIT_LOG_SCHEMA.md registration cross-reference closure — AUDIT_LOG_SCHEMA.md v2.54 registered `system.amendment_rate_monitor_stale_declared` HIGH/7yr + `system.amendment_rate_monitor_restored` STANDARD/3yr + AMEND-STALE-CHAIN-01 ordering invariant + Zod v2 schemas + CC5.2/CC6.1/CC7.2 auditor narratives in the R-48 monitoring-control sub-section of `§Contract Amendment Rate Compliance Monitoring events` (2026-06-27). R-48.12 item 1 status: `[ ]` → `[x] Done 2026-06-27 (AUDIT_LOG_SCHEMA.md v2.54)`. INCIDENT_RESPONSE.md v3.16.2 R-48.11 cross-reference and R-48.12 checklist patched in tandem. Document header v5.4.4 → v5.4.5. No new alert rules, SLOs, metrics, or event specs in this patch. Owner: security-engineer + compliance-officer.*
 
