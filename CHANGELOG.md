@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [9.71.1] — 2026-06-27
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — header v3.16.1 → v3.16.2: stale-header patch; v3.16.2 version note was authored (R-48.12 item 1 cross-reference closure · AUDIT_LOG_SCHEMA v2.54) but `# FORM ·` line was not updated.
+- `docs/OBSERVABILITY.md` — header v5.4.4 → v5.4.5: stale-header patch; v5.4.5 version note was authored (§57.12 AUDIT_LOG_SCHEMA.md registration cross-reference closure) but `# FORM ·` line was not updated.
+- `VERSION` — 9.71.0 → 9.71.1.
+
+---
+
 ## [9.71.0] — 2026-06-27
 
 ### Added
