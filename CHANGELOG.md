@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [9.51.0] — 2026-06-27
+
+### Added
+- `content/post-1091-extensor-indicis-proprius-anatomy.md` — Block 1051–1100 cluster 9 post 1/5. EIP: origin on posterior ulna + interosseous membrane (distal to EDC); inserts ulnar side of index-finger EDC tendon → extensor hood via 4th extensor compartment; PIN (C7–C8) innervation; bypasses juncturae tendinum constraints of EDC; Spinner's test / "gun sign"; EIP transfer as first-choice donor tendon for EPL rupture and radial nerve palsy reconstruction. clinical_safety_review: NOT_REQUIRED.
+- `content/post-1092-extensor-digiti-minimi-anatomy.md` — Block 1051–1100 cluster 9 post 2/5. EDM: dedicated little-finger extensor; dual-slip anatomy in own 5th extensor compartment; common extensor origin; PIN (C7–C8); independent MCP extension while other fingers flex; De Quervain's (1st compartment) vs EDM tenosynovitis (5th compartment) differential; Vaughan-Jackson syndrome in RA; grip balance and eccentric extensor loading. clinical_safety_review: NOT_REQUIRED.
+- `content/post-1093-extensor-digitorum-communis-architecture.md` — Block 1051–1100 cluster 9 post 3/5. EDC: multipennate primary extensor of fingers 2–5; four tendons via 4th extensor compartment; juncturae tendinum as passive coupling between fingers (clinical trap: ring-finger EDC laceration masked by juncturae); Verdan extensor zones I–VIII; extensor retinaculum with all 6 compartments; lateral epicondyle overuse and eccentric loading. clinical_safety_review: NOT_REQUIRED.
+- `content/post-1094-sagittal-band-mcp-anatomy.md` — Block 1051–1100 cluster 9 post 4/5. Sagittal band: transverse retinacular ligament centering EDC tendon over MCP; origin (volar plate + transverse metacarpal ligament); radial vs ulnar bands; Sagittal Band Syndrome / boxer's knuckle — radial rupture → ulnar subluxation, middle finger most common, Grade I–III classification (Rayan-Murray); extensor hood component overview; MCP taping and return-to-training protocol. clinical_safety_review: NOT_REQUIRED.
+- `content/post-1095-retinacular-system-digits-anatomy.md` — Block 1051–1100 cluster 9 post 5/5. Retinacular system: ORL (Landsmeer's ligament) as passive PIP–DIP coupling (PIP extension → ORL tightens → passive DIP extension); TRL preventing dorsal lateral-band migration; Haines-Zancolli test for ORL tightness; Boutonnière deformity (central slip rupture → lateral bands volar, ORL shortened) and Swan-neck (TRL lax, lateral bands dorsal) as opposite ends of retinacular failure; hook grip ORL mechanics; post-injury rehabilitation. clinical_safety_review: NOT_REQUIRED.
+- `blog.html` — dates for posts 1091–1095 cards updated to 2026-06-27 (content refreshed this iteration).
+
+### Changed
+- `STATUS.md` — Block 1051–1100 progress updated to 45/50; cluster 9 COMPLETE (posts 1091–1095); next: posts 1096–1100 (cluster 10).
+- `VERSION` — 9.50.1 → 9.51.0.
+
+---
+
 ## [9.50.1] — 2026-06-27
 
 ### Changed
