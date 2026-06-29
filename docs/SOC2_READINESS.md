@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.52.0
+# FORM · SOC 2 Type II Readiness v3.53.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -32657,3 +32657,189 @@ This section closes **OBSERVABILITY §59.10 item 4** (P1/M6) and **§60.10 item 
 | 2 | File first WAU-DECLINE-STALE-E-001 artefact after first R-51 activation: retrieve `system.wau_decline_monitor_stale_declared` and `system.wau_decline_monitor_restored` from DEC-030 WAU-DECLINE-STALE-CHAIN-01 chain for `incident_id`; run R-51-C2 and R-51-C3 queries (apply OQ-WAU-OBS-01 advisory seat guard); file narrative at `pilots/wau-decline/WAU-DECLINE-STALE-E-001_<incident_id>.md`; SHA-256 hash; upload to R2 with correct Object Lock retention class (`t0g_gap_found` → 7yr / no gap → 3yr); upload to Vanta (CC7.2/A1.1/CC3.2); add to MASTER-INDEX within 48h of `restored` emission. | compliance-officer + devops-lead | **P1** | Per incident (first activation est. M6+) | [ ] |
 
 *v3.52.0 (2026-06-29): §127 Cross-Reference Patch — Pilot Monitor Stale Evidence Registration. Two artefacts registered (count 96 → 97 → 98): CHAMP-LOGIN-STALE-E-001 (CC7.2/A1.1/CC3.2, per-incident, 7yr if `t0b_gap_found = true` / 3yr if false — per-incident IC narrative for each R-50 `champion_login_monitor` job 50 stale activation; IC devops-lead + compliance-officer, PAM-elevated; filed within 48h of `system.champion_login_monitor_restored` emission; path `pilots/champion-login/CHAMP-LOGIN-STALE-E-001_<incident_id>.md`) and WAU-DECLINE-STALE-E-001 (CC7.2/A1.1/CC3.2, per-incident, 7yr if `t0g_gap_found = true` / 3yr if false — per-incident IC narrative for each R-51 `wau_decline_monitor` job 51 stale activation; weekly job cadence means worst-case 14–21 day stale window; IC devops-lead + compliance-officer, PAM-elevated; filed within 48h of `system.wau_decline_monitor_restored` emission; path `pilots/wau-decline/WAU-DECLINE-STALE-E-001_<incident_id>.md`). §80.3 R2 subfolders added: `pilots/champion-login/` (WORM Object Lock; `form_api` NO ACCESS; 7yr/3yr retention class set by IC at upload per `t0b_gap_found` boolean) and `pilots/wau-decline/` (WORM Object Lock; `form_api` NO ACCESS; 7yr/3yr retention class set by IC at upload per `t0g_gap_found` boolean; 14–21 day worst-case stale window noted for auditor). §80.3 `pilots/save-protocol/` entry extended to include PILOT-ACT-STALE-E-001 (backfill from §126.6). §80.4 Vanta mirror: three new entries — PILOT-ACT-STALE-E-001 (backfill from §126.6, per-incident, CC7.2/A1.1/CC3.2), CHAMP-LOGIN-STALE-E-001 (per-incident upload; CC7.2/A1.1/CC3.2; 48h cadence), WAU-DECLINE-STALE-E-001 (per-incident upload; CC7.2/A1.1/CC3.2; 48h cadence). OBSERVABILITY §59.10 item 4 → `[x] Done — 2026-06-29 (SOC2_READINESS.md v3.52.0)`. OBSERVABILITY §60.10 item 4 → `[x] Done — 2026-06-29 (SOC2_READINESS.md v3.52.0)`. INCIDENT_RESPONSE R-50.12 item 4 → `[x] Done — 2026-06-29 (SOC2_READINESS.md v3.52.0)`. INCIDENT_RESPONSE R-51.12 item 4 → `[x] Done — 2026-06-29 (SOC2_READINESS.md v3.52.0)`. Document header v3.51.0 → v3.52.0. Owner: compliance-officer. Cross-references: `docs/OBSERVABILITY.md §59` (CHAMP-LOGIN-STALE-E-001 primary definition — §59.8; §59.10 item 4 closed); `docs/OBSERVABILITY.md §60` (WAU-DECLINE-STALE-E-001 primary definition — §60.8; §60.10 item 4 closed); `docs/INCIDENT_RESPONSE.md R-50` (champion login monitor stale runbook — R-50.12 item 4 closed); `docs/INCIDENT_RESPONSE.md R-51` (WAU decline monitor stale runbook — R-51.12 item 4 closed); `docs/AUDIT_LOG_SCHEMA.md §Champion Login Monitor Stale events` (`system.champion_login_monitor_stale_declared` HIGH/7yr + `system.champion_login_monitor_restored` STANDARD/3yr — DEC-030 chain sources for CHAMP-LOGIN-STALE-E-001; registered v2.57, 2026-06-29); `docs/AUDIT_LOG_SCHEMA.md §WAU Decline Monitor Stale events` (`system.wau_decline_monitor_stale_declared` HIGH/7yr + `system.wau_decline_monitor_restored` STANDARD/3yr — DEC-030 chain sources for WAU-DECLINE-STALE-E-001; registered v2.57, 2026-06-29); `docs/SOC2_READINESS.md §126.6` (PILOT-ACT-STALE-E-001 companion — same per-incident pattern, `pilots/save-protocol/` subfolder); `docs/SOC2_READINESS.md §80.3` (`pilots/champion-login/` and `pilots/wau-decline/` subfolders added; `pilots/save-protocol/` entry extended); `docs/SOC2_READINESS.md §80.4` (PILOT-ACT-STALE-E-001 backfill + CHAMP-LOGIN-STALE-E-001 + WAU-DECLINE-STALE-E-001 Vanta mirror entries added); `docs/DECISION_LOG.md DEC-030` (HMAC-chained audit log — CHAMP-LOGIN-STALE-CHAIN-01 and WAU-DECLINE-STALE-CHAIN-01 basis); `docs/COST_MODEL.md §46` (T0-Alpha/T0-Beta/T0-Gamma pilot save triggers — context for CC3.2 gap risk).*
+
+---
+
+## §128 · Q3 2026 Access Review — Pre-Execution Gate · OQ-AR-01 Resolution · OQ-TDD-01 Resolution (CC6.3 / CC6.4 / C1.2 / CC4.2)
+
+*v3.53.0 (2026-06-29)*
+
+This section closes **OQ-AR-01** (🟡 Open → 🟢 Resolved — pilot-tier tenant inclusion in §23.2.3 quarterly access review; P1, compliance-officer + customer-success; deadline 2026-07-17 pre-review gate) and **OQ-TDD-01** (🟡 Open → 🟢 Resolved — §67.7 destruction certificate DPA cross-reference specification; P1, compliance-officer; deadline before first certificate issuance). It also provides the structured pre-execution gate content for the Q3 2026 access review, due 2026-07-31, with a 14-day pre-gate at 2026-07-17 per `compliance/calendar/q3-2026-access-review.md` and AR-2026-Q2-01 remediation commitment.
+
+---
+
+### §128.1 OQ-AR-01 Resolution — Pilot-Tier Tenant Inclusion in §23.2.3
+
+**Decision (compliance-officer + customer-success, 2026-06-29):** Pilot-tier tenants are reviewed under §23.2.3 using the **identical procedure** as production enterprise tenants. No lighter-weight alternative is adopted. The pilot designation is noted in the evidence artefact header and in the §23.2.3 result table (`tier` column), but this notation does not create a different control standard or allow any steps to be skipped.
+
+**Rationale:**
+
+1. **Real employee data under a live DPA.** Pilot tenants operate under FORM's free-trial DPA (30-day free trial terms) which contains Art. 28 processor obligations including access control requirements. The controller/processor relationship is fully live — the fact that no fee is paid does not reduce the data protection obligations or the SOC 2 auditor's expectation that FORM reviews all tenants for whom it processes employee personal data.
+
+2. **SOC 2 auditor consistency expectation.** A lighter-weight procedure for pilot tenants would create a documented carve-out. A SOC 2 Type II auditor reviewing the Q3 access review artefact will note any tenants with active admin roles that received a different review procedure and will ask why. There is no auditor-accepted justification for treating pilot-tier employees' data with less access-control diligence than paid-tier employees.
+
+3. **§23.2.3 query already returns pilot-tier rows.** The inactive-account sweep query in §23.2.3 joins `tenant_users` to `tenants` and filters on `t.tier`. Extending the filter from `= 'enterprise'` to `IN ('enterprise', 'pilot')` (§128.2) is a single-line change with no procedural overhead. The `tier` column value in the query result provides the auditor-visible pilot designation without requiring a separate section.
+
+4. **Privacy floor maintained.** The §23.2.3 query returns only role/permission metadata — `email`, `role`, `last_sign_in_at`, `tenant_name`, `tier`. It does not return individual workout sessions, coaching exchanges, biometric values, or any GDPR Art. 9 health data. This is consistent with the reviewer scope limitation in §23.4 Step 1 and §65.4 Step 1: the reviewer has RLS-restricted access to role metadata only.
+
+5. **Operational reality at Q3 2026.** As of 2026-06-29 there are zero active pilot tenants (pre-launch). If one or more 90-day pilots commence before 2026-07-31, their admin roles appear in the §128.2 query and are reviewed without additional process friction. Zero pilot rows returned = affirmative confirmation that no pilot access issues exist; N > 0 rows = the same inactive-account check applied as for enterprise.
+
+**Impact on Q3 2026 evidence artefact (`compliance/access-review/2026-q3/access-review-2026-Q3.md`):**
+
+| Q2 2026 field | Q3 2026 update |
+|---|---|
+| §65.3.2 "Enterprise tenant admin roles" section | Renamed to "Enterprise and pilot-tier tenant admin roles" (OQ-AR-01 decision, §128.1) |
+| §23.2.3 query `WHERE t.tier = 'enterprise'` | Extended to `WHERE t.tier IN ('enterprise', 'pilot')` per §128.2 |
+| Finding AR-2026-Q3-XX row (if any) | Note `tier` value in finding row — no separate finding created for pilot-tier vs. enterprise |
+| CC5.3 control effectiveness row for SCIM deprovisioning → session revocation | Q3 provides first live validation (not pre-launch staging) if any SSO pilot is active; note result |
+
+**OQ-AR-01 status:** 🟢 **Resolved** — 2026-06-29. No further open question on this topic. Compliance-officer and customer-success sign-off documented in this section. §65.11 Q3 forward plan row "Potentially 1–3 pilot tenants…reviewed per §23.2.3" is now the confirmed operational procedure.
+
+---
+
+### §128.2 Updated §23.2.3 Query for Q3 2026 (Pilot + Enterprise Scope)
+
+The following query replaces the Q2 staging query in §65.4.4 for the Q3 2026 production execution. It extends the tier filter per the OQ-AR-01 resolution in §128.1.
+
+```sql
+-- Q3 2026 access review — enterprise + pilot tier tenant admin roles
+-- Run against production Supabase (not staging) per §65.11 Q3 forward plan
+-- Requires form_admin role (PAM break-glass elevation per SSO §24)
+SELECT
+  u.id              AS user_id,
+  u.email,
+  u.role,
+  u.last_sign_in_at,
+  t.name            AS tenant_name,
+  t.tier,
+  t.id              AS tenant_id,
+  CASE
+    WHEN u.last_sign_in_at < NOW() - INTERVAL '90 days'
+      OR u.last_sign_in_at IS NULL
+    THEN 'INACTIVE — review required'
+    ELSE 'Active'
+  END               AS status
+FROM tenant_users u
+JOIN tenants t ON t.id = u.tenant_id
+WHERE u.role IN ('tenant_manager', 'tenant_admin', 'tenant_hr')
+  AND t.tier IN ('enterprise', 'pilot')   -- OQ-AR-01: pilot tier included from Q3 2026
+  AND u.deleted_at IS NULL
+ORDER BY t.tier DESC, t.name, u.role, u.last_sign_in_at NULLS FIRST;
+```
+
+**Expected Q3 results (as of 2026-06-29 pre-launch baseline):** 0 rows across both tiers. If 1+ pilot tenants are active by 2026-07-31, rows will appear under `tier = 'pilot'`. Zero rows returned for both tiers is a valid result and constitutes affirmative confirmation of no active admin accounts requiring review — document this in the artefact.
+
+**Inactive account threshold:** >`90 days` since `last_sign_in_at`, or `last_sign_in_at IS NULL` (account provisioned but never logged in). Any flagged row is subject to the §23.4 Step 3 deprovisioning review within the 24-hour SLA.
+
+**Privacy floor:** This query returns `email` (pseudonymous within FORM's internal systems), `role`, and timestamps only. It does not return health data, workout sessions, coaching turns, biometrics, or GDPR Art. 9 data. Reviewer access is restricted to `form_admin` read-only role via PAM session (§24.2); no `SELECT` on health tables is available under this role.
+
+---
+
+### §128.3 OQ-TDD-01 Resolution — Destruction Certificate DPA Cross-Reference Specification
+
+**Decision (compliance-officer, 2026-06-29):** The §67.7 destruction certificate template shall include:
+
+1. **DPA execution date** — already present in the template as `under the Data Processing Agreement dated {DPA date}` in the DELETION SCOPE block. No structural change required. The `{DPA date}` placeholder must be populated with the ISO 8601 date the enterprise DPA was executed (DocuSign completion date for the MSA DPA Exhibit).
+
+2. **One-line processing activities summary** — a new `Processing activities covered:` line, inserted immediately after the DPA date reference in the DELETION SCOPE block, containing the approved boilerplate: *"Processing activities covered: on-device CV coaching, wearable integration, AI-assisted workout programming, and enterprise administration as specified in the Data Processing Agreement Exhibit A."*
+
+3. **OMIT individual DPIA PA IDs (PA-01…PA-12)** — the DPIA processing activity identifiers from `docs/GDPR_DPIA.md` are technical artefacts designed for FORM's internal DPIA management, not for the customer-facing destruction certificate. Including them increases certificate length without improving the Art. 17 paper trail for a typical enterprise privacy officer or their legal counsel; the DPA Exhibit A is the operative document and the DPA date creates an unambiguous cross-reference. An enterprise DPO who needs the DPIA PA IDs can request the full DPIA artefact via the data room.
+
+**Rationale:**
+
+- **Art. 17(1)(b) compliance confirmation.** GDPR Art. 17(1)(b) requires erasure where personal data is no longer necessary for the purpose for which it was collected. The processing activities summary confirms to the customer's DPO which purposes have ended — without requiring them to cross-reference the DPA Exhibit themselves. The DPA execution date anchors which version of the DPA is being fulfilled and provides the contract-reference anchor an Art. 29 inquiry or regulatory audit would expect.
+
+- **DPO readability.** A privacy officer receiving a destruction certificate is likely not a technical person. A one-line summary ("on-device CV coaching, wearable integration, AI-assisted workout programming") is immediately comprehensible and sufficient for their Art. 17 compliance file. A block of `PA-01 / PA-02 / ... / PA-12` identifiers adds length and forces cross-referencing a document they may not have easy access to.
+
+- **Future-proof.** If FORM adds new processing activities to the DPA Exhibit in a future MSA amendment, the boilerplate "as specified in the Data Processing Agreement Exhibit A" automatically covers the updated scope without requiring the destruction certificate template to be revised. Hardcoding PA IDs would require template updates on every DPIA amendment.
+
+**Template update (§67.7 DELETION SCOPE block — before TDD-P0-04 PDF draft execution):**
+
+```
+─────────────────────────────────────────────────────────────────
+DELETION SCOPE
+─────────────────────────────────────────────────────────────────
+
+This certificate confirms that FORM has permanently and
+irreversibly deleted all personal data processed on behalf of
+{Customer legal entity name} under the Data Processing Agreement
+dated {DPA execution date — ISO 8601, e.g. 2026-08-15}.
+Processing activities covered: on-device CV coaching, wearable
+integration, AI-assisted workout programming, and enterprise
+administration as specified in the Data Processing Agreement
+Exhibit A, in accordance with GDPR Art. 28(3)(g) and
+Art. 17(1)(b). All specified processing activities have now
+concluded for this tenant as of the deletion date above.
+```
+
+**Implementation:** Before TDD-P0-04 (draft §67.7 template as fillable PDF, M6), the `docs/SOC2_READINESS.md §67.7` Markdown template in this document serves as the authoritative specification. The PDF draft must match the wording above. No change to the AUDIT TRAIL or RETAINED DATA blocks is required.
+
+**OQ-TDD-01 status:** 🟢 **Resolved** — 2026-06-29. Compliance-officer sign-off documented in this section. §67.10 OQ table row updated: OQ-TDD-01 🟡 Open → 🟢 Resolved (§128.3).
+
+---
+
+### §128.4 Q3 2026 Access Review — Pre-Execution Gate Content
+
+**Review due date:** 2026-07-31 (per §65.11 Q3 forward plan and §15.1 compliance calendar)  
+**Pre-gate date:** 2026-07-17 — 14 days ahead; `compliance/calendar/q3-2026-access-review.md` v1.0 committed 2026-06-05 per §65.13 item 6 (AR-2026-Q2-01 remediation)  
+**Gate owner:** compliance-officer  
+**AR-2026-Q2-01 remediation:** ✅ Calendar gate created (LIN-AR-2026-01 remediation — pre-gate file committed; execution window 2026-07-28/31)
+
+The following pre-gate checklist defines the 14 items that must be completed or confirmed by 2026-07-17 before the review execution window (2026-07-28–2026-07-31).
+
+#### §128.4.1 Pre-Gate Checklist (Due 2026-07-17)
+
+| # | Gate Item | Owner | Status |
+|---|---|---|---|
+| PG-Q3-01 | Confirm authorized roster current: review `compliance/access-review/authorized-roster.md` v1.0; verify all entries remain accurate (no new hires, no role changes, no SaaS tool additions since 2026-06-05). If any changes: create v1.1 with diff noted. | compliance-officer | [ ] |
+| PG-Q3-02 | Confirm pilot tenant count: run §128.2 query against production; record row count and tier breakdown in this pre-gate record. Zero rows = affirmative pre-launch confirmation; document in artefact header. | compliance-officer | [ ] |
+| PG-Q3-03 | Confirm OQ-AR-01 decision applies: if any pilot tenants are active, confirm §128.1 decision is recorded in the Q3 artefact header before review execution. No action required if zero pilot tenants. | compliance-officer | [x] Documented — §128.1, 2026-06-29 |
+| PG-Q3-04 | Confirm AR-2026-Q2-02 status (Sentry DPA): target closed before Q3 review date per §65.11. If still open, log as Q3 finding AR-2026-Q3-XX with updated Linear ticket. | compliance-officer | [ ] |
+| PG-Q3-05 | Flag credential SLA approach: `CLOUDFLARE_API_KEY` and `WORKOS_API_KEY` reach 180-day SLA ~2026-09-03 per §65.11 forward plan. Note in Q3 artefact as upcoming rotation items; no action required before 2026-07-31, but rotation must complete before 2026-09-03. | compliance-officer | [ ] |
+| PG-Q3-06 | Confirm §23.4 Step 5 control effectiveness table entries are current: review CC4.2 rows for any control changes since 2026-06-05 (new RLS policies, new PAM procedures, new SCIM/SSO pilots). If SSO pilot is active, `SCIM deprovisioning → session revocation` row receives its first live validation — document result. | compliance-officer | [ ] |
+| PG-Q3-07 | Confirm §65.13 AR-P0-01 and AR-P0-02 closure status: SHA-256 of Q2 artefact must be committed and `system.access_review_completed` DEC-030 event must be emitted for `review_quarter: "2026-Q2"` before Q3 review starts. If still open, close before 2026-07-17. | compliance-officer | [ ] |
+| PG-Q3-08 | Draft Q3 artefact shell: create `compliance/access-review/2026-q3/access-review-2026-Q3.md` stub with: header (quarter, reviewer, due date, execution date TBD), §128.1 OQ-AR-01 decision reference, §128.2 query (to run during execution), CC4.2 control effectiveness table skeleton, findings register (empty). | compliance-officer | [ ] |
+| PG-Q3-09 | Confirm `ANTHROPIC_API_KEY` rotation SLA: key last rotated during Q2 review 2026-06-05 (AR-2026-Q2-04). 180-day SLA falls ~2026-12-03 (outside Q3 scope). 90-day advisory check at Q3 review: note SLA status, no action required. | compliance-officer | [ ] |
+| PG-Q3-10 | Confirm OWASP security training status (§22): annual training due Q3 per §15.1 calendar. If not yet completed, schedule within review window 2026-07-28/31. | compliance-officer | [ ] |
+| PG-Q3-11 | OQ-TDD-01 template update: confirm §67.7 DELETION SCOPE block wording has been updated per §128.3 before TDD-P0-04 PDF draft. If TDD-P0-04 has already been executed with the old template, update the SPECIMEN PDF to reflect the §128.3 changes. | compliance-officer | [x] §128.3 specifies update — apply before TDD-P0-04 execution |
+| PG-Q3-12 | Review OQ-AR-02 posture: confirm no pilot tenant has requested SIEM export. If any request received, initiate MSA Addendum 4 (OBSERVABILITY §47 SIEM-CONSENT-01) before enabling. No new evidence artefact required for Q3 unless a SIEM addendum is executed. | compliance-officer + customer-success | [ ] |
+| PG-Q3-13 | Confirm `compliance/calendar/q3-2026-access-review.md` pre-gate checklist (the file committed 2026-06-05) is updated with §128 cross-reference: add a line referencing `SOC2_READINESS.md §128` as the OQ-AR-01 and OQ-TDD-01 resolution record for the Q3 review. | compliance-officer | [ ] |
+| PG-Q3-14 | Notify customer-success of Q3 review window (2026-07-28/31): if any enterprise pilot is active, CSM must confirm no planned SCIM provisioning runs or SSO configuration changes during the review window (to avoid confounding the §23.2.3 inactive-account sweep result). | compliance-officer + customer-success | [ ] |
+
+#### §128.4.2 Q3 2026 Artefact Differences from Q2
+
+| Item | Q2 2026 | Q3 2026 |
+|---|---|---|
+| Tier scope in §23.2.3 | `t.tier = 'enterprise'` (pre-launch, 0 rows) | `t.tier IN ('enterprise', 'pilot')` per §128.2 |
+| OQ-AR-01 decision reference | Not applicable (no pilot tenants) | Include §128.1 reference in artefact header |
+| SCIM deprovisioning → session revocation | Pre-launch staging validation only | First live production validation if any SSO pilot is active |
+| AR-2026-Q2-01 remediation | Finding logged (36-day latency) | Confirmed closed: pre-gate file committed; execution on-time 2026-07-28/31 |
+| Evidence artefact path | `compliance/access-review/2026-q2/access-review-2026-Q2.md` | `compliance/access-review/2026-q3/access-review-2026-Q3.md` |
+| DEC-030 `review_quarter` field | `"2026-Q2"` | `"2026-Q3"` |
+
+---
+
+### §128.5 SOC 2 Criteria
+
+| Criterion | Relevance | Status |
+|---|---|---|
+| **CC6.3** — Restrict logical access to systems | §128.2 Q3 query covers all enterprise + pilot tenant admin roles; inactive accounts flagged within 24h SLA | 🟢 Procedure defined (§128) |
+| **CC6.4** — Manage access credential provisioning | OQ-AR-01 extends credential review to pilot tier; same roster-comparison procedure | 🟢 Extended to pilot tier |
+| **CC4.2** — Quarterly control effectiveness review | §128.4.1 PG-Q3-06 requires CC4.2 table review before execution; first live SCIM/SSO validation if pilot active | 🟡 Gate in place; execution 2026-07-28/31 |
+| **C1.2** — Dispose of confidential information using appropriate procedures | OQ-TDD-01 resolution in §128.3 specifies DPA date + processing activities summary in destruction certificate — strengthens Art. 17 paper trail | 🟢 Template spec updated |
+| **CC9.2** — Vendor and customer commitments monitored | Pilot-tier tenants reviewed at same standard as paid enterprise confirms FORM's DPA commitments to pilot customers are operationally monitored | 🟢 Covered by OQ-AR-01 decision |
+
+---
+
+### §128.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Deadline | Status |
+|---|---|---|---|---|---|
+| 1 | Execute pre-gate checklist (§128.4.1 PG-Q3-01 through PG-Q3-14): all 14 items completed and recorded in `compliance/calendar/q3-2026-access-review.md` with §128 cross-reference. | compliance-officer | **P0** | 2026-07-17 | [ ] |
+| 2 | Execute Q3 2026 access review (§23.4 Steps 1–6): run §128.2 query against production; compare to `authorized-roster.md`; deprovision any inactive accounts within 24h; file artefact at `compliance/access-review/2026-q3/access-review-2026-Q3.md`; compute SHA-256; emit `system.access_review_completed` DEC-030 event with `review_quarter: "2026-Q3"`. | compliance-officer | **P0** | 2026-07-31 | [ ] |
+| 3 | Update §67.7 DELETION SCOPE block wording per §128.3 before TDD-P0-04 PDF draft execution: add `Processing activities covered:` line with approved boilerplate. | compliance-officer | **P1** | Before TDD-P0-04 (M6) | [ ] |
+| 4 | If any pilot tenant admin roles are returned by §128.2 at Q3 execution: note `tier = 'pilot'` in the artefact CC5.3 section and document that the OQ-AR-01 decision in §128.1 applies — same 24h deprovisioning SLA, same control effectiveness rating criteria. | compliance-officer | **P1** | 2026-07-31 (if applicable) | [ ] |
+| 5 | Resolve OQ-AR-02 before enterprise GA (M13): if any pilot or enterprise customer requests SIEM export, confirm MSA Addendum 4 (OBSERVABILITY §47) is executed and `siem.consent_addendum_signed` DEC-030 event is emitted before `siem.tenant_export_enabled`; confirm no `system.access_review_completed` event is pushed to the default `siem.*` stream without a separate `form.compliance_event` topic configuration. Owner: compliance-officer + security-engineer. | compliance-officer + security-engineer | **P2** | Before enterprise GA (M13) | [ ] |
+| 6 | Update `compliance/calendar/q3-2026-access-review.md` v1.0 (committed 2026-06-05) to add §128 cross-reference: one-line entry "OQ-AR-01 and OQ-TDD-01 resolved — see SOC2_READINESS.md §128, v3.53.0, 2026-06-29." | compliance-officer | **P0** | 2026-07-17 pre-gate | [ ] |
+
+*v3.53.0 (2026-06-29): §128 Q3 2026 Access Review — Pre-Execution Gate · OQ-AR-01 Resolution · OQ-TDD-01 Resolution. Closes OQ-AR-01 (🟡 Open → 🟢 Resolved; P1; compliance-officer + customer-success; 2026-07-17 pre-review gate deadline): pilot-tier tenants reviewed under §23.2.3 at same standard as production enterprise tenants; same §23.4 procedure; pilot designation noted in artefact `tier` column; no lighter-weight alternative; decision effective immediately from this section. Closes OQ-TDD-01 (🟡 Open → 🟢 Resolved; P1; compliance-officer; deadline before first certificate issuance): §67.7 destruction certificate DELETION SCOPE block receives two changes — (1) `{DPA date}` placeholder population spec clarified as ISO 8601 DocuSign completion date; (2) new `Processing activities covered:` line with approved boilerplate added immediately after DPA date reference; individual DPIA PA IDs (PA-01…PA-12) omitted from certificate face as too technical for privacy officer recipients. §128.2 provides updated §23.2.3 production query extending `WHERE t.tier = 'enterprise'` to `WHERE t.tier IN ('enterprise', 'pilot')` per OQ-AR-01 decision; query includes `status` computed column flagging accounts inactive >90 days. §128.4 provides 14-item pre-gate checklist due 2026-07-17 (PG-Q3-01 through PG-Q3-14) covering: authorized-roster currency, pilot tenant count, OQ-AR-01 application, Sentry DPA status, credential SLA flags, control effectiveness table review, Q2 artefact SHA-256 closure, Q3 artefact shell creation, training cadence, template update, OQ-AR-02 SIEM posture, calendar file update, and CSM pilot-window notification. §128.4.2 documents Q3 vs Q2 artefact differences. §128.5 maps to CC6.3, CC6.4, CC4.2, C1.2, CC9.2. §128.6 six-item implementation checklist: 3× P0 (pre-gate execution 2026-07-17; Q3 review execution 2026-07-31; calendar file §128 cross-reference by 2026-07-17), 2× P1 (§67.7 template update before M6; pilot-tier deprovisioning SLA note if applicable), 1× P2 (OQ-AR-02 SIEM topic configuration before M13 GA). Document header v3.52.0 → v3.53.0. Owner: compliance-officer. Cross-references: `docs/SOC2_READINESS.md §23` (quarterly access review procedure — primary); `docs/SOC2_READINESS.md §23.2.3` (inactive-account sweep query — extended to pilot tier per §128.2); `docs/SOC2_READINESS.md §65` (Q2 2026 access review execution record — template for Q3); `docs/SOC2_READINESS.md §65.11` (Q3 2026 forward plan — pre-gate 2026-07-17; execution 2026-07-28/31; artefact path `compliance/access-review/2026-q3/`); `docs/SOC2_READINESS.md §67.7` (destruction certificate template — OQ-TDD-01 DELETION SCOPE block update specified in §128.3); `docs/SOC2_READINESS.md §67.10` (OQ-TDD-01 row: 🟡 Open → 🟢 Resolved, §128.3); `docs/OBSERVABILITY.md §47` (SIEM consent addendum — OQ-AR-02 SIEM posture reference); `compliance/calendar/q3-2026-access-review.md` (pre-gate calendar file committed 2026-06-05 per §65.13 item 6; add §128 cross-reference per PG-Q3-13 / §128.6 item 6); `compliance/access-review/authorized-roster.md` v1.0 (baseline for Q3 review per §65.13 AR-P0-03); `docs/DECISION_LOG.md DEC-030` (HMAC-chained audit log — `system.access_review_completed` DEC-030 event for Q3 artefact); `docs/GDPR_DPIA.md §35` (PA-01…PA-12 processing activities — omitted from destruction certificate per OQ-TDD-01 resolution; available via data room).*

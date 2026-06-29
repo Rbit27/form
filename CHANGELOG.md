@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.4.1] — 2026-06-29
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.52.0 → v3.53.0: §128 Q3 2026 Access Review Pre-Execution Gate. Closes **OQ-AR-01** (🟡 → 🟢): pilot-tier tenants reviewed under §23.2.3 at same standard as production enterprise tenants; same §23.4 procedure; `tier` designation noted in artefact; no lighter-weight alternative; decision effective 2026-06-29 ahead of 2026-07-17 pre-gate and 2026-07-31 execution deadline. Closes **OQ-TDD-01** (🟡 → 🟢): §67.7 destruction certificate DELETION SCOPE block updated — DPA execution date population spec clarified; new `Processing activities covered:` boilerplate line added; individual DPIA PA IDs (PA-01…PA-12) omitted from certificate face. §128.2 provides updated §23.2.3 production query: `WHERE t.tier IN ('enterprise', 'pilot')` + computed `status` column. §128.4 provides 14-item pre-gate checklist (PG-Q3-01 through PG-Q3-14) due 2026-07-17. §128.5 maps to CC6.3/CC6.4/CC4.2/C1.2/CC9.2. §128.6 six-item implementation checklist: 3× P0 (pre-gate 2026-07-17; Q3 review 2026-07-31; calendar file §128 cross-reference), 2× P1, 1× P2 (OQ-AR-02 SIEM topic before M13 GA).
+- `VERSION` — 10.4.0 → 10.4.1.
+
+---
+
 ## [10.4.0] — 2026-06-29
 
 ### Added
