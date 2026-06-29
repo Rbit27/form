@@ -2813,8 +2813,8 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2731 | Self-coached ідентичність: чому «тренуюся сам» є архітектурним вибором, а не дефіцитом | **draft · v9.87.0 → post-2731-self-coached-identity-architectural-choice.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2732 | Ідентичність і коучинг: як self-coached атлет взаємодіє з тренером, консультантом або ментором без втрати автономії | **draft · v9.88.0 → post-2732-identity-and-coaching-without-losing-autonomy.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2733 | Гнучка ідентичність: як self-coached атлет переглядає власний образ у відповідь на дані, а не на зовнішній тиск | **draft · v9.90.0 → post-2733-identity-flexibility-data-driven-update.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2734 | Ідентичність і тренувальний вік: як самообраз змінюється (або не змінюється) з роками практики | proposed · v9.82.0 |
-| 2735 | Синтез 2726–2735: тренувальна ідентичність як операційний інструмент — не психологія, а рішення | proposed · v9.82.0 |
+| 2734 | Ідентичність і тренувальний вік: як самообраз змінюється (або не змінюється) з роками практики | **draft · v9.91.0 → post-2734-identity-and-training-age.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2735 | Синтез 2726–2735: тренувальна ідентичність як операційний інструмент — не психологія, а рішення | **draft · v9.91.0 → post-2735-training-identity-synthesis.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending · **SERIES COMPLETE** |
 
 ### Editorial series: 2721–2730 · Тренувальна ідентичність: як self-coached атлет думає про себе як про атлета — і чому це має значення (superseded by series 2726–2735 · v9.82.0 — post numbers 2721–2725 consumed by авторегуляція series)
 
