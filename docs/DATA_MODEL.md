@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.35
+# FORM · Multi-Tenant Data Model v1.36
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -54,6 +54,8 @@
 44. [`enterprise_churn_events` Schema — Migration 0085](#44-enterprise_churn_events-schema--migration-0085)
 45. [`enterprise_contracts` Loyalty Discount Schema Extension — Migration 0086](#45-enterprise_contracts-loyalty-discount-schema-extension--migration-0086)
 46. [`litigation_hold_records` Schema — Migration 0087](#46-litigation_hold_records-schema--migration-0087)
+47. [`enterprise_contracts` Amendment Columns — Migration 0088](#47-enterprise_contracts-amendment-columns--migration-0088)
+48. [`enterprise_contracts.graduated_from_pilot_id` — Pilot-to-Paid Cohort FK — Migration 0089](#48-enterprise_contractsgraduated_from_pilot_id--pilot-to-paid-cohort-fk--migration-0089)
 
 ---
 
@@ -17727,6 +17729,227 @@ Migration 0088 provides three SOC 2 criteria with DDL-layer evidence, supplement
 | `docs/COST_MODEL.md §45.8 item 3` — mark `[x] Done` when migration 0088 deployed to production | §47.8 item 3 (simultaneous close) | 🟡 **Pending — §47.8 item 3.** |
 
 ---
+
+## 48. `enterprise_contracts.graduated_from_pilot_id` — Pilot-to-Paid Cohort FK — Migration 0089
+
+### 48.1 Purpose and Design Rationale
+
+Section §47 documented the `enterprise_contracts` amendment columns (migration 0088). This section closes the DATA_MODEL registration obligation created by `docs/COST_MODEL.md §47.8 item 8` (P1/M6): adding `graduated_from_pilot_id UUID NULLABLE REFERENCES tenant_pilots(id) ON DELETE SET NULL` to `enterprise_contracts` to enable post-graduation cohort analysis and pilot-to-paid traceability.
+
+**Three operational gaps closed by this column:**
+
+1. **Cohort analysis** — Without a direct FK between `enterprise_contracts` and `tenant_pilots`, the CSM team cannot answer "how does first-year NRR correlate with activation bucket at graduation?" without cross-referencing two tables via `tenant_id` — which is ambiguous when a winback tenant holds a new `tenant_id` (per DEC-079/Option B).
+
+2. **GRAD-CHAIN-01 traceability** — The `enterprise.pilot_graduated` DEC-030 event (COST_MODEL §47.6.1) records `pilot_id`. The `enterprise_contracts` row does not. This FK makes the graduation-to-contract link explicit and queryable at the schema layer without audit log traversal.
+
+3. **OQ-ENT-01 calibration** — COST_MODEL §47.8 item 9 requires calibrating the §47.3.2 NRR estimates against actuals after 10 graduated pilots. `graduated_from_pilot_id` is the joining key for that calibration query.
+
+**Four design principles:**
+
+1. **Additive-only migration** — `ALTER TABLE enterprise_contracts ADD COLUMN IF NOT EXISTS graduated_from_pilot_id UUID REFERENCES tenant_pilots(id) ON DELETE SET NULL`. One nullable column; no DEFAULT; no CHECK constraint; no structural coupling to prior migration 0088 columns.
+
+2. **ON DELETE SET NULL** — `tenant_pilots` rows are hard-deleted after 5 years (§16.9 retention: soft-delete at 2 years, hard-delete at 5 years). If the pilot row is deleted, the contract must NOT be deleted — `ON DELETE SET NULL` is the correct FK action. A NULL `graduated_from_pilot_id` on a post-5-year contract is expected, not a data integrity failure.
+
+3. **Nullable for non-pilot-origin contracts** — Not all `enterprise_contracts` rows originate from a pilot. Direct-enterprise deals (signed without a pilot period) have `graduated_from_pilot_id = NULL` by design. `NOT NULL` would be architecturally incorrect.
+
+4. **Privacy floor** — `graduated_from_pilot_id` is a FORM-internal UUID referencing `tenant_pilots(id)`. `tenant_pilots` contains no individual employee data (§16.3: `internal_notes` PII prohibition; `success_criteria` is aggregate-only JSONB). The FK itself carries no personal data.
+
+### 48.2 Migration Dependency Chain
+
+```
+0083 (expansion columns) → 0084 (enterprise_renewals) → 0085 (enterprise_churn_events) →
+0086 (loyalty discount) → 0087 (litigation_hold_records) → 0088 (amendment columns) →
+0089 (graduated_from_pilot_id)  ← this migration
+```
+
+Migration 0089 has two structural prerequisites:
+- **Migration 0082** or equivalent (`enterprise_contracts` baseline, §16): the table being altered must exist.
+- **`tenant_pilots` creation** (§16.3): the referenced table must exist before the FK can be declared. Unlike migrations 0083–0088 (which add columns with no new cross-table FKs), migration 0089 introduces a new FK constraint and therefore has a hard structural dependency on `tenant_pilots` being present.
+
+No structural FK dependency on migrations 0083–0088 individually, but they must be applied in order per the established chain convention.
+
+### 48.3 Migration Script
+
+```sql
+-- Migration: 0089_enterprise_contracts_graduated_from_pilot_id.sql
+-- Depends on: enterprise_contracts table (migration 0082, §16)
+--             tenant_pilots table (§16.3) — structural FK dependency
+-- Decision: DEC-084 (2026-06-29) — Pilot Graduation Economics & First-Year ARR Recognition
+-- Governance spec: docs/COST_MODEL.md §47 (Pilot Graduation Economics)
+-- FK action: ON DELETE SET NULL (tenant_pilots hard-deleted at 5yr per §16.9)
+-- Write path: graduation Worker at enterprise.contract_activated event (§47.6.2)
+
+BEGIN;
+
+ALTER TABLE enterprise_contracts
+  ADD COLUMN IF NOT EXISTS graduated_from_pilot_id UUID
+    REFERENCES tenant_pilots(id) ON DELETE SET NULL;
+
+COMMENT ON COLUMN enterprise_contracts.graduated_from_pilot_id
+  IS 'FK → tenant_pilots(id): the pilot from which this contract was graduated (DEC-084, COST_MODEL §47). NULL for direct-enterprise deals (no pilot period) and for contracts whose source pilot row has been hard-deleted after the 5-year retention period (§16.9). ON DELETE SET NULL is intentional — pilot row deletion must not cascade to contract deletion (7-year financial records). Write path: graduation Worker at enterprise.contract_activated event (§47.6.2); written once at INSERT, never updated.';
+
+COMMIT;
+```
+
+**Nullable design:** `NULL` means either (a) the contract originated from a direct-enterprise deal with no pilot, or (b) the source `tenant_pilots` row has been hard-deleted after its 5-year retention period. Both are valid operational states. There is no ambiguity because `tenant_pilots.ends_at` + `tenant_pilots.deleted_at` (from the soft-delete cron, §16.9) provide timing context when needed.
+
+**Write path:** The graduation Worker emits `enterprise.contract_activated` (§47.6.2) and simultaneously INSERTs the new `enterprise_contracts` row with `graduated_from_pilot_id = tenant_pilots.id`. There is no separate UPDATE path for this column — the FK is written once at contract INSERT and never updated.
+
+**FK referential action rationale:**
+
+| FK action | Assessment |
+|---|---|
+| `ON DELETE SET NULL` ✅ | `tenant_pilots` rows are hard-deleted at 5 years (§16.9). SET NULL preserves 7-year financial records while releasing the FK reference cleanly. |
+| ~~`ON DELETE CASCADE`~~ ❌ | Would delete active financial records when a pilot row is deleted — a GDPR / SOC 2 / ASC 606 violation. |
+| ~~`ON DELETE RESTRICT`~~ ❌ | Would block the §16.9 5-year hard-delete pg_cron job for any contract still holding a live reference. Contracts outlive pilots by design. |
+
+### 48.4 Staging Validation Checklist
+
+| # | Check | SQL | Expected result |
+|---|---|---|---|
+| 1 | Column present with correct type and FK constraint | `SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = 'enterprise_contracts' AND column_name = 'graduated_from_pilot_id';` | 1 row: `graduated_from_pilot_id`, `uuid`, `YES` (nullable) |
+| 2 | FK constraint registered against `tenant_pilots` | `SELECT tc.constraint_name, ccu.table_name AS foreign_table FROM information_schema.table_constraints tc JOIN information_schema.referential_constraints rc ON tc.constraint_name = rc.constraint_name JOIN information_schema.constraint_column_usage ccu ON rc.unique_constraint_name = ccu.constraint_name WHERE tc.table_name = 'enterprise_contracts' AND tc.constraint_type = 'FOREIGN KEY' AND ccu.table_name = 'tenant_pilots';` | 1 row with `foreign_table = tenant_pilots` |
+| 3 | All existing rows have NULL in new column | `SELECT COUNT(*) FROM enterprise_contracts WHERE graduated_from_pilot_id IS NOT NULL;` | `0` |
+| 4 | `form_api` still REVOKED from `enterprise_contracts` | `SET ROLE form_api; SELECT graduated_from_pilot_id FROM enterprise_contracts LIMIT 1;` | `ERROR: permission denied for table enterprise_contracts` |
+| 5 | `tenant_manager` still has no policy on `enterprise_contracts` | `SET ROLE tenant_manager; SELECT graduated_from_pilot_id FROM enterprise_contracts LIMIT 1;` | `ERROR` or 0 rows (RLS no-policy behaviour per §16) |
+| 6 | `compliance_reviewer` can SELECT new column | `SET ROLE compliance_reviewer; SELECT id, graduated_from_pilot_id FROM enterprise_contracts LIMIT 5;` | Up to 5 rows (all NULL before first graduated pilot contract); no error |
+
+Retain staging output at `compliance/evidence/graduation/migration-0089-validation_<YYYY-MM-DD>.txt`.
+
+### 48.5 Column Semantics
+
+| Column | Type | Nullability | Default | Semantics |
+|---|---|---|---|---|
+| `graduated_from_pilot_id` (new) | UUID | NULL | — | FK → `tenant_pilots(id)`. Identifies the pilot from which this contract was converted. NULL for direct-enterprise deals (no pilot) or after source pilot row hard-delete at 5yr (§16.9). ON DELETE SET NULL: pilot hard-delete does not cascade to contract deletion. Written once at contract INSERT by the graduation Worker; never updated. |
+
+**Cohort analytics query pattern:**
+
+```sql
+-- First-year seat utilisation by activation bucket at graduation
+-- Requires: enterprise_contracts.graduated_from_pilot_id (this column)
+--           tenant_pilots.success_criteria (§16.3 JSONB)
+SELECT
+  (tp.success_criteria->>'activation_rate_pct')::NUMERIC   AS graduation_activation_pct,
+  COUNT(ec.id)                                             AS cohort_size,
+  AVG(
+    (SELECT COUNT(*) FROM tenant_users tu
+     WHERE tu.tenant_id = ec.tenant_id AND tu.status = 'active')::FLOAT
+    / NULLIF(ec.seats_contracted, 0)
+  )                                                        AS avg_seat_utilisation_rate
+FROM enterprise_contracts ec
+JOIN tenant_pilots tp ON tp.id = ec.graduated_from_pilot_id
+WHERE ec.status = 'active'
+  AND ec.graduated_from_pilot_id IS NOT NULL
+GROUP BY 1
+ORDER BY 1;
+```
+
+*Privacy floor: this query operates on aggregate counts and seat ratios only. No individual `user_id`, name, coaching transcript, or GDPR Art. 9 data is returned. `success_criteria` JSONB contains only numeric thresholds (§16.3). `tenant_users` COUNT is an aggregate — no row-level health data is accessed.*
+
+### 48.6 RLS Behaviour
+
+Migration 0089 adds one column to `enterprise_contracts`. The RLS policies defined in §16 — and unchanged by migrations 0082–0088 — continue to apply without modification:
+
+| Role | Policy on `enterprise_contracts` | Behaviour on `graduated_from_pilot_id` |
+|---|---|---|
+| `form_api` | REVOKED (`REVOKE ALL ON enterprise_contracts FROM form_api` in §16) | No access — unchanged. |
+| `form_system` | ALL via service role | Can SELECT + INSERT. The graduation Worker runs as `form_system` and writes this column at INSERT. |
+| `form_admin` | SELECT + UPDATE on non-financial columns per §16 | SELECT visible for cohort dashboards. UPDATE is not valid — the column is write-once at INSERT by the graduation Worker. |
+| `compliance_reviewer` | SELECT only | Can read for GRAD-E-001 cross-check queries (§48.7). |
+| `tenant_owner` / `tenant_admin` / `tenant_manager` | No RLS policy on `enterprise_contracts` | No access — unchanged. `graduated_from_pilot_id` is FORM-internal metadata; tenant roles must never read it. |
+
+**DDL auditor proof queries (run after migration 0089):**
+
+```sql
+-- Confirm form_api cannot read the new column
+SET ROLE form_api;
+SELECT graduated_from_pilot_id FROM enterprise_contracts LIMIT 1;
+-- Expected: ERROR: permission denied for table enterprise_contracts
+
+-- Confirm tenant_manager has no policy on enterprise_contracts
+SET ROLE tenant_manager;
+SELECT graduated_from_pilot_id FROM enterprise_contracts LIMIT 1;
+-- Expected: ERROR or 0 rows (RLS no-policy = no rows visible)
+
+-- Confirm compliance_reviewer can SELECT
+SET ROLE compliance_reviewer;
+SELECT id, tenant_id, graduated_from_pilot_id FROM enterprise_contracts LIMIT 5;
+-- Expected: up to 5 rows (all NULL before first graduated pilot contract), no error
+```
+
+### 48.7 Privacy Floor
+
+`graduated_from_pilot_id` is a FORM-internal UUID. No personal data is stored in this column or derivable from it alone.
+
+| Column | Privacy classification | GDPR relevance | PHI / Art. 9 risk |
+|---|---|---|---|
+| `graduated_from_pilot_id` (new) | FORM-internal reference UUID | None — a pointer between two FORM-internal tables | None — a UUID referencing a pilot record; no employee PII, health data, or coaching content |
+
+**Referenced table privacy floor (§16.3 `tenant_pilots`):** `tenant_pilots` contains no individual employee data. `internal_notes` carries a CSM PII prohibition enforced by onboarding guide + weekly content-scan Worker. `success_criteria` JSONB stores only numeric aggregate thresholds (`activation_rate_pct`, `weekly_engagement_pct`, `nps_floor`, `min_active_seats`, `evaluation_date`). A JOIN on `graduated_from_pilot_id` does not expose GDPR Art. 9 special-category data.
+
+### 48.8 SOC 2 Evidence Mapping
+
+Migration 0089 provides DDL-layer traceability supporting three SOC 2 criteria already evidenced by GRAD-E-001 (SOC2_READINESS §129):
+
+| Criterion | DDL mechanism | Auditor proof |
+|---|---|---|
+| **CC3.2** — Risk assessment with formal criteria | `graduated_from_pilot_id` FK enables SQL verification that every pilot-origin contract has a traceable graduation record | `SELECT COUNT(*) FROM enterprise_contracts WHERE graduated_from_pilot_id IS NULL AND start_at > '<pilot_programme_launch_date>'` — should return 0 for all pilot-graduated contracts after graduation Worker deploys |
+| **CC9.2** — Vendor and customer contract compliance | Pilot-to-contract traceability confirms that no contract bypassed the graduation criteria gate (COST_MODEL §47.2) | JOIN with `tenant_pilots.success_criteria` to confirm `activation_rate_pct ≥ 50` for each non-null `graduated_from_pilot_id` |
+| **A1.1** — Contractual basis for availability SLA | `enterprise_contracts.plan` (§16) determines SLA tier; `graduated_from_pilot_id` links the SLA-tier contract to the pilot that established the customer's activation baseline | GRAD-E-001 annual export (SOC2_READINESS §129) cross-references `pilot_id` in `enterprise.pilot_graduated` event to `enterprise_contracts.graduated_from_pilot_id` column — auditors can verify no contract activation event lacks a corresponding pilot graduation event |
+
+**GRAD-E-001 cross-check query:**
+
+```sql
+-- For every enterprise.contract_activated DEC-030 event with a non-null pilot_id,
+-- verify a matching enterprise_contracts row exists with graduated_from_pilot_id set.
+-- Run as part of annual GRAD-E-001 evidence collection (CC3.2/CC7.2/A1.1).
+SELECT
+  al.payload->>'pilot_id'       AS event_pilot_id,
+  ec.graduated_from_pilot_id    AS contract_pilot_fk,
+  (al.payload->>'pilot_id' = ec.graduated_from_pilot_id::TEXT) AS chain_consistent
+FROM audit_log al
+JOIN enterprise_contracts ec
+  ON ec.tenant_id = (al.payload->>'tenant_id')::UUID
+WHERE al.event_type = 'enterprise.contract_activated'
+  AND al.payload->>'pilot_id' IS NOT NULL
+  AND al.created_at >= NOW() - INTERVAL '1 year';
+-- Expected: all rows have chain_consistent = true; zero false rows.
+```
+
+### 48.9 Implementation Checklist
+
+#### P0 — Before first pilot graduation in production
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0089_enterprise_contracts_graduated_from_pilot_id.sql` to staging; run all six §48.4 validation checks; retain output at `compliance/evidence/graduation/migration-0089-validation_<YYYY-MM-DD>.txt`. | platform-engineer + enterprise-architect | **P0** | M6 | [ ] |
+| 2 | Deploy migration 0089 to production **before** the graduation Worker (`enterprise.contract_activated` emitter) is deployed. The Worker writes `graduated_from_pilot_id` at INSERT — deploying Worker before column exists causes `undefined column` errors. | platform-engineer | **P0** | M6 (before graduation Worker deploy) | [ ] |
+
+#### P1 — Graduation Worker integration
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Update graduation Worker to write `graduated_from_pilot_id = tenant_pilots.id` on `enterprise_contracts` INSERT at graduation (the `enterprise.contract_activated` event handler, COST_MODEL §47.6.2). Add integration test: `graduated_from_pilot_id` on the resulting `enterprise_contracts` row must equal the `pilot_id` in the `enterprise.contract_activated` DEC-030 event payload. | platform-engineer + enterprise-architect | **P1** | M6 | [ ] |
+| 4 | Mark `docs/COST_MODEL.md §47.8 item 8` as `[x] Done — 2026-06-29 (DATA_MODEL.md §48 v1.36)` and update §47.9 cross-reference to 🟢. | compliance-officer | **P1** | M6 (this authoring pass) | [x] **Done — 2026-06-29** |
+
+#### P2 — Cohort analytics calibration
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | After 10 graduated pilots (COST_MODEL §47.8 item 9): run §48.5 cohort analytics query to calibrate §47.3.2 NRR estimates and §47.3.3 retention model against actuals. If actuals deviate > 10 pp in any activation bucket, update COST_MODEL §47.3.2 tables and file an updated GRAD-E-001 amendment report. | customer-success + data-engineer | **P2** | After 10 pilots | [ ] |
+
+### 48.10 Cross-Reference Obligations Created by §48
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/COST_MODEL.md §47.8 item 8` — mark `[x] Done` (documentation portion — §48 authored) | §48.9 item 4 (P1, this authoring pass) | 🟢 **Done — 2026-06-29 (DATA_MODEL §48 v1.36)** |
+| `compliance/evidence/graduation/migration-0089-validation_<YYYY-MM-DD>.txt` — staging validation output | §48.9 item 1 (P0/M6) | 🟡 **Pending — migration not yet applied to staging** |
+| Graduation Worker: `graduated_from_pilot_id` write at `enterprise_contracts` INSERT | §48.9 item 3 (P1/M6) | 🟡 **Pending — Worker implementation** |
+| Cohort analytics calibration against COST_MODEL §47.3.2 after 10 pilots | §48.9 item 5 (P2, after 10 pilots) | 🟡 **Pending — awaiting pilot graduation volume** |
+
+---
+
+*v1.36 (2026-06-29): §48 `enterprise_contracts.graduated_from_pilot_id` — Pilot-to-Paid Cohort FK — Migration 0089. Closes `docs/COST_MODEL.md §47.8 item 8` (P1/M6): DATA_MODEL registration gap for the `graduated_from_pilot_id UUID NULLABLE REFERENCES tenant_pilots(id) ON DELETE SET NULL` column on `enterprise_contracts`. §48.1 purpose + four design principles: (1) additive-only migration (ALTER TABLE ADD COLUMN IF NOT EXISTS — one nullable UUID FK column; no DEFAULT; no CHECK); (2) ON DELETE SET NULL (tenant_pilots hard-deleted at 5yr per §16.9; contract must not be deleted — 7yr financial records); (3) nullable for non-pilot-origin direct-enterprise deals; (4) privacy floor — FORM-internal UUID only, no employee PII or Art. 9 data. §48.2 migration dependency chain: 0083→0084→0085→0086→0087→0088→0089; structural FK dependency on tenant_pilots table (§16.3) — unlike prior additive migrations 0083–0088. FK referential action table: ON DELETE SET NULL (correct) vs CASCADE (rejected — destroys 7yr financial records) vs RESTRICT (rejected — blocks §16.9 5yr hard-delete cron). §48.3 full DDL: ALTER TABLE enterprise_contracts ADD COLUMN IF NOT EXISTS graduated_from_pilot_id UUID REFERENCES tenant_pilots(id) ON DELETE SET NULL; COMMENT ON COLUMN with governance context (DEC-084, §47.6.2 write path, ON DELETE SET NULL rationale, write-once-at-INSERT invariant). §48.4 six-item staging validation checklist: column present with correct type (uuid, nullable); FK constraint registered against tenant_pilots; existing rows all NULL; form_api REVOKE confirmed; tenant_manager no-policy confirmed; compliance_reviewer SELECT. Evidence path: compliance/evidence/graduation/migration-0089-validation_<YYYY-MM-DD>.txt. §48.5 column semantics table (1 column); cohort analytics query pattern (activation bucket → seat utilisation rate JOIN on graduated_from_pilot_id; privacy floor note: aggregate counts only, no Art. 9 data). §48.6 RLS: five-role policy table unchanged from §16 (form_api REVOKED; form_system ALL; form_admin SELECT; compliance_reviewer SELECT; tenant roles no access); three DDL auditor proof queries (form_api REVOKE; tenant_manager no-policy; compliance_reviewer SELECT). §48.7 privacy floor: single-column table (FORM-internal UUID; GDPR relevance: none; PHI/Art. 9: none); referenced table tenant_pilots privacy floor confirmation (internal_notes PII prohibition + weekly content-scan; success_criteria aggregate JSONB only). §48.8 SOC 2 evidence: CC3.2 (pilot-to-contract traceability SQL), CC9.2 (graduation criteria gate verifiability), A1.1 (SLA-tier → graduation baseline link); GRAD-E-001 annual cross-check query (enterprise.contract_activated event pilot_id vs graduated_from_pilot_id column — chain_consistent assertion). §48.9 implementation checklist: 2× P0/M6 (migration 0089 staging apply + six validation checks; production deploy before graduation Worker); 2× P1/M6 (graduation Worker write-on-INSERT + integration test; COST_MODEL §47.8 item 8 closure — [x] Done this authoring pass); 1× P2/after-10-pilots (cohort analytics calibration against §47.3.2 NRR estimates). §48.10 cross-reference obligations: COST_MODEL §47.8 item 8 🟢 Done; migration-0089 staging output 🟡 pending; graduation Worker implementation 🟡 pending; cohort calibration 🟡 pending. TOC updated (§47 + §48 added). Document header v1.35 → v1.36. No schema applied — documentation only. Cross-references: `docs/COST_MODEL.md §47` (authoritative pilot graduation economics + GRAD-CHAIN-01/02 + DEC-084); `docs/COST_MODEL.md §47.8 item 8` (P1/M6 obligation now closed — documentation portion); `docs/COST_MODEL.md §47.9` (cross-reference row updated 🟡 → 🟢); `docs/DATA_MODEL.md §16` (enterprise_contracts baseline DDL — sole table modified; form_api REVOKE established here); `docs/DATA_MODEL.md §16.3` (tenant_pilots baseline DDL — referenced FK target); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` (v2.59 — enterprise.pilot_graduated HIGH/7yr + enterprise.contract_activated STANDARD/3yr; GRAD-CHAIN-01/02 invariants); `docs/SOC2_READINESS.md §129` (GRAD-E-001 evidence artefact — CC3.2/CC7.2/A1.1; graduated_from_pilot_id enables annual cross-check query). Owner: enterprise-architect + compliance-officer.*
 
 *v1.35 (2026-06-27): §47 `enterprise_contracts` Amendment Columns — Migration 0088. Closes the DATA_MODEL registration gap created when `docs/COST_MODEL.md §45` (v2.15, 2026-06-26) specified migration 0088 DDL inline as part of the pure tier upgrade governance spec (DEC-082) without a companion DATA_MODEL section — the same gap pattern resolved by DATA_MODEL §42 → COST_MODEL §41 (expansion columns), §43 → §42 (enterprise_renewals), §44 → §43.9 (enterprise_churn_events), and §45 → §44 (contract_discount_type). §47.1 purpose + four design principles: (1) additive-only migration (ALTER TABLE ADD COLUMN IF NOT EXISTS — four nullable columns, no DDL mutual-exclusivity constraint, no DEFAULT); (2) single-write path (`amend_contract_tier()` SECURITY DEFINER RPC — only mechanism writing all four columns atomically; `form_api` REVOKED from `enterprise_contracts` since §16); (3) TU-CHAIN-01 enforced at Worker layer (HTTP 422 on `new_rate < §31.5 floor`); (4) privacy floor — all four columns are commercial metadata only (`amendment_justification_hash` is SHA-256 opaque token; plaintext in R2 only). §47.2 migration dependency chain: 0083→0084→0085→0086→0087→0088; no structural FK dependency on 0086/0087; production gate = COST_MODEL §45.8 item 1 (outside counsel ASC 606 confirmation, P0/M12). §47.3.1 full DDL: `ALTER TABLE enterprise_contracts ADD COLUMN IF NOT EXISTS` for four columns — `amendment_date TIMESTAMPTZ`, `amendment_type VARCHAR(30) CHECK (IN ('tier_upgrade','scope_expansion','term_extension','other'))`, `prior_rate_per_seat_usd NUMERIC(10,4)`, `amendment_justification_hash TEXT`; four `COMMENT ON COLUMN` entries; all-nullable design rationale; four-or-none atomicity invariant. §47.3.2 six-item staging validation checklist (columns present with correct types; existing rows all NULL; CHECK constraint rejects invalid amendment_type; valid tier_upgrade write accepted + ROLLBACK; form_api REVOKE confirmed; tenant_manager no-policy confirmed). §47.4 column semantics table: four columns with type, nullability, semantics; enum value meanings for amendment_type (tier_upgrade / scope_expansion / term_extension / other — three are reserved-future); immutability invariant (single-amendment per contract_id; second amendment requires new contract per Option B or new Decision Log entry). §47.5 RLS: five-role policy table (form_api REVOKED; form_system ALL via SECURITY DEFINER; form_admin SELECT + routed UPDATE; compliance_reviewer SELECT; tenant roles no access); three DDL auditor proof queries (form_api REVOKE, tenant_manager no-policy, compliance_reviewer SELECT). §47.6 privacy floor: four-column classification table (all commercial metadata; amendment_justification_hash SHA-256 opaque); justification plaintext governance (R2 path, r2:compliance-officer write-only, no employee PII or Art. 9 data). §47.7 SOC 2 evidence mapping: CC5.2 (REVOKE + SECURITY DEFINER proof), CC6.1 (RPC-only write path), CC1.4 (CHECK constraint valid-values + prior_rate_per_seat_usd discrepancy cross-check); ADM-E-001/ADM-E-002 DDL supplement cross-reference (registered SOC2_READINESS §118 — §47 adds DDL-layer proofs not yet in §118). §47.8 implementation checklist: 3× P0/M12 (outside counsel gate + staging validation + production deploy); 3× P1/M12 (amend_contract_tier() RPC implementation + two integration tests); 2× P2/M13+ (SOC2_READINESS §122 DDL supplement authorship; discrepancy-detection protocol). §47.9 four cross-reference obligations created: SOC2_READINESS §122 DDL supplement 🟡 pending (P2/M13+); migration-0088 staging validation file 🟡 pending (P0/M12); ASC 606 counsel letter 🟡 pending (P0/M12 gate); COST_MODEL §45.8 item 3 mark-done 🟡 pending (simultaneous with production deploy). Document header v1.34 → v1.35. No schema applied — documentation only. Cross-references: `docs/COST_MODEL.md §45` (authoritative governance spec — DEC-082, Option A amendment mechanics, TU-CHAIN-01, credit formula, `amend_contract_tier()` RPC spec, §45.8 item 3 production deploy obligation); `docs/COST_MODEL.md §45.4` (migration 0088 DDL spec — this section is the DATA_MODEL registration; §45.8 item 3 simultaneous close); `docs/DATA_MODEL.md §16` (`enterprise_contracts` baseline DDL — sole table modified; `form_api` REVOKE established here); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pure Tier Upgrade events` (v2.50 — `enterprise.contract_amended` + `billing.rate_updated` DEC-030 events; TU-CHAIN-01 chain invariant); `docs/SOC2_READINESS.md §118` (ADM-E-001/ADM-E-002 registered 2026-06-26 — §47.7 adds DDL supplement not yet captured in §118); `docs/DECISION_LOG.md DEC-082` (formal adoption record — Option A amendment, ASC 606 prospective Type 2 treatment, outside counsel gate). Owner: enterprise-architect + compliance-officer.*
 

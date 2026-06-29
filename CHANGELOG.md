@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.7.1] — 2026-06-29
+
+### Added
+- `docs/DATA_MODEL.md §48` — `enterprise_contracts.graduated_from_pilot_id` — Pilot-to-Paid Cohort FK — Migration 0089 (v1.36). Closes `docs/COST_MODEL.md §47.8 item 8` (P1/M6, documentation portion). `graduated_from_pilot_id UUID NULLABLE REFERENCES tenant_pilots(id) ON DELETE SET NULL`. Four design principles: additive-only (ALTER TABLE ADD COLUMN IF NOT EXISTS); ON DELETE SET NULL (tenant_pilots hard-deleted at 5yr per §16.9 — must not cascade to 7yr financial records); nullable for direct-enterprise deals; privacy floor (FORM-internal UUID, no employee PII or Art. 9 data). Migration dependency chain: 0083→...→0088→0089; structural FK dependency on tenant_pilots table (unlike prior additive migrations). Six-item staging validation checklist; cohort analytics query pattern (activation bucket → seat utilisation rate, aggregate-only); DDL auditor proof queries for form_api REVOKE, tenant_manager no-policy, compliance_reviewer SELECT. SOC 2 mapping: CC3.2 (pilot-to-contract traceability SQL), CC9.2 (graduation criteria gate verifiability), A1.1 (SLA-tier → graduation baseline link via GRAD-E-001 annual cross-check). Four implementation checklist items: 2× P0/M6 (staging apply + production deploy before graduation Worker); 2× P1/M6 (graduation Worker write-path + item 8 closure — [x] Done this authoring pass); 1× P2 (cohort calibration after 10 pilots).
+
+### Changed
+- `docs/COST_MODEL.md §47.8 item 8` — status `[ ]` → `[x] Done — 2026-06-29 (DATA_MODEL.md §48 v1.36; documentation portion complete)`.
+- `docs/COST_MODEL.md §47.9` — cross-reference row for `docs/DATA_MODEL.md §48` updated 🟡 Pending → 🟢 Done.
+- `docs/DATA_MODEL.md` — header v1.35 → v1.36; TOC entries §47 and §48 added (§47 was previously missing from TOC).
+- `VERSION` — 10.7.0 → 10.7.1.
+
+---
+
 ## [10.7.0] — 2026-06-29
 
 ### Added

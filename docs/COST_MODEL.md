@@ -13061,7 +13061,7 @@ GRAD-CHAIN-02 (v1.0):
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 7 | Build Admin Console "Graduation Dashboard": per-pilot graduation date, activation bucket, ACV, first invoice date, 3-month retention status (active/at-risk/churned). Source: `enterprise.pilot_graduated` + `enterprise.contract_activated` events JOIN to billing data. Privacy floor: aggregate activation rates only; no individual `user_id`. | platform-engineer + design-craft | **P1** | M6 | [ ] |
-| 8 | Add `graduated_from_pilot_id` column (UUID nullable FK → `pilot_programs.id`) to `enterprise_contracts` to enable post-graduation cohort tracking. Migration 0089. Document DDL and RLS considerations in `docs/DATA_MODEL.md §48` (next section). | platform-engineer + enterprise-architect | **P1** | M6 | [ ] |
+| 8 | Add `graduated_from_pilot_id` column (UUID nullable FK → `pilot_programs.id`) to `enterprise_contracts` to enable post-graduation cohort tracking. Migration 0089. Document DDL and RLS considerations in `docs/DATA_MODEL.md §48` (next section). | platform-engineer + enterprise-architect | **P1** | M6 | [x] **Done — 2026-06-29 (DATA_MODEL.md §48 v1.36; documentation portion complete — DDL, FK rationale, RLS, staging checklist, cohort analytics query, SOC 2 mapping authored; production deploy and graduation Worker write-path pending §48.9 items 1–3)** |
 
 #### P2 — After first 10 graduating pilots (est. M10–M18)
 
@@ -13081,10 +13081,9 @@ GRAD-CHAIN-02 (v1.0):
 | `docs/SOC2_READINESS.md` | §79.4 master evidence table | GRAD-E-001 registration (count 98 → 99; §129) | 🟢 **Done — 2026-06-29 (SOC2_READINESS.md §129 v3.54.0; §47.8 item 5)** |
 | `docs/SOC2_READINESS.md` | §80.3 R2 subfolder registry | `pilots/graduation/` subfolder | 🟢 **Done — 2026-06-29 (SOC2_READINESS.md §129.3 v3.54.0; §47.8 item 5)** |
 | `docs/OBSERVABILITY.md` | §60.11 OQ-WAU-OBS-02 | OQ-ENTERPRISE-ARR-01 now formally registered at §47.5.1, resolving forward reference to "COST_MODEL §37"; `tenant_id`-level interim position confirmed | 🟢 Forward reference resolved — OQ-WAU-OBS-02 remains 🟡 Open pending §47.8 item 11 |
-| `docs/DATA_MODEL.md` | Future §48 | `graduated_from_pilot_id` FK column on `enterprise_contracts` (migration 0089) | 🟡 **Pending — §47.8 item 8 (P1/M6)** |
+| `docs/DATA_MODEL.md` | §48 | `graduated_from_pilot_id` FK column on `enterprise_contracts` (migration 0089) — DDL, FK rationale (ON DELETE SET NULL), RLS, staging checklist, cohort analytics query, SOC 2 mapping | 🟢 **Done — 2026-06-29 (DATA_MODEL.md §48 v1.36; §47.8 item 8 documentation portion closed)** |
 | `docs/DECISION_LOG.md` | New entry DEC-084 | Pilot Graduation Economics governance decision | 🟢 **Done — 2026-06-29 (DECISION_LOG.md DEC-084; §47.8 item 6)** |
 | `docs/COST_MODEL.md` | §46 (CSM Save Protocol) | §47 is the "happy path" companion; save-protocol graduations use `enterprise.pilot_saved` (§46.7 Event 3), not `enterprise.pilot_graduated` | — |
-| `docs/DECISION_LOG.md` | New entry DEC-084 | Pilot Graduation Economics governance decision | [ ] §47.8 item 6 |
 
 ---
 
