@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [10.6.0] — 2026-06-29
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` — New section (v2.59). Two DEC-030 HMAC-chained events: `enterprise.pilot_graduated` (HIGH/7yr, CC3.2/CC7.2/CC9.2/A1.1, GRAD-CHAIN-01 anchor) + `enterprise.contract_activated` (STANDARD/3yr, CC3.2/A1.1, GRAD-CHAIN-02 companion). Zod v2 schemas (`PilotGraduatedSchema`, `ContractActivatedSchema`). GRAD-CHAIN-01: `pilot_graduated` blocked HTTP 422 `GRAD_CHAIN_01_NO_PILOT_STARTED` if no prior `pilot_started` for same `pilot_id`. GRAD-CHAIN-02: `contract_activated` with non-null `pilot_id` blocked HTTP 422 `GRAD_CHAIN_02_NO_GRADUATION_EVENT` if no prior `pilot_graduated` or `pilot_saved` within 30 days. CC3.2/CC7.2/CC9.2/A1.1 auditor narratives. Retention table: +2 rows. Closes COST_MODEL §47.8 item 1 (P0/M5).
+- `docs/SOC2_READINESS.md §129` — Cross-Reference Patch · Pilot Graduation Evidence (v3.54.0). GRAD-E-001 registered in §79.4 (count 98 → 99): annual export of `enterprise.pilot_graduated` + `enterprise.contract_activated` events, CC3.2/CC7.2/A1.1, annual Q4, 3yr retention, path `pilots/graduation/GRAD-E-001_<YYYY>.csv`. `pilots/graduation/` R2 subfolder added to §80.3 (WORM Object Lock 3yr; `form_api` NO ACCESS). Vanta mirror entry added to §80.4. Closes COST_MODEL §47.8 item 5 (P0/M5).
+- `docs/DECISION_LOG.md DEC-084` — Pilot Graduation Economics & First-Year ARR Recognition (2026-06-29). Standard graduation criteria (≥ 50% activation, ≥ 3 champion logins, no T0-Gamma active), three-tier approval authority (CSM/CS Lead/Founder), GRAD-CHAIN-01/02 invariants, ASC 606 revenue recognition trigger, OQ-ENTERPRISE-ARR-01 registration. Closes COST_MODEL §47.8 item 6 (P0/M5).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — header v2.58 → v2.59; retention table +2 rows for graduation events.
+- `docs/COST_MODEL.md §47.8/§47.9` — items 1, 5, 6 marked `[x] Done — 2026-06-29`; §47.9 cross-reference statuses updated to 🟢.
+- `VERSION` — 10.5.2 → 10.6.0.
+
+---
+
 ## [10.5.2] — 2026-06-29
 
 ### Added

@@ -32843,3 +32843,74 @@ The following pre-gate checklist defines the 14 items that must be completed or 
 | 6 | Update `compliance/calendar/q3-2026-access-review.md` v1.0 (committed 2026-06-05) to add §128 cross-reference: one-line entry "OQ-AR-01 and OQ-TDD-01 resolved — see SOC2_READINESS.md §128, v3.53.0, 2026-06-29." | compliance-officer | **P0** | 2026-07-17 pre-gate | [ ] |
 
 *v3.53.0 (2026-06-29): §128 Q3 2026 Access Review — Pre-Execution Gate · OQ-AR-01 Resolution · OQ-TDD-01 Resolution. Closes OQ-AR-01 (🟡 Open → 🟢 Resolved; P1; compliance-officer + customer-success; 2026-07-17 pre-review gate deadline): pilot-tier tenants reviewed under §23.2.3 at same standard as production enterprise tenants; same §23.4 procedure; pilot designation noted in artefact `tier` column; no lighter-weight alternative; decision effective immediately from this section. Closes OQ-TDD-01 (🟡 Open → 🟢 Resolved; P1; compliance-officer; deadline before first certificate issuance): §67.7 destruction certificate DELETION SCOPE block receives two changes — (1) `{DPA date}` placeholder population spec clarified as ISO 8601 DocuSign completion date; (2) new `Processing activities covered:` line with approved boilerplate added immediately after DPA date reference; individual DPIA PA IDs (PA-01…PA-12) omitted from certificate face as too technical for privacy officer recipients. §128.2 provides updated §23.2.3 production query extending `WHERE t.tier = 'enterprise'` to `WHERE t.tier IN ('enterprise', 'pilot')` per OQ-AR-01 decision; query includes `status` computed column flagging accounts inactive >90 days. §128.4 provides 14-item pre-gate checklist due 2026-07-17 (PG-Q3-01 through PG-Q3-14) covering: authorized-roster currency, pilot tenant count, OQ-AR-01 application, Sentry DPA status, credential SLA flags, control effectiveness table review, Q2 artefact SHA-256 closure, Q3 artefact shell creation, training cadence, template update, OQ-AR-02 SIEM posture, calendar file update, and CSM pilot-window notification. §128.4.2 documents Q3 vs Q2 artefact differences. §128.5 maps to CC6.3, CC6.4, CC4.2, C1.2, CC9.2. §128.6 six-item implementation checklist: 3× P0 (pre-gate execution 2026-07-17; Q3 review execution 2026-07-31; calendar file §128 cross-reference by 2026-07-17), 2× P1 (§67.7 template update before M6; pilot-tier deprovisioning SLA note if applicable), 1× P2 (OQ-AR-02 SIEM topic configuration before M13 GA). Document header v3.52.0 → v3.53.0. Owner: compliance-officer. Cross-references: `docs/SOC2_READINESS.md §23` (quarterly access review procedure — primary); `docs/SOC2_READINESS.md §23.2.3` (inactive-account sweep query — extended to pilot tier per §128.2); `docs/SOC2_READINESS.md §65` (Q2 2026 access review execution record — template for Q3); `docs/SOC2_READINESS.md §65.11` (Q3 2026 forward plan — pre-gate 2026-07-17; execution 2026-07-28/31; artefact path `compliance/access-review/2026-q3/`); `docs/SOC2_READINESS.md §67.7` (destruction certificate template — OQ-TDD-01 DELETION SCOPE block update specified in §128.3); `docs/SOC2_READINESS.md §67.10` (OQ-TDD-01 row: 🟡 Open → 🟢 Resolved, §128.3); `docs/OBSERVABILITY.md §47` (SIEM consent addendum — OQ-AR-02 SIEM posture reference); `compliance/calendar/q3-2026-access-review.md` (pre-gate calendar file committed 2026-06-05 per §65.13 item 6; add §128 cross-reference per PG-Q3-13 / §128.6 item 6); `compliance/access-review/authorized-roster.md` v1.0 (baseline for Q3 review per §65.13 AR-P0-03); `docs/DECISION_LOG.md DEC-030` (HMAC-chained audit log — `system.access_review_completed` DEC-030 event for Q3 artefact); `docs/GDPR_DPIA.md §35` (PA-01…PA-12 processing activities — omitted from destruction certificate per OQ-TDD-01 resolution; available via data room).*
+
+
+---
+
+## §129 · Cross-Reference Patch — Pilot Graduation Evidence Registration (GRAD-E-001 · CC3.2 / CC7.2 / A1.1)
+
+**Date:** 2026-06-29  **Author:** compliance-officer (cloud worker)  **Trigger:** `docs/COST_MODEL.md §47.8 item 5` (P0/M5, open since 2026-06-29 §47 authoring) required registering one SOC 2 evidence artefact (GRAD-E-001), creating a new R2 subfolder (`pilots/graduation/`), and adding a Vanta mirror entry.
+
+---
+
+### §129.1 Obligation Closed
+
+This section closes **COST_MODEL §47.8 item 5** (P0/M5) — the documentation registration obligation created when `docs/COST_MODEL.md §47` (v2.21.0, 2026-06-29) defined the Pilot Graduation Economics governance and specified one SOC 2 evidence artefact (GRAD-E-001) without registering it in SOC2_READINESS.md. One artefact registered (count 98 → 99); `pilots/graduation/` R2 subfolder added to §80.3; one Vanta mirror entry added to §80.4.
+
+---
+
+### §129.2 GRAD-E-001 Artefact
+
+**GRAD-E-001** — Annual export of all `enterprise.pilot_graduated` and `enterprise.pilot_saved` events with corresponding `enterprise.contract_activated` events for the calendar year. TSC criteria: CC3.2 / CC7.2 / A1.1. Retention: 3 years. Collection: annual (Q4) from first graduating pilot (est. M5–M6). Owner: compliance-officer. Path: `compliance/evidence/pilots/graduation/GRAD-E-001_<YYYY>.csv`.
+
+**Columns:** `pilot_id` (UUID), `graduation_date` (TIMESTAMPTZ), `graduation_path` (standard / post_save_protocol / direct), `activation_rate_at_graduation` (NUMERIC 0–1), `graduation_tier` (standard / conditional), `activation_bucket` (A / B / C), `acv_at_graduation_usd` (NUMERIC), `contract_activation_date` (TIMESTAMPTZ — from `enterprise.contract_activated`), `days_pilot_to_activation` (INT — computed: contract_activation_date minus pilot_start_date).
+
+**Privacy floor:** `pilot_id` UUIDs and aggregate NUMERIC rates only; no individual employee `user_id`, name, email, workout session, or GDPR Art. 9 special-category health data; `form_api` REVOKED from all source tables (`audit_log_events`, `pilot_programs`, `enterprise_contracts`); `form_system` read-only for export job. Zero-event years filed as affirmative attestation.
+
+**Primary definition:** `docs/COST_MODEL.md §47.7` (GRAD-E-001 SOC 2 evidence mapping — CC3.2/CC7.2/A1.1, annual Q4, 3yr). Source events: `enterprise.pilot_graduated` (HIGH/7yr) and `enterprise.contract_activated` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` (v2.59, 2026-06-29). Chain verifiable via HMAC-VERIFY-ALGO-001 (GRAD-CHAIN-01/02 continuity).
+
+---
+
+### §129.3 §80.3 R2 Folder Addition
+
+`pilots/graduation/` subfolder added to the `compliance/evidence/` folder structure in §80.3. Covers GRAD-E-001 (annual; 3yr WORM Object Lock Governance; `form_api` NO ACCESS; `form_system` role only).
+
+---
+
+### §129.4 §80.4 Vanta Mirror Addition
+
+GRAD-E-001 added to the §80.4 Vanta mirror list. Upload cadence: annually — from Q4 of first year with ≥ 1 graduating pilot (est. M6+). Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. CC3.2 / CC7.2 / A1.1 criteria tags applied. Privacy flag: `pilot_id` UUIDs + aggregate NUMERIC rates only; no PII or GDPR Art. 9 data; Vanta access: compliance-officer + security-engineer only.
+
+---
+
+### §129.5 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| `COST_MODEL §47.8 item 5` — GRAD-E-001 registration in §79.4 + `pilots/graduation/` in §80.3 + Vanta entry §80.4 | This section | 🟢 **Done — 2026-06-29 (SOC2_READINESS.md v3.54.0, §129)** |
+| `COST_MODEL §47.8 item 1` — `enterprise.pilot_graduated` + `enterprise.contract_activated` events in AUDIT_LOG_SCHEMA.md | `AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` v2.59 (2026-06-29) | 🟢 **Done — registered simultaneously** |
+| `COST_MODEL §47.8 item 6` — DEC-084 in DECISION_LOG.md | `DECISION_LOG.md DEC-084` (2026-06-29) | 🟢 **Done — registered simultaneously** |
+
+---
+
+### §129.6 §79.4 Row Addition
+
+One row added to the §79.4 master evidence table (count 98 → 99):
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|
+| **GRAD-E-001** | CC3.2, CC7.2, A1.1 | Annual export of `enterprise.pilot_graduated` + `enterprise.pilot_saved` events cross-referenced to `enterprise.contract_activated` events. Columns: `pilot_id`, `graduation_date`, `graduation_path`, `activation_rate_at_graduation`, `graduation_tier`, `activation_bucket`, `acv_at_graduation_usd`, `contract_activation_date`, `days_pilot_to_activation`. GRAD-CHAIN-01/02 HMAC continuity verified per HMAC-VERIFY-ALGO-001. Privacy: pilot_id UUIDs + aggregate NUMERIC only; no employee PII or Art. 9 data; `form_api` REVOKED. | Annual (Q4) | 3 yr | `pilots/graduation/GRAD-E-001_<YYYY>.csv` |
+
+---
+
+### §129.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `compliance/evidence/pilots/graduation/` folder on Cloudflare R2 `form-soc2-evidence` bucket; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). | devops-lead | **P0** | M5 | [ ] |
+| 2 | File first GRAD-E-001 artefact after Q4 of first year with ≥ 1 graduating pilot: query `enterprise.pilot_graduated` + `enterprise.contract_activated` DEC-030 events for the year; verify GRAD-CHAIN-01/02 continuity (HMAC-VERIFY-ALGO-001 chain check); file at `pilots/graduation/GRAD-E-001_<YYYY>.csv`; SHA-256 hash; upload to R2 (3yr WORM Object Lock); upload to Vanta (CC3.2/CC7.2/A1.1); add to MASTER-INDEX. Privacy check: `pilot_id` UUIDs + aggregate rates only; no employee `user_id`. | compliance-officer | **P1** | Q4 of first graduation year (est. M12+) | [ ] |
+| 3 | Add GRAD-E-001 to §79.5 compliance calendar at Month O+12 (first annual filing); confirm §79.5 quarterly calendar does not require GRAD-E interim entries (artefact is annual). | compliance-officer | **P2** | Month O+1 calendar review | [ ] |
+
+---
+
+*v3.54.0 (2026-06-29): §129 Cross-Reference Patch — COST_MODEL §47.8 item 5 (GRAD-E-001 · CC3.2 / CC7.2 / A1.1). Closes P0/M5 documentation obligation created when COST_MODEL §47 (v2.21.0, 2026-06-29, DEC-084) defined Pilot Graduation Economics and specified one SOC 2 evidence artefact (GRAD-E-001) without registering it in SOC2_READINESS.md. One artefact registered (count 98 → 99): GRAD-E-001 (CC3.2/CC7.2/A1.1, annual Q4, 3yr — annual export of `enterprise.pilot_graduated` + `enterprise.pilot_saved` + `enterprise.contract_activated` DEC-030 events; columns: `pilot_id`, `graduation_date`, `graduation_path`, `activation_rate_at_graduation`, `graduation_tier`, `activation_bucket`, `acv_at_graduation_usd`, `contract_activation_date`, `days_pilot_to_activation`; GRAD-CHAIN-01/02 HMAC continuity verified per HMAC-VERIFY-ALGO-001; zero-event years filed as affirmative attestation; privacy: `pilot_id` UUIDs + aggregate NUMERIC only; no employee PII or GDPR Art. 9 data; `form_api` REVOKED). §80.3 `pilots/graduation/` R2 subfolder added (WORM Object Lock Governance 3yr; `form_api` NO ACCESS; `form_system` role only). §80.4 Vanta mirror list: one new entry for GRAD-E-001 (annual Q4 from first graduation year; CC3.2/CC7.2/A1.1; privacy: pilot_id UUIDs + aggregate NUMERIC only). Three cross-reference obligations confirmed closed (§129.5): AUDIT_LOG_SCHEMA.md v2.59 §Enterprise Pilot Graduation events (COST_MODEL §47.8 item 1); DEC-084 DECISION_LOG.md (item 6); this §129 (item 5). Three implementation checklist items: P0/M5 (R2 folder creation), P1/Q4 (first GRAD-E-001 filing), P2/M+1 (calendar update). Privacy floor: all §129 content is DEC-030 event metadata and aggregate NUMERIC rates — no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data; `form_api` REVOKED from all source tables; `form_system` read-only for export. Document header v3.53.0 → v3.54.0. Owner: compliance-officer. Cross-references: `docs/COST_MODEL.md §47.7` (GRAD-E-001 primary definition — artefact description, criteria CC3.2/CC7.2/A1.1, 3yr retention, R2 path, privacy floor); `docs/COST_MODEL.md §47.8 item 5` (obligation source — 🟢 closed this patch); `docs/COST_MODEL.md §47.6` (two §47 DEC-030 events — `enterprise.pilot_graduated` HIGH/7yr + `enterprise.contract_activated` STANDARD/3yr); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` (v2.59, 2026-06-29 — two events with GRAD-CHAIN-01/02 invariants, Zod v2 schemas, CC3.2/CC7.2/CC9.2/A1.1 auditor narratives); `docs/DECISION_LOG.md DEC-084` (formal adoption record — 2026-06-29, Pilot Graduation Economics & First-Year ARR Recognition); `docs/SOC2_READINESS.md §126.1` (SAVE-E-001 companion — same pilot lifecycle domain; `pilots/save-protocol/` subfolder for save-path artefacts); `docs/SOC2_READINESS.md §80.3` (`pilots/graduation/` subfolder added after `pilots/wau-decline/`); `docs/SOC2_READINESS.md §80.4` (GRAD-E-001 Vanta mirror entry added after WAU-DECLINE-STALE-E-001); `docs/DATA_MODEL.md §48` (future obligation — `graduated_from_pilot_id` FK column on `enterprise_contracts`, migration 0089; COST_MODEL §47.8 item 8, P1/M6); `docs/DECISION_LOG.md DEC-030` (HMAC-chained audit log — GRAD-CHAIN-01/02 ordering invariant basis).*

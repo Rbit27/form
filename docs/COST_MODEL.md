@@ -13049,12 +13049,12 @@ GRAD-CHAIN-02 (v1.0):
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register §47.6 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` subsection: `enterprise.pilot_graduated` (HIGH/7yr) + `enterprise.contract_activated` (STANDARD/3yr). Include Zod v2 schemas for both events; GRAD-CHAIN-01 + GRAD-CHAIN-02 invariant blocks. | compliance-officer + security-engineer | **P0** | M5 | [ ] |
+| 1 | Register §47.6 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` subsection: `enterprise.pilot_graduated` (HIGH/7yr) + `enterprise.contract_activated` (STANDARD/3yr). Include Zod v2 schemas for both events; GRAD-CHAIN-01 + GRAD-CHAIN-02 invariant blocks. | compliance-officer + security-engineer | **P0** | M5 | [x] **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.59)** |
 | 2 | Implement GRAD-CHAIN-01 predecessor check in `emit-audit-event` Worker for `enterprise.pilot_graduated`. Integration tests: (a) `pilot_graduated` with no prior `pilot_started` → 422 `GRAD_CHAIN_01_NO_PILOT_STARTED`; (b) `pilot_graduated` with prior `pilot_started`, same `pilot_id` → 201. | platform-engineer | **P0** | M5 | [ ] |
 | 3 | Implement GRAD-CHAIN-02 predecessor check in `emit-audit-event` Worker for `enterprise.contract_activated` (when `pilot_id` non-null). Integration tests: (a) `contract_activated` with no prior graduation event → 422 `GRAD_CHAIN_02_NO_GRADUATION_EVENT`; (b) prior `pilot_graduated` within 30 days → 201; (c) prior `pilot_saved` within 30 days → 201; (d) `pilot_id = null` → 201 (no chain check). | platform-engineer | **P0** | M5 | [ ] |
 | 4 | Add "Graduate Pilot" flow to Admin Console pilot management view (form_admin + customer-success roles only). UI pre-fills: `activation_rate_at_graduation` from live KPI panel; `activation_bucket` (A/B/C) auto-computed; `graduation_tier` inferred from §47.2.2 decision table. On submit: emits `enterprise.pilot_graduated` via IC PAM-elevated API call; shows GRAD-CHAIN-01 status. | platform-engineer + design-craft | **P0** | M5 | [ ] |
-| 5 | Register GRAD-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (one row after SAVE-E-002); add `pilots/graduation/` R2 subfolder to §80.3; add Vanta mirror entry in §80.4. | compliance-officer | **P0** | M5 | [ ] |
-| 6 | Register DEC-084 in `docs/DECISION_LOG.md`: "Pilot Graduation Economics & First-Year ARR Recognition (§47, v2.21.0, 2026-06-29). Standard graduation criteria (≥ 50% activation / ≥ 3 champion logins / no T0-Gamma active), three-tier approval authority, GRAD-CHAIN-01/02 invariants, OQ-ENTERPRISE-ARR-01 registration." | compliance-officer | **P0** | M5 (this authoring pass) | [ ] |
+| 5 | Register GRAD-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (one row after SAVE-E-002); add `pilots/graduation/` R2 subfolder to §80.3; add Vanta mirror entry in §80.4. | compliance-officer | **P0** | M5 | [x] **Done — 2026-06-29 (SOC2_READINESS.md §129 v3.54.0)** |
+| 6 | Register DEC-084 in `docs/DECISION_LOG.md`: "Pilot Graduation Economics & First-Year ARR Recognition (§47, v2.21.0, 2026-06-29). Standard graduation criteria (≥ 50% activation / ≥ 3 champion logins / no T0-Gamma active), three-tier approval authority, GRAD-CHAIN-01/02 invariants, OQ-ENTERPRISE-ARR-01 registration." | compliance-officer | **P0** | M5 (this authoring pass) | [x] **Done — 2026-06-29 (DECISION_LOG.md DEC-084)** |
 
 #### P1 — Before first paid contract Month 3 review (est. M6–M8)
 
@@ -13077,11 +13077,12 @@ GRAD-CHAIN-02 (v1.0):
 
 | Document | Section | Relationship | Status |
 |---|---|---|---|
-| `docs/AUDIT_LOG_SCHEMA.md` | New §Enterprise Pilot Graduation events | GRAD-CHAIN-01/02 invariants + Zod v2 schemas for `enterprise.pilot_graduated` + `enterprise.contract_activated` | [ ] §47.8 item 1 |
-| `docs/SOC2_READINESS.md` | §79.4 master evidence table | GRAD-E-001 registration (one row after SAVE-E-002) | [ ] §47.8 item 5 |
-| `docs/SOC2_READINESS.md` | §80.3 R2 subfolder registry | `pilots/graduation/` subfolder | [ ] §47.8 item 5 |
+| `docs/AUDIT_LOG_SCHEMA.md` | New §Enterprise Pilot Graduation events | GRAD-CHAIN-01/02 invariants + Zod v2 schemas for `enterprise.pilot_graduated` + `enterprise.contract_activated` | 🟢 **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.59; §47.8 item 1)** |
+| `docs/SOC2_READINESS.md` | §79.4 master evidence table | GRAD-E-001 registration (count 98 → 99; §129) | 🟢 **Done — 2026-06-29 (SOC2_READINESS.md §129 v3.54.0; §47.8 item 5)** |
+| `docs/SOC2_READINESS.md` | §80.3 R2 subfolder registry | `pilots/graduation/` subfolder | 🟢 **Done — 2026-06-29 (SOC2_READINESS.md §129.3 v3.54.0; §47.8 item 5)** |
 | `docs/OBSERVABILITY.md` | §60.11 OQ-WAU-OBS-02 | OQ-ENTERPRISE-ARR-01 now formally registered at §47.5.1, resolving forward reference to "COST_MODEL §37"; `tenant_id`-level interim position confirmed | 🟢 Forward reference resolved — OQ-WAU-OBS-02 remains 🟡 Open pending §47.8 item 11 |
-| `docs/DATA_MODEL.md` | Future §48 | `graduated_from_pilot_id` FK column on `enterprise_contracts` (migration 0089) | [ ] §47.8 item 8 |
+| `docs/DATA_MODEL.md` | Future §48 | `graduated_from_pilot_id` FK column on `enterprise_contracts` (migration 0089) | 🟡 **Pending — §47.8 item 8 (P1/M6)** |
+| `docs/DECISION_LOG.md` | New entry DEC-084 | Pilot Graduation Economics governance decision | 🟢 **Done — 2026-06-29 (DECISION_LOG.md DEC-084; §47.8 item 6)** |
 | `docs/COST_MODEL.md` | §46 (CSM Save Protocol) | §47 is the "happy path" companion; save-protocol graduations use `enterprise.pilot_saved` (§46.7 Event 3), not `enterprise.pilot_graduated` | — |
 | `docs/DECISION_LOG.md` | New entry DEC-084 | Pilot Graduation Economics governance decision | [ ] §47.8 item 6 |
 

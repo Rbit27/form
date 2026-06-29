@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.5.1** — 2026-06-29
+**v10.6.0** — 2026-06-29 · Enterprise: DEC-030 pilot graduation events (AUDIT_LOG_SCHEMA v2.59) + SOC2 GRAD-E-001 §129 (count 98→99) + DEC-084
 
 ---
 
