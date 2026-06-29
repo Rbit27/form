@@ -2901,7 +2901,7 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2769 | Тренування при підвищеному робочому навантаженні: адаптація без нульового місяця | **draft · v9.95.0 → post-2769-training-under-high-work-stress.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2770 | Тренування при хронічному дефіциті сну: коли відновлення в дефіциті | **draft · v9.95.0 → post-2770-training-chronic-sleep-deprivation.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2771 | Тренування у мікроциклі без єдиного «правильного» дня: нерівномірний тижневий розклад і як його рахувати | **draft · v9.96.0 → post-2771-irregular-weekly-schedule.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2772 | Тренування в парі: де партнер підсилює прогрес, де заважає, де нейтральний | proposed · v9.92.0 |
+| 2772 | Тренування в парі: де партнер підсилює прогрес, де заважає, де нейтральний | **draft · v9.97.0 → post-2772-training-with-partner.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2773 | Вік і тренування: що реально змінюється за фізіологією — без мотиваційних кліше | proposed · v9.92.0 |
 | 2774 | Тривалість тренування і результат: що трапляється з ефективністю при 30-хв vs. 90-хв форматі | proposed · v9.92.0 |
 | 2775 | Синтез 2766–2775: тренування в реальних умовах як стратегічна компетентність, а не компроміс | proposed · v9.92.0 |
