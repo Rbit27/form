@@ -19266,3 +19266,325 @@ export const WauDeclineRestoredSchema = z.object({
 *v3.18.3 (2026-06-29): Patch — R-50.12 item 5 and R-51.12 item 5 closed. Both §12.6 registrations were completed in `docs/OBSERVABILITY.md` v2.5 patch (2026-06-29) which explicitly closed `OBSERVABILITY §59.10 item 5` and `OBSERVABILITY §60.10 item 5` — but R-50.12 and R-51.12 checklist rows were not updated at the time. This patch corrects the discrepancy: R-50.12 item 5 → [x] Done (job 50 `champion_login_monitor` in §12.6, `0 11 * * *`, 49h freshness); R-51.12 item 5 → [x] Done (job 51 `wau_decline_monitor` in §12.6, `0 12 * * 1`, 8-day freshness). Document header v3.18.2 → v3.18.3. Owner: devops-lead.*
 
 *v3.18.4 (2026-06-29): Cross-reference sync — R-49.11, R-50.11, R-51.11 stale "pending" notes replaced with closed status. Eight forward-references updated: R-49.11 §AUDIT_LOG_SCHEMA (PILOT-ACT-STALE-CHAIN-01 events registered AUDIT_LOG_SCHEMA.md v2.56 — closes §R-49.12 item 1); R-49.11 §SOC2_READINESS (PILOT-ACT-STALE-E-001 registered §126 SOC2_READINESS.md v3.51.0 — closes §R-49.12 item 4); R-50.11 §AUDIT_LOG_SCHEMA (CHAMP-LOGIN-STALE-CHAIN-01 events registered v2.57 — closes §59.10 item 2); R-50.11 §SOC2_READINESS (CHAMP-LOGIN-STALE-E-001 registered §127 v3.52.0; §126→§127 section correction — closes §59.10 item 4); R-50.11 §12.6 (job 50 stale-consequence cross-ref registered v2.5 patch — closes §59.10 item 5); R-51.11 §AUDIT_LOG_SCHEMA (WAU-DECLINE-STALE-CHAIN-01 events registered v2.57 — closes §60.10 item 2); R-51.11 §SOC2_READINESS (WAU-DECLINE-STALE-E-001 registered §127 v3.52.0; §126→§127 section correction — closes §60.10 item 4); R-51.11 §12.6 (job 51 stale-consequence cross-ref registered v2.5 patch — closes §60.10 item 5). Document header v3.18.3 → v3.18.4. compliance-officer + security-engineer.*
+
+---
+
+## R-52 · Admin Reporting Pipeline MV Refresh Stale Recovery
+
+**Classification:** P2 (escalates to P1 if > 48h stale) · Operational · devops-lead primary
+**Trigger:** AL-ADMIN-RPT-01, AL-ADMIN-RPT-02, AL-ADMIN-RPT-03, or AL-ADMIN-RPT-04 fires
+**Version:** v1.0 · 2026-06-29
+**Owner:** devops-lead + compliance-officer
+**Review:** After every activation; minimum annual. Next: June 2027 or first activation.
+
+> **Critical characteristic — no IC PAM elevation required.** `REFRESH MATERIALIZED VIEW CONCURRENTLY` under `form_system` role does not modify the HMAC audit chain. This is a routine operational recovery, not a compliance-chain incident. **Stale-consequence is product degradation, not compliance breach:** the Admin Dashboard stale banner becomes visible to tenant admins when any MV exceeds the 26h freshness window (ADMIN-RPT-SLO-01). The underlying `audit_log` HMAC chain, SOC 2 controls, and GDPR obligations are unaffected. P1 escalation is at devops-lead discretion if any single view exceeds 48h stale (two consecutive missed nightly runs).
+
+> **Distinction from R-49/R-50/R-51:** Those runbooks cover monitoring-control failures (missing T0-Alpha/Beta/Gamma detection) requiring IC DEC-030 stale chain events and PAM elevation. R-52 covers a nightly reporting pipeline freshness gap — there are no save-protocol, WAU-decline, or champion-engagement detection obligations at risk. The Admin Dashboard is an HR-facing informational view with a k-anonymity guard; staleness is visible to the tenant admin via a banner and is self-healing on next successful pg_cron run.
+
+---
+
+### R-52.1 Trigger Conditions
+
+This runbook activates when `pg-cron-health-monitor` fires **AL-ADMIN-RPT-01**, **AL-ADMIN-RPT-02**, **AL-ADMIN-RPT-03**, or **AL-ADMIN-RPT-04** (see `docs/OBSERVABILITY.md §62.4`):
+
+| Alert | Job | View | Condition | PagerDuty |
+|---|---|---|---|---|
+| **AL-ADMIN-RPT-01** | 52 · `admin_wellness_mv_refresh` | `tenant_wellness_summary_v2` | No `system.admin_mv_refreshed` with `view_name = 'tenant_wellness_summary_v2'` in `audit_log_events` for > 26h | P2, `form-devops`, dedup `admin-rpt-wellness-stale` |
+| **AL-ADMIN-RPT-02** | 53 · `admin_engagement_mv_refresh` | `tenant_engagement_summary` | No `system.admin_mv_refreshed` with `view_name = 'tenant_engagement_summary'` for > 26h | P2, `form-devops`, dedup `admin-rpt-engagement-stale` |
+| **AL-ADMIN-RPT-03** | 54 · `admin_feature_adoption_mv_refresh` | `tenant_feature_adoption` | No `system.admin_mv_refreshed` with `view_name = 'tenant_feature_adoption'` for > 26h | P2, `form-devops`, dedup `admin-rpt-feature-stale` |
+| **AL-ADMIN-RPT-04** | 55 · `admin_cohort_breakdown_mv_refresh` | `tenant_cohort_breakdown` | No `system.admin_mv_refreshed` with `view_name = 'tenant_cohort_breakdown'` for > 26h | P2, `form-devops`, dedup `admin-rpt-cohort-stale` |
+
+**Multiple alerts may fire simultaneously** if the pg_cron scheduler itself fails (H1) or a Supabase maintenance window overlaps the 02:15–03:00 UTC window (H3). Treat all four alerts as a single incident with shared root cause in that case.
+
+**Auto-resolve:** Each alert auto-resolves on the next successful `system.admin_mv_refreshed` emission for the matching `view_name`.
+
+---
+
+### R-52.2 Severity Classification
+
+| Severity | Condition |
+|---|---|
+| **P2** | Any single alert fires; stale window ≤ 48h |
+| **P2 → P1 escalation** | Any view stale > 48h (two consecutive missed nightly runs); devops-lead discretion |
+| **P2 co-active R-03** | R-52-C4 (peer job health) shows all other nightly jobs also stale → Supabase infrastructure event probable; activate R-03 in parallel |
+
+**Severity rationale:** ENTERPRISE.md §"Hard commitments" does not include an admin dashboard refresh SLA (only uptime, P0/P1/P2 response SLAs, and data residency). The stale banner is visible to tenant admins immediately — FORM is not the sole detection surface. A P1 would be warranted only if admin-dashboard staleness directly violated an MSA obligation (it does not). The P2 → P1 escalation path (> 48h stale) is preserved at devops-lead discretion.
+
+---
+
+### R-52.3 Immediate Actions (T+0 to T+30 min)
+
+**Step 1 — Acknowledge PagerDuty and determine scope:**
+
+Acknowledge the firing alert(s). Note which `view_name`(s) are stale and whether multiple alerts fired simultaneously — this discriminates H1/H2/H3 from H4 (see §R-52.4).
+
+**Step 2 — Run scope queries R-52-C1 through R-52-C5:**
+
+**R-52-C1 — Staleness in hours for each view:**
+```sql
+SELECT
+  v.view_name,
+  MAX(ale.created_at)                                              AS last_refreshed_at,
+  NOW() - MAX(ale.created_at)                                     AS stale_window,
+  EXTRACT(EPOCH FROM (NOW() - MAX(ale.created_at))) / 3600        AS stale_hours
+FROM (
+  VALUES
+    ('tenant_wellness_summary_v2'),
+    ('tenant_engagement_summary'),
+    ('tenant_feature_adoption'),
+    ('tenant_cohort_breakdown')
+) AS v(view_name)
+LEFT JOIN audit_log_events ale
+  ON ale.event_type = 'system.admin_mv_refreshed'
+  AND ale.payload->>'view_name' = v.view_name
+GROUP BY v.view_name
+ORDER BY stale_hours DESC NULLS FIRST;
+-- stale_hours > 26: confirms trigger is valid (ADMIN-RPT-SLO-01 breach)
+-- stale_hours > 48: two consecutive missed nightly runs — P2 → P1 escalation at devops-lead discretion
+-- NULL last_refreshed_at: event never emitted for that view (new deployment or AUDIT_LOG_SCHEMA.md
+--   registration not yet deployed)
+-- Privacy: view_name is a string literal enum — not a tenant identifier
+```
+
+**R-52-C2 — Last successful `system.admin_mv_refreshed` timestamp and k-anonymity guard status per view:**
+```sql
+SELECT
+  payload->>'view_name'               AS view_name,
+  created_at                          AS last_refreshed_at,
+  (payload->>'suppressed_cell_count')::INT AS suppressed_cell_count,
+  (payload->>'tenant_row_count')::INT      AS tenant_row_count,
+  (payload->>'refresh_duration_ms')::INT   AS refresh_duration_ms_last
+FROM audit_log_events
+WHERE event_type = 'system.admin_mv_refreshed'
+ORDER BY created_at DESC
+LIMIT 8;
+-- One row per view from the last successful nightly window
+-- suppressed_cell_count IS NULL: k-anonymity guard did not complete (schema violation)
+-- suppressed_cell_count = 0: all cohorts above k-floor on last run (normal)
+-- suppressed_cell_count >= 1: some cohorts suppressed on last run (normal, privacy floor active)
+-- Privacy: suppressed_cell_count is an aggregate integer only — no cohort identity
+```
+
+**R-52-C3 — Admin Dashboard stale-banner active status (for each view):**
+```sql
+-- Confirm which views are currently beyond the 26h freshness window
+SELECT
+  payload->>'view_name'  AS view_name,
+  MAX(created_at)         AS last_refreshed_at,
+  CASE
+    WHEN NOW() - MAX(created_at) > INTERVAL '26 hours' THEN 'STALE BANNER ACTIVE'
+    ELSE 'Fresh'
+  END                     AS dashboard_status
+FROM audit_log_events
+WHERE event_type = 'system.admin_mv_refreshed'
+GROUP BY payload->>'view_name';
+-- STALE BANNER ACTIVE: tenant admins can see the stale data indicator on that view's panel
+-- Fresh: < 26h since last refresh — banner not shown for this view
+```
+
+**R-52-C4 — Peer job health (H4 Supabase / H1 scheduler discriminator):**
+```sql
+SELECT
+  jobname,
+  MAX(start_time)                                           AS last_run,
+  NOW() - MAX(start_time)                                   AS since_last_run,
+  EXTRACT(EPOCH FROM (NOW() - MAX(start_time))) / 3600      AS hours_since_run
+FROM pg_cron.job_run_details
+WHERE jobname IN (
+  'pilot_activation_monitor',
+  'champion_login_monitor',
+  'wau_decline_monitor',
+  'renewal_notice_check',
+  'white_label_cert_check'
+)
+GROUP BY jobname;
+-- All peer jobs stale (hours_since_run >> expected cadence): H4 Supabase outage → activate R-03 in parallel
+-- Only admin_*_mv_refresh jobs stale: H1/H2/H3 local failure → continue R-52 scope queries
+-- Note: peer jobs are daily or weekly — use hours_since_run > 26 for daily and > 200 for wau_decline_monitor
+```
+
+**R-52-C5 — k-anonymity guard last run health for ADMIN-RPT-SLO-02 (wellness + cohort views):**
+```sql
+-- Check whether the last completed refresh for tenant_wellness_summary_v2 and
+-- tenant_cohort_breakdown included a non-null suppressed_cell_count (SLO-02 health)
+SELECT
+  payload->>'view_name'               AS view_name,
+  created_at                          AS last_run_at,
+  (payload->>'suppressed_cell_count') AS suppressed_cell_count_raw,
+  CASE
+    WHEN (payload->>'suppressed_cell_count') IS NULL THEN 'SLO-02 VIOLATION (null)'
+    ELSE 'SLO-02 OK'
+  END AS slo02_status
+FROM audit_log_events
+WHERE event_type = 'system.admin_mv_refreshed'
+  AND payload->>'view_name' IN ('tenant_wellness_summary_v2', 'tenant_cohort_breakdown')
+ORDER BY created_at DESC
+LIMIT 4;
+-- SLO-02 VIOLATION (null): k-anonymity guard did not emit — schema error in job SQL or Worker validation failed
+-- SLO-02 OK: k-anonymity guard ran to completion (either 0 or positive suppressed count)
+-- Privacy: suppressed_cell_count is an aggregate integer — no cohort name or user identity derivable
+```
+
+**Step 3 — Identify root cause from §R-52.4 and proceed to manual recovery (§R-52.6):**
+
+No DEC-030 stale chain events are emitted for R-52 activations. No IC PAM elevation is required. Proceed directly to §R-52.6.
+
+---
+
+### R-52.4 Root Cause Hypotheses
+
+| Hypothesis | Discriminator | Likely indicator |
+|---|---|---|
+| **H1** — pg_cron scheduler failure (job deleted, disabled, or not registered) | `SELECT jobid, jobname, schedule, active FROM pg_cron.job WHERE jobname LIKE 'admin_%_mv_refresh';` returns no rows (deleted), `active = false` (disabled), or missing rows | Human error during migration; accidental job drop; migration that did not re-register the jobs after a `pg_cron` schema reset |
+| **H2** — `REFRESH CONCURRENTLY` lock contention from a long-running query | Job is registered and active (H1 negative); peer jobs healthy (H4 negative); `pg_cron.job_run_details` shows the job started but returned a non-zero exit code or ran longer than expected | A long-running `SELECT` on the MV or underlying tables acquired an `AccessShareLock` that blocked the `REFRESH CONCURRENTLY` `ExclusiveLock`; common during heavy Admin Dashboard read traffic or during a large migration touching the MV's source tables |
+| **H3** — Supabase maintenance window overlapping nightly 02:15–03:00 UTC run | R-52-C4 shows some peer jobs also have missed runs around the same time; Supabase status page shows maintenance activity in that window | Supabase planned maintenance may pause pg_cron execution without firing a `system.cron_job_stale` alert if the pg_cron health monitor itself was also paused; check Supabase status page and `pg_cron.job_run_details` for the maintenance window times |
+| **H4** — Supabase infrastructure outage | R-52-C4 shows all peer jobs stale (not just admin MV refresh jobs); devops-lead Slack or PagerDuty shows platform-wide outage | Activate R-03 in parallel immediately; R-52 recovery self-resolves once Supabase recovers |
+
+**H1 resolution:** Re-register missing/disabled jobs. Canonical spec in `docs/OBSERVABILITY.md §62.5`. Jobs 52–55 use `SECURITY DEFINER`; `form_api` is REVOKED from all four MV relations. Manual trigger after re-registration: `SELECT cron.run_job('admin_wellness_mv_refresh');` (and for 53–55). Verify `system.admin_mv_refreshed` emitted for each view within 2 min.
+
+**H2 resolution:** Identify and terminate (or wait for completion of) the blocking long-running query via `SELECT pid, query, wait_event_type, wait_event, now() - pg_stat_activity.query_start AS duration FROM pg_stat_activity WHERE state = 'active' ORDER BY duration DESC LIMIT 10;`. After lock released, manually trigger the affected job(s). If lock contention is chronic, consider rescheduling the MV refresh jobs to a lower-traffic window (coordinate with devops-lead and platform-engineer).
+
+**H3 resolution:** No active intervention required. Confirm Supabase maintenance window has ended; manually trigger all four jobs in staggered order (15-min apart to preserve ADMIN-MV-CHAIN-01 advisory ordering); verify all four `system.admin_mv_refreshed` events emitted. File a note in `#devops` noting maintenance window vs. job schedule conflict for future consideration.
+
+**H4 resolution:** R-03 owns Supabase outage recovery. R-52 activates R-03 in parallel on H4 discrimination. Admin MV refresh jobs will auto-resume once Supabase recovers.
+
+---
+
+### R-52.5 P1 Escalation Path (> 48h Stale)
+
+When R-52-C1 shows `stale_hours > 48` for any view (two consecutive missed nightly runs):
+
+1. Escalate the PagerDuty alert from P2 to P1 at devops-lead discretion.
+2. Post to `#devops` and `#enterprise-ops`:
+   ```
+   [R-52 P1 ESCALATION] Admin MV refresh stale > 48h for view(s): {view_names}.
+   Tenant admins see stale banner. Root cause under investigation. ETA: {eta}.
+   ```
+3. Notify customer-success: tenant admins of any active enterprise tenant may report a stale dashboard — CSM to prepare a brief: *"Admin Dashboard data is temporarily delayed. Your underlying data is secure and unaffected. We are resolving this now and expect refresh within {eta}."*
+4. Proceed to §R-52.6 recovery immediately.
+
+**No MSA SLA breach applies** — ENTERPRISE_SLA.md §4 and §5 do not reference Admin Dashboard refresh cadence as a hard-SLA obligation. The notification to customer-success is proactive service quality, not contractual.
+
+---
+
+### R-52.6 Recovery Steps
+
+1. Identify root cause from §R-52.4 (H1/H2/H3/H4).
+2. Fix root cause per §R-52.4 resolution procedures.
+3. Manually trigger all stale jobs in staggered order under `form_system` role (**no PAM elevation required**):
+   ```sql
+   -- Trigger in schedule order to preserve ADMIN-MV-CHAIN-01 advisory ordering
+   SELECT cron.run_job('admin_wellness_mv_refresh');
+   -- Wait ~2 min, then:
+   SELECT cron.run_job('admin_engagement_mv_refresh');
+   -- Wait ~2 min, then:
+   SELECT cron.run_job('admin_feature_adoption_mv_refresh');
+   -- Wait ~2 min, then:
+   SELECT cron.run_job('admin_cohort_breakdown_mv_refresh');
+   ```
+4. Confirm all four `system.admin_mv_refreshed` events emitted:
+   ```sql
+   SELECT payload->>'view_name' AS view_name, created_at
+   FROM audit_log_events
+   WHERE event_type = 'system.admin_mv_refreshed'
+   ORDER BY created_at DESC
+   LIMIT 4;
+   ```
+   All four views must appear with `created_at` within the last 10 minutes.
+5. Verify k-anonymity guard ran (ADMIN-RPT-SLO-02):
+   ```sql
+   SELECT payload->>'view_name', payload->>'suppressed_cell_count', created_at
+   FROM audit_log_events
+   WHERE event_type = 'system.admin_mv_refreshed'
+   ORDER BY created_at DESC LIMIT 4;
+   ```
+   `suppressed_cell_count` must be non-null for all four rows.
+6. Confirm Admin Dashboard stale banner clears:
+   ```sql
+   SELECT payload->>'view_name', MAX(created_at) AS last_refreshed
+   FROM audit_log_events
+   WHERE event_type = 'system.admin_mv_refreshed'
+   GROUP BY payload->>'view_name';
+   ```
+   All four `last_refreshed` values must be within the last 30 min.
+7. PagerDuty alerts (AL-ADMIN-RPT-01..04) auto-resolve on `system.admin_mv_refreshed` emission per `view_name`. Confirm all firing alerts have resolved.
+8. Post resolution note to `#devops`:
+   ```
+   [R-52 RESOLVED] Admin MV refresh jobs (52–55) restored. Root cause: {H1/H2/H3/H4}.
+   All four views refreshed. Stale banners cleared. Duration: {stale_hours}h.
+   ```
+9. If stale window exceeded 48h (P1 escalation): notify customer-success to close the tenant communication loop.
+
+---
+
+### R-52.7 Communication Templates
+
+**IC Slack on detection (post to `#devops`):**
+```
+[R-52 ACTIVATED] admin_*_mv_refresh (jobs 52–55) — one or more MV refresh jobs stale.
+Alert(s): {AL-ADMIN-RPT-01/02/03/04} | Stale views: {view_names}
+Stale window: {stale_hours}h | Tenant banner active: yes
+Scope queries running. PD: {pd_incident_url}
+```
+
+**Customer-success notification (if > 48h stale — P1 escalation):**
+```
+[Admin Dashboard Delay] Admin reporting pipeline stale {stale_hours}h for {view_name(s)}.
+Tenant admins see stale-data banner. No compliance breach; underlying data unaffected.
+CSM brief: "Admin Dashboard data temporarily delayed. Resolving now, ETA {eta}."
+```
+
+**Post-resolution Slack (`#devops`):**
+```
+[R-52 RESOLVED] Admin MV refresh jobs (52–55) restored.
+Root cause: {H1/H2/H3/H4} | Stale: {stale_hours}h | Views affected: {count}/4
+k-anonymity guard status: {suppressed_cell_counts on recovery run}
+Next nightly run: ~02:15–03:00 UTC tomorrow.
+```
+
+---
+
+### R-52.8 SOC 2 Evidence
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | Path |
+|---|---|---|---|---|---|
+| **ADMIN-RPT-E-001** | C1.1 / P4.1 / CC7.2 | Annual export of `pg_cron.job_run_details` run history for jobs 52–55 plus `system.admin_mv_refreshed` event count per `view_name` for the observation year; confirms pipeline operated without > 26h gap for any view; `suppressed_cell_count` summary confirms k-anonymity guard ran on every refresh | Annual | 3 yr | `enterprise/admin-reporting/ADMIN-RPT-E-001-{YYYY}.json` |
+
+**R-52 is not a SOC 2 evidence generation trigger.** Unlike R-49/R-50/R-51, an R-52 activation does not require filing a per-incident IC narrative artefact — the stale-window consequence is product degradation (stale dashboard banner), not a monitoring-layer compliance gap (no T0-Alpha/Beta/Gamma detection obligations are affected). ADMIN-RPT-E-001 is collected annually (not per-incident) and documents the overall pipeline health for the observation year. If an R-52 activation results in a stale window that appears in ADMIN-RPT-E-001, the annual narrative notes the gap and its resolution. If the stale window results in a tenant escalation, the customer-success communication is filed separately in the enterprise account record.
+
+---
+
+### R-52.9 Cross-References
+
+- `docs/OBSERVABILITY.md §62` — Admin Reporting Pipeline Observability (canonical spec; §62.2 ADMIN-RPT-SLO-01/02; §62.4 AL-ADMIN-RPT-01..04 alert rules; §62.5 job 52–55 DDL specs; §62.6 DEC-030 event schema; §62.7 ADMIN-RPT-E-001; §62.8 dashboard spec; §62.9 implementation checklist item 4 → [x] Done 2026-06-29)
+- `docs/OBSERVABILITY.md §12.6` — pg_cron canonical registry (jobs 52–55)
+- `docs/DATA_MODEL.md §17` — Admin Dashboard MV DDL specs (`tenant_wellness_summary_v2`, `tenant_engagement_summary`, `tenant_feature_adoption`, `tenant_cohort_breakdown`); k-anonymity column names (`k_anonymity_suppressed` for wellness; `meets_anonymity_floor` for cohort_breakdown — verify exact names before deploy per §62.9 item 1)
+- `docs/SOC2_READINESS.md §130` — ADMIN-RPT-E-001 artefact registration (C1.1/P4.1/CC7.2, annual, 3yr)
+- `docs/AUDIT_LOG_SCHEMA.md v2.60` — `system.admin_mv_refreshed` (LOW/1yr) event registration + ADMIN-MV-CHAIN-01 advisory invariant + Zod v2 `AdminMvRefreshedSchema`
+- `admin-dashboard.html` — Admin Dashboard stale-data banner UI (visible to tenant admins when any MV > 26h stale per §62.8 spec)
+- R-03 (Infrastructure Outage — H4 co-activation on Supabase outage)
+- R-49 (Pilot Activation Monitor Stale — structural peer; daily monitoring job stale recovery)
+- R-50 (Champion Login Monitor Stale — structural peer)
+- R-51 (WAU Decline Monitor Stale — structural peer)
+- DEC-030
+
+---
+
+### R-52.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy four pg_cron jobs (52–55) per `docs/OBSERVABILITY.md §62.5`. SECURITY DEFINER; `form_api` REVOKED from all four MV relations. Integration tests: (a) seed a tenant with cohort size < k-floor in `tenant_cohort_breakdown`; confirm `suppressed_cell_count ≥ 1` in `system.admin_mv_refreshed` after refresh; (b) seed a healthy cohort ≥ k-floor; confirm `suppressed_cell_count = 0`; (c) confirm all four events appear in staggered schedule order within a test nightly window (ADMIN-MV-CHAIN-01 advisory). Column name verification against DATA_MODEL §17 DDL required before deploy (§62.9 item 1 — `k_anonymity_suppressed` for wellness; `meets_anonymity_floor` for cohort_breakdown). | devops-lead + platform-engineer | **P0** | M7 | [ ] |
+| 2 | Configure AL-ADMIN-RPT-01..04 PagerDuty routing rules (four rules, one per job): `pg-cron-health-monitor` routes `system.cron_job_stale WHERE job_name = 'admin_{wellness/engagement/feature_adoption/cohort_breakdown}_mv_refresh'` → service `form-devops` P2; dedup keys per §62.4; auto-resolve on next matching `system.admin_mv_refreshed` event per `view_name`. | devops-lead | **P1** | M7 | [ ] |
+| 3 | Create `enterprise/admin-reporting/` subfolder on Cloudflare R2 `form-soc2-evidence` bucket; confirm `r2:form-api` has NO ACCESS. Register ADMIN-RPT-E-001 template in `compliance/evidence/enterprise/admin-reporting/` and add Vanta mirror entry (C1.1/P4.1/CC7.2, annual, 3yr). | compliance-officer | **P1** | M7 | [ ] |
+| 4 | Build "Admin Reporting Pipeline Health" dashboard panel group (§62.8): `form_admin` + `devops-lead` gate; all tenant-facing roles excluded; ADMIN-RPT-SLO-01 SLO gauges (4× per view); suppressed_cell_count sparklines for wellness + cohort views. | platform-engineer + design-craft | **P2** | M8 | [ ] |
+
+---
+
+*v1.0 (2026-06-29): R-52 Admin Reporting Pipeline MV Refresh Stale Recovery — fifty-second runbook. Closes `docs/OBSERVABILITY.md §62.9` item 4 (P1/M7 — author R-52 stale recovery runbook). Structural distinction from R-49/R-50/R-51: **no IC DEC-030 stale chain events** (MV refresh does not modify the HMAC audit chain; no PAM elevation required); **P2 not P1** (per DATA_MODEL §17 canonical spec; stale-consequence is product degradation, not compliance breach); **four jobs (52–55) covering four views** rather than one job covering one monitoring obligation; **H3 is Supabase maintenance-window overlap** (unique to a 02:15–03:00 UTC nightly batch window rather than an always-on monitor). Five scope queries: R-52-C1 (staleness in hours per view from `audit_log_events` — thresholds at 26h trigger, 48h P1 escalation); R-52-C2 (last successful `system.admin_mv_refreshed` per view with k-anonymity guard status); R-52-C3 (Admin Dashboard stale-banner active status per view); R-52-C4 (peer job health — H4 Supabase discriminator); R-52-C5 (k-anonymity guard last run health for ADMIN-RPT-SLO-02 — `suppressed_cell_count` non-null check for wellness + cohort views). Three root causes H1–H3 (plus H4 Supabase via R-03): H1 (job deleted/disabled — re-register from OBSERVABILITY §62.5); H2 (REFRESH CONCURRENTLY lock contention — terminate blocking query, manual trigger); H3 (Supabase maintenance window overlapping 02:15–03:00 UTC nightly window — wait for maintenance to end, manual trigger in staggered order). Manual recovery: `SELECT cron.run_job(...)` for each job in schedule order (no PAM elevation); verify all four `system.admin_mv_refreshed` events emitted; confirm `suppressed_cell_count` non-null on each. Communication templates: IC Slack on detection; customer-success notification (> 48h stale only); post-resolution Slack. SOC 2 evidence: ADMIN-RPT-E-001 (C1.1/P4.1/CC7.2, annual, 3yr — `docs/SOC2_READINESS.md §130`; collected annually, not per-incident). Four-item implementation checklist: P0/M7 (deploy jobs 52–55 + integration tests); P1/M7 (PagerDuty routing rules); P1/M7 (R2 folder + ADMIN-RPT-E-001 Vanta entry); P2/M8 (Admin Reporting Pipeline Health dashboard). Privacy floor throughout: no employee `user_id`, name, email, coaching session content, health value, or GDPR Art. 9 special-category data in any query result surfaced in this runbook; R-52-C1/C2/C3/C5 surface only aggregate counts, timing integers, and `view_name` string literals — no tenant identity; R-52-C4 surfaces only job names and timestamps. Cross-references: `docs/OBSERVABILITY.md §62`; `docs/OBSERVABILITY.md §12.6`; `docs/DATA_MODEL.md §17`; `docs/SOC2_READINESS.md §130`; `docs/AUDIT_LOG_SCHEMA.md v2.60`; `admin-dashboard.html`; R-03; R-49; R-50; R-51; DEC-030. Owner: devops-lead + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-29 · Owner: devops-lead + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**

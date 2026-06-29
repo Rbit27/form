@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [10.15.0] — 2026-06-29
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md` v2.60 — New section `§Admin Reporting Pipeline MV Refresh events`: `system.admin_mv_refreshed` (LOW/1yr, C1.1/P4.1/CC7.2) with `AdminMvRefreshedSchema` Zod v2, ADMIN-MV-CHAIN-01 advisory ordering invariant, privacy invariants, auditor narratives. Closes `OBSERVABILITY.md §62.9` item 2.
+- `docs/INCIDENT_RESPONSE.md` R-52 — Admin Dashboard MV stale recovery runbook (P2; pg_cron jobs 52–55; no DEC-030 stale chain; no PAM elevation; H1/H2/H3 root causes; scope queries R-52-C1..R-52-C5; ADMIN-RPT-E-001 SOC 2 evidence reference). Closes `OBSERVABILITY.md §62.9` item 4.
+- `docs/SOC2_READINESS.md` v3.55.0 §130 — ADMIN-RPT-E-001 artefact registration (C1.1/P4.1/CC7.2, annual, 3yr); `enterprise/admin-reporting/` R2 subfolder added to §80.3; Vanta mirror entry added to §80.4; §79.4 row added (count 99 → 100). Closes `OBSERVABILITY.md §62.9` item 3.
+
+### Changed
+- `docs/OBSERVABILITY.md` — §62.9 items 2, 3, 4 closed (`[ ]` → `[x] Done — 2026-06-29`); §62.1 R-52 pending note resolved; §62.4 AL-ADMIN-RPT-01 runbook column updated; §62.6 schema comment updated; §62.7 Vanta cell updated; §12.6 patch note updated.
+- `VERSION` — 10.14.0 → 10.15.0.
+
 ## [10.14.0] — 2026-06-29
 
 ### Added

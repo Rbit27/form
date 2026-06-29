@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.53.0
+# FORM · SOC 2 Type II Readiness v3.55.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -32914,3 +32914,80 @@ One row added to the §79.4 master evidence table (count 98 → 99):
 ---
 
 *v3.54.0 (2026-06-29): §129 Cross-Reference Patch — COST_MODEL §47.8 item 5 (GRAD-E-001 · CC3.2 / CC7.2 / A1.1). Closes P0/M5 documentation obligation created when COST_MODEL §47 (v2.21.0, 2026-06-29, DEC-084) defined Pilot Graduation Economics and specified one SOC 2 evidence artefact (GRAD-E-001) without registering it in SOC2_READINESS.md. One artefact registered (count 98 → 99): GRAD-E-001 (CC3.2/CC7.2/A1.1, annual Q4, 3yr — annual export of `enterprise.pilot_graduated` + `enterprise.pilot_saved` + `enterprise.contract_activated` DEC-030 events; columns: `pilot_id`, `graduation_date`, `graduation_path`, `activation_rate_at_graduation`, `graduation_tier`, `activation_bucket`, `acv_at_graduation_usd`, `contract_activation_date`, `days_pilot_to_activation`; GRAD-CHAIN-01/02 HMAC continuity verified per HMAC-VERIFY-ALGO-001; zero-event years filed as affirmative attestation; privacy: `pilot_id` UUIDs + aggregate NUMERIC only; no employee PII or GDPR Art. 9 data; `form_api` REVOKED). §80.3 `pilots/graduation/` R2 subfolder added (WORM Object Lock Governance 3yr; `form_api` NO ACCESS; `form_system` role only). §80.4 Vanta mirror list: one new entry for GRAD-E-001 (annual Q4 from first graduation year; CC3.2/CC7.2/A1.1; privacy: pilot_id UUIDs + aggregate NUMERIC only). Three cross-reference obligations confirmed closed (§129.5): AUDIT_LOG_SCHEMA.md v2.59 §Enterprise Pilot Graduation events (COST_MODEL §47.8 item 1); DEC-084 DECISION_LOG.md (item 6); this §129 (item 5). Three implementation checklist items: P0/M5 (R2 folder creation), P1/Q4 (first GRAD-E-001 filing), P2/M+1 (calendar update). Privacy floor: all §129 content is DEC-030 event metadata and aggregate NUMERIC rates — no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data; `form_api` REVOKED from all source tables; `form_system` read-only for export. Document header v3.53.0 → v3.54.0. Owner: compliance-officer. Cross-references: `docs/COST_MODEL.md §47.7` (GRAD-E-001 primary definition — artefact description, criteria CC3.2/CC7.2/A1.1, 3yr retention, R2 path, privacy floor); `docs/COST_MODEL.md §47.8 item 5` (obligation source — 🟢 closed this patch); `docs/COST_MODEL.md §47.6` (two §47 DEC-030 events — `enterprise.pilot_graduated` HIGH/7yr + `enterprise.contract_activated` STANDARD/3yr); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` (v2.59, 2026-06-29 — two events with GRAD-CHAIN-01/02 invariants, Zod v2 schemas, CC3.2/CC7.2/CC9.2/A1.1 auditor narratives); `docs/DECISION_LOG.md DEC-084` (formal adoption record — 2026-06-29, Pilot Graduation Economics & First-Year ARR Recognition); `docs/SOC2_READINESS.md §126.1` (SAVE-E-001 companion — same pilot lifecycle domain; `pilots/save-protocol/` subfolder for save-path artefacts); `docs/SOC2_READINESS.md §80.3` (`pilots/graduation/` subfolder added after `pilots/wau-decline/`); `docs/SOC2_READINESS.md §80.4` (GRAD-E-001 Vanta mirror entry added after WAU-DECLINE-STALE-E-001); `docs/DATA_MODEL.md §48` (future obligation — `graduated_from_pilot_id` FK column on `enterprise_contracts`, migration 0089; COST_MODEL §47.8 item 8, P1/M6); `docs/DECISION_LOG.md DEC-030` (HMAC-chained audit log — GRAD-CHAIN-01/02 ordering invariant basis).*
+
+---
+
+## §130 · Cross-Reference Patch — Admin Reporting Pipeline Evidence Registration (ADMIN-RPT-E-001 · C1.1 / P4.1 / CC7.2)
+
+**Date:** 2026-06-29  **Author:** compliance-officer (cloud worker)  **Trigger:** `docs/OBSERVABILITY.md §62.9 item 3` (P1/M7, open since 2026-06-29 §62 authoring) required registering one SOC 2 evidence artefact (ADMIN-RPT-E-001), creating a new R2 subfolder (`enterprise/admin-reporting/`), and adding a Vanta mirror entry.
+
+---
+
+### §130.1 Obligation Closed
+
+This section closes **OBSERVABILITY §62.9 item 3** (P1/M7) — the documentation registration obligation created when `docs/OBSERVABILITY.md §62` (2026-06-29) defined the Admin Reporting Pipeline monitoring and specified one SOC 2 evidence artefact (ADMIN-RPT-E-001) without registering it in SOC2_READINESS.md. One artefact registered (count 99 → 100); `enterprise/admin-reporting/` R2 subfolder added to §80.3; one Vanta mirror entry added to §80.4.
+
+---
+
+### §130.2 ADMIN-RPT-E-001 Artefact
+
+**ADMIN-RPT-E-001** — Annual export of `pg_cron.job_run_details` run history for jobs 52–55 (Admin Dashboard MV refresh jobs) plus `system.admin_mv_refreshed` DEC-030 HMAC-chained event count per `view_name` for the observation year. Confirms ADMIN-RPT-SLO-01 compliance (≤ 26h freshness gap per view per C1.1/P4.1); `suppressed_cell_count` summary confirms ADMIN-RPT-SLO-02 (k-anonymity guard active throughout year). TSC criteria: C1.1 / P4.1 / CC7.2. Retention: 3 years. Collection: annual (Q4) from first full year with pg_cron jobs 52–55 in production. Owner: compliance-officer + devops-lead. Path: `enterprise/admin-reporting/ADMIN-RPT-E-001-{YYYY}.json`. Zero-event years filed as affirmative attestation.
+
+**Contents of ADMIN-RPT-E-001 artefact:**
+
+1. `observation_year` (INT) — calendar year of the observation period
+2. `job_run_summary` — array of 4 entries (one per `view_name`): `job_name` (TEXT), `total_runs` (INT), `successful_runs` (INT), `max_gap_hours` (NUMERIC) — max gap between consecutive successful runs; must be ≤ 26h per ADMIN-RPT-SLO-01
+3. `mv_event_summary` — array of 4 entries (one per `view_name`): `view_name` (TEXT), `event_count` (INT), `suppressed_cell_count_total` (INT) — sum of `suppressed_cell_count` across all `system.admin_mv_refreshed` events for the year; non-null per ADMIN-RPT-SLO-02
+4. `slo_01_compliant` (BOOLEAN) — `true` when all 4 views have `max_gap_hours ≤ 26`; otherwise `false` with non-compliant views listed
+5. `slo_02_compliant` (BOOLEAN) — `true` when all 4 `suppressed_cell_count_total` values are non-null; always `true` if ADMIN-RPT-SLO-02 guard was active throughout the year
+6. `hmac_chain_verified` (BOOLEAN) — `true` when HMAC-VERIFY-ALGO-001 chain check passes on all `system.admin_mv_refreshed` events for the year
+
+**Primary definition:** `docs/OBSERVABILITY.md §62.9` (ADMIN-RPT-E-001 SOC 2 evidence mapping — C1.1/P4.1/CC7.2, annual, 3yr). Source events: `system.admin_mv_refreshed` (LOW/1yr) in `docs/AUDIT_LOG_SCHEMA.md §Admin Reporting Pipeline MV Refresh events` (v2.60, 2026-06-29). ADMIN-MV-CHAIN-01 advisory ordering invariant (within-night ordering; not HTTP-422-enforced). Stale recovery runbook: `docs/INCIDENT_RESPONSE.md R-52`.
+
+**Privacy floor:** `system.admin_mv_refreshed` carries only operational metadata (`view_name`, `tenant_row_count`, `suppressed_cell_count`, `refresh_duration_ms`) — no individual employee `user_id`, name, email, session data, or GDPR Art. 9 special-category health value is included. `tenant_row_count` is the count of tenant rows in the MV (org-level aggregate). `form_api` REVOKED from all four Admin Dashboard MV relations per `docs/OBSERVABILITY.md §62.6`. HR `tenant_manager` role sees only aggregated MV summaries — zero individual employee access.
+
+---
+
+### §130.3 §80.3 R2 Folder Addition
+
+`enterprise/admin-reporting/` subfolder added to the `compliance/evidence/` folder structure in §80.3. Covers ADMIN-RPT-E-001 (annual; 3yr WORM Object Lock Governance; `form_api` NO ACCESS; `form_system` role only).
+
+---
+
+### §130.4 §80.4 Vanta Mirror Addition
+
+ADMIN-RPT-E-001 added to the §80.4 Vanta mirror list. Upload cadence: annually — from Q4 of first full year with pg_cron jobs 52–55 in production. Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. C1.1 / P4.1 / CC7.2 criteria tags applied. Privacy flag: operational pg_cron metadata + `system.admin_mv_refreshed` aggregate counts only; no individual employee PII or GDPR Art. 9 data; Vanta access: compliance-officer + security-engineer only.
+
+---
+
+### §130.5 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| `OBSERVABILITY §62.9 item 3` — ADMIN-RPT-E-001 registration in §79.4 + `enterprise/admin-reporting/` in §80.3 + Vanta entry §80.4 | This section | 🟢 **Done — 2026-06-29 (SOC2_READINESS.md v3.55.0, §130)** |
+| `OBSERVABILITY §62.9 item 2` — `system.admin_mv_refreshed` event in AUDIT_LOG_SCHEMA.md | `AUDIT_LOG_SCHEMA.md §Admin Reporting Pipeline MV Refresh events` v2.60 (2026-06-29) | 🟢 **Done — registered simultaneously** |
+| `OBSERVABILITY §62.9 item 4` — R-52 stale recovery runbook in INCIDENT_RESPONSE.md | `INCIDENT_RESPONSE.md R-52` (2026-06-29) | 🟢 **Done — registered simultaneously** |
+
+---
+
+### §130.6 §79.4 Row Addition
+
+One row added to the §79.4 master evidence table (count 99 → 100):
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|
+| **ADMIN-RPT-E-001** | C1.1, P4.1, CC7.2 | Annual export of `pg_cron.job_run_details` run history for pg_cron jobs 52–55 (Admin Dashboard MV refresh) + `system.admin_mv_refreshed` DEC-030 HMAC-chained event count per `view_name`. Confirms ADMIN-RPT-SLO-01 (≤ 26h freshness gap per view) and ADMIN-RPT-SLO-02 (k-anonymity guard active, `suppressed_cell_count` non-null). ADMIN-MV-CHAIN-01 HMAC continuity verified per HMAC-VERIFY-ALGO-001. Privacy: pg_cron operational metadata + aggregate tenant counts only; no employee PII or Art. 9 data; `form_api` REVOKED from all Admin Dashboard MV relations. | Annual (Q4) | 3 yr | `enterprise/admin-reporting/ADMIN-RPT-E-001-{YYYY}.json` |
+
+---
+
+### §130.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `compliance/evidence/enterprise/admin-reporting/` folder on Cloudflare R2 `form-soc2-evidence` bucket; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). | devops-lead | **P0** | M7 | [ ] |
+| 2 | File first ADMIN-RPT-E-001 artefact after first full year with pg_cron jobs 52–55 in production: (a) export `pg_cron.job_run_details` for jobs `admin_wellness_mv_refresh`, `admin_engagement_mv_refresh`, `admin_feature_adoption_mv_refresh`, `admin_cohort_mv_refresh` for the year; (b) query `system.admin_mv_refreshed` DEC-030 events by `view_name` — count events, sum `suppressed_cell_count`, compute `max_gap_hours`; (c) verify ADMIN-MV-CHAIN-01 continuity (HMAC-VERIFY-ALGO-001); (d) file at `enterprise/admin-reporting/ADMIN-RPT-E-001-{YYYY}.json`; (e) SHA-256 hash; (f) upload to R2 (3yr WORM Object Lock); (g) upload to Vanta (C1.1/P4.1/CC7.2); (h) add to MASTER-INDEX. Privacy check: `tenant_row_count` aggregate + pg_cron operational metadata only; no employee `user_id`. | compliance-officer + devops-lead | **P1** | Q4 of first full year with jobs 52–55 (est. M12+) | [ ] |
+| 3 | Add ADMIN-RPT-E-001 to §79.5 compliance calendar at Month O+12 (first annual filing); confirm §79.5 quarterly calendar does not require ADMIN-RPT-E interim entries (artefact is annual). | compliance-officer | **P2** | Month O+1 calendar review | [ ] |
+
+---
+
+*v3.55.0 (2026-06-29): §130 Cross-Reference Patch — OBSERVABILITY §62.9 item 3 (ADMIN-RPT-E-001 · C1.1 / P4.1 / CC7.2). Closes P1/M7 documentation registration obligation created when `docs/OBSERVABILITY.md §62` (2026-06-29) defined the Admin Reporting Pipeline MV refresh monitoring and specified one SOC 2 evidence artefact (ADMIN-RPT-E-001) without registering it in SOC2_READINESS.md. One artefact registered (count 99 → 100): ADMIN-RPT-E-001 (C1.1/P4.1/CC7.2, annual Q4, 3yr — annual export of `pg_cron.job_run_details` run history for pg_cron jobs 52–55 (Admin Dashboard MV refresh: `tenant_wellness_summary_v2`, `tenant_engagement_summary`, `tenant_feature_adoption`, `tenant_cohort_breakdown`) + `system.admin_mv_refreshed` DEC-030 HMAC-chained event count per `view_name`; confirms ADMIN-RPT-SLO-01 (≤ 26h freshness gap per view, C1.1/P4.1) and ADMIN-RPT-SLO-02 (k-anonymity guard active, `suppressed_cell_count` non-null, P4.1); ADMIN-MV-CHAIN-01 advisory HMAC ordering invariant verified; privacy: pg_cron operational metadata + aggregate `tenant_row_count` only; no individual employee `user_id`, name, email, session, or GDPR Art. 9 health data; `form_api` REVOKED from all Admin Dashboard MV relations; zero-event years filed as affirmative attestation). §80.3 `enterprise/admin-reporting/` R2 subfolder added (WORM Object Lock Governance 3yr; `form_api` NO ACCESS; `form_system` role only). §80.4 Vanta mirror list: one new entry for ADMIN-RPT-E-001 (annual Q4 from first full year with jobs 52–55; C1.1/P4.1/CC7.2; privacy: pg_cron metadata + aggregate counts only). Three cross-reference obligations confirmed closed (§130.5): AUDIT_LOG_SCHEMA.md v2.60 §Admin Reporting Pipeline MV Refresh events (OBSERVABILITY §62.9 item 2); INCIDENT_RESPONSE.md R-52 stale recovery runbook (item 4); this §130 (item 3). Three implementation checklist items: P0/M7 (R2 folder creation), P1/Q4 first filing, P2/M+1 calendar update. Privacy floor: `system.admin_mv_refreshed` carries operational metadata only — `view_name`, aggregate `tenant_row_count`, `suppressed_cell_count`, `refresh_duration_ms`; no individual employee `user_id`, name, email, session, or GDPR Art. 9 health data; `form_api` REVOKED from all Admin Dashboard MV relations; HR `tenant_manager` role sees only aggregated MV summaries. Document header v3.53.0 → v3.55.0 (v3.54.0 applied by §129 — 2026-06-29; both bumps applied in this pass as §129 header update was deferred). Owner: compliance-officer. Cross-references: `docs/OBSERVABILITY.md §62.9 item 3` (obligation source — 🟢 closed this patch); `docs/OBSERVABILITY.md §62` (Admin Reporting Pipeline specification — pg_cron jobs 52–55, four MVs, ADMIN-RPT-SLO-01/02, k-anonymity guard via `assert_k_anonymity()`); `docs/AUDIT_LOG_SCHEMA.md §Admin Reporting Pipeline MV Refresh events` (v2.60, 2026-06-29 — `system.admin_mv_refreshed` LOW/1yr, `AdminMvRefreshedSchema` Zod v2, ADMIN-MV-CHAIN-01 advisory invariant, C1.1/P4.1/CC7.2 auditor narratives); `docs/INCIDENT_RESPONSE.md R-52` (Admin Dashboard MV stale recovery runbook — P2, no DEC-030 stale chain pair, no PAM elevation, H1–H3 root causes, scope queries R-52-C1 through R-52-C5, ADMIN-RPT-E-001 SOC 2 evidence reference); `docs/SOC2_READINESS.md §79.4` (§130 row insertion — ADMIN-RPT-E-001 after GRAD-E-001, count 99 → 100); `docs/SOC2_READINESS.md §80.3` (`enterprise/admin-reporting/` subfolder added); `docs/SOC2_READINESS.md §80.4` (ADMIN-RPT-E-001 Vanta mirror entry added after GRAD-E-001); `docs/DECISION_LOG.md DEC-030` (HMAC-chained audit log — ADMIN-MV-CHAIN-01 advisory ordering invariant basis).*
