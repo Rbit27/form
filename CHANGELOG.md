@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [9.93.0] — 2026-06-29
+
+### Added
+- `content/post-2767-training-during-travel.md` — Series 2766–2775 «Тренування і реальне життя» post 2/10. «Тренування в подорожах: що зберігає результат, що — ілюзія, і де мінімальний ефективний обсяг». Deadaptation timeline (чому тиждень — це не загроза); ієрархія maintenance training факторів: інтенсивність > об'єм (Bickel 2011 — 1/3 об'єму при збереженій інтенсивності; Ralston 2017 — 1×/тиждень підтримує силу); реальна оцінка готельного залу і що дає тренувальний стимул; мінімальний протокол (40–50 хв, RPE 8–9, 2–3 сети на патерн); психологічна пастка компенсаційного тренування «до/після»; системна архітектура для атлетів із частими відрядженнями (maintenance week vs. active recovery). clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2767 card added at top of feed.
+
+### Changed
+- `STATUS.md` — Block 1101–1150 updated 10/50 → **50/50 BLOCK COMPLETE** (posts 1101–1150 confirmed on disk; STATUS was not updated past Cluster 1 when posts 1111–1150 were committed in a prior session); series 2766–2775 progress updated 1/10 → 2/10; Current version v9.90.0 → v9.93.0.
+- `docs/INCIDENT_RESPONSE.md` — v3.18.2 → v3.18.3; R-50.12 item 5 [x] Done and R-51.12 item 5 [x] Done (both §12.6 registrations were completed in OBSERVABILITY.md §12.6 v2.5 patch on 2026-06-29 — checklist discrepancy corrected).
+- `VERSION` — 9.92.1 → 9.93.0.
+
 ## [9.92.1] — 2026-06-29
 
 ### Added
