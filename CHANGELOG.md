@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.10.1] — 2026-06-29
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.8.1 — AL-SIEM-CONSENT-01 alert rule added to §27.7; §47.11 item 6 closed (documentation portion). New §27.7 row: P1 PagerDuty `form-security` alert on HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` from `emit-audit-event` Worker (SIEM-CONSENT-01 invariant violation). §27.10 CC9.2 mapping and SOC 2 note updated to include AL-SIEM-CONSENT-01 as CC9.2 + CC1.1 evidence. Document header v5.7.3 → v5.8.1 (also patches missed v5.8.0 header bump for §61).
+- `VERSION` — 10.10.0 → 10.10.1.
+
+---
+
 ## [10.10.0] — 2026-06-29
 
 ### Added
