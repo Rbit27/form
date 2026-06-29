@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.19.0] — 2026-06-29
+
+### Added
+- `content/post-2840-plateau-vs-adaptive-plateau.md` — Block 2836–2845 cluster «Прогрес без ілюзій» post 5/10. Плато vs. адаптаційне плато: механізм fitness-fatigue моделі (Banister, 1975) і суперкомпенсації (Yakovlev/Matveyev); чому стагнація у числах може бути двома протилежними станами; практичний алгоритм діагностики за RPE тренд, обсяг блоку і реакція на deload; три рівні втручання при справжньому плато. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2840 card added at top of feed.
+
+### Changed
+- `STATUS.md` — Series 2836–2845 progress updated to 5/10; next: post-2841 (Ретроспектива блоку: як проводити post-block review без самоосуду і без самообману).
+- `VERSION` — 10.18.1 → 10.19.0.
+
+---
+
 ## [10.18.1] — 2026-06-29
 
 ### Changed
