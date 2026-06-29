@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [10.2.1] — 2026-06-29
+
+### Changed
+- `docs/COST_MODEL.md` — v2.20.0 → v2.20.1: §46.9 item 1 status patch. `AUDIT_LOG_SCHEMA.md v2.56` registered all four §46.7 DEC-030 pilot save-protocol events with Zod v2 schemas and PILOT-SAVE-CHAIN-01 invariant block on 2026-06-29; checklist row `[ ]` → `[x] Done`. Closes cross-reference gap with §R-49.12 item 1.
+- `docs/INCIDENT_RESPONSE.md` — v3.18.3 → v3.18.4: Cross-reference sync for R-49.11, R-50.11, R-51.11. Eight stale "pending §X.Y item N" notes replaced with closed registration records: PILOT-ACT-STALE-CHAIN-01 events (AUDIT_LOG_SCHEMA.md v2.56), PILOT-ACT-STALE-E-001 (SOC2_READINESS.md §126 v3.51.0), CHAMP-LOGIN-STALE-CHAIN-01 events (v2.57), CHAMP-LOGIN-STALE-E-001 (§127 v3.52.0, §126→§127 section correction), job 50 §12.6 cross-ref (OBSERVABILITY.md v2.5 patch), WAU-DECLINE-STALE-CHAIN-01 events (v2.57), WAU-DECLINE-STALE-E-001 (§127 v3.52.0), job 51 §12.6 cross-ref (OBSERVABILITY.md v2.5 patch).
+- `VERSION` — 10.2.0 → 10.2.1.
+
+---
+
 ## [10.2.0] — 2026-06-29
 
 ### Added

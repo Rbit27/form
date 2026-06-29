@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.18.3
+# FORM · Incident Response Runbook v3.18.4
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -18449,8 +18449,8 @@ const PilotActivationMonitorRestoredSchema = z.object({
 - `docs/OBSERVABILITY.md §58` — pilot activation monitoring canonical spec (§58.5); PILOT-ACT-SLO-01/02 (§58.2); AL-SAVE-01 / AL-PILOT-ACT-01 (§58.4); stale-window DEC-030 event specs (§58.7); PILOT-ACT-STALE-E-001 (§58.8); §58.10 item 3 — this runbook closes
 - `docs/OBSERVABILITY.md §12.6` — job 49 pg_cron registry; stale-consequence cross-ref updated to R-49 (v5.5.0, 2026-06-29)
 - `docs/COST_MODEL.md §46` — CSM Save Protocol (canonical); T0-Alpha trigger §46.2; T+30 response window §46.3; PILOT-SAVE-CHAIN-01 §46.5; DEC-030 pilot events §46.7; §46.9 item 4 (job 49 registration obligation — closed OBSERVABILITY.md §12.6 v2.4, 2026-06-27)
-- `docs/SOC2_READINESS.md §126` — SAVE-E-001/SAVE-E-002 registration; PILOT-ACT-STALE-E-001 registration pending §R-49.12 item 4
-- `docs/AUDIT_LOG_SCHEMA.md` — `system.pilot_activation_monitor_stale_declared` + `system.pilot_activation_monitor_restored` + PILOT-ACT-STALE-CHAIN-01 pending §R-49.12 item 1
+- `docs/SOC2_READINESS.md §126` — SAVE-E-001/SAVE-E-002 registration; PILOT-ACT-STALE-E-001 registered §126.4 (SOC2_READINESS.md v3.51.0, 2026-06-29 — closes §R-49.12 item 4)
+- `docs/AUDIT_LOG_SCHEMA.md v2.56` — `system.pilot_activation_monitor_stale_declared` (HIGH/7yr) + `system.pilot_activation_monitor_restored` (STANDARD/3yr) + PILOT-ACT-STALE-CHAIN-01 registered (2026-06-29 — closes §R-49.12 item 1)
 - R-03 (Infrastructure Outage — H4 co-activation)
 - R-05 (HMAC chain break — PILOT-ACT-STALE-CHAIN-01 ordering inversion escalation)
 - R-20 (Insider Threat — H1 deliberate deletion co-activation path)
@@ -18815,10 +18815,10 @@ export const ChampLoginRestoredSchema = z.object({
 ### R-50.11 Cross-References
 
 - `docs/OBSERVABILITY.md §59` — champion login observability canonical spec (§59.5); CHAMP-LOGIN-SLO-01/02 (§59.2); AL-SAVE-02 / AL-CHAMP-ACT-01 (§59.4); stale-window DEC-030 event specs (§59.7); CHAMP-LOGIN-STALE-E-001 (§59.8); §59.10 item 6 — this runbook closes
-- `docs/OBSERVABILITY.md §12.6` — job 50 pg_cron registry; stale-consequence cross-ref pending §59.10 item 5
+- `docs/OBSERVABILITY.md §12.6` — job 50 pg_cron registry; stale-consequence cross-ref registered (OBSERVABILITY.md §12.6 v2.5 patch, 2026-06-29 — closes §59.10 item 5)
 - `docs/COST_MODEL.md §46` — CSM Save Protocol (canonical); T0-Beta trigger §46.2; T+30 response window §46.3; PILOT-SAVE-CHAIN-01 §46.5; DEC-030 pilot events §46.7
-- `docs/SOC2_READINESS.md §126` — CHAMP-LOGIN-STALE-E-001 registration pending §59.10 item 4
-- `docs/AUDIT_LOG_SCHEMA.md` — `system.champion_login_monitor_stale_declared` + `system.champion_login_monitor_restored` + CHAMP-LOGIN-STALE-CHAIN-01 pending §59.10 item 2
+- `docs/SOC2_READINESS.md §127` — CHAMP-LOGIN-STALE-E-001 registered §127 (SOC2_READINESS.md v3.52.0, 2026-06-29 — closes §59.10 item 4)
+- `docs/AUDIT_LOG_SCHEMA.md v2.57` — `system.champion_login_monitor_stale_declared` (HIGH/7yr) + `system.champion_login_monitor_restored` (STANDARD/3yr) + CHAMP-LOGIN-STALE-CHAIN-01 registered (2026-06-29 — closes §59.10 item 2)
 - R-03 (Infrastructure Outage — H4 co-activation)
 - R-05 (HMAC chain break — CHAMP-LOGIN-STALE-CHAIN-01 ordering inversion escalation)
 - R-20 (Insider Threat — H1 deliberate deletion co-activation path)
@@ -19221,10 +19221,10 @@ export const WauDeclineRestoredSchema = z.object({
 ### R-51.11 Cross-References
 
 - `docs/OBSERVABILITY.md §60` — WAU decline observability canonical spec (§60.5); WAU-DECLINE-SLO-01/02 (§60.2); AL-SAVE-03 / AL-WAU-ACT-01 (§60.4); stale-window DEC-030 event specs (§60.7); WAU-DECLINE-STALE-E-001 (§60.8); §60.10 item 6 — this runbook closes
-- `docs/OBSERVABILITY.md §12.6` — job 51 pg_cron registry; stale-consequence cross-ref pending §60.10 item 5
+- `docs/OBSERVABILITY.md §12.6` — job 51 pg_cron registry; stale-consequence cross-ref registered (OBSERVABILITY.md §12.6 v2.5 patch, 2026-06-29 — closes §60.10 item 5)
 - `docs/COST_MODEL.md §46` — CSM Save Protocol (canonical); T0-Gamma trigger §46.2; T+30 response window §46.3; PILOT-SAVE-CHAIN-01 §46.5; DEC-030 pilot events §46.7; OQ-ENTERPRISE-ARR-01 §37 (multi-entity deal structure — cross-ref OQ-WAU-OBS-02)
-- `docs/SOC2_READINESS.md §126` — WAU-DECLINE-STALE-E-001 registration pending §60.10 item 4
-- `docs/AUDIT_LOG_SCHEMA.md` — `system.wau_decline_monitor_stale_declared` + `system.wau_decline_monitor_restored` + WAU-DECLINE-STALE-CHAIN-01 pending §60.10 item 2
+- `docs/SOC2_READINESS.md §127` — WAU-DECLINE-STALE-E-001 registered §127 (SOC2_READINESS.md v3.52.0, 2026-06-29 — closes §60.10 item 4)
+- `docs/AUDIT_LOG_SCHEMA.md v2.57` — `system.wau_decline_monitor_stale_declared` (HIGH/7yr) + `system.wau_decline_monitor_restored` (STANDARD/3yr) + WAU-DECLINE-STALE-CHAIN-01 registered (2026-06-29 — closes §60.10 item 2)
 - R-03 (Infrastructure Outage — H4 co-activation)
 - R-05 (HMAC chain break — WAU-DECLINE-STALE-CHAIN-01 ordering inversion escalation)
 - R-20 (Insider Threat — H1 deliberate deletion co-activation path)
@@ -19264,3 +19264,5 @@ export const WauDeclineRestoredSchema = z.object({
 *v3.18.2 (2026-06-29): Patch — R-50.12 item 4 and R-51.12 item 4 closed. `docs/SOC2_READINESS.md §127` (v3.52.0, 2026-06-29) registered CHAMP-LOGIN-STALE-E-001 (CC7.2/A1.1/CC3.2, per-incident — IC narrative for each R-50 `champion_login_monitor` job 50 stale activation; `pilots/champion-login/` R2 subfolder established; Vanta mirror entry added; 7yr if `t0b_gap_found = true` / 3yr otherwise) and WAU-DECLINE-STALE-E-001 (CC7.2/A1.1/CC3.2, per-incident — IC narrative for each R-51 `wau_decline_monitor` job 51 stale activation; `pilots/wau-decline/` R2 subfolder established; Vanta mirror entry added; 7yr if `t0g_gap_found = true` / 3yr otherwise; weekly cadence means worst-case 14–21 day stale window). Document header v3.18.1 → v3.18.2. Cross-ref: `docs/SOC2_READINESS.md §127`; `docs/OBSERVABILITY.md §59.10` item 4 → [x] Done; `docs/OBSERVABILITY.md §60.10` item 4 → [x] Done. Owner: compliance-officer.*
 
 *v3.18.3 (2026-06-29): Patch — R-50.12 item 5 and R-51.12 item 5 closed. Both §12.6 registrations were completed in `docs/OBSERVABILITY.md` v2.5 patch (2026-06-29) which explicitly closed `OBSERVABILITY §59.10 item 5` and `OBSERVABILITY §60.10 item 5` — but R-50.12 and R-51.12 checklist rows were not updated at the time. This patch corrects the discrepancy: R-50.12 item 5 → [x] Done (job 50 `champion_login_monitor` in §12.6, `0 11 * * *`, 49h freshness); R-51.12 item 5 → [x] Done (job 51 `wau_decline_monitor` in §12.6, `0 12 * * 1`, 8-day freshness). Document header v3.18.2 → v3.18.3. Owner: devops-lead.*
+
+*v3.18.4 (2026-06-29): Cross-reference sync — R-49.11, R-50.11, R-51.11 stale "pending" notes replaced with closed status. Eight forward-references updated: R-49.11 §AUDIT_LOG_SCHEMA (PILOT-ACT-STALE-CHAIN-01 events registered AUDIT_LOG_SCHEMA.md v2.56 — closes §R-49.12 item 1); R-49.11 §SOC2_READINESS (PILOT-ACT-STALE-E-001 registered §126 SOC2_READINESS.md v3.51.0 — closes §R-49.12 item 4); R-50.11 §AUDIT_LOG_SCHEMA (CHAMP-LOGIN-STALE-CHAIN-01 events registered v2.57 — closes §59.10 item 2); R-50.11 §SOC2_READINESS (CHAMP-LOGIN-STALE-E-001 registered §127 v3.52.0; §126→§127 section correction — closes §59.10 item 4); R-50.11 §12.6 (job 50 stale-consequence cross-ref registered v2.5 patch — closes §59.10 item 5); R-51.11 §AUDIT_LOG_SCHEMA (WAU-DECLINE-STALE-CHAIN-01 events registered v2.57 — closes §60.10 item 2); R-51.11 §SOC2_READINESS (WAU-DECLINE-STALE-E-001 registered §127 v3.52.0; §126→§127 section correction — closes §60.10 item 4); R-51.11 §12.6 (job 51 stale-consequence cross-ref registered v2.5 patch — closes §60.10 item 5). Document header v3.18.3 → v3.18.4. compliance-officer + security-engineer.*
