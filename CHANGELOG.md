@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [10.5.2] — 2026-06-29
+
+### Added
+- `docs/COST_MODEL.md §47` — Pilot Graduation Economics & First-Year ARR Recognition (DEC-084, v2.21.0). Standard graduation criteria (≥ 50% activation / ≥ 3 champion logins / no T0-Gamma active at Day 83–90), three-tier approval authority (CSM/CS Lead/Founder). CAC amortization model: $5,800 total pilot CAC at 50-seat mid-market; payback from first invoice 0.99–1.6 months. First-year margin profiles by activation bucket (≥ 70% → ~64% GM; 50–70% → ~58%; 30–50% conditional → ~49%). ASC 606 recognition trigger: no ARR during pilot period (ASC 340-40-25-1). Pro-rata billing formula at graduation. Seat expansion ARR forecast at M12 by bucket. OQ-ENTERPRISE-ARR-01 formally registered (§47.5.1) — resolves forward reference "COST_MODEL §37" cited in OBSERVABILITY §60.11 OQ-WAU-OBS-02; tenant-level WAU interim position confirmed. Two DEC-030 events: `enterprise.pilot_graduated` (HIGH/7yr, CC3.2/CC7.2/CC9.2/A1.1) + `enterprise.contract_activated` (STANDARD/3yr, CC3.2/A1.1). GRAD-CHAIN-01/02 chain invariants. GRAD-E-001 SOC 2 evidence artefact (CC3.2/CC7.2/A1.1, annual Q4, 3yr). Implementation checklist: 6× P0/M5, 2× P1/M6, 3× P2/M10+.
+
+### Changed
+- `docs/OBSERVABILITY.md §60.11` — OQ-WAU-OBS-02 status note updated: OQ-ENTERPRISE-ARR-01 now formally registered at COST_MODEL §47.5.1 (v2.21.0, 2026-06-29); forward reference to "COST_MODEL §37" resolved; tenant-level interim position confirmed; resolution gate points to COST_MODEL §47.8 item 11. OQ-WAU-OBS-02 remains 🟡 Open pending multi-entity deal structure.
+- `VERSION` — 10.5.1 → 10.5.2.
+
+---
+
 ## [10.5.1] — 2026-06-29
 
 ### Added

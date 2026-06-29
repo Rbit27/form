@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.20.1
+# FORM · Cost Model & Unit Economics v2.21.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -12796,4 +12796,296 @@ PILOT-SAVE-CHAIN-01 (v1.0):
 **Privacy floor (restatement):** The CSM Save Protocol is designed so that no individual employee `user_id`, name, email, health data, coaching exchange content, or GDPR Art. 9 special-category data is surfaced to the CSM, CS Lead, or Founder at any step. The Admin Console save-protocol panel shows only aggregate activation rates and WAU percentages. The "HR never sees individual user data" principle from ENTERPRISE.md applies equally to FORM's own customer-success team — the save protocol instructs the CSM to ask the HR champion about communication effectiveness, not to request or receive lists of non-participating employees.
 
 ---
+
+## §47 · Pilot Graduation Economics & First-Year ARR Recognition (DEC-084)
+
+> Owner: data-engineer + enterprise-architect + customer-success + compliance-officer. Review: before first pilot graduates to paid; at each subsequent graduation. Audience: founder, future CFO, compliance-officer, enterprise-architect.
+
+### 47.1 Purpose and Scope
+
+This section models the economic and operational transition from a successful enterprise pilot to a paid contract — the "happy path" conclusion of the 90-day pilot programme. It is a companion to §46 (CSM Save Protocol), which covers interventions when pilots *fail* activation targets. This section covers what happens when pilots *succeed*.
+
+**Scope:**
+- Activation threshold at which a pilot qualifies for standard graduation (clean path, no save protocol)
+- Economic model for pilot-to-paid conversion: CAC amortization, first-year margin profile, seat expansion probability
+- ARR recognition mechanics (ASC 606) at the moment of contract activation
+- Two new DEC-030 audit events: `enterprise.pilot_graduated` (standard path) and `enterprise.contract_activated` (first billing cycle)
+- Formal registration of **OQ-ENTERPRISE-ARR-01** (multi-entity deal structure and parent-org ARR treatment), resolving the forward reference in `OBSERVABILITY.md §60.11 OQ-WAU-OBS-02`
+
+**Out of scope:** Post-save-protocol graduation is modelled in §46 (`enterprise.pilot_saved`). Renewal economics at Year 2+ are covered in §42. Seat expansion mid-contract is covered in §41.
+
+---
+
+### 47.2 Graduation Decision Framework
+
+#### 47.2.1 Standard Graduation Criteria
+
+A pilot qualifies for **standard graduation** (no save protocol required) when all three criteria are met at or before Day 90:
+
+| Criterion | Threshold | Measurement source |
+|---|---|---|
+| **Overall activation rate** | ≥ 50% of contracted seats have ≥ 1 completed coaching session | `session_completed` events / `pilot_programs.seats` |
+| **Champion logins** | ≥ 3 distinct admin-role logins in the last 30 days | `admin.dashboard_session_started` events (OBSERVABILITY §58.11) |
+| **WAU trend** | No T0-Gamma condition active (§46.2.3) at Day 83–90 assessment window | `wau_decline_monitor` job 51 output |
+
+Meeting the 50% threshold ensures the paid contract begins with sufficient momentum. Pilots in the 30–50% range are eligible for graduation but receive **accelerated CSM coverage** in Month 1 of paid (see §47.3.3). Pilots below 30% at Day 90 must have completed the save protocol (§46) before graduation is permitted.
+
+#### 47.2.2 Graduation Decision Authority
+
+| Activation rate at Day 90 | Required approver | Contract path |
+|---|---|---|
+| ≥ 70% | CSM (self-authorize) | Standard graduation; `enterprise.pilot_graduated` emitted with `graduation_tier = 'standard'` |
+| 50–70% | CS Lead sign-off | Standard graduation with accelerated onboarding note |
+| 30–50% | Founder sign-off | Graduation with written CSM health plan; `enterprise.pilot_graduated` emitted with `graduation_tier = 'conditional'` |
+| < 30% without active save protocol | Blocked — save protocol required | Cannot emit `enterprise.pilot_graduated` without prior `enterprise.pilot_save_protocol_triggered` |
+
+**Privacy floor (restatement):** The graduation decision is based on aggregate activation rates. No individual employee `user_id`, name, session content, or health data is surfaced to the CSM, CS Lead, or Founder in the graduation assessment. The "HR never sees individual user data" principle extends to FORM's internal customer-success team.
+
+---
+
+### 47.3 Pilot-to-Paid Economic Model
+
+#### 47.3.1 CAC Amortization at Graduation
+
+Pilot-period costs are capitalized as customer acquisition cost starting from the first day of the paid contract (`enterprise_contracts.contract_start_date`), not from pilot inception.
+
+| Cost component | Estimated cost (mid-market pilot, 50 seats) | Notes |
+|---|---|---|
+| BD/outbound to signed pilot | $2,400 | §19.3 founder-led phase estimate |
+| CSM time during pilot (90 days × 8 h/month × $100/h loaded) | $2,400 | Internal loaded rate including benefits |
+| Legal/MSA review (one-time) | $800 | Shared across Year 1 contract term for amortization |
+| Onboarding collateral (per-tenant) | $200 | Template amortized over 5 pilots at $1,000/set |
+| **Total pilot CAC at graduation** | **$5,800** | vs. full AE-sourced enterprise CAC target of $8,000–$12,000 (§8.5) |
+
+**Amortization rule:** Pilot CAC is amortized straightline over the first contracted ARR term (12 months for annual; 24 months for multi-year). At a $6/seat × 50 seats = $3,600/month rate, **CAC payback from first invoice: 1.6 months**. At $9/seat (Growth): **0.99 months**.
+
+No pilot CAC is expensed during the pilot period itself — consistent with ASC 340-40-25-1 (pre-contract costs).
+
+#### 47.3.2 First-Year Margin Profile by Graduation Activation Tier
+
+| Activation rate at Day 90 | Year-1 NRR estimate | Seat expansion by Month 12 (≥ 10 seats) | Gross margin Year 1 | Notes |
+|---|---|---|---|---|
+| ≥ 70% | 118–125% | 45% probability | ~64% | Best cohort; expansion-revenue upside likely in Year 1 |
+| 50–70% | 100–112% | 22% probability | ~58% | On-target; standard CSM cadence |
+| 30–50% (conditional grad.) | 85–98% | 9% probability | ~49% | Accelerated CSM cost in M1–M3 partially offsets margin |
+| Post-save-protocol (§46) | 82–105% | 15% probability | ~51% | Save protocol investment recovered at ~Month 7 on renewal probability improvement |
+
+*Gross margin includes infrastructure COGS (§15), AI API costs ($0.28/MAU/month at 50 seats), and CSM cost allocation. Excludes CAC amortization. All estimates; calibrate against actuals after first 10 graduated pilots (§47.8 item 9).*
+
+#### 47.3.3 Activation Rate at Graduation → First-Year Retention Model
+
+| Activation rate at Day 90 | 3-month retention | 6-month retention | 12-month renewal probability | CSM cadence post-graduation |
+|---|---|---|---|---|
+| ≥ 70% | 98% | 95% | 88% | Monthly pulse check (standard) |
+| 50–70% | 93% | 87% | 74% | Bi-weekly for 90 days, then monthly |
+| 30–50% | 83% | 74% | 60% | Weekly for 30 days, bi-weekly for 60 days, then monthly |
+| Post-save-protocol (§46) | 85% | 76% | 63% | Weekly for 30 days (continuation of save-protocol cadence) |
+
+*Forward-looking estimates; to be calibrated against actuals after first 10 graduating pilots.*
+
+---
+
+### 47.4 First-Year ARR Recognition Mechanics
+
+#### 47.4.1 Revenue Recognition Trigger (ASC 606)
+
+ARR recognition begins on `enterprise_contracts.contract_start_date` — the later of:
+- The date the pilot formally ends (Day 91 or graduation decision date, whichever is earlier), **and**
+- The date the paid MSA/order form is countersigned
+
+**No ARR is recognized during the 90-day pilot period** regardless of activation rate or graduation tier. Pilot costs are pre-contract period costs (ASC 340-40-25-1).
+
+| Event | Revenue treatment |
+|---|---|
+| Pilot acceptance (Day 0) | No revenue; pilot is a free service period |
+| Pilot progression (Days 1–90) | No revenue; no deferred revenue recorded |
+| Graduation decision + MSA countersign | ARR clock starts; first invoice issued |
+| Monthly billing | Revenue recognized as service is delivered (monthly) |
+| Annual upfront | Cash collected Day 1; recognized $ARR/12 per month over 12 months |
+| Multi-year prepaid | Deferred revenue waterfall per §18.5; recognized monthly |
+
+#### 47.4.2 Pro-Rata Billing at Graduation
+
+If the paid MSA is countersigned mid-month:
+
+```
+first_invoice_amount = (rate_per_seat × contracted_seats)
+                       × (days_remaining_in_month / days_in_month)
+```
+
+Subsequent months: full-month billing on the first day of each calendar month (or anniversary day for annual plans).
+
+**Billing system event:** `billing.contract_first_invoice_issued` (STANDARD, 3yr) is emitted by the billing Worker when the first invoice is sent. This event is distinct from `enterprise.contract_activated` (§47.6.2) — the DEC-030 chain event is emitted by compliance infrastructure; the billing event is emitted by billing infrastructure.
+
+#### 47.4.3 Seat Expansion ARR Forecast (Month 12)
+
+Expected ARR at 12 months post-graduation for a standard 50-seat $9/seat Growth pilot:
+
+| Scenario | Base ARR/month | P(expansion ≥ 10 seats, M12) | Expected expansion ARR | Total ARR P50 |
+|---|---|---|---|---|
+| ≥ 70% activation | $5,400 | 45% × 25 seats avg | +$1,013 | $6,413/mo |
+| 50–70% activation | $5,400 | 22% × 20 seats avg | +$396 | $5,796/mo |
+| 30–50% activation | $5,400 | 9% × 15 seats avg | +$122 | $5,522/mo |
+
+*Uses 25-seat minimum expansion increment (§21.6). Expansion mechanics per §41.*
+
+---
+
+### 47.5 Multi-Entity Deal Structure (OQ-ENTERPRISE-ARR-01)
+
+#### 47.5.1 Open Question Registration
+
+**OQ-ENTERPRISE-ARR-01** — Multi-entity parent-org ARR treatment
+
+| Field | Value |
+|---|---|
+| **ID** | OQ-ENTERPRISE-ARR-01 |
+| **Priority** | P1 |
+| **Raised by** | OBSERVABILITY §60.11 OQ-WAU-OBS-02 (forward reference to "COST_MODEL §37"; formally registered here as §47.5.1) |
+| **Raised date** | 2026-06-29 |
+| **Owner** | enterprise-architect + data-engineer |
+| **Status** | 🟡 Open |
+
+**Question:** When a parent organization has multiple active tenants under different contracts (e.g., a holding company with a Growth-tier pilot for one subsidiary and an Enterprise contract for the HR division), how should ARR, WAU monitoring, and seat utilization be computed?
+
+| | **Option A — Tenant-level (current)** | **Option B — Parent-org-level** | **Option C — Hybrid** |
+|---|---|---|---|
+| **ARR** | Each `tenant_id` has its own ARR; summed independently | Parent-org ARR = sum of all child tenants | Per-tenant billing; parent-org view for expansions/NRR |
+| **WAU monitoring** | `wau_decline_monitor` (job 51) runs per `tenant_id` | WAU computed at parent level across all seats | Per-tenant WAU; T0-Gamma evaluated at parent level |
+| **BDG** | Per-tenant BDG KV cache keyed by `tenant_id` | BDG must key by `parent_org_id` with `tenant_id`s as children | Per-tenant BDG; separate parent-org expansion dashboard |
+| **DATA_MODEL** | No schema change needed | `parent_org_id` FK on `enterprise_contracts`; multi-level RLS | `parent_org_id` on `enterprise_contracts`; RLS at `tenant_id` level |
+| **ASC 606** | Clean — each contract is independent | Potential variable-consideration complexity across parent | Hybrid keeps per-tenant recognition; simplest ASC 606 path |
+| **Privacy** | Strongest isolation (`tenant_id` boundary) | Must ensure child tenants cannot see each other's data | Child tenants see only own data; parent admin sees aggregate only |
+
+**Current interim position:** Option A (tenant-level) — no schema change or WAU cross-aggregation until OQ-ENTERPRISE-ARR-01 is resolved. The `wau_decline_monitor` (job 51) runs per `tenant_id` isolation, consistent with the interim position stated in OBSERVABILITY §60.11 OQ-WAU-OBS-02.
+
+**Resolution gate:** OQ-ENTERPRISE-ARR-01 requires DATA_MODEL.md to add a `parent_org_id` hierarchy design. Until that section is authored, Option A remains the production standard. Expected trigger: first multi-entity deal in pipeline (est. M8–M12).
+
+#### 47.5.2 Impact on OBSERVABILITY §60.11 OQ-WAU-OBS-02
+
+OBSERVABILITY §60.11 OQ-WAU-OBS-02 is **🟡 Open** pending this OQ. Now that OQ-ENTERPRISE-ARR-01 is formally registered at §47.5.1 (resolving the forward reference to "COST_MODEL §37"), the interim position is confirmed: WAU monitoring at `tenant_id` level is correct for the current schema. OQ-WAU-OBS-02 remains 🟡 Open and will close when OQ-ENTERPRISE-ARR-01 is resolved (§47.8 item 11).
+
+---
+
+### 47.6 DEC-030 Audit Events
+
+Two new DEC-030 events for the pilot graduation lifecycle. Both events are registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` (§47.8 item 1).
+
+#### 47.6.1 Event 1 — `enterprise.pilot_graduated`
+
+*Standard-path graduation event. Not emitted for save-protocol graduations — those use `enterprise.pilot_saved` (§46.7 Event 3).*
+
+| Field | Type | Description |
+|---|---|---|
+| `pilot_id` | UUID | |
+| `tenant_id` | UUID | |
+| `graduation_date` | TIMESTAMPTZ | ISO 8601, graduation decision timestamp |
+| `activation_rate_at_graduation` | NUMERIC(5,4) | Decimal: 0.7 = 70% |
+| `seat_count_graduated` | INT | Contracted seats entering paid term |
+| `acv_at_graduation_usd` | NUMERIC(12,2) | Annual contract value at graduation |
+| `graduation_tier` | `'standard' \| 'conditional'` | 'conditional' requires Founder sign-off (§47.2.2) |
+| `activation_bucket` | `'A' \| 'B' \| 'C'` | A = ≥70%, B = 50–70%, C = 30–50% (maps to CSM cadence §47.3.3) |
+| `approved_by_role` | `'csm' \| 'cs_lead' \| 'founder'` | Graduation decision authority per §47.2.2 |
+
+**Classification:** HIGH · 7 yr · CC3.2 · CC7.2 · CC9.2 · A1.1
+
+**GRAD-CHAIN-01 (prerequisite):** `emit-audit-event` Worker verifies that `enterprise.pilot_started` with the same `pilot_id` exists in `audit_log_events`. If not found: HTTP 422 `GRAD_CHAIN_01_NO_PILOT_STARTED`.
+
+#### 47.6.2 Event 2 — `enterprise.contract_activated`
+
+*Emitted on first billing cycle activation, for both standard (§47.6.1) and save-protocol (§46.7) graduation paths, and for direct-to-enterprise deals.*
+
+| Field | Type | Description |
+|---|---|---|
+| `tenant_id` | UUID | |
+| `contract_id` | UUID | FK to `enterprise_contracts.id` |
+| `pilot_id` | UUID \| null | Null for direct-to-enterprise deals (no prior pilot) |
+| `activation_date` | TIMESTAMPTZ | Matches `enterprise_contracts.contract_start_date` |
+| `billing_cycle` | `'monthly' \| 'annual' \| 'multi_year'` | |
+| `first_invoice_date` | TIMESTAMPTZ | |
+| `total_acv_usd` | NUMERIC(12,2) | |
+| `graduation_path` | `'standard' \| 'post_save_protocol' \| 'direct'` | `direct` = no prior pilot |
+
+**Classification:** STANDARD · 3 yr · CC3.2 · A1.1
+
+**GRAD-CHAIN-02 (prerequisite when `pilot_id` is non-null):** `emit-audit-event` Worker verifies that `enterprise.pilot_graduated` OR `enterprise.pilot_saved` with the same `pilot_id` exists in `audit_log_events` within 30 days. If not found: HTTP 422 `GRAD_CHAIN_02_NO_GRADUATION_EVENT`.
+
+**Chain invariant spec:**
+
+```
+GRAD-CHAIN-01 (v1.0):
+  For event: enterprise.pilot_graduated
+  Predecessor required: enterprise.pilot_started
+    WHERE pilot_id = incoming.pilot_id
+  Violation: HTTP 422 { code: 'GRAD_CHAIN_01_NO_PILOT_STARTED', pilot_id }
+
+GRAD-CHAIN-02 (v1.0):
+  For event: enterprise.contract_activated WHERE pilot_id IS NOT NULL
+  Predecessor required: enterprise.pilot_graduated OR enterprise.pilot_saved
+    WHERE pilot_id = incoming.pilot_id
+    AND created_at >= NOW() - INTERVAL '30 days'
+  Violation: HTTP 422 { code: 'GRAD_CHAIN_02_NO_GRADUATION_EVENT', pilot_id, event_type }
+```
+
+---
+
+### 47.7 SOC 2 Evidence Mapping
+
+| Evidence artefact | Criteria | Description | Cadence | Retention |
+|---|---|---|---|---|
+| **GRAD-E-001** | CC3.2, CC7.2, A1.1 | Annual export of all `enterprise.pilot_graduated` and `enterprise.pilot_saved` events with corresponding `enterprise.contract_activated` events. Columns: `pilot_id`, `graduation_date`, `graduation_path`, `activation_rate_at_graduation`, `graduation_tier`, `acv_at_graduation_usd`, days from pilot start to activation. Zero-event years filed as affirmative attestation. Privacy floor: pilot_id UUIDs and aggregate rates only; no individual `user_id`. | Annual (Q4) | 3 yr |
+
+**CC3.2 auditor narrative:** FORM defines formal graduation criteria (§47.2.1) for pilot-to-paid conversion, including activation thresholds and sign-off authority tiers. The `enterprise.pilot_graduated` DEC-030 event creates an immutable, HMAC-chained record of each graduation decision. GRAD-E-001 enables auditors to verify that all contracts originated from traceable pilot graduation decisions.
+
+**CC7.2 auditor narrative:** Graduation activation thresholds (≥ 50% overall, ≥ 3 champion logins, no T0-Gamma active) provide structured criteria for monitoring pilot service delivery quality before committing to a paid contract. The three-tier approval authority (CSM / CS Lead / Founder) escalates oversight for lower-activation graduations.
+
+**A1.1 auditor narrative:** `enterprise.contract_activated` provides a timestamped record of when paid service availability begins for each tenant, establishing an audit trail from pilot graduation to contracted service commencement.
+
+---
+
+### 47.8 Implementation Checklist
+
+#### P0 — Before first pilot graduation (est. M5–M6)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register §47.6 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` subsection: `enterprise.pilot_graduated` (HIGH/7yr) + `enterprise.contract_activated` (STANDARD/3yr). Include Zod v2 schemas for both events; GRAD-CHAIN-01 + GRAD-CHAIN-02 invariant blocks. | compliance-officer + security-engineer | **P0** | M5 | [ ] |
+| 2 | Implement GRAD-CHAIN-01 predecessor check in `emit-audit-event` Worker for `enterprise.pilot_graduated`. Integration tests: (a) `pilot_graduated` with no prior `pilot_started` → 422 `GRAD_CHAIN_01_NO_PILOT_STARTED`; (b) `pilot_graduated` with prior `pilot_started`, same `pilot_id` → 201. | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Implement GRAD-CHAIN-02 predecessor check in `emit-audit-event` Worker for `enterprise.contract_activated` (when `pilot_id` non-null). Integration tests: (a) `contract_activated` with no prior graduation event → 422 `GRAD_CHAIN_02_NO_GRADUATION_EVENT`; (b) prior `pilot_graduated` within 30 days → 201; (c) prior `pilot_saved` within 30 days → 201; (d) `pilot_id = null` → 201 (no chain check). | platform-engineer | **P0** | M5 | [ ] |
+| 4 | Add "Graduate Pilot" flow to Admin Console pilot management view (form_admin + customer-success roles only). UI pre-fills: `activation_rate_at_graduation` from live KPI panel; `activation_bucket` (A/B/C) auto-computed; `graduation_tier` inferred from §47.2.2 decision table. On submit: emits `enterprise.pilot_graduated` via IC PAM-elevated API call; shows GRAD-CHAIN-01 status. | platform-engineer + design-craft | **P0** | M5 | [ ] |
+| 5 | Register GRAD-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (one row after SAVE-E-002); add `pilots/graduation/` R2 subfolder to §80.3; add Vanta mirror entry in §80.4. | compliance-officer | **P0** | M5 | [ ] |
+| 6 | Register DEC-084 in `docs/DECISION_LOG.md`: "Pilot Graduation Economics & First-Year ARR Recognition (§47, v2.21.0, 2026-06-29). Standard graduation criteria (≥ 50% activation / ≥ 3 champion logins / no T0-Gamma active), three-tier approval authority, GRAD-CHAIN-01/02 invariants, OQ-ENTERPRISE-ARR-01 registration." | compliance-officer | **P0** | M5 (this authoring pass) | [ ] |
+
+#### P1 — Before first paid contract Month 3 review (est. M6–M8)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Build Admin Console "Graduation Dashboard": per-pilot graduation date, activation bucket, ACV, first invoice date, 3-month retention status (active/at-risk/churned). Source: `enterprise.pilot_graduated` + `enterprise.contract_activated` events JOIN to billing data. Privacy floor: aggregate activation rates only; no individual `user_id`. | platform-engineer + design-craft | **P1** | M6 | [ ] |
+| 8 | Add `graduated_from_pilot_id` column (UUID nullable FK → `pilot_programs.id`) to `enterprise_contracts` to enable post-graduation cohort tracking. Migration 0089. Document DDL and RLS considerations in `docs/DATA_MODEL.md §48` (next section). | platform-engineer + enterprise-architect | **P1** | M6 | [ ] |
+
+#### P2 — After first 10 graduating pilots (est. M10–M18)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | Calibrate §47.3.2 NRR estimates and §47.3.3 retention model against actuals. If actuals deviate > 10 pp in any activation bucket, update tables and file updated GRAD-E-001 amendment. | customer-success + data-engineer | **P2** | After 10 pilots | [ ] |
+| 10 | File first GRAD-E-001 artefact after Q4 of first year with ≥ 1 graduating pilot: compile `enterprise.pilot_graduated` + `enterprise.contract_activated` events; file at `compliance/evidence/pilots/graduation/GRAD-E-001_<YYYY>.csv`; SHA-256 hash; upload to R2; upload to Vanta (CC3.2/CC7.2/A1.1). Privacy check: pilot_id UUIDs and aggregate rates only; no individual `user_id`. | compliance-officer | **P2** | M12 | [ ] |
+| 11 | Resolve OQ-ENTERPRISE-ARR-01 (§47.5.1) once multi-entity deal pipeline emerges. Trigger: first signed deal referencing multiple `tenant_id`s under one parent org. Resolution: add `parent_org_id` hierarchy to DATA_MODEL.md; update `wau_decline_monitor` (job 51) per OBSERVABILITY §60.11 OQ-WAU-OBS-02 guidance; close OQ-WAU-OBS-02; register DEC-08x. | enterprise-architect + data-engineer | **P2** | M8–M12 (on-demand) | 🟡 Pending first multi-entity deal |
+
+---
+
+### 47.9 Cross-Reference Index
+
+| Document | Section | Relationship | Status |
+|---|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md` | New §Enterprise Pilot Graduation events | GRAD-CHAIN-01/02 invariants + Zod v2 schemas for `enterprise.pilot_graduated` + `enterprise.contract_activated` | [ ] §47.8 item 1 |
+| `docs/SOC2_READINESS.md` | §79.4 master evidence table | GRAD-E-001 registration (one row after SAVE-E-002) | [ ] §47.8 item 5 |
+| `docs/SOC2_READINESS.md` | §80.3 R2 subfolder registry | `pilots/graduation/` subfolder | [ ] §47.8 item 5 |
+| `docs/OBSERVABILITY.md` | §60.11 OQ-WAU-OBS-02 | OQ-ENTERPRISE-ARR-01 now formally registered at §47.5.1, resolving forward reference to "COST_MODEL §37"; `tenant_id`-level interim position confirmed | 🟢 Forward reference resolved — OQ-WAU-OBS-02 remains 🟡 Open pending §47.8 item 11 |
+| `docs/DATA_MODEL.md` | Future §48 | `graduated_from_pilot_id` FK column on `enterprise_contracts` (migration 0089) | [ ] §47.8 item 8 |
+| `docs/COST_MODEL.md` | §46 (CSM Save Protocol) | §47 is the "happy path" companion; save-protocol graduations use `enterprise.pilot_saved` (§46.7 Event 3), not `enterprise.pilot_graduated` | — |
+| `docs/DECISION_LOG.md` | New entry DEC-084 | Pilot Graduation Economics governance decision | [ ] §47.8 item 6 |
+
+---
+
+*v2.21.0 (2026-06-29): §47 Pilot Graduation Economics & First-Year ARR Recognition (DEC-084). Standard graduation criteria (≥ 50% activation / ≥ 3 champion logins / no T0-Gamma active), three-tier approval authority table, CAC amortization model (total pilot CAC $5,800 at 50-seat mid-market), first-year margin profiles by activation bucket (A/B/C), ASC 606 recognition trigger (no ARR during pilot period), pro-rata billing formula, seat expansion ARR forecast at M12. OQ-ENTERPRISE-ARR-01 formally registered (§47.5.1) — resolves forward reference "COST_MODEL §37" cited in OBSERVABILITY §60.11 OQ-WAU-OBS-02; tenant-level interim position confirmed. Two DEC-030 events: `enterprise.pilot_graduated` (HIGH/7yr, CC3.2/CC7.2/CC9.2/A1.1) + `enterprise.contract_activated` (STANDARD/3yr, CC3.2/A1.1). GRAD-CHAIN-01 (requires prior `enterprise.pilot_started`) and GRAD-CHAIN-02 (requires prior `enterprise.pilot_graduated` or `enterprise.pilot_saved` within 30 days) invariants. GRAD-E-001 SOC 2 evidence mapping (CC3.2/CC7.2/A1.1, annual Q4, 3yr). Implementation checklist: 6× P0/M5, 2× P1/M6, 3× P2/M10+. Owner: data-engineer + enterprise-architect + customer-success + compliance-officer.*
 
