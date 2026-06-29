@@ -4,11 +4,13 @@
 **Pre-review gate (14 days ahead):** 2026-07-17
 **Owner:** compliance-officer (founder)
 **SOC 2 criteria:** CC6.2, CC6.3, CC6.5, CC4.2, CC1.2
-**Cross-reference:** `docs/SOC2_READINESS.md §23` (procedure), `§65.11` (Q3 forward plan), `§65.13 AR-P1-01` (this calendar gate closes the AR-2026-Q2-01 remediation)
+**Cross-reference:** `docs/SOC2_READINESS.md §23` (procedure), `§65.11` (Q3 forward plan), `§65.13 AR-P1-01` (this calendar gate closes the AR-2026-Q2-01 remediation), `§128` (OQ-AR-01 and OQ-TDD-01 resolved — 2026-06-29)
 
 **Why this file exists:** Q2 2026 access review (executed 2026-06-05) was conducted 36 days late — no calendar gate was in place (finding AR-2026-Q2-01, Low severity). This document is the remediation: a standing pre-review checklist committed to the repo so the Q3 review cannot silently slip.
 
 ---
+
+> **OQ-AR-01 and OQ-TDD-01 resolved — see SOC2_READINESS.md §128, v3.53.0, 2026-06-29.** Pilot-tier tenants are now reviewed under §23.2.3 at the same standard as production enterprise tenants (§128.1). Destruction certificate DELETION SCOPE block updated with `Processing activities covered:` boilerplate (§128.3).
 
 ## Gate: 2026-07-17 (T-14 days)
 
@@ -39,7 +41,7 @@ Review the 11 human account systems from the Q2 artifact and confirm the list is
 | Google Play | founder email | Active |
 
 - [ ] Verify no new SaaS services have been added to the stack since 2026-06-05 that are not on this list. Add any new services before the review date.
-- [ ] If any enterprise pilot tenants went live between Q2 and Q3 review: confirm §23.2.3 enterprise tenant query is ready to run against production (per §65.11 OQ-AR-01 guidance)
+- [ ] If any enterprise pilot tenants went live between Q2 and Q3 review: confirm §23.2.3 enterprise tenant query is ready to run against production using `WHERE t.tier IN ('enterprise', 'pilot')` per §128.1 OQ-AR-01 resolution (pilot-tier reviewed at same standard as enterprise)
 
 ### Step 2 — Service account / API token inventory
 
@@ -112,5 +114,7 @@ Per `docs/SOC2_READINESS.md §65.11`:
 | Second reviewer | N/A (solo-founder compensating control) | Activate if any hire by 2026-07-17 |
 
 ---
+
+*v1.1 (2026-06-29): §128 cross-reference added. OQ-AR-01 and OQ-TDD-01 resolved — see SOC2_READINESS.md §128, v3.53.0, 2026-06-29. Cross-reference header updated to include §128. Step 1 pilot-tenant bullet updated to reference §128.1 OQ-AR-01 resolution and `WHERE t.tier IN ('enterprise', 'pilot')` query extension. Closes SOC2_READINESS.md §128.6 item 6 (P0, 2026-07-17 pre-gate). Owner: compliance-officer.*
 
 *v1.0 (2026-06-05): Created as remediation for AR-2026-Q2-01 (Q2 2026 access review latency finding). Closes SOC2_READINESS.md §65.13 AR-P1-01. Owner: compliance-officer.*

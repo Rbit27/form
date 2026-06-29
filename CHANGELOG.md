@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [10.20.1] — 2026-06-29
+
+### Changed
+- `compliance/calendar/q3-2026-access-review.md` v1.0 → v1.1 — §128 cross-reference patch (P0, 2026-07-17 pre-gate). Cross-reference header extended with §128 entry. Blockquote note added above Gate section: "OQ-AR-01 and OQ-TDD-01 resolved — see SOC2_READINESS.md §128, v3.53.0, 2026-06-29." Step 1 pilot-tenant bullet updated from §65.11 OQ-AR-01 guidance to §128.1 resolution (`WHERE t.tier IN ('enterprise', 'pilot')` query extension). Closes SOC2_READINESS.md §128.6 item 6 (P0, 2026-07-17 pre-gate, compliance-officer).
+- `docs/SOC2_READINESS.md §128.6 item 6` — status `[ ]` → `[x] Done — 2026-06-29 (v1.1)`. Document header v3.55.0 → v3.55.1.
+- `VERSION` — 10.20.0 → 10.20.1.
+
+---
+
 ## [10.20.0] — 2026-06-29
 
 ### Added
