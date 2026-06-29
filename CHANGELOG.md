@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.9.0] — 2026-06-29
+
+### Added
+- `content/post-2829-programming-errors-fix-now-vs-end-of-block.md` — Editorial series 2826–2835, post 4/10. "Помилки програмування: які виправляти одразу, які — наприкінці блоку." Founder-voice, editorial-brutalist, 13-min read. Тема: таймінг виправлення помилок програмування — три категорії «виправляй одразу» (тканинний ризик, некумулятивне перевантаження, технічна невідповідність рівню) і чотири категорії «виправляй наприкінці блоку» (порядок вправ, частота, вибір вправи, прогресійний протокол). Науковий фундамент: Issurin 2010 (concentrated loading, ефект передчасного переривання стимулу). Алгоритм чотирьох кроків. Ключова відмінність: відкладене виправлення ≠ ігнорування — різниця у наявності запису. clinical-safety: NOT_REQUIRED.
+- `blog.html` — card for post-2829 inserted at top of grid.
+
+### Changed
+- `README.md` — post-2829 status proposed → draft · v10.9.0.
+- `STATUS.md` — series 2826–2835 progress 3/10 → 4/10; post-2829 entry added.
+- `VERSION` — 10.8.0 → 10.9.0.
+
+---
+
 ## [10.8.0] — 2026-06-29
 
 ### Added
