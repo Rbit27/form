@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [10.3.0] — 2026-06-29
+
+### Added
+- `content/post-2780-specificity-vs-general-development-when-to-be-narrow.md` — Серія 2776–2785 «Тренувальне рішення в умовах конкуруючих пріоритетів», пост 5/10. Специфічність vs. загальний розвиток: SAID-принцип у практичному вимірі — нейральна специфічність до 1RM не будується широким тренінгом. Coffey & Hawley (2007): AMPK-інгібування mTORC1 — задокументований молекулярний механізм interference. Wilson et al. (2012) мета-аналіз 21 concurrent training RCT: силові адаптації знижуються; тип/частота/обсяг аеробного — головні модератори. Hickson (1980): розрив 6–8 год між аеробним і силовим суттєво знижує конкуренцію. Коли бути вузьким: конкретна ціль із датою, застигла вправа, обмежена відновна ємність. Коли бути широким: рання кар'єра, перехідні блоки, довгостроковий горизонт. Практична таблиця 4 компонентів × ширина × частота × логіка. clinical-safety NOT_REQUIRED · sports-scientist review pending.
+- `content/post-2781-deload-vs-continue-when-one-more-week-is-a-mistake.md` — Серія 2776–2785, пост 6/10. Деload vs. продовження: Meeusen et al. (2013) ECSS/ACSM: функціональний overreaching (FOR) vs. нефункціональний (NFOR) vs. перетренованість. Fry & Kraemer (1997): накопичення ≥ 4–6 тижнів без розрядки — типовий шлях до FOR. Halson (2014): 1 тиждень 40–60% об'єму достатній для відновлення при FOR. Чотири сигнали для деload: RPE-дрейф ≥ 2 тижні; показники стоять 3+ тижні; 2+ суб'єктивних маркери; часовий маркер ≥ 5–6 тижнів. Два формати деload. Практичний алгоритм: 4 кроки × рішення. Найпоширеніша помилка — «ще один тиждень» при 6+ тижнях і RPE-дрейфі. clinical-safety NOT_REQUIRED · sports-scientist review pending.
+- `blog.html` — posts 2780–2781 added at top of feed.
+
+### Changed
+- `README.md` — posts 2780–2781 updated proposed → draft with file references.
+- `STATUS.md` — series 2776–2785 progress updated 4/10 → 6/10; next: post-2782.
+- `VERSION` — 10.2.1 → 10.3.0.
+
+---
+
 ## [10.2.1] — 2026-06-29
 
 ### Changed

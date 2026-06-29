@@ -2916,8 +2916,8 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2777 | Коли програмна рекомендація суперечить твоєму відчуттю: що важливіше — план чи сигнал | **draft · v10.1.0 → post-2777-plan-vs-signal-when-recommendation-conflicts-with-feeling.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2778 | Конкуруючий тиждень: як вибудувати тренування, коли відрядження, хвороба і дедлайн збіглись | **draft · v10.1.0 → post-2778-competing-week-travel-illness-deadline.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2779 | Об'єм vs. інтенсивність: практичний вибір, коли обидва варіанти «правильні» | **draft · v10.2.0 → post-2779-volume-vs-intensity-practical-choice-competing-priorities.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2780 | Специфічність vs. загальний розвиток: де self-coached атлет має бути «вузьким» — і де широким | proposed · v9.94.0 |
-| 2781 | Деload vs. продовження: коли «ще один тиждень» — рішення, а коли — помилка | proposed · v9.94.0 |
+| 2780 | Специфічність vs. загальний розвиток: де self-coached атлет має бути «вузьким» — і де широким | **draft · v10.3.0 → post-2780-specificity-vs-general-development-when-to-be-narrow.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2781 | Деload vs. продовження: коли «ще один тиждень» — рішення, а коли — помилка | **draft · v10.3.0 → post-2781-deload-vs-continue-when-one-more-week-is-a-mistake.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2782 | Як обирати між двома вправами, якщо обидві працюють | proposed · v9.94.0 |
 | 2783 | Тренування з двома цілями: як структурувати блок без жертви однією задля іншої | proposed · v9.94.0 |
 | 2784 | Мінімальний ефективний вибір: коли «хороший» варіант кращий за «кращий» | proposed · v9.94.0 |
