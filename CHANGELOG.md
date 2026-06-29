@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.7.0] — 2026-06-29
+
+### Added
+- `content/post-2827-when-plan-becomes-excuse.md` — Editorial series 2826–2835, post 2/10. "Момент коли план перестає бути планом і стає виправданням." Founder-voice, editorial-brutalist, 13-min read. Тема: хронологічна різниця між адаптацією плану і раціоналізацією уникнення. Алгоритм трьох питань перед кожною зміною. clinical-safety: NOT_REQUIRED.
+- `blog.html` — card for post-2827 inserted at top of grid (most recent first).
+- `README.md §Editorial series 2836–2845` — new proposed series "Прогрес без ілюзій: як self-coached атлет вимірює те, що реально рахується" (10 topics, proposed · v10.7.0). post-2827 status updated: proposed → draft.
+
+### Changed
+- `STATUS.md §Content library 2826–2835` — count 1/10 → 2/10; post-2827 entry appended.
+- `VERSION` — 10.6.0 → 10.7.0.
+
+---
+
 ## [10.6.0] — 2026-06-29
 
 ### Added
