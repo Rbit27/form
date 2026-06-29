@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.10.0] — 2026-06-29
+
+### Added
+- `content/post-2830-end-of-block-review-not-rationalization.md` — Editorial series 2826–2835, post 5/10. "Кінець блоку: ревізія, а не раціоналізація." Founder-voice, editorial-brutalist, 13-min read. Тема: структура чесного end-of-block debrief — первинні метрики, виконання плану, поведінка RPE, оцінка гіпотези блоку. Три ознаки раціоналізації vs. ревізії. Три помилки кінця блоку (підсумки по пам'яті, змішування аналізу і планування, оцінка за одним параметром). Різниця між «відчуттям прогресу» і даними адаптації. Тест на раціоналізацію. clinical-safety: NOT_REQUIRED.
+- `blog.html` — card for post-2830 inserted at top of grid.
+
+### Changed
+- `STATUS.md` — series 2826–2835 progress 4/10 → 5/10; post-2830 entry added.
+- `VERSION` — 10.9.0 → 10.10.0.
+
+---
+
 ## [10.9.0] — 2026-06-29
 
 ### Added
