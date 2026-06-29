@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.8.0] — 2026-06-29
+
+### Added
+- `content/post-2828-self-assessment-vs-self-delusion.md` — Editorial series 2826–2835, post 3/10. "Self-assessment vs. self-delusion: три ознаки що ти брешеш собі про прогрес." Founder-voice, editorial-brutalist, 14-min read. Тема: три архітектурні механізми когнітивного спотворення самооцінки прогресу — (1) зручна база порівняння (порівняння з найгіршою версією себе), (2) метрична підміна (вимірюєш те, що легко, а не те, що важливо), (3) нефальсифікована заява про прогрес. Дослідницька база: Buckingham & Goodall 2019 (idiosyncratic rater effect), Epley & Dunning 2000 (систематичне переоцінювання), Kahneman WYSIATI, McNally 2021, Ehrlinger & Dunning 2003, Stone 2002 (self-serving bias у спорті), Tali Sharot (нейрологічна основа оптимізму). Структурний захист: визначена база до блоку, відповідна метрика, фальсифікована умова успіху. clinical-safety: NOT_REQUIRED.
+- `blog.html` — card for post-2828 inserted at top of grid.
+
+### Changed
+- `README.md` — post-2828 status proposed → draft · v10.8.0.
+- `STATUS.md` — series 2826–2835 progress 2/10 → 3/10; post-2828 entry added.
+- `VERSION` — 10.7.1 → 10.8.0.
+
+---
+
 ## [10.7.1] — 2026-06-29
 
 ### Added
