@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.49.0
+# FORM · SOC 2 Type II Readiness v3.51.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -32539,3 +32539,42 @@ All SAVE-E artefacts enforce the FORM enterprise privacy floor:
 - HR `tenant_manager` role excluded from all pilot save-protocol data per ENTERPRISE.md privacy floor
 
 *v3.50.0 (2026-06-27): §126 Cross-Reference Patch — COST_MODEL §46.9 item 5 (SAVE-E-001 / SAVE-E-002 · CC3.2 / CC7.2 / CC9.2 / A1.1). Closes P0/M4 documentation obligation created when COST_MODEL §46 (v2.20.0, 2026-06-27, DEC-083) defined two SOC 2 evidence artefacts for the Pilot CSM Save Protocol without registering them in SOC2_READINESS.md. Two artefacts registered (count 93 → 95): SAVE-E-001 (CC3.2/CC7.2/CC9.2, annual, 3yr — `enterprise.pilot_save_protocol_triggered` DEC-030 HMAC-chain export with SAVED/MANAGED_DOWN/ABANDONED outcomes) and SAVE-E-002 (CC7.2/A1.1, annual, 3yr — `pilot_activation_monitor` job 49 pg_cron run history). §80.3 `pilots/save-protocol/` R2 subfolder added (WORM Object Lock Governance; `form_api` NO ACCESS; `form_system` role only). §80.4 Vanta mirror list: two new entries for SAVE-E-001 (annual from M5+) and SAVE-E-002 (annual from M12+). Four checklist items in §126.4 (P0/M4: R2 folder creation; P1: first SAVE-E-001 and SAVE-E-002 filings; P2: calendar update). COST_MODEL §46.9 item 5 → `[x] Done — 2026-06-27`. Privacy floor: `pilot_id` UUID + aggregate NUMERIC rates only in SAVE-E-001; scheduler metadata only in SAVE-E-002; `form_api` REVOKED from all data sources; IC PAM-elevated access only for event emitter. Document header v3.49.0 → v3.50.0. Owner: compliance-officer. Cross-references: `docs/COST_MODEL.md §46.8` (SAVE-E-001/SAVE-E-002 primary definitions); `docs/COST_MODEL.md §46.9 item 5` (closed by this section); `docs/COST_MODEL.md §46.7` (four §46 DEC-030 events — `enterprise.pilot_save_protocol_triggered` HIGH/7yr is SAVE-E-001 source); `docs/OBSERVABILITY.md §12.6` (job 49 `pilot_activation_monitor` registration — SAVE-E-002 run history source); `docs/DECISION_LOG.md DEC-083` (formal adoption record — 2026-06-27, OQ-21 → 🟢 Resolved); `docs/SOC2_READINESS.md §79.4` (§126 row insertions: SAVE-E-001 after ADM-E-002, SAVE-E-002 after SAVE-E-001); `docs/SOC2_READINESS.md §80.3` (`pilots/save-protocol/` folder entry added after `victor-safety/`); `docs/SOC2_READINESS.md §80.4` (SAVE-E-001 + SAVE-E-002 Vanta mirror entries added after AMEND-STALE group); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Save Protocol events` (four §46.7 events with PILOT-SAVE-CHAIN-01 invariant — SAVE-E-001 collection source); `docs/ENTERPRISE.md §Pilot` (90-day free pilot governance, dedicated CSM for Growth+); `docs/DECISION_LOG.md DEC-030` (HMAC-chained audit log — PILOT-SAVE-CHAIN-01 ordering invariant basis).*
+
+---
+
+## §126.6 · PILOT-ACT-STALE-E-001 Registration (CC7.2 / A1.1 / CC3.2)
+
+*v3.51.0 (2026-06-29)*
+
+This subsection closes **INCIDENT_RESPONSE R-49.12 item 4** (P1/M5) — the documentation registration obligation created when `docs/INCIDENT_RESPONSE.md R-49` (v1.0, 2026-06-29) defined PILOT-ACT-STALE-E-001 as a per-incident IC narrative evidence artefact without registering it in SOC2_READINESS.md. One artefact registered (count 95 → 96); `pilots/save-protocol/` R2 subfolder confirmed as the storage location (already added in §126.2); one Vanta mirror entry added to §80.4.
+
+**PILOT-ACT-STALE-E-001** — Per-incident IC narrative for each R-49 (`pilot_activation_monitor` job 49 stale) activation. TSC criteria: CC7.2 / A1.1 / CC3.2. Retention: **7 years** when `save_protocol_gap_found = true` (T0-Alpha miss during stale window — primary CC3.2 risk-response evidence); **3 years** when `save_protocol_gap_found = false` (all-clear stale incident — operational restoration record). Collection: per incident, filed by IC within 48 hours of `system.pilot_activation_monitor_restored` emission at R-49 Step 6. Owner: compliance-officer + devops-lead. Path: `compliance/evidence/pilots/save-protocol/PILOT-ACT-STALE-E-001_<incident_id>.md`.
+
+**Contents of PILOT-ACT-STALE-E-001 narrative:**
+
+1. `incident_id` (UUID — matches PILOT-ACT-STALE-CHAIN-01 `incident_id`)
+2. `declared_at` — timestamp of `system.pilot_activation_monitor_stale_declared` emission
+3. `restored_at` — timestamp of `system.pilot_activation_monitor_restored` emission
+4. `stale_hours` — duration of job 49 staleness (from `stale_declared` payload)
+5. `root_cause` — H1–H4 enum (from `restored` payload)
+6. `day14_cohort_active` — boolean (CC7.2 monitoring scope attestation)
+7. `save_protocol_gap_found` — boolean (CC3.2 risk-response gap attestation)
+8. `save_protocol_gap_resolved` — boolean (CC3.2 compensating control attestation; required `true` when gap found)
+9. `r49_c2_query_output` — R-49-C2 scope query result (active Day-14 pilot cohort count — aggregate integer; no `pilot_id` listed in artefact unless gap found)
+10. `r49_c3_query_output` — R-49-C3 save-protocol predecessor check result (gap boolean; aggregate count only)
+11. `fix_deployed_at` — datetime of job 49 restoration
+12. IC signature: compliance-officer or devops-lead (PAM session UUID)
+
+**Privacy floor:** PILOT-ACT-STALE-E-001 carries FORM-internal `incident_id` UUID, booleans, aggregate integers, H1–H4 enum, and operational timestamps — no employee `user_id`, `activation_rate` value, individual pilot seat data, tenant name, or GDPR Art. 9 health data. R-49-C2/C3 query outputs in the narrative are expressed as aggregate counts only; `pilot_id` UUIDs appear only in the IC's `#security-restricted` session and are never committed to the artefact file. `form_api` REVOKED from all source tables (`pilot_programs`, `session_completed`, `audit_log_events`, `pg_cron.job_run_details`).
+
+**§80.3 R2 folder:** `pilots/save-protocol/` subfolder (added in §126.2) covers PILOT-ACT-STALE-E-001. WORM Object Lock Governance; `form_api` NO ACCESS; `form_system` role only. Retention governed by `save_protocol_gap_found` boolean: 7yr Object Lock when `true`; 3yr Object Lock when `false`. IC sets retention class at upload time.
+
+**§80.4 Vanta mirror entry:** PILOT-ACT-STALE-E-001 added to the §80.4 Vanta mirror list. Upload cadence: per incident, within 48 hours of R-49 Step 6 completion. Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. CC7.2 / A1.1 / CC3.2 criteria tags applied. Privacy flag: FORM-internal operational data only — no PII or GDPR Art. 9 data; Vanta access: compliance-officer + security-engineer only.
+
+**Implementation checklist addition (§126.4 extension):**
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | File first PILOT-ACT-STALE-E-001 artefact after first R-49 activation: retrieve `system.pilot_activation_monitor_stale_declared` and `system.pilot_activation_monitor_restored` from DEC-030 chain for `incident_id`; run R-49-C2 and R-49-C3 queries; file narrative at `pilots/save-protocol/PILOT-ACT-STALE-E-001_<incident_id>.md`; SHA-256 hash; upload to R2 with correct Object Lock retention class (`save_protocol_gap_found` → 7yr / no gap → 3yr); upload to Vanta (CC7.2/A1.1/CC3.2); add to MASTER-INDEX within 48h of `restored` emission. | compliance-officer + devops-lead | **P1** | Per incident (first activation est. M5+) | [ ] |
+
+*v3.51.0 (2026-06-29): §126.6 PILOT-ACT-STALE-E-001 Registration — closes `docs/INCIDENT_RESPONSE.md R-49.12` item 4 (P1/M5). One artefact registered (count 95 → 96): PILOT-ACT-STALE-E-001 (CC7.2/A1.1/CC3.2, per-incident, 7yr if `save_protocol_gap_found = true` / 3yr if false — per-incident IC narrative for each R-49 `pilot_activation_monitor` job 49 stale activation; IC devops-lead + compliance-officer, PAM-elevated; filed within 48h of `system.pilot_activation_monitor_restored` emission). `pilots/save-protocol/` R2 subfolder confirmed (already added §126.2); WORM Object Lock retention class set by IC at upload (7yr / 3yr governed by `save_protocol_gap_found` boolean). §80.4 Vanta mirror: one new entry (per-incident upload; CC7.2/A1.1/CC3.2; 48h cadence). Implementation checklist item 5 added (P1/per-incident). INCIDENT_RESPONSE R-49.12 item 4 → `[x] Done — 2026-06-29 (SOC2_READINESS.md v3.51.0)`. Privacy floor: `incident_id` UUID + booleans + aggregate integers + H1–H4 enum + operational timestamps only; no employee `user_id`, `activation_rate` value, tenant name, or GDPR Art. 9 data; `form_api` REVOKED from all sources. Document header v3.50.0 → v3.51.0. Owner: compliance-officer. Cross-references: `docs/INCIDENT_RESPONSE.md R-49` (source runbook — R-49.10 defines PILOT-ACT-STALE-E-001; R-49.12 item 4 obligation closed); `docs/AUDIT_LOG_SCHEMA.md §Pilot Activation Monitor Stale events` (`system.pilot_activation_monitor_stale_declared` HIGH/7yr + `system.pilot_activation_monitor_restored` STANDARD/3yr — DEC-030 chain sources for PILOT-ACT-STALE-E-001 narrative; registered v2.56, 2026-06-29); `docs/SOC2_READINESS.md §126.1` (SAVE-E-001 companion — same `pilots/save-protocol/` R2 subfolder; PILOT-ACT-STALE-E-001 shares folder); `docs/SOC2_READINESS.md §126.2` (§80.3 R2 folder — `pilots/save-protocol/` already added; this subsection extends its scope to incident artefacts); `docs/OBSERVABILITY.md §58` (PILOT-ACT-STALE-CHAIN-01 canonical spec; §58.8 PILOT-ACT-STALE-E-001 primary definition); `docs/OBSERVABILITY.md §12.6` (job 49 `pilot_activation_monitor` pg_cron registry); `docs/DECISION_LOG.md DEC-030` (HMAC-chained audit log — PILOT-ACT-STALE-CHAIN-01 basis).*

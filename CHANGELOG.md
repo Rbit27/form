@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [9.86.0] — 2026-06-29
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Save Protocol events` — four DEC-030 HMAC-chained events (`enterprise.pilot_save_protocol_triggered` HIGH/7yr, `enterprise.pilot_save_protocol_updated` STANDARD/3yr, `enterprise.pilot_saved` HIGH/7yr, `enterprise.pilot_abandoned` HIGH/7yr) with PILOT-SAVE-CHAIN-01 ordering invariant (HTTP 422 `PILOT_SAVE_CHAIN_01_VIOLATION` on inversion → R-05), four Zod v2 schemas, and CC3.2/CC7.2/CC9.2 auditor narratives. Closes `docs/COST_MODEL.md §46.9` item 1 (P0/M4). SAVE-E-001 primary evidence source (`docs/SOC2_READINESS.md §126.1`).
+- `docs/AUDIT_LOG_SCHEMA.md §Pilot Activation Monitor Stale events` — two DEC-030 HMAC-chained events (`system.pilot_activation_monitor_stale_declared` HIGH/7yr, `system.pilot_activation_monitor_restored` STANDARD/3yr) with PILOT-ACT-STALE-CHAIN-01 ordering invariant (HTTP 422 `PILOT_ACT_STALE_CHAIN_01_VIOLATION` on inversion → R-05), two Zod v2 schemas from R-49.9, and CC7.2/A1.1/CC3.2 auditor narratives. Closes `docs/INCIDENT_RESPONSE.md R-49.12` item 1 (P0/M5).
+- `docs/SOC2_READINESS.md §126.6` — PILOT-ACT-STALE-E-001 per-incident IC narrative evidence artefact registered (CC7.2/A1.1/CC3.2; 7yr if `save_protocol_gap_found = true` / 3yr otherwise; path `compliance/evidence/pilots/save-protocol/PILOT-ACT-STALE-E-001_<incident_id>.md`; filed within 48h of R-49 Step 6; IC devops-lead + compliance-officer, PAM-elevated). Evidence count 95 → 96. Closes `docs/INCIDENT_RESPONSE.md R-49.12` item 4 (P1/M5).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — retention table +4 rows (pilot save protocol triggered/saved/abandoned HIGH 7yr; updated STANDARD 3yr; stale_declared HIGH 7yr; restored STANDARD 3yr). Header v2.55 → v2.56. Changelog entries v2.55 and v2.56 added.
+- `docs/SOC2_READINESS.md` — header v3.49.0 → v3.51.0 (v3.50.0 already in §126 section note; v3.51.0 for PILOT-ACT-STALE-E-001 registration). §80.4 Vanta mirror: PILOT-ACT-STALE-E-001 entry added.
+- `docs/INCIDENT_RESPONSE.md §R-49.12` — item 1 → `[x] Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.56)`; item 4 → `[x] Done — 2026-06-29 (SOC2_READINESS.md v3.51.0)`.
+- `VERSION` — 9.85.1 → 9.86.0.
+
+---
+
 ## [9.85.1] — 2026-06-29
 
 ### Added
