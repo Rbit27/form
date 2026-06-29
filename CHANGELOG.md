@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [10.0.1] — 2026-06-29
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.57 → v2.58: formal version registration for `admin.dashboard_session_started` (LOW/1yr, CC3.2). Event content (section `### Admin (dashboard sessions)`, two-layer de-dup invariant, Zod v2 schema, SOC 2 auditor narrative) was written inline during the OBSERVABILITY §61 authoring pass (v5.8.0, 2026-06-29) with a forward reference to "v2.58"; this patch closes the header lag, adds the event row to the retention table, and adds the v2.58 changelog entry. Closes `docs/OBSERVABILITY.md §59.10` item 1 documentation portion and §61.4 forward reference. Privacy floor: no actor `user_id`, name, email, or GDPR Art. 9 data; `tenant_id_slug` is an opaque slug; HR never sees individual employee data.
+- `VERSION` — 10.0.0 → 10.0.1.
+
 ## [10.0.0] — 2026-06-29
 
 ### Added
