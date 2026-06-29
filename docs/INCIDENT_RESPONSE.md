@@ -18482,3 +18482,777 @@ const PilotActivationMonitorRestoredSchema = z.object({
 ---
 
 *v3.17.0 (2026-06-29): R-49 Pilot Activation Monitor Stale (`pilot_activation_monitor` · job 49) — closes `docs/OBSERVABILITY.md §58.10` item 3 (P1/M5). Companion §58 canonical observability spec co-authored in OBSERVABILITY.md v5.5.0, 2026-06-29 in the same commit. Privacy floor: both DEC-030 stale events (`system.pilot_activation_monitor_stale_declared` HIGH/7yr + `system.pilot_activation_monitor_restored` STANDARD/3yr) carry booleans, numeric counts, H1–H4 enum, FORM-internal UUID — no employee `user_id`, `activation_rate` value, tenant name, or GDPR Art. 9 health data. R-49-C2/C3 scope queries surface only FORM-internal `pilot_id` UUIDs and aggregate rates. Owner: devops-lead + customer-success + compliance-officer.*
+
+---
+
+## R-50: Champion Login Monitor Stale (`champion_login_monitor` · job 50)
+
+**Classification:** P1 initial (escalates to P1 + customer-success page if active Day-45 pilot cohort found with < 2 champion sessions and no prior T0-Beta Slack — see §R-50.5)
+**Owner:** devops-lead + customer-success + compliance-officer
+**Runbook version:** v1.0 (2026-06-29)
+**Review:** after every activation, minimum annual.
+
+### R-50.1 Trigger Conditions
+
+This runbook activates when `pg-cron-health-monitor` fires **AL-CHAMP-ACT-01** (see `docs/OBSERVABILITY.md §59.4`):
+
+| Condition | Detail |
+|---|---|
+| **Primary** | No `system.champion_login_check_passed` LOW event in `audit_log_events` for > 49 h — job 50 `champion_login_monitor` failed to complete at least one daily cycle |
+| **PagerDuty service** | `form-devops` |
+| **Severity** | P1 |
+| **Route** | devops-lead (primary on-call); customer-success notified separately if R-50-C2 positive AND R-50-C3 negative |
+| **Dedup key** | `champ-login-check-stale` |
+| **Auto-resolve** | On next successful `system.champion_login_check_passed` LOW emission after job 50 restoration |
+
+**Critical characteristic:** Job 50 stale creates a **T0-Beta monitoring blind spot** — a pilot that reaches Day 45 with fewer than 2 champion logins will go undetected until job 50 is restored. Unlike T0-Alpha (Day-14 activation rate monitored by job 49), T0-Beta is a point-in-time check evaluated only when a pilot is at exactly Day 45. If a pilot crosses the Day-45 boundary during the stale window, the AL-SAVE-02 Slack alert will never fire for that cohort window. **PILOT-SAVE-CHAIN-01** at the `emit-audit-event` Worker layer continues operating independently — a stale job 50 does not prevent the IC or CSM from manually checking champion sessions and initiating the save protocol via Admin Console.
+
+**Distinction from AL-SAVE-02:** AL-SAVE-02 fires when job 50 detects T0-Beta threshold breach (champion_session_count < 2 at Day 45 for an active Growth or Enterprise pilot) — the operational Slack alert triggering CSM save-protocol action. AL-CHAMP-ACT-01 (this runbook's trigger) fires when job 50 itself stops running — a monitoring infrastructure failure, not a pilot health event.
+
+### R-50.2 Severity Classification
+
+| Severity | Condition |
+|---|---|
+| **P1** | No `system.champion_login_check_passed` LOW in > 49 h; no active Day-44–46 pilot cohort (R-50-C2 negative) |
+| **P1 + customer-success page** | No `system.champion_login_check_passed` LOW in > 49 h; active Day-44–46 cohort exists (R-50-C2 positive); save protocol already triggered for all below-threshold pilots (R-50-C3 fully positive) — restore job 50; customer-success confirms save-protocol status |
+| **P1 + immediate escalation** | No `system.champion_login_check_passed` LOW in > 49 h; active Day-44–46 cohort exists (R-50-C2 positive); any pilot below T0-Beta threshold lacks a `enterprise.pilot_save_protocol_triggered` predecessor (R-50-C3 partially/fully negative) — proceed to §R-50.5 before job 50 restoration |
+| **H4 co-activate R-03** | All peer daily jobs stale (R-50-C4 positive) → Supabase outage probable; activate R-03 in parallel |
+
+### R-50.3 Immediate Actions (T+0 to T+30 min)
+
+**Step 1 — Emit stale-declared DEC-030 event (T+0):**
+
+Emit via `emit-audit-event` Worker (IC PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 anchor — must precede the `restored` terminal event for the same `incident_id`.
+
+```json
+{
+  "event_type": "system.champion_login_monitor_stale_declared",
+  "severity": "HIGH",
+  "payload": {
+    "incident_id": "<new-uuid>",
+    "stale_hours": 0,
+    "day45_cohort_active": false,
+    "t0b_gap": false
+  }
+}
+```
+
+*(Populate `stale_hours`, `day45_cohort_active`, and `t0b_gap` after scope queries R-50-C1 through R-50-C3 complete — amendment is acceptable; the event is the CHAMP-LOGIN-STALE-CHAIN-01 anchor and must be emitted at Step 1 before recovery actions begin.)*
+
+**Step 2 — Run scope queries:**
+
+**R-50-C1 — Staleness confirmation:**
+```sql
+SELECT
+  MAX(created_at)                                           AS last_check_at,
+  NOW() - MAX(created_at)                                   AS stale_window,
+  EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600      AS stale_hours
+FROM audit_log_events
+WHERE event_type = 'system.champion_login_check_passed';
+-- stale_hours > 49: confirms trigger is valid
+-- stale_hours > 96: escalate proactive note to customer-success regardless of R-50-C2 result
+```
+
+**R-50-C2 — Active Day-44–46 pilot cohort (primary escalation gate):**
+```sql
+SELECT
+  pp.pilot_id,
+  pp.tenant_id,
+  pp.tier,
+  pp.contracted_seats,
+  pp.start_date + INTERVAL '45 days'       AS day45_date,
+  DATE_PART('day', NOW() - pp.start_date)  AS day_number
+FROM pilot_programs pp
+WHERE pp.status = 'active'
+  AND DATE_PART('day', NOW() - pp.start_date) BETWEEN 44 AND 46
+  AND pp.tier IN ('growth', 'enterprise');
+-- Rows returned: R-50-C2 positive → proceed to R-50-C3
+-- No rows: R-50-C2 negative → proceed directly to §R-50.6 recovery
+-- Privacy: FORM-internal UUIDs only; no employee names, emails, or health data
+-- ± 1-day window accounts for potential multi-day stale overlap across the Day-45 boundary
+```
+
+**R-50-C3 — T0-Beta gap assessment: save protocol already triggered? (for each R-50-C2 pilot):**
+```sql
+-- Step A: compute champion session count for each Day-44–46 pilot
+SELECT
+  pp.pilot_id,
+  COUNT(*)                                        AS champion_sessions,
+  pp.contracted_seats,
+  pp.tier
+FROM pilot_programs pp
+LEFT JOIN audit_log_events ale
+  ON ale.event_type   = 'admin.dashboard_session_started'
+  AND ale.actor_role   IN ('enterprise_admin', 'tenant_manager')
+  AND ale.tenant_id_slug = (
+        SELECT slug FROM tenants WHERE id = pp.tenant_id
+      )
+  AND ale.created_at  >= pp.start_date
+  AND ale.created_at  <  pp.start_date + INTERVAL '45 days'
+WHERE pp.pilot_id = ANY(ARRAY[<r50_c2_pilot_ids>])
+GROUP BY pp.pilot_id, pp.contracted_seats, pp.tier;
+-- Privacy: returns aggregate session count per pilot_id UUID; no employee user_id, name, or GDPR Art. 9 data
+
+-- Step B: for pilots where champion_sessions < 2, check save protocol predecessor
+SELECT
+  ale.payload->>'pilot_id'      AS pilot_id,
+  ale.created_at                AS triggered_at,
+  ale.payload->>'trigger_type'  AS trigger_type
+FROM audit_log_events ale
+WHERE ale.event_type = 'enterprise.pilot_save_protocol_triggered'
+  AND ale.payload->>'pilot_id' = ANY(ARRAY[<r50_c2_below_threshold_pilot_ids>])
+  AND ale.created_at >= NOW() - INTERVAL '60 days';
+-- All below-threshold pilots matched: R-50-C3 fully positive → monitoring-only restoration
+-- Any below-threshold pilot unmatched: R-50-C3 partially/fully negative → §R-50.5 escalation
+-- Privacy: FORM-internal pilot_id UUIDs only; no employee user_id or health data
+```
+
+**R-50-C4 — Peer daily job health (H4 Supabase discriminator):**
+```sql
+SELECT
+  jobname,
+  MAX(start_time)                                              AS last_run,
+  NOW() - MAX(start_time)                                      AS since_last_run,
+  EXTRACT(EPOCH FROM (NOW() - MAX(start_time))) / 3600         AS hours_since_run
+FROM pg_cron.job_run_details
+WHERE jobname IN (
+  'pilot_activation_monitor',
+  'renewal_notice_check',
+  'white_label_cert_check',
+  'litigation_hold_compliance_monitor',
+  'pricing_exception_compliance_monitor'
+)
+GROUP BY jobname;
+-- All stale (hours_since_run > 49): H4 Supabase outage → activate R-03 in parallel
+-- Only job 50 stale: H1/H2/H3 local failure → continue R-50 scope queries
+```
+
+**R-50-C5 — Job registration check (H1 discriminator):**
+```sql
+SELECT
+  jobid, jobname, schedule, active, username
+FROM pg_cron.job
+WHERE jobname = 'champion_login_monitor';
+-- Row absent: H1 deleted → re-register from §59.5 canonical spec
+-- Row present, active = false: H1 disabled → re-enable (UPDATE pg_cron.job SET active = true ...)
+-- Row present, active = true: H2 permissions or H3 pg_net → continue investigation
+```
+
+### R-50.4 Root Cause Hypotheses
+
+| Hypothesis | Discriminator | Likely indicator |
+|---|---|---|
+| **H1** — Job deleted or disabled | R-50-C5 returns no row (deleted) or `active = false` (disabled) | Human error during maintenance window; accidental job drop |
+| **H2** — `form_system` permissions revoked on `pilot_programs` or `audit_log_events` | R-50-C5 active; peer jobs healthy (R-50-C4 negative); `pg_cron.job_run_details.return_message` shows `permission denied` | IAM policy rollback; accidental REVOKE during migration |
+| **H3** — `pg_net` or audit-event pipeline degraded | R-50-C5 active; peer jobs healthy; job history shows SUCCESS in pg_cron but `system.champion_login_check_passed` absent from `audit_log_events` > 49 h | pg_net connectivity failure; `audit-event-flush` Worker backlog |
+| **H4** — Supabase outage | R-50-C4: all peer daily jobs stale | Supabase infrastructure event; activate R-03 in parallel |
+
+**H1 resolution:** Re-register job 50 with canonical spec from `docs/OBSERVABILITY.md §59.5`. Confirm schedule `0 11 * * *`, `form_system` role, SECURITY DEFINER. Manual trigger: `SELECT cron.run_job('champion_login_monitor');` — verify `system.champion_login_check_passed` LOW emitted within 2 min.
+
+**H2 resolution:** Re-grant `SELECT` on `pilot_programs` and `audit_log_events` to `form_system` role. Confirm via `\dp pilot_programs`. Manual-trigger after re-grant. If revocation was intentional (IAM policy change), coordinate with enterprise-architect before re-granting.
+
+**H3 resolution:** Check pg_net health: `SELECT * FROM net._http_response ORDER BY created DESC LIMIT 20;`. If pg_net degraded, follow pg_net recovery procedures. If `audit-event-flush` Worker is backlogged, check Cloudflare Worker queue depth. Manual-trigger job 50 after pipeline recovery.
+
+**H4 resolution:** R-03 owns Supabase outage recovery. R-50 escalates to R-03 immediately on H4 discrimination.
+
+### R-50.5 Escalation Path — Active Day-44–46 Cohort Below Threshold (R-50-C2 Positive, R-50-C3 Partially or Fully Negative)
+
+When R-50-C2 identifies an active Day-44–46 pilot cohort **and** R-50-C3 shows that one or more pilots with champion_sessions < 2 lack a `enterprise.pilot_save_protocol_triggered` predecessor event, the IC must manually assess T0-Beta status for each unprotected pilot before restoring job 50.
+
+**Step 1 — Manual T0-Beta session count check (R-50-C3 Step A output):**
+
+Use the champion session count from R-50-C3 Step A. If any below-threshold pilot is unmatched in R-50-C3 Step B, proceed to Step 2.
+
+**Step 2 — Page customer-success (for any below-threshold pilot without save protocol open):**
+
+Immediately contact customer-success lead via PagerDuty `form-enterprise` P1 out-of-band:
+
+> Champion login monitoring gap — job 50 stale {stale_hours}h. Pilot `{pilot_id}` at Day {day_number}; champion sessions: {champion_sessions}/2. T0-Beta threshold crossed. Save protocol NOT yet triggered for this pilot. Action: initiate save protocol via Admin Console → Save Protocol Trigger for `{pilot_id}`.
+
+Payload contains FORM-internal `pilot_id` UUID and aggregate session count only — no company name, employee names, individual user_id, or health data.
+
+**Step 3 — Confirm save protocol triggered:**
+
+After customer-success initiates: confirm `enterprise.pilot_save_protocol_triggered` HIGH/7yr emitted for the `pilot_id` within 15 min. The trigger requires IC PAM-elevated access per COST_MODEL §46.3.
+
+**Step 4 — Resume restoration:**
+
+After all unprotected pilots confirmed triggered (or Step 1 shows all at ≥ 2 champion sessions), proceed to §R-50.6.
+
+**Why P1, not P0:** The save protocol T+30 calendar-day response window begins at `enterprise.pilot_save_protocol_triggered` emission. A missed T0-Beta Slack loses the automated detection signal, but the CSM can initiate manually within the T+30 window. There is no technical security breach; the risk is service-quality: delayed or missed T0-Beta notification. Treat as urgent P1 customer commitment risk, not routine maintenance.
+
+### R-50.6 Recovery Steps
+
+1. Identify root cause from H1–H4 discrimination (§R-50.4).
+2. Fix root cause (re-register job, re-grant permissions, restore pg_net, or follow R-03 if H4).
+3. Manual trigger after fix: `SELECT cron.run_job('champion_login_monitor');`
+4. Confirm all-clear emission:
+   ```sql
+   SELECT created_at FROM audit_log_events
+   WHERE event_type = 'system.champion_login_check_passed'
+   ORDER BY created_at DESC LIMIT 1;
+   ```
+   Must be within 2 min of manual trigger.
+5. Confirm job 50 healthy in run details:
+   ```sql
+   SELECT start_time, return_code, return_message
+   FROM   pg_cron.job_run_details
+   WHERE  jobname = 'champion_login_monitor'
+   ORDER  BY start_time DESC LIMIT 3;
+   ```
+6. Emit restored DEC-030 terminal event (IC PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 terminal.
+7. Update stale-declared event payload amendment with final `stale_hours`, `day45_cohort_active`, and `t0b_gap` values.
+8. File CHAMP-LOGIN-STALE-E-001 artefact within 48 h.
+
+### R-50.7 Communication Templates
+
+**IC Slack on detection (post to `#security-restricted`):**
+```
+[R-50 ACTIVATED] champion_login_monitor (job 50) stale — AL-CHAMP-ACT-01 fired.
+Stale window: {stale_hours}h | Day-44–46 cohort active: {yes/no}
+Scope queries running. PD: {pd_incident_url}
+```
+
+**Customer-success page (if R-50-C2 positive, R-50-C3 negative — via PagerDuty form-enterprise P1):**
+```
+[T0-Beta Gap] Champion login monitor stale {stale_hours}h.
+Pilot {pilot_id} at Day {day_number} — champion sessions: {n}/2.
+Save protocol NOT yet triggered. Action: initiate via Admin Console → Save Protocol Trigger.
+```
+
+**Post-resolution Slack (#security-restricted):**
+```
+[R-50 RESOLVED] champion_login_monitor (job 50) restored.
+Root cause: {H1/H2/H3/H4} | Stale: {stale_hours}h | T0-Beta gap: {yes/no}
+Gap resolved: {yes/no/N/A} | CHAMP-LOGIN-STALE-E-001 filed: {yes/pending}
+```
+
+### R-50.8 DEC-030 HMAC-Chained Events
+
+**CHAMP-LOGIN-STALE-CHAIN-01 ordering invariant:**
+- `system.champion_login_monitor_restored` requires a preceding `system.champion_login_monitor_stale_declared` with the same `incident_id`
+- Ordering inversion returns HTTP 422 `CHAMP_LOGIN_STALE_CHAIN_01_VIOLATION` → escalate to R-05
+- Independent of PILOT-SAVE-CHAIN-01, PILOT-ACT-STALE-CHAIN-01, and WAU-DECLINE-STALE-CHAIN-01
+
+**§R-50.8.1 — `system.champion_login_monitor_stale_declared` (HIGH / 7 yr):**
+
+Emitted by IC at Step 1 (PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 anchor.
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | CHAMP-LOGIN-STALE-CHAIN-01 anchor — must match `restored` terminal event |
+| `stale_hours` | NUMERIC | Hours elapsed since last `system.champion_login_check_passed` |
+| `day45_cohort_active` | BOOLEAN | True if any Growth/Enterprise pilot is at Day 44–46 during the stale window |
+| `t0b_gap` | BOOLEAN | True only if `day45_cohort_active` AND any Day-44–46 pilot has champion_sessions < 2 without a `enterprise.pilot_save_protocol_triggered` predecessor |
+
+**Classification:** HIGH · 7 yr · CC3.2 · CC7.2 · A1.1
+
+**§R-50.8.2 — `system.champion_login_monitor_restored` (STANDARD / 3 yr):**
+
+Emitted by IC at Step 6 (PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 terminal event.
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | Matches `stale_declared` — CHAMP-LOGIN-STALE-CHAIN-01 |
+| `stale_hours` | NUMERIC | Total stale duration in hours |
+| `day45_cohort_active` | BOOLEAN | True if any mature pilot was in Day 44–46 window during stale period |
+| `t0b_gap_resolved` | BOOLEAN | Must be `true` if `t0b_gap` was `true` in stale_declared; enforced by IC before P1 closure |
+| `root_cause` | ENUM | H1_deleted / H1_disabled / H2_permissions_revoked / H3_pg_net_degraded / H4_supabase_outage |
+| `fix_deployed_at` | ISO-8601 timestamp | When job 50 was restored |
+
+**Classification:** STANDARD · 3 yr · CC7.2 · A1.1
+
+**Privacy floor (both events):** No employee `user_id`, name, email, champion session content, body metrics, or GDPR Art. 9 special-category health data. Only booleans, numeric counts/hours, H1–H4 enum, and FORM-internal `incident_id` UUID.
+
+**AUDIT_LOG_SCHEMA.md registration:** Pending §59.10 item 2 (P0/M6). Zod v2 schemas to be authored at §R-50.9 in this document.
+
+### R-50.9 Zod v2 Schemas (canonical source: this document §R-50.9)
+
+```typescript
+import { z } from 'zod';
+
+// system.champion_login_monitor_stale_declared (HIGH · 7 yr)
+export const ChampLoginStaleDeclaredSchema = z.object({
+  incident_id:         z.string().uuid(),
+  stale_hours:         z.number().nonnegative(),
+  day45_cohort_active: z.boolean(),
+  t0b_gap:             z.boolean(),
+});
+
+// system.champion_login_monitor_restored (STANDARD · 3 yr)
+export const ChampLoginRestoredSchema = z.object({
+  incident_id:         z.string().uuid(),
+  stale_hours:         z.number().nonnegative(),
+  day45_cohort_active: z.boolean(),
+  t0b_gap_resolved:    z.boolean(),    // must be true if t0b_gap was true; enforced by IC before P1 close
+  root_cause:          z.enum([
+    'H1_deleted',
+    'H1_disabled',
+    'H2_permissions_revoked',
+    'H3_pg_net_degraded',
+    'H4_supabase_outage',
+  ]),
+  fix_deployed_at:     z.string().datetime(),
+});
+```
+
+**Privacy floor:** Both schemas carry only booleans, numeric counts, H1–H4 enums, and FORM-internal `incident_id` UUID. No employee `user_id`, champion session content, tenant name, or GDPR Art. 9 special-category health data.
+
+**SOC 2 auditor rationale:** CC7.2 — the CHAMP-LOGIN-STALE-CHAIN-01 HMAC chain provides a tamper-evident timeline from detection to restoration, independently verifiable per HMAC-VERIFY-ALGO-001. `t0b_gap_resolved = true` in the terminal event confirms that any T0-Beta monitoring gap was remediated within the R-50 lifecycle.
+
+### R-50.10 SOC 2 Evidence
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | Path |
+|---|---|---|---|---|---|
+| **CHAMP-LOGIN-STALE-E-001** | CC7.2 / A1.1 / CC3.2 | IC narrative per R-50 activation: stale window (hours), root cause (H1–H4), Day-44–46 cohort status, T0-Beta gap found/resolved. Filed within 48 h of job 50 restoration. | Per incident | 7 yr if T0-Beta gap found; 3 yr if no gap | `compliance/evidence/pilots/champion-login/CHAMP-LOGIN-STALE-E-001_<incident_id>.md` |
+
+**CC7.2 auditor rationale:** Job 50 staleness is a monitoring-layer failure — the detection sentinel for FORM's T0-Beta pilot save trigger stopped running. CHAMP-LOGIN-STALE-E-001 documents the gap and its remediation. `t0b_gap_resolved = true` in `system.champion_login_monitor_restored` provides HMAC-chained confirmation that any Day-45 pilot below champion-login threshold was identified and the save protocol initiated despite the monitoring gap.
+
+**A1.1 auditor rationale:** FORM's enterprise pilot availability commitment (COST_MODEL §46.3, MSA) requires that champion-login monitoring runs daily without gap. R-50 activation and CHAMP-LOGIN-STALE-E-001 document FORM's detection and response procedure when this monitoring commitment is disrupted.
+
+**CC3.2 auditor rationale:** Champion disengagement at Day 45 is a documented enterprise risk (COST_MODEL §46.1); job 50 is the designed monitoring response to that risk. R-50 documents the monitoring-layer response itself failing and being remediated — satisfying CC3.2's requirement that risk responses are operative and recoverable.
+
+### R-50.11 Cross-References
+
+- `docs/OBSERVABILITY.md §59` — champion login observability canonical spec (§59.5); CHAMP-LOGIN-SLO-01/02 (§59.2); AL-SAVE-02 / AL-CHAMP-ACT-01 (§59.4); stale-window DEC-030 event specs (§59.7); CHAMP-LOGIN-STALE-E-001 (§59.8); §59.10 item 6 — this runbook closes
+- `docs/OBSERVABILITY.md §12.6` — job 50 pg_cron registry; stale-consequence cross-ref pending §59.10 item 5
+- `docs/COST_MODEL.md §46` — CSM Save Protocol (canonical); T0-Beta trigger §46.2; T+30 response window §46.3; PILOT-SAVE-CHAIN-01 §46.5; DEC-030 pilot events §46.7
+- `docs/SOC2_READINESS.md §126` — CHAMP-LOGIN-STALE-E-001 registration pending §59.10 item 4
+- `docs/AUDIT_LOG_SCHEMA.md` — `system.champion_login_monitor_stale_declared` + `system.champion_login_monitor_restored` + CHAMP-LOGIN-STALE-CHAIN-01 pending §59.10 item 2
+- R-03 (Infrastructure Outage — H4 co-activation)
+- R-05 (HMAC chain break — CHAMP-LOGIN-STALE-CHAIN-01 ordering inversion escalation)
+- R-20 (Insider Threat — H1 deliberate deletion co-activation path)
+- R-45 (Litigation Hold Monitor Stale — structural daily-job-stale peer)
+- R-46 (Pricing Exception Monitor Stale — structural daily-job-stale peer)
+- R-47 (SCIM Provisioning Monitor Stale — structural daily-job-stale peer)
+- R-48 (Amendment Rate Compliance Monitor Stale — structural daily-job-stale peer)
+- R-49 (Pilot Activation Monitor Stale — closest structural peer: same save-protocol ecosystem)
+- R-51 (WAU Decline Monitor Stale — T0-Gamma structural sibling; both pilots/§46 scope)
+- DEC-030
+
+### R-50.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Emit `admin.dashboard_session_started` (LOW/1yr) from Admin Dashboard backend on any `enterprise_admin` or `tenant_manager` page load; wire to `emit-audit-event` Worker; add to AUDIT_LOG_SCHEMA.md. | platform-engineer + security-engineer | **P0** | M6 | [ ] |
+| 2 | Register `system.champion_login_monitor_stale_declared` (HIGH/7yr) + `system.champion_login_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md`. Include CHAMP-LOGIN-STALE-CHAIN-01 ordering invariant; CC7.2/A1.1/CC3.2 auditor narratives. Zod v2 schemas sourced from §R-50.9. | security-engineer + compliance-officer | **P0** | M6 | [ ] |
+| 3 | Deploy PagerDuty routing rule AL-CHAMP-ACT-01: `pg-cron-health-monitor` routes `system.cron_job_stale WHERE job_name = 'champion_login_monitor'` → service `form-devops` P1; dedup `champ-login-check-stale`; auto-resolve on next `system.champion_login_check_passed`. | devops-lead | **P0** | M6 | [ ] |
+| 4 | Register CHAMP-LOGIN-STALE-E-001 artefact template path in `docs/SOC2_READINESS.md §126` evidence table; establish `pilots/champion-login/` subfolder in R2 compliance bucket; add Vanta mirror entry (CC7.2/A1.1/CC3.2). | compliance-officer | **P1** | M6 | [ ] |
+| 5 | Register job 50 in `docs/OBSERVABILITY.md §12.6` pg_cron canonical registry: schedule `0 11 * * *`; freshness 49 h; SOC 2 CC3.2/CC7.2/A1.1; stale-consequence cross-ref `INCIDENT_RESPONSE R-50`; PagerDuty dedup `champ-login-check-stale`. | devops-lead | **P1** | M6 | [ ] |
+
+---
+
+*v1.0 (2026-06-29): R-50 Champion Login Monitor Stale (`champion_login_monitor` · job 50) — fiftieth runbook. Closes `docs/OBSERVABILITY.md §59.10` item 6 (P1/M6 — author R-50 stale recovery runbook). Companion §59 canonical observability spec co-authored in OBSERVABILITY.md v5.6.0, 2026-06-29. Critical characteristic: unlike R-49 (T0-Alpha activation rate — continuous risk), R-50 covers T0-Beta (champion login — point-in-time check at Day 45 only). Pilot crossing Day 45 during the stale window loses the automated AL-SAVE-02 Slack signal permanently for that cohort window; CSM must be manually notified if R-50-C2 positive and R-50-C3 negative. PILOT-SAVE-CHAIN-01 at the `emit-audit-event` Worker layer continues operating independently. Key distinction from R-49: R-50 gap risk is binary (pilot either passes Day 45 or not during the stale window), not graduated; a 49 h stale window that does not overlap any pilot's Day-45 window has zero T0-Beta gap risk. Two DEC-030 HMAC-chained events: `system.champion_login_monitor_stale_declared` HIGH/7yr (CHAMP-LOGIN-STALE-CHAIN-01 anchor; IC PAM-elevated at Step 1; CC7.2/A1.1/CC3.2); `system.champion_login_monitor_restored` STANDARD/3yr (terminal; IC PAM-elevated at Step 6; `t0b_gap_resolved = true` required if gap found). Five scope queries: R-50-C1 (staleness — stale_hours); R-50-C2 (active Day-44–46 cohort — primary escalation gate, ±1 day window); R-50-C3 (T0-Beta gap — champion session count + save protocol predecessor check); R-50-C4 (peer daily job health — H4 discriminator); R-50-C5 (job registration — H1 discriminator). Four root causes H1–H4. Three communication templates (IC Slack on detection; customer-success page if gap found; post-resolution). One evidence artefact: CHAMP-LOGIN-STALE-E-001 (CC7.2/A1.1/CC3.2; 7yr if T0-Beta gap / 3yr if no gap). Five-item implementation checklist: `admin.dashboard_session_started` event prerequisite (P0/M6 item 1); AUDIT_LOG_SCHEMA.md event registration (P0/M6 item 2); AL-CHAMP-ACT-01 PagerDuty routing rule (P0/M6 item 3); SOC2_READINESS §126 CHAMP-LOGIN-STALE-E-001 (P1/M6 item 4); §12.6 job 50 registry (P1/M6 item 5). Privacy floor: both DEC-030 stale events carry only booleans, numeric counts, H1–H4 enum, and FORM-internal `incident_id` UUID — no employee `user_id`, champion session content, tenant name, or GDPR Art. 9 health data; R-50-C2/C3 surface only FORM-internal `pilot_id` UUIDs and aggregate session counts. Cross-references: `docs/OBSERVABILITY.md §59`; `docs/OBSERVABILITY.md §12.6`; `docs/COST_MODEL.md §46`; `docs/SOC2_READINESS.md §126`; R-03; R-05; R-20; R-45–R-49; R-51. Owner: devops-lead + customer-success + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-29 · Owner: devops-lead + customer-success + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---
+
+## R-51: WAU Decline Monitor Stale (`wau_decline_monitor` · job 51)
+
+**Classification:** P1 initial (escalates to P1 + customer-success page if active mature pilot cohort found with T0-Gamma gap unresolved — see §R-51.5)
+**Owner:** devops-lead + customer-success + compliance-officer
+**Runbook version:** v1.0 (2026-06-29)
+**Review:** after every activation, minimum annual.
+
+### R-51.1 Trigger Conditions
+
+This runbook activates when `pg-cron-health-monitor` fires **AL-WAU-ACT-01** (see `docs/OBSERVABILITY.md §60.4`):
+
+| Condition | Detail |
+|---|---|
+| **Primary** | No `system.wau_decline_check_passed` LOW event in `audit_log_events` for > 8 days — job 51 `wau_decline_monitor` failed to complete at least one weekly cycle |
+| **PagerDuty service** | `form-devops` |
+| **Severity** | P1 |
+| **Route** | devops-lead (primary on-call); customer-success notified separately if R-51-C2 positive AND R-51-C3 negative |
+| **Dedup key** | `wau-decline-check-stale` |
+| **Auto-resolve** | On next successful `system.wau_decline_check_passed` LOW emission after job 51 restoration |
+
+**Critical characteristic — weekly cadence amplifies gap risk:** Job 51 is a **weekly** job (every Monday at 12:00 UTC), unlike daily jobs 49/50. A stale window can reach **14–21 days** if two or three Monday runs fail consecutively. Each additional missed Monday represents a full week of T0-Gamma detection blindness — a pilot exhibiting 3 consecutive ≥ 10 pp WAU rate declines may go undetected for the full stale window plus the 3-week evaluation period. T+30 save-protocol response window (COST_MODEL §46.3) begins to narrow significantly after 14+ days of monitoring gap. **PILOT-SAVE-CHAIN-01** at the `emit-audit-event` Worker layer continues operating independently — a stale job 51 does not prevent the IC or CSM from manually computing WAU rates and initiating the save protocol via Admin Console.
+
+**Freshness window:** 8 days (1-day tolerance above 7-day cadence). AL-WAU-ACT-01 fires when `system.wau_decline_check_passed` is absent for > 8 days.
+
+**Distinction from AL-SAVE-03:** AL-SAVE-03 fires when job 51 detects T0-Gamma threshold breach (3 consecutive weekly WAU rate declines ≥ 10 pp for an active Growth or Enterprise pilot ≥ 28 days) — the operational Slack alert triggering CSM save-protocol action. AL-WAU-ACT-01 (this runbook's trigger) fires when job 51 itself stops running — a monitoring infrastructure failure, not a pilot health event.
+
+**OQ-WAU-OBS-01 note:** OBSERVABILITY.md §60.11 flags a minimum seat guard risk — a 5-seat pilot may show extreme WAU rate volatility from small absolute changes. A minimum seat guard `contracted_seats >= 25` is recommended before first live pilot deployment. The R-51-C2/C3 scope queries below include this guard as an advisory filter (marked); align with COST_MODEL §21.6.
+
+### R-51.2 Severity Classification
+
+| Severity | Condition |
+|---|---|
+| **P1** | No `system.wau_decline_check_passed` LOW in > 8 days; no active mature pilot cohort (R-51-C2 negative) |
+| **P1 + customer-success page** | No `system.wau_decline_check_passed` LOW in > 8 days; mature pilots active ≥ 28 days (R-51-C2 positive); save protocol already triggered for all T0-Gamma-breaching pilots (R-51-C3 fully positive) — restore job 51; customer-success confirms save-protocol status |
+| **P1 + immediate escalation** | No `system.wau_decline_check_passed` LOW in > 8 days; mature pilots active ≥ 28 days (R-51-C2 positive); manual WAU computation confirms T0-Gamma breach for ≥ 1 pilot AND save protocol not yet triggered (R-51-C3 partially/fully negative) — proceed to §R-51.5 before job 51 restoration |
+| **H4 co-activate R-03** | All peer jobs stale (R-51-C4 positive) → Supabase outage probable; activate R-03 in parallel |
+
+**Stale-window escalation note:** If `stale_days > 14` (two missed Monday runs), immediately escalate proactive note to customer-success regardless of R-51-C2 result — the T0-Gamma detection window covering 3 consecutive weeks may have been fully open during the gap.
+
+### R-51.3 Immediate Actions (T+0 to T+30 min)
+
+**Step 1 — Emit stale-declared DEC-030 event (T+0):**
+
+Emit via `emit-audit-event` Worker (IC PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 anchor — must precede the `restored` terminal event for the same `incident_id`.
+
+```json
+{
+  "event_type": "system.wau_decline_monitor_stale_declared",
+  "severity": "HIGH",
+  "payload": {
+    "incident_id": "<new-uuid>",
+    "stale_days": 0,
+    "mature_pilots_active": false,
+    "t0g_gap": false
+  }
+}
+```
+
+*(Populate `stale_days`, `mature_pilots_active`, and `t0g_gap` after scope queries R-51-C1 through R-51-C3 complete — amendment is acceptable; the event is the WAU-DECLINE-STALE-CHAIN-01 anchor and must be emitted at Step 1 before recovery actions begin.)*
+
+**Step 2 — Run scope queries:**
+
+**R-51-C1 — Staleness confirmation:**
+```sql
+SELECT
+  MAX(created_at)                                                    AS last_check_at,
+  NOW() - MAX(created_at)                                            AS stale_window,
+  EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 86400              AS stale_days
+FROM audit_log_events
+WHERE event_type = 'system.wau_decline_check_passed';
+-- stale_days > 8: confirms trigger is valid
+-- stale_days > 14: two missed Monday runs — escalate proactive note to customer-success
+-- stale_days > 21: three missed Monday runs — P1 + immediate escalation regardless of R-51-C2 result
+```
+
+**R-51-C2 — Active mature pilot cohort ≥ 28 days (primary escalation gate):**
+```sql
+SELECT
+  pp.pilot_id,
+  pp.tenant_id,
+  pp.tier,
+  pp.contracted_seats,
+  pp.start_date,
+  DATE_PART('day', NOW() - pp.start_date)  AS pilot_day
+FROM pilot_programs pp
+WHERE pp.status = 'active'
+  AND DATE_PART('day', NOW() - pp.start_date) >= 28
+  AND pp.tier IN ('growth', 'enterprise')
+  -- Advisory filter (OQ-WAU-OBS-01): AND pp.contracted_seats >= 25
+  --   Pilots with < 25 seats may show WAU rate volatility from small absolute changes.
+  --   Include them in scope but flag separately; align with COST_MODEL §21.6 before go-live.
+ORDER BY pilot_day DESC;
+-- Rows returned: R-51-C2 positive → proceed to R-51-C3
+-- No rows: R-51-C2 negative → proceed directly to §R-51.6 recovery
+-- Privacy: FORM-internal UUIDs only; no employee names, emails, session content, or health data
+```
+
+**R-51-C3 — T0-Gamma gap assessment: 3-consecutive-week WAU decline + save protocol check:**
+```sql
+-- Step A: Compute manual WAU rate per week for each R-51-C2 pilot
+-- (mirrors job 51 logic from OBSERVABILITY §60.5)
+WITH weekly_wau AS (
+  SELECT
+    pp.pilot_id,
+    DATE_TRUNC('week', sc.created_at)                                AS week_start,
+    COUNT(DISTINCT sc.user_id)::NUMERIC
+      / NULLIF(pp.contracted_seats, 0)                               AS wau_rate
+  FROM pilot_programs pp
+  JOIN session_completed sc ON sc.tenant_id = pp.tenant_id
+  WHERE pp.pilot_id = ANY(ARRAY[<r51_c2_pilot_ids>])
+    AND pp.status = 'active'
+    AND sc.created_at >= NOW() - INTERVAL '35 days'
+    AND sc.created_at <  DATE_TRUNC('week', NOW())
+  GROUP BY pp.pilot_id, DATE_TRUNC('week', sc.created_at)
+),
+week_over_week AS (
+  SELECT
+    pilot_id,
+    week_start,
+    wau_rate,
+    LAG(wau_rate) OVER (PARTITION BY pilot_id ORDER BY week_start)       AS prev_wau_rate,
+    (LAG(wau_rate) OVER (PARTITION BY pilot_id ORDER BY week_start)
+      - wau_rate) * 100                                                   AS decline_pp
+  FROM weekly_wau
+),
+consecutive_check AS (
+  SELECT
+    pilot_id,
+    week_start,
+    decline_pp,
+    LAG(decline_pp, 1) OVER (PARTITION BY pilot_id ORDER BY week_start)  AS dp_1,
+    LAG(decline_pp, 2) OVER (PARTITION BY pilot_id ORDER BY week_start)  AS dp_2
+  FROM week_over_week
+  WHERE prev_wau_rate IS NOT NULL
+)
+SELECT
+  pilot_id,
+  MAX(CASE WHEN decline_pp >= 10 AND dp_1 >= 10 AND dp_2 >= 10 THEN 1 ELSE 0 END) AS t0g_breach
+FROM consecutive_check
+GROUP BY pilot_id;
+-- pilot_id with t0g_breach = 1: T0-Gamma threshold crossed → Step B
+-- Privacy: aggregate WAU rate per pilot_id UUID; no individual user_id, name, or health data
+
+-- Step B: For breach pilots, check save protocol predecessor
+SELECT
+  ale.payload->>'pilot_id'      AS pilot_id,
+  ale.created_at                AS triggered_at,
+  ale.payload->>'trigger_type'  AS trigger_type
+FROM audit_log_events ale
+WHERE ale.event_type = 'enterprise.pilot_save_protocol_triggered'
+  AND ale.payload->>'pilot_id' = ANY(ARRAY[<r51_c3_breach_pilot_ids>])
+  AND ale.created_at >= NOW() - INTERVAL '60 days';
+-- All breach pilots matched: R-51-C3 fully positive → monitoring-only restoration
+-- Any breach pilot unmatched: R-51-C3 partially/fully negative → §R-51.5 escalation
+-- Privacy: FORM-internal pilot_id UUIDs only; no individual user_id or health data
+```
+
+**R-51-C4 — Peer job health (H4 Supabase discriminator):**
+```sql
+SELECT
+  jobname,
+  MAX(start_time)                                              AS last_run,
+  NOW() - MAX(start_time)                                      AS since_last_run,
+  EXTRACT(EPOCH FROM (NOW() - MAX(start_time))) / 86400        AS days_since_run
+FROM pg_cron.job_run_details
+WHERE jobname IN (
+  'pilot_activation_monitor',
+  'champion_login_monitor',
+  'renewal_notice_check',
+  'white_label_cert_check',
+  'litigation_hold_compliance_monitor'
+)
+GROUP BY jobname;
+-- All stale: H4 Supabase outage → activate R-03 in parallel
+-- Only job 51 stale: H1/H2/H3 local failure → continue R-51 scope queries
+-- Note: peer jobs are daily — check stale_days > 1 for them, not > 8
+```
+
+**R-51-C5 — Job registration check (H1 discriminator):**
+```sql
+SELECT
+  jobid, jobname, schedule, active, username
+FROM pg_cron.job
+WHERE jobname = 'wau_decline_monitor';
+-- Row absent: H1 deleted → re-register from §60.5 canonical spec
+-- Row present, active = false: H1 disabled → re-enable (UPDATE pg_cron.job SET active = true ...)
+-- Row present, active = true: H2 permissions or H3 pg_net → continue investigation
+```
+
+### R-51.4 Root Cause Hypotheses
+
+| Hypothesis | Discriminator | Likely indicator |
+|---|---|---|
+| **H1** — Job deleted or disabled | R-51-C5 returns no row (deleted) or `active = false` (disabled) | Human error during maintenance window; accidental job drop |
+| **H2** — `form_system` permissions revoked on `pilot_programs` or `session_completed` | R-51-C5 active; peer daily jobs healthy (R-51-C4 negative); `pg_cron.job_run_details.return_message` shows `permission denied` | IAM policy rollback; accidental REVOKE during migration |
+| **H3** — `pg_net` or audit-event pipeline degraded | R-51-C5 active; peer jobs healthy; job history shows SUCCESS in pg_cron but `system.wau_decline_check_passed` absent from `audit_log_events` > 8 days | pg_net connectivity failure; `audit-event-flush` Worker backlog |
+| **H4** — Supabase outage | R-51-C4: peer daily jobs stale (check days_since_run > 1) | Supabase infrastructure event; activate R-03 in parallel |
+
+**H1 resolution:** Re-register job 51 with canonical spec from `docs/OBSERVABILITY.md §60.5`. Confirm schedule `0 12 * * 1`, `form_system` role, SECURITY DEFINER. Manual trigger: `SELECT cron.run_job('wau_decline_monitor');` — verify `system.wau_decline_check_passed` LOW emitted within 2 min.
+
+**H2 resolution:** Re-grant `SELECT` on `pilot_programs` and `session_completed` to `form_system` role. Confirm via `\dp pilot_programs`. Manual-trigger after re-grant. If revocation was intentional (IAM policy change), coordinate with enterprise-architect before re-granting.
+
+**H3 resolution:** Check pg_net health: `SELECT * FROM net._http_response ORDER BY created DESC LIMIT 20;`. If pg_net degraded, follow pg_net recovery procedures. If `audit-event-flush` Worker is backlogged, check Cloudflare Worker queue depth. Manual-trigger job 51 after pipeline recovery.
+
+**H4 resolution:** R-03 owns Supabase outage recovery. R-51 escalates to R-03 immediately on H4 discrimination.
+
+### R-51.5 Escalation Path — Active Mature Pilot Cohort with T0-Gamma Breach (R-51-C2 Positive, R-51-C3 Partially or Fully Negative)
+
+When R-51-C2 identifies active mature pilots (≥ 28 days) **and** R-51-C3 Step A confirms T0-Gamma breach for ≥ 1 pilot **and** R-51-C3 Step B shows that pilot lacks a `enterprise.pilot_save_protocol_triggered` predecessor, the IC must manually initiate the save protocol for each unprotected pilot before restoring job 51.
+
+**Step 1 — Verify manual WAU rate computation (R-51-C3 Step A output):**
+
+Use the `t0g_breach = 1` pilot_ids from R-51-C3. Confirm 3-consecutive-week decline pattern is real and not an artifact of incomplete weeks (exclude `DATE_TRUNC('week', NOW())` — current week may be partial).
+
+**Step 2 — Page customer-success (for any breach pilot without save protocol open):**
+
+Immediately contact customer-success lead via PagerDuty `form-enterprise` P1 out-of-band:
+
+> WAU decline monitoring gap — job 51 stale {stale_days} days ({stale_weeks} weeks). Pilot `{pilot_id}` has 3+ consecutive weekly WAU declines ≥ 10 pp. Save protocol NOT yet triggered. Action: initiate save protocol via Admin Console → Save Protocol Trigger for `{pilot_id}`.
+
+Payload contains FORM-internal `pilot_id` UUID and aggregate WAU rate only — no company name, employee names, individual user_id, or GDPR Art. 9 health data.
+
+**Step 3 — Confirm save protocol triggered:**
+
+After customer-success initiates: confirm `enterprise.pilot_save_protocol_triggered` HIGH/7yr emitted for the `pilot_id` within 15 min. The trigger requires IC PAM-elevated access per COST_MODEL §46.3.
+
+**Step 4 — Resume restoration:**
+
+After all unprotected breach pilots confirmed triggered (or Step 1 shows all pilots have no T0-Gamma breach), proceed to §R-51.6.
+
+**Why P1, not P0:** The save protocol T+30 calendar-day response window begins at `enterprise.pilot_save_protocol_triggered` emission. The weekly cadence of job 51 means a gap can absorb more detection latency than daily jobs, but the T0-Gamma condition itself requires 3 weeks of declining data to form — IC has time to manually compute and initiate. There is no technical security breach; the risk is service-quality: delayed T0-Gamma notification. Note: if `stale_days > 21`, treat as P1 maximum urgency — three full weekly evaluation windows have been missed.
+
+### R-51.6 Recovery Steps
+
+1. Identify root cause from H1–H4 discrimination (§R-51.4).
+2. Fix root cause (re-register job, re-grant permissions, restore pg_net, or follow R-03 if H4).
+3. Manual trigger after fix: `SELECT cron.run_job('wau_decline_monitor');`
+4. Confirm all-clear emission:
+   ```sql
+   SELECT created_at FROM audit_log_events
+   WHERE event_type = 'system.wau_decline_check_passed'
+   ORDER BY created_at DESC LIMIT 1;
+   ```
+   Must be within 2 min of manual trigger.
+5. Confirm job 51 healthy in run details:
+   ```sql
+   SELECT start_time, return_code, return_message
+   FROM   pg_cron.job_run_details
+   WHERE  jobname = 'wau_decline_monitor'
+   ORDER  BY start_time DESC LIMIT 3;
+   ```
+6. Emit restored DEC-030 terminal event (IC PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 terminal.
+7. Update stale-declared event payload amendment with final `stale_days`, `mature_pilots_active`, `t0g_gap_found`, and `t0g_gap_resolved` values.
+8. File WAU-DECLINE-STALE-E-001 artefact within 48 h.
+
+### R-51.7 Communication Templates
+
+**IC Slack on detection (post to `#security-restricted`):**
+```
+[R-51 ACTIVATED] wau_decline_monitor (job 51) stale — AL-WAU-ACT-01 fired.
+Stale window: {stale_days} days ({stale_weeks} weeks) | Mature pilot cohort active: {yes/no}
+Scope queries running. PD: {pd_incident_url}
+NOTE: Weekly cadence — stale_days > 14 means multiple Monday runs missed; escalate CS proactively.
+```
+
+**Customer-success page (if R-51-C2 positive, R-51-C3 negative — via PagerDuty form-enterprise P1):**
+```
+[T0-Gamma Gap] WAU decline monitor stale {stale_days} days ({stale_weeks} weeks).
+Pilot {pilot_id} — 3 consecutive WAU declines ≥ 10 pp confirmed. Tier: {tier}.
+Save protocol NOT yet triggered. Action: initiate via Admin Console → Save Protocol Trigger.
+```
+
+**Post-resolution Slack (#security-restricted):**
+```
+[R-51 RESOLVED] wau_decline_monitor (job 51) restored.
+Root cause: {H1/H2/H3/H4} | Stale: {stale_days} days | T0-Gamma gap: {yes/no}
+Gap resolved: {yes/no/N/A} | WAU-DECLINE-STALE-E-001 filed: {yes/pending}
+```
+
+### R-51.8 DEC-030 HMAC-Chained Events
+
+**WAU-DECLINE-STALE-CHAIN-01 ordering invariant:**
+- `system.wau_decline_monitor_restored` requires a preceding `system.wau_decline_monitor_stale_declared` with the same `incident_id`
+- Ordering inversion returns HTTP 422 `WAU_DECLINE_STALE_CHAIN_01_VIOLATION` → escalate to R-05
+- Independent of PILOT-SAVE-CHAIN-01, PILOT-ACT-STALE-CHAIN-01, and CHAMP-LOGIN-STALE-CHAIN-01
+
+**§R-51.8.1 — `system.wau_decline_monitor_stale_declared` (HIGH / 7 yr):**
+
+Emitted by IC at Step 1 (PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 anchor.
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | WAU-DECLINE-STALE-CHAIN-01 anchor — must match `restored` terminal event |
+| `stale_days` | NUMERIC | Days elapsed since last `system.wau_decline_check_passed` |
+| `mature_pilots_active` | BOOLEAN | True if any Growth/Enterprise pilot with ≥ 28 days exists during the stale window |
+| `t0g_gap` | BOOLEAN | True only if `mature_pilots_active` AND manual computation confirms ≥ 1 pilot with 3-consecutive ≥ 10 pp WAU declines without a `enterprise.pilot_save_protocol_triggered` predecessor |
+
+**Classification:** HIGH · 7 yr · CC3.2 · CC7.2 · A1.1
+
+**§R-51.8.2 — `system.wau_decline_monitor_restored` (STANDARD / 3 yr):**
+
+Emitted by IC at Step 6 (PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 terminal event.
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | Matches `stale_declared` — WAU-DECLINE-STALE-CHAIN-01 |
+| `stale_days` | NUMERIC | Total stale duration in days |
+| `mature_pilots_active` | BOOLEAN | True if any mature pilot existed during stale window |
+| `t0g_gap_found` | BOOLEAN | True if a 3-consecutive-week WAU decline pattern was identified during the gap |
+| `t0g_gap_resolved` | BOOLEAN | Must be `true` if `t0g_gap_found = true` before P1 closure |
+| `root_cause` | ENUM | H1_deleted / H1_disabled / H2_permissions_revoked / H3_pg_net_degraded / H4_supabase_outage |
+| `fix_deployed_at` | ISO-8601 timestamp | When job 51 was restored |
+
+**Classification:** STANDARD · 3 yr · CC7.2 · A1.1
+
+**Privacy floor (both events):** No employee `user_id`, name, email, WAU values, tenant name, session content, body metrics, or GDPR Art. 9 special-category health data. Only booleans, numeric counts/days, H1–H4 enum, and FORM-internal `incident_id` UUID.
+
+**AUDIT_LOG_SCHEMA.md registration:** Pending §60.10 item 2 (P0/M6). Zod v2 schemas to be authored at §R-51.9 in this document.
+
+### R-51.9 Zod v2 Schemas (canonical source: this document §R-51.9)
+
+```typescript
+import { z } from 'zod';
+
+// system.wau_decline_monitor_stale_declared (HIGH · 7 yr)
+export const WauDeclineStaleDeclaredSchema = z.object({
+  incident_id:          z.string().uuid(),
+  stale_days:           z.number().nonnegative(),
+  mature_pilots_active: z.boolean(),
+  t0g_gap:              z.boolean(),
+});
+
+// system.wau_decline_monitor_restored (STANDARD · 3 yr)
+export const WauDeclineRestoredSchema = z.object({
+  incident_id:          z.string().uuid(),
+  stale_days:           z.number().nonnegative(),
+  mature_pilots_active: z.boolean(),
+  t0g_gap_found:        z.boolean(),
+  t0g_gap_resolved:     z.boolean(),   // must be true if t0g_gap_found; enforced by IC before P1 close
+  root_cause:           z.enum([
+    'H1_deleted',
+    'H1_disabled',
+    'H2_permissions_revoked',
+    'H3_pg_net_degraded',
+    'H4_supabase_outage',
+  ]),
+  fix_deployed_at:      z.string().datetime(),
+});
+```
+
+**Privacy floor:** Both schemas carry only booleans, numeric counts, H1–H4 enums, and FORM-internal `incident_id` UUID. No employee `user_id`, WAU values, tenant name, or GDPR Art. 9 special-category health data.
+
+**SOC 2 auditor rationale:** CC7.2 — the WAU-DECLINE-STALE-CHAIN-01 HMAC chain provides a tamper-evident timeline from detection to restoration, independently verifiable per HMAC-VERIFY-ALGO-001. `t0g_gap_resolved = true` in the terminal event confirms that any T0-Gamma monitoring gap was remediated within the R-51 lifecycle.
+
+### R-51.10 SOC 2 Evidence
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | Path |
+|---|---|---|---|---|---|
+| **WAU-DECLINE-STALE-E-001** | CC7.2 / A1.1 / CC3.2 | IC narrative per R-51 activation: stale window (days), root cause (H1–H4), mature pilot cohort status, T0-Gamma gap found/resolved. Filed within 48 h of job 51 restoration. | Per incident | 7 yr if T0-Gamma gap found; 3 yr if no gap | `compliance/evidence/pilots/wau-decline/WAU-DECLINE-STALE-E-001_<incident_id>.md` |
+
+**CC7.2 auditor rationale:** Job 51 staleness is a monitoring-layer failure — the detection sentinel for FORM's T0-Gamma pilot save trigger stopped running. WAU-DECLINE-STALE-E-001 documents the gap and its remediation. `t0g_gap_resolved = true` in `system.wau_decline_monitor_restored` provides HMAC-chained confirmation that any pilot exhibiting 3-consecutive WAU declines was identified and the save protocol initiated despite the monitoring gap.
+
+**A1.1 auditor rationale:** FORM's enterprise pilot availability commitment (COST_MODEL §46.3, MSA) requires that WAU decline monitoring runs weekly without gap. R-51 activation and WAU-DECLINE-STALE-E-001 document FORM's detection and response procedure when this monitoring commitment is disrupted. The weekly cadence means a multi-run gap has a higher impact on detection latency than daily jobs — auditors should note that `stale_days > 14` indicates two missed evaluation windows.
+
+**CC3.2 auditor rationale:** Sustained WAU decline across 3 consecutive weeks is a documented enterprise risk (COST_MODEL §46.1); job 51 is the designed monitoring response to that risk. R-51 documents the monitoring-layer response itself failing and being remediated — satisfying CC3.2's requirement that risk responses are operative and recoverable.
+
+### R-51.11 Cross-References
+
+- `docs/OBSERVABILITY.md §60` — WAU decline observability canonical spec (§60.5); WAU-DECLINE-SLO-01/02 (§60.2); AL-SAVE-03 / AL-WAU-ACT-01 (§60.4); stale-window DEC-030 event specs (§60.7); WAU-DECLINE-STALE-E-001 (§60.8); §60.10 item 6 — this runbook closes
+- `docs/OBSERVABILITY.md §12.6` — job 51 pg_cron registry; stale-consequence cross-ref pending §60.10 item 5
+- `docs/COST_MODEL.md §46` — CSM Save Protocol (canonical); T0-Gamma trigger §46.2; T+30 response window §46.3; PILOT-SAVE-CHAIN-01 §46.5; DEC-030 pilot events §46.7; OQ-ENTERPRISE-ARR-01 §37 (multi-entity deal structure — cross-ref OQ-WAU-OBS-02)
+- `docs/SOC2_READINESS.md §126` — WAU-DECLINE-STALE-E-001 registration pending §60.10 item 4
+- `docs/AUDIT_LOG_SCHEMA.md` — `system.wau_decline_monitor_stale_declared` + `system.wau_decline_monitor_restored` + WAU-DECLINE-STALE-CHAIN-01 pending §60.10 item 2
+- R-03 (Infrastructure Outage — H4 co-activation)
+- R-05 (HMAC chain break — WAU-DECLINE-STALE-CHAIN-01 ordering inversion escalation)
+- R-20 (Insider Threat — H1 deliberate deletion co-activation path)
+- R-45 (Litigation Hold Monitor Stale — structural job-stale peer)
+- R-46 (Pricing Exception Monitor Stale — structural job-stale peer)
+- R-47 (SCIM Provisioning Monitor Stale — structural job-stale peer)
+- R-48 (Amendment Rate Compliance Monitor Stale — structural peer; monthly cadence similarly amplifies gap)
+- R-49 (Pilot Activation Monitor Stale — T0-Alpha structural sibling in the same §46 save-protocol ecosystem)
+- R-50 (Champion Login Monitor Stale — T0-Beta structural sibling; closest peer)
+- DEC-030
+
+### R-51.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy `wau_decline_monitor` as pg_cron job 51 (`0 12 * * 1`). SECURITY DEFINER; REVOKE form_api from pilot_programs + session_completed. Integration test: seed 3 weekly windows of declining session_completed counts for a synthetic pilot_id (decline ≥ 10 pp each); confirm Slack fires; seed flat or improving pilot and confirm no Slack; confirm `system.wau_decline_check_passed` emitted when no pilots breached threshold. | devops-lead + platform-engineer | **P0** | M6 | [ ] |
+| 2 | Register `system.wau_decline_monitor_stale_declared` (HIGH/7yr) + `system.wau_decline_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md`. Include WAU-DECLINE-STALE-CHAIN-01 invariant; CC7.2/A1.1/CC3.2 auditor narratives. Zod v2 schemas sourced from §R-51.9. | security-engineer + compliance-officer | **P0** | M6 | [ ] |
+| 3 | Configure AL-WAU-ACT-01 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale WHERE job_name = 'wau_decline_monitor'` → service `form-devops` P1; dedup `wau-decline-check-stale`; auto-resolve on next `system.wau_decline_check_passed`. | devops-lead | **P0** | M6 | [ ] |
+| 4 | Register WAU-DECLINE-STALE-E-001 artefact template path in `docs/SOC2_READINESS.md §126` evidence table; establish `pilots/wau-decline/` subfolder in R2 compliance bucket; add Vanta mirror entry (CC7.2/A1.1/CC3.2). | compliance-officer | **P1** | M6 | [ ] |
+| 5 | Register job 51 in `docs/OBSERVABILITY.md §12.6` pg_cron canonical registry: schedule `0 12 * * 1`; freshness 8 days; SOC 2 CC3.2/CC7.2/A1.1; stale-consequence cross-ref `INCIDENT_RESPONSE R-51`; PagerDuty dedup `wau-decline-check-stale`. | devops-lead | **P1** | M6 | [ ] |
+
+---
+
+*v1.0 (2026-06-29): R-51 WAU Decline Monitor Stale (`wau_decline_monitor` · job 51) — fifty-first runbook. Closes `docs/OBSERVABILITY.md §60.10` item 6 (P1/M6 — author R-51 stale recovery runbook). Companion §60 canonical observability spec co-authored in OBSERVABILITY.md v5.6.0, 2026-06-29. Critical characteristic: unlike daily jobs 49/50, job 51 is weekly — a stale window can reach 14–21 days if two or three Monday runs fail consecutively; each additional missed Monday represents a full week of T0-Gamma detection blindness. T0-Gamma requires 3 consecutive weeks of ≥ 10 pp WAU rate decline — the evaluation window spans 21+ days of data, meaning a 14-day stale gap can allow a T0-Gamma condition to form and persist undetected across the full gap. Practical risk mitigation: the T0-Gamma signal requires 3 completed weeks of `session_completed` data, and the IC manual computation in §R-51.5 can always reproduce the signal from historical data within the save-protocol T+30 window. OQ-WAU-OBS-01 advisory flag: minimum seat guard `contracted_seats >= 25` recommended before first live pilot deployment to prevent WAU rate volatility from small absolute changes in small-seat pilots; R-51-C2 query marks this as advisory filter. Two DEC-030 HMAC-chained events: `system.wau_decline_monitor_stale_declared` HIGH/7yr (WAU-DECLINE-STALE-CHAIN-01 anchor; IC PAM-elevated at Step 1; CC7.2/A1.1/CC3.2); `system.wau_decline_monitor_restored` STANDARD/3yr (terminal; IC PAM-elevated at Step 6; `t0g_gap_resolved = true` required if gap found; includes `t0g_gap_found` separate from `t0g_gap_resolved` for auditor clarity). Five scope queries: R-51-C1 (staleness in days — thresholds at 8, 14, 21 days); R-51-C2 (mature pilots ≥ 28 days active — primary escalation gate; OQ-WAU-OBS-01 minimum seat guard advisory); R-51-C3 (T0-Gamma gap — 3-consecutive-week WAU decline SQL + save protocol predecessor check); R-51-C4 (peer job health — H4 discriminator; peer jobs daily so check days_since_run > 1); R-51-C5 (job registration — H1 discriminator). Four root causes H1–H4. Three communication templates (IC Slack on detection with weekly-cadence warning; customer-success page if gap found; post-resolution). One evidence artefact: WAU-DECLINE-STALE-E-001 (CC7.2/A1.1/CC3.2; 7yr if T0-Gamma gap / 3yr if no gap). Five-item implementation checklist: job 51 deploy + integration test (P0/M6 item 1); AUDIT_LOG_SCHEMA.md event registration (P0/M6 item 2); AL-WAU-ACT-01 PagerDuty routing rule (P0/M6 item 3); SOC2_READINESS §126 WAU-DECLINE-STALE-E-001 (P1/M6 item 4); §12.6 job 51 registry (P1/M6 item 5). Privacy floor: both DEC-030 stale events carry only booleans, numeric counts, H1–H4 enum, and FORM-internal `incident_id` UUID — no employee `user_id`, WAU values, tenant name, session content, or GDPR Art. 9 health data; R-51-C2/C3 surface only FORM-internal `pilot_id` UUIDs and aggregate WAU rates — no individual user identities; HR/tenant_manager never see individual data per ENTERPRISE.md principle. Cross-references: `docs/OBSERVABILITY.md §60`; `docs/OBSERVABILITY.md §12.6`; `docs/COST_MODEL.md §46`; `docs/SOC2_READINESS.md §126`; R-03; R-05; R-20; R-45–R-50. Owner: devops-lead + customer-success + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-29 · Owner: devops-lead + customer-success + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
