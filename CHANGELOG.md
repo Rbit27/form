@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.5.1] — 2026-06-29
+
+### Added
+- `content/post-2826-self-coached-accountability.md` — Editorial series 2826–2835 «Підзвітність self-coached атлета: рішення без виправдань», пост 1/10. Тема: що насправді означає бути своїм тренером — не свобода, а повна відповідальність за всі функції: спостерігач, аналітик, планувальник, ревізор. Kahneman (2011) ретроспективна раціоналізація рішень. Fitzgerald (2014) «performance log blindness». Kernis et al. (1993) самозахисна нечесність при крихкій самооцінці. Різниця між адаптацією програми і уникненням (тригер + гіпотеза + рішення + термін перевірки). Мінімальна структура self-coaching: 3 хв після сесії, 10 хв на тиждень, 15 хв на блок. Коли self-coaching виправданий, коли — ризикований. clinical-safety: NOT_REQUIRED · sports-scientist review not required for editorial posts.
+- `blog.html` — post-2826 card added at top of feed.
+- `README.md` — Editorial series 2826–2835 «Підзвітність self-coached атлета: рішення без виправдань» added to roadmap (posts 2826–2835 · proposed); post-2826 → draft.
+
+### Changed
+- `STATUS.md` — series 2826–2835 row added (1/10); current version v10.5.0 → v10.5.1.
+- `VERSION` — 10.5.0 → 10.5.1.
+
+---
+
 ## [10.5.0] — 2026-06-29
 
 ### Added
