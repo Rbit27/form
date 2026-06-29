@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.8.1
+# FORM · Observability & Monitoring Taxonomy v5.9.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -1287,6 +1287,10 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `pilot_activation_monitor` | `0 10 * * *` | 26 h | CC3.2/CC7.2/A1.1 — daily Day-14 pilot activation rate sentinel (T0-Alpha trigger per COST_MODEL §46.2); queries `session_completed` events joined to `pilot_programs.seats` for pilots at `day_number = 14`; computes `activation_rate = active_seats / contracted_seats`; if `activation_rate < 0.30` AND pilot tier is Growth or Enterprise: fires AL-SAVE-01 PagerDuty P1 `form-enterprise` → customer-success with dedup key `pilot-save-t0a-{pilot_id}` 24h cooldown (prompts CSM to initiate save protocol and emit `enterprise.pilot_save_protocol_triggered` HIGH/7yr via Admin Console "Save Protocol Trigger" button — IC PAM-elevated; pg_cron is the detection sentinel, not the event emitter); on all-clear (all Day-14 pilots at ≥ 30% activation): emits `system.pilot_activation_check_passed` LOW/1yr (no `pilot_id` — privacy floor; aggregate checked-pilot count only); stale = T0-Alpha monitoring blind spot — a Day-14 cohort activating below 30% goes undetected until next daily run, extending save-protocol start by up to 24h (tolerated; see freshness note below); `form_api` REVOKED from `pilot_programs` and `session_completed`; pg_cron reads via `form_system` role | PagerDuty P1 `form-enterprise` → customer-success; dedup key `pilot-save-t0a-{pilot_id}` 24h cooldown (re-alerts after 24h if pilot remains below threshold and no `enterprise.pilot_save_protocol_triggered` event emitted for same `pilot_id`); privacy invariant: alert payload contains only `pilot_id` (FORM-internal UUID), `activation_rate` (aggregate NUMERIC 0.00–1.00), `day_number` (integer) — no individual employee `user_id`, name, email, session content, coaching exchange, or GDPR Art. 9 health data; all-clear `system.pilot_activation_check_passed` omits `pilot_id` entirely (aggregate count only); cross-ref: COST_MODEL §46.2 (T0-Alpha trigger definition: Day-14 activation rate < 30% — primary §21.7 signal); COST_MODEL §46.7 (`enterprise.pilot_save_protocol_triggered` HIGH/7yr DEC-030 event — emitted by IC not pg_cron; job 49 is the detection and alerting sentinel); COST_MODEL §46.9 item 4 (P0/M4 — job 49 registration obligation; closes this §12.6 entry); SOC2_READINESS §126 (SAVE-E-001/SAVE-E-002 cross-reference registration, 2026-06-27); SAVE-E-002 (CC7.2/A1.1, annual `pg_cron.job_run_details WHERE jobname = 'pilot_activation_monitor'` run history, 3yr — confirms monitoring sentinel operated without >26h detection blind spot throughout observation year); INCIDENT_RESPONSE R-49 (§R-49.5; v1.0, 2026-06-29) — **job 49** |
 | `champion_login_monitor` | `0 11 * * *` | 49 h | CC3.2/CC7.2/A1.1 — daily Day-45 champion login sentinel (T0-Beta trigger per COST_MODEL §46.2); queries `audit_log_events` for `admin.dashboard_session_started` events with `actor_role IN ('enterprise_admin', 'tenant_manager')` for pilots at `day_number = 45` (Growth or Enterprise tier); if `champion_session_count < 2`: fires AL-SAVE-02 Slack `#enterprise-health` P1 (not PagerDuty — per COST_MODEL §46.2 T0-Beta severity) with payload `pilot_id` UUID, `champion_session_count` INT, `tier` — no employee `user_id` or PII; on all-clear (no Day-45 pilot below threshold): emits `system.champion_login_check_passed` LOW/1yr (aggregate `day45_pilots_checked` count only — no `pilot_id` in all-clear, privacy floor); stale = T0-Beta monitoring blind spot — a pilot crossing Day 45 with < 2 champion logins goes undetected; point-in-time check (stale gap that spans no Day-45 pilots has zero T0-Beta gap risk); `form_api` REVOKED from `pilot_programs` and `audit_log_events`; pg_cron reads via `form_system` role; prerequisite: `admin.dashboard_session_started` LOW/1yr event emitted by Admin Dashboard backend (§59.10 item 1 P0/M6) | PagerDuty P1 `form-devops` → devops-lead (AL-CHAMP-ACT-01; stale-only); Slack `#enterprise-health` (AL-SAVE-02; T0-Beta threshold breach); dedup AL-SAVE-02: `pilot-save-t0b-{pilot_id}` 48h cooldown; dedup AL-CHAMP-ACT-01: `champ-login-check-stale`; auto-resolve AL-CHAMP-ACT-01 on next `system.champion_login_check_passed`; privacy invariant: AL-SAVE-02 payload contains only `pilot_id` (FORM-internal UUID), `champion_session_count` INT, `tier` string — no individual employee `user_id`, name, email, session content, coaching exchange, or GDPR Art. 9 health data; cross-ref: COST_MODEL §46.2 (T0-Beta trigger definition); §59.4 (AL-SAVE-02/AL-CHAMP-ACT-01 alert specs); §59.5 (job 50 canonical SQL spec); CHAMP-LOGIN-STALE-CHAIN-01 stale events (INCIDENT_RESPONSE §R-50.8); INCIDENT_RESPONSE R-50 (§R-50.5; v1.0, 2026-06-29) — **job 50** |
 | `wau_decline_monitor` | `0 12 * * 1` | 8 days | CC3.2/CC7.2/A1.1 — weekly WAU decline sentinel (T0-Gamma trigger per COST_MODEL §46.2); runs Monday 12:00 UTC; evaluates pilots ≥ 28 active days (Growth or Enterprise tier) for 3 consecutive weekly WAU rate declines ≥ 10 pp (WAU/contracted_seats — `session_completed` grouped by `tenant_id` and week); if 3-consecutive-decline pattern confirmed: fires AL-SAVE-03 Slack `#enterprise-health` P1 (not PagerDuty — per COST_MODEL §46.2 T0-Gamma severity) with payload `pilot_id` UUID, `pilot_day` INT, `tier`, `min_decline_pp` NUMERIC — no employee `user_id` or PII; on all-clear: emits `system.wau_decline_check_passed` LOW/1yr (aggregate mature pilots checked — no `pilot_id`, privacy floor); stale = T0-Gamma monitoring blind spot; weekly cadence amplifies gap risk — stale window can reach 14–21 days if multiple Monday runs fail; a missed Monday run that spans a T0-Gamma pattern means the AL-SAVE-03 Slack for that week is permanently lost; `form_api` REVOKED from `pilot_programs` and `session_completed`; pg_cron reads via `form_system` role; OQ-WAU-OBS-01: minimum seat guard `contracted_seats >= 25` recommended before first live pilot (WAU rate volatility risk in small-seat pilots) | PagerDuty P1 `form-devops` → devops-lead (AL-WAU-ACT-01; stale-only); Slack `#enterprise-health` (AL-SAVE-03; T0-Gamma threshold breach); dedup AL-SAVE-03: `pilot-save-t0g-{pilot_id}` 8-day cooldown (weekly cadence); dedup AL-WAU-ACT-01: `wau-decline-check-stale`; auto-resolve AL-WAU-ACT-01 on next `system.wau_decline_check_passed`; privacy invariant: AL-SAVE-03 payload contains only `pilot_id` (FORM-internal UUID), `pilot_day` INT, `tier` string, `min_decline_pp` NUMERIC — no individual employee `user_id`, name, email, WAU value, session content, or GDPR Art. 9 health data; cross-ref: COST_MODEL §46.2 (T0-Gamma trigger definition: 3 consecutive weekly WAU rate declines ≥ 10 pp); §60.4 (AL-SAVE-03/AL-WAU-ACT-01 alert specs); §60.5 (job 51 canonical SQL spec); WAU-DECLINE-STALE-CHAIN-01 stale events (INCIDENT_RESPONSE §R-51.8); INCIDENT_RESPONSE R-51 (§R-51.5; v1.0, 2026-06-29) — **job 51** |
+| `admin_wellness_mv_refresh` | `15 2 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_wellness_summary_v2` (DATA_MODEL §17); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_wellness_summary_v2'`, `tenant_row_count` (INT, aggregate), `suppressed_cell_count` (INT, cells suppressed by k-anonymity guard `assert_k_anonymity()` using `tenants.reporting_k_floor` default N ≥ 5), `refresh_duration_ms` (INT); stale = Admin Dashboard "stale banner" (DATA_MODEL §17 > 26h obligation) and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED from all four MV relations; pg_cron reads and refreshes via `form_system` role; privacy invariant: payload aggregate counts only — no employee `user_id`, name, health metric, avg form_score per employee, or GDPR Art. 9 special-category data; `tenant_row_count` is a count of distinct tenant rows in the MV, not a count of employees | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-wellness-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_wellness_summary_v2'`; P2 severity per DATA_MODEL §17 "P2 alert on cron failure" — stale admin metrics are a product-degradation consequence (banner shown to tenant admin), not a compliance breach; cross-ref: §62.4 AL-ADMIN-RPT-01; §62.5.1 (job 52 SQL spec); DATA_MODEL §17 (MV definition and refresh schedule); INCIDENT_RESPONSE R-52 (stale recovery runbook — §62.9 item 4; pending); ADMIN-RPT-E-001 (C1.1/P4.1/CC7.2, annual, 3yr; §62.7) — **job 52** |
+| `admin_engagement_mv_refresh` | `30 2 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_engagement_summary` (DATA_MODEL §17); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_engagement_summary'`, `tenant_row_count`, `suppressed_cell_count = 0` (tenant-level summary only; no per-cohort k-anonymity floor applied — engagement metrics are computed at tenant granularity, not SCIM-group granularity; OQ-ADMIN-RPT-01 open), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role; privacy invariant: activation_rate_pct and D30 retention in this MV are tenant-level aggregates — no individual employee session or health data | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-engagement-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_engagement_summary'`; cross-ref: §62.4 AL-ADMIN-RPT-02; §62.5.2 (job 53 SQL spec); DATA_MODEL §17; INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 53** |
+| `admin_feature_adoption_mv_refresh` | `45 2 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_feature_adoption` (DATA_MODEL §17); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_feature_adoption'`, `tenant_row_count`, `suppressed_cell_count = 0` (tenant-level only; CV adoption % and voice coaching adoption % are tenant aggregates; no per-cohort k-floor; OQ-ADMIN-RPT-01 open), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role; privacy invariant: feature adoption percentages are tenant aggregates — no individual employee feature-usage records | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-feature-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_feature_adoption'`; cross-ref: §62.4 AL-ADMIN-RPT-03; §62.5.3 (job 54 SQL spec); DATA_MODEL §17; INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 54** |
+| `admin_cohort_breakdown_mv_refresh` | `0 3 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_cohort_breakdown` (DATA_MODEL §17); keyed by SCIM group (SSO_SCIM §27 — SCIM group membership is an org-structure signal, not individual employee data); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_cohort_breakdown'`, `tenant_row_count`, `suppressed_cell_count` (COUNT WHERE NOT meets_anonymity_floor — SCIM groups with size < `tenants.reporting_k_floor` (default N ≥ 5) have aggregate engagement metrics NULLed by `assert_k_anonymity()`; this is the most privacy-sensitive of the four MVs because SCIM group membership size is visible as a structural signal), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-cohort-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_cohort_breakdown'`; privacy invariant: payload contains only `view_name` (string literal), aggregate `tenant_row_count` (INT), aggregate `suppressed_cell_count` (INT count of SCIM groups below k-floor — no group name, SCIM attribute value, employee count, or user_id), `refresh_duration_ms`; cross-ref: §62.4 AL-ADMIN-RPT-04; §62.5.4 (job 55 SQL spec); DATA_MODEL §17; SSO_SCIM §27 (SCIM group key for cohort_breakdown); INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 55** |
 
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
@@ -1294,7 +1298,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 
 **Job-number conflict resolution (v0.9, 2026-06-22):** Two sections within OBSERVABILITY.md independently claimed job numbers already assigned in this §12.6 canonical registry: (1) `docs/OBSERVABILITY.md §42.7` (v3.9, 2026-06-14) referenced `white_label_cert_check` as "job 32" — but job 32 was already assigned to `turh_retention_purge` when the v0.4 patch was published (2026-06-19); (2) `docs/OBSERVABILITY.md §43.7` (v4.0, 2026-06-14) referenced `webhook_degraded_escalation_check` as "job 34" — but job 34 was already assigned to `bdg_override_expiry_sweep` in the same v0.4 patch. Both are renumbered in this registry: `white_label_cert_check` → **job 40**; `webhook_degraded_escalation_check` → **job 41**. In-text citations in §42.7, §42.14 item 3, §43.7, and §43.15 items 6–8 corrected in this v0.9 patch (since both sections reside within OBSERVABILITY.md, consistent with the v0.5 precedent of correcting §49 in-text citations). This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
-*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days. `pricing_exception_compliance_monitor` (job 46) is daily at 09:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the REENTRY-CHAIN-01 commercial governance control has no immediate safety implication; Worker-layer real-time enforcement (COST_MODEL §44.5 HTTP 422) is the primary gate; daily monitoring-layer verification (sweep 1) is a belt-and-suspenders sentinel; quarterly trigger (sweep 2) is activated by date arithmetic, not a tight compliance deadline. `scim_provisioning_compliance_monitor` (job 47) is daily at 06:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the SCIM-PROV-SLO-01 zero-tolerance CC6.4 target is enforced at SCIM Worker write time (HTTP 422 on sensitive attribute push per SSO_SCIM §27.12); job 47 provides the proactive daily monitoring-layer confirmation and quarterly evidence trigger; the AL-SCIM-01 reactive burst detector (§26.7b, job 24, every 5 min) handles real-time anomaly detection; a single missed job 47 run extends daily-baseline detection latency by 24h, tolerated for a day-scale compliance evidence obligation. `amendment_rate_compliance_monitor` (job 48) is monthly at 07:00 UTC on the 1st — 33-day freshness window gives 1-day tolerance for scheduling jitter; tolerated because TU-CHAIN-01 is enforced at Worker layer in real time via HTTP 422 in `amend_contract_tier()` SECURITY DEFINER RPC (COST_MODEL §45.5), and the price floor is enforced at the DDL layer via CHECK constraint (DATA_MODEL §47); job 48 is a monthly belt-and-suspenders forensic cross-check, not the primary enforcement gate; a missed run means at most 64 days between verifications — acceptable for a commercial governance control without an immediate safety implication, well within the annual ADM-E-002 evidence filing cycle (SOC2_READINESS §118). `pilot_activation_monitor` (job 49) is daily at 10:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the T0-Alpha trigger (Day-14 activation < 30%) is a day-scale milestone, not a sub-hour safety requirement; a single missed run extends T0-Alpha detection latency by up to 24h before the next daily cycle, acceptable given the save protocol has a T+30 calendar-day response window (COST_MODEL §46.3); PILOT-SAVE-CHAIN-01 is enforced at the `emit-audit-event` Worker layer (HTTP 422 on inversion) independently of pg_cron monitoring; a missed job 49 run does not prevent the IC from manually triggering the save protocol via Admin Console. `champion_login_monitor` (job 50) is daily at 11:00 UTC — 49h freshness window gives 2-day tolerance; chosen because T0-Beta is a point-in-time check at Day 45 only (not a continuous evaluation like T0-Alpha); a single missed run is tolerated because a pilot must be at exactly Day 45 for the breach to be detectable — a 49h stale window that spans no Day-45 pilot boundary has zero T0-Beta gap risk; the 2-day tolerance ensures a single scheduling failure does not trigger a false stale alarm before the next daily run. `wau_decline_monitor` (job 51) is weekly Monday at 12:00 UTC — 8-day freshness window gives 1-day tolerance above the 7-day cadence; the weekly cadence amplifies gap risk relative to daily jobs: if two consecutive Monday runs fail, the stale window reaches 14–21 days with no T0-Gamma detection; the 8-day freshness absorbs a single scheduling jitter (clock drift, Monday Supabase maintenance window) without triggering AL-WAU-ACT-01; tolerated for a 21-day rolling pattern check because the T0-Gamma signal requires 3 completed weeks of data — the IC manual computation in INCIDENT_RESPONSE R-51 can always reproduce the signal from historical `session_completed` data within the save-protocol T+30 window.
+*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days. `pricing_exception_compliance_monitor` (job 46) is daily at 09:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the REENTRY-CHAIN-01 commercial governance control has no immediate safety implication; Worker-layer real-time enforcement (COST_MODEL §44.5 HTTP 422) is the primary gate; daily monitoring-layer verification (sweep 1) is a belt-and-suspenders sentinel; quarterly trigger (sweep 2) is activated by date arithmetic, not a tight compliance deadline. `scim_provisioning_compliance_monitor` (job 47) is daily at 06:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the SCIM-PROV-SLO-01 zero-tolerance CC6.4 target is enforced at SCIM Worker write time (HTTP 422 on sensitive attribute push per SSO_SCIM §27.12); job 47 provides the proactive daily monitoring-layer confirmation and quarterly evidence trigger; the AL-SCIM-01 reactive burst detector (§26.7b, job 24, every 5 min) handles real-time anomaly detection; a single missed job 47 run extends daily-baseline detection latency by 24h, tolerated for a day-scale compliance evidence obligation. `amendment_rate_compliance_monitor` (job 48) is monthly at 07:00 UTC on the 1st — 33-day freshness window gives 1-day tolerance for scheduling jitter; tolerated because TU-CHAIN-01 is enforced at Worker layer in real time via HTTP 422 in `amend_contract_tier()` SECURITY DEFINER RPC (COST_MODEL §45.5), and the price floor is enforced at the DDL layer via CHECK constraint (DATA_MODEL §47); job 48 is a monthly belt-and-suspenders forensic cross-check, not the primary enforcement gate; a missed run means at most 64 days between verifications — acceptable for a commercial governance control without an immediate safety implication, well within the annual ADM-E-002 evidence filing cycle (SOC2_READINESS §118). `pilot_activation_monitor` (job 49) is daily at 10:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the T0-Alpha trigger (Day-14 activation < 30%) is a day-scale milestone, not a sub-hour safety requirement; a single missed run extends T0-Alpha detection latency by up to 24h before the next daily cycle, acceptable given the save protocol has a T+30 calendar-day response window (COST_MODEL §46.3); PILOT-SAVE-CHAIN-01 is enforced at the `emit-audit-event` Worker layer (HTTP 422 on inversion) independently of pg_cron monitoring; a missed job 49 run does not prevent the IC from manually triggering the save protocol via Admin Console. `champion_login_monitor` (job 50) is daily at 11:00 UTC — 49h freshness window gives 2-day tolerance; chosen because T0-Beta is a point-in-time check at Day 45 only (not a continuous evaluation like T0-Alpha); a single missed run is tolerated because a pilot must be at exactly Day 45 for the breach to be detectable — a 49h stale window that spans no Day-45 pilot boundary has zero T0-Beta gap risk; the 2-day tolerance ensures a single scheduling failure does not trigger a false stale alarm before the next daily run. `wau_decline_monitor` (job 51) is weekly Monday at 12:00 UTC — 8-day freshness window gives 1-day tolerance above the 7-day cadence; the weekly cadence amplifies gap risk relative to daily jobs: if two consecutive Monday runs fail, the stale window reaches 14–21 days with no T0-Gamma detection; the 8-day freshness absorbs a single scheduling jitter (clock drift, Monday Supabase maintenance window) without triggering AL-WAU-ACT-01; tolerated for a 21-day rolling pattern check because the T0-Gamma signal requires 3 completed weeks of data — the IC manual computation in INCIDENT_RESPONSE R-51 can always reproduce the signal from historical `session_completed` data within the save-protocol T+30 window. `admin_wellness_mv_refresh` (job 52) is daily at 02:15 UTC — 26h freshness window gives 1-hour tolerance above nightly cadence; tolerated because the stale-data consequence is a visible Admin Dashboard banner (DATA_MODEL §17 "stale banner at > 26h") that informs tenant admins without requiring FORM intervention; the P2 alert fires at devops-lead who can manually trigger REFRESH CONCURRENTLY (IC PAM elevation not required for MV refresh, unlike the pilot monitor save protocol); a single missed run extends stale exposure by 24h before the banner is resolved — acceptable for aggregate reporting metrics with no safety implication. `admin_engagement_mv_refresh` (job 53) is daily at 02:30 UTC — 26h freshness window (same rationale). `admin_feature_adoption_mv_refresh` (job 54) is daily at 02:45 UTC — 26h freshness window (same rationale). `admin_cohort_breakdown_mv_refresh` (job 55) is daily at 03:00 UTC — 26h freshness window (same rationale); the staggered 15-minute offsets between jobs 52–55 (02:15 → 02:30 → 02:45 → 03:00 UTC) distribute pg_cron concurrency load and ensure REFRESH CONCURRENTLY operations do not overlap on shared tenant tables; all four jobs complete before the Admin Dashboard's 05:00 UTC cache-warm window.
 
 **DEC-030 events emitted by `pg-cron-health-monitor`** — registered in `docs/AUDIT_LOG_SCHEMA.md §System`:
 
@@ -1315,6 +1319,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 **v0.5 · 2026-06-20 · Owner: devops-lead**
 **Review: quarterly or on architecture change. Next scheduled review: August 2026.**
 **SOC 2 evidence: CC7.2 (system monitoring). See also INCIDENT_RESPONSE.md for CC7.3–CC7.5.**
+*v2.6 patch (2026-06-29): §12.6 jobs 52–55 registered — closes DATA_MODEL §17 monitoring gap ("P2 alert on cron failure" / "stale banner at > 26h" referenced but unspecified; canonical observability section §62). Four nightly admin reporting MV refresh jobs: job 52 `admin_wellness_mv_refresh` (`15 2 * * *`, 02:15 UTC, 26h freshness, AL-ADMIN-RPT-01 P2); job 53 `admin_engagement_mv_refresh` (`30 2 * * *`, 02:30 UTC, 26h, AL-ADMIN-RPT-02 P2); job 54 `admin_feature_adoption_mv_refresh` (`45 2 * * *`, 02:45 UTC, 26h, AL-ADMIN-RPT-03 P2); job 55 `admin_cohort_breakdown_mv_refresh` (`0 3 * * *`, 03:00 UTC, 26h, AL-ADMIN-RPT-04 P2). All P2 PagerDuty `form-devops` → devops-lead; all-clear event `system.admin_mv_refreshed` LOW/1yr (one emission per job per successful nightly run); `form_api` REVOKED from all four MV relations; `form_system` role. `suppressed_cell_count` field in `system.admin_mv_refreshed` confirms k-anonymity guard (`assert_k_anonymity()`, `tenants.reporting_k_floor` N ≥ 5) ran to completion — non-null INT is the ADMIN-RPT-SLO-02 health signal. Freshness window note extended to cover jobs 52–55 (staggered 15-min offset between jobs distributes concurrency load). Canonical section: §62 (this authoring pass). SOC 2 evidence artefact ADMIN-RPT-E-001 registered in §62.7 (C1.1/P4.1/CC7.2, annual, 3yr; SOC2_READINESS §129 registration pending §62.9 item 3).*
 *v2.5 patch (2026-06-29): §12.6 jobs 50–51 registered — closes OBSERVABILITY §59.10 item 5 (P1/M6) and §60.10 item 5 (P1/M6). Job 50 `champion_login_monitor` (`0 11 * * *`, daily 11:00 UTC, 49h freshness): T0-Beta trigger per COST_MODEL §46.2 (Day-45 champion_session_count < 2 → AL-SAVE-02 Slack); AL-CHAMP-ACT-01 PagerDuty `form-devops` P1 dead-man's switch; stale-recovery runbook INCIDENT_RESPONSE R-50 (v1.0, 2026-06-29 — closes §59.10 item 6). Prerequisite `admin.dashboard_session_started` LOW/1yr event pending §59.10 item 1 (P0/M6). Job 51 `wau_decline_monitor` (`0 12 * * 1`, weekly Monday 12:00 UTC, 8-day freshness): T0-Gamma trigger per COST_MODEL §46.2 (3 consecutive weekly WAU rate declines ≥ 10 pp → AL-SAVE-03 Slack); AL-WAU-ACT-01 PagerDuty `form-devops` P1 dead-man's switch; stale-recovery runbook INCIDENT_RESPONSE R-51 (v1.0, 2026-06-29 — closes §60.10 item 6). Freshness note extended to cover jobs 50 and 51. Canonical sections: §59 (job 50), §60 (job 51).*
 *v2.4 patch (2026-06-27): §12.6 job 49 `pilot_activation_monitor` registered — closes COST_MODEL §46.9 item 4 (P0/M4). Daily Day-14 pilot activation sentinel (T0-Alpha trigger per COST_MODEL §46.2): schedule `0 10 * * *` (10:00 UTC — offset from existing daily jobs at 06:00/08:00/09:00 UTC to distribute pg_cron load); 26h freshness window (consistent with jobs 39, 45, 46, 47; tolerated because T0-Alpha is a day-scale milestone with T+30 response window). Fires AL-SAVE-01 PagerDuty P1 `form-enterprise` → customer-success with dedup `pilot-save-t0a-{pilot_id}` 24h when Day-14 `activation_rate < 0.30` for Growth or Enterprise tier pilots; all-clear `system.pilot_activation_check_passed` LOW/1yr on clean sweep. Evidence artefact: SAVE-E-002 (annual `pg_cron.job_run_details WHERE jobname = 'pilot_activation_monitor'` run history, CC7.2/A1.1, 3yr; registered SOC2_READINESS §126, 2026-06-27). Freshness window note extended to cover job 49. Canonical source: COST_MODEL §46. Cross-ref: SOC2_READINESS §126 (SAVE-E-001/SAVE-E-002 registration).*
 *v2.3 patch (2026-06-27): §12.6 job 48 `amendment_rate_compliance_monitor` registered — closes the amendment rate compliance monitoring gap identified in OBSERVABILITY §57 (v5.4.0, 2026-06-27): no automated monthly cross-check existed for TU-CHAIN-01 chain integrity (`billing.rate_updated` → `enterprise.contract_amended` pairing per COST_MODEL §45.5) or price floor compliance (`enterprise_contracts.rate_per_seat_usd ≥ §31.5 floor`) between annual ADM-E-002 filings (SOC2_READINESS §118). Schedule `0 7 1 * *` (07:00 UTC on 1st of each month — offset from jobs 45/46/47 at 08:00/09:00/06:00 UTC); 33-day freshness window (monthly + 1-day tolerance). Sweep 1: correlated subquery for `billing.rate_updated` events in last 32 days without `enterprise.contract_amended` chain partner for same `tenant_id` within ±24h; gap_count > 0 → `security.amendment_chain_gap_detected` CRITICAL/7yr + AL-AMEND-01 P0 (AMEND-MONITOR-CHAIN-01 ordering invariant: HTTP 200 before PagerDuty). Sweep 2: `enterprise_contracts` floor check against §31.5 tier floors (Starter $6.00, Growth $4.50, Enterprise $4.00); breach_count > 0 → `security.amendment_floor_breach_detected` CRITICAL/7yr + AL-AMEND-02 P0. Unknown-tier NULL bypass protection: unrecognised `tier` excluded from breach set → `system.amendment_unknown_tier_detected` STANDARD/3yr. All-clear: `system.amendment_rate_check_passed` LOW/1yr (aggregate counts only — privacy floor; suppressed when CRITICAL emitted — AMEND-MONITOR-CHAIN-01). Evidence artefact: AMEND-OBS-E-001 (annual run history, CC5.2/CC6.1/A1.1, 3yr; SOC2_READINESS §124 registration pending §57.10 item 5). Freshness window note extended to cover job 48. Canonical section: §57.*
@@ -17442,3 +17447,365 @@ const AdminDashboardSessionStartedSchema = z.object({
 *v5.8.1 (2026-06-29): §27.7 AL-SIEM-CONSENT-01 alert rule documentation — closes §47.11 item 6 documentation portion (P1/M5). New §27.7 row: AL-SIEM-CONSENT-01, trigger = HTTP 422 `SIEM_CONSENT_01_NO_ADDENDUM` from `emit-audit-event` Worker (SIEM-CONSENT-01 invariant violation, §47.7), severity P1, routing PagerDuty HIGH `form-security` → security-engineer + compliance-officer + `#security-alerts`, SLA < 30 min, runbook: check `audit_log` for `siem.consent_addendum_signed` chain record for the tenant; if absent disable export + notify CSM; if chain ordering violated escalate to INCIDENT_RESPONSE.md R-01; notify compliance-officer within 1 h. §27.10 SOC 2 note updated to include AL-SIEM-CONSENT-01 as CC9.2 + CC1.1 evidence (real-time consent invariant enforcement converting procedural control to technology control). §27.10 CC9.2 mapping row extended: "AL-SIEM-CONSENT-01 (§27.7) provides real-time detection if SIEM export activated without signed MSA Addendum 4." §47.11 item 6: `[ ]` → `[x] Done — 2026-06-29`. PagerDuty rule configuration (devops-lead) and integration tests (platform-engineer) remain pending; this patch closes the documentation obligation only. Privacy floor: AL-SIEM-CONSENT-01 trigger and runbook carry `tenant_id` slug only — no employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data. Document header: v5.7.3 → v5.8.1 (v5.8.0 retroactively covers §61 header bump which was missed). Owner: devops-lead + security-engineer + compliance-officer.*
 
 *v5.8.0 (2026-06-29): §61 Save-Alert Escalation Protocol — OQ-PILOT-OBS-01, OQ-CHAMP-OBS-01, OQ-CHAMP-OBS-02 Resolution. Closes three open questions from the pilot activation observability system (§58 / §59) in a single authoring pass. No new pg_cron jobs or DEC-030 chain events. §61.2 (OQ-PILOT-OBS-01): AL-SAVE-01 re-alert escalation — cap at 3 re-alerts (72 h); KV counter `alert-save01-count:{pilot_id}` TTL 7 days; at count ≥ 3, PagerDuty urgency → CRITICAL + Slack `#enterprise-cs-escalations` mention `@cs-lead`; dedup key rotates to `pilot-save-t0a-escalated-{pilot_id}` (no cooldown); KV reset on `enterprise.pilot_save_protocol_triggered` for same `pilot_id`; aligned with COST_MODEL §46.3 Step 1 (CSM T+0 obligation) and §46.4 (L2 joins at T+15 or earlier if activation < 25%). §61.3 (OQ-CHAMP-OBS-02): AL-SAVE-02 re-alert escalation — cap at 2 re-alerts (96 h); KV counter `alert-save02-count:{pilot_id}` TTL 10 days; at count ≥ 2, Slack `#enterprise-health` + `#enterprise-cs-escalations` mention `@cs-lead`; reset on `enterprise.pilot_save_protocol_triggered` with `trigger_type = 'T0B'`; consistent with T0-Beta being L2-default per COST_MODEL §46.4. §61.4 (OQ-CHAMP-OBS-01): `admin.dashboard_session_started` de-dup — two layers: (1) client-side `sessionStorage.getItem('form-admin-sess-emitted')` gate (clears on tab/window close); (2) server-side KV `admin-sess-start-{actor_id}:{tenant_id}` TTL 4 h (HTTP 200 `{"deduplicated": true}` on hit, no HMAC chain entry); 4 h TTL allows genuine second-session afternoon login to count separately (consistent with T0-Beta "≥ 2 logins"); Zod v2 schema: `tenant_id_slug` (string), `actor_role` (enum enterprise_admin|tenant_manager), `pilot_day` (int|null), `is_pilot_active` (bool) — no actor `user_id` or Art. 9 data; AUDIT_LOG_SCHEMA.md v2.58 registers event (LOW/1yr, CC3.2) — closes §59.10 item 1 documentation portion. §61.5 OQ tracker: OQ-PILOT-OBS-01 🟡 → 🟢; OQ-CHAMP-OBS-01 🟡 → 🟢; OQ-CHAMP-OBS-02 🟡 → 🟢. §58.11 OQ-PILOT-OBS-01 and §59.11 OQ-CHAMP-OBS-01/02 patched in-line. §59.10 item 1: `[ ]` → `[x] Done — documentation portion`. §61.6 four-item implementation checklist: 3× P0/M6 (KV counters for AL-SAVE-01 and AL-SAVE-02; two-layer de-dup for `admin.dashboard_session_started`), 1× P1/M7 (integration tests). §61.7 cross-reference obligations: all five 🟢 Done (this pass). Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 data in any escalation payload, KV key, or event schema. KV counter keys carry `pilot_id` UUID only — no tenant name or employee PII. Owner: devops-lead + platform-engineer + customer-success + compliance-officer.*
+
+---
+
+## §62. Enterprise Admin Reporting Pipeline Observability
+
+### §62.1 Purpose and Scope
+
+This section documents the observability layer for the enterprise admin reporting pipeline — the four nightly materialized-view refresh jobs that populate the Admin Dashboard aggregate metrics (DATA_MODEL §17). The pipeline runs between 02:15 and 03:00 UTC nightly; each of the four views has a dedicated pg_cron job (jobs 52–55). Without refresh, the Admin Dashboard shows stale aggregate metrics to tenant admins; DATA_MODEL §17 specifies "stale banner at > 26h" and "P2 alert on cron failure" — this section is the authoritative definition of those alerts, the SLOs they enforce, and the SOC 2 evidence they generate.
+
+**Privacy floor (non-negotiable):** All four materialized views contain only aggregate, tenant-level or SCIM-group-level metrics. No employee `user_id`, name, email, coaching session content, body composition value, or GDPR Art. 9 special-category health data is present in any MV row, refresh event payload, or monitoring signal. HR and tenant admins see aggregate-only results — the k-anonymity guard (`assert_k_anonymity()`, floor controlled by `tenants.reporting_k_floor` default N ≥ 5) suppresses any cohort cell that would expose a group below the floor. Individual data is never available via the admin reporting path; this is enforced at the MV definition layer and confirmed at every nightly refresh by the `suppressed_cell_count` field in `system.admin_mv_refreshed`. This invariant is non-negotiable per ENTERPRISE.md §"Privacy floor for enterprise" items 1–2 (HR never sees individual user data; HR sees aggregates only).
+
+**In scope:**
+- Four pg_cron refresh jobs: `admin_wellness_mv_refresh` (job 52, 02:15 UTC), `admin_engagement_mv_refresh` (job 53, 02:30 UTC), `admin_feature_adoption_mv_refresh` (job 54, 02:45 UTC), `admin_cohort_breakdown_mv_refresh` (job 55, 03:00 UTC)
+- Two SLOs: ADMIN-RPT-SLO-01 (pipeline freshness ≤ 26h per view), ADMIN-RPT-SLO-02 (k-anonymity guard health)
+- Four dead-man's switch alert rules: AL-ADMIN-RPT-01 through AL-ADMIN-RPT-04 (P2 each)
+- DEC-030 audit event: `system.admin_mv_refreshed` LOW/1yr — one emission per job per successful nightly run
+- SOC 2 evidence artefact ADMIN-RPT-E-001 (C1.1/P4.1/CC7.2, annual, 3yr)
+- INCIDENT_RESPONSE R-52 (admin MV refresh stale recovery runbook — pending authoring; §62.9 item 4)
+
+**Out of scope:** Admin Dashboard RBAC (SSO_SCIM §27), SIEM export consent gate (OBSERVABILITY §47), pilot activation monitoring (§58–§60), individual user session monitoring, any employer access to per-employee data.
+
+---
+
+### §62.2 SLOs
+
+| SLO ID | Signal | Target | Breach condition | Cadence | SOC 2 criteria | Owner |
+|---|---|---|---|---|---|---|
+| **ADMIN-RPT-SLO-01** | Hours elapsed since last `system.admin_mv_refreshed` per `view_name` in `audit_log_events`; verifiable via `pg_cron.job_run_details WHERE jobname IN ('admin_wellness_mv_refresh', 'admin_engagement_mv_refresh', 'admin_feature_adoption_mv_refresh', 'admin_cohort_breakdown_mv_refresh')` | ≤ 26 h per view (nightly cadence with 1-hour scheduling tolerance) | > 26 h elapsed for any individual view — AL-ADMIN-RPT-01 through AL-ADMIN-RPT-04 fire from `pg-cron-health-monitor` (§12.7) | Nightly (02:15 → 03:00 UTC staggered) | C1.1 / P4.1 / CC7.2 | devops-lead |
+| **ADMIN-RPT-SLO-02** | `suppressed_cell_count` field in every `system.admin_mv_refreshed` event is a non-null INT ≥ 0; `meets_anonymity_floor` rate on `tenant_cohort_breakdown` (job 55) is non-zero confirmable via `suppressed_cell_count` | k-anonymity guard (`assert_k_anonymity()`) produces a non-null `suppressed_cell_count` in every nightly `system.admin_mv_refreshed` emission | Any `system.admin_mv_refreshed` event where `suppressed_cell_count` IS NULL — indicates the k-anonymity guard did not run to completion | Nightly (embedded in each refresh event payload) | C1.1 / P4.1 / CC6.1 | compliance-officer + devops-lead |
+
+---
+
+### §62.3 Monitoring Architecture
+
+```
+nightly 02:15 UTC          02:30 UTC          02:45 UTC          03:00 UTC
+       │                      │                   │                   │
+       ▼                      ▼                   ▼                   ▼
+[job 52]                 [job 53]            [job 54]            [job 55]
+admin_wellness_          admin_engagement_   admin_feature_      admin_cohort_
+mv_refresh               mv_refresh          adoption_mv_refresh breakdown_mv_refresh
+  │                        │                   │                   │
+  REFRESH CONCURRENTLY     REFRESH CONCURRENTLY  ...                 REFRESH CONCURRENTLY
+  tenant_wellness_         tenant_engagement_                        tenant_cohort_
+  summary_v2               summary                                   breakdown
+  │                        │                   │                   │
+  emit system.admin_mv_refreshed LOW/1yr (view_name, tenant_row_count,
+         suppressed_cell_count, refresh_duration_ms)
+  │
+  ▼
+[pg-cron-health-monitor §12.7] ─────────────────────────────────────────
+  dead-man's switch: no system.admin_mv_refreshed for view in > 26 h
+  → AL-ADMIN-RPT-01 (job 52 stale)
+  → AL-ADMIN-RPT-02 (job 53 stale)
+  → AL-ADMIN-RPT-03 (job 54 stale)
+  → AL-ADMIN-RPT-04 (job 55 stale)
+  each → PagerDuty P2 form-devops → devops-lead
+  │
+  ▼
+Admin Dashboard stale-data banner
+  condition: any view's last system.admin_mv_refreshed > NOW() - INTERVAL '26 hours'
+  (UI guard; DATA_MODEL §17 "stale banner at > 26h" obligation — tenant admin sees it)
+```
+
+**Privacy invariant:** No individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data flows through any node in the diagram above. The four MVs, the audit events, the PagerDuty payloads, and the dashboard all operate exclusively on aggregate counts, percentages, boolean health flags, and timing integers.
+
+---
+
+### §62.4 Alert Rules
+
+| Alert ID | Trigger | Severity | Routing | SLA | Dedup key | Runbook |
+|---|---|---|---|---|---|---|
+| **AL-ADMIN-RPT-01** | `system.cron_job_stale WHERE job_name = 'admin_wellness_mv_refresh'` from `pg-cron-health-monitor` (§12.7); no `system.admin_mv_refreshed` with `view_name = 'tenant_wellness_summary_v2'` in `audit_log_events` in > 26 h | P2 | PagerDuty `form-devops` → devops-lead; Slack `#devops`; auto-resolve on next `system.admin_mv_refreshed` for `view_name = 'tenant_wellness_summary_v2'` | < 4 h response; P1 escalation at devops-lead discretion if ≥ 2 consecutive runs fail (> 48h stale) | `admin-rpt-wellness-stale` | INCIDENT_RESPONSE R-52 (pending — §62.9 item 4) |
+| **AL-ADMIN-RPT-02** | `system.cron_job_stale WHERE job_name = 'admin_engagement_mv_refresh'`; no `system.admin_mv_refreshed` with `view_name = 'tenant_engagement_summary'` in > 26 h | P2 | PagerDuty `form-devops` → devops-lead; Slack `#devops`; auto-resolve on next matching `system.admin_mv_refreshed` | < 4 h response | `admin-rpt-engagement-stale` | INCIDENT_RESPONSE R-52 |
+| **AL-ADMIN-RPT-03** | `system.cron_job_stale WHERE job_name = 'admin_feature_adoption_mv_refresh'`; no `system.admin_mv_refreshed` with `view_name = 'tenant_feature_adoption'` in > 26 h | P2 | PagerDuty `form-devops` → devops-lead; Slack `#devops`; auto-resolve on next matching `system.admin_mv_refreshed` | < 4 h response | `admin-rpt-feature-stale` | INCIDENT_RESPONSE R-52 |
+| **AL-ADMIN-RPT-04** | `system.cron_job_stale WHERE job_name = 'admin_cohort_breakdown_mv_refresh'`; no `system.admin_mv_refreshed` with `view_name = 'tenant_cohort_breakdown'` in > 26 h | P2 | PagerDuty `form-devops` → devops-lead; Slack `#devops`; auto-resolve on next matching `system.admin_mv_refreshed` | < 4 h response | `admin-rpt-cohort-stale` | INCIDENT_RESPONSE R-52 |
+
+**Severity rationale (P2 not P1):** DATA_MODEL §17 canonical spec is "P2 alert on cron failure." The stale-data consequence is visible to the tenant admin immediately via the Admin Dashboard banner — FORM is not the sole detection surface. A P1 would be warranted only if stale admin reporting directly violated a compliance SLA or MSA obligation; ENTERPRISE.md §"Hard commitments" does not include an admin dashboard refresh SLA (only uptime, P0/P1/P2 response, and data residency). The P2 → P1 manual escalation path (≥ 48h stale, devops-lead discretion) is preserved in R-52.
+
+---
+
+### §62.5 Job Specifications
+
+#### §62.5.1 Job 52 — `admin_wellness_mv_refresh`
+
+| Field | Value |
+|---|---|
+| Job name | `admin_wellness_mv_refresh` |
+| Schedule (UTC) | `15 2 * * *` (02:15 UTC nightly) |
+| Role | `form_system` (`form_api` REVOKED from all four MV relations — aggregate-only reads and refresh via `form_system` exclusively) |
+| Freshness window | 26 h |
+| Target view | `tenant_wellness_summary_v2` (DATA_MODEL §17) |
+| Stale alert | AL-ADMIN-RPT-01 (§62.4) |
+| All-clear event | `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_wellness_summary_v2'` |
+| SOC 2 criteria | C1.1 (prohibited metric registry — no avg form_score per employee visible to HR; MV contains only tenant-level aggregates) · P4.1 (opted_out gate health confirmed by suppressed_cell_count > 0 when cohorts below k-floor) · CC7.2 (refresh job health monitoring via dead-man's switch) |
+
+```sql
+-- admin_wellness_mv_refresh: pg_cron job 52, 02:15 UTC nightly
+-- SECURITY DEFINER; form_api REVOKED from tenant_wellness_summary_v2.
+-- tenant_wellness_summary_v2 contains: tenant_id (slug), week_start, wau_count (INT),
+-- mau_count (INT), participation_pct (NUMERIC), avg_form_score_suppressed (NUMERIC|NULL
+-- — NULL when below k-floor), k_anonymity_suppressed (BOOL).
+-- suppressed_cell_count = COUNT WHERE k_anonymity_suppressed = true.
+-- Confirm column names against DATA_MODEL §17 DDL before deploy (§62.9 item 1).
+DO $$
+DECLARE
+  v_start            TIMESTAMPTZ := clock_timestamp();
+  v_tenant_row_count INT;
+  v_suppressed       INT;
+BEGIN
+  REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_wellness_summary_v2;
+
+  SELECT
+    COUNT(*),
+    COALESCE(SUM(CASE WHEN k_anonymity_suppressed THEN 1 ELSE 0 END), 0)
+  INTO v_tenant_row_count, v_suppressed
+  FROM tenant_wellness_summary_v2;
+
+  PERFORM emit_audit_event(
+    p_event_type    => 'system.admin_mv_refreshed',
+    p_severity      => 'LOW',
+    p_retention_yrs => 1,
+    p_payload       => jsonb_build_object(
+      'view_name',             'tenant_wellness_summary_v2',
+      'tenant_row_count',      v_tenant_row_count,
+      'suppressed_cell_count', v_suppressed,
+      'refresh_duration_ms',   EXTRACT(EPOCH FROM clock_timestamp() - v_start)::INT * 1000
+    )
+  );
+  -- Privacy invariant: payload contains only aggregate counts and a duration integer.
+  -- No employee user_id, name, health metric, avg form_score per-employee, or GDPR Art. 9 data.
+  -- k_anonymity_suppressed = true rows have avg_form_score_suppressed = NULL in the MV —
+  -- the guard is enforced at MV query time; suppressed_cell_count is a health signal only.
+END $$;
+```
+
+---
+
+#### §62.5.2 Job 53 — `admin_engagement_mv_refresh`
+
+| Field | Value |
+|---|---|
+| Job name | `admin_engagement_mv_refresh` |
+| Schedule (UTC) | `30 2 * * *` (02:30 UTC nightly) |
+| Role | `form_system` |
+| Freshness window | 26 h |
+| Target view | `tenant_engagement_summary` (DATA_MODEL §17) |
+| Stale alert | AL-ADMIN-RPT-02 (§62.4) |
+| All-clear event | `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_engagement_summary'` |
+| SOC 2 criteria | C1.1 / P4.1 / CC7.2 |
+| Note | `tenant_engagement_summary` is a tenant-level summary (activation_rate_pct, D30 retention) — no per-SCIM-group breakdown and no per-cohort k-floor; `suppressed_cell_count = 0` by design. OQ-ADMIN-RPT-01 open (whether a tenant-level k-floor should be applied). |
+
+```sql
+-- admin_engagement_mv_refresh: pg_cron job 53, 02:30 UTC nightly
+-- tenant_engagement_summary: tenant_id (slug), activation_rate_pct (NUMERIC),
+-- d30_retention_pct (NUMERIC), weekly_active_pct (NUMERIC). Tenant-level only; no cohort.
+DO $$
+DECLARE
+  v_start            TIMESTAMPTZ := clock_timestamp();
+  v_tenant_row_count INT;
+BEGIN
+  REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_engagement_summary;
+
+  SELECT COUNT(*) INTO v_tenant_row_count FROM tenant_engagement_summary;
+
+  PERFORM emit_audit_event(
+    p_event_type    => 'system.admin_mv_refreshed',
+    p_severity      => 'LOW',
+    p_retention_yrs => 1,
+    p_payload       => jsonb_build_object(
+      'view_name',             'tenant_engagement_summary',
+      'tenant_row_count',      v_tenant_row_count,
+      'suppressed_cell_count', 0,
+      'refresh_duration_ms',   EXTRACT(EPOCH FROM clock_timestamp() - v_start)::INT * 1000
+    )
+  );
+  -- suppressed_cell_count = 0 by design: tenant_engagement_summary has no per-cohort
+  -- k-anonymity floor (OQ-ADMIN-RPT-01). Payload: aggregate INT counts only; no employee PII.
+END $$;
+```
+
+---
+
+#### §62.5.3 Job 54 — `admin_feature_adoption_mv_refresh`
+
+| Field | Value |
+|---|---|
+| Job name | `admin_feature_adoption_mv_refresh` |
+| Schedule (UTC) | `45 2 * * *` (02:45 UTC nightly) |
+| Role | `form_system` |
+| Freshness window | 26 h |
+| Target view | `tenant_feature_adoption` (DATA_MODEL §17) |
+| Stale alert | AL-ADMIN-RPT-03 (§62.4) |
+| All-clear event | `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_feature_adoption'` |
+| SOC 2 criteria | C1.1 / P4.1 / CC7.2 |
+| Note | `tenant_feature_adoption` is a tenant-level summary (CV adoption %, voice coaching adoption %) — no per-SCIM-group breakdown; `suppressed_cell_count = 0` by design. OQ-ADMIN-RPT-01 open. |
+
+```sql
+-- admin_feature_adoption_mv_refresh: pg_cron job 54, 02:45 UTC nightly
+-- tenant_feature_adoption: tenant_id (slug), cv_adoption_pct (NUMERIC),
+-- voice_coaching_adoption_pct (NUMERIC), feature_flags_enabled (JSONB). Tenant-level only.
+DO $$
+DECLARE
+  v_start            TIMESTAMPTZ := clock_timestamp();
+  v_tenant_row_count INT;
+BEGIN
+  REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_feature_adoption;
+
+  SELECT COUNT(*) INTO v_tenant_row_count FROM tenant_feature_adoption;
+
+  PERFORM emit_audit_event(
+    p_event_type    => 'system.admin_mv_refreshed',
+    p_severity      => 'LOW',
+    p_retention_yrs => 1,
+    p_payload       => jsonb_build_object(
+      'view_name',             'tenant_feature_adoption',
+      'tenant_row_count',      v_tenant_row_count,
+      'suppressed_cell_count', 0,
+      'refresh_duration_ms',   EXTRACT(EPOCH FROM clock_timestamp() - v_start)::INT * 1000
+    )
+  );
+  -- suppressed_cell_count = 0 by design (OQ-ADMIN-RPT-01). Payload: aggregate counts only.
+END $$;
+```
+
+---
+
+#### §62.5.4 Job 55 — `admin_cohort_breakdown_mv_refresh`
+
+| Field | Value |
+|---|---|
+| Job name | `admin_cohort_breakdown_mv_refresh` |
+| Schedule (UTC) | `0 3 * * *` (03:00 UTC nightly) |
+| Role | `form_system` |
+| Freshness window | 26 h |
+| Target view | `tenant_cohort_breakdown` (DATA_MODEL §17) |
+| Stale alert | AL-ADMIN-RPT-04 (§62.4) |
+| All-clear event | `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_cohort_breakdown'` |
+| SOC 2 criteria | C1.1 / P4.1 / CC7.2 |
+| Note | `tenant_cohort_breakdown` is keyed by SCIM group (SSO_SCIM §27 — SCIM group membership is an org-structure signal, not individual employee data). Rows with SCIM group size < `tenants.reporting_k_floor` (default N ≥ 5) have `meets_anonymity_floor = false` and aggregate engagement metrics NULLed by `assert_k_anonymity()`. This is the most privacy-sensitive of the four MVs: `suppressed_cell_count = COUNT WHERE NOT meets_anonymity_floor` is the most operationally meaningful signal. |
+
+```sql
+-- admin_cohort_breakdown_mv_refresh: pg_cron job 55, 03:00 UTC nightly
+-- tenant_cohort_breakdown: tenant_id (slug), scim_group_id (opaque slug — not group name),
+-- scim_group_size (INT), weekly_active_pct (NUMERIC|NULL), d30_retention_pct (NUMERIC|NULL),
+-- meets_anonymity_floor (BOOL). Rows with meets_anonymity_floor = false have
+-- weekly_active_pct and d30_retention_pct = NULL (k-anonymity guard via assert_k_anonymity()).
+DO $$
+DECLARE
+  v_start            TIMESTAMPTZ := clock_timestamp();
+  v_tenant_row_count INT;
+  v_suppressed       INT;
+BEGIN
+  REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_cohort_breakdown;
+
+  SELECT
+    COUNT(*),
+    COALESCE(SUM(CASE WHEN NOT meets_anonymity_floor THEN 1 ELSE 0 END), 0)
+  INTO v_tenant_row_count, v_suppressed
+  FROM tenant_cohort_breakdown;
+
+  PERFORM emit_audit_event(
+    p_event_type    => 'system.admin_mv_refreshed',
+    p_severity      => 'LOW',
+    p_retention_yrs => 1,
+    p_payload       => jsonb_build_object(
+      'view_name',             'tenant_cohort_breakdown',
+      'tenant_row_count',      v_tenant_row_count,
+      'suppressed_cell_count', v_suppressed,
+      'refresh_duration_ms',   EXTRACT(EPOCH FROM clock_timestamp() - v_start)::INT * 1000
+    )
+  );
+  -- Privacy invariant: suppressed_cell_count is an aggregate integer count of SCIM groups
+  -- below the k-anonymity floor — no group name, SCIM attribute value, employee count,
+  -- individual user_id, health metric, or GDPR Art. 9 data in the payload.
+  -- scim_group_id in the MV is an opaque slug, not resolvable from the pg_cron context;
+  -- tenant admins see it only via Admin Dashboard with RBAC gate (SSO_SCIM §27).
+END $$;
+```
+
+---
+
+### §62.6 DEC-030 Audit Event Schema
+
+**`system.admin_mv_refreshed` — LOW / 1 yr**
+
+Emitted by each of the four MV refresh jobs (52–55) on successful REFRESH MATERIALIZED VIEW CONCURRENTLY completion. One event per job per nightly run.
+
+```typescript
+// AUDIT_LOG_SCHEMA.md registration pending — §62.9 item 2
+const AdminMvRefreshedSchema = z.object({
+  view_name: z.enum([
+    'tenant_wellness_summary_v2',
+    'tenant_engagement_summary',
+    'tenant_feature_adoption',
+    'tenant_cohort_breakdown',
+  ]),
+  tenant_row_count:      z.number().int().min(0),
+  suppressed_cell_count: z.number().int().min(0),
+  refresh_duration_ms:   z.number().int().min(0),
+  // Privacy invariants (non-negotiable):
+  // - No employee user_id, name, email, or GDPR Art. 9 health data.
+  // - No tenant_id UUID or tenant_name — only view_name discriminates the emission source.
+  // - suppressed_cell_count is a privacy-guard health signal; the integer itself is not PII.
+  // - Absent from this event: any field that would allow cross-referencing to an individual
+  //   employee record, coaching exchange, body metric, or mental health indicator.
+});
+```
+
+**Chain invariant (ADMIN-MV-CHAIN-01):** Within any single calendar day (UTC), `system.admin_mv_refreshed` events for the four views must appear in schedule order: `tenant_wellness_summary_v2` (02:15) → `tenant_engagement_summary` (02:30) → `tenant_feature_adoption` (02:45) → `tenant_cohort_breakdown` (03:00). If the chain audit detects reversed ordering within a nightly window, a scheduling anomaly occurred. Enforced by staggered schedule (15-min offsets); not enforced at Worker layer — REFRESH CONCURRENTLY is idempotent and does not depend on prior job success. An out-of-order emission is advisory, not a hard invariant violation (unlike GRAD-CHAIN-01/02 or SIEM-CONSENT-01 which are HTTP-422-enforced).
+
+---
+
+### §62.7 SOC 2 Evidence Artefacts
+
+| Artefact ID | Criteria | Cadence | Retention | Contents | R2 Path | Vanta |
+|---|---|---|---|---|---|---|
+| **ADMIN-RPT-E-001** | C1.1 / P4.1 / CC7.2 | Annual | 3 yr | `pg_cron.job_run_details WHERE jobname IN ('admin_wellness_mv_refresh', 'admin_engagement_mv_refresh', 'admin_feature_adoption_mv_refresh', 'admin_cohort_breakdown_mv_refresh')` run history for the observation year; confirms pipeline operated without > 26 h gap for any view; includes `system.admin_mv_refreshed` event count per `view_name` (4 × ~365 ≈ 1,460 events/year expected); `suppressed_cell_count` summary over the year confirms k-anonymity guard (`assert_k_anonymity()`) ran to completion on every refresh | `enterprise/admin-reporting/ADMIN-RPT-E-001-{YYYY}.json` | Mirror entry required — SOC2_READINESS §129 registration pending (§62.9 item 3) |
+
+**Auditor narrative (C1.1 / P4.1):** The four nightly pg_cron refresh jobs (52–55) regenerate the Admin Dashboard materialized views from production tenant data. The `suppressed_cell_count` field in every `system.admin_mv_refreshed` event confirms the k-anonymity guard ran to completion for that view on that nightly cycle. A zero `suppressed_cell_count` on `tenant_wellness_summary_v2` or `tenant_cohort_breakdown` means all cohorts exceeded the k-floor — the guard operated but no suppression was needed (healthy pilot program). A positive `suppressed_cell_count` means some cohorts were below the floor and their sensitive aggregate metrics were NULLed — the guard operated as designed (privacy protection activated). Either outcome produces a valid non-null `suppressed_cell_count` satisfying ADMIN-RPT-SLO-02. ADMIN-RPT-E-001 provides the annual run-history evidence that the pipeline was continuous and the k-anonymity guard was active throughout the SOC 2 observation period. This satisfies C1.1 (prohibited metric registry — no per-employee health data visible to HR confirmed by k-floor guard), P4.1 (opted-out users are never included in MV calculations — guard confirms no leakage), and CC7.2 (monitoring control operating continuously).
+
+---
+
+### §62.8 Dashboard Spec — Admin Reporting Pipeline Health
+
+**Panel group: "Admin Reporting Pipeline" (`form_admin` + `devops-lead` roles only; `tenant_manager`, `enterprise_admin`, and all tenant-facing roles excluded):**
+
+| Panel | Type | Source | Update cadence |
+|---|---|---|---|
+| Pipeline freshness (4 views) | Grid stat: green (≤ 26h) / amber (26–48h) / red (> 48h) per view | `audit_log_events WHERE event_type = 'system.admin_mv_refreshed'` grouped by `payload->>'view_name'`, MAX(created_at) | Real-time (on event emission) |
+| Last refresh duration (ms) | Sparklines per view (7-day) | `system.admin_mv_refreshed.payload->>'refresh_duration_ms'` last 7 days grouped by `view_name` | Daily (job run) |
+| Suppressed cell count history | Bar chart — wellness + cohort views only (30 days) | `system.admin_mv_refreshed WHERE payload->>'view_name' IN ('tenant_wellness_summary_v2', 'tenant_cohort_breakdown')` last 30 days, `suppressed_cell_count` field | Daily |
+| ADMIN-RPT-SLO-01 compliance | SLO gauge (26h target, 4 gauges) | MAX age since last `system.admin_mv_refreshed` per `view_name` | Real-time |
+| AL-ADMIN-RPT-01..04 fire history | Bar chart (30 days) | `audit_log_events WHERE event_type = 'system.cron_job_stale' AND payload->>'job_name' LIKE 'admin_%_mv_refresh'` | Real-time |
+
+**Privacy constraint:** All panels show aggregate counts, durations, and job health flags only. No individual `user_id`, `tenant_id` UUID, tenant name, employee name, health metric, or GDPR Art. 9 data. `view_name` (a string literal from the event enum) is the only discriminant — it identifies the MV type, not any tenant or user. `tenant_manager` and `enterprise_admin` cannot view this panel group.
+
+---
+
+### §62.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy four pg_cron jobs (52–55): `admin_wellness_mv_refresh` (`15 2 * * *`), `admin_engagement_mv_refresh` (`30 2 * * *`), `admin_feature_adoption_mv_refresh` (`45 2 * * *`), `admin_cohort_breakdown_mv_refresh` (`0 3 * * *`). SECURITY DEFINER; `form_api` REVOKED from all four MV relations. Confirm suppression column names from DATA_MODEL §17 MV DDL before deploy (`k_anonymity_suppressed` for wellness; `meets_anonymity_floor` for cohort_breakdown — verify exact names). Integration tests: (a) seed a tenant with cohort size < N=5 in `tenant_cohort_breakdown`; confirm `suppressed_cell_count ≥ 1` in emitted event after refresh; (b) seed a healthy cohort ≥ N=5; confirm `suppressed_cell_count = 0`; (c) confirm all four events appear in the correct schedule order within a test nightly window (ADMIN-MV-CHAIN-01 advisory ordering). | devops-lead + platform-engineer | **P0** | M7 | [ ] |
+| 2 | Register `system.admin_mv_refreshed` (LOW/1yr, C1.1/P4.1/CC7.2) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schema (§62.6), ADMIN-MV-CHAIN-01 ordering invariant note (advisory, not HTTP-422-enforced), and privacy invariant annotation (no employee `user_id`, GDPR Art. 9 data, or tenant PII in payload). | security-engineer + compliance-officer | **P0** | M7 | [ ] |
+| 3 | Register ADMIN-RPT-E-001 artefact template path in `docs/SOC2_READINESS.md §129` evidence table; establish `enterprise/admin-reporting/` subfolder in R2 compliance bucket; add Vanta mirror entry (C1.1/P4.1/CC7.2, annual, 3yr retention). | compliance-officer | **P1** | M7 | [ ] |
+| 4 | Author INCIDENT_RESPONSE R-52 (`admin_*_mv_refresh` stale recovery runbook) following R-49 structure: 5 scope queries (R-52-C1 staleness in hours for each view from `pg_cron.job_run_details`; R-52-C2 last successful `system.admin_mv_refreshed` timestamp per view; R-52-C3 Admin Dashboard stale banner active status; R-52-C4 peer job health — are other nightly jobs running?; R-52-C5 `tenant_cohort_breakdown` k-floor suppression last run for ADMIN-RPT-SLO-02 health); 3 root causes H1 (pg_cron scheduler failure), H2 (REFRESH CONCURRENTLY lock contention from long-running queries), H3 (Supabase maintenance window overlapping nightly run); manual recovery: REFRESH MATERIALIZED VIEW CONCURRENTLY manually under `form_system` role (no IC PAM elevation required — MV refresh does not modify audit chain); verify `system.admin_mv_refreshed` emitted after manual refresh; stale-consequence note (Admin Dashboard shows stale banner to tenant admins — product degradation, not compliance breach; P1 escalation if > 48h stale). | devops-lead + compliance-officer | **P1** | M7 | [ ] |
+| 5 | Configure AL-ADMIN-RPT-01..04 PagerDuty routing rules (four rules, one per job): `pg-cron-health-monitor` routes `system.cron_job_stale WHERE job_name = 'admin_{wellness/engagement/feature_adoption/cohort_breakdown}_mv_refresh'` → service `form-devops` P2; dedup keys as §62.4; auto-resolve on next matching `system.admin_mv_refreshed` event per `view_name`. | devops-lead | **P1** | M7 | [ ] |
+| 6 | Build "Admin Reporting Pipeline Health" dashboard panel group (§62.8): `form_admin` + `devops-lead` gate; all tenant-facing roles excluded; ADMIN-RPT-SLO-01 SLO gauges (4× per view); suppressed_cell_count sparklines for wellness + cohort views. | platform-engineer + design-craft | **P2** | M8 | [ ] |
+
+---
+
+### §62.10 OQ Gap Tracker
+
+| ID | Question | Owner | Status |
+|---|---|---|---|
+| OQ-ADMIN-RPT-01 | `tenant_engagement_summary` and `tenant_feature_adoption` do not have per-cohort k-anonymity floors — they are tenant-level summaries only (activation_rate_pct, D30 retention, CV adoption %, voice coaching adoption % at tenant granularity). Should a tenant-level k-floor be applied (e.g., suppress metrics for tenants with fewer than N activated users)? Current spec: no tenant-level k-floor on engagement or feature adoption; `suppressed_cell_count = 0` by design for jobs 53–54 (§62.5.2 / §62.5.3). The ENTERPRISE.md §"Privacy floor for enterprise" items 1–2 mandate aggregate-only data but do not specify a minimum tenant user count for tenant-level metrics (as opposed to cohort-level metrics). Confirm with compliance-officer before M7 deploy: if a tenant has only 1–2 activated users, does `activation_rate_pct` at tenant level constitute a privacy risk? | compliance-officer + data-engineer | 🟡 Open — confirm with compliance-officer. Interim: no tenant-level k-floor on engagement/feature_adoption; `suppressed_cell_count = 0` by design for jobs 53–54. |
+| OQ-ADMIN-RPT-02 | If a tenant has zero active users (newly onboarded or churned mid-pilot), `tenant_wellness_summary_v2` will have rows with `wau_count = 0` and `participation_pct = 0.0`. Should the refresh job suppress the entire row (not just per-cell k-floor), or retain zero-value rows to indicate "tenant exists but no data yet"? Current spec: zero-value rows retained (consistent with DATA_MODEL §17 MV definition — the MV is populated for all `tenants` regardless of activity). Confirm data model intent with data-engineer before first live pilot Admin Dashboard. | data-engineer + enterprise-architect | 🟡 Open — zero-value rows retained per current DATA_MODEL §17 spec; no change required unless first pilot Admin Dashboard reveals UX ambiguity (e.g., tenant admin confusing 0-row absence with filter issue). |
+
+---
+
+*v5.9.0 (2026-06-29): §62 Enterprise Admin Reporting Pipeline Observability — closes the DATA_MODEL §17 monitoring gap ("P2 alert on cron failure" / "stale banner at > 26h" referenced but unspecified in OBSERVABILITY.md). Four new pg_cron jobs registered in §12.6 canonical registry (v2.6 patch): job 52 `admin_wellness_mv_refresh` (02:15 UTC nightly, 26h freshness, AL-ADMIN-RPT-01 P2); job 53 `admin_engagement_mv_refresh` (02:30 UTC, 26h, AL-ADMIN-RPT-02 P2); job 54 `admin_feature_adoption_mv_refresh` (02:45 UTC, 26h, AL-ADMIN-RPT-03 P2); job 55 `admin_cohort_breakdown_mv_refresh` (03:00 UTC, 26h, AL-ADMIN-RPT-04 P2). Two SLOs: ADMIN-RPT-SLO-01 (pipeline freshness ≤ 26h per view, C1.1/P4.1/CC7.2), ADMIN-RPT-SLO-02 (k-anonymity guard active — `suppressed_cell_count` non-null INT in every `system.admin_mv_refreshed` event, C1.1/P4.1/CC6.1). Four alert rules AL-ADMIN-RPT-01 through AL-ADMIN-RPT-04 (P2, PagerDuty `form-devops` → devops-lead; per-view dedup keys; auto-resolve on next successful refresh event per `view_name`). DEC-030 event `system.admin_mv_refreshed` LOW/1yr with Zod v2 schema (§62.6) and ADMIN-MV-CHAIN-01 ordering invariant (advisory; enforced by staggered schedule, not HTTP 422). SOC 2 evidence artefact ADMIN-RPT-E-001 (C1.1/P4.1/CC7.2, annual, 3yr; SOC2_READINESS §129 registration pending §62.9 item 3). §62.9 implementation checklist: 2× P0/M7 (deploy jobs + AUDIT_LOG_SCHEMA.md registration), 2× P1/M7 (SOC2_READINESS §129 registration + INCIDENT_RESPONSE R-52 runbook), 1× P1/M7 (PagerDuty routing rules), 1× P2/M8 (dashboard). Two OQs: OQ-ADMIN-RPT-01 (tenant-level k-floor for engagement/feature_adoption MVs — compliance-officer determination pending), OQ-ADMIN-RPT-02 (zero-value row handling for tenants with no activity). Privacy floor: no employee `user_id`, name, email, health data, coaching content, body metric, or GDPR Art. 9 special-category data in any job SQL, event payload, alert, or dashboard panel — all monitoring signals are aggregate counts, timing integers, and boolean health flags. §12.6 v2.6 patch: jobs 52–55 registered; freshness window note extended to cover staggered 02:15–03:00 UTC nightly cadence. Document header v5.8.1 → v5.9.0. Owner: devops-lead + compliance-officer + data-engineer + enterprise-architect.*

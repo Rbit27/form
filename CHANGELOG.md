@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.12.1] — 2026-06-29
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.9.0 — §62 Enterprise Admin Reporting Pipeline Observability added. Closes DATA_MODEL §17 monitoring gap ("P2 alert on cron failure" / "stale banner at > 26h" specified but unimplemented in OBSERVABILITY.md). Four new pg_cron jobs registered in §12.6 canonical registry (v2.6 patch): job 52 `admin_wellness_mv_refresh` (02:15 UTC nightly); job 53 `admin_engagement_mv_refresh` (02:30 UTC); job 54 `admin_feature_adoption_mv_refresh` (02:45 UTC); job 55 `admin_cohort_breakdown_mv_refresh` (03:00 UTC). Two SLOs (ADMIN-RPT-SLO-01: pipeline freshness ≤ 26h per view; ADMIN-RPT-SLO-02: k-anonymity guard active). Four alert rules AL-ADMIN-RPT-01..04 (P2, PagerDuty form-devops). DEC-030 event `system.admin_mv_refreshed` LOW/1yr with ADMIN-MV-CHAIN-01 ordering invariant. SOC 2 evidence artefact ADMIN-RPT-E-001 (C1.1/P4.1/CC7.2, annual, 3yr). INCIDENT_RESPONSE R-52 runbook and AUDIT_LOG_SCHEMA.md registration pending (§62.9 items 2, 4). Two OQs: OQ-ADMIN-RPT-01 (tenant-level k-floor for engagement/feature_adoption); OQ-ADMIN-RPT-02 (zero-value row handling). Privacy floor: aggregate counts and timing integers only; no employee user_id, health data, or GDPR Art. 9 data. Document header v5.8.1 → v5.9.0.
+- `VERSION` — 10.12.0 → 10.12.1.
+
+---
+
 ## [10.12.0] — 2026-06-29
 
 ### Added
