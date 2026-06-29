@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.86.1] — 2026-06-29
+
+### Added
+- `content/post-2730-novice-intermediate-advanced-identity-transition.md` — editorial 13-хв пост «Новачок → intermediate → advanced: як перехід тренувального статусу вимагає зміни ідентичності — і чому цього не відбувається автоматично». Серія 2726–2735 «Тренувальна ідентичність» · пост 5/10. Self-schema (Markus, 1977), intermediate trap як ідентичнісна пастка, діагностика чотирма тестами, практика ідентичнісного оновлення. clinical-safety NOT_REQUIRED · sports-scientist review pending.
+- `blog.html` — blog card for post-2730 (№ 2730 · Training Methodology · 13 хв · draft · 2026-06-29).
+- `README.md` — Editorial series 2756–2765 «Тренувальна компетентність: як self-coached атлет знає, що він знає — і де його знання закінчуються» proposed · 10 topics (posts 2756–2765).
+
+### Changed
+- `STATUS.md` — series 2726–2735 progress 4/10 → 5/10; current version updated to v9.86.1.
+- `VERSION` — 9.86.0 → 9.86.1.
+
+---
+
 ## [9.86.0] — 2026-06-29
 
 ### Added
