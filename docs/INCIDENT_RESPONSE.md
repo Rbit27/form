@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.16.2
+# FORM · Incident Response Runbook v3.17.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -18123,3 +18123,362 @@ export const AmendmentRateMonitorRestoredPayload = z.object({
 *v3.16.2 (2026-06-27): Patch — R-48.12 item 1 cross-reference closed. `docs/AUDIT_LOG_SCHEMA.md` v2.54 registered `system.amendment_rate_monitor_stale_declared` (HIGH/7yr) + `system.amendment_rate_monitor_restored` (STANDARD/3yr) + AMEND-STALE-CHAIN-01 ordering invariant + Zod v2 schemas + CC5.2/CC6.1/CC7.2 auditor narratives in the R-48 monitoring-control sub-section of `§Contract Amendment Rate Compliance Monitoring events`. Retention table +2 rows. R-48.12 item 1 status `[ ]` → `[x] Done — 2026-06-27 (AUDIT_LOG_SCHEMA.md v2.54)`. R-48.11 cross-reference updated: §57.10 item 1 note → 🟢 Done v2.53; AMEND-STALE-CHAIN-01 note → 🟢 Done v2.54. Document header v3.16.1 → v3.16.2. Owner: security-engineer + compliance-officer.*
 
 *v3.16.1 (2026-06-27): Patch — R-48.12 item 4 cross-reference closed. SOC2_READINESS.md §125 registered six AMEND-STALE evidence artefacts (E-001 through E-006; §79.4 count 87 → 93; §80.3 `amendments/monitoring/` extended; §80.4 Vanta mirror updated). R-48.12 item 4 status `[ ]` → `[x] Done — 2026-06-27 (SOC2_READINESS.md §125 · v3.49.0)`. Document header v3.16.0 → v3.16.1. Owner: compliance-officer.*
+
+---
+
+## R-49: Pilot Activation Monitor Stale (`pilot_activation_monitor` · job 49)
+
+**Classification:** P1 initial (escalates to P1 + customer-success page if active Day-14 pilot cohort found below T0-Alpha threshold — see §R-49.5)
+**Owner:** devops-lead + customer-success + compliance-officer
+**Runbook version:** v1.0 (2026-06-29)
+**Review:** after every activation, minimum annual.
+
+### R-49.1 Trigger Conditions
+
+This runbook activates when `pg-cron-health-monitor` fires **AL-PILOT-ACT-01** (see `docs/OBSERVABILITY.md §58.4`):
+
+| Condition | Detail |
+|---|---|
+| **Primary** | No `system.pilot_activation_check_passed` LOW event in `audit_log_events` for > 26 h — job 49 `pilot_activation_monitor` failed to complete at least one daily cycle |
+| **PagerDuty service** | `form-devops` |
+| **Severity** | P1 |
+| **Route** | devops-lead (primary on-call); customer-success notified separately if R-49-C2 positive AND R-49-C3 negative |
+| **Dedup key** | `pilot-act-check-stale` |
+| **Auto-resolve** | On next successful `system.pilot_activation_check_passed` LOW emission after job 49 restoration |
+
+**Critical characteristic:** Job 49 stale creates a **T0-Alpha monitoring blind spot** — a Day-14 pilot cohort with activation rate below 30% will go undetected until job 49 is restored. The save protocol T+30 calendar-day response window absorbs up to 24 h of detection latency (per `docs/OBSERVABILITY.md §12.6` freshness note), but multi-day stale windows narrow the response runway. **PILOT-SAVE-CHAIN-01** at the `emit-audit-event` Worker layer continues enforcing chain ordering independently of pg_cron; a stale job 49 does not prevent the IC from manually initiating the save protocol via Admin Console.
+
+**Distinction from AL-SAVE-01:** AL-SAVE-01 fires when job 49 detects T0-Alpha threshold breach (activation < 30% at Day 14 for an active pilot) — the operational alert for the save protocol trigger. AL-PILOT-ACT-01 (this runbook's trigger) fires when job 49 itself stops running — a monitoring infrastructure failure, not a pilot health event.
+
+### R-49.2 Severity Classification
+
+| Severity | Condition |
+|---|---|
+| **P1** | No `system.pilot_activation_check_passed` LOW in > 26 h; no active Day-14 pilot cohort (R-49-C2 negative) |
+| **P1 + customer-success page** | No `system.pilot_activation_check_passed` LOW in > 26 h; active Day-14 cohort exists (R-49-C2 positive); save protocol already triggered for all below-threshold pilots (R-49-C3 fully positive) — restore job 49; customer-success confirms no gap in save-protocol status |
+| **P1 + immediate escalation** | No `system.pilot_activation_check_passed` LOW in > 26 h; active Day-14 cohort exists (R-49-C2 positive); T0-Alpha threshold not met for ≥ 1 pilot AND save protocol not yet triggered (R-49-C3 partially/fully negative) — proceed to §R-49.5 before job 49 restoration |
+| **H4 co-activate R-03** | All peer daily jobs stale (R-49-C4 positive) → Supabase outage probable; activate R-03 in parallel |
+
+### R-49.3 Immediate Actions (T+0 to T+30 min)
+
+**Step 1 — Emit stale-declared DEC-030 event (T+0):**
+
+Emit via `emit-audit-event` Worker (IC PAM-elevated). PILOT-ACT-STALE-CHAIN-01 anchor — must precede the `restored` terminal event for the same `incident_id`.
+
+```json
+{
+  "event_type": "system.pilot_activation_monitor_stale_declared",
+  "severity": "HIGH",
+  "payload": {
+    "incident_id": "<new-uuid>",
+    "stale_hours": 0,
+    "day14_cohort_active": false,
+    "save_protocol_gap": false
+  }
+}
+```
+
+*(Populate `stale_hours`, `day14_cohort_active`, and `save_protocol_gap` after scope queries R-49-C1 through R-49-C3 complete — amendment is acceptable; the event is the PILOT-ACT-STALE-CHAIN-01 anchor and must be emitted at Step 1 before recovery actions begin.)*
+
+**Step 2 — Run scope queries:**
+
+**R-49-C1 — Staleness confirmation:**
+```sql
+SELECT
+  MAX(created_at)                                           AS last_check_at,
+  NOW() - MAX(created_at)                                   AS stale_window,
+  EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600      AS stale_hours
+FROM audit_log_events
+WHERE event_type = 'system.pilot_activation_check_passed';
+-- stale_hours > 26: confirms trigger is valid
+-- stale_hours > 48: escalate proactive note to customer-success regardless of R-49-C2 result
+```
+
+**R-49-C2 — Active Day-14 pilot cohort (primary escalation gate):**
+```sql
+SELECT
+  pp.pilot_id,
+  pp.tenant_id,
+  pp.tier,
+  pp.contracted_seats,
+  pp.start_date + INTERVAL '14 days'       AS day14_date,
+  DATE_PART('day', NOW() - pp.start_date)  AS day_number
+FROM pilot_programs pp
+WHERE pp.status = 'active'
+  AND DATE_PART('day', NOW() - pp.start_date) BETWEEN 13 AND 15
+  AND pp.tier IN ('growth', 'enterprise');
+-- Rows returned: R-49-C2 positive → proceed to R-49-C3
+-- No rows: R-49-C2 negative → proceed directly to §R-49.6 recovery
+-- Privacy: FORM-internal UUIDs only; no employee names, emails, or health data
+```
+
+**R-49-C3 — Save protocol already triggered? (for each R-49-C2 pilot):**
+```sql
+SELECT
+  ale.payload->>'pilot_id'    AS pilot_id,
+  ale.created_at              AS triggered_at,
+  ale.payload->>'trigger_type' AS trigger_type
+FROM audit_log_events ale
+WHERE ale.event_type = 'enterprise.pilot_save_protocol_triggered'
+  AND ale.payload->>'pilot_id' = ANY(ARRAY[<r49_c2_pilot_ids>])
+  AND ale.created_at >= NOW() - INTERVAL '45 days';
+-- PILOT-SAVE-CHAIN-01 45-day predecessor window
+-- All R-49-C2 pilots matched: R-49-C3 fully positive → monitoring-only restoration needed
+-- Any R-49-C2 pilot unmatched: R-49-C3 partially/fully negative → §R-49.5 escalation
+-- Privacy: FORM-internal pilot_id UUIDs only; no employee user_id, activation rate, or health data
+```
+
+**R-49-C4 — Peer daily job health (H4 Supabase discriminator):**
+```sql
+SELECT
+  jobname,
+  MAX(start_time)                                              AS last_run,
+  NOW() - MAX(start_time)                                      AS since_last_run,
+  EXTRACT(EPOCH FROM (NOW() - MAX(start_time))) / 3600         AS hours_since_run
+FROM pg_cron.job_run_details
+WHERE jobname IN (
+  'renewal_notice_check',
+  'white_label_cert_check',
+  'litigation_hold_compliance_monitor',
+  'pricing_exception_compliance_monitor',
+  'scim_provisioning_compliance_monitor'
+)
+GROUP BY jobname;
+-- All stale (hours_since_run > 26): H4 Supabase outage → activate R-03 in parallel
+-- Only job 49 stale: H1/H2/H3 local failure → continue R-49 scope queries
+```
+
+**R-49-C5 — Job registration check (H1 discriminator):**
+```sql
+SELECT
+  jobid, jobname, schedule, active, username
+FROM pg_cron.job
+WHERE jobname = 'pilot_activation_monitor';
+-- Row absent: H1 deleted → re-register from §58.5 canonical spec
+-- Row present, active = false: H1 disabled → re-enable (UPDATE pg_cron.job SET active = true ...)
+-- Row present, active = true: H2 permissions or H3 pg_net → continue investigation
+```
+
+### R-49.4 Root Cause Hypotheses
+
+| Hypothesis | Discriminator | Likely indicator |
+|---|---|---|
+| **H1** — Job deleted or disabled | R-49-C5 returns no row (deleted) or `active = false` (disabled) | Human error during maintenance window; accidental job drop |
+| **H2** — `form_system` permissions revoked on `pilot_programs` or `session_completed` | R-49-C5 active; peer jobs healthy (R-49-C4 negative); `pg_cron.job_run_details.return_message` shows `permission denied` | IAM policy rollback; accidental REVOKE during migration |
+| **H3** — `pg_net` or audit-event pipeline degraded | R-49-C5 active; peer jobs healthy; job history shows SUCCESS in pg_cron but `system.pilot_activation_check_passed` absent from `audit_log_events` > 26 h | pg_net connectivity failure; `audit-event-flush` Worker backlog |
+| **H4** — Supabase outage | R-49-C4: all peer daily jobs stale | Supabase infrastructure event; activate R-03 in parallel |
+
+**H1 resolution:** Re-register job 49 with canonical spec from `docs/OBSERVABILITY.md §58.5`. Confirm schedule `0 10 * * *`, `form_system` role, SECURITY DEFINER. Manual trigger: `SELECT cron.run_job('pilot_activation_monitor');` — verify `system.pilot_activation_check_passed` LOW emitted within 2 min.
+
+**H2 resolution:** Re-grant `SELECT` on `pilot_programs` and `session_completed` to `form_system` role. Confirm via `\dp pilot_programs`. Manual-trigger after re-grant. If revocation was intentional (IAM policy change), coordinate with enterprise-architect before re-granting.
+
+**H3 resolution:** Check pg_net health: `SELECT * FROM net._http_response ORDER BY created DESC LIMIT 20;`. If pg_net degraded, follow pg_net recovery procedures. If `audit-event-flush` Worker is backlogged, check Cloudflare Worker queue depth. Manual-trigger job 49 after pipeline recovery.
+
+**H4 resolution:** R-03 owns Supabase outage recovery. R-49 escalates to R-03 immediately on H4 discrimination.
+
+### R-49.5 Escalation Path — Active Day-14 Cohort Below Threshold (R-49-C2 Positive, R-49-C3 Partially or Fully Negative)
+
+When R-49-C2 identifies an active Day-14 pilot cohort **and** R-49-C3 shows that one or more pilots lack a `enterprise.pilot_save_protocol_triggered` predecessor event within the PILOT-SAVE-CHAIN-01 45-day window, the IC must manually assess T0-Alpha status for each unprotected pilot before restoring job 49.
+
+**Step 1 — Manual T0-Alpha activation rate check (one query per unprotected pilot):**
+```sql
+SELECT
+  COUNT(DISTINCT se.user_id)                                                       AS active_users,
+  pp.contracted_seats,
+  ROUND(COUNT(DISTINCT se.user_id)::numeric / pp.contracted_seats, 4)              AS manual_activation_rate
+FROM pilot_programs pp
+JOIN session_completed se ON se.tenant_id = pp.tenant_id
+WHERE pp.pilot_id = '<unprotected_pilot_id>'
+  AND se.created_at >= pp.start_date;
+-- Privacy: returns aggregate counts only; no individual user_id, name, email, session content, or GDPR Art. 9 health data
+-- manual_activation_rate < 0.30 → Step 2 (T0-Alpha threshold crossed)
+-- manual_activation_rate >= 0.30 → no T0-Alpha condition; proceed to job restoration
+```
+
+**Step 2 — Page customer-success (if T0-Alpha threshold crossed for any pilot):**
+
+Immediately contact customer-success lead via PagerDuty `form-enterprise` P1 out-of-band:
+
+> Pilot activation monitoring gap — job 49 stale {stale_hours}h. Pilot `{pilot_id}` at Day {day_number}; manual activation_rate: {rate}. T0-Alpha crossed (< 30%). Save protocol NOT yet triggered for this pilot. Action: initiate save protocol via Admin Console → Save Protocol Trigger for `{pilot_id}`.
+
+Payload contains FORM-internal `pilot_id` UUID and aggregate rate only — no company name, employee names, or health data.
+
+**Step 3 — Confirm save protocol triggered:**
+
+After customer-success initiates: confirm `enterprise.pilot_save_protocol_triggered` HIGH/7yr emitted for the `pilot_id` within 15 min. The trigger requires IC PAM-elevated access per COST_MODEL §46.3.
+
+**Step 4 — Resume restoration:**
+
+After all unprotected pilots confirmed triggered (or Step 1 shows all at ≥ 30%), proceed to §R-49.6.
+
+**Why P1, not P0:** The save protocol T+30 calendar-day response window begins at `enterprise.pilot_save_protocol_triggered` emission. A 24 h detection delay (one missed run) consumes one day of the T+30 window — acceptable per COST_MODEL §46.3. There is no technical security breach (PILOT-SAVE-CHAIN-01 at Worker layer is unaffected); the risk is service-quality: delayed T0-Alpha notification. IC must treat this as urgent P1 customer commitment risk, not routine maintenance.
+
+### R-49.6 Recovery Steps
+
+1. Identify root cause from H1–H4 discrimination (§R-49.4).
+2. Fix root cause (re-register job, re-grant permissions, restore pg_net, or follow R-03 if H4).
+3. Manual trigger after fix: `SELECT cron.run_job('pilot_activation_monitor');`
+4. Confirm all-clear emission:
+   ```sql
+   SELECT created_at FROM audit_log_events
+   WHERE event_type = 'system.pilot_activation_check_passed'
+   ORDER BY created_at DESC LIMIT 1;
+   ```
+   Must be within 2 min of manual trigger.
+5. Confirm job 49 healthy in run details:
+   ```sql
+   SELECT jobname, start_time, return_message
+   FROM pg_cron.job_run_details
+   WHERE jobname = 'pilot_activation_monitor'
+   ORDER BY start_time DESC LIMIT 3;
+   ```
+   Last entry: `return_message = 'succeeded'`.
+6. Emit `system.pilot_activation_monitor_restored` (PILOT-ACT-STALE-CHAIN-01 terminal event; IC PAM-elevated):
+   ```json
+   {
+     "event_type": "system.pilot_activation_monitor_restored",
+     "severity": "STANDARD",
+     "payload": {
+       "incident_id": "<same-uuid-as-stale_declared>",
+       "root_cause": "<H1_deleted|H1_disabled|H2_permissions_revoked|H3_pg_net_degraded|H4_supabase_outage>",
+       "stale_hours": <total_stale_hours>,
+       "day14_cohort_affected": <boolean>,
+       "save_protocol_gap_found": <boolean>,
+       "save_protocol_gap_resolved": <boolean>,
+       "fix_deployed_at": "<ISO-8601>"
+     }
+   }
+   ```
+   `save_protocol_gap_resolved` must be `true` if `save_protocol_gap_found = true` before closing the P1 incident.
+7. File **PILOT-ACT-STALE-E-001** stale-window note (see §R-49.10).
+8. Update **SAVE-E-002 gap note** if stale window > 26 h during the annual observation period: file at `compliance/evidence/pilots/save-protocol/SAVE-E-002_gap_note_<incident_id>.md` — stale window, root cause, resolution, T0-Alpha gap assessment.
+9. Close PagerDuty P1 incident after `system.pilot_activation_monitor_restored` emitted and job 49 confirmed healthy.
+
+### R-49.7 Communication Templates
+
+**IC Slack `#incidents` — on detection:**
+```
+🔴 [P1] Pilot Activation Monitor Stale
+job 49 `pilot_activation_monitor` not run in {stale_hours}h (threshold: 26h).
+T0-Alpha monitoring blind spot active. Running R-49 scope queries.
+IC: {ic_name} | Started: {timestamp_utc}
+Day-14 cohort active (R-49-C2): {yes / no / pending}
+```
+
+**Customer-success page — if R-49-C2 positive AND R-49-C3 negative for any pilot:**
+```
+⚡ [Urgent] Pilot activation monitoring gap — job 49 stale for {stale_hours}h.
+Pilot {pilot_id} at Day {day_number}; manual activation_rate: {rate:.0%}.
+T0-Alpha crossed. Save protocol NOT yet triggered.
+Action: Admin Console → Save Protocol Trigger → pilot {pilot_id}.
+IC: {ic_name} | PagerDuty: form-enterprise P1
+```
+
+**`#security-restricted` post-resolution summary:**
+```
+✅ [R-49 RESOLVED] Pilot Activation Monitor Stale — job 49 restored.
+Root cause: {H1|H2|H3|H4} — {one-line description}
+Stale window: {stale_hours}h ({start_utc} → {restore_utc})
+Day-14 cohort affected: {yes / no}
+Save protocol gap: {none | resolved for pilot_id(s) [...]}
+DEC-030 chain: system.pilot_activation_monitor_stale_declared (anchor) → restored (terminal) — PILOT-ACT-STALE-CHAIN-01 complete
+SAVE-E-002 gap note filed: {yes — path | no}
+```
+
+### R-49.8 DEC-030 HMAC-Chained Events
+
+**PILOT-ACT-STALE-CHAIN-01 ordering invariant:**
+- `system.pilot_activation_monitor_restored` requires a preceding `system.pilot_activation_monitor_stale_declared` with the same `incident_id`
+- Violation: HTTP 422 `PILOT_ACT_STALE_CHAIN_01_VIOLATION` at `emit-audit-event` Worker
+- Ordering inversion: escalate to R-05 (HMAC chain break)
+- Suppression: none — both events must be emitted as a pair for each R-49 activation
+
+| Event | Classification | Emitter | Trigger |
+|---|---|---|---|
+| `system.pilot_activation_monitor_stale_declared` | HIGH / 7 yr | IC (PAM-elevated) | R-49 Step 1 — stale confirmed by R-49-C1; PILOT-ACT-STALE-CHAIN-01 anchor |
+| `system.pilot_activation_monitor_restored` | STANDARD / 3 yr | IC (PAM-elevated) | R-49 Step 6 — job 49 restored and `system.pilot_activation_check_passed` confirmed; PILOT-ACT-STALE-CHAIN-01 terminal |
+
+### R-49.9 Zod v2 Schemas (canonical source: this document §R-49.9)
+
+```typescript
+// system.pilot_activation_monitor_stale_declared
+const PilotActivationMonitorStaleDeclaredSchema = z.object({
+  incident_id:          z.string().uuid(),
+  stale_hours:          z.number().positive(),
+  day14_cohort_active:  z.boolean(),
+  save_protocol_gap:    z.boolean(),  // true only if day14_cohort_active AND any pilot lacks PILOT-SAVE-CHAIN-01 predecessor
+});
+
+// system.pilot_activation_monitor_restored
+const PilotActivationMonitorRestoredSchema = z.object({
+  incident_id:               z.string().uuid(),      // matches stale_declared — PILOT-ACT-STALE-CHAIN-01
+  root_cause:                z.enum([
+    'H1_deleted',
+    'H1_disabled',
+    'H2_permissions_revoked',
+    'H3_pg_net_degraded',
+    'H4_supabase_outage',
+  ]),
+  stale_hours:               z.number().positive(),
+  day14_cohort_affected:     z.boolean(),
+  save_protocol_gap_found:   z.boolean(),
+  save_protocol_gap_resolved: z.boolean(),           // must be true if save_protocol_gap_found; enforced by IC before P1 close
+  fix_deployed_at:           z.string().datetime(),
+});
+```
+
+**Privacy floor:** Both schemas carry only booleans, numeric counts, H1–H4 enums, and FORM-internal `incident_id` UUID. No employee `user_id`, name, email, `activation_rate` value, tenant name, coaching exchange content, or GDPR Art. 9 special-category health data.
+
+**SOC 2 auditor rationale:** CC7.2 — the PILOT-ACT-STALE-CHAIN-01 HMAC chain provides a tamper-evident timeline from detection to restoration, independently verifiable per HMAC-VERIFY-ALGO-001. `save_protocol_gap_resolved = true` in the terminal event confirms that any T0-Alpha monitoring gap was remediated within the R-49 lifecycle.
+
+### R-49.10 SOC 2 Evidence
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | Path |
+|---|---|---|---|---|---|
+| **PILOT-ACT-STALE-E-001** | CC7.2 / A1.1 / CC3.2 | IC narrative per R-49 activation: stale window (hours), root cause (H1–H4), R-49-C2 result (Day-14 cohort active?), R-49-C3 result (save protocol gap?), gap resolution steps if applicable. Filed within 48 h of job 49 restoration. | Per incident | 7 yr if save-protocol gap found; 3 yr if no gap | `compliance/evidence/pilots/save-protocol/PILOT-ACT-STALE-E-001_<incident_id>.md` |
+| **SAVE-E-002 gap note** | CC7.2 / A1.1 | Stale window note appended to annual SAVE-E-002 filing: `incident_id`, `stale_hours`, observation-year impact, resolution. Required only if R-49 activation occurs during the SAVE-E-002 annual observation year. | Per incident (if within annual SAVE-E-002 window) | 3 yr | `compliance/evidence/pilots/save-protocol/SAVE-E-002_gap_note_<incident_id>.md` |
+
+**CC7.2 auditor rationale:** Job 49 staleness is a monitoring-layer failure — the detection sentinel for FORM's T0-Alpha pilot save trigger stopped running. PILOT-ACT-STALE-E-001 documents the gap and its remediation. `save_protocol_gap_resolved = true` in `system.pilot_activation_monitor_restored` provides HMAC-chained confirmation that any pilot below T0-Alpha threshold was identified and the save protocol initiated despite the monitoring gap. SAVE-E-002 explicitly covers `pg_cron.job_run_details WHERE jobname = 'pilot_activation_monitor'` run history — any R-49 activation creates a documented gap note in that annual artefact.
+
+**A1.1 auditor rationale:** FORM's enterprise pilot availability commitment (COST_MODEL §46.3, MSA) requires that activation monitoring runs daily without gap. R-49 activation and PILOT-ACT-STALE-E-001 document FORM's detection and response procedure when this monitoring commitment is disrupted.
+
+**CC3.2 auditor rationale:** Pilot activation failure is a documented enterprise risk (COST_MODEL §46.1); job 49 is the designed monitoring response to that risk. R-49 documents the monitoring-layer response itself failing and being remediated — satisfying CC3.2's requirement that risk responses are operative and recoverable.
+
+### R-49.11 Cross-References
+
+- `docs/OBSERVABILITY.md §58` — pilot activation monitoring canonical spec (§58.5); PILOT-ACT-SLO-01/02 (§58.2); AL-SAVE-01 / AL-PILOT-ACT-01 (§58.4); stale-window DEC-030 event specs (§58.7); PILOT-ACT-STALE-E-001 (§58.8); §58.10 item 3 — this runbook closes
+- `docs/OBSERVABILITY.md §12.6` — job 49 pg_cron registry; stale-consequence cross-ref updated to R-49 (v5.5.0, 2026-06-29)
+- `docs/COST_MODEL.md §46` — CSM Save Protocol (canonical); T0-Alpha trigger §46.2; T+30 response window §46.3; PILOT-SAVE-CHAIN-01 §46.5; DEC-030 pilot events §46.7; §46.9 item 4 (job 49 registration obligation — closed OBSERVABILITY.md §12.6 v2.4, 2026-06-27)
+- `docs/SOC2_READINESS.md §126` — SAVE-E-001/SAVE-E-002 registration; PILOT-ACT-STALE-E-001 registration pending §R-49.12 item 4
+- `docs/AUDIT_LOG_SCHEMA.md` — `system.pilot_activation_monitor_stale_declared` + `system.pilot_activation_monitor_restored` + PILOT-ACT-STALE-CHAIN-01 pending §R-49.12 item 1
+- R-03 (Infrastructure Outage — H4 co-activation)
+- R-05 (HMAC chain break — PILOT-ACT-STALE-CHAIN-01 ordering inversion escalation)
+- R-20 (Insider Threat — H1 deliberate deletion co-activation path)
+- R-45 (Litigation Hold Monitor Stale — structural daily-job-stale peer)
+- R-46 (Pricing Exception Monitor Stale — structural daily-job-stale peer)
+- R-47 (SCIM Provisioning Monitor Stale — structural daily-job-stale peer)
+- R-48 (Amendment Rate Compliance Monitor Stale — closest structural peer: daily-range monitoring failure)
+- DEC-030
+
+### R-49.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.pilot_activation_monitor_stale_declared` (HIGH/7yr) and `system.pilot_activation_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md` — new subsection `§Pilot Activation Monitor Stale events` after the CSM Save Protocol events section. Include PILOT-ACT-STALE-CHAIN-01 ordering invariant block (same `incident_id` required; HTTP 422 `PILOT_ACT_STALE_CHAIN_01_VIOLATION` on inversion → R-05); Zod v2 schemas from §R-49.9; CC7.2/A1.1/CC3.2 auditor narratives. | security-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 2 | Deploy PagerDuty routing rule for job 49 stale: `pg-cron-health-monitor` routes `system.cron_job_stale WHERE job_name = 'pilot_activation_monitor'` to service `form-devops` P1; dedup key `pilot-act-check-stale`; auto-resolve on next `system.pilot_activation_check_passed` LOW emission. Integration test: simulate job 49 > 26 h staleness in staging; confirm P1 fires; confirm auto-resolve after manual run. | devops-lead | **P0** | M5 | [ ] |
+| 3 | Confirm `docs/OBSERVABILITY.md §12.6` job 49 stale-consequence cross-ref updated from "runbook to be authored at §R-49 (P1/M5)" to "INCIDENT_RESPONSE R-49 (§R-49.5; v1.0, 2026-06-29)"; confirm §58.10 item 3 marked `[x] Done`. | devops-lead | **P1** | M5 | [x] Done — 2026-06-29 (INCIDENT_RESPONSE.md v3.17.0 + OBSERVABILITY.md v5.5.0 co-authored this pass) |
+| 4 | Register PILOT-ACT-STALE-E-001 evidence artefact template path (`compliance/evidence/pilots/save-protocol/PILOT-ACT-STALE-E-001_<incident_id>.md`) in `docs/SOC2_READINESS.md §126` evidence table; confirm `pilots/save-protocol/` R2 subfolder policy covers PILOT-ACT-STALE-E-001; add Vanta mirror entry (CC7.2/A1.1/CC3.2). | compliance-officer | **P1** | M5 | [ ] |
+
+---
+
+*v1.0 (2026-06-29): R-49 Pilot Activation Monitor Stale (`pilot_activation_monitor` · job 49) — forty-ninth runbook. Closes `docs/OBSERVABILITY.md §58.10` item 3 (P1/M5 — author R-49 stale recovery runbook) and `docs/OBSERVABILITY.md §12.6` job 49 stale-consequence cross-ref. Job 49 `pilot_activation_monitor` (`0 10 * * *`; 26 h freshness window; daily 10:00 UTC) was registered in OBSERVABILITY.md §12.6 (v2.4 patch, 2026-06-27) with stale-recovery runbook explicitly deferred as "INCIDENT_RESPONSE — runbook to be authored at §R-49 (P1/M5)"; §58 canonical observability spec co-authored in OBSERVABILITY.md v5.5.0, 2026-06-29 as part of this authoring pass. Critical characteristic: unlike R-48 (monthly job — stale window up to 64 days), job 49 is daily — a stale window represents 26 h–52 h+ detection gap at the T0-Alpha threshold; primary risk is T0-Alpha blind spot (Day-14 pilot cohort below 30% activation goes undetected), narrowing the T+30 save-protocol response window by the stale duration. Key distinction from structural peers: R-49 has no independent P0 escalation path (unlike R-48 with TU-CHAIN-01 + floor breach dual P0s, or R-47 with SCIM-ATTR-CHAIN-01 P0); escalation is always P1, with immediate customer-success page if R-49-C2 positive and R-49-C3 negative. PILOT-SAVE-CHAIN-01 at the `emit-audit-event` Worker layer continues operating independently — a stale job 49 disables automated T0-Alpha detection, not the save protocol mechanism itself. Two DEC-030 HMAC-chained events: `system.pilot_activation_monitor_stale_declared` HIGH/7yr (PILOT-ACT-STALE-CHAIN-01 anchor; IC PAM-elevated at Step 1; CC7.2/A1.1/CC3.2); `system.pilot_activation_monitor_restored` STANDARD/3yr (terminal; IC PAM-elevated at Step 6; `save_protocol_gap_resolved = true` required if gap found). Five scope queries: R-49-C1 (staleness — stale_hours); R-49-C2 (active Day-14 cohort — primary escalation gate); R-49-C3 (save protocol predecessor check — gap discriminator); R-49-C4 (peer daily job health — H4 discriminator); R-49-C5 (job registration — H1 discriminator). Four root causes: H1 (deleted/disabled); H2 (form_system permissions revoked on pilot_programs/session_completed); H3 (pg_net or audit-event pipeline degraded); H4 (Supabase outage → R-03). Three communication templates (IC Slack on detection; customer-success page if gap found; #security-restricted post-resolution). Two evidence artefacts: PILOT-ACT-STALE-E-001 (per-incident IC narrative; CC7.2/A1.1/CC3.2; 7yr if gap / 3yr if no gap); SAVE-E-002 gap note (annual filing amendment; CC7.2/A1.1; 3yr). Four implementation checklist items: AUDIT_LOG_SCHEMA.md event registration + PILOT-ACT-STALE-CHAIN-01 (P0/M5 item 1); PagerDuty routing rule for job 49 stale (P0/M5 item 2); §12.6 + §58.10 cross-ref closure (P1/M5 item 3 — [x] Done this authoring pass); SOC2_READINESS §126 PILOT-ACT-STALE-E-001 registration (P1/M5 item 4). Privacy floor: both DEC-030 stale events carry only booleans, numeric counts, H1–H4 enum, and FORM-internal `incident_id` UUID — no employee `user_id`, `activation_rate` value, tenant name, or GDPR Art. 9 health data; R-49-C2/C3 surface only FORM-internal `pilot_id` UUIDs and aggregate rates — no individual employee identities; "HR never sees individual user data" principle (ENTERPRISE.md) applies to the R-49 escalation path — customer-success receives only pilot_id UUID and aggregate rate. Cross-references: `docs/OBSERVABILITY.md §58`; `docs/OBSERVABILITY.md §12.6`; `docs/COST_MODEL.md §46`; `docs/SOC2_READINESS.md §126`; R-03; R-05; R-20; R-45; R-46; R-47; R-48. Owner: devops-lead + customer-success + compliance-officer.*
+
+---
+
+**v1.0 · 2026-06-29 · Owner: devops-lead + customer-success + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---
+
+*v3.17.0 (2026-06-29): R-49 Pilot Activation Monitor Stale (`pilot_activation_monitor` · job 49) — closes `docs/OBSERVABILITY.md §58.10` item 3 (P1/M5). Companion §58 canonical observability spec co-authored in OBSERVABILITY.md v5.5.0, 2026-06-29 in the same commit. Privacy floor: both DEC-030 stale events (`system.pilot_activation_monitor_stale_declared` HIGH/7yr + `system.pilot_activation_monitor_restored` STANDARD/3yr) carry booleans, numeric counts, H1–H4 enum, FORM-internal UUID — no employee `user_id`, `activation_rate` value, tenant name, or GDPR Art. 9 health data. R-49-C2/C3 scope queries surface only FORM-internal `pilot_id` UUIDs and aggregate rates. Owner: devops-lead + customer-success + compliance-officer.*

@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.4.6
+# FORM · Observability & Monitoring Taxonomy v5.5.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -1284,7 +1284,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 
 | `scim_provisioning_compliance_monitor` | `0 6 * * *` | 26 h | CC6.4/CC4.1/CC7.2 — daily SCIM sensitive attribute violation sentinel (sweep 1) + quarterly SCIM provisioning compliance trigger (sweep 2); sweep 1: `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'scim.rejected_sensitive_attribute' AND created_at >= NOW() - INTERVAL '26 hours'`; on count > 0: emits `security.scim_sensitive_attr_violation_detected` CRITICAL/7yr (SCIM-ATTR-CHAIN-01 ordering invariant: DEC-030 HTTP 200 confirmed before AL-SCIM-PROV-01 PagerDuty P0 fires); sweep 2: fires only in first 7 days of Jan/Apr/Jul/Oct — aggregate `scim.rejected_sensitive_attribute` count for prior quarter → emits `system.scim_provisioning_quarterly_check_triggered` STANDARD/3yr (aggregate, no `tenant_id`) + Slack `#compliance` advisory; always emits `system.scim_provisioning_check_passed` LOW/1yr after all sweeps (aggregate counts, no `tenant_id` — privacy floor); `form_system` role; `form_api` REVOKED from `audit_log_events`; stale = SCIM-PROV-SLO-01 (zero sensitive attribute violations) monitoring blind spot + SCIM-PROV-E-003 quarterly zero-count assertion collection baseline unavailable | PagerDuty P1 `form-devops` → devops-lead; dedup `scim-prov-check-stale`; 26h freshness window (daily cadence appropriate for CC6.4 zero-tolerance baseline — reactive burst AL-SCIM-01 (§26.7b) handles real-time spike detection; job 47 provides proactive daily confirmation and quarterly evidence trigger); cross-ref: §56.4 (AL-SCIM-PROV-01/02 alert specs); §56.5 (job spec — §56.5.2 sweep 1 SQL, §56.5.3 sweep 2 SQL, §56.5.5 SCIM-ATTR-CHAIN-01 invariant); §56.6 (§6.2 `scim_provisioning_compliance` subsection — this commit v5.3.0); SSO_SCIM §26.7b (AL-SCIM-01 reactive burst complement); SCIM-PROV-MON-E-001 (CC4.1/A1.1/CC7.2, annual 3yr — §56.8); INCIDENT_RESPONSE R-47 (job 47 stale recovery runbook — §R-47.5; v1.0, 2026-06-26) — **job 47** |
 | `amendment_rate_compliance_monitor` | `0 7 1 * *` | 33 days | CC5.2/CC6.1/A1.1 — monthly TU-CHAIN-01 chain integrity cross-check (sweep 1) + price floor forensic verification (sweep 2); sweep 1: correlated subquery on `audit_log_events` for `billing.rate_updated` events in last 32 days lacking matching `enterprise.contract_amended` for same `tenant_id` within ±24h (TU-CHAIN-01 per COST_MODEL §45.5); on gap_count > 0: emits `security.amendment_chain_gap_detected` CRITICAL/7yr (AMEND-MONITOR-CHAIN-01 ordering invariant: DEC-030 HTTP 200 confirmed before AL-AMEND-01 PagerDuty P0 fires); sweep 2: `SELECT id FROM enterprise_contracts WHERE amendment_type IS NOT NULL AND rate_per_seat_usd < CASE tier WHEN 'starter' THEN 6.00 WHEN 'growth' THEN 4.50 WHEN 'enterprise' THEN 4.00 END`; on breach_count > 0: emits `security.amendment_floor_breach_detected` CRITICAL/7yr (AMEND-MONITOR-CHAIN-01: DEC-030 HTTP 200 confirmed before AL-AMEND-02 PagerDuty P0 fires); unknown-tier NULL bypass protection: rows with unrecognised `tier` excluded from breach set → `system.amendment_unknown_tier_detected` STANDARD/3yr for devops-lead review; always emits `system.amendment_rate_check_passed` LOW/1yr after both clean sweeps (aggregate counts — privacy floor; suppressed when CRITICAL emitted — AMEND-MONITOR-CHAIN-01); `form_system` role; `form_api` REVOKED from `audit_log_events` and `enterprise_contracts`; stale = AMEND-SLO-01 TU-CHAIN-01 chain gap monitoring blind spot + AMEND-SLO-02 price floor forensic cross-check unavailable | PagerDuty P1 `form-devops` → devops-lead; dedup `amend-check-stale`; 33-day freshness window (monthly cadence — 1-day tolerance; tolerated because TU-CHAIN-01 is enforced at Worker layer in real time via HTTP 422 in `amend_contract_tier()` SECURITY DEFINER RPC; price floor enforced at DDL layer via CHECK constraint (DATA_MODEL §47); job 48 is monthly belt-and-suspenders forensic cross-check, not primary enforcement gate; a missed run means at most 64 days between verifications — acceptable for a commercial governance control, well within the annual ADM-E-002 filing cycle); cross-ref: §57.4 (AL-AMEND-01/02/03 alert specs); §57.5 (job spec — §57.5.2 sweep 1 SQL, §57.5.3 sweep 2 SQL, §57.5.5 AMEND-MONITOR-CHAIN-01 invariant); §57.6 (§6.2 `amendment_rate_health` subsection — v5.4.0, this commit); COST_MODEL §45.5 (TU-CHAIN-01 source definition); COST_MODEL §31.5 (price floors: Starter $6.00, Growth $4.50, Enterprise $4.00); DATA_MODEL §47 (migration 0088 — amendment columns + floor CHECK constraint); SOC2_READINESS §118 (ADM-E-001/ADM-E-002 annual evidence artefacts); AMEND-OBS-E-001 (CC5.2/CC6.1/A1.1, annual 3yr — §57.8; SOC2_READINESS §124 registration pending §57.10 item 5 P1/M6); INCIDENT_RESPONSE R-48 (§R-48.5/R-48.6; v1.0, 2026-06-27) — **job 48** |
-| `pilot_activation_monitor` | `0 10 * * *` | 26 h | CC3.2/CC7.2/A1.1 — daily Day-14 pilot activation rate sentinel (T0-Alpha trigger per COST_MODEL §46.2); queries `session_completed` events joined to `pilot_programs.seats` for pilots at `day_number = 14`; computes `activation_rate = active_seats / contracted_seats`; if `activation_rate < 0.30` AND pilot tier is Growth or Enterprise: fires AL-SAVE-01 PagerDuty P1 `form-enterprise` → customer-success with dedup key `pilot-save-t0a-{pilot_id}` 24h cooldown (prompts CSM to initiate save protocol and emit `enterprise.pilot_save_protocol_triggered` HIGH/7yr via Admin Console "Save Protocol Trigger" button — IC PAM-elevated; pg_cron is the detection sentinel, not the event emitter); on all-clear (all Day-14 pilots at ≥ 30% activation): emits `system.pilot_activation_check_passed` LOW/1yr (no `pilot_id` — privacy floor; aggregate checked-pilot count only); stale = T0-Alpha monitoring blind spot — a Day-14 cohort activating below 30% goes undetected until next daily run, extending save-protocol start by up to 24h (tolerated; see freshness note below); `form_api` REVOKED from `pilot_programs` and `session_completed`; pg_cron reads via `form_system` role | PagerDuty P1 `form-enterprise` → customer-success; dedup key `pilot-save-t0a-{pilot_id}` 24h cooldown (re-alerts after 24h if pilot remains below threshold and no `enterprise.pilot_save_protocol_triggered` event emitted for same `pilot_id`); privacy invariant: alert payload contains only `pilot_id` (FORM-internal UUID), `activation_rate` (aggregate NUMERIC 0.00–1.00), `day_number` (integer) — no individual employee `user_id`, name, email, session content, coaching exchange, or GDPR Art. 9 health data; all-clear `system.pilot_activation_check_passed` omits `pilot_id` entirely (aggregate count only); cross-ref: COST_MODEL §46.2 (T0-Alpha trigger definition: Day-14 activation rate < 30% — primary §21.7 signal); COST_MODEL §46.7 (`enterprise.pilot_save_protocol_triggered` HIGH/7yr DEC-030 event — emitted by IC not pg_cron; job 49 is the detection and alerting sentinel); COST_MODEL §46.9 item 4 (P0/M4 — job 49 registration obligation; closes this §12.6 entry); SOC2_READINESS §126 (SAVE-E-001/SAVE-E-002 cross-reference registration, 2026-06-27); SAVE-E-002 (CC7.2/A1.1, annual `pg_cron.job_run_details WHERE jobname = 'pilot_activation_monitor'` run history, 3yr — confirms monitoring sentinel operated without >26h detection blind spot throughout observation year); INCIDENT_RESPONSE — runbook to be authored at §R-49 (P1/M5) — **job 49** |
+| `pilot_activation_monitor` | `0 10 * * *` | 26 h | CC3.2/CC7.2/A1.1 — daily Day-14 pilot activation rate sentinel (T0-Alpha trigger per COST_MODEL §46.2); queries `session_completed` events joined to `pilot_programs.seats` for pilots at `day_number = 14`; computes `activation_rate = active_seats / contracted_seats`; if `activation_rate < 0.30` AND pilot tier is Growth or Enterprise: fires AL-SAVE-01 PagerDuty P1 `form-enterprise` → customer-success with dedup key `pilot-save-t0a-{pilot_id}` 24h cooldown (prompts CSM to initiate save protocol and emit `enterprise.pilot_save_protocol_triggered` HIGH/7yr via Admin Console "Save Protocol Trigger" button — IC PAM-elevated; pg_cron is the detection sentinel, not the event emitter); on all-clear (all Day-14 pilots at ≥ 30% activation): emits `system.pilot_activation_check_passed` LOW/1yr (no `pilot_id` — privacy floor; aggregate checked-pilot count only); stale = T0-Alpha monitoring blind spot — a Day-14 cohort activating below 30% goes undetected until next daily run, extending save-protocol start by up to 24h (tolerated; see freshness note below); `form_api` REVOKED from `pilot_programs` and `session_completed`; pg_cron reads via `form_system` role | PagerDuty P1 `form-enterprise` → customer-success; dedup key `pilot-save-t0a-{pilot_id}` 24h cooldown (re-alerts after 24h if pilot remains below threshold and no `enterprise.pilot_save_protocol_triggered` event emitted for same `pilot_id`); privacy invariant: alert payload contains only `pilot_id` (FORM-internal UUID), `activation_rate` (aggregate NUMERIC 0.00–1.00), `day_number` (integer) — no individual employee `user_id`, name, email, session content, coaching exchange, or GDPR Art. 9 health data; all-clear `system.pilot_activation_check_passed` omits `pilot_id` entirely (aggregate count only); cross-ref: COST_MODEL §46.2 (T0-Alpha trigger definition: Day-14 activation rate < 30% — primary §21.7 signal); COST_MODEL §46.7 (`enterprise.pilot_save_protocol_triggered` HIGH/7yr DEC-030 event — emitted by IC not pg_cron; job 49 is the detection and alerting sentinel); COST_MODEL §46.9 item 4 (P0/M4 — job 49 registration obligation; closes this §12.6 entry); SOC2_READINESS §126 (SAVE-E-001/SAVE-E-002 cross-reference registration, 2026-06-27); SAVE-E-002 (CC7.2/A1.1, annual `pg_cron.job_run_details WHERE jobname = 'pilot_activation_monitor'` run history, 3yr — confirms monitoring sentinel operated without >26h detection blind spot throughout observation year); INCIDENT_RESPONSE R-49 (§R-49.5; v1.0, 2026-06-29) — **job 49** |
 
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
@@ -16420,3 +16420,266 @@ export const AmendmentRateMonitorRestoredPayload = z.object({
 *v5.4.1 (2026-06-27): §57.10 item 6 cross-reference patch — INCIDENT_RESPONSE R-48 authored (INCIDENT_RESPONSE.md v3.16.0, 2026-06-27). Three stale "pending §57.10 item 6" references resolved: (1) §6.2 `amendment_rate_health` AL-AMEND-01 runbook column updated from "INCIDENT_RESPONSE R-48 (pending §57.10 item 6)" to "INCIDENT_RESPONSE R-48 (§R-48.5; v1.0, 2026-06-27)"; (2) §6.2 AL-AMEND-02 runbook column updated from "INCIDENT_RESPONSE R-48 (pending §57.10 item 6)" to "INCIDENT_RESPONSE R-48 (§R-48.6; v1.0, 2026-06-27)"; (3) §12.6 job 48 stale-consequence cross-ref updated from "INCIDENT_RESPONSE R-48 (job 48 stale recovery runbook — pending §57.10 item 6 P1/M7)" to "INCIDENT_RESPONSE R-48 (§R-48.5/R-48.6; v1.0, 2026-06-27)". §57.10 item 6 status: `[ ]` → `[x] Done — 2026-06-27 (INCIDENT_RESPONSE.md v3.16.0)`. Document header v5.4.0 → v5.4.1. No new alert rules, SLOs, metrics, or evidence artefacts. Privacy floor: no changes to privacy floor in any amended row — cross-reference text update only. Owner: devops-lead + compliance-officer.*
 
 *v5.4.0 (2026-06-27): §57 Amendment Rate Change Compliance Observability — closes the amendment rate compliance monitoring gap identified after COST_MODEL §45 (DEC-082, 2026-06-26) established the Pure Tier Upgrade governance framework and DATA_MODEL §47 (migration 0088, 2026-06-27) added amendment columns to `enterprise_contracts`: no automated monitoring existed between annual ADM-E-001/ADM-E-002 filings (SOC2_READINESS §118) to verify TU-CHAIN-01 chain integrity or price floor compliance. New pg_cron job 48 `amendment_rate_compliance_monitor` (`0 7 1 * *`; monthly; 33-day freshness window; sweep 1: correlated subquery for `billing.rate_updated` events in last 32 days without matching `enterprise.contract_amended` for same `tenant_id` within ±24h; sweep 2: `enterprise_contracts` floor check against §31.5 tier floors: Starter $6.00, Growth $4.50, Enterprise $4.00; unknown-tier NULL bypass protection → `system.amendment_unknown_tier_detected` STANDARD/3yr). Three new DEC-030 events: `security.amendment_chain_gap_detected` CRITICAL/7yr (AL-AMEND-01 P0; AMEND-MONITOR-CHAIN-01 ordering invariant), `security.amendment_floor_breach_detected` CRITICAL/7yr (AL-AMEND-02 P0), `system.amendment_rate_check_passed` LOW/1yr (suppressed when CRITICAL emitted — AMEND-MONITOR-CHAIN-01). Three alert rules: AL-AMEND-01 (P0 chain gap; PagerDuty `form-security` + `form-compliance` → security-engineer + compliance-officer + enterprise-architect), AL-AMEND-02 (P0 floor breach), AL-AMEND-03 (P1 job 48 stale; PagerDuty `form-devops`). Three SLOs: AMEND-SLO-01/02/03. Evidence artefact AMEND-OBS-E-001 (annual run history, CC5.2/CC6.1/A1.1, 3yr; R2 path `compliance/evidence/amendments/monitoring/AMEND-OBS-E-001_<YYYY>.md`; SOC2_READINESS §79.4 registration pending §57.10 item 5 P1/M6). TOC entry added. §6.2 `amendment_rate_health` subsection inserted after `scim_provisioning_compliance` and before `sca_vulnerability_monitoring` (item 4 done). §12.6 job 48 registered (v2.3 patch, item 3 done). Freshness window note extended for job 48. Privacy floor throughout: all event payloads carry aggregate counts or FORM-internal UUIDs only — no employee `user_id`, name, email, health value, rate value, or GDPR Art. 9 special-category data. Pending obligations: AUDIT_LOG_SCHEMA.md DEC-030 registration (item 1 P0/M5); job 48 implementation (item 2 P0/M5); SOC2_READINESS §124 AMEND-OBS-E-001 registration (item 5 P1/M6); INCIDENT_RESPONSE R-48 (item 6 P1/M7); staging test (item 7 P2/M8); Metabase dashboard (item 8 P1/M8). Owner: compliance-officer + security-engineer + enterprise-architect. Document v5.3.1 → v5.4.0.*
+
+---
+
+## §58. Pilot Activation Observability
+
+### §58.1 Purpose and Scope
+
+This section documents the observability layer for enterprise pilot activation monitoring — the detection infrastructure that supports FORM's CSM Save Protocol (COST_MODEL §46). The primary artefact is pg_cron job 49 `pilot_activation_monitor`: a daily sentinel that checks whether Day-14 pilots have reached the T0-Alpha activation threshold (30% of contracted seats completing at least one session) and fires AL-SAVE-01 to prompt save-protocol initiation when the threshold is not met.
+
+**Monitoring gap being closed:** Without job 49, a Day-14 pilot below the T0-Alpha threshold could go undetected indefinitely — customer-success would only learn of low activation through manual review or customer escalation. Job 49 converts that passive risk into a daily automated sentinel with a tamper-evident DEC-030 all-clear chain.
+
+**Privacy floor (absolute):** Job 49 never surfaces individual employee `user_id`, name, email, session content, coaching exchange, or GDPR Art. 9 special-category health data. The T0-Alpha check is a fleet-level aggregate (`active_seats / contracted_seats`). The all-clear event `system.pilot_activation_check_passed` carries aggregate pilot count only — no `pilot_id`. AL-SAVE-01 payload contains `pilot_id` (FORM-internal UUID), `activation_rate` (NUMERIC 0.00–1.00), and `day_number` (integer). HR (`tenant_manager`) and `enterprise_admin` roles are excluded from any pilot activation dashboard panel.
+
+**SOC 2 scope:** CC3.2 (risk identification and response — pilot activation failure documented as enterprise risk; job 49 is the designed monitoring response), CC7.2 (anomaly detection — daily sweep detects T0-Alpha threshold crossing within 26 h), A1.1 (availability of enterprise pilot monitoring commitment).
+
+### §58.2 SLOs
+
+| SLO ID | Measurement | Target | Breach condition | Cadence | Criteria | Owner |
+|---|---|---|---|---|---|---|
+| **PILOT-ACT-SLO-01** | Hours elapsed since last `system.pilot_activation_check_passed` LOW event in `audit_log_events`; verifiable via `pg_cron.job_run_details WHERE jobname = 'pilot_activation_monitor'` | ≤ 26 h (job 49 daily 10:00 UTC) | > 26 h elapsed (AL-PILOT-ACT-01 fires via `pg-cron-health-monitor`) | Daily | CC7.2 / A1.1 | devops-lead |
+| **PILOT-ACT-SLO-02** | Time from Day-14 activation-rate crossing below 30% (for an active Growth or Enterprise tier pilot) to AL-SAVE-01 P1 firing | ≤ 26 h (one job 49 daily cycle) | > 26 h without AL-SAVE-01 (job 49 stale — PILOT-ACT-SLO-01 breach implies PILOT-ACT-SLO-02 breach if active Day-14 cohort exists) | Daily | A1.1 / CC3.2 | customer-success + devops-lead |
+
+**Error budget note:** PILOT-ACT-SLO-01 and PILOT-ACT-SLO-02 target 100% compliance over any observation month (zero stale-window days). A single R-49 activation creates a PILOT-ACT-STALE-E-001 evidence note and potentially a SAVE-E-002 gap note for the annual filing. No formal error budget consumption model applies — each breach is individually documented and resolved.
+
+### §58.3 Monitoring Architecture
+
+```
+pg_cron job 49 `pilot_activation_monitor` (daily 10:00 UTC · form_system role)
+│
+├─ Query: session_completed JOIN pilot_programs
+│    WHERE pilot_programs.day_number = 14
+│    AND pilot_programs.status = 'active'
+│    AND pilot_programs.tier IN ('growth', 'enterprise')
+│
+├─ activation_rate = active_seats / contracted_seats
+│
+├─ IF activation_rate < 0.30 (T0-Alpha threshold)
+│    └─ Fire AL-SAVE-01 → PagerDuty form-enterprise P1
+│         Payload: pilot_id (UUID), activation_rate (NUMERIC), day_number (int)
+│         Dedup: pilot-save-t0a-{pilot_id} 24h
+│         → customer-success initiates save protocol via Admin Console
+│              → emit enterprise.pilot_save_protocol_triggered HIGH/7yr (IC PAM-elevated)
+│              → PILOT-SAVE-CHAIN-01 begins (COST_MODEL §46.5)
+│
+└─ IF all Day-14 pilots at ≥ 30% (or no Day-14 pilots active)
+     └─ Emit system.pilot_activation_check_passed LOW/1yr
+          Payload: checked_pilot_count (aggregate int), check_run_at (timestamptz)
+          No pilot_id — privacy floor
+          → pg-cron-health-monitor dead-man's switch resets
+
+pg-cron-health-monitor (independent sweep)
+│
+└─ No system.pilot_activation_check_passed LOW in audit_log_events for > 26h
+     └─ Fire AL-PILOT-ACT-01 → PagerDuty form-devops P1
+          Dedup: pilot-act-check-stale
+          → devops-lead initiates INCIDENT_RESPONSE R-49
+```
+
+### §58.4 Alert Rules
+
+**Subsection: `pilot_activation_health` (AL-SAVE-01, AL-PILOT-ACT-01):**
+
+| Alert | Trigger | Severity | Route | Dedup / auto-resolve | Cross-ref |
+|---|---|---|---|---|---|
+| **AL-SAVE-01** | job 49 sweep: `activation_rate < 0.30` for active Day-14 Growth or Enterprise pilot | P1 | PagerDuty `form-enterprise` → customer-success | Dedup `pilot-save-t0a-{pilot_id}` 24 h; re-alerts every 24 h if pilot remains below threshold and no `enterprise.pilot_save_protocol_triggered` emitted for same `pilot_id`; auto-resolves on `enterprise.pilot_save_protocol_triggered` HIGH emission for the same `pilot_id` | §58.5 job 49 SQL; COST_MODEL §46.2 (T0-Alpha definition); INCIDENT_RESPONSE R-49 §R-49.5 (if job 49 stale and manual T0-Alpha check required) |
+| **AL-PILOT-ACT-01** | `pg-cron-health-monitor`: no `system.pilot_activation_check_passed` LOW event in `audit_log_events` for > 26 h | P1 | PagerDuty `form-devops` → devops-lead | Dedup `pilot-act-check-stale`; auto-resolves on next `system.pilot_activation_check_passed` LOW emission | INCIDENT_RESPONSE R-49; §58.2 PILOT-ACT-SLO-01 breach |
+
+**SOC 2 mapping (`pilot_activation_health`):** CC3.2 (AL-SAVE-01 implements the automated detection arm of the pilot activation risk response designed in COST_MODEL §46; its firing creates the trigger condition for `enterprise.pilot_save_protocol_triggered` — the DEC-030 evidence of risk-response initiation); CC7.2 (AL-PILOT-ACT-01 detects monitoring-layer failure — job 49 not running — via the dead-man's switch pattern; PILOT-ACT-SLO-01 breach confirmed by AL-PILOT-ACT-01 firing); A1.1 (both alerts jointly guarantee that T0-Alpha threshold crossings are surfaced within the 26 h freshness window — supporting FORM's enterprise pilot monitoring commitment per COST_MODEL §46.3 and MSA).
+
+Privacy floor: AL-SAVE-01 payload contains only `pilot_id` (FORM-internal UUID), `activation_rate` (aggregate NUMERIC 0.00–1.00), and `day_number` (integer) — no employee `user_id`, name, email, session content, coaching exchange content, body weight, health metrics, or GDPR Art. 9 special-category data. AL-PILOT-ACT-01 payload contains only `job_name` string and `stale_hours` numeric — no pilot data whatsoever. `tenant_manager` (HR) and `enterprise_admin` excluded from any alert routing.
+
+### §58.5 Job Specification — `pilot_activation_monitor` (job 49)
+
+| Field | Value |
+|---|---|
+| Job name | `pilot_activation_monitor` |
+| pg_cron schedule | `0 10 * * *` (daily 10:00 UTC — offset from jobs 45/46/47/48 to distribute load) |
+| Freshness window | 26 h (1-day tolerance; consistent with daily compliance jobs 39, 45, 46, 47) |
+| Role | `form_system` (SECURITY DEFINER); `form_api` REVOKED from `pilot_programs` and `session_completed` |
+| SOC 2 scope | CC3.2, CC7.2, A1.1 |
+| Registered | OBSERVABILITY.md §12.6 (v2.4 patch, 2026-06-27); canonical spec this section |
+
+**Job SQL (canonical):**
+```sql
+DO $$
+DECLARE
+  v_pilot        RECORD;
+  v_active_users INT;
+  v_rate         NUMERIC(5,4);
+  v_alert_fired  BOOLEAN := false;
+BEGIN
+  FOR v_pilot IN
+    SELECT pilot_id, tenant_id, contracted_seats, tier
+    FROM   pilot_programs
+    WHERE  status = 'active'
+    AND    DATE_PART('day', NOW() - start_date) = 14
+    AND    tier IN ('growth', 'enterprise')
+  LOOP
+    SELECT COUNT(DISTINCT user_id) INTO v_active_users
+    FROM   session_completed
+    WHERE  tenant_id = v_pilot.tenant_id
+    AND    created_at >= (
+             SELECT start_date FROM pilot_programs WHERE pilot_id = v_pilot.pilot_id
+           );
+
+    v_rate := v_active_users::numeric / NULLIF(v_pilot.contracted_seats, 0);
+
+    IF v_rate IS NULL OR v_rate < 0.30 THEN
+      -- Fire AL-SAVE-01 via pg_net (PagerDuty form-enterprise P1)
+      -- Payload: pilot_id UUID, activation_rate NUMERIC, day_number 14
+      -- No employee user_id, name, or health data in payload
+      PERFORM net.http_post(
+        url     := current_setting('app.pagerduty_events_url'),
+        headers := jsonb_build_object('Content-Type', 'application/json'),
+        body    := jsonb_build_object(
+          'routing_key',  current_setting('app.pagerduty_enterprise_key'),
+          'event_action', 'trigger',
+          'dedup_key',    'pilot-save-t0a-' || v_pilot.pilot_id,
+          'payload', jsonb_build_object(
+            'summary',   'T0-Alpha: pilot activation below 30% at Day 14',
+            'severity',  'warning',
+            'source',    'pilot_activation_monitor',
+            'custom_details', jsonb_build_object(
+              'pilot_id',        v_pilot.pilot_id,
+              'activation_rate', COALESCE(v_rate, 0),
+              'day_number',      14,
+              'contracted_seats', v_pilot.contracted_seats,
+              'active_users',    v_active_users
+            )
+          )
+        )
+      );
+      v_alert_fired := true;
+    END IF;
+  END LOOP;
+
+  -- Emit all-clear only when no alert fired (aggregate, no pilot_id — privacy floor)
+  IF NOT v_alert_fired THEN
+    PERFORM net.http_post(
+      url     := current_setting('app.audit_event_url'),
+      headers := jsonb_build_object('Content-Type', 'application/json'),
+      body    := jsonb_build_object(
+        'event_type', 'system.pilot_activation_check_passed',
+        'severity',   'LOW',
+        'payload', jsonb_build_object(
+          'checked_pilot_count', (
+            SELECT COUNT(*) FROM pilot_programs
+            WHERE status = 'active'
+            AND DATE_PART('day', NOW() - start_date) = 14
+            AND tier IN ('growth', 'enterprise')
+          ),
+          'check_run_at', NOW()
+        )
+      )
+    );
+  END IF;
+END $$;
+```
+
+**Privacy note:** `user_id` appears in the inner `COUNT(DISTINCT user_id)` aggregate — only the integer count is used; no `user_id` value exits the job SQL. AL-SAVE-01 PagerDuty payload contains only `pilot_id`, `activation_rate`, `day_number`, `contracted_seats`, `active_users` (integer count). The all-clear event omits `pilot_id` entirely.
+
+**Freshness tolerance:** 26 h gives one-run tolerance for scheduling jitter. Tolerated because the T0-Alpha trigger is a day-scale milestone (not a sub-hour safety requirement) and the save protocol has a T+30 calendar-day response window (COST_MODEL §46.3). A single missed run extends T0-Alpha detection latency by at most 24 h. PILOT-SAVE-CHAIN-01 at the `emit-audit-event` Worker layer operates independently.
+
+### §58.6 §6.2 Cross-Reference
+
+The following rows are inserted into the §6.2 Alert Rules table under a new `pilot_activation_health` subsection, after `amendment_rate_health`:
+
+**Subsection: `pilot_activation_health` (AL-SAVE-01, AL-PILOT-ACT-01 — §58.4):**
+
+| Alert condition | Detection mechanism | Severity | Route | Cross-ref |
+|---|---|---|---|---|
+| **T0-Alpha threshold crossed** | `pilot_activation_monitor` pg_cron (job 49, `0 10 * * *`): activation_rate < 0.30 for Day-14 Growth/Enterprise pilot; dedup `pilot-save-t0a-{pilot_id}` 24 h; auto-resolves on `enterprise.pilot_save_protocol_triggered` for same `pilot_id` | P1 | PagerDuty `form-enterprise` → customer-success | §58.4 AL-SAVE-01; §58.5 (job 49 SQL); COST_MODEL §46.2 (T0-Alpha trigger); INCIDENT_RESPONSE R-49 §R-49.5 (manual T0-Alpha path when job 49 stale) |
+| **Job 49 freshness dead-man's switch** | No `system.pilot_activation_check_passed` LOW event in `audit_log_events` for > 26 h; detected by `pg-cron-health-monitor` | P1 | PagerDuty `form-devops` → devops-lead; dedup `pilot-act-check-stale`; auto-resolves on next `system.pilot_activation_check_passed` | §58.4 AL-PILOT-ACT-01; §12.6 (freshness window note — job 49 daily 10:00 UTC); INCIDENT_RESPONSE R-49 |
+
+**SOC 2 mapping (`pilot_activation_health`):** CC3.2 (AL-SAVE-01 is the automated detection arm of the save protocol — a designed risk response; AL-PILOT-ACT-01 is the belt-and-suspenders monitoring of the monitoring layer itself); CC7.2 (both alerts jointly confirm that T0-Alpha threshold crossings and monitoring infrastructure failures are surfaced within the 26 h freshness window); A1.1 (T0-Alpha monitoring supports FORM's enterprise pilot availability commitment per COST_MODEL §46.3). Privacy floor: AL-SAVE-01 payload: `pilot_id` UUID, `activation_rate` NUMERIC 0.00–1.00, `day_number` int — no employee `user_id`, name, email, health data, or GDPR Art. 9 special-category data; AL-PILOT-ACT-01 payload: `job_name` string, `stale_hours` numeric — no pilot data. `tenant_manager` and `enterprise_admin` excluded from all routing.
+
+### §58.7 DEC-030 Stale-Window Event Specifications
+
+**PILOT-ACT-STALE-CHAIN-01 ordering invariant:**
+- `system.pilot_activation_monitor_restored` requires a preceding `system.pilot_activation_monitor_stale_declared` with the same `incident_id`
+- Violation: HTTP 422 `PILOT_ACT_STALE_CHAIN_01_VIOLATION` at `emit-audit-event` Worker
+- Ordering inversion: escalate to R-05 (HMAC chain break)
+- Independent of PILOT-SAVE-CHAIN-01 (COST_MODEL §46.5) — both chains may be active simultaneously during an R-49 event where save protocol is also in progress
+
+**§58.7.1 — `system.pilot_activation_monitor_stale_declared` (HIGH / 7 yr):**
+
+Emitted by IC at R-49 Step 1 (PAM-elevated). PILOT-ACT-STALE-CHAIN-01 anchor. Zod v2 schema sourced from INCIDENT_RESPONSE §R-49.9.
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | PILOT-ACT-STALE-CHAIN-01 anchor — must match `restored` terminal event |
+| `stale_hours` | NUMERIC | Hours elapsed since last `system.pilot_activation_check_passed` |
+| `day14_cohort_active` | BOOLEAN | True if R-49-C2 found active Day-14 Growth/Enterprise pilots |
+| `save_protocol_gap` | BOOLEAN | True only if `day14_cohort_active` AND any pilot lacks PILOT-SAVE-CHAIN-01 predecessor |
+
+**Classification:** HIGH · 7 yr · CC3.2 · CC7.2 · A1.1
+
+**CC7.2 auditor rationale:** IC attestation that T0-Alpha monitoring layer experienced a confirmed gap. The HIGH classification and 7yr retention match the `enterprise.pilot_save_protocol_triggered` events (COST_MODEL §46.7) to ensure the monitoring-failure chain is preserved alongside the save-protocol chain throughout any audit look-back window.
+
+**§58.7.2 — `system.pilot_activation_monitor_restored` (STANDARD / 3 yr):**
+
+Emitted by IC at R-49 Step 6 (PAM-elevated). PILOT-ACT-STALE-CHAIN-01 terminal event. Zod v2 schema sourced from INCIDENT_RESPONSE §R-49.9.
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | Matches `stale_declared` — PILOT-ACT-STALE-CHAIN-01 |
+| `root_cause` | ENUM | H1_deleted / H1_disabled / H2_permissions_revoked / H3_pg_net_degraded / H4_supabase_outage |
+| `stale_hours` | NUMERIC | Total stale duration |
+| `day14_cohort_affected` | BOOLEAN | True if any Day-14 pilot existed during stale window |
+| `save_protocol_gap_found` | BOOLEAN | True if gap found per R-49-C3 |
+| `save_protocol_gap_resolved` | BOOLEAN | Must be `true` if `save_protocol_gap_found = true` before P1 closure |
+| `fix_deployed_at` | ISO-8601 timestamp | When job 49 was restored |
+
+**Classification:** STANDARD · 3 yr · CC7.2 · A1.1
+
+**Privacy floor (both events):** No employee `user_id`, name, email, `activation_rate` value, tenant name, coaching exchange content, or GDPR Art. 9 special-category health data. Only booleans, numeric counts, H1–H4 enum, and FORM-internal `incident_id` UUID.
+
+**AUDIT_LOG_SCHEMA.md registration:** Pending §58.10 item 1 (P0/M5 — R-49.12 item 1). Events not yet in AUDIT_LOG_SCHEMA.md; canonical Zod v2 schemas in INCIDENT_RESPONSE §R-49.9.
+
+### §58.8 Evidence Artefacts
+
+| Artefact | Criteria | Description | Cadence | Retention | Path |
+|---|---|---|---|---|---|
+| **PILOT-ACT-STALE-E-001** | CC7.2 / A1.1 / CC3.2 | IC narrative per R-49 activation: stale window (hours), root cause (H1–H4), R-49-C2 result (Day-14 cohort active?), R-49-C3 result (save protocol gap?), resolution steps. Filed within 48 h of job 49 restoration. | Per incident | 7 yr if save-protocol gap found; 3 yr if no gap | `compliance/evidence/pilots/save-protocol/PILOT-ACT-STALE-E-001_<incident_id>.md` |
+| **SAVE-E-002 gap note** | CC7.2 / A1.1 | Stale window note appended to annual SAVE-E-002 filing: `incident_id`, `stale_hours`, observation-year impact, resolution. Required only if R-49 activation occurs during the SAVE-E-002 annual observation year. | Per incident (if in SAVE-E-002 window) | 3 yr | `compliance/evidence/pilots/save-protocol/SAVE-E-002_gap_note_<incident_id>.md` |
+
+**SOC2_READINESS.md registration:** Both paths pending §58.10 item 4 (P1/M5 — R-49.12 item 4). `pilots/save-protocol/` R2 subfolder policy already established for SAVE-E-001/SAVE-E-002 (SOC2_READINESS §126, 2026-06-27).
+
+### §58.9 Dashboard — Pilot Activation Health
+
+**Panel group: "Pilot Activation Health" (admin dashboard — form_admin + customer-success roles only; `tenant_manager` and `enterprise_admin` excluded):**
+
+| Panel | Type | Source | Update cadence |
+|---|---|---|---|
+| Active Day-14 pilots | Count stat | `pilot_programs WHERE status = 'active' AND day_number = 14` | Daily (job 49 run) |
+| Activation rate per Day-14 pilot | Bar chart | `session_completed` aggregate per `pilot_id` | Daily (job 49 run) |
+| T0-Alpha threshold line | Reference line at 0.30 | — | Static |
+| Job 49 last run | Stat with green/amber/red state | `pg_cron.job_run_details WHERE jobname = 'pilot_activation_monitor'` | Real-time |
+| AL-SAVE-01 fire history (30 days) | Bar chart | `audit_log_events WHERE event_type = 'enterprise.pilot_save_protocol_triggered'` | Daily |
+| PILOT-ACT-SLO-01 compliance | SLO gauge (26 h target) | `audit_log_events WHERE event_type = 'system.pilot_activation_check_passed'` | Real-time |
+
+**Privacy constraint:** No panel displays individual employee `user_id`, name, email, session content, body metrics, coaching conversation content, or GDPR Art. 9 health data. Activation rate panels show aggregate percentage per `pilot_id` (FORM UUID) only. `tenant_manager` (HR) and `enterprise_admin` roles cannot view this panel group.
+
+### §58.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.pilot_activation_monitor_stale_declared` (HIGH/7yr) + `system.pilot_activation_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md` — new subsection `§Pilot Activation Monitor Stale events` after CSM Save Protocol events. Include PILOT-ACT-STALE-CHAIN-01 invariant; Zod v2 schemas from INCIDENT_RESPONSE §R-49.9; CC7.2/A1.1/CC3.2 auditor narratives. | security-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 2 | Deploy AL-PILOT-ACT-01 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale WHERE job_name = 'pilot_activation_monitor'` → service `form-devops` P1; dedup `pilot-act-check-stale`; auto-resolve on next `system.pilot_activation_check_passed` LOW. Integration test: simulate job 49 > 26 h staleness in staging; confirm P1 fires; confirm auto-resolve after manual run. | devops-lead | **P0** | M5 | [ ] |
+| 3 | Confirm `docs/OBSERVABILITY.md §12.6` job 49 stale-consequence cross-ref updated from "runbook to be authored at §R-49 (P1/M5)" to "INCIDENT_RESPONSE R-49 (§R-49.5; v1.0, 2026-06-29)"; confirm §58.10 item 3 marked `[x] Done`. | devops-lead | **P1** | M5 | [x] Done — 2026-06-29 (INCIDENT_RESPONSE.md v3.17.0 + OBSERVABILITY.md v5.5.0 co-authored) |
+| 4 | Register PILOT-ACT-STALE-E-001 artefact template path in `docs/SOC2_READINESS.md §126` evidence table; confirm `pilots/save-protocol/` R2 subfolder covers PILOT-ACT-STALE-E-001 paths; add Vanta mirror entry (CC7.2/A1.1/CC3.2). | compliance-officer | **P1** | M5 | [ ] |
+| 5 | Build "Pilot Activation Health" dashboard panel group (§58.9) in Admin Console (Metabase or inline): form_admin + customer-success role gate; activate PILOT-ACT-SLO-01 gauge; confirm `tenant_manager` and `enterprise_admin` excluded. | platform-engineer + design-craft | **P1** | M5 | [ ] |
+
+### §58.11 OQ Gap Tracker
+
+| ID | Question | Owner | Status |
+|---|---|---|---|
+| OQ-PILOT-OBS-01 | AL-SAVE-01 dedup key is `pilot-save-t0a-{pilot_id}` with 24 h cooldown — after 24 h, re-alert fires if pilot remains below threshold and no `enterprise.pilot_save_protocol_triggered` emitted. Confirm: should re-alert fire indefinitely until save protocol triggered, or should there be a maximum re-alert count (e.g. 3× before escalating to CS Lead)? COST_MODEL §46 escalation tree (L1→L2→L3) implies re-alerts should escalate after T+7 if no save protocol initiated; PagerDuty urgency escalation may be the right mechanism. | customer-success + devops-lead | 🟡 Open — escalation cadence undefined; recommend alignment with COST_MODEL §46.3 escalation tree before first live pilot |
+| OQ-PILOT-OBS-02 | T0-Beta (Day-45: champion logins < 2) and T0-Gamma (3 consecutive WAU declines ≥ 10 pp) triggers (COST_MODEL §46.2) are not yet covered by a pg_cron job — only T0-Alpha (Day-14 activation) is automated via job 49. T0-Beta and T0-Gamma rely on manual CSM review per COST_MODEL §46.3. Add separate jobs (50, 51) to automate T0-Beta and T0-Gamma detection, or document manual review as the intended mechanism? | customer-success + devops-lead | 🟡 Open — recommend §59 + §60 canonical specs for jobs 50/51 after first live pilot |
+
+---
+
+*v5.5.0 (2026-06-29): §58 Pilot Activation Observability — companion observability canonical spec for INCIDENT_RESPONSE R-49 (`pilot_activation_monitor` job 49 stale recovery runbook, v3.17.0, 2026-06-29). Closes `docs/OBSERVABILITY.md §12.6` job 49 stale-consequence cross-ref (updated from "runbook to be authored at §R-49 (P1/M5)" to "INCIDENT_RESPONSE R-49 (§R-49.5; v1.0, 2026-06-29)"). New sections: §58.1 purpose and scope (T0-Alpha monitoring gap closed; privacy floor; SOC 2 scope CC3.2/CC7.2/A1.1); §58.2 SLOs (PILOT-ACT-SLO-01: job 49 freshness ≤ 26 h — CC7.2/A1.1; PILOT-ACT-SLO-02: T0-Alpha detected within 26 h — A1.1/CC3.2); §58.3 monitoring architecture (pg_cron job 49 → T0-Alpha check → AL-SAVE-01 or all-clear; pg-cron-health-monitor dead-man's switch → AL-PILOT-ACT-01); §58.4 alert rules (AL-SAVE-01 P1 `form-enterprise` → customer-success, dedup `pilot-save-t0a-{pilot_id}` 24 h; AL-PILOT-ACT-01 P1 `form-devops` → devops-lead, dedup `pilot-act-check-stale`); §58.5 job 49 canonical SQL spec (form_system SECURITY DEFINER; REVOKE form_api from pilot_programs + session_completed; 26 h freshness tolerance); §58.6 §6.2 cross-reference (`pilot_activation_health` subsection, two rows: AL-SAVE-01 + AL-PILOT-ACT-01; SOC 2 mapping CC3.2/CC7.2/A1.1; privacy floor); §58.7 DEC-030 stale-window event specs (PILOT-ACT-STALE-CHAIN-01: HTTP 422 `PILOT_ACT_STALE_CHAIN_01_VIOLATION` on ordering inversion → R-05; `system.pilot_activation_monitor_stale_declared` HIGH/7yr anchor; `system.pilot_activation_monitor_restored` STANDARD/3yr terminal; both events carry booleans, numeric counts, H1–H4 enum, FORM-internal UUID only — no employee PII or GDPR Art. 9 data; AUDIT_LOG_SCHEMA.md registration pending §58.10 item 1 P0/M5); §58.8 evidence artefacts (PILOT-ACT-STALE-E-001 per-incident IC narrative; SAVE-E-002 gap note; both pending SOC2_READINESS §126 registration per §58.10 item 4 P1/M5); §58.9 dashboard (pilot activation health panel group — form_admin + customer-success only; tenant_manager + enterprise_admin excluded; 6 panels: Day-14 pilot count, activation rate bar chart, T0-Alpha reference line, job 49 last run, AL-SAVE-01 fire history, PILOT-ACT-SLO-01 gauge); §58.10 implementation checklist (5 items: AUDIT_LOG_SCHEMA.md P0/M5; AL-PILOT-ACT-01 PagerDuty P0/M5; §12.6 + §58.10 cross-ref closure P1/M5 [x] Done this pass; SOC2_READINESS §126 P1/M5; dashboard P1/M5); §58.11 OQ gap tracker (OQ-PILOT-OBS-01: AL-SAVE-01 re-alert escalation cadence vs COST_MODEL §46.3 escalation tree; OQ-PILOT-OBS-02: T0-Beta + T0-Gamma automation jobs 50/51 deferred). TOC entry to be added at next major section authoring pass. Privacy floor throughout: no employee `user_id`, name, email, activation rate value, coaching content, body metrics, or GDPR Art. 9 special-category data in any event, alert payload, or dashboard panel. Owner: devops-lead + customer-success + compliance-officer.*

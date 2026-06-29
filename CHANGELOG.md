@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.85.1] — 2026-06-29
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-49` — Pilot Activation Monitor Stale runbook (`pilot_activation_monitor` · job 49). Forty-ninth runbook; closes `docs/OBSERVABILITY.md §12.6` job 49 stale-consequence cross-ref and §58.10 item 3. Five scope queries (R-49-C1 staleness; R-49-C2 active Day-14 cohort; R-49-C3 save protocol gap check; R-49-C4 peer job health; R-49-C5 job registration). Four root causes (H1 deleted/disabled; H2 permissions revoked; H3 pg_net degraded; H4 Supabase outage). One escalation path (§R-49.5 — customer-success page if R-49-C2 positive and R-49-C3 negative). Two DEC-030 HMAC-chained events: `system.pilot_activation_monitor_stale_declared` HIGH/7yr + `system.pilot_activation_monitor_restored` STANDARD/3yr; PILOT-ACT-STALE-CHAIN-01 ordering invariant (HTTP 422 on inversion → R-05). Two evidence artefacts: PILOT-ACT-STALE-E-001 + SAVE-E-002 gap note. Privacy floor: both events carry booleans, numeric counts, H1–H4 enum, FORM-internal UUID only — no employee PII or GDPR Art. 9 health data.
+- `docs/OBSERVABILITY.md §58` — Pilot Activation Observability canonical spec (companion to R-49). §58.1 purpose; §58.2 SLOs (PILOT-ACT-SLO-01 ≤ 26 h freshness / PILOT-ACT-SLO-02 T0-Alpha detection ≤ 26 h); §58.3 monitoring architecture; §58.4 alert rules (AL-SAVE-01 P1 customer-success / AL-PILOT-ACT-01 P1 devops-lead); §58.5 job 49 canonical SQL; §58.6 §6.2 `pilot_activation_health` subsection; §58.7 DEC-030 stale-window event specs (PILOT-ACT-STALE-CHAIN-01); §58.8 evidence artefacts; §58.9 dashboard; §58.10 implementation checklist; §58.11 OQ gap tracker (OQ-PILOT-OBS-01/02).
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — header v3.16.2 → v3.17.0.
+- `docs/OBSERVABILITY.md` — header v5.4.6 → v5.5.0; §12.6 job 49 stale-consequence cross-ref updated from "runbook to be authored at §R-49 (P1/M5)" to "INCIDENT_RESPONSE R-49 (§R-49.5; v1.0, 2026-06-29)".
+- `VERSION` — 9.85.0 → 9.85.1.
+
+---
+
 ## [9.85.0] — 2026-06-29
 
 ### Added
