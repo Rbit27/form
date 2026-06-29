@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [9.94.1] — 2026-06-29
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.5.1 patch: §58.10 implementation checklist cross-reference closure. Item 1 `[ ]` → `[x] Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.56)`: `system.pilot_activation_monitor_stale_declared` (HIGH/7yr) + `system.pilot_activation_monitor_restored` (STANDARD/3yr) registered in AUDIT_LOG_SCHEMA.md v2.56 (2026-06-29), closing INCIDENT_RESPONSE R-49.12 item 1 (P0/M5). Item 4 `[ ]` → `[x] Done — 2026-06-29 (SOC2_READINESS.md §126.6, v3.51.0)`: PILOT-ACT-STALE-E-001 registered in SOC2_READINESS.md §126.6 (v3.51.0, 2026-06-29) with `pilots/save-protocol/` R2 subfolder confirmed and Vanta mirror entry added (CC7.2/A1.1/CC3.2), closing INCIDENT_RESPONSE R-49.12 item 4 (P1/M5). Version note v5.5.1 appended to §58 section.
+- `VERSION` — 9.94.0 → 9.94.1.
+
 ## [9.94.0] — 2026-06-29
 
 ### Added
