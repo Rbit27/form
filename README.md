@@ -2918,10 +2918,10 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2779 | Об'єм vs. інтенсивність: практичний вибір, коли обидва варіанти «правильні» | **draft · v10.2.0 → post-2779-volume-vs-intensity-practical-choice-competing-priorities.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2780 | Специфічність vs. загальний розвиток: де self-coached атлет має бути «вузьким» — і де широким | **draft · v10.3.0 → post-2780-specificity-vs-general-development-when-to-be-narrow.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2781 | Деload vs. продовження: коли «ще один тиждень» — рішення, а коли — помилка | **draft · v10.3.0 → post-2781-deload-vs-continue-when-one-more-week-is-a-mistake.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2782 | Як обирати між двома вправами, якщо обидві працюють | proposed · v9.94.0 |
-| 2783 | Тренування з двома цілями: як структурувати блок без жертви однією задля іншої | proposed · v9.94.0 |
-| 2784 | Мінімальний ефективний вибір: коли «хороший» варіант кращий за «кращий» | proposed · v9.94.0 |
-| 2785 | Синтез 2776–2785: алгоритм тренувального вибору в умовах конкуруючих пріоритетів | proposed · v9.94.0 |
+| 2782 | Як обирати між двома вправами, якщо обидві працюють | **draft · v10.4.0 → post-2782-two-exercises-both-work-selection-algorithm.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2783 | Тренування з двома цілями: як структурувати блок без жертви однією задля іншої | **draft · v10.5.0 → post-2783-two-goals-block-structure-no-sacrifice.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2784 | Мінімальний ефективний вибір: коли «хороший» варіант кращий за «кращий» | **draft · v10.5.0 → post-2784-minimum-effective-choice-good-vs-best.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2785 | Синтез 2776–2785: алгоритм тренувального вибору в умовах конкуруючих пріоритетів | **draft · v10.5.0 → post-2785-synthesis-2776-2785-competing-priorities-algorithm.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 
 ### Editorial series: 2786–2795 · Тренувальна адаптація в часі: довгострокова логіка self-coached прогресу (proposed · v9.98.0)
 
