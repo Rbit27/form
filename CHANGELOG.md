@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.20.0] — 2026-06-29
+
+### Added
+- `content/post-2841-post-block-review-without-self-deception.md` — Block 2836–2845 cluster «Прогрес без ілюзій» post 6/10. Ретроспектива блоку: структурований post-block review без самоосуду і без самообману. Чотири блоки аналізу: силова адаптація (e1RM пост-деловантаження, динаміка всередині блоку), об'єм і RPE тренди, технічна якість, зовнішні фактори і виконання програми. Два способи зробити review марним — самоосуд і самообман. Практичний шаблон, три рішення на виході. Stone et al. (1982); McEwen (2007); Stults-Kolehmainen & Sinha (2014). clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2841 card added at top of feed.
+
+### Changed
+- `STATUS.md` — Series 2836–2845 progress updated to 6/10; next: post-2842 (Як будувати наступний блок на основі попереднього: від аналізу до програмного рішення).
+- `VERSION` — 10.19.0 → 10.20.0.
+
+---
+
 ## [10.19.0] — 2026-06-29
 
 ### Added

@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.19.0** — 2026-06-29 · post-2840 (plateau-vs-adaptive-plateau · editorial) · Series 2836–2845 «Прогрес без ілюзій» 5/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending
+**v10.20.0** — 2026-06-29 · post-2841 (post-block-review-without-self-deception · editorial) · Series 2836–2845 «Прогрес без ілюзій» 6/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending
 
 ---
 
