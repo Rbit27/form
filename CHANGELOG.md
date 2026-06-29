@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [9.98.1] — 2026-06-29
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.7.3 → v5.8.0 — §61 «Save-Alert Escalation Protocol» added. Resolves three open questions: OQ-PILOT-OBS-01 (AL-SAVE-01 escalation cap: 3× / 72 h, KV counter `alert-save01-count:{pilot_id}` TTL 7 d, CRITICAL upgrade + `#enterprise-cs-escalations` @cs-lead at count ≥ 3, reset on `enterprise.pilot_save_protocol_triggered`); OQ-CHAMP-OBS-02 (AL-SAVE-02 escalation cap: 2× / 96 h, KV counter `alert-save02-count:{pilot_id}` TTL 10 d, CS Lead mention at count ≥ 2, reset on `enterprise.pilot_save_protocol_triggered` trigger_type=T0B); OQ-CHAMP-OBS-01 (`admin.dashboard_session_started` two-layer de-dup: Layer 1 `sessionStorage` gate, Layer 2 KV `admin-sess-start-{actor_id}:{tenant_id}` 4 h TTL). In-line status updates: §58.11 OQ-PILOT-OBS-01 🟡 → 🟢, §59.10 item 1 `[ ]` → `[x]`, §59.11 OQ-CHAMP-OBS-01 🟡 → 🟢, §59.11 OQ-CHAMP-OBS-02 🟡 → 🟢. Aligns with COST_MODEL §46.3 Step 1 + §46.4 escalation tree.
+- `docs/AUDIT_LOG_SCHEMA.md` v2.57 → v2.58 — `admin.dashboard_session_started` event registered under new `### Admin (dashboard sessions)` subsection. Severity: LOW; retention: 1 year; HMAC-chained (DEC-030). Zod v2 schema: `tenant_id_slug`, `actor_role` (enum: enterprise_admin | tenant_manager), `pilot_day` (int 0–180 | null), `is_pilot_active` (boolean). Two-layer de-dup invariant documented (OQ-CHAMP-OBS-01 resolution). SOC 2 CC3.2 auditor narrative. Cross-references: OBSERVABILITY §59 (job 50 consumer), §61.4 (de-dup definition), COST_MODEL §46.2 (T0-Beta trigger), SSO_SCIM §17 (pilot runbook). Closes OBSERVABILITY §59.10 item 1 documentation portion (P0/M6).
+- `VERSION` — 9.98.0 → 9.98.1.
+
+---
+
 ## [9.98.0] — 2026-06-29
 
 ### Added

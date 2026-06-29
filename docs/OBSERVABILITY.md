@@ -16680,7 +16680,7 @@ Emitted by IC at R-49 Step 6 (PAM-elevated). PILOT-ACT-STALE-CHAIN-01 terminal e
 
 | ID | Question | Owner | Status |
 |---|---|---|---|
-| OQ-PILOT-OBS-01 | AL-SAVE-01 dedup key is `pilot-save-t0a-{pilot_id}` with 24 h cooldown — after 24 h, re-alert fires if pilot remains below threshold and no `enterprise.pilot_save_protocol_triggered` emitted. Confirm: should re-alert fire indefinitely until save protocol triggered, or should there be a maximum re-alert count (e.g. 3× before escalating to CS Lead)? COST_MODEL §46 escalation tree (L1→L2→L3) implies re-alerts should escalate after T+7 if no save protocol initiated; PagerDuty urgency escalation may be the right mechanism. | customer-success + devops-lead | 🟡 Open — escalation cadence undefined; recommend alignment with COST_MODEL §46.3 escalation tree before first live pilot |
+| OQ-PILOT-OBS-01 | AL-SAVE-01 dedup key is `pilot-save-t0a-{pilot_id}` with 24 h cooldown — after 24 h, re-alert fires if pilot remains below threshold and no `enterprise.pilot_save_protocol_triggered` emitted. Confirm: should re-alert fire indefinitely until save protocol triggered, or should there be a maximum re-alert count (e.g. 3× before escalating to CS Lead)? COST_MODEL §46 escalation tree (L1→L2→L3) implies re-alerts should escalate after T+7 if no save protocol initiated; PagerDuty urgency escalation may be the right mechanism. | customer-success + devops-lead | 🟢 **Resolved (v5.8.0, 2026-06-29)** — §61.2: cap at 3× (72 h); KV counter `alert-save01-count:{pilot_id}`; at count ≥ 3, PagerDuty urgency → CRITICAL + Slack `#enterprise-cs-escalations` mention `@cs-lead`; reset on `enterprise.pilot_save_protocol_triggered`; aligned with COST_MODEL §46.3 Step 1 + §46.4 L2 escalation tree. |
 | OQ-PILOT-OBS-02 | T0-Beta (Day-45: champion logins < 2) and T0-Gamma (3 consecutive WAU declines ≥ 10 pp) triggers (COST_MODEL §46.2) are not yet covered by a pg_cron job — only T0-Alpha (Day-14 activation) is automated via job 49. T0-Beta and T0-Gamma rely on manual CSM review per COST_MODEL §46.3. Add separate jobs (50, 51) to automate T0-Beta and T0-Gamma detection, or document manual review as the intended mechanism? | customer-success + devops-lead | 🟢 Resolved — §59 (`champion_login_monitor` job 50) and §60 (`wau_decline_monitor` job 51) canonical specs authored (OBSERVABILITY.md v5.6.0, 2026-06-29). Both T0-Beta and T0-Gamma are now fully specified as automated pg_cron jobs with DEC-030 HMAC chains, Slack alerting, stale-recovery runbook stubs (R-50, R-51), and implementation checklists. |
 
 ---
@@ -16954,7 +16954,7 @@ Emitted by IC at R-50 Step 5 (PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 terminal
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Emit `admin.dashboard_session_started` (LOW/1yr) from Admin Dashboard backend on any `enterprise_admin` or `tenant_manager` page load. Payload: `tenant_id_slug` (string), `actor_role` enum, `created_at` — no `user_id`. Wire to `emit-audit-event` Worker. Add to AUDIT_LOG_SCHEMA.md. | platform-engineer + security-engineer | **P0** | M6 | [ ] |
+| 1 | Emit `admin.dashboard_session_started` (LOW/1yr) from Admin Dashboard backend on any `enterprise_admin` or `tenant_manager` page load. Payload: `tenant_id_slug` (string), `actor_role` enum, `created_at` — no `user_id`. Wire to `emit-audit-event` Worker. Add to AUDIT_LOG_SCHEMA.md. | platform-engineer + security-engineer | **P0** | M6 | [x] Done — documentation portion: AUDIT_LOG_SCHEMA.md v2.58 (2026-06-29) registers event schema, two-layer de-dup rule (`sessionStorage` gate + `admin-sess-start-{actor_id}:{tenant_id}` KV 4 h TTL), Zod v2 schema, SOC 2 CC3.2 narrative; closes OQ-CHAMP-OBS-01 (§61.4); [ ] implementation — pending platform-engineer Admin Dashboard backend emission call (M6) |
 | 2 | Register `system.champion_login_monitor_stale_declared` (HIGH/7yr) + `system.champion_login_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md`. Include CHAMP-LOGIN-STALE-CHAIN-01 invariant; author Zod v2 schemas at INCIDENT_RESPONSE §R-50.9; CC7.2/A1.1/CC3.2 auditor narratives. | security-engineer + compliance-officer | **P0** | M6 | [x] Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57) |
 | 3 | Deploy `champion_login_monitor` as pg_cron job 50 (`0 11 * * *`). Integration test: seed two pilot_programs rows (one at Day 45 with 0 events, one at Day 45 with 2 events); confirm Slack webhook fires for the first and not the second; confirm `system.champion_login_check_passed` emitted when no Day-45 pilots below threshold. | devops-lead + platform-engineer | **P0** | M6 | [ ] |
 | 4 | Register CHAMP-LOGIN-STALE-E-001 artefact template path in `docs/SOC2_READINESS.md §126` evidence table; establish `pilots/champion-login/` subfolder in R2 compliance bucket policy; add Vanta mirror entry (CC7.2/A1.1/CC3.2). | compliance-officer | **P1** | M6 | [x] Done — 2026-06-29 (SOC2_READINESS.md v3.52.0) |
@@ -16969,8 +16969,8 @@ Emitted by IC at R-50 Step 5 (PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 terminal
 
 | ID | Question | Owner | Status |
 |---|---|---|---|
-| OQ-CHAMP-OBS-01 | The `admin.dashboard_session_started` event requires platform-engineer to add an emission call to every Admin Dashboard page load. Is there a risk of double-counting if the admin navigates between pages in a single session? Recommend: emit only on initial page load per browser session (session cookie or `sessionStorage` gate) and document the de-dup mechanism in AUDIT_LOG_SCHEMA.md. | platform-engineer + security-engineer | 🟡 Open — de-dup mechanism to be defined in §59.10 item 1 implementation |
-| OQ-CHAMP-OBS-02 | AL-SAVE-02 Slack dedup key `pilot-save-t0b-{pilot_id}` has a 48 h cooldown. If champion sessions remain below 2 after Day 45, re-alerts will fire every 48 h until `enterprise.pilot_save_protocol_triggered` is emitted. Should there be a maximum re-alert count before escalating to CS Lead, consistent with OQ-PILOT-OBS-01 for AL-SAVE-01? Recommend: align escalation cadence with COST_MODEL §46.4 escalation tree (L1→L2 at T+15 if metric not improving). | customer-success + devops-lead | 🟡 Open — recommend resolving alongside OQ-PILOT-OBS-01 before first live pilot |
+| OQ-CHAMP-OBS-01 | The `admin.dashboard_session_started` event requires platform-engineer to add an emission call to every Admin Dashboard page load. Is there a risk of double-counting if the admin navigates between pages in a single session? Recommend: emit only on initial page load per browser session (session cookie or `sessionStorage` gate) and document the de-dup mechanism in AUDIT_LOG_SCHEMA.md. | platform-engineer + security-engineer | 🟢 **Resolved (v5.8.0, 2026-06-29)** — §61.4: two-layer de-dup: (1) client-side `sessionStorage.getItem('form-admin-sess-emitted')` gate; (2) server-side KV `admin-sess-start-{actor_id}:{tenant_id}` with 4 h TTL. AUDIT_LOG_SCHEMA.md v2.58 registers event schema, Zod v2 schema, and de-dup invariant. Closes §59.10 item 1 documentation portion. |
+| OQ-CHAMP-OBS-02 | AL-SAVE-02 Slack dedup key `pilot-save-t0b-{pilot_id}` has a 48 h cooldown. If champion sessions remain below 2 after Day 45, re-alerts will fire every 48 h until `enterprise.pilot_save_protocol_triggered` is emitted. Should there be a maximum re-alert count before escalating to CS Lead, consistent with OQ-PILOT-OBS-01 for AL-SAVE-01? Recommend: align escalation cadence with COST_MODEL §46.4 escalation tree (L1→L2 at T+15 if metric not improving). | customer-success + devops-lead | 🟢 **Resolved (v5.8.0, 2026-06-29)** — §61.3: cap at 2× (96 h); KV counter `alert-save02-count:{pilot_id}` TTL 10 days; at count ≥ 2, Slack `#enterprise-health` + `#enterprise-cs-escalations` mention `@cs-lead`; reset on `enterprise.pilot_save_protocol_triggered` with `trigger_type = 'T0B'`; aligned with COST_MODEL §46.4 T0-Beta L2 default; resolved alongside OQ-PILOT-OBS-01. |
 
 ---
 
@@ -17289,3 +17289,153 @@ Emitted by IC at R-51 Step 5 (PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 terminal
 *v5.7.1 (2026-06-29): Patch — §59.10 item 2 and §60.10 item 2 closed. `docs/AUDIT_LOG_SCHEMA.md` v2.57 registered all four pilot-monitor stale events: `system.champion_login_monitor_stale_declared` (HIGH/7yr) + `system.champion_login_monitor_restored` (STANDARD/3yr) with CHAMP-LOGIN-STALE-CHAIN-01 invariant (R-50 stale chain — closes §59.10 item 2 P0/M6); `system.wau_decline_monitor_stale_declared` (HIGH/7yr) + `system.wau_decline_monitor_restored` (STANDARD/3yr) with WAU-DECLINE-STALE-CHAIN-01 invariant (R-51 stale chain — closes §60.10 item 2 P0/M6). Zod v2 schemas and CC7.2/A1.1/CC3.2 auditor narratives in AUDIT_LOG_SCHEMA.md new sections. Document header v5.7.0 → v5.7.1. Cross-ref: `docs/AUDIT_LOG_SCHEMA.md v2.57`; `docs/INCIDENT_RESPONSE.md R-50.12` item 2 → [x] Done; `docs/INCIDENT_RESPONSE.md R-51.12` item 2 → [x] Done. Owner: devops-lead + compliance-officer + security-engineer.*
 
 *v5.7.2 (2026-06-29): Patch — §59.10 item 4 and §60.10 item 4 closed. `docs/SOC2_READINESS.md §127` (v3.52.0, 2026-06-29) registered CHAMP-LOGIN-STALE-E-001 (CC7.2/A1.1/CC3.2, per-incident, 7yr if `t0b_gap_found = true` / 3yr if false — IC narrative for each R-50 champion_login_monitor stale activation; `pilots/champion-login/` R2 subfolder established; Vanta mirror entry added) and WAU-DECLINE-STALE-E-001 (CC7.2/A1.1/CC3.2, per-incident, 7yr if `t0g_gap_found = true` / 3yr if false — IC narrative for each R-51 wau_decline_monitor stale activation; `pilots/wau-decline/` R2 subfolder established; Vanta mirror entry added; weekly cadence means worst-case 14–21 day stale window). Document header v5.7.1 → v5.7.2. Cross-ref: `docs/SOC2_READINESS.md §127`; `docs/INCIDENT_RESPONSE.md R-50.12` item 4 → [x] Done; `docs/INCIDENT_RESPONSE.md R-51.12` item 4 → [x] Done. Owner: compliance-officer.*
+
+---
+
+## §61. Save-Alert Escalation Protocol — OQ-PILOT-OBS-01 · OQ-CHAMP-OBS-01 · OQ-CHAMP-OBS-02 Resolution
+
+### §61.1 Purpose and Scope
+
+This section closes three open questions from the pilot activation observability system (§58 / §59):
+
+- **OQ-PILOT-OBS-01** (§58.11): AL-SAVE-01 re-alert escalation cadence — should indefinite 24 h re-alerts escalate to CS Lead, and if so, when?
+- **OQ-CHAMP-OBS-02** (§59.11): AL-SAVE-02 maximum re-alert count before CS Lead escalation.
+- **OQ-CHAMP-OBS-01** (§59.11): `admin.dashboard_session_started` event de-duplication mechanism — how to prevent double-counting across page navigations within a single browser session.
+
+Both OQ-PILOT-OBS-01 and OQ-CHAMP-OBS-02 were flagged as "recommend resolving before first live pilot" and "recommend resolving alongside OQ-PILOT-OBS-01." No new pg_cron jobs or DEC-030 chain events are introduced — this is a documentation-and-design resolution. `admin.dashboard_session_started` is registered in AUDIT_LOG_SCHEMA.md v2.58 (this pass), closing §59.10 item 1 documentation portion.
+
+**Privacy floor (unchanged):** No employee `user_id`, name, email, coaching content, or GDPR Art. 9 data in any escalation payload or event schema. All re-alert escalations route to FORM-internal Slack channels; `pilot_id` UUID and aggregate metric values only.
+
+---
+
+### §61.2 OQ-PILOT-OBS-01 Resolution — AL-SAVE-01 Re-Alert Escalation Cadence
+
+**Decision: cap AL-SAVE-01 re-alerts at 3× (72 h) then escalate PagerDuty urgency and notify CS Lead.**
+
+**Context:** AL-SAVE-01 fires when `pilot_activation_monitor` (job 49) detects a Day-14 pilot with activation rate < 30% (T0-Alpha). The existing dedup key `pilot-save-t0a-{pilot_id}` has a 24 h cooldown, meaning AL-SAVE-01 re-fires every 24 h while: (a) activation remains below threshold and (b) no `enterprise.pilot_save_protocol_triggered` emitted for the same `pilot_id`.
+
+COST_MODEL §46.3 Step 1 requires the CSM to confirm the metric and emit the trigger within the same day (T+0). If the CSM has not acted within 72 h (3 re-alerts), a process gap is likely.
+
+**Escalation rule:**
+
+| Re-alert count | Time since T0-Alpha | Action |
+|---|---|---|
+| 1st | T+24 h | AL-SAVE-01 re-fires; routes to `form-enterprise` P1 → customer-success on-call |
+| 2nd | T+48 h | AL-SAVE-01 re-fires identically |
+| 3rd | T+72 h | AL-SAVE-01 re-fires with PagerDuty urgency **CRITICAL** + Slack `#enterprise-cs-escalations` mention `@cs-lead`; dedup key rotates to `pilot-save-t0a-escalated-{pilot_id}` (no cooldown) |
+| 4th+ | T+96 h and beyond | CRITICAL re-alert every 24 h until manual resolution |
+
+**KV counter implementation:**
+
+- KV key: `alert-save01-count:{pilot_id}` — increment atomically on every AL-SAVE-01 emission; TTL: 7 days (pilot window).
+- On increment result ≥ 3: switch PagerDuty urgency to CRITICAL; post separate Slack message to `#enterprise-cs-escalations` with `pilot_id` slug + `activation_rate` + `days_since_trigger`.
+- **Reset:** on `enterprise.pilot_save_protocol_triggered` emission for the same `pilot_id` — DEL `alert-save01-count:{pilot_id}` from KV (all-clear path in job 49 or `emit-audit-event` Worker post-hook).
+
+**SOC 2 note (CC3.2 / CC4.1):** A T0-Alpha failure escalated to CS Lead within 72 h without save protocol initiation creates an observable process-gap trail in the HMAC chain (AL-SAVE-01 events present; `enterprise.pilot_save_protocol_triggered` absent). This satisfies CC4.1 continuous monitoring and CC3.2 risk identification requirements: the monitoring control operates even when the human response is delayed.
+
+---
+
+### §61.3 OQ-CHAMP-OBS-02 Resolution — AL-SAVE-02 Re-Alert Escalation Cadence
+
+**Decision: cap AL-SAVE-02 re-alerts at 2× (96 h) then escalate, consistent with T0-Beta being L2-default.**
+
+**Context:** AL-SAVE-02 fires when `champion_login_monitor` (job 50) detects a Day-45 pilot with `champion_session_count < 2` (T0-Beta). The existing dedup key `pilot-save-t0b-{pilot_id}` has a 48 h cooldown. Unlike T0-Alpha (CSM acts independently at L1), T0-Beta directly triggers L2 (CS Lead involvement per COST_MODEL §46.4). The escalation threshold is therefore lower.
+
+**Escalation rule:**
+
+| Re-alert count | Time since T0-Beta | Action |
+|---|---|---|
+| 1st | T+48 h | AL-SAVE-02 re-fires; Slack `#enterprise-health` with `pilot_id` slug + `champion_session_count` + `tier` |
+| 2nd | T+96 h | AL-SAVE-02 re-fires + Slack `#enterprise-cs-escalations` mention `@cs-lead`; CS Lead must acknowledge |
+| 3rd+ | T+144 h and beyond | CS-Lead-aware re-alert every 48 h until `enterprise.pilot_save_protocol_triggered` emitted |
+
+**KV counter implementation:**
+
+- KV key: `alert-save02-count:{pilot_id}` — increment on every AL-SAVE-02 Slack emission; TTL: 10 days.
+- On increment result ≥ 2: add `#enterprise-cs-escalations` mention.
+- **Reset:** on `enterprise.pilot_save_protocol_triggered` with `trigger_type = 'T0B'` for the same `pilot_id` — DEL `alert-save02-count:{pilot_id}`.
+
+**Consistency with §61.2:** Both escalation rules use the same KV counter pattern and the same auto-reset trigger. The differences (24 h vs 48 h cooldown; 3 vs 2 threshold) reflect the severity difference: T0-Alpha is L1 (CSM acts solo until 72 h gap), T0-Beta is L2-default (CS Lead joins earlier by design).
+
+---
+
+### §61.4 OQ-CHAMP-OBS-01 Resolution — `admin.dashboard_session_started` De-Duplication Mechanism
+
+**Decision: two-layer de-dup — client-side `sessionStorage` gate + server-side 4 h KV TTL.**
+
+**Context:** `champion_login_monitor` (job 50) counts `admin.dashboard_session_started` events per `actor_id` within the 45-day pilot window to determine whether the IT admin champion has logged in ≥ 2 times. If the Admin Dashboard emits this event on every page navigation (not just on initial session start), a single work session spanning multiple page views would inflate `champion_session_count`, masking genuine non-engagement.
+
+**Session definition:**
+
+> **One session** = a continuous browser session from first page load until tab/window close or browser session end (`sessionStorage` is cleared).
+
+**Layer 1 — client-side `sessionStorage` gate (frontend):**
+
+1. On any Admin Dashboard page load, check `sessionStorage.getItem('form-admin-sess-emitted')`.
+2. If **absent**: call the backend emission endpoint; set `sessionStorage.setItem('form-admin-sess-emitted', '1')`.
+3. If **present**: skip emission for this page load.
+
+`sessionStorage` clears on tab/window/browser close — the next new browser session starts fresh.
+
+**Layer 2 — server-side KV gate (`emit-audit-event` Worker):**
+
+1. On receiving an emission request, check KV key `admin-sess-start-{actor_id}:{tenant_id}` (TTL: 4 h).
+2. If **KV key exists**: return HTTP 200 `{"deduplicated": true}` — no HMAC chain entry appended.
+3. If **KV key absent**: emit `admin.dashboard_session_started` to the HMAC chain; SET `admin-sess-start-{actor_id}:{tenant_id}` with TTL 4 h.
+
+**4 h TTL rationale:** Shorter than a typical working day, so a second login after a 4 h break (e.g. morning session + afternoon return) counts as two sessions — consistent with COST_MODEL §46.2 T0-Beta "≥ 2 admin logins." A session shorter than 4 h is absorbed; a genuine second visit after ≥ 4 h counts separately.
+
+**Zod v2 schema** (canonical source: AUDIT_LOG_SCHEMA.md v2.58):
+
+```typescript
+const AdminDashboardSessionStartedSchema = z.object({
+  tenant_id_slug:  z.string().min(1).max(64),
+  actor_role:      z.enum(['enterprise_admin', 'tenant_manager']),
+  pilot_day:       z.number().int().min(0).max(180).nullable(),
+  is_pilot_active: z.boolean(),
+  // Privacy invariant: actor user_id is NOT included.
+  // tenant_id_slug is an opaque human-safe slug — not a UUID.
+  // No name, email, health data, or coaching content.
+});
+```
+
+**Privacy floor:** No `actor_user_id`, `actor_name`, `actor_email`, or Art. 9 health data. `tenant_id_slug` is an opaque slug (e.g. `acme-corp`) — cross-referencing with personal identity requires admin access to the tenant registry. `pilot_day` (INT|NULL) allows job 50 to filter Day 1–45 events without a separate join. `is_pilot_active` (BOOL) allows job 50 to exclude non-pilot tenant admin sessions without reading `pilot_programs`.
+
+**AUDIT_LOG_SCHEMA.md registration:** v2.58 (this authoring pass) — LOW severity, 1yr retention, SOC 2 CC3.2 (champion engagement monitoring control). Closes §59.10 item 1 documentation portion; implementation (actual backend emission call) remains pending platform-engineer M6.
+
+---
+
+### §61.5 OQ Status Updates
+
+| OQ ID | Section | Prior status | New status |
+|---|---|---|---|
+| OQ-PILOT-OBS-01 | §58.11 | 🟡 Open | 🟢 **Resolved (v5.8.0, 2026-06-29)** — §61.2: AL-SAVE-01 re-alert cap 3× / 72 h; KV counter `alert-save01-count:{pilot_id}` TTL 7 days; PagerDuty CRITICAL + `@cs-lead` mention at count ≥ 3; reset on `enterprise.pilot_save_protocol_triggered`. |
+| OQ-CHAMP-OBS-01 | §59.11 | 🟡 Open | 🟢 **Resolved (v5.8.0, 2026-06-29)** — §61.4: two-layer de-dup (`sessionStorage` gate + KV `admin-sess-start-{actor_id}:{tenant_id}` 4 h TTL); AUDIT_LOG_SCHEMA.md v2.58 registers schema; closes §59.10 item 1 documentation portion. |
+| OQ-CHAMP-OBS-02 | §59.11 | 🟡 Open | 🟢 **Resolved (v5.8.0, 2026-06-29)** — §61.3: AL-SAVE-02 re-alert cap 2× / 96 h; KV counter `alert-save02-count:{pilot_id}` TTL 10 days; `#enterprise-cs-escalations` mention `@cs-lead` at count ≥ 2; reset on `enterprise.pilot_save_protocol_triggered` with `trigger_type = 'T0B'`. |
+
+---
+
+### §61.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Implement KV counter `alert-save01-count:{pilot_id}` (TTL 7 days) in AL-SAVE-01 emission path: increment on fire; at count ≥ 3, switch PagerDuty urgency to CRITICAL + post to `#enterprise-cs-escalations`; DEL counter on `enterprise.pilot_save_protocol_triggered` for same `pilot_id`. | platform-engineer + devops-lead | **P0** | M6 | [ ] |
+| 2 | Implement KV counter `alert-save02-count:{pilot_id}` (TTL 10 days) in job 50 AL-SAVE-02 emission path: increment on fire; at count ≥ 2, add `#enterprise-cs-escalations` Slack mention `@cs-lead`; DEL counter on `enterprise.pilot_save_protocol_triggered` with `trigger_type = 'T0B'`. | platform-engineer + devops-lead | **P0** | M6 | [ ] |
+| 3 | Implement two-layer de-dup for `admin.dashboard_session_started`: (a) client-side `sessionStorage.getItem('form-admin-sess-emitted')` gate; (b) server-side KV `admin-sess-start-{actor_id}:{tenant_id}` TTL 4 h in `emit-audit-event` Worker (HTTP 200 `{"deduplicated": true}` on hit). | platform-engineer | **P0** | M6 | [ ] |
+| 4 | Integration tests: (a) two page loads same sessionStorage → 1 event emitted; (b) load after ≥ 4 h gap → second event emitted; (c) AL-SAVE-01 count ≥ 3 without `pilot_save_protocol_triggered` → CRITICAL urgency + CS Lead mention fires; (d) `pilot_save_protocol_triggered` → KV counters reset. | devops-lead + platform-engineer | **P1** | M7 | [ ] |
+
+---
+
+### §61.7 Cross-Reference Obligations Created by §61
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md v2.58` — register `admin.dashboard_session_started` (LOW/1yr, CC3.2) with two-layer de-dup invariant, Zod v2 schema, and session-definition note | §61.4; §59.10 item 1 documentation portion | 🟢 **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.58, this authoring pass)** |
+| §58.11 OQ-PILOT-OBS-01 status patch: 🟡 → 🟢 | §61.5 | 🟢 **Done — 2026-06-29 (in-line patch, this authoring pass)** |
+| §59.11 OQ-CHAMP-OBS-01 status patch: 🟡 → 🟢 | §61.5 | 🟢 **Done — 2026-06-29 (in-line patch, this authoring pass)** |
+| §59.11 OQ-CHAMP-OBS-02 status patch: 🟡 → 🟢 | §61.5 | 🟢 **Done — 2026-06-29 (in-line patch, this authoring pass)** |
+| §59.10 item 1 documentation portion: `[ ]` → `[x] Done` | §61.4 | 🟢 **Done — 2026-06-29 (in-line patch, this authoring pass)** |
+
+---
+
+*v5.8.0 (2026-06-29): §61 Save-Alert Escalation Protocol — OQ-PILOT-OBS-01, OQ-CHAMP-OBS-01, OQ-CHAMP-OBS-02 Resolution. Closes three open questions from the pilot activation observability system (§58 / §59) in a single authoring pass. No new pg_cron jobs or DEC-030 chain events. §61.2 (OQ-PILOT-OBS-01): AL-SAVE-01 re-alert escalation — cap at 3 re-alerts (72 h); KV counter `alert-save01-count:{pilot_id}` TTL 7 days; at count ≥ 3, PagerDuty urgency → CRITICAL + Slack `#enterprise-cs-escalations` mention `@cs-lead`; dedup key rotates to `pilot-save-t0a-escalated-{pilot_id}` (no cooldown); KV reset on `enterprise.pilot_save_protocol_triggered` for same `pilot_id`; aligned with COST_MODEL §46.3 Step 1 (CSM T+0 obligation) and §46.4 (L2 joins at T+15 or earlier if activation < 25%). §61.3 (OQ-CHAMP-OBS-02): AL-SAVE-02 re-alert escalation — cap at 2 re-alerts (96 h); KV counter `alert-save02-count:{pilot_id}` TTL 10 days; at count ≥ 2, Slack `#enterprise-health` + `#enterprise-cs-escalations` mention `@cs-lead`; reset on `enterprise.pilot_save_protocol_triggered` with `trigger_type = 'T0B'`; consistent with T0-Beta being L2-default per COST_MODEL §46.4. §61.4 (OQ-CHAMP-OBS-01): `admin.dashboard_session_started` de-dup — two layers: (1) client-side `sessionStorage.getItem('form-admin-sess-emitted')` gate (clears on tab/window close); (2) server-side KV `admin-sess-start-{actor_id}:{tenant_id}` TTL 4 h (HTTP 200 `{"deduplicated": true}` on hit, no HMAC chain entry); 4 h TTL allows genuine second-session afternoon login to count separately (consistent with T0-Beta "≥ 2 logins"); Zod v2 schema: `tenant_id_slug` (string), `actor_role` (enum enterprise_admin|tenant_manager), `pilot_day` (int|null), `is_pilot_active` (bool) — no actor `user_id` or Art. 9 data; AUDIT_LOG_SCHEMA.md v2.58 registers event (LOW/1yr, CC3.2) — closes §59.10 item 1 documentation portion. §61.5 OQ tracker: OQ-PILOT-OBS-01 🟡 → 🟢; OQ-CHAMP-OBS-01 🟡 → 🟢; OQ-CHAMP-OBS-02 🟡 → 🟢. §58.11 OQ-PILOT-OBS-01 and §59.11 OQ-CHAMP-OBS-01/02 patched in-line. §59.10 item 1: `[ ]` → `[x] Done — documentation portion`. §61.6 four-item implementation checklist: 3× P0/M6 (KV counters for AL-SAVE-01 and AL-SAVE-02; two-layer de-dup for `admin.dashboard_session_started`), 1× P1/M7 (integration tests). §61.7 cross-reference obligations: all five 🟢 Done (this pass). Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 data in any escalation payload, KV key, or event schema. KV counter keys carry `pilot_id` UUID only — no tenant name or employee PII. Owner: devops-lead + platform-engineer + customer-success + compliance-officer.*

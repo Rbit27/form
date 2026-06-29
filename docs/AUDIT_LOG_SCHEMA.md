@@ -852,6 +852,33 @@ const IntegrationApiCallSchema = z.object({
 - `admin.key_rotation_reminder` — Automated cadence alert (14d, 7d, 3d before scheduled rotation); **LOW severity, 3yr retention**; emitter: `workers/key-rotation-monitor` Cron (daily 09:00 UTC per KEY_ROTATION_KV); payload: `{key_name, days_until_expiry, next_rotation_due_iso, rotation_type: 'scheduled'}`; no PagerDuty — Slack `#security-ops` only; cross-ref: SOC2_READINESS §57.7, OBSERVABILITY §30 AL-KEY-01
 - `admin.key_rotation_overdue` — Scheduled rotation window missed; **HIGH severity, 7yr retention**; fires when `days_until_expiry ≤ 0`; triggers AL-KEY-02 (P0 PagerDuty, no auto-resolve); payload: `{key_name, days_overdue, last_rotation_iso, rotation_period_days}`; cross-ref: SOC2_READINESS §57.7, OBSERVABILITY §30 AL-KEY-02
 
+### Admin (dashboard sessions)
+
+> LOW severity · 1yr retention · HMAC-chained · DEC-030. Emitted by Admin Dashboard backend (Workers layer) on initial session start for `enterprise_admin` and `tenant_manager` roles. Used as the signal source for `champion_login_monitor` (pg_cron job 50, `docs/OBSERVABILITY.md §59`) to evaluate T0-Beta pilot health (COST_MODEL §46.2). **Two-layer de-duplication invariant (OQ-CHAMP-OBS-01 resolution — OBSERVABILITY §61.4):** (1) client-side `sessionStorage.getItem('form-admin-sess-emitted')` gate — prevents duplicate emissions across page navigations within the same browser tab; (2) server-side KV `admin-sess-start-{actor_id}:{tenant_id}` with 4 h TTL — `emit-audit-event` Worker returns HTTP 200 `{"deduplicated": true}` on KV hit with no HMAC chain entry. A second genuine login after ≥ 4 h emits a new event (consistent with COST_MODEL §46.2 T0-Beta "≥ 2 admin logins"). **Privacy invariant:** no actor `user_id`, `actor_name`, `actor_email`, coaching content, or GDPR Art. 9 special-category data; `tenant_id_slug` is an opaque human-safe slug — not a UUID.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `admin.dashboard_session_started` | LOW | 1 yr | First Admin Dashboard page load in a new browser session (post de-dup) | `tenant_id_slug` (string, max 64), `actor_role` (enum: `enterprise_admin`\|`tenant_manager`), `pilot_day` (INT\|NULL — null if tenant not on pilot), `is_pilot_active` (BOOL) |
+
+**Zod v2 schema (canonical source: this section, v2.58):**
+
+```typescript
+const AdminDashboardSessionStartedSchema = z.object({
+  tenant_id_slug:  z.string().min(1).max(64),
+  actor_role:      z.enum(['enterprise_admin', 'tenant_manager']),
+  pilot_day:       z.number().int().min(0).max(180).nullable(),
+  is_pilot_active: z.boolean(),
+});
+```
+
+**Emitter:** `emit-audit-event` Worker (after Layer 2 KV gate passes); called by Admin Dashboard backend on initial page load. `form_api` and `form_system` roles cannot directly emit — requires Admin Dashboard auth context.
+
+**SOC 2 auditor narrative (CC3.2):** `admin.dashboard_session_started` events provide continuous evidence that the IT admin champion is actively engaging with the Admin Dashboard during the 45-day pilot window. `champion_login_monitor` (job 50) queries these events to evaluate the T0-Beta criterion. The de-dup invariant ensures event count equals genuine session count — no inflation from page navigation. Absence of events for a pilot in the Day-45 window is the direct T0-Beta signal. The HMAC chain provides tamper-evident evidence of the monitoring control's operation over the pilot window.
+
+**Cross-references:** `docs/OBSERVABILITY.md §59` (job 50 `champion_login_monitor` — primary consumer); `docs/OBSERVABILITY.md §61.4` (OQ-CHAMP-OBS-01 resolution — de-dup mechanism definition); `docs/COST_MODEL.md §46.2` (T0-Beta trigger: "Day-45 champion logins < 2"); `docs/SSO_SCIM_IMPLEMENTATION.md §17` (enterprise pilot runbook — SSO setup timing may affect when admin champion first logs in). Closes `docs/OBSERVABILITY.md §59.10` item 1 documentation portion (P0/M6).
+
+---
+
 ### Asset & Device Management
 
 > Defined in `compliance/c1/device-disposal-policy.md §8` (POL-013) and `docs/SOC2_READINESS.md §66.10`. All five events are HMAC-chained with 7-year retention. Privacy invariant: no serial number in plain text — use `device_asset_id` (FORM-DEV-XXX). The 30-day `disposal_initiated` → `disposal_completed` gap triggers alert MDD-AL-01. Closes MDD-P0-03; cross-ref: SOC 2 C1.2 / CC6.5 / CC6.7.
