@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [9.90.1] — 2026-06-29
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.56 → v2.57. +4 DEC-030 HMAC-chained events across two new sections: `### Champion Login Monitor Stale events` (`system.champion_login_monitor_stale_declared` HIGH/7yr + `system.champion_login_monitor_restored` STANDARD/3yr; CHAMP-LOGIN-STALE-CHAIN-01; Zod v2 schemas `ChampLoginStaleDeclaredSchema`/`ChampLoginRestoredSchema`; CC7.2/A1.1/CC3.2 auditor narratives; closes INCIDENT_RESPONSE R-50.12 item 2 P0/M6); `### WAU Decline Monitor Stale events` (`system.wau_decline_monitor_stale_declared` HIGH/7yr + `system.wau_decline_monitor_restored` STANDARD/3yr; WAU-DECLINE-STALE-CHAIN-01; Zod v2 schemas `WauDeclineStaleDeclaredSchema`/`WauDeclineRestoredSchema`; uses `stale_days` not `stale_hours` — weekly cadence amplifies gap to 14–21 days; `t0g_gap_found` + `t0g_gap_resolved` as separate fields for auditor clarity; CC7.2/A1.1/CC3.2 auditor narratives; closes INCIDENT_RESPONSE R-51.12 item 2 P0/M6). Retention table +4 rows. Privacy floor (all 4 events): `incident_id` UUID + booleans + NUMERIC + enums + datetime only; no employee `user_id`, session content, WAU rate values, tenant name, or GDPR Art. 9 health data.
+- `docs/OBSERVABILITY.md` — v5.7.0 → v5.7.1. §59.10 item 2 → `[x] Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57)`. §60.10 item 2 → `[x] Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57)`. v5.7.1 patch note appended.
+- `docs/INCIDENT_RESPONSE.md` — v3.17.0 → v3.18.1 (v3.18.0 gap: R-50 + R-51 authored 2026-06-29 but header not updated — corrected). R-50.12 item 2 → `[x] Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57)`. R-51.12 item 2 → `[x] Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57)`. v3.18.1 patch note appended.
+- `VERSION` — 9.90.0 → 9.90.1.
+
+---
+
 ## [9.90.0] — 2026-06-29
 
 ### Added
