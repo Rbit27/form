@@ -2808,7 +2808,7 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2726 | Тренувальна ідентичність: що це, чому вона формується — і де вона починає командувати замість тебе | **draft · v9.82.0 → post-2726-training-identity-what-it-is-and-where-it-goes-wrong.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2727 | «Я силовий атлет» — як категорія замінює аналіз: де ідентитет блокує адаптацію програми | **draft · v9.83.0 → post-2727-strength-athlete-identity-category-vs-analysis.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2728 | Ідентичність і перерва — чому пропуск тижня відчувається як криза і як реструктурувати цю логіку | **draft · v9.84.0 → post-2728-identity-and-break-week-crisis-restructure.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2729 | Порівняння і ідентичність: де соціальне позиціонування формує тренувальні рішення без усвідомлення | proposed · v9.82.0 |
+| 2729 | Порівняння і ідентичність: де соціальне позиціонування формує тренувальні рішення без усвідомлення | **draft · v9.85.0 → post-2729-comparison-identity-social-positioning.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2730 | Новачок → intermediate → advanced: як перехід тренувального статусу вимагає зміни ідентичності — і чому цього не відбувається автоматично | proposed · v9.82.0 |
 | 2731 | Self-coached ідентичність: чому «тренуюся сам» є архітектурним вибором, а не дефіцитом | proposed · v9.82.0 |
 | 2732 | Як ідентичність впливає на вибір програми: чому атлети обирають те, що підтверджує, а не те, що розвиває | proposed · v9.82.0 |
