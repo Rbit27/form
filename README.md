@@ -2809,10 +2809,10 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2727 | «Я силовий атлет» — як категорія замінює аналіз: де ідентитет блокує адаптацію програми | **draft · v9.83.0 → post-2727-strength-athlete-identity-category-vs-analysis.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2728 | Ідентичність і перерва — чому пропуск тижня відчувається як криза і як реструктурувати цю логіку | **draft · v9.84.0 → post-2728-identity-and-break-week-crisis-restructure.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2729 | Порівняння і ідентичність: де соціальне позиціонування формує тренувальні рішення без усвідомлення | **draft · v9.85.0 → post-2729-comparison-identity-social-positioning.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2730 | Новачок → intermediate → advanced: як перехід тренувального статусу вимагає зміни ідентичності — і чому цього не відбувається автоматично | proposed · v9.82.0 |
-| 2731 | Self-coached ідентичність: чому «тренуюся сам» є архітектурним вибором, а не дефіцитом | proposed · v9.82.0 |
+| 2730 | Новачок → intermediate → advanced: як перехід тренувального статусу вимагає зміни ідентичності — і чому цього не відбувається автоматично | **draft · v9.85.2 → post-2730-novice-intermediate-advanced-identity-transition.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2731 | Self-coached ідентичність: чому «тренуюся сам» є архітектурним вибором, а не дефіцитом | **draft · v9.87.0 → post-2731-self-coached-identity-architectural-choice.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2732 | Ідентичність і коучинг: як self-coached атлет взаємодіє з тренером, консультантом або ментором без втрати автономії | **draft · v9.88.0 → post-2732-identity-and-coaching-without-losing-autonomy.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2733 | Гнучка ідентичність: як self-coached атлет переглядає власний образ у відповідь на дані, а не на зовнішній тиск | proposed · v9.82.0 |
+| 2733 | Гнучка ідентичність: як self-coached атлет переглядає власний образ у відповідь на дані, а не на зовнішній тиск | **draft · v9.90.0 → post-2733-identity-flexibility-data-driven-update.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2734 | Ідентичність і тренувальний вік: як самообраз змінюється (або не змінюється) з роками практики | proposed · v9.82.0 |
 | 2735 | Синтез 2726–2735: тренувальна ідентичність як операційний інструмент — не психологія, а рішення | proposed · v9.82.0 |
 
