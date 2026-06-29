@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.86.2] — 2026-06-29
+
+### Changed
+- `docs/ENTERPRISE_ONBOARDING.md` — v0.3 → v0.4. Added `§6.4 Activation Health Milestones — CSM Save Protocol`: three trigger conditions (T0-Alpha Day-14 activation < 30%; T0-Beta Day-45 champion logins < 2; T0-Gamma 3 consecutive WAU declines ≥ 10 pp), six-step T+0→T+30 playbook table, six-item approved intervention menu, three-tier escalation tree (L1 CSM / L2 CS Lead / L3 Founder with ACV thresholds), CSM trigger checklist, and privacy floor restatement (aggregate-only — no individual employee data at any step). Added Day-14 activation row (≥ 30%, all tiers) to §6 milestone table. Added activation monitoring note to §4.1 (pilot cohort launch section) referencing §6.4 and T0-Alpha/T0-Beta/T0-Gamma triggers. Added Day-14 checkpoint line to `Appendix A.1` pre-launch checklist. Added `docs/COST_MODEL.md §46` to doc header references. Closes `COST_MODEL.md §46.9` item 9 (P1 / M5). HMAC invariant: `PILOT-SAVE-CHAIN-01`. Evidence artefacts: SAVE-E-001 / SAVE-E-002.
+- `VERSION` — 9.86.1 → 9.86.2.
+
+---
+
 ## [9.86.1] — 2026-06-29
 
 ### Added

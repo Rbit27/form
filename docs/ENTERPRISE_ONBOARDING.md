@@ -1,9 +1,11 @@
-# FORM · Enterprise Customer Onboarding v0.3
+# FORM · Enterprise Customer Onboarding v0.4
 
 > Operational playbook for every enterprise deal from contract signature through Year 1 renewal.
 > Owner: `customer-success` + `enterprise-architect` + `compliance-officer`.
 > Activate per account. One named CSM owns each account end-to-end.
-> References: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/SSO_SCIM_IMPLEMENTATION.md`, `docs/DATA_MODEL.md`, `docs/ENTERPRISE_SLA.md`.
+> References: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/SSO_SCIM_IMPLEMENTATION.md`, `docs/DATA_MODEL.md`, `docs/ENTERPRISE_SLA.md`, `docs/COST_MODEL.md §46`.
+>
+> **v0.4 changes (2026-06-29):** Added §6.4 Activation Health Milestones — CSM Save Protocol trigger spec (T0-Alpha / T0-Beta / T0-Gamma) per `COST_MODEL.md §46`. Added Day-14 checkpoint row to §6 milestone table. Added activation health monitoring note to §4.1. Closes `COST_MODEL.md §46.9` item 9 (P1 / M5).
 
 ---
 
@@ -269,6 +271,9 @@ Questions? Reply to this email or message [People Ops contact].
 
 ---
 
+**Activation health monitoring — from Day 14:**
+FORM monitors pilot activation from Day 14 onwards via the `pilot_activation_monitor` daily job. If the Day-14 activation rate falls below 30% (T0-Alpha), or Day-45 champion logins are fewer than 2 (T0-Beta), or three consecutive weeks show a ≥ 10 percentage-point WAU decline (T0-Gamma), your CSM will proactively contact you to initiate the CSM Save Protocol. Full trigger spec: §6.4. No individual employee data is visible to FORM at any step — the save protocol operates on aggregate activation rates and WAU percentages only.
+
 ### 4.2 Full seat rollout (Day 45–60)
 
 Once pilot adoption reaches ≥ 25% (checkpoint from Admin Dashboard → Analytics → Activation):
@@ -316,6 +321,7 @@ Success criteria are set on the kick-off call (§2.1). Standard defaults by tier
 
 | Milestone | Metric | Starter threshold | Growth threshold | Enterprise threshold |
 |---|---|---|---|---|
+| **Day-14 activation** (§6.4) | % of pilot seats with ≥ 1 session | ≥ 30% | ≥ 30% | ≥ 30% |
 | 30-day activation | % employees who logged ≥ 1 session | ≥ 20% | ≥ 25% | ≥ 30% |
 | 60-day D30 retention | % of activated users active in Day 31–60 | ≥ 35% | ≥ 40% | ≥ 45% |
 | 90-day NPS | Net Promoter Score from in-app survey | ≥ 30 | ≥ 35 | ≥ 40 |
@@ -349,6 +355,73 @@ Duration: 60 minutes.
 6. Year 1 renewal timeline — renewal date, contract review process
 
 **QBR output:** CSM sends written summary within 48 hours. Include one-page data snapshot (PDF from Admin Dashboard). File in account CRM.
+
+### 6.4 Activation health milestones — CSM Save Protocol
+
+**Reference:** `docs/COST_MODEL.md §46` (CSM Save Protocol, DEC-083, 2026-06-27). PILOT-SAVE-CHAIN-01 audit invariant. Evidence artefacts: SAVE-E-001 / SAVE-E-002.
+
+FORM monitors pilot activation continuously from Day 1 via the `pilot_activation_monitor` pg_cron daily job (registered in `OBSERVABILITY.md §12.6`, job 49). If any of the three trigger conditions below is met, the CSM initiates the save protocol automatically — the customer does not need to flag the issue. The protocol operates on aggregate activation rates and WAU percentages only. No individual employee `user_id`, name, email, or health data is surfaced to the CSM at any step.
+
+#### Trigger conditions
+
+| Trigger | Condition | When checked | Emits |
+|---|---|---|---|
+| **T0-Alpha** | Pilot activation rate < 30% at Day 14 | Daily job (job 49) · fires on Day 14 of pilot | `enterprise.pilot_save_protocol_triggered` (HIGH, 7yr) |
+| **T0-Beta** | `tenant_admin` or `tenant_owner` logins in Admin Dashboard < 2 by Day 45 | CSM manual check via audit log on Day 45 | Same event, `trigger_type: 'T0B'` |
+| **T0-Gamma** | WAU (weekly active users as % of pilot seats) declined ≥ 10 percentage points for 3 consecutive weeks, at any point during the pilot | Daily job (job 49) on WAU trend detection | Same event, `trigger_type: 'T0G'` |
+
+T0-Alpha and T0-Beta thresholds apply identically across all tiers — the 30% Day-14 floor is an absolute floor, not a tier-specific target.
+
+#### What happens when a trigger fires
+
+The PILOT-SAVE-CHAIN-01 chain invariant means a `pilot_save_protocol_triggered` event must exist before any `pilot_saved` or `pilot_abandoned` event can be emitted for the same `pilot_id`. The full six-step playbook is in `COST_MODEL.md §46.3`. CSM responsibilities by step:
+
+| Step | Day | CSM action |
+|---|---|---|
+| **T+0** | Trigger day | Contact HR champion on Slack Connect: "We've noticed early activation is below the threshold we set in kickoff. I'd like to schedule a 30-minute call this week to identify blockers." Do not disclose individual non-participants. |
+| **T+3** | Within 3 days | Apply one intervention from the approved menu (see below). Emit `enterprise.pilot_save_protocol_updated`. |
+| **T+14** | Mid-protocol | Check activation rate. If ≥ 30%: move to managed recovery. If < 30%: escalate to L2 (CS Lead). |
+| **T+21** | Late protocol | If activation still below floor: Founder loop-in. Discuss managed-down (seat reduction) or abandon path. |
+| **T+28** | Pre-decision | Final joint call with CS Lead + customer champion. Agree outcome. |
+| **T+30** | Outcome | Emit `enterprise.pilot_saved` (conversion at ≥ 25% activation) or `enterprise.pilot_abandoned` (founder-approved). |
+
+**Approved intervention menu (CSM selects one per step; max 3 across the protocol):**
+
+1. Re-send welcome email with updated launch date and "why FORM" messaging (drafted by FORM brand-voice, sent from customer's People Ops address)
+2. Manager briefing: 30-min call with People Ops lead explaining aggregate-only metrics and privacy floor; CSM provides deck
+3. One-time QR code print card: simple card with QR → App Store + SSO instructions, distributed physically in office
+4. Slack/Teams announcement in a high-traffic channel — not a wellness channel — co-written with customer comms team
+5. Lunch-and-learn session: CSM-led 20-min demo via Zoom or in-person; offered to pilot cohort
+6. Technical review: CSM + customer IT to confirm SSO is prompting on first login (not silently failing); re-check SCIM provisioning status
+
+**Escalation tree:**
+
+| Level | Trigger | Owner |
+|---|---|---|
+| **L1 CSM** | Any T0 trigger | Named CSM on account |
+| **L2 CS Lead** | T+14 check still below threshold, OR T0-Alpha at a Growth/Enterprise account | Customer-success lead |
+| **L3 Founder** | T+21 and < 15% activation, OR ACV ≥ $100k and still below threshold, OR any T0-Gamma trigger at Enterprise tier | Founder + CS Lead |
+
+#### Privacy floor (restatement for this context)
+
+The save protocol never requests or accesses:
+- Names or email addresses of employees who have not activated
+- Individual session history of any employee
+- GDPR Art. 9 health data of any kind
+
+The CSM's only data access during the save protocol is the aggregate activation rate, WAU trend percentage, and Admin Dashboard login count from the audit log. The intervention is always directed at the *channel* (announcement, SSO friction, manager awareness) — never at identifying or contacting specific non-participating employees.
+
+#### Checklist — CSM completes at trigger
+
+```
+□ T0 trigger type confirmed (T0-Alpha / T0-Beta / T0-Gamma)
+□ Trigger emitted by form_admin via save protocol UI (PILOT-SAVE-CHAIN-01 predecessor audit event logged)
+□ HR champion contacted within 24h of trigger
+□ Intervention from approved menu selected and agreed with champion
+□ CS Lead notified if T+14 check is still below threshold
+□ COST_MODEL.md §46.9 item 7 save-protocol dashboard reviewed weekly during protocol
+□ Outcome recorded (saved / managed-down / abandoned) within T+30; audit event emitted
+```
 
 ---
 
@@ -517,6 +590,7 @@ Contract start: [Date]
 □ Slack Connect channel opened: form-[slug]-shared
 □ Success criteria agreed (90-day): [metric 1], [metric 2]
 □ Privacy model walkthrough completed
+□ Day-14 activation checkpoint explained (§6.4) — CSM will proactively contact if < 30% activation
 ```
 
 ### A.2 90-day QBR data pull (Admin Dashboard queries)
