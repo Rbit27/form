@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.18.0] — 2026-06-29
+
+### Added
+- `content/post-2839-minimal-metrics-self-coached-athlete.md` — Series «Прогрес без ілюзій» 4/10. Мінімальний набір метрик для self-coached атлета: e1RM, тоннаж/ефективні підходи, RPE, технічна нотатка. Чому більше метрик не означає кращого розуміння. Marcora et al. 2009 (суб'єктивна енергія vs. продуктивність); Israetel et al. 2019 (ефективні підходи). clinical-safety NOT_REQUIRED · sports-scientist review pending.
+- `blog.html` — card for post-2839 added at top of feed.
+
+### Changed
+- `STATUS.md` — Series 2836–2845 progress updated to 4/10; next: post-2840 (плато vs. адаптаційне плато).
+- `VERSION` — 10.17.0 → 10.18.0.
+
+---
+
 ## [10.17.0] — 2026-06-29
 
 ### Added
