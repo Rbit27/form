@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.9.0
+# FORM · Observability & Monitoring Taxonomy v5.9.1
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -1288,8 +1288,8 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `champion_login_monitor` | `0 11 * * *` | 49 h | CC3.2/CC7.2/A1.1 — daily Day-45 champion login sentinel (T0-Beta trigger per COST_MODEL §46.2); queries `audit_log_events` for `admin.dashboard_session_started` events with `actor_role IN ('enterprise_admin', 'tenant_manager')` for pilots at `day_number = 45` (Growth or Enterprise tier); if `champion_session_count < 2`: fires AL-SAVE-02 Slack `#enterprise-health` P1 (not PagerDuty — per COST_MODEL §46.2 T0-Beta severity) with payload `pilot_id` UUID, `champion_session_count` INT, `tier` — no employee `user_id` or PII; on all-clear (no Day-45 pilot below threshold): emits `system.champion_login_check_passed` LOW/1yr (aggregate `day45_pilots_checked` count only — no `pilot_id` in all-clear, privacy floor); stale = T0-Beta monitoring blind spot — a pilot crossing Day 45 with < 2 champion logins goes undetected; point-in-time check (stale gap that spans no Day-45 pilots has zero T0-Beta gap risk); `form_api` REVOKED from `pilot_programs` and `audit_log_events`; pg_cron reads via `form_system` role; prerequisite: `admin.dashboard_session_started` LOW/1yr event emitted by Admin Dashboard backend (§59.10 item 1 P0/M6) | PagerDuty P1 `form-devops` → devops-lead (AL-CHAMP-ACT-01; stale-only); Slack `#enterprise-health` (AL-SAVE-02; T0-Beta threshold breach); dedup AL-SAVE-02: `pilot-save-t0b-{pilot_id}` 48h cooldown; dedup AL-CHAMP-ACT-01: `champ-login-check-stale`; auto-resolve AL-CHAMP-ACT-01 on next `system.champion_login_check_passed`; privacy invariant: AL-SAVE-02 payload contains only `pilot_id` (FORM-internal UUID), `champion_session_count` INT, `tier` string — no individual employee `user_id`, name, email, session content, coaching exchange, or GDPR Art. 9 health data; cross-ref: COST_MODEL §46.2 (T0-Beta trigger definition); §59.4 (AL-SAVE-02/AL-CHAMP-ACT-01 alert specs); §59.5 (job 50 canonical SQL spec); CHAMP-LOGIN-STALE-CHAIN-01 stale events (INCIDENT_RESPONSE §R-50.8); INCIDENT_RESPONSE R-50 (§R-50.5; v1.0, 2026-06-29) — **job 50** |
 | `wau_decline_monitor` | `0 12 * * 1` | 8 days | CC3.2/CC7.2/A1.1 — weekly WAU decline sentinel (T0-Gamma trigger per COST_MODEL §46.2); runs Monday 12:00 UTC; evaluates pilots ≥ 28 active days (Growth or Enterprise tier) for 3 consecutive weekly WAU rate declines ≥ 10 pp (WAU/contracted_seats — `session_completed` grouped by `tenant_id` and week); if 3-consecutive-decline pattern confirmed: fires AL-SAVE-03 Slack `#enterprise-health` P1 (not PagerDuty — per COST_MODEL §46.2 T0-Gamma severity) with payload `pilot_id` UUID, `pilot_day` INT, `tier`, `min_decline_pp` NUMERIC — no employee `user_id` or PII; on all-clear: emits `system.wau_decline_check_passed` LOW/1yr (aggregate mature pilots checked — no `pilot_id`, privacy floor); stale = T0-Gamma monitoring blind spot; weekly cadence amplifies gap risk — stale window can reach 14–21 days if multiple Monday runs fail; a missed Monday run that spans a T0-Gamma pattern means the AL-SAVE-03 Slack for that week is permanently lost; `form_api` REVOKED from `pilot_programs` and `session_completed`; pg_cron reads via `form_system` role; OQ-WAU-OBS-01: minimum seat guard `contracted_seats >= 25` recommended before first live pilot (WAU rate volatility risk in small-seat pilots) | PagerDuty P1 `form-devops` → devops-lead (AL-WAU-ACT-01; stale-only); Slack `#enterprise-health` (AL-SAVE-03; T0-Gamma threshold breach); dedup AL-SAVE-03: `pilot-save-t0g-{pilot_id}` 8-day cooldown (weekly cadence); dedup AL-WAU-ACT-01: `wau-decline-check-stale`; auto-resolve AL-WAU-ACT-01 on next `system.wau_decline_check_passed`; privacy invariant: AL-SAVE-03 payload contains only `pilot_id` (FORM-internal UUID), `pilot_day` INT, `tier` string, `min_decline_pp` NUMERIC — no individual employee `user_id`, name, email, WAU value, session content, or GDPR Art. 9 health data; cross-ref: COST_MODEL §46.2 (T0-Gamma trigger definition: 3 consecutive weekly WAU rate declines ≥ 10 pp); §60.4 (AL-SAVE-03/AL-WAU-ACT-01 alert specs); §60.5 (job 51 canonical SQL spec); WAU-DECLINE-STALE-CHAIN-01 stale events (INCIDENT_RESPONSE §R-51.8); INCIDENT_RESPONSE R-51 (§R-51.5; v1.0, 2026-06-29) — **job 51** |
 | `admin_wellness_mv_refresh` | `15 2 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_wellness_summary_v2` (DATA_MODEL §17); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_wellness_summary_v2'`, `tenant_row_count` (INT, aggregate), `suppressed_cell_count` (INT, cells suppressed by k-anonymity guard `assert_k_anonymity()` using `tenants.reporting_k_floor` default N ≥ 5), `refresh_duration_ms` (INT); stale = Admin Dashboard "stale banner" (DATA_MODEL §17 > 26h obligation) and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED from all four MV relations; pg_cron reads and refreshes via `form_system` role; privacy invariant: payload aggregate counts only — no employee `user_id`, name, health metric, avg form_score per employee, or GDPR Art. 9 special-category data; `tenant_row_count` is a count of distinct tenant rows in the MV, not a count of employees | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-wellness-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_wellness_summary_v2'`; P2 severity per DATA_MODEL §17 "P2 alert on cron failure" — stale admin metrics are a product-degradation consequence (banner shown to tenant admin), not a compliance breach; cross-ref: §62.4 AL-ADMIN-RPT-01; §62.5.1 (job 52 SQL spec); DATA_MODEL §17 (MV definition and refresh schedule); INCIDENT_RESPONSE R-52 (stale recovery runbook — §62.9 item 4; pending); ADMIN-RPT-E-001 (C1.1/P4.1/CC7.2, annual, 3yr; §62.7) — **job 52** |
-| `admin_engagement_mv_refresh` | `30 2 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_engagement_summary` (DATA_MODEL §17); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_engagement_summary'`, `tenant_row_count`, `suppressed_cell_count = 0` (tenant-level summary only; no per-cohort k-anonymity floor applied — engagement metrics are computed at tenant granularity, not SCIM-group granularity; OQ-ADMIN-RPT-01 open), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role; privacy invariant: activation_rate_pct and D30 retention in this MV are tenant-level aggregates — no individual employee session or health data | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-engagement-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_engagement_summary'`; cross-ref: §62.4 AL-ADMIN-RPT-02; §62.5.2 (job 53 SQL spec); DATA_MODEL §17; INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 53** |
-| `admin_feature_adoption_mv_refresh` | `45 2 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_feature_adoption` (DATA_MODEL §17); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_feature_adoption'`, `tenant_row_count`, `suppressed_cell_count = 0` (tenant-level only; CV adoption % and voice coaching adoption % are tenant aggregates; no per-cohort k-floor; OQ-ADMIN-RPT-01 open), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role; privacy invariant: feature adoption percentages are tenant aggregates — no individual employee feature-usage records | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-feature-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_feature_adoption'`; cross-ref: §62.4 AL-ADMIN-RPT-03; §62.5.3 (job 54 SQL spec); DATA_MODEL §17; INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 54** |
+| `admin_engagement_mv_refresh` | `30 2 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_engagement_summary` (DATA_MODEL §17); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_engagement_summary'`, `tenant_row_count`, `suppressed_cell_count` (INT — count of rows where `activation_rate_pct IS NULL`, i.e. tenants with `total_activated < 5`; k-floor on `activation_rate_pct` per DEC-085 / OQ-ADMIN-RPT-01 resolved 2026-06-29; `d30_retention_pct` suppression counted separately only when below its cohort-size floor), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role; privacy invariant: activation_rate_pct and D30 retention in this MV are tenant-level aggregates — no individual employee session or health data | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-engagement-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_engagement_summary'`; cross-ref: §62.4 AL-ADMIN-RPT-02; §62.5.2 (job 53 SQL spec); §62.11 (OQ-ADMIN-RPT-01 resolution); DATA_MODEL §17; INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 53** |
+| `admin_feature_adoption_mv_refresh` | `45 2 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_feature_adoption` (DATA_MODEL §17); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_feature_adoption'`, `tenant_row_count`, `suppressed_cell_count` (INT — count of rows where `cv_adoption_pct IS NULL`, i.e. tenants with `total_active_users < 5`; k-floor on `cv_adoption_pct` and `voice_coach_adoption_pct` was already in the MV DDL; `suppressed_cell_count` now correctly counted rather than hardcoded 0 per DEC-085 / OQ-ADMIN-RPT-01 resolved 2026-06-29), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role; privacy invariant: feature adoption percentages are tenant aggregates — no individual employee feature-usage records | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-feature-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_feature_adoption'`; cross-ref: §62.4 AL-ADMIN-RPT-03; §62.5.3 (job 54 SQL spec); §62.11 (OQ-ADMIN-RPT-01 resolution); DATA_MODEL §17; INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 54** |
 | `admin_cohort_breakdown_mv_refresh` | `0 3 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_cohort_breakdown` (DATA_MODEL §17); keyed by SCIM group (SSO_SCIM §27 — SCIM group membership is an org-structure signal, not individual employee data); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_cohort_breakdown'`, `tenant_row_count`, `suppressed_cell_count` (COUNT WHERE NOT meets_anonymity_floor — SCIM groups with size < `tenants.reporting_k_floor` (default N ≥ 5) have aggregate engagement metrics NULLed by `assert_k_anonymity()`; this is the most privacy-sensitive of the four MVs because SCIM group membership size is visible as a structural signal), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-cohort-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_cohort_breakdown'`; privacy invariant: payload contains only `view_name` (string literal), aggregate `tenant_row_count` (INT), aggregate `suppressed_cell_count` (INT count of SCIM groups below k-floor — no group name, SCIM attribute value, employee count, or user_id), `refresh_duration_ms`; cross-ref: §62.4 AL-ADMIN-RPT-04; §62.5.4 (job 55 SQL spec); DATA_MODEL §17; SSO_SCIM §27 (SCIM group key for cohort_breakdown); INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 55** |
 
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
@@ -17597,7 +17597,7 @@ END $$;
 | Stale alert | AL-ADMIN-RPT-02 (§62.4) |
 | All-clear event | `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_engagement_summary'` |
 | SOC 2 criteria | C1.1 / P4.1 / CC7.2 |
-| Note | `tenant_engagement_summary` is a tenant-level summary (activation_rate_pct, D30 retention) — no per-SCIM-group breakdown and no per-cohort k-floor; `suppressed_cell_count = 0` by design. OQ-ADMIN-RPT-01 open (whether a tenant-level k-floor should be applied). |
+| Note | `tenant_engagement_summary` is a tenant-level summary (activation_rate_pct, D30 retention). k-floor N ≥ 5 on `total_activated` applied to `activation_rate_pct` in MV DDL per DEC-085 (2026-06-29). `suppressed_cell_count` counts rows where `activation_rate_pct IS NULL`. OQ-ADMIN-RPT-01 🟢 Resolved (§62.11). |
 
 ```sql
 -- admin_engagement_mv_refresh: pg_cron job 53, 02:30 UTC nightly
@@ -17619,12 +17619,15 @@ BEGIN
     p_payload       => jsonb_build_object(
       'view_name',             'tenant_engagement_summary',
       'tenant_row_count',      v_tenant_row_count,
-      'suppressed_cell_count', 0,
+      'suppressed_cell_count', (
+        -- Count tenants where activation_rate_pct IS NULL (total_activated < 5).
+        -- k-floor N≥5 per DEC-085 / OQ-ADMIN-RPT-01 resolution (2026-06-29).
+        -- No employee user_id or PII in this count.
+        SELECT COUNT(*)::INT FROM tenant_engagement_summary WHERE activation_rate_pct IS NULL
+      ),
       'refresh_duration_ms',   EXTRACT(EPOCH FROM clock_timestamp() - v_start)::INT * 1000
     )
   );
-  -- suppressed_cell_count = 0 by design: tenant_engagement_summary has no per-cohort
-  -- k-anonymity floor (OQ-ADMIN-RPT-01). Payload: aggregate INT counts only; no employee PII.
 END $$;
 ```
 
@@ -17642,7 +17645,7 @@ END $$;
 | Stale alert | AL-ADMIN-RPT-03 (§62.4) |
 | All-clear event | `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_feature_adoption'` |
 | SOC 2 criteria | C1.1 / P4.1 / CC7.2 |
-| Note | `tenant_feature_adoption` is a tenant-level summary (CV adoption %, voice coaching adoption %) — no per-SCIM-group breakdown; `suppressed_cell_count = 0` by design. OQ-ADMIN-RPT-01 open. |
+| Note | `tenant_feature_adoption` is a tenant-level summary (CV adoption %, voice coaching adoption %). k-floor N ≥ 5 on `total_active_users` was already in the MV DDL; `suppressed_cell_count` now correctly counts rows where `cv_adoption_pct IS NULL` (was hardcoded 0 before). OQ-ADMIN-RPT-01 🟢 Resolved (§62.11 + DEC-085). |
 
 ```sql
 -- admin_feature_adoption_mv_refresh: pg_cron job 54, 02:45 UTC nightly
@@ -17664,11 +17667,16 @@ BEGIN
     p_payload       => jsonb_build_object(
       'view_name',             'tenant_feature_adoption',
       'tenant_row_count',      v_tenant_row_count,
-      'suppressed_cell_count', 0,
+      'suppressed_cell_count', (
+        -- Count tenants where cv_adoption_pct IS NULL (total_active_users < 5).
+        -- k-floor N≥5 on total_active_users was already in the MV DDL; suppressed_cell_count
+        -- was incorrectly hardcoded 0. Fixed by DEC-085 / OQ-ADMIN-RPT-01 (2026-06-29).
+        -- No employee user_id or PII in this count.
+        SELECT COUNT(*)::INT FROM tenant_feature_adoption WHERE cv_adoption_pct IS NULL
+      ),
       'refresh_duration_ms',   EXTRACT(EPOCH FROM clock_timestamp() - v_start)::INT * 1000
     )
   );
-  -- suppressed_cell_count = 0 by design (OQ-ADMIN-RPT-01). Payload: aggregate counts only.
 END $$;
 ```
 
@@ -17803,8 +17811,69 @@ const AdminMvRefreshedSchema = z.object({
 
 | ID | Question | Owner | Status |
 |---|---|---|---|
-| OQ-ADMIN-RPT-01 | `tenant_engagement_summary` and `tenant_feature_adoption` do not have per-cohort k-anonymity floors — they are tenant-level summaries only (activation_rate_pct, D30 retention, CV adoption %, voice coaching adoption % at tenant granularity). Should a tenant-level k-floor be applied (e.g., suppress metrics for tenants with fewer than N activated users)? Current spec: no tenant-level k-floor on engagement or feature adoption; `suppressed_cell_count = 0` by design for jobs 53–54 (§62.5.2 / §62.5.3). The ENTERPRISE.md §"Privacy floor for enterprise" items 1–2 mandate aggregate-only data but do not specify a minimum tenant user count for tenant-level metrics (as opposed to cohort-level metrics). Confirm with compliance-officer before M7 deploy: if a tenant has only 1–2 activated users, does `activation_rate_pct` at tenant level constitute a privacy risk? | compliance-officer + data-engineer | 🟡 Open — confirm with compliance-officer. Interim: no tenant-level k-floor on engagement/feature_adoption; `suppressed_cell_count = 0` by design for jobs 53–54. |
-| OQ-ADMIN-RPT-02 | If a tenant has zero active users (newly onboarded or churned mid-pilot), `tenant_wellness_summary_v2` will have rows with `wau_count = 0` and `participation_pct = 0.0`. Should the refresh job suppress the entire row (not just per-cell k-floor), or retain zero-value rows to indicate "tenant exists but no data yet"? Current spec: zero-value rows retained (consistent with DATA_MODEL §17 MV definition — the MV is populated for all `tenants` regardless of activity). Confirm data model intent with data-engineer before first live pilot Admin Dashboard. | data-engineer + enterprise-architect | 🟡 Open — zero-value rows retained per current DATA_MODEL §17 spec; no change required unless first pilot Admin Dashboard reveals UX ambiguity (e.g., tenant admin confusing 0-row absence with filter issue). |
+| OQ-ADMIN-RPT-01 | `tenant_engagement_summary` and `tenant_feature_adoption` do not have per-cohort k-anonymity floors — they are tenant-level summaries only (activation_rate_pct, D30 retention, CV adoption %, voice coaching adoption % at tenant granularity). Should a tenant-level k-floor be applied (e.g., suppress metrics for tenants with fewer than N activated users)? Current spec: no tenant-level k-floor on engagement or feature adoption; `suppressed_cell_count = 0` by design for jobs 53–54 (§62.5.2 / §62.5.3). The ENTERPRISE.md §"Privacy floor for enterprise" items 1–2 mandate aggregate-only data but do not specify a minimum tenant user count for tenant-level metrics (as opposed to cohort-level metrics). Confirm with compliance-officer before M7 deploy: if a tenant has only 1–2 activated users, does `activation_rate_pct` at tenant level constitute a privacy risk? | compliance-officer + data-engineer | 🟢 **Resolved (v5.9.1, 2026-06-29) — DEC-085. See §62.11.** Compliance-officer ruling: k-floor N ≥ 5 on `total_activated` applied to `activation_rate_pct` in `tenant_engagement_summary` DDL (DATA_MODEL §17.3.2 v1.37). `tenant_feature_adoption` k-floor on `total_active_users` was already in DDL; `suppressed_cell_count` corrected from hardcoded 0 to actual count. Jobs 53–54 SQL updated to count suppressed rows. |
+| OQ-ADMIN-RPT-02 | If a tenant has zero active users (newly onboarded or churned mid-pilot), `tenant_wellness_summary_v2` will have rows with `wau_count = 0` and `participation_pct = 0.0`. Should the refresh job suppress the entire row (not just per-cell k-floor), or retain zero-value rows to indicate "tenant exists but no data yet"? Current spec: zero-value rows retained (consistent with DATA_MODEL §17 MV definition — the MV is populated for all `tenants` regardless of activity). Confirm data model intent with data-engineer before first live pilot Admin Dashboard. | data-engineer + enterprise-architect | 🟢 **Resolved (v5.9.1, 2026-06-29) — DEC-085. See §62.11.** Zero-value row retention confirmed. Tenants with 0 activated users are a sub-case of the k-floor: `total_activated = 0 < 5` → `activation_rate_pct IS NULL`. The row is retained (UX: admin sees "—" rather than missing row), rate column suppressed. No separate row-suppression logic required. |
+
+---
+
+## §62.11 OQ-ADMIN-RPT-01 & OQ-ADMIN-RPT-02 Resolution — Tenant-Level k-Floor & Zero-Value Row Handling (DEC-085)
+
+**Date:** 2026-06-29 · **Owner:** compliance-officer · **Decision:** DEC-085
+
+### §62.11.1 Background
+
+OQ-ADMIN-RPT-01 asked whether `activation_rate_pct` in `tenant_engagement_summary` and `cv_adoption_pct` / `voice_coach_adoption_pct` in `tenant_feature_adoption` should be suppressed when the tenant has fewer than N activated users. OQ-ADMIN-RPT-02 asked whether tenants with zero active users should have their entire row suppressed.
+
+Both OQs were flagged as blocking the M7 deploy.
+
+**Key observation discovered during resolution:** `tenant_feature_adoption` DDL *already had* k-floor CASE guards (`CASE WHEN total_active_users >= 5 THEN ...`) for `cv_adoption_pct` and `voice_coach_adoption_pct` — but the pg_cron job 54 SQL was incorrectly emitting `suppressed_cell_count = 0` (hardcoded). The monitoring layer did not reflect the privacy floor already present in the MV DDL. This is corrected.
+
+`tenant_engagement_summary` did NOT have a k-floor on `activation_rate_pct` (only `d30_retention_pct` had one). This is added.
+
+### §62.11.2 Compliance-Officer Ruling — OQ-ADMIN-RPT-01
+
+**Ruling: YES — apply k-floor N ≥ 5 to `activation_rate_pct` in `tenant_engagement_summary`.**
+
+**Rationale:**
+
+1. **ENTERPRISE.md principle 1**: "HR can never see individual user data." A `activation_rate_pct` of 2% in a 50-seat org means "1 person activated this month." In a 50-person workplace where colleagues know each other, the single activated user is trivially identifiable. This violates the spirit of the privacy floor even though the number is a percentage.
+
+2. **GDPR Recital 26**: Information is anonymous only when the natural person "is not reasonably likely to be identified." A rate that reverse-engineers to a specific headcount (1 or 2 people) in a well-known cohort does not satisfy Recital 26 at typical enterprise org sizes.
+
+3. **Internal consistency**: `d30_retention_pct` (in the same MV) already applies a cohort-size k-floor; `tenant_feature_adoption` already applies `total_active_users >= 5`. Applying the same threshold to `activation_rate_pct` is consistent across all four rate columns in the admin reporting pipeline.
+
+4. **Counter-argument considered and rejected**: "The 50-seat minimum means the denominator is always large." — Rejected because the denominator (`total_provisioned`) is large; the numerator (`total_activated`) can be 1 during early pilot days. The rate reveals the count through simple arithmetic (2% × 50 seats = 1 person), so denominator size alone does not prevent re-identification.
+
+5. **Threshold chosen — N ≥ 5**: Consistent with `assert_k_anonymity()` default and `tenants.reporting_k_floor INTEGER DEFAULT 5 CHECK IN (5, 10, 15)` in the schema. Per-tenant override (k=10, k=15) remains available via `reporting_k_floor` for sensitive-industry or EU pilot customers.
+
+**Changes made:**
+
+| File | Change |
+|---|---|
+| `DATA_MODEL.md §17.3.2` (v1.37) | `activation_rate_pct` wrapped in `CASE WHEN COALESCE(a.total_activated, 0) >= 5 THEN ... ELSE NULL END`. DDL note added. |
+| `OBSERVABILITY.md §62.5.2` | `suppressed_cell_count` now counts `WHERE activation_rate_pct IS NULL` (was hardcoded 0). |
+| `OBSERVABILITY.md §62.5.3` | `suppressed_cell_count` now counts `WHERE cv_adoption_pct IS NULL` (was incorrectly hardcoded 0 despite k-floor already in DDL). |
+| `OBSERVABILITY.md §12.6` | Jobs 53 and 54 registry entries updated to describe actual suppression behavior. |
+
+**Migration note:** Existing `tenant_engagement_summary` rows may have non-NULL `activation_rate_pct` for tenants with `total_activated < 5`. The MV DDL change takes effect on the next nightly `REFRESH MATERIALIZED VIEW CONCURRENTLY` (02:30 UTC). No schema migration (DDL ALTER) is required — the CASE expression is in the view definition, not a column constraint.
+
+**SOC 2 implication:** `suppressed_cell_count` in `ADMIN-RPT-E-001` artefacts now correctly reflects active suppression for both jobs 53 and 54. This strengthens C1.1 (confidentiality policy enforcement) and P4.1 (use-limitation principle) evidence.
+
+### §62.11.3 Ruling — OQ-ADMIN-RPT-02 (Zero-Value Row Handling)
+
+**Ruling: RETAIN zero-value rows. No change required.**
+
+**Rationale:** Tenants with `total_activated = 0` are already a sub-case of OQ-ADMIN-RPT-01: `0 < 5`, so `activation_rate_pct IS NULL` after the k-floor. The row is retained in the MV but the rate column is suppressed. The admin dashboard should render NULL as "—" or "Not enough data yet," which is the correct UX signal for a newly onboarded tenant or one mid-pilot with no activations. Suppressing the entire row would create ambiguity (is the tenant missing from the pipeline, or does it simply have no data?). Row retention is confirmed.
+
+**`tenant_wellness_summary_v2`** (the original subject of OQ-ADMIN-RPT-02): `wau_count = 0` and `participation_pct = 0.0` rows are retained. The `assert_k_anonymity()` guard on `avg_form_score` already handles the privacy concern for that column. No separate row-suppression logic is added.
+
+### §62.11.4 SOC 2 Evidence Update
+
+ADMIN-RPT-E-001 artefact description updated: the annual pg_cron run history now includes a `suppressed_cell_count` summary for jobs 53 and 54 that reflects actual suppression (not the former hardcoded 0). Auditor narrative: "Jobs 53 and 54 apply a k-anonymity floor of N ≥ 5 at the MV DDL layer; `suppressed_cell_count` in each `system.admin_mv_refreshed` event represents the number of tenants for which rate columns are NULL-suppressed in the reporting period, providing positive evidence that the privacy floor was enforced on every refresh cycle."
+
+---
+
+*v5.9.1 (2026-06-29): Patch — OQ-ADMIN-RPT-01 · OQ-ADMIN-RPT-02 resolved (DEC-085). Compliance-officer ruling: k-floor N ≥ 5 applied to `activation_rate_pct` in `tenant_engagement_summary` DDL (DATA_MODEL §17.3.2 v1.37); `suppressed_cell_count` in jobs 53–54 corrected from hardcoded 0 to actual per-view count. `tenant_feature_adoption` k-floor on `total_active_users` was already in DDL; monitoring layer now reflects it. OQ-ADMIN-RPT-02: zero-value row retention confirmed — tenants with 0 activations have NULL rate columns (sub-case of k-floor), rows retained. §62.10 OQ tracker: both OQs 🟡 → 🟢 Resolved. §62.11 resolution section added. §62.5.2 SQL updated (suppressed_cell_count count). §62.5.3 SQL updated (suppressed_cell_count count). §12.6 jobs 53–54 registry entries updated. ADMIN-RPT-E-001 auditor narrative updated. DEC-085 registered in DECISION_LOG.md. DATA_MODEL.md v1.36 → v1.37. Document header v5.9.0 → v5.9.1. Owner: compliance-officer + data-engineer + enterprise-architect.*
 
 ---
 

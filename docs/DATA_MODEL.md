@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.36
+# FORM · Multi-Tenant Data Model v1.37
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -3787,10 +3787,18 @@ SELECT
   NOW()                                              AS computed_at,
   p.total_provisioned,
   COALESCE(a.total_activated, 0)                     AS total_activated,
-  ROUND(
-    100.0 * COALESCE(a.total_activated, 0)
-    / NULLIF(p.total_provisioned, 0), 1
-  )                                                  AS activation_rate_pct,
+  -- k-floor N≥5 on total_activated per DEC-085 / OQ-ADMIN-RPT-01 resolution (2026-06-29):
+  -- activation_rate_pct is suppressed when fewer than 5 users have activated, because
+  -- a 2% rate in a 50-seat org effectively reveals a single individual — violating
+  -- ENTERPRISE.md privacy floor principle 1 ("HR can never see individual user data").
+  CASE
+    WHEN COALESCE(a.total_activated, 0) >= 5
+    THEN ROUND(
+           100.0 * COALESCE(a.total_activated, 0)
+           / NULLIF(p.total_provisioned, 0), 1
+         )
+    ELSE NULL
+  END                                                AS activation_rate_pct,
   COALESCE(wau.weekly_active, 0)                     AS weekly_active_users,
   ROUND(
     100.0 * COALESCE(wau.weekly_active, 0)
@@ -3824,6 +3832,8 @@ CREATE POLICY tes_tenant_read ON tenant_engagement_summary
 ```
 
 **No individual data path:** Query aggregates only counts and percentages. `d30_cohort_size` is included so the API middleware can enforce the k-floor — it is never returned to the admin dashboard.
+
+**k-floor applied at DDL layer (DEC-085, 2026-06-29):** Both `activation_rate_pct` (N ≥ 5 on `total_activated`) and `d30_retention_pct` (N ≥ 5 on `d30_cohort_size`) are NULL-suppressed in the MV when below-floor. `tenant_feature_adoption` applies the same floor on `total_active_users` and `total_sessions`. Row retention is unchanged — tenants with zero activations appear in the MV with NULL rate columns, allowing the admin dashboard to display a "not enough data yet" state rather than a missing row (which could be confused with a filter issue). See §62.11 for compliance-officer ruling and OQ-ADMIN-RPT-01 / OQ-ADMIN-RPT-02 resolution.
 
 ---
 

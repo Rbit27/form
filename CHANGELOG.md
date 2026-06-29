@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [10.18.1] — 2026-06-29
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.9.1 — §62.11 added: OQ-ADMIN-RPT-01 & OQ-ADMIN-RPT-02 resolved (DEC-085). Compliance-officer ruling: k-floor N ≥ 5 applied to `activation_rate_pct` in `tenant_engagement_summary` DDL; `suppressed_cell_count` in jobs 53–54 corrected from hardcoded 0 to actual count; `tenant_feature_adoption` existing k-floor now reflected in monitoring layer. Zero-value row retention confirmed. §62.10 OQ tracker: both OQs 🟡 → 🟢 Resolved.
+- `docs/DATA_MODEL.md` v1.37 — §17.3.2 `tenant_engagement_summary` DDL: `activation_rate_pct` wrapped in `CASE WHEN COALESCE(a.total_activated, 0) >= 5 THEN ... ELSE NULL END`. DDL note added cross-referencing §62.11 and DEC-085.
+- `docs/DECISION_LOG.md` — DEC-085 registered: OQ-ADMIN-RPT-01 & OQ-ADMIN-RPT-02 compliance-officer ruling (tenant-level k-floor for admin reporting MVs, zero-value row retention).
+- `VERSION` — 10.18.0 → 10.18.1.
+
+---
+
 ## [10.18.0] — 2026-06-29
 
 ### Added
