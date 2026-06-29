@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [9.92.1] — 2026-06-29
+
+### Added
+- `docs/SOC2_READINESS.md §127` (v3.52.0) — Cross-Reference Patch registering CHAMP-LOGIN-STALE-E-001 (per-incident IC narrative for R-50 `champion_login_monitor` job 50 stale activations; CC7.2/A1.1/CC3.2; 7yr if `t0b_gap_found = true`, 3yr otherwise) and WAU-DECLINE-STALE-E-001 (per-incident IC narrative for R-51 `wau_decline_monitor` job 51 stale activations; CC7.2/A1.1/CC3.2; 7yr if `t0g_gap_found = true`, 3yr otherwise; weekly job cadence — worst-case 14–21 day stale window). Evidence count 96 → 98. §80.3 R2 subfolders `pilots/champion-login/` and `pilots/wau-decline/` added. §80.3 `pilots/save-protocol/` extended to include PILOT-ACT-STALE-E-001. §80.4 Vanta mirror list: PILOT-ACT-STALE-E-001 backfill + two new per-incident entries.
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.51.0 → v3.52.0; §127 appended; §80.3 and §80.4 extended.
+- `docs/OBSERVABILITY.md` — v5.7.1 → v5.7.2; §59.10 item 4 and §60.10 item 4 closed (SOC2_READINESS.md v3.52.0).
+- `docs/INCIDENT_RESPONSE.md` — v3.18.1 → v3.18.2; R-50.12 item 4 and R-51.12 item 4 closed (SOC2_READINESS.md v3.52.0).
+- `VERSION` — 9.92.0 → 9.92.1.
+
 ## [9.92.0] — 2026-06-29
 
 ### Added
