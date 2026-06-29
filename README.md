@@ -2898,8 +2898,8 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | 2766 | Ідеальний тренувальний тиждень не існує: чому планування від реальних обмежень — не компроміс, а точність | **draft · v9.92.0 → post-2766-ideal-training-week-doesnt-exist.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2767 | Тренування в подорожах: що зберігає результат, що — ілюзія, і де мінімальний ефективний обсяг | **draft · v9.93.0 → post-2767-training-during-travel.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2768 | Сезонна динаміка тренування: чому однакова програма взимку і влітку — різні програми | **draft · v9.94.0 → post-2768-seasonal-training-dynamics.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
-| 2769 | Тренування при підвищеному робочому навантаженні: адаптація без нуля | proposed · v9.92.0 |
-| 2770 | Як повернутись після форс-мажору: реальна механіка детренованості і зворотна адаптація | proposed · v9.92.0 |
+| 2769 | Тренування при підвищеному робочому навантаженні: адаптація без нульового місяця | **draft · v9.95.0 → post-2769-training-under-high-work-stress.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2770 | Тренування при хронічному дефіциті сну: коли відновлення в дефіциті | **draft · v9.95.0 → post-2770-training-chronic-sleep-deprivation.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2771 | Обладнання і результат: де різниця між залом і домашнім тренуванням принципова, де — ні | proposed · v9.92.0 |
 | 2772 | Тренування в парі: де партнер підсилює прогрес, де заважає, де нейтральний | proposed · v9.92.0 |
 | 2773 | Вік і тренування: що реально змінюється за фізіологією — без мотиваційних кліше | proposed · v9.92.0 |
