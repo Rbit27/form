@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.96.1] — 2026-06-29
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.7.2 → v5.7.3 — OQ-WAU-OBS-01 resolved. `wau_decline_monitor` (job 51) §60.5 canonical SQL updated: `AND contracted_seats >= 25` guard added to both the main pilot evaluation loop and the all-clear `pilots_evaluated` subquery. Closes false-positive risk where a sub-25-seat pilot (e.g., 5 seats) could trigger T0-Gamma via single-user departure (3 → 2 active = 20 pp rate decline). Decision: rate-threshold with seat-count floor; aligns with COST_MODEL §21.6 minimum expansion increment of 25 seats. §60.11 OQ-WAU-OBS-01 🟡 → 🟢 Resolved.
+- `VERSION` — 9.96.0 → 9.96.1.
+
+---
+
 ## [9.96.0] — 2026-06-29
 
 ### Added

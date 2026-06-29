@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.7.2
+# FORM · Observability & Monitoring Taxonomy v5.7.3
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -17081,6 +17081,7 @@ BEGIN
     WHERE  status = 'active'
     AND    DATE_PART('day', NOW() - start_date) >= 28
     AND    tier IN ('growth', 'enterprise')
+    AND    contracted_seats >= 25  -- OQ-WAU-OBS-01: exclude sub-25-seat pilots (WAU rate noise floor per COST_MODEL §21.6)
   LOOP
     -- Compute 3-consecutive-week decline check
     -- Privacy floor: aggregate WAU rate per week — no user_id in computation
@@ -17154,6 +17155,7 @@ BEGIN
             WHERE  status = 'active'
             AND    DATE_PART('day', NOW() - start_date) >= 28
             AND    tier IN ('growth', 'enterprise')
+            AND    contracted_seats >= 25  -- mirrors main loop guard (OQ-WAU-OBS-01)
           ),
           'check_run_at', NOW()
         )
@@ -17277,10 +17279,12 @@ Emitted by IC at R-51 Step 5 (PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 terminal
 
 | ID | Question | Owner | Status |
 |---|---|---|---|
-| OQ-WAU-OBS-01 | COST_MODEL §46.2 defines T0-Gamma as "WAU rate" decline (WAU / contracted_seats). However, a new pilot with low contracted seats may show extreme rate volatility from small absolute changes (e.g., 5-seat pilot: 3 → 2 active users = 20 pp decline). Should the threshold apply only to pilots above a minimum seat count (e.g., ≥ 25 seats) to avoid false positives from small pilots? Recommend: add a minimum seat guard `contracted_seats >= 25` to the T0-Gamma SQL in §60.5 before deploying, or treat 5-seat pilots differently with an absolute WAU floor (≥ 3 active users) rather than a rate threshold. | customer-success + devops-lead | 🟡 Open — minimum seat guard recommended before first live pilot; align with COST_MODEL §21.6 (minimum deal size ≥ 25 seats per managed-down path) |
+| OQ-WAU-OBS-01 | COST_MODEL §46.2 defines T0-Gamma as "WAU rate" decline (WAU / contracted_seats). However, a new pilot with low contracted seats may show extreme rate volatility from small absolute changes (e.g., 5-seat pilot: 3 → 2 active users = 20 pp decline). Should the threshold apply only to pilots above a minimum seat count (e.g., ≥ 25 seats) to avoid false positives from small pilots? Recommend: add a minimum seat guard `contracted_seats >= 25` to the T0-Gamma SQL in §60.5 before deploying, or treat 5-seat pilots differently with an absolute WAU floor (≥ 3 active users) rather than a rate threshold. | customer-success + devops-lead | 🟢 **Resolved (v5.7.3, 2026-06-29)** — §60.5 SQL updated: `AND contracted_seats >= 25` guard added to both the main pilot evaluation loop and the all-clear `pilots_evaluated` subquery. Decision: rate-threshold approach with a seat-count floor is simpler and sufficient; absolute WAU floor alternative is deferred as a future enhancement. Rationale: 25 seats is the minimum expansion increment per COST_MODEL §21.6, making it the natural floor — sub-25-seat pilots are valid during negotiation but WAU rate at that scale is dominated by single-user noise rather than structural engagement decline. INCIDENT_RESPONSE R-51 R-51-C2/C3 advisory filter comment (`-- Advisory filter (OQ-WAU-OBS-01)`) now reflects production status. |
 | OQ-WAU-OBS-02 | The consecutive-week check in §60.5 evaluates a single `tenant_id` in isolation. If a Growth pilot and an Enterprise pilot share a parent org (multi-entity deal), should WAU be computed at the `tenant_id` level or the parent-org level? Current spec: `tenant_id` level — no cross-tenant aggregation. Confirm this is correct once multi-entity deal structure is defined in DATA_MODEL.md. | enterprise-architect + data-engineer | 🟡 Open — `tenant_id` level is correct until multi-entity deal structure is defined; revisit when DATA_MODEL.md adds parent-org hierarchy (OQ-ENTERPRISE-ARR-01 in COST_MODEL §37) |
 
 ---
+
+*v5.7.3 (2026-06-29): Patch — OQ-WAU-OBS-01 resolved. §60.5 `wau_decline_monitor` (job 51) canonical SQL updated: `AND contracted_seats >= 25` guard added to both the main pilot evaluation FOR loop and the all-clear `pilots_evaluated` subquery — ensures sub-25-seat pilots are excluded from T0-Gamma WAU rate evaluation where single-user departures (e.g., 2 → 1 active user on a 5-seat pilot = 20 pp rate decline) would generate false positives rather than structural decay signals. Decision basis: 25 seats = minimum expansion increment per COST_MODEL §21.6; the rate-threshold approach with a seat floor is simpler and sufficient; absolute WAU floor (≥ 3 active users) alternative deferred as future enhancement. §60.11 OQ-WAU-OBS-01 status 🟡 → 🟢 Resolved. INCIDENT_RESPONSE R-51 R-51-C2 advisory filter annotation (`-- Advisory filter (OQ-WAU-OBS-01)`) now reflects production status — no doc change required (the advisory note remains accurate as documentation of the reasoning; §60.5 is the canonical production SQL). Document header v5.7.2 → v5.7.3. Privacy floor unchanged: no new payload fields; aggregate counts remain the only cross-pilot visibility. Owner: devops-lead + customer-success.*
 
 *v5.7.1 (2026-06-29): Patch — §59.10 item 2 and §60.10 item 2 closed. `docs/AUDIT_LOG_SCHEMA.md` v2.57 registered all four pilot-monitor stale events: `system.champion_login_monitor_stale_declared` (HIGH/7yr) + `system.champion_login_monitor_restored` (STANDARD/3yr) with CHAMP-LOGIN-STALE-CHAIN-01 invariant (R-50 stale chain — closes §59.10 item 2 P0/M6); `system.wau_decline_monitor_stale_declared` (HIGH/7yr) + `system.wau_decline_monitor_restored` (STANDARD/3yr) with WAU-DECLINE-STALE-CHAIN-01 invariant (R-51 stale chain — closes §60.10 item 2 P0/M6). Zod v2 schemas and CC7.2/A1.1/CC3.2 auditor narratives in AUDIT_LOG_SCHEMA.md new sections. Document header v5.7.0 → v5.7.1. Cross-ref: `docs/AUDIT_LOG_SCHEMA.md v2.57`; `docs/INCIDENT_RESPONSE.md R-50.12` item 2 → [x] Done; `docs/INCIDENT_RESPONSE.md R-51.12` item 2 → [x] Done. Owner: devops-lead + compliance-officer + security-engineer.*
 
