@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [9.87.0] — 2026-06-29
+
+### Added
+- `content/post-2731-self-coached-identity-architectural-choice.md` — editorial 13-хв пост «Self-coached ідентичність: чому «тренуюся сам» є архітектурним вибором, а не дефіцитом». Серія 2726–2735 «Тренувальна ідентичність» · пост 6/10. Три типи self-coached атлетів («тимчасово без тренера», «я і є тренер і я правий», «дослідник власного тіла»), чотири вимоги до свідомого self-coached підходу (систематичне самовідстеження, відокремлення спостереження від висновку, вихід з плану коли план не відповідає реальності, зовнішній перегляд на власних умовах), практичний критерій вибору vs. обмеження. clinical-safety NOT_REQUIRED · sports-scientist review pending.
+- `content/post-1110-hip-hinge-cluster-synthesis-squat-patterns-intro.md` — biomechanics 14-хв пост «Hip hinge: синтез кластеру і перехід до присідань — два патерни, один скелет». Block 1101–1150 cluster 1 synthesis (posts 1101–1109) + squat patterns opener. Ключові принципи дев'яти попередніх постів, спільний знаменник hip hinge (управління кутом тазостегнового суглоба під навантаженням), hip hinge vs squat (спільні структури і ключова різниця — кут тулуба і синхронність двох суглобів), параметри squat pattern (нейтральний поперек при вертикалізації, коліна у фронтальній площині, розподіл ваги по стопі, глибина як функція анатомії), анонс кластеру 2 (1111–1119 squat patterns). Cluster 1 COMPLETE (10/10). clinical-safety NOT_REQUIRED · sports-scientist review pending.
+- `blog.html` — blog cards for post-2731 (№ 2731 · Training Methodology · 13 хв · draft · 2026-06-29) and post-1110 (№ 1110 · Biomechanics · 14 хв · draft · 2026-06-29).
+
+### Changed
+- `STATUS.md` — Block 1101–1150 updated 9/50 → 10/50; cluster 1 COMPLETE; cluster 2 IN PROGRESS; next: post-1111 (Goblet squat). Editorial series 2726–2735 updated 5/10 → 6/10; next: post-2732 (ідентичність і коучинг без втрати автономії).
+- `VERSION` — 9.86.2 → 9.87.0.
+
+---
+
 ## [9.86.2] — 2026-06-29
 
 ### Changed
