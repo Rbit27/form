@@ -2913,8 +2913,8 @@ Founder-voice editorial long-reads — 13-хв формат. Тон: editorial-b
 | Post | Topic | Status |
 |---|---|---|
 | 2776 | Два пріоритети одночасно: що відбувається, коли ціль сили конфліктує з ціллю витривалості | proposed · v9.94.0 |
-| 2777 | Коли програмна рекомендація суперечить твоєму відчуттю: що важливіше — план чи сигнал | proposed · v9.94.0 |
-| 2778 | Конкуруючий тиждень: як вибудувати тренування, коли відрядження, хвороба і дедлайн збіглись | proposed · v9.94.0 |
+| 2777 | Коли програмна рекомендація суперечить твоєму відчуттю: що важливіше — план чи сигнал | **draft · v10.1.0 → post-2777-plan-vs-signal-when-recommendation-conflicts-with-feeling.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
+| 2778 | Конкуруючий тиждень: як вибудувати тренування, коли відрядження, хвороба і дедлайн збіглись | **draft · v10.1.0 → post-2778-competing-week-travel-illness-deadline.md** · clinical-safety NOT_REQUIRED · sports-scientist review pending |
 | 2779 | Об'єм vs. інтенсивність: практичний вибір, коли обидва варіанти «правильні» | proposed · v9.94.0 |
 | 2780 | Специфічність vs. загальний розвиток: де self-coached атлет має бути «вузьким» — і де широким | proposed · v9.94.0 |
 | 2781 | Деload vs. продовження: коли «ще один тиждень» — рішення, а коли — помилка | proposed · v9.94.0 |
