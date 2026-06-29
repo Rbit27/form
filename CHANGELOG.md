@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.17.0] — 2026-06-29
+
+### Added
+- `content/post-2838-confirmation-bias-training-journal.md` — Series «Прогрес без ілюзій» 3/10. Confirmation bias у тренувальному журналі: три механізми (selective recording, interpretation bias, memory-based reconstruction) і чотири структурні контрзаходи. Nickerson 1998; MacNamara & Collins 2015; Kahneman peak-end rule. clinical-safety NOT_REQUIRED · sports-scientist review pending.
+- `content/post-2837-better-feeling-vs-better-performing.md` — Series «Прогрес без ілюзій» 2/10. Різниця між суб'єктивним досвідом і продуктивністю: чотири типи розходження, протокол «коли довіряти відчуттю vs. числам». Thibaut et al. 2021 (mental fatigue та силова продуктивність). clinical-safety NOT_REQUIRED · sports-scientist review pending.
+- `blog.html` — cards for posts 2837–2838 added at top of feed.
+
+### Changed
+- `STATUS.md` — Series 2836–2845 progress updated to 3/10; next: posts 2839–2840.
+- `VERSION` — 10.15.0 → 10.17.0.
+
+---
+
 ## [10.15.0] — 2026-06-29
 
 ### Added
