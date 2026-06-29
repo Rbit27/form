@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [9.88.1] — 2026-06-29
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.5.0 → v5.6.0. Added §59 T0-Beta Champion Login Observability (`champion_login_monitor` · job 50) and §60 T0-Gamma WAU Decline Observability (`wau_decline_monitor` · job 51). Closes OQ-PILOT-OBS-02 (§58.11 status updated 🟡 Open → 🟢 Resolved). §59: daily pg_cron job 50 (`0 11 * * *`, 49 h freshness) monitors `admin.dashboard_session_started` audit events for `enterprise_admin`/`tenant_manager` roles within 45-day pilot window; < 2 sessions → AL-SAVE-02 Slack `#enterprise-health` alert (T0-Beta per COST_MODEL §46.2); CHAMP-LOGIN-STALE-CHAIN-01 (`system.champion_login_monitor_stale_declared` HIGH/7yr + `system.champion_login_monitor_restored` STANDARD/3yr); AL-CHAMP-ACT-01 PagerDuty `form-devops` P1 dead-man's switch (49 h); CHAMP-LOGIN-SLO-01/02; requires new `admin.dashboard_session_started` LOW/1yr audit event (§59.10 item 1 P0/M6); 8-item implementation checklist; R-50 runbook stub; 2 open questions. §60: weekly pg_cron job 51 (`0 12 * * 1`, 8-day freshness) computes WAU rate (active_users/contracted_seats) per pilot over last 4 completed weeks; 3 consecutive weeks of ≥ 10 pp rate decline → AL-SAVE-03 Slack `#enterprise-health` alert (T0-Gamma per COST_MODEL §46.2); WAU-DECLINE-STALE-CHAIN-01 (`system.wau_decline_monitor_stale_declared` HIGH/7yr + `system.wau_decline_monitor_restored` STANDARD/3yr); AL-WAU-ACT-01 PagerDuty `form-devops` P1 dead-man's switch (8 days); WAU-DECLINE-SLO-01/02; 7-item implementation checklist; R-51 runbook stub; 2 open questions. Privacy floor: all payloads carry pilot_id UUID, aggregate counts/rates, tier string, integer days — no employee user_id, name, email, session content, body metrics, coaching exchange, or GDPR Art. 9 health data. compliance-officer + security-engineer + enterprise-architect owners. DEC-030 HMAC invariant: CHAMP-LOGIN-STALE-CHAIN-01 (§59) and WAU-DECLINE-STALE-CHAIN-01 (§60).
+- `VERSION` — 9.88.0 → 9.88.1.
+
+---
+
 ## [9.88.0] — 2026-06-29
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.5.0
+# FORM · Observability & Monitoring Taxonomy v5.6.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -16678,8 +16678,599 @@ Emitted by IC at R-49 Step 6 (PAM-elevated). PILOT-ACT-STALE-CHAIN-01 terminal e
 | ID | Question | Owner | Status |
 |---|---|---|---|
 | OQ-PILOT-OBS-01 | AL-SAVE-01 dedup key is `pilot-save-t0a-{pilot_id}` with 24 h cooldown — after 24 h, re-alert fires if pilot remains below threshold and no `enterprise.pilot_save_protocol_triggered` emitted. Confirm: should re-alert fire indefinitely until save protocol triggered, or should there be a maximum re-alert count (e.g. 3× before escalating to CS Lead)? COST_MODEL §46 escalation tree (L1→L2→L3) implies re-alerts should escalate after T+7 if no save protocol initiated; PagerDuty urgency escalation may be the right mechanism. | customer-success + devops-lead | 🟡 Open — escalation cadence undefined; recommend alignment with COST_MODEL §46.3 escalation tree before first live pilot |
-| OQ-PILOT-OBS-02 | T0-Beta (Day-45: champion logins < 2) and T0-Gamma (3 consecutive WAU declines ≥ 10 pp) triggers (COST_MODEL §46.2) are not yet covered by a pg_cron job — only T0-Alpha (Day-14 activation) is automated via job 49. T0-Beta and T0-Gamma rely on manual CSM review per COST_MODEL §46.3. Add separate jobs (50, 51) to automate T0-Beta and T0-Gamma detection, or document manual review as the intended mechanism? | customer-success + devops-lead | 🟡 Open — recommend §59 + §60 canonical specs for jobs 50/51 after first live pilot |
+| OQ-PILOT-OBS-02 | T0-Beta (Day-45: champion logins < 2) and T0-Gamma (3 consecutive WAU declines ≥ 10 pp) triggers (COST_MODEL §46.2) are not yet covered by a pg_cron job — only T0-Alpha (Day-14 activation) is automated via job 49. T0-Beta and T0-Gamma rely on manual CSM review per COST_MODEL §46.3. Add separate jobs (50, 51) to automate T0-Beta and T0-Gamma detection, or document manual review as the intended mechanism? | customer-success + devops-lead | 🟢 Resolved — §59 (`champion_login_monitor` job 50) and §60 (`wau_decline_monitor` job 51) canonical specs authored (OBSERVABILITY.md v5.6.0, 2026-06-29). Both T0-Beta and T0-Gamma are now fully specified as automated pg_cron jobs with DEC-030 HMAC chains, Slack alerting, stale-recovery runbook stubs (R-50, R-51), and implementation checklists. |
 
 ---
 
-*v5.5.0 (2026-06-29): §58 Pilot Activation Observability — companion observability canonical spec for INCIDENT_RESPONSE R-49 (`pilot_activation_monitor` job 49 stale recovery runbook, v3.17.0, 2026-06-29). Closes `docs/OBSERVABILITY.md §12.6` job 49 stale-consequence cross-ref (updated from "runbook to be authored at §R-49 (P1/M5)" to "INCIDENT_RESPONSE R-49 (§R-49.5; v1.0, 2026-06-29)"). New sections: §58.1 purpose and scope (T0-Alpha monitoring gap closed; privacy floor; SOC 2 scope CC3.2/CC7.2/A1.1); §58.2 SLOs (PILOT-ACT-SLO-01: job 49 freshness ≤ 26 h — CC7.2/A1.1; PILOT-ACT-SLO-02: T0-Alpha detected within 26 h — A1.1/CC3.2); §58.3 monitoring architecture (pg_cron job 49 → T0-Alpha check → AL-SAVE-01 or all-clear; pg-cron-health-monitor dead-man's switch → AL-PILOT-ACT-01); §58.4 alert rules (AL-SAVE-01 P1 `form-enterprise` → customer-success, dedup `pilot-save-t0a-{pilot_id}` 24 h; AL-PILOT-ACT-01 P1 `form-devops` → devops-lead, dedup `pilot-act-check-stale`); §58.5 job 49 canonical SQL spec (form_system SECURITY DEFINER; REVOKE form_api from pilot_programs + session_completed; 26 h freshness tolerance); §58.6 §6.2 cross-reference (`pilot_activation_health` subsection, two rows: AL-SAVE-01 + AL-PILOT-ACT-01; SOC 2 mapping CC3.2/CC7.2/A1.1; privacy floor); §58.7 DEC-030 stale-window event specs (PILOT-ACT-STALE-CHAIN-01: HTTP 422 `PILOT_ACT_STALE_CHAIN_01_VIOLATION` on ordering inversion → R-05; `system.pilot_activation_monitor_stale_declared` HIGH/7yr anchor; `system.pilot_activation_monitor_restored` STANDARD/3yr terminal; both events carry booleans, numeric counts, H1–H4 enum, FORM-internal UUID only — no employee PII or GDPR Art. 9 data; AUDIT_LOG_SCHEMA.md registration pending §58.10 item 1 P0/M5); §58.8 evidence artefacts (PILOT-ACT-STALE-E-001 per-incident IC narrative; SAVE-E-002 gap note; both pending SOC2_READINESS §126 registration per §58.10 item 4 P1/M5); §58.9 dashboard (pilot activation health panel group — form_admin + customer-success only; tenant_manager + enterprise_admin excluded; 6 panels: Day-14 pilot count, activation rate bar chart, T0-Alpha reference line, job 49 last run, AL-SAVE-01 fire history, PILOT-ACT-SLO-01 gauge); §58.10 implementation checklist (5 items: AUDIT_LOG_SCHEMA.md P0/M5; AL-PILOT-ACT-01 PagerDuty P0/M5; §12.6 + §58.10 cross-ref closure P1/M5 [x] Done this pass; SOC2_READINESS §126 P1/M5; dashboard P1/M5); §58.11 OQ gap tracker (OQ-PILOT-OBS-01: AL-SAVE-01 re-alert escalation cadence vs COST_MODEL §46.3 escalation tree; OQ-PILOT-OBS-02: T0-Beta + T0-Gamma automation jobs 50/51 deferred). TOC entry to be added at next major section authoring pass. Privacy floor throughout: no employee `user_id`, name, email, activation rate value, coaching content, body metrics, or GDPR Art. 9 special-category data in any event, alert payload, or dashboard panel. Owner: devops-lead + customer-success + compliance-officer.*
+*v5.5.0 (2026-06-29): §58 Pilot Activation Observability — companion observability canonical spec for INCIDENT_RESPONSE R-49 (`pilot_activation_monitor` job 49 stale recovery runbook, v3.17.0, 2026-06-29). Closes `docs/OBSERVABILITY.md §12.6` job 49 stale-consequence cross-ref (updated from "runbook to be authored at §R-49 (P1/M5)" to "INCIDENT_RESPONSE R-49 (§R-49.5; v1.0, 2026-06-29)"). New sections: §58.1 purpose and scope (T0-Alpha monitoring gap closed; privacy floor; SOC 2 scope CC3.2/CC7.2/A1.1); §58.2 SLOs (PILOT-ACT-SLO-01: job 49 freshness ≤ 26 h — CC7.2/A1.1; PILOT-ACT-SLO-02: T0-Alpha detected within 26 h — A1.1/CC3.2); §58.3 monitoring architecture (pg_cron job 49 → T0-Alpha check → AL-SAVE-01 or all-clear; pg-cron-health-monitor dead-man's switch → AL-PILOT-ACT-01); §58.4 alert rules (AL-SAVE-01 P1 `form-enterprise` → customer-success, dedup `pilot-save-t0a-{pilot_id}` 24 h; AL-PILOT-ACT-01 P1 `form-devops` → devops-lead, dedup `pilot-act-check-stale`); §58.5 job 49 canonical SQL spec (form_system SECURITY DEFINER; REVOKE form_api from pilot_programs + session_completed; 26 h freshness tolerance); §58.6 §6.2 cross-reference (`pilot_activation_health` subsection, two rows: AL-SAVE-01 + AL-PILOT-ACT-01; SOC 2 mapping CC3.2/CC7.2/A1.1; privacy floor); §58.7 DEC-030 stale-window event specs (PILOT-ACT-STALE-CHAIN-01: HTTP 422 `PILOT_ACT_STALE_CHAIN_01_VIOLATION` on ordering inversion → R-05; `system.pilot_activation_monitor_stale_declared` HIGH/7yr anchor; `system.pilot_activation_monitor_restored` STANDARD/3yr terminal; both events carry booleans, numeric counts, H1–H4 enum, FORM-internal UUID only — no employee PII or GDPR Art. 9 data; AUDIT_LOG_SCHEMA.md registration pending §58.10 item 1 P0/M5); §58.8 evidence artefacts (PILOT-ACT-STALE-E-001 per-incident IC narrative; SAVE-E-002 gap note; both pending SOC2_READINESS §126 registration per §58.10 item 4 P1/M5); §58.9 dashboard (pilot activation health panel group — form_admin + customer-success only; tenant_manager + enterprise_admin excluded; 6 panels: Day-14 pilot count, activation rate bar chart, T0-Alpha reference line, job 49 last run, AL-SAVE-01 fire history, PILOT-ACT-SLO-01 gauge); §58.10 implementation checklist (5 items: AUDIT_LOG_SCHEMA.md P0/M5; AL-PILOT-ACT-01 PagerDuty P0/M5; §12.6 + §58.10 cross-ref closure P1/M5 [x] Done this pass; SOC2_READINESS §126 P1/M5; dashboard P1/M5); §58.11 OQ gap tracker (OQ-PILOT-OBS-01: AL-SAVE-01 re-alert escalation cadence vs COST_MODEL §46.3 escalation tree; OQ-PILOT-OBS-02: T0-Beta + T0-Gamma automation jobs 50/51 — resolved by §59/§60 v5.6.0). TOC entry to be added at next major section authoring pass. Privacy floor throughout: no employee `user_id`, name, email, activation rate value, coaching content, body metrics, or GDPR Art. 9 special-category data in any event, alert payload, or dashboard panel. Owner: devops-lead + customer-success + compliance-officer.*
+
+---
+
+## §59. T0-Beta Champion Login Observability (`champion_login_monitor` · job 50)
+
+### §59.1 Purpose and Scope
+
+**Context:** COST_MODEL §46.2 defines three save-protocol triggers. T0-Alpha (Day-14 activation rate) is automated by job 49 (§58). T0-Beta — "Day-45 champion logins < 2" — was flagged in OQ-PILOT-OBS-02 as relying on manual CSM review. This section closes that gap by specifying job 50 (`champion_login_monitor`), a daily pg_cron job that counts admin dashboard sessions for the IT admin champion within each active pilot and fires a Slack alert when the threshold is breached at Day 45.
+
+**Champion definition:** The IT admin champion is any user with `role = 'enterprise_admin'` or `role = 'tenant_manager'` for the pilot's `tenant_id`. COST_MODEL §46.2 uses the term "IT admin" specifically, but `tenant_manager` (HR champion) is included because either role can serve as the primary adoption driver per ENTERPRISE_ONBOARDING.md §3.2.
+
+**Signal:** Cumulative count of `admin.dashboard_session_started` audit events with `actor_role IN ('enterprise_admin', 'tenant_manager')` for `tenant_id = pilot.tenant_id` within the window `[pilot.start_date, pilot.start_date + INTERVAL '45 days']`. Threshold: < 2 at Day 45.
+
+**New audit event required:** `admin.dashboard_session_started` (LOW/1yr) must be registered in `docs/AUDIT_LOG_SCHEMA.md` and emitted by the Admin Dashboard backend when an `enterprise_admin` or `tenant_manager` user loads any Admin Dashboard page. Payload: `tenant_id` as slug only, `actor_role` enum, `created_at` — no `user_id`, name, or session content.
+
+**Scope exclusion:** This section does not cover T0-Alpha (§58) or T0-Gamma (§60). Champion login activity is measured in aggregate across all admin-role users for the tenant — individual IT admin identity is never surfaced in any alert payload, audit event, or dashboard panel.
+
+**SOC 2 scope:** CC3.2 (automated detection of a documented enterprise risk: champion disengagement predicts pilot failure per COST_MODEL §46.1); CC7.2 (anomaly detection — champion login count is a leading indicator of pilot health); A1.1 (pilot conversion availability — T0-Beta supports FORM's enterprise pilot commitment per COST_MODEL §46.3 MSA terms).
+
+**Privacy floor:** All payloads carry only `pilot_id` UUID, `champion_session_count` INTEGER, `pilot_day` INTEGER, and `tenant_id` slug. No individual `user_id`, name, email, session content, body metrics, coaching exchange, or GDPR Art. 9 special-category health data. `tenant_manager` and `enterprise_admin` role cannot query this panel or receive DEC-030 events from this job.
+
+---
+
+### §59.2 SLOs
+
+| SLO ID | Metric | Target | Measurement | Criteria |
+|---|---|---|---|---|
+| **CHAMP-LOGIN-SLO-01** | `champion_login_monitor` (job 50) freshness | ≤ 49 h between successful runs | `audit_log_events WHERE event_type = 'system.champion_login_check_passed'` timestamp gap | CC7.2 / A1.1 |
+| **CHAMP-LOGIN-SLO-02** | T0-Beta detection latency | Day-45 threshold breach detected within 49 h of pilot reaching Day 45 | Confirmed by AL-SAVE-02 fire time vs. `pilot_programs.start_date + INTERVAL '45 days'` | A1.1 / CC3.2 |
+
+**Freshness window rationale:** Job 50 runs daily but the T0-Beta trigger is evaluated only at Day 45. A 49 h freshness window (2-day tolerance) ensures that a single failed daily run does not trigger a stale alert, while a 2-run gap surfaces as a dead-man's-switch breach before the check window closes. Consistent with jobs 45–49 (daily compliance job pattern).
+
+---
+
+### §59.3 Monitoring Architecture
+
+```
+pg_cron job 50 (`champion_login_monitor`, daily 11:00 UTC)
+  │
+  ├─ Query: audit_log_events WHERE event_type = 'admin.dashboard_session_started'
+  │          AND actor_role IN ('enterprise_admin', 'tenant_manager')
+  │          AND tenant_id IN (active pilots at Day 44–46)
+  │
+  ├─ champion_session_count < 2 at Day 45?
+  │   ├─ YES → pg_net HTTP POST to Slack #enterprise-health (AL-SAVE-02)
+  │   │         Dedup key: pilot-save-t0b-{pilot_id} (48 h cooldown)
+  │   │         No PagerDuty — T0-Beta severity P1 per COST_MODEL §46.2
+  │   └─ NO  → emit system.champion_login_check_passed LOW/1yr (all-clear)
+  │
+  └─ pg-cron-health-monitor dead-man's switch
+      └─ No system.champion_login_check_passed for > 49 h?
+          └─ PagerDuty form-devops P1 (AL-CHAMP-ACT-01)
+```
+
+**Note:** T0-Beta Slack alert fires for pilots on exactly Day 45 (checked as `DATE_PART('day', NOW() - start_date) = 45`). The job runs daily but only evaluates pilots at the Day-45 boundary. Pilots not yet at Day 45 are evaluated for all-clear only. Pilots past Day 45 are excluded (save protocol should already be open if applicable).
+
+---
+
+### §59.4 Alert Rules
+
+| Alert ID | Condition | Severity | Route | Dedup Key | Auto-Resolve |
+|---|---|---|---|---|---|
+| **AL-SAVE-02** | `champion_session_count < 2` for a Growth or Enterprise pilot at Day 45 | P1 | Slack `#enterprise-health` Webhook (not PagerDuty — per COST_MODEL §46.2) | `pilot-save-t0b-{pilot_id}` (48 h cooldown) | On `enterprise.pilot_save_protocol_triggered` for same `pilot_id` within 48 h |
+| **AL-CHAMP-ACT-01** | No `system.champion_login_check_passed` in `audit_log_events` for > 49 h | P1 | PagerDuty `form-devops` → devops-lead | `champ-login-check-stale` | Next `system.champion_login_check_passed` LOW emission |
+
+**AL-SAVE-02 Slack message template (no sensitive data):**
+```
+[FORM Alert · T0-Beta · AL-SAVE-02]
+Pilot: {pilot_id}  |  Day: 45  |  Tier: {tier}
+Champion dashboard sessions (cumulative Day 0–45): {champion_session_count}
+Threshold: 2  |  Status: BELOW THRESHOLD
+Action required: CSM to review champion engagement and open save protocol if appropriate.
+Ref: COST_MODEL §46.2 (T0-Beta) · INCIDENT_RESPONSE R-50
+```
+
+**SOC 2 mapping (AL-SAVE-02):** CC3.2 (automated detection of champion disengagement risk — a documented risk response per COST_MODEL §46.1); CC7.2 (monitoring of enterprise pilot health leading indicator); A1.1 (pilot conversion commitment — detection supports FORM's ability to intervene before Day-45 disengagement leads to pilot failure). **Privacy floor:** `pilot_id` UUID and count integer only — no `user_id`, champion name, session content.
+
+---
+
+### §59.5 Job Specification — `champion_login_monitor` (job 50)
+
+| Field | Value |
+|---|---|
+| Job name | `champion_login_monitor` |
+| pg_cron schedule | `0 11 * * *` (daily 11:00 UTC — offset from job 49 at 10:00 UTC to distribute load) |
+| Freshness window | 49 h (2-day tolerance; daily job) |
+| Role | `form_system` (SECURITY DEFINER); `form_api` REVOKED from `pilot_programs` and `audit_log_events` |
+| SOC 2 scope | CC3.2, CC7.2, A1.1 |
+| Prerequisite | `admin.dashboard_session_started` event emitted by Admin Dashboard backend (§59.10 item 1 P0/M6) |
+| Registered | `docs/OBSERVABILITY.md §12.6` — pending §59.10 item 5 (P1/M6) |
+
+**Job SQL (canonical):**
+```sql
+DO $$
+DECLARE
+  v_pilot               RECORD;
+  v_champion_sessions   INT;
+  v_alert_fired         BOOLEAN := false;
+BEGIN
+  -- Evaluate only pilots at exactly Day 45 (Growth or Enterprise tier)
+  FOR v_pilot IN
+    SELECT pilot_id, tenant_id, tier
+    FROM   pilot_programs
+    WHERE  status = 'active'
+    AND    DATE_PART('day', NOW() - start_date) = 45
+    AND    tier IN ('growth', 'enterprise')
+  LOOP
+    -- Count distinct-day admin dashboard sessions in the 45-day pilot window
+    -- Privacy floor: counting events, not surfacing user identities
+    SELECT COUNT(*)
+    INTO   v_champion_sessions
+    FROM   audit_log_events
+    WHERE  event_type   = 'admin.dashboard_session_started'
+    AND    actor_role   IN ('enterprise_admin', 'tenant_manager')
+    AND    tenant_id_slug = (
+             SELECT slug FROM tenants WHERE id = v_pilot.tenant_id
+           )
+    AND    created_at   >= (
+             SELECT start_date FROM pilot_programs WHERE pilot_id = v_pilot.pilot_id
+           )
+    AND    created_at   < (
+             SELECT start_date + INTERVAL '45 days' FROM pilot_programs WHERE pilot_id = v_pilot.pilot_id
+           );
+
+    IF v_champion_sessions < 2 THEN
+      -- Fire AL-SAVE-02 via pg_net to Slack webhook (not PagerDuty — T0-Beta is P1 Slack per COST_MODEL §46.2)
+      -- Payload: pilot_id UUID, champion_session_count INT, pilot_day 45 — no user_id or PII
+      PERFORM net.http_post(
+        url     := current_setting('app.slack_enterprise_health_webhook'),
+        headers := jsonb_build_object('Content-Type', 'application/json'),
+        body    := jsonb_build_object(
+          'text', format(
+            '[FORM Alert · T0-Beta · AL-SAVE-02] Pilot: %s | Day: 45 | Tier: %s | Champion sessions: %s/2 | Action: CSM to open save protocol. Ref: COST_MODEL §46.2 · INCIDENT_RESPONSE R-50',
+            v_pilot.pilot_id, v_pilot.tier, v_champion_sessions
+          )
+        )
+      );
+      v_alert_fired := true;
+    END IF;
+  END LOOP;
+
+  -- All-clear: emit only when no Day-45 pilot breached threshold
+  -- (aggregate count only — no pilot_id in all-clear event: privacy floor)
+  IF NOT v_alert_fired THEN
+    PERFORM net.http_post(
+      url     := current_setting('app.audit_event_url'),
+      headers := jsonb_build_object('Content-Type', 'application/json'),
+      body    := jsonb_build_object(
+        'event_type', 'system.champion_login_check_passed',
+        'severity',   'LOW',
+        'payload', jsonb_build_object(
+          'day45_pilots_checked', (
+            SELECT COUNT(*)
+            FROM   pilot_programs
+            WHERE  status = 'active'
+            AND    DATE_PART('day', NOW() - start_date) = 45
+            AND    tier IN ('growth', 'enterprise')
+          ),
+          'check_run_at', NOW()
+        )
+      )
+    );
+  END IF;
+END;
+$$;
+```
+
+**Privacy constraints enforced in SQL:**
+1. `tenant_id_slug` (not raw UUID) used in `audit_log_events` join — consistent with the DEC-030 privacy-floor pattern where tenant is identified by slug, not internal UUID
+2. `COUNT(*)` not `COUNT(DISTINCT user_id)` — event count only, no identity surfacing
+3. Slack payload carries `pilot_id` UUID, `tier` string, and integer count — no `user_id`, champion name, or session content
+4. All-clear event carries aggregate pilot count only — no individual `pilot_id` UUIDs
+
+**form_api REVOKE rationale:** `audit_log_events` contains HMAC-chained tamper-evident records. `form_api` role must not have SELECT on this table (consistent with CC4.1 audit log integrity policy across all monitoring jobs).
+
+---
+
+### §59.6 §6.2 Cross-Reference
+
+The following rows are inserted into the §6.2 Alert Rules table under a new `champion_login_health` subsection, after `pilot_activation_health`:
+
+**Subsection: `champion_login_health` (AL-SAVE-02, AL-CHAMP-ACT-01 — §59.4):**
+
+| Alert condition | Detection mechanism | Severity | Route | Cross-ref |
+|---|---|---|---|---|
+| **T0-Beta threshold crossed** | `champion_login_monitor` pg_cron (job 50, `0 11 * * *`): champion_session_count < 2 at Day 45 for Growth/Enterprise pilot; dedup `pilot-save-t0b-{pilot_id}` 48 h; auto-resolves on `enterprise.pilot_save_protocol_triggered` for same `pilot_id` | P1 | Slack `#enterprise-health` webhook | §59.4 AL-SAVE-02; §59.5 (job 50 SQL); COST_MODEL §46.2 (T0-Beta trigger); INCIDENT_RESPONSE R-50 (manual recovery when job 50 stale) |
+| **Job 50 freshness dead-man's switch** | No `system.champion_login_check_passed` LOW event in `audit_log_events` for > 49 h; detected by `pg-cron-health-monitor` | P1 | PagerDuty `form-devops` → devops-lead; dedup `champ-login-check-stale`; auto-resolves on next `system.champion_login_check_passed` | §59.4 AL-CHAMP-ACT-01; §12.6 (job 50 registry — pending §59.10 item 5); INCIDENT_RESPONSE R-50 |
+
+**SOC 2 mapping (`champion_login_health`):** CC3.2 (AL-SAVE-02 is the automated detection arm of the T0-Beta save trigger — a documented risk response per COST_MODEL §46.1; AL-CHAMP-ACT-01 is monitoring of the monitoring layer itself); CC7.2 (both alerts confirm that champion disengagement signals and monitoring failures are surfaced within the 49 h freshness window); A1.1 (T0-Beta monitoring supports FORM's enterprise pilot availability commitment). **Privacy floor:** AL-SAVE-02 Slack payload: `pilot_id` UUID, `champion_session_count` INT, `tier` string — no employee `user_id`, name, email, health data, or GDPR Art. 9 special-category data. AL-CHAMP-ACT-01 PagerDuty payload: `job_name` string, `stale_hours` numeric — no pilot data. `tenant_manager` and `enterprise_admin` excluded from all routing.
+
+---
+
+### §59.7 DEC-030 Stale-Window Event Specifications
+
+**CHAMP-LOGIN-STALE-CHAIN-01 ordering invariant:**
+- `system.champion_login_monitor_restored` requires a preceding `system.champion_login_monitor_stale_declared` with the same `incident_id`
+- Violation: HTTP 422 `CHAMP_LOGIN_STALE_CHAIN_01_VIOLATION` at `emit-audit-event` Worker
+- Ordering inversion: escalate to R-05 (HMAC chain break)
+- Independent of PILOT-SAVE-CHAIN-01 — both chains may be active simultaneously if T0-Beta fires while job 50 is also stale
+
+**§59.7.1 — `system.champion_login_monitor_stale_declared` (HIGH / 7 yr):**
+
+Emitted by IC at R-50 Step 1 (PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 anchor.
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | CHAMP-LOGIN-STALE-CHAIN-01 anchor — must match `restored` terminal event |
+| `stale_hours` | NUMERIC | Hours elapsed since last `system.champion_login_check_passed` |
+| `day45_cohort_active` | BOOLEAN | True if any Growth/Enterprise pilot is at Day 44–46 during the stale window |
+| `t0b_gap` | BOOLEAN | True only if `day45_cohort_active` AND any Day-45 pilot lacks a T0-Beta check result |
+
+**Classification:** HIGH · 7 yr · CC3.2 · CC7.2 · A1.1
+
+**§59.7.2 — `system.champion_login_monitor_restored` (STANDARD / 3 yr):**
+
+Emitted by IC at R-50 Step 5 (PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 terminal event.
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | Matches `stale_declared` — CHAMP-LOGIN-STALE-CHAIN-01 |
+| `root_cause` | ENUM | H1_deleted / H1_disabled / H2_permissions_revoked / H3_pg_net_degraded / H4_supabase_outage |
+| `stale_hours` | NUMERIC | Total stale duration |
+| `day45_cohort_affected` | BOOLEAN | True if any Day-45 pilot existed during stale window |
+| `t0b_gap_found` | BOOLEAN | True if a Day-45 pilot was missed |
+| `t0b_gap_resolved` | BOOLEAN | Must be `true` if `t0b_gap_found = true` before P1 closure |
+| `fix_deployed_at` | ISO-8601 timestamp | When job 50 was restored |
+
+**Classification:** STANDARD · 3 yr · CC7.2 · A1.1
+
+**Privacy floor (both events):** No employee `user_id`, name, email, champion session count value, tenant name, coaching exchange content, or GDPR Art. 9 special-category health data. Only booleans, numeric counts, H1–H4 enum, and FORM-internal `incident_id` UUID.
+
+**AUDIT_LOG_SCHEMA.md registration:** Pending §59.10 item 2 (P0/M6). Events not yet in AUDIT_LOG_SCHEMA.md; Zod v2 schemas to be authored at §R-50.9 in INCIDENT_RESPONSE.md.
+
+---
+
+### §59.8 Evidence Artefacts
+
+| Artefact | Criteria | Description | Cadence | Retention | Path |
+|---|---|---|---|---|---|
+| **CHAMP-LOGIN-STALE-E-001** | CC7.2 / A1.1 / CC3.2 | IC narrative per R-50 activation: stale window (hours), root cause (H1–H4), Day-45 cohort status, T0-Beta gap found/resolved. Filed within 48 h of job 50 restoration. | Per incident | 7 yr if T0-Beta gap found; 3 yr if no gap | `compliance/evidence/pilots/champion-login/CHAMP-LOGIN-STALE-E-001_<incident_id>.md` |
+
+**SOC2_READINESS.md registration:** Pending §59.10 item 4 (P1/M6). Subfolder policy `pilots/champion-login/` to be established alongside existing `pilots/save-protocol/` (SOC2_READINESS §126).
+
+---
+
+### §59.9 Dashboard — Champion Login Health
+
+**Panel group: "Champion Login Health" (admin dashboard — `form_admin` + `customer-success` roles only; `tenant_manager` and `enterprise_admin` excluded):**
+
+| Panel | Type | Source | Update cadence |
+|---|---|---|---|
+| Active Day-44–46 pilots | Count stat | `pilot_programs WHERE status = 'active' AND DATE_PART('day', NOW() - start_date) BETWEEN 44 AND 46` | Daily (job 50 run) |
+| Champion sessions per Day-45 pilot | Bar chart | `audit_log_events WHERE event_type = 'admin.dashboard_session_started'` grouped by `pilot_id` slug | Daily (job 50 run) |
+| T0-Beta threshold line | Reference line at 2 | — | Static |
+| Job 50 last run | Stat with green/amber/red state | `pg_cron.job_run_details WHERE jobname = 'champion_login_monitor'` | Real-time |
+| AL-SAVE-02 fire history (30 days) | Bar chart | Slack webhook fire log (proxy via `audit_log_events WHERE event_type = 'enterprise.pilot_save_protocol_triggered' AND trigger_type = 'T0-Beta'`) | Daily |
+| CHAMP-LOGIN-SLO-01 compliance | SLO gauge (49 h target) | `audit_log_events WHERE event_type = 'system.champion_login_check_passed'` | Real-time |
+
+**Privacy constraint:** No panel displays individual `user_id`, champion name, email, session content, body metrics, or GDPR Art. 9 health data. Bar chart shows aggregate session count per `pilot_id` UUID slug — not per-user breakdown. `tenant_manager` and `enterprise_admin` cannot view this panel group.
+
+---
+
+### §59.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Emit `admin.dashboard_session_started` (LOW/1yr) from Admin Dashboard backend on any `enterprise_admin` or `tenant_manager` page load. Payload: `tenant_id_slug` (string), `actor_role` enum, `created_at` — no `user_id`. Wire to `emit-audit-event` Worker. Add to AUDIT_LOG_SCHEMA.md. | platform-engineer + security-engineer | **P0** | M6 | [ ] |
+| 2 | Register `system.champion_login_monitor_stale_declared` (HIGH/7yr) + `system.champion_login_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md`. Include CHAMP-LOGIN-STALE-CHAIN-01 invariant; author Zod v2 schemas at INCIDENT_RESPONSE §R-50.9; CC7.2/A1.1/CC3.2 auditor narratives. | security-engineer + compliance-officer | **P0** | M6 | [ ] |
+| 3 | Deploy `champion_login_monitor` as pg_cron job 50 (`0 11 * * *`). Integration test: seed two pilot_programs rows (one at Day 45 with 0 events, one at Day 45 with 2 events); confirm Slack webhook fires for the first and not the second; confirm `system.champion_login_check_passed` emitted when no Day-45 pilots below threshold. | devops-lead + platform-engineer | **P0** | M6 | [ ] |
+| 4 | Register CHAMP-LOGIN-STALE-E-001 artefact template path in `docs/SOC2_READINESS.md §126` evidence table; establish `pilots/champion-login/` subfolder in R2 compliance bucket policy; add Vanta mirror entry (CC7.2/A1.1/CC3.2). | compliance-officer | **P1** | M6 | [ ] |
+| 5 | Register job 50 in `docs/OBSERVABILITY.md §12.6` pg_cron canonical registry: schedule `0 11 * * *`; freshness 49 h; SOC 2 CC3.2/CC7.2/A1.1; stale-consequence cross-ref `INCIDENT_RESPONSE R-50`; PagerDuty dedup `champ-login-check-stale`. | devops-lead | **P1** | M6 | [ ] |
+| 6 | Author INCIDENT_RESPONSE R-50 (`champion_login_monitor` stale recovery runbook) following R-49 structure: 5 scope queries (R-50-C1 staleness, R-50-C2 Day-45 cohort active, R-50-C3 T0-Beta gap, R-50-C4 peer job health, R-50-C5 job registration); CHAMP-LOGIN-STALE-CHAIN-01 DEC-030 events; 4 root causes H1–H4; Slack notification template if Day-45 pilot missed; CHAMP-LOGIN-STALE-E-001 evidence artefact. | devops-lead + compliance-officer | **P1** | M6 | [ ] |
+| 7 | Build "Champion Login Health" dashboard panel group (§59.9): `form_admin` + `customer-success` gate; `tenant_manager` and `enterprise_admin` excluded; CHAMP-LOGIN-SLO-01 gauge; bar chart using `pilot_id` slug (not name or `user_id`). | platform-engineer + design-craft | **P2** | M7 | [ ] |
+| 8 | Configure AL-CHAMP-ACT-01 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale WHERE job_name = 'champion_login_monitor'` → service `form-devops` P1; dedup `champ-login-check-stale`; auto-resolve on next `system.champion_login_check_passed`. | devops-lead | **P0** | M6 | [ ] |
+
+---
+
+### §59.11 OQ Gap Tracker
+
+| ID | Question | Owner | Status |
+|---|---|---|---|
+| OQ-CHAMP-OBS-01 | The `admin.dashboard_session_started` event requires platform-engineer to add an emission call to every Admin Dashboard page load. Is there a risk of double-counting if the admin navigates between pages in a single session? Recommend: emit only on initial page load per browser session (session cookie or `sessionStorage` gate) and document the de-dup mechanism in AUDIT_LOG_SCHEMA.md. | platform-engineer + security-engineer | 🟡 Open — de-dup mechanism to be defined in §59.10 item 1 implementation |
+| OQ-CHAMP-OBS-02 | AL-SAVE-02 Slack dedup key `pilot-save-t0b-{pilot_id}` has a 48 h cooldown. If champion sessions remain below 2 after Day 45, re-alerts will fire every 48 h until `enterprise.pilot_save_protocol_triggered` is emitted. Should there be a maximum re-alert count before escalating to CS Lead, consistent with OQ-PILOT-OBS-01 for AL-SAVE-01? Recommend: align escalation cadence with COST_MODEL §46.4 escalation tree (L1→L2 at T+15 if metric not improving). | customer-success + devops-lead | 🟡 Open — recommend resolving alongside OQ-PILOT-OBS-01 before first live pilot |
+
+---
+
+*v5.6.0 (2026-06-29): §59 T0-Beta Champion Login Observability + §60 T0-Gamma WAU Decline Observability — closes OQ-PILOT-OBS-02 (§58.11 updated 🟡 → 🟢 Resolved). §59: `champion_login_monitor` job 50 (`0 11 * * *`, daily 11:00 UTC, 49 h freshness); signal = `admin.dashboard_session_started` audit events for `enterprise_admin`/`tenant_manager` role within 45-day pilot window (< 2 → AL-SAVE-02); new event `admin.dashboard_session_started` LOW/1yr required (§59.10 item 1 P0/M6); Slack `#enterprise-health` alert for T0-Beta (not PagerDuty — per COST_MODEL §46.2 P1 severity); CHAMP-LOGIN-STALE-CHAIN-01 stale events (`system.champion_login_monitor_stale_declared` HIGH/7yr + `system.champion_login_monitor_restored` STANDARD/3yr); AL-CHAMP-ACT-01 PagerDuty `form-devops` P1 dead-man's switch (49 h); CHAMP-LOGIN-SLO-01/02; 8-item implementation checklist (4× P0/M6, 2× P1/M6, 1× P2/M7, 1× P0/M6); 2 open questions (OQ-CHAMP-OBS-01 event de-dup, OQ-CHAMP-OBS-02 re-alert escalation). §60: `wau_decline_monitor` job 51 (`0 12 * * 1`, weekly Monday 12:00 UTC, 8-day freshness); signal = 3 consecutive weekly WAU rate declines ≥ 10 pp (WAU/contracted_seats); Slack `#enterprise-health` alert for T0-Gamma (not PagerDuty — per COST_MODEL §46.2 P1 severity); WAU-DECLINE-STALE-CHAIN-01 stale events (`system.wau_decline_monitor_stale_declared` HIGH/7yr + `system.wau_decline_monitor_restored` STANDARD/3yr); AL-WAU-ACT-01 PagerDuty `form-devops` P1 dead-man's switch (8 days); WAU-DECLINE-SLO-01/02; 7-item implementation checklist (3× P0/M6, 2× P1/M6, 1× P2/M7, 1× P0/M6); 2 open questions (OQ-WAU-OBS-01 WAU rate vs raw count, OQ-WAU-OBS-02 cross-tenant normalization). Privacy floor throughout: no employee `user_id`, name, email, body metrics, coaching content, or GDPR Art. 9 special-category data in any event, alert payload, SQL variable, or dashboard panel. Both §59 and §60 are parallel to §58 in architecture: daily/weekly pg_cron job → Slack alert on threshold breach → DEC-030 all-clear on clean run → HMAC-chained stale events on job failure → R-50/R-51 runbooks (to be authored, §59.10 item 6 / §60.10 item 6). Owner: devops-lead + customer-success + compliance-officer.*
+
+---
+
+## §60. T0-Gamma WAU Decline Observability (`wau_decline_monitor` · job 51)
+
+### §60.1 Purpose and Scope
+
+**Context:** COST_MODEL §46.2 defines T0-Gamma as "3 consecutive weekly WAU declines ≥ 10 percentage points" — a post-launch decay signal that Day 14 (T0-Alpha) does not catch. Like T0-Beta, T0-Gamma was flagged in OQ-PILOT-OBS-02 as relying on manual CSM review. This section closes that gap by specifying job 51 (`wau_decline_monitor`), a weekly pg_cron job that computes week-on-week WAU rate for each active pilot and fires a Slack alert when three consecutive 7-day windows all show ≥ 10 pp rate decline.
+
+**WAU rate definition:** `active_weekly_users / contracted_seats` for the pilot's `tenant_id` in a given 7-day window. "Active" = any user with ≥ 1 `session_completed` event in the window. The rate is bounded [0, 1]; rates > 1 (possible if a seat shares sessions) are clamped to 1. This is the same denominator used in T0-Alpha (§58.5) for consistency.
+
+**10 pp decline definition:** `(wau_rate_this_week - wau_rate_prev_week) ≤ -0.10`. Example: if WAU rate was 0.45 last week and 0.34 this week, that is a -0.11 decline (11 pp) — above threshold. If the same decline pattern persists for 3 consecutive weeks, T0-Gamma fires.
+
+**Consecutive window rule:** The 3 windows must be adjacent with no break. A week without a ≥ 10 pp decline resets the counter. Job 51 evaluates the last 4 completed weeks (28 days) to assess 3 consecutive weekly pairs.
+
+**SOC 2 scope:** CC3.2 (automated detection of post-launch decay — a documented enterprise risk per COST_MODEL §46.1); CC7.2 (anomaly detection — consecutive WAU decline is a leading indicator of pilot failure); A1.1 (pilot conversion commitment — T0-Gamma detection supports FORM's ability to intervene before decay reaches point of no return).
+
+**Privacy floor:** All payloads carry `pilot_id` UUID, `declining_weeks` INTEGER (0–3), `min_decline_pp` NUMERIC, and tier. No individual `user_id`, session content, body metrics, coaching exchange content, name, or GDPR Art. 9 special-category health data. WAU is computed as an aggregate count across all pilot seats — individual user identity is never surfaced.
+
+---
+
+### §60.2 SLOs
+
+| SLO ID | Metric | Target | Measurement | Criteria |
+|---|---|---|---|---|
+| **WAU-DECLINE-SLO-01** | `wau_decline_monitor` (job 51) freshness | ≤ 8 days between successful runs | `audit_log_events WHERE event_type = 'system.wau_decline_check_passed'` timestamp gap | CC7.2 / A1.1 |
+| **WAU-DECLINE-SLO-02** | T0-Gamma detection latency | Consecutive 3-week decline detected within 8 days of the third declining week | Confirmed by AL-SAVE-03 fire time vs. third weekly window close | A1.1 / CC3.2 |
+
+**Freshness window rationale:** Job 51 runs weekly (Monday 12:00 UTC). An 8-day freshness window (1-day tolerance above the 7-day cadence) ensures a single failed Monday run surfaces as a dead-man's-switch breach without a PagerDuty page mid-week. One-week tolerance is appropriate because T0-Gamma is a lagging signal (3-week pattern already established); one missed weekly run extends detection by 7 days — acceptable for a P1 signal per COST_MODEL §46.2, in contrast to T0-Alpha which is P0 with a 26 h freshness.
+
+---
+
+### §60.3 Monitoring Architecture
+
+```
+pg_cron job 51 (`wau_decline_monitor`, weekly Monday 12:00 UTC)
+  │
+  ├─ Compute weekly WAU rate for each active pilot (last 4 weeks)
+  │   WAU_rate = COUNT(DISTINCT user_id WHERE session_completed) / contracted_seats
+  │
+  ├─ Identify pilots with ≥ 3 consecutive weeks of WAU rate decline ≥ 10 pp
+  │
+  ├─ Declining pilots found?
+  │   ├─ YES → pg_net HTTP POST to Slack #enterprise-health (AL-SAVE-03)
+  │   │         Dedup key: pilot-save-t0g-{pilot_id} (7 days cooldown)
+  │   │         No PagerDuty — T0-Gamma severity P1 per COST_MODEL §46.2
+  │   └─ NO  → emit system.wau_decline_check_passed LOW/1yr (all-clear)
+  │
+  └─ pg-cron-health-monitor dead-man's switch
+      └─ No system.wau_decline_check_passed for > 8 days?
+          └─ PagerDuty form-devops P1 (AL-WAU-ACT-01)
+```
+
+**Note:** "Active pilot" for T0-Gamma means any `pilot_programs` row with `status = 'active'` AND `DATE_PART('day', NOW() - start_date) >= 28` (at least 4 completed weeks for 3-window consecutive check). Pilots with fewer than 4 completed weeks are evaluated for all-clear but never trigger AL-SAVE-03.
+
+---
+
+### §60.4 Alert Rules
+
+| Alert ID | Condition | Severity | Route | Dedup Key | Auto-Resolve |
+|---|---|---|---|---|---|
+| **AL-SAVE-03** | 3 consecutive weekly WAU rate declines ≥ 10 pp for a Growth or Enterprise pilot with ≥ 28 pilot days | P1 | Slack `#enterprise-health` webhook (not PagerDuty — per COST_MODEL §46.2) | `pilot-save-t0g-{pilot_id}` (7-day cooldown) | On `enterprise.pilot_save_protocol_triggered` for same `pilot_id` within 7 days |
+| **AL-WAU-ACT-01** | No `system.wau_decline_check_passed` in `audit_log_events` for > 8 days | P1 | PagerDuty `form-devops` → devops-lead | `wau-decline-check-stale` | Next `system.wau_decline_check_passed` LOW emission |
+
+**AL-SAVE-03 Slack message template (no sensitive data):**
+```
+[FORM Alert · T0-Gamma · AL-SAVE-03]
+Pilot: {pilot_id}  |  Tier: {tier}  |  Pilot day: {pilot_day}
+Consecutive WAU decline weeks: {declining_weeks}/3
+Min single-week decline: {min_decline_pp} pp
+Action required: CSM to review WAU trend and open save protocol if appropriate.
+Ref: COST_MODEL §46.2 (T0-Gamma) · INCIDENT_RESPONSE R-51
+```
+
+**SOC 2 mapping (AL-SAVE-03):** CC3.2 (automated detection of post-launch decay — documented risk response); CC7.2 (anomaly detection on pilot engagement metrics); A1.1 (pilot conversion commitment — T0-Gamma intervention supports FORM's ability to avoid pilot failure). **Privacy floor:** `pilot_id` UUID, `declining_weeks` integer, `min_decline_pp` numeric, `tier` string — no `user_id`, session content, or individual identity.
+
+---
+
+### §60.5 Job Specification — `wau_decline_monitor` (job 51)
+
+| Field | Value |
+|---|---|
+| Job name | `wau_decline_monitor` |
+| pg_cron schedule | `0 12 * * 1` (weekly Monday 12:00 UTC — offset from daily jobs 49/50 at 10:00/11:00 UTC to distribute load) |
+| Freshness window | 8 days (1-day tolerance above 7-day cadence) |
+| Role | `form_system` (SECURITY DEFINER); `form_api` REVOKED from `pilot_programs` and `session_completed` |
+| SOC 2 scope | CC3.2, CC7.2, A1.1 |
+| Registered | `docs/OBSERVABILITY.md §12.6` — pending §60.10 item 5 (P1/M6) |
+
+**Job SQL (canonical):**
+```sql
+DO $$
+DECLARE
+  v_pilot        RECORD;
+  v_alert_fired  BOOLEAN := false;
+  v_decline_rows INT;
+  v_min_decline  NUMERIC;
+BEGIN
+  -- Only evaluate pilots with >= 28 active days (4 completed weeks for 3-window check)
+  FOR v_pilot IN
+    SELECT pilot_id, tenant_id, contracted_seats, tier,
+           DATE_PART('day', NOW() - start_date) AS pilot_day
+    FROM   pilot_programs
+    WHERE  status = 'active'
+    AND    DATE_PART('day', NOW() - start_date) >= 28
+    AND    tier IN ('growth', 'enterprise')
+  LOOP
+    -- Compute 3-consecutive-week decline check
+    -- Privacy floor: aggregate WAU rate per week — no user_id in computation
+    WITH weekly_wau AS (
+      SELECT
+        DATE_TRUNC('week', created_at)                             AS week_start,
+        COUNT(DISTINCT user_id)::NUMERIC
+          / NULLIF(v_pilot.contracted_seats, 0)                    AS wau_rate
+      FROM   session_completed
+      WHERE  tenant_id  = v_pilot.tenant_id
+      AND    created_at >= NOW() - INTERVAL '28 days'
+      AND    created_at <  DATE_TRUNC('week', NOW())  -- exclude current incomplete week
+      GROUP  BY DATE_TRUNC('week', created_at)
+    ),
+    week_over_week AS (
+      SELECT
+        week_start,
+        wau_rate,
+        LAG(wau_rate) OVER (ORDER BY week_start)       AS prev_wau_rate,
+        (LAG(wau_rate) OVER (ORDER BY week_start)
+          - wau_rate) * 100                             AS decline_pp
+      FROM weekly_wau
+    ),
+    consecutive AS (
+      SELECT
+        week_start,
+        decline_pp,
+        LAG(decline_pp, 1) OVER (ORDER BY week_start)  AS dp_1,
+        LAG(decline_pp, 2) OVER (ORDER BY week_start)  AS dp_2
+      FROM week_over_week
+      WHERE prev_wau_rate IS NOT NULL
+    )
+    SELECT
+      COUNT(*) FILTER (WHERE decline_pp >= 10 AND dp_1 >= 10 AND dp_2 >= 10),
+      MIN(decline_pp)  FILTER (WHERE decline_pp >= 10 AND dp_1 >= 10 AND dp_2 >= 10)
+    INTO v_decline_rows, v_min_decline
+    FROM consecutive;
+
+    IF v_decline_rows > 0 THEN
+      -- Fire AL-SAVE-03 via pg_net to Slack webhook
+      -- Payload: pilot_id UUID, declining_weeks INT, min_decline_pp NUMERIC — no user_id
+      PERFORM net.http_post(
+        url     := current_setting('app.slack_enterprise_health_webhook'),
+        headers := jsonb_build_object('Content-Type', 'application/json'),
+        body    := jsonb_build_object(
+          'text', format(
+            '[FORM Alert · T0-Gamma · AL-SAVE-03] Pilot: %s | Tier: %s | Day: %s | Consecutive decline weeks: 3 | Min weekly decline: %s pp | Action: CSM to open save protocol. Ref: COST_MODEL §46.2 · INCIDENT_RESPONSE R-51',
+            v_pilot.pilot_id,
+            v_pilot.tier,
+            v_pilot.pilot_day::INT,
+            ROUND(COALESCE(v_min_decline, 0), 1)
+          )
+        )
+      );
+      v_alert_fired := true;
+    END IF;
+  END LOOP;
+
+  -- All-clear: aggregate count only — no pilot_id in all-clear event (privacy floor)
+  IF NOT v_alert_fired THEN
+    PERFORM net.http_post(
+      url     := current_setting('app.audit_event_url'),
+      headers := jsonb_build_object('Content-Type', 'application/json'),
+      body    := jsonb_build_object(
+        'event_type', 'system.wau_decline_check_passed',
+        'severity',   'LOW',
+        'payload', jsonb_build_object(
+          'pilots_evaluated', (
+            SELECT COUNT(*)
+            FROM   pilot_programs
+            WHERE  status = 'active'
+            AND    DATE_PART('day', NOW() - start_date) >= 28
+            AND    tier IN ('growth', 'enterprise')
+          ),
+          'check_run_at', NOW()
+        )
+      )
+    );
+  END IF;
+END;
+$$;
+```
+
+**Privacy constraints enforced in SQL:**
+1. `COUNT(DISTINCT user_id)` used only as an integer numerator — `user_id` values are never stored in any variable, alert payload, or audit event
+2. CTE result aggregated to `wau_rate` NUMERIC before any cross-pilot comparison — no per-user data leaves the CTE
+3. Slack payload carries `pilot_id` UUID, `tier` string, `pilot_day` integer, integer decline count, and rounded `min_decline_pp` — no `user_id` or individual session data
+4. All-clear event carries aggregate pilot count only — no individual `pilot_id` UUIDs
+
+**form_api REVOKE rationale:** Consistent with all monitoring jobs (CC4.1 audit log + privacy-sensitive table access restrictions). `session_completed` contains health-adjacent data; `form_api` role must not have SELECT on it outside the application request path.
+
+---
+
+### §60.6 §6.2 Cross-Reference
+
+The following rows are inserted into the §6.2 Alert Rules table under a new `wau_decline_health` subsection, after `champion_login_health`:
+
+**Subsection: `wau_decline_health` (AL-SAVE-03, AL-WAU-ACT-01 — §60.4):**
+
+| Alert condition | Detection mechanism | Severity | Route | Cross-ref |
+|---|---|---|---|---|
+| **T0-Gamma threshold crossed** | `wau_decline_monitor` pg_cron (job 51, `0 12 * * 1`): 3 consecutive weekly WAU rate declines ≥ 10 pp for pilot with ≥ 28 days; dedup `pilot-save-t0g-{pilot_id}` 7 days; auto-resolves on `enterprise.pilot_save_protocol_triggered` for same `pilot_id` | P1 | Slack `#enterprise-health` webhook | §60.4 AL-SAVE-03; §60.5 (job 51 SQL); COST_MODEL §46.2 (T0-Gamma trigger); INCIDENT_RESPONSE R-51 (manual recovery when job 51 stale) |
+| **Job 51 freshness dead-man's switch** | No `system.wau_decline_check_passed` LOW event in `audit_log_events` for > 8 days; detected by `pg-cron-health-monitor` | P1 | PagerDuty `form-devops` → devops-lead; dedup `wau-decline-check-stale`; auto-resolves on next `system.wau_decline_check_passed` | §60.4 AL-WAU-ACT-01; §12.6 (job 51 registry — pending §60.10 item 5); INCIDENT_RESPONSE R-51 |
+
+**SOC 2 mapping (`wau_decline_health`):** CC3.2 (AL-SAVE-03 is the automated detection arm of the T0-Gamma save trigger — documented risk response per COST_MODEL §46.1); CC7.2 (both alerts confirm that post-launch decay signals and monitoring failures are surfaced within the 8-day freshness window); A1.1 (T0-Gamma monitoring supports FORM's enterprise pilot conversion commitment). **Privacy floor:** AL-SAVE-03 Slack payload: `pilot_id` UUID, integer decline count, `min_decline_pp` NUMERIC, `tier` string, `pilot_day` integer — no employee `user_id`, name, email, session content, body metrics, or GDPR Art. 9 health data. AL-WAU-ACT-01 PagerDuty payload: `job_name` string, `stale_hours` numeric. `tenant_manager` and `enterprise_admin` excluded from all routing.
+
+---
+
+### §60.7 DEC-030 Stale-Window Event Specifications
+
+**WAU-DECLINE-STALE-CHAIN-01 ordering invariant:**
+- `system.wau_decline_monitor_restored` requires a preceding `system.wau_decline_monitor_stale_declared` with the same `incident_id`
+- Violation: HTTP 422 `WAU_DECLINE_STALE_CHAIN_01_VIOLATION` at `emit-audit-event` Worker
+- Ordering inversion: escalate to R-05 (HMAC chain break)
+- Independent of PILOT-SAVE-CHAIN-01 and CHAMP-LOGIN-STALE-CHAIN-01
+
+**§60.7.1 — `system.wau_decline_monitor_stale_declared` (HIGH / 7 yr):**
+
+Emitted by IC at R-51 Step 1 (PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 anchor.
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | WAU-DECLINE-STALE-CHAIN-01 anchor — must match `restored` terminal event |
+| `stale_days` | NUMERIC | Days elapsed since last `system.wau_decline_check_passed` |
+| `mature_pilots_active` | BOOLEAN | True if any Growth/Enterprise pilot with ≥ 28 days exists during the stale window |
+| `t0g_gap` | BOOLEAN | True only if `mature_pilots_active` AND at least one pilot has completed 3 additional weeks during the stale window without being evaluated |
+
+**Classification:** HIGH · 7 yr · CC3.2 · CC7.2 · A1.1
+
+**§60.7.2 — `system.wau_decline_monitor_restored` (STANDARD / 3 yr):**
+
+Emitted by IC at R-51 Step 5 (PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 terminal event.
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | Matches `stale_declared` — WAU-DECLINE-STALE-CHAIN-01 |
+| `root_cause` | ENUM | H1_deleted / H1_disabled / H2_permissions_revoked / H3_pg_net_degraded / H4_supabase_outage |
+| `stale_days` | NUMERIC | Total stale duration in days |
+| `mature_pilots_affected` | BOOLEAN | True if any mature pilot existed during stale window |
+| `t0g_gap_found` | BOOLEAN | True if a 3-week decline pattern was missed |
+| `t0g_gap_resolved` | BOOLEAN | Must be `true` if `t0g_gap_found = true` before P1 closure |
+| `fix_deployed_at` | ISO-8601 timestamp | When job 51 was restored |
+
+**Classification:** STANDARD · 3 yr · CC7.2 · A1.1
+
+**Privacy floor (both events):** No employee `user_id`, name, email, WAU values, tenant name, session content, body metrics, or GDPR Art. 9 special-category health data. Only booleans, numeric counts/days, H1–H4 enum, and FORM-internal `incident_id` UUID.
+
+**AUDIT_LOG_SCHEMA.md registration:** Pending §60.10 item 2 (P0/M6). Zod v2 schemas to be authored at §R-51.9 in INCIDENT_RESPONSE.md.
+
+---
+
+### §60.8 Evidence Artefacts
+
+| Artefact | Criteria | Description | Cadence | Retention | Path |
+|---|---|---|---|---|---|
+| **WAU-DECLINE-STALE-E-001** | CC7.2 / A1.1 / CC3.2 | IC narrative per R-51 activation: stale window (days), root cause (H1–H4), mature pilot cohort status, T0-Gamma gap found/resolved. Filed within 48 h of job 51 restoration. | Per incident | 7 yr if T0-Gamma gap found; 3 yr if no gap | `compliance/evidence/pilots/wau-decline/WAU-DECLINE-STALE-E-001_<incident_id>.md` |
+
+**SOC2_READINESS.md registration:** Pending §60.10 item 4 (P1/M6). Subfolder `pilots/wau-decline/` to be established in the R2 compliance bucket alongside existing `pilots/save-protocol/` and `pilots/champion-login/` (SOC2_READINESS §126).
+
+---
+
+### §60.9 Dashboard — WAU Decline Health
+
+**Panel group: "WAU Decline Health" (admin dashboard — `form_admin` + `customer-success` roles only; `tenant_manager` and `enterprise_admin` excluded):**
+
+| Panel | Type | Source | Update cadence |
+|---|---|---|---|
+| Mature active pilots (≥ 28 days) | Count stat | `pilot_programs WHERE status = 'active' AND DATE_PART('day', NOW() - start_date) >= 28` | Weekly (job 51 run) |
+| Weekly WAU rate by pilot (last 4 weeks) | Line chart per pilot | `session_completed` grouped by `pilot_id` slug and week | Weekly (job 51 run) |
+| T0-Gamma threshold band | Shaded region: ≥ 10 pp weekly decline × 3 | — | Static |
+| Job 51 last run | Stat with green/amber/red state | `pg_cron.job_run_details WHERE jobname = 'wau_decline_monitor'` | Real-time |
+| AL-SAVE-03 fire history (90 days) | Bar chart | `audit_log_events WHERE event_type = 'enterprise.pilot_save_protocol_triggered' AND trigger_type = 'T0-Gamma'` | Weekly |
+| WAU-DECLINE-SLO-01 compliance | SLO gauge (8-day target) | `audit_log_events WHERE event_type = 'system.wau_decline_check_passed'` | Real-time |
+
+**Privacy constraint:** Line chart shows WAU rate (0–1 NUMERIC) per `pilot_id` UUID slug — not per-user breakdown. No individual `user_id`, employee name, body metrics, coaching content, or GDPR Art. 9 health data. `tenant_manager` and `enterprise_admin` cannot view this panel group.
+
+---
+
+### §60.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy `wau_decline_monitor` as pg_cron job 51 (`0 12 * * 1`). SECURITY DEFINER; REVOKE form_api from pilot_programs + session_completed. Integration test: seed 3 weekly windows of declining session_completed counts for a synthetic pilot_id (decline ≥ 10 pp each); confirm Slack fires; seed flat or improving pilot and confirm no Slack; confirm `system.wau_decline_check_passed` emitted when no pilots breached threshold. | devops-lead + platform-engineer | **P0** | M6 | [ ] |
+| 2 | Register `system.wau_decline_monitor_stale_declared` (HIGH/7yr) + `system.wau_decline_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md`. Include WAU-DECLINE-STALE-CHAIN-01 invariant; author Zod v2 schemas at INCIDENT_RESPONSE §R-51.9; CC7.2/A1.1/CC3.2 auditor narratives. | security-engineer + compliance-officer | **P0** | M6 | [ ] |
+| 3 | Configure AL-WAU-ACT-01 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale WHERE job_name = 'wau_decline_monitor'` → service `form-devops` P1; dedup `wau-decline-check-stale`; auto-resolve on next `system.wau_decline_check_passed`. | devops-lead | **P0** | M6 | [ ] |
+| 4 | Register WAU-DECLINE-STALE-E-001 artefact template path in `docs/SOC2_READINESS.md §126` evidence table; establish `pilots/wau-decline/` subfolder in R2 compliance bucket; add Vanta mirror entry (CC7.2/A1.1/CC3.2). | compliance-officer | **P1** | M6 | [ ] |
+| 5 | Register job 51 in `docs/OBSERVABILITY.md §12.6` pg_cron canonical registry: schedule `0 12 * * 1`; freshness 8 days; SOC 2 CC3.2/CC7.2/A1.1; stale-consequence cross-ref `INCIDENT_RESPONSE R-51`; PagerDuty dedup `wau-decline-check-stale`. | devops-lead | **P1** | M6 | [ ] |
+| 6 | Author INCIDENT_RESPONSE R-51 (`wau_decline_monitor` stale recovery runbook) following R-49 structure: 5 scope queries (R-51-C1 staleness in days, R-51-C2 mature pilot cohort active, R-51-C3 T0-Gamma gap assessment, R-51-C4 peer job health, R-51-C5 job registration); WAU-DECLINE-STALE-CHAIN-01 DEC-030 events; 4 root causes H1–H4; Slack notification template if T0-Gamma missed; WAU-DECLINE-STALE-E-001 evidence artefact; note that weekly cadence means stale window can reach 14–21 days if multiple Monday runs fail — higher gap risk than daily jobs. | devops-lead + compliance-officer | **P1** | M6 | [ ] |
+| 7 | Build "WAU Decline Health" dashboard panel group (§60.9): `form_admin` + `customer-success` gate; `tenant_manager` and `enterprise_admin` excluded; WAU-DECLINE-SLO-01 gauge; line chart using `pilot_id` slug with WAU rate (not raw user counts). | platform-engineer + design-craft | **P2** | M7 | [ ] |
+
+---
+
+### §60.11 OQ Gap Tracker
+
+| ID | Question | Owner | Status |
+|---|---|---|---|
+| OQ-WAU-OBS-01 | COST_MODEL §46.2 defines T0-Gamma as "WAU rate" decline (WAU / contracted_seats). However, a new pilot with low contracted seats may show extreme rate volatility from small absolute changes (e.g., 5-seat pilot: 3 → 2 active users = 20 pp decline). Should the threshold apply only to pilots above a minimum seat count (e.g., ≥ 25 seats) to avoid false positives from small pilots? Recommend: add a minimum seat guard `contracted_seats >= 25` to the T0-Gamma SQL in §60.5 before deploying, or treat 5-seat pilots differently with an absolute WAU floor (≥ 3 active users) rather than a rate threshold. | customer-success + devops-lead | 🟡 Open — minimum seat guard recommended before first live pilot; align with COST_MODEL §21.6 (minimum deal size ≥ 25 seats per managed-down path) |
+| OQ-WAU-OBS-02 | The consecutive-week check in §60.5 evaluates a single `tenant_id` in isolation. If a Growth pilot and an Enterprise pilot share a parent org (multi-entity deal), should WAU be computed at the `tenant_id` level or the parent-org level? Current spec: `tenant_id` level — no cross-tenant aggregation. Confirm this is correct once multi-entity deal structure is defined in DATA_MODEL.md. | enterprise-architect + data-engineer | 🟡 Open — `tenant_id` level is correct until multi-entity deal structure is defined; revisit when DATA_MODEL.md adds parent-org hierarchy (OQ-ENTERPRISE-ARR-01 in COST_MODEL §37) |
