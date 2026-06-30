@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.58.0** — 2026-06-30 · post-2885 · «Мінімальна ефективна доза як система: від разового інструменту до постійного принципу тренування» · series «Мінімальна ефективна доза» 2876–2885 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2885 · next: series 2886–2895 «Прогресивне навантаження: механіка, варіанти, помилки» (proposed) OR enterprise priority
+
 **v10.57.0** — 2026-06-30 · post-2884 · «Коли зменшувати: ознаки того, що поточний обсяг перевищує відновлювальну здатність» · series «Мінімальна ефективна доза» 2876–2885 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2884 · next: post-2885 («Мінімальна ефективна доза як система: від разового інструменту до постійного принципу тренування»)
 
 **v10.56.0** — 2026-06-30 · post-2883 · «Ознаки, що "мінімум" став занадто малим: коли треба розширюватись» · series «Мінімальна ефективна доза» 2876–2885 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2883 · next: post-2884 («Коли зменшувати: ознаки того, що поточний обсяг перевищує відновлювальну здатність»)
