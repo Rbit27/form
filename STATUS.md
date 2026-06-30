@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.32.0** — 2026-06-30 · post 2859 · Series 2856–2865 «Повернення після паузи» 4/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for 2859 · Series 2876–2885 «Мінімалістичне тренування» proposed in roadmap · README: posts 2857–2859 updated to draft
+**v10.33.0** — 2026-06-30 · post 2860 · Series 2856–2865 «Повернення після паузи» 5/10 · clinical-safety CONDITIONAL PASS · sports-scientist review pending · blog.html card added for 2860 · README: post-2860 updated to draft
 
 ---
 

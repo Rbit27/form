@@ -3035,7 +3035,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: рішення
 | 2857 | Перший тиждень повернення: протокол, а не компенсація | **draft · v10.31.0 → post-2857-first-week-back-protocol-not-compensation.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
 | 2858 | Рекалібрація RPE після паузи: чому твоя внутрішня шкала збилась | **draft · v10.31.0 → post-2858-rpe-recalibration-after-break.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
 | 2859 | «Надолужити»: чому компенсаційна логіка руйнує повернення до тренувань | **draft · v10.32.0 → post-2859-catch-up-logic-destroys-return.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
-| 2860 | Повернення після хвороби: окремий протокол, окрема логіка | proposed · v10.26.0 |
+| 2860 | Повернення після хвороби: окремий протокол, окрема логіка | **draft · v10.33.0 → post-2860-return-after-illness-separate-protocol.md · clinical-safety CONDITIONAL PASS · sports-scientist review pending** |
 | 2861 | Повернення після травми: де тренер, де лікар і де межа | proposed · v10.26.0 |
 | 2862 | «Надолужити» — чому ця рамка знищує повернення | proposed · v10.26.0 |
 | 2863 | Як адаптувати програму на час повернення: тижень 1, тижень 2, тижень 3 | proposed · v10.26.0 |
