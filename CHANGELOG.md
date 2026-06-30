@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [10.30.1] — 2026-06-30
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.9.1 → v5.9.2 — §12.6 job 52 cross-reference sync patch. `admin_wellness_mv_refresh` (job 52) registry entry cross-ref updated: "INCIDENT_RESPONSE R-52 (stale recovery runbook — §62.9 item 4; pending)" → "INCIDENT_RESPONSE R-52 (§R-52; v1.0, 2026-06-29)". R-52 was authored 2026-06-29 and §62.9 item 4 marked [x] Done; the v5.9.1 patch updated jobs 53–54 but left the job 52 "pending" stale. v5.9.0 footer corrected: SOC2_READINESS registration updated §129 → §130 (actual registration was §130, 2026-06-29); §62.9 P1/M7 items annotated resolved.
+- `VERSION` — 10.30.0 → 10.30.1.
+
 ## [10.30.0] — 2026-06-30
 
 ### Added
