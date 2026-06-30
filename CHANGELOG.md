@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [10.21.0] — 2026-06-30
+
+### Added
+- `content/post-2842-regression-to-the-mean-training.md` — Series «Прогрес без ілюзій» 2836–2845, post 7/10. Регресія до середнього (Galton, 1886): кожен тренувальний результат = справжня продуктивність + варіативність. PR — момент збігу обох у плюс; нижча наступна сесія — статистична норма, не деградація. Три помилки: оцінка тренду за двома точками, пошук причини де її немає, зміна програми на нормальній варіативності. Правило: ковзне середнє, не пік. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-2843-short-term-goals-self-coached-athlete.md` — Series «Прогрес без ілюзій» 2836–2845, post 8/10. Три рівні цілей: процесна (тижневий горизонт, під повним контролем), блокова (6–8 тижнів з моментом вимірювання після деловантаження), стратегічна (12–24 місяці). Чому «PR до кінця місяця» спотворює рішення в середині блоку — рівно коли рішення найбільш деструктивні. Banister fitness-fatigue (1975) і момент найгіршого рішення. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-2844-invisible-progress-neural-adaptations.md` — Series «Прогрес без ілюзій» 2836–2845, post 9/10. Форми прогресу, що не відображаються в e1RM: нейральні адаптації (рекрутування моторних одиниць, rate coding, координація — Sale 1988, Enoka 2002), технічна адаптація (нейральний актив, невидимий без відео), відновна ємність (зростання тоннажної витривалості). Протокол: RPE на субмаксимальних вагах, відеоаналіз, тоннажна динаміка. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-2845-progress-measurement-framework-synthesis.md` — Series «Прогрес без ілюзій» 2836–2845, post 10/10 · SERIES FINALE. Синтез дев'яти ідей серії. П'ять питань після кожного блоку: силова адаптація (e1RM post-deload), відповідність процесу програмі, технічна якість (відео), невидимий прогрес, зовнішні фактори. Як виглядає рік через цю рамку — від базової лінії до персонального калібраційного профілю. Три конкретні дії після прочитання. SERIES 2836–2845 COMPLETE. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — posts 2842–2845 added at top of feed.
+
+### Changed
+- `STATUS.md` — Series 2836–2845 progress updated to 10/10 COMPLETE; next series 2846–2855 «Рішення під тиском» confirmed as next.
+- `VERSION` — 10.20.1 → 10.21.0.
+
+---
+
 ## [10.20.1] — 2026-06-29
 
 ### Changed
