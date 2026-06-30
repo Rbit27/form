@@ -6,7 +6,9 @@
 
 ## Current version
 
-**v10.58.0** — 2026-06-30 · post-2885 · «Мінімальна ефективна доза як система: від разового інструменту до постійного принципу тренування» · series «Мінімальна ефективна доза» 2876–2885 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2885 · next: series 2886–2895 «Прогресивне навантаження: механіка, варіанти, помилки» (proposed) OR enterprise priority
+**v10.59.0** — 2026-06-30 · post-2886 · «Як читати власну прогресію: від запису до висновку за 10 хвилин» · series «Тренувальний інтелект» 2886–2895 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2886 · README roadmap extended to 2965 (3 нові серії: 2936–2945, 2946–2955, 2956–2965) · next: post-2887 («Сигнал і шум у тренувальних даних: як відрізнити реальний тренд від ситуаційної варіабельності»)
+
+**v10.58.0** — 2026-06-30 · post-2885 · «Мінімальна ефективна доза як система: від разового інструменту до постійного принципу тренування» · series «Мінімальна ефективна доза» 2876–2885 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2885 · next: series 2886–2895 «Тренувальний інтелект»
 
 **v10.57.0** — 2026-06-30 · post-2884 · «Коли зменшувати: ознаки того, що поточний обсяг перевищує відновлювальну здатність» · series «Мінімальна ефективна доза» 2876–2885 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2884 · next: post-2885 («Мінімальна ефективна доза як система: від разового інструменту до постійного принципу тренування»)
 
