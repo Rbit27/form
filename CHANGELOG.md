@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.23.0] — 2026-06-30
+
+### Added
+- `content/post-2847-program-fits-or-you-dont-follow-it.md` — Series «Рішення під тиском» 2846–2855, post 2/10. Атрибуційна помилка в тренуванні: чому «програма не підходить» є психологічно зручнішим поясненням, ніж «я не виконую програму». Що таке «виконання програми» у вимірюваних критеріях: частота, обсяг, інтенсивність, прогресія — а не суб'єктивне відчуття «я ходив». Три діагностичних запитання. Що таке program hopping і чому це проблема виконання, що маскується під проблему вибору. MEV–MAV–MRV (Israetel et al.) як рамка для оцінки обсягу при повному виконанні. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2847 card added at top of feed.
+
+### Changed
+- `STATUS.md` — Series 2846–2855 updated: post-2847 written, 2/10. Next: 2848.
+- `VERSION` — 10.22.1 → 10.23.0.
+
+---
+
 ## [10.22.1] — 2026-06-30
 
 ### Changed
