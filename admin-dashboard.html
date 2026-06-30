@@ -67,6 +67,32 @@
   .hmac-tag { font-family:'JetBrains Mono',monospace; font-size:10px; color:#6F6A60; background:#0B0A07; padding:2px 6px; border-radius:4px; border:1px solid #1F1D16; }
   .chain-ok { color:#DDFF2D; }
   .section-divider { height:1px; background:#1F1D16; margin:32px 0; }
+
+  /* ── Stale-data banner · DATA_MODEL §17 "stale banner at > 26h" · OBSERVABILITY §62.8 · INCIDENT_RESPONSE R-52 ── */
+  .stale-banner {
+    border-radius: 12px; padding: 14px 20px; margin-bottom: 20px;
+    display: none; align-items: center; gap: 14px;
+  }
+  .stale-banner.visible { display: flex; }
+  .stale-banner.warn { background: rgba(251,191,36,0.07); border: 1px solid rgba(251,191,36,0.28); }
+  .stale-banner.crit { background: rgba(255,87,51,0.07); border: 1px solid rgba(255,87,51,0.32); }
+  .stale-views { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
+  .stale-view-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.12em;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 9999px;
+  }
+  .stale-view-tag.warn { background: rgba(251,191,36,0.12); color: #FBBF24; border: 1px solid rgba(251,191,36,0.3); }
+  .stale-view-tag.crit { background: rgba(255,87,51,0.12); color: #FF5733; border: 1px solid rgba(255,87,51,0.3); }
+  .stale-demo-strip {
+    position: fixed; bottom: 16px; right: 16px; z-index: 900;
+    background: #13110C; border: 1px solid #2A2820; border-radius: 10px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  /* Freshness dot replaces pulse-dot when MV data is stale */
+  #freshness-indicator .stale-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  #freshness-indicator .stale-dot.ok   { background: #DDFF2D; animation: pulse 1.6s ease-in-out infinite; box-shadow: 0 0 0 3px rgba(221,255,45,0.2); }
+  #freshness-indicator .stale-dot.warn { background: #FBBF24; }
+  #freshness-indicator .stale-dot.crit { background: #FF5733; animation: pulse 1.6s ease-in-out infinite; box-shadow: 0 0 0 3px rgba(255,87,51,0.2); }
 </style>
 </head>
 <body class="grain antialiased">
@@ -176,6 +202,23 @@
   <!-- Main content -->
   <main class="flex-1 p-10 overflow-y-auto">
 
+    <!-- Stale-data banner · DATA_MODEL §17 "stale banner at > 26h" · OBSERVABILITY §62.8 · INCIDENT_RESPONSE R-52.9
+         Visible to tenant admins when any nightly reporting MV is > 26h stale.
+         Privacy floor: shows aggregate-view category labels only — no pg_cron job names,
+         no internal MV names, no individual user_id, no GDPR Art. 9 data.
+         Amber = 26–48h stale (ADMIN-RPT-SLO-01 degraded). Red = > 48h stale (P1 escalation). -->
+    <div id="stale-banner" class="stale-banner" role="alert" aria-live="polite" aria-atomic="true">
+      <div id="stale-glyph" class="font-mono flex-shrink-0 text-base">⚠</div>
+      <div class="flex-1">
+        <div id="stale-msg" class="text-sm font-medium"></div>
+        <div class="stale-views" id="stale-views"></div>
+      </div>
+      <button
+        class="text-mute text-xs font-mono hover:text-paper transition-colors ml-2 flex-shrink-0"
+        onclick="setStaleness('fresh')"
+        aria-label="Dismiss data freshness warning">dismiss ×</button>
+    </div>
+
     <!-- ═══════════════════════════════════ OVERVIEW ═══════════════════════════════════ -->
     <div id="screen-overview" class="screen active">
       <div class="flex items-end justify-between mb-10">
@@ -186,9 +229,9 @@
             <em class="text-mute text-3xl">412 seats · 287 active</em>
           </h1>
         </div>
-        <div class="flex items-center gap-3 text-mute text-xs font-mono">
-          <div class="pulse-dot w-2 h-2 bg-acid rounded-full"></div>
-          <span>LIVE · оновлено зараз</span>
+        <div id="freshness-indicator" class="flex items-center gap-2 text-xs font-mono">
+          <div id="freshness-dot" class="stale-dot ok"></div>
+          <span id="freshness-label" class="text-mute">оновлено 02:30 UTC</span>
         </div>
       </div>
 
@@ -3057,6 +3100,14 @@
 
     </div>
 
+    <!-- Demo strip · stale-data banner states · for mockup only; not present in production UI -->
+    <div class="stale-demo-strip" aria-hidden="true">
+      <span class="label" style="font-size:9px;">demo · data freshness</span>
+      <button class="btn-ghost" style="padding:5px 10px;font-size:9px;" onclick="setStaleness('fresh')">fresh</button>
+      <button class="btn-ghost" style="padding:5px 10px;font-size:9px;" onclick="setStaleness('warn')">28h stale</button>
+      <button class="btn-ghost" style="padding:5px 10px;font-size:9px;" onclick="setStaleness('crit')">52h stale</button>
+    </div>
+
   </main>
 </div>
 
@@ -3147,6 +3198,65 @@
       warning.classList.remove('hidden');
     }
   }
+
+  // ── Stale-data banner · DATA_MODEL §17 / OBSERVABILITY §62.8 / INCIDENT_RESPONSE R-52.9 ──
+  // Production: sourced from GET /api/admin/tenants/:tenantId/reporting-freshness
+  // Returns per-view age in hours; banner shown when any view > 26h stale.
+  // Privacy floor: labels are human-readable category names only — no pg_cron job names,
+  // no Postgres MV identifiers, no individual user_id or GDPR Art. 9 data.
+  const FRESHNESS_VIEW_LABELS = {
+    wellness:        'Wellness',
+    engagement:      'Engagement',
+    featureAdoption: 'Feature Adoption',
+    cohortBreakdown: 'Team Breakdown',
+  };
+
+  function setStaleness(state) {
+    const banner   = document.getElementById('stale-banner');
+    const msg      = document.getElementById('stale-msg');
+    const viewsEl  = document.getElementById('stale-views');
+    const glyph    = document.getElementById('stale-glyph');
+    const dot      = document.getElementById('freshness-dot');
+    const label    = document.getElementById('freshness-label');
+
+    banner.classList.remove('visible', 'warn', 'crit');
+    viewsEl.innerHTML = '';
+
+    if (state === 'fresh') {
+      dot.className   = 'stale-dot ok';
+      label.style.color = '#6F6A60';
+      label.textContent = 'оновлено 02:30 UTC';
+      return;
+    }
+
+    const isWarn = state === 'warn';
+    banner.classList.add('visible', isWarn ? 'warn' : 'crit');
+
+    const colour = isWarn ? '#FBBF24' : '#FF5733';
+    glyph.style.color = colour;
+    msg.style.color   = colour;
+    dot.className     = `stale-dot ${isWarn ? 'warn' : 'crit'}`;
+    label.style.color = colour;
+
+    if (isWarn) {
+      label.textContent = 'оновлено 28 год тому';
+      msg.textContent   = 'Деякі дані можуть бути застарілими — останнє оновлення 28 год тому.';
+      ['engagement'].forEach(k => appendViewTag(viewsEl, k, 'warn'));
+    } else {
+      label.textContent = 'оновлено 52 год тому';
+      msg.textContent   = 'Дані застарілі понад 48 год. Команда FORM вже вирішує цю проблему.';
+      ['engagement', 'featureAdoption'].forEach(k => appendViewTag(viewsEl, k, 'crit'));
+    }
+  }
+
+  function appendViewTag(container, key, cls) {
+    const tag = document.createElement('span');
+    tag.className   = `stale-view-tag ${cls}`;
+    tag.textContent = FRESHNESS_VIEW_LABELS[key];
+    container.appendChild(tag);
+  }
+
+  setStaleness('warn'); // demo default — illustrates amber warning state per §62.8 spec
 </script>
 </body>
 </html>

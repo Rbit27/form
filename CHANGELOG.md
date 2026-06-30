@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.24.1] — 2026-06-30
+
+### Changed
+- `admin-dashboard.html` — Stale-data banner added per DATA_MODEL §17 ("stale banner at > 26h"), OBSERVABILITY §62.8 (amber 26–48h / red > 48h per-view freshness), and INCIDENT_RESPONSE R-52.9 (cross-reference obligation). Three states: fresh (pulse dot, green), warn (amber banner, lists stale views by human-readable category label — Wellness / Engagement / Feature Adoption / Team Breakdown), crit (red banner, > 48h). Privacy floor enforced: banner shows category names only — no pg_cron job names, no internal MV identifiers (`tenant_wellness_summary_v2` etc.), no user_id, no GDPR Art. 9 data. `#freshness-indicator` replaces static "LIVE · оновлено зараз" dot with dynamic freshness dot (green/amber/red). Demo strip (fixed bottom-right, `aria-hidden="true"`) allows mockup toggle between states. `setStaleness()` JS function is the production integration point: replace with `GET /api/admin/tenants/:tenantId/reporting-freshness` response. compliance-officer + devops-lead.
+- `VERSION` — 10.24.0 → 10.24.1.
+
+---
+
 ## [10.24.0] — 2026-06-30
 
 ### Added
