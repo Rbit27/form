@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.18.4
+# FORM · Incident Response Runbook v3.18.5
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -19586,5 +19586,448 @@ Next nightly run: ~02:15–03:00 UTC tomorrow.
 ---
 
 **v1.0 · 2026-06-29 · Owner: devops-lead + compliance-officer**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---
+
+## R-53: Fleet Maturity Chain Monitor & NRR Bridge Filing Monitor — Manual Stale Health Check
+
+> **Trigger: Proactive — no automated alert.** Unlike R-44 through R-52, this runbook is NOT triggered by `system.cron_job_stale`. Jobs 56 (`fleet_mat_chain_verify`) and 57 (`nrr_bridge_q1_calendar_check`) have **N/A freshness windows** (`docs/OBSERVABILITY.md §12.6` freshness note) — `pg-cron-health-monitor` does not monitor them for staleness. IC must proactively detect and remediate staleness through quarterly health audits, annual evidence preparation, or cross-investigation from a related alert.
+
+### R-53.1 Overview
+
+| Attribute | Value |
+|---|---|
+| **Runbook** | R-53 |
+| **Version** | 1.0 (2026-06-30) |
+| **Owner** | compliance-officer + devops-lead |
+| **Trigger** | Proactive — no automated `system.cron_job_stale` detection; manual health check protocol |
+| **Jobs covered** | Job 56 (`fleet_mat_chain_verify`) — weekly Monday 06:00 UTC; Job 57 (`nrr_bridge_q1_calendar_check`) — daily 06:00 UTC |
+| **Default severity** | **P2** — monitoring gap without confirmed live breach |
+| **P0 escalation** | Job 56 stale AND manual chain integrity check (R-53-C5) finds orphan `enterprise.fleet_maturity_declared` event with no matching `enterprise.annual_nrr_bridge_filed` for same `filing_year` |
+| **P1 escalation** | Job 57 stale AND current date > April 1 AND prior-year renewals exist AND no `enterprise.annual_nrr_bridge_filed` event for that `reporting_year` |
+| **P3 baseline** | Job 57 stale AND current date ≤ March 31 OR no prior-year renewals OR filing already found (R-53-C6) |
+| **SOC 2 criteria** | CC4.1, A1.1 (monitoring gap in chain integrity verification and Q1 calendar sentinel) |
+| **Structural distinction** | Unlike R-49/R-50/R-51/R-52: no automated staleness detection; no PAM elevation required for recovery; two separate jobs in one combined runbook; `pg-cron-health-monitor` does not cover these jobs from a freshness-window perspective |
+
+**Key distinction from all prior stale runbooks (R-44 through R-52):** Every prior runbook responds to a `system.cron_job_stale` PagerDuty alert. R-53 has no such trigger. `pg-cron-health-monitor` tracks freshness-window-based jobs only — jobs 56 and 57 are explicitly excluded because their monitored obligations are annual/calendar-gated events, not time-decaying freshness-sensitive data (`docs/OBSERVABILITY.md §12.6` freshness note: "no conventional freshness window applies"). The IC initiates R-53 proactively; R-53 defines the health check queries, severity branching, and recovery steps for when jobs 56 or 57 are found to be stale through manual discovery.
+
+**Privacy floor (invariant throughout R-53):** No employee `user_id`, name, email, coaching session content, health value, or GDPR Art. 9 special-category data in any query result surfaced in this runbook. R-53-C1 through R-53-C6 surface only timestamps, aggregate integer counts, boolean flags, and `filing_year`/`reporting_year` integers. No per-tenant ARR breakdown.
+
+### R-53.2 Manual Trigger Conditions
+
+R-53 is initiated by one of the following — not by an automated alert:
+
+| Trigger | Context | First action |
+|---|---|---|
+| **Quarterly cron health audit** | DevOps-lead runs quarterly `pg_cron.job_run_details` sweep covering all registered jobs, including jobs 56 and 57 | Run R-53-C1 + R-53-C2 to confirm last successful run within expected cadence |
+| **Annual FLEET-FILING-E-001 evidence preparation** | Compliance-officer collecting annual artefact; discovers job 56 or 57 run history gap in `pg_cron.job_run_details` that would leave the artefact run-history table incomplete | Run R-53-C1 + R-53-C2; proceed with severity assessment |
+| **AL-FLEET-MAT-01 P0 cross-investigation** | Job 56 fired `security.fleet_mat_chain_violation` CRITICAL; IC investigates whether job was stale (missed prior weeks → gap in retrospective coverage) | Run R-53-C1; recover job 56 first, then AL-FLEET-MAT-01 IC continues with FLEET-MAT-CHAIN-01 remediation |
+| **R-05 chain integrity co-investigation** | IC investigating unauthorized event deletion (R-05) discovers job 56 has not run for > 7 days → retrospective scan may have missed the gap period | Run R-53-C1 + R-53-C5 as part of R-05 chain verification; if gap confirmed, open R-53 sub-IC |
+| **Developer / platform-engineer health check** | Job 56 or 57 missing from `cron.job` catalog (e.g. post-Supabase upgrade, migration rollback); developer flags absence | Run R-53-C3 + R-53-C4; treat as H1 |
+| **AL-FLEET-FILING-01 P1 cross-investigation** | Job 57 fired `enterprise.nrr_bridge_q1_overdue` P1; IC investigating whether delayed detection was caused by a prior stale period | Run R-53-C2; if stale gap precedes the overdue period, emit `system.nrr_bridge_filing_monitor_stale_declared` (R-53.7) |
+
+### R-53.3 Scope Queries
+
+All queries: role `form_audit` (read-only on `audit_log_events`, `enterprise_renewals`, `pg_cron.job_run_details`, `cron.job`). No PAM elevation required.
+
+**R-53-C1: Job 56 last successful run — staleness in days**
+
+```sql
+-- Role: form_audit
+-- Staleness threshold: > 7 days (job 56 weekly; > 7 days = at least one missed Monday run)
+SELECT
+  run_id,
+  job_name,
+  start_time,
+  end_time,
+  status,
+  EXTRACT(EPOCH FROM (NOW() - end_time)) / 86400.0  AS days_since_last_run
+FROM pg_cron.job_run_details
+WHERE job_name = 'fleet_mat_chain_verify'
+  AND status = 'succeeded'
+ORDER BY end_time DESC
+LIMIT 5;
+-- Zero rows = job has never run or has never succeeded
+-- days_since_last_run > 7  = at least one weekly cycle missed
+-- days_since_last_run > 14 = two or more cycles missed; consider escalating severity
+```
+
+**R-53-C2: Job 57 last successful run — staleness in days**
+
+```sql
+-- Role: form_audit
+-- Staleness threshold: > 2 days (job 57 daily; > 2 days = at least one missed daily run)
+-- Severity escalation: > 2 days AND date > April 1 AND R-53-C6 returns obligation unmet
+SELECT
+  run_id,
+  job_name,
+  start_time,
+  end_time,
+  status,
+  EXTRACT(EPOCH FROM (NOW() - end_time)) / 86400.0  AS days_since_last_run
+FROM pg_cron.job_run_details
+WHERE job_name = 'nrr_bridge_q1_calendar_check'
+  AND status = 'succeeded'
+ORDER BY end_time DESC
+LIMIT 5;
+```
+
+**R-53-C3: Job 56 catalog registration check**
+
+```sql
+-- Role: form_audit
+-- Confirms job 56 is still registered in cron.job catalog
+-- Zero rows = job deleted; treat as H1 (re-register from OBSERVABILITY §63.5.1)
+SELECT
+  jobid,
+  schedule,
+  jobname,
+  nodename,
+  active
+FROM cron.job
+WHERE jobname = 'fleet_mat_chain_verify';
+```
+
+**R-53-C4: Job 57 catalog registration check**
+
+```sql
+-- Role: form_audit
+SELECT
+  jobid,
+  schedule,
+  jobname,
+  nodename,
+  active
+FROM cron.job
+WHERE jobname = 'nrr_bridge_q1_calendar_check';
+```
+
+**R-53-C5: Manual FLEET-MAT-CHAIN-01 chain integrity check**
+
+```sql
+-- Role: form_audit (read-only on audit_log_events)
+-- Purpose: detect orphan fleet_maturity_declared events (no matching nrr_bridge row)
+-- Run if job 56 was stale to verify no chain gap occurred during the stale period
+-- Privacy floor: surfaces filing_year INT and orphan_event_id UUID only — no per-tenant data
+SELECT
+  fmd.id                                  AS orphan_event_id,
+  fmd.payload->>'filing_year'             AS filing_year,
+  fmd.created_at                          AS declared_at
+FROM audit_log_events fmd
+WHERE fmd.event_type = 'enterprise.fleet_maturity_declared'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events nrr
+    WHERE nrr.event_type = 'enterprise.annual_nrr_bridge_filed'
+      AND (nrr.payload->>'reporting_year')::int
+          = (fmd.payload->>'filing_year')::int
+  )
+ORDER BY fmd.created_at DESC;
+-- Zero rows  = chain integrity intact during stale period → P2 confirmed
+-- Non-zero   = orphan chain event found → escalate to P0; activate AL-FLEET-MAT-01 manual path
+```
+
+**R-53-C6: Q1 calendar compliance check (manual equivalent of one job 57 run)**
+
+```sql
+-- Role: form_audit
+-- Purpose: determine whether Q1 filing obligation exists and whether filing was made
+-- Run if job 57 was stale AND current date > April 1
+-- Privacy floor: aggregate renewal_count INT and filing_found BOOL only; no ARR values
+SELECT
+  (EXTRACT(YEAR FROM NOW()) - 1)::int                      AS checking_reporting_year,
+  COALESCE(r.renewal_count, 0)                             AS renewal_count,
+  CASE WHEN b.id IS NOT NULL THEN TRUE ELSE FALSE END      AS filing_found,
+  b.created_at                                             AS filed_at
+FROM (
+  SELECT COUNT(*) AS renewal_count
+  FROM enterprise_renewals
+  WHERE EXTRACT(YEAR FROM closed_at) = EXTRACT(YEAR FROM NOW()) - 1
+    AND status = 'closed_won'
+) r
+LEFT JOIN audit_log_events b
+  ON b.event_type = 'enterprise.annual_nrr_bridge_filed'
+ AND (b.payload->>'reporting_year')::int
+     = (EXTRACT(YEAR FROM NOW()) - 1)::int
+LIMIT 1;
+-- If renewal_count > 0 AND filing_found = FALSE AND EXTRACT(MONTH FROM NOW()) > 3
+--   → Q1 overdue confirmed; escalate to P1
+-- If renewal_count = 0 OR filing_found = TRUE OR EXTRACT(MONTH FROM NOW()) <= 3
+--   → No obligation breach; severity P2 (or P3 if job 57 stale < 7 days and well before April 1)
+```
+
+### R-53.4 Root Cause Classification
+
+| Hypothesis | Symptom | Discriminator | Resolution |
+|---|---|---|---|
+| **H1 — Job deleted / deregistered** | R-53-C3 or R-53-C4 returns zero rows | `cron.job` catalog has no matching job name entry | Re-register from OBSERVABILITY §63.5.1 (job 56) or §63.5.2 (job 57) using `cron.schedule()`; `form_system` role; SECURITY DEFINER |
+| **H2 — Job disabled (`active = false`)** | R-53-C3 or R-53-C4 returns a row with `active = false` | `cron.job.active` is `false` | `UPDATE cron.job SET active = true WHERE jobname = '<name>'`; investigate why it was disabled (check migration history for any `active = false` DDL) |
+| **H3 — Supabase scheduled maintenance overlap** | `pg_cron.job_run_details` shows `status = 'failed'` or `status = 'running'` rows from the expected schedule time; Supabase status page confirms maintenance in that window | Job is registered and active; maintenance log correlates with missed run | No re-registration needed; confirm job runs on next scheduled Monday (job 56) or next day (job 57); verify expected DEC-030 event emitted after maintenance window closes |
+| **H4 — SECURITY DEFINER function broken** | R-53-C3/C4 shows job registered and active; `pg_cron.job_run_details` shows `status = 'failed'` with `return_message` containing a PL/pgSQL exception | Function body raised unhandled exception (e.g. schema migration changed a column name referenced in the job SQL) | Inspect `return_message` column of failed run; fix underlying schema mismatch; redeploy function body from OBSERVABILITY §63.5.1/§63.5.2; trigger manual run to verify |
+
+### R-53.5 Job 56 (`fleet_mat_chain_verify`) Recovery Protocol
+
+> **When to activate:** R-53-C1 shows `days_since_last_run > 7` (at least one missed weekly Monday run) OR R-53-C3 shows job missing from `cron.job` catalog.
+
+**Step 1 — Confirm staleness and diagnose root cause**
+
+```sql
+-- R-53-C1: confirm days since last successful run
+-- R-53-C3: confirm job registration status
+-- Also inspect recent failures:
+SELECT run_id, job_name, status, return_message, start_time
+FROM pg_cron.job_run_details
+WHERE job_name = 'fleet_mat_chain_verify'
+ORDER BY start_time DESC
+LIMIT 10;
+-- C3 zero rows → H1 (deleted); active = false → H2; failure return_message → H4; maintenance → H3
+```
+
+**Step 2 — Run manual FLEET-MAT-CHAIN-01 chain integrity check immediately**
+
+Run **R-53-C5** before recovering the job. If R-53-C5 returns non-zero rows, escalate to **P0** and initiate AL-FLEET-MAT-01 manual alert path:
+
+```
+[AL-FLEET-MAT-01 MANUAL — P0] Fleet maturity chain violation detected during R-53 job 56 stale period.
+filing_year: {filing_year} | orphan_event_id: {uuid} | declared_at: {timestamp}
+IC: {ic_name} | PagerDuty incident opened; security-engineer notified.
+```
+
+Emit `system.fleet_mat_chain_monitor_stale_declared` HIGH/7yr DEC-030 event (R-53.7) upon confirming stale.
+
+**Step 3 — Resolve root cause per H1/H2/H3/H4 classification**
+
+*H1 (job deleted):*
+```sql
+-- Re-register job 56 from OBSERVABILITY §63.5.1 SQL (paste verbatim)
+-- Role: form_system (SECURITY DEFINER)
+SELECT cron.schedule(
+  'fleet_mat_chain_verify',
+  '0 6 * * 1',
+  $$[full SQL body from OBSERVABILITY §63.5.1]$$
+);
+```
+
+*H2 (job disabled):*
+```sql
+UPDATE cron.job SET active = true WHERE jobname = 'fleet_mat_chain_verify';
+```
+
+*H3 (maintenance):* No action required beyond monitoring the next Monday 06:00 UTC run.
+
+*H4 (function broken):* Redeploy corrected PL/pgSQL body using `cron.alter_job()` or drop-and-recreate from §63.5.1; fix schema mismatch first.
+
+**Step 4 — Trigger manual run**
+
+```sql
+-- Role: form_system
+-- Triggers immediate execution (does not wait for next Monday)
+SELECT cron.run_job(jobid)
+FROM cron.job
+WHERE jobname = 'fleet_mat_chain_verify';
+```
+
+**Step 5 — Verify recovery**
+
+```sql
+-- Role: form_audit
+-- Confirm system.fleet_mat_chain_check_passed emitted with chain_consistent = true
+SELECT id, event_type, created_at, payload
+FROM audit_log_events
+WHERE event_type IN (
+  'system.fleet_mat_chain_check_passed',
+  'security.fleet_mat_chain_violation'
+)
+ORDER BY created_at DESC
+LIMIT 3;
+-- Expected: top row = system.fleet_mat_chain_check_passed, chain_consistent = true
+-- If top row = security.fleet_mat_chain_violation → P0 escalation (R-53-C5 should have caught this)
+```
+
+**Step 6 — Emit recovery DEC-030 event**
+
+Emit `system.fleet_mat_chain_monitor_restored` LOW/3yr DEC-030 event (R-53.7) after confirming `system.fleet_mat_chain_check_passed` received. The FLEET-MAT-STALE-CHAIN-01 ordering invariant requires `fleet_mat_chain_monitor_stale_declared` to precede `fleet_mat_chain_monitor_restored` for the same `ic_run_id` — verify in `audit_log_events` before emitting.
+
+### R-53.6 Job 57 (`nrr_bridge_q1_calendar_check`) Recovery Protocol
+
+> **When to activate:** R-53-C2 shows `days_since_last_run > 2` (at least one missed daily run) OR R-53-C4 shows job missing from `cron.job` catalog.
+
+**Step 1 — Confirm staleness and diagnose root cause**
+
+```sql
+-- R-53-C2: last successful run; R-53-C4: registration status
+SELECT run_id, job_name, status, return_message, start_time
+FROM pg_cron.job_run_details
+WHERE job_name = 'nrr_bridge_q1_calendar_check'
+ORDER BY start_time DESC
+LIMIT 10;
+```
+
+**Step 2 — Assess Q1 calendar obligation**
+
+Run **R-53-C6** immediately. Branch on result:
+
+| R-53-C6 result | Calendar date | Severity | Action |
+|---|---|---|---|
+| `renewal_count = 0` | Any | **P3** — no obligation | Log finding; recover job; no escalation |
+| `filing_found = true` | Any | **P3** — filed before stale period ended | Log finding; recover job; no escalation |
+| `renewal_count > 0` AND `filing_found = false` | ≤ March 31 | **P2** — within Q1 window | Recover job; monitor until April 1 |
+| `renewal_count > 0` AND `filing_found = false` | ≥ April 1 | **P1 — escalate** | Emit `system.nrr_bridge_filing_monitor_stale_declared` HIGH/7yr (R-53.7); contact compliance-officer; initiate NRR Bridge filing via `emit-audit-event` Worker; do NOT mark resolved until `enterprise.annual_nrr_bridge_filed` emitted |
+
+**Step 3 — Emit stale declared event (P1 path only)**
+
+If Step 2 confirms P1 (obligation missed due to stale period), emit `system.nrr_bridge_filing_monitor_stale_declared` HIGH/7yr DEC-030 event (R-53.7) via `emit-audit-event` Worker. Payload: `{ ic_run_id: UUID, job_name: "nrr_bridge_q1_calendar_check", stale_days: INT, reporting_year: INT, filing_found: false }`.
+
+**Step 4 — Resolve root cause per H1/H2/H3/H4 classification**
+
+*H1 (job deleted):*
+```sql
+SELECT cron.schedule(
+  'nrr_bridge_q1_calendar_check',
+  '0 6 * * *',
+  $$[full SQL body from OBSERVABILITY §63.5.2]$$
+);
+```
+
+*H2 (job disabled):*
+```sql
+UPDATE cron.job SET active = true WHERE jobname = 'nrr_bridge_q1_calendar_check';
+```
+
+*H3 (maintenance) / H4 (function broken):* Follow same pattern as R-53.5 H3/H4 above.
+
+**Step 5 — Trigger manual run**
+
+```sql
+SELECT cron.run_job(jobid)
+FROM cron.job
+WHERE jobname = 'nrr_bridge_q1_calendar_check';
+```
+
+**Step 6 — Verify recovery**
+
+```sql
+-- Role: form_audit
+SELECT id, event_type, created_at, payload
+FROM audit_log_events
+WHERE event_type IN (
+  'system.nrr_bridge_q1_check_passed',
+  'enterprise.nrr_bridge_q1_overdue'
+)
+ORDER BY created_at DESC
+LIMIT 3;
+-- If nrr_bridge_q1_overdue emitted → filing overdue; continue P1 escalation
+-- If nrr_bridge_q1_check_passed emitted → obligation not triggered; P2/P3 confirmed
+```
+
+**Step 7 — Emit recovery DEC-030 event**
+
+Emit `system.nrr_bridge_filing_monitor_restored` LOW/3yr DEC-030 event (R-53.7) after confirming job is registered, running, and emitting expected events. NRR-FILING-STALE-CHAIN-01 ordering invariant requires `nrr_bridge_filing_monitor_stale_declared` to precede `nrr_bridge_filing_monitor_restored` for the same `ic_run_id`.
+
+**Note (P1 path):** Do NOT emit `nrr_bridge_filing_monitor_restored` until `enterprise.annual_nrr_bridge_filed` is confirmed emitted by compliance-officer for the relevant `reporting_year`. Recovery = job restored AND filing obligation met.
+
+### R-53.7 DEC-030 Stale Events & Chain Invariants
+
+Four new DEC-030 events emitted manually by IC during R-53 activation (not emitted by `pg-cron-health-monitor`):
+
+| Event type | Severity | Retention | Emitter | Key payload fields | SOC 2 |
+|---|---|---|---|---|---|
+| `system.fleet_mat_chain_monitor_stale_declared` | HIGH | 7 yr | IC (compliance-officer or devops-lead) via `emit-audit-event` Worker | `ic_run_id` UUID, `job_name: "fleet_mat_chain_verify"`, `stale_days` INT, `root_cause_hypothesis` TEXT ('H1'/'H2'/'H3'/'H4'), `chain_integrity_check_result` TEXT ('intact'/'orphan_found') | CC4.1 / A1.1 |
+| `system.fleet_mat_chain_monitor_restored` | LOW | 3 yr | IC (compliance-officer or devops-lead) via `emit-audit-event` Worker | `ic_run_id` UUID, `job_name: "fleet_mat_chain_verify"`, `resolution_steps` TEXT, `chain_consistent: true` BOOL | CC4.1 / A1.1 |
+| `system.nrr_bridge_filing_monitor_stale_declared` | HIGH | 7 yr | IC (compliance-officer) via `emit-audit-event` Worker | `ic_run_id` UUID, `job_name: "nrr_bridge_q1_calendar_check"`, `stale_days` INT, `root_cause_hypothesis` TEXT, `obligation_triggered` BOOL, `reporting_year` INT nullable | CC4.1 / A1.1 |
+| `system.nrr_bridge_filing_monitor_restored` | LOW | 3 yr | IC (compliance-officer) via `emit-audit-event` Worker | `ic_run_id` UUID, `job_name: "nrr_bridge_q1_calendar_check"`, `resolution_steps` TEXT, `filing_confirmed` BOOL | CC4.1 / A1.1 |
+
+**FLEET-MAT-STALE-CHAIN-01 ordering invariant:** For a given `ic_run_id`, `system.fleet_mat_chain_monitor_stale_declared` MUST precede `system.fleet_mat_chain_monitor_restored` in `audit_log_events`. Worker enforces HTTP 422 `FLEET_MAT_STALE_CHAIN_01_VIOLATION` if `restored` event received before `stale_declared` for the same `ic_run_id`. Do not emit `restored` without a preceding `stale_declared` in the same IC activation.
+
+**NRR-FILING-STALE-CHAIN-01 ordering invariant:** For a given `ic_run_id`, `system.nrr_bridge_filing_monitor_stale_declared` MUST precede `system.nrr_bridge_filing_monitor_restored`. Worker enforces HTTP 422 `NRR_FILING_STALE_CHAIN_01_VIOLATION`. On P1 escalation, do not emit `restored` until `enterprise.annual_nrr_bridge_filed` is confirmed emitted for the relevant `reporting_year`.
+
+**Privacy invariant:** All four stale events carry only operational metadata — integers, booleans, UUIDs, hypothesis strings. No per-tenant ARR breakdown, no employee `user_id`, no coaching content, no GDPR Art. 9 special-category data.
+
+**Follow-up obligation (P0 / future pass):** These four event types must be registered in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, severity labels, retention periods, and SOC 2 criterion mapping. Evidence artefacts FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 must be registered in `docs/SOC2_READINESS.md §79.4`. See R-53.11 items 1–2.
+
+### R-53.8 Communication Templates
+
+**IC Slack (`#enterprise-compliance`) — on stale declaration:**
+```
+[R-53 ACTIVATED] pg_cron job {56 / 57} ({fleet_mat_chain_verify / nrr_bridge_q1_calendar_check}) found stale.
+Stale: {stale_days}d | Root cause: {H1/H2/H3/H4 — investigating} | Severity: {P0/P1/P2/P3}
+Chain integrity check (R-53-C5): {intact / orphan_found — see P0 escalation}
+Q1 calendar check (R-53-C6): {obligation_triggered: bool | filing_found: bool}
+IC: {name} | Run ID: {ic_run_id}
+```
+
+**P0 escalation (orphan `fleet_maturity_declared` found):**
+```
+[R-53 — P0 ESCALATION] FLEET-MAT-CHAIN-01 chain violation detected during stale period.
+filing_year: {year} | orphan_event_id: {uuid} | job 56 stale since: {date}
+AL-FLEET-MAT-01 MANUAL PATH ACTIVATED.
+Owner: compliance-officer + security-engineer. Forensic review required before marking resolved.
+```
+
+**P1 escalation (Q1 filing overdue confirmed):**
+```
+[R-53 — P1 ESCALATION] NRR Bridge Q1 filing overdue detected during job 57 stale period.
+reporting_year: {year} | renewal_count: {n} | filing_found: false
+Compliance-officer: initiate NRR Bridge filing via emit-audit-event Worker immediately.
+AL-FLEET-FILING-01 P1: PagerDuty incident opened (dedup nrr-bridge-q1-overdue-{year}).
+```
+
+**Post-resolution Slack (`#enterprise-compliance`):**
+```
+[R-53 RESOLVED] pg_cron job {56 / 57} recovered.
+Root cause: {H1/H2/H3/H4} | Stale: {stale_days}d | Chain integrity: {intact / violation_remediated}
+Recovery events emitted: {stale_declared_event_id} → {restored_event_id}
+Next scheduled run: {date/time UTC}
+```
+
+### R-53.9 SOC 2 Evidence
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | Path |
+|---|---|---|---|---|---|
+| **FLEET-MAT-STALE-E-001** | CC4.1 / A1.1 | Per-activation export of R-53 job 56 stale IC record: `system.fleet_mat_chain_monitor_stale_declared` event, chain integrity check result (R-53-C5 output), root cause classification, `system.fleet_mat_chain_monitor_restored` event, time-to-recovery in minutes. If zero activations in observation year, export quarterly health audit logs as positive non-occurrence evidence. | Per R-53 activation (or annual zero-count if no activations) | 7 yr | `enterprise/fleet-mat-stale/FLEET-MAT-STALE-E-001-{YYYY}-{ic_run_id}.json` |
+| **NRR-FILING-STALE-E-001** | CC4.1 / A1.1 | Per-activation export of R-53 job 57 stale IC record: `system.nrr_bridge_filing_monitor_stale_declared` event, Q1 calendar check result (R-53-C6 output), root cause classification, `system.nrr_bridge_filing_monitor_restored` event, and (if P1) `enterprise.annual_nrr_bridge_filed` event confirming obligation met. If zero activations in observation year, export quarterly health audit logs as positive non-occurrence evidence. | Per R-53 activation (or annual zero-count if no activations) | 7 yr | `enterprise/nrr-filing-stale/NRR-FILING-STALE-E-001-{YYYY}-{ic_run_id}.json` |
+
+**R-53 IS a SOC 2 evidence generation trigger** — unlike R-52 (admin MV refresh, product degradation only), a stale job 56 represents a gap in the FLEET-MAT-CHAIN-01 retrospective verification that auditors require for CC4.1/A1.1 continuous monitoring evidence. A stale job 57 in Q1 represents a gap in the annual filing calendar sentinel. Every R-53 activation — regardless of whether a live compliance breach was found — must produce FLEET-MAT-STALE-E-001 or NRR-FILING-STALE-E-001 for the observation year.
+
+---
+
+### R-53.10 Cross-References
+
+- `docs/OBSERVABILITY.md §63` — Enterprise Annual Filing Calendar & Fleet Maturity Chain Observability (canonical spec; §63.4 AL-FLEET-MAT-01/AL-FLEET-FILING-01 alert rules; §63.5.1/§63.5.2 job DDL specs; §63.6 DEC-030 event schema; §63.7 FLEET-FILING-E-001; §63.8 dashboard spec; §63.9 implementation checklist item 7 — R-53 authorship → [x] Done this pass)
+- `docs/OBSERVABILITY.md §12.6` — pg_cron canonical registry (jobs 56–57; freshness note — N/A; stale-consequence cross-ref updated: R-53.5/R-53.6; v5.10.3, 2026-06-30)
+- `docs/COST_MODEL.md §48` — `enterprise.annual_nrr_bridge_filed` + NRR-BRIDGE-INV-01 source (FLEET-FILING-SLO-01/02/03 definitions)
+- `docs/COST_MODEL.md §49` — `enterprise.fleet_maturity_declared` + FLEET-MAT-CHAIN-01 source
+- `docs/SOC2_READINESS.md §136` — FLEET-FILING-E-001 artefact registration (CC4.1/A1.1, annual Q1, 3yr)
+- `docs/AUDIT_LOG_SCHEMA.md v2.63` — `system.fleet_mat_chain_check_passed`, `security.fleet_mat_chain_violation`, `system.nrr_bridge_q1_check_passed`, `enterprise.nrr_bridge_q1_overdue` registered; four R-53.7 stale events pending follow-up registration (R-53.11 items 1–2)
+- R-03 (Infrastructure Outage — H3 Supabase maintenance co-activation)
+- R-05 (Unauthorized Event Deletion — cross-investigation trigger for R-53; co-activate R-53-C5 if job 56 stale during R-05 IC)
+- R-49 (Pilot Activation Monitor Stale — structural peer: daily monitoring job stale recovery)
+- R-50 (Champion Login Monitor Stale — structural peer)
+- R-51 (WAU Decline Monitor Stale — structural peer; weekly cadence peer for job 56)
+- DEC-030
+
+---
+
+### R-53.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register four new DEC-030 stale events in `docs/AUDIT_LOG_SCHEMA.md`: `system.fleet_mat_chain_monitor_stale_declared` HIGH/7yr, `system.fleet_mat_chain_monitor_restored` LOW/3yr, `system.nrr_bridge_filing_monitor_stale_declared` HIGH/7yr, `system.nrr_bridge_filing_monitor_restored` LOW/3yr. Include Zod v2 schemas (`FleetMatChainMonitorStaleDeclaredSchema`, `FleetMatChainMonitorRestoredSchema`, `NrrBridgeFilingMonitorStaleDeclaredSchema`, `NrrBridgeFilingMonitorRestoredSchema`). Register FLEET-MAT-STALE-CHAIN-01 and NRR-FILING-STALE-CHAIN-01 ordering invariants with HTTP 422 error codes. Severity/retention/SOC 2 mapping as specified in R-53.7. | compliance-officer + devops-lead | **P0** | M13 | [ ] |
+| 2 | Register FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC4.1/A1.1, per-activation + annual zero-count, 7yr, R2 paths `enterprise/fleet-mat-stale/` and `enterprise/nrr-filing-stale/`). Add Vanta mirror entries. | compliance-officer | **P0** | M13 | [ ] |
+| 3 | Implement `emit-audit-event` Worker enforcement for FLEET-MAT-STALE-CHAIN-01 and NRR-FILING-STALE-CHAIN-01 ordering invariants: HTTP 422 `FLEET_MAT_STALE_CHAIN_01_VIOLATION` if `system.fleet_mat_chain_monitor_restored` received before `system.fleet_mat_chain_monitor_stale_declared` for same `ic_run_id`; equivalently for NRR-FILING-STALE-CHAIN-01. | platform-engineer | **P1** | M13 | [ ] |
+| 4 | Create `enterprise/fleet-mat-stale/` and `enterprise/nrr-filing-stale/` subfolders on Cloudflare R2 `form-soc2-evidence` bucket; confirm `r2:form-api` has NO ACCESS. Register FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 templates in `compliance/evidence/` and add Vanta mirror entries (CC4.1/A1.1, per-activation, 7yr). | compliance-officer | **P1** | M13 | [ ] |
+| 5 | Establish quarterly cron health audit protocol: devops-lead runs R-53-C1 through R-53-C4 on the first Monday of each calendar quarter; results logged to `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md` on R2; confirms jobs 56 and 57 are registered, active, and have run within expected cadence. This quarterly audit is the primary preventive mechanism for catching job 56/57 staleness before it affects evidence collection. | devops-lead | **P1** | M14 | [ ] |
+| 6 | Add R-53 cross-reference to `docs/OBSERVABILITY.md §12.6` job 56 and 57 stale-consequence column: "INCIDENT_RESPONSE R-53 (§R-53.5/R-53.6; v1.0, 2026-06-30 — manual stale health check protocol; no automated freshness trigger)". | compliance-officer | **P0** | M13 | [x] Done — OBSERVABILITY.md v5.10.3, 2026-06-30 (this pass). |
+| 7 | Add R-53 authorship item to `docs/OBSERVABILITY.md §63.9` implementation checklist. | compliance-officer | **P0** | M13 | [x] Done — OBSERVABILITY.md v5.10.3, 2026-06-30 (this pass). |
+
+---
+
+*v1.0 (2026-06-30): R-53 Fleet Maturity Chain Monitor & NRR Bridge Filing Monitor — Manual Stale Health Check — fifty-third runbook. Key structural distinction from all prior runbooks (R-44 through R-52): **no automated `system.cron_job_stale` detection** — `pg-cron-health-monitor` does not monitor jobs 56 and 57 because their freshness windows are N/A (`docs/OBSERVABILITY.md §12.6` freshness note). R-53 is a proactive manual health check protocol, not an IC response to an automated alert. Six manual trigger conditions (quarterly health audit; annual FLEET-FILING-E-001 evidence preparation; AL-FLEET-MAT-01 P0 cross-investigation; R-05 chain integrity co-investigation; developer health check; AL-FLEET-FILING-01 P1 cross-investigation). Six scope queries: R-53-C1 (job 56 staleness in days from `pg_cron.job_run_details`); R-53-C2 (job 57 staleness in days); R-53-C3 (job 56 catalog registration check — `cron.job`); R-53-C4 (job 57 catalog registration check); R-53-C5 (manual FLEET-MAT-CHAIN-01 chain integrity check — equivalent to one job 56 run; surfaces orphan `fleet_maturity_declared` events with no matching `nrr_bridge` row for same `filing_year`); R-53-C6 (Q1 calendar compliance check — equivalent to one job 57 run; surfaces `renewal_count` INT, `filing_found` BOOL, `filed_at` TIMESTAMPTZ). Root cause classification: H1 (job deleted — re-register from §63.5.1/§63.5.2); H2 (job disabled — toggle `cron.job.active`); H3 (Supabase maintenance window overlap — wait and monitor next run); H4 (SECURITY DEFINER function broken — fix schema mismatch, redeploy from §63.5). Severity branching: P2 default (monitoring gap; chain intact per R-53-C5; no Q1 obligation breach per R-53-C6); P1 escalation if job 57 stale AND date > April 1 AND renewals > 0 AND no filing found; P0 escalation if job 56 stale AND R-53-C5 finds orphan chain event; P3 if job 57 stale AND date ≤ March 31 OR no renewals OR filing already found. Four new DEC-030 stale events (R-53.7) emitted manually by IC (not by pg-cron-health-monitor): `system.fleet_mat_chain_monitor_stale_declared` HIGH/7yr; `system.fleet_mat_chain_monitor_restored` LOW/3yr; `system.nrr_bridge_filing_monitor_stale_declared` HIGH/7yr; `system.nrr_bridge_filing_monitor_restored` LOW/3yr. Two chain ordering invariants: FLEET-MAT-STALE-CHAIN-01 (stale_declared precedes restored for same `ic_run_id`; HTTP 422 `FLEET_MAT_STALE_CHAIN_01_VIOLATION`); NRR-FILING-STALE-CHAIN-01 (equivalently; HTTP 422 `NRR_FILING_STALE_CHAIN_01_VIOLATION`). Two SOC 2 evidence artefacts: FLEET-MAT-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr, `enterprise/fleet-mat-stale/`); NRR-FILING-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr, `enterprise/nrr-filing-stale/`). R-53 IS a SOC 2 evidence generation trigger (unlike R-52). Communication templates: IC Slack on stale declaration; P0/P1 escalation templates; post-resolution Slack. Seven-item implementation checklist: P0/M13 (register four DEC-030 stale events in AUDIT_LOG_SCHEMA.md + chain invariants); P0/M13 (register FLEET-MAT-STALE-E-001/NRR-FILING-STALE-E-001 in SOC2_READINESS.md §79.4); P1/M13 (Worker enforcement of FLEET-MAT-STALE-CHAIN-01/NRR-FILING-STALE-CHAIN-01); P1/M13 (R2 subfolders + Vanta entries); P1/M14 (quarterly cron health audit protocol); P0/M13 ([x] Done — §12.6 cross-ref update this pass); P0/M13 ([x] Done — §63.9 checklist item this pass). Cross-references: `docs/OBSERVABILITY.md §63`; `docs/OBSERVABILITY.md §12.6`; `docs/COST_MODEL.md §48`; `docs/COST_MODEL.md §49`; `docs/SOC2_READINESS.md §136`; `docs/AUDIT_LOG_SCHEMA.md v2.63`; R-03; R-05; R-49; R-50; R-51; DEC-030. Privacy floor throughout: no employee `user_id`, name, email, coaching session content, health value, or GDPR Art. 9 special-category data in any query result; R-53-C1 through R-53-C6 surface only timestamps, aggregate integer counts, boolean flags, and `filing_year`/`reporting_year` integers. Owner: compliance-officer + devops-lead.*
+
+---
+
+**v1.0 · 2026-06-30 · Owner: compliance-officer + devops-lead**
 **Review: after every activation, minimum annual.**
 **Next scheduled review: June 2027 or after first activation — whichever comes first.**

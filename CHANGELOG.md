@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [10.54.1] — 2026-06-30
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v3.18.5 — R-53 Fleet Maturity Chain Monitor & NRR Bridge Filing Monitor stale recovery runbook added (§R-53.1–R-53.11). Covers pg_cron jobs 56 (`fleet_mat_chain_verify`) and 57 (`nrr_bridge_q1_calendar_check`). Key distinction: no automated `system.cron_job_stale` detection (N/A freshness windows per §12.6). Six manual trigger conditions; six scope queries (R-53-C1–C6); four root cause hypotheses (H1–H4); severity branching (P0/P1/P2/P3); separate recovery protocols for each job; four new DEC-030 stale events with FLEET-MAT-STALE-CHAIN-01 and NRR-FILING-STALE-CHAIN-01 ordering invariants; two SOC 2 evidence artefacts (FLEET-MAT-STALE-E-001, NRR-FILING-STALE-E-001); seven-item implementation checklist (items 6–7 closed this pass). Closes OBSERVABILITY.md §63.9 stale runbook obligation.
+- `docs/OBSERVABILITY.md` v5.10.3 — §12.6 cross-ref patch: job 56 (`fleet_mat_chain_verify`) and job 57 (`nrr_bridge_q1_calendar_check`) stale-consequence column updated with `INCIDENT_RESPONSE R-53 (§R-53.5/R-53.6; v1.0, 2026-06-30)`. §63.9 checklist: new item added for R-53 authorship (🟢 Done this pass).
+- `VERSION` — 10.54.0 → 10.54.1.
+
 ## [10.54.0] — 2026-06-30
 
 ### Added
