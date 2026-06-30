@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v10.71.0** — 2026-06-30 · post-2897 · «Як виглядає "достатньо даних" для тренувального рішення» · series «Якість тренувального рішення» 2896–2905 (2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2897 · next: post-2898 («Чотири типи тренувальних рішень — і різна вага доказів для кожного»)
+
+**v10.70.1** — 2026-06-30 · enterprise: COST_MODEL §52 OQ-CS-04 FEHS breakdown in qbr_completed · AUDIT_LOG_SCHEMA v2.66 · DECISION_LOG DEC-089
+
 **v10.70.0** — 2026-06-30 · post-2896 · «Дані проти інтуїції в тренуванні: коли кожне з них вигравало» · series «Якість тренувального рішення» 2896–2905 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2896 · README roadmap extended to 2995 (серія 2986–2995 «Атлет і технологія») · next: post-2897 («Як виглядає "достатньо даних" для тренувального рішення»)
 
 **v10.69.0** — 2026-06-30 · post-2895 · «Синтез 2886–2895: операційний профіль досвідченого self-coached атлета» · series «Тренувальний інтелект» 2886–2895 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2895 · next: series 2896–2905 «Рішення під невизначеністю» (post-2896 — перший пост)
