@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.40.0] — 2026-06-30
+
+### Added
+- `content/post-2871-program-diagnostic-algorithm.md` — Серія «Автономне тренування» 2866–2875 · 6/10. «Коли програма не працює: алгоритм діагностики до того, як міняти все». П'ять діагностичних кроків до рішення про зміну програми: (1) мінімальний горизонт оцінки 6–8 тижнів (Helms et al. 2014); (2) аудит виконання — відсоток фактичного виконання за обсягом, інтенсивністю та частотою (Zourdos et al. 2016 для RPE-калібрації); (3) контекстна контамінація — сон (Leproult & Van Cauter 1999), позатренувальний стрес (Stults-Kolehmainen & Sinha 2014); (4) валідність метрики — e1RM-тренд і RPE-тенденція vs. крепатура і помпа (Damas et al. 2016); (5) структурна відповідність програми профілю атлета (Schoenfeld 2016, Barbalho 2020, Brigatto 2019). Чотири сценарії виправданої зміни програми. Чому кожна нова програма коштує 2–4 тижні нейром'язової адаптаційної фази. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+
+### Changed
+- `blog.html` — post-2871 card added at top of feed.
+- `README.md` — post-2871 → draft; editorial series header updated to 6/10 · v10.40.0.
+- `STATUS.md` — post-2871 added; Series 2866–2875 «Автономне тренування» 6/10; current version v10.40.0; next: post-2872.
+- `VERSION` — 10.39.0 → 10.40.0.
+
+---
+
 ## [10.39.0] — 2026-06-30
 
 ### Added

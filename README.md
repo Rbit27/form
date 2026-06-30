@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · proposed next (45+) · current: 2866–2875 «Автономне тренування» 5/10 · roadmap extended to 2905 · v10.39.0
+### Editorial series: 11–44 drafted · proposed next (45+) · current: 2866–2875 «Автономне тренування» 6/10 · roadmap extended to 2905 · v10.40.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3055,7 +3055,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 2868 | П'ять патернів самопрограмування, що знищують прогрес — і як їх впізнати в собі | draft · v10.37.0 · review_pending: sports-scientist |
 | 2869 | Технічна самооцінка без тренера: мінімальний протокол відеоаналізу | **draft · v10.38.0 → post-2869-technical-self-assessment-video-analysis-protocol.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
 | 2870 | Програма — це стартова точка: коли відступ від плану є дисципліною, а не відмовкою | **draft · v10.39.0 → post-2870-program-is-a-starting-point-when-deviation-is-discipline.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
-| 2871 | Коли програма не працює: алгоритм діагностики до того, як міняти все | proposed · v10.30.0 |
+| 2871 | Коли програма не працює: алгоритм діагностики до того, як міняти все | **draft · v10.40.0 → post-2871-program-diagnostic-algorithm.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
 | 2872 | Підзвітність без тренера: три мінімальні системи самоконтролю | proposed · v10.30.0 |
 | 2873 | Тижневий огляд self-coached атлета: що переглядати, що ні і як часто | proposed · v10.30.0 |
 | 2874 | Коли AI недостатньо: ознаки, що пора шукати людину-тренера | proposed · v10.30.0 |

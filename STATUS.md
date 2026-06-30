@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.39.0** — 2026-06-30 · post-2870 · Series 2866–2875 «Автономне тренування» 5/10 · post-2870 «Програма — це стартова точка: коли відступ від плану є дисципліною, а не відмовкою» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2870 · README: post-2870 → draft · next: post-2871
+**v10.40.0** — 2026-06-30 · post-2871 · Series 2866–2875 «Автономне тренування» 6/10 · post-2871 «Коли програма не працює: алгоритм діагностики до того, як міняти все» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2871 · README: post-2871 → draft · next: post-2872
 
 ---
 
