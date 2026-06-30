@@ -15,6 +15,15 @@
 
 ## 2026-06-30
 
+### DEC-087 · OQ-ENTERPRISE-ARR-04 Resolution: `evidence_artefact_id` Optional in Zod + FLEET-MAT-CHAIN-02 Evidence Linkage Invariant
+
+- **Decision:** `evidence_artefact_id` in `FleetMaturityDeclaredSchema` (Zod v2) remains `.optional()` — confirmed correct. Presence enforced at Worker layer from `consecutive_cycles_at_target >= 2` via FLEET-MAT-CHAIN-02 (HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED` if absent). Invariant check order in `emit-audit-event` Worker: (1) FLEET-MAT-CHAIN-01 → (2) FLEET-MAT-CHAIN-02 → (3) Zod validation → (4) emit. No schema change. Full rationale and invariant spec in `docs/COST_MODEL.md §50`.
+- **Owner:** compliance-officer + enterprise-architect
+- **Why:** (1) Non-declaration years (cycles 1–2) are valid events without `evidence_artefact_id` — Zod required would reject them; (2) zero-declaration-year affirmative attestation pattern (`docs/SOC2_READINESS.md §132`) requires null for cycle 0–1 events; (3) DEC-030 design pattern: schema validates structure, Worker enforces business invariants — consistent with FLEET-MAT-CHAIN-01 precedent.
+- **Reverse cost:** Low. FLEET-MAT-CHAIN-02 is a pre-emit conditional check in one Worker function. Reversal: remove the conditional. Schema unchanged.
+
+---
+
 ### DEC-086 · Fleet Maturity Governance: 120% NRR Declaration Protocol — FM conditions, two-cycle gate, automated Worker declaration, FLEET-MAT-CHAIN-01 invariant
 
 - **Decision:** Fleet maturity is formally declared when FM-C1 (Green Fleet ≥ 65%), FM-C2 (expansion take-up ≥ 55%), FM-C3 (≥ 1 tier upgrade per cohort year) are simultaneously met for two consecutive annual renewal cycles and the fleet has ≥ 12 active tenants. Declaration automated by `emit-audit-event` Worker via `enterprise.fleet_maturity_declared` DEC-030 event (LOW/3yr/CC4.1/A1.1). FLEET-MAT-CHAIN-01 invariant enforced (HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE` if NRR bridge missing for same `filing_year`). Lapse event at `consecutive_cycles_at_target = 0`. SOC 2 evidence: FLEET-MAT-E-001 (CC4.1/A1.1, annual Q1, 3yr). Full model in `docs/COST_MODEL.md §49`.

@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.23.1
+# FORM · Cost Model & Unit Economics v2.23.3
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -375,6 +375,7 @@
     - 49.9 Implementation Checklist
     - 49.10 Open Questions
     - 49.11 Cross-Reference Index
+50. [OQ-ENTERPRISE-ARR-04 Resolution — `evidence_artefact_id` Optionality & FLEET-MAT-CHAIN-02 (DEC-087)](#50--oq-enterprise-arr-04-resolution--evidence_artefact_id-schema-optionality-confirmed--fleet-mat-chain-02-evidence-linkage-invariant-dec-087)
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -13772,7 +13773,7 @@ const FleetMaturityDeclaredSchema = z.object({
 
 **OQ-ENTERPRISE-ARR-03** (P2, M24): What is the actual seat expansion take-up rate (FM-C2 input) for Green vs Amber tenants in Phase 2 CSM coverage? The 70%/25% split used in §49.4 is modelled from §48 assumptions, not observed data. Owner: customer-success.
 
-**OQ-ENTERPRISE-ARR-04** (P1, M18): Should `evidence_artefact_id` in `FleetMaturityDeclaredSchema` be required (not optional) to create a mandatory evidence linkage? Current design makes it optional for years 1–2 (before first declaration) and required from cycle 2 onwards via Worker invariant. A fully required field would fail schema validation in non-declaration years. Owner: compliance-officer.
+**OQ-ENTERPRISE-ARR-04** (P1, M18): 🟢 **Resolved (DEC-087, 2026-06-30 — §50).** `evidence_artefact_id` remains `.optional()` in `FleetMaturityDeclaredSchema`. Presence enforced at Worker layer via FLEET-MAT-CHAIN-02 (HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED` when `consecutive_cycles_at_target >= 2` and field absent). Schema-level required rejected: non-declaration years (cycles 1–2) produce valid events without the field; Zod required would break zero-declaration-year affirmative attestation (SOC2_READINESS §132). See §50 for full rationale and invariant spec.
 
 ---
 
@@ -13791,10 +13792,151 @@ const FleetMaturityDeclaredSchema = z.object({
 | `docs/ENTERPRISE.md` | Pricing tiers | §49.4 tier upgrade ARR uses Growth→Elite delta ($300/mo = $3,600/yr at 100 seats) | 🟢 |
 | `docs/DATA_MODEL.md` | §17 (Admin Dashboard RLS) | Privacy floor: §49 tables contain fleet aggregates only; consistent with §17 k-anonymity (n ≥ 5) | 🟢 |
 | `docs/OBSERVABILITY.md` | §63 (Fleet Maturity Chain Monitoring) | Companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56–57; four DEC-030 events in AUDIT_LOG_SCHEMA v2.63 | 🟢 |
+| `docs/DECISION_LOG.md` | DEC-087 | OQ-ENTERPRISE-ARR-04 resolution; FLEET-MAT-CHAIN-02 evidence linkage invariant formalisation | 🟢 |
+| `docs/COST_MODEL.md` | §50 | OQ-ENTERPRISE-ARR-04 resolution section; FLEET-MAT-CHAIN-02 spec; confirmed schema optionality | 🟢 |
 
 ---
 
-*v2.23.2 (2026-06-30): §49.9 + §49.11 OBSERVABILITY §63 cross-reference closure. P1/M13 obligation from OBSERVABILITY §63.9 item 5 fulfilled: new row in §49.9 checklist confirms OBSERVABILITY §63 (v5.10.0, 2026-06-30) as companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56–57 registered §12.6 v2.7 patch; all four DEC-030 events registered AUDIT_LOG_SCHEMA.md v2.63 (2026-06-30). New row in §49.11 cross-reference index: `docs/OBSERVABILITY.md §63` → 🟢. OBSERVABILITY §63.10 obligation for COST_MODEL §49.9 → 🟢. Document header v2.23.1 → v2.23.2. Owner: compliance-officer.*
+## §50 · OQ-ENTERPRISE-ARR-04 Resolution — `evidence_artefact_id` Schema Optionality Confirmed & FLEET-MAT-CHAIN-02 Evidence Linkage Invariant (DEC-087)
+
+### 50.1 Background
+
+`OQ-ENTERPRISE-ARR-04` (P1, M18) was opened in §49.10 when `FleetMaturityDeclaredSchema` (Zod v2) was first authored:
+
+> *"Should `evidence_artefact_id` in `FleetMaturityDeclaredSchema` be required (not optional) to create a mandatory evidence linkage? Current design makes it optional for years 1–2 (before first declaration) and required from cycle 2 onwards via Worker invariant. A fully required field would fail schema validation in non-declaration years. Owner: compliance-officer."*
+
+This section provides the formal resolution (DEC-087). Owner: compliance-officer + enterprise-architect.
+
+---
+
+### 50.2 Decision (DEC-087)
+
+**`evidence_artefact_id` remains `.optional()` in the Zod v2 schema — confirmed as the correct design.**
+
+The existing Worker-layer comment ("`Worker invariant: evidence_artefact_id must be present when consecutive_cycles_at_target >= 2`") is formalised as a named chain invariant: **FLEET-MAT-CHAIN-02**.
+
+No schema change is required. This section documents the compliance-officer ruling and names the invariant so it can be monitored and audited independently of FLEET-MAT-CHAIN-01.
+
+---
+
+### 50.3 Rationale — Three Grounds for Optional-at-Schema
+
+**Ground 1: Non-declaration years are legitimate `enterprise.fleet_maturity_declared` events.**
+
+When `consecutive_cycles_at_target < 2`, the event is still emitted — it serves as an affirmative attestation that the filing year occurred and fleet maturity was *not* yet achieved. Making `evidence_artefact_id` required at schema layer would cause Zod validation to reject these events outright, creating a gap in the annual filing chain for years 1 and 2 (before any fleet maturity declaration is possible).
+
+**Ground 2: Consistency with the FLEET-MAT-E-001 zero-declaration-year affirmative attestation pattern.**
+
+`docs/SOC2_READINESS.md §132` and §49.8 both document the zero-declaration year pattern: *"Zero-declaration years filed as affirmative attestation (all FM fields present, `fm_*_met` = false as applicable)."* A Zod `.required()` field would break this pattern — the first two years of fleet tracking would produce events that are schema-invalid despite being correct business events.
+
+**Ground 3: DEC-030 design pattern — schema validates structure; Worker enforces business invariants.**
+
+FLEET-MAT-CHAIN-01 (the NRR bridge ordering check) is a Worker-layer invariant, not a schema constraint. FLEET-MAT-CHAIN-02 follows the same pattern: the *existence* of the evidence linkage, once the two-cycle threshold is reached, is a business rule enforced at the application boundary. Schema constraints (Zod) validate field types and formats; business rules (Worker invariants) validate inter-event and state-dependent conditions. Mixing these concerns would make the Zod schema context-dependent and invalid from a pure-schema design standpoint.
+
+---
+
+### 50.4 FLEET-MAT-CHAIN-02 Invariant Specification
+
+> **FLEET-MAT-CHAIN-02 (Evidence Linkage Invariant):** When the `emit-audit-event` Worker is about to emit `enterprise.fleet_maturity_declared` and `payload.consecutive_cycles_at_target >= 2`, `evidence_artefact_id` MUST be present in the payload. If absent, the Worker returns HTTP 422 with error code `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED`.
+>
+> Error payload: `{ "error": "FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED", "message": "evidence_artefact_id is required when consecutive_cycles_at_target >= 2", "filing_year": <int>, "consecutive_cycles_at_target": <int> }`
+
+**Invariant check order in the `emit-audit-event` Worker for `enterprise.fleet_maturity_declared`:**
+
+| Step | Invariant / Action | Failure response |
+|---|---|---|
+| 1 | **FLEET-MAT-CHAIN-01**: Verify `enterprise.annual_nrr_bridge_filed` exists in current HMAC chain for `filing_year` | HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE` |
+| 2 | **FLEET-MAT-CHAIN-02**: If `consecutive_cycles_at_target >= 2`, verify `evidence_artefact_id` is present | HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED` |
+| 3 | **Zod v2 schema validation**: Validate full `FleetMaturityDeclaredSchema` | HTTP 400 on schema errors |
+| 4 | **Emit event**: Write to `audit_log` via `form_system` SECURITY DEFINER function | — |
+
+**Relationship to FLEET-MAT-CHAIN-01:** The two invariants are independent pre-emit guards in the same Worker handler. FLEET-MAT-CHAIN-01 verifies causal ordering (NRR bridge must precede declaration); FLEET-MAT-CHAIN-02 verifies evidence completeness (artefact linkage required from cycle 2). Neither invariant supersedes the other; both must pass for the event to be emitted.
+
+---
+
+### 50.5 Confirmed `FleetMaturityDeclaredSchema` (No Change)
+
+The Zod v2 schema defined in §49.7 is confirmed correct as authored. No field changes, no constraint changes, no new fields.
+
+```typescript
+// Confirmed — no changes from §49.7 (DEC-087)
+const FleetMaturityDeclaredSchema = z.object({
+  filing_year:                     z.number().int().min(2026).max(2050),
+  consecutive_cycles_at_target:    z.number().int().min(0),
+  green_fleet_pct:                 z.number().min(0).max(1),
+  expansion_takeup_pct:            z.number().min(0).max(1),
+  tier_upgrades_count:             z.number().int().min(0),
+  trailing_nrr_pct:                z.number().min(0).max(3),
+  active_tenant_count:             z.number().int().positive(),
+  fm_c1_met:                       z.boolean(),
+  fm_c2_met:                       z.boolean(),
+  fm_c3_met:                       z.boolean(),
+  correlated_nrr_bridge_event_id:  z.string().uuid(),
+  evidence_artefact_id:            z.string()
+                                     .regex(/^FLEET-MAT-E-001_\d{4}$/)
+                                     .optional(),   // ← Optional confirmed correct (DEC-087)
+})
+// FLEET-MAT-CHAIN-01: NRR bridge event must exist in HMAC chain for same filing_year before emit
+// FLEET-MAT-CHAIN-02 (formalised DEC-087): HTTP 422 FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED
+//   when consecutive_cycles_at_target >= 2 and evidence_artefact_id absent
+// active_tenant_count >= 12 required when consecutive_cycles_at_target >= 2 (DEC-086 §49.2)
+```
+
+---
+
+### 50.6 SOC 2 Evidence Note
+
+FLEET-MAT-CHAIN-02 is now an auditor-verifiable invariant with a named error code. FLEET-MAT-E-001 collection (CC4.1/A1.1, annual Q1, 3yr — registered SOC2_READINESS §132) continues unchanged.
+
+Two complementary auditor queries confirm the invariant is operating correctly:
+
+| Query | Expected result | Interpretation |
+|---|---|---|
+| Count `enterprise.fleet_maturity_declared` events with `consecutive_cycles_at_target >= 2` AND `evidence_artefact_id IS NULL` | **0** | Any positive count indicates a FLEET-MAT-CHAIN-02 bypass (Worker bug or direct `audit_log` write — `form_api` is REVOKED) |
+| Count `enterprise.fleet_maturity_declared` events with `consecutive_cycles_at_target < 2` AND `evidence_artefact_id IS NULL` | **> 0** in years 1–2 | Confirms zero-declaration-year pattern operating correctly; these are valid non-declaration-year events |
+
+These queries are additive to FLEET-MAT-E-001 evidence collection. No change to the R2 path `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv` or Vanta mapping registered in SOC2_READINESS §132.
+
+---
+
+### 50.7 DEC-087 Decision Record
+
+| Field | Value |
+|---|---|
+| **Decision ID** | DEC-087 |
+| **Date** | 2026-06-30 |
+| **Question** | OQ-ENTERPRISE-ARR-04: Should `evidence_artefact_id` in `FleetMaturityDeclaredSchema` be required or optional at schema level? |
+| **Decision** | Keep `.optional()` in Zod v2 schema. Enforce presence at Worker layer (FLEET-MAT-CHAIN-02) when `consecutive_cycles_at_target >= 2`. HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED` on violation. No schema change. |
+| **Owner** | compliance-officer + enterprise-architect |
+| **Why** | (1) Non-declaration years (cycles 1–2) produce valid events without `evidence_artefact_id` — Zod required would reject them; (2) zero-declaration-year affirmative attestation pattern (SOC2_READINESS §132) requires null `evidence_artefact_id` for cycle 0–1 events; (3) DEC-030 design pattern: schema validates structure, Worker enforces business invariants — consistent with FLEET-MAT-CHAIN-01. |
+| **Reverse cost** | Low. FLEET-MAT-CHAIN-02 is a pre-emit guard in one Worker function. Reversal: remove conditional check. Schema unchanged. |
+
+---
+
+### 50.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Add FLEET-MAT-CHAIN-02 guard to `emit-audit-event` Worker `fleet_maturity_declared` handler: check `payload.consecutive_cycles_at_target >= 2 && !payload.evidence_artefact_id` → HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED`. Execute **after** FLEET-MAT-CHAIN-01 check, **before** Zod validation. Add unit test: payload with `consecutive_cycles_at_target = 2` and `evidence_artefact_id = undefined` → 422; same payload with `evidence_artefact_id = "FLEET-MAT-E-001_2028"` → passes FLEET-MAT-CHAIN-02 check. | platform-engineer | **P1** | M15 (same milestone as FLEET-MAT-CHAIN-01 Worker implementation per §49.9 item 2) | [ ] |
+| 2 | Update `docs/AUDIT_LOG_SCHEMA.md` Fleet Maturity events section: add FLEET-MAT-CHAIN-02 invariant name, description, and HTTP 422 error code alongside existing FLEET-MAT-CHAIN-01 documentation. | compliance-officer | **P1** | M15 | [ ] |
+| 3 | Add two §50.6 auditor queries to FLEET-MAT-E-001 evidence collection notes in `docs/SOC2_READINESS.md §132`. | compliance-officer | **P2** | M18 (before first FLEET-MAT-E-001 collection) | [ ] |
+| 4 | Mark OQ-ENTERPRISE-ARR-04 🟢 Resolved in §49.10 of this document and register DEC-087 in §49.11 and `docs/DECISION_LOG.md`. | compliance-officer | **P1** | M13 (this authoring pass) | [x] **Done — this patch (v2.23.3, 2026-06-30).** |
+
+---
+
+### 50.9 Cross-Reference Obligations Created by §50
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md` — add FLEET-MAT-CHAIN-02 invariant name + HTTP 422 error code to Fleet Maturity events section | §50.8 item 2 (P1/M15) | 🟡 Pending — Worker implementation milestone |
+| `docs/SOC2_READINESS.md §132` — add two §50.6 auditor queries to FLEET-MAT-E-001 collection notes | §50.8 item 3 (P2/M18) | 🟡 Pending — before first evidence collection |
+| FLEET-MAT-CHAIN-02 Worker guard implementation + unit test (`consecutive_cycles_at_target >= 2` && absent `evidence_artefact_id` → 422) | §50.8 item 1 (P1/M15) | 🟡 Pending — Worker implementation milestone |
+
+---
+
+*v2.23.3 (2026-06-30): §50 OQ-ENTERPRISE-ARR-04 Resolution — `evidence_artefact_id` schema optionality confirmed; FLEET-MAT-CHAIN-02 Evidence Linkage Invariant formalised (DEC-087). Closes OQ-ENTERPRISE-ARR-04 (P1/M18): `.optional()` in `FleetMaturityDeclaredSchema` confirmed correct. Three grounds: (1) non-declaration years (cycles 1–2) are valid events without `evidence_artefact_id` — Zod required would reject them; (2) zero-declaration-year affirmative attestation pattern (SOC2_READINESS §132) requires null for cycle 0–1 events; (3) DEC-030 design pattern: schema validates structure, Worker enforces business invariants. New named invariant FLEET-MAT-CHAIN-02: when `consecutive_cycles_at_target >= 2` and `evidence_artefact_id` absent → HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED`. Check order in Worker: (1) FLEET-MAT-CHAIN-01 (NRR bridge ordering); (2) FLEET-MAT-CHAIN-02 (evidence linkage); (3) Zod v2 schema; (4) emit. Confirmed `FleetMaturityDeclaredSchema` unchanged. Two SOC 2 auditor queries (§50.6): non-null `evidence_artefact_id` on cycle-≥2 events (expect 0 null); null `evidence_artefact_id` on cycle-<2 events (expect > 0). §49.10 OQ-ENTERPRISE-ARR-04 marked 🟢 Resolved. §49.11: DEC-087 + §50 cross-reference rows added. TOC entry §50 added. DEC-087 registered in `docs/DECISION_LOG.md`. Note: v2.23.2 document header update (stated in v2.23.2 version note) was not applied in the prior authoring pass; header corrected v2.23.1 → v2.23.3 in this patch. Owner: compliance-officer + enterprise-architect.*
+
+*v2.23.2 (2026-06-30): §49.9 + §49.11 OBSERVABILITY §63 cross-reference closure. P1/M13 obligation from OBSERVABILITY §63.9 item 5 fulfilled: new row in §49.9 checklist confirms OBSERVABILITY §63 (v5.10.0, 2026-06-30) as companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56–57 registered §12.6 v2.7 patch; all four DEC-030 events registered AUDIT_LOG_SCHEMA.md v2.63 (2026-06-30). New row in §49.11 cross-reference index: `docs/OBSERVABILITY.md §63` → 🟢. OBSERVABILITY §63.10 obligation for COST_MODEL §49.9 → 🟢. Document header v2.23.1 → v2.23.2. Owner: compliance-officer.* (2026-06-30): §49.9 + §49.11 OBSERVABILITY §63 cross-reference closure. P1/M13 obligation from OBSERVABILITY §63.9 item 5 fulfilled: new row in §49.9 checklist confirms OBSERVABILITY §63 (v5.10.0, 2026-06-30) as companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56–57 registered §12.6 v2.7 patch; all four DEC-030 events registered AUDIT_LOG_SCHEMA.md v2.63 (2026-06-30). New row in §49.11 cross-reference index: `docs/OBSERVABILITY.md §63` → 🟢. OBSERVABILITY §63.10 obligation for COST_MODEL §49.9 → 🟢. Document header v2.23.1 → v2.23.2. Owner: compliance-officer.*
 
 *v2.23.1 (2026-06-30): §49.9 checklist + §49.11 cross-reference closure. Three documentation obligations opened in v2.23.0 are now fulfilled: (1) `enterprise.fleet_maturity_declared` registered in `docs/AUDIT_LOG_SCHEMA.md` v2.62 (2026-06-30) — `FleetMaturityDeclaredSchema` Zod v2, FLEET-MAT-CHAIN-01 invariant, CC4.1/A1.1 auditor narratives; (2) FLEET-MAT-E-001 registered in `docs/SOC2_READINESS.md §132` (v3.57.0, 2026-06-30) — §79.4 row (count 101→102), `enterprise/fleet-maturity/` R2 subfolder (§80.3), Vanta mirror entry (§80.4); (3) DEC-086 (Fleet Maturity governance protocol) registered in `docs/DECISION_LOG.md`. §49.9 items 1 and 3 status updated 🟡 Open → ✅ Done. §49.11 cross-reference index: DEC-086, AUDIT_LOG_SCHEMA Enterprise Fleet Maturity events, SOC2_READINESS §132 rows updated 🟡 → 🟢. Document header v2.23.0 → v2.23.1. Owner: compliance-officer.*
 

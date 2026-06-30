@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [10.50.1] — 2026-06-30
+
+### Changed
+- `docs/COST_MODEL.md §50` — OQ-ENTERPRISE-ARR-04 Resolution: `evidence_artefact_id` schema optionality confirmed; FLEET-MAT-CHAIN-02 Evidence Linkage Invariant formalised (DEC-087). Closes P1/M18 open question from §49.10: `.optional()` in `FleetMaturityDeclaredSchema` is correct design. New named invariant FLEET-MAT-CHAIN-02 enforced at Worker layer (HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED` when `consecutive_cycles_at_target >= 2` and field absent). Three rationale grounds documented. Invariant check order specified (FLEET-MAT-CHAIN-01 → FLEET-MAT-CHAIN-02 → Zod → emit). Two SOC 2 auditor queries added. Document header v2.23.1 → v2.23.3 (v2.23.2 header update applied retroactively). Owner: compliance-officer + enterprise-architect.
+- `docs/DECISION_LOG.md` — DEC-087 registered: OQ-ENTERPRISE-ARR-04 resolution, FLEET-MAT-CHAIN-02 invariant formalisation.
+- `VERSION` — 10.50.0 → 10.50.1.
+
+---
+
 ## [10.50.0] — 2026-06-30
 
 ### Added
