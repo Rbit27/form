@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.62.0** — 2026-06-30 · post-2889 · «RPE як інструмент, а не оцінка: як калібрувати суб'єктивне сприйняття навантаження» · series «Тренувальний інтелект» 2886–2895 (4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2889 · next: post-2890 (як планувати тижневий об'єм коли розклад змінюється)
+
 **v10.61.0** — 2026-06-30 · post-2888 · «Плато: як правильно діагностувати зупинку прогресу і знайти реальну причину» · series «Тренувальний інтелект» 2886–2895 (3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2888 · next: post-2889 («RPE як інструмент, а не оцінка: як калібрувати суб'єктивне сприйняття навантаження»)
 
 **v10.60.0** — 2026-06-30 · post-2887 · «Сигнал і шум у тренувальних даних: як відрізнити реальний тренд від ситуаційної варіабельності» · series «Тренувальний інтелект» 2886–2895 (2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2887 · next: post-2888 («Плато: як правильно діагностувати зупинку прогресу і знайти реальну причину»)
