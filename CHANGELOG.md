@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [10.27.0] — 2026-06-30
+
+### Added
+- `content/post-2851-return-after-illness.md` — Series «Рішення під тиском» 2846–2855 post 6/10. «Повернення після хвороби: протокол, а не компенсація». Detraining vs. illness-catabolism distinction (Mujika & Padilla 2000; Bhatt et al. 2007); three psychological mechanisms driving the «make up for lost time» error; three red-flag criteria (fever, below-neck symptoms, duration > 14 days) for stopping and consulting a doctor; two-phase return protocol (neurological calibration days 1–3 → graduated load restoration days 4–10); RPE as inter-session recovery indicator; three specific «don't do» mistakes with predicted outcomes. clinical-safety: CONDITIONAL PASS (red-flag block present). sports-scientist review pending.
+- `blog.html` — post-2851 card added at top of feed.
+
+### Changed
+- `VERSION` — 10.26.1 → 10.27.0.
+
 ## [10.26.1] — 2026-06-30
 
 ### Changed
