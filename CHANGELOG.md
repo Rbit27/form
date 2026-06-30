@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [10.44.0] — 2026-06-30
+
+### Added
+- `content/post-2874-when-ai-is-not-enough-signs-to-find-human-coach.md` — Series «Автономне тренування» 2866–2875 · 9/10. «Коли AI недостатньо: ознаки, що пора шукати людину-тренера». Що AI робить добре (агрегація даних, протокольний scaffolding, доступність, відсутність упереджень); чотири структурні обмеження (реальна технічна оцінка, нюанси відновлення, специфічне пікування, підзвітність у кризі); чотири ознаки-тригери (технічне плато без діагностики, конфліктні сигнали без вирішення, підготовка до змагань з фіксованою датою, ізоляція від зворотного зв'язку); алгоритм «раз на квартал → 6+ тижнів → визнач задачу → обери тренера»; принципи вибору тренера. Côté & Gilbert 2009; Nash & Collins 2006; Durand-Bush & Salmela 2002. clinical-safety: NOT_REQUIRED.
+- `docs/AUDIT_LOG_SCHEMA.md §Fleet Maturity Chain Monitoring` — новий розділ `### Enterprise Fleet Maturity Chain Monitoring events` (v2.63). Зареєстровано 4 DEC-030 HMAC-chained events з OBSERVABILITY §63 (P0/M13): `security.fleet_mat_chain_violation` (CRITICAL/7yr — job 56, orphan detection, AL-FLEET-MAT-01 P0, no auto-resolve), `system.fleet_mat_chain_check_passed` (LOW/1yr — job 56 all-clear), `enterprise.nrr_bridge_q1_overdue` (HIGH/7yr — job 57, April 1 deadline miss, AL-FLEET-FILING-01 P1, 7-day re-alert dedup, auto-resolve on filing), `system.nrr_bridge_q1_check_passed` (LOW/1yr — job 57 all-clear). Чотири Zod v2 схеми. Closes `docs/OBSERVABILITY.md §63.9` item 3 (P0/M13 — 🟢 2026-06-30).
+- `blog.html` — card for post-2874 added at top of feed.
+
+### Changed
+- `docs/OBSERVABILITY.md §63.9` — item 3 (P0/M13 — AUDIT_LOG_SCHEMA registration) → 🟢 Done; item 5 (P1/M13 — COST_MODEL §49.9 cross-ref) → 🟢 Done; §63.10 cross-reference obligations for AUDIT_LOG_SCHEMA.md and COST_MODEL §49.9 → 🟢 Done.
+- `docs/COST_MODEL.md §49.9` — новий рядок чеклисту: OBSERVABILITY §63 cross-reference (P1/M13 → ✅ Done). §49.11 cross-reference index: новий рядок `docs/OBSERVABILITY.md §63` → 🟢. v2.23.1 → v2.23.2.
+- `README.md` — series 2866–2875 progress 8/10 → 9/10; post-2874 → draft · v10.44.0.
+- `STATUS.md` — current version v10.42.0 → v10.44.0; next: post-2875 (синтез серії).
+- `VERSION` — 10.43.0 → 10.44.0.
+
+---
+
 ## [10.43.0] — 2026-06-30
 
 ### Added

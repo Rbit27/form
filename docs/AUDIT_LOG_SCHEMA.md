@@ -4616,6 +4616,75 @@ const FleetMaturityDeclaredSchema = z.object({
 
 ---
 
+### Enterprise Fleet Maturity Chain Monitoring events (DEC-030 HMAC-chained · OBSERVABILITY §63 · CC4.1 / A1.1)
+
+> Defined in `docs/OBSERVABILITY.md §63` (v5.10.0, 2026-06-30). Four DEC-030 HMAC-chained monitoring events emitted by two pg_cron sentinels registered in OBSERVABILITY §12.6 v2.7 patch: job 56 `fleet_mat_chain_verify` (`0 6 * * 1`, Monday 06:00 UTC, weekly) and job 57 `nrr_bridge_q1_calendar_check` (`0 6 * * *`, daily 06:00 UTC). Together these close the monitoring gap identified in OBSERVABILITY §63 for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01 chain invariants introduced by COST_MODEL §48–§49 (v2.22.0–v2.23.0, 2026-06-30). **Privacy floor (all four events):** monitoring signals are filing-calendar booleans, chain-integrity counts, and aggregate ARR percentages only — no per-tenant breakdown, no employee `user_id`, no GDPR Art. 9 data. `form_api` REVOKED from `audit_log_events` INSERT for all four event types.
+
+| Event | Severity | Retention | Emitter | Key payload |
+|---|---|---|---|---|
+| `security.fleet_mat_chain_violation` | CRITICAL | 7 yr | `form_system` (`service_role`) via job 56 `fleet_mat_chain_verify` — per orphan `fleet_maturity_declared` row | `filing_year` (INT), `orphan_event_id` (UUID — the `fleet_maturity_declared` event with no matching `annual_nrr_bridge_filed` for same `filing_year`), `check_run_at` (datetime), `total_orphan_count` (INT ≥ 1 — orphan count this run), `alert_dedup_key` (TEXT `fleet-mat-chain-violation-{filing_year}`) |
+| `system.fleet_mat_chain_check_passed` | LOW | 1 yr | `form_system` via job 56 all-clear path (`orphan_count = 0`) | `events_checked` (INT — total `fleet_maturity_declared` events scanned), `check_run_at` (datetime) |
+| `enterprise.nrr_bridge_q1_overdue` | HIGH | 7 yr | `form_system` via job 57 — when date > April 1 + prior-year renewal trigger met + no `enterprise.annual_nrr_bridge_filed` for `reporting_year` | `reporting_year` (INT), `days_overdue` (INT ≥ 1 — calendar days past April 1), `check_run_at` (datetime), `alert_dedup_key` (TEXT `nrr-bridge-q1-overdue-{reporting_year}`) — 7-day re-alert dedup; auto-resolve on filing |
+| `system.nrr_bridge_q1_check_passed` | LOW | 1 yr | `form_system` via job 57 all-clear path (filing confirmed or trigger condition not met) | `reporting_year` (INT), `check_run_at` (datetime), `filing_confirmed` (BOOLEAN — true if `enterprise.annual_nrr_bridge_filed` found for `reporting_year`; false if renewal trigger not yet met) |
+
+```typescript
+// security.fleet_mat_chain_violation (CRITICAL · 7 yr · CC4.1 / A1.1)
+const FleetMatChainViolationSchema = z.object({
+  filing_year:       z.number().int().min(2026).max(2050),
+  orphan_event_id:   z.string().uuid(),
+  check_run_at:      z.string().datetime(),
+  total_orphan_count: z.number().int().nonnegative().min(1),
+  alert_dedup_key:   z.string(),
+})
+
+// system.fleet_mat_chain_check_passed (LOW · 1 yr · CC4.1)
+const FleetMatChainCheckPassedSchema = z.object({
+  events_checked: z.number().int().nonnegative(),
+  check_run_at:   z.string().datetime(),
+})
+
+// enterprise.nrr_bridge_q1_overdue (HIGH · 7 yr · CC4.1 / A1.1)
+const NrrBridgeQ1OverdueSchema = z.object({
+  reporting_year:  z.number().int().min(2025).max(2050),
+  days_overdue:    z.number().int().positive(),
+  check_run_at:    z.string().datetime(),
+  alert_dedup_key: z.string(),
+})
+
+// system.nrr_bridge_q1_check_passed (LOW · 1 yr · CC4.1)
+const NrrBridgeQ1CheckPassedSchema = z.object({
+  reporting_year:    z.number().int().min(2025).max(2050),
+  check_run_at:      z.string().datetime(),
+  filing_confirmed:  z.boolean(),
+})
+```
+
+**Alert routing:**
+
+| Event | Alert | Severity | Channel | Dedup key |
+|---|---|---|---|---|
+| `security.fleet_mat_chain_violation` | AL-FLEET-MAT-01 | P0 | PagerDuty `form-compliance` → compliance-officer + security-engineer | `fleet-mat-chain-violation-{filing_year}` (no auto-resolve — requires manual compliance-officer sign-off per OBSERVABILITY §63.3) |
+| `enterprise.nrr_bridge_q1_overdue` | AL-FLEET-FILING-01 | P1 | PagerDuty `form-compliance` → compliance-officer | `nrr-bridge-q1-overdue-{reporting_year}` (7-day re-alert dedup; auto-resolve on `enterprise.annual_nrr_bridge_filed` emission for same `reporting_year`) |
+
+**FLEET-MAT-CHAIN-01 retrospective invariant:** Job 56 (`fleet_mat_chain_verify`) performs a weekly retrospective scan of all historical `fleet_maturity_declared` events. For each event, it queries the HMAC-chained audit log for an `enterprise.annual_nrr_bridge_filed` with matching `filing_year`. Any orphan triggers `security.fleet_mat_chain_violation` CRITICAL/7yr and AL-FLEET-MAT-01 P0. This is a retrospective audit — the structural FLEET-MAT-CHAIN-01 forward invariant (HTTP 422 at `emit-audit-event` Worker) prevents new orphans at write time; job 56 covers historical data and any invariant bypass.
+
+**SLOs (per OBSERVABILITY §63.5):**
+- FLEET-FILING-SLO-01: NRR Bridge filed by April 1 when trigger met — 100% zero-tolerance, CC4.1/A1.1
+- FLEET-FILING-SLO-02: Zero FLEET-MAT-CHAIN-01 retrospective violations — 100% zero-tolerance, CC4.1/A1.1
+- FLEET-FILING-SLO-03: NRR-BRIDGE-INV-01 passes 100% of filed events — structurally enforced at Worker write layer via HTTP 422 before persistence; no pg_cron verification needed
+
+**CC4.1 auditor narrative:** `security.fleet_mat_chain_violation` and `system.fleet_mat_chain_check_passed` together provide weekly auditor-verifiable evidence that the FLEET-MAT-CHAIN-01 causal ordering invariant holds across all historical `fleet_maturity_declared` events. A zero-violation run emitting `fleet_mat_chain_check_passed` with `events_checked > 0` constitutes an affirmative auditor-inspectable attestation. `enterprise.nrr_bridge_q1_overdue` provides a calendar-deadline monitoring record proving FORM detects and alerts on missed annual NRR bridge obligations — consistent with CC4.1 monitoring and communication of control performance against defined criteria.
+
+**A1.1 auditor narrative:** `enterprise.nrr_bridge_q1_overdue` demonstrates FORM monitors its annual NRR bridge filing obligation (April 1 deadline for prior-year cohort), a metric directly tied to enterprise service delivery attestation. Unbroken chain of `nrr_bridge_q1_check_passed` events (daily) provides A1.1 availability-monitoring evidence. `security.fleet_mat_chain_violation` absence across job 56 runs provides A1.1 evidence that fleet maturity declarations are structurally backed by validated NRR bridge computations, consistent with availability commitments in tenant SLAs.
+
+**SOC 2 evidence:** FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr, `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv`) — SOC2_READINESS §79.4 registration pending per OBSERVABILITY §63.9 item 6 (P1/M15).
+
+**Retention table additions:** `security.fleet_mat_chain_violation` CRITICAL 7yr CC4.1/A1.1; `system.fleet_mat_chain_check_passed` LOW 1yr CC4.1; `enterprise.nrr_bridge_q1_overdue` HIGH 7yr CC4.1/A1.1; `system.nrr_bridge_q1_check_passed` LOW 1yr CC4.1.
+
+*v2.63 (2026-06-30): +4 events — Enterprise Fleet Maturity Chain Monitoring (OBSERVABILITY §63 · CC4.1/A1.1). New section `### Enterprise Fleet Maturity Chain Monitoring events` inserted after `### Enterprise Fleet Maturity events`. Events: `security.fleet_mat_chain_violation` (CRITICAL/7yr — job 56 orphan detection, AL-FLEET-MAT-01 P0), `system.fleet_mat_chain_check_passed` (LOW/1yr — job 56 all-clear), `enterprise.nrr_bridge_q1_overdue` (HIGH/7yr — job 57 April 1 deadline miss, AL-FLEET-FILING-01 P1, 7-day re-alert dedup, auto-resolve on filing), `system.nrr_bridge_q1_check_passed` (LOW/1yr — job 57 all-clear). Four Zod v2 schemas registered. Alert routing: AL-FLEET-MAT-01 P0 `form-compliance` (no auto-resolve); AL-FLEET-FILING-01 P1 `form-compliance` (auto-resolve on `annual_nrr_bridge_filed`). Retention table: +4 rows. Privacy floor: filing-calendar booleans, chain-integrity counts, aggregate flags only — no per-tenant breakdown, no `user_id`, no GDPR Art. 9 data. Document header v2.62 → v2.63. **Closes `docs/OBSERVABILITY.md §63.9` item 3 (P0/M13 — 🟢 2026-06-30 — all four DEC-030 event types now registered).** Owner: compliance-officer + security-engineer + devops-lead.*
+
+---
+
 ## Export & delivery
 
 Enterprise tenants can:

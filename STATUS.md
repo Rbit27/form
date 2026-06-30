@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.42.0** — 2026-06-30 · post-2873 · Series 2866–2875 «Автономне тренування» 8/10 · post-2873 «Тижневий огляд self-coached атлета: що переглядати, що ні і як часто» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2873 · README: post-2873 → draft; roadmap extended to 2915; series 2906–2915 «Тренувальна комунікація з собою» proposed · next: post-2874
+**v10.44.0** — 2026-06-30 · post-2874 · Series 2866–2875 «Автономне тренування» 9/10 · post-2874 «Коли AI недостатньо: ознаки, що пора шукати людину-тренера» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2874 · README: post-2874 → draft · AUDIT_LOG_SCHEMA.md v2.63: +4 OBSERVABILITY §63 DEC-030 events registered (P0/M13 closed) · COST_MODEL.md v2.23.2: §49.9 OBSERVABILITY §63 cross-ref added · OBSERVABILITY.md §63.9 item 3 + item 5 → 🟢 · next: post-2875 (синтез серії)
 
 ---
 

@@ -13762,6 +13762,7 @@ const FleetMaturityDeclaredSchema = z.object({
 | P1 | M15 | File first FLEET-MAT-E-001 affirmative attestation (zero-declaration year) | compliance-officer | 🟡 Open |
 | P2 | M24 | Validate FM-C1/C2/C3 thresholds against first 3 renewal cohorts | customer-success | 🟡 Open |
 | P2 | M36 | Calibrate expansion take-up rates (FM-C2) against actual CSM Phase 2→3 transition | customer-success | 🟡 Open |
+| P1 | M13 | Cross-reference note: OBSERVABILITY §63 (v5.10.0, 2026-06-30) authored as companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56 (`fleet_mat_chain_verify`, weekly) and 57 (`nrr_bridge_q1_calendar_check`, daily) registered in §12.6 v2.7 patch; four DEC-030 events registered in AUDIT_LOG_SCHEMA.md v2.63 (2026-06-30) | compliance-officer | ✅ Done (2026-06-30) |
 
 ---
 
@@ -13789,8 +13790,11 @@ const FleetMaturityDeclaredSchema = z.object({
 | `docs/SOC2_READINESS.md` | §132 | FLEET-MAT-E-001 evidence registration; §79.4 count 101→102 | 🟢 |
 | `docs/ENTERPRISE.md` | Pricing tiers | §49.4 tier upgrade ARR uses Growth→Elite delta ($300/mo = $3,600/yr at 100 seats) | 🟢 |
 | `docs/DATA_MODEL.md` | §17 (Admin Dashboard RLS) | Privacy floor: §49 tables contain fleet aggregates only; consistent with §17 k-anonymity (n ≥ 5) | 🟢 |
+| `docs/OBSERVABILITY.md` | §63 (Fleet Maturity Chain Monitoring) | Companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56–57; four DEC-030 events in AUDIT_LOG_SCHEMA v2.63 | 🟢 |
 
 ---
+
+*v2.23.2 (2026-06-30): §49.9 + §49.11 OBSERVABILITY §63 cross-reference closure. P1/M13 obligation from OBSERVABILITY §63.9 item 5 fulfilled: new row in §49.9 checklist confirms OBSERVABILITY §63 (v5.10.0, 2026-06-30) as companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56–57 registered §12.6 v2.7 patch; all four DEC-030 events registered AUDIT_LOG_SCHEMA.md v2.63 (2026-06-30). New row in §49.11 cross-reference index: `docs/OBSERVABILITY.md §63` → 🟢. OBSERVABILITY §63.10 obligation for COST_MODEL §49.9 → 🟢. Document header v2.23.1 → v2.23.2. Owner: compliance-officer.*
 
 *v2.23.1 (2026-06-30): §49.9 checklist + §49.11 cross-reference closure. Three documentation obligations opened in v2.23.0 are now fulfilled: (1) `enterprise.fleet_maturity_declared` registered in `docs/AUDIT_LOG_SCHEMA.md` v2.62 (2026-06-30) — `FleetMaturityDeclaredSchema` Zod v2, FLEET-MAT-CHAIN-01 invariant, CC4.1/A1.1 auditor narratives; (2) FLEET-MAT-E-001 registered in `docs/SOC2_READINESS.md §132` (v3.57.0, 2026-06-30) — §79.4 row (count 101→102), `enterprise/fleet-maturity/` R2 subfolder (§80.3), Vanta mirror entry (§80.4); (3) DEC-086 (Fleet Maturity governance protocol) registered in `docs/DECISION_LOG.md`. §49.9 items 1 and 3 status updated 🟡 Open → ✅ Done. §49.11 cross-reference index: DEC-086, AUDIT_LOG_SCHEMA Enterprise Fleet Maturity events, SOC2_READINESS §132 rows updated 🟡 → 🟢. Document header v2.23.0 → v2.23.1. Owner: compliance-officer.*
 
