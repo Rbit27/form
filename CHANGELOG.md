@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [10.34.1] — 2026-06-30
+
+### Added
+- `admin-dashboard.html` — **App Health screen** (`screen-apphealth`). Implements `OBSERVABILITY.md §28.6` per-tenant "App Health" Admin Dashboard panel (P2 M6 checklist item). Four sections: (1) crash-free summary row — iOS 99.7% (MOBILE-SLO-02 ✓) and Android 99.3% (⚠ near SLO floor) with k-anon fleet counts; (2) device tier distribution — Tier 1/2/3 breakdown (42%/35%/23%) with CV inference P95 per tier; (3) OTA rollout history — last 3 production builds with adoption at 24 h/48 h/72 h; (4) performance signals — CV thermal throttle (3.2% fleet / 7.1% Tier 3), cold start P95 (1,840 ms), frame render rate (94.1%). Active alerts surface AL-MOBILE-05 (P2 — OTA adoption below 95% at 48 h for v3.14.2). Privacy floor: k-anonymity n ≥ 10 enforced, no device IDs, no crash traces, no user_id, device tier from model-lookup only. SOC 2 CC7.2/A1.1/A1.2 evidence. Sidebar nav item "App Health" (⬡) added after "SLA & Uptime".
+
+### Changed
+- `VERSION` — 10.34.0 → 10.34.1.
+
+---
+
 ## [10.34.0] — 2026-06-30
 
 ### Added

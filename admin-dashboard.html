@@ -145,6 +145,10 @@
         <span class="font-mono">◎</span>
         <span>SLA &amp; Uptime</span>
       </div>
+      <div class="sidebar-item" data-screen="apphealth">
+        <span class="font-mono">⬡</span>
+        <span>App Health</span>
+      </div>
 
       <div class="label mt-6 mb-2 px-3">Налаштування</div>
       <div class="sidebar-item" data-screen="branding">
@@ -2278,6 +2282,276 @@
           <div class="text-dim">OBSERVABILITY.md §23 · ENTERPRISE_SLA.md §3</div>
           <div>DEC-030: sla.incident_opened · sla.incident_closed · sla.measurement_reconciled</div>
           <div>enterprise-architect + compliance-officer</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ════════════════════════════ APP HEALTH ════════════════════════════ -->
+    <!-- OBSERVABILITY.md §28.6 — per-tenant "App Health" Admin Dashboard panel
+         Privacy floor: no user_id, no device IDs, no crash traces, aggregate counts only.
+         k-anonymity gate: panel suppressed (shows notice) when tenant fleet < 10 devices.
+         Source: Sentry fleet-level crash-free rate + ota_update_events Postgres + device_tier lookup.
+         CC7.2/A1.1 SOC 2 evidence — tenant-facing view of MOBILE-SLO-01…07 fleet posture.
+         OBSERVABILITY §28.12 P2 M6 — platform-engineer + devops-lead. -->
+    <div id="screen-apphealth" class="screen">
+
+      <!-- Header -->
+      <div class="flex items-end justify-between mb-10">
+        <div>
+          <div class="label mb-2">App Health · Acme Corp · Jun 2026</div>
+          <h1 class="font-serif text-paper text-5xl font-light leading-tight">
+            Mobile fleet<br>
+            <em class="text-mute text-3xl">Aggregate · no individual data</em>
+          </h1>
+        </div>
+        <div class="flex items-center gap-3 text-mute text-xs font-mono">
+          <div class="pulse-dot w-2 h-2 bg-acid rounded-full"></div>
+          <span>Sentry · EAS · Cloudflare AE · refreshed 5 min</span>
+        </div>
+      </div>
+
+      <!-- k-anon notice banner -->
+      <div class="stat-card mb-6" style="background:rgba(221,255,45,0.04);border-color:rgba(221,255,45,0.2);">
+        <div class="flex items-start gap-4">
+          <span class="font-mono text-acid text-lg flex-shrink-0">⊕</span>
+          <div>
+            <div class="label mb-1 text-acid">Privacy floor · k-anonymity n ≥ 10</div>
+            <div class="text-dim text-sm leading-relaxed">
+              All metrics below represent your fleet aggregate — no individual device identifiers, employee names, or crash stack traces are visible here.
+              Crash details are accessible only to FORM's mobile engineering team via Sentry.
+              If your active fleet falls below 10 devices in any dimension, that cell is suppressed.
+              Ref: <span class="font-mono text-mute">OBSERVABILITY.md §28.6</span> · <span class="font-mono text-mute">MOBILE-SLO-01…07</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Crash-free summary row -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+
+        <div class="stat-card">
+          <div class="label">iOS crash-free rate</div>
+          <div class="data text-acid text-4xl font-light mt-2">99.7<span class="text-mute text-lg">%</span></div>
+          <div class="text-acid text-xs font-mono mt-2">↑ MOBILE-SLO-02 met (≥ 99.5%)</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
+            <div class="h-1 bg-acid" style="width:99.7%"></div>
+          </div>
+          <div class="text-mute text-xs font-mono mt-1">Fleet · rolling 7 days · n=231 devices</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="label">Android crash-free rate</div>
+          <div class="data text-4xl font-light mt-2" style="color:#FBBF24">99.3<span class="text-mute text-lg">%</span></div>
+          <div class="text-xs font-mono mt-2" style="color:#FBBF24">⚠ Near SLO floor (≥ 99.5%)</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
+            <div class="h-1" style="width:99.3%;background:#FBBF24"></div>
+          </div>
+          <div class="text-mute text-xs font-mono mt-1">Fleet · rolling 7 days · n=181 devices</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="label">OTA adoption · production</div>
+          <div class="data text-paper text-4xl font-light mt-2">91<span class="text-mute text-lg">%</span></div>
+          <div class="text-xs font-mono mt-2" style="color:#FBBF24">⚠ Below 95% target at 48 h</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
+            <div class="h-1" style="width:91%;background:#FBBF24"></div>
+          </div>
+          <div class="text-mute text-xs font-mono mt-1">Build v3.14.2 · published 47 h ago · MOBILE-SLO-06</div>
+        </div>
+
+      </div>
+
+      <!-- Device tier distribution + OTA history -->
+      <div class="grid grid-cols-2 gap-4 mb-6">
+
+        <!-- Device tier distribution -->
+        <div class="stat-card">
+          <div class="label mb-4">Device tier distribution</div>
+          <div class="text-mute text-xs font-mono mb-5">Fleet of 412 seats · 412 activated devices · k-anon met</div>
+
+          <div class="space-y-4">
+            <!-- Tier 1 -->
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <div class="text-dim text-sm">Tier 1 — flagship (iPhone 15+, Galaxy S24+)</div>
+                <span class="data text-paper text-sm">42%</span>
+              </div>
+              <div class="h-1.5 bg-line rounded-full overflow-hidden">
+                <div class="h-1.5 bg-acid" style="width:42%"></div>
+              </div>
+              <div class="text-mute text-xs font-mono mt-1">173 devices · CV inference P95 &lt; 22 ms</div>
+            </div>
+
+            <!-- Tier 2 -->
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <div class="text-dim text-sm">Tier 2 — mid-range (iPhone 12–14, Galaxy S21–23)</div>
+                <span class="data text-paper text-sm">35%</span>
+              </div>
+              <div class="h-1.5 bg-line rounded-full overflow-hidden">
+                <div class="h-1.5" style="width:35%;background:#A39D8E"></div>
+              </div>
+              <div class="text-mute text-xs font-mono mt-1">144 devices · CV inference P95 &lt; 38 ms</div>
+            </div>
+
+            <!-- Tier 3 -->
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <div class="text-dim text-sm">Tier 3 — older / corporate mid-range Android</div>
+                <span class="data text-paper text-sm">23%</span>
+              </div>
+              <div class="h-1.5 bg-line rounded-full overflow-hidden">
+                <div class="h-1.5" style="width:23%;background:#6F6A60"></div>
+              </div>
+              <div class="text-mute text-xs font-mono mt-1">95 devices · CV frame rate reduced to 15 fps</div>
+            </div>
+          </div>
+
+          <div class="mt-5 pt-4 border-t border-line text-mute text-xs font-mono">
+            Tier classification: device model lookup — no biometric or location data · OBSERVABILITY §28.4
+          </div>
+        </div>
+
+        <!-- OTA rollout history -->
+        <div class="stat-card">
+          <div class="label mb-4">OTA rollout history · production channel</div>
+          <div class="text-mute text-xs font-mono mb-5">Last 3 builds · adoption at 24 h / 48 h / 72 h</div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Build</th>
+                <th>24 h</th>
+                <th>48 h</th>
+                <th>72 h</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="data text-paper">v3.14.2</td>
+                <td class="data" style="color:#FBBF24">74%</td>
+                <td class="data" style="color:#FBBF24">91%</td>
+                <td class="text-mute data">—</td>
+                <td><span class="badge badge-warn" style="font-size:9px">⚠ in progress</span></td>
+              </tr>
+              <tr>
+                <td class="data text-paper">v3.13.1</td>
+                <td class="data text-acid">88%</td>
+                <td class="data text-acid">97%</td>
+                <td class="data text-acid">99%</td>
+                <td><span class="badge badge-active" style="font-size:9px">✓ complete</span></td>
+              </tr>
+              <tr>
+                <td class="data text-paper">v3.12.0</td>
+                <td class="data text-acid">91%</td>
+                <td class="data text-acid">98%</td>
+                <td class="data text-acid">99%</td>
+                <td><span class="badge badge-active" style="font-size:9px">✓ complete</span></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="mt-4 pt-3 border-t border-line">
+            <div class="flex justify-between text-mute text-xs font-mono">
+              <span>SLO: ≥ 95% adoption within 48 h · MOBILE-SLO-06</span>
+              <span class="text-xs font-mono" style="color:#FBBF24">⚠ v3.14.2 below target</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Active alerts + CV thermal -->
+      <div class="grid grid-cols-2 gap-4 mb-6">
+
+        <!-- Active AL-MOBILE alerts -->
+        <div class="stat-card">
+          <div class="label mb-4">Active app alerts · your fleet</div>
+          <div class="text-mute text-xs font-mono mb-5">AL-MOBILE-01 through AL-MOBILE-08 · FORM-internal PagerDuty · tenant-visible summary only</div>
+
+          <!-- AL-MOBILE-05 amber alert -->
+          <div class="flex items-start gap-3 p-4 rounded-xl mb-3" style="background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.28);">
+            <span class="font-mono text-sm flex-shrink-0" style="color:#FBBF24">P2</span>
+            <div>
+              <div class="text-paper text-sm font-medium">AL-MOBILE-05 · OTA adoption below 95% at 72 h</div>
+              <div class="text-dim text-xs mt-1">Build v3.14.2 on production channel · 91% adoption at 48 h · FORM team investigating delivery</div>
+              <div class="text-mute text-xs font-mono mt-2">Opened 2026-06-30 09:41 UTC · FORM devops-lead</div>
+            </div>
+          </div>
+
+          <!-- No other active alerts -->
+          <div class="flex items-start gap-3 p-4 rounded-xl" style="background:rgba(221,255,45,0.04);border:1px solid rgba(221,255,45,0.1);">
+            <span class="font-mono text-acid text-sm flex-shrink-0">✓</span>
+            <div>
+              <div class="text-dim text-sm">No P0 or P1 alerts active</div>
+              <div class="text-mute text-xs mt-1">Crash-free rates, ANR, cold start, and frame rate within SLO</div>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-line text-mute text-xs font-mono">
+            Crash stack traces are never shared here — accessible to FORM mobile-engineer via Sentry only
+          </div>
+        </div>
+
+        <!-- CV thermal / performance signals -->
+        <div class="stat-card">
+          <div class="label mb-4">Performance signals · fleet aggregate</div>
+          <div class="text-mute text-xs font-mono mb-5">Rolling 24 h · fleet-level · no per-user data</div>
+
+          <div class="space-y-5">
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <div class="text-dim text-sm">CV thermal throttle rate</div>
+                <span class="data text-acid text-sm">3.2%</span>
+              </div>
+              <div class="h-1 bg-line rounded-full overflow-hidden">
+                <div class="h-1 bg-acid" style="width:32%"></div>
+              </div>
+              <div class="text-mute text-xs font-mono mt-1">MOBILE-SLO-07 ≤ 5% · ✓ met · Tier 3 fleet: 7.1% (flagged separately)</div>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <div class="text-dim text-sm">Cold start P95</div>
+                <span class="data text-paper text-sm">1,840 ms</span>
+              </div>
+              <div class="h-1 bg-line rounded-full overflow-hidden">
+                <div class="h-1 bg-acid" style="width:92%"></div>
+              </div>
+              <div class="text-mute text-xs font-mono mt-1">MOBILE-SLO-01 &lt; 2,000 ms · ✓ met</div>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <div class="text-dim text-sm">Frame render rate at 60 fps</div>
+                <span class="data text-acid text-sm">94.1%</span>
+              </div>
+              <div class="h-1 bg-line rounded-full overflow-hidden">
+                <div class="h-1 bg-acid" style="width:94.1%"></div>
+              </div>
+              <div class="text-mute text-xs font-mono mt-1">MOBILE-SLO-05 ≥ 90% · ✓ met</div>
+            </div>
+          </div>
+
+          <div class="mt-5 pt-4 border-t border-line text-mute text-xs font-mono">
+            Tier 3 thermal detail available to FORM mobile-engineer · not surfaced here (individual-device risk) · OBSERVABILITY §28.6
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Privacy + spec footnote -->
+      <div class="stat-card" style="border-color:rgba(255,87,51,0.15);background:rgba(255,87,51,0.03);">
+        <div class="label mb-2" style="color:#FF5733">Privacy floor · enforced at query layer</div>
+        <div class="text-dim text-sm leading-relaxed">
+          This panel never exposes individual device identifiers, employee names, crash stack traces, or biometric data.
+          Crash details remain in Sentry, accessible only to FORM's mobile-engineering team.
+          Device tier is derived from a device model lookup table — not from location, biometrics, or any GDPR Art. 9 data.
+          k-anonymity (n ≥ 10) is enforced via <span class="font-mono text-mute">HAVING COUNT(*) &gt;= 10</span> on all fleet queries.
+          Cells with fewer than 10 devices are suppressed and shown as "—".
+          Ref: <span class="font-mono text-mute">OBSERVABILITY.md §28.6, §28.10</span> · <span class="font-mono text-mute">SOC 2 CC7.2 / A1.1 / A1.2</span>
         </div>
       </div>
 
