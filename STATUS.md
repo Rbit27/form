@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.57.0** — 2026-06-30 · post-2884 · «Коли зменшувати: ознаки того, що поточний обсяг перевищує відновлювальну здатність» · series «Мінімальна ефективна доза» 2876–2885 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2884 · next: post-2885 («Мінімальна ефективна доза як система: від разового інструменту до постійного принципу тренування»)
+
 **v10.56.0** — 2026-06-30 · post-2883 · «Ознаки, що "мінімум" став занадто малим: коли треба розширюватись» · series «Мінімальна ефективна доза» 2876–2885 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2883 · next: post-2884 («Коли зменшувати: ознаки того, що поточний обсяг перевищує відновлювальну здатність»)
 
 **v10.55.0** — 2026-06-30 · enterprise: AUDIT_LOG_SCHEMA v2.65 (+4 R-53 stale events; FLEET-MAT-STALE-CHAIN-01 + NRR-FILING-STALE-CHAIN-01 invariants) · SOC2_READINESS v3.63.0 (§137: FLEET-MAT-STALE-E-001 + NRR-FILING-STALE-E-001 registered; count 104 → 106) · INCIDENT_RESPONSE R-53.11 items 1–2 [x] Done (P0/M13) · next: post-2883 («Ознаки, що "мінімум" став занадто малим: коли треба розширюватись»)
