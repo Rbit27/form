@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.48.0] — 2026-06-30
+
+### Added
+- `content/post-2876-minimum-effective-dose-science-vs-myth.md` — Series «Мінімальна ефективна доза» 2876–2885 · 1/10. «Мінімальна ефективна доза: де наука і де міф». Covers: origins of MED in pharmacology vs. its misapplication in fitness; dose-response curve in training (nonlinear, goal- and status-dependent); minimum volume thresholds from meta-analyses (Krieger 2010, Schoenfeld et al. 2017, Ralston et al. 2017, Rhea et al. 2003); three MED myths debunked; practical audit framework (weekly sets per muscle × RIR × training age). Table: minimum thresholds by goal and training status. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2876 card added at top of feed (before post-2875).
+
+### Changed
+- `STATUS.md` — current version updated to v10.48.0; content engine row updated with post-2876.
+- `VERSION` — 10.47.0 → 10.48.0.
+
+---
+
 ## [10.47.0] — 2026-06-30
 
 ### Added

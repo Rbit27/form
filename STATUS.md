@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.47.0** — 2026-06-30 · post-2875 · «Автономне тренування: вісім компетенцій, які ти будуєш — і що з ними робити далі» · series «Автономне тренування» 2866–2875 COMPLETE (10/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2875 · next: post-897 (AI-тренер і людина-тренер, block 896–900) або post-1091 (extensor indicis proprius, block 1091–1095)
+**v10.48.0** — 2026-06-30 · post-2876 · «Мінімальна ефективна доза: де наука і де міф» · series «Мінімальна ефективна доза» 2876–2885 START (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2876 · next: post-2877 (тренування 2× на тиждень: що реально можна і що — ні)
 
 ---
 
