@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.55.2
+# FORM · SOC 2 Type II Readiness v3.56.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -32994,6 +32994,81 @@ One row added to the §79.4 master evidence table (count 99 → 100):
 | 3 | Add ADMIN-RPT-E-001 to §79.5 compliance calendar at Month O+12 (first annual filing); confirm §79.5 quarterly calendar does not require ADMIN-RPT-E interim entries (artefact is annual). | compliance-officer | **P2** | Month O+1 calendar review | [ ] |
 
 ---
+
+## §131 · Cross-Reference Patch — NRR Bridge Evidence Registration (NRR-BRIDGE-E-001 · CC4.1 / A1.1)
+
+**Date:** 2026-06-30  **Author:** compliance-officer (cloud worker)  **Trigger:** `docs/COST_MODEL.md §48.9 item 1` (P0/M13, open since 2026-06-30 §48 authoring) required registering `enterprise.annual_nrr_bridge_filed` in `docs/AUDIT_LOG_SCHEMA.md §Enterprise NRR Bridge events`; `docs/COST_MODEL.md §48.9 item 6` (P1/M15) required registering NRR-BRIDGE-E-001 in §79.4, adding `enterprise/nrr/` to §80.3, and adding a Vanta mirror entry to §80.4.
+
+---
+
+### §131.1 Obligations Closed
+
+This section closes two obligations:
+
+1. **COST_MODEL §48.9 item 1** (P0/M13) — `enterprise.annual_nrr_bridge_filed` registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise NRR Bridge events` (v2.61, 2026-06-30). NRR-BRIDGE-INV-01 arithmetic invariant + Zod v2 `AnnualNrrBridgeFiledSchema` registered.
+2. **COST_MODEL §48.9 item 6** (P1/M15) — NRR-BRIDGE-E-001 registered in §79.4 master evidence table (count 100 → 101); `enterprise/nrr/` R2 subfolder added to §80.3; Vanta mirror entry added to §80.4.
+
+---
+
+### §131.2 NRR-BRIDGE-E-001 Artefact
+
+**NRR-BRIDGE-E-001** — Annual export of the `enterprise.annual_nrr_bridge_filed` DEC-030 HMAC-chained event for the calendar year, cross-referenced to the `NRR-BRIDGE-E-001_<YYYY>.csv` artefact via `bridge_hash` SHA-256. Fleet-level GRR/NRR bridge: `reporting_year`, `cohort_tenant_count`, six ARR components (`opening_arr_usd`, `retained_arr_usd`, `expansion_arr_usd`, `contraction_arr_usd`, `churned_arr_usd`, `closing_arr_usd`), `grr_pct`, `nrr_pct`, `logo_retention_rate_pct`, `green_fleet_pct_at_m12`, `filed_by`, `bridge_hash`. NRR-BRIDGE-INV-01 arithmetic invariant verified at emission. TSC criteria: CC4.1 / A1.1. Retention: 3 years. Collection: annual (Q1, covering prior year cohort). Owner: compliance-officer + data-engineer. Path: `compliance/evidence/nrr/NRR-BRIDGE-E-001_<YYYY>.csv`.
+
+**CC4.1 auditor narrative:** `enterprise.annual_nrr_bridge_filed` is an immutable, HMAC-chained, arithmetic-verified annual record of FORM's enterprise customer retention performance. The NRR-BRIDGE-INV-01 invariant (HTTP 422 `NRR_BRIDGE_INV_01_RETENTION_CHECK` on arithmetic mismatch) ensures the bridge is internally consistent at the moment of filing — auditors can verify `grr_pct × opening_arr_usd ≈ retained_arr_usd` without accessing source tables. `bridge_hash` SHA-256 links the chain event to the archived CSV artefact tamper-evidently. Annual Q1 cadence aligns with SOC 2 Type II observation period; zero-renewal years filed as affirmative attestation with `cohort_tenant_count = 0`.
+
+**A1.1 auditor narrative:** The annual NRR bridge confirms that FORM's enterprise service commitments (availability, CSM engagement, onboarding per `docs/ENTERPRISE_SLA.md`) translated to observable retention outcomes over the contracted service term. `logo_retention_rate_pct` (renewed logos / opening cohort count) and `nrr_pct` are fleet-level availability-outcome metrics. The `enterprise.contract_renewed` event chain (`docs/AUDIT_LOG_SCHEMA.md §Enterprise Contract Renewal events`, registered v2.23) provides per-renewal evidence; NRR-BRIDGE-E-001 aggregates these into an annual board-ready summary with auditor-verifiable arithmetic.
+
+**Primary definition:** `docs/COST_MODEL.md §48.7` (NRR-BRIDGE-E-001 SOC 2 evidence mapping — CC4.1/A1.1, annual Q1, 3yr). Source event: `enterprise.annual_nrr_bridge_filed` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise NRR Bridge events` (v2.61, 2026-06-30). NRR-BRIDGE-INV-01 arithmetic invariant (±$1 tolerance) verified at `emit-audit-event` Worker layer.
+
+**Privacy floor:** All twelve numeric payload fields are fleet-level aggregates — no per-tenant breakdown, no individual employee `user_id`, name, email, or GDPR Art. 9 special-category health value. `filed_by` is a FORM-internal role enum. `bridge_hash` is SHA-256 of the CSV artefact — no PII derivable. `enterprise_contracts` ACV and seat-count data underlying the bridge: `compliance_reviewer` role access only; `form_api` REVOKED. HR `tenant_manager` role has zero access to `enterprise_contracts` or `audit_log_events`.
+
+---
+
+### §131.3 §80.3 R2 Folder Addition
+
+`enterprise/nrr/` subfolder added to the `compliance/evidence/` folder structure in §80.3. Covers NRR-BRIDGE-E-001 (annual Q1; 3yr WORM Object Lock Governance; `form_api` NO ACCESS; `compliance_reviewer` + `r2:compliance-officer` read access only).
+
+---
+
+### §131.4 §80.4 Vanta Mirror Addition
+
+NRR-BRIDGE-E-001 added to the §80.4 Vanta mirror list. Upload cadence: annually — Q1 of first year with ≥ 1 completed renewal cohort (est. M14). Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. CC4.1 / A1.1 criteria tags applied. Privacy flag: fleet-level ARR aggregates only — no per-tenant ACV, no employee `user_id`, no GDPR Art. 9 data; Vanta access: compliance-officer + security-engineer only.
+
+---
+
+### §131.5 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| `COST_MODEL §48.9 item 1` — `enterprise.annual_nrr_bridge_filed` + NRR-BRIDGE-INV-01 + Zod v2 schema in `docs/AUDIT_LOG_SCHEMA.md §Enterprise NRR Bridge events` | `docs/AUDIT_LOG_SCHEMA.md v2.61` (2026-06-30) | 🟢 **Done — 2026-06-30 (AUDIT_LOG_SCHEMA.md v2.61)** |
+| `COST_MODEL §48.9 item 6` — NRR-BRIDGE-E-001 in §79.4 master evidence table (count +1 after GRAD-E-001) | This section §131.6 | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.56.0, §131)** |
+| `COST_MODEL §48.9 item 6` — `enterprise/nrr/` R2 WORM subfolder in §80.3 | This section §131.3 | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.56.0, §131)** |
+| `COST_MODEL §48.9 item 6` — NRR-BRIDGE-E-001 Vanta mirror entry in §80.4 | This section §131.4 | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.56.0, §131)** |
+| `COST_MODEL §48.11` — §79.4 cross-ref status update (🟡 → 🟢) | COST_MODEL.md v2.22.1 | 🟢 **Done — 2026-06-30 (COST_MODEL.md v2.22.1)** |
+
+---
+
+### §131.6 §79.4 Row Addition
+
+One row added to the §79.4 master evidence table (count 100 → 101):
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|
+| **NRR-BRIDGE-E-001** | CC4.1, A1.1 | Annual export of `enterprise.annual_nrr_bridge_filed` DEC-030 HMAC-chained event + cross-reference to `NRR-BRIDGE-E-001_<YYYY>.csv` via `bridge_hash` SHA-256. Fleet-level GRR/NRR bridge: six ARR components (opening, retained, expansion, contraction, churned, closing), GRR%, NRR%, logo retention %, Green fleet % at M12. NRR-BRIDGE-INV-01 arithmetic invariant verified at emission. No per-tenant breakdown; no `user_id`; no GDPR Art. 9 data; `form_api` REVOKED from `enterprise_contracts`. Zero-renewal years filed as affirmative attestation (`cohort_tenant_count = 0`). | Annual (Q1) | 3 yr | `enterprise/nrr/NRR-BRIDGE-E-001_<YYYY>.csv` |
+
+---
+
+### §131.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `compliance/evidence/enterprise/nrr/` folder on Cloudflare R2 `form-soc2-evidence` bucket; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). | devops-lead | **P0** | M13 | [ ] |
+| 2 | File first NRR-BRIDGE-E-001 artefact in Q1 of first year with ≥ 1 completed renewal cohort: (a) run §48.9 item 3 bridge computation query; (b) verify NRR-BRIDGE-INV-01 arithmetic (±$1 tolerance); (c) emit `enterprise.annual_nrr_bridge_filed` (HTTP 422 if arithmetic fails); (d) file CSV at `compliance/evidence/nrr/NRR-BRIDGE-E-001_<YYYY>.csv`; (e) SHA-256 hash; (f) upload to R2 (3yr WORM Object Lock); (g) upload to Vanta (CC4.1/A1.1); (h) add to MASTER-INDEX. Privacy check: fleet aggregates only; no per-tenant ACV; no `user_id`. | compliance-officer + data-engineer | **P1** | Q1 of first full renewal year (est. M14) | [ ] |
+| 3 | Add NRR-BRIDGE-E-001 to §79.5 compliance calendar at Month O+13 (first annual filing); confirm §79.5 quarterly calendar does not require NRR-BRIDGE-E-001 interim entries (artefact is annual). | compliance-officer | **P2** | Month O+1 calendar review | [ ] |
+
+---
+
+*v3.56.0 (2026-06-30): §131 Cross-Reference Patch — NRR Bridge Evidence Registration (NRR-BRIDGE-E-001 · CC4.1 / A1.1). Closes `docs/COST_MODEL.md §48.9` item 1 (P0/M13 — `enterprise.annual_nrr_bridge_filed` registration in AUDIT_LOG_SCHEMA.md v2.61) and item 6 (P1/M15 — NRR-BRIDGE-E-001 in §79.4 + `enterprise/nrr/` in §80.3 + Vanta entry §80.4). One artefact registered (count 100 → 101): NRR-BRIDGE-E-001 (CC4.1/A1.1, annual Q1, 3yr — fleet-level GRR/NRR bridge: `cohort_tenant_count`, six ARR components, `grr_pct`, `nrr_pct`, `logo_retention_rate_pct`, `green_fleet_pct_at_m12`, `bridge_hash` SHA-256; NRR-BRIDGE-INV-01 arithmetic invariant; privacy: fleet aggregates only, no `user_id`, no GDPR Art. 9 data; `form_api` REVOKED). `enterprise/nrr/` R2 subfolder added to §80.3 (annual; 3yr WORM Object Lock Governance; `form_api` NO ACCESS; `form_system` role only). NRR-BRIDGE-E-001 Vanta mirror entry added to §80.4 (annual Q1; CC4.1/A1.1; privacy: fleet aggregates only). Three cross-reference obligations closed (§131.5): AUDIT_LOG_SCHEMA.md v2.61 §NRR Bridge events (§48.9 item 1); this §131 §79.4 row (§48.9 item 6 §79.4); this §131 §80.3/§80.4 additions (§48.9 item 6 vault). Implementation checklist: 1× P0/M13 (R2 folder creation), 1× P1/M13 (first NRR-BRIDGE-E-001 filing), 1× P2/M+1 (calendar update). Document header v3.55.2 → v3.56.0. Owner: compliance-officer + data-engineer + enterprise-architect.*
 
 *v3.55.2 (2026-06-30): §67.7 Destruction Certificate DELETION SCOPE block updated — OQ-TDD-01 template application (§128.3, v3.53.0). Closes §128.6 item 3 (P1/before TDD-P0-04): §67.7 DELETION SCOPE paragraph reworded to (1) clarify `{DPA date}` placeholder as ISO 8601 DocuSign completion date (`{DPA execution date — ISO 8601, e.g. 2026-08-15}`), and (2) insert `Processing activities covered: on-device CV coaching, wearable integration, AI-assisted workout programming, and enterprise administration as specified in the Data Processing Agreement Exhibit A` immediately after the DPA date reference, followed by the GDPR Art. 28(3)(g) / Art. 17(1)(b) citations and a closing sentence confirming all processing activities have concluded for the tenant. The AUDIT TRAIL and RETAINED DATA blocks are unchanged. §67.11 OQ-TDD-01 table row patched: Priority column `**P1**` → `🟢 **Resolved**`; Target column updated with resolution record (§128.3, v3.53.0; §67.7 applied v3.55.2 2026-06-30). Document header v3.55.1 → v3.55.2. Owner: compliance-officer. Cross-references: `docs/SOC2_READINESS.md §128.3` (OQ-TDD-01 resolution — decision, approved boilerplate, and implementation note: "before TDD-P0-04 PDF draft, the §67.7 Markdown template is the authoritative specification"); `docs/SOC2_READINESS.md §128.6 item 3` (implementation obligation — [x] Done this patch); `docs/SOC2_READINESS.md §67.8` (TDD-E-002 signed certificate PDF uses §67.7 as template — PDF draft per TDD-P0-04 must match the updated wording); `docs/SOC2_READINESS.md §67.10 TDD-P0-04` (remaining open: draft §67.7 as fillable PDF; updated Markdown template is now the correct source of truth).*
 

@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.28.1] — 2026-06-30
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.60 → v2.61 — `§Enterprise NRR Bridge events` section added. One DEC-030 HMAC-chained event: `enterprise.annual_nrr_bridge_filed` (LOW/3yr/CC4.1/A1.1). NRR-BRIDGE-INV-01 arithmetic invariant (HTTP 422 `NRR_BRIDGE_INV_01_RETENTION_CHECK` when bridge components don't close within ±$1). Zod v2 `AnnualNrrBridgeFiledSchema` (14 fields). CC4.1/A1.1 auditor narratives. Closes `docs/COST_MODEL.md §48.9` item 1 (P0/M13).
+- `docs/SOC2_READINESS.md` v3.55.2 → v3.56.0 — §131 Cross-Reference Patch added. NRR-BRIDGE-E-001 registered in §79.4 (count 100 → 101); `enterprise/nrr/` added to §80.3 R2 folder structure; NRR-BRIDGE-E-001 added to §80.4 Vanta mirror list. Closes `docs/COST_MODEL.md §48.9` item 6 (P1/M15).
+- `docs/COST_MODEL.md` v2.22.0 → v2.22.1 — §48.9 items 1 and 6 marked `[x] Done`; §48.11 cross-reference rows updated 🟡 → 🟢.
+- `VERSION` — 10.28.0 → 10.28.1.
+
 ## [10.28.0] — 2026-06-30
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.22.0
+# FORM · Cost Model & Unit Economics v2.22.1
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -13411,7 +13411,7 @@ const AnnualNrrBridgeFiledSchema = z.object({
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register `enterprise.annual_nrr_bridge_filed` in `docs/AUDIT_LOG_SCHEMA.md §Enterprise NRR Bridge events` subsection: LOW/3yr; NRR-BRIDGE-INV-01 arithmetic invariant; Zod v2 schema (§48.7.1). | compliance-officer | **P0** | M13 | [ ] |
+| 1 | Register `enterprise.annual_nrr_bridge_filed` in `docs/AUDIT_LOG_SCHEMA.md §Enterprise NRR Bridge events` subsection: LOW/3yr; NRR-BRIDGE-INV-01 arithmetic invariant; Zod v2 schema (§48.7.1). | compliance-officer | **P0** | M13 | [x] **Done — 2026-06-30 (AUDIT_LOG_SCHEMA.md v2.61)** |
 | 2 | Implement NRR-BRIDGE-INV-01 validation in `emit-audit-event` Worker: bridge arithmetic check (`retained + expansion − contraction − churned = closing ±$1`); HTTP 422 `NRR_BRIDGE_INV_01_RETENTION_CHECK` on mismatch. Integration test: inject bridge with $1.50 rounding discrepancy → confirm 422; correct bridge → confirm 201. | platform-engineer | **P0** | M13 | [ ] |
 | 3 | Build NRR bridge computation query in Supabase / data warehouse: join `enterprise_contracts`, `enterprise_renewals` (§42.6 migration 0084), `enterprise_adoption_snapshots` (§40.7), `enterprise_churn_events` (§43.8); output all nine numeric fields from `AnnualNrrBridgeFiledSchema`. Privacy: aggregate only; no `user_id`. Validate against §23.1 ARR bridge template output for same period. | data-engineer | **P0** | M13 | [ ] |
 | 4 | File first NRR-BRIDGE-E-001 in Q1 of first year with ≥ 1 renewal event: run §48.9 item 3 query; file CSV at `compliance/evidence/nrr/NRR-BRIDGE-E-001_<YYYY>.csv`; compute SHA-256; emit `enterprise.annual_nrr_bridge_filed` (NRR-BRIDGE-INV-01 pass required); upload to R2 `enterprise/nrr/` WORM prefix; mirror to Vanta (CC4.1/A1.1). | compliance-officer + data-engineer | **P0** | M13 | [ ] |
@@ -13421,7 +13421,7 @@ const AnnualNrrBridgeFiledSchema = z.object({
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 5 | Build internal board metrics dashboard: six-metric pack from §48.6 (GRR, NRR, Logo Retention, Green Fleet %, Expansion ARR %, CAC Payback). Access: founder + compliance-officer only. No per-tenant drill-down in the board-level view. Validate that the dashboard query does not expose individual `user_id` or GDPR Art. 9 data at any aggregation level. | data-engineer | **P1** | M15 | [ ] |
-| 6 | Register NRR-BRIDGE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (one row after GRAD-E-001; count + 1); add `enterprise/nrr/` R2 WORM subfolder to §80.3; add Vanta mirror entry to §80.4 (CC4.1/A1.1). | compliance-officer | **P1** | M15 | [ ] |
+| 6 | Register NRR-BRIDGE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (one row after GRAD-E-001; count + 1); add `enterprise/nrr/` R2 WORM subfolder to §80.3; add Vanta mirror entry to §80.4 (CC4.1/A1.1). | compliance-officer | **P1** | M15 | [x] **Done — 2026-06-30 (SOC2_READINESS.md v3.56.0, §131)** |
 | 7 | Add §48.6 board deck narrative template to the internal investor reporting runbook (Notion / Linear). Confirm that: (a) fleet GRR/NRR figures are accurate to two decimal places; (b) no per-tenant detail appears in any investor-facing output; (c) Year-2 NRR vs. Year-3+ 120% target framing is included to contextualise the first-cohort result. | customer-success + founder | **P1** | M15 | [ ] |
 
 #### P2 — After 3 renewal cohorts (est. M36)
@@ -13449,9 +13449,9 @@ const AnnualNrrBridgeFiledSchema = z.object({
 
 | Document | Section | Relationship | Status |
 |---|---|---|---|
-| `docs/AUDIT_LOG_SCHEMA.md` | New §Enterprise NRR Bridge events | `enterprise.annual_nrr_bridge_filed` + NRR-BRIDGE-INV-01 invariant + Zod v2 schema | 🟡 Pending — §48.9 item 1, M13 |
-| `docs/SOC2_READINESS.md` | §79.4 master evidence table | NRR-BRIDGE-E-001 registration (count +1 after GRAD-E-001) | 🟡 Pending — §48.9 item 6, M15 |
-| `docs/SOC2_READINESS.md` | §80.3 R2 subfolder registry | `enterprise/nrr/` WORM subfolder | 🟡 Pending — §48.9 item 6, M15 |
+| `docs/AUDIT_LOG_SCHEMA.md` | New §Enterprise NRR Bridge events | `enterprise.annual_nrr_bridge_filed` + NRR-BRIDGE-INV-01 invariant + Zod v2 schema | 🟢 **Done — 2026-06-30 (AUDIT_LOG_SCHEMA.md v2.61)** |
+| `docs/SOC2_READINESS.md` | §79.4 master evidence table | NRR-BRIDGE-E-001 registration (count +1 after GRAD-E-001) | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.56.0, §131)** |
+| `docs/SOC2_READINESS.md` | §80.3 R2 subfolder registry | `enterprise/nrr/` WORM subfolder | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.56.0, §131)** |
 | `docs/COST_MODEL.md` | §23.1 ARR bridge formula | §48.3 fills the §23.1 six-component template with post-graduation cohort data | — |
 | `docs/COST_MODEL.md` | §40.3.3 (WAU health — expansion probability) | §48.3 expansion rows use §40.3.3 Green/Amber/Red take-up rates | — |
 | `docs/COST_MODEL.md` | §41.8 (Seat expansion NRR contribution) | §48.3 expansion ARR components; §48.5 expansion take-up lever | — |
@@ -13463,5 +13463,7 @@ const AnnualNrrBridgeFiledSchema = z.object({
 | `docs/ENTERPRISE_SLA.md` | SLA tier commitments | §48.8 A1.1 narrative: NRR bridge attests service delivery against SLA obligations | — |
 
 ---
+
+*v2.22.1 (2026-06-30): §48.9 items 1 and 6 closed; §48.11 cross-reference status updated 🟡→🟢 for three rows. Item 1 (P0/M13): `enterprise.annual_nrr_bridge_filed` registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise NRR Bridge events` (v2.61, 2026-06-30) — NRR-BRIDGE-INV-01 arithmetic invariant, Zod v2 `AnnualNrrBridgeFiledSchema`, CC4.1/A1.1 auditor narratives. Item 6 (P1/M15): NRR-BRIDGE-E-001 registered in `docs/SOC2_READINESS.md §131` (v3.56.0, 2026-06-30) — §79.4 row (count 100→101), `enterprise/nrr/` §80.3 R2 subfolder, §80.4 Vanta mirror entry. Document header v2.22.0 → v2.22.1. Owner: compliance-officer.*
 
 *v2.22.0 (2026-06-30): §48 Year-2 ARR Bridge: Activation Bucket × Health Band NRR Model. Synthesizes §47 graduation activation buckets (A/B/C) and §40 WAU health band model into a first-principles Year-2 ARR bridge with three fleet scenarios. §48.2 activation bucket → health band migration probability matrix (A: 72% Green; B: 38% Green; C: 15% Green [all ESTIMATE]); ADO-CHAIN-01 cross-reference for downgrade-triggered CSM follow-up. §48.3 Year-2 ARR bridge for representative 8-tenant Growth-tier cohort ($86,400 opening ARR): Base NRR 95.9% / Bull NRR 100.0% / Bear NRR 88.7% [all ESTIMATE]. §48.4 NRR component attribution: GRR contributes 92.2 pp; expansion +5.0 pp net; 120% NRR is a Year 3+ target, not a first-cohort expectation. §48.5 lever analysis: 120% NRR requires Green fleet share > 65%, expansion take-up > 55%, and ≥ 1 tier upgrade per cohort year — CSM capacity is the binding constraint (single-CSM capacity ~25 tenants). §48.6 board reporting pack: six KPIs (GRR ≥ 85% / NRR ≥ 120% at scale / Logo Retention ≥ 88% / Green Fleet ≥ 48% Y2→65%+ Y3 / Expansion ARR % ≥ 5% Y2→20%+ Y3 / CAC Payback ≤ 18 months) with board deck narrative template; privacy floor: fleet aggregates only. §48.7 DEC-030 event `enterprise.annual_nrr_bridge_filed` (LOW, 3yr, CC4.1/A1.1): NRR-BRIDGE-INV-01 arithmetic invariant (retained + expansion − contraction − churned = closing ±$1; HTTP 422 on mismatch); Zod v2 `AnnualNrrBridgeFiledSchema`. §48.8 SOC 2 evidence: NRR-BRIDGE-E-001 (CC4.1/A1.1, annual Q1, 3yr, `compliance/evidence/nrr/`). §48.9 implementation checklist: 4× P0/M13 (AUDIT_LOG_SCHEMA event registration, NRR-BRIDGE-INV-01 Worker implementation, bridge computation query, first NRR-BRIDGE-E-001 filing); 3× P1/M15 (board metrics dashboard, SOC2_READINESS evidence registration, board deck template); 4× P2/M24–M36 (matrix calibration after 3 cohorts, contraction ARR calibration after 5 renewals, per-tier breakdown gate, structural-risk escalation protocol). §48.10 three open questions: OQ-NRR-01 (P2 — actual bucket→band migration rates, M36); OQ-NRR-02 (P1 — per-tier NRR-BRIDGE-E-001 after ≥ 5 tenants/tier); OQ-NRR-03 (P2 — direct-deal proxy model after first direct contract). TOC entries added for §47 (previously missing) and §48. Document header v2.21.0 → v2.22.0. Privacy floor: all §48 tables, DEC-030 events, SOC 2 artefacts, and board reporting templates contain fleet-level aggregate data only — no individual `user_id`, tenant name, country, industry vertical, or GDPR Art. 9 special-category data. Owner: data-engineer + enterprise-architect + customer-success + compliance-officer.*
