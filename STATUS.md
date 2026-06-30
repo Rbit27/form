@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.35.0** — 2026-06-30 · posts 2864–2865 · Series 2856–2865 «Повернення після паузи» COMPLETE (10/10) · post-2864 clinical-safety CONDITIONAL PASS · post-2865 clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards added for 2864–2865 · series synthesis published · next series TBD per README roadmap
+**v10.36.0** — 2026-06-30 · post-2866 · Series 2866–2875 «Автономне тренування» START (1/10) · post-2866 «Коли «стоп» — не слабкість: алгоритм скасування тренування» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for 2866 · README roadmap: post-2866 → draft
 
 ---
 
