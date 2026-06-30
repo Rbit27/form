@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.45.0** — 2026-06-30 · post-896 · «Перетренованість або лінощі: як self-coached атлет справді відрізняє одне від одного» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-896 · README: block 896–900 proposed (авторегуляція і психологія); post-896 → draft · next: post-897 (AI-тренер і людина-тренер) або post-2875 (синтез серії «Автономне тренування»)
+**v10.47.0** — 2026-06-30 · post-2875 · «Автономне тренування: вісім компетенцій, які ти будуєш — і що з ними робити далі» · series «Автономне тренування» 2866–2875 COMPLETE (10/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2875 · next: post-897 (AI-тренер і людина-тренер, block 896–900) або post-1091 (extensor indicis proprius, block 1091–1095)
 
 ---
 

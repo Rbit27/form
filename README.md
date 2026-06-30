@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · proposed next (45+) · current: 2866–2875 «Автономне тренування» 9/10 · roadmap extended to 2915 · block 896–900 added · v10.45.0
+### Editorial series: 11–44 drafted · proposed next (45+) · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · roadmap extended to 2915 · block 896–900 active · v10.47.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3069,7 +3069,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 2872 | Підзвітність без тренера: три мінімальні системи самоконтролю | **draft · v10.41.0 → post-2872-accountability-without-coach-three-minimal-self-monitoring-systems.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
 | 2873 | Тижневий огляд self-coached атлета: що переглядати, що ні і як часто | **draft · v10.42.0 → post-2873-weekly-review-self-coached-athlete-protocol.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
 | 2874 | Коли AI недостатньо: ознаки, що пора шукати людину-тренера | **draft · v10.44.0 → post-2874-when-ai-is-not-enough-signs-to-find-human-coach.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
-| 2875 | Синтез 2866–2875: операційна рамка self-coached атлета | proposed · v10.30.0 |
+| 2875 | Автономне тренування: вісім компетенцій, які ти будуєш — і що з ними робити далі | **draft · v10.47.0 → post-2875-autonomous-training-synthesis-what-you-are-building.md · clinical-safety NOT_REQUIRED · sports-scientist review pending · SERIES COMPLETE** |
 
 ---
 

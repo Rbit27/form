@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.47.0] — 2026-06-30
+
+### Added
+- `content/post-2875-autonomous-training-synthesis-what-you-are-building.md` — Series «Автономне тренування» 2866–2875 · 10/10 SYNTHESIS. «Автономне тренування: вісім компетенцій, які ти будуєш — і що з ними робити далі». Synthesis of the full 9-post series: maps eight self-coached athlete competencies (situational recognition, reading progress, cognitive error recognition, technical self-assessment, autoregulation, programme diagnostics, accountability without external control, knowing the limits of autonomy), names three cross-cutting principles (data-driven decisions, minimal sufficient intervention, retrospection as operational requirement), and provides a competency table (baseline vs. operational level). Three practical next steps. References: Zimmerman 2000 (self-regulated learning), Ericsson & Harwell 2019 (deliberate practice), Bandura 1997 (self-monitoring), Helms et al. 2014/2016 (RIR/RPE), Zourdos et al. 2016. clinical-safety: NOT_REQUIRED. Series 2866–2875 COMPLETE.
+- `blog.html` — post-2875 card added at top of feed (before post-2874).
+
+### Changed
+- `README.md` — series «Автономне тренування» 2866–2875 marked COMPLETE 10/10; post-2875 row updated proposed → draft.
+- `STATUS.md` — current version updated to v10.47.0; next: post-897 or post-1091.
+
+---
+
 ## [10.46.0] — 2026-06-30
 
 ### Added
