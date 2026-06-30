@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.63.0** — 2026-06-30 · post-100-editorial-synthesis · «100 постів: 10 принципів, якими FORM думає про тренування без прикрас» · Editorial series milestone · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-100 · README: post-100 marked draft; series 2966–2975 «Рішення під невизначеністю» proposed · next: post-2890 series «Тренувальний інтелект» 5/10
+
 **v10.62.0** — 2026-06-30 · post-2889 · «RPE як інструмент, а не оцінка: як калібрувати суб'єктивне сприйняття навантаження» · series «Тренувальний інтелект» 2886–2895 (4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2889 · next: post-2890 (як планувати тижневий об'єм коли розклад змінюється)
 
 **v10.61.0** — 2026-06-30 · post-2888 · «Плато: як правильно діагностувати зупинку прогресу і знайти реальну причину» · series «Тренувальний інтелект» 2886–2895 (3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2888 · next: post-2889 («RPE як інструмент, а не оцінка: як калібрувати суб'єктивне сприйняття навантаження»)
