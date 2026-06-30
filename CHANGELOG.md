@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.48.1] — 2026-06-30
+
+### Changed
+- `docs/OBSERVABILITY.md §64` — Cross-Reference Patch: §63.6 + §12.6 AUDIT_LOG_SCHEMA.md v2.63 Registration Closure (v5.10.2). Closes three stale "pending registration" annotations left by §63 (v5.10.0, 2026-06-30) when `docs/AUDIT_LOG_SCHEMA.md v2.63` fulfilled §63.9 item 3 (P0/M13) in the same session. Three inline updates: (1) §63.6 bold note `**Pending registration (§63.9 item 3 — P0/M13):**` → `**Registered (§63.9 item 3 — 🟢 Closed):**` confirming AUDIT_LOG_SCHEMA.md v2.63 registration of all four DEC-030 event types (`system.fleet_mat_chain_check_passed` LOW/1yr, `security.fleet_mat_chain_violation` CRITICAL/7yr, `system.nrr_bridge_q1_check_passed` LOW/1yr, `enterprise.nrr_bridge_q1_overdue` HIGH/7yr); (2) §12.6 job 56 `fleet_mat_chain_verify` AUDIT_LOG_SCHEMA.md cross-ref annotation: "(pending `security.fleet_mat_chain_violation` + `system.fleet_mat_chain_check_passed` registration — §63.9 item 3 P0/M13)" → "(registered v2.63, 2026-06-30 — §63.9 item 3 🟢 Closed)"; (3) §12.6 job 57 `nrr_bridge_q1_calendar_check` AUDIT_LOG_SCHEMA.md cross-ref annotation updated equivalently. §64 section added with TOC entry, four-item implementation checklist (all [x] Done), three-row cross-reference obligations closed table. Document header v5.10.1 → v5.10.2. Owner: compliance-officer + devops-lead.
+- `VERSION` — 10.48.0 → 10.48.1.
+
+---
+
 ## [10.48.0] — 2026-06-30
 
 ### Added
