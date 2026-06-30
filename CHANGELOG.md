@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.52.0] — 2026-06-30
+
+### Added
+- `content/post-2880-detraining-what-is-actually-lost-and-how-fast.md` — Series «Мінімальна ефективна доза» 2876–2885 · 5/10. «Детренування: скільки реально втрачається і за скільки». Нейральне vs. структурне детренування: нейральне знижується першим (Hortobágyi 1993, Häkkinen 1985). Реальні цифри втрат: сила 5–12% за 3–4 тижні, маса — помітна лише після 4+ тижнів (Mujika & Padilla 2000, 2001). Міонуклеарна ретенція і «м'язова пам'ять» (Bruusgaard 2010, Ogasawara 2013). Maintenance mode: скорочення об'єму на 33–67% при збереженні ~80% інтенсивності зберігає більшість адаптацій. Практичний алгоритм MED-режиму при паузі. clinical-safety: NOT_REQUIRED.
+- `blog.html` — card for post-2880 added at top of feed.
+- `README.md` — Editorial series 2916–2925 «Тренувальна стійкість» proposed; post-2880 status → draft; roadmap header updated to 2925 · v10.52.0.
+
+### Changed
+- `STATUS.md` — Series «Мінімальна ефективна доза» 2876–2885 progress updated to 5/10; next: post-2881.
+- `VERSION` — 10.51.0 → 10.52.0.
+
+---
+
 ## [10.51.0] — 2026-06-30
 
 ### Added

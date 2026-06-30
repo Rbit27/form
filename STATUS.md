@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.51.0** — 2026-06-30 · post-2879 · «Коли 45-хвилинна сесія краща за двогодинну» · series «Мінімальна ефективна доза» 2876–2885 (4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2879 · next: post-2880 (деренування: скільки реально втрачається і за скільки)
+**v10.52.0** — 2026-06-30 · post-2880 · «Детренування: скільки реально втрачається і за скільки» · series «Мінімальна ефективна доза» 2876–2885 (5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2880 · README roadmap extended to 2925 (series «Тренувальна стійкість» 2916–2925 proposed) · next: post-2881 (мінімалістична програма при максимальному стресі: алгоритм рішення)
 
 ---
 
