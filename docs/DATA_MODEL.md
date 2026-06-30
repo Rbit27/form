@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.39
+# FORM · Multi-Tenant Data Model v1.40
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -14395,6 +14395,220 @@ OQ-OFB-02 is closed. One forward-looking question opened by this section:
 
 ---
 
+### 36.11 Cross-Reference Patch — `tenants.data_region` as Canonical Routing Source (§49, Migration 0090)
+
+> **Closes:** `docs/DATA_MODEL.md §49.10` row 4 — `docs/DATA_MODEL.md §36` routing-source cross-reference patch (§49.9 item 6, P1/M7, documentation patch).
+> Owner: enterprise-architect + compliance-officer. Date: 2026-06-30.
+
+---
+
+#### 36.11.1 Purpose and Scope
+
+`docs/DATA_MODEL.md §49` (v1.38, 2026-06-30) formally registered `tenants.data_region` as a NOT NULL column via migration `0090_tenants_data_region.sql`. The §49.10 cross-reference table (row 4) required a documentation patch to §36, confirming that `tenants.data_region` is the **single canonical routing source** for `resolveEgressBucket()` — not a separate routing config derived at the application layer.
+
+This patch fulfils that obligation and resolves a critical enum value discrepancy discovered during cross-reference authorship:
+
+- **§36 (migration 0075, `tenant_data_egress_packages`)** uses lowercase with Cloudflare zone suffix: `'us-east-1'`, `'eu-central-1'`, `'eu-west-1'`.
+- **§49 (migration 0090, `tenants`)** uses uppercase without suffix: `'US-EAST-1'`, `'EU-CENTRAL'`, `'EU-WEST'`.
+
+Because **neither migration has been applied to production** (§36.9 items 1–2: `[ ]`; §49.9 items 1–2: `[ ]`), the discrepancy is a documentation inconsistency only — no data migration is required. This patch canonicalises the values and amends the migration 0075 DDL spec before any production deploy.
+
+**Production blocking condition:** migration 0075 MUST NOT be applied to production until §36.11 canonical values are used in the deployment script. §36.9 item 2 gate remains `[ ]` pending this correction.
+
+---
+
+#### 36.11.2 Canonical `DataRegion` Values
+
+`tenants.data_region` (§49, migration 0090) is declared the **authoritative source table**. Its enum format — uppercase, no zone suffix — is the canonical `DataRegion` vocabulary for all FORM enterprise infrastructure.
+
+| Canonical value | Replaces (§36 legacy) | Cloudflare zone | GDPR SCC required |
+|---|---|---|---|
+| `'US-EAST-1'` | `'us-east-1'` | US East | No |
+| `'EU-CENTRAL'` | `'eu-central-1'` | EU (Frankfurt) | No — EU jurisdiction bucket |
+| `'EU-WEST'` | `'eu-west-1'` | EU (Dublin) | No — EU jurisdiction bucket |
+
+**Rationale for §49 values as canonical:**
+1. `tenants.data_region` is the source table; the destination column `tenant_data_egress_packages.data_region` is denormalized from it. Source wins on naming disputes.
+2. The uppercase format is free from Cloudflare-zone numbering semantics (`eu-central-1` implies a zone family that may expand to `-2`, `-3`; `EU-CENTRAL` is a logical region label unaffected by zone proliferation).
+3. §49.5 region routing table, §49.6 RLS auditor queries, and the REGION-E-001 cross-check query (§49.8) already use uppercase — changing §49 would require amending more downstream content.
+
+**Impact scope:** §36.4 (TypeScript type), §36.5 (migration 0075 DDL), §36.7 (OFB-E-005 SQL), §36.6 (`DataRegion` payload type) are each amended by this patch. The §36 prose and decision logic are unchanged — only the enum string literals change.
+
+---
+
+#### 36.11.3 Amended TypeScript `DataRegion` Type (supersedes §36.4)
+
+```typescript
+// apps/offboarding-worker/src/routing.ts
+// v2 — canonical DataRegion values (§36.11, 2026-06-30).
+// Supersedes v1 in §36.4 (lowercase 'us-east-1' / 'eu-central-1' / 'eu-west-1').
+
+export type DataRegion = 'US-EAST-1' | 'EU-CENTRAL' | 'EU-WEST';
+
+/** Canonical R2 bucket per data_region. Must stay in sync with §36.11.4 chk_r2_bucket_region_consistency. */
+const R2_BUCKET_BY_REGION: Record<DataRegion, string> = {
+  'US-EAST-1': 'form-offboarding-exports',
+  'EU-CENTRAL': 'form-offboarding-exports-eu',
+  'EU-WEST':    'form-offboarding-exports-eu',
+} as const;
+
+export function resolveEgressBucket(dataRegion: DataRegion): string {
+  return R2_BUCKET_BY_REGION[dataRegion];
+}
+
+export function isEuRegion(dataRegion: DataRegion): boolean {
+  return dataRegion !== 'US-EAST-1';
+}
+
+// Unit tests (apps/offboarding-worker/src/routing.test.ts) — supersedes §36.4 assertions:
+// expect(resolveEgressBucket('EU-CENTRAL')).toBe('form-offboarding-exports-eu');
+// expect(resolveEgressBucket('EU-WEST')).toBe('form-offboarding-exports-eu');
+// expect(resolveEgressBucket('US-EAST-1')).toBe('form-offboarding-exports');
+// expect(isEuRegion('EU-CENTRAL')).toBe(true);
+// expect(isEuRegion('EU-WEST')).toBe(true);
+// expect(isEuRegion('US-EAST-1')).toBe(false);
+```
+
+**`isEuRegion()` implementation note:** the v1 `dataRegion.startsWith('eu-')` guard is replaced by `dataRegion !== 'US-EAST-1'`. This is strictly equivalent for the current three-value enum and is safe for any future `data_region` value that is not `'US-EAST-1'` (e.g. a hypothetical `'APAC'` from OQ-R2-01 would correctly be flagged as non-US). If OQ-R2-01 adds a non-EU non-US region, `isEuRegion()` must be updated to explicitly enumerate EU values rather than relying on negation.
+
+---
+
+#### 36.11.4 Amended Migration 0075 DDL (supersedes §36.5 for enum values)
+
+The following replaces the `data_region` CHECK constraint and the partial index in migration `0075_offboarding_r2_routing.sql`. All other migration steps (DROP DEFAULT on `r2_bucket`, verification queries) are unchanged.
+
+```sql
+-- Migration: 0075_offboarding_r2_routing.sql (§36.11 canonical value amendment)
+-- Enum values corrected to match tenants.data_region (§49, migration 0090).
+-- No structural change to migration logic; only string literal values updated.
+
+BEGIN;
+
+-- Step 1 (amended): data_region column with canonical uppercase values.
+-- Supersedes §36.5 Step 1 which used 'us-east-1'/'eu-central-1'/'eu-west-1'.
+ALTER TABLE tenant_data_egress_packages
+  ADD COLUMN data_region VARCHAR(20) NOT NULL DEFAULT 'US-EAST-1'
+    CHECK (data_region IN ('US-EAST-1', 'EU-CENTRAL', 'EU-WEST'));
+
+COMMENT ON COLUMN tenant_data_egress_packages.data_region
+  IS 'Copied from tenants.data_region (§49, migration 0090) at offboarding job creation time. '
+     'Canonical values: US-EAST-1 / EU-CENTRAL / EU-WEST (uppercase — see §36.11). '
+     'Determines r2_bucket via resolveEgressBucket(). Immutable after row creation. '
+     'Denormalized here so evidence queries (§36.7) are self-contained without joining tenants.';
+
+-- Step 2: Backfill (unchanged — pre-migration rows are all US-EAST-1).
+UPDATE tenant_data_egress_packages
+  SET data_region = 'US-EAST-1'
+  WHERE data_region = 'US-EAST-1'; -- no-op; explicit audit trail.
+
+-- Step 3 (amended): chk_r2_bucket_region_consistency with canonical uppercase values.
+-- Supersedes §36.5 Step 3.
+ALTER TABLE tenant_data_egress_packages
+  ADD CONSTRAINT chk_r2_bucket_region_consistency CHECK (
+    (data_region = 'US-EAST-1'
+      AND r2_bucket = 'form-offboarding-exports')
+    OR
+    (data_region IN ('EU-CENTRAL', 'EU-WEST')
+      AND r2_bucket = 'form-offboarding-exports-eu')
+  );
+
+-- Step 4: DROP DEFAULT from r2_bucket (unchanged).
+ALTER TABLE tenant_data_egress_packages
+  ALTER COLUMN r2_bucket DROP DEFAULT;
+
+-- Step 5 (amended): Partial index with canonical uppercase values.
+-- Supersedes §36.5 Step 5.
+CREATE INDEX idx_egress_packages_eu_region
+  ON tenant_data_egress_packages (tenant_id, created_at DESC)
+  WHERE data_region IN ('EU-CENTRAL', 'EU-WEST');
+
+-- Step 6: Staging verification (amended check values).
+SELECT data_region, r2_bucket, COUNT(*) AS row_count
+FROM tenant_data_egress_packages
+GROUP BY data_region, r2_bucket
+ORDER BY data_region;
+-- Expected pre-EU-tenant: one row ('US-EAST-1', 'form-offboarding-exports', N).
+
+-- Confirm constraint rejects EU-region + US-bucket (staging only):
+-- INSERT INTO tenant_data_egress_packages (... data_region, r2_bucket ...)
+--   VALUES (... 'EU-CENTRAL', 'form-offboarding-exports' ...);
+-- Expected: ERROR 23514 check_violation on chk_r2_bucket_region_consistency.
+
+COMMIT;
+```
+
+**Dependency note:** migration 0075 and migration 0090 are independent (different tables: `tenant_data_egress_packages` vs `tenants`). Either may be applied first. However, the offboarding Worker that reads `tenants.data_region` and writes `tenant_data_egress_packages.data_region` requires **both** migrations to be deployed before any EU tenant egress job runs. A guard in the Worker init path should confirm both columns exist before processing EU tenants.
+
+---
+
+#### 36.11.5 Amended OFB-E-005 Evidence SQL (supersedes §36.7)
+
+The OFB-E-005 collection query's `is_eu_region` filter is unaffected (it reads the audit log payload boolean, not the Postgres column). However, the companion Postgres spot-check query for the EXPLAIN ANALYZE exercise (§36.9 item 8) must use canonical uppercase values:
+
+```sql
+-- OFB-E-005 Postgres spot-check (canonical values — supersedes §36.7 SQL):
+SELECT
+  event_id,
+  created_at,
+  payload->>'tenant_id'          AS tenant_id,
+  payload->>'offboarding_job_id' AS offboarding_job_id,
+  payload->>'package_type'       AS package_type,
+  payload->>'package_id'         AS package_id,
+  payload->>'data_region'        AS data_region,    -- will return 'EU-CENTRAL' or 'EU-WEST'
+  payload->>'r2_bucket'          AS r2_bucket,
+  (payload->>'is_eu_region')::boolean AS is_eu_region,
+  payload->>'package_size_bytes' AS package_size_bytes
+FROM audit_log_events
+WHERE event_type = 'enterprise.data_export_completed'
+  AND (payload->>'is_eu_region')::boolean = true
+  AND created_at >= date_trunc('quarter', now()) - INTERVAL '1 quarter'
+  AND created_at <  date_trunc('quarter', now())
+ORDER BY created_at;
+-- PASS: every row has r2_bucket = 'form-offboarding-exports-eu' and
+--       data_region IN ('EU-CENTRAL', 'EU-WEST').
+-- FAIL: any row with r2_bucket = 'form-offboarding-exports' — escalate to R-05 + P1 alert.
+```
+
+The `DataExportCompletedPayload.data_region` field (§36.6) emits the value read from `tenants.data_region` at job creation time; post-§36.11, that will be `'EU-CENTRAL'` or `'EU-WEST'`. Existing `is_eu_region: boolean` remains the primary filter for automated OFB-REGION-01 enforcement — no change to the chain invariant logic.
+
+---
+
+#### 36.11.6 §36.9 Implementation Checklist — Canonical Value Block
+
+Items 1–5 in §36.9 (all `[ ]`) carry a hard prerequisite: migration 0075 must use the §36.11 canonical DDL before any staging or production deployment. The status of item 2 (staging deployment) and item 3 (routing.ts implementation) are explicitly gated on §36.11 canonical DDL and TypeScript type respectively.
+
+| §36.9 item | Task | Additional gate from §36.11 | Status |
+|---|---|---|---|
+| 2 | Run migration 0075 on staging | Use §36.11.4 DDL (not §36.5) — CHECK constraint must use uppercase values | [ ] |
+| 3 | Implement `resolveEgressBucket()` | Use §36.11.3 TypeScript type (`DataRegion = 'US-EAST-1' | 'EU-CENTRAL' | 'EU-WEST'`) | [ ] |
+| 4 | Register OFB-REGION-01 invariant | `is_eu_region === true` logic unchanged; payload `data_region` will be uppercase | [ ] |
+| 8 | EXPLAIN ANALYZE for `idx_egress_packages_eu_region` | Use `WHERE data_region IN ('EU-CENTRAL', 'EU-WEST')` in the test query | [ ] |
+
+---
+
+#### 36.11.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update `apps/offboarding-worker/src/routing.ts` `DataRegion` type to canonical uppercase values (`'US-EAST-1' | 'EU-CENTRAL' | 'EU-WEST'`) per §36.11.3. Update `isEuRegion()` guard from `startsWith('eu-')` to `!== 'US-EAST-1'`. Update six unit test assertions. | platform-engineer | **P1** | M8 (before §36.9 item 3 deploy) | [ ] |
+| 2 | Confirm deployment script for migration 0075 uses §36.11.4 DDL (not §36.5 DDL) — CHECK constraint `('US-EAST-1', 'EU-CENTRAL', 'EU-WEST')`; DEFAULT `'US-EAST-1'`; partial index `WHERE data_region IN ('EU-CENTRAL', 'EU-WEST')`. | platform-engineer | **P1** | M8 (blocks §36.9 item 2) | [ ] |
+| 3 | Update `docs/AUDIT_LOG_SCHEMA.md §6.Enterprise-Offboarding` `DataExportCompletedPayload.data_region` field comment to note canonical values `'US-EAST-1' | 'EU-CENTRAL' | 'EU-WEST'`. | compliance-officer | **P1** | M8 | [ ] |
+| 4 | Update §49.10 cross-reference table: `docs/DATA_MODEL.md §36` routing-source patch row → 🟢 Done. | compliance-officer | **P1** | M7 (this authoring pass) | [x] **Done — §49.10 updated this patch (v1.40, 2026-06-30).** |
+
+---
+
+#### 36.11.8 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/DATA_MODEL.md §36` — Update EU-Region R2 routing cross-reference to reference `tenants.data_region` as canonical routing source; resolve enum value discrepancy | `docs/DATA_MODEL.md §49.10` row 4 (§49.9 item 6, P1/M7, documentation patch) | 🟢 **Done — §36.11 this patch (v1.40, 2026-06-30).** `tenants.data_region` confirmed canonical source. Uppercase values `'US-EAST-1'`, `'EU-CENTRAL'`, `'EU-WEST'` declared canonical. Migration 0075 DDL and TypeScript type amended. §49.10 row 4 updated 🟡 → 🟢. |
+
+---
+
+*v1.40 (2026-06-30): §36.11 Cross-Reference Patch — `tenants.data_region` as Canonical Routing Source (§49, Migration 0090). Closes `docs/DATA_MODEL.md §49.10` row 4 (§49.9 item 6, P1/M7, documentation patch). §36.11.1 purpose and scope: §49 (v1.38, 2026-06-30) formally registered `tenants.data_region` with uppercase values `'US-EAST-1'`/`'EU-CENTRAL'`/`'EU-WEST'`; §36 (v1.15, 2026-06-15) specified migration 0075 with lowercase `'us-east-1'`/`'eu-central-1'`/`'eu-west-1'`; neither migration applied to production; discrepancy is documentation-only. §36.11.2 canonical value declaration: `tenants.data_region` (§49) is the authoritative source; three reasons for upstream-table canonicality (source wins on naming disputes; uppercase avoids zone-numbering suffix semantics; §49.5/§49.6/REGION-E-001 already use uppercase). Three-row canonical value table: `US-EAST-1` (replaces `us-east-1`), `EU-CENTRAL` (replaces `eu-central-1`), `EU-WEST` (replaces `eu-west-1`). §36.11.3 amended TypeScript `DataRegion` type (supersedes §36.4): `'US-EAST-1' | 'EU-CENTRAL' | 'EU-WEST'`; `R2_BUCKET_BY_REGION` updated; `isEuRegion()` guard changed from `startsWith('eu-')` to `!== 'US-EAST-1'`; six unit test assertions updated. `isEuRegion()` negation note: safe for current three-value enum; must enumerate EU values explicitly if OQ-R2-01 adds non-EU non-US region. §36.11.4 amended migration 0075 DDL (supersedes §36.5 for enum literals): `data_region VARCHAR(20) NOT NULL DEFAULT 'US-EAST-1' CHECK (IN 'US-EAST-1'/'EU-CENTRAL'/'EU-WEST')`; `chk_r2_bucket_region_consistency` updated to uppercase; `idx_egress_packages_eu_region` WHERE clause updated to `('EU-CENTRAL', 'EU-WEST')`; all other migration steps unchanged. Dependency note: migration 0075 and 0090 are independent (different tables); both must be deployed before EU tenant egress Worker runs. §36.11.5 amended OFB-E-005 Postgres spot-check SQL (canonical values; DEC-030 audit log query unchanged — reads `is_eu_region` boolean; `data_region` payload field will emit `'EU-CENTRAL'`/`'EU-WEST'`). §36.11.6 §36.9 implementation checklist gates: items 2, 3, 4, 8 carry §36.11 canonical DDL/type prerequisites; all remain `[ ]` engineering pending. §36.11.7 four-item implementation checklist: items 1–3 `[ ]` P1/M8 (routing.ts update, migration 0075 deploy script, AUDIT_LOG_SCHEMA field comment); item 4 `[x]` Done — §49.10 row 4 updated this pass. §36.11.8 one cross-reference obligation closed: §49.10 row 4 🟡 Pending → 🟢 Done. Privacy floor: no change — `data_region` is a technical routing label, not a personal data element; no employee `user_id`, health data, or GDPR Art. 9 category in any §36.11 content. Cross-references: `docs/DATA_MODEL.md §49` (v1.38, 2026-06-30 — `tenants.data_region` canonical DDL; migration 0090; uppercase values declared); `docs/DATA_MODEL.md §49.10` (row 4 — §36 routing-source patch obligation; now 🟢 Done); `docs/DATA_MODEL.md §36.4` (legacy TypeScript type — superseded by §36.11.3); `docs/DATA_MODEL.md §36.5` (legacy migration 0075 DDL — superseded by §36.11.4 for enum values); `docs/DATA_MODEL.md §36.7` (OFB-E-005 SQL — Postgres spot-check updated §36.11.5); `docs/DATA_MODEL.md §36.10 OQ-R2-01` (APAC/LATAM expansion — any new region must update canonical value table §36.11.2, `DataRegion` type §36.11.3, migration 0075 CHECK, and migration 0090 CHECK simultaneously); `docs/AUDIT_LOG_SCHEMA.md §6.Enterprise-Offboarding` (`DataExportCompletedPayload.data_region` — P1/M8 comment update pending §36.11.7 item 3). Owner: enterprise-architect + compliance-officer.*
+
+---
+
 ## 37. Enterprise Pipeline Tracking Schema — `enterprise_pipeline_stages` + `enterprise_impl_time_log`
 
 > Owner: `enterprise-architect` + `data-engineer` + `compliance-officer`. Review: before first enterprise pilot (M7), on any change to pipeline stage definition, and quarterly.
@@ -18243,7 +18457,7 @@ ORDER BY t.country_code, t.id;
 |---|---|---|---|---|---|
 | 4 | Update Admin Dashboard tenant creation form to display `data_region` selection (EU-CENTRAL / EU-WEST / US-EAST-1) with Cloudflare zone tooltips. Make it read-only post-creation (mirrors DATA-REGION-CHAIN-01). | platform-engineer + design-craft | **P1** | M7 | [ ] |
 | 5 | Implement Cloudflare Worker routing on `data_region`: EU-CENTRAL Workers bind to Frankfurt Durable Objects + EU-Central D1; EU-WEST Workers bind to Dublin Durable Objects + EU-West D1. Integration test: create EU-CENTRAL tenant; write a session record; confirm it appears in EU-Central D1 only, not in US-EAST-1 D1. | platform-engineer + devops-lead | **P1** | M7 | [ ] |
-| 6 | Update `docs/DATA_MODEL.md §36` (EU-Region R2 Bucket Routing for Enterprise Offboarding Egress) to reference `tenants.data_region` as the canonical routing source for R2 bucket selection. Current §36 may use a separate routing config; `data_region` should be the single source of truth. | enterprise-architect + compliance-officer | **P1** | M7 (documentation patch) | [ ] |
+| 6 | Update `docs/DATA_MODEL.md §36` (EU-Region R2 Bucket Routing for Enterprise Offboarding Egress) to reference `tenants.data_region` as the canonical routing source for R2 bucket selection. Current §36 may use a separate routing config; `data_region` should be the single source of truth. | enterprise-architect + compliance-officer | **P1** | M7 (documentation patch) | [x] **Done — §36.11 (v1.40, 2026-06-30).** `tenants.data_region` (§49, migration 0090) confirmed as canonical source. Enum value discrepancy resolved (§36 lowercase superseded by §49 uppercase: `US-EAST-1`/`EU-CENTRAL`/`EU-WEST`). Migration 0075 DDL and TypeScript `DataRegion` type amended in §36.11.3–4. |
 
 #### P2 — Compliance integration
 
@@ -18259,7 +18473,7 @@ ORDER BY t.country_code, t.id;
 | `docs/SOC2_READINESS.md §139` — Register REGION-E-001 (PI1.1/CC6.7/P5.1/C1.1); §79.4 count 107 → 108; §80.3 `compliance/evidence/data-residency/` subfolder; §80.4 Vanta entry | §49.9 item 7 (P2/M8) | 🟢 **Done — SOC2_READINESS.md v3.65.0 §139, 2026-06-30** |
 | `compliance/evidence/data-residency/migration-0090-validation_<YYYY-MM-DD>.txt` — Staging validation output | §49.9 item 1 (P0) | 🟡 **Pending — migration not yet applied to staging** |
 | Tenant provisioning API: `data_region` parameter at tenant creation | §49.9 item 3 (P0) | 🟡 **Pending — Worker implementation** |
-| `docs/DATA_MODEL.md §36` — Update EU-Region R2 routing cross-reference to reference `tenants.data_region` as canonical routing source | §49.9 item 6 (P1/M7, documentation patch) | 🟡 **Pending — cross-reference patch** |
+| `docs/DATA_MODEL.md §36` — Update EU-Region R2 routing cross-reference to reference `tenants.data_region` as canonical routing source | §49.9 item 6 (P1/M7, documentation patch) | 🟢 **Done — §36.11 (v1.40, 2026-06-30).** Canonical upstream source confirmed; enum value discrepancy resolved (uppercase `'US-EAST-1'`/`'EU-CENTRAL'`/`'EU-WEST'`); migration 0075 DDL and TypeScript type amended. |
 | Cloudflare Worker routing implementation: EU-CENTRAL → Frankfurt DO + D1; EU-WEST → Dublin DO + D1; integration test | §49.9 item 5 (P1/M7) | 🟡 **Pending — infrastructure implementation** |
 | REGION-E-001 first annual collection run + R2 storage | §49.9 item 8 (P2/M10) | 🟡 **Pending — awaiting migration deploy + EU tenant onboarding** |
 

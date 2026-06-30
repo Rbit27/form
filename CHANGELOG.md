@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.65.1] — 2026-06-30
+
+### Changed
+- `docs/DATA_MODEL.md §36.11` — v1.40. Cross-Reference Patch: `tenants.data_region` as Canonical Routing Source for EU Offboarding Egress (§49, Migration 0090). Closes `docs/DATA_MODEL.md §49.10` row 4 (§49.9 item 6, P1/M7). §36.11.1: neither migration 0075 nor 0090 applied to production — discrepancy is documentation-only; `tenants.data_region` confirmed as the single canonical routing source for `resolveEgressBucket()`. §36.11.2 canonical values: `'US-EAST-1'` / `'EU-CENTRAL'` / `'EU-WEST'` (uppercase, no zone suffix — §49 source-table format; supersedes §36 lowercase `'us-east-1'`/`'eu-central-1'`/`'eu-west-1'`). §36.11.3 amended `DataRegion` TypeScript type (supersedes §36.4); `isEuRegion()` guard updated from `startsWith('eu-')` to `!== 'US-EAST-1'`; six unit test assertions updated. §36.11.4 amended migration 0075 DDL (supersedes §36.5 enum literals): `data_region VARCHAR(20) DEFAULT 'US-EAST-1' CHECK (IN 'US-EAST-1'/'EU-CENTRAL'/'EU-WEST')`; `chk_r2_bucket_region_consistency` and `idx_egress_packages_eu_region` WHERE clause updated to canonical values; §36.9 items 2/3/4/8 blocked on §36.11 canonical DDL. §36.11.5 amended OFB-E-005 Postgres spot-check SQL. §36.11.7: items 1–3 `[ ]` P1/M8 (routing.ts, migration 0075 deploy script, AUDIT_LOG_SCHEMA comment); item 4 `[x]` Done. §49.10 row 4 🟡 → 🟢 Done; §49.9 item 6 `[ ]` → `[x]` Done. Privacy floor: `data_region` is a technical routing label — no individual `user_id`, health value, or GDPR Art. 9 data.
+- `VERSION` — 10.65.0 → 10.65.1.
+
+---
+
 ## [10.64.0] — 2026-06-30
 
 ### Added
