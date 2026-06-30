@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.23.4
+# FORM · Cost Model & Unit Economics v2.24.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -376,6 +376,15 @@
     - 49.10 Open Questions
     - 49.11 Cross-Reference Index
 50. [OQ-ENTERPRISE-ARR-04 Resolution — `evidence_artefact_id` Optionality & FLEET-MAT-CHAIN-02 (DEC-087)](#50--oq-enterprise-arr-04-resolution--evidence_artefact_id-schema-optionality-confirmed--fleet-mat-chain-02-evidence-linkage-invariant-dec-087)
+51. [§51 · OQ-CS-03 Resolution — Tiered k-Anonymity Floor for QBR Aggregate Metrics (DEC-088)](#51--oq-cs-03-resolution--tiered-k-anonymity-floor-for-qbr-aggregate-metrics-dec-088)
+    - 51.1 Background
+    - 51.2 Decision (DEC-088) — Tiered k-Anonymity Framework
+    - 51.3 Decision Rationale
+    - 51.4 QBR-K-ANON-01 Invariant
+    - 51.5 §26.8.3 In-Line Patch
+    - 51.6 DEC-088 Decision Record
+    - 51.7 Implementation Checklist
+    - 51.8 Cross-Reference Obligations
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -4705,11 +4714,12 @@ All QBR data shown to the customer must pass the privacy floor:
 
 | Metric | Shown in QBR? | Privacy status | Notes |
 |---|---|---|---|
-| % of invited employees who activated | ✅ Yes | Aggregate-only | Min denominator: 5 activated to display (k-anonymity) |
+| % of invited employees who activated | ✅ Yes | Aggregate-only | Min denominator: 5 activated (k ≥ 5, Tier 1 — see §51.2) |
 | Weekly active % (of activated) | ✅ Yes | Aggregate-only | Same k-anonymity floor |
 | Average weekly workouts per activated user | ✅ Yes | Aggregate-only | No per-user breakdown |
 | Opt-in NPS (if collected) | ✅ Yes | Voluntary + aggregate | Individual responses never shown |
 | Engagement trend (month-over-month) | ✅ Yes | Aggregate time series | No individual trend lines |
+| Health-adjacent aggregates (recovery score avg, workout frequency distribution) | ❌ Not currently in scope | k ≥ 10 required if added (Tier 2 — §51.2) | Requires §40.4 amendment + new DEC + compliance-officer sign-off |
 | Department-level breakdown | ❌ No | Privacy floor violation | Manager-reports never available per ENTERPRISE.md |
 | Individual user workout history | ❌ No | Privacy floor violation | HR never sees individual data — hard constraint |
 | Body composition metrics (any) | ❌ No | GDPR Art. 9 — never aggregated | Body composition data never aggregated to employer |
@@ -4815,9 +4825,9 @@ The §22.3 Base scenario defers all hiring to Month 13, where a founding enginee
 
 The FEHS score computed in §26.9.1 uses data that is already visible to customers in the admin dashboard (activation rate, weekly active rate). Making FEHS visible to customers would (a) increase transparency and trust, (b) give customers a single headline metric for their health programme, and (c) reduce the CSM time spent explaining raw metrics. Risk: if FEHS drops to Red, a customer seeing their own Red score may panic and escalate before FORM has a recovery plan ready, compressing the intervention window. Alternative: provide a customer-facing "wellness programme health" label (Good / Needs Attention / At Risk) that is coarser than the internal 0–100 score. Owner: product-strategist + customer-success. Priority: **P1 — decide before admin dashboard v2.** Resolution: ship internal-only FEHS at M5; evaluate customer-facing version at M8 after first two QBR cycles.
 
-**OQ-CS-03: What is the right k-anonymity floor for QBR aggregate metrics?**
+**OQ-CS-03: What is the right k-anonymity floor for QBR aggregate metrics? — 🟢 RESOLVED DEC-088 (v2.24.0, 2026-06-30)**
 
-§26.8.3 states a k=5 floor (at least 5 activated users before any aggregate metric is displayed). This matches the admin dashboard spec in `docs/DATA_MODEL.md §17`. However, for small Starter customers (50 seats, 30% activation = 15 activated users), a k=5 floor means QBR metrics become available from the first cohort. For very small pilots (25 seats, 30% activation = 7–8 activated), k=5 may still be too low for body-metric or health-adjacent aggregates. Recommendation: maintain k=5 for engagement metrics (activation rate, weekly active), but raise to k=10 for any aggregate that touches health-adjacent data (e.g., average workout frequency, recovery scores). Owner: compliance-officer + clinical-safety. Priority: **P1 — before first QBR.** Resolution: compliance-officer to confirm floor with outside counsel for GDPR Art. 9 data categories; update §26.8.3 and admin dashboard spec accordingly.
+`§51` provides the formal compliance-officer ruling: tiered k-anonymity framework with k ≥ 5 (Tier 1, engagement) for all §40.4 current QBR metrics, and k ≥ 10 (Tier 2, health-adjacent) as prerequisite for any future health-adjacent aggregate inclusion. Absolute prohibition for body composition, mental health signals, ED-screening, and biometric data regardless of cohort size. QBR-K-ANON-01 invariant formalises the k-floor check as a component of the CSM `privacy_floor_verified` attestation (QBR-PRIV-01). No Zod schema change. See `docs/COST_MODEL.md §51` for full rationale and DEC-088 decision record.
 
 **OQ-CS-04: Should `fehs_score_at_qbr` in the `enterprise.qbr_completed` event include the individual signal weights?**
 
@@ -13943,3 +13953,108 @@ These queries are additive to FLEET-MAT-E-001 evidence collection. No change to 
 *v2.23.1 (2026-06-30): §49.9 checklist + §49.11 cross-reference closure. Three documentation obligations opened in v2.23.0 are now fulfilled: (1) `enterprise.fleet_maturity_declared` registered in `docs/AUDIT_LOG_SCHEMA.md` v2.62 (2026-06-30) — `FleetMaturityDeclaredSchema` Zod v2, FLEET-MAT-CHAIN-01 invariant, CC4.1/A1.1 auditor narratives; (2) FLEET-MAT-E-001 registered in `docs/SOC2_READINESS.md §132` (v3.57.0, 2026-06-30) — §79.4 row (count 101→102), `enterprise/fleet-maturity/` R2 subfolder (§80.3), Vanta mirror entry (§80.4); (3) DEC-086 (Fleet Maturity governance protocol) registered in `docs/DECISION_LOG.md`. §49.9 items 1 and 3 status updated 🟡 Open → ✅ Done. §49.11 cross-reference index: DEC-086, AUDIT_LOG_SCHEMA Enterprise Fleet Maturity events, SOC2_READINESS §132 rows updated 🟡 → 🟢. Document header v2.23.0 → v2.23.1. Owner: compliance-officer.*
 
 *v2.23.0 (2026-06-30): §49 Year-3+ Fleet Maturity Economics & 120% NRR Path (DEC-086). Extends §48.3 Year-2 Base closing ARR ($82,881) to Year-3 projections (Bull 122.4% / Base 112.1% / Bear 99.1% NRR [all ESTIMATE]). Formalises FM-C1/C2/C3 fleet maturity conditions with two-cycle gate and ≥ 12-tenant statistical floor (DEC-086). Lever attribution: 97% of the 120% NRR gap is expansion-driven (seat growth + tier upgrades), not retention-driven. CSM Phase 3 (≥ 3 CSMs, 26–37 tenants) identified as structural enabler for FM-C2 ≥ 55% expansion take-up. DEC-030 event `enterprise.fleet_maturity_declared` (LOW/3yr/CC4.1/A1.1) with FLEET-MAT-CHAIN-01 ordering invariant (HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE` on violation); 12-field `FleetMaturityDeclaredSchema` (Zod v2). SOC 2 evidence FLEET-MAT-E-001 (CC4.1/A1.1, annual Q1, 3yr, `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv`); §79.4 count 101→102. Document header v2.22.1 → v2.23.0. Owner: data-engineer + enterprise-architect + customer-success + compliance-officer.*
+
+---
+
+## §51 · OQ-CS-03 Resolution — Tiered k-Anonymity Floor for QBR Aggregate Metrics (DEC-088)
+
+### 51.1 Background
+
+`OQ-CS-03` (P1, §26.12) was opened when §26.8.3 first defined the QBR content privacy floor:
+
+> *"What is the right k-anonymity floor for QBR aggregate metrics? §26.8.3 states a k=5 floor. However, for very small pilots (25 seats, 30% activation = 7–8 activated), k=5 may still be too low for body-metric or health-adjacent aggregates. Recommendation: maintain k=5 for engagement metrics, but raise to k=10 for any aggregate that touches health-adjacent data. Owner: compliance-officer + clinical-safety."*
+
+This section provides the formal compliance-officer ruling (DEC-088). It supersedes the informal §26.8.3 recommendation with an authoritative tiered framework and introduces the QBR-K-ANON-01 named invariant. Owner: compliance-officer + clinical-safety.
+
+---
+
+### 51.2 Decision (DEC-088) — Tiered k-Anonymity Framework
+
+A three-tier framework governs all QBR aggregate metrics, governed by data sensitivity classification:
+
+| Tier | k-floor | Applies to |
+|---|---|---|
+| **Tier 1 — Engagement** | k ≥ 5 | Activated seats, WAU rate, coaching engagement rate, workout log rate, streak cohort size, Victor session volume (all six §40.4 currently-permitted metrics) |
+| **Tier 2 — Health-adjacent** | k ≥ 10 | Any aggregate touching workout frequency distributions, recovery score averages, sleep score aggregates, injury log rates — currently **not** in §40.4 scope |
+| **Absolute prohibition** | n/a — never permitted regardless of cohort size | Body composition, mental health signals, ED-screening data, injury data, biometric trends (ENTERPRISE.md privacy floor; clinical-safety VETO) |
+
+**Current scope of §40.4 QBR metrics:** All six currently-permitted metrics are Tier 1. No Tier 2 metric is currently in scope. The Tier 2 threshold activates only if a future §40.4 amendment adds health-adjacent aggregates — which itself requires a new DEC + compliance-officer sign-off.
+
+**No DEC-030 schema change:** The existing `enterprise.qbr_completed` `privacy_floor_verified: z.literal(true)` attestation (QBR-PRIV-01 chain invariant, HTTP 422 if absent) already encodes the k-floor check. §51.4 formalises what the CSM attestation covers; no new Zod field is added.
+
+---
+
+### 51.3 Decision Rationale
+
+**Ground 1: DEC-085 precedent establishes k ≥ 5 for engagement metrics.**
+
+DEC-085 (2026-06-29, OBSERVABILITY v5.9.1) resolved OQ-ADMIN-RPT-01/02 by setting k-floor N ≥ 5 for `tenant_engagement_summary` and `tenant_feature_adoption` materialized views in the Admin Dashboard. Both §40.4 QBR metrics and these admin MVs draw from the same aggregate schema (`enterprise_adoption_snapshots`, migration 0078). Using k ≥ 5 for engagement-type QBR metrics maintains consistency across the enterprise reporting stack and simplifies the compliance-officer's attestation perimeter.
+
+**Ground 2: Current §40.4 scope is engagement-only; Tier 2 threshold is preventive.**
+
+None of the six §40.4 metrics touch health-adjacent physiology. Aggregate workout frequency (*sessions ÷ activated seats*) is a behavioural engagement signal, not a physiological metric — it remains Tier 1 at k ≥ 5. Any *distribution* metric (e.g., "X% of users log 0 workouts/week") would cross into Tier 2 and is not currently in §40.4 scope.
+
+**Ground 3: GDPR Art. 9 risk is addressed by the absolute prohibition, not a higher k-floor.**
+
+GDPR Art. 9 special-category data (body composition, mental health indicators, biometric trends) is covered by the absolute prohibition — these fields are architecturally excluded from the QBR pipeline at any cohort size. The tiered k-floor governs quasi-identification risk from aggregate engagement data, which is a lower risk category. Conflating the two would require an unjustifiably high floor on non-sensitive engagement metrics.
+
+---
+
+### 51.4 QBR-K-ANON-01 Invariant
+
+> **QBR-K-ANON-01 (k-Anonymity Floor for QBR Deliverables):** Before a CSM may check `privacy_floor_verified` in the Admin Console "Complete QBR" modal, they must confirm that all aggregate metrics shared in the QBR satisfy the applicable tier: k ≥ 5 for Tier 1 engagement metrics; k ≥ 10 for any Tier 2 health-adjacent metric (not currently in scope); and no absolute-prohibition metric was disclosed in any form.
+>
+> **Relationship to QBR-PRIV-01:** QBR-K-ANON-01 defines what "privacy floor compliance" means for the CSM attestation. QBR-PRIV-01 (Worker-layer HTTP 422 enforcement) remains unchanged. QBR-K-ANON-01 is a procedural extension of QBR-PRIV-01, not a replacement.
+>
+> **Admin Console copy update (§51.7 item 1):** The attestation checkbox text must be updated to: *"I confirm no individual employee data was shared in this QBR, and all shared aggregate metrics met the required k-anonymity thresholds (k ≥ 5 for engagement metrics)."*
+
+No DEC-030 schema change. No new Worker invariant code. The existing `privacy_floor_verified: z.literal(true)` field in `QbrCompletedPayload` (AUDIT_LOG_SCHEMA.md v2.18) encodes QBR-K-ANON-01 compliance — the UI copy update makes the k-floor check explicit in the CSM's attestation workflow.
+
+---
+
+### 51.5 §26.8.3 In-Line Patch
+
+Applied in this authoring pass:
+
+1. **k-floor note updated** on "% of invited employees who activated" row: "Min denominator: 5 activated (k ≥ 5, Tier 1 — see §51.2)".
+2. **Tier 2 row added** between "Engagement trend" and "Department-level breakdown": `Health-adjacent aggregates (recovery score avg, workout frequency distribution) | ❌ Not currently in scope | k ≥ 10 required if added (Tier 2 — §51.2) | Requires §40.4 amendment + new DEC + compliance-officer sign-off`.
+3. **§26.12 OQ-CS-03 status** updated: 🟡 Open → 🟢 **Resolved DEC-088 (v2.24.0, 2026-06-30)**.
+
+---
+
+### 51.6 DEC-088 Decision Record
+
+| Field | Value |
+|---|---|
+| **Decision ID** | DEC-088 |
+| **Date** | 2026-06-30 |
+| **Question** | OQ-CS-03: What is the right k-anonymity floor for QBR aggregate metrics? |
+| **Decision** | Tiered framework: k ≥ 5 (Tier 1) for all §40.4 current engagement metrics; k ≥ 10 (Tier 2) prerequisite for any future health-adjacent aggregate; absolute prohibition for body composition, mental health, ED-screening, biometric data regardless of cohort size. QBR-K-ANON-01 invariant: Admin Console attestation copy explicitly covers k-floor. No Zod schema change required. |
+| **Owner** | compliance-officer + clinical-safety |
+| **Why** | (1) DEC-085 precedent: k ≥ 5 for admin dashboard engagement MVs → consistent for QBR engagement metrics. (2) §40.4 current scope is engagement-only — Tier 2 is preventive. (3) GDPR Art. 9 risk covered by absolute prohibition, not a higher k-floor on non-sensitive metrics. |
+| **Reverse cost** | Low. Framework is documentation + UI copy only. Changing Tier 1 floor: update §26.8.3, §51.2, Admin Console copy, CSM training. No Worker code or schema deployed. |
+
+---
+
+### 51.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update Admin Console "Complete QBR" modal attestation checkbox copy to: *"I confirm no individual employee data was shared in this QBR, and all shared aggregate metrics met the required k-anonymity thresholds (k ≥ 5 for engagement metrics)."* | platform-engineer | **P1** | M10 (before first QBR) | [ ] |
+| 2 | Add QBR-K-ANON-01 to CSM privacy-floor training module: include worked examples (25-seat pilot, 30% activation = 7–8 activated; k ≥ 5 satisfied; all Tier 1 §40.4 metrics displayable). | customer-success | **P1** | M10 (before first QBR) | [ ] |
+| 3 | Update §26.12 OQ-CS-03 status 🟡 → 🟢 Resolved (DEC-088). | compliance-officer | **P0** | This authoring pass | [x] **Done — inline patch (v2.24.0, 2026-06-30).** |
+| 4 | Register DEC-088 in `docs/DECISION_LOG.md`. | compliance-officer | **P0** | This authoring pass | [x] **Done — DEC-088 registered (2026-06-30).** |
+
+---
+
+### 51.8 Cross-Reference Obligations Created by §51
+
+| Obligation | Source | Status |
+|---|---|---|
+| Admin Console modal attestation copy update (QBR-K-ANON-01 explicit k-floor reference) | §51.7 item 1 (P1/M10) | 🟡 Pending — before first QBR |
+| CSM training module update (QBR-K-ANON-01 worked examples) | §51.7 item 2 (P1/M10) | 🟡 Pending — before first QBR |
+| DEC-088 registered in `docs/DECISION_LOG.md` | §51.7 item 4 (P0 this pass) | 🟢 **Done — 2026-06-30** |
+
+---
+
+*v2.24.0 (2026-06-30): §51 OQ-CS-03 Resolution — Tiered k-Anonymity Floor for QBR Aggregate Metrics (DEC-088). Closes OQ-CS-03 (P1, §26.12 — k-anonymity floor for health-adjacent QBR metrics; before first QBR). Decision: Tier 1 engagement metrics (all six current §40.4 metrics: activated seats, WAU rate, coaching engagement rate, workout log rate, streak cohort size ≥ 5, Victor session volume) retain k ≥ 5 floor, consistent with DEC-085 admin dashboard precedent (OBSERVABILITY v5.9.1, 2026-06-29). Tier 2 health-adjacent aggregates (workout frequency distributions, recovery score averages, sleep aggregates) require k ≥ 10 — threshold activates only if §40.4 is amended to include such metrics (requires new DEC + compliance-officer sign-off). Absolute prohibition (body composition, mental health signals, ED-screening, biometric trends) applies regardless of cohort size per ENTERPRISE.md privacy floor. New named invariant QBR-K-ANON-01: CSM attestation (`privacy_floor_verified: true`, QBR-PRIV-01) explicitly covers k-floor compliance; Admin Console modal copy update pending M10 (§51.7 item 1); no Zod schema change. §26.8.3 in-line patch: k-floor note updated to cite §51.2 tiered framework; Tier 2 row inserted in QBR content table. §26.12 OQ-CS-03 patched 🟡 → 🟢 Resolved DEC-088. TOC entry §51 added. DEC-088 registered in `docs/DECISION_LOG.md`. Document header v2.23.4 → v2.24.0. Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §51 construct — §51 governs aggregate thresholds only. Cross-references: `docs/COST_MODEL.md §26.8.3` (QBR content table — in-line patch this pass); `docs/COST_MODEL.md §26.12` (OQ-CS-03 — 🟢 Resolved); `docs/COST_MODEL.md §40.4` (QBR permissible metrics — all six remain Tier 1; Tier 2 threshold is preventive); `docs/OBSERVABILITY.md §62` (DEC-085 — k-floor N ≥ 5 for admin dashboard MVs — Tier 1 precedent); `docs/DATA_MODEL.md §17` (admin dashboard k-anon n ≥ 5 enforcement — §51 Tier 1 floor consistent); `docs/ENTERPRISE.md §Privacy floor` (absolute prohibition source — ENTERPRISE.md §7 items 6–7); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Adoption Monitoring events` (`enterprise.qbr_completed` QBR-PRIV-01 — schema unchanged); `docs/DECISION_LOG.md DEC-088` (formal decision record — P0 this pass). Owner: compliance-officer + clinical-safety.*

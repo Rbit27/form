@@ -15,6 +15,15 @@
 
 ## 2026-06-30
 
+### DEC-088 · OQ-CS-03 Resolution: Tiered k-Anonymity Floor for QBR Aggregate Metrics
+
+- **Decision:** Tiered k-anonymity framework for all QBR aggregate metrics: Tier 1 (engagement) k ≥ 5 — activated seats, WAU rate, coaching engagement rate, workout log rate, streak cohort size, Victor session volume (all §40.4 current metrics); Tier 2 (health-adjacent) k ≥ 10 — prerequisite for any future inclusion of workout frequency distributions, recovery score averages, sleep aggregates (not currently in §40.4 scope); Absolute prohibition — body composition, mental health signals, ED-screening, biometric data may never appear in QBR materials regardless of cohort size. New named invariant QBR-K-ANON-01 extends QBR-PRIV-01 attestation to explicitly cover k-floor compliance. No Zod schema change. Full rationale in `docs/COST_MODEL.md §51`.
+- **Owner:** compliance-officer + clinical-safety
+- **Why:** (1) DEC-085 (admin dashboard MVs, 2026-06-29) established k ≥ 5 for engagement-tier aggregates — QBR Tier 1 metrics are consistent. (2) All §40.4 current metrics are engagement-only; Tier 2 is preventive documentation. (3) GDPR Art. 9 risk covered by absolute prohibition, not a higher floor on non-sensitive metrics.
+- **Reverse cost:** Low. Documentation + UI copy only. No schema deployed. Changing Tier 1 floor: update §26.8.3, §51.2, Admin Console copy, CSM training module.
+
+---
+
 ### DEC-087 · OQ-ENTERPRISE-ARR-04 Resolution: `evidence_artefact_id` Optional in Zod + FLEET-MAT-CHAIN-02 Evidence Linkage Invariant
 
 - **Decision:** `evidence_artefact_id` in `FleetMaturityDeclaredSchema` (Zod v2) remains `.optional()` — confirmed correct. Presence enforced at Worker layer from `consecutive_cycles_at_target >= 2` via FLEET-MAT-CHAIN-02 (HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED` if absent). Invariant check order in `emit-audit-event` Worker: (1) FLEET-MAT-CHAIN-01 → (2) FLEET-MAT-CHAIN-02 → (3) Zod validation → (4) emit. No schema change. Full rationale and invariant spec in `docs/COST_MODEL.md §50`.

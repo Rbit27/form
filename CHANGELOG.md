@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [10.67.1] — 2026-06-30
+
+### Changed
+- `docs/COST_MODEL.md §51` — v2.24.0. OQ-CS-03 Resolution: Tiered k-Anonymity Floor for QBR Aggregate Metrics (DEC-088). Closes OQ-CS-03 (P1, §26.12 — before first QBR). Tier 1 engagement metrics (all six §40.4 current metrics) retain k ≥ 5 floor, consistent with DEC-085 admin dashboard precedent. Tier 2 health-adjacent aggregates require k ≥ 10 — activates only if §40.4 is amended. Absolute prohibition for body composition, mental health, ED-screening, biometric data. QBR-K-ANON-01 invariant extends QBR-PRIV-01 CSM attestation. §26.8.3 in-line patch (k-floor note + Tier 2 row). §26.12 OQ-CS-03 🟡 → 🟢 Resolved.
+- `docs/DECISION_LOG.md` — DEC-088 registered (QBR k-anonymity tiered framework, 2026-06-30).
+- `VERSION` — 10.67.0 → 10.67.1.
+
+---
+
 ## [10.67.0] — 2026-06-30
 
 ### Added
