@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.33.0** — 2026-06-30 · post 2860 · Series 2856–2865 «Повернення після паузи» 5/10 · clinical-safety CONDITIONAL PASS · sports-scientist review pending · blog.html card added for 2860 · README: post-2860 updated to draft
+**v10.34.0** — 2026-06-30 · post 2863 · Series 2856–2865 «Повернення після паузи» 8/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for 2863 · README: series 2886–2895 «Тренувальний інтелект» proposed · post-2861 SKIPPED (injury/pain topic — clinical-safety HARD VETO; requires medical professional review) · post-2862 SKIPPED (content substantially covered in post-2859)
 
 ---
 
