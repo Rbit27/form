@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [10.26.1] — 2026-06-30
+
+### Changed
+- `docs/COST_MODEL.md` v2.21.0 → v2.22.0 — §48 «Year-2 ARR Bridge: Activation Bucket × Health Band NRR Model» added. Synthesizes §47 graduation activation buckets (A/B/C) and §40 WAU health band model into a first-principles Year-2 ARR bridge with three fleet scenarios (Base/Bull/Bear). §48.2 migration probability matrix (A→Green 72%; B→Green 38%; C→Green 15% [ESTIMATE]). §48.3 Year-2 ARR bridge for representative 8-tenant Growth-tier cohort ($86,400 opening ARR): Base NRR 95.9% / Bull 100.0% / Bear 88.7% [ESTIMATE]. §48.4 NRR component attribution: GRR dominates (92.2 pp); expansion +5.0 pp net; 120% NRR is a Year 3+ target. §48.5 lever analysis: 120% NRR requires Green fleet > 65%, expansion take-up > 55%, ≥ 1 tier upgrade — CSM capacity is the binding constraint. §48.6 six-metric board reporting pack (GRR / NRR / Logo Retention / Green Fleet % / Expansion ARR % / CAC Payback) with board deck narrative template; privacy floor: fleet aggregates only, no per-tenant breakdown. §48.7 DEC-030 event `enterprise.annual_nrr_bridge_filed` (LOW, 3yr, CC4.1/A1.1) with NRR-BRIDGE-INV-01 arithmetic invariant (bridge must close ±$1; HTTP 422 on mismatch) and Zod v2 `AnnualNrrBridgeFiledSchema`. §48.8 SOC 2 evidence NRR-BRIDGE-E-001 (CC4.1/A1.1, annual Q1, 3yr, `compliance/evidence/nrr/`). §48.9 checklist: 4× P0/M13, 3× P1/M15, 4× P2/M24–M36. §48.10 OQ-NRR-01 (P2 — bucket→band calibration M36), OQ-NRR-02 (P1 — per-tier gate ≥ 5 tenants), OQ-NRR-03 (P2 — direct-deal proxy model). TOC entries added for §47 (previously missing from TOC) and §48. compliance-officer + enterprise-architect + data-engineer + customer-success.
+- `VERSION` — 10.26.0 → 10.26.1.
+
 ## [10.26.0] — 2026-06-30
 
 ### Added

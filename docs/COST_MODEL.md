@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.21.0
+# FORM · Cost Model & Unit Economics v2.22.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -341,6 +341,28 @@
     - 46.8 SOC 2 Evidence Mapping
     - 46.9 Implementation Checklist
     - 46.10 OQ-21 Resolution
+47. [§47 · Pilot Graduation Economics & First-Year ARR Recognition (DEC-084)](#47--pilot-graduation-economics--first-year-arr-recognition-dec-084)
+    - 47.1 Purpose and Scope
+    - 47.2 Graduation Decision Framework
+    - 47.3 Pilot-to-Paid Economic Model
+    - 47.4 First-Year ARR Recognition Mechanics
+    - 47.5 Multi-Entity Deal Structure (OQ-ENTERPRISE-ARR-01)
+    - 47.6 DEC-030 Audit Events
+    - 47.7 SOC 2 Evidence Mapping
+    - 47.8 Implementation Checklist
+    - 47.9 Cross-Reference Index
+48. [§48 · Year-2 ARR Bridge: Activation Bucket × Health Band NRR Model](#48--year-2-arr-bridge-activation-bucket--health-band-nrr-model)
+    - 48.1 Purpose and Scope
+    - 48.2 Activation Bucket to WAU Health Band Migration Model
+    - 48.3 Year-2 ARR Bridge by Fleet Scenario
+    - 48.4 NRR Decomposition — Component Attribution
+    - 48.5 Path to 120% NRR: Lever Analysis
+    - 48.6 Board Reporting Metrics Pack
+    - 48.7 DEC-030 HMAC-Chained Audit Event
+    - 48.8 SOC 2 Evidence Mapping
+    - 48.9 Implementation Checklist
+    - 48.10 Open Questions
+    - 48.11 Cross-Reference Index
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -13089,3 +13111,357 @@ GRAD-CHAIN-02 (v1.0):
 
 *v2.21.0 (2026-06-29): §47 Pilot Graduation Economics & First-Year ARR Recognition (DEC-084). Standard graduation criteria (≥ 50% activation / ≥ 3 champion logins / no T0-Gamma active), three-tier approval authority table, CAC amortization model (total pilot CAC $5,800 at 50-seat mid-market), first-year margin profiles by activation bucket (A/B/C), ASC 606 recognition trigger (no ARR during pilot period), pro-rata billing formula, seat expansion ARR forecast at M12. OQ-ENTERPRISE-ARR-01 formally registered (§47.5.1) — resolves forward reference "COST_MODEL §37" cited in OBSERVABILITY §60.11 OQ-WAU-OBS-02; tenant-level interim position confirmed. Two DEC-030 events: `enterprise.pilot_graduated` (HIGH/7yr, CC3.2/CC7.2/CC9.2/A1.1) + `enterprise.contract_activated` (STANDARD/3yr, CC3.2/A1.1). GRAD-CHAIN-01 (requires prior `enterprise.pilot_started`) and GRAD-CHAIN-02 (requires prior `enterprise.pilot_graduated` or `enterprise.pilot_saved` within 30 days) invariants. GRAD-E-001 SOC 2 evidence mapping (CC3.2/CC7.2/A1.1, annual Q4, 3yr). Implementation checklist: 6× P0/M5, 2× P1/M6, 3× P2/M10+. Owner: data-engineer + enterprise-architect + customer-success + compliance-officer.*
 
+
+---
+
+## §48 · Year-2 ARR Bridge: Activation Bucket × Health Band NRR Model
+
+> **Purpose:** Synthesize §47 (pilot graduation activation buckets) and §40 (WAU health band model) into a first-principles Year-2 ARR bridge and NRR scenario model. This section defines the board-level output metrics, three fleet scenarios, the 120% NRR lever analysis, and the DEC-030 audit trail for annual NRR filing. §23 provides the ARR bridge formula; §48 fills it with the post-graduation cohort data that §23 lacked when authored.
+
+> **Owner:** data-engineer + enterprise-architect + customer-success. Review: annually at each renewal cohort close; on any change to graduation criteria (§47) or health band thresholds (§40).
+
+---
+
+### 48.1 Purpose and Scope
+
+§47 closes the pilot lifecycle: a tenant graduates with an activation rate of 30–100%+ and a known `activation_bucket` (A/B/C per §47.2.1). §40 monitors ongoing WAU health (Green/Amber/Red) through the first paid year. §42 models renewal mechanics. §41 models seat expansion.
+
+What no prior section models is the **Year-1→Year-2 transition for a graduating cohort as a whole**: given the mix of activation buckets at graduation, what health band distribution is expected at Month 12, and what does the resulting Year-2 ARR bridge look like? This section fills that gap.
+
+**In scope:**
+- First renewal cohort — all tenants who graduated from paid pilots in Year 1 and whose initial paid contract expires in Year 2.
+- Fleet-level GRR, NRR, and board metrics derived from the §47 graduation audit trail.
+
+**Not in scope:**
+- Direct-to-enterprise deals with no prior pilot (`graduation_path = 'direct'`; no activation bucket assigned at contract start — see OQ-NRR-03 below).
+- Mid-contract seat expansions modeled in §41.
+- Winback economics modeled in §43–44.
+- Multi-entity parent-org ARR treatment (OQ-ENTERPRISE-ARR-01, §47.5).
+
+**Privacy floor (non-waivable):** all NRR bridge components aggregate across the tenant fleet; no individual `user_id`, employee name, health record, or GDPR Art. 9 data appears in any §48 table, DEC-030 event, or evidence artefact. Per-tenant ACV and seat counts are restricted to the `enterprise_contracts` table (`compliance_reviewer` role); board and investor reporting shows fleet-level aggregates only.
+
+**Cross-references:** §23.1 (ARR bridge formula — §48.3 fills the §23.1 template with cohort data); §40.3.3 (Green/Amber/Red expansion probabilities — §48.2 uses these as migration matrix inputs); §41.8 (seat expansion ARR by health band — §48.3 expansion rows); §42.8.2 (renewal conversion rates — §48.3 GRR inputs); §43.2 (churn state machine — §48.3 churned ARR); §47.2.1 (activation thresholds — §48.2 bucket inputs); `docs/ENTERPRISE.md` (pricing tiers; privacy floor); `docs/ENTERPRISE_SLA.md` (SLA commitments — §48.8 A1.1 narrative).
+
+---
+
+### 48.2 Activation Bucket to WAU Health Band Migration Model
+
+At pilot graduation, each tenant has a known `activation_bucket` (A, B, or C per §47.2.1). Over the first year of paid contract, WAU health evolves under the influence of product engagement, Victor coaching penetration, and CSM intervention. This section models the expected health band distribution at Month 12 (Year-1 end / Year-2 start).
+
+#### 48.2.1 Migration probability matrix
+
+The probability estimates below are derived from §47.3.3 (first-year retention model by activation bucket) and §40.3 (WAU health band churn probability). All figures are **[ESTIMATE]** until calibrated against FORM actuals per §47.8 item 9 (after 10 graduating pilots) and §48.9 item 8 (after 3 renewal cohorts).
+
+| Activation bucket at graduation | P(Green at M12) | P(Amber at M12) | P(Red at M12) | P(Churned before M12) |
+|---|---|---|---|---|
+| **A — ≥ 70% activation** | 72% [ESTIMATE] | 18% [ESTIMATE] | 5% [ESTIMATE] | 5% [ESTIMATE] |
+| **B — 50–70% activation** | 38% [ESTIMATE] | 42% [ESTIMATE] | 12% [ESTIMATE] | 8% [ESTIMATE] |
+| **C — 30–50% activation** | 15% [ESTIMATE] | 38% [ESTIMATE] | 32% [ESTIMATE] | 15% [ESTIMATE] |
+
+**Derivation rationale:**
+
+- **A-bucket** tenants enter paid with ≥ 70% of seats activated and Victor coaching habit established. The primary churn risk is champion departure (§43.2 state machine). P(Green at M12) ≈ 70–75%, driven by high first-session engagement rate and strong employer champion presence. The 5% logo churn risk is dominated by acquisition events and budget freezes, not product disengagement.
+
+- **B-bucket** tenants enter with momentum but incomplete penetration (50–70% of seats activated). CSM intervention at M3 and M6 (§40.6) can lift 20–25 pp of Amber accounts to Green — reflected in the 38% Green-at-M12 figure (higher than the raw §40.3 Amber→Green lift of ~20%). P(Green at M12) ≈ 35–40%.
+
+- **C-bucket** tenants are conditional graduations (§47.2.2), requiring Founder sign-off and an accelerated CSM coverage plan from Month 1 of paid. Despite the save protocol (§46), ~15% churn before renewal and ~32% remain Red at M12, making them the primary T0-Gamma risk population per §46.2. P(Green at M12) ≈ 15%.
+
+#### 48.2.2 CSM intervention lift
+
+§40.5 estimates 9–17 pp lift in renewal probability for accounts receiving structured CSM intervention before health band deterioration. The §48.2.1 matrix incorporates this lift for B and C-bucket accounts. The [ESTIMATE] tag is removed after 10 observed Year-1 → Year-2 transitions.
+
+**ADO-CHAIN-01 applies:** any downgrade from A→Amber, B→Red, or C→Red must trigger a Linear CSM follow-up task within 2 business days per §40.8.3. The ADO-CHAIN-01 evidence is collected in ADO-E-003 (§40.9) and feeds the §48.9 calibration checklist.
+
+#### 48.2.3 Direct-deal accounts (no activation bucket)
+
+Tenants with `graduation_path = 'direct'` (§47.6.2) have no `activation_bucket` at contract start. These accounts are assigned an estimated health band using Month 3 WAU data as a proxy (S1 Activation milestone per §40.2.2). See OQ-NRR-03 below for formal treatment.
+
+---
+
+### 48.3 Year-2 ARR Bridge by Fleet Scenario
+
+Three scenarios bracket the expected range. All use a **representative first renewal cohort of 8 tenants**, average **100 seats**, **Growth tier ($9/seat/month)**, ACV = **$10,800/tenant/year**, cohort opening ARR = **$86,400** [ESTIMATE; replace with actuals from first renewal cohort at M13].
+
+The activation bucket mix follows the §40.3.3 Green/Amber/Red baseline distribution and §47.2.1 graduation probability:
+
+| Bucket | Fleet share [ESTIMATE] | Tenants in 8-deal cohort |
+|---|---|---|
+| A (≥ 70% activation) | 40% | 3 |
+| B (50–70% activation) | 45% | 4 |
+| C (30–50% activation) | 15% | 1 |
+
+#### 48.3.1 Base scenario (realistic mixed fleet)
+
+Apply §48.2.1 matrix to derive M12 health band expected values:
+
+| Bucket | Tenants | P(Green) | P(Amber) | P(Red) | P(Churned) | E[Green] | E[Amber] | E[Red] | E[Churned] |
+|---|---|---|---|---|---|---|---|---|---|
+| A | 3 | 72% | 18% | 5% | 5% | 2.16 | 0.54 | 0.15 | 0.15 |
+| B | 4 | 38% | 42% | 12% | 8% | 1.52 | 1.68 | 0.48 | 0.32 |
+| C | 1 | 15% | 38% | 32% | 15% | 0.15 | 0.38 | 0.32 | 0.15 |
+| **Fleet total** | **8** | | | | | **3.83** | **2.60** | **0.95** | **0.62** |
+
+*Fractional values are expected-value averages. A concrete 8-tenant cohort will realise ±1 tenant per band due to rounding and individual variance.*
+
+**Year-2 ARR Bridge (Base scenario):**
+
+| ARR bridge component | Formula | Amount [ESTIMATE] |
+|---|---|---|
+| **Opening cohort ARR** | 8 × $10,800 | **$86,400** |
+| − Logo churn ARR | 0.62 expected churned × $10,800 | − $6,696 |
+| **Retained ARR (GRR numerator)** | | **$79,704** |
+| + Seat expansion (Green band) | 3.83 × 35% take-up × 25 seats avg × $9 × 12 | + $3,619 |
+| + Seat expansion (Amber band) | 2.60 × 12% take-up × 20 seats avg × $9 × 12 | + $672 |
+| + Seat expansion (Red band) | 0.95 × 2% take-up × 10 seats avg × $9 × 12 | + $21 |
+| **Total expansion ARR** | | **+ $4,312** |
+| − Seat contraction (Amber band) | 2.60 × 15% contraction rate × 10 seats avg × $9 × 12 | − $421 |
+| − Seat contraction (Red band) | 0.95 × 35% contraction rate × 20 seats avg × $9 × 12 | − $714 |
+| **Total contraction ARR** | | **− $1,135** |
+| **Closing ARR** | $79,704 + $4,312 − $1,135 | **$82,881** |
+| **Gross Retention Rate (GRR)** | $79,704 / $86,400 | **92.2%** [ESTIMATE] |
+| **Net Revenue Retention (NRR)** | $82,881 / $86,400 | **95.9%** [ESTIMATE] |
+| **Logo Retention Rate** | 7.38 retained / 8 total | **92.3%** [ESTIMATE] |
+
+*Expansion probability inputs from §41.8.2; contraction rates from §40.3 churn probability proxy applied to seat reductions; all [ESTIMATE] until Deal 5 expansion calibration (§41.8 item 8).*
+
+#### 48.3.2 Bull scenario (high-A-bucket fleet)
+
+Assume 70% of tenants graduate as A-bucket (tighter graduation standards or superior onboarding outcome):
+
+| Metric | Value [ESTIMATE] |
+|---|---|
+| A-bucket tenants | 5.6 → 6 |
+| E[Green at M12] fleet avg | 58% |
+| E[Churned before M12] fleet avg | 6% |
+| Logo churn ARR | 0.48 × $10,800 = $5,184 |
+| GRR | **94.0%** |
+| Expansion ARR | + $6,100 |
+| Contraction ARR | − $890 |
+| Closing ARR | $86,400 − $5,184 + $6,100 − $890 = **$86,426** |
+| **NRR** | **$86,426 / $86,400 = 100.0%** [ESTIMATE] |
+
+#### 48.3.3 Bear scenario (high-C-bucket fleet)
+
+Assume 40% of tenants graduate as C-bucket (aggressive graduation standards; C-bucket Founder sign-offs frequent):
+
+| Metric | Value [ESTIMATE] |
+|---|---|
+| C-bucket tenants | 3.2 → 3 |
+| E[Green at M12] fleet avg | 32% |
+| E[Churned before M12] fleet avg | 11% |
+| Logo churn ARR | 0.88 × $10,800 = $9,504 |
+| GRR | **89.0%** |
+| Expansion ARR | + $1,890 |
+| Contraction ARR | − $2,110 |
+| Closing ARR | $86,400 − $9,504 + $1,890 − $2,110 = **$76,676** |
+| **NRR** | **$76,676 / $86,400 = 88.7%** [ESTIMATE] |
+
+**Bear scenario interpretation:** NRR 88.7% falls below the 85% GRR target only marginally; logo churn is the dominant driver. This scenario reinforces §47.2.2's Founder sign-off gate for C-bucket graduations — tightening graduation authority is the highest-leverage control for fleet GRR.
+
+---
+
+### 48.4 NRR Decomposition — Component Attribution
+
+In the Base scenario ($86,400 opening ARR, 95.9% NRR), the NRR components are:
+
+| Component | ARR Δ | Contribution to NRR | Primary lever |
+|---|---|---|---|
+| Logo retention (GRR base) | +$79,704 | +92.2 pp | Activation quality at graduation (§47) |
+| Seat expansion — Green band | +$3,619 | +4.2 pp | CSM T1/T2/T3 triggers (§41.2) |
+| Seat expansion — Amber band | +$672 | +0.8 pp | CSM intervention → Green lift (§40.6) |
+| Seat expansion — Red band | +$21 | +0.0 pp | Negligible at Red health |
+| Seat contraction — Amber | −$421 | −0.5 pp | Amber intervention cadence (§40.6) |
+| Seat contraction — Red | −$714 | −0.8 pp | T0-Gamma save protocol (§46) |
+| Logo churn | −$6,696 | −7.7 pp | Champion protection (§43.2); C-bucket gate |
+| **Net (NRR)** | | **+95.9 pp** | |
+
+**Primary insight:** GRR dominates the first-cohort NRR — expansion contributes only +5.0 pp net. To reach 120% NRR, expansion must contribute +27 pp, which requires the fleet to run predominantly at Green health with high expansion uptake. This is achievable in Year 3+ (mature fleet) but not in Year 2 (first renewal cohort at lower deal count and CSM coverage). Board reporting must contextualise Year-2 NRR against fleet maturity.
+
+---
+
+### 48.5 Path to 120% NRR: Lever Analysis
+
+§23.5 targets 120% NRR at enterprise scale. The lever analysis below shows what must change simultaneously to bridge from the Base first-cohort NRR of 95.9% to the 120% target.
+
+| Lever | Base scenario | Required for 120% NRR | Δ needed | Primary owner |
+|---|---|---|---|---|
+| GRR (logo retention) | 92.2% | ≥ 95% | +2.8 pp | Reduce C-bucket graduation rate; accelerate C→Amber migration via §46 save protocol |
+| Green fleet share at M12 | 48% [ESTIMATE] | ≥ 65% | +17 pp | Stronger onboarding → A-bucket graduation mix; §47.2.1 activation threshold enforcement |
+| Green expansion take-up rate | 35% [ESTIMATE] | ≥ 55% | +20 pp | CSM expansion trigger cadence (§41.2 T1/T2/T3); expansion pipeline in Admin Console |
+| Average expansion seat count | 25 seats [ESTIMATE] | ≥ 35 seats | +10 seats | Larger headcount orgs in pipeline; MSA seat ceiling planning |
+| Tier upgrade events in cohort year | 0 [ESTIMATE] | ≥ 1–2 | — | Tier upgrade is highest-leverage single event: Growth→Enterprise = +$30k ACV (§23.2.2) |
+
+**Binding constraint:** CSM capacity. Each lever requires CSM-hours investment:
+- Green lift from Amber: 16h per account (§40.6 M3 Amber intervention)
+- Expansion trigger: 2–4h per expansion event (§41.2 CSM time budget)
+- Tier upgrade: 8–12h negotiation + 4h implementation (§36.3)
+
+At the first CSM hire (forecast at $72k fully-loaded, §26.4), capacity is approximately 400 CSM-hours/quarter. A fleet of 8 tenants with 3 Amber accounts and 4 expansion opportunities consumes ~200 CSM-hours/quarter — within single-CSM capacity. The capacity constraint becomes binding above 25 tenants; the second CSM hire trigger (§26.5) is M8–M12 in the Base enterprise forecast.
+
+**120% NRR timeline:** base forecast reaches 120% NRR in Year 3 (Month 36) when: (a) fleet health mix improves to ≥ 65% Green as onboarding quality compounds, (b) ≥ 1 tier upgrade per cohort year, and (c) expansion take-up rate surpasses 50%. These are not aspirational targets — they follow directly from the §40.3.3 expansion probability model applied to a mature Green-dominant fleet.
+
+---
+
+### 48.6 Board Reporting Metrics Pack
+
+Six metrics constitute the FORM enterprise board reporting pack. Computed from the §23.1 ARR bridge and §48.3 scenario model. All figures are fleet-level; no per-tenant breakdown in any investor-facing output.
+
+| Metric | Definition | Source | Year-2 target | Year-3+ target | Reporting cadence |
+|---|---|---|---|---|---|
+| **GRR** (Gross Retention Rate) | Retained ARR / Opening cohort ARR | `enterprise_renewals` + `enterprise.churn_confirmed` DEC-030 chain | ≥ 85% | ≥ 92% | Annual (at cohort renewal) |
+| **NRR** (Net Revenue Retention) | (Retained + expansion − contraction) / Opening ARR | §23.1 ARR bridge | ≥ 90% | ≥ 120% | Annual |
+| **Logo Retention Rate** | Logos renewed / Logos in opening cohort | Count of `enterprise.contract_renewed` / cohort count | ≥ 88% | ≥ 92% | Annual |
+| **Green Fleet %** | Tenants at Green WAU health at M12 / Total active tenants | `enterprise_adoption_snapshots.wau_health_band` | ≥ 48% | ≥ 65% | Quarterly |
+| **Expansion ARR %** | Seat expansion ARR / Opening cohort ARR | `enterprise.expansion_initiated` events | ≥ 5% | ≥ 20% | Annual |
+| **CAC Payback Period** | Total enterprise CAC / (ACV × gross margin) | §14.4 model; actual deal CAC from §36.6.2 | ≤ 18 months | ≤ 14 months | Annual |
+
+**Board deck narrative template:**
+
+```
+[Q4 YYYY] Enterprise Cohort NRR Update
+
+Cohort: [N] tenants / [total seats] seats
+Opening ARR: $[X] · Closing ARR: $[Y]
+
+GRR: [X%]   (target ≥ 85% / actuals to replace [ESTIMATE] after Deal 5)
+NRR: [X%]   (Year-2 range 90–100%; 120% is Year-3+ target)
+Logo Retention: [N/M] tenants renewed
+Green Fleet at M12: [X%] of active tenants
+
+Top expansion: [N] Green-band tenants with open expansion conversations.
+Top risk: [N] Red-band tenants — CSM T0-Gamma protocol active per §46.
+NRR bridge filed: enterprise.annual_nrr_bridge_filed · [event_id]
+
+Next cohort: [N] pilots in progress; est. graduation [YYYY-QN].
+```
+
+**Privacy invariant on board deck:** fleet GRR/NRR figures only; no tenant name, industry vertical, seat count per tenant, or country of operation in the deck unless covered by an explicit customer reference agreement in the MSA. Investor due-diligence data rooms follow the same floor; per-tenant detail is restricted to `enterprise_contracts` table (`compliance_reviewer` role, §40.7 RLS).
+
+---
+
+### 48.7 DEC-030 HMAC-Chained Audit Event
+
+One new DEC-030 event for annual NRR bridge filing. Registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise NRR Bridge events` per §48.9 item 1.
+
+#### 48.7.1 Event — `enterprise.annual_nrr_bridge_filed`
+
+| Field | Type | Description |
+|---|---|---|
+| `reporting_year` | `INT` | Calendar year covered by this bridge (e.g. `2026`) |
+| `cohort_tenant_count` | `INT` | Opening-cohort logo count |
+| `opening_arr_usd` | `NUMERIC(12,2)` | Sum of all opening ACV values in cohort |
+| `retained_arr_usd` | `NUMERIC(12,2)` | GRR numerator (opening ARR minus churned ARR) |
+| `expansion_arr_usd` | `NUMERIC(12,2)` | Total seat expansion ARR in period |
+| `contraction_arr_usd` | `NUMERIC(12,2)` | Total seat contraction ARR in period |
+| `churned_arr_usd` | `NUMERIC(12,2)` | ARR from logos that did not renew |
+| `closing_arr_usd` | `NUMERIC(12,2)` | Retained + expansion − contraction |
+| `grr_pct` | `NUMERIC(5,4)` | GRR decimal (0.9220 = 92.2%) |
+| `nrr_pct` | `NUMERIC(5,4)` | NRR decimal (0.9590 = 95.9%) |
+| `logo_retention_rate_pct` | `NUMERIC(5,4)` | Logos renewed / opening cohort count |
+| `green_fleet_pct_at_m12` | `NUMERIC(5,4)` | Green-band share of active tenants at M12 |
+| `filed_by` | `'founder' \| 'data_engineer' \| 'compliance_officer'` | Filing identity |
+| `bridge_hash` | `TEXT` | SHA-256 of `NRR-BRIDGE-E-001_<YYYY>.csv` artefact |
+
+**Classification:** LOW · 3 yr · CC4.1 · A1.1
+
+**NRR-BRIDGE-INV-01 arithmetic invariant:** `emit-audit-event` Worker returns HTTP 422 `NRR_BRIDGE_INV_01_RETENTION_CHECK` if:
+```
+retained_arr_usd + expansion_arr_usd − contraction_arr_usd − churned_arr_usd ≠ closing_arr_usd  (tolerance ±$1.00)
+```
+This ensures the bridge is internally consistent before the DEC-030 event is emitted and the artefact is archived.
+
+**Zod v2 schema:**
+
+```typescript
+const AnnualNrrBridgeFiledSchema = z.object({
+  reporting_year: z.number().int().min(2025).max(2050),
+  cohort_tenant_count: z.number().int().positive(),
+  opening_arr_usd: z.number().positive(),
+  retained_arr_usd: z.number().nonnegative(),
+  expansion_arr_usd: z.number().nonnegative(),
+  contraction_arr_usd: z.number().nonnegative(),
+  churned_arr_usd: z.number().nonnegative(),
+  closing_arr_usd: z.number().nonnegative(),
+  grr_pct: z.number().min(0).max(1),
+  nrr_pct: z.number().min(0).max(2),
+  logo_retention_rate_pct: z.number().min(0).max(1),
+  green_fleet_pct_at_m12: z.number().min(0).max(1),
+  filed_by: z.enum(['founder', 'data_engineer', 'compliance_officer']),
+  bridge_hash: z.string().length(64),
+})
+```
+
+---
+
+### 48.8 SOC 2 Evidence Mapping
+
+| Evidence artefact | Criteria | Description | Cadence | Retention |
+|---|---|---|---|---|
+| **NRR-BRIDGE-E-001** | CC4.1, A1.1 | Annual NRR bridge export: fleet-level GRR, NRR, logo retention, expansion/contraction/churn components, health band distribution at M12. No per-tenant breakdown; no individual `user_id`, employee name, or GDPR Art. 9 data. Filed as CSV at `compliance/evidence/nrr/NRR-BRIDGE-E-001_<YYYY>.csv`; SHA-256 hash stored in `bridge_hash` field of `enterprise.annual_nrr_bridge_filed` event. | Annual (Q1, covering prior year cohort) | 3 yr |
+
+**CC4.1 auditor narrative:** FORM monitors enterprise customer retention performance against defined WAU health thresholds (§40 bands) and files an annual NRR bridge report demonstrating: (a) GRR is tracked at fleet level, (b) logo churn events are linked to identifiable DEC-030 chain events (`enterprise.churn_confirmed`, §43.7), (c) expansion events are linked to `enterprise.expansion_initiated` (§41.7), and (d) the bridge arithmetic is verified by NRR-BRIDGE-INV-01 before filing. The `enterprise.annual_nrr_bridge_filed` event creates an immutable HMAC-chained record of each annual NRR filing.
+
+**A1.1 auditor narrative:** The annual NRR bridge demonstrates that FORM's enterprise service delivery produces measurable retention outcomes (retained ARR, logo count) over the contracted service term. The bridge filing, combined with the `enterprise.contract_renewed` event chain (§42.7), provides auditors with a timestamped, tamper-evident record that availability commitments in `docs/ENTERPRISE_SLA.md` translated to observable customer retention.
+
+---
+
+### 48.9 Implementation Checklist
+
+#### P0 — Before first Year-2 renewal event (est. M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `enterprise.annual_nrr_bridge_filed` in `docs/AUDIT_LOG_SCHEMA.md §Enterprise NRR Bridge events` subsection: LOW/3yr; NRR-BRIDGE-INV-01 arithmetic invariant; Zod v2 schema (§48.7.1). | compliance-officer | **P0** | M13 | [ ] |
+| 2 | Implement NRR-BRIDGE-INV-01 validation in `emit-audit-event` Worker: bridge arithmetic check (`retained + expansion − contraction − churned = closing ±$1`); HTTP 422 `NRR_BRIDGE_INV_01_RETENTION_CHECK` on mismatch. Integration test: inject bridge with $1.50 rounding discrepancy → confirm 422; correct bridge → confirm 201. | platform-engineer | **P0** | M13 | [ ] |
+| 3 | Build NRR bridge computation query in Supabase / data warehouse: join `enterprise_contracts`, `enterprise_renewals` (§42.6 migration 0084), `enterprise_adoption_snapshots` (§40.7), `enterprise_churn_events` (§43.8); output all nine numeric fields from `AnnualNrrBridgeFiledSchema`. Privacy: aggregate only; no `user_id`. Validate against §23.1 ARR bridge template output for same period. | data-engineer | **P0** | M13 | [ ] |
+| 4 | File first NRR-BRIDGE-E-001 in Q1 of first year with ≥ 1 renewal event: run §48.9 item 3 query; file CSV at `compliance/evidence/nrr/NRR-BRIDGE-E-001_<YYYY>.csv`; compute SHA-256; emit `enterprise.annual_nrr_bridge_filed` (NRR-BRIDGE-INV-01 pass required); upload to R2 `enterprise/nrr/` WORM prefix; mirror to Vanta (CC4.1/A1.1). | compliance-officer + data-engineer | **P0** | M13 | [ ] |
+
+#### P1 — Before first investor board deck with enterprise metrics (est. M15)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Build internal board metrics dashboard: six-metric pack from §48.6 (GRR, NRR, Logo Retention, Green Fleet %, Expansion ARR %, CAC Payback). Access: founder + compliance-officer only. No per-tenant drill-down in the board-level view. Validate that the dashboard query does not expose individual `user_id` or GDPR Art. 9 data at any aggregation level. | data-engineer | **P1** | M15 | [ ] |
+| 6 | Register NRR-BRIDGE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (one row after GRAD-E-001; count + 1); add `enterprise/nrr/` R2 WORM subfolder to §80.3; add Vanta mirror entry to §80.4 (CC4.1/A1.1). | compliance-officer | **P1** | M15 | [ ] |
+| 7 | Add §48.6 board deck narrative template to the internal investor reporting runbook (Notion / Linear). Confirm that: (a) fleet GRR/NRR figures are accurate to two decimal places; (b) no per-tenant detail appears in any investor-facing output; (c) Year-2 NRR vs. Year-3+ 120% target framing is included to contextualise the first-cohort result. | customer-success + founder | **P1** | M15 | [ ] |
+
+#### P2 — After 3 renewal cohorts (est. M36)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Calibrate §48.2.1 migration probability matrix: cross-tab `activation_bucket` at graduation (from `enterprise.pilot_graduated.activation_bucket`) against `wau_health_band` at M12 (from `enterprise_adoption_snapshots`) for all tenants in the first 3 renewal cohorts. If any bucket × band cell deviates > 10 pp from §48.2.1, update matrix; create DECISION_LOG DEC-0XX; update §48.3.1 Base scenario table. | data-engineer + customer-success | **P2** | M36 | [ ] |
+| 9 | Calibrate §48.3 contraction ARR model: after 5 renewal events, compute actual seat contraction rates for Amber and Red accounts against §40.3 proxies. If deviation > 15 pp, update contraction rows in §48.3.1 with actuals; create DECISION_LOG DEC-0XX. | data-engineer | **P2** | After 5 renewals (est. M24) | [ ] |
+| 10 | Evaluate whether NRR-BRIDGE-E-001 should include a per-tier breakdown (Starter / Growth / Enterprise) per OQ-NRR-02. Gate: ≥ 5 active tenants per tier segment. Until gate, maintain fleet-level aggregate only. If gate is met, add `tier_breakdown` sub-object to `AnnualNrrBridgeFiledSchema` (additive field; no breaking change). | compliance-officer + enterprise-architect | **P2** | After ≥ 5 tenants/tier (est. M36) | [ ] |
+| 11 | If NRR < 90% in two consecutive annual filings, escalate to board as structural risk (not cohort immaturity). §48.5 lever analysis becomes the remediation roadmap; assign each lever as a P0 OKR with quantified owner and deadline. | founder + enterprise-architect | **P2** | On-trigger | [ ] |
+
+---
+
+### 48.10 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-NRR-01** | **What is the actual activation bucket → health band migration rate for FORM's fleet?** §48.2.1 uses SaaS wellness sector estimates (A→Green 72%; B→Green 38%; C→Green 15%). Run the calibration (§48.9 item 8) after 3 renewal cohorts. If A→Green actual < 60%, shift the §48.5 lever analysis emphasis to onboarding quality (Day 0–90 implementation, §36). If B→Green actual > 50%, the §47.2.2 Founder sign-off gate for C-bucket can be relaxed. | **P2** | data-engineer + customer-success | After 3 renewal cohorts (est. M36) |
+| **OQ-NRR-02** | **Should `enterprise.annual_nrr_bridge_filed` include a per-tier breakdown?** Analytically valuable for investor reporting; allows GRR/NRR segmentation by deal size. Risk: at < 5 tenants per tier in Year 1–2, reverse-engineering individual contract values from tier-aggregated ARR is feasible. Resolution: add `tier_breakdown` sub-object only after ≥ 5 tenants per tier segment. Until then, fleet aggregate only. Outside counsel input recommended before including per-tier data in any SEC/FCA filing context. | **P1** | compliance-officer + enterprise-architect | After ≥ 5 tenants per tier (est. M24–M36) |
+| **OQ-NRR-03** | **How should direct-to-enterprise deals (no activation bucket) be modeled in §48.2?** `graduation_path = 'direct'` accounts (§47.6.2) have no `activation_bucket` at contract start. For the NRR model, use Month 3 WAU rate as proxy: WAU ≥ 40% → treat as A-equivalent; WAU 20–39% → B-equivalent; WAU < 20% → C-equivalent. Formally add this as a `direct_deal_proxy` column to §48.2.1 after the first direct-to-enterprise deal closes and M3 WAU data is available. | **P2** | data-engineer + enterprise-architect | After first direct-to-enterprise deal closes (est. M12–M18) |
+
+---
+
+### 48.11 Cross-Reference Index
+
+| Document | Section | Relationship | Status |
+|---|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md` | New §Enterprise NRR Bridge events | `enterprise.annual_nrr_bridge_filed` + NRR-BRIDGE-INV-01 invariant + Zod v2 schema | 🟡 Pending — §48.9 item 1, M13 |
+| `docs/SOC2_READINESS.md` | §79.4 master evidence table | NRR-BRIDGE-E-001 registration (count +1 after GRAD-E-001) | 🟡 Pending — §48.9 item 6, M15 |
+| `docs/SOC2_READINESS.md` | §80.3 R2 subfolder registry | `enterprise/nrr/` WORM subfolder | 🟡 Pending — §48.9 item 6, M15 |
+| `docs/COST_MODEL.md` | §23.1 ARR bridge formula | §48.3 fills the §23.1 six-component template with post-graduation cohort data | — |
+| `docs/COST_MODEL.md` | §40.3.3 (WAU health — expansion probability) | §48.3 expansion rows use §40.3.3 Green/Amber/Red take-up rates | — |
+| `docs/COST_MODEL.md` | §41.8 (Seat expansion NRR contribution) | §48.3 expansion ARR components; §48.5 expansion take-up lever | — |
+| `docs/COST_MODEL.md` | §42.8.2 (Renewal conversion rates) | §48.3 GRR inputs by health band | — |
+| `docs/COST_MODEL.md` | §43.2 (Post-churn state machine) | §48.3 logo churn ARR linked to churn event chain | — |
+| `docs/COST_MODEL.md` | §47.2.1 (Activation thresholds) | §48.2.1 bucket inputs; §48.5 A-bucket → Green fleet lever | — |
+| `docs/DATA_MODEL.md` | §17 (Admin Dashboard RLS) | §48.6 board metrics dashboard privacy floor consistent with §17 k-anonymity (n ≥ 5) | — |
+| `docs/ENTERPRISE.md` | Pricing tiers | §48.3 uses Growth $9/seat/month = $10,800/yr ACV at 100 seats | — |
+| `docs/ENTERPRISE_SLA.md` | SLA tier commitments | §48.8 A1.1 narrative: NRR bridge attests service delivery against SLA obligations | — |
+
+---
+
+*v2.22.0 (2026-06-30): §48 Year-2 ARR Bridge: Activation Bucket × Health Band NRR Model. Synthesizes §47 graduation activation buckets (A/B/C) and §40 WAU health band model into a first-principles Year-2 ARR bridge with three fleet scenarios. §48.2 activation bucket → health band migration probability matrix (A: 72% Green; B: 38% Green; C: 15% Green [all ESTIMATE]); ADO-CHAIN-01 cross-reference for downgrade-triggered CSM follow-up. §48.3 Year-2 ARR bridge for representative 8-tenant Growth-tier cohort ($86,400 opening ARR): Base NRR 95.9% / Bull NRR 100.0% / Bear NRR 88.7% [all ESTIMATE]. §48.4 NRR component attribution: GRR contributes 92.2 pp; expansion +5.0 pp net; 120% NRR is a Year 3+ target, not a first-cohort expectation. §48.5 lever analysis: 120% NRR requires Green fleet share > 65%, expansion take-up > 55%, and ≥ 1 tier upgrade per cohort year — CSM capacity is the binding constraint (single-CSM capacity ~25 tenants). §48.6 board reporting pack: six KPIs (GRR ≥ 85% / NRR ≥ 120% at scale / Logo Retention ≥ 88% / Green Fleet ≥ 48% Y2→65%+ Y3 / Expansion ARR % ≥ 5% Y2→20%+ Y3 / CAC Payback ≤ 18 months) with board deck narrative template; privacy floor: fleet aggregates only. §48.7 DEC-030 event `enterprise.annual_nrr_bridge_filed` (LOW, 3yr, CC4.1/A1.1): NRR-BRIDGE-INV-01 arithmetic invariant (retained + expansion − contraction − churned = closing ±$1; HTTP 422 on mismatch); Zod v2 `AnnualNrrBridgeFiledSchema`. §48.8 SOC 2 evidence: NRR-BRIDGE-E-001 (CC4.1/A1.1, annual Q1, 3yr, `compliance/evidence/nrr/`). §48.9 implementation checklist: 4× P0/M13 (AUDIT_LOG_SCHEMA event registration, NRR-BRIDGE-INV-01 Worker implementation, bridge computation query, first NRR-BRIDGE-E-001 filing); 3× P1/M15 (board metrics dashboard, SOC2_READINESS evidence registration, board deck template); 4× P2/M24–M36 (matrix calibration after 3 cohorts, contraction ARR calibration after 5 renewals, per-tier breakdown gate, structural-risk escalation protocol). §48.10 three open questions: OQ-NRR-01 (P2 — actual bucket→band migration rates, M36); OQ-NRR-02 (P1 — per-tier NRR-BRIDGE-E-001 after ≥ 5 tenants/tier); OQ-NRR-03 (P2 — direct-deal proxy model after first direct contract). TOC entries added for §47 (previously missing) and §48. Document header v2.21.0 → v2.22.0. Privacy floor: all §48 tables, DEC-030 events, SOC 2 artefacts, and board reporting templates contain fleet-level aggregate data only — no individual `user_id`, tenant name, country, industry vertical, or GDPR Art. 9 special-category data. Owner: data-engineer + enterprise-architect + customer-success + compliance-officer.*
