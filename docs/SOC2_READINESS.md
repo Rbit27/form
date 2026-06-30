@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.63.0
+# FORM · SOC 2 Type II Readiness v3.65.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -33911,6 +33911,94 @@ One row added to the §79.4 master evidence table (count 106 → 107), after NRR
 | 1 | Create `enterprise/cron-health-audits/` subfolder on Cloudflare R2 `form-soc2-evidence` bucket; enable WORM Object Lock Governance 7yr; confirm `r2:form-api` has NO ACCESS (§80.3 invariant). Prerequisite: pg_cron jobs 56 and 57 deployed (§63.9 items 1–2, P0/M13). | devops-lead | **P1** | M14 (after jobs 56/57 deploy) | [ ] |
 | 2 | File first CRON-HEALTH-AUDIT-E-001 artefact: use OBSERVABILITY §65.5 template; run Q-C1 through Q-C4 on first Monday of next quarter after job 56/57 deploy; upload to R2 at `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md` (7yr WORM); SHA-256 hash; upload to Vanta within 48h; add to MASTER-INDEX. Privacy check: PASS/FAIL + `days_since_last_run` + timestamps only. | devops-lead | **P1** | Q1-2027 (est.) | [ ] |
 | 3 | Add CRON-HEALTH-AUDIT-E-001 to §79.5 compliance calendar at first-Monday-of-Q slot (alongside GRAD-E-001 and NRR-BRIDGE-E-001). | compliance-officer | **P2** | Before first filing | [ ] |
+
+---
+
+## §139 · Cross-Reference Patch — REGION-E-001 Registration (PI1.1 / CC6.7 / P5.1 / C1.1 · DATA_MODEL §49)
+
+> Date: 2026-06-30. Trigger: `docs/DATA_MODEL.md §49.9` item 7 (P2/M8 — register REGION-E-001 in §79.4 master evidence table; add §80.3 R2 subfolder; add §80.4 Vanta mirror entry). Owner: compliance-officer + enterprise-architect.
+
+### §139.1 Purpose
+
+`docs/DATA_MODEL.md §49` (v1.38, 2026-06-30) — `tenants.data_region` EU Data Residency Column — introduced a new SOC 2 evidence artefact REGION-E-001 and deferred its registration to this document. This §139 fulfils that obligation: §79.4 master evidence table row (count 107 → 108), §80.3 R2 subfolder description, §80.4 Vanta mirror entry, and implementation checklist. Closes `docs/DATA_MODEL.md §49.9` item 7 (P2/M8) and `docs/DATA_MODEL.md §49.10` cross-reference obligation.
+
+REGION-E-001 is the annual EU Data Residency Compliance Verification — the auditor-facing evidence that every EU-country tenant has `data_region ≠ 'US-EAST-1'` (i.e. is routed to Frankfurt `EU-CENTRAL` or Dublin `EU-WEST`, not to US-EAST-1). It is produced by running the §49.8 cross-check query as `compliance_reviewer` and exporting the result to `compliance/evidence/data-residency/region-e-001_<YYYY>.csv`. The artefact covers four SOC 2 criteria (PI1.1 / CC6.7 / P5.1 / C1.1) and provides auditors with annual evidence that FORM honours its contractual data residency promise ("Data residency (EU customers stay in EU)" — ENTERPRISE.md §"What we promise customers"). DATA-REGION-CHAIN-01 (immutability trigger on `tenants.data_region`) and the §49.3 CHECK constraint are the enforcement mechanisms; REGION-E-001 is the annual verification output.
+
+---
+
+### §139.2 Artefact Description
+
+**REGION-E-001** — Annual EU data residency compliance verification. Content: output of the §49.8 cross-check query joined on `tenants` + `enterprise_contracts` filtered to EU/GDPR-applicable `country_code` values (31 jurisdictions: EU member states + GB + NO + CH); five columns per row: `tenant_id UUID`, `data_region VARCHAR(20)`, `country_code VARCHAR(10)`, `dpa_signed_at TIMESTAMPTZ`, `verified_at TIMESTAMPTZ`; assertion: zero rows with `eu_correctly_routed = false` (any false row = P1 incident — EU personal data routed to US-EAST-1 in violation of DPA). Zero-EU-tenant years: compliance-officer files affirmative nil attestation (`region-e-001_<YYYY>-nil.json`) confirming zero EU/GDPR-applicable active contracts in the reference year. Privacy floor: `tenant_id` FORM-internal UUID, `data_region` enum, `country_code` ISO 3166-1 alpha-2 (commercial metadata), `dpa_signed_at` contract date — no individual employee `user_id`, health data, coaching transcript, or GDPR Art. 9 special-category data.
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | REGION-E-001 |
+| **Name** | EU Data Residency Annual Compliance Verification |
+| **SOC 2 criteria** | PI1.1, CC6.7, P5.1, C1.1 |
+| **Collection frequency** | Annual (+ triggered on each EU tenant onboarding; nil attestation in zero-EU-tenant years) |
+| **Retention** | 7 years |
+| **R2 path** | `compliance/evidence/data-residency/region-e-001_<YYYY>.csv` (nil years: `region-e-001_<YYYY>-nil.json`) |
+| **Primary definition** | `docs/DATA_MODEL.md §49.8` (v1.38, 2026-06-30) |
+
+---
+
+### §139.3 §80.3 R2 Subfolder Addition
+
+New R2 subfolder added to the evidence bucket topology (§80.3):
+
+| Subfolder | Purpose | Access | Retention |
+|---|---|---|---|
+| `compliance/evidence/data-residency/` | REGION-E-001 annual CSV exports + nil attestations; migration-0090 staging validation file (`migration-0090-validation_<YYYY-MM-DD>.txt`) | `form_system` (compliance-officer write via PAM session); `compliance_reviewer` + `r2:compliance-officer` read; `r2:form-api` **NO ACCESS** | WORM Object Lock Governance, 7yr minimum |
+
+Filename conventions:
+- Active EU tenant years: `region-e-001_<YYYY>.csv` (e.g. `region-e-001_2027.csv`)
+- Zero-EU-tenant years: `region-e-001_<YYYY>-nil.json` (affirmative nil attestation)
+- Staging migration validation: `migration-0090-validation_<YYYY-MM-DD>.txt`
+
+---
+
+### §139.4 §80.4 Vanta Mirror Entry
+
+REGION-E-001 added to Vanta mirror schedule (§80.4):
+
+| Artefact ID | Vanta upload timing | TSC mapping | Privacy note |
+|---|---|---|---|
+| REGION-E-001 | Within 48h of annual filing (or nil attestation). Additional upload within 48h of each new EU tenant onboarding (triggered run). | PI1.1, CC6.7, P5.1, C1.1 | `tenant_id` UUID, `data_region` enum, `country_code` ISO 3166-1 alpha-2, `dpa_signed_at` TIMESTAMPTZ, `verified_at` TIMESTAMPTZ — no employee `user_id`, health values, or GDPR Art. 9 data |
+
+Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. Vanta access: compliance-officer + security-engineer only.
+
+---
+
+### §139.5 §79.4 Master Evidence Table Row
+
+One row added to the §79.4 master evidence table (count 107 → 108), after CRON-HEALTH-AUDIT-E-001 (§138):
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|
+| **REGION-E-001** | PI1.1, CC6.7, P5.1, C1.1 | Annual EU data residency compliance verification. Output of `DATA_MODEL.md §49.8` cross-check query run as `compliance_reviewer`: `tenants` JOIN `enterprise_contracts` filtered to 31 EU/GDPR-applicable `country_code` values; assertion: zero rows with `eu_correctly_routed = false` (any false = P1 incident). Five-column schema: `tenant_id UUID`, `data_region VARCHAR(20)`, `country_code VARCHAR(10)`, `dpa_signed_at TIMESTAMPTZ`, `verified_at TIMESTAMPTZ`. Zero-EU-tenant years: affirmative nil attestation (`region-e-001_<YYYY>-nil.json`). Enforcement mechanisms: DATA-REGION-CHAIN-01 immutability trigger (prevents silent `data_region` change post-INSERT) + §49.3 CHECK constraint (rejects invalid region values at DB layer). Privacy: tenant commercial metadata only — no `user_id`, no health values, no GDPR Art. 9 data. Source: DATA_MODEL.md §49.8 (v1.38, 2026-06-30). | Annual + EU-tenant-trigger | 7 yr | `compliance/evidence/data-residency/region-e-001_<YYYY>.csv` |
+
+---
+
+### §139.6 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/DATA_MODEL.md §49.9` item 7 (P2/M8) — Register REGION-E-001 in SOC2_READINESS §139 (PI1.1/CC6.7/P5.1/C1.1); §79.4 count 107 → 108; §80.3 `compliance/evidence/data-residency/` subfolder; §80.4 Vanta entry | §49.9 item 7 + §49.10 cross-reference obligation | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.65.0, §139)** |
+| `docs/DATA_MODEL.md §49.10` — SOC2_READINESS §139 cross-reference obligation (row 1) | §49.10 (v1.38, 2026-06-30) | 🟢 **Done — this section** |
+
+---
+
+### §139.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `compliance/evidence/data-residency/` subfolder on Cloudflare R2 `form-soc2-evidence` bucket; enable WORM Object Lock Governance 7yr; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). Prerequisite: migration 0090 deployed to production (DATA_MODEL §49.9 item 2, P0). | devops-lead | **P1** | M8 (after migration 0090 production deploy) | [ ] |
+| 2 | Execute REGION-E-001 first annual collection run: run §49.8 cross-check query as `compliance_reviewer`; export five-column result to `compliance/evidence/data-residency/region-e-001_<YYYY>.csv` (7yr WORM); SHA-256 hash; upload to Vanta within 48h; add to MASTER-INDEX. If zero EU tenants at time of run: file nil attestation at `region-e-001_<YYYY>-nil.json` instead. Privacy check: confirm output contains no `user_id`, no health values before upload. | compliance-officer + data-engineer | **P2** | M10 (before SOC 2 audit window) | [ ] |
+| 3 | Add REGION-E-001 to §79.5 compliance calendar: (a) annual Q4 slot for prior-year verification; (b) EU-tenant-trigger protocol — within 48h of each new EU tenant onboarding, run a triggered collection and upload to Vanta. | compliance-officer | **P2** | Before first EU tenant onboarding | [ ] |
+
+---
+
+*v3.65.0 (2026-06-30): §139 Cross-Reference Patch — REGION-E-001 Registration (PI1.1 / CC6.7 / P5.1 / C1.1 · DATA_MODEL §49). Closes `docs/DATA_MODEL.md §49.9` item 7 (P2/M8) and `docs/DATA_MODEL.md §49.10` cross-reference obligation (row 1). New annual SOC 2 evidence artefact registered (count 107 → 108): REGION-E-001 (PI1.1/CC6.7/P5.1/C1.1, annual + EU-tenant-trigger + nil attestation in zero-EU-tenant years, 7yr — annual EU data residency compliance verification confirming zero EU-country active tenants with `data_region = 'US-EAST-1'`; five-column export of DATA_MODEL §49.8 cross-check query; assertion: zero `eu_correctly_routed = false` rows; any false row = P1 incident; enforcement mechanisms DATA-REGION-CHAIN-01 immutability trigger + §49.3 CHECK constraint; R2 path `compliance/evidence/data-residency/region-e-001_<YYYY>.csv`, nil years at `region-e-001_<YYYY>-nil.json`, WORM 7yr, `r2:form-api` NO ACCESS). §139.3: new R2 subfolder `compliance/evidence/data-residency/` (WORM 7yr; `r2:form-api` NO ACCESS; also hosts `migration-0090-validation_<YYYY-MM-DD>.txt`). §139.4: Vanta mirror entry (annual + EU-tenant-trigger; 48h upload SLA; PI1.1/CC6.7/P5.1/C1.1; five-column tenant commercial metadata — no `user_id`, no GDPR Art. 9 data). §139.5: §79.4 master evidence table row (count 107 → 108; insertion after CRON-HEALTH-AUDIT-E-001). §139.6: two cross-reference obligations closed (DATA_MODEL §49.9 item 7 → 🟢 Done; DATA_MODEL §49.10 obligation row 1 → 🟢 Done). §139.7: three-item implementation checklist (1× P1 R2 folder at M8 after migration 0090 production deploy; 1× P2 first collection run M10; 1× P2 compliance calendar + EU-tenant-trigger protocol). Document header v3.63.0 → v3.65.0 (v3.64.0 header update applied retroactively — §138, 2026-06-30, was authored without incrementing the document header line). Privacy floor: REGION-E-001 contains `tenant_id` FORM-internal UUID, `data_region` enum, `country_code` ISO 3166-1 alpha-2 (commercial metadata), `dpa_signed_at` contract date, `verified_at` timestamp — no individual employee `user_id`, name, email, health value, coaching transcript, or GDPR Art. 9 special-category data; `r2:form-api` REVOKED from `compliance/evidence/data-residency/`. Owner: compliance-officer + enterprise-architect.*
 
 ---
 

@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [10.63.1] — 2026-06-30
+
+### Added
+- `docs/SOC2_READINESS.md §139` — v3.65.0. Cross-Reference Patch: REGION-E-001 Registration (PI1.1 / CC6.7 / P5.1 / C1.1 · DATA_MODEL §49). Closes `docs/DATA_MODEL.md §49.9` item 7 (P2/M8) and `docs/DATA_MODEL.md §49.10` cross-reference obligation. New annual SOC 2 evidence artefact registered (§79.4 count 107 → 108): REGION-E-001 — "EU Data Residency Annual Compliance Verification" — annual + EU-tenant-trigger + nil attestation in zero-EU-tenant years, 7yr retention. Content: output of §49.8 cross-check query (`tenants` JOIN `enterprise_contracts` on 31 EU/GDPR `country_code` values; five columns: `tenant_id`, `data_region`, `country_code`, `dpa_signed_at`, `verified_at`; assertion: zero `eu_correctly_routed = false` rows; any false row = P1 incident). Enforcement: DATA-REGION-CHAIN-01 immutability trigger + §49.3 CHECK constraint. §139.3: new R2 subfolder `compliance/evidence/data-residency/` (WORM 7yr; `r2:form-api` NO ACCESS; also hosts `migration-0090-validation_<YYYY-MM-DD>.txt`). §139.4: Vanta mirror entry (annual + EU-tenant-trigger; 48h upload SLA; PI1.1/CC6.7/P5.1/C1.1; five-column tenant commercial metadata only — no `user_id`, no GDPR Art. 9 data). §139.5: §79.4 master evidence table row (insertion after CRON-HEALTH-AUDIT-E-001). §139.6: two cross-reference obligations closed. §139.7: three-item implementation checklist (1× P1 R2 folder at M8; 1× P2 first collection run M10; 1× P2 compliance calendar). Document header v3.63.0 → v3.65.0 (v3.64.0 header update applied retroactively). Privacy floor: tenant commercial metadata only — no `user_id`, no health values, no GDPR Art. 9 data.
+
+### Changed
+- `docs/DATA_MODEL.md` — v1.38 → v1.39; §49.9 item 7 status `[ ]` → `[x] Done (SOC2_READINESS.md v3.65.0 §139, 2026-06-30)`; §49.10 cross-reference row 1 🟡 Pending → 🟢 Done.
+- `VERSION` — 10.63.0 → 10.63.1.
+
+---
+
 ## [10.63.0] — 2026-06-30
 
 ### Added
