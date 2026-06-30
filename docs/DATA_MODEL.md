@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.37
+# FORM · Multi-Tenant Data Model v1.38
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -56,6 +56,7 @@
 46. [`litigation_hold_records` Schema — Migration 0087](#46-litigation_hold_records-schema--migration-0087)
 47. [`enterprise_contracts` Amendment Columns — Migration 0088](#47-enterprise_contracts-amendment-columns--migration-0088)
 48. [`enterprise_contracts.graduated_from_pilot_id` — Pilot-to-Paid Cohort FK — Migration 0089](#48-enterprise_contractsgraduated_from_pilot_id--pilot-to-paid-cohort-fk--migration-0089)
+49. [`tenants.data_region` — EU Data Residency Column — Migration 0090](#49-tenantsdata_region--eu-data-residency-column--migration-0090)
 
 ---
 
@@ -17958,6 +17959,313 @@ WHERE al.event_type = 'enterprise.contract_activated'
 | Cohort analytics calibration against COST_MODEL §47.3.2 after 10 pilots | §48.9 item 5 (P2, after 10 pilots) | 🟡 **Pending — awaiting pilot graduation volume** |
 
 ---
+
+## §49: `tenants.data_region` — EU Data Residency Column — Migration 0090
+
+> **Decision**: DEC-OQ-REGION-01 — Closes ENTERPRISE.md Open Question 2 (EU data residency — Frankfurt vs Dublin).
+> **Owner**: `enterprise-architect` + `compliance-officer`.
+> **Authored**: 2026-06-30. **Migration**: `0090_tenants_data_region.sql`. **Version**: v1.38.
+
+### 49.1 Purpose
+
+This section closes the schema gap between the hard customer commitment in ENTERPRISE.md §"What we promise customers" — "Data residency (EU customers stay in EU)" — and the DATA_MODEL: no `tenants` column existed to enforce Cloudflare region routing at the database layer.
+
+**DEC-OQ-REGION-01 resolution**: EU-CENTRAL (Cloudflare EU-Central-1, Frankfurt) for DACH customers; EU-WEST (Cloudflare EU-West-1, Dublin) for UK/IE/FR customers; US-EAST-1 default for all non-EU tenants. Multi-region expansion deferred to post-Series A.
+
+**Four design principles:**
+
+1. **Additive-only migration**: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS` — one `NOT NULL VARCHAR(20)` column with `DEFAULT 'US-EAST-1'`. Backfills existing rows automatically; no table rewrite in Postgres 11+ for additions with a constant default. Safe to run under live traffic.
+2. **NOT NULL with DEFAULT**: Unlike the nullable columns in §42–§48, `data_region` is NOT NULL because every tenant must have an assigned region — absent is not a valid routing state. The DEFAULT 'US-EAST-1' ensures pre-migration rows are not broken.
+3. **CHECK constraint**: Three valid values only (`'US-EAST-1'`, `'EU-CENTRAL'`, `'EU-WEST'`). Invalid regions (e.g. `NULL`, `'APAC'`, `'EU'`) are rejected at the database layer before any Worker logic runs.
+4. **Post-insert immutability via SECURITY DEFINER trigger**: A `BEFORE UPDATE` trigger `trg_tenants_data_region_immutable` raises `EXCEPTION` if `OLD.data_region IS DISTINCT FROM NEW.data_region`. This enforces invariant **DATA-REGION-CHAIN-01**: once a tenant's data lands in a region, it cannot be silently rerouted without a formal GDPR Art. 20 data-portability migration process. The trigger fires even for `form_system`; bypassing it requires dropping the trigger (a DDL operation requiring a breaking-change DEC).
+
+### 49.2 Migration Dependency Chain
+
+```
+0083 → 0084 → 0085 → 0086 → 0087 → 0088 → 0089 → 0090
+```
+
+Migration 0090 modifies the `tenants` table — **not** `enterprise_contracts`. It has no structural FK dependency on migrations 0083–0089, which all modified `enterprise_contracts`, `enterprise_renewals`, `enterprise_churn_events`, `enterprise_contracts` loyalty/amendment columns, `litigation_hold_records`, and `enterprise_contracts.graduated_from_pilot_id`. The only structural dependency is that the `tenants` table exists (created in the initial schema, pre-0083).
+
+**Production gate**: None. No outside counsel review required (this is a DDL-only schema change with no ASC 606 or financial reporting implications). Migration 0090 can be applied in any standard deployment window. The `DEFAULT 'US-EAST-1'` clause ensures safe rollout.
+
+### 49.3 DDL
+
+```sql
+-- Migration: 0090_tenants_data_region.sql
+-- Purpose: Add data_region column to tenants for EU data residency enforcement.
+-- Decision: DEC-OQ-REGION-01 (closes ENTERPRISE.md Open Question 2)
+-- Owner: enterprise-architect + compliance-officer
+-- Date: 2026-06-30
+-- Ref: docs/DATA_MODEL.md §49
+
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS
+  data_region VARCHAR(20) NOT NULL DEFAULT 'US-EAST-1'
+  CHECK (data_region IN ('US-EAST-1', 'EU-CENTRAL', 'EU-WEST'));
+
+COMMENT ON COLUMN tenants.data_region IS
+  'Cloudflare routing region for this tenant''s data. '
+  'Set once at tenant creation INSERT; immutable post-insert '
+  '(DATA-REGION-CHAIN-01 — trg_tenants_data_region_immutable raises EXCEPTION on UPDATE). '
+  'US-EAST-1 = Cloudflare US East (default, all non-EU tenants). '
+  'EU-CENTRAL = Cloudflare EU-Central-1, Frankfurt (DACH customers: DE/AT/CH). '
+  'EU-WEST = Cloudflare EU-West-1, Dublin (UK/IE/FR/Benelux customers). '
+  'Drives: Cloudflare Worker Durable Object binding, D1 region selection, '
+  'R2 bucket selection for offboarding egress (see DATA_MODEL.md §36). '
+  'GDPR Art. 46(2)(c) SCC applies for EU-CENTRAL and EU-WEST. '
+  'Source: DEC-OQ-REGION-01 (ENTERPRISE.md Open Question 2 resolution). '
+  'Region change requires GDPR Art. 20 data-portability migration process.';
+
+-- DATA-REGION-CHAIN-01: post-insert immutability trigger
+CREATE OR REPLACE FUNCTION trg_fn_tenants_data_region_immutable()
+  RETURNS TRIGGER
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+AS $$
+BEGIN
+  IF OLD.data_region IS DISTINCT FROM NEW.data_region THEN
+    RAISE EXCEPTION
+      'DATA-REGION-CHAIN-01: tenants.data_region is immutable post-insert. '
+      'Current region: %. Attempted region: %. '
+      'A region change moves EU personal data across jurisdictions and requires '
+      'a GDPR Art. 20 data-portability migration with compliance-officer approval. '
+      'Ref: docs/DATA_MODEL.md §49.1 principle 4. DEC-OQ-REGION-01.',
+      OLD.data_region, NEW.data_region;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_tenants_data_region_immutable
+  BEFORE UPDATE ON tenants
+  FOR EACH ROW
+  EXECUTE FUNCTION trg_fn_tenants_data_region_immutable();
+
+COMMENT ON TRIGGER trg_tenants_data_region_immutable ON tenants IS
+  'DATA-REGION-CHAIN-01: Raises EXCEPTION if data_region changes post-insert. '
+  'Enforces EU data residency invariant. Ref: docs/DATA_MODEL.md §49.1. DEC-OQ-REGION-01.';
+```
+
+**Immutability invariant — DATA-REGION-CHAIN-01:**
+
+> Once `tenants.data_region` is set at `INSERT`, it must not change. A region change physically moves EU personal data across jurisdictions (potentially triggering GDPR Art. 20 data-portability rights for every affected data subject), voids the current SCC basis, and requires a new DPA with the destination region's legal entity. Only a formal GDPR Art. 20 data-portability migration process — approved by the compliance-officer with a new Decision Log entry — may legitimately result in a `data_region` change. That process involves: (1) export all affected tenant data under Art. 20 rights; (2) re-ingest to target region; (3) DROP the immutability trigger, UPDATE `data_region`, re-CREATE the trigger; (4) audit log `tenant.region_migrated` DEC-030 event.
+
+### 49.4 Staging Validation Checklist
+
+Run all seven checks after applying migration 0090 to staging. Retain console output at `compliance/evidence/data-residency/migration-0090-validation_<YYYY-MM-DD>.txt`.
+
+```sql
+-- 1. Column present with correct type (varchar, not null, has default, has check)
+SELECT column_name, data_type, character_maximum_length, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_name = 'tenants' AND column_name = 'data_region';
+-- Expected: data_type=character varying, character_maximum_length=20,
+--           is_nullable=NO, column_default='US-EAST-1'::character varying
+
+-- 2. CHECK constraint registered
+SELECT conname, pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE conrelid = 'tenants'::regclass AND contype = 'c'
+  AND conname LIKE '%data_region%';
+-- Expected: constraint definition contains 'US-EAST-1', 'EU-CENTRAL', 'EU-WEST'
+
+-- 3. DEFAULT applied to existing rows (if any pre-migration rows exist)
+SELECT COUNT(*) FROM tenants WHERE data_region IS NULL;
+-- Expected: 0 (DEFAULT backfill)
+
+SELECT COUNT(*) FROM tenants WHERE data_region = 'US-EAST-1';
+-- Expected: equals total pre-migration tenant count
+
+-- 4. CHECK rejects invalid values (run each; all must fail with constraint violation)
+BEGIN;
+INSERT INTO tenants (name, data_region) VALUES ('test-invalid', NULL);
+-- Expected: ERROR: null value in column "data_region" violates not-null constraint
+ROLLBACK;
+
+BEGIN;
+INSERT INTO tenants (name, data_region) VALUES ('test-invalid', 'APAC');
+-- Expected: ERROR: new row for relation "tenants" violates check constraint
+ROLLBACK;
+
+-- 5. CHECK accepts all three valid values (run each; all must succeed)
+BEGIN;
+INSERT INTO tenants (name, data_region) VALUES ('test-us', 'US-EAST-1');
+INSERT INTO tenants (name, data_region) VALUES ('test-eu-central', 'EU-CENTRAL');
+INSERT INTO tenants (name, data_region) VALUES ('test-eu-west', 'EU-WEST');
+-- Expected: 3 rows inserted without error
+ROLLBACK;
+
+-- 6. Immutability trigger fires on UPDATE attempt
+BEGIN;
+UPDATE tenants SET data_region = 'EU-CENTRAL'
+WHERE id = (SELECT id FROM tenants LIMIT 1);
+-- Expected: ERROR: DATA-REGION-CHAIN-01: tenants.data_region is immutable post-insert...
+ROLLBACK;
+
+-- 7. form_api cannot UPDATE tenants (existing grant — data_region inherits)
+SET ROLE form_api;
+UPDATE tenants SET name = 'test' WHERE id = (SELECT id FROM tenants LIMIT 1);
+-- Expected: ERROR: permission denied for table tenants (or 0 rows if no UPDATE grant)
+RESET ROLE;
+```
+
+### 49.5 Column Semantics
+
+| Column | Type | Nullable | Default | Immutable | Semantics |
+|---|---|---|---|---|---|
+| `data_region` | `VARCHAR(20)` | NOT NULL | `'US-EAST-1'` | Yes (DATA-REGION-CHAIN-01) | Cloudflare routing region for this tenant's data. Set once at tenant creation. Drives Worker Durable Object binding, D1 region, R2 bucket selection (§36). |
+
+**Region routing table:**
+
+| `data_region` value | Cloudflare zone | Geographic scope | GDPR SCC required? | R2 bucket (§36) |
+|---|---|---|---|---|
+| `US-EAST-1` | US East (Virginia) | Default — all non-EU tenants | No (US–US transfer) | `form-offboarding-us` |
+| `EU-CENTRAL` | EU-Central-1 (Frankfurt) | Germany, Austria, Switzerland | Yes — Art. 46(2)(c) SCC | `form-offboarding-eu-central` |
+| `EU-WEST` | EU-West-1 (Dublin) | Ireland, UK, France, Benelux | Yes — Art. 46(2)(c) SCC | `form-offboarding-eu-west` |
+
+**GDPR Art. 46 SCC alignment**: For both EU regions, a signed SCC Module 1 (controller-to-controller) or Module 2 (controller-to-processor) DPA must be executed before any pilot data flows. The DPA signing gate is enforced by ENTERPRISE.md §"Sales process" (Contract phase, Month 4–5). `data_region` at `'EU-CENTRAL'` or `'EU-WEST'` does **not** replace the DPA — it is the schema enforcement mechanism that ensures data **stays** in EU once the DPA is signed. A tenant with `data_region = 'EU-CENTRAL'` and no signed DPA is an incident (P1 per INCIDENT_RESPONSE §3 — data governance breach).
+
+### 49.6 RLS Behaviour
+
+The `tenants` table has different RLS from `enterprise_contracts` (which is fully REVOKED from `form_api`). `form_api` requires SELECT access to `tenants` at request time to resolve Cloudflare Worker routing. The `data_region` column inherits this existing access pattern.
+
+| Role | Policy on `tenants` | Behaviour on `data_region` |
+|---|---|---|
+| `form_api` | SELECT via tenant-scoped RLS (`tenant_id = current_setting('app.current_tenant_id')::UUID`) | Can SELECT own tenant's `data_region` — required for Cloudflare Worker routing decisions at request dispatch. No UPDATE grant exists on `tenants` for `form_api`. |
+| `form_system` | ALL via service role | Full access. Only write path for `data_region` at tenant `INSERT`. The SECURITY DEFINER trigger enforces DATA-REGION-CHAIN-01 even for `form_system` post-INSERT. |
+| `form_admin` | SELECT | Can read `data_region` across all tenants for the operations dashboard (region distribution reporting). Cannot INSERT/UPDATE. |
+| `compliance_reviewer` | SELECT | Can read `data_region` for REGION-E-001 annual cross-check query (§49.8). |
+| `tenant_owner` / `tenant_admin` | SELECT on own tenant row (existing RLS policy) | Can read own `data_region` — transparently confirms their contracted data residency commitment in the Admin Dashboard. |
+| `tenant_manager` | SELECT on own tenant row (existing RLS policy) | Can read own `data_region`. This does **not** violate the privacy floor: `data_region` is commercial/contractual metadata, not individual employee health data, coaching transcripts, or GDPR Art. 9 special-category data. |
+
+**DDL auditor proof queries (run after migration 0090):**
+
+```sql
+-- 1. Confirm form_api can SELECT data_region for own tenant (RLS-scoped)
+SET ROLE form_api;
+SET LOCAL app.current_tenant_id = '<staging-test-tenant-id>';
+SELECT id, data_region FROM tenants
+WHERE id = current_setting('app.current_tenant_id')::UUID;
+-- Expected: 1 row returned with data_region value; no error
+
+-- 2. Confirm immutability trigger fires and blocks UPDATE
+BEGIN;
+SET ROLE form_system;
+UPDATE tenants SET data_region = 'EU-CENTRAL'
+WHERE id = '<staging-test-tenant-id>' AND data_region = 'US-EAST-1';
+-- Expected: ERROR: DATA-REGION-CHAIN-01: tenants.data_region is immutable post-insert...
+ROLLBACK;
+
+-- 3. Confirm compliance_reviewer can SELECT data_region across all tenants
+SET ROLE compliance_reviewer;
+SELECT id, data_region FROM tenants ORDER BY created_at DESC LIMIT 10;
+-- Expected: rows returned; no permission error; data_region values visible
+RESET ROLE;
+```
+
+### 49.7 Privacy Floor
+
+| Column | Privacy classification | GDPR relevance | PHI / Art. 9 risk |
+|---|---|---|---|
+| `data_region` (new) | Commercial / contractual metadata | GDPR Art. 46(2)(c) SCC compliance mechanism — determines the legal basis for cross-border transfers and which Cloudflare jurisdiction stores data at rest | None — a region enum value; no employee PII, health data, coaching transcripts, or GDPR Art. 9 special-category data |
+
+**Privacy floor note — `tenant_manager` access**: `tenant_manager` can read `data_region` for their own tenant row. This is intentional. IT/HR personnel need to know where company data is stored (required for their own GDPR Art. 30 Record of Processing Activities). `data_region` carries zero individual employee health data. It does not enable HR to see individual user activity, coaching content, body composition, or mental health data. The FORM privacy floor invariant (§6, ENTERPRISE.md §"Privacy floor for enterprise") — *HR can never see individual user data* — is not implicated by this column.
+
+### 49.8 SOC 2 Evidence Mapping
+
+This section introduces a new evidence artefact: **REGION-E-001** (to be formally registered in SOC2_READINESS §139).
+
+| Criterion | DDL mechanism | Auditor proof |
+|---|---|---|
+| **PI1.1** — Personal information collected in conformity with privacy commitments | `data_region IN ('EU-CENTRAL', 'EU-WEST')` ensures EU personal data stays in EU, fulfilling the contractual residency promise ("Data residency (EU customers stay in EU)" — ENTERPRISE.md §"What we promise customers") | REGION-E-001 annual query: zero EU-country tenants with `data_region = 'US-EAST-1'` (see §49.8 cross-check query below) |
+| **CC6.7** — Data transmitted and stored in conformity with physical access controls | `data_region` drives Cloudflare Worker region binding — EU data is written only to EU D1 / EU R2; US-EAST-1 Workers are not bound to EU Durable Objects | REGION-E-001: cross-check `data_region` against Worker deployment topology; confirm no EU-CENTRAL/EU-WEST tenant's data appears in US D1 at the application layer |
+| **P5.1** — Privacy notice communicated to data subjects regarding how information is used | `data_region` visible to `tenant_owner` in Admin Dashboard confirms their data residency commitment — transparent disclosure at the tenant level | REGION-E-001 includes `tenant_owner` acknowledgement log from Admin Dashboard residency display UI (to be implemented in §49.9 item 4) |
+| **C1.1** — Information designated as confidential is protected as committed | EU personal data never leaves the EU region at rest — `DATA-REGION-CHAIN-01` trigger prevents silent `data_region` change; no Worker can reroute EU data without triggering the immutability EXCEPTION | Penetration test scenario: attempt direct DB UPDATE on `data_region` for EU tenant without dropping trigger — must raise EXCEPTION; log in annual pentest report |
+
+**REGION-E-001 artefact specification** (pending registration in SOC2_READINESS §139):
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | REGION-E-001 |
+| **Type** | Monitoring artefact |
+| **SOC 2 criteria** | PI1.1, CC6.7, P5.1, C1.1 |
+| **Collection frequency** | Annual (+ triggered on each EU tenant onboarding) |
+| **Evidence path** | `compliance/evidence/data-residency/region-e-001_<YYYY>.csv` |
+| **Schema** | `(tenant_id UUID, data_region VARCHAR(20), country_code VARCHAR(10), dpa_signed_at TIMESTAMPTZ, verified_at TIMESTAMPTZ)` |
+| **Assertion** | Zero rows with `data_region = 'US-EAST-1'` where `country_code` is an EU member state, UK, or CH |
+
+**REGION-E-001 annual cross-check query:**
+
+```sql
+-- REGION-E-001: Annual data residency compliance verification
+-- Run as compliance_reviewer; export to compliance/evidence/data-residency/region-e-001_<YYYY>.csv
+-- Assertion: all_eu_correctly_routed = true for every row returned
+
+SELECT
+  t.id                           AS tenant_id,
+  t.data_region,
+  t.country_code,
+  ec.dpa_signed_at,
+  NOW()                          AS verified_at,
+  (t.data_region <> 'US-EAST-1') AS eu_correctly_routed
+FROM tenants t
+JOIN enterprise_contracts ec
+  ON ec.tenant_id = t.id
+  AND ec.status   = 'active'
+WHERE t.country_code IN (
+  -- EU member states + GDPR-applicable jurisdictions
+  'DE','AT','CH','IE','FR','BE','NL','LU','GB',
+  'PL','SE','NO','DK','FI','ES','IT','PT','CZ',
+  'SK','HU','RO','BG','HR','SI','EE','LV','LT',
+  'CY','MT','GR'
+)
+ORDER BY t.country_code, t.id;
+
+-- Expected: zero rows with eu_correctly_routed = false
+-- Any false row = P1 incident (EU personal data in US region)
+```
+
+*Privacy floor: this query returns `tenant_id` (FORM-internal UUID), `data_region` (enum), `country_code` (commercial metadata), and `dpa_signed_at` (contract date). No individual employee `user_id`, health data, coaching transcript, or GDPR Art. 9 special-category data is returned.*
+
+### 49.9 Implementation Checklist
+
+#### P0 — Before first EU tenant onboarding
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0090_tenants_data_region.sql` to staging; run all seven §49.4 validation checks; retain output at `compliance/evidence/data-residency/migration-0090-validation_<YYYY-MM-DD>.txt`. | platform-engineer + enterprise-architect | **P0** | Before EU pilot | [ ] |
+| 2 | Deploy migration 0090 to production **before** any EU tenant onboarding. A tenant `INSERT` with `data_region = 'EU-CENTRAL'` or `'EU-WEST'` requires the column to exist. Deploying EU onboarding flow before migration 0090 causes `undefined column` errors. | platform-engineer | **P0** | Before EU pilot | [ ] |
+| 3 | Update tenant provisioning API (`create_tenant()` SECURITY DEFINER RPC or equivalent) to accept `data_region` at tenant creation. Default to `'US-EAST-1'` if not provided. Reject if value not in `('US-EAST-1', 'EU-CENTRAL', 'EU-WEST')` (DB CHECK will catch it, but API-layer validation gives cleaner error messages). | platform-engineer + enterprise-architect | **P0** | Before EU pilot | [ ] |
+
+#### P1 — EU tenant onboarding flow
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Update Admin Dashboard tenant creation form to display `data_region` selection (EU-CENTRAL / EU-WEST / US-EAST-1) with Cloudflare zone tooltips. Make it read-only post-creation (mirrors DATA-REGION-CHAIN-01). | platform-engineer + design-craft | **P1** | M7 | [ ] |
+| 5 | Implement Cloudflare Worker routing on `data_region`: EU-CENTRAL Workers bind to Frankfurt Durable Objects + EU-Central D1; EU-WEST Workers bind to Dublin Durable Objects + EU-West D1. Integration test: create EU-CENTRAL tenant; write a session record; confirm it appears in EU-Central D1 only, not in US-EAST-1 D1. | platform-engineer + devops-lead | **P1** | M7 | [ ] |
+| 6 | Update `docs/DATA_MODEL.md §36` (EU-Region R2 Bucket Routing for Enterprise Offboarding Egress) to reference `tenants.data_region` as the canonical routing source for R2 bucket selection. Current §36 may use a separate routing config; `data_region` should be the single source of truth. | enterprise-architect + compliance-officer | **P1** | M7 (documentation patch) | [ ] |
+
+#### P2 — Compliance integration
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Register REGION-E-001 in `docs/SOC2_READINESS.md §139` (PI1.1/CC6.7/P5.1/C1.1). Increment §79.4 evidence count 107 → 108. Add `data-residency/` subfolder to §80.3 R2 registry and REGION-E-001 to §80.4 Vanta mirror list. | compliance-officer | **P2** | M8 | [ ] |
+| 8 | Execute REGION-E-001 first annual collection run using §49.8 cross-check query. Export to `compliance/evidence/data-residency/region-e-001_<YYYY>.csv`. Store in R2 `compliance/evidence/data-residency/` subfolder. Schedule annual recurrence (pg_cron or calendar reminder). | compliance-officer + data-engineer | **P2** | M10 (before SOC 2 audit window) | [ ] |
+
+### 49.10 Cross-Reference Obligations Created by §49
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/SOC2_READINESS.md §139` — Register REGION-E-001 (PI1.1/CC6.7/P5.1/C1.1); §79.4 count 107 → 108; §80.3 `data-residency/` subfolder; §80.4 Vanta entry | §49.9 item 7 (P2/M8) | 🟡 **Pending — to be authored in next SOC2 pass** |
+| `compliance/evidence/data-residency/migration-0090-validation_<YYYY-MM-DD>.txt` — Staging validation output | §49.9 item 1 (P0) | 🟡 **Pending — migration not yet applied to staging** |
+| Tenant provisioning API: `data_region` parameter at tenant creation | §49.9 item 3 (P0) | 🟡 **Pending — Worker implementation** |
+| `docs/DATA_MODEL.md §36` — Update EU-Region R2 routing cross-reference to reference `tenants.data_region` as canonical routing source | §49.9 item 6 (P1/M7, documentation patch) | 🟡 **Pending — cross-reference patch** |
+| Cloudflare Worker routing implementation: EU-CENTRAL → Frankfurt DO + D1; EU-WEST → Dublin DO + D1; integration test | §49.9 item 5 (P1/M7) | 🟡 **Pending — infrastructure implementation** |
+| REGION-E-001 first annual collection run + R2 storage | §49.9 item 8 (P2/M10) | 🟡 **Pending — awaiting migration deploy + EU tenant onboarding** |
+
+---
+
+*v1.38 (2026-06-30): §49 `tenants.data_region` — EU Data Residency Column — Migration 0090. Closes ENTERPRISE.md Open Question 2 (EU data residency — Frankfurt vs Dublin; DEC-OQ-REGION-01). Resolves the schema gap between ENTERPRISE.md §"What we promise customers" hard commitment ("Data residency (EU customers stay in EU)") and the DATA_MODEL: no `tenants` column existed to enforce Cloudflare region routing at the database layer. §49.1 purpose + four design principles: (1) additive-only migration (ALTER TABLE tenants ADD COLUMN IF NOT EXISTS — one NOT NULL VARCHAR(20) column with DEFAULT 'US-EAST-1'; backfills existing rows automatically, no table rewrite in Postgres 11+); (2) NOT NULL with DEFAULT (every tenant must have an assigned region — absent is not a valid routing state; DEFAULT 'US-EAST-1' ensures pre-migration rows are not broken); (3) CHECK constraint (three valid values: 'US-EAST-1'/'EU-CENTRAL'/'EU-WEST'; invalid regions rejected at DB layer before any Worker logic runs); (4) post-insert immutability via SECURITY DEFINER trigger trg_tenants_data_region_immutable (DATA-REGION-CHAIN-01: BEFORE UPDATE trigger raises EXCEPTION if OLD.data_region IS DISTINCT FROM NEW.data_region; fires even for form_system; bypass requires DROP TRIGGER — a DDL breaking-change DEC). §49.2 migration dependency chain: 0083→0084→0085→0086→0087→0088→0089→0090; migration 0090 modifies tenants table only (no structural FK dependency on 0083–0089 which all modified enterprise_contracts or related tables); no outside-counsel production gate (DDL-only, no ASC 606 / financial reporting implications). §49.3 full DDL: ALTER TABLE tenants ADD COLUMN IF NOT EXISTS data_region VARCHAR(20) NOT NULL DEFAULT 'US-EAST-1' CHECK (IN 'US-EAST-1'/'EU-CENTRAL'/'EU-WEST'); COMMENT ON COLUMN (DATA-REGION-CHAIN-01, DEC-OQ-REGION-01, GDPR Art. 46 SCC note, immutability instruction, GDPR Art. 20 migration path reference); trg_fn_tenants_data_region_immutable() SECURITY DEFINER function (RAISE EXCEPTION with OLD/NEW region values + migration path reference); trg_tenants_data_region_immutable BEFORE UPDATE trigger; COMMENT ON TRIGGER. DATA-REGION-CHAIN-01 invariant full specification (Art. 20 portability migration path: export → re-ingest → DROP trigger → UPDATE → re-CREATE trigger → audit_log tenant.region_migrated event). §49.4 seven-item staging validation checklist: column present (varchar(20), not null, default 'US-EAST-1'); CHECK constraint registered; DEFAULT backfills existing rows (zero NULL count); CHECK rejects NULL + 'APAC' with expected errors; CHECK accepts all three valid values; immutability trigger fires on UPDATE (EXCEPTION text verified); form_api cannot UPDATE tenants. Evidence path: compliance/evidence/data-residency/migration-0090-validation_<YYYY-MM-DD>.txt. §49.5 column semantics (1 column: type/nullable/default/immutable/semantics); region routing table (US-EAST-1/EU-CENTRAL/EU-WEST: Cloudflare zone, geographic scope, GDPR SCC required, R2 bucket); GDPR Art. 46 SCC alignment note (DPA prerequisite; data_region enforces residency post-DPA — does not replace DPA; EU tenant without DPA = P1 incident). §49.6 RLS: six-role policy table (form_api SELECT via tenant-scoped RLS for Worker routing; form_system ALL — only write path; form_admin SELECT across all tenants; compliance_reviewer SELECT; tenant_owner/tenant_admin SELECT on own row for Admin Dashboard; tenant_manager SELECT on own row — not a privacy floor violation: contractual IT metadata, not health data); three DDL auditor proof queries (form_api SELECT own tenant; immutability trigger EXCEPTION on UPDATE; compliance_reviewer SELECT all). §49.7 privacy floor: single-column classification table (commercial/contractual metadata; GDPR Art. 46(2)(c) SCC mechanism; no PHI/Art. 9 risk); tenant_manager read justification (GDPR Art. 30 ROPA requirement for IT/HR; zero individual health data exposure). §49.8 SOC 2 evidence: four criteria mapped (PI1.1 — EU data stays in EU; CC6.7 — data_region drives Cloudflare Worker region binding, EU data in EU D1/R2 only; P5.1 — data_region visible to tenant_owner in Admin Dashboard; C1.1 — DATA-REGION-CHAIN-01 trigger prevents silent region change); new artefact REGION-E-001 spec (monitoring type, PI1.1/CC6.7/P5.1/C1.1, annual + EU-tenant-trigger, evidence path compliance/evidence/data-residency/region-e-001_<YYYY>.csv, schema: tenant_id/data_region/country_code/dpa_signed_at/verified_at); REGION-E-001 annual cross-check query (JOIN tenants + enterprise_contracts on country_code IN 31 EU/GDPR jurisdictions; assertion: zero eu_correctly_routed=false rows; privacy floor note: aggregate commercial metadata only). §49.9 implementation checklist: 3× P0 (migration 0090 staging + 7 validation checks + evidence file; production deploy before EU onboarding; tenant provisioning API data_region parameter); 3× P1/M7 (Admin Dashboard data_region selection — read-only post-creation; Cloudflare Worker routing implementation + integration test EU-CENTRAL→Frankfurt DO/D1; DATA_MODEL §36 routing-source cross-reference patch); 2× P2 (SOC2_READINESS §139 REGION-E-001 registration → count 107→108 + data-residency/ R2 subfolder + Vanta entry; REGION-E-001 first annual collection run M10). §49.10 six cross-reference obligations: SOC2_READINESS §139 🟡 pending (P2/M8); migration-0090 staging validation file 🟡 pending; tenant provisioning API 🟡 pending; DATA_MODEL §36 routing-source patch 🟡 pending; Cloudflare Worker routing implementation 🟡 pending; REGION-E-001 first collection run 🟡 pending (P2/M10). TOC updated (§49 added). Document header v1.37 → v1.38. No schema applied — documentation only. Cross-references: `docs/ENTERPRISE.md §"Open questions" item 2` (EU data residency — Frankfurt vs Dublin — closed by DEC-OQ-REGION-01); `docs/ENTERPRISE.md §"What we promise customers"` (hard commitment: "Data residency (EU customers stay in EU)"); `docs/DATA_MODEL.md §36` (EU-Region R2 Bucket Routing for Enterprise Offboarding Egress — data_region feeds §36 bucket selection; §36 routing-source update pending §49.9 item 6); `docs/DATA_MODEL.md §16` (tenants baseline DDL — sole table modified by migration 0090); `docs/SOC2_READINESS.md §139` (REGION-E-001 registration — 🟡 pending, P2/M8; §79.4 count 107→108). Owner: enterprise-architect + compliance-officer.*
 
 *v1.36 (2026-06-29): §48 `enterprise_contracts.graduated_from_pilot_id` — Pilot-to-Paid Cohort FK — Migration 0089. Closes `docs/COST_MODEL.md §47.8 item 8` (P1/M6): DATA_MODEL registration gap for the `graduated_from_pilot_id UUID NULLABLE REFERENCES tenant_pilots(id) ON DELETE SET NULL` column on `enterprise_contracts`. §48.1 purpose + four design principles: (1) additive-only migration (ALTER TABLE ADD COLUMN IF NOT EXISTS — one nullable UUID FK column; no DEFAULT; no CHECK); (2) ON DELETE SET NULL (tenant_pilots hard-deleted at 5yr per §16.9; contract must not be deleted — 7yr financial records); (3) nullable for non-pilot-origin direct-enterprise deals; (4) privacy floor — FORM-internal UUID only, no employee PII or Art. 9 data. §48.2 migration dependency chain: 0083→0084→0085→0086→0087→0088→0089; structural FK dependency on tenant_pilots table (§16.3) — unlike prior additive migrations 0083–0088. FK referential action table: ON DELETE SET NULL (correct) vs CASCADE (rejected — destroys 7yr financial records) vs RESTRICT (rejected — blocks §16.9 5yr hard-delete cron). §48.3 full DDL: ALTER TABLE enterprise_contracts ADD COLUMN IF NOT EXISTS graduated_from_pilot_id UUID REFERENCES tenant_pilots(id) ON DELETE SET NULL; COMMENT ON COLUMN with governance context (DEC-084, §47.6.2 write path, ON DELETE SET NULL rationale, write-once-at-INSERT invariant). §48.4 six-item staging validation checklist: column present with correct type (uuid, nullable); FK constraint registered against tenant_pilots; existing rows all NULL; form_api REVOKE confirmed; tenant_manager no-policy confirmed; compliance_reviewer SELECT. Evidence path: compliance/evidence/graduation/migration-0089-validation_<YYYY-MM-DD>.txt. §48.5 column semantics table (1 column); cohort analytics query pattern (activation bucket → seat utilisation rate JOIN on graduated_from_pilot_id; privacy floor note: aggregate counts only, no Art. 9 data). §48.6 RLS: five-role policy table unchanged from §16 (form_api REVOKED; form_system ALL; form_admin SELECT; compliance_reviewer SELECT; tenant roles no access); three DDL auditor proof queries (form_api REVOKE; tenant_manager no-policy; compliance_reviewer SELECT). §48.7 privacy floor: single-column table (FORM-internal UUID; GDPR relevance: none; PHI/Art. 9: none); referenced table tenant_pilots privacy floor confirmation (internal_notes PII prohibition + weekly content-scan; success_criteria aggregate JSONB only). §48.8 SOC 2 evidence: CC3.2 (pilot-to-contract traceability SQL), CC9.2 (graduation criteria gate verifiability), A1.1 (SLA-tier → graduation baseline link); GRAD-E-001 annual cross-check query (enterprise.contract_activated event pilot_id vs graduated_from_pilot_id column — chain_consistent assertion). §48.9 implementation checklist: 2× P0/M6 (migration 0089 staging apply + six validation checks; production deploy before graduation Worker); 2× P1/M6 (graduation Worker write-on-INSERT + integration test; COST_MODEL §47.8 item 8 closure — [x] Done this authoring pass); 1× P2/after-10-pilots (cohort analytics calibration against §47.3.2 NRR estimates). §48.10 cross-reference obligations: COST_MODEL §47.8 item 8 🟢 Done; migration-0089 staging output 🟡 pending; graduation Worker implementation 🟡 pending; cohort calibration 🟡 pending. TOC updated (§47 + §48 added). Document header v1.35 → v1.36. No schema applied — documentation only. Cross-references: `docs/COST_MODEL.md §47` (authoritative pilot graduation economics + GRAD-CHAIN-01/02 + DEC-084); `docs/COST_MODEL.md §47.8 item 8` (P1/M6 obligation now closed — documentation portion); `docs/COST_MODEL.md §47.9` (cross-reference row updated 🟡 → 🟢); `docs/DATA_MODEL.md §16` (enterprise_contracts baseline DDL — sole table modified; form_api REVOKE established here); `docs/DATA_MODEL.md §16.3` (tenant_pilots baseline DDL — referenced FK target); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Pilot Graduation events` (v2.59 — enterprise.pilot_graduated HIGH/7yr + enterprise.contract_activated STANDARD/3yr; GRAD-CHAIN-01/02 invariants); `docs/SOC2_READINESS.md §129` (GRAD-E-001 evidence artefact — CC3.2/CC7.2/A1.1; graduated_from_pilot_id enables annual cross-check query). Owner: enterprise-architect + compliance-officer.*
 

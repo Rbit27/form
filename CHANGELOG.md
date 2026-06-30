@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [10.61.1] — 2026-06-30
+
+### Added
+- `docs/DATA_MODEL.md §49` — `tenants.data_region` EU Data Residency Column — Migration 0090. Closes ENTERPRISE.md Open Question 2 (DEC-OQ-REGION-01): schema enforcement layer for the hard customer commitment "Data residency (EU customers stay in EU)". Three-region enum (US-EAST-1 / EU-CENTRAL Frankfurt / EU-WEST Dublin), NOT NULL with DEFAULT, CHECK constraint, and post-insert immutability trigger (DATA-REGION-CHAIN-01). SOC 2 evidence artefact REGION-E-001 specified (PI1.1/CC6.7/P5.1/C1.1). Six cross-reference obligations created (SOC2_READINESS §139 pending).
+
+### Changed
+- `VERSION` — 10.61.0 → 10.61.1.
+- `docs/DATA_MODEL.md` — v1.37 → v1.38; §49 and TOC entry added.
+
+---
+
 ## [10.61.0] — 2026-06-30
 
 ### Added
