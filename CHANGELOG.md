@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.40.1] — 2026-06-30
+
+### Changed
+- `docs/SOC2_READINESS.md` — §134 Cross-Reference Patch: MASTER-INDEX-YYYY.csv schema extended with four optional columns (`vanta_uploaded`, `chain_verified`, `filing_year`, `fleet_mat_chain_01_verified`) for annual enterprise fleet artefacts. Canonical template rows defined for NRR-BRIDGE-E-001 (CC4.1/A1.1, annual-q1, `enterprise/nrr/`, `chain_verified: true`) and FLEET-MAT-E-001 (CC4.1/A1.1, annual-q1, `enterprise/fleet-maturity/`, `chain_verified: true`, `fleet_mat_chain_01_verified: true`). Filing-year row protocol established (one row per `filing_year`; zero-declaration years as affirmative attestation; `vanta_uploaded = true` within 48h). §79.4 MASTER-INDEX amendment documented for both artefacts. §79.9 item 4 extended to require 12-column seeding for fleet artefact rows. §133.6 item 3 closed ([x] Done — v3.59.0). Document header v3.58.0 → v3.59.0. Owner: compliance-officer.
+- `VERSION` — 10.40.0 → 10.40.1.
+
+---
+
 ## [10.40.0] — 2026-06-30
 
 ### Added

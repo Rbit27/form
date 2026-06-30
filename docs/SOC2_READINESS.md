@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.58.0
+# FORM · SOC 2 Type II Readiness v3.59.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -33254,4 +33254,175 @@ The §132.6 table row (last row) has been updated inline from `🟡 Open — wil
 |---|---|---|---|---|---|
 | 1 | Update §131.7 item 3 status: `[ ]` → `[x] Done — 2026-06-30 (SOC2_READINESS §133.2)` | compliance-officer | **P2** | Month O+1 calendar review | [x] **Done — this patch (v3.58.0, 2026-06-30).** |
 | 2 | Update §132.6 last row: `🟡 Open — will update 🟡→🟢 in next patch` → `🟢 **Done — 2026-06-30 (COST_MODEL v2.23.1 §49.11; SOC2_READINESS §133.3, v3.58.0)**` | compliance-officer | **P2** | Next patch after v3.57.0 | [x] **Done — this patch (v3.58.0, 2026-06-30).** |
-| 3 | Add NRR-BRIDGE-E-001 and FLEET-MAT-E-001 annual filing entries to MASTER-INDEX-YYYY.csv template (§79.9 item 4): include `filing_year`, `sha256`, `r2_path`, `vanta_uploaded`, `chain_verified`, and (for FLEET-MAT-E-001) `fleet_mat_chain_01_verified: true` fields; document in §79.4 MASTER-INDEX row for both artefacts. | compliance-officer | **P2** | Before Month O+12 MASTER-INDEX review | [ ] |
+| 3 | Add NRR-BRIDGE-E-001 and FLEET-MAT-E-001 annual filing entries to MASTER-INDEX-YYYY.csv template (§79.9 item 4): include `filing_year`, `sha256`, `r2_path`, `vanta_uploaded`, `chain_verified`, and (for FLEET-MAT-E-001) `fleet_mat_chain_01_verified: true` fields; document in §79.4 MASTER-INDEX row for both artefacts. | compliance-officer | **P2** | Before Month O+12 MASTER-INDEX review | [x] **Done — 2026-06-30 (SOC2_READINESS §134, v3.59.0).** |
+
+---
+
+*v3.59.0 (2026-06-30): §134 Cross-Reference Patch — MASTER-INDEX-YYYY.csv Template Extension for Annual Enterprise Fleet Artefacts (NRR-BRIDGE-E-001 · FLEET-MAT-E-001). Closes `docs/SOC2_READINESS.md §133.6` item 3 (P2/before Month O+12 MASTER-INDEX review). Extends MASTER-INDEX CSV schema with four optional columns (`vanta_uploaded`, `chain_verified`, `filing_year`, `fleet_mat_chain_01_verified`) — backward-compatible addition; existing rows carry empty values. Defines canonical template rows for NRR-BRIDGE-E-001 (CC4.1/A1.1, annual-q1, `enterprise/nrr/`, `chain_verified: true`, `fleet_mat_chain_01_verified: `) and FLEET-MAT-E-001 (CC4.1/A1.1, annual-q1, `enterprise/fleet-maturity/`, `chain_verified: true`, `fleet_mat_chain_01_verified: true`). Specifies filing-year row creation protocol: one row per `filing_year` per artefact; `collected_at` = ISO 8601 filing date; zero-declaration years carry `status = COLLECTED` and `chain_verified: true`. §79.4 MASTER-INDEX amendment: NRR-BRIDGE-E-001 and FLEET-MAT-E-001 rows gain `fleet_mat_chain_01_verified` note in "R2 file path" column cross-reference. §79.9 item 4 status updated from `NOT_YET_COLLECTED` seed instruction to include fleet artefact extension note. Privacy floor: MASTER-INDEX rows contain operational metadata only — `evidence_id`, `r2_path`, `sha256`, status flags; no individual employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data; `form_api` has zero access to `form-soc2-evidence` R2 bucket. Document header v3.58.0 → v3.59.0. Owner: compliance-officer.*
+
+---
+
+## §134 · Cross-Reference Patch — MASTER-INDEX-YYYY.csv Template Extension for Annual Enterprise Fleet Artefacts (NRR-BRIDGE-E-001 · FLEET-MAT-E-001)
+
+> Date: 2026-06-30. Trigger: `docs/SOC2_READINESS.md §133.6` item 3 (P2/before Month O+12 MASTER-INDEX review) — open `[ ]` after v3.58.0. Owners: compliance-officer.
+
+### §134.1 Purpose and Scope
+
+This patch closes the one remaining open item from the enterprise fleet artefact sprint (§131–§133, 2026-06-30):
+
+**§133.6 item 3:** Add NRR-BRIDGE-E-001 and FLEET-MAT-E-001 annual filing entries to `MASTER-INDEX-YYYY.csv` template (§79.9 item 4), including `filing_year`, `sha256`, `r2_path`, `vanta_uploaded`, `chain_verified`, and (for FLEET-MAT-E-001) `fleet_mat_chain_01_verified: true` fields; document in §79.4 MASTER-INDEX row for both artefacts.
+
+This section delivers:
+
+1. **§134.2** — Extended MASTER-INDEX CSV schema (four optional columns, backward-compatible).
+2. **§134.3** — Canonical template rows for NRR-BRIDGE-E-001 and FLEET-MAT-E-001.
+3. **§134.4** — Filing-year row protocol (one row per `filing_year`, zero-declaration handling).
+4. **§134.5** — §79.4 MASTER-INDEX amendment notes for both artefacts.
+5. **§134.6** — §79.9 item 4 extension note.
+6. **§134.7** — Cross-reference obligations closed.
+7. **§134.8** — Implementation checklist (all items closed in this patch).
+
+---
+
+### §134.2 Extended MASTER-INDEX CSV Schema
+
+**Current schema (§81.7):**
+
+```
+evidence_id,tsc_criteria,collection_cadence,owner,r2_path,status,collected_at,sha256
+```
+
+**Extended schema (v3.59.0):**
+
+```
+evidence_id,tsc_criteria,collection_cadence,owner,r2_path,status,collected_at,sha256,vanta_uploaded,chain_verified,filing_year,fleet_mat_chain_01_verified
+```
+
+**Extension rationale:** Annual enterprise fleet artefacts (NRR-BRIDGE-E-001, FLEET-MAT-E-001) require four metadata fields that monthly and quarterly artefacts do not carry:
+
+| New column | Type | Annual fleet artefacts | All other artefacts |
+|---|---|---|---|
+| `vanta_uploaded` | `boolean` | `true` once uploaded within 48h of filing | `` (empty — Vanta sync handled by mirror-log, not MASTER-INDEX) |
+| `chain_verified` | `boolean` | `true` — DEC-030 HMAC chain verified as prerequisite to filing | `` (empty) |
+| `filing_year` | `integer` | Year covered by the artefact (e.g., `2027`) | `` (empty) |
+| `fleet_mat_chain_01_verified` | `boolean \| ` | `true` for FLEET-MAT-E-001 (FLEET-MAT-CHAIN-01 prerequisite met); `` for NRR-BRIDGE-E-001 | `` (empty) |
+
+**Backward compatibility:** The four new columns are appended at the end of the schema. Existing rows in `MASTER-INDEX-2026.csv` that were seeded per §79.9 item 4 carry empty values for these four columns — CSV parsers handle trailing empty columns transparently. The §81.7 Cloudflare Worker's `updateMasterIndexRows()` function is not broken by the extension because it operates on `evidence_id` matching, not column index. The Worker emits `system.evidence_collection_automated` with `master_index_hash` — the hash will differ once the template rows are seeded (expected; no CC4.2 deficiency).
+
+**MASTER-INDEX-CHAIN-01 impact:** `master_index_hash` in the §81.7 DEC-030 event captures the SHA-256 of the entire file at the moment of the monthly automation run. Annual fleet artefact rows are populated manually (by compliance-officer in Q1) — the monthly automation run after the first annual Q1 filing will produce a different `master_index_hash` than the month before. This is the expected and correct behaviour; auditors comparing `master_index_hash` values across months should note the Q1 annual filing as the explanation for any hash delta.
+
+---
+
+### §134.3 Canonical Template Rows
+
+The following rows are added to `MASTER-INDEX-2026.csv` (and carried forward to each subsequent year's MASTER-INDEX) with `status = NOT_YET_COLLECTED` until the first eligible Q1 filing.
+
+**Template (one row per artefact; `{YYYY}` = filing year; populated at time of filing):**
+
+```csv
+NRR-BRIDGE-E-001,CC4.1/A1.1,annual-q1,compliance-officer+data-engineer,enterprise/nrr/NRR-BRIDGE-E-001_{YYYY}.csv,NOT_YET_COLLECTED,,{sha256},true,true,{YYYY},
+FLEET-MAT-E-001,CC4.1/A1.1,annual-q1,compliance-officer,enterprise/fleet-maturity/FLEET-MAT-E-001_{YYYY}.csv,NOT_YET_COLLECTED,,{sha256},true,true,{YYYY},true
+```
+
+**Field-by-field specification:**
+
+| Column | NRR-BRIDGE-E-001 value | FLEET-MAT-E-001 value | Note |
+|---|---|---|---|
+| `evidence_id` | `NRR-BRIDGE-E-001` | `FLEET-MAT-E-001` | Stable across years |
+| `tsc_criteria` | `CC4.1/A1.1` | `CC4.1/A1.1` | Per §131.2 / §132.2 |
+| `collection_cadence` | `annual-q1` | `annual-q1` | Distinguishes from `monthly` / `quarterly` / `annual` for pen-test artefacts |
+| `owner` | `compliance-officer+data-engineer` | `compliance-officer` | Per §131.2 / §132.2 |
+| `r2_path` | `enterprise/nrr/NRR-BRIDGE-E-001_{YYYY}.csv` | `enterprise/fleet-maturity/FLEET-MAT-E-001_{YYYY}.csv` | `{YYYY}` replaced with 4-digit year at filing time |
+| `status` | `NOT_YET_COLLECTED` → `COLLECTED` at filing | `NOT_YET_COLLECTED` → `COLLECTED` at filing | Updated by compliance-officer on the day of filing |
+| `collected_at` | ISO 8601 filing date (e.g., `2027-02-14`) | ISO 8601 filing date — **must be ≥ NRR-BRIDGE-E-001 `collected_at` for the same `{YYYY}`** | Enforced by FLEET-MAT-CHAIN-01 at Worker layer |
+| `sha256` | SHA-256 of the filed CSV file | SHA-256 of the filed CSV file | Computed locally before R2 upload; verified post-upload |
+| `vanta_uploaded` | `true` | `true` | Set to `true` once Vanta upload confirmed (within 48h of `collected_at`) |
+| `chain_verified` | `true` | `true` | `true` = `enterprise.annual_nrr_bridge_filed` / `enterprise.fleet_maturity_declared` DEC-030 event successfully emitted (HTTP 200 from `emit-audit-event` Worker) |
+| `filing_year` | `{YYYY}` (integer) | `{YYYY}` (integer) | The calendar year the artefact covers — may differ from the year in which it is filed |
+| `fleet_mat_chain_01_verified` | `` (empty) | `true` | `true` = FLEET-MAT-CHAIN-01 prerequisite (`enterprise.annual_nrr_bridge_filed` for the same `filing_year` present in HMAC chain) confirmed before `enterprise.fleet_maturity_declared` emitted |
+
+**Zero-declaration year handling:** Even in years where `cohort_tenant_count = 0` (no renewal cohort) or FM-C1/C2/C3 are not met, both artefacts must be filed as affirmative attestation. The template rows carry `status = NOT_YET_COLLECTED` until filing; `collected_at` and `sha256` are populated on filing regardless of the artefact's substantive content. A missing `filing_year` row in any year after the observation period start is a CC4.1/A1.1 SOC 2 gap — not a deferral option.
+
+**Per-year row creation:** Each calendar year after the observation period start requires a new pair of rows. The `MASTER-INDEX-YYYY.csv` file for each year should be pre-seeded with these template rows (with `status = NOT_YET_COLLECTED`) during the Month O-1 setup or at the start of each new calendar year, whichever comes first. The §81.7 monthly automation Worker does not create new annual-artefact rows — creation is a manual compliance-officer step.
+
+---
+
+### §134.4 Filing-Year Row Protocol
+
+The annual Q1 filing procedure for both artefacts is defined in §79.5 (§133.2 addition, v3.58.0). This section specifies the MASTER-INDEX mechanics that accompany that procedure.
+
+**Step 1 — Pre-filing:** Confirm the `MASTER-INDEX-{YYYY}.csv` file for the current `filing_year` contains template rows for both artefacts with `status = NOT_YET_COLLECTED`. If missing, create them per §134.3.
+
+**Step 2 — NRR-BRIDGE-E-001 filing:** After `enterprise.annual_nrr_bridge_filed` DEC-030 event is emitted (HTTP 200) and the CSV is uploaded to R2:
+- Set `status = COLLECTED`
+- Set `collected_at = {ISO 8601 date}`
+- Set `sha256 = {SHA-256 of the filed CSV}`
+- Set `vanta_uploaded = true` (after Vanta upload — within 48h)
+- Set `chain_verified = true`
+- Set `filing_year = {YYYY}`
+- Leave `fleet_mat_chain_01_verified` empty
+
+**Step 3 — FLEET-MAT-E-001 filing:** After `enterprise.fleet_maturity_declared` DEC-030 event is emitted (HTTP 200, FLEET-MAT-CHAIN-01 prerequisite confirmed) and the CSV is uploaded to R2:
+- Set `status = COLLECTED`
+- Set `collected_at = {ISO 8601 date}` (must be ≥ NRR-BRIDGE-E-001 `collected_at` for same `filing_year`)
+- Set `sha256 = {SHA-256 of the filed CSV}`
+- Set `vanta_uploaded = true` (after Vanta upload — within 48h)
+- Set `chain_verified = true`
+- Set `filing_year = {YYYY}`
+- Set `fleet_mat_chain_01_verified = true`
+
+**Step 4 — MASTER-INDEX integrity:** After both rows are updated, recompute SHA-256 of the updated `MASTER-INDEX-{YYYY}.csv` and record in the monthly compliance memo for the Q1 month. The next automated monthly run (§81.7) will capture `master_index_hash` of the updated file — this is the expected post-filing hash value.
+
+**Step 5 — Vanta mirror timing:** Both artefacts require Vanta upload within 48h of filing (§131.4 / §132.4). Set `vanta_uploaded = true` in MASTER-INDEX only after confirming the Vanta upload completed. If Vanta upload fails within 48h, open a P1 incident via `docs/INCIDENT_RESPONSE.md` escalation path — Vanta mirror gap is a CC4.1/A1.1 control deficiency if unresolved within 72h.
+
+---
+
+### §134.5 §79.4 MASTER-INDEX Amendment
+
+The §79.4 master evidence table rows for NRR-BRIDGE-E-001 and FLEET-MAT-E-001 (added in §131.6 and §132.5 respectively) are amended inline to note the extended MASTER-INDEX fields:
+
+**NRR-BRIDGE-E-001 §79.4 row amendment:**
+
+The `R2 file path` cell for NRR-BRIDGE-E-001 is updated to read:
+
+> `enterprise/nrr/NRR-BRIDGE-E-001_<YYYY>.csv` — one file per `filing_year`. MASTER-INDEX row: extended schema (§134.2) — `vanta_uploaded: true`, `chain_verified: true`, `filing_year: {YYYY}`, `fleet_mat_chain_01_verified: ` (empty).
+
+**FLEET-MAT-E-001 §79.4 row amendment:**
+
+The `R2 file path` cell for FLEET-MAT-E-001 is updated to read:
+
+> `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv` — one file per `filing_year`. MASTER-INDEX row: extended schema (§134.2) — `vanta_uploaded: true`, `chain_verified: true`, `filing_year: {YYYY}`, `fleet_mat_chain_01_verified: true` (FLEET-MAT-CHAIN-01 prerequisite confirmed).
+
+**Inline note:** The §79.4 table itself (line ~26754–26762) is not re-printed here to avoid duplication. This §134.5 amendment is the authoritative specification for how those two rows appear in MASTER-INDEX; any future §79.4 revision must carry these field values in the R2 path column.
+
+---
+
+### §134.6 §79.9 Item 4 Extension Note
+
+§79.9 item 4 (P0/Month O-1) currently reads:
+
+> Create initial MASTER-INDEX-YYYY.csv: seed with all evidence IDs from §79.4 table with `status = NOT_YET_COLLECTED`. Store at `compliance/evidence/MASTER-INDEX-2026.csv`.
+
+**Extension:** When seeding `MASTER-INDEX-2026.csv` per item 4, the two annual-fleet-artefact rows (NRR-BRIDGE-E-001, FLEET-MAT-E-001) must be seeded using the extended 12-column template rows defined in §134.3, not the base 8-column schema. All other §79.4 artefact rows carry empty values for columns 9–12. The extended schema (§134.2) is backward-compatible — no tooling changes required for the §81.7 monthly automation Worker.
+
+The status of §79.9 item 4 itself remains `[ ]` (creation of the physical CSV file is an implementation task — not completed by this documentation patch). This §134.6 note augments item 4's content specification without changing its open status.
+
+---
+
+### §134.7 Cross-Reference Obligations Closed
+
+| Obligation | Source | Closed by |
+|---|---|---|
+| `docs/SOC2_READINESS.md §133.6` item 3 (P2/before Month O+12) — MASTER-INDEX template for NRR-BRIDGE-E-001 + FLEET-MAT-E-001; `filing_year`, `chain_verified`, `fleet_mat_chain_01_verified` fields; §79.4 MASTER-INDEX row documentation | §133.6 (v3.58.0, 2026-06-30) — `[ ]` | 🟢 **§134.2–§134.5 (v3.59.0, 2026-06-30)** — Extended schema defined; template rows specified; §79.4 amendment documented; zero-declaration protocol and per-year row creation procedure established |
+
+---
+
+### §134.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update §133.6 item 3 status: `[ ]` → `[x] Done — 2026-06-30 (SOC2_READINESS §134, v3.59.0)` | compliance-officer | **P2** | This patch | [x] **Done — this patch (v3.59.0, 2026-06-30).** |
+| 2 | When creating `MASTER-INDEX-2026.csv` (§79.9 item 4): seed NRR-BRIDGE-E-001 and FLEET-MAT-E-001 using the 12-column extended template rows from §134.3 (not the 8-column base schema). All other rows carry empty values for columns 9–12. | compliance-officer | **P0** | Month O-1 (§79.9 item 4 milestone) | [ ] |
+| 3 | When NRR-BRIDGE-E-001 is first filed (Q1 of first year with ≥ 1 renewal cohort): populate MASTER-INDEX row per §134.4 step 2 — `status = COLLECTED`, `collected_at`, `sha256`, `vanta_uploaded = true`, `chain_verified = true`, `filing_year`. Recompute MASTER-INDEX SHA-256. | compliance-officer + data-engineer | **P1** | Q1 of first renewal year | [ ] |
+| 4 | When FLEET-MAT-E-001 is first filed (same Q1, after NRR-BRIDGE-E-001): populate MASTER-INDEX row per §134.4 step 3 — `status = COLLECTED`, `collected_at` ≥ NRR-BRIDGE-E-001 `collected_at`, `sha256`, `vanta_uploaded = true`, `chain_verified = true`, `filing_year`, `fleet_mat_chain_01_verified = true`. | compliance-officer | **P1** | Q1 of first renewal year (after item 3) | [ ] |
+| 5 | Before Month O+12 MASTER-INDEX review: confirm `MASTER-INDEX-2026.csv` contains the 12-column extended rows for both artefacts (seeded per item 2). Run SHA-256 integrity check. Document in Q4 2026 compliance memo. | compliance-officer | **P2** | Month O+12 | [ ] |
