@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.55.0] — 2026-06-30
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §R-53 Fleet Maturity Chain Monitor & NRR Bridge Filing Monitor Stale events` — v2.65. Four new DEC-030 HMAC-chained stale lifecycle events emitted manually by IC during R-53 activations: `system.fleet_mat_chain_monitor_stale_declared` (HIGH/7yr — `ic_run_id`, `stale_days`, `trigger`, `r53_c5_chain_intact` BOOL, `initial_severity`), `system.fleet_mat_chain_monitor_restored` (LOW/3yr — `root_cause` H1-H4, `restored_at`, `stale_days_total`), `system.nrr_bridge_filing_monitor_stale_declared` (HIGH/7yr — `r53_c6_filing_overdue` BOOL), `system.nrr_bridge_filing_monitor_restored` (LOW/3yr — `q1_filing_confirmed` BOOL). Two chain ordering invariants: FLEET-MAT-STALE-CHAIN-01 (HTTP 422 `FLEET_MAT_STALE_CHAIN_01_VIOLATION`) and NRR-FILING-STALE-CHAIN-01 (HTTP 422 `NRR_FILING_STALE_CHAIN_01_VIOLATION`). Four Zod v2 schemas registered. Closes INCIDENT_RESPONSE R-53.11 item 1 (P0/M13).
+- `docs/SOC2_READINESS.md §137` — v3.63.0. Cross-Reference Patch: FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 registered in §79.4 master evidence table (count 104 → 106). Two new §80.3 R2 subfolders (`enterprise/fleet-mat-stale/` + `enterprise/nrr-filing-stale/`; WORM Object Lock Governance 7yr; `form_api` NO ACCESS). Two §80.4 Vanta mirror entries (per-activation + annual Q1 zero-count; 48h upload SLA; CC4.1/A1.1). Five-item implementation checklist. Closes INCIDENT_RESPONSE R-53.11 item 2 (P0/M13).
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md R-53.11` — items 1 and 2 updated from `[ ]` to `[x] Done` (AUDIT_LOG_SCHEMA.md v2.65 + SOC2_READINESS.md v3.63.0, 2026-06-30). Items 3–5 remain open (P1/M13–M14: Worker enforcement, R2 folders, quarterly cron audit protocol).
+- `VERSION` — 10.54.1 → 10.55.0.
+
+---
+
 ## [10.54.1] — 2026-06-30
 
 ### Changed

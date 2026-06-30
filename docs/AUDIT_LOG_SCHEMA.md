@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.64
+# FORM · Audit Log Schema v2.65
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -4680,9 +4680,88 @@ const NrrBridgeQ1CheckPassedSchema = z.object({
 
 **A1.1 auditor narrative:** `enterprise.nrr_bridge_q1_overdue` demonstrates FORM monitors its annual NRR bridge filing obligation (April 1 deadline for prior-year cohort), a metric directly tied to enterprise service delivery attestation. Unbroken chain of `nrr_bridge_q1_check_passed` events (daily) provides A1.1 availability-monitoring evidence. `security.fleet_mat_chain_violation` absence across job 56 runs provides A1.1 evidence that fleet maturity declarations are structurally backed by validated NRR bridge computations, consistent with availability commitments in tenant SLAs.
 
-**SOC 2 evidence:** FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr, `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv`) — SOC2_READINESS §79.4 registration pending per OBSERVABILITY §63.9 item 6 (P1/M15).
+**SOC 2 evidence:** FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr, `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv`) — SOC2_READINESS §79.4 registration per §136.
 
 **Retention table additions:** `security.fleet_mat_chain_violation` CRITICAL 7yr CC4.1/A1.1; `system.fleet_mat_chain_check_passed` LOW 1yr CC4.1; `enterprise.nrr_bridge_q1_overdue` HIGH 7yr CC4.1/A1.1; `system.nrr_bridge_q1_check_passed` LOW 1yr CC4.1.
+
+---
+
+### R-53 Fleet Maturity Chain Monitor & NRR Bridge Filing Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-53 · CC4.1 / A1.1)
+
+> Defined in `docs/INCIDENT_RESPONSE.md R-53.7` (v1.0, 2026-06-30). Four DEC-030 HMAC-chained stale lifecycle events emitted **manually by the Incident Commander (IC)** when R-53 is activated — i.e., when pg_cron job 56 (`fleet_mat_chain_verify`) or job 57 (`nrr_bridge_q1_calendar_check`) is found stale during a proactive health check. Unlike the four monitoring events registered above (which are emitted by `form_system` on pg_cron run), these four events track the *stale detection and recovery lifecycle itself*. Emitter: compliance-officer or devops-lead (IC) via `emit-audit-event` Worker using `form_admin` PAM session. **Privacy floor (all four events):** no employee `user_id`, name, email, coaching session content, health value, or GDPR Art. 9 special-category data — IC operational metadata only (`ic_run_id` UUID, `job_name`, `stale_days`, `root_cause` enum). `form_api` REVOKED from `audit_log_events` INSERT for all four event types.
+
+| Event | Severity | Retention | Emitter | Key payload |
+|---|---|---|---|---|
+| `system.fleet_mat_chain_monitor_stale_declared` | HIGH | 7 yr | IC (compliance-officer or devops-lead) at R-53 activation when job 56 confirmed stale | `ic_run_id` (UUID — R-53 activation anchor), `job_name: 'fleet_mat_chain_verify'` (literal), `stale_days` (INT ≥ 1), `trigger` (enum: `quarterly_health_audit`, `annual_fleet_filing_prep`, `al_fleet_mat_01_coinvestigation`, `r05_coinvestigation`, `developer_health_check`), `r53_c5_chain_intact` (BOOLEAN — result of R-53-C5 manual check; `false` = P0 escalation path), `initial_severity` (enum: `P0`, `P1`, `P2`, `P3`) |
+| `system.fleet_mat_chain_monitor_restored` | LOW | 3 yr | IC after confirming job 56 is registered, active, and has executed successfully post-fix | `ic_run_id` (UUID — must match prior `stale_declared` for same activation), `job_name: 'fleet_mat_chain_verify'` (literal), `root_cause` (enum: `H1`, `H2`, `H3`, `H4`), `restored_at` (datetime), `stale_days_total` (INT — total stale duration) |
+| `system.nrr_bridge_filing_monitor_stale_declared` | HIGH | 7 yr | IC (compliance-officer or devops-lead) at R-53 activation when job 57 confirmed stale | `ic_run_id` (UUID — R-53 activation anchor), `job_name: 'nrr_bridge_q1_calendar_check'` (literal), `stale_days` (INT ≥ 1), `trigger` (enum: `quarterly_health_audit`, `annual_fleet_filing_prep`, `al_fleet_filing_01_coinvestigation`, `r05_coinvestigation`, `developer_health_check`), `r53_c6_filing_overdue` (BOOLEAN — result of R-53-C6 Q1 calendar check; `true` AND `date > 2026-04-01` AND `renewal_count > 0` = P1 escalation), `initial_severity` (enum: `P0`, `P1`, `P2`, `P3`) |
+| `system.nrr_bridge_filing_monitor_restored` | LOW | 3 yr | IC after confirming job 57 is registered, active, and has executed successfully post-fix | `ic_run_id` (UUID — must match prior `stale_declared` for same activation), `job_name: 'nrr_bridge_q1_calendar_check'` (literal), `root_cause` (enum: `H1`, `H2`, `H3`, `H4`), `restored_at` (datetime), `stale_days_total` (INT — total stale duration), `q1_filing_confirmed` (BOOLEAN — `true` if `enterprise.annual_nrr_bridge_filed` was found for the relevant `reporting_year` at restoration time) |
+
+```typescript
+// system.fleet_mat_chain_monitor_stale_declared (HIGH · 7 yr · CC4.1 / A1.1)
+// FLEET-MAT-STALE-CHAIN-01: this event MUST precede system.fleet_mat_chain_monitor_restored for same ic_run_id
+// emit-audit-event Worker returns HTTP 422 FLEET_MAT_STALE_CHAIN_01_VIOLATION on inversion
+const FleetMatChainMonitorStaleDeclaredSchema = z.object({
+  ic_run_id:            z.string().uuid(),
+  job_name:             z.literal('fleet_mat_chain_verify'),
+  stale_days:           z.number().int().positive(),
+  trigger:              z.enum(['quarterly_health_audit', 'annual_fleet_filing_prep', 'al_fleet_mat_01_coinvestigation', 'r05_coinvestigation', 'developer_health_check']),
+  r53_c5_chain_intact:  z.boolean(),
+  initial_severity:     z.enum(['P0', 'P1', 'P2', 'P3']),
+})
+
+// system.fleet_mat_chain_monitor_restored (LOW · 3 yr · CC4.1)
+// FLEET-MAT-STALE-CHAIN-01: must be preceded by system.fleet_mat_chain_monitor_stale_declared for same ic_run_id
+const FleetMatChainMonitorRestoredSchema = z.object({
+  ic_run_id:        z.string().uuid(),
+  job_name:         z.literal('fleet_mat_chain_verify'),
+  root_cause:       z.enum(['H1', 'H2', 'H3', 'H4']),
+  restored_at:      z.string().datetime(),
+  stale_days_total: z.number().int().positive(),
+})
+
+// system.nrr_bridge_filing_monitor_stale_declared (HIGH · 7 yr · CC4.1 / A1.1)
+// NRR-FILING-STALE-CHAIN-01: this event MUST precede system.nrr_bridge_filing_monitor_restored for same ic_run_id
+// emit-audit-event Worker returns HTTP 422 NRR_FILING_STALE_CHAIN_01_VIOLATION on inversion
+const NrrBridgeFilingMonitorStaleDeclaredSchema = z.object({
+  ic_run_id:              z.string().uuid(),
+  job_name:               z.literal('nrr_bridge_q1_calendar_check'),
+  stale_days:             z.number().int().positive(),
+  trigger:                z.enum(['quarterly_health_audit', 'annual_fleet_filing_prep', 'al_fleet_filing_01_coinvestigation', 'r05_coinvestigation', 'developer_health_check']),
+  r53_c6_filing_overdue:  z.boolean(),
+  initial_severity:       z.enum(['P0', 'P1', 'P2', 'P3']),
+})
+
+// system.nrr_bridge_filing_monitor_restored (LOW · 3 yr · CC4.1)
+// NRR-FILING-STALE-CHAIN-01: must be preceded by system.nrr_bridge_filing_monitor_stale_declared for same ic_run_id
+const NrrBridgeFilingMonitorRestoredSchema = z.object({
+  ic_run_id:             z.string().uuid(),
+  job_name:              z.literal('nrr_bridge_q1_calendar_check'),
+  root_cause:            z.enum(['H1', 'H2', 'H3', 'H4']),
+  restored_at:           z.string().datetime(),
+  stale_days_total:      z.number().int().positive(),
+  q1_filing_confirmed:   z.boolean(),
+})
+```
+
+**Chain ordering invariants:**
+
+| Invariant | Rule | HTTP 422 code | Scope |
+|---|---|---|---|
+| FLEET-MAT-STALE-CHAIN-01 | `system.fleet_mat_chain_monitor_stale_declared` must precede `system.fleet_mat_chain_monitor_restored` for same `ic_run_id` | `FLEET_MAT_STALE_CHAIN_01_VIOLATION` | Enforced at `emit-audit-event` Worker write layer |
+| NRR-FILING-STALE-CHAIN-01 | `system.nrr_bridge_filing_monitor_stale_declared` must precede `system.nrr_bridge_filing_monitor_restored` for same `ic_run_id` | `NRR_FILING_STALE_CHAIN_01_VIOLATION` | Enforced at `emit-audit-event` Worker write layer |
+
+**No PagerDuty routing** for these four events — they are IC-emitted lifecycle records, not automated alert triggers. They appear in the weekly DEC-030 chain audit and in FLEET-MAT-STALE-E-001 / NRR-FILING-STALE-E-001 evidence artefacts.
+
+**CC4.1 auditor narrative:** `system.fleet_mat_chain_monitor_stale_declared` proves FORM detected a gap in its continuous monitoring for FLEET-MAT-CHAIN-01 chain integrity (job 56). `system.fleet_mat_chain_monitor_restored` with matching `ic_run_id` proves the monitoring gap was remediated. Together, the pair constitutes a complete CC4.1 monitoring-gap-and-recovery record. `r53_c5_chain_intact: true` in `stale_declared` proves the FLEET-MAT-CHAIN-01 invariant remained intact despite the job staleness — no orphan `fleet_maturity_declared` events accumulated during the gap.
+
+**A1.1 auditor narrative:** `system.nrr_bridge_filing_monitor_stale_declared` + `system.nrr_bridge_filing_monitor_restored` prove that when job 57 (NRR bridge Q1 calendar sentinel) went stale, IC detected and remediated the monitoring gap. `r53_c6_filing_overdue: false` in `stale_declared` (or `q1_filing_confirmed: true` in `restored`) proves the annual NRR bridge filing obligation was not missed despite the calendar sentinel going dark. Both events are A1.1 availability-monitoring remediation records.
+
+**SOC 2 evidence:** FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr) — registered in `docs/SOC2_READINESS.md §137`. Per-activation: export of both stale/restored events for each R-53 activation. Annual zero-count: if no activations in the year, compliance-officer files an affirmative attestation confirming `R-53 activation count = 0` for the year with a supporting `pg_cron.job_run_details` health export for jobs 56 and 57.
+
+**Retention table additions:** `system.fleet_mat_chain_monitor_stale_declared` HIGH 7yr CC4.1/A1.1; `system.fleet_mat_chain_monitor_restored` LOW 3yr CC4.1; `system.nrr_bridge_filing_monitor_stale_declared` HIGH 7yr CC4.1/A1.1; `system.nrr_bridge_filing_monitor_restored` LOW 3yr CC4.1.
+
+*v2.65 (2026-06-30): +4 events — R-53 Fleet Maturity Chain Monitor & NRR Bridge Filing Monitor Stale lifecycle (INCIDENT_RESPONSE R-53 · CC4.1/A1.1). New section `### R-53 Fleet Maturity Chain Monitor & NRR Bridge Filing Monitor Stale events` inserted before `## Export & delivery`. Events: `system.fleet_mat_chain_monitor_stale_declared` (HIGH/7yr — IC emits at R-53 activation; `r53_c5_chain_intact` bool; FLEET-MAT-STALE-CHAIN-01 anchor), `system.fleet_mat_chain_monitor_restored` (LOW/3yr — IC emits after job 56 recovery; `root_cause` H1-H4 enum), `system.nrr_bridge_filing_monitor_stale_declared` (HIGH/7yr — IC emits at R-53 activation; `r53_c6_filing_overdue` bool; NRR-FILING-STALE-CHAIN-01 anchor), `system.nrr_bridge_filing_monitor_restored` (LOW/3yr — IC emits after job 57 recovery; `q1_filing_confirmed` bool). Two chain ordering invariants: FLEET-MAT-STALE-CHAIN-01 (`stale_declared` precedes `restored` for same `ic_run_id`; HTTP 422 `FLEET_MAT_STALE_CHAIN_01_VIOLATION`) and NRR-FILING-STALE-CHAIN-01 (equivalently; HTTP 422 `NRR_FILING_STALE_CHAIN_01_VIOLATION`). Four Zod v2 schemas registered (canonical source for `emit-audit-event` Worker). Emitter: IC (compliance-officer or devops-lead) via PAM session — not automated. No PagerDuty routing (IC-lifecycle records). SOC 2 evidence: FLEET-MAT-STALE-E-001 + NRR-FILING-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr) registered in `docs/SOC2_READINESS.md §137`. Retention table: +4 rows (2× HIGH/7yr stale_declared; 2× LOW/3yr restored). Privacy floor: `ic_run_id` UUID + `job_name` literal + operational enum fields only — no employee `user_id`, no health values, no GDPR Art. 9 data. **Closes `docs/INCIDENT_RESPONSE.md R-53.11` item 1 (P0/M13 — 🟢 2026-06-30).** Cross-ref: `docs/INCIDENT_RESPONSE.md R-53` (R-53.7 event definitions + R-53.11 checklist); `docs/SOC2_READINESS.md §137` (FLEET-MAT-STALE-E-001 + NRR-FILING-STALE-E-001 registration); `docs/OBSERVABILITY.md §63` (job 56/57 monitoring layer — these are the recovery-lifecycle complements). Document header v2.64 → v2.65. Owner: compliance-officer + devops-lead.*
 
 *v2.64 (2026-06-30): §Enterprise Fleet Maturity events — FLEET-MAT-CHAIN-02 documentation (DEC-087). Closes `docs/COST_MODEL.md §50.8` item 2 (P1/M15): FLEET-MAT-CHAIN-02 invariant name (`FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED`), description, and HTTP 422 error code added alongside FLEET-MAT-CHAIN-01 in the Fleet Maturity events section. Zod schema comment updated: `// Worker invariant: evidence_artefact_id...` → `// FLEET-MAT-CHAIN-02 (DEC-087): evidence_artefact_id MUST be present...` (two-line comment with check order). SOC 2 auditor verification cross-reference added to FLEET-MAT-CHAIN-02 paragraph → `docs/SOC2_READINESS.md §132.8`. Document header v2.62 → v2.64 (v2.63 header update retroactively applied — `v2.63` authoring pass stated `Document header v2.62 → v2.63` but the header was not updated; corrected in this patch consistent with COST_MODEL v2.23.3 precedent). Owner: compliance-officer + security-engineer.*
 

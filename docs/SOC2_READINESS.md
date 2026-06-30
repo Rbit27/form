@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.62.0
+# FORM · SOC 2 Type II Readiness v3.63.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -33736,6 +33736,106 @@ FLEET-FILING-E-001 contains:
 No individual employee `user_id`, name, email, or GDPR Art. 9 special-category health data. No per-tenant ARR breakdown. No key material. `form_api` REVOKED from `audit_log_events` and `enterprise_renewals`. Privacy classification: compliance operational metadata — internal only; `compliance_reviewer` + `r2:compliance-officer` access.
 
 ---
+
+## §137 · Cross-Reference Patch — R-53 Stale Evidence Registration (FLEET-MAT-STALE-E-001 · NRR-FILING-STALE-E-001 · CC4.1 / A1.1)
+
+> Date: 2026-06-30. Trigger: `docs/INCIDENT_RESPONSE.md R-53.11` items 1–2 (P0/M13 — register FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 in §79.4 master evidence table; add §80.3 R2 subfolders; add §80.4 Vanta mirror entries). Owner: compliance-officer + devops-lead.
+
+### §137.1 Purpose
+
+`docs/INCIDENT_RESPONSE.md R-53` (v1.0, 2026-06-30) — the "Fleet Maturity Chain Monitor & NRR Bridge Filing Monitor Manual Stale Health Check" runbook — specified two SOC 2 evidence artefacts (R-53.9) and deferred their registration to this document. This §137 fulfils that obligation: §79.4 master evidence table rows (count 104 → 106), §80.3 R2 subfolder descriptions, §80.4 Vanta mirror entries, and implementation checklist.
+
+FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 are **per-activation + annual zero-count** artefacts — distinct from the annual aggregate artefacts (FLEET-MAT-E-001, FLEET-FILING-E-001) registered in §132 and §136. They evidence the monitoring-gap-and-recovery lifecycle for the R-53 manual health check protocol itself.
+
+---
+
+### §137.2 Artefact Descriptions
+
+**FLEET-MAT-STALE-E-001** — Per-activation IC record for R-53 activations involving pg_cron job 56 (`fleet_mat_chain_verify`) staleness. Content: export of `system.fleet_mat_chain_monitor_stale_declared` DEC-030 event (HIGH/7yr, `AUDIT_LOG_SCHEMA.md v2.65`): `ic_run_id`, `stale_days`, `trigger`, `r53_c5_chain_intact` BOOL, `initial_severity`; chain integrity check result (R-53-C5 output: orphan count, check_run_at); root cause classification (H1-H4); `system.fleet_mat_chain_monitor_restored` DEC-030 event (LOW/3yr): `root_cause`, `restored_at`, `stale_days_total`; time-to-recovery in minutes. **Zero-activation years:** compliance-officer files affirmative attestation confirming `R-53 job 56 activation count = 0` with supporting `pg_cron.job_run_details` run-health export for job 56 covering the year. Privacy floor: `ic_run_id` UUID, `job_name` literal, operational enum fields only — no employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data.
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | FLEET-MAT-STALE-E-001 |
+| **Name** | Fleet Maturity Chain Monitor Stale Recovery Record |
+| **SOC 2 criteria** | CC4.1, A1.1 |
+| **Cadence** | Per-activation (each R-53 job 56 stale event) + annual zero-count affirmative attestation |
+| **Retention** | 7 years |
+| **R2 path** | `enterprise/fleet-mat-stale/FLEET-MAT-STALE-E-001-{YYYY}-{ic_run_id}.json` |
+| **Primary definition** | `docs/INCIDENT_RESPONSE.md R-53.9` (v1.0, 2026-06-30) |
+
+**NRR-FILING-STALE-E-001** — Per-activation IC record for R-53 activations involving pg_cron job 57 (`nrr_bridge_q1_calendar_check`) staleness. Content: export of `system.nrr_bridge_filing_monitor_stale_declared` DEC-030 event (HIGH/7yr): `ic_run_id`, `stale_days`, `trigger`, `r53_c6_filing_overdue` BOOL, `initial_severity`; Q1 calendar check result (R-53-C6 output: `renewal_count` INT, `filing_found` BOOL, `filed_at` TIMESTAMPTZ); root cause classification (H1-H4); `system.nrr_bridge_filing_monitor_restored` DEC-030 event (LOW/3yr): `root_cause`, `restored_at`, `stale_days_total`, `q1_filing_confirmed` BOOL; and (if P1) `enterprise.annual_nrr_bridge_filed` event confirming obligation met. **Zero-activation years:** compliance-officer files affirmative attestation with `pg_cron.job_run_details` run-health export for job 57 covering the year. Privacy floor: same as FLEET-MAT-STALE-E-001.
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | NRR-FILING-STALE-E-001 |
+| **Name** | NRR Bridge Filing Monitor Stale Recovery Record |
+| **SOC 2 criteria** | CC4.1, A1.1 |
+| **Cadence** | Per-activation (each R-53 job 57 stale event) + annual zero-count affirmative attestation |
+| **Retention** | 7 years |
+| **R2 path** | `enterprise/nrr-filing-stale/NRR-FILING-STALE-E-001-{YYYY}-{ic_run_id}.json` |
+| **Primary definition** | `docs/INCIDENT_RESPONSE.md R-53.9` (v1.0, 2026-06-30) |
+
+---
+
+### §137.3 §80.3 R2 Subfolder Additions
+
+Two new R2 subfolders added to the evidence bucket topology (§80.3):
+
+| Subfolder | Purpose | Access | Retention |
+|---|---|---|---|
+| `enterprise/fleet-mat-stale/` | FLEET-MAT-STALE-E-001 per-activation artefacts + annual zero-count attestations | `form_system` (IC filing via PAM session); `compliance_reviewer` + `r2:compliance-officer` read; `r2:form-api` NO ACCESS | WORM Object Lock Governance, 7yr minimum |
+| `enterprise/nrr-filing-stale/` | NRR-FILING-STALE-E-001 per-activation artefacts + annual zero-count attestations | `form_system` (IC filing via PAM session); `compliance_reviewer` + `r2:compliance-officer` read; `r2:form-api` NO ACCESS | WORM Object Lock Governance, 7yr minimum |
+
+Filename convention: `{ARTEFACT-ID}-{YYYY}-{ic_run_id}.json` for activations; `{ARTEFACT-ID}-{YYYY}-zero-count.json` for annual nil attestations.
+
+---
+
+### §137.4 §80.4 Vanta Mirror Entries
+
+Both artefacts added to Vanta mirror schedule (§80.4):
+
+| Artefact ID | Vanta upload timing | TSC mapping | Privacy note |
+|---|---|---|---|
+| FLEET-MAT-STALE-E-001 | Within 48h of each activation filing; annually Q1 for zero-count attestation (even if no activations) | CC4.1, A1.1 | `ic_run_id` UUID, `stale_days` INT, `r53_c5_chain_intact` BOOL, `root_cause` enum, time-to-recovery INT — no employee `user_id`, no health values, no GDPR Art. 9 data |
+| NRR-FILING-STALE-E-001 | Within 48h of each activation filing; annually Q1 for zero-count attestation | CC4.1, A1.1 | `ic_run_id` UUID, `stale_days` INT, `r53_c6_filing_overdue` BOOL, `q1_filing_confirmed` BOOL, `root_cause` enum — no employee `user_id`, no health values, no GDPR Art. 9 data |
+
+Standard Vanta mirror-log entries required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. Vanta access: compliance-officer + security-engineer only.
+
+---
+
+### §137.5 §79.4 Master Evidence Table Rows
+
+Two rows added to the §79.4 master evidence table (count 104 → 106), after FLEET-FILING-E-001 (§136):
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|
+| **FLEET-MAT-STALE-E-001** | CC4.1, A1.1 | Per-activation IC export when R-53 is activated for pg_cron job 56 (`fleet_mat_chain_verify`) staleness: `system.fleet_mat_chain_monitor_stale_declared` DEC-030 event (HIGH/7yr: `ic_run_id`, `stale_days`, `trigger`, `r53_c5_chain_intact` BOOL, `initial_severity`); R-53-C5 chain integrity check output (orphan count); root cause H1-H4; `system.fleet_mat_chain_monitor_restored` DEC-030 event (LOW/3yr); time-to-recovery minutes. Zero-activation years: affirmative `activation_count = 0` attestation with `pg_cron.job_run_details` run-health export for job 56. FLEET-MAT-STALE-CHAIN-01 ordering invariant. Privacy: `ic_run_id` UUID + operational enum fields only; no `user_id`, no health values. Source: INCIDENT_RESPONSE R-53.9 (v1.0, 2026-06-30). | Per-activation + Annual zero-count | 7 yr | `enterprise/fleet-mat-stale/FLEET-MAT-STALE-E-001-{YYYY}-{ic_run_id}.json` |
+| **NRR-FILING-STALE-E-001** | CC4.1, A1.1 | Per-activation IC export when R-53 is activated for pg_cron job 57 (`nrr_bridge_q1_calendar_check`) staleness: `system.nrr_bridge_filing_monitor_stale_declared` DEC-030 event (HIGH/7yr: `ic_run_id`, `stale_days`, `trigger`, `r53_c6_filing_overdue` BOOL, `initial_severity`); R-53-C6 Q1 calendar check output (`renewal_count`, `filing_found`, `filed_at`); root cause H1-H4; `system.nrr_bridge_filing_monitor_restored` DEC-030 event (LOW/3yr: `q1_filing_confirmed` BOOL); and (if P1) `enterprise.annual_nrr_bridge_filed` confirmation. Zero-activation years: affirmative `activation_count = 0` attestation with `pg_cron.job_run_details` run-health export for job 57. NRR-FILING-STALE-CHAIN-01 ordering invariant. Privacy: same floor as FLEET-MAT-STALE-E-001. Source: INCIDENT_RESPONSE R-53.9 (v1.0, 2026-06-30). | Per-activation + Annual zero-count | 7 yr | `enterprise/nrr-filing-stale/NRR-FILING-STALE-E-001-{YYYY}-{ic_run_id}.json` |
+
+---
+
+### §137.6 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/INCIDENT_RESPONSE.md R-53.11` item 2 (P0/M13) — Register FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 in §79.4 master evidence table (CC4.1/A1.1, per-activation + annual zero-count, 7yr, R2 paths `enterprise/fleet-mat-stale/` and `enterprise/nrr-filing-stale/`) + Vanta mirror entries | This section §137.5 (§79.4 rows), §137.3 (§80.3 R2 subfolders), §137.4 (§80.4 Vanta mirror) | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.63.0, §137)** |
+| `docs/INCIDENT_RESPONSE.md R-53.9` — FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 SOC 2 evidence artefact paths `enterprise/fleet-mat-stale/` and `enterprise/nrr-filing-stale/` | §137.3 R2 subfolders confirmed | 🟢 **Done — 2026-06-30** |
+
+---
+
+### §137.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `enterprise/fleet-mat-stale/` and `enterprise/nrr-filing-stale/` subfolders on Cloudflare R2 `form-soc2-evidence` bucket; enable WORM Object Lock Governance 7yr; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). Prerequisite: pg_cron jobs 56 and 57 deployed (OBSERVABILITY §63.9 items 1–2, P0/M13). | devops-lead | **P1** | M13 (after job 56/57 deploy) | [ ] |
+| 2 | File first per-activation FLEET-MAT-STALE-E-001 artefact on first R-53 job 56 stale activation: export both DEC-030 events (`stale_declared` + `restored`) for same `ic_run_id`; SHA-256 hash; upload to R2 at `enterprise/fleet-mat-stale/FLEET-MAT-STALE-E-001-{YYYY}-{ic_run_id}.json` (7yr WORM); upload to Vanta within 48h; add to MASTER-INDEX. Privacy check: `ic_run_id` UUID + operational enum fields only; no `user_id`. | compliance-officer | **P1** | On first R-53 job 56 activation | [ ] |
+| 3 | File first annual zero-count attestation for FLEET-MAT-STALE-E-001 in Q1 of any year with zero R-53 job 56 activations: compile `pg_cron.job_run_details` run-health export for job 56; confirm `activation_count = 0`; file at `enterprise/fleet-mat-stale/FLEET-MAT-STALE-E-001-{YYYY}-zero-count.json`; upload to Vanta. | compliance-officer | **P1** | Annual Q1 | [ ] |
+| 4 | Same as items 2–3 for NRR-FILING-STALE-E-001 (job 57 activations and zero-count attestations). | compliance-officer | **P1** | On first R-53 job 57 activation / Annual Q1 | [ ] |
+| 5 | Add FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 to §79.5 compliance calendar at Annual Q1 filing slot (alongside FLEET-FILING-E-001). | compliance-officer | **P2** | Before first filing | [ ] |
+
+---
+
+*v3.63.0 (2026-06-30): §137 Cross-Reference Patch — R-53 Stale Evidence Registration (FLEET-MAT-STALE-E-001 + NRR-FILING-STALE-E-001 · CC4.1/A1.1). Closes `docs/INCIDENT_RESPONSE.md R-53.11` item 2 (P0/M13). Two artefacts registered (count 104 → 106): FLEET-MAT-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr — per-activation IC export of `system.fleet_mat_chain_monitor_stale_declared` HIGH/7yr + `system.fleet_mat_chain_monitor_restored` LOW/3yr DEC-030 events with FLEET-MAT-STALE-CHAIN-01 ordering invariant; R-53-C5 chain integrity result; root cause H1-H4; time-to-recovery; zero-activation years as affirmative nil attestation with job 56 run-health export; `enterprise/fleet-mat-stale/FLEET-MAT-STALE-E-001-{YYYY}-{ic_run_id}.json`) and NRR-FILING-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr — per-activation IC export of `system.nrr_bridge_filing_monitor_stale_declared` HIGH/7yr + `system.nrr_bridge_filing_monitor_restored` LOW/3yr DEC-030 events with NRR-FILING-STALE-CHAIN-01 ordering invariant; R-53-C6 Q1 calendar check result; `q1_filing_confirmed` bool; zero-activation years as affirmative nil attestation with job 57 run-health export; `enterprise/nrr-filing-stale/NRR-FILING-STALE-E-001-{YYYY}-{ic_run_id}.json`). §137.3: two new R2 subfolders (`enterprise/fleet-mat-stale/` + `enterprise/nrr-filing-stale/`; WORM Object Lock Governance 7yr; `form_api` NO ACCESS). §137.4: two Vanta mirror entries (per-activation + annual Q1; 48h upload SLA; CC4.1/A1.1; `ic_run_id` UUID + operational enum fields only — no `user_id`, no GDPR Art. 9 data). §137.5: two §79.4 master evidence table rows (count 104 → 106; insertion after FLEET-FILING-E-001). §137.7: five-item implementation checklist (2× P1 per-activation filing; 1× P1 zero-count; 1× P1 NRR-FILING; 1× P2 calendar). §137.6: two cross-reference obligations closed (R-53.11 item 2 🟢 Done; R-53.9 artefact paths confirmed). Privacy floor: `ic_run_id` UUID + operational enum fields only — no employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data; `form_api` REVOKED. Document header v3.62.0 → v3.63.0. Owner: compliance-officer + devops-lead.*
 
 *v3.62.0 (2026-06-30): §132.8 FLEET-MAT-CHAIN-02 Auditor Queries (DEC-087). Closes `docs/COST_MODEL.md §50.8` item 3 (P2/M18) + §50.9 item 3: two complementary auditor queries added to FLEET-MAT-E-001 evidence collection notes in §132. Query 1: count `enterprise.fleet_maturity_declared` events with `consecutive_cycles_at_target >= 2` AND `evidence_artefact_id IS NULL` — expected 0 (any positive indicates FLEET-MAT-CHAIN-02 bypass). Query 2: count events with `consecutive_cycles_at_target < 2` AND `evidence_artefact_id IS NULL` — expected > 0 in years 1–2 (confirms zero-declaration-year affirmative attestation operating correctly). No change to FLEET-MAT-E-001 artefact scope, R2 path, Vanta mapping, or §79.4 evidence count. §132.6 cross-reference table: two new rows (§50.9 item 3 → 🟢 Closed; AUDIT_LOG_SCHEMA v2.64 FLEET-MAT-CHAIN-02 → 🟢 Registered). FLEET-MAT-CHAIN-02 documented in AUDIT_LOG_SCHEMA.md v2.64 (2026-06-30). Document header v3.61.0 → v3.62.0. Owner: compliance-officer.*
 
