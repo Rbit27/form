@@ -18346,3 +18346,284 @@ Cross-ref column entry updated from `AUDIT_LOG_SCHEMA.md (pending \`enterprise.n
 *v5.10.3 (2026-06-30): §12.6 + §63.9 cross-reference patch — INCIDENT_RESPONSE R-53 companion documentation. Closes the stale runbook gap for pg_cron jobs 56 (`fleet_mat_chain_verify`) and 57 (`nrr_bridge_q1_calendar_check`): unlike all prior jobs (R-44 through R-52 covering jobs 44–55), jobs 56 and 57 had no INCIDENT_RESPONSE runbook cross-reference in §12.6 stale-consequence column and no §63.9 checklist item for runbook authorship. INCIDENT_RESPONSE R-53 (v1.0, 2026-06-30) was authored as a manual health check protocol — the key structural distinction being no automated `system.cron_job_stale` detection (N/A freshness windows; §12.6 freshness note explicitly excludes jobs 56–57 from `pg-cron-health-monitor` coverage). Two §12.6 inline updates: job 56 and job 57 cross-ref columns extended with `INCIDENT_RESPONSE R-53 (§R-53.5/R-53.6; v1.0, 2026-06-30 — manual stale health check protocol; no automated freshness trigger)`. §63.9 new checklist item added (P1/M13 — R-53 authorship; 🟢 Done this pass). Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §v5.10.3 edit; all changes are metadata-only cross-reference annotations. Document header v5.10.2 → v5.10.3. Owner: compliance-officer + devops-lead.*
 
 *v5.10.2 (2026-06-30): §64 Cross-Reference Patch — §63.6 + §12.6 AUDIT_LOG_SCHEMA.md v2.63 Registration Closure. Closes three stale "pending registration" annotations created when §63 (v5.10.0, 2026-06-30) specified four new DEC-030 event types (§63.9 item 3 P0/M13) without yet registering them in `docs/AUDIT_LOG_SCHEMA.md`. `docs/AUDIT_LOG_SCHEMA.md v2.63` (2026-06-30) fulfilled that registration obligation — all four events (`system.fleet_mat_chain_check_passed` LOW/1yr, `security.fleet_mat_chain_violation` CRITICAL/7yr, `system.nrr_bridge_q1_check_passed` LOW/1yr, `enterprise.nrr_bridge_q1_overdue` HIGH/7yr) registered with Zod v2 schemas, severity, retention, SOC 2 criterion mapping (CC4.1/A1.1). §63.9 item 3 was already marked 🟢 Done in the checklist; this patch closes the three companion documentation obligations in the live body text. Three inline updates: (1) §63.6 bold note: "Pending registration (§63.9 item 3 — P0/M13): All four event types must be registered..." → "Registered (§63.9 item 3 — 🟢 Closed): All four event types registered in AUDIT_LOG_SCHEMA.md v2.63 (2026-06-30)..."; (2) §12.6 job 56 `fleet_mat_chain_verify` AUDIT_LOG_SCHEMA.md cross-ref: "(pending `security.fleet_mat_chain_violation` + `system.fleet_mat_chain_check_passed` registration — §63.9 item 3 P0/M13)" → "(registered v2.63, 2026-06-30 — §63.9 item 3 🟢 Closed)"; (3) §12.6 job 57 `nrr_bridge_q1_calendar_check` AUDIT_LOG_SCHEMA.md cross-ref updated equivalently. §64 TOC entry added. §64.3 four-item implementation checklist (all [x] Done — this patch). §64.4 three-row cross-reference obligations closed table. Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §64 content; all edits are metadata-only cross-reference annotations. Document header v5.10.1 → v5.10.2. Owner: compliance-officer + devops-lead.*
+
+---
+
+## §65 Quarterly pg_cron Health Audit Protocol — Jobs 56 & 57
+
+### §65.1 Purpose and Scope
+
+> Date: 2026-06-30. Trigger: `docs/INCIDENT_RESPONSE.md R-53.11` item 5 (P1/M14) — "Establish quarterly cron health audit protocol". Owner: devops-lead + compliance-officer.
+
+This section specifies the quarterly manual health audit protocol for pg_cron jobs 56 (`fleet_mat_chain_verify`) and 57 (`nrr_bridge_q1_calendar_check`). The protocol was established as R-53.11 item 5 and its documentation portion is fulfilled here (OBSERVABILITY §65, v5.11.0, 2026-06-30).
+
+**Why a manual protocol?** Jobs 56 and 57 carry `freshness_window: N/A` in the §12.6 pg_cron canonical registry — `pg-cron-health-monitor` does not automatically detect their staleness and does not emit `system.cron_job_stale` for either job. The quarterly audit is the **primary preventive mechanism** for catching silent staleness before it creates a gap in FLEET-MAT-CHAIN-01 retrospective verification coverage or NRR Bridge Q1 filing calendar coverage.
+
+**Scope:** Jobs 56 and 57 only. All other jobs in §12.6 with defined freshness windows are already covered by the automated `pg-cron-health-monitor` dead-man's switch and their respective R-44 through R-52 runbooks.
+
+**Privacy floor (invariant throughout §65):** All queries surface only timestamps, job names, schedule strings, `active` BOOL, integer row counts, and `days_since_last_run` NUMERIC — no employee `user_id`, name, email, health value, coaching session content, or GDPR Art. 9 special-category data. The quarterly audit log stored on R2 must not include any such data.
+
+---
+
+### §65.2 Audit Schedule
+
+| Quarter | Run date | Calendar description |
+|---|---|---|
+| **Q1** | First Monday of January | e.g. 2027-01-04, 2028-01-03 |
+| **Q2** | First Monday of April | e.g. 2027-04-07, 2028-04-03 |
+| **Q3** | First Monday of July | e.g. 2027-07-05, 2028-07-02 |
+| **Q4** | First Monday of October | e.g. 2027-10-04, 2028-10-02 |
+
+**Owner:** devops-lead. **Backup:** compliance-officer (if devops-lead unavailable, compliance-officer runs the audit and notifies devops-lead before EOD the same Monday).
+
+**Duration:** < 15 minutes — four read-only queries against `pg_cron.job_run_details` and `cron.job` via `form_audit` role.
+
+**Prerequisite:** pg_cron jobs 56 and 57 deployed to production Supabase (§63.9 items 1–2 P0/M13 — currently 🟡 Open). Quarterly audits begin after first production deploy. Until deploy, devops-lead files a CRON-HEALTH-AUDIT-E-001 artefact with `job_56_deployed: false` and `job_57_deployed: false` as the per-quarter pre-deploy attestation (see §65.5 template).
+
+---
+
+### §65.3 Audit Queries
+
+Run all four queries in a single `form_audit` session against production Supabase. Read-only — do not modify any data.
+
+**Q-C1 · Job 56 (`fleet_mat_chain_verify`) — last successful run**
+
+```sql
+-- Role: form_audit (read-only)
+-- Pass threshold: days_since_last_run ≤ 7 (weekly job; > 7 = at least one Monday missed)
+SELECT
+  run_id,
+  job_name,
+  start_time,
+  end_time,
+  status,
+  EXTRACT(EPOCH FROM (NOW() - end_time)) / 86400.0  AS days_since_last_run
+FROM pg_cron.job_run_details
+WHERE job_name = 'fleet_mat_chain_verify'
+  AND status = 'succeeded'
+ORDER BY end_time DESC
+LIMIT 5;
+-- Zero rows = job has never succeeded (treat as FAIL — open R-53 IC)
+-- days_since_last_run > 7  → at least one weekly cycle missed
+-- days_since_last_run > 14 → two or more cycles missed; escalate to P1 assessment
+```
+
+**Q-C2 · Job 57 (`nrr_bridge_q1_calendar_check`) — last successful run**
+
+```sql
+-- Role: form_audit (read-only)
+-- Pass threshold: days_since_last_run ≤ 2 (daily job; > 2 = at least one daily run missed)
+SELECT
+  run_id,
+  job_name,
+  start_time,
+  end_time,
+  status,
+  EXTRACT(EPOCH FROM (NOW() - end_time)) / 86400.0  AS days_since_last_run
+FROM pg_cron.job_run_details
+WHERE job_name = 'nrr_bridge_q1_calendar_check'
+  AND status = 'succeeded'
+ORDER BY end_time DESC
+LIMIT 5;
+```
+
+**Q-C3 · Job 56 — catalog registration check**
+
+```sql
+-- Role: form_audit (read-only)
+-- Pass: returns 1 row with active = true
+-- Zero rows = job deleted (H1 — re-register from OBSERVABILITY §63.5.1)
+-- active = false = job disabled (H2 — re-enable)
+SELECT
+  jobid,
+  schedule,
+  jobname,
+  nodename,
+  active
+FROM cron.job
+WHERE jobname = 'fleet_mat_chain_verify';
+```
+
+**Q-C4 · Job 57 — catalog registration check**
+
+```sql
+-- Role: form_audit (read-only)
+SELECT
+  jobid,
+  schedule,
+  jobname,
+  nodename,
+  active
+FROM cron.job
+WHERE jobname = 'nrr_bridge_q1_calendar_check';
+-- Zero rows = H1; active = false = H2 (same pattern as Q-C3 / job 57)
+```
+
+---
+
+### §65.4 Pass / Fail Criteria
+
+| Check | Pass | Fail — required action |
+|---|---|---|
+| **Q-C3: Job 56 registered** | Q-C3 returns 1 row | 0 rows → H1: re-register from §63.5.1; open R-53 IC |
+| **Q-C4: Job 57 registered** | Q-C4 returns 1 row | 0 rows → H1: re-register from §63.5.2; open R-53 IC |
+| **Q-C3: Job 56 active** | `active = true` | `active = false` → H2: `UPDATE cron.job SET active = true WHERE jobname = 'fleet_mat_chain_verify'`; investigate why disabled |
+| **Q-C4: Job 57 active** | `active = true` | `active = false` → H2: equivalently for job 57 |
+| **Q-C1: Job 56 recency** | `days_since_last_run ≤ 7` | > 7 → assess: ≤ 14 days AND known Supabase maintenance window → H3 (log as acceptable gap); > 14 days OR no maintenance explanation → open R-53.5 IC |
+| **Q-C2: Job 57 recency** | `days_since_last_run ≤ 2` | > 2 → assess: if Q1 date context AND renewals exist, run R-53-C6 to check obligation status; open R-53.6 IC if gap unresolved within 4 hours |
+
+**Escalation rule:** If any Q-C1 through Q-C4 check fails and the root cause cannot be confirmed as H3 (Supabase maintenance, run recovered) or H4 (transient error, subsequent run succeeded) within **4 hours**, open a formal R-53 IC per INCIDENT_RESPONSE.md R-53.5 (job 56) or R-53.6 (job 57).
+
+**No-IC scenarios (document in artefact, no escalation required):**
+- Q-C1 `days_since_last_run` between 7 and 10 days AND `pg_cron.job_run_details` shows a failed run within that window followed by a successful run → H4 transient, job self-recovered. Note in artefact.
+- Q-C2 `days_since_last_run` between 2 and 4 days AND date is not in Q1 AND no renewal events exist → P3, low risk. Note in artefact.
+
+---
+
+### §65.5 R2 Artefact Template
+
+**File path:** `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md`  
+**Storage:** Cloudflare R2 `form-soc2-evidence` bucket, WORM Object Lock Governance 7yr  
+**Access:** `form_system` (devops-lead file via PAM session); `compliance_reviewer` + `r2:compliance-officer` read; `r2:form-api` **NO ACCESS**
+
+```markdown
+# FORM · Quarterly pg_cron Health Audit — {YYYY} Q{N}
+
+**Date:** {YYYY-MM-DD} (first Monday of Q{N})
+**Auditor:** {devops-lead handle}
+**Backup auditor (if applicable):** {compliance-officer handle or N/A}
+**Supabase project:** form-production
+**Role used:** form_audit
+
+---
+
+## Pre-Audit State
+
+| Job | Deployed? | Notes |
+|-----|-----------|-------|
+| 56 `fleet_mat_chain_verify` | {YES / NO} | {if NO: pre-deploy attestation quarter} |
+| 57 `nrr_bridge_q1_calendar_check` | {YES / NO} | {if NO: pre-deploy attestation quarter} |
+
+> If either job is not yet deployed, skip Q-C1 through Q-C4 below and file this artefact
+> with `overall_result: PRE_DEPLOY_ATTESTATION`. No R-53 IC required.
+
+---
+
+## Q-C3: Job 56 Registration Check
+
+| Field      | Result |
+|------------|--------|
+| Registered | {YES / NO} |
+| `active`   | {true / false / N/A} |
+| Schedule   | {0 6 * * 1 / N/A if not registered} |
+| Pass       | {YES / NO} |
+
+## Q-C4: Job 57 Registration Check
+
+| Field      | Result |
+|------------|--------|
+| Registered | {YES / NO} |
+| `active`   | {true / false / N/A} |
+| Schedule   | {0 6 * * * / N/A if not registered} |
+| Pass       | {YES / NO} |
+
+## Q-C1: Job 56 Last Successful Run
+
+| Field                     | Result |
+|---------------------------|--------|
+| Last succeeded `end_time` | {YYYY-MM-DD HH:MM UTC / NEVER} |
+| `days_since_last_run`     | {N.NN} |
+| Pass (≤ 7 days)           | {YES / NO} |
+| Row count returned        | {N} |
+
+## Q-C2: Job 57 Last Successful Run
+
+| Field                     | Result |
+|---------------------------|--------|
+| Last succeeded `end_time` | {YYYY-MM-DD HH:MM UTC / NEVER} |
+| `days_since_last_run`     | {N.NN} |
+| Pass (≤ 2 days)           | {YES / NO} |
+| Row count returned        | {N} |
+
+---
+
+## Audit Result
+
+| Overall result            | {PASS / FAIL / PRE_DEPLOY_ATTESTATION} |
+|---------------------------|----------------------------------------|
+| R-53 IC opened            | {YES / NO} |
+| IC run ID (if opened)     | {UUID / N/A} |
+| Root cause (if FAIL)      | {H1 / H2 / H3 / H4 / N/A} |
+| Resolution summary        | {free text / N/A} |
+
+## Privacy Attestation
+
+I confirm no employee `user_id`, name, email, health value, coaching content,
+or GDPR Art. 9 special-category data is present in this artefact.
+All fields contain only: timestamps, `active` BOOL, schedule strings,
+`days_since_last_run` NUMERIC, integer row counts, PASS/FAIL enum,
+and `ic_run_id` UUID (if R-53 IC opened).
+
+**Auditor sign-off:** {devops-lead handle} · {YYYY-MM-DD}
+```
+
+---
+
+### §65.6 SOC 2 Evidence Artefact — CRON-HEALTH-AUDIT-E-001
+
+**CRON-HEALTH-AUDIT-E-001** is the quarterly artefact produced by this protocol. It demonstrates continuous preventive monitoring of pg_cron jobs 56 and 57 throughout the SOC 2 observation period — complementing the automated DEC-030 event chains (§63) with a manual attestation layer that covers the N/A-freshness monitoring gap.
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | CRON-HEALTH-AUDIT-E-001 |
+| **Name** | Quarterly pg_cron Health Audit Report (Jobs 56 & 57) |
+| **SOC 2 criteria** | CC4.1, A1.1 |
+| **Cadence** | Quarterly (first Monday of each calendar quarter) |
+| **Retention** | 7 years |
+| **R2 path** | `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md` |
+| **Vanta mirror** | Within 48h of filing; compliance-officer + security-engineer access only |
+| **Primary definition** | `docs/OBSERVABILITY.md §65` (v5.11.0, 2026-06-30) |
+| **SOC2_READINESS registration** | §138 (v3.64.0, 2026-06-30) — count 106 → 107 |
+
+**SOC 2 auditor narrative — CC4.1 (Monitoring Activities):** FORM maintains a quarterly manual review cadence for pg_cron jobs 56 and 57 — the Fleet Maturity Chain Monitor and NRR Bridge Filing Calendar Monitor. These jobs operate with N/A freshness windows and are therefore excluded from the automated `pg-cron-health-monitor` dead-man's switch. On the first Monday of each calendar quarter, devops-lead executes Q-C1 through Q-C4 (read-only queries against `pg_cron.job_run_details` and `cron.job`) to confirm both jobs are registered, active, and have completed successfully within their expected cadence (job 56: ≤ 7 days; job 57: ≤ 2 days). Results are filed as CRON-HEALTH-AUDIT-E-001 on Cloudflare R2 `form-soc2-evidence` (WORM Object Lock Governance 7yr, `r2:form-api` NO ACCESS) and mirrored to Vanta within 48 hours. A failing audit result triggers R-53 IC activation (INCIDENT_RESPONSE.md R-53.5 or R-53.6). This preventive control ensures no SOC 2 observation quarter passes without an explicit confirmation that the monitoring infrastructure for CC4.1/A1.1 filing-calendar compliance is operational.
+
+**SOC 2 auditor narrative — A1.1 (Availability):** The quarterly audit verifies that the automated monitoring layer for the NRR Bridge annual filing obligation (job 57) and the Fleet Maturity Chain retrospective scanner (job 56) remains available and scheduled throughout the SOC 2 observation period. Job registration (`cron.job` catalog) and `active = true` checks confirm the Supabase pg_cron scheduler did not silently deregister or disable either job due to schema migrations, maintenance operations, or platform upgrades. CRON-HEALTH-AUDIT-E-001 is the attestation record demonstrating this A1.1 availability check was performed for each quarter.
+
+**Privacy floor:** CRON-HEALTH-AUDIT-E-001 contains only: `days_since_last_run` NUMERIC, `active` BOOL, `schedule` STRING, `last_succeeded_at` TIMESTAMPTZ, `row_count_returned` INT, overall PASS/FAIL enum, and `ic_run_id` UUID (if R-53 opened). No employee `user_id`, name, email, coaching session content, health metric, or GDPR Art. 9 special-category data is included or inferable.
+
+---
+
+### §65.7 R2 Subfolder Registration
+
+New subfolder added to the `form-soc2-evidence` bucket topology (see `docs/SOC2_READINESS.md §138.3`):
+
+| Subfolder | Purpose | Access | Retention |
+|---|---|---|---|
+| `enterprise/cron-health-audits/` | CRON-HEALTH-AUDIT-E-001 quarterly audit reports | `form_system` (devops-lead write via PAM session); `compliance_reviewer` + `r2:compliance-officer` read; `r2:form-api` **NO ACCESS** | WORM Object Lock Governance, 7yr minimum |
+
+Filename convention: `quarterly-{YYYY}-Q{1|2|3|4}.md` — e.g. `quarterly-2027-Q1.md`, `quarterly-2027-Q2.md`.
+
+---
+
+### §65.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Mark R-53.11 item 5 in `docs/INCIDENT_RESPONSE.md` as documentation portion done: `[ ]` → `[x] Done (documentation portion — OBSERVABILITY §65, v5.11.0, 2026-06-30); [ ] (operational — calendar reminder + R2 subfolder + first audit after job 56/57 deploy)` | compliance-officer | **P1** | M14 (this authoring pass) | [x] **Done — INCIDENT_RESPONSE.md v1.1 patch, 2026-06-30.** |
+| 2 | Register CRON-HEALTH-AUDIT-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC4.1/A1.1, quarterly, 7yr), §80.3 R2 subfolder (`enterprise/cron-health-audits/`), and §80.4 Vanta mirror entry; count 106 → 107. | compliance-officer | **P1** | M14 (this authoring pass) | [x] **Done — SOC2_READINESS.md §138 (v3.64.0, 2026-06-30).** |
+| 3 | Create `enterprise/cron-health-audits/` subfolder on Cloudflare R2 `form-soc2-evidence` bucket; enable WORM Object Lock Governance 7yr; confirm `r2:form-api` has NO ACCESS. Prerequisite: R2 bucket operational (§80.3). | devops-lead | **P1** | M14 (with or after job 56/57 deploy — §63.9 items 1–2) | [ ] |
+| 4 | Schedule recurring calendar reminder: first Monday of January, April, July, October — "Run OBSERVABILITY §65 quarterly pg_cron health audit for jobs 56+57; file CRON-HEALTH-AUDIT-E-001." Add to Linear/Notion recurring task + team calendar. | devops-lead | **P1** | M14 | [ ] |
+| 5 | File first CRON-HEALTH-AUDIT-E-001 artefact: use §65.5 template; upload to R2 `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md`; SHA-256 hash; upload to Vanta within 48h; add to SOC2 MASTER-INDEX. If jobs 56/57 not yet deployed, file pre-deploy attestation per §65.2 prerequisite note. | devops-lead | **P1** | First Monday of first Q after job 56/57 deploy (est. Q1-2027) | [ ] |
+
+---
+
+### §65.9 Cross-Reference Obligations Created by §65
+
+| Document | Obligation | Status |
+|---|---|---|
+| `docs/INCIDENT_RESPONSE.md R-53.11 item 5` | Mark documentation portion done: `[ ]` → `[x] Done (documentation portion — OBSERVABILITY §65, v5.11.0, 2026-06-30); [ ] (operational)` | 🟢 **Done — INCIDENT_RESPONSE.md v1.1 patch (2026-06-30)** |
+| `docs/SOC2_READINESS.md §79.4` | Register CRON-HEALTH-AUDIT-E-001 (CC4.1/A1.1, quarterly, 7yr); §80.3 `enterprise/cron-health-audits/`; §80.4 Vanta mirror; count 106 → 107 | 🟢 **Done — SOC2_READINESS.md §138 (v3.64.0, 2026-06-30)** |
+
+---
+
+*v5.11.0 (2026-06-30): §65 Quarterly pg_cron Health Audit Protocol — Jobs 56 & 57. Fulfils `docs/INCIDENT_RESPONSE.md R-53.11` item 5 (P1/M14) documentation portion. §65.1 purpose: quarterly manual health check for pg_cron jobs 56 (`fleet_mat_chain_verify`) and 57 (`nrr_bridge_q1_calendar_check`) — primary preventive mechanism covering the N/A-freshness monitoring gap (both jobs excluded from automated `pg-cron-health-monitor` coverage per §12.6). §65.2 schedule: first Monday of each calendar quarter (Q1 January, Q2 April, Q3 July, Q4 October); owner devops-lead, backup compliance-officer; < 15 min. §65.3 queries: four read-only `form_audit` queries equivalent to INCIDENT_RESPONSE R-53-C1 through R-53-C4 — Q-C1/Q-C2 confirm `days_since_last_run` ≤ 7 / ≤ 2 days respectively from `pg_cron.job_run_details`; Q-C3/Q-C4 confirm registration and `active = true` from `cron.job`. §65.4 pass/fail criteria table: FAIL paths → H1 (re-register from §63.5.1/§63.5.2), H2 (re-enable `active`), H3 (Supabase maintenance window — acceptable gap), H4 (transient self-recovered); escalation to R-53 IC within 4 hours if root cause unresolved. §65.5 R2 artefact template (Markdown): `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md`; WORM 7yr; `r2:form-api` NO ACCESS; privacy attestation block; pre-deploy attestation mode for pre-GA quarters. §65.6 new SOC 2 evidence artefact CRON-HEALTH-AUDIT-E-001 (CC4.1/A1.1, quarterly, 7yr); two auditor narratives (CC4.1 preventive monitoring, A1.1 availability); privacy floor. §65.7 R2 subfolder `enterprise/cron-health-audits/` registration. §65.8 five-item implementation checklist: items 1 and 2 [x] Done (documentation portions — INCIDENT_RESPONSE.md v1.1 + SOC2_READINESS.md §138 v3.64.0, 2026-06-30); items 3–5 [ ] operational (R2 subfolder creation, calendar reminder, first artefact filing Q1-2027). §65.9 two cross-reference obligations: both 🟢 Done. Privacy floor: all queries surface only timestamps, `active` BOOL, schedule strings, integer counts, `days_since_last_run` NUMERIC — no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 data; CRON-HEALTH-AUDIT-E-001 artefact same privacy-safe fields only. Document header v5.10.3 → v5.11.0. Owner: devops-lead + compliance-officer.*

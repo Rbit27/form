@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.57.1] — 2026-06-30
+
+### Added
+- `docs/OBSERVABILITY.md §65` — v5.11.0. Quarterly pg_cron Health Audit Protocol — Jobs 56 & 57. Fulfils INCIDENT_RESPONSE R-53.11 item 5 (P1/M14) documentation portion. Full protocol spec: four read-only queries (Q-C1 through Q-C4, equivalent to R-53-C1 through R-53-C4) run by devops-lead on first Monday of each calendar quarter against `pg_cron.job_run_details` and `cron.job`; confirms jobs 56 (`fleet_mat_chain_verify`) and 57 (`nrr_bridge_q1_calendar_check`) are registered, `active = true`, and last succeeded within cadence thresholds (job 56: ≤ 7 days; job 57: ≤ 2 days). Pass/fail criteria table (§65.4) with H1–H4 root cause mapping and 4-hour R-53 IC escalation rule. R2 artefact Markdown template (§65.5): `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md`, WORM 7yr, `r2:form-api` NO ACCESS. New SOC 2 evidence artefact CRON-HEALTH-AUDIT-E-001 (CC4.1/A1.1, quarterly, 7yr; §65.6). R2 subfolder `enterprise/cron-health-audits/` (§65.7). Five-item implementation checklist (§65.8): items 1–2 [x] Done (documentation portions); items 3–5 [ ] operational. Two cross-reference obligations (§65.9): both 🟢 Done. Privacy floor: timestamps, `active` BOOL, schedule strings, `days_since_last_run` NUMERIC, row counts only — no employee `user_id`, health values, or GDPR Art. 9 data.
+- `docs/SOC2_READINESS.md §138` — v3.64.0. CRON-HEALTH-AUDIT-E-001 registration: §79.4 master evidence table row (count 106 → 107; CC4.1/A1.1, quarterly, 7yr); §80.3 R2 subfolder `enterprise/cron-health-audits/` (WORM 7yr, `r2:form-api` NO ACCESS); §80.4 Vanta mirror entry (quarterly, 48h upload SLA). Closes OBSERVABILITY §65.9 cross-reference obligation. Three-item implementation checklist: 2× P1 operational (R2 folder M14, first filing Q1-2027), 1× P2 compliance calendar entry.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md R-53.11 item 5` — v1.1 patch. Status `[ ]` → `[x] Done (documentation portion — OBSERVABILITY §65, v5.11.0, 2026-06-30); [ ] (operational — calendar reminder, R2 subfolder creation, first audit Q1-2027)`. Version note v1.0 → v1.1 added.
+- `VERSION` — 10.57.0 → 10.57.1.
+
+---
+
 ## [10.57.0] — 2026-06-30
 
 ### Added

@@ -33835,6 +33835,89 @@ Two rows added to the §79.4 master evidence table (count 104 → 106), after FL
 
 ---
 
+## §138 · Cross-Reference Patch — CRON-HEALTH-AUDIT-E-001 Registration (CC4.1 / A1.1 · OBSERVABILITY §65)
+
+### §138.1 Purpose
+
+`docs/OBSERVABILITY.md §65` (v5.11.0, 2026-06-30) — the "Quarterly pg_cron Health Audit Protocol — Jobs 56 & 57" — introduced a new SOC 2 evidence artefact CRON-HEALTH-AUDIT-E-001 and deferred its registration to this document. This §138 fulfils that obligation: §79.4 master evidence table row (count 106 → 107), §80.3 R2 subfolder description, §80.4 Vanta mirror entry, and implementation checklist. Closes `docs/OBSERVABILITY.md §65.9` cross-reference obligation (🟢 Done).
+
+CRON-HEALTH-AUDIT-E-001 is the quarterly audit report produced by devops-lead on the first Monday of each calendar quarter, confirming that pg_cron jobs 56 (`fleet_mat_chain_verify`) and 57 (`nrr_bridge_q1_calendar_check`) are registered, active, and have completed within expected cadence. These jobs carry `freshness_window: N/A` in the §12.6 registry and are excluded from the automated `pg-cron-health-monitor` dead-man's switch — CRON-HEALTH-AUDIT-E-001 is the preventive manual control that covers this monitoring gap for CC4.1/A1.1 continuous monitoring and availability evidence.
+
+---
+
+### §138.2 Artefact Description
+
+**CRON-HEALTH-AUDIT-E-001** — Quarterly audit record confirming operational state of pg_cron jobs 56 and 57. Content: Q-C1 result (`fleet_mat_chain_verify` last succeeded timestamp + `days_since_last_run`; pass threshold ≤ 7 days); Q-C2 result (`nrr_bridge_q1_calendar_check` last succeeded timestamp + `days_since_last_run`; pass threshold ≤ 2 days); Q-C3 result (job 56 `cron.job` catalog registration + `active` BOOL); Q-C4 result (job 57 equivalently); overall PASS/FAIL; R-53 IC run ID if opened; root cause classification H1-H4 if FAIL. Privacy floor: `days_since_last_run` NUMERIC, `active` BOOL, `schedule` STRING, `last_succeeded_at` TIMESTAMPTZ, integer row counts, PASS/FAIL enum, `ic_run_id` UUID (if R-53 opened) — no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data.
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | CRON-HEALTH-AUDIT-E-001 |
+| **Name** | Quarterly pg_cron Health Audit Report (Jobs 56 & 57) |
+| **SOC 2 criteria** | CC4.1, A1.1 |
+| **Cadence** | Quarterly (first Monday of January, April, July, October) |
+| **Retention** | 7 years |
+| **R2 path** | `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md` |
+| **Primary definition** | `docs/OBSERVABILITY.md §65` (v5.11.0, 2026-06-30) |
+
+---
+
+### §138.3 §80.3 R2 Subfolder Addition
+
+New R2 subfolder added to the evidence bucket topology (§80.3):
+
+| Subfolder | Purpose | Access | Retention |
+|---|---|---|---|
+| `enterprise/cron-health-audits/` | CRON-HEALTH-AUDIT-E-001 quarterly audit reports | `form_system` (devops-lead write via PAM session); `compliance_reviewer` + `r2:compliance-officer` read; `r2:form-api` **NO ACCESS** | WORM Object Lock Governance, 7yr minimum |
+
+Filename convention: `quarterly-{YYYY}-Q{1|2|3|4}.md` (e.g. `quarterly-2027-Q1.md`).
+
+---
+
+### §138.4 §80.4 Vanta Mirror Entry
+
+CRON-HEALTH-AUDIT-E-001 added to Vanta mirror schedule (§80.4):
+
+| Artefact ID | Vanta upload timing | TSC mapping | Privacy note |
+|---|---|---|---|
+| CRON-HEALTH-AUDIT-E-001 | Within 48h of each quarterly filing | CC4.1, A1.1 | `days_since_last_run` NUMERIC, `active` BOOL, `schedule` STRING, `last_succeeded_at` TIMESTAMPTZ, row counts, PASS/FAIL, `ic_run_id` UUID (if R-53 opened) — no employee `user_id`, health values, or GDPR Art. 9 data |
+
+Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. Vanta access: compliance-officer + security-engineer only.
+
+---
+
+### §138.5 §79.4 Master Evidence Table Row
+
+One row added to the §79.4 master evidence table (count 106 → 107), after NRR-FILING-STALE-E-001 (§137):
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|
+| **CRON-HEALTH-AUDIT-E-001** | CC4.1, A1.1 | Quarterly manual audit of pg_cron jobs 56 (`fleet_mat_chain_verify`) and 57 (`nrr_bridge_q1_calendar_check`) — the primary preventive control covering the N/A-freshness monitoring gap for these jobs. Four read-only queries (Q-C1 through Q-C4, equivalent to INCIDENT_RESPONSE R-53-C1 through R-53-C4) confirm: job 56 last succeeded ≤ 7 days ago; job 57 last succeeded ≤ 2 days ago; both jobs registered in `cron.job` catalog; both jobs `active = true`. FAIL → R-53 IC activation within 4 hours. PASS/FAIL + root cause H1-H4 + IC run ID recorded. Privacy: `days_since_last_run`, `active`, `schedule`, `last_succeeded_at`, row counts, PASS/FAIL enum, `ic_run_id` UUID only — no employee `user_id`, health values, GDPR Art. 9 data. Source: OBSERVABILITY §65 (v5.11.0, 2026-06-30). | Quarterly (first Monday of Q1–Q4) | 7 yr | `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md` |
+
+---
+
+### §138.6 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/OBSERVABILITY.md §65.9` — Register CRON-HEALTH-AUDIT-E-001 in §79.4 master evidence table (CC4.1/A1.1, quarterly, 7yr), §80.3 R2 subfolder (`enterprise/cron-health-audits/`), §80.4 Vanta mirror entry; count 106 → 107 | §65.9 (v5.11.0, 2026-06-30) + §65.8 item 2 | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.64.0, §138)** |
+| `docs/OBSERVABILITY.md §65.8 item 2` — SOC2_READINESS §79.4 row + §80.3 + §80.4 | §65.8 item 2 (P1/M14) | 🟢 **Done — this section** |
+
+---
+
+### §138.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `enterprise/cron-health-audits/` subfolder on Cloudflare R2 `form-soc2-evidence` bucket; enable WORM Object Lock Governance 7yr; confirm `r2:form-api` has NO ACCESS (§80.3 invariant). Prerequisite: pg_cron jobs 56 and 57 deployed (§63.9 items 1–2, P0/M13). | devops-lead | **P1** | M14 (after jobs 56/57 deploy) | [ ] |
+| 2 | File first CRON-HEALTH-AUDIT-E-001 artefact: use OBSERVABILITY §65.5 template; run Q-C1 through Q-C4 on first Monday of next quarter after job 56/57 deploy; upload to R2 at `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md` (7yr WORM); SHA-256 hash; upload to Vanta within 48h; add to MASTER-INDEX. Privacy check: PASS/FAIL + `days_since_last_run` + timestamps only. | devops-lead | **P1** | Q1-2027 (est.) | [ ] |
+| 3 | Add CRON-HEALTH-AUDIT-E-001 to §79.5 compliance calendar at first-Monday-of-Q slot (alongside GRAD-E-001 and NRR-BRIDGE-E-001). | compliance-officer | **P2** | Before first filing | [ ] |
+
+---
+
+*v3.64.0 (2026-06-30): §138 Cross-Reference Patch — CRON-HEALTH-AUDIT-E-001 Registration (CC4.1 / A1.1 · OBSERVABILITY §65). Closes `docs/OBSERVABILITY.md §65.9` cross-reference obligation (P1/M14 documentation portion). New quarterly SOC 2 evidence artefact registered (count 106 → 107): CRON-HEALTH-AUDIT-E-001 (CC4.1/A1.1, quarterly Q1-Q4 first Monday, 7yr — quarterly manual audit confirming pg_cron jobs 56 and 57 registered in `cron.job` catalog, `active = true`, and last succeeded within cadence thresholds; primary preventive control for N/A-freshness monitoring gap; FAIL → R-53 IC within 4 hours; R2 path `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md`, WORM 7yr, `r2:form-api` NO ACCESS). §138.3: new R2 subfolder `enterprise/cron-health-audits/` (WORM 7yr; `r2:form-api` NO ACCESS). §138.4: Vanta mirror entry (quarterly, 48h upload SLA; CC4.1/A1.1; operational enum fields only — no `user_id`, no GDPR Art. 9 data). §138.5: §79.4 master evidence table row (insertion after NRR-FILING-STALE-E-001). §138.6: two cross-reference obligations closed (§65.9 + §65.8 item 2 → 🟢 Done). §138.7: three-item implementation checklist (2× P1 operational — R2 folder M14, first filing Q1-2027; 1× P2 calendar entry). Privacy floor: CRON-HEALTH-AUDIT-E-001 contains only timestamps, `active` BOOL, schedule strings, PASS/FAIL enum, `days_since_last_run` NUMERIC, integer row counts, and `ic_run_id` UUID (if R-53 opened) — no employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data; `r2:form-api` REVOKED. Document header v3.63.0 → v3.64.0. Owner: compliance-officer + devops-lead.*
+
+---
+
 *v3.63.0 (2026-06-30): §137 Cross-Reference Patch — R-53 Stale Evidence Registration (FLEET-MAT-STALE-E-001 + NRR-FILING-STALE-E-001 · CC4.1/A1.1). Closes `docs/INCIDENT_RESPONSE.md R-53.11` item 2 (P0/M13). Two artefacts registered (count 104 → 106): FLEET-MAT-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr — per-activation IC export of `system.fleet_mat_chain_monitor_stale_declared` HIGH/7yr + `system.fleet_mat_chain_monitor_restored` LOW/3yr DEC-030 events with FLEET-MAT-STALE-CHAIN-01 ordering invariant; R-53-C5 chain integrity result; root cause H1-H4; time-to-recovery; zero-activation years as affirmative nil attestation with job 56 run-health export; `enterprise/fleet-mat-stale/FLEET-MAT-STALE-E-001-{YYYY}-{ic_run_id}.json`) and NRR-FILING-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr — per-activation IC export of `system.nrr_bridge_filing_monitor_stale_declared` HIGH/7yr + `system.nrr_bridge_filing_monitor_restored` LOW/3yr DEC-030 events with NRR-FILING-STALE-CHAIN-01 ordering invariant; R-53-C6 Q1 calendar check result; `q1_filing_confirmed` bool; zero-activation years as affirmative nil attestation with job 57 run-health export; `enterprise/nrr-filing-stale/NRR-FILING-STALE-E-001-{YYYY}-{ic_run_id}.json`). §137.3: two new R2 subfolders (`enterprise/fleet-mat-stale/` + `enterprise/nrr-filing-stale/`; WORM Object Lock Governance 7yr; `form_api` NO ACCESS). §137.4: two Vanta mirror entries (per-activation + annual Q1; 48h upload SLA; CC4.1/A1.1; `ic_run_id` UUID + operational enum fields only — no `user_id`, no GDPR Art. 9 data). §137.5: two §79.4 master evidence table rows (count 104 → 106; insertion after FLEET-FILING-E-001). §137.7: five-item implementation checklist (2× P1 per-activation filing; 1× P1 zero-count; 1× P1 NRR-FILING; 1× P2 calendar). §137.6: two cross-reference obligations closed (R-53.11 item 2 🟢 Done; R-53.9 artefact paths confirmed). Privacy floor: `ic_run_id` UUID + operational enum fields only — no employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data; `form_api` REVOKED. Document header v3.62.0 → v3.63.0. Owner: compliance-officer + devops-lead.*
 
 *v3.62.0 (2026-06-30): §132.8 FLEET-MAT-CHAIN-02 Auditor Queries (DEC-087). Closes `docs/COST_MODEL.md §50.8` item 3 (P2/M18) + §50.9 item 3: two complementary auditor queries added to FLEET-MAT-E-001 evidence collection notes in §132. Query 1: count `enterprise.fleet_maturity_declared` events with `consecutive_cycles_at_target >= 2` AND `evidence_artefact_id IS NULL` — expected 0 (any positive indicates FLEET-MAT-CHAIN-02 bypass). Query 2: count events with `consecutive_cycles_at_target < 2` AND `evidence_artefact_id IS NULL` — expected > 0 in years 1–2 (confirms zero-declaration-year affirmative attestation operating correctly). No change to FLEET-MAT-E-001 artefact scope, R2 path, Vanta mapping, or §79.4 evidence count. §132.6 cross-reference table: two new rows (§50.9 item 3 → 🟢 Closed; AUDIT_LOG_SCHEMA v2.64 FLEET-MAT-CHAIN-02 → 🟢 Registered). FLEET-MAT-CHAIN-02 documented in AUDIT_LOG_SCHEMA.md v2.64 (2026-06-30). Document header v3.61.0 → v3.62.0. Owner: compliance-officer.*
