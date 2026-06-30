@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.44.0** — 2026-06-30 · post-2874 · Series 2866–2875 «Автономне тренування» 9/10 · post-2874 «Коли AI недостатньо: ознаки, що пора шукати людину-тренера» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2874 · README: post-2874 → draft · AUDIT_LOG_SCHEMA.md v2.63: +4 OBSERVABILITY §63 DEC-030 events registered (P0/M13 closed) · COST_MODEL.md v2.23.2: §49.9 OBSERVABILITY §63 cross-ref added · OBSERVABILITY.md §63.9 item 3 + item 5 → 🟢 · next: post-2875 (синтез серії)
+**v10.45.0** — 2026-06-30 · post-896 · «Перетренованість або лінощі: як self-coached атлет справді відрізняє одне від одного» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-896 · README: block 896–900 proposed (авторегуляція і психологія); post-896 → draft · next: post-897 (AI-тренер і людина-тренер) або post-2875 (синтез серії «Автономне тренування»)
 
 ---
 

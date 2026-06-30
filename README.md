@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · proposed next (45+) · current: 2866–2875 «Автономне тренування» 9/10 · roadmap extended to 2915 · v10.44.0
+### Editorial series: 11–44 drafted · proposed next (45+) · current: 2866–2875 «Автономне тренування» 9/10 · roadmap extended to 2915 · block 896–900 added · v10.45.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -615,6 +615,16 @@ Planned — posts 764–800:
 | 893 | Тренувальний щоденник як інструмент діагностики: що записувати, щоб отримати корисні дані | proposed · v6.83.0 |
 | 894 | Що відбувається з технікою при максимальному зусиллі — і де межа безпечної деградації | proposed · v6.83.0 |
 | 895 | Синтез 886–895: десять практичних рамок self-coached атлета без ідеальних умов | proposed · v6.83.0 |
+
+### Block 896–900 — Авторегуляція і психологія: кордон між дисципліною і помилкою (proposed · v10.45.0)
+
+| Post | Topic | Status |
+|---|---|---|
+| 896 | Перетренованість або лінощі: як self-coached атлет справді відрізняє одне від одного | **draft · v10.45.0** |
+| 897 | AI-тренер і людина-тренер: чесна таблиця трейдофів без маркетингу | proposed · v10.45.0 |
+| 898 | Синдром «ще одного підходу»: де закінчується дисципліна і починається помилка у програмуванні | proposed · v10.45.0 |
+| 899 | Тренування при хронічному стресі поза залом: три рівні адаптації програми | proposed · v10.45.0 |
+| 900 | Вікна відновлення: що наука і практика говорять про 24, 48, 72 години між сесіями | proposed · v10.45.0 |
 
 ### Block 901–950 — Practical athlete intelligence (proposed · v4.57.0)
 
