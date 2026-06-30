@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [10.22.0] — 2026-06-30
+
+### Added
+- `content/post-2846-fatigued-brain-wrong-decisions.md` — Series «Рішення під тиском» 2846–2855, post 1/10. Когнітивна втома і тренувальні рішення: три передбачувані помилки (йти важче за план, скоротити без даних, змінити програму в середині блоку). Механізм: знижена активність ПФК під когнітивною втомою (Vasquez & Tudoselu 2019), зміщення від «що правильно за планом» до «що відчувається правильно зараз». Рішення: принцип попереднього зобов'язання (pre-commitment). Три практичних правила. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2846 card added at top of feed.
+
+### Changed
+- `STATUS.md` — Series 2846–2855 updated: post-2846 written, 1/10.
+- `VERSION` — 10.21.0 → 10.22.0.
+
 ## [10.21.0] — 2026-06-30
 
 ### Added
