@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.25.0** — 2026-06-30 · post-2849 (panic-after-bad-training · editorial) · Series 2846–2855 «Рішення під тиском» 4/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending
+**v10.26.0** — 2026-06-30 · post-2850 (life-stress-training-decisions · editorial) · Series 2846–2855 «Рішення під тиском» 5/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending · README: series 2856–2865 «Повернення після паузи» proposed
 
 ---
 
