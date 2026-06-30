@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.65.0** — 2026-06-30 · post-2891 · «Як відстежувати прогрес без надлишкового збору даних» · series «Тренувальний інтелект» 2886–2895 (6/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2891 · README: series 2976–2985 «Тренування і контекст» proposed · next: post-2892 («як читати тренувальний тренд — коли зміна є сигналом, а коли варіабельністю»)
+
 **v10.64.0** — 2026-06-30 · post-2890 · «Як планувати тижневий об'єм, коли розклад змінюється» · series «Тренувальний інтелект» 2886–2895 (5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2890 · next: post-2891 («як відстежувати прогрес без надлишкового збору даних»)
 
 **v10.63.0** — 2026-06-30 · post-100-editorial-synthesis · «100 постів: 10 принципів, якими FORM думає про тренування без прикрас» · Editorial series milestone · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-100 · README: post-100 marked draft; series 2966–2975 «Рішення під невизначеністю» proposed · next: post-2890 series «Тренувальний інтелект» 5/10
