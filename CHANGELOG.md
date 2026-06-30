@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.38.1] — 2026-06-30
+
+### Changed
+- `docs/SOC2_READINESS.md` — §133 Cross-Reference Patch: §79.5 Annual Q1 compliance calendar subsection added (NRR-BRIDGE-E-001 + FLEET-MAT-E-001 enterprise fleet artefacts; FLEET-MAT-CHAIN-01 ordering requirement; zero-declaration years affirmative attestation; quarterly exemption confirmed). §131.7 item 3 closed ([x] Done). §132.6 stale 🟡 row patched to 🟢 (COST_MODEL v2.23.1 §49.11 reciprocal closure). Document header v3.57.0 → v3.58.0.
+- `VERSION` — 10.38.0 → 10.38.1.
+
+---
+
 ## [10.38.0] — 2026-06-30
 
 ### Added

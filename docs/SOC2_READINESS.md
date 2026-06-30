@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.57.0
+# FORM · SOC 2 Type II Readiness v3.58.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -26747,6 +26747,20 @@ This table is exhaustive for the primary evidence set. Individual control sectio
 | Prepare fieldwork response team: compliance-officer (primary), security-engineer (system access), devops-lead (infra queries), founder (commercial/legal questions) | compliance-officer | Each person briefed on §79.6 response SLAs |
 | Pre-run all SQL queries in §79.4 domain-specific sections; verify outputs match what was filed quarterly | devops-lead | No surprises during fieldwork |
 
+#### Annual Q1 — Enterprise Fleet Artefacts *(first collection: Q1 of first year with ≥ 1 completed renewal cohort, est. M14)*
+
+| Action | Owner | Artefact filed |
+|---|---|---|
+| In Q1 following the first year with ≥ 1 completed renewal cohort: (a) run COST_MODEL §48 NRR bridge computation query; (b) verify NRR-BRIDGE-INV-01 arithmetic invariant (opening + retained + expansion − contraction − churned = closing, ±$1 tolerance); (c) emit `enterprise.annual_nrr_bridge_filed` DEC-030 HMAC-chained event (HTTP 422 if arithmetic fails); (d) export event to CSV; (e) SHA-256 hash; (f) upload to R2 `enterprise/nrr/NRR-BRIDGE-E-001_<YYYY>.csv` (3yr WORM Object Lock Governance); (g) upload to Vanta within 48h (CC4.1/A1.1); (h) add to MASTER-INDEX (`filing_year`, `sha256`, `r2_path`, `vanta_uploaded: true`, `chain_verified: true`). Zero-renewal years (`cohort_tenant_count = 0`) filed as affirmative attestation. Privacy check: fleet-level GRR/NRR aggregates only — no per-tenant ACV, no `user_id`, no GDPR Art. 9 data; `form_api` REVOKED. | compliance-officer + data-engineer | **NRR-BRIDGE-E-001** |
+| After NRR-BRIDGE-E-001 for the same `filing_year` is filed: (a) confirm prior `enterprise.annual_nrr_bridge_filed` event exists in HMAC chain for `filing_year` (FLEET-MAT-CHAIN-01 prerequisite — HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE` if absent); (b) emit `enterprise.fleet_maturity_declared` DEC-030 HMAC-chained event, evaluating FM-C1 (`green_fleet_pct ≥ 0.65`), FM-C2 (`expansion_takeup_pct ≥ 0.55`), FM-C3 (`tier_upgrades_count ≥ 1`); (c) export event to CSV; (d) SHA-256 hash; (e) upload to R2 `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv` (3yr WORM Object Lock Governance); (f) upload to Vanta within 48h (CC4.1/A1.1); (g) add to MASTER-INDEX. Zero-declaration years (`fm_c1_met = false`, etc.) filed as affirmative attestation — FM conditions evaluated regardless. Privacy check: fleet aggregates + boolean flags only — no per-tenant breakdown, no `user_id`, no GDPR Art. 9 data; `form_api` REVOKED. **Must file after NRR-BRIDGE-E-001 for the same `filing_year`** (FLEET-MAT-CHAIN-01). | compliance-officer | **FLEET-MAT-E-001** |
+
+**Collection notes:**
+- **Cadence**: Annual Q1 (January–March) of each year following a completed renewal cohort. First collection estimated at M14 from observation period start. Repeat annually thereafter.
+- **Ordering requirement (FLEET-MAT-CHAIN-01)**: NRR-BRIDGE-E-001 must be filed first in every collection cycle. FLEET-MAT-E-001 emission fails at the Worker layer (HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE`) if no prior `enterprise.annual_nrr_bridge_filed` exists for the same `filing_year` in the HMAC chain.
+- **Zero-declaration years**: Both artefacts are required annually regardless of fleet performance. A missing `filing_year` in either artefact is a CC4.1/A1.1 gap in the SOC 2 observation record — do not skip collection in underperformance years.
+- **Quarterly calendar exemption**: Neither NRR-BRIDGE-E-001 nor FLEET-MAT-E-001 requires interim quarterly entries in §79.5. Both are annual-only artefacts. The §79.5 Quarterly subsection is not modified.
+- **MASTER-INDEX**: File both entries in the current year's `MASTER-INDEX-YYYY.csv` under `enterprise/` with `status = COLLECTED`; include `filing_year`, `sha256`, `r2_path`, and `vanta_uploaded: true`. FLEET-MAT-E-001 entries require an additional `fleet_mat_chain_01_verified: true` field.
+
 ---
 
 ### 79.6 Auditor Fieldwork Response Protocol
@@ -33064,7 +33078,7 @@ One row added to the §79.4 master evidence table (count 100 → 101):
 |---|---|---|---|---|---|
 | 1 | Create `compliance/evidence/enterprise/nrr/` folder on Cloudflare R2 `form-soc2-evidence` bucket; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). | devops-lead | **P0** | M13 | [ ] |
 | 2 | File first NRR-BRIDGE-E-001 artefact in Q1 of first year with ≥ 1 completed renewal cohort: (a) run §48.9 item 3 bridge computation query; (b) verify NRR-BRIDGE-INV-01 arithmetic (±$1 tolerance); (c) emit `enterprise.annual_nrr_bridge_filed` (HTTP 422 if arithmetic fails); (d) file CSV at `compliance/evidence/nrr/NRR-BRIDGE-E-001_<YYYY>.csv`; (e) SHA-256 hash; (f) upload to R2 (3yr WORM Object Lock); (g) upload to Vanta (CC4.1/A1.1); (h) add to MASTER-INDEX. Privacy check: fleet aggregates only; no per-tenant ACV; no `user_id`. | compliance-officer + data-engineer | **P1** | Q1 of first full renewal year (est. M14) | [ ] |
-| 3 | Add NRR-BRIDGE-E-001 to §79.5 compliance calendar at Month O+13 (first annual filing); confirm §79.5 quarterly calendar does not require NRR-BRIDGE-E-001 interim entries (artefact is annual). | compliance-officer | **P2** | Month O+1 calendar review | [ ] |
+| 3 | Add NRR-BRIDGE-E-001 to §79.5 compliance calendar at Month O+13 (first annual filing); confirm §79.5 quarterly calendar does not require NRR-BRIDGE-E-001 interim entries (artefact is annual). | compliance-officer | **P2** | Month O+1 calendar review | [x] **Done — 2026-06-30 (SOC2_READINESS §133.2)** |
 
 ---
 
@@ -33135,7 +33149,7 @@ The following row is added to the §79.4 master evidence register (count 101 →
 | `docs/COST_MODEL.md §49.9` item 3 (P0/M13) | Register FLEET-MAT-E-001 in `docs/SOC2_READINESS.md §132` | 🟢 Closed — this section |
 | `docs/AUDIT_LOG_SCHEMA.md §Enterprise Fleet Maturity events` | `enterprise.fleet_maturity_declared` event, FLEET-MAT-CHAIN-01 invariant, Zod v2 `FleetMaturityDeclaredSchema` | 🟢 Registered v2.62 (2026-06-30) |
 | `docs/DECISION_LOG.md DEC-086` | Fleet Maturity governance protocol | 🟢 Registered (2026-06-30) |
-| `docs/COST_MODEL.md §49.11` cross-reference index | SOC2_READINESS §132 row | 🟡 Open — will update 🟡→🟢 in next patch |
+| `docs/COST_MODEL.md §49.11` cross-reference index | SOC2_READINESS §132 row → §133.3 | 🟢 **Done — 2026-06-30 (COST_MODEL v2.23.1 §49.11; SOC2_READINESS §133.3, v3.58.0)** |
 
 ### §132.7 Implementation Checklist
 
@@ -33151,3 +33165,93 @@ The following row is added to the §79.4 master evidence register (count 101 →
 *v3.55.1 (2026-06-29): §128.6 item 6 closed — `compliance/calendar/q3-2026-access-review.md` updated to v1.1: §128 cross-reference added to header; blockquote OQ-AR-01/OQ-TDD-01 resolution note added above Gate section; Step 1 pilot-tenant bullet updated to reference §128.1 query extension (`WHERE t.tier IN ('enterprise', 'pilot')`). Document header v3.55.0 → v3.55.1. Owner: compliance-officer.*
 
 *v3.55.0 (2026-06-29): §130 Cross-Reference Patch — OBSERVABILITY §62.9 item 3 (ADMIN-RPT-E-001 · C1.1 / P4.1 / CC7.2). Closes P1/M7 documentation registration obligation created when `docs/OBSERVABILITY.md §62` (2026-06-29) defined the Admin Reporting Pipeline MV refresh monitoring and specified one SOC 2 evidence artefact (ADMIN-RPT-E-001) without registering it in SOC2_READINESS.md. One artefact registered (count 99 → 100): ADMIN-RPT-E-001 (C1.1/P4.1/CC7.2, annual Q4, 3yr — annual export of `pg_cron.job_run_details` run history for pg_cron jobs 52–55 (Admin Dashboard MV refresh: `tenant_wellness_summary_v2`, `tenant_engagement_summary`, `tenant_feature_adoption`, `tenant_cohort_breakdown`) + `system.admin_mv_refreshed` DEC-030 HMAC-chained event count per `view_name`; confirms ADMIN-RPT-SLO-01 (≤ 26h freshness gap per view, C1.1/P4.1) and ADMIN-RPT-SLO-02 (k-anonymity guard active, `suppressed_cell_count` non-null, P4.1); ADMIN-MV-CHAIN-01 advisory HMAC ordering invariant verified; privacy: pg_cron operational metadata + aggregate `tenant_row_count` only; no individual employee `user_id`, name, email, session, or GDPR Art. 9 health data; `form_api` REVOKED from all Admin Dashboard MV relations; zero-event years filed as affirmative attestation). §80.3 `enterprise/admin-reporting/` R2 subfolder added (WORM Object Lock Governance 3yr; `form_api` NO ACCESS; `form_system` role only). §80.4 Vanta mirror list: one new entry for ADMIN-RPT-E-001 (annual Q4 from first full year with jobs 52–55; C1.1/P4.1/CC7.2; privacy: pg_cron metadata + aggregate counts only). Three cross-reference obligations confirmed closed (§130.5): AUDIT_LOG_SCHEMA.md v2.60 §Admin Reporting Pipeline MV Refresh events (OBSERVABILITY §62.9 item 2); INCIDENT_RESPONSE.md R-52 stale recovery runbook (item 4); this §130 (item 3). Three implementation checklist items: P0/M7 (R2 folder creation), P1/Q4 first filing, P2/M+1 calendar update. Privacy floor: `system.admin_mv_refreshed` carries operational metadata only — `view_name`, aggregate `tenant_row_count`, `suppressed_cell_count`, `refresh_duration_ms`; no individual employee `user_id`, name, email, session, or GDPR Art. 9 health data; `form_api` REVOKED from all Admin Dashboard MV relations; HR `tenant_manager` role sees only aggregated MV summaries. Document header v3.53.0 → v3.55.0 (v3.54.0 applied by §129 — 2026-06-29; both bumps applied in this pass as §129 header update was deferred). Owner: compliance-officer. Cross-references: `docs/OBSERVABILITY.md §62.9 item 3` (obligation source — 🟢 closed this patch); `docs/OBSERVABILITY.md §62` (Admin Reporting Pipeline specification — pg_cron jobs 52–55, four MVs, ADMIN-RPT-SLO-01/02, k-anonymity guard via `assert_k_anonymity()`); `docs/AUDIT_LOG_SCHEMA.md §Admin Reporting Pipeline MV Refresh events` (v2.60, 2026-06-29 — `system.admin_mv_refreshed` LOW/1yr, `AdminMvRefreshedSchema` Zod v2, ADMIN-MV-CHAIN-01 advisory invariant, C1.1/P4.1/CC7.2 auditor narratives); `docs/INCIDENT_RESPONSE.md R-52` (Admin Dashboard MV stale recovery runbook — P2, no DEC-030 stale chain pair, no PAM elevation, H1–H3 root causes, scope queries R-52-C1 through R-52-C5, ADMIN-RPT-E-001 SOC 2 evidence reference); `docs/SOC2_READINESS.md §79.4` (§130 row insertion — ADMIN-RPT-E-001 after GRAD-E-001, count 99 → 100); `docs/SOC2_READINESS.md §80.3` (`enterprise/admin-reporting/` subfolder added); `docs/SOC2_READINESS.md §80.4` (ADMIN-RPT-E-001 Vanta mirror entry added after GRAD-E-001); `docs/DECISION_LOG.md DEC-030` (HMAC-chained audit log — ADMIN-MV-CHAIN-01 advisory ordering invariant basis).*
+
+---
+
+*v3.58.0 (2026-06-30): §133 Cross-Reference Patch — §79.5 Calendar Additions (NRR-BRIDGE-E-001 · FLEET-MAT-E-001 · Annual Q1 Enterprise Fleet Artefacts). Closes two open obligations: (1) `docs/SOC2_READINESS.md §131.7` item 3 (P2/Month O+1 calendar review — NRR-BRIDGE-E-001 §79.5 calendar entry at Month O+13, quarterly calendar exemption confirmed); (2) `docs/SOC2_READINESS.md §132.6` stale 🟡 row — `docs/COST_MODEL.md §49.11` cross-reference index SOC2_READINESS §132 row updated 🟡 → 🟢 (COST_MODEL v2.23.1 2026-06-30; §133.3 inline update). §79.5 "Annual Q1 — Enterprise Fleet Artefacts" subsection added (after Month O+12 section): two rows — NRR-BRIDGE-E-001 (filing procedure: bridge computation, NRR-BRIDGE-INV-01 arithmetic verify ±$1, `enterprise.annual_nrr_bridge_filed` HTTP-422-gated, R2 3yr WORM `enterprise/nrr/`, Vanta 48h, MASTER-INDEX) and FLEET-MAT-E-001 (filing procedure: FLEET-MAT-CHAIN-01 prerequisite check, `enterprise.fleet_maturity_declared` FM-C1/C2/C3 evaluation, zero-declaration affirmative attestation, R2 3yr WORM `enterprise/fleet-maturity/`, Vanta 48h, MASTER-INDEX with `fleet_mat_chain_01_verified: true`). Ordering requirement confirmed: FLEET-MAT-E-001 must be filed after NRR-BRIDGE-E-001 for the same `filing_year` — FLEET-MAT-CHAIN-01 HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE` enforced at Worker layer. Zero-declaration years: both artefacts required annually as affirmative attestation; missing `filing_year` = CC4.1/A1.1 SOC 2 gap. Quarterly calendar exemption confirmed — §79.5 Quarterly subsection unchanged. §131.7 item 3: `[ ]` → `[x] Done — 2026-06-30 (SOC2_READINESS §133.2)`. §132.6 stale 🟡 row: inline update to 🟢 Done (COST_MODEL v2.23.1 §49.11; §133.3). Two cross-reference obligations closed (§133.5). Three-item implementation checklist §133.6 (items 1–2 [x] Done this patch; item 3 P2/before Month O+12 — MASTER-INDEX annual filing template for `fleet_mat_chain_01_verified` field). Privacy floor: §133 contains no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data; NRR-BRIDGE-E-001 and FLEET-MAT-E-001 carry fleet-level aggregates and boolean flags only; no per-tenant breakdown; `form_api` REVOKED from all relevant audit event sources. Document header v3.57.0 → v3.58.0. Owner: compliance-officer.*
+
+---
+
+## §133 · Cross-Reference Patch — §79.5 Calendar Additions (NRR-BRIDGE-E-001 · FLEET-MAT-E-001 · Annual Q1 Enterprise Fleet Artefacts)
+
+> Date: 2026-06-30. Trigger: (1) `docs/SOC2_READINESS.md §131.7` item 3 (P2/Month O+1 calendar review — NRR-BRIDGE-E-001 §79.5 calendar entry at Month O+13); (2) `docs/SOC2_READINESS.md §132.6` stale 🟡 — `docs/COST_MODEL.md §49.11` cross-reference index SOC2_READINESS §132 row (closed in COST_MODEL v2.23.1, 2026-06-30; reciprocal §132.6 update not yet applied). Owners: compliance-officer.
+
+### §133.1 Purpose and Scope
+
+This patch closes three open items from the enterprise fleet artefact sprint (§131 + §132, 2026-06-30):
+
+1. **§79.5 compliance calendar addition**: Add "Annual Q1 — Enterprise Fleet Artefacts" subsection covering NRR-BRIDGE-E-001 and FLEET-MAT-E-001. Both are annual evidence artefacts with Q1 filing cadence; first eligible collection is Q1 of the first year with ≥ 1 completed renewal cohort (estimated M14 from observation period start). §79.5 currently covers Month O-1, Monthly, Quarterly, and Month O+12 actions — no Annual Q1 entry for enterprise fleet artefacts exists prior to this patch.
+
+2. **§132.6 stale 🟡 inline closure**: `docs/COST_MODEL.md §49.11` cross-reference index SOC2_READINESS §132 row was updated 🟡 → 🟢 in COST_MODEL v2.23.1 (2026-06-30). The reciprocal §132.6 row in this document is updated inline to 🟢 by §133.3 below.
+
+3. **§131.7 item 3 closure**: §133.2 fulfils the P2/Month O+1 obligation to add NRR-BRIDGE-E-001 to §79.5 with confirmed quarterly calendar exemption. §131.7 item 3 status updated `[ ]` → `[x] Done`.
+
+---
+
+### §133.2 §79.5 Calendar Inline Addition — Annual Q1 Enterprise Fleet Artefacts
+
+The "Annual Q1 — Enterprise Fleet Artefacts" subsection has been inserted directly into §79.5 (after the "Month O+12 — Fieldwork Preparation" table, before the §79.6 separator). Two filing procedures are specified:
+
+**NRR-BRIDGE-E-001** (compliance-officer + data-engineer, annual Q1):
+- Run COST_MODEL §48 NRR bridge computation query
+- Verify NRR-BRIDGE-INV-01 arithmetic invariant (opening + retained + expansion − contraction − churned = closing, ±$1 tolerance)
+- Emit `enterprise.annual_nrr_bridge_filed` DEC-030 HMAC-chained event (HTTP 422 on arithmetic failure)
+- Export to CSV → SHA-256 hash → R2 `enterprise/nrr/NRR-BRIDGE-E-001_<YYYY>.csv` (3yr WORM) → Vanta (48h) → MASTER-INDEX
+- Zero-renewal years (`cohort_tenant_count = 0`) filed as affirmative attestation
+
+**FLEET-MAT-E-001** (compliance-officer, annual Q1, after NRR-BRIDGE-E-001):
+- Confirm FLEET-MAT-CHAIN-01 prerequisite: prior `enterprise.annual_nrr_bridge_filed` for same `filing_year` in HMAC chain; HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE` on violation
+- Emit `enterprise.fleet_maturity_declared` DEC-030 HMAC-chained event evaluating FM-C1/C2/C3
+- Export to CSV → SHA-256 hash → R2 `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv` (3yr WORM) → Vanta (48h) → MASTER-INDEX (with `fleet_mat_chain_01_verified: true`)
+- Zero-declaration years filed as affirmative attestation regardless of FM-C1/C2/C3 outcome
+
+**Quarterly exemption confirmed:** Neither artefact requires quarterly entries. The §79.5 Quarterly subsection is not modified by this patch. Both artefacts are annual-only under CC4.1/A1.1.
+
+---
+
+### §133.3 §132.6 Stale 🟡 Closure — COST_MODEL §49.11 Cross-Reference Row
+
+The §132.6 cross-reference closure table contained one row marked 🟡 Open:
+
+> `docs/COST_MODEL.md §49.11` cross-reference index | SOC2_READINESS §132 row | 🟡 Open — will update 🟡→🟢 in next patch
+
+**Closure:** `docs/COST_MODEL.md v2.23.1` (2026-06-30) — the §49.9 + §49.11 cross-reference closure patch — updated the SOC2_READINESS §132 row in the §49.11 cross-reference index table from 🟡 → 🟢 Done. The reciprocal obligation (updating the §132.6 status in this document) is fulfilled by this patch.
+
+The §132.6 table row (last row) has been updated inline from `🟡 Open — will update 🟡→🟢 in next patch` to `🟢 **Done — 2026-06-30 (COST_MODEL v2.23.1 §49.11; SOC2_READINESS §133.3, v3.58.0)**`.
+
+| Cross-reference | Obligation | Status (§133.3) |
+|---|---|---|
+| `docs/COST_MODEL.md §49.11` cross-reference index — SOC2_READINESS §132 row | §132.6 last row → §133.3 | 🟢 **Done — 2026-06-30 (COST_MODEL v2.23.1 §49.11; SOC2_READINESS §133.3, v3.58.0)** |
+
+---
+
+### §133.4 §131.7 Item 3 — Confirmation
+
+§131.7 implementation checklist item 3 required:
+
+> Add NRR-BRIDGE-E-001 to §79.5 compliance calendar at Month O+13 (first annual filing); confirm §79.5 quarterly calendar does not require NRR-BRIDGE-E-001 interim entries (artefact is annual).
+
+**Fulfillment:** §133.2 (inline to §79.5) adds the "Annual Q1 — Enterprise Fleet Artefacts" subsection with full NRR-BRIDGE-E-001 filing procedure. FLEET-MAT-E-001 is added alongside by FLEET-MAT-CHAIN-01 symmetry — both are annual Q1 artefacts and FLEET-MAT-E-001 requires NRR-BRIDGE-E-001 as a prerequisite for the same `filing_year`.
+
+**Quarterly exemption:** The §79.5 Quarterly subsection (`scim.user_deprovisioned` exports, access reviews, Vanta dashboard exports, etc.) is unchanged. Neither NRR-BRIDGE-E-001 nor FLEET-MAT-E-001 requires quarterly entries — confirmed.
+
+§131.7 item 3 status: `[ ]` → `[x] Done — 2026-06-30 (SOC2_READINESS §133.2)`.
+
+---
+
+### §133.5 Cross-Reference Obligations Closed
+
+| Obligation | Source | Closed by |
+|---|---|---|
+| `docs/SOC2_READINESS.md §131.7` item 3 (P2/Month O+1) — Add NRR-BRIDGE-E-001 to §79.5 compliance calendar at Month O+13; confirm quarterly exemption | §131.7 (v3.56.0, 2026-06-30) | 🟢 **§133.2 + §133.4 (v3.58.0, 2026-06-30)** — "Annual Q1 — Enterprise Fleet Artefacts" added to §79.5; NRR-BRIDGE-E-001 + FLEET-MAT-E-001 filing procedures documented; quarterly exemption confirmed |
+| `docs/SOC2_READINESS.md §132.6` stale 🟡 — COST_MODEL §49.11 SOC2_READINESS §132 cross-ref row | §132.6 (v3.57.0, 2026-06-30) — "🟡 Open — will update 🟡→🟢 in next patch" | 🟢 **§133.3 inline update (v3.58.0, 2026-06-30)** — COST_MODEL v2.23.1 §49.11 closed the upstream obligation; §132.6 last row patched to 🟢 |
+
+---
+
+### §133.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update §131.7 item 3 status: `[ ]` → `[x] Done — 2026-06-30 (SOC2_READINESS §133.2)` | compliance-officer | **P2** | Month O+1 calendar review | [x] **Done — this patch (v3.58.0, 2026-06-30).** |
+| 2 | Update §132.6 last row: `🟡 Open — will update 🟡→🟢 in next patch` → `🟢 **Done — 2026-06-30 (COST_MODEL v2.23.1 §49.11; SOC2_READINESS §133.3, v3.58.0)**` | compliance-officer | **P2** | Next patch after v3.57.0 | [x] **Done — this patch (v3.58.0, 2026-06-30).** |
+| 3 | Add NRR-BRIDGE-E-001 and FLEET-MAT-E-001 annual filing entries to MASTER-INDEX-YYYY.csv template (§79.9 item 4): include `filing_year`, `sha256`, `r2_path`, `vanta_uploaded`, `chain_verified`, and (for FLEET-MAT-E-001) `fleet_mat_chain_01_verified: true` fields; document in §79.4 MASTER-INDEX row for both artefacts. | compliance-officer | **P2** | Before Month O+12 MASTER-INDEX review | [ ] |
