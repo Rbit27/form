@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.70.0** — 2026-06-30 · post-2896 · «Дані проти інтуїції в тренуванні: коли кожне з них вигравало» · series «Якість тренувального рішення» 2896–2905 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2896 · README roadmap extended to 2995 (серія 2986–2995 «Атлет і технологія») · next: post-2897 («Як виглядає "достатньо даних" для тренувального рішення»)
+
 **v10.69.0** — 2026-06-30 · post-2895 · «Синтез 2886–2895: операційний профіль досвідченого self-coached атлета» · series «Тренувальний інтелект» 2886–2895 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2895 · next: series 2896–2905 «Рішення під невизначеністю» (post-2896 — перший пост)
 
 **v10.68.0** — 2026-06-30 · post-2894 · «Навантаження і відновлення як єдина система: чому тренування і відновлення — це не два окремих процеси» · series «Тренувальний інтелект» 2886–2895 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2894 · next: post-2895 (синтез серії 2886–2895 — операційний профіль досвідченого self-coached атлета)
