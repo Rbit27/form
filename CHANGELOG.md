@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [10.33.1] — 2026-06-30
+
+### Added
+- `docs/COST_MODEL.md §49` — Year-3+ Fleet Maturity Economics & 120% NRR Path (DEC-086). Extends §48.3 Year-2 Base closing ARR ($82,881) to Year-3 projections: Bull 122.4% / Base 112.1% / Bear 99.1% NRR [all ESTIMATE]. Formalises FM-C1 (Green Fleet ≥ 65%), FM-C2 (expansion take-up ≥ 55%), FM-C3 (≥ 1 tier upgrade/year) with two-cycle gate and ≥ 12-tenant statistical floor. Lever attribution: 97% of the +26.5 pp gap to 120% NRR is expansion-driven (seat growth + tier upgrades). CSM Phase 3 (≥ 3 CSMs, 26–37 tenants) identified as fleet maturity enabler.
+
+### Changed
+- `docs/COST_MODEL.md` — header v2.22.1 → v2.23.0; §49 TOC entry added; DEC-030 event `enterprise.fleet_maturity_declared` with FLEET-MAT-CHAIN-01 ordering invariant and 12-field `FleetMaturityDeclaredSchema` (Zod v2); SOC 2 FLEET-MAT-E-001 (CC4.1/A1.1) registered.
+- `docs/DECISION_LOG.md` — DEC-086 Fleet Maturity Governance decision record added (2026-06-30).
+- `docs/AUDIT_LOG_SCHEMA.md` — header v2.61 → v2.62; `enterprise.fleet_maturity_declared` event registered in new §Enterprise Fleet Maturity events section; FLEET-MAT-CHAIN-01 invariant; `FleetMaturityDeclaredSchema` Zod v2; CC4.1/A1.1 auditor narratives.
+- `docs/SOC2_READINESS.md` — header v3.56.0 → v3.57.0; §132 Fleet Maturity Evidence Registration appended; FLEET-MAT-E-001 §79.4 row (count 101 → 102); `enterprise/fleet-maturity/` R2 subfolder (§132.3); Vanta mirror entry (§132.4).
+- `VERSION` — 10.33.0 → 10.33.1.
+
+---
+
 ## [10.33.0] — 2026-06-30
 
 ### Added

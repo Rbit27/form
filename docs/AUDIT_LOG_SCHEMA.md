@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.61
+# FORM · Audit Log Schema v2.62
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -4570,6 +4570,49 @@ const AnnualNrrBridgeFiledSchema = z.object({
 **A1.1 auditor narrative:** The annual NRR bridge confirms that FORM's enterprise service commitments (availability, onboarding, CSM engagement per `docs/ENTERPRISE_SLA.md`) translated to observable retention outcomes over the contracted service term. `logo_retention_rate_pct` (renewed logos / opening cohort count) and `nrr_pct` are fleet-level availability-outcome metrics. The `enterprise.contract_renewed` event chain (§Enterprise Contract Renewal events, registered v2.23) provides per-renewal evidence; `enterprise.annual_nrr_bridge_filed` aggregates these into an annual board-ready summary with auditor-verifiable arithmetic.
 
 **Emitters:** `enterprise.annual_nrr_bridge_filed` — compliance-officer, data-engineer, or founder (all via IC PAM-elevated `POST /internal/audit/emit`). Not automated by `form_system` — requires human review of the NRR-BRIDGE-E-001 CSV before filing. `form_api` REVOKED from `audit_log_events` INSERT.
+
+---
+
+### Enterprise Fleet Maturity events (DEC-030 HMAC-chained · COST_MODEL §49.7 · CC4.1 / A1.1)
+
+> Defined in `docs/COST_MODEL.md §49.7` (v2.23.0, 2026-06-30). One DEC-030 HMAC-chained event. FLEET-MAT-CHAIN-01 ordering invariant: HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE` if no prior `enterprise.annual_nrr_bridge_filed` for same `filing_year`. FM conditions per DEC-086: FM-C1 (Green ≥ 65%), FM-C2 (expansion take-up ≥ 55%), FM-C3 (≥ 1 upgrade/year); declaration requires 2 consecutive cycles + ≥ 12 active tenants. Lapse at `consecutive_cycles_at_target = 0`. Privacy floor: 12 fields are fleet-level aggregates or boolean flags — no per-tenant data, no employee `user_id`, no GDPR Art. 9 data. FLEET-MAT-E-001 (CC4.1/A1.1) — `docs/SOC2_READINESS.md §132`. Registered v2.62 (2026-06-30).
+
+| Event | Severity | Retention | Description | Payload fields |
+|---|---|---|---|---|
+| `enterprise.fleet_maturity_declared` | LOW | 3 yr | Automated by Worker after `enterprise.annual_nrr_bridge_filed`; FLEET-MAT-CHAIN-01 required; lapse at `consecutive_cycles_at_target = 0`; `form_api` REVOKED | `filing_year` (INT 2026–2050), `consecutive_cycles_at_target` (INT ≥ 0), `green_fleet_pct` (NUMERIC 0–1), `expansion_takeup_pct` (NUMERIC 0–1), `tier_upgrades_count` (INT ≥ 0), `trailing_nrr_pct` (NUMERIC 0–3), `active_tenant_count` (INT positive), `fm_c1_met` (BOOLEAN), `fm_c2_met` (BOOLEAN), `fm_c3_met` (BOOLEAN), `correlated_nrr_bridge_event_id` (UUID), `evidence_artefact_id` (TEXT `FLEET-MAT-E-001_<YYYY>` — present when `consecutive_cycles_at_target ≥ 2` only) |
+
+**Zod v2 schema (TypeScript):**
+
+```typescript
+const FleetMaturityDeclaredSchema = z.object({
+  filing_year:                     z.number().int().min(2026).max(2050),
+  consecutive_cycles_at_target:    z.number().int().min(0),
+  green_fleet_pct:                 z.number().min(0).max(1),
+  expansion_takeup_pct:            z.number().min(0).max(1),
+  tier_upgrades_count:             z.number().int().min(0),
+  trailing_nrr_pct:                z.number().min(0).max(3),
+  active_tenant_count:             z.number().int().positive(),
+  fm_c1_met:                       z.boolean(),
+  fm_c2_met:                       z.boolean(),
+  fm_c3_met:                       z.boolean(),
+  correlated_nrr_bridge_event_id:  z.string().uuid(),
+  evidence_artefact_id:            z.string()
+                                     .regex(/^FLEET-MAT-E-001_\d{4}$/)
+                                     .optional(),
+})
+// Worker invariant: evidence_artefact_id must be present when consecutive_cycles_at_target >= 2
+// Worker invariant: active_tenant_count >= 12 required when consecutive_cycles_at_target >= 2
+```
+
+**FLEET-MAT-CHAIN-01 ordering invariant:** Before emitting `enterprise.fleet_maturity_declared`, the Worker queries the HMAC-chained audit log for an `enterprise.annual_nrr_bridge_filed` event with matching `filing_year`. If none is found, returns HTTP 422 with error code `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE`. Ensures fleet maturity declarations are causally downstream of a validated NRR bridge computation.
+
+**CC4.1 auditor narrative:** `enterprise.fleet_maturity_declared` demonstrates that FORM monitors its enterprise fleet health continuously via FM-C1/C2/C3 conditions, evaluates expansion performance against defined thresholds annually, and produces an immutable HMAC-chained record of fleet status for each `filing_year`. The two-cycle gate (`consecutive_cycles_at_target ≥ 2`) ensures declarations reflect sustained structural performance. No-declaration years emit the event with `fm_*_met = false` — creating an affirmative annual record regardless of outcome.
+
+**A1.1 auditor narrative:** `enterprise.fleet_maturity_declared` provides annual evidence that FORM tracks service delivery capacity (Green fleet availability, expansion take-up rate) against commitments in tenant SLAs. Fleet Maturity declaration confirms the fleet is structurally capable of sustaining ≥ 120% NRR, consistent with A1.1 availability commitments. FLEET-MAT-CHAIN-01 invariant ensures each declaration is backed by a validated NRR bridge computation.
+
+**Emitters:** `emit-audit-event` Cloudflare Worker only, triggered automatically after each `enterprise.annual_nrr_bridge_filed` event for the same `filing_year`. `form_api` Supabase role REVOKED from `audit_log_events` INSERT for this event type. `form_system` SECURITY DEFINER mediates all writes.
+
+*v2.62 (2026-06-30): +1 `enterprise.*` event — Enterprise Fleet Maturity (`enterprise.fleet_maturity_declared` · COST_MODEL §49.7 · CC4.1/A1.1 · LOW/3yr · FLEET-MAT-CHAIN-01). 12-field `FleetMaturityDeclaredSchema` (Zod v2). §79.4 evidence count 101→102 via FLEET-MAT-E-001 (`docs/SOC2_READINESS.md §132`). Document header v2.61 → v2.62. Owner: compliance-officer + security-engineer.*
 
 ---
 

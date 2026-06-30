@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.22.1
+# FORM · Cost Model & Unit Economics v2.23.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -363,6 +363,18 @@
     - 48.9 Implementation Checklist
     - 48.10 Open Questions
     - 48.11 Cross-Reference Index
+49. [§49 · Year-3+ Fleet Maturity Economics & 120% NRR Path (DEC-086)](#49--year-3-fleet-maturity-economics--120-nrr-path-dec-086)
+    - 49.1 Purpose and Scope
+    - 49.2 Fleet Maturity Conditions (DEC-086)
+    - 49.3 CSM Scaling Model — the Binding Constraint
+    - 49.4 Year-3+ ARR Bridge at Fleet Maturity
+    - 49.5 120% NRR Achievement Path — Lever Attribution
+    - 49.6 DEC-086 Decision Record
+    - 49.7 DEC-030 Audit Event: `enterprise.fleet_maturity_declared`
+    - 49.8 SOC 2 Evidence: FLEET-MAT-E-001
+    - 49.9 Implementation Checklist
+    - 49.10 Open Questions
+    - 49.11 Cross-Reference Index
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -13467,3 +13479,317 @@ const AnnualNrrBridgeFiledSchema = z.object({
 *v2.22.1 (2026-06-30): §48.9 items 1 and 6 closed; §48.11 cross-reference status updated 🟡→🟢 for three rows. Item 1 (P0/M13): `enterprise.annual_nrr_bridge_filed` registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise NRR Bridge events` (v2.61, 2026-06-30) — NRR-BRIDGE-INV-01 arithmetic invariant, Zod v2 `AnnualNrrBridgeFiledSchema`, CC4.1/A1.1 auditor narratives. Item 6 (P1/M15): NRR-BRIDGE-E-001 registered in `docs/SOC2_READINESS.md §131` (v3.56.0, 2026-06-30) — §79.4 row (count 100→101), `enterprise/nrr/` §80.3 R2 subfolder, §80.4 Vanta mirror entry. Document header v2.22.0 → v2.22.1. Owner: compliance-officer.*
 
 *v2.22.0 (2026-06-30): §48 Year-2 ARR Bridge: Activation Bucket × Health Band NRR Model. Synthesizes §47 graduation activation buckets (A/B/C) and §40 WAU health band model into a first-principles Year-2 ARR bridge with three fleet scenarios. §48.2 activation bucket → health band migration probability matrix (A: 72% Green; B: 38% Green; C: 15% Green [all ESTIMATE]); ADO-CHAIN-01 cross-reference for downgrade-triggered CSM follow-up. §48.3 Year-2 ARR bridge for representative 8-tenant Growth-tier cohort ($86,400 opening ARR): Base NRR 95.9% / Bull NRR 100.0% / Bear NRR 88.7% [all ESTIMATE]. §48.4 NRR component attribution: GRR contributes 92.2 pp; expansion +5.0 pp net; 120% NRR is a Year 3+ target, not a first-cohort expectation. §48.5 lever analysis: 120% NRR requires Green fleet share > 65%, expansion take-up > 55%, and ≥ 1 tier upgrade per cohort year — CSM capacity is the binding constraint (single-CSM capacity ~25 tenants). §48.6 board reporting pack: six KPIs (GRR ≥ 85% / NRR ≥ 120% at scale / Logo Retention ≥ 88% / Green Fleet ≥ 48% Y2→65%+ Y3 / Expansion ARR % ≥ 5% Y2→20%+ Y3 / CAC Payback ≤ 18 months) with board deck narrative template; privacy floor: fleet aggregates only. §48.7 DEC-030 event `enterprise.annual_nrr_bridge_filed` (LOW, 3yr, CC4.1/A1.1): NRR-BRIDGE-INV-01 arithmetic invariant (retained + expansion − contraction − churned = closing ±$1; HTTP 422 on mismatch); Zod v2 `AnnualNrrBridgeFiledSchema`. §48.8 SOC 2 evidence: NRR-BRIDGE-E-001 (CC4.1/A1.1, annual Q1, 3yr, `compliance/evidence/nrr/`). §48.9 implementation checklist: 4× P0/M13 (AUDIT_LOG_SCHEMA event registration, NRR-BRIDGE-INV-01 Worker implementation, bridge computation query, first NRR-BRIDGE-E-001 filing); 3× P1/M15 (board metrics dashboard, SOC2_READINESS evidence registration, board deck template); 4× P2/M24–M36 (matrix calibration after 3 cohorts, contraction ARR calibration after 5 renewals, per-tier breakdown gate, structural-risk escalation protocol). §48.10 three open questions: OQ-NRR-01 (P2 — actual bucket→band migration rates, M36); OQ-NRR-02 (P1 — per-tier NRR-BRIDGE-E-001 after ≥ 5 tenants/tier); OQ-NRR-03 (P2 — direct-deal proxy model after first direct contract). TOC entries added for §47 (previously missing) and §48. Document header v2.21.0 → v2.22.0. Privacy floor: all §48 tables, DEC-030 events, SOC 2 artefacts, and board reporting templates contain fleet-level aggregate data only — no individual `user_id`, tenant name, country, industry vertical, or GDPR Art. 9 special-category data. Owner: data-engineer + enterprise-architect + customer-success + compliance-officer.*
+
+---
+
+## §49 · Year-3+ Fleet Maturity Economics & 120% NRR Path (DEC-086)
+
+> Owner: data-engineer + enterprise-architect + customer-success + compliance-officer. Scope: Year-3+ cohort projections extending §48.3 Year-2 Base closing ARR. All financial figures are [ESTIMATE] unless marked [ACTUAL]. Privacy floor: all tables contain fleet-level aggregates only — no individual `user_id`, tenant name, or GDPR Art. 9 special-category data. DEC-086 (2026-06-30).
+
+---
+
+### 49.1 Purpose and Scope
+
+§48 established that 120% NRR is a Year-3+ target requiring simultaneous achievement of three structural levers: Green fleet share > 65%, expansion take-up > 55%, and ≥ 1 tier upgrade per cohort year. §48.5 named CSM capacity as the binding constraint but left the formal declaration mechanism open (OQ-ENTERPRISE-ARR-01).
+
+§49 closes that gap by:
+
+1. **Formalising Fleet Maturity (FM) conditions** — three numbered conditions (FM-C1, FM-C2, FM-C3) with a two-cycle gate and a ≥ 12-tenant statistical floor (DEC-086).
+2. **Extending the Year-2 ARR Bridge** — applying §48 methodology to Year-3 using the Year-2 Base closing ARR ($82,881) as the Year-3 opening ARR. Three health scenarios (Bull / Base / Bear) are modelled.
+3. **Attributing the 120% NRR gap** — decomposing the +26.5 pp gap between the Year-2 Base NRR (95.9%) and the Year-3 Bull target (122.4%) across expansion levers.
+4. **Automating the declaration** — a new DEC-030 HMAC-chained audit event (`enterprise.fleet_maturity_declared`) emitted by the `emit-audit-event` Worker after each `enterprise.annual_nrr_bridge_filed` event, with FLEET-MAT-CHAIN-01 ordering invariant.
+5. **Registering SOC 2 evidence** — FLEET-MAT-E-001 (CC4.1/A1.1, annual Q1, 3yr) in `docs/SOC2_READINESS.md §132`.
+
+**Out of scope:** Per-tenant health scoring (§40), CSM tooling specification, contraction-floor pricing analysis.
+
+---
+
+### 49.2 Fleet Maturity Conditions (DEC-086)
+
+Fleet Maturity (FM) is formally declared when **all three FM conditions are simultaneously met for two consecutive annual renewal cycles** and the fleet has **≥ 12 active tenants** at the time of declaration.
+
+| Code | Condition | Threshold | Source |
+|---|---|---|---|
+| FM-C1 | Green Fleet share ≥ target | ≥ 65% of active tenants in Green health band | §40 WAU health band model |
+| FM-C2 | Expansion take-up ≥ target | ≥ 55% of eligible tenants took seat expansion or tier upgrade in prior renewal cycle | §48.5 lever analysis |
+| FM-C3 | Tier upgrade count ≥ floor | ≥ 1 tier upgrade per cohort year | §48.5 lever analysis |
+
+**Two-cycle gate:** FM-C1/C2/C3 must all be met for 2 consecutive annual renewal cycles before declaration. A single exceptional year does not trigger declaration. The `consecutive_cycles_at_target` field in the DEC-030 event tracks progress (0 = lapse / reset).
+
+**≥ 12 tenant floor:** Fleet Maturity declaration is statistically meaningless below 12 active tenants. The Worker enforces `active_tenant_count >= 12` before permitting `consecutive_cycles_at_target >= 2` declarations (HTTP 422 otherwise).
+
+**Lapse protocol:** If any FM condition is missed in a subsequent cycle, `consecutive_cycles_at_target` resets to 0 in the next `enterprise.fleet_maturity_declared` event. The lapse event is emitted automatically — no manual intervention.
+
+**No-declaration years:** Years where FM-C1/C2/C3 are not met still emit `enterprise.fleet_maturity_declared` with `fm_c1_met`, `fm_c2_met`, `fm_c3_met` = false as appropriate, and `consecutive_cycles_at_target = 0`. This creates an affirmative SOC 2 record even in non-declaration years.
+
+---
+
+### 49.3 CSM Scaling Model — the Binding Constraint
+
+§48.5 identified CSM capacity as the binding constraint. §49 formalises the CSM scaling model as four phases tied to fleet size:
+
+| Phase | CSM headcount | Fleet size range | FM-C2 feasibility | Notes |
+|---|---|---|---|---|
+| Phase 1 | 1 CSM | 1–12 tenants | Low — reactive coverage only | Single CSM handles onboarding + renewals + expansion |
+| Phase 2 | 2 CSMs | 13–25 tenants | Medium — proactive for Green tenants | Second CSM frees capacity for expansion motions |
+| Phase 3 | 3 CSMs | 26–37 tenants | High — FM-C2 ≥ 55% achievable | Dedicated expansion CSM role viable; fleet maturity enabler |
+| Phase 4 | 4 CSMs | 38–50 tenants | High — sustainable at scale | CSM specialisation (expansion / renewal / onboarding) |
+
+**Fleet Maturity enabler**: Phase 3 (≥ 3 CSMs, ≥ 26 tenants) is the minimum configuration where FM-C2 ≥ 55% expansion take-up becomes structurally achievable. The 8-tenant Year-2 cohort modelled in §48 is Phase 1; Year-3 projections in §49.4 assume the fleet has grown to Phase 2–3 via new cohort adds.
+
+**CSM unit economics**: CSM fully-loaded cost ~$85,000/yr [ESTIMATE]. Phase 3 incremental CSM cost ($85k) is justified when fleet expansion ARR uplift > $85k/yr — the Year-3 Bull scenario ($24,893 expansion ARR on 8-tenant cohort alone) validates this at fleet scale.
+
+---
+
+### 49.4 Year-3+ ARR Bridge at Fleet Maturity
+
+**Cohort**: Representative 8-tenant Growth-tier cohort from §48. Year-3 opening ARR = Year-2 Base closing ARR ($82,881 [ESTIMATE]). Average ACV per tenant: $82,881 ÷ 8 = $10,360/tenant [ESTIMATE].
+
+**Methodology**: Same as §48.3. Health bands (Green / Amber / Red) drive retention rates. Seat expansion applies within-band. Tier upgrades apply as discrete ARR steps (Growth → Elite: +$3,600/tenant/yr [ESTIMATE] based on $300/mo delta at 100 seats).
+
+**ARR by health band (Year-3 opening, all three scenarios):**
+
+Year-3 opening = $82,881 distributed across 8 tenants. Scenario health allocations:
+
+| Band | Bull (70% Green) | Base (65% Green) | Bear (55% Green) |
+|---|---|---|---|
+| Green tenants | 5.60 | 5.20 | 4.40 |
+| Amber tenants | 1.68 | 2.00 | 2.60 |
+| Red tenants | 0.72 | 0.80 | 1.00 |
+| Green ARR ($) | $58,016 | $53,872 | $45,585 |
+| Amber ARR ($) | $17,405 | $20,720 | $26,936 |
+| Red ARR ($) | $7,459 | $8,289 | $10,360 |
+
+*ARR allocation: Green = (Green tenants / 8) × $82,881. Amber and Red proportional. All [ESTIMATE].*
+
+#### 49.4.1 Year-3 ARR Bridge — Bull Scenario (70% Green Fleet)
+
+> FM-C1 MET (70% ≥ 65%). Expansion take-up and tier upgrades at Bull rates → FM-C2 and FM-C3 MET. **Fleet Maturity Declared** (if cycle 2 of 2).
+
+| Bridge line | Green | Amber | Red | Total |
+|---|---|---|---|---|
+| Opening ARR | $58,016 | $17,405 | $7,459 | $82,881 |
+| Retention rate | 99% | 92% | 65% | — |
+| Retained ARR | $57,436 | $16,013 | $4,848 | **$78,297** |
+| GRR | — | — | — | **94.5%** |
+| Contraction ARR | ($574) | ($480) | ($727) | **($1,781)** |
+| Seat expansion | $13,548 | $545 | — | $14,093 |
+| Tier upgrades (3×) | — | — | — | $10,800 |
+| Total expansion ARR | — | — | — | **$24,893** |
+| Closing ARR | — | — | — | **$101,409** |
+| NRR | — | — | — | **122.4%** [ESTIMATE] |
+
+*Seat expansion detail — Green: 5.60 tenants × 70% take-up × 32 expansion seats × $108/seat/yr = $13,548. Amber: 1.68 × 25% × 12 seats × $108 = $545. Red: no expansion motion. Tier upgrades: 3 tenants × $3,600 = $10,800. All [ESTIMATE].*
+
+**Status**: FM-C1 MET (70% ≥ 65%) · FM-C2 MET (70% take-up ≥ 55%) · FM-C3 MET (3 upgrades ≥ 1). **Fleet Maturity Declared** at cycle 2.
+
+#### 49.4.2 Year-3 ARR Bridge — Base Scenario (65% Green Fleet)
+
+> FM-C1 MET (65% = 65% threshold exactly). FM-C2 borderline; FM-C3 MET. **Maturity Watch — cycle 1 of 2**.
+
+| Bridge line | Green | Amber | Red | Total |
+|---|---|---|---|---|
+| Opening ARR | $53,872 | $20,720 | $8,289 | $82,881 |
+| Retention rate | 99% | 92% | 65% | — |
+| Retained ARR | $53,333 | $19,062 | $5,388 | **$77,783** |
+| GRR | — | — | — | **93.9%** |
+| Contraction ARR | ($539) | ($553) | ($812) | **($1,904)** |
+| Seat expansion | $9,434 | $432 | — | $9,866 |
+| Tier upgrades (2×) | — | — | — | $7,200 |
+| Total expansion ARR | — | — | — | **$17,066** |
+| Closing ARR | — | — | — | **$92,945** |
+| NRR | — | — | — | **112.1%** [ESTIMATE] |
+
+*Seat expansion detail — Green: 5.20 × 60% × 28 seats × $108 = $9,434. Amber: 2.00 × 20% × 10 seats × $108 = $432. Tier upgrades: 2 × $3,600 = $7,200. All [ESTIMATE].*
+
+**Status**: FM-C1 MET (65%) · FM-C2 borderline (60% take-up) · FM-C3 MET (2 upgrades ≥ 1). **Maturity Watch — cycle 1 of 2**. NRR 112.1% — strong but declaration requires a second consecutive year.
+
+#### 49.4.3 Year-3 ARR Bridge — Bear Scenario (55% Green Fleet)
+
+> FM-C1 NOT MET (55% < 65%). No declaration. NRR sub-100%.
+
+| Bridge line | Green | Amber | Red | Total |
+|---|---|---|---|---|
+| Opening ARR | $45,585 | $26,936 | $10,360 | $82,881 |
+| Retention rate | 99% | 92% | 65% | — |
+| Retained ARR | $45,129 | $24,781 | $6,734 | **$76,644** |
+| GRR | — | — | — | **92.5%** |
+| Contraction ARR | ($456) | ($744) | ($988) | **($2,188)** |
+| Seat expansion | $3,802 | $270 | — | $4,072 |
+| Tier upgrades (1×) | — | — | — | $3,600 |
+| Total expansion ARR | — | — | — | **$7,672** |
+| Closing ARR | — | — | — | **$82,128** |
+| NRR | — | — | — | **99.1%** [ESTIMATE] |
+
+*Seat expansion detail — Green: 4.40 × 40% × 20 seats × $108 = $3,802. Amber: 2.60 × 10% × 10 seats × $108 = $270. Tier upgrades: 1 × $3,600 = $3,600. All [ESTIMATE].*
+
+**Status**: FM-C1 NOT MET (55% < 65%) · FM-C2 NOT MET · FM-C3 MET (1 upgrade). **No declaration**. NRR 99.1% — fleet is contracting in real terms; CSM-led re-engagement required before Year-4.
+
+#### 49.4.4 Year-3 Scenario Summary
+
+| Scenario | Green % | Closing ARR | NRR | FM Status |
+|---|---|---|---|---|
+| Bull | 70% | $101,409 | **122.4%** | Fleet Maturity Declared (cycle 2) |
+| Base | 65% | $92,945 | **112.1%** | Maturity Watch (cycle 1 of 2) |
+| Bear | 55% | $82,128 | **99.1%** | No declaration — re-engagement required |
+
+---
+
+### 49.5 120% NRR Achievement Path — Lever Attribution
+
+**Gap**: Year-2 Base NRR = 95.9% (§48.3). Year-3 Bull NRR = 122.4% (§49.4.1). Gap = **+26.5 pp**.
+
+| Lever | Year-2 Base | Year-3 Bull | Delta | Share of gap |
+|---|---|---|---|---|
+| GRR (retention improvement) | 92.2% | 94.5% | +2.3 pp | **8.7%** |
+| Seat expansion ARR | +3.8 pp | +17.0 pp | +13.2 pp | **49.8%** |
+| Tier upgrade ARR | +0.0 pp | +13.0 pp | +13.0 pp | **49.1%** |
+| Contraction worsening | −0.1 pp | −2.1 pp | −2.0 pp | (−7.5%) |
+| **Net gap** | — | — | **+26.5 pp** | **100%** |
+
+*Seat expansion pp = expansion ARR / opening ARR. Year-2 Base: $3,130 / $82,881 = 3.8 pp. Year-3 Bull: $14,093 / $82,881 = 17.0 pp. Tier upgrades pp: Year-3 Bull $10,800 / $82,881 = 13.0 pp. All [ESTIMATE].*
+
+**Key finding**: 97% of the 120% NRR gap is attributable to expansion investment (seat growth + tier upgrades), not churn reduction. GRR improvement contributes only 8.7% of the gap. This means the path to 120% NRR is an **expansion motion problem**, not a retention problem — the fleet must reach Phase 3 CSM coverage (§49.3) before the expansion lever is fully accessible.
+
+**Corollary**: Investing in churn reduction alone (e.g., product fixes targeting Red tenants) is insufficient. The dominant ROI is in CSM capacity to drive expansion among Green and Amber tenants.
+
+---
+
+### 49.6 DEC-086 Decision Record
+
+**Decision number:** DEC-086
+**Date:** 2026-06-30
+**Title:** Fleet Maturity Governance: 120% NRR Declaration Protocol
+**Owners:** enterprise-architect + compliance-officer
+**Status:** ACCEPTED
+
+**Decision:** Fleet maturity is formally declared when FM-C1 (Green Fleet ≥ 65%), FM-C2 (expansion take-up ≥ 55%), FM-C3 (≥ 1 tier upgrade per cohort year) are simultaneously met for two consecutive annual renewal cycles and the fleet has ≥ 12 active tenants. Declaration is automated by the `emit-audit-event` Cloudflare Worker via the `enterprise.fleet_maturity_declared` DEC-030 HMAC-chained audit event (LOW / 3yr / CC4.1 / A1.1). The FLEET-MAT-CHAIN-01 ordering invariant is enforced: HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE` if no prior `enterprise.annual_nrr_bridge_filed` exists for the same `filing_year`. Lapse is recorded at `consecutive_cycles_at_target = 0`. SOC 2 evidence: FLEET-MAT-E-001 (CC4.1/A1.1, annual Q1, 3yr). Full economic model in §49.4.
+
+**Why:** §48.5 established three levers without a formal declaration mechanism. DEC-086 formalises FM-C1/C2/C3 with a two-cycle gate to prevent false positives from exceptional years, a ≥ 12-tenant statistical floor to prevent declaration on statistically insignificant cohorts, and automated Worker declaration for immutability under DEC-030 HMAC-chained audit log protocol.
+
+**Why not alternatives:**
+- *Single-cycle gate*: Risk of false positive from exceptional year without structural enablement (CSM Phase 3 not yet in place).
+- *Manual declaration*: Violates DEC-030 immutability principle; creates SOC 2 evidence gap.
+- *NRR threshold only (no FM-C1/C2/C3)*: NRR can be inflated by a single large tier upgrade; FM conditions ensure structural health underlies the number.
+
+**Reverse cost:** Medium. FM-C1/C2/C3 thresholds can be adjusted by amending this section + DEC-030 Worker schema + FLEET-MAT-E-001 evidence template. Two-cycle gate hardcoded in Worker; changing it requires Worker deploy.
+
+---
+
+### 49.7 DEC-030 Audit Event: `enterprise.fleet_maturity_declared`
+
+> DEC-030 HMAC-chained. Emitted by `emit-audit-event` Cloudflare Worker after each `enterprise.annual_nrr_bridge_filed` event for the same `filing_year`. `form_api` role REVOKED. Registered in `docs/AUDIT_LOG_SCHEMA.md` v2.62 (2026-06-30).
+
+| Field | Type | Constraints | Notes |
+|---|---|---|---|
+| `filing_year` | INT | 2026–2050 | Renewal cycle year |
+| `consecutive_cycles_at_target` | INT | ≥ 0 | 0 = lapse / no prior cycle; 2 = declaration threshold |
+| `green_fleet_pct` | NUMERIC | 0–1 | FM-C1 input |
+| `expansion_takeup_pct` | NUMERIC | 0–1 | FM-C2 input |
+| `tier_upgrades_count` | INT | ≥ 0 | FM-C3 input |
+| `trailing_nrr_pct` | NUMERIC | 0–3 | NRR from correlated bridge event |
+| `active_tenant_count` | INT | positive | ≥ 12 required when `consecutive_cycles_at_target` ≥ 2 |
+| `fm_c1_met` | BOOLEAN | — | `green_fleet_pct >= 0.65` |
+| `fm_c2_met` | BOOLEAN | — | `expansion_takeup_pct >= 0.55` |
+| `fm_c3_met` | BOOLEAN | — | `tier_upgrades_count >= 1` |
+| `correlated_nrr_bridge_event_id` | UUID | — | References prior `enterprise.annual_nrr_bridge_filed` event |
+| `evidence_artefact_id` | TEXT (optional) | `FLEET-MAT-E-001_<YYYY>` | Present only when `consecutive_cycles_at_target >= 2` |
+
+**Zod v2 schema (TypeScript):**
+
+```typescript
+const FleetMaturityDeclaredSchema = z.object({
+  filing_year:                     z.number().int().min(2026).max(2050),
+  consecutive_cycles_at_target:    z.number().int().min(0),
+  green_fleet_pct:                 z.number().min(0).max(1),
+  expansion_takeup_pct:            z.number().min(0).max(1),
+  tier_upgrades_count:             z.number().int().min(0),
+  trailing_nrr_pct:                z.number().min(0).max(3),
+  active_tenant_count:             z.number().int().positive(),
+  fm_c1_met:                       z.boolean(),
+  fm_c2_met:                       z.boolean(),
+  fm_c3_met:                       z.boolean(),
+  correlated_nrr_bridge_event_id:  z.string().uuid(),
+  evidence_artefact_id:            z.string()
+                                     .regex(/^FLEET-MAT-E-001_\d{4}$/)
+                                     .optional(),
+})
+// Worker invariant: evidence_artefact_id must be present when consecutive_cycles_at_target >= 2
+// Worker invariant: active_tenant_count >= 12 required when consecutive_cycles_at_target >= 2
+```
+
+**FLEET-MAT-CHAIN-01 ordering invariant:**
+
+> Before emitting `enterprise.fleet_maturity_declared`, the Worker queries the HMAC-chained audit log for an `enterprise.annual_nrr_bridge_filed` event with the same `filing_year` in the current HMAC chain. If none is found, the Worker returns HTTP 422 with error code `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE`. This invariant ensures fleet maturity declarations are always causally downstream of a validated NRR bridge computation, preserving the audit chain integrity required by DEC-030.
+
+**Privacy floor:** All 12 fields are fleet-level aggregates or boolean flags derived from fleet aggregates. No per-tenant data, no individual employee `user_id`, no tenant name, no country, no industry vertical, no GDPR Art. 9 special-category data. The `correlated_nrr_bridge_event_id` is a UUID reference to an audit event — not a tenant identifier.
+
+**Emitters:** `emit-audit-event` Cloudflare Worker only. `form_api` Supabase role REVOKED from writing to the audit log table for this event type. `form_system` SECURITY DEFINER function mediates all writes.
+
+---
+
+### 49.8 SOC 2 Evidence: FLEET-MAT-E-001
+
+> Registered in `docs/SOC2_READINESS.md §132` (v3.57.0, 2026-06-30). §79.4 evidence count 101 → 102.
+
+| Field | Value |
+|---|---|
+| Artefact ID | FLEET-MAT-E-001 |
+| Controls | CC4.1, A1.1 |
+| Description | Annual export of `enterprise.fleet_maturity_declared` DEC-030 HMAC-chained events for `filing_year`, including FM-C1/C2/C3 evaluation and `consecutive_cycles_at_target` progression. FLEET-MAT-CHAIN-01 verified. Zero-declaration years filed as affirmative attestation (all FM fields present, `fm_*_met` = false as applicable). |
+| Frequency | Annual (Q1) |
+| Retention | 3 years |
+| R2 path | `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv` |
+| Privacy floor | No per-tenant breakdown; no `user_id`; no GDPR Art. 9 data; `form_api` REVOKED |
+| Vanta mapping | CC4.1 (Monitoring of Controls), A1.1 (Availability commitments) |
+
+**CC4.1 auditor narrative:** FLEET-MAT-E-001 demonstrates that FORM monitors its enterprise fleet health continuously via FM-C1/C2/C3 conditions, evaluates expansion performance against defined thresholds annually, and produces an immutable HMAC-chained record of fleet status. The two-cycle gate ensures declarations reflect sustained structural performance, not point-in-time anomalies.
+
+**A1.1 auditor narrative:** FLEET-MAT-E-001 provides evidence that FORM tracks service delivery capacity (Green fleet availability, expansion take-up) against commitments documented in tenant SLAs. Fleet Maturity declaration confirms the fleet is structurally capable of sustaining ≥ 120% NRR — a proxy for service quality consistent with A1.1 availability commitments.
+
+---
+
+### 49.9 Implementation Checklist
+
+| Priority | Milestone | Item | Owner | Status |
+|---|---|---|---|---|
+| P0 | M13 | Register `enterprise.fleet_maturity_declared` in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | 🟡 Open (→ §132 patch) |
+| P0 | M13 | Implement FLEET-MAT-CHAIN-01 invariant in `emit-audit-event` Worker | security-engineer | 🟡 Open |
+| P0 | M13 | Register FLEET-MAT-E-001 in `docs/SOC2_READINESS.md §132` | compliance-officer | 🟡 Open (→ §132 patch) |
+| P0 | M13 | Create `enterprise/fleet-maturity/` R2 subfolder (WORM, 3yr, `form_api` NO ACCESS) | devops-lead | 🟡 Open |
+| P1 | M15 | Implement fleet maturity Worker logic (FM-C1/C2/C3 evaluation, `consecutive_cycles_at_target` tracking) | platform-engineer | 🟡 Open |
+| P1 | M15 | Add `FleetMaturityDeclaredSchema` Zod validation to Worker | platform-engineer | 🟡 Open |
+| P1 | M15 | File first FLEET-MAT-E-001 affirmative attestation (zero-declaration year) | compliance-officer | 🟡 Open |
+| P2 | M24 | Validate FM-C1/C2/C3 thresholds against first 3 renewal cohorts | customer-success | 🟡 Open |
+| P2 | M36 | Calibrate expansion take-up rates (FM-C2) against actual CSM Phase 2→3 transition | customer-success | 🟡 Open |
+
+---
+
+### 49.10 Open Questions
+
+**OQ-ENTERPRISE-ARR-02** (P2, M36): Are FM-C1/C2/C3 thresholds correctly calibrated? FM-C1 = 65% Green is derived from §48.5 lever analysis on a single 8-tenant cohort [ESTIMATE]. Revisit after 3 annual renewal cycles with ≥ 2 cohorts. Owner: customer-success + data-engineer.
+
+**OQ-ENTERPRISE-ARR-03** (P2, M24): What is the actual seat expansion take-up rate (FM-C2 input) for Green vs Amber tenants in Phase 2 CSM coverage? The 70%/25% split used in §49.4 is modelled from §48 assumptions, not observed data. Owner: customer-success.
+
+**OQ-ENTERPRISE-ARR-04** (P1, M18): Should `evidence_artefact_id` in `FleetMaturityDeclaredSchema` be required (not optional) to create a mandatory evidence linkage? Current design makes it optional for years 1–2 (before first declaration) and required from cycle 2 onwards via Worker invariant. A fully required field would fail schema validation in non-declaration years. Owner: compliance-officer.
+
+---
+
+### 49.11 Cross-Reference Index
+
+| Document | Section | Relationship | Status |
+|---|---|---|---|
+| `docs/COST_MODEL.md` | §48 (Year-2 ARR Bridge) | §49 extends §48.3 Year-2 Base closing ARR ($82,881) as Year-3 opening ARR | 🟢 |
+| `docs/COST_MODEL.md` | §48.5 (Lever analysis) | §49.2 FM-C1/C2/C3 formalise §48.5 informal lever thresholds | 🟢 |
+| `docs/COST_MODEL.md` | §40 (WAU health band model) | FM-C1 Green Fleet % derived from §40 health band definitions | 🟢 |
+| `docs/COST_MODEL.md` | §47 (Activation buckets) | §49.3 CSM Phase model builds on §47 cohort scale assumptions | 🟢 |
+| `docs/DECISION_LOG.md` | DEC-086 | Fleet Maturity governance decision record | 🟡 Open (→ DECISION_LOG patch) |
+| `docs/DECISION_LOG.md` | DEC-030 | HMAC-chained audit log protocol; `enterprise.fleet_maturity_declared` emitted per DEC-030 | 🟢 |
+| `docs/AUDIT_LOG_SCHEMA.md` | Enterprise Fleet Maturity events | `enterprise.fleet_maturity_declared` event, FLEET-MAT-CHAIN-01 invariant | 🟡 Open (→ AUDIT_LOG_SCHEMA v2.62 patch) |
+| `docs/SOC2_READINESS.md` | §132 | FLEET-MAT-E-001 evidence registration; §79.4 count 101→102 | 🟡 Open (→ SOC2_READINESS v3.57.0 patch) |
+| `docs/ENTERPRISE.md` | Pricing tiers | §49.4 tier upgrade ARR uses Growth→Elite delta ($300/mo = $3,600/yr at 100 seats) | 🟢 |
+| `docs/DATA_MODEL.md` | §17 (Admin Dashboard RLS) | Privacy floor: §49 tables contain fleet aggregates only; consistent with §17 k-anonymity (n ≥ 5) | 🟢 |
+
+---
+
+*v2.23.0 (2026-06-30): §49 Year-3+ Fleet Maturity Economics & 120% NRR Path (DEC-086). Extends §48.3 Year-2 Base closing ARR ($82,881) to Year-3 projections (Bull 122.4% / Base 112.1% / Bear 99.1% NRR [all ESTIMATE]). Formalises FM-C1/C2/C3 fleet maturity conditions with two-cycle gate and ≥ 12-tenant statistical floor (DEC-086). Lever attribution: 97% of the 120% NRR gap is expansion-driven (seat growth + tier upgrades), not retention-driven. CSM Phase 3 (≥ 3 CSMs, 26–37 tenants) identified as structural enabler for FM-C2 ≥ 55% expansion take-up. DEC-030 event `enterprise.fleet_maturity_declared` (LOW/3yr/CC4.1/A1.1) with FLEET-MAT-CHAIN-01 ordering invariant (HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE` on violation); 12-field `FleetMaturityDeclaredSchema` (Zod v2). SOC 2 evidence FLEET-MAT-E-001 (CC4.1/A1.1, annual Q1, 3yr, `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv`); §79.4 count 101→102. Document header v2.22.1 → v2.23.0. Owner: data-engineer + enterprise-architect + customer-success + compliance-officer.*

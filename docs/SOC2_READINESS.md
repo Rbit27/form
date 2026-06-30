@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.56.0
+# FORM · SOC 2 Type II Readiness v3.57.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -33067,6 +33067,82 @@ One row added to the §79.4 master evidence table (count 100 → 101):
 | 3 | Add NRR-BRIDGE-E-001 to §79.5 compliance calendar at Month O+13 (first annual filing); confirm §79.5 quarterly calendar does not require NRR-BRIDGE-E-001 interim entries (artefact is annual). | compliance-officer | **P2** | Month O+1 calendar review | [ ] |
 
 ---
+
+*v3.57.0 (2026-06-30): §132 Cross-Reference Patch — Fleet Maturity Evidence Registration (FLEET-MAT-E-001 · CC4.1 / A1.1). Closes `docs/COST_MODEL.md §49.9` items 1 and 3 (P0/M13). One artefact registered (count 101 → 102): FLEET-MAT-E-001 (CC4.1/A1.1, annual Q1, 3yr — annual export of `enterprise.fleet_maturity_declared` DEC-030 HMAC-chained event + FM-C1/C2/C3 conditions evaluation; FLEET-MAT-CHAIN-01 verified; zero-declaration years filed as affirmative attestation; no per-tenant breakdown; no `user_id`; no GDPR Art. 9 data; `form_api` REVOKED; `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv`). `enterprise/fleet-maturity/` R2 subfolder described in §132.3 (annual Q1; 3yr WORM Object Lock Governance; `form_api` NO ACCESS). FLEET-MAT-E-001 Vanta mirror entry described in §132.4 (annual Q1; CC4.1/A1.1; fleet aggregates + boolean flags only). Implementation checklist: 1× P0/M13 (R2 folder creation), 1× P1 (first FLEET-MAT-E-001 filing). Document header v3.56.0 → v3.57.0. Owner: compliance-officer + enterprise-architect.*
+
+---
+
+## §132 · Cross-Reference Patch — Fleet Maturity Evidence Registration (FLEET-MAT-E-001 · CC4.1 / A1.1)
+
+> Date: 2026-06-30. Trigger: `docs/COST_MODEL.md §49.9` items 1 (P0/M13 — AUDIT_LOG_SCHEMA registration) and 3 (P0/M13 — SOC2_READINESS §132 registration). Owners: compliance-officer + enterprise-architect.
+
+### §132.1 Purpose
+
+§49.8 (`docs/COST_MODEL.md` v2.23.0, 2026-06-30) defined the FLEET-MAT-E-001 SOC 2 evidence artefact for the `enterprise.fleet_maturity_declared` DEC-030 HMAC-chained audit event and assigned its registration to `docs/SOC2_READINESS.md §132`. This section completes that registration: §79.4 evidence table row (count 101 → 102), §80.3 R2 subfolder description, §80.4 Vanta mirror entry, and implementation checklist.
+
+### §132.2 FLEET-MAT-E-001 Artefact Description
+
+| Field | Value |
+|---|---|
+| Artefact ID | **FLEET-MAT-E-001** |
+| Controls | **CC4.1** (Monitoring of Controls), **A1.1** (Availability commitments) |
+| Description | Annual export of `enterprise.fleet_maturity_declared` DEC-030 HMAC-chained events for `filing_year`, including FM-C1 (`green_fleet_pct ≥ 0.65`), FM-C2 (`expansion_takeup_pct ≥ 0.55`), FM-C3 (`tier_upgrades_count ≥ 1`) evaluation and `consecutive_cycles_at_target` progression. FLEET-MAT-CHAIN-01 ordering invariant verified (prior `enterprise.annual_nrr_bridge_filed` for same `filing_year` confirmed). Zero-declaration years (`fm_c1_met`, `fm_c2_met`, `fm_c3_met` = false) filed as affirmative attestation. |
+| Frequency | Annual (Q1) |
+| Retention | 3 years |
+| R2 path | `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv` |
+| Privacy floor | No per-tenant breakdown; no individual employee `user_id`, name, email, or health value; no GDPR Art. 9 special-category data; all fields are fleet-level aggregates or boolean flags; `form_api` REVOKED |
+| DEC-030 event | `enterprise.fleet_maturity_declared` (LOW / 3yr) — `docs/AUDIT_LOG_SCHEMA.md §Enterprise Fleet Maturity events` (v2.62, 2026-06-30) |
+| DEC-086 | Fleet Maturity governance protocol — `docs/COST_MODEL.md §49.6` + `docs/DECISION_LOG.md DEC-086` |
+
+### §132.3 R2 Subfolder Addition
+
+The following subfolder is added to the `form-soc2-evidence` Cloudflare R2 bucket under the `enterprise/` prefix:
+
+```
+enterprise/fleet-maturity/        # Annual Q1; 3yr WORM Object Lock Governance mode
+                                  # form_api role: NO ACCESS (bucket policy invariant)
+                                  # form_system role: write (evidence upload path only)
+                                  # Files: FLEET-MAT-E-001_<YYYY>.csv (one per filing_year)
+```
+
+This addition follows the same pattern as `enterprise/nrr/` (§131, v3.56.0) and `enterprise/admin-reporting/` (§130, v3.55.0) — described in the cross-reference patch section, not by modifying the inline §80.3 code block.
+
+**Bucket policy invariant:** `form_api` has NO ACCESS to `enterprise/fleet-maturity/`. Only `form_system` (SECURITY DEFINER) and IC PAM-elevated compliance-officer role may write. Bucket enforces 3-year WORM Object Lock (Governance mode) — objects cannot be deleted or overwritten within the retention window.
+
+### §132.4 Vanta Mirror Entry
+
+The following entry is added to the §80.4 Vanta Evidence Mirror protocol:
+
+| Artefact | Frequency | Controls | Privacy note | Vanta tag |
+|---|---|---|---|---|
+| FLEET-MAT-E-001 | Annual Q1 (from first `filing_year` with ≥ 1 annual renewal cycle) | CC4.1, A1.1 | Fleet aggregates + boolean flags only — no per-tenant breakdown, no `user_id`, no GDPR Art. 9 data | `enterprise-fleet-maturity` |
+
+This addition follows the same pattern as NRR-BRIDGE-E-001 (§131.4, v3.56.0).
+
+### §132.5 §79.4 Master Evidence Table Row
+
+The following row is added to the §79.4 master evidence register (count 101 → 102), after NRR-BRIDGE-E-001:
+
+| Artefact ID | Controls | Description | Frequency | Retention | R2 path |
+|---|---|---|---|---|---|
+| **FLEET-MAT-E-001** | CC4.1, A1.1 | Annual export of `enterprise.fleet_maturity_declared` DEC-030 HMAC-chained event + FM conditions evaluation (FM-C1/C2/C3). FLEET-MAT-CHAIN-01 verified. Zero-declaration years filed as affirmative attestation. No per-tenant breakdown; no `user_id`; no GDPR Art. 9 data; `form_api` REVOKED. | Annual (Q1) | 3 yr | `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv` |
+
+### §132.6 Cross-Reference Closure
+
+| Cross-reference | Obligation | Status |
+|---|---|---|
+| `docs/COST_MODEL.md §49.9` item 1 (P0/M13) | Register `enterprise.fleet_maturity_declared` in `docs/AUDIT_LOG_SCHEMA.md` | 🟢 Closed — AUDIT_LOG_SCHEMA.md v2.62 §Enterprise Fleet Maturity events (2026-06-30) |
+| `docs/COST_MODEL.md §49.9` item 3 (P0/M13) | Register FLEET-MAT-E-001 in `docs/SOC2_READINESS.md §132` | 🟢 Closed — this section |
+| `docs/AUDIT_LOG_SCHEMA.md §Enterprise Fleet Maturity events` | `enterprise.fleet_maturity_declared` event, FLEET-MAT-CHAIN-01 invariant, Zod v2 `FleetMaturityDeclaredSchema` | 🟢 Registered v2.62 (2026-06-30) |
+| `docs/DECISION_LOG.md DEC-086` | Fleet Maturity governance protocol | 🟢 Registered (2026-06-30) |
+| `docs/COST_MODEL.md §49.11` cross-reference index | SOC2_READINESS §132 row | 🟡 Open — will update 🟡→🟢 in next patch |
+
+### §132.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `enterprise/fleet-maturity/` folder on Cloudflare R2 `form-soc2-evidence` bucket; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). Enable 3-year WORM Object Lock (Governance mode). | devops-lead | **P0** | M13 | [ ] |
+| 2 | File first FLEET-MAT-E-001 artefact in Q1 of first year with ≥ 1 completed annual renewal cycle: (a) emit `enterprise.fleet_maturity_declared` (FLEET-MAT-CHAIN-01: confirm prior NRR bridge event for same `filing_year` exists); (b) export event to CSV; (c) SHA-256 hash; (d) upload to R2 at `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv` (3yr WORM); (e) upload to Vanta (CC4.1/A1.1); (f) add to MASTER-INDEX. Privacy check: fleet aggregates + boolean flags only; no per-tenant ACV; no `user_id`. | compliance-officer | **P1** | Q1 of first full renewal year (est. M14) | [ ] |
 
 *v3.56.0 (2026-06-30): §131 Cross-Reference Patch — NRR Bridge Evidence Registration (NRR-BRIDGE-E-001 · CC4.1 / A1.1). Closes `docs/COST_MODEL.md §48.9` item 1 (P0/M13 — `enterprise.annual_nrr_bridge_filed` registration in AUDIT_LOG_SCHEMA.md v2.61) and item 6 (P1/M15 — NRR-BRIDGE-E-001 in §79.4 + `enterprise/nrr/` in §80.3 + Vanta entry §80.4). One artefact registered (count 100 → 101): NRR-BRIDGE-E-001 (CC4.1/A1.1, annual Q1, 3yr — fleet-level GRR/NRR bridge: `cohort_tenant_count`, six ARR components, `grr_pct`, `nrr_pct`, `logo_retention_rate_pct`, `green_fleet_pct_at_m12`, `bridge_hash` SHA-256; NRR-BRIDGE-INV-01 arithmetic invariant; privacy: fleet aggregates only, no `user_id`, no GDPR Art. 9 data; `form_api` REVOKED). `enterprise/nrr/` R2 subfolder added to §80.3 (annual; 3yr WORM Object Lock Governance; `form_api` NO ACCESS; `form_system` role only). NRR-BRIDGE-E-001 Vanta mirror entry added to §80.4 (annual Q1; CC4.1/A1.1; privacy: fleet aggregates only). Three cross-reference obligations closed (§131.5): AUDIT_LOG_SCHEMA.md v2.61 §NRR Bridge events (§48.9 item 1); this §131 §79.4 row (§48.9 item 6 §79.4); this §131 §80.3/§80.4 additions (§48.9 item 6 vault). Implementation checklist: 1× P0/M13 (R2 folder creation), 1× P1/M13 (first NRR-BRIDGE-E-001 filing), 1× P2/M+1 (calendar update). Document header v3.55.2 → v3.56.0. Owner: compliance-officer + data-engineer + enterprise-architect.*
 
