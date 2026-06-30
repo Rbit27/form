@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v10.69.0** — 2026-06-30 · post-2895 · «Синтез 2886–2895: операційний профіль досвідченого self-coached атлета» · series «Тренувальний інтелект» 2886–2895 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2895 · next: series 2896–2905 «Рішення під невизначеністю» (post-2896 — перший пост)
+
+**v10.68.0** — 2026-06-30 · post-2894 · «Навантаження і відновлення як єдина система: чому тренування і відновлення — це не два окремих процеси» · series «Тренувальний інтелект» 2886–2895 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2894 · next: post-2895 (синтез серії 2886–2895 — операційний профіль досвідченого self-coached атлета)
+
 **v10.67.0** — 2026-06-30 · post-2893 · «Як коригувати програму в режимі реального часу: принципи інтра-циклічних змін без хаосу» · series «Тренувальний інтелект» 2886–2895 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2893 · next: post-2894 («навантаження і відновлення як єдина система — чому тренування і відновлення — це не два окремих процеси»)
 
 **v10.66.0** — 2026-06-30 · post-2892 · «Як читати тренувальний тренд: коли зміна — це сигнал, а коли варіабельність» · series «Тренувальний інтелект» 2886–2895 (7/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2892 · next: post-2893 («як коригувати програму в режимі реального часу — принципи інтра-циклічних змін без хаосу»)
