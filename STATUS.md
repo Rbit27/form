@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.50.0** — 2026-06-30 · post-2878 · «Мінімальний об'єм для підтримання: сила і гіпертрофія — різні числа» · series «Мінімальна ефективна доза» 2876–2885 (3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2878 · next: post-2879 (коли 45-хвилинна сесія краща за двогодинну)
+**v10.51.0** — 2026-06-30 · post-2879 · «Коли 45-хвилинна сесія краща за двогодинну» · series «Мінімальна ефективна доза» 2876–2885 (4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2879 · next: post-2880 (деренування: скільки реально втрачається і за скільки)
 
 ---
 
