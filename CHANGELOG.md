@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [10.43.0] — 2026-06-30
+
+### Added
+- `docs/OBSERVABILITY.md §63` — Enterprise Annual Filing Calendar & Fleet Maturity Chain Observability (v5.10.0). Closes the monitoring gap created by COST_MODEL §48 and §49 (both 2026-06-30): `enterprise.annual_nrr_bridge_filed` and `enterprise.fleet_maturity_declared` had chain invariants (NRR-BRIDGE-INV-01 arithmetic; FLEET-MAT-CHAIN-01 ordering) enforced at the Worker write layer but no OBSERVABILITY sentinel or evidence artefact. Two pg_cron jobs registered in §12.6 v2.7 patch: job 56 `fleet_mat_chain_verify` (weekly Monday 06:00 UTC, `0 6 * * 1`) — retrospective FLEET-MAT-CHAIN-01 chain integrity scan; AL-FLEET-MAT-01 P0 PagerDuty `form-compliance` on violation; `security.fleet_mat_chain_violation` CRITICAL/7yr; `system.fleet_mat_chain_check_passed` LOW/1yr. Job 57 `nrr_bridge_q1_calendar_check` (daily 06:00 UTC, `0 6 * * *`) — Q1 filing deadline monitor; AL-FLEET-FILING-01 P1 PagerDuty `form-compliance` with 7-day re-alert when April 1 passed + prior-year renewals + no filing; `enterprise.nrr_bridge_q1_overdue` HIGH/7yr; `system.nrr_bridge_q1_check_passed` LOW/1yr; auto-resolve on filing. Three SLOs: FLEET-FILING-SLO-01 (Q1 filing on-time, CC4.1/A1.1), FLEET-FILING-SLO-02 (zero chain violations, CC4.1/A1.1), FLEET-FILING-SLO-03 (NRR-BRIDGE-INV-01 passes 100% of filed events — structurally enforced at Worker layer, CC4.1). SOC 2 evidence artefact FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr, `compliance/evidence/fleet-filing/`; SOC2_READINESS §79.4 registration pending P1/M15). Cross-reference obligations: AUDIT_LOG_SCHEMA.md four new event types (P0/M13), COST_MODEL §49.9 cross-ref note (P1/M13), SOC2_READINESS §79.4 FLEET-FILING-E-001 (P1/M15). Privacy floor: all signals are filing-calendar booleans and chain-integrity counts — no per-tenant ARR, no employee user_id, no GDPR Art. 9 data.
+
+### Changed
+- `docs/OBSERVABILITY.md §12.6` — v2.7 patch: jobs 56 and 57 registered in canonical pg_cron job registry; freshness window note extended to cover jobs 56–57 (N/A with annual-sentinel rationale). Document header v5.9.2 → v5.10.0. TOC entry §63 added.
+- `VERSION` — 10.42.0 → 10.43.0.
+
+---
+
 ## [10.42.0] — 2026-06-30
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.9.2
+# FORM · Observability & Monitoring Taxonomy v5.10.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -62,6 +62,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §37 | Data Retention, Erasure & GDPR Compliance Pipeline Observability |
 | §56 | SCIM Provisioning Compliance Observability |
 | §57 | Amendment Rate Change Compliance Observability |
+| §63 | Enterprise Annual Filing Calendar & Fleet Maturity Chain Observability |
 
 ---
 
@@ -1291,6 +1292,8 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `admin_engagement_mv_refresh` | `30 2 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_engagement_summary` (DATA_MODEL §17); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_engagement_summary'`, `tenant_row_count`, `suppressed_cell_count` (INT — count of rows where `activation_rate_pct IS NULL`, i.e. tenants with `total_activated < 5`; k-floor on `activation_rate_pct` per DEC-085 / OQ-ADMIN-RPT-01 resolved 2026-06-29; `d30_retention_pct` suppression counted separately only when below its cohort-size floor), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role; privacy invariant: activation_rate_pct and D30 retention in this MV are tenant-level aggregates — no individual employee session or health data | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-engagement-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_engagement_summary'`; cross-ref: §62.4 AL-ADMIN-RPT-02; §62.5.2 (job 53 SQL spec); §62.11 (OQ-ADMIN-RPT-01 resolution); DATA_MODEL §17; INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 53** |
 | `admin_feature_adoption_mv_refresh` | `45 2 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_feature_adoption` (DATA_MODEL §17); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_feature_adoption'`, `tenant_row_count`, `suppressed_cell_count` (INT — count of rows where `cv_adoption_pct IS NULL`, i.e. tenants with `total_active_users < 5`; k-floor on `cv_adoption_pct` and `voice_coach_adoption_pct` was already in the MV DDL; `suppressed_cell_count` now correctly counted rather than hardcoded 0 per DEC-085 / OQ-ADMIN-RPT-01 resolved 2026-06-29), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role; privacy invariant: feature adoption percentages are tenant aggregates — no individual employee feature-usage records | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-feature-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_feature_adoption'`; cross-ref: §62.4 AL-ADMIN-RPT-03; §62.5.3 (job 54 SQL spec); §62.11 (OQ-ADMIN-RPT-01 resolution); DATA_MODEL §17; INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 54** |
 | `admin_cohort_breakdown_mv_refresh` | `0 3 * * *` | 26 h | C1.1/P4.1/CC7.2 — nightly REFRESH MATERIALIZED VIEW CONCURRENTLY `tenant_cohort_breakdown` (DATA_MODEL §17); keyed by SCIM group (SSO_SCIM §27 — SCIM group membership is an org-structure signal, not individual employee data); emits `system.admin_mv_refreshed` LOW/1yr with `view_name = 'tenant_cohort_breakdown'`, `tenant_row_count`, `suppressed_cell_count` (COUNT WHERE NOT meets_anonymity_floor — SCIM groups with size < `tenants.reporting_k_floor` (default N ≥ 5) have aggregate engagement metrics NULLed by `assert_k_anonymity()`; this is the most privacy-sensitive of the four MVs because SCIM group membership size is visible as a structural signal), `refresh_duration_ms`; stale = Admin Dashboard "stale banner" and ADMIN-RPT-SLO-01 breach; `form_api` REVOKED; `form_system` role | PagerDuty P2 `form-devops` → devops-lead; Slack `#devops`; dedup `admin-rpt-cohort-stale`; auto-resolve on next `system.admin_mv_refreshed` with `view_name = 'tenant_cohort_breakdown'`; privacy invariant: payload contains only `view_name` (string literal), aggregate `tenant_row_count` (INT), aggregate `suppressed_cell_count` (INT count of SCIM groups below k-floor — no group name, SCIM attribute value, employee count, or user_id), `refresh_duration_ms`; cross-ref: §62.4 AL-ADMIN-RPT-04; §62.5.4 (job 55 SQL spec); DATA_MODEL §17; SSO_SCIM §27 (SCIM group key for cohort_breakdown); INCIDENT_RESPONSE R-52; ADMIN-RPT-E-001 — **job 55** |
+| `fleet_mat_chain_verify` | `0 6 * * 1` | N/A (annual events — not freshness-based; see freshness note) | CC4.1/A1.1 — weekly FLEET-MAT-CHAIN-01 retrospective chain integrity check; for every `enterprise.fleet_maturity_declared` in `audit_log_events`, verifies matching `enterprise.annual_nrr_bridge_filed` for same `filing_year`; violation → `security.fleet_mat_chain_violation` CRITICAL/7yr per orphan event + AL-FLEET-MAT-01 P0 PagerDuty `form-compliance` → compliance-officer + security-engineer (simultaneous); all-clear → `system.fleet_mat_chain_check_passed` LOW/1yr (`events_verified_count` INT, `chain_consistent` BOOL — no per-tenant data); `form_api` REVOKED from `audit_log_events`; `form_system` role; dedup key `fleet-mat-chain-violation-{filing_year}`; no auto-resolve (manual forensic investigation required; activate INCIDENT_RESPONSE R-05 if unauthorized event emission or deletion suspected) | PagerDuty P0 `form-compliance` → compliance-officer + security-engineer; Slack `#enterprise-compliance`; SIEM bridge `siem.fleet_mat_chain_violation` CRITICAL; no auto-resolve; privacy invariant: violation payload contains only `filing_year` INT, `orphan_event_id` UUID, `checked_at`, `slo_id` — no per-tenant ARR, no employee `user_id`, no GDPR Art. 9 data; all-clear payload contains aggregate `events_verified_count` INT and `chain_consistent` BOOL only; cross-ref: §63.4 (AL-FLEET-MAT-01 alert spec); §63.5.1 (job 56 canonical SQL); §63.6 (DEC-030 events); §63.7 (FLEET-FILING-E-001 artefact); COST_MODEL §49 (FLEET-MAT-CHAIN-01 source); AUDIT_LOG_SCHEMA.md (pending `security.fleet_mat_chain_violation` + `system.fleet_mat_chain_check_passed` registration — §63.9 item 3 P0/M13) — **job 56** |
+| `nrr_bridge_q1_calendar_check` | `0 6 * * *` | N/A (annual calendar deadline — Q1 deadline = April 1; see freshness note) | CC4.1/A1.1 — daily Q1 NRR Bridge filing deadline monitor; trigger condition: current date > April 1 AND prior-year `enterprise_renewals` has ≥ 1 closed row AND no `enterprise.annual_nrr_bridge_filed` event exists for that `reporting_year`; on breach: emits `enterprise.nrr_bridge_q1_overdue` HIGH/7yr (`reporting_year` INT, `renewal_count` INT, `dedup_key` TEXT — no ARR values, no per-tenant data) + AL-FLEET-FILING-01 P1 PagerDuty `form-compliance` → compliance-officer; 7-day re-alert dedup; auto-resolve on filing; before April 1 or no renewals: emits `system.nrr_bridge_q1_check_passed` LOW/1yr (`reporting_year_trigger_met` NULL); after confirmed filing: `system.nrr_bridge_q1_check_passed` with `reporting_year_trigger_met` INT + `filing_found = TRUE`; `form_api` REVOKED from `audit_log_events` and `enterprise_renewals`; `form_system` role | PagerDuty P1 `form-compliance` → compliance-officer; Slack `#enterprise-compliance`; dedup `nrr-bridge-q1-overdue-{reporting_year}` 7-day re-alert; auto-resolve when next daily run detects `filing_found = TRUE` for matching `reporting_year`; privacy invariant: `reporting_year` INT and `renewal_count` INT only — no individual ARR values, no per-tenant breakdown, no employee `user_id`, no GDPR Art. 9 data; cross-ref: §63.4 (AL-FLEET-FILING-01 alert spec); §63.5.2 (job 57 canonical SQL); §63.6 (DEC-030 events); §63.7 (FLEET-FILING-E-001 artefact); COST_MODEL §48 (`enterprise.annual_nrr_bridge_filed` + NRR-BRIDGE-INV-01 source); AUDIT_LOG_SCHEMA.md (pending `enterprise.nrr_bridge_q1_overdue` + `system.nrr_bridge_q1_check_passed` registration — §63.9 item 3 P0/M13) — **job 57** |
 
 **Job-number conflict resolution (v0.4, 2026-06-19):** Two cross-document references independently claimed "job 33" for newly authored jobs, after `evidence_cron_freshness_check` (job 33) was already canonical in this registry (registered v0.3 patch, 2026-06-12). The conflicts: (1) `docs/SSO_SCIM_IMPLEMENTATION.md §34.3` (v2.6, 2026-06-19) referenced `bdg_override_expiry_sweep` as "job 33"; (2) `docs/DATA_MODEL.md §35.4` referenced `dsar_slo_miss_counter_reset` as "job 33". Both are renumbered in this registry: `bdg_override_expiry_sweep` → **job 34**; `dsar_slo_miss_counter_reset` → **job 36**. The in-text job number citations in SSO_SCIM §34.3 and DATA_MODEL §35.4 remain at "33" in their source documents — authors should update those references at next authoring pass. This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
@@ -1298,7 +1301,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 
 **Job-number conflict resolution (v0.9, 2026-06-22):** Two sections within OBSERVABILITY.md independently claimed job numbers already assigned in this §12.6 canonical registry: (1) `docs/OBSERVABILITY.md §42.7` (v3.9, 2026-06-14) referenced `white_label_cert_check` as "job 32" — but job 32 was already assigned to `turh_retention_purge` when the v0.4 patch was published (2026-06-19); (2) `docs/OBSERVABILITY.md §43.7` (v4.0, 2026-06-14) referenced `webhook_degraded_escalation_check` as "job 34" — but job 34 was already assigned to `bdg_override_expiry_sweep` in the same v0.4 patch. Both are renumbered in this registry: `white_label_cert_check` → **job 40**; `webhook_degraded_escalation_check` → **job 41**. In-text citations in §42.7, §42.14 item 3, §43.7, and §43.15 items 6–8 corrected in this v0.9 patch (since both sections reside within OBSERVABILITY.md, consistent with the v0.5 precedent of correcting §49 in-text citations). This registry is the canonical authority for job numbers; cross-document references take the number from here, not the reverse.
 
-*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days. `pricing_exception_compliance_monitor` (job 46) is daily at 09:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the REENTRY-CHAIN-01 commercial governance control has no immediate safety implication; Worker-layer real-time enforcement (COST_MODEL §44.5 HTTP 422) is the primary gate; daily monitoring-layer verification (sweep 1) is a belt-and-suspenders sentinel; quarterly trigger (sweep 2) is activated by date arithmetic, not a tight compliance deadline. `scim_provisioning_compliance_monitor` (job 47) is daily at 06:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the SCIM-PROV-SLO-01 zero-tolerance CC6.4 target is enforced at SCIM Worker write time (HTTP 422 on sensitive attribute push per SSO_SCIM §27.12); job 47 provides the proactive daily monitoring-layer confirmation and quarterly evidence trigger; the AL-SCIM-01 reactive burst detector (§26.7b, job 24, every 5 min) handles real-time anomaly detection; a single missed job 47 run extends daily-baseline detection latency by 24h, tolerated for a day-scale compliance evidence obligation. `amendment_rate_compliance_monitor` (job 48) is monthly at 07:00 UTC on the 1st — 33-day freshness window gives 1-day tolerance for scheduling jitter; tolerated because TU-CHAIN-01 is enforced at Worker layer in real time via HTTP 422 in `amend_contract_tier()` SECURITY DEFINER RPC (COST_MODEL §45.5), and the price floor is enforced at the DDL layer via CHECK constraint (DATA_MODEL §47); job 48 is a monthly belt-and-suspenders forensic cross-check, not the primary enforcement gate; a missed run means at most 64 days between verifications — acceptable for a commercial governance control without an immediate safety implication, well within the annual ADM-E-002 evidence filing cycle (SOC2_READINESS §118). `pilot_activation_monitor` (job 49) is daily at 10:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the T0-Alpha trigger (Day-14 activation < 30%) is a day-scale milestone, not a sub-hour safety requirement; a single missed run extends T0-Alpha detection latency by up to 24h before the next daily cycle, acceptable given the save protocol has a T+30 calendar-day response window (COST_MODEL §46.3); PILOT-SAVE-CHAIN-01 is enforced at the `emit-audit-event` Worker layer (HTTP 422 on inversion) independently of pg_cron monitoring; a missed job 49 run does not prevent the IC from manually triggering the save protocol via Admin Console. `champion_login_monitor` (job 50) is daily at 11:00 UTC — 49h freshness window gives 2-day tolerance; chosen because T0-Beta is a point-in-time check at Day 45 only (not a continuous evaluation like T0-Alpha); a single missed run is tolerated because a pilot must be at exactly Day 45 for the breach to be detectable — a 49h stale window that spans no Day-45 pilot boundary has zero T0-Beta gap risk; the 2-day tolerance ensures a single scheduling failure does not trigger a false stale alarm before the next daily run. `wau_decline_monitor` (job 51) is weekly Monday at 12:00 UTC — 8-day freshness window gives 1-day tolerance above the 7-day cadence; the weekly cadence amplifies gap risk relative to daily jobs: if two consecutive Monday runs fail, the stale window reaches 14–21 days with no T0-Gamma detection; the 8-day freshness absorbs a single scheduling jitter (clock drift, Monday Supabase maintenance window) without triggering AL-WAU-ACT-01; tolerated for a 21-day rolling pattern check because the T0-Gamma signal requires 3 completed weeks of data — the IC manual computation in INCIDENT_RESPONSE R-51 can always reproduce the signal from historical `session_completed` data within the save-protocol T+30 window. `admin_wellness_mv_refresh` (job 52) is daily at 02:15 UTC — 26h freshness window gives 1-hour tolerance above nightly cadence; tolerated because the stale-data consequence is a visible Admin Dashboard banner (DATA_MODEL §17 "stale banner at > 26h") that informs tenant admins without requiring FORM intervention; the P2 alert fires at devops-lead who can manually trigger REFRESH CONCURRENTLY (IC PAM elevation not required for MV refresh, unlike the pilot monitor save protocol); a single missed run extends stale exposure by 24h before the banner is resolved — acceptable for aggregate reporting metrics with no safety implication. `admin_engagement_mv_refresh` (job 53) is daily at 02:30 UTC — 26h freshness window (same rationale). `admin_feature_adoption_mv_refresh` (job 54) is daily at 02:45 UTC — 26h freshness window (same rationale). `admin_cohort_breakdown_mv_refresh` (job 55) is daily at 03:00 UTC — 26h freshness window (same rationale); the staggered 15-minute offsets between jobs 52–55 (02:15 → 02:30 → 02:45 → 03:00 UTC) distribute pg_cron concurrency load and ensure REFRESH CONCURRENTLY operations do not overlap on shared tenant tables; all four jobs complete before the Admin Dashboard's 05:00 UTC cache-warm window.
+*Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. `siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, `scim_mass_deprovision_check`, `google_directory_alert_check` (job 35), `caep_reregister_sweep` (job 37), and `sso_fleet_health_check` (job 38) run every 5 minutes — 6-min window gives 3-run tolerance (near-real-time anomaly detection requirement). `bdg_override_expiry_sweep` (job 34) runs every 15 minutes — 20-min window gives 3-run tolerance. `webhook_degraded_escalation_check` (job 41) runs every 30 minutes — 35-min window gives one-run tolerance (consistent with the bdg_override_expiry_sweep pattern: one extra cadence interval for scheduling jitter). `quarterly_perf_regression_check` (job 30) and `dsar_slo_miss_counter_reset` (job 36) are quarterly — 35-day freshness window reflects quarterly cadence (fires only when 3 consecutive months elapse without a run). All daily jobs use 26 h to absorb clock drift and cron scheduling jitter. `renewal_notice_check` (job 39) is daily at 09:00 UTC — 26h freshness window consistent with all daily compliance jobs. `white_label_cert_check` (job 40) is daily at 02:00 UTC — 26h freshness window (scheduled after Cloudflare auto-renewal window, which closes ~01:30 UTC). `sca_sla_monitor` (job 42) runs every 15 minutes — 20-min freshness window gives 3-run tolerance (consistent with `bdg_override_expiry_sweep` (job 34) pattern). `deletion_sla_monitor` (job 43) runs every 6 hours — 7h freshness window gives 1-run tolerance; tolerated because the monitored obligation (GDPR Art. 17 35-day SLA) is a day-scale deadline, not a sub-hour SLA; a single missed run extends warning latency by at most 6 hours before the next detection cycle. `offboard_chain_monitor` (job 44) runs every hour — 2h freshness window gives 1-run tolerance; tolerated because the monitored obligation (OFFBOARD-CHAIN-01 24h window) is a multi-hour MSA contractual commitment; a single missed run extends OFFBOARD-CHAIN-01 breach-detection latency by at most 1 hour before the next cycle. `litigation_hold_compliance_monitor` (job 45) is daily at 08:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because all three monitored obligations (6-month review, 36-month cap, 10-business-day deletion) are day-scale compliance deadlines; a single missed run extends breach-detection latency by 24h, which is acceptable given the minimum obligation window is 10 business days. `pricing_exception_compliance_monitor` (job 46) is daily at 09:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the REENTRY-CHAIN-01 commercial governance control has no immediate safety implication; Worker-layer real-time enforcement (COST_MODEL §44.5 HTTP 422) is the primary gate; daily monitoring-layer verification (sweep 1) is a belt-and-suspenders sentinel; quarterly trigger (sweep 2) is activated by date arithmetic, not a tight compliance deadline. `scim_provisioning_compliance_monitor` (job 47) is daily at 06:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the SCIM-PROV-SLO-01 zero-tolerance CC6.4 target is enforced at SCIM Worker write time (HTTP 422 on sensitive attribute push per SSO_SCIM §27.12); job 47 provides the proactive daily monitoring-layer confirmation and quarterly evidence trigger; the AL-SCIM-01 reactive burst detector (§26.7b, job 24, every 5 min) handles real-time anomaly detection; a single missed job 47 run extends daily-baseline detection latency by 24h, tolerated for a day-scale compliance evidence obligation. `amendment_rate_compliance_monitor` (job 48) is monthly at 07:00 UTC on the 1st — 33-day freshness window gives 1-day tolerance for scheduling jitter; tolerated because TU-CHAIN-01 is enforced at Worker layer in real time via HTTP 422 in `amend_contract_tier()` SECURITY DEFINER RPC (COST_MODEL §45.5), and the price floor is enforced at the DDL layer via CHECK constraint (DATA_MODEL §47); job 48 is a monthly belt-and-suspenders forensic cross-check, not the primary enforcement gate; a missed run means at most 64 days between verifications — acceptable for a commercial governance control without an immediate safety implication, well within the annual ADM-E-002 evidence filing cycle (SOC2_READINESS §118). `pilot_activation_monitor` (job 49) is daily at 10:00 UTC — 26h freshness window gives 1-day tolerance; tolerated because the T0-Alpha trigger (Day-14 activation < 30%) is a day-scale milestone, not a sub-hour safety requirement; a single missed run extends T0-Alpha detection latency by up to 24h before the next daily cycle, acceptable given the save protocol has a T+30 calendar-day response window (COST_MODEL §46.3); PILOT-SAVE-CHAIN-01 is enforced at the `emit-audit-event` Worker layer (HTTP 422 on inversion) independently of pg_cron monitoring; a missed job 49 run does not prevent the IC from manually triggering the save protocol via Admin Console. `champion_login_monitor` (job 50) is daily at 11:00 UTC — 49h freshness window gives 2-day tolerance; chosen because T0-Beta is a point-in-time check at Day 45 only (not a continuous evaluation like T0-Alpha); a single missed run is tolerated because a pilot must be at exactly Day 45 for the breach to be detectable — a 49h stale window that spans no Day-45 pilot boundary has zero T0-Beta gap risk; the 2-day tolerance ensures a single scheduling failure does not trigger a false stale alarm before the next daily run. `wau_decline_monitor` (job 51) is weekly Monday at 12:00 UTC — 8-day freshness window gives 1-day tolerance above the 7-day cadence; the weekly cadence amplifies gap risk relative to daily jobs: if two consecutive Monday runs fail, the stale window reaches 14–21 days with no T0-Gamma detection; the 8-day freshness absorbs a single scheduling jitter (clock drift, Monday Supabase maintenance window) without triggering AL-WAU-ACT-01; tolerated for a 21-day rolling pattern check because the T0-Gamma signal requires 3 completed weeks of data — the IC manual computation in INCIDENT_RESPONSE R-51 can always reproduce the signal from historical `session_completed` data within the save-protocol T+30 window. `admin_wellness_mv_refresh` (job 52) is daily at 02:15 UTC — 26h freshness window gives 1-hour tolerance above nightly cadence; tolerated because the stale-data consequence is a visible Admin Dashboard banner (DATA_MODEL §17 "stale banner at > 26h") that informs tenant admins without requiring FORM intervention; the P2 alert fires at devops-lead who can manually trigger REFRESH CONCURRENTLY (IC PAM elevation not required for MV refresh, unlike the pilot monitor save protocol); a single missed run extends stale exposure by 24h before the banner is resolved — acceptable for aggregate reporting metrics with no safety implication. `admin_engagement_mv_refresh` (job 53) is daily at 02:30 UTC — 26h freshness window (same rationale). `admin_feature_adoption_mv_refresh` (job 54) is daily at 02:45 UTC — 26h freshness window (same rationale). `admin_cohort_breakdown_mv_refresh` (job 55) is daily at 03:00 UTC — 26h freshness window (same rationale); the staggered 15-minute offsets between jobs 52–55 (02:15 → 02:30 → 02:45 → 03:00 UTC) distribute pg_cron concurrency load and ensure REFRESH CONCURRENTLY operations do not overlap on shared tenant tables; all four jobs complete before the Admin Dashboard's 05:00 UTC cache-warm window. `fleet_mat_chain_verify` (job 56) is weekly Monday at 06:00 UTC — no conventional freshness window applies because the monitored signals are annual filing events, not time-decaying freshness-sensitive data; a missed weekly run extends the FLEET-MAT-CHAIN-01 chain-integrity verification gap by 7 days, tolerated because FLEET-MAT-CHAIN-01 is enforced at the Worker write layer in real time (HTTP 422); a stale job 56 does not cause a live compliance breach — it is a belt-and-suspenders retrospective scan; the 7-day gap between runs is the worst-case detection latency for a post-write chain anomaly (retroactive event deletion), which has no precedent in FORM's threat model at the time of authoring. `nrr_bridge_q1_calendar_check` (job 57) is daily at 06:00 UTC — no conventional freshness window applies because the monitored deadline is April 1 (an annual threshold); a single missed daily run extends Q1 deadline-breach detection by 24h, tolerated because (a) the filing is a human-emitted annual action, not a real-time compliance gate; (b) the compliance-officer has the entire Q1 window (January 1 – March 31) to proactively file before the sentinel first pages; (c) AL-FLEET-FILING-01 re-alerts weekly once the P1 fires, so detection latency within the overdue period remains bounded at 7 days; (d) NRR-BRIDGE-INV-01 arithmetic is enforced at the Worker write layer before persistence — no missed job 57 run can cause an invalid filing to persist.
 
 **DEC-030 events emitted by `pg-cron-health-monitor`** — registered in `docs/AUDIT_LOG_SCHEMA.md §System`:
 
@@ -1319,6 +1322,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 **v0.5 · 2026-06-20 · Owner: devops-lead**
 **Review: quarterly or on architecture change. Next scheduled review: August 2026.**
 **SOC 2 evidence: CC7.2 (system monitoring). See also INCIDENT_RESPONSE.md for CC7.3–CC7.5.**
+*v2.7 patch (2026-06-30): §12.6 jobs 56–57 registered — closes COST_MODEL §48 (v2.22.0, 2026-06-30) and §49 (v2.23.0, 2026-06-30) monitoring gap: both sections introduced annual DEC-030 events (`enterprise.annual_nrr_bridge_filed`, `enterprise.fleet_maturity_declared`) with chain invariants (NRR-BRIDGE-INV-01 arithmetic; FLEET-MAT-CHAIN-01 ordering) but no OBSERVABILITY sentinel existed for either. Job 56 `fleet_mat_chain_verify` (`0 6 * * 1`, Monday 06:00 UTC, weekly): retrospective FLEET-MAT-CHAIN-01 chain integrity scan across all historical `fleet_maturity_declared` events; violation → `security.fleet_mat_chain_violation` CRITICAL/7yr + AL-FLEET-MAT-01 P0 PagerDuty `form-compliance` → compliance-officer + security-engineer (no auto-resolve); all-clear → `system.fleet_mat_chain_check_passed` LOW/1yr; `form_system` role; `form_api` REVOKED from `audit_log_events`. Job 57 `nrr_bridge_q1_calendar_check` (`0 6 * * *`, daily 06:00 UTC): Q1 filing calendar deadline monitor (April 1 threshold, trigger condition: prior-year enterprise renewals > 0); breach → `enterprise.nrr_bridge_q1_overdue` HIGH/7yr + AL-FLEET-FILING-01 P1 PagerDuty `form-compliance` → compliance-officer (7-day re-alert dedup `nrr-bridge-q1-overdue-{reporting_year}`; auto-resolve on filing); all-clear → `system.nrr_bridge_q1_check_passed` LOW/1yr; `form_system` role; `form_api` REVOKED from `audit_log_events` and `enterprise_renewals`. Freshness window note extended to cover jobs 56 and 57 (N/A — annual-event sentinels with no conventional freshness window; justification in note). Four new DEC-030 events pending AUDIT_LOG_SCHEMA.md registration (§63.9 item 3 P0/M13): `security.fleet_mat_chain_violation` CRITICAL/7yr, `system.fleet_mat_chain_check_passed` LOW/1yr, `enterprise.nrr_bridge_q1_overdue` HIGH/7yr, `system.nrr_bridge_q1_check_passed` LOW/1yr. Canonical section: §63 (v5.10.0, 2026-06-30).*
 *v2.6 patch (2026-06-29): §12.6 jobs 52–55 registered — closes DATA_MODEL §17 monitoring gap ("P2 alert on cron failure" / "stale banner at > 26h" referenced but unspecified; canonical observability section §62). Four nightly admin reporting MV refresh jobs: job 52 `admin_wellness_mv_refresh` (`15 2 * * *`, 02:15 UTC, 26h freshness, AL-ADMIN-RPT-01 P2); job 53 `admin_engagement_mv_refresh` (`30 2 * * *`, 02:30 UTC, 26h, AL-ADMIN-RPT-02 P2); job 54 `admin_feature_adoption_mv_refresh` (`45 2 * * *`, 02:45 UTC, 26h, AL-ADMIN-RPT-03 P2); job 55 `admin_cohort_breakdown_mv_refresh` (`0 3 * * *`, 03:00 UTC, 26h, AL-ADMIN-RPT-04 P2). All P2 PagerDuty `form-devops` → devops-lead; all-clear event `system.admin_mv_refreshed` LOW/1yr (one emission per job per successful nightly run); `form_api` REVOKED from all four MV relations; `form_system` role. `suppressed_cell_count` field in `system.admin_mv_refreshed` confirms k-anonymity guard (`assert_k_anonymity()`, `tenants.reporting_k_floor` N ≥ 5) ran to completion — non-null INT is the ADMIN-RPT-SLO-02 health signal. Freshness window note extended to cover jobs 52–55 (staggered 15-min offset between jobs distributes concurrency load). Canonical section: §62 (this authoring pass). SOC 2 evidence artefact ADMIN-RPT-E-001 registered in §62.7 (C1.1/P4.1/CC7.2, annual, 3yr; SOC2_READINESS.md v3.55.0 §130 registration closed 2026-06-29).*
 *v2.5 patch (2026-06-29): §12.6 jobs 50–51 registered — closes OBSERVABILITY §59.10 item 5 (P1/M6) and §60.10 item 5 (P1/M6). Job 50 `champion_login_monitor` (`0 11 * * *`, daily 11:00 UTC, 49h freshness): T0-Beta trigger per COST_MODEL §46.2 (Day-45 champion_session_count < 2 → AL-SAVE-02 Slack); AL-CHAMP-ACT-01 PagerDuty `form-devops` P1 dead-man's switch; stale-recovery runbook INCIDENT_RESPONSE R-50 (v1.0, 2026-06-29 — closes §59.10 item 6). Prerequisite `admin.dashboard_session_started` LOW/1yr event pending §59.10 item 1 (P0/M6). Job 51 `wau_decline_monitor` (`0 12 * * 1`, weekly Monday 12:00 UTC, 8-day freshness): T0-Gamma trigger per COST_MODEL §46.2 (3 consecutive weekly WAU rate declines ≥ 10 pp → AL-SAVE-03 Slack); AL-WAU-ACT-01 PagerDuty `form-devops` P1 dead-man's switch; stale-recovery runbook INCIDENT_RESPONSE R-51 (v1.0, 2026-06-29 — closes §60.10 item 6). Freshness note extended to cover jobs 50 and 51. Canonical sections: §59 (job 50), §60 (job 51).*
 *v2.4 patch (2026-06-27): §12.6 job 49 `pilot_activation_monitor` registered — closes COST_MODEL §46.9 item 4 (P0/M4). Daily Day-14 pilot activation sentinel (T0-Alpha trigger per COST_MODEL §46.2): schedule `0 10 * * *` (10:00 UTC — offset from existing daily jobs at 06:00/08:00/09:00 UTC to distribute pg_cron load); 26h freshness window (consistent with jobs 39, 45, 46, 47; tolerated because T0-Alpha is a day-scale milestone with T+30 response window). Fires AL-SAVE-01 PagerDuty P1 `form-enterprise` → customer-success with dedup `pilot-save-t0a-{pilot_id}` 24h when Day-14 `activation_rate < 0.30` for Growth or Enterprise tier pilots; all-clear `system.pilot_activation_check_passed` LOW/1yr on clean sweep. Evidence artefact: SAVE-E-002 (annual `pg_cron.job_run_details WHERE jobname = 'pilot_activation_monitor'` run history, CC7.2/A1.1, 3yr; registered SOC2_READINESS §126, 2026-06-27). Freshness window note extended to cover job 49. Canonical source: COST_MODEL §46. Cross-ref: SOC2_READINESS §126 (SAVE-E-001/SAVE-E-002 registration).*
@@ -17880,3 +17884,408 @@ ADMIN-RPT-E-001 artefact description updated: the annual pg_cron run history now
 ---
 
 *v5.9.0 (2026-06-29): §62 Enterprise Admin Reporting Pipeline Observability — closes the DATA_MODEL §17 monitoring gap ("P2 alert on cron failure" / "stale banner at > 26h" referenced but unspecified in OBSERVABILITY.md). Four new pg_cron jobs registered in §12.6 canonical registry (v2.6 patch): job 52 `admin_wellness_mv_refresh` (02:15 UTC nightly, 26h freshness, AL-ADMIN-RPT-01 P2); job 53 `admin_engagement_mv_refresh` (02:30 UTC, 26h, AL-ADMIN-RPT-02 P2); job 54 `admin_feature_adoption_mv_refresh` (02:45 UTC, 26h, AL-ADMIN-RPT-03 P2); job 55 `admin_cohort_breakdown_mv_refresh` (03:00 UTC, 26h, AL-ADMIN-RPT-04 P2). Two SLOs: ADMIN-RPT-SLO-01 (pipeline freshness ≤ 26h per view, C1.1/P4.1/CC7.2), ADMIN-RPT-SLO-02 (k-anonymity guard active — `suppressed_cell_count` non-null INT in every `system.admin_mv_refreshed` event, C1.1/P4.1/CC6.1). Four alert rules AL-ADMIN-RPT-01 through AL-ADMIN-RPT-04 (P2, PagerDuty `form-devops` → devops-lead; per-view dedup keys; auto-resolve on next successful refresh event per `view_name`). DEC-030 event `system.admin_mv_refreshed` LOW/1yr with Zod v2 schema (§62.6) and ADMIN-MV-CHAIN-01 ordering invariant (advisory; enforced by staggered schedule, not HTTP 422). SOC 2 evidence artefact ADMIN-RPT-E-001 (C1.1/P4.1/CC7.2, annual, 3yr; SOC2_READINESS §130 registration ✅ 2026-06-29, §62.9 item 3). §62.9 implementation checklist: 2× P0/M7 (deploy jobs + AUDIT_LOG_SCHEMA.md registration), 2× P1/M7 (SOC2_READINESS §130 registration ✅ 2026-06-29 + INCIDENT_RESPONSE R-52 runbook ✅ v1.0, 2026-06-29), 1× P1/M7 (PagerDuty routing rules), 1× P2/M8 (dashboard). Two OQs: OQ-ADMIN-RPT-01 (tenant-level k-floor for engagement/feature_adoption MVs — compliance-officer determination pending), OQ-ADMIN-RPT-02 (zero-value row handling for tenants with no activity). Privacy floor: no employee `user_id`, name, email, health data, coaching content, body metric, or GDPR Art. 9 special-category data in any job SQL, event payload, alert, or dashboard panel — all monitoring signals are aggregate counts, timing integers, and boolean health flags. §12.6 v2.6 patch: jobs 52–55 registered; freshness window note extended to cover staggered 02:15–03:00 UTC nightly cadence. Document header v5.8.1 → v5.9.0. Owner: devops-lead + compliance-officer + data-engineer + enterprise-architect.*
+
+---
+
+## §63 Enterprise Annual Filing Calendar & Fleet Maturity Chain Observability
+
+**v5.10.0 · 2026-06-30 · Owner: compliance-officer + devops-lead + enterprise-architect**
+**SOC 2 scope: CC4.1, A1.1**
+
+### §63.1 Purpose and Scope
+
+This section provides observability coverage for two annual enterprise-tier compliance obligations introduced in COST_MODEL.md §48 and §49 (both 2026-06-30):
+
+| Obligation | Source | DEC-030 Event | Invariant | Emitter |
+|---|---|---|---|---|
+| Annual NRR Bridge Filing | COST_MODEL §48 | `enterprise.annual_nrr_bridge_filed` | NRR-BRIDGE-INV-01 (arithmetic) | Human (compliance-officer / data-engineer / founder) — PAM-elevated |
+| Fleet Maturity Declaration | COST_MODEL §49 | `enterprise.fleet_maturity_declared` | FLEET-MAT-CHAIN-01 (ordering) | Automated Worker after each `nrr_bridge` event |
+
+Neither obligation was covered by any OBSERVABILITY section prior to §63. The invariants are enforced at the Worker write layer (HTTP 422 on violation) but no pg_cron monitoring sentinel existed to:
+
+- Verify FLEET-MAT-CHAIN-01 chain integrity retrospectively across all historical `fleet_maturity_declared` events.
+- Detect when the Q1 NRR Bridge filing deadline (April 1) has passed without a corresponding `annual_nrr_bridge_filed` event for a year in which enterprise renewal trigger conditions were met.
+
+Both gaps would be silent: no alert, no evidence artefact, no SLO breach signal. §63 closes both.
+
+**Privacy floor (inherited from DEC-030 and COST_MODEL §48 / §49):** All monitoring signals in §63 are fleet-level ARR aggregates, filing-calendar boolean flags, and chain-integrity counts. No per-tenant ARR breakdown, no individual employee `user_id`, name, email, coaching content, body metric, or GDPR Art. 9 special-category data appears in any job SQL, event payload, alert payload, or dashboard panel.
+
+### §63.2 SLOs
+
+| SLO ID | Description | Target | SOC 2 Criterion |
+|---|---|---|---|
+| **FLEET-FILING-SLO-01** | NRR Bridge filed within Q1 window (by April 1) when prior-year enterprise renewal trigger conditions are met (≥ 1 `enterprise_renewals` row closed for that `reporting_year`) | 100% — zero-tolerance; a missed Q1 filing for a year with renewals is a compliance gap | CC4.1 / A1.1 |
+| **FLEET-FILING-SLO-02** | Zero FLEET-MAT-CHAIN-01 retrospective ordering violations — every `enterprise.fleet_maturity_declared` event has a matching `enterprise.annual_nrr_bridge_filed` for the same `filing_year` | 100% — zero-tolerance; any violation requires immediate forensic investigation + R-05 co-activation if unauthorized emission suspected | CC4.1 / A1.1 |
+| **FLEET-FILING-SLO-03** | NRR-BRIDGE-INV-01 arithmetic invariant passes for 100% of filed events — `\|retained_arr_usd + expansion_arr_usd − contraction_arr_usd − churned_arr_usd − closing_arr_usd\| ≤ $1.00` for every emitted `enterprise.annual_nrr_bridge_filed` | 100% — zero-tolerance; any arithmetic mismatch causes the Worker to reject with HTTP 422 `NRR_BRIDGE_INV_01_RETENTION_CHECK` before persisting the event; structurally enforced at Worker write layer, not by pg_cron | CC4.1 |
+
+All three SLOs are zero-tolerance. Error budget = zero: any breach is an immediate P0 or P1 alert. The SLOs are not rolling-window percentage targets because (a) the events are annual — denominator is at most 1 per `reporting_year`; (b) an arithmetic or chain violation for even a single filing is a compliance material event.
+
+### §63.3 Monitoring Architecture
+
+Two pg_cron jobs provide sentinel coverage:
+
+```
+                    ┌──────────────────────────────────────────┐
+                    │     Annual compliance chain sentinel       │
+                    │                                           │
+  Weekly Mon 06:00  │  job 56: fleet_mat_chain_verify           │
+  ─────────────────►│  Retrospective FLEET-MAT-CHAIN-01 check  │──► system.fleet_mat_chain_check_passed LOW/1yr
+                    │  For every fleet_maturity_declared event  │
+                    │  verify matching nrr_bridge event exists  │──► AL-FLEET-MAT-01 P0 (on violation)
+                    │  for same filing_year                     │
+                    └──────────────────────────────────────────┘
+
+                    ┌──────────────────────────────────────────┐
+                    │     Q1 filing calendar sentinel            │
+                    │                                           │
+  Daily 06:00       │  job 57: nrr_bridge_q1_calendar_check    │
+  ─────────────────►│  Checks: prior year had renewals AND      │──► system.nrr_bridge_q1_check_passed LOW/1yr
+                    │  current date > April 1 AND no            │
+                    │  annual_nrr_bridge_filed event for year   │──► AL-FLEET-FILING-01 P1 (when overdue)
+                    └──────────────────────────────────────────┘
+```
+
+**Invariant enforcement vs. monitoring sentinel distinction:**
+
+- **NRR-BRIDGE-INV-01 (arithmetic)** is enforced at the `emit-audit-event` Worker write layer as HTTP 422 `NRR_BRIDGE_INV_01_RETENTION_CHECK`. The event is rejected before persisting if the arithmetic check fails. No pg_cron job is needed to re-verify the invariant post-persistence — a successfully stored `enterprise.annual_nrr_bridge_filed` event already passed the arithmetic gate. FLEET-FILING-SLO-03 is satisfied structurally by the Worker; job 57 is the calendar-deadline sentinel only.
+- **FLEET-MAT-CHAIN-01 (ordering)** is enforced at the Worker layer as HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE`. However, unlike arithmetic rejections (which prevent a single event from persisting), chain anomalies can in theory arise from retroactive event deletion or database replay anomalies. Job 56 performs a weekly retrospective scan to catch any such post-write gap.
+
+### §63.4 Alert Rules
+
+#### AL-FLEET-MAT-01 — Fleet Maturity Chain Violation (P0)
+
+| Field | Value |
+|---|---|
+| **Trigger** | `enterprise.fleet_maturity_declared` event found in `audit_log_events` without a matching `enterprise.annual_nrr_bridge_filed` for the same `filing_year`; detected by job 56 weekly scan |
+| **Severity** | P0 |
+| **Routing** | PagerDuty service `form-compliance` → compliance-officer + security-engineer (simultaneous, not escalation); Slack `#enterprise-compliance` |
+| **Dedup key** | `fleet-mat-chain-violation-{filing_year}` |
+| **Auto-resolve** | No — manual resolution required; compliance-officer must investigate and confirm the matching `nrr_bridge` event was not deleted or corrupted; activate INCIDENT_RESPONSE R-05 if unauthorized event emission or deletion is suspected |
+| **SIEM bridge** | Emits `siem.fleet_mat_chain_violation` CRITICAL to SIEM on receipt by the `emit-audit-event` Worker; see §27 |
+| **SOC 2** | CC4.1 / A1.1 — chain integrity monitoring; any P0 instance must be documented in the annual FLEET-FILING-E-001 artefact (§63.7) |
+
+#### AL-FLEET-FILING-01 — NRR Bridge Q1 Deadline Overdue (P1)
+
+| Field | Value |
+|---|---|
+| **Trigger** | Current date > April 1 AND prior year had ≥ 1 `enterprise_renewals` row closed AND no `enterprise.annual_nrr_bridge_filed` event exists for that `reporting_year` in `audit_log_events`; detected by job 57 daily scan |
+| **Severity** | P1 |
+| **Routing** | PagerDuty service `form-compliance` → compliance-officer; Slack `#enterprise-compliance` |
+| **Dedup key** | `nrr-bridge-q1-overdue-{reporting_year}` |
+| **Re-alert** | Every 7 days while condition persists (weekly re-alert dedup — does not page daily) |
+| **Auto-resolve** | Yes — automatically resolves when `enterprise.annual_nrr_bridge_filed` is emitted for the matching `reporting_year`; job 57 detects the all-clear on its next daily run and emits `system.nrr_bridge_q1_check_passed` with `filing_found = true` |
+| **SOC 2** | CC4.1 / A1.1 — annual filing calendar compliance; any P1 instance must be documented in the annual FLEET-FILING-E-001 artefact; auditor narrative must explain the filing delay |
+
+### §63.5 Job Specifications
+
+#### §63.5.1 Job 56 — `fleet_mat_chain_verify`
+
+**Purpose:** Weekly retrospective FLEET-MAT-CHAIN-01 chain integrity check.
+**Schedule:** `0 6 * * 1` (Monday 06:00 UTC).
+**Freshness:** N/A — see §12.6 freshness window note (job 56 paragraph).
+
+```sql
+-- fleet_mat_chain_verify: pg_cron job 56, Monday 06:00 UTC weekly
+-- FLEET-MAT-CHAIN-01 retrospective chain integrity check.
+-- Verifies every enterprise.fleet_maturity_declared has a matching
+-- enterprise.annual_nrr_bridge_filed for the same filing_year.
+-- Privacy floor: no per-tenant breakdown, no employee data —
+-- only filing_year integers and aggregate event counts.
+
+DO $$
+DECLARE
+  v_violation_count   INT := 0;
+  v_events_checked    INT := 0;
+  v_violation_year    INT;
+  v_violation_id      UUID;
+  v_checked_at        TIMESTAMPTZ := NOW();
+BEGIN
+  SELECT COUNT(*)
+    INTO v_events_checked
+    FROM audit_log_events
+   WHERE event_type = 'enterprise.fleet_maturity_declared';
+
+  -- Find any fleet_maturity_declared event without a matching nrr_bridge event
+  -- for the same filing_year.
+  FOR v_violation_year, v_violation_id IN
+    SELECT
+      (payload->>'filing_year')::INT AS filing_year,
+      id
+    FROM audit_log_events
+    WHERE event_type = 'enterprise.fleet_maturity_declared'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log_events nrr
+        WHERE nrr.event_type = 'enterprise.annual_nrr_bridge_filed'
+          AND (nrr.payload->>'reporting_year')::INT
+              = (audit_log_events.payload->>'filing_year')::INT
+      )
+    ORDER BY (payload->>'filing_year')::INT ASC
+    LIMIT 10
+  LOOP
+    v_violation_count := v_violation_count + 1;
+
+    PERFORM extensions.http((
+      'POST',
+      current_setting('app.audit_event_worker_url'),
+      ARRAY[extensions.http_header('Authorization',
+            'Bearer ' || current_setting('app.audit_event_worker_secret'))],
+      'application/json',
+      json_build_object(
+        'event_type',  'security.fleet_mat_chain_violation',
+        'severity',    'CRITICAL',
+        'retention',   '7yr',
+        'payload', json_build_object(
+          'filing_year',               v_violation_year,
+          'orphan_event_id',           v_violation_id,
+          'checked_at',                v_checked_at,
+          'slo_id',                    'FLEET-FILING-SLO-02'
+        )
+      )::text
+    )::extensions.http_request);
+  END LOOP;
+
+  IF v_violation_count > 0 THEN
+    -- AL-FLEET-MAT-01 fires at Worker on receipt of security.fleet_mat_chain_violation.
+    RETURN;
+  END IF;
+
+  -- All-clear
+  PERFORM extensions.http((
+    'POST',
+    current_setting('app.audit_event_worker_url'),
+    ARRAY[extensions.http_header('Authorization',
+          'Bearer ' || current_setting('app.audit_event_worker_secret'))],
+    'application/json',
+    json_build_object(
+      'event_type',  'system.fleet_mat_chain_check_passed',
+      'severity',    'LOW',
+      'retention',   '1yr',
+      'payload', json_build_object(
+        'checked_at',            v_checked_at,
+        'events_verified_count', v_events_checked,
+        'chain_consistent',      TRUE
+      )
+    )::text
+  )::extensions.http_request);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+**Role:** `form_system`. `form_api` REVOKED from `audit_log_events` per DEC-030.
+**Error handling:** Any unhandled exception emits `system.cron_job_stale` via `pg-cron-health-monitor` (§12.6). No AL-FLEET-MAT-01 fires from a job failure (vs. a chain violation).
+**SOC 2:** CC4.1 / A1.1 — weekly chain integrity run history feeds FLEET-FILING-E-001 annual evidence artefact.
+
+#### §63.5.2 Job 57 — `nrr_bridge_q1_calendar_check`
+
+**Purpose:** Daily Q1 NRR Bridge filing deadline monitor.
+**Schedule:** `0 6 * * *` (daily 06:00 UTC — same hour as job 47 for operational familiarity).
+**Freshness:** N/A — see §12.6 freshness window note (job 57 paragraph).
+
+```sql
+-- nrr_bridge_q1_calendar_check: pg_cron job 57, daily 06:00 UTC
+-- Q1 NRR Bridge filing deadline monitor.
+-- Fires AL-FLEET-FILING-01 if: current date > April 1 AND prior reporting_year
+-- had enterprise renewals AND no annual_nrr_bridge_filed event exists for that year.
+-- Privacy floor: no ARR values in event payload — only reporting_year (INT)
+-- and filing_found (BOOL) in the all-clear signal.
+
+DO $$
+DECLARE
+  v_checked_at          TIMESTAMPTZ := NOW();
+  v_current_year        INT         := EXTRACT(YEAR FROM NOW())::INT;
+  v_reporting_year      INT;
+  v_renewal_count       INT;
+  v_bridge_event_count  INT;
+BEGIN
+  -- Before Q1 deadline: no check needed
+  IF EXTRACT(MONTH FROM NOW())::INT < 4 THEN
+    PERFORM extensions.http((
+      'POST',
+      current_setting('app.audit_event_worker_url'),
+      ARRAY[extensions.http_header('Authorization',
+            'Bearer ' || current_setting('app.audit_event_worker_secret'))],
+      'application/json',
+      json_build_object(
+        'event_type',  'system.nrr_bridge_q1_check_passed',
+        'severity',    'LOW',
+        'retention',   '1yr',
+        'payload', json_build_object(
+          'checked_at',                 v_checked_at,
+          'reporting_year_trigger_met', NULL,
+          'filing_found',               TRUE,
+          'note',                       'Before Q1 deadline — no check required'
+        )
+      )::text
+    )::extensions.http_request);
+    RETURN;
+  END IF;
+
+  v_reporting_year := v_current_year - 1;
+
+  -- Check trigger condition: did prior year have enterprise renewals?
+  SELECT COUNT(*)
+    INTO v_renewal_count
+    FROM enterprise_renewals
+   WHERE EXTRACT(YEAR FROM renewal_closed_at)::INT = v_reporting_year
+     AND status = 'closed';
+
+  IF v_renewal_count = 0 THEN
+    PERFORM extensions.http((
+      'POST',
+      current_setting('app.audit_event_worker_url'),
+      ARRAY[extensions.http_header('Authorization',
+            'Bearer ' || current_setting('app.audit_event_worker_secret'))],
+      'application/json',
+      json_build_object(
+        'event_type',  'system.nrr_bridge_q1_check_passed',
+        'severity',    'LOW',
+        'retention',   '1yr',
+        'payload', json_build_object(
+          'checked_at',                 v_checked_at,
+          'reporting_year_trigger_met', NULL,
+          'filing_found',               TRUE,
+          'note',                       'No enterprise renewals in prior year — trigger condition not met'
+        )
+      )::text
+    )::extensions.http_request);
+    RETURN;
+  END IF;
+
+  -- Trigger condition met: check whether nrr_bridge event was filed
+  SELECT COUNT(*)
+    INTO v_bridge_event_count
+    FROM audit_log_events
+   WHERE event_type = 'enterprise.annual_nrr_bridge_filed'
+     AND (payload->>'reporting_year')::INT = v_reporting_year;
+
+  IF v_bridge_event_count = 0 THEN
+    -- Q1 filing overdue: emit; Worker fires AL-FLEET-FILING-01 P1
+    PERFORM extensions.http((
+      'POST',
+      current_setting('app.audit_event_worker_url'),
+      ARRAY[extensions.http_header('Authorization',
+            'Bearer ' || current_setting('app.audit_event_worker_secret'))],
+      'application/json',
+      json_build_object(
+        'event_type',  'enterprise.nrr_bridge_q1_overdue',
+        'severity',    'HIGH',
+        'retention',   '7yr',
+        'payload', json_build_object(
+          'reporting_year',  v_reporting_year,
+          'renewal_count',   v_renewal_count,
+          'checked_at',      v_checked_at,
+          'slo_id',          'FLEET-FILING-SLO-01',
+          'dedup_key',       'nrr-bridge-q1-overdue-' || v_reporting_year::TEXT
+        )
+      )::text
+    )::extensions.http_request);
+    RETURN;
+  END IF;
+
+  -- Filing found: all-clear
+  PERFORM extensions.http((
+    'POST',
+    current_setting('app.audit_event_worker_url'),
+    ARRAY[extensions.http_header('Authorization',
+          'Bearer ' || current_setting('app.audit_event_worker_secret'))],
+    'application/json',
+    json_build_object(
+      'event_type',  'system.nrr_bridge_q1_check_passed',
+      'severity',    'LOW',
+      'retention',   '1yr',
+      'payload', json_build_object(
+        'checked_at',                 v_checked_at,
+        'reporting_year_trigger_met', v_reporting_year,
+        'filing_found',               TRUE
+      )
+    )::text
+  )::extensions.http_request);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+**Role:** `form_system`. `form_api` REVOKED from `audit_log_events` and `enterprise_renewals`.
+**Re-alert dedup:** `enterprise.nrr_bridge_q1_overdue` carries `dedup_key = 'nrr-bridge-q1-overdue-{reporting_year}'`. AL-FLEET-FILING-01 PagerDuty routing fires on first receipt and re-alerts after 7 days if the key remains unresolved; auto-resolved when `enterprise.annual_nrr_bridge_filed` is received for the matching `reporting_year`.
+**SOC 2:** CC4.1 / A1.1 — daily run history feeds FLEET-FILING-E-001 annual evidence artefact.
+
+### §63.6 DEC-030 Events
+
+All events emitted via `emit-audit-event` Worker under DEC-030 HMAC chain protocol. `form_api` REVOKED from `audit_log_events` INSERT.
+
+| Event type | Severity | Retention | Emitter | Key payload fields | SOC 2 |
+|---|---|---|---|---|---|
+| `system.fleet_mat_chain_check_passed` | LOW | 1yr | Job 56 (weekly all-clear) | `checked_at`, `events_verified_count` INT, `chain_consistent` BOOL | CC4.1 / A1.1 |
+| `security.fleet_mat_chain_violation` | CRITICAL | 7yr | Job 56 (per violation) | `filing_year` INT, `orphan_event_id` UUID, `checked_at`, `slo_id` | CC4.1 / A1.1 |
+| `system.nrr_bridge_q1_check_passed` | LOW | 1yr | Job 57 (daily all-clear) | `checked_at`, `reporting_year_trigger_met` INT nullable, `filing_found` BOOL | CC4.1 / A1.1 |
+| `enterprise.nrr_bridge_q1_overdue` | HIGH | 7yr | Job 57 (per overdue year) | `reporting_year` INT, `renewal_count` INT, `checked_at`, `slo_id`, `dedup_key` | CC4.1 / A1.1 |
+
+**Privacy invariant:** All four events carry only operational metadata (integers, booleans, UUIDs, timestamps, dedup strings). No per-tenant ARR breakdown, no employee `user_id`, no coaching content, no GDPR Art. 9 special-category data.
+
+**Pending registration (§63.9 item 3 — P0/M13):** All four event types must be registered in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, severity, retention, and SOC 2 criterion mapping at next authoring pass.
+
+### §63.7 SOC 2 Evidence Artefact — FLEET-FILING-E-001
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | FLEET-FILING-E-001 |
+| **Name** | Enterprise Annual Filing Chain Integrity Report |
+| **SOC 2 criteria** | CC4.1, A1.1 |
+| **Cadence** | Annual — filed in Q1 of each calendar year for the prior reporting year |
+| **Retention** | 3 years |
+| **R2 path** | `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv` |
+| **Vanta mirror** | Uploaded within 48h of filing; SOC2_READINESS.md §79.4 registration pending (§63.9 item 6 P1/M15) |
+
+**Content:**
+
+1. **NRR Bridge filing calendar compliance** — for each prior `reporting_year` since the first `enterprise_renewals` row was closed:
+   - Trigger condition met? (`renewal_count > 0` BOOL)
+   - Filing date (TIMESTAMPTZ or NULL)
+   - `reporting_year` INT
+   - `bridge_hash` (64-char hex SHA-256 from the `enterprise.annual_nrr_bridge_filed` payload field)
+   - AL-FLEET-FILING-01 fired? (BOOL — indicates Q1 deadline was missed before filing)
+
+2. **FLEET-MAT-CHAIN-01 weekly verification run history** — job 56 results for the past 52 Mondays:
+   - Run date, `events_verified_count` INT, `chain_consistent` BOOL
+   - Count of `security.fleet_mat_chain_violation` events in the period (any count > 0 triggers inline R2 audit log export in the artefact)
+
+3. **NRR-BRIDGE-INV-01 structural compliance note** — since NRR-BRIDGE-INV-01 is enforced at the Worker write layer (HTTP 422 before persistence), the count of successfully stored `enterprise.annual_nrr_bridge_filed` events is evidence that the invariant passed for all of them. Auditor narrative: "Each persisted `enterprise.annual_nrr_bridge_filed` event passed the NRR-BRIDGE-INV-01 arithmetic gate at the `emit-audit-event` Worker layer prior to storage. No additional post-persistence arithmetic re-check is required; structural enforcement is the control."
+
+**Privacy floor:** FLEET-FILING-E-001 contains fleet-level ARR aggregates from the `enterprise.annual_nrr_bridge_filed` payload (total opening/closing ARR, NRR %, GRR %, logo retention rate) — no per-tenant ARR breakdown, no individual employee data, no GDPR Art. 9 special-category data.
+
+### §63.8 Dashboard Specification — "Enterprise Annual Filing Health"
+
+**Panel location:** Enterprise compliance dashboard (admin-only, IC PAM-elevated access).
+
+| Panel | Data source | Refresh |
+|---|---|---|
+| **NRR Bridge last filed** | `audit_log_events WHERE event_type = 'enterprise.annual_nrr_bridge_filed' ORDER BY created_at DESC LIMIT 1` → display `reporting_year` + `created_at` date | On load |
+| **Fleet Maturity last declared** | `audit_log_events WHERE event_type = 'enterprise.fleet_maturity_declared' ORDER BY created_at DESC LIMIT 1` → display `filing_year` + `consecutive_cycles_at_target` INT | On load |
+| **FLEET-MAT-CHAIN-01 chain integrity** | `audit_log_events WHERE event_type IN ('system.fleet_mat_chain_check_passed', 'security.fleet_mat_chain_violation') AND created_at >= NOW() - INTERVAL '52 weeks' ORDER BY created_at DESC` → sparkline of weekly check results (green = all-clear, red = violation); last 52 weeks | Hourly |
+| **Q1 filing calendar status** | `audit_log_events WHERE event_type IN ('enterprise.annual_nrr_bridge_filed', 'enterprise.nrr_bridge_q1_overdue')` → per-year table: `reporting_year`, `filed` BOOL, `overdue` BOOL, `al_fleet_filing_01_fired` BOOL | On load |
+
+**Privacy floor:** All panels display only integer years, boolean flags, aggregate NRR/GRR percentages, and chain-check run counts — no per-tenant breakdown, no employee data.
+
+### §63.9 Implementation Checklist
+
+| Priority | Milestone | Item | Status |
+|---|---|---|---|
+| P0 | M13 | Deploy pg_cron job 56 (`fleet_mat_chain_verify`) via `cron.schedule()` against production Supabase; write integration test asserting that a synthetic orphan `fleet_maturity_declared` row (no matching `nrr_bridge` row for same `filing_year`) triggers `security.fleet_mat_chain_violation` CRITICAL emission and AL-FLEET-MAT-01 PagerDuty fire | 🟡 Open |
+| P0 | M13 | Deploy pg_cron job 57 (`nrr_bridge_q1_calendar_check`) via `cron.schedule()` against production Supabase; write integration test asserting that trigger condition met (prior-year renewals > 0) + date > April 1 + no bridge event → `enterprise.nrr_bridge_q1_overdue` HIGH emission and AL-FLEET-FILING-01 P1 fire | 🟡 Open |
+| P0 | M13 | Register four new DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, severity, retention, and SOC 2 mapping: `system.fleet_mat_chain_check_passed` LOW/1yr, `security.fleet_mat_chain_violation` CRITICAL/7yr, `system.nrr_bridge_q1_check_passed` LOW/1yr, `enterprise.nrr_bridge_q1_overdue` HIGH/7yr | 🟡 Open |
+| P1 | M13 | Configure PagerDuty routing rules: AL-FLEET-MAT-01 (service `form-compliance`, P0, dedup `fleet-mat-chain-violation-{filing_year}`, no auto-resolve, simultaneous compliance-officer + security-engineer); AL-FLEET-FILING-01 (service `form-compliance`, P1, dedup `nrr-bridge-q1-overdue-{reporting_year}`, 7-day re-alert, auto-resolve on `enterprise.annual_nrr_bridge_filed` emission for matching `reporting_year`) | 🟡 Open |
+| P1 | M13 | Add cross-reference note to `docs/COST_MODEL.md §49.9` implementation checklist: "P1/M13 — OBSERVABILITY §63 (v5.10.0, 2026-06-30) authored as companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56 and 57 registered in §12.6 v2.7 patch" | 🟡 Open |
+| P1 | M15 | Register FLEET-FILING-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC4.1/A1.1, annual Q1, 3yr, R2 path `compliance/evidence/fleet-filing/`) and upload Vanta mirror entry within 48h of first filing | 🟡 Open |
+| P2 | M15 | Build "Enterprise Annual Filing Health" dashboard panel per §63.8 spec in admin compliance dashboard | 🟡 Open |
+
+### §63.10 Cross-Reference Obligations Created by §63
+
+| Document | Obligation | Status |
+|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md` | Register `system.fleet_mat_chain_check_passed`, `security.fleet_mat_chain_violation`, `system.nrr_bridge_q1_check_passed`, `enterprise.nrr_bridge_q1_overdue` with Zod v2 schemas, severity, retention, SOC 2 mapping | 🟡 Pending P0/M13 |
+| `docs/SOC2_READINESS.md §79.4` | Register FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr) in master evidence table and Vanta mirror | 🟡 Pending P1/M15 |
+| `docs/COST_MODEL.md §49.9` | Add cross-reference note: "OBSERVABILITY §63 is the companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56–57 registered §12.6 v2.7 patch 2026-06-30" | 🟡 Pending P1/M13 |
+
+---
+
+*v5.10.0 (2026-06-30): §63 Enterprise Annual Filing Calendar & Fleet Maturity Chain Observability — closes the monitoring gap created by COST_MODEL §48 (v2.22.0, 2026-06-30) and §49 (v2.23.0, 2026-06-30). Both sections introduced annual DEC-030 events (`enterprise.annual_nrr_bridge_filed` and `enterprise.fleet_maturity_declared`) with chain invariants (NRR-BRIDGE-INV-01 arithmetic; FLEET-MAT-CHAIN-01 ordering) but no OBSERVABILITY monitoring coverage existed. Two pg_cron sentinels registered in §12.6 v2.7 patch: job 56 `fleet_mat_chain_verify` (`0 6 * * 1`, Monday 06:00 UTC, weekly) — retrospective FLEET-MAT-CHAIN-01 chain integrity scan across all historical `fleet_maturity_declared` events; fires AL-FLEET-MAT-01 P0 PagerDuty `form-compliance` → compliance-officer + security-engineer on violation; emits `security.fleet_mat_chain_violation` CRITICAL/7yr per orphan event + `system.fleet_mat_chain_check_passed` LOW/1yr on all-clear; no auto-resolve. Job 57 `nrr_bridge_q1_calendar_check` (`0 6 * * *`, daily 06:00 UTC) — Q1 filing deadline monitor; fires AL-FLEET-FILING-01 P1 PagerDuty `form-compliance` → compliance-officer with 7-day re-alert dedup `nrr-bridge-q1-overdue-{reporting_year}` when April 1 passed + prior-year renewal trigger met + no `enterprise.annual_nrr_bridge_filed` event; emits `enterprise.nrr_bridge_q1_overdue` HIGH/7yr on detection; `system.nrr_bridge_q1_check_passed` LOW/1yr on all-clear; auto-resolve on filing. Three SLOs: FLEET-FILING-SLO-01 (NRR Bridge filed by April 1 when trigger met, 100% zero-tolerance, CC4.1/A1.1), FLEET-FILING-SLO-02 (zero FLEET-MAT-CHAIN-01 retrospective violations, 100% zero-tolerance, CC4.1/A1.1), FLEET-FILING-SLO-03 (NRR-BRIDGE-INV-01 passes 100% of filed events, 100% zero-tolerance, CC4.1 — structurally enforced at Worker write layer via HTTP 422 before persistence, not by pg_cron). SOC 2 evidence artefact FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr; R2 `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv`; SOC2_READINESS §79.4 registration pending §63.9 item 6 P1/M15). Four new DEC-030 event types pending AUDIT_LOG_SCHEMA.md registration (§63.9 item 3 P0/M13). Privacy floor: all monitoring signals are filing-calendar booleans, chain-integrity counts, and aggregate ARR percentages — no per-tenant breakdown, no employee user_id, no GDPR Art. 9 data. Cross-reference obligations: AUDIT_LOG_SCHEMA.md (P0/M13), COST_MODEL §49.9 (P1/M13), SOC2_READINESS §79.4 (P1/M15). Document header v5.9.2 → v5.10.0. Owner: compliance-officer + devops-lead + enterprise-architect.*
