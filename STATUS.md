@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.54.0** — 2026-06-30 · post-2882 · «Підтримка чи прогрес: чому ці цілі вимагають різних програм — і різного мислення» · series «Мінімальна ефективна доза» 2876–2885 (7/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2882 · README: series 2926–2935 «Що я насправді знаю про своє тренування» proposed · next: post-2883 («Ознаки, що "мінімум" став занадто малим: коли треба розширюватись»)
+
 **v10.53.0** — 2026-06-30 · post-2881 · «Мінімалістична програма при максимальному стресі: алгоритм рішення» · series «Мінімальна ефективна доза» 2876–2885 (6/10) · clinical-safety CONDITIONAL PASS · sports-scientist review pending · blog.html card added for post-2881 · next: post-2882 (різниця між «підтримкою» і «прогресом» — і коли яка з них правильна ціль)
 
 ---
