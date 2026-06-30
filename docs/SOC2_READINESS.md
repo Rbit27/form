@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.55.1
+# FORM · SOC 2 Type II Readiness v3.55.2
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -22480,8 +22480,13 @@ DELETION SCOPE
 This certificate confirms that FORM has permanently and
 irreversibly deleted all personal data processed on behalf of
 {Customer legal entity name} under the Data Processing Agreement
-dated {DPA date}, in accordance with GDPR Art. 28(3)(g) and
-Art. 17(1)(b).
+dated {DPA execution date — ISO 8601, e.g. 2026-08-15}.
+Processing activities covered: on-device CV coaching, wearable
+integration, AI-assisted workout programming, and enterprise
+administration as specified in the Data Processing Agreement
+Exhibit A, in accordance with GDPR Art. 28(3)(g) and
+Art. 17(1)(b). All specified processing activities have now
+concluded for this tenant as of the deletion date above.
 
 Data deleted from FORM's production database:
 
@@ -22615,7 +22620,7 @@ Artifacts for each tenant are stored in the private `form-compliance` repo under
 
 | OQ | Question | Owner | Priority | Target |
 |---|---|---|---|---|
-| **OQ-TDD-01** | **Should the destruction certificate include the customer's DPA execution date and a reference to the specific Art. 28 processing activities (PA-01…PA-12 from `docs/GDPR_DPIA.md`) that have now ended?** Adding DPIA cross-references strengthens the Art. 17 paper trail but increases certificate length. Recommendation: include DPA date and a one-line summary of processing activities; omit individual PA IDs (too technical for privacy officers). | compliance-officer | **P1** | Before first certificate issuance |
+| **OQ-TDD-01** | **Should the destruction certificate include the customer's DPA execution date and a reference to the specific Art. 28 processing activities (PA-01…PA-12 from `docs/GDPR_DPIA.md`) that have now ended?** Adding DPIA cross-references strengthens the Art. 17 paper trail but increases certificate length. Recommendation: include DPA date and a one-line summary of processing activities; omit individual PA IDs (too technical for privacy officers). | compliance-officer | 🟢 **Resolved** | 🟢 **Resolved — 2026-06-29 (§128.3, v3.53.0). §67.7 DELETION SCOPE block updated v3.55.2 (2026-06-30).** Decision: ISO 8601 DPA execution date + one-line processing activities summary per §128.3 boilerplate; individual DPIA PA IDs (PA-01…PA-12) omitted from certificate face. |
 | **OQ-TDD-02** | **Can FORM commit to accelerated cold backup purge (< 30 days) for enterprise customers who contractually require it?** Standard policy is 90-day rotation. Accelerated purge requires identifying and deleting individual snapshots by tenant prefix in R2 — technically feasible (TDD-P2-02) but operationally expensive. Recommendation: offer as an Enterprise+ add-on (not standard); charge $500 one-time for manual execution pre-automation. | devops-lead + compliance-officer | **P1** | First regulated-industry pilot |
 | **OQ-TDD-03** | **Should FORM disclose the count of tenant data deletions performed per year in the annual SOC 2 transparency report?** Aggregate count (not customer identities) would demonstrate the control is operationally active, not just documented. Risk: zero deletions in year 1 looks like unused controls. Recommendation: include once FORM has executed at least two real deletions. | compliance-officer | **P2** | First SOC 2 annual renewal |
 
@@ -32837,7 +32842,7 @@ The following pre-gate checklist defines the 14 items that must be completed or 
 |---|---|---|---|---|---|
 | 1 | Execute pre-gate checklist (§128.4.1 PG-Q3-01 through PG-Q3-14): all 14 items completed and recorded in `compliance/calendar/q3-2026-access-review.md` with §128 cross-reference. | compliance-officer | **P0** | 2026-07-17 | [ ] |
 | 2 | Execute Q3 2026 access review (§23.4 Steps 1–6): run §128.2 query against production; compare to `authorized-roster.md`; deprovision any inactive accounts within 24h; file artefact at `compliance/access-review/2026-q3/access-review-2026-Q3.md`; compute SHA-256; emit `system.access_review_completed` DEC-030 event with `review_quarter: "2026-Q3"`. | compliance-officer | **P0** | 2026-07-31 | [ ] |
-| 3 | Update §67.7 DELETION SCOPE block wording per §128.3 before TDD-P0-04 PDF draft execution: add `Processing activities covered:` line with approved boilerplate. | compliance-officer | **P1** | Before TDD-P0-04 (M6) | [ ] |
+| 3 | Update §67.7 DELETION SCOPE block wording per §128.3 before TDD-P0-04 PDF draft execution: add `Processing activities covered:` line with approved boilerplate. | compliance-officer | **P1** | Before TDD-P0-04 (M6) | [x] **Done — 2026-06-30 (v3.55.2):** §67.7 DELETION SCOPE block updated with ISO 8601 DPA execution date spec and full `Processing activities covered:` boilerplate per §128.3 exact wording; §67.11 OQ-TDD-01 status patched 🟡 → 🟢 Resolved. |
 | 4 | If any pilot tenant admin roles are returned by §128.2 at Q3 execution: note `tier = 'pilot'` in the artefact CC5.3 section and document that the OQ-AR-01 decision in §128.1 applies — same 24h deprovisioning SLA, same control effectiveness rating criteria. | compliance-officer | **P1** | 2026-07-31 (if applicable) | [ ] |
 | 5 | Resolve OQ-AR-02 before enterprise GA (M13): if any pilot or enterprise customer requests SIEM export, confirm MSA Addendum 4 (OBSERVABILITY §47) is executed and `siem.consent_addendum_signed` DEC-030 event is emitted before `siem.tenant_export_enabled`; confirm no `system.access_review_completed` event is pushed to the default `siem.*` stream without a separate `form.compliance_event` topic configuration. Owner: compliance-officer + security-engineer. | compliance-officer + security-engineer | **P2** | Before enterprise GA (M13) | [ ] |
 | 6 | Update `compliance/calendar/q3-2026-access-review.md` v1.0 (committed 2026-06-05) to add §128 cross-reference: one-line entry "OQ-AR-01 and OQ-TDD-01 resolved — see SOC2_READINESS.md §128, v3.53.0, 2026-06-29." | compliance-officer | **P0** | 2026-07-17 pre-gate | [x] **Done — 2026-06-29 (v1.1):** cross-reference header updated, blockquote note added, Step 1 pilot-tenant bullet updated to §128.1 query extension. |
@@ -32989,6 +32994,8 @@ One row added to the §79.4 master evidence table (count 99 → 100):
 | 3 | Add ADMIN-RPT-E-001 to §79.5 compliance calendar at Month O+12 (first annual filing); confirm §79.5 quarterly calendar does not require ADMIN-RPT-E interim entries (artefact is annual). | compliance-officer | **P2** | Month O+1 calendar review | [ ] |
 
 ---
+
+*v3.55.2 (2026-06-30): §67.7 Destruction Certificate DELETION SCOPE block updated — OQ-TDD-01 template application (§128.3, v3.53.0). Closes §128.6 item 3 (P1/before TDD-P0-04): §67.7 DELETION SCOPE paragraph reworded to (1) clarify `{DPA date}` placeholder as ISO 8601 DocuSign completion date (`{DPA execution date — ISO 8601, e.g. 2026-08-15}`), and (2) insert `Processing activities covered: on-device CV coaching, wearable integration, AI-assisted workout programming, and enterprise administration as specified in the Data Processing Agreement Exhibit A` immediately after the DPA date reference, followed by the GDPR Art. 28(3)(g) / Art. 17(1)(b) citations and a closing sentence confirming all processing activities have concluded for the tenant. The AUDIT TRAIL and RETAINED DATA blocks are unchanged. §67.11 OQ-TDD-01 table row patched: Priority column `**P1**` → `🟢 **Resolved**`; Target column updated with resolution record (§128.3, v3.53.0; §67.7 applied v3.55.2 2026-06-30). Document header v3.55.1 → v3.55.2. Owner: compliance-officer. Cross-references: `docs/SOC2_READINESS.md §128.3` (OQ-TDD-01 resolution — decision, approved boilerplate, and implementation note: "before TDD-P0-04 PDF draft, the §67.7 Markdown template is the authoritative specification"); `docs/SOC2_READINESS.md §128.6 item 3` (implementation obligation — [x] Done this patch); `docs/SOC2_READINESS.md §67.8` (TDD-E-002 signed certificate PDF uses §67.7 as template — PDF draft per TDD-P0-04 must match the updated wording); `docs/SOC2_READINESS.md §67.10 TDD-P0-04` (remaining open: draft §67.7 as fillable PDF; updated Markdown template is now the correct source of truth).*
 
 *v3.55.1 (2026-06-29): §128.6 item 6 closed — `compliance/calendar/q3-2026-access-review.md` updated to v1.1: §128 cross-reference added to header; blockquote OQ-AR-01/OQ-TDD-01 resolution note added above Gate section; Step 1 pilot-tenant bullet updated to reference §128.1 query extension (`WHERE t.tier IN ('enterprise', 'pilot')`). Document header v3.55.0 → v3.55.1. Owner: compliance-officer.*
 

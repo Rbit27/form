@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.22.1] — 2026-06-30
+
+### Changed
+- `docs/SOC2_READINESS.md §67.7` — Destruction Certificate DELETION SCOPE block updated per OQ-TDD-01 resolution (§128.3, v3.53.0): `{DPA date}` placeholder clarified as ISO 8601 DocuSign completion date; `Processing activities covered:` boilerplate line inserted (on-device CV coaching, wearable integration, AI-assisted workout programming, enterprise administration per DPA Exhibit A); GDPR Art. 28(3)(g)/Art. 17(1)(b) citations and closing sentence added. AUDIT TRAIL and RETAINED DATA blocks unchanged. Closes `§128.6 item 3` (P1/before TDD-P0-04). §67.11 OQ-TDD-01 status patched 🟡 → 🟢 Resolved. compliance-officer + security-engineer.
+- `VERSION` — 10.22.0 → 10.22.1.
+
+---
+
 ## [10.22.0] — 2026-06-30
 
 ### Added
