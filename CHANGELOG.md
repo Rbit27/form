@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.49.0] — 2026-06-30
+
+### Added
+- `content/post-2877-training-twice-per-week-what-is-real.md` — Series «Мінімальна ефективна доза» 2876–2885 · 2/10. «Тренування 2× на тиждень: що реально можна і що — ні». Covers: definition disambiguation (frequency-per-muscle vs. frequency-per-session vs. matched-volume comparisons); strength outcomes at 2× per muscle (Colquhoun et al. 2018 — volume, not frequency, drives maximal strength; McLester et al. 2000 — trained vs untrained differences); hypertrophy ceiling at 2× (Schoenfeld et al. 2016, 2019 meta-analyses; Zaroni et al. 2019 — 5× advantage in hypertrophy at equal volume); maintenance as underrated use case (Bickel et al. 2011); two structural failure modes (split = 1× per muscle, not 2×; low volume + low intensity at low frequency); Full Body architecture as default for 2× frequency; practical strength-gain rate orientations from Oranchuk et al. (2019); four-question personal audit. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2877 card added at top of feed (before post-2876).
+
+### Changed
+- `STATUS.md` — current version updated to v10.49.0; series «Мінімальна ефективна доза» 2/10; next: post-2878.
+- `VERSION` — 10.48.1 → 10.49.0.
+
+---
+
 ## [10.48.1] — 2026-06-30
 
 ### Changed
