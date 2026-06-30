@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.50.0] — 2026-06-30
+
+### Added
+- `content/post-2878-minimum-volume-strength-vs-hypertrophy-maintenance.md` — Series «Мінімальна ефективна доза» 2876–2885 · 3/10. «Мінімальний об'єм для підтримання: сила і гіпертрофія — різні числа». Covers: structural vs. neural adaptation as the core mechanism behind different maintenance thresholds; strength maintenance data (Androulakis-Korakakis et al. 2020 — 1–2 sets/muscle/week at high intensity sufficient; Bickel et al. 2011 — 1/9 training volume retains strength at 32 weeks); hypertrophy maintenance floor (Schoenfeld et al. 2017 — dose-response meta-analysis; Ralston et al. 2017 — min 6–8 effective sets/muscle/week); detraining timelines for both adaptations; myonuclear permanence and muscle memory (Bruusgaard et al. 2010, Kostoglou et al. 2021); practical table by goal and context; common mistake of reducing intensity instead of volume. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2878 card added at top of feed (before post-2877).
+
+### Changed
+- `STATUS.md` — current version updated to v10.50.0; series «Мінімальна ефективна доза» 3/10; next: post-2879.
+- `VERSION` — 10.49.0 → 10.50.0.
+
+---
+
 ## [10.49.0] — 2026-06-30
 
 ### Added

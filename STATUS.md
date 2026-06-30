@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.49.0** — 2026-06-30 · post-2877 · «Тренування 2× на тиждень: що реально можна і що — ні» · series «Мінімальна ефективна доза» 2876–2885 (2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2877 · next: post-2878 (мінімальний об'єм для підтримання сили vs. гіпертрофії)
+**v10.50.0** — 2026-06-30 · post-2878 · «Мінімальний об'єм для підтримання: сила і гіпертрофія — різні числа» · series «Мінімальна ефективна доза» 2876–2885 (3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2878 · next: post-2879 (коли 45-хвилинна сесія краща за двогодинну)
 
 ---
 
