@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.28.0** — 2026-06-30 · post-2852 (no-reprogram-after-bad-session · editorial) · Series 2846–2855 «Рішення під тиском» 7/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending
+**v10.29.0** — 2026-06-30 · posts 2853–2855 · Series 2846–2855 «Рішення під тиском» COMPLETE (10/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · Next series: 2856–2865 «Повернення після паузи»
 
 ---
 
