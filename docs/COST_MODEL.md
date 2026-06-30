@@ -377,6 +377,7 @@
     - 49.11 Cross-Reference Index
 50. [OQ-ENTERPRISE-ARR-04 Resolution — `evidence_artefact_id` Optionality & FLEET-MAT-CHAIN-02 (DEC-087)](#50--oq-enterprise-arr-04-resolution--evidence_artefact_id-schema-optionality-confirmed--fleet-mat-chain-02-evidence-linkage-invariant-dec-087)
 51. [§51 · OQ-CS-03 Resolution — Tiered k-Anonymity Floor for QBR Aggregate Metrics (DEC-088)](#51--oq-cs-03-resolution--tiered-k-anonymity-floor-for-qbr-aggregate-metrics-dec-088)
+52. [§52 · OQ-CS-04 Resolution — FEHS Signal Breakdown in `enterprise.qbr_completed` (DEC-089)](#52--oq-cs-04-resolution--fehs-signal-breakdown-in-enterpriseqbr_completed-dec-089)
     - 51.1 Background
     - 51.2 Decision (DEC-088) — Tiered k-Anonymity Framework
     - 51.3 Decision Rationale
@@ -4829,9 +4830,11 @@ The FEHS score computed in §26.9.1 uses data that is already visible to custome
 
 `§51` provides the formal compliance-officer ruling: tiered k-anonymity framework with k ≥ 5 (Tier 1, engagement) for all §40.4 current QBR metrics, and k ≥ 10 (Tier 2, health-adjacent) as prerequisite for any future health-adjacent aggregate inclusion. Absolute prohibition for body composition, mental health signals, ED-screening, and biometric data regardless of cohort size. QBR-K-ANON-01 invariant formalises the k-floor check as a component of the CSM `privacy_floor_verified` attestation (QBR-PRIV-01). No Zod schema change. See `docs/COST_MODEL.md §51` for full rationale and DEC-088 decision record.
 
-**OQ-CS-04: Should `fehs_score_at_qbr` in the `enterprise.qbr_completed` event include the individual signal weights?**
+**OQ-CS-04: Should `fehs_score_at_qbr` in the `enterprise.qbr_completed` event include the individual signal weights? — 🟢 RESOLVED DEC-089 (v2.25.0, 2026-06-30)**
 
 The `enterprise.qbr_completed` event records the FEHS score at the time of the QBR but not the breakdown by signal (activation, WAU, seat trend, etc.). Including the signal breakdown in the event payload would enable retrospective analysis of which signal types most reliably predict churn. Excluding it keeps the event payload simpler and reduces the risk of a future schema interpretation error. Risk: without signal-level granularity in the QBR event, the churn prediction model (§26.9.2) can only be calibrated against total FEHS score, not individual signals. Owner: data-engineer. Priority: **P2.** Resolution: include signal weights in a `fehs_breakdown` JSONB field from Day 1 — retrofitting this after 12 months of QBR data is significantly more expensive than including it upfront.
+
+`§52` provides the formal resolution: `fehs_breakdown` added as optional field (→ required at M10 Admin Console modal launch) containing all six signal scores and their weights; FEHS-CHAIN-01 invariant enforces score consistency; all six signals are tenant-aggregate only (privacy floor preserved). See `docs/COST_MODEL.md §52` and DEC-089.
 
 ---
 
@@ -14058,3 +14061,125 @@ Applied in this authoring pass:
 ---
 
 *v2.24.0 (2026-06-30): §51 OQ-CS-03 Resolution — Tiered k-Anonymity Floor for QBR Aggregate Metrics (DEC-088). Closes OQ-CS-03 (P1, §26.12 — k-anonymity floor for health-adjacent QBR metrics; before first QBR). Decision: Tier 1 engagement metrics (all six current §40.4 metrics: activated seats, WAU rate, coaching engagement rate, workout log rate, streak cohort size ≥ 5, Victor session volume) retain k ≥ 5 floor, consistent with DEC-085 admin dashboard precedent (OBSERVABILITY v5.9.1, 2026-06-29). Tier 2 health-adjacent aggregates (workout frequency distributions, recovery score averages, sleep aggregates) require k ≥ 10 — threshold activates only if §40.4 is amended to include such metrics (requires new DEC + compliance-officer sign-off). Absolute prohibition (body composition, mental health signals, ED-screening, biometric trends) applies regardless of cohort size per ENTERPRISE.md privacy floor. New named invariant QBR-K-ANON-01: CSM attestation (`privacy_floor_verified: true`, QBR-PRIV-01) explicitly covers k-floor compliance; Admin Console modal copy update pending M10 (§51.7 item 1); no Zod schema change. §26.8.3 in-line patch: k-floor note updated to cite §51.2 tiered framework; Tier 2 row inserted in QBR content table. §26.12 OQ-CS-03 patched 🟡 → 🟢 Resolved DEC-088. TOC entry §51 added. DEC-088 registered in `docs/DECISION_LOG.md`. Document header v2.23.4 → v2.24.0. Privacy floor: no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §51 construct — §51 governs aggregate thresholds only. Cross-references: `docs/COST_MODEL.md §26.8.3` (QBR content table — in-line patch this pass); `docs/COST_MODEL.md §26.12` (OQ-CS-03 — 🟢 Resolved); `docs/COST_MODEL.md §40.4` (QBR permissible metrics — all six remain Tier 1; Tier 2 threshold is preventive); `docs/OBSERVABILITY.md §62` (DEC-085 — k-floor N ≥ 5 for admin dashboard MVs — Tier 1 precedent); `docs/DATA_MODEL.md §17` (admin dashboard k-anon n ≥ 5 enforcement — §51 Tier 1 floor consistent); `docs/ENTERPRISE.md §Privacy floor` (absolute prohibition source — ENTERPRISE.md §7 items 6–7); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Adoption Monitoring events` (`enterprise.qbr_completed` QBR-PRIV-01 — schema unchanged); `docs/DECISION_LOG.md DEC-088` (formal decision record — P0 this pass). Owner: compliance-officer + clinical-safety.*
+
+---
+
+## 52. §52 · OQ-CS-04 Resolution — FEHS Signal Breakdown in `enterprise.qbr_completed` (DEC-089)
+
+### 52.1 Background and Resolution Direction
+
+§26.12 OQ-CS-04 posed the question: should `enterprise.qbr_completed` include per-signal FEHS scores in addition to the aggregate `fehs_score_at_qbr`? The concern was twofold:
+
+1. **Churn model calibration**: without signal-level granularity, the §26.9.2 churn prediction model can only train on total FEHS score, missing the diagnostic power of individual signals (which signal drove the decline: activation? WAU? executive disengagement?).
+2. **Retrofit cost**: adding `fehs_breakdown` retroactively after 12 months of QBR data means backfilling historical events is impossible without regenerating them from health score snapshots — expensive and potentially lossy if snapshots were not retained.
+
+DEC-089 resolves: **include `fehs_breakdown` from Day 1 as an optional field**, transitioning to required at M10 Admin Console modal launch. This matches the resolution direction already stated in §26.12 and avoids the retrofit cliff.
+
+### 52.2 Decision Analysis
+
+| Option | Description | Verdict |
+|---|---|---|
+| **A: Include `fehs_breakdown` from Day 1 (optional → required at M10)** | Six signal scores + their weights carried in every `qbr_completed` event. Optional now so Worker accepts historical replays; required at M10 when Admin Console modal auto-populates from `health_score_updated`. | ✅ **Chosen (DEC-089)** |
+| **B: Exclude — record only `fehs_score_at_qbr`** | Simpler payload today; rely on snapshot join for retrospective analysis. | ❌ Rejected: snapshot-to-QBR join is unreliable at scale; retrofit cost estimated 3–5 engineering days + data integrity risk. |
+| **C: Store breakdown in a separate `enterprise.qbr_fehs_snapshot` event** | Decouples QBR event from FEHS state. | ❌ Rejected: creates a mandatory two-event compound transaction with no gain over Option A; increases audit log complexity. |
+
+**Tie-breaker principle:** the §26.9 FEHS churn model is a core CS moat; degrading its training signal to save 6 numeric fields per QBR event is not a viable trade-off.
+
+### 52.3 `fehs_breakdown` Schema
+
+The `QbrCompletedPayload` Zod schema in `docs/AUDIT_LOG_SCHEMA.md` is extended as follows (see §52.6 for the formal obligation):
+
+```typescript
+// Extension to enterprise.qbr_completed — COST_MODEL §52 / DEC-089
+fehs_score_at_qbr: z.number().min(0).max(100).optional(),
+// Total FEHS composite score (0–100) at QBR time. Optional now; required at M10.
+
+fehs_breakdown: z.object({
+  activation_pct:         z.number().min(0).max(100), // signal 1: activated/contracted × 100 (weight 25%)
+  wau_pct:                z.number().min(0).max(100), // signal 2: WAU/contracted × 100 (weight 25%)
+  seat_utilisation_pct:   z.number().min(0).max(100), // signal 3: habitual/contracted × 100 (weight 20%)
+  exec_engagement_score:  z.number().min(0).max(100), // signal 4: exec attendance cadence (weight 15%)
+  support_volume_inverse: z.number().min(0).max(100), // signal 5: 100 − min(tickets_30d/floor,100) (weight 10%)
+  renewal_distance_score: z.number().min(0).max(100), // signal 6: decay from days_until_renewal (weight 5%)
+}).optional(),
+// Optional now; required at M10 Admin Console modal launch (modal auto-populates from health_score_updated).
+// Privacy floor: all six signals are tenant-aggregate only — no individual user_id, name, or health value.
+```
+
+**FEHS-CHAIN-01 invariant** (enforced by `emit-audit-event` Cloudflare Worker, checked after QBR-PRIV-01 and before Zod validation):
+
+| Check | HTTP | Error code |
+|---|---|---|
+| `fehs_score_at_qbr` present **and** `fehs_breakdown` absent | 422 | `FEHS_CHAIN_01_BREAKDOWN_REQUIRED` |
+| `fehs_breakdown` present **and** `fehs_score_at_qbr` absent | 422 | `FEHS_CHAIN_01_SCORE_REQUIRED` |
+| `abs(weighted_sum(fehs_breakdown) − fehs_score_at_qbr) > 0.5` | 422 | `FEHS_CHAIN_01_SCORE_MISMATCH` |
+
+Weighted sum formula: `(activation_pct × 0.25) + (wau_pct × 0.25) + (seat_utilisation_pct × 0.20) + (exec_engagement_score × 0.15) + (support_volume_inverse × 0.10) + (renewal_distance_score × 0.05)`
+
+Tolerance ±0.5 accommodates floating-point rounding in the Admin Console frontend before the value is sent to the Worker.
+
+### 52.4 Privacy Floor
+
+All six signals in `fehs_breakdown` are tenant-aggregate metrics derived exclusively from aggregates that already appear in `enterprise.health_score_updated`:
+
+| Signal | Source aggregate | Contains individual data? |
+|---|---|---|
+| `activation_pct` | `activated_seats / contracted_seats × 100` | No — seat count only |
+| `wau_pct` | `wau_count / contracted_seats × 100` | No — headcount aggregate |
+| `seat_utilisation_pct` | `habitual_seats / contracted_seats × 100` | No — headcount aggregate |
+| `exec_engagement_score` | CSM-assessed attendance cadence (0–100) | No — CSM scoring, no employee identity |
+| `support_volume_inverse` | `100 − min(tickets_30d / floor, 100)` | No — ticket count only, no ticket content |
+| `renewal_distance_score` | Decay function of `days_until_renewal` | No — date arithmetic only |
+
+**Hard prohibitions (unchanged from ENTERPRISE.md privacy floor):**
+- No individual `user_id`, name, email, or health value in any `fehs_breakdown` field
+- No GDPR Art. 9 special-category data (body composition, mental health, ED-screening, biometric trends)
+- HR systems never receive any field from `fehs_breakdown`
+
+k-anonymity: `fehs_breakdown` contains headcount-derived rates, not individual counts; the k-floor enforcement from §51 (QBR-K-ANON-01, Tier 1 k ≥ 5) applies to the source aggregates in `health_score_updated` before they are surfaced in any QBR context — `fehs_breakdown` inherits this guarantee automatically.
+
+### 52.5 Admin Console Integration
+
+The Admin Console "Complete QBR" modal (M10 milestone) will auto-populate `fehs_score_at_qbr` and `fehs_breakdown` from the most recent `enterprise.health_score_updated` event for the tenant. Workflow:
+
+1. CSM opens "Complete QBR" modal for tenant.
+2. Modal queries `SELECT * FROM enterprise_events WHERE tenant_id = $1 AND event_type = 'enterprise.health_score_updated' ORDER BY occurred_at DESC LIMIT 1` via Admin Console API.
+3. Modal pre-fills `fehs_score_at_qbr` (total) and all six `fehs_breakdown` signals from the snapshot.
+4. CSM reviews pre-filled values, attests `privacy_floor_verified` (QBR-PRIV-01 + QBR-K-ANON-01), and submits.
+5. Worker validates FEHS-CHAIN-01 invariant before accepting the event.
+
+At M10, `fehs_breakdown` transitions from optional to required in the Zod schema. The Worker will begin returning 422 `FEHS_CHAIN_01_BREAKDOWN_REQUIRED` for any `qbr_completed` submitted without it. Backfill of pre-M10 events is explicitly out of scope — historical events without `fehs_breakdown` are valid and complete for compliance purposes.
+
+### 52.6 AUDIT_LOG_SCHEMA Update Obligation
+
+`docs/AUDIT_LOG_SCHEMA.md` must be updated (this authoring pass, P0):
+
+1. Bump document header: `v2.65` → `v2.66`
+2. In `QbrCompletedPayload` (currently lines 2947–2959): add `fehs_score_at_qbr` and `fehs_breakdown` optional fields after `privacy_floor_verified`.
+3. Add FEHS-CHAIN-01 invariant comment block immediately after the new fields.
+4. Add version note referencing DEC-089 and §52.
+
+### 52.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update `QbrCompletedPayload` in `docs/AUDIT_LOG_SCHEMA.md` to add `fehs_score_at_qbr` + `fehs_breakdown` + FEHS-CHAIN-01 invariant comment. | compliance-officer | **P0** | This authoring pass | [x] **Done — AUDIT_LOG_SCHEMA v2.66 (2026-06-30).** |
+| 2 | Implement FEHS-CHAIN-01 check in `emit-audit-event` Cloudflare Worker (after QBR-PRIV-01, before Zod validation). | security-engineer | **P1** | M9 (before first enterprise pilot QBR) | [ ] |
+| 3 | Update Admin Console "Complete QBR" modal to auto-populate `fehs_score_at_qbr` and `fehs_breakdown` from latest `health_score_updated` snapshot. | platform-engineer | **P1** | M10 (Admin Console modal launch) | [ ] |
+| 4 | Update §26.12 OQ-CS-04 status 🟡 → 🟢 Resolved (DEC-089). | compliance-officer | **P0** | This authoring pass | [x] **Done — inline patch (v2.25.0, 2026-06-30).** |
+| 5 | Register DEC-089 in `docs/DECISION_LOG.md`. | compliance-officer | **P0** | This authoring pass | [x] **Done — DEC-089 registered (2026-06-30).** |
+| 6 | Transition `fehs_breakdown` from optional to required in Zod schema at M10 (coordinate with Admin Console modal launch). | data-engineer | **P2** | M10 | [ ] |
+
+### 52.8 Cross-Reference Obligations Created by §52
+
+| Obligation | Source | Status |
+|---|---|---|
+| `AUDIT_LOG_SCHEMA.md` v2.66 — add `fehs_score_at_qbr` + `fehs_breakdown` to `QbrCompletedPayload` | §52.6 / §52.7 item 1 | 🟢 **Done — 2026-06-30** |
+| DEC-089 registered in `docs/DECISION_LOG.md` | §52.7 item 5 | 🟢 **Done — 2026-06-30** |
+| `emit-audit-event` Worker — FEHS-CHAIN-01 check implementation | §52.3 / §52.7 item 2 (P1/M9) | 🟡 Pending — before first pilot QBR |
+| Admin Console "Complete QBR" modal — auto-populate from `health_score_updated` | §52.5 / §52.7 item 3 (P1/M10) | 🟡 Pending — M10 |
+| `fehs_breakdown` optional → required transition in Zod schema | §52.7 item 6 (P2/M10) | 🟡 Pending — M10 (coordinate with modal launch) |
+
+---
+
+*v2.25.0 (2026-06-30): §52 OQ-CS-04 Resolution — FEHS Signal Breakdown in `enterprise.qbr_completed` (DEC-089). Closes OQ-CS-04 (P2, §26.12 — should `fehs_score_at_qbr` include per-signal breakdown; include from Day 1). Decision: add `fehs_breakdown` as optional field (→ required at M10) carrying all six FEHS signal scores with weights; `fehs_score_at_qbr` (total composite, 0–100) added as co-optional sibling. New FEHS-CHAIN-01 Worker invariant: score + breakdown must be co-present; |weighted_sum − fehs_score_at_qbr| ≤ 0.5; HTTP 422 on any violation (three error codes: FEHS_CHAIN_01_BREAKDOWN_REQUIRED, FEHS_CHAIN_01_SCORE_REQUIRED, FEHS_CHAIN_01_SCORE_MISMATCH). Admin Console "Complete QBR" modal to auto-populate from latest `health_score_updated` at M10; `fehs_breakdown` transitions optional → required at M10 in lockstep. Privacy floor: all six signals are tenant-aggregate only — headcount rates and date arithmetic; no individual `user_id`, name, email, or health value; HR systems excluded; k-floor inherited from QBR-K-ANON-01 (§51). AUDIT_LOG_SCHEMA.md updated v2.65 → v2.66 (P0, this pass). §26.12 OQ-CS-04 patched 🟡 → 🟢 Resolved DEC-089. TOC entry §52 added. DEC-089 registered in `docs/DECISION_LOG.md`. Document header v2.24.0 → v2.25.0. Cross-references: `docs/AUDIT_LOG_SCHEMA.md` (`QbrCompletedPayload` v2.66 — fehs fields + FEHS-CHAIN-01); `docs/DECISION_LOG.md DEC-089` (formal decision record); `docs/COST_MODEL.md §26.9` (FEHS composite definition — six signals, weights); `docs/COST_MODEL.md §26.10` (`enterprise.health_score_updated` source event for Admin Console pre-population); `docs/COST_MODEL.md §26.12` (OQ-CS-04 — 🟢 Resolved); `docs/COST_MODEL.md §51` (QBR-K-ANON-01 — k-floor inheritance); `docs/ENTERPRISE.md §Privacy floor` (absolute prohibition source). Owner: compliance-officer + data-engineer + security-engineer.*

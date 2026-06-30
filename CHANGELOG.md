@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.70.1] — 2026-06-30
+
+### Added
+- `docs/COST_MODEL.md §52` — OQ-CS-04 Resolution: FEHS Signal Breakdown in `enterprise.qbr_completed` (DEC-089, v2.25.0). Closes §26.12 OQ-CS-04 (P2). Decision: add `fehs_breakdown` (six signal scores with weights) + `fehs_score_at_qbr` to `enterprise.qbr_completed` as optional fields, required at M10 Admin Console modal launch. New FEHS-CHAIN-01 Worker invariant enforces score ↔ breakdown co-presence and ±0.5 score consistency. Privacy floor: all six signals are tenant-aggregate only (QBR-K-ANON-01 Tier 1 k ≥ 5 inherited). Cross-refs: AUDIT_LOG_SCHEMA.md v2.66, DECISION_LOG.md DEC-089.
+- `docs/DECISION_LOG.md DEC-089` — Formal decision record for OQ-CS-04 resolution (FEHS signal breakdown).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.65 → v2.66: `QbrCompletedPayload` extended with `fehs_score_at_qbr` + `fehs_breakdown` + FEHS-CHAIN-01 invariant documentation.
+- `docs/COST_MODEL.md §26.12` — OQ-CS-04 patched 🟡 → 🟢 Resolved DEC-089 with §52 pointer.
+- `VERSION` — 10.70.0 → 10.70.1.
+
+---
+
 ## [10.70.0] — 2026-06-30
 
 ### Added

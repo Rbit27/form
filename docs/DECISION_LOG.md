@@ -15,6 +15,15 @@
 
 ## 2026-06-30
 
+### DEC-089 · OQ-CS-04 Resolution: FEHS Signal Breakdown in `enterprise.qbr_completed`
+
+- **Decision:** Add `fehs_breakdown` (six signal scores with weights) and `fehs_score_at_qbr` (total composite 0–100) to `enterprise.qbr_completed` as optional fields, transitioning to required at M10 Admin Console modal launch. New FEHS-CHAIN-01 Worker invariant: score + breakdown must be co-present; |weighted_sum − fehs_score_at_qbr| ≤ 0.5 tolerance for floating-point rounding; HTTP 422 on any violation (three error codes: `FEHS_CHAIN_01_BREAKDOWN_REQUIRED`, `FEHS_CHAIN_01_SCORE_REQUIRED`, `FEHS_CHAIN_01_SCORE_MISMATCH`). Admin Console "Complete QBR" modal auto-populates from latest `enterprise.health_score_updated` snapshot. Full rationale in `docs/COST_MODEL.md §52`. Schema in `docs/AUDIT_LOG_SCHEMA.md v2.66`.
+- **Owner:** compliance-officer + data-engineer + security-engineer
+- **Why:** (1) Churn model (§26.9.2) requires per-signal granularity to identify which signal drives decline — total FEHS score alone is insufficient for calibration. (2) Retrofitting after 12 months of QBR data requires backfill from health score snapshots — expensive and lossy if snapshots not retained. (3) Admin Console modal launch (M10) creates natural transition point from optional to required — frontend auto-population removes CSM burden. (4) Privacy floor preserved: all six signals are tenant-aggregate rates (headcount arithmetic only), identical privacy profile to existing `health_score_updated` aggregates.
+- **Reverse cost:** Low. Fields optional until M10 — removing them before M10 is a Zod schema rollback + Worker FEHS-CHAIN-01 removal with no data loss. After M10: historical QBR events without `fehs_breakdown` remain valid (no backfill required); removing from schema would break Admin Console modal auto-populate.
+
+---
+
 ### DEC-088 · OQ-CS-03 Resolution: Tiered k-Anonymity Floor for QBR Aggregate Metrics
 
 - **Decision:** Tiered k-anonymity framework for all QBR aggregate metrics: Tier 1 (engagement) k ≥ 5 — activated seats, WAU rate, coaching engagement rate, workout log rate, streak cohort size, Victor session volume (all §40.4 current metrics); Tier 2 (health-adjacent) k ≥ 10 — prerequisite for any future inclusion of workout frequency distributions, recovery score averages, sleep aggregates (not currently in §40.4 scope); Absolute prohibition — body composition, mental health signals, ED-screening, biometric data may never appear in QBR materials regardless of cohort size. New named invariant QBR-K-ANON-01 extends QBR-PRIV-01 attestation to explicitly cover k-floor compliance. No Zod schema change. Full rationale in `docs/COST_MODEL.md §51`.

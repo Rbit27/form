@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.65
+# FORM · Audit Log Schema v2.66
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -2944,7 +2944,7 @@ export const AdoptionHealthDowngradedPayload = z.object({
   // No user_id, no employee names, no health values
 });
 
-// enterprise.qbr_completed — COST_MODEL §40.8.4
+// enterprise.qbr_completed — COST_MODEL §40.8.4 + §52 (DEC-089)
 export const QbrCompletedPayload = z.object({
   tenant_id:                z.string().uuid(),
   qbr_date:                 z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -2956,6 +2956,24 @@ export const QbrCompletedPayload = z.object({
   expansion_discussed:      z.boolean(),
   privacy_floor_verified:   z.literal(true),   // QBR-PRIV-01 chain invariant — HTTP 422 if absent or false
   // No attendee names, no per-user engagement metrics, no coaching content
+  //
+  // FEHS breakdown — added v2.66 / DEC-089 / COST_MODEL §52
+  // Both fields optional now; required at M10 Admin Console modal launch.
+  // FEHS-CHAIN-01: if either is present, the other must also be present (HTTP 422 on violation).
+  // FEHS-CHAIN-01: |weighted_sum(fehs_breakdown) − fehs_score_at_qbr| must be ≤ 0.5 (HTTP 422 FEHS_CHAIN_01_SCORE_MISMATCH).
+  // Worker check order: QBR-PRIV-01 → FEHS-CHAIN-01 → Zod validation.
+  fehs_score_at_qbr: z.number().min(0).max(100).optional(),
+  // Total FEHS composite score (0–100) at QBR time. Formula: see COST_MODEL §26.9.
+  fehs_breakdown: z.object({
+    activation_pct:         z.number().min(0).max(100), // signal 1: activated/contracted × 100 (weight 25%)
+    wau_pct:                z.number().min(0).max(100), // signal 2: WAU/contracted × 100 (weight 25%)
+    seat_utilisation_pct:   z.number().min(0).max(100), // signal 3: habitual/contracted × 100 (weight 20%)
+    exec_engagement_score:  z.number().min(0).max(100), // signal 4: exec attendance cadence (weight 15%)
+    support_volume_inverse: z.number().min(0).max(100), // signal 5: 100 − min(tickets_30d/floor,100) (weight 10%)
+    renewal_distance_score: z.number().min(0).max(100), // signal 6: decay from days_until_renewal (weight 5%)
+    // Privacy floor: all six signals are tenant-aggregate only — no user_id, name, email, or health value.
+    // k-anonymity: inherits QBR-K-ANON-01 Tier 1 (k ≥ 5) from source health_score_updated aggregates.
+  }).optional(),
 });
 
 // system.csm_followup_overdue — ADO-CHAIN-01 advisory (LOW, non-blocking)
@@ -4760,6 +4778,8 @@ const NrrBridgeFilingMonitorRestoredSchema = z.object({
 **SOC 2 evidence:** FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr) — registered in `docs/SOC2_READINESS.md §137`. Per-activation: export of both stale/restored events for each R-53 activation. Annual zero-count: if no activations in the year, compliance-officer files an affirmative attestation confirming `R-53 activation count = 0` for the year with a supporting `pg_cron.job_run_details` health export for jobs 56 and 57.
 
 **Retention table additions:** `system.fleet_mat_chain_monitor_stale_declared` HIGH 7yr CC4.1/A1.1; `system.fleet_mat_chain_monitor_restored` LOW 3yr CC4.1; `system.nrr_bridge_filing_monitor_stale_declared` HIGH 7yr CC4.1/A1.1; `system.nrr_bridge_filing_monitor_restored` LOW 3yr CC4.1.
+
+*v2.66 (2026-06-30): `QbrCompletedPayload` extended — `fehs_score_at_qbr` (z.number().min(0).max(100).optional()) and `fehs_breakdown` (z.object with six signal scores, optional) added per DEC-089 / COST_MODEL §52. New FEHS-CHAIN-01 Worker invariant: score + breakdown must be co-present (HTTP 422 `FEHS_CHAIN_01_BREAKDOWN_REQUIRED` / `FEHS_CHAIN_01_SCORE_REQUIRED`); |weighted_sum − fehs_score_at_qbr| ≤ 0.5 (HTTP 422 `FEHS_CHAIN_01_SCORE_MISMATCH`). Worker check order: QBR-PRIV-01 → FEHS-CHAIN-01 → Zod validation. Both fields optional now; mandatory at M10 Admin Console modal launch (Admin Console auto-populates from latest `enterprise.health_score_updated`). Privacy floor: all six signals are tenant-aggregate only — `activation_pct`, `wau_pct`, `seat_utilisation_pct`, `exec_engagement_score`, `support_volume_inverse`, `renewal_distance_score`; no individual `user_id`, name, email, or health value; k-floor inherited from QBR-K-ANON-01 Tier 1 (k ≥ 5, §51). Closes COST_MODEL.md §52.6 obligation (P0 this pass). Document header v2.65 → v2.66. Owner: compliance-officer + data-engineer + security-engineer.*
 
 *v2.65 (2026-06-30): +4 events — R-53 Fleet Maturity Chain Monitor & NRR Bridge Filing Monitor Stale lifecycle (INCIDENT_RESPONSE R-53 · CC4.1/A1.1). New section `### R-53 Fleet Maturity Chain Monitor & NRR Bridge Filing Monitor Stale events` inserted before `## Export & delivery`. Events: `system.fleet_mat_chain_monitor_stale_declared` (HIGH/7yr — IC emits at R-53 activation; `r53_c5_chain_intact` bool; FLEET-MAT-STALE-CHAIN-01 anchor), `system.fleet_mat_chain_monitor_restored` (LOW/3yr — IC emits after job 56 recovery; `root_cause` H1-H4 enum), `system.nrr_bridge_filing_monitor_stale_declared` (HIGH/7yr — IC emits at R-53 activation; `r53_c6_filing_overdue` bool; NRR-FILING-STALE-CHAIN-01 anchor), `system.nrr_bridge_filing_monitor_restored` (LOW/3yr — IC emits after job 57 recovery; `q1_filing_confirmed` bool). Two chain ordering invariants: FLEET-MAT-STALE-CHAIN-01 (`stale_declared` precedes `restored` for same `ic_run_id`; HTTP 422 `FLEET_MAT_STALE_CHAIN_01_VIOLATION`) and NRR-FILING-STALE-CHAIN-01 (equivalently; HTTP 422 `NRR_FILING_STALE_CHAIN_01_VIOLATION`). Four Zod v2 schemas registered (canonical source for `emit-audit-event` Worker). Emitter: IC (compliance-officer or devops-lead) via PAM session — not automated. No PagerDuty routing (IC-lifecycle records). SOC 2 evidence: FLEET-MAT-STALE-E-001 + NRR-FILING-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr) registered in `docs/SOC2_READINESS.md §137`. Retention table: +4 rows (2× HIGH/7yr stale_declared; 2× LOW/3yr restored). Privacy floor: `ic_run_id` UUID + `job_name` literal + operational enum fields only — no employee `user_id`, no health values, no GDPR Art. 9 data. **Closes `docs/INCIDENT_RESPONSE.md R-53.11` item 1 (P0/M13 — 🟢 2026-06-30).** Cross-ref: `docs/INCIDENT_RESPONSE.md R-53` (R-53.7 event definitions + R-53.11 checklist); `docs/SOC2_READINESS.md §137` (FLEET-MAT-STALE-E-001 + NRR-FILING-STALE-E-001 registration); `docs/OBSERVABILITY.md §63` (job 56/57 monitoring layer — these are the recovery-lifecycle complements). Document header v2.64 → v2.65. Owner: compliance-officer + devops-lead.*
 
