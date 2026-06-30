@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.59.0
+# FORM · SOC 2 Type II Readiness v3.60.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -33426,3 +33426,179 @@ The status of §79.9 item 4 itself remains `[ ]` (creation of the physical CSV f
 | 3 | When NRR-BRIDGE-E-001 is first filed (Q1 of first year with ≥ 1 renewal cohort): populate MASTER-INDEX row per §134.4 step 2 — `status = COLLECTED`, `collected_at`, `sha256`, `vanta_uploaded = true`, `chain_verified = true`, `filing_year`. Recompute MASTER-INDEX SHA-256. | compliance-officer + data-engineer | **P1** | Q1 of first renewal year | [ ] |
 | 4 | When FLEET-MAT-E-001 is first filed (same Q1, after NRR-BRIDGE-E-001): populate MASTER-INDEX row per §134.4 step 3 — `status = COLLECTED`, `collected_at` ≥ NRR-BRIDGE-E-001 `collected_at`, `sha256`, `vanta_uploaded = true`, `chain_verified = true`, `filing_year`, `fleet_mat_chain_01_verified = true`. | compliance-officer | **P1** | Q1 of first renewal year (after item 3) | [ ] |
 | 5 | Before Month O+12 MASTER-INDEX review: confirm `MASTER-INDEX-2026.csv` contains the 12-column extended rows for both artefacts (seeded per item 2). Run SHA-256 integrity check. Document in Q4 2026 compliance memo. | compliance-officer | **P2** | Month O+12 | [ ] |
+
+---
+
+## §135 · Cross-Reference Patch — Credential SLA Forward Plan: CLOUDFLARE_API_KEY + WORKOS_API_KEY Rotation Pre-Alert (CC6.7 / CC6.8)
+
+> **Date:** 2026-06-30
+> **Trigger:** §65.11 Q3 2026 forward plan flagged `CLOUDFLARE_API_KEY` and `WORKOS_API_KEY` reaching 180-day rotation SLA ~2026-09-03. `compliance/calendar/q3-2026-access-review.md` Step 2 and PG-Q3-05 checklist item require flagging in Q3 artefact. No SOC2_READINESS section yet documents the forward rotation timeline or evidence artefact obligations for these two keys beyond the Q2 review row. §135 closes this gap: defines rotation forward plan, evidence obligation, and MASTER-INDEX pre-alert entry.
+> **Owner:** compliance-officer + security-engineer
+
+---
+
+### §135.1 Background
+
+The Q2 2026 access review (§65, v1.1, 2026-06-05) inventoried 14 service account / API token rows in `compliance/access-review/authorized-roster.md` v1.0. Two of those rows carry a 180-day rotation SLA and were within SLA at time of Q2 review:
+
+| Credential | Consumer | Last rotated (est.) | 180-day SLA deadline | Q2 status |
+|---|---|---|---|---|
+| `CLOUDFLARE_API_KEY` | Cloudflare → GitHub Actions (IaC drift detection, §50) | 2026-03-07 (estimated) | **~2026-09-03** | ✅ Within SLA at Q2 |
+| `WORKOS_API_KEY` | WorkOS → Cloudflare Workers (Enterprise SSO, pre-launch) | 2026-03-07 (estimated) | **~2026-09-03** | ✅ Within SLA at Q2 |
+
+Both keys reach the 180-day boundary approximately **2026-09-03** — between the Q3 review execution window (2026-07-28/31) and the Q4 review due date (2026-10-31). Per §23.4 Step 5 (credential rotation SLA enforcement), both must be rotated before the deadline or a new finding is opened.
+
+---
+
+### §135.2 Forward Rotation Plan
+
+**Target rotation window:** 2026-08-18 to 2026-09-02 (14-day buffer before 180-day deadline)
+
+**Responsible:** security-engineer + compliance-officer (co-sign DEC-030 `system.credential_rotated` event per §65.9 protocol)
+
+**Rotation procedure for both keys:**
+
+1. **Pre-rotation:** Confirm current token value in 1Password FORM vault (`CLOUDFLARE_API_KEY` vault entry and `WORKOS_API_KEY` vault entry). Note `last_rotated_at` field — must match 2026-03-07 estimate.
+
+2. **CLOUDFLARE_API_KEY rotation:**
+   - Generate new API token in Cloudflare Dashboard (Zone → API Tokens → Create Token); apply same permission scope as current token (Zone:DNS:Read, Zone:Cache:Purge, Account:Workers:Edit)
+   - Update GitHub Actions secret `CLOUDFLARE_API_KEY` via GitHub repository settings
+   - Verify IaC drift detection workflow (§50) completes successfully on next scheduled run
+   - Update 1Password vault entry: new token value + `last_rotated_at: 2026-08-{DD}`
+   - Update `compliance/access-review/authorized-roster.md`: `last_rotated_at` column for `CLOUDFLARE_API_KEY` row
+
+3. **WORKOS_API_KEY rotation:**
+   - Generate new API key in WorkOS Dashboard (API Keys section)
+   - Update Cloudflare Workers secret `WORKOS_API_KEY` via `wrangler secret put WORKOS_API_KEY`
+   - Verify SSO authentication flow in staging environment (zero active tenants pre-launch — functional test only)
+   - Update 1Password vault entry: new key value + `last_rotated_at: 2026-08-{DD}`
+   - Update `compliance/access-review/authorized-roster.md`: `last_rotated_at` column for `WORKOS_API_KEY` row
+
+4. **Post-rotation DEC-030 emission:** Emit two `system.credential_rotated` events (one per credential) per §65.9 event schema: `{ credential_id, rotated_at, rotated_by, next_due_at, rotation_reason: "scheduled_180d_sla" }`. Record HMAC chain event IDs in §135.5 tracking table.
+
+5. **Q3 artefact update:** Add rotation completion note to Q3 access review artefact (`compliance/access-review/2026-q3/access-review-2026-Q3.md`). If rotation completes before Q3 review execution (2026-07-28/31): note as pre-review rotation event. If rotation completes after Q3 review (2026-08-01 to 2026-09-02): add post-review addendum to Q3 artefact.
+
+---
+
+### §135.3 PG-Q3-05 Checklist Closure
+
+`docs/SOC2_READINESS.md §128.4.1 PG-Q3-05` states:
+
+> Flag credential SLA approach: `CLOUDFLARE_API_KEY` and `WORKOS_API_KEY` reach 180-day SLA ~2026-09-03 per §65.11 forward plan. Note in Q3 artefact as upcoming rotation items; no action required before 2026-07-31, but rotation must complete before 2026-09-03.
+
+This §135 constitutes the advance documentation of PG-Q3-05 scope. The PG-Q3-05 checklist item (`[ ]`) in §128.4.1 is not yet closed — execution occurs at the 2026-07-17 pre-gate — but the rotation plan is now specified here. When the compliance-officer executes PG-Q3-05, they reference §135.2 as the rotation procedure.
+
+**PG-Q3-05 expected closure note (to be applied 2026-07-17):**
+
+> `[x] Done — 2026-07-17 (PG-Q3 pre-gate): CLOUDFLARE_API_KEY and WORKOS_API_KEY SLA approach flagged. Rotation forward plan per SOC2_READINESS.md §135.2. Target window: 2026-08-18 to 2026-09-02. Q3 artefact will note as upcoming rotation. No action required before 2026-07-31 review.`
+
+---
+
+### §135.4 Evidence Artefact: CRED-ROT-E-001
+
+One new evidence artefact is defined to track the 2026 H2 rotation of these two credentials.
+
+**CRED-ROT-E-001** — Bi-annual rotation artefact for `CLOUDFLARE_API_KEY` and `WORKOS_API_KEY` (180-day SLA credentials). Covers each rotation cycle as a discrete evidence record. Fields: credential IDs rotated, `rotated_at` ISO 8601 timestamps, DEC-030 `system.credential_rotated` HMAC chain event IDs, SHA-256 of updated `authorized-roster.md` post-rotation, compliance-officer attestation. **TSC criteria:** CC6.7 (key/credential rotation limits exposure window), CC6.8 (2-step update to 1Password + target secret store prevents single-point update failure). **Retention:** 3 years. **Collection:** Per rotation event (expected ~2× per year for each credential at 180-day cadence). **Owner:** security-engineer + compliance-officer. **R2 path:** `compliance/evidence/credential-rotations/CRED-ROT-E-001-{YYYYMMDD}.json`.
+
+**CRED-ROT-E-001 JSON schema:**
+
+```json
+{
+  "evidence_id": "CRED-ROT-E-001",
+  "rotation_date": "2026-08-{DD}",
+  "credentials_rotated": [
+    {
+      "credential_id": "CLOUDFLARE_API_KEY",
+      "previous_last_rotated_at": "2026-03-07",
+      "rotated_at": "2026-08-{DD}",
+      "next_due_at": "2027-02-{DD}",
+      "dec030_event_id": "[PENDING — fill post-rotation]",
+      "authorized_roster_updated": true
+    },
+    {
+      "credential_id": "WORKOS_API_KEY",
+      "previous_last_rotated_at": "2026-03-07",
+      "rotated_at": "2026-08-{DD}",
+      "next_due_at": "2027-02-{DD}",
+      "dec030_event_id": "[PENDING — fill post-rotation]",
+      "authorized_roster_updated": true
+    }
+  ],
+  "authorized_roster_sha256": "[PENDING — SHA-256 of updated authorized-roster.md post-rotation]",
+  "attestation": {
+    "attested_by": "compliance-officer",
+    "attested_at": "2026-08-{DD}",
+    "statement": "Rotation executed per SOC2_READINESS.md §135.2. Both credentials updated in target secret stores and 1Password. DEC-030 events emitted and HMAC chain verified."
+  },
+  "vanta_uploaded": false,
+  "chain_verified": false
+}
+```
+
+---
+
+### §135.5 §79.4 MASTER-INDEX Row
+
+CRED-ROT-E-001 is added to the §79.4 master evidence table (insertion after ADMIN-RPT-E-001, count 100 → 101):
+
+| Evidence ID | TSC Criteria | Cadence | Retention | R2 path | Notes |
+|---|---|---|---|---|---|
+| **CRED-ROT-E-001** | CC6.7, CC6.8 | Per 180-day rotation event (~2× per year per credential) | 3 yr | `compliance/evidence/credential-rotations/CRED-ROT-E-001-{YYYYMMDD}.json` | First filing: 2026-08-18 to 2026-09-02 (CLOUDFLARE_API_KEY + WORKOS_API_KEY H2 2026 rotation). Zero-rotation periods filed as affirmative nil attestation if SLA is extended by decision. |
+
+---
+
+### §135.6 §80.3 R2 Subfolder
+
+New R2 subfolder added to the evidence bucket topology (§80.3):
+
+| Subfolder | Purpose | Access | Retention |
+|---|---|---|---|
+| `compliance/evidence/credential-rotations/` | CRED-ROT-E-001 per-rotation artefacts | `form_system` role only; `form_api` NO ACCESS | WORM Object Lock Governance, 3yr minimum |
+
+---
+
+### §135.7 §80.4 Vanta Mirror
+
+CRED-ROT-E-001 added to Vanta mirror schedule (§80.4):
+
+| Artefact ID | Vanta upload timing | TSC mapping | Privacy note |
+|---|---|---|---|
+| CRED-ROT-E-001 | Within 48h of rotation event | CC6.7, CC6.8 | Operational metadata only: credential_id (key name, not key value), rotated_at timestamps, DEC-030 event IDs, attestation. No key material, no employee PII, no GDPR Art. 9 data. |
+
+---
+
+### §135.8 §51 Gap Register Update
+
+The gap register (§51) carries CC6.7 (key rotation) as an open item (ENC-GAP-002, 🔴 → 🟡 per §58). This §135 does not change the ENC-GAP-002 status — that gap concerns the HMAC audit chain key rotation runbook (M9 milestone). However, §135 establishes that the CC6.7 control for service credential rotation (CLOUDFLARE_API_KEY, WORKOS_API_KEY) has a documented, time-bound execution plan. The gap register note for CC6.7 is extended:
+
+> **CC6.7 (service credentials):** 180-day rotation SLA documented in `authorized-roster.md` v1.0 (§65.3.2); CLOUDFLARE_API_KEY and WORKOS_API_KEY rotation forward plan per §135.2 (target: 2026-08-18 to 2026-09-02); CRED-ROT-E-001 evidence artefact defined. First filing pending rotation event.
+
+---
+
+### §135.9 Checklist
+
+| # | Action | Owner | Priority | Deadline | Status |
+|---|---|---|---|---|---|
+| 1 | At 2026-07-17 PG-Q3 pre-gate: apply PG-Q3-05 closure note per §135.3 to §128.4.1 table | compliance-officer | **P0** | 2026-07-17 | [ ] |
+| 2 | Execute rotation per §135.2: CLOUDFLARE_API_KEY and WORKOS_API_KEY. Emit two `system.credential_rotated` DEC-030 events. Update `authorized-roster.md`. | security-engineer + compliance-officer | **P0** | 2026-09-02 (before 180-day deadline) | [ ] |
+| 3 | File CRED-ROT-E-001 at `compliance/evidence/credential-rotations/CRED-ROT-E-001-{YYYYMMDD}.json`; populate fields per §135.4 schema; compute SHA-256; upload to R2 `compliance/evidence/credential-rotations/` (WORM Object Lock 3yr); upload to Vanta within 48h | security-engineer + compliance-officer | **P0** | 2026-09-02 (same day as rotation) | [ ] |
+| 4 | Add CRED-ROT-E-001 row to `MASTER-INDEX-2026.csv` (§79.9 item 4 — note: physical file not yet created; add when §79.9 item 4 is executed) | compliance-officer | **P1** | Month O-1 (§79.9 item 4 milestone) | [ ] |
+| 5 | Update `compliance/calendar/q3-2026-access-review.md` Step 2 credential SLA flag: add §135 cross-reference note | compliance-officer | **P2** | 2026-07-17 pre-gate | [ ] |
+| 6 | Note CRED-ROT-E-001 in Q3 access review artefact (as pre-rotation plan or post-rotation completion, depending on timing) | compliance-officer | **P1** | 2026-07-31 | [ ] |
+
+---
+
+### §135.10 Privacy Floor
+
+CRED-ROT-E-001 artefact contains:
+- `credential_id`: key names only (`CLOUDFLARE_API_KEY`, `WORKOS_API_KEY`) — not key values
+- `rotated_at`, `next_due_at`: operational timestamps
+- `dec030_event_id`: HMAC chain pointers
+- `authorized_roster_sha256`: hash of the updated roster file
+- Attestation metadata: role name only (`compliance-officer`), no personal name, no email, no employee `user_id`
+
+No individual employee PII, no customer data, no GDPR Art. 9 special-category data. `form_api` has zero access to `form-soc2-evidence` R2 bucket. Privacy classification: operational compliance metadata — internal only.
+
+---
+
+*v3.60.0 (2026-06-30): §135 Cross-Reference Patch — Credential SLA Forward Plan: CLOUDFLARE_API_KEY + WORKOS_API_KEY Rotation Pre-Alert (CC6.7 / CC6.8). Triggered by §65.11 Q3 forward plan flag and §128.4.1 PG-Q3-05 checklist item. Background: CLOUDFLARE_API_KEY and WORKOS_API_KEY both estimated to reach 180-day rotation SLA ~2026-09-03 (last rotated 2026-03-07, per Q2 access review §65.3.2). §135.2 defines forward rotation plan: target window 2026-08-18 to 2026-09-02; 5-step procedure per credential (pre-rotation, Cloudflare/WorkOS Dashboard rotation, secret store update, 1Password update, `authorized-roster.md` update); two `system.credential_rotated` DEC-030 events post-rotation; Q3 artefact note. §135.3 specifies PG-Q3-05 expected closure note (applies 2026-07-17 at pre-gate). §135.4 defines one new evidence artefact: CRED-ROT-E-001 (CC6.7/CC6.8, per-rotation-event cadence, 3yr retention, `compliance/evidence/credential-rotations/CRED-ROT-E-001-{YYYYMMDD}.json`); JSON schema with 9 fields including `dec030_event_id` (×2), `authorized_roster_sha256`, attestation block, `vanta_uploaded`, `chain_verified`. §135.5 adds CRED-ROT-E-001 to §79.4 master evidence table (count 100 → 101). §135.6 adds `compliance/evidence/credential-rotations/` R2 subfolder (WORM Object Lock 3yr; `form_api` NO ACCESS). §135.7 adds CRED-ROT-E-001 to §80.4 Vanta mirror schedule (48h upload SLA; CC6.7/CC6.8; operational metadata only — no key values, no PII). §135.8 extends §51 gap register CC6.7 note to reflect service credential rotation plan. §135.9 six-item implementation checklist: 3× P0 (PG-Q3-05 closure 2026-07-17; rotation execution 2026-09-02; CRED-ROT-E-001 filing 2026-09-02), 2× P1 (MASTER-INDEX row at Month O-1; Q3 artefact note 2026-07-31), 1× P2 (calendar cross-reference 2026-07-17). Privacy floor: CRED-ROT-E-001 carries operational metadata only — credential ID (key name, not value), timestamps, DEC-030 event IDs, roster SHA-256, role-level attestation; no key material, no employee PII, no GDPR Art. 9 data; `form_api` NO ACCESS to `form-soc2-evidence` bucket. Document header v3.59.0 → v3.60.0. Owner: compliance-officer + security-engineer.*

@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.40.0** — 2026-06-30 · post-2871 · Series 2866–2875 «Автономне тренування» 6/10 · post-2871 «Коли програма не працює: алгоритм діагностики до того, як міняти все» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2871 · README: post-2871 → draft · next: post-2872
+**v10.41.0** — 2026-06-30 · post-2872 · Series 2866–2875 «Автономне тренування» 7/10 · post-2872 «Підзвітність без тренера: три мінімальні системи самоконтролю» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2872 · README: post-2872 → draft · SOC2_READINESS §135 (CC6.7/CC6.8 credential SLA forward plan, CRED-ROT-E-001 evidence artefact, v3.60.0) · next: post-2873
 
 ---
 

@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [10.41.0] — 2026-06-30
+
+### Added
+- `content/post-2872-accountability-without-coach-three-minimal-self-monitoring-systems.md` — Editorial series «Автономне тренування» 2866–2875 · 7/10. «Підзвітність без тренера: три мінімальні системи самоконтролю». Підзвітність — не мотивація, а системна функція. Три ієрархічні компоненти: фіксація, огляд, аудит. Система 1: тренувальний журнал (операційний запис: вправа, підходи × повторення × вага, RPE/RIR, нотатка — 2–3 хв після сесії; чому RPE обов'язковий; де вести). Система 2: тижневий огляд 10–15 хв — три питання (виконано від плану; динаміка інтенсивності/обсягу; що змінити); записувати рішення. Система 3: квартальний аудит — кількісна динаміка (1–2 кг/місяць для intermediate, Helms 2014); аудит виконання (< 80% = проблема планування, не мотивації); аудит відповідності програмі (свідомі vs неусвідомлені відхилення); програмне рішення на Q+1. Ієрархія: журнал → тижневий огляд → квартальний аудит. Мінімальність — не поверхневість, а достатність; система, що виконується на 90% під стресом, краща за ідеальну, що виконується тільки коли все добре. Baumeister & Tierney 2011 (ego depletion / motivational decay); Hagger et al. 2010 (ego depletion meta-analysis); Helms et al. 2016 (RIR-RPE scale); Zourdos et al. 2016 (RPE resistance training). clinical-safety: NOT_REQUIRED. sports-scientist review pending. blog.html card added. README: post-2872 → draft; series position 6/10 → 7/10.
+- `docs/SOC2_READINESS.md §135` — Cross-Reference Patch: Credential SLA Forward Plan — CLOUDFLARE_API_KEY + WORKOS_API_KEY Rotation Pre-Alert (CC6.7 / CC6.8). Triggered by §65.11 Q3 2026 forward plan flag and §128.4.1 PG-Q3-05 checklist item. Background: both credentials estimated to reach 180-day SLA ~2026-09-03. §135.2 rotation procedure defined (target: 2026-08-18 to 2026-09-02; 5-step per credential; two `system.credential_rotated` DEC-030 events; Q3 artefact note). §135.3 PG-Q3-05 expected closure note (to apply 2026-07-17 pre-gate). §135.4 new evidence artefact CRED-ROT-E-001 (CC6.7/CC6.8, per-rotation-event cadence, 3yr, `compliance/evidence/credential-rotations/CRED-ROT-E-001-{YYYYMMDD}.json`; 9-field JSON schema including `dec030_event_id` ×2, `authorized_roster_sha256`, attestation block, `vanta_uploaded`, `chain_verified`). §135.5 §79.4 MASTER-INDEX row insertion (count 100 → 101). §135.6 `compliance/evidence/credential-rotations/` R2 subfolder (WORM Object Lock 3yr; `form_api` NO ACCESS). §135.7 §80.4 Vanta mirror entry (48h upload SLA; operational metadata only; no key material, no PII). §135.8 §51 gap register CC6.7 note extended with service credential rotation plan. §135.9 six-item checklist (3× P0, 2× P1, 1× P2). Privacy floor: credential IDs (key names, not values), timestamps, DEC-030 pointers, roster SHA-256, role attestation only. Document header v3.59.0 → v3.60.0. Owner: compliance-officer + security-engineer.
+
+### Changed
+- `blog.html` — post-2872 card added at top of feed.
+- `README.md` — post-2872 → draft; editorial series position 6/10 → 7/10; version note updated to v10.41.0.
+- `STATUS.md` — v10.40.0 → v10.41.0; post-2872 added; SOC2_READINESS §135 noted; next: post-2873.
+- `VERSION` — 10.40.1 → 10.41.0.
+
+---
+
 ## [10.40.1] — 2026-06-30
 
 ### Changed
