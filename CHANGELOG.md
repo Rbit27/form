@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [10.38.0] — 2026-06-30
+
+### Added
+- `content/post-2869-technical-self-assessment-video-analysis-protocol.md` — Block 2866–2875 «Автономне тренування» 4/10. «Технічна самооцінка без тренера: мінімальний протокол відеоаналізу». Чому пропріоцепція ненадійна під навантаженням (нейрологічна основа). Мінімальний протокол: що знімати (основні рухові патерни 2–4 вправи), коли (при тренувальних вагах; раз на 4 тижні + після нового максимуму + при підозрі), ракурси (бічний і ззаду). Функціональні маркери для присяду, тяги, жиму. Три помилки відеоаналізу. Рамка рішення: коригую зараз / логую і чекаю / потрібна консультація. Технічна деградація під блоковим навантаженням і роль базової лінії. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card for post-2869 added at top of feed.
+- `README.md` — Editorial series 2896–2905 «Якість тренувального рішення: як self-coached атлет відрізняє аналіз від інтуїції» added to roadmap (10 proposed topics).
+
+### Changed
+- `README.md` — post-2869 status: proposed → draft · v10.38.0 · review_pending: sports-scientist. Editorial series header updated.
+- `STATUS.md` — current version updated to v10.38.0; Series 2866–2875 progress: 4/10; next: post-2870.
+- `VERSION` — 10.37.0 → 10.38.0.
+
+---
+
 ## [10.37.0] — 2026-06-30
 
 ### Added
