@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · proposed next (45+) · current: 2866–2875 «Автономне тренування» 7/10 · roadmap extended to 2905 · v10.41.0
+### Editorial series: 11–44 drafted · proposed next (45+) · current: 2866–2875 «Автономне тренування» 8/10 · roadmap extended to 2915 · v10.42.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3057,7 +3057,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 2870 | Програма — це стартова точка: коли відступ від плану є дисципліною, а не відмовкою | **draft · v10.39.0 → post-2870-program-is-a-starting-point-when-deviation-is-discipline.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
 | 2871 | Коли програма не працює: алгоритм діагностики до того, як міняти все | **draft · v10.40.0 → post-2871-program-diagnostic-algorithm.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
 | 2872 | Підзвітність без тренера: три мінімальні системи самоконтролю | **draft · v10.41.0 → post-2872-accountability-without-coach-three-minimal-self-monitoring-systems.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
-| 2873 | Тижневий огляд self-coached атлета: що переглядати, що ні і як часто | proposed · v10.30.0 |
+| 2873 | Тижневий огляд self-coached атлета: що переглядати, що ні і як часто | **draft · v10.42.0 → post-2873-weekly-review-self-coached-athlete-protocol.md · clinical-safety NOT_REQUIRED · sports-scientist review pending** |
 | 2874 | Коли AI недостатньо: ознаки, що пора шукати людину-тренера | proposed · v10.30.0 |
 | 2875 | Синтез 2866–2875: операційна рамка self-coached атлета | proposed · v10.30.0 |
 
@@ -3117,6 +3117,25 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 2903 | Різниця між «я протестував» і «я маю доказ» у self-coached контексті | proposed · v10.38.0 |
 | 2904 | Коли довіряти тренувальному досвіду — і коли він тебе обманює | proposed · v10.38.0 |
 | 2905 | Синтез 2896–2905: рамка тренувального рішення для self-coached атлета | proposed · v10.38.0 |
+
+---
+
+### Editorial series: 2906–2915 · Тренувальна комунікація з собою: як self-coached атлет описує, пояснює і передає власний досвід (proposed · v10.42.0)
+
+Founder-voice editorial. Тон: editorial-brutalist. Фокус: мова тренувального досвіду — як атлет формулює власний прогрес, помилки і рішення. Не для зовнішньої аудиторії, а для самого себе: точна мова як інструмент кращого мислення про тренування. Наступний шар після «Якості тренувального рішення» (2896–2905) → якщо рішення якісне, але його не можна чітко сформулювати — воно не відтворюване.
+
+| Post | Topic | Status |
+|---|---|---|
+| 2906 | Чому точна мова важлива для self-coached атлета: різниця між «погано» і «RPE 9 при плановому 7.5» | proposed · v10.42.0 |
+| 2907 | Як описати власний тренувальний стан без самодіагностики: межа між спостереженням і інтерпретацією | proposed · v10.42.0 |
+| 2908 | Три рівні пояснення пропущеного тренування — і чому перший завжди неточний | proposed · v10.42.0 |
+| 2909 | Як формулювати тренувальне рішення, яке можна відтворити через три місяці | proposed · v10.42.0 |
+| 2910 | Пояснення плато: п'ять різних формулювань одного факту і що вони говорять про атлета | proposed · v10.42.0 |
+| 2911 | Чому «я слухаю тіло» — не пояснення, а уникнення пояснення | proposed · v10.42.0 |
+| 2912 | Як говорити про прогрес без маніпуляції: чесна мова без мотиваційного буллшиту | proposed · v10.42.0 |
+| 2913 | Тренувальний словник self-coached атлета: 10 понять, які варто знати точно | proposed · v10.42.0 |
+| 2914 | Як передати власний тренувальний контекст AI-тренеру: що сказати, щоб рекомендація була точною | proposed · v10.42.0 |
+| 2915 | Синтез 2906–2915: мова як тренувальний інструмент self-coached атлета | proposed · v10.42.0 |
 
 ---
 
