@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.23.3
+# FORM · Cost Model & Unit Economics v2.23.4
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -13918,8 +13918,8 @@ These queries are additive to FLEET-MAT-E-001 evidence collection. No change to 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 1 | Add FLEET-MAT-CHAIN-02 guard to `emit-audit-event` Worker `fleet_maturity_declared` handler: check `payload.consecutive_cycles_at_target >= 2 && !payload.evidence_artefact_id` → HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED`. Execute **after** FLEET-MAT-CHAIN-01 check, **before** Zod validation. Add unit test: payload with `consecutive_cycles_at_target = 2` and `evidence_artefact_id = undefined` → 422; same payload with `evidence_artefact_id = "FLEET-MAT-E-001_2028"` → passes FLEET-MAT-CHAIN-02 check. | platform-engineer | **P1** | M15 (same milestone as FLEET-MAT-CHAIN-01 Worker implementation per §49.9 item 2) | [ ] |
-| 2 | Update `docs/AUDIT_LOG_SCHEMA.md` Fleet Maturity events section: add FLEET-MAT-CHAIN-02 invariant name, description, and HTTP 422 error code alongside existing FLEET-MAT-CHAIN-01 documentation. | compliance-officer | **P1** | M15 | [ ] |
-| 3 | Add two §50.6 auditor queries to FLEET-MAT-E-001 evidence collection notes in `docs/SOC2_READINESS.md §132`. | compliance-officer | **P2** | M18 (before first FLEET-MAT-E-001 collection) | [ ] |
+| 2 | Update `docs/AUDIT_LOG_SCHEMA.md` Fleet Maturity events section: add FLEET-MAT-CHAIN-02 invariant name, description, and HTTP 422 error code alongside existing FLEET-MAT-CHAIN-01 documentation. | compliance-officer | **P1** | M15 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.64 §Enterprise Fleet Maturity events (2026-06-30).** |
+| 3 | Add two §50.6 auditor queries to FLEET-MAT-E-001 evidence collection notes in `docs/SOC2_READINESS.md §132`. | compliance-officer | **P2** | M18 (before first FLEET-MAT-E-001 collection) | [x] **Done — SOC2_READINESS.md §132.8 (v3.62.0, 2026-06-30).** |
 | 4 | Mark OQ-ENTERPRISE-ARR-04 🟢 Resolved in §49.10 of this document and register DEC-087 in §49.11 and `docs/DECISION_LOG.md`. | compliance-officer | **P1** | M13 (this authoring pass) | [x] **Done — this patch (v2.23.3, 2026-06-30).** |
 
 ---
@@ -13928,11 +13928,13 @@ These queries are additive to FLEET-MAT-E-001 evidence collection. No change to 
 
 | Obligation | Source | Status |
 |---|---|---|
-| `docs/AUDIT_LOG_SCHEMA.md` — add FLEET-MAT-CHAIN-02 invariant name + HTTP 422 error code to Fleet Maturity events section | §50.8 item 2 (P1/M15) | 🟡 Pending — Worker implementation milestone |
-| `docs/SOC2_READINESS.md §132` — add two §50.6 auditor queries to FLEET-MAT-E-001 collection notes | §50.8 item 3 (P2/M18) | 🟡 Pending — before first evidence collection |
+| `docs/AUDIT_LOG_SCHEMA.md` — add FLEET-MAT-CHAIN-02 invariant name + HTTP 422 error code to Fleet Maturity events section | §50.8 item 2 (P1/M15) | 🟢 **Done — AUDIT_LOG_SCHEMA.md v2.64 §Enterprise Fleet Maturity events (2026-06-30)** |
+| `docs/SOC2_READINESS.md §132` — add two §50.6 auditor queries to FLEET-MAT-E-001 collection notes | §50.8 item 3 (P2/M18) | 🟢 **Done — SOC2_READINESS.md §132.8 (v3.62.0, 2026-06-30)** |
 | FLEET-MAT-CHAIN-02 Worker guard implementation + unit test (`consecutive_cycles_at_target >= 2` && absent `evidence_artefact_id` → 422) | §50.8 item 1 (P1/M15) | 🟡 Pending — Worker implementation milestone |
 
 ---
+
+*v2.23.4 (2026-06-30): §50.8 + §50.9 documentation obligations closed. §50.8 items 2 and 3 marked [x] Done: item 2 — `docs/AUDIT_LOG_SCHEMA.md v2.64` §Enterprise Fleet Maturity events updated with FLEET-MAT-CHAIN-02 invariant name, description, and HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED`; item 3 — `docs/SOC2_READINESS.md §132.8` (v3.62.0) adds two FLEET-MAT-CHAIN-02 auditor queries to FLEET-MAT-E-001 collection protocol. §50.9 cross-reference table: items 2 and 3 updated 🟡 Pending → 🟢 Done. Document header v2.23.3 → v2.23.4. Owner: compliance-officer.*
 
 *v2.23.3 (2026-06-30): §50 OQ-ENTERPRISE-ARR-04 Resolution — `evidence_artefact_id` schema optionality confirmed; FLEET-MAT-CHAIN-02 Evidence Linkage Invariant formalised (DEC-087). Closes OQ-ENTERPRISE-ARR-04 (P1/M18): `.optional()` in `FleetMaturityDeclaredSchema` confirmed correct. Three grounds: (1) non-declaration years (cycles 1–2) are valid events without `evidence_artefact_id` — Zod required would reject them; (2) zero-declaration-year affirmative attestation pattern (SOC2_READINESS §132) requires null for cycle 0–1 events; (3) DEC-030 design pattern: schema validates structure, Worker enforces business invariants. New named invariant FLEET-MAT-CHAIN-02: when `consecutive_cycles_at_target >= 2` and `evidence_artefact_id` absent → HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED`. Check order in Worker: (1) FLEET-MAT-CHAIN-01 (NRR bridge ordering); (2) FLEET-MAT-CHAIN-02 (evidence linkage); (3) Zod v2 schema; (4) emit. Confirmed `FleetMaturityDeclaredSchema` unchanged. Two SOC 2 auditor queries (§50.6): non-null `evidence_artefact_id` on cycle-≥2 events (expect 0 null); null `evidence_artefact_id` on cycle-<2 events (expect > 0). §49.10 OQ-ENTERPRISE-ARR-04 marked 🟢 Resolved. §49.11: DEC-087 + §50 cross-reference rows added. TOC entry §50 added. DEC-087 registered in `docs/DECISION_LOG.md`. Note: v2.23.2 document header update (stated in v2.23.2 version note) was not applied in the prior authoring pass; header corrected v2.23.1 → v2.23.3 in this patch. Owner: compliance-officer + enterprise-architect.*
 

@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.62
+# FORM · Audit Log Schema v2.64
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -4600,11 +4600,14 @@ const FleetMaturityDeclaredSchema = z.object({
                                      .regex(/^FLEET-MAT-E-001_\d{4}$/)
                                      .optional(),
 })
-// Worker invariant: evidence_artefact_id must be present when consecutive_cycles_at_target >= 2
+// FLEET-MAT-CHAIN-02 (DEC-087): evidence_artefact_id MUST be present when consecutive_cycles_at_target >= 2
+// HTTP 422 FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED if absent; check order: CHAIN-01 → CHAIN-02 → Zod → emit
 // Worker invariant: active_tenant_count >= 12 required when consecutive_cycles_at_target >= 2
 ```
 
 **FLEET-MAT-CHAIN-01 ordering invariant:** Before emitting `enterprise.fleet_maturity_declared`, the Worker queries the HMAC-chained audit log for an `enterprise.annual_nrr_bridge_filed` event with matching `filing_year`. If none is found, returns HTTP 422 with error code `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE`. Ensures fleet maturity declarations are causally downstream of a validated NRR bridge computation.
+
+**FLEET-MAT-CHAIN-02 evidence linkage invariant (DEC-087):** When `payload.consecutive_cycles_at_target >= 2`, `evidence_artefact_id` MUST be present. If absent, the Worker returns HTTP 422 with error code `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED`. Executed as the second pre-emit guard — after FLEET-MAT-CHAIN-01, before Zod v2 schema validation. Check order: FLEET-MAT-CHAIN-01 → FLEET-MAT-CHAIN-02 → Zod → emit. Relationship: FLEET-MAT-CHAIN-01 verifies causal ordering (NRR bridge must precede declaration); FLEET-MAT-CHAIN-02 verifies evidence completeness (artefact linkage required from cycle 2). The two invariants are independent pre-emit guards — both must pass for the event to be emitted. SOC 2 auditor verification: see `docs/SOC2_READINESS.md §132.8` for two complementary auditor queries confirming invariant operation.
 
 **CC4.1 auditor narrative:** `enterprise.fleet_maturity_declared` demonstrates that FORM monitors its enterprise fleet health continuously via FM-C1/C2/C3 conditions, evaluates expansion performance against defined thresholds annually, and produces an immutable HMAC-chained record of fleet status for each `filing_year`. The two-cycle gate (`consecutive_cycles_at_target ≥ 2`) ensures declarations reflect sustained structural performance. No-declaration years emit the event with `fm_*_met = false` — creating an affirmative annual record regardless of outcome.
 
@@ -4680,6 +4683,8 @@ const NrrBridgeQ1CheckPassedSchema = z.object({
 **SOC 2 evidence:** FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr, `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv`) — SOC2_READINESS §79.4 registration pending per OBSERVABILITY §63.9 item 6 (P1/M15).
 
 **Retention table additions:** `security.fleet_mat_chain_violation` CRITICAL 7yr CC4.1/A1.1; `system.fleet_mat_chain_check_passed` LOW 1yr CC4.1; `enterprise.nrr_bridge_q1_overdue` HIGH 7yr CC4.1/A1.1; `system.nrr_bridge_q1_check_passed` LOW 1yr CC4.1.
+
+*v2.64 (2026-06-30): §Enterprise Fleet Maturity events — FLEET-MAT-CHAIN-02 documentation (DEC-087). Closes `docs/COST_MODEL.md §50.8` item 2 (P1/M15): FLEET-MAT-CHAIN-02 invariant name (`FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED`), description, and HTTP 422 error code added alongside FLEET-MAT-CHAIN-01 in the Fleet Maturity events section. Zod schema comment updated: `// Worker invariant: evidence_artefact_id...` → `// FLEET-MAT-CHAIN-02 (DEC-087): evidence_artefact_id MUST be present...` (two-line comment with check order). SOC 2 auditor verification cross-reference added to FLEET-MAT-CHAIN-02 paragraph → `docs/SOC2_READINESS.md §132.8`. Document header v2.62 → v2.64 (v2.63 header update retroactively applied — `v2.63` authoring pass stated `Document header v2.62 → v2.63` but the header was not updated; corrected in this patch consistent with COST_MODEL v2.23.3 precedent). Owner: compliance-officer + security-engineer.*
 
 *v2.63 (2026-06-30): +4 events — Enterprise Fleet Maturity Chain Monitoring (OBSERVABILITY §63 · CC4.1/A1.1). New section `### Enterprise Fleet Maturity Chain Monitoring events` inserted after `### Enterprise Fleet Maturity events`. Events: `security.fleet_mat_chain_violation` (CRITICAL/7yr — job 56 orphan detection, AL-FLEET-MAT-01 P0), `system.fleet_mat_chain_check_passed` (LOW/1yr — job 56 all-clear), `enterprise.nrr_bridge_q1_overdue` (HIGH/7yr — job 57 April 1 deadline miss, AL-FLEET-FILING-01 P1, 7-day re-alert dedup, auto-resolve on filing), `system.nrr_bridge_q1_check_passed` (LOW/1yr — job 57 all-clear). Four Zod v2 schemas registered. Alert routing: AL-FLEET-MAT-01 P0 `form-compliance` (no auto-resolve); AL-FLEET-FILING-01 P1 `form-compliance` (auto-resolve on `annual_nrr_bridge_filed`). Retention table: +4 rows. Privacy floor: filing-calendar booleans, chain-integrity counts, aggregate flags only — no per-tenant breakdown, no `user_id`, no GDPR Art. 9 data. Document header v2.62 → v2.63. **Closes `docs/OBSERVABILITY.md §63.9` item 3 (P0/M13 — 🟢 2026-06-30 — all four DEC-030 event types now registered).** Owner: compliance-officer + security-engineer + devops-lead.*
 

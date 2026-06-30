@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [10.52.1] — 2026-06-30
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.64 — FLEET-MAT-CHAIN-02 evidence linkage invariant (DEC-087) added to §Enterprise Fleet Maturity events: invariant paragraph, HTTP 422 `FLEET_MAT_CHAIN_02_EVIDENCE_ARTEFACT_REQUIRED`, Zod comment updated. Document header corrected v2.62 → v2.64 (v2.63 header retroactively applied). Closes `docs/COST_MODEL.md §50.8` item 2 (P1/M15).
+- `docs/SOC2_READINESS.md` v3.62.0 — §132.8 added: two FLEET-MAT-CHAIN-02 auditor queries additive to FLEET-MAT-E-001 collection (Query 1: cycle-≥2 events with null `evidence_artefact_id` → expect 0; Query 2: cycle-<2 events with null `evidence_artefact_id` → expect > 0). §132.6 cross-reference table updated with two new closure rows. Closes `docs/COST_MODEL.md §50.8` item 3 (P2/M18).
+- `docs/COST_MODEL.md` v2.23.4 — §50.8 items 2 and 3 marked `[x] Done`; §50.9 cross-reference rows 2 and 3 updated 🟡 → 🟢.
+- `VERSION` — 10.52.0 → 10.52.1.
+
+---
+
 ## [10.52.0] — 2026-06-30
 
 ### Added
