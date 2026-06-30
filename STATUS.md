@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.61.0** — 2026-06-30 · post-2888 · «Плато: як правильно діагностувати зупинку прогресу і знайти реальну причину» · series «Тренувальний інтелект» 2886–2895 (3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2888 · next: post-2889 («RPE як інструмент, а не оцінка: як калібрувати суб'єктивне сприйняття навантаження»)
+
 **v10.60.0** — 2026-06-30 · post-2887 · «Сигнал і шум у тренувальних даних: як відрізнити реальний тренд від ситуаційної варіабельності» · series «Тренувальний інтелект» 2886–2895 (2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2887 · next: post-2888 («Плато: як правильно діагностувати зупинку прогресу і знайти реальну причину»)
 
 **v10.59.0** — 2026-06-30 · post-2886 · «Як читати власну прогресію: від запису до висновку за 10 хвилин» · series «Тренувальний інтелект» 2886–2895 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2886 · README roadmap extended to 2965 (3 нові серії: 2936–2945, 2946–2955, 2956–2965) · next: post-2887 («Сигнал і шум у тренувальних даних: як відрізнити реальний тренд від ситуаційної варіабельності»)
