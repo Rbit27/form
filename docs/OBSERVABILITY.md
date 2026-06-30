@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.10.0
+# FORM · Observability & Monitoring Taxonomy v5.10.1
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -18234,7 +18234,7 @@ All events emitted via `emit-audit-event` Worker under DEC-030 HMAC chain protoc
 | **Cadence** | Annual — filed in Q1 of each calendar year for the prior reporting year |
 | **Retention** | 3 years |
 | **R2 path** | `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv` |
-| **Vanta mirror** | Uploaded within 48h of filing; SOC2_READINESS.md §79.4 registration pending (§63.9 item 6 P1/M15) |
+| **Vanta mirror** | Uploaded within 48h of filing; SOC2_READINESS.md §79.4 registration complete — §136, v3.61.0, 2026-06-30 (§63.9 item 6 🟢 Closed) |
 
 **Content:**
 
@@ -18275,7 +18275,7 @@ All events emitted via `emit-audit-event` Worker under DEC-030 HMAC chain protoc
 | P0 | M13 | Register four new DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, severity, retention, and SOC 2 mapping: `system.fleet_mat_chain_check_passed` LOW/1yr, `security.fleet_mat_chain_violation` CRITICAL/7yr, `system.nrr_bridge_q1_check_passed` LOW/1yr, `enterprise.nrr_bridge_q1_overdue` HIGH/7yr | 🟢 Done (AUDIT_LOG_SCHEMA.md v2.63, 2026-06-30) |
 | P1 | M13 | Configure PagerDuty routing rules: AL-FLEET-MAT-01 (service `form-compliance`, P0, dedup `fleet-mat-chain-violation-{filing_year}`, no auto-resolve, simultaneous compliance-officer + security-engineer); AL-FLEET-FILING-01 (service `form-compliance`, P1, dedup `nrr-bridge-q1-overdue-{reporting_year}`, 7-day re-alert, auto-resolve on `enterprise.annual_nrr_bridge_filed` emission for matching `reporting_year`) | 🟡 Open |
 | P1 | M13 | Add cross-reference note to `docs/COST_MODEL.md §49.9` implementation checklist: "P1/M13 — OBSERVABILITY §63 (v5.10.0, 2026-06-30) authored as companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56 and 57 registered in §12.6 v2.7 patch" | 🟢 Done (COST_MODEL.md v2.23.2, 2026-06-30) |
-| P1 | M15 | Register FLEET-FILING-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC4.1/A1.1, annual Q1, 3yr, R2 path `compliance/evidence/fleet-filing/`) and upload Vanta mirror entry within 48h of first filing | 🟡 Open |
+| P1 | M15 | Register FLEET-FILING-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC4.1/A1.1, annual Q1, 3yr, R2 path `compliance/evidence/fleet-filing/`) and upload Vanta mirror entry within 48h of first filing | 🟢 Done (SOC2_READINESS.md v3.61.0 §136, 2026-06-30) |
 | P2 | M15 | Build "Enterprise Annual Filing Health" dashboard panel per §63.8 spec in admin compliance dashboard | 🟡 Open |
 
 ### §63.10 Cross-Reference Obligations Created by §63
@@ -18283,9 +18283,11 @@ All events emitted via `emit-audit-event` Worker under DEC-030 HMAC chain protoc
 | Document | Obligation | Status |
 |---|---|---|
 | `docs/AUDIT_LOG_SCHEMA.md` | Register `system.fleet_mat_chain_check_passed`, `security.fleet_mat_chain_violation`, `system.nrr_bridge_q1_check_passed`, `enterprise.nrr_bridge_q1_overdue` with Zod v2 schemas, severity, retention, SOC 2 mapping | 🟢 Done — AUDIT_LOG_SCHEMA.md v2.63, 2026-06-30 |
-| `docs/SOC2_READINESS.md §79.4` | Register FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr) in master evidence table and Vanta mirror | 🟡 Pending P1/M15 |
+| `docs/SOC2_READINESS.md §79.4` | Register FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr) in master evidence table and Vanta mirror | 🟢 Done — SOC2_READINESS.md v3.61.0 §136, 2026-06-30 |
 | `docs/COST_MODEL.md §49.9` | Add cross-reference note: "OBSERVABILITY §63 is the companion monitoring section for FLEET-MAT-CHAIN-01 and NRR-BRIDGE-INV-01; pg_cron jobs 56–57 registered §12.6 v2.7 patch 2026-06-30" | 🟢 Done — COST_MODEL.md v2.23.2, 2026-06-30 |
 
 ---
 
 *v5.10.0 (2026-06-30): §63 Enterprise Annual Filing Calendar & Fleet Maturity Chain Observability — closes the monitoring gap created by COST_MODEL §48 (v2.22.0, 2026-06-30) and §49 (v2.23.0, 2026-06-30). Both sections introduced annual DEC-030 events (`enterprise.annual_nrr_bridge_filed` and `enterprise.fleet_maturity_declared`) with chain invariants (NRR-BRIDGE-INV-01 arithmetic; FLEET-MAT-CHAIN-01 ordering) but no OBSERVABILITY monitoring coverage existed. Two pg_cron sentinels registered in §12.6 v2.7 patch: job 56 `fleet_mat_chain_verify` (`0 6 * * 1`, Monday 06:00 UTC, weekly) — retrospective FLEET-MAT-CHAIN-01 chain integrity scan across all historical `fleet_maturity_declared` events; fires AL-FLEET-MAT-01 P0 PagerDuty `form-compliance` → compliance-officer + security-engineer on violation; emits `security.fleet_mat_chain_violation` CRITICAL/7yr per orphan event + `system.fleet_mat_chain_check_passed` LOW/1yr on all-clear; no auto-resolve. Job 57 `nrr_bridge_q1_calendar_check` (`0 6 * * *`, daily 06:00 UTC) — Q1 filing deadline monitor; fires AL-FLEET-FILING-01 P1 PagerDuty `form-compliance` → compliance-officer with 7-day re-alert dedup `nrr-bridge-q1-overdue-{reporting_year}` when April 1 passed + prior-year renewal trigger met + no `enterprise.annual_nrr_bridge_filed` event; emits `enterprise.nrr_bridge_q1_overdue` HIGH/7yr on detection; `system.nrr_bridge_q1_check_passed` LOW/1yr on all-clear; auto-resolve on filing. Three SLOs: FLEET-FILING-SLO-01 (NRR Bridge filed by April 1 when trigger met, 100% zero-tolerance, CC4.1/A1.1), FLEET-FILING-SLO-02 (zero FLEET-MAT-CHAIN-01 retrospective violations, 100% zero-tolerance, CC4.1/A1.1), FLEET-FILING-SLO-03 (NRR-BRIDGE-INV-01 passes 100% of filed events, 100% zero-tolerance, CC4.1 — structurally enforced at Worker write layer via HTTP 422 before persistence, not by pg_cron). SOC 2 evidence artefact FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr; R2 `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv`; SOC2_READINESS §79.4 registration pending §63.9 item 6 P1/M15). Four new DEC-030 event types pending AUDIT_LOG_SCHEMA.md registration (§63.9 item 3 P0/M13). Privacy floor: all monitoring signals are filing-calendar booleans, chain-integrity counts, and aggregate ARR percentages — no per-tenant breakdown, no employee user_id, no GDPR Art. 9 data. Cross-reference obligations: AUDIT_LOG_SCHEMA.md (P0/M13), COST_MODEL §49.9 (P1/M13), SOC2_READINESS §79.4 (P1/M15). Document header v5.9.2 → v5.10.0. Owner: compliance-officer + devops-lead + enterprise-architect.*
+
+*v5.10.1 (2026-06-30): Patch — §63.9 item 6 + §63.10 + §63.7 cross-reference closure. FLEET-FILING-E-001 registered in `docs/SOC2_READINESS.md §136` (v3.61.0, 2026-06-30): §79.4 master evidence table row (count 103 → 104; CC4.1/A1.1, annual Q1, 3yr, R2 `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv`); §80.3 R2 subfolder (`compliance/evidence/fleet-filing/`, WORM 3yr, `form_api` NO ACCESS); §80.4 Vanta mirror entry (annually Q1; 48h upload SLA; fleet aggregates + chain-integrity counts only). §63.9 item 6 (P1/M15): 🟡 Open → 🟢 Done. §63.10 SOC2_READINESS §79.4 row: 🟡 Pending P1/M15 → 🟢 Done. §63.7 Vanta mirror field: pending note → registered note. Document header v5.10.0 → v5.10.1. Owner: compliance-officer + devops-lead + enterprise-architect.*

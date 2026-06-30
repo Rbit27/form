@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.60.0
+# FORM · SOC 2 Type II Readiness v3.61.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -33602,3 +33602,122 @@ No individual employee PII, no customer data, no GDPR Art. 9 special-category da
 ---
 
 *v3.60.0 (2026-06-30): §135 Cross-Reference Patch — Credential SLA Forward Plan: CLOUDFLARE_API_KEY + WORKOS_API_KEY Rotation Pre-Alert (CC6.7 / CC6.8). Triggered by §65.11 Q3 forward plan flag and §128.4.1 PG-Q3-05 checklist item. Background: CLOUDFLARE_API_KEY and WORKOS_API_KEY both estimated to reach 180-day rotation SLA ~2026-09-03 (last rotated 2026-03-07, per Q2 access review §65.3.2). §135.2 defines forward rotation plan: target window 2026-08-18 to 2026-09-02; 5-step procedure per credential (pre-rotation, Cloudflare/WorkOS Dashboard rotation, secret store update, 1Password update, `authorized-roster.md` update); two `system.credential_rotated` DEC-030 events post-rotation; Q3 artefact note. §135.3 specifies PG-Q3-05 expected closure note (applies 2026-07-17 at pre-gate). §135.4 defines one new evidence artefact: CRED-ROT-E-001 (CC6.7/CC6.8, per-rotation-event cadence, 3yr retention, `compliance/evidence/credential-rotations/CRED-ROT-E-001-{YYYYMMDD}.json`); JSON schema with 9 fields including `dec030_event_id` (×2), `authorized_roster_sha256`, attestation block, `vanta_uploaded`, `chain_verified`. §135.5 adds CRED-ROT-E-001 to §79.4 master evidence table (count 100 → 101). §135.6 adds `compliance/evidence/credential-rotations/` R2 subfolder (WORM Object Lock 3yr; `form_api` NO ACCESS). §135.7 adds CRED-ROT-E-001 to §80.4 Vanta mirror schedule (48h upload SLA; CC6.7/CC6.8; operational metadata only — no key values, no PII). §135.8 extends §51 gap register CC6.7 note to reflect service credential rotation plan. §135.9 six-item implementation checklist: 3× P0 (PG-Q3-05 closure 2026-07-17; rotation execution 2026-09-02; CRED-ROT-E-001 filing 2026-09-02), 2× P1 (MASTER-INDEX row at Month O-1; Q3 artefact note 2026-07-31), 1× P2 (calendar cross-reference 2026-07-17). Privacy floor: CRED-ROT-E-001 carries operational metadata only — credential ID (key name, not value), timestamps, DEC-030 event IDs, roster SHA-256, role-level attestation; no key material, no employee PII, no GDPR Art. 9 data; `form_api` NO ACCESS to `form-soc2-evidence` bucket. Document header v3.59.0 → v3.60.0. Owner: compliance-officer + security-engineer.*
+
+---
+
+## §136 · Cross-Reference Patch — FLEET-FILING-E-001 Registration (CC4.1 / A1.1 · OBSERVABILITY §63.7)
+
+> Date: 2026-06-30. Trigger: `docs/OBSERVABILITY.md §63.9` item 6 (P1/M15 — FLEET-FILING-E-001 in §79.4 master evidence table + §80.3 R2 subfolder + §80.4 Vanta mirror). Owner: compliance-officer + devops-lead + enterprise-architect.
+
+### §136.1 Purpose
+
+`docs/OBSERVABILITY.md §63` (v5.10.0, 2026-06-30) defined the Enterprise Annual Filing Calendar & Fleet Maturity Chain Observability section and specified one SOC 2 evidence artefact — FLEET-FILING-E-001 ("Enterprise Annual Filing Chain Integrity Report", CC4.1/A1.1, annual Q1, 3yr) — without registering it in this document. §63.9 item 6 (P1/M15) assigned that registration obligation here. This §136 fulfils it: §79.4 evidence table row (count 103 → 104), §80.3 R2 subfolder description, §80.4 Vanta mirror entry, and implementation checklist.
+
+FLEET-FILING-E-001 is the annual chain-integrity and calendar-compliance evidence artefact for the two pg_cron sentinel jobs registered in OBSERVABILITY §12.6 v2.7 patch:
+- **Job 56** (`fleet_mat_chain_verify`, weekly Monday 06:00 UTC) — retrospective FLEET-MAT-CHAIN-01 chain integrity scan.
+- **Job 57** (`nrr_bridge_q1_calendar_check`, daily 06:00 UTC) — Q1 NRR Bridge filing deadline monitor.
+
+FLEET-FILING-E-001 is distinct from NRR-BRIDGE-E-001 (the actual NRR arithmetic bridge artefact, registered in §131) and FLEET-MAT-E-001 (the fleet maturity declaration artefact, registered in §132). FLEET-FILING-E-001 is the *monitoring and calendar compliance* layer: it records whether the other two artefacts were filed on time and whether the chain remained intact.
+
+---
+
+### §136.2 FLEET-FILING-E-001 Artefact Description
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | FLEET-FILING-E-001 |
+| **Name** | Enterprise Annual Filing Chain Integrity Report |
+| **SOC 2 criteria** | CC4.1, A1.1 |
+| **Cadence** | Annual — filed in Q1 of each calendar year covering the prior `reporting_year` |
+| **Retention** | 3 years |
+| **R2 path** | `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv` |
+| **First eligible filing** | Q1 of first year after pg_cron jobs 56 and 57 have run for ≥ 52 consecutive weeks (est. M28 from observation-period start, subject to M13 job deploy milestone) |
+| **Primary definition** | `docs/OBSERVABILITY.md §63.7` (Enterprise Annual Filing Chain Integrity Report — CC4.1/A1.1, annual Q1, 3yr). Source jobs: `fleet_mat_chain_verify` (job 56) and `nrr_bridge_q1_calendar_check` (job 57) in OBSERVABILITY §12.6 v2.7 patch. |
+
+**Content (three components per OBSERVABILITY §63.7):**
+
+1. **NRR Bridge filing calendar compliance** — for each prior `reporting_year` since the first `enterprise_renewals` row was closed:
+   - Trigger condition met? (`renewal_count > 0` BOOL)
+   - Filing date (TIMESTAMPTZ or NULL)
+   - `reporting_year` INT
+   - `bridge_hash` (64-char hex SHA-256 from the `enterprise.annual_nrr_bridge_filed` payload)
+   - AL-FLEET-FILING-01 fired? (BOOL — indicates Q1 deadline was missed before filing)
+
+2. **FLEET-MAT-CHAIN-01 weekly verification run history** — job 56 results for the past 52 Mondays:
+   - Run date, `events_verified_count` INT, `chain_consistent` BOOL
+   - Count of `security.fleet_mat_chain_violation` events in the period (any count > 0 triggers inline R2 audit log export in the artefact)
+
+3. **NRR-BRIDGE-INV-01 structural compliance note** — since NRR-BRIDGE-INV-01 is enforced at the Worker write layer (HTTP 422 before persistence), the count of successfully stored `enterprise.annual_nrr_bridge_filed` events is evidence that the invariant passed for all of them. Auditor narrative: "Each persisted `enterprise.annual_nrr_bridge_filed` event passed the NRR-BRIDGE-INV-01 arithmetic gate at the `emit-audit-event` Worker layer prior to storage. No additional post-persistence arithmetic re-check is required; structural enforcement is the control."
+
+**Privacy floor:** FLEET-FILING-E-001 contains fleet-level ARR aggregates from the `enterprise.annual_nrr_bridge_filed` payload (total opening/closing ARR, NRR %, GRR %, logo retention rate) and chain-integrity counts — no per-tenant ARR breakdown, no individual employee `user_id`, name, email, or GDPR Art. 9 special-category health data. `form_api` REVOKED from `audit_log_events` and `enterprise_renewals`. HR `tenant_manager` role has zero access.
+
+---
+
+### §136.3 §80.3 R2 Subfolder Addition
+
+New R2 subfolder added to the evidence bucket topology (§80.3):
+
+| Subfolder | Purpose | Access | Retention |
+|---|---|---|---|
+| `compliance/evidence/fleet-filing/` | FLEET-FILING-E-001 annual chain integrity artefacts | `form_system` role only (for filing); `compliance_reviewer` + `r2:compliance-officer` read; `form_api` NO ACCESS | WORM Object Lock Governance, 3yr minimum |
+
+One file per reporting year: `FLEET-FILING-E-001_<YYYY>.csv`. Zero-activity years (jobs 56/57 deployed but no NRR Bridge trigger met) filed as affirmative nil attestation with `trigger_condition_met = FALSE` and all chain-check rows showing `chain_consistent = TRUE`.
+
+---
+
+### §136.4 §80.4 Vanta Mirror Entry
+
+FLEET-FILING-E-001 added to Vanta mirror schedule (§80.4):
+
+| Artefact ID | Vanta upload timing | TSC mapping | Privacy note |
+|---|---|---|---|
+| FLEET-FILING-E-001 | Within 48h of filing; annually Q1 from first qualifying year (est. M28 from OB start) | CC4.1, A1.1 | Fleet-level aggregates and chain-integrity counts only: `bridge_hash` SHA-256, `renewal_count` INT, `events_verified_count` INT, `chain_consistent` BOOL, filing date. No per-tenant ARR, no employee `user_id`, no GDPR Art. 9 data. |
+
+Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. Vanta access: compliance-officer + security-engineer only.
+
+---
+
+### §136.5 §79.4 Master Evidence Table Row
+
+One row added to the §79.4 master evidence table (count 103 → 104), after CRED-ROT-E-001:
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|
+| **FLEET-FILING-E-001** | CC4.1, A1.1 | Annual "Enterprise Annual Filing Chain Integrity Report": (1) NRR Bridge Q1 filing calendar compliance per `reporting_year` (trigger condition, filing date, `bridge_hash`, AL-FLEET-FILING-01 fired BOOL); (2) FLEET-MAT-CHAIN-01 weekly chain integrity run history from job 56 (52 Mondays: `events_verified_count` INT, `chain_consistent` BOOL, violation count); (3) NRR-BRIDGE-INV-01 structural compliance note (Worker-layer HTTP 422 enforcement). Zero-activity years filed as affirmative nil attestation. Privacy: fleet aggregates + chain-integrity counts only; no per-tenant ARR, no `user_id`, no GDPR Art. 9 data; `form_api` REVOKED. Primary definition: OBSERVABILITY §63.7 (v5.10.0, 2026-06-30). | Annual (Q1) | 3 yr | `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv` |
+
+---
+
+### §136.6 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `OBSERVABILITY §63.9 item 6` (P1/M15) — Register FLEET-FILING-E-001 in §79.4 master evidence table (CC4.1/A1.1, annual Q1, 3yr, R2 path `compliance/evidence/fleet-filing/`) and upload Vanta mirror entry within 48h of first filing | This section §136.5 (§79.4 row), §136.3 (§80.3 R2 subfolder), §136.4 (§80.4 Vanta mirror) | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.61.0 §136)** |
+| `OBSERVABILITY §63.10` — Register FLEET-FILING-E-001 (CC4.1/A1.1, annual Q1, 3yr) in master evidence table and Vanta mirror | This §136 | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.61.0 §136)** |
+| `OBSERVABILITY §63.7` — §80.4 Vanta mirror entry "SOC2_READINESS.md §79.4 registration pending (§63.9 item 6 P1/M15)" | This §136.4 | 🟢 **Done — 2026-06-30 (SOC2_READINESS.md v3.61.0 §136)** |
+
+---
+
+### §136.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `compliance/evidence/fleet-filing/` folder on Cloudflare R2 `form-soc2-evidence` bucket; enable WORM Object Lock Governance 3yr; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). Prerequisite: pg_cron jobs 56 and 57 must be deployed first (OBSERVABILITY §63.9 items 1–2, P0/M13). | devops-lead | **P0** | M13 (immediately after job 56/57 deploy) | [ ] |
+| 2 | File first FLEET-FILING-E-001 artefact in Q1 of first year after jobs 56 and 57 have run for ≥ 52 consecutive weeks: (a) export job 56 run history for prior 52 Mondays from `pg_cron.job_run_details`; (b) export `enterprise.nrr_bridge_q1_overdue` + `enterprise.annual_nrr_bridge_filed` events for the `reporting_year`; (c) compile FLEET-FILING-E-001 three-component CSV per OBSERVABILITY §63.7; (d) SHA-256 hash; (e) upload to R2 at `compliance/evidence/fleet-filing/FLEET-FILING-E-001_<YYYY>.csv` (WORM 3yr); (f) upload to Vanta within 48h (CC4.1/A1.1); (g) add to MASTER-INDEX. Privacy check: fleet aggregates + chain-integrity counts only; no per-tenant ARR, no `user_id`. | compliance-officer + devops-lead | **P1** | Q1 of first qualifying year (est. M28 from OB start) | [ ] |
+| 3 | Add FLEET-FILING-E-001 to §79.5 compliance calendar at first eligible Q1; confirm §79.5 Quarterly section does not require interim FLEET-FILING-E-001 entries (artefact is strictly annual). | compliance-officer | **P2** | Before first Q1 filing | [ ] |
+
+---
+
+### §136.8 Privacy Floor
+
+FLEET-FILING-E-001 contains:
+- `reporting_year` INT and `filing_year` INT — temporal identifiers only
+- `renewal_count` INT — fleet-level aggregate count of closed renewals; no per-tenant ACV
+- `bridge_hash` 64-char hex SHA-256 — derived from the NRR-BRIDGE-E-001 artefact; no PII derivable
+- `events_verified_count` INT and `chain_consistent` BOOL — pg_cron job 56 chain-check results; aggregate counts only
+- Filing calendar booleans: `trigger_condition_met`, `al_fleet_filing_01_fired`
+
+No individual employee `user_id`, name, email, or GDPR Art. 9 special-category health data. No per-tenant ARR breakdown. No key material. `form_api` REVOKED from `audit_log_events` and `enterprise_renewals`. Privacy classification: compliance operational metadata — internal only; `compliance_reviewer` + `r2:compliance-officer` access.
+
+---
+
+*v3.61.0 (2026-06-30): §136 Cross-Reference Patch — FLEET-FILING-E-001 Registration in §79.4 Master Evidence Table (CC4.1 / A1.1 · OBSERVABILITY §63.7). Closes `docs/OBSERVABILITY.md §63.9` item 6 (P1/M15 — FLEET-FILING-E-001 registration in SOC2_READINESS §79.4 master evidence table + §80.3 R2 subfolder + §80.4 Vanta mirror). FLEET-FILING-E-001 is the "Enterprise Annual Filing Chain Integrity Report": annual Q1 evidence artefact covering (1) NRR Bridge Q1 filing calendar compliance per `reporting_year` (trigger condition met BOOL, filing date, `bridge_hash`, AL-FLEET-FILING-01 fired BOOL); (2) FLEET-MAT-CHAIN-01 weekly verification run history from pg_cron job 56 (52 Mondays: `events_verified_count` INT, `chain_consistent` BOOL, violation count); (3) NRR-BRIDGE-INV-01 structural compliance note (Worker-layer HTTP 422 enforcement). Primary definition: OBSERVABILITY §63.7 (v5.10.0, 2026-06-30). §136.5 adds FLEET-FILING-E-001 to §79.4 master evidence table (count 103 → 104; insertion after CRED-ROT-E-001). §136.3 adds `compliance/evidence/fleet-filing/` R2 subfolder (WORM Object Lock Governance 3yr; `form_api` NO ACCESS; `form_system` + `compliance_reviewer` + `r2:compliance-officer` access only). §136.4 adds FLEET-FILING-E-001 to §80.4 Vanta mirror schedule (annually Q1; 48h upload SLA; CC4.1/A1.1; fleet-level aggregates + chain-integrity counts only — no per-tenant ARR, no `user_id`, no GDPR Art. 9 data). §136.7 three-item implementation checklist: 1× P0 (R2 folder creation at M13 after job 56/57 deploy), 1× P1 (first filing Q1 est. M28), 1× P2 (§79.5 calendar entry before first filing). Three cross-reference obligations closed (§136.6): OBSERVABILITY §63.9 item 6 (P1/M15 registration obligation — 🟢 Done); OBSERVABILITY §63.10 cross-ref row (🟢 Done); OBSERVABILITY §63.7 Vanta mirror pending note (🟢 Done). Privacy floor: FLEET-FILING-E-001 contains fleet-level aggregates, chain-integrity counts, and filing-calendar booleans only — no per-tenant ARR, no individual employee `user_id`, name, email, or GDPR Art. 9 special-category data; `form_api` REVOKED from `audit_log_events` and `enterprise_renewals`. Document header v3.60.0 → v3.61.0. Owner: compliance-officer + devops-lead + enterprise-architect.*

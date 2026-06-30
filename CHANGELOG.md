@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.46.0] — 2026-06-30
+
+### Added
+- `docs/SOC2_READINESS.md §136` — Cross-Reference Patch: FLEET-FILING-E-001 Registration (CC4.1 / A1.1 · OBSERVABILITY §63.7). Closes `docs/OBSERVABILITY.md §63.9` item 6 (P1/M15 — SOC2_READINESS §79.4 registration + §80.3 R2 subfolder + §80.4 Vanta mirror for FLEET-FILING-E-001). Artefact registered (count 103 → 104): FLEET-FILING-E-001 ("Enterprise Annual Filing Chain Integrity Report", CC4.1/A1.1, annual Q1, 3yr) — annual Q1 evidence covering three components: (1) NRR Bridge Q1 filing calendar compliance per `reporting_year` (trigger condition BOOL, filing date, `bridge_hash` SHA-256, AL-FLEET-FILING-01 fired BOOL); (2) FLEET-MAT-CHAIN-01 weekly verification run history from pg_cron job 56 (52 Mondays: `events_verified_count` INT, `chain_consistent` BOOL, violation count); (3) NRR-BRIDGE-INV-01 structural compliance note (Worker-layer HTTP 422 enforcement; no additional post-persistence check required). R2 subfolder `compliance/evidence/fleet-filing/` (WORM Object Lock Governance 3yr; `form_api` NO ACCESS; `form_system` + `compliance_reviewer` + `r2:compliance-officer` access). Vanta mirror entry (annually Q1; 48h upload SLA; CC4.1/A1.1; fleet aggregates + chain-integrity counts only). Three-item implementation checklist: P0 (R2 folder at M13 after job 56/57 deploy); P1 (first filing Q1 est. M28); P2 (§79.5 calendar entry). Primary definition: OBSERVABILITY §63.7 (v5.10.0, 2026-06-30). Privacy floor: fleet-level aggregates, chain-integrity counts, filing-calendar booleans — no per-tenant ARR, no `user_id`, no GDPR Art. 9 data. SOC2_READINESS header v3.60.0 → v3.61.0. Owner: compliance-officer + devops-lead + enterprise-architect.
+
+### Changed
+- `docs/OBSERVABILITY.md §63.9` — item 6 (P1/M15 — FLEET-FILING-E-001 SOC2_READINESS registration) → 🟢 Done (SOC2_READINESS.md v3.61.0 §136, 2026-06-30).
+- `docs/OBSERVABILITY.md §63.10` — cross-reference row `docs/SOC2_READINESS.md §79.4` → 🟢 Done (SOC2_READINESS §136, v3.61.0, 2026-06-30).
+- `docs/OBSERVABILITY.md §63.7` — Vanta mirror field updated: pending note → registered (SOC2_READINESS §136, v3.61.0). Document header v5.10.0 → v5.10.1.
+- `VERSION` — 10.45.0 → 10.46.0.
+
+---
+
 ## [10.45.0] — 2026-06-30
 
 ### Added
