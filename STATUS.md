@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.23.0** — 2026-06-30 · post-2847 (program-fits-or-you-dont-follow-it · editorial) · Series 2846–2855 «Рішення під тиском» 2/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending
+**v10.24.0** — 2026-06-30 · post-2848 (deload-decision-signals · editorial) · Series 2846–2855 «Рішення під тиском» 3/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending
 
 ---
 
