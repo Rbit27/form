@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v10.36.0** — 2026-06-30 · post-2866 · Series 2866–2875 «Автономне тренування» START (1/10) · post-2866 «Коли «стоп» — не слабкість: алгоритм скасування тренування» · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for 2866 · README roadmap: post-2866 → draft
+**v10.37.0** — 2026-06-30 · posts 2867–2868 · Series 2866–2875 «Автономне тренування» 2/3 of 10 · post-2867 «Як читати власний прогрес без зовнішньої точки зору» · post-2868 «П'ять патернів самопрограмування, що знищують прогрес» · clinical-safety NOT_REQUIRED (both) · sports-scientist review pending · blog.html cards added for 2867–2868 · README roadmap: posts 2867–2868 → draft · next: posts 2869–2870
 
 ---
 
