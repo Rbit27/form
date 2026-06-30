@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.23.0
+# FORM · Cost Model & Unit Economics v2.23.1
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -13753,9 +13753,9 @@ const FleetMaturityDeclaredSchema = z.object({
 
 | Priority | Milestone | Item | Owner | Status |
 |---|---|---|---|---|
-| P0 | M13 | Register `enterprise.fleet_maturity_declared` in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | 🟡 Open (→ §132 patch) |
+| P0 | M13 | Register `enterprise.fleet_maturity_declared` in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | ✅ Done (`docs/AUDIT_LOG_SCHEMA.md` v2.62, 2026-06-30) |
 | P0 | M13 | Implement FLEET-MAT-CHAIN-01 invariant in `emit-audit-event` Worker | security-engineer | 🟡 Open |
-| P0 | M13 | Register FLEET-MAT-E-001 in `docs/SOC2_READINESS.md §132` | compliance-officer | 🟡 Open (→ §132 patch) |
+| P0 | M13 | Register FLEET-MAT-E-001 in `docs/SOC2_READINESS.md §132` | compliance-officer | ✅ Done (`docs/SOC2_READINESS.md` v3.57.0 §132, 2026-06-30) |
 | P0 | M13 | Create `enterprise/fleet-maturity/` R2 subfolder (WORM, 3yr, `form_api` NO ACCESS) | devops-lead | 🟡 Open |
 | P1 | M15 | Implement fleet maturity Worker logic (FM-C1/C2/C3 evaluation, `consecutive_cycles_at_target` tracking) | platform-engineer | 🟡 Open |
 | P1 | M15 | Add `FleetMaturityDeclaredSchema` Zod validation to Worker | platform-engineer | 🟡 Open |
@@ -13783,13 +13783,15 @@ const FleetMaturityDeclaredSchema = z.object({
 | `docs/COST_MODEL.md` | §48.5 (Lever analysis) | §49.2 FM-C1/C2/C3 formalise §48.5 informal lever thresholds | 🟢 |
 | `docs/COST_MODEL.md` | §40 (WAU health band model) | FM-C1 Green Fleet % derived from §40 health band definitions | 🟢 |
 | `docs/COST_MODEL.md` | §47 (Activation buckets) | §49.3 CSM Phase model builds on §47 cohort scale assumptions | 🟢 |
-| `docs/DECISION_LOG.md` | DEC-086 | Fleet Maturity governance decision record | 🟡 Open (→ DECISION_LOG patch) |
+| `docs/DECISION_LOG.md` | DEC-086 | Fleet Maturity governance decision record | 🟢 |
 | `docs/DECISION_LOG.md` | DEC-030 | HMAC-chained audit log protocol; `enterprise.fleet_maturity_declared` emitted per DEC-030 | 🟢 |
-| `docs/AUDIT_LOG_SCHEMA.md` | Enterprise Fleet Maturity events | `enterprise.fleet_maturity_declared` event, FLEET-MAT-CHAIN-01 invariant | 🟡 Open (→ AUDIT_LOG_SCHEMA v2.62 patch) |
-| `docs/SOC2_READINESS.md` | §132 | FLEET-MAT-E-001 evidence registration; §79.4 count 101→102 | 🟡 Open (→ SOC2_READINESS v3.57.0 patch) |
+| `docs/AUDIT_LOG_SCHEMA.md` | Enterprise Fleet Maturity events | `enterprise.fleet_maturity_declared` event, FLEET-MAT-CHAIN-01 invariant | 🟢 |
+| `docs/SOC2_READINESS.md` | §132 | FLEET-MAT-E-001 evidence registration; §79.4 count 101→102 | 🟢 |
 | `docs/ENTERPRISE.md` | Pricing tiers | §49.4 tier upgrade ARR uses Growth→Elite delta ($300/mo = $3,600/yr at 100 seats) | 🟢 |
 | `docs/DATA_MODEL.md` | §17 (Admin Dashboard RLS) | Privacy floor: §49 tables contain fleet aggregates only; consistent with §17 k-anonymity (n ≥ 5) | 🟢 |
 
 ---
+
+*v2.23.1 (2026-06-30): §49.9 checklist + §49.11 cross-reference closure. Three documentation obligations opened in v2.23.0 are now fulfilled: (1) `enterprise.fleet_maturity_declared` registered in `docs/AUDIT_LOG_SCHEMA.md` v2.62 (2026-06-30) — `FleetMaturityDeclaredSchema` Zod v2, FLEET-MAT-CHAIN-01 invariant, CC4.1/A1.1 auditor narratives; (2) FLEET-MAT-E-001 registered in `docs/SOC2_READINESS.md §132` (v3.57.0, 2026-06-30) — §79.4 row (count 101→102), `enterprise/fleet-maturity/` R2 subfolder (§80.3), Vanta mirror entry (§80.4); (3) DEC-086 (Fleet Maturity governance protocol) registered in `docs/DECISION_LOG.md`. §49.9 items 1 and 3 status updated 🟡 Open → ✅ Done. §49.11 cross-reference index: DEC-086, AUDIT_LOG_SCHEMA Enterprise Fleet Maturity events, SOC2_READINESS §132 rows updated 🟡 → 🟢. Document header v2.23.0 → v2.23.1. Owner: compliance-officer.*
 
 *v2.23.0 (2026-06-30): §49 Year-3+ Fleet Maturity Economics & 120% NRR Path (DEC-086). Extends §48.3 Year-2 Base closing ARR ($82,881) to Year-3 projections (Bull 122.4% / Base 112.1% / Bear 99.1% NRR [all ESTIMATE]). Formalises FM-C1/C2/C3 fleet maturity conditions with two-cycle gate and ≥ 12-tenant statistical floor (DEC-086). Lever attribution: 97% of the 120% NRR gap is expansion-driven (seat growth + tier upgrades), not retention-driven. CSM Phase 3 (≥ 3 CSMs, 26–37 tenants) identified as structural enabler for FM-C2 ≥ 55% expansion take-up. DEC-030 event `enterprise.fleet_maturity_declared` (LOW/3yr/CC4.1/A1.1) with FLEET-MAT-CHAIN-01 ordering invariant (HTTP 422 `FLEET_MAT_CHAIN_01_NO_NRR_BRIDGE` on violation); 12-field `FleetMaturityDeclaredSchema` (Zod v2). SOC 2 evidence FLEET-MAT-E-001 (CC4.1/A1.1, annual Q1, 3yr, `enterprise/fleet-maturity/FLEET-MAT-E-001_<YYYY>.csv`); §79.4 count 101→102. Document header v2.22.1 → v2.23.0. Owner: data-engineer + enterprise-architect + customer-success + compliance-officer.*

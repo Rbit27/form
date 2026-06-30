@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.36.1] — 2026-06-30
+
+### Changed
+- `docs/COST_MODEL.md` — §49.9 checklist items 1 + 3 closed (✅ Done); §49.11 cross-reference index three rows updated 🟡 → 🟢 (DEC-086, AUDIT_LOG_SCHEMA v2.62 Enterprise Fleet Maturity events, SOC2_READINESS v3.57.0 §132). Document header v2.23.0 → v2.23.1.
+- `VERSION` — 10.36.0 → 10.36.1.
+
+---
+
 ## [10.36.0] — 2026-06-30
 
 ### Added
