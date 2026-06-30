@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [10.64.0] — 2026-06-30
+
+### Added
+- `content/post-2890-weekly-volume-flexible-scheduling.md` — Editorial series post 2890. «Як планувати тижневий об'єм, коли розклад змінюється». Серія «Тренувальний інтелект» 2886–2895 (5/10). Тиждень як одиниця адаптації (Krieger 2010; Schoenfeld et al. 2016; Ralston et al. 2017); MEV/MAV/MRV фрейм для управління об'ємом при нестабільному графіку (Israetel et al. 2019); принцип перерозподілу замість надолуження; три сценарії змін розкладу з алгоритмами рішень; пріоритизація рівнів 1–3; практичний приклад двох пропущених тренувань. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2890 картка додана вгорі фіду.
+
+### Changed
+- `VERSION` — 10.63.1 → 10.64.0.
+
+---
+
 ## [10.63.1] — 2026-06-30
 
 ### Added
