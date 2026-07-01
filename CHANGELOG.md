@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.83.1] — 2026-07-01
+
+### Added
+- `docs/COST_MODEL.md §54` — OQ-CS-02 Resolution: Programme Health Indicator in Enterprise Admin Dashboard (DEC-092). PHI 3-band label (Healthy / Needs Attention / At Risk) derived from FEHS bands; raw FEHS (0–100) remains internal-only per OBSERVABILITY §33.3 CHS policy. PHI card in Admin Dashboard Overview tab: label + trend arrow + activation_rate_pct + wau_rate_pct sparklines. `GET /api/admin/tenants/:tenantId/programme-health` Worker endpoint spec: dual-query backend (monthly FEHS snapshot → CASE WHEN → PHI label), `ProgrammeHealthResponse` Zod schema, 60 req/min rate limit, `tenant_admin` RLS, `form_admin` cross-tenant read. `admin.programme_health_label_viewed` LOW/1yr DEC-030 event: `phi_label` + `trend` + `admin_user_id` pseudonymous UUID; PHI-VIEW-01 invariant; dedup `phi-label-viewed-{tenant_id}-{admin_user_id}-{snapshot_date}`; C1.2/CC2.2 SOC 2 mapping. CSM efficiency economics: ~$18.13/account/month saving (~29 min/account/month in health-status escalation reduction at $37.50/h CSM rate); 0.41 additional accounts per CSM capacity equivalent. PHI NRR contribution: ~$16,200 ARR preserved per 20-account cohort [ESTIMATE — to validate M8]. Privacy floor: no raw FEHS score; no individual employee user_id, email, health data, or GDPR Art. 9 data; `below_k_threshold` gate (n < 5 → `insufficient_data`); `form_api` REVOKED from `tenant_engagement_snapshots`. COST_MODEL header v2.26.0 → v2.27.0.
+
+### Changed
+- `docs/COST_MODEL.md §26.12` — OQ-CS-02 patched 🟡 P1 Open → 🟢 Resolved DEC-092 (v2.27.0, 2026-07-01).
+- `docs/DECISION_LOG.md` — DEC-092 registered (2026-07-01): PHI adopted; DEC-091 (CS hire gate) immediately below.
+- `VERSION` — 10.83.0 → 10.83.1.
+
+---
+
 ## [10.82.0] — 2026-07-01
 
 ### Added

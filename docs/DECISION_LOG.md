@@ -15,6 +15,15 @@
 
 ## 2026-07-01
 
+### DEC-092 · OQ-CS-02 Resolution: Programme Health Indicator in Enterprise Admin Dashboard
+
+- **Decision:** Programme Health Indicator (PHI) adopted — 3-band label (Healthy / Needs Attention / At Risk) derived from FEHS bands (Green/Yellow → Healthy; Red → Needs Attention; Critical → At Risk). Raw FEHS numeric score (0–100) stays internal-only, consistent with OBSERVABILITY §33.3 CHS "internal only" policy. PHI card in Admin Dashboard Overview tab exposes label + trend arrow (vs. prior month) + activation_rate_pct + wau_rate_pct. `admin.programme_health_label_viewed` LOW/1yr DEC-030 event on card load. Full specification in `docs/COST_MODEL.md §54`.
+- **Owner:** product-strategist + customer-success + compliance-officer
+- **Why:** (1) Raw score creates false-precision escalations: renewal-distance signal (5% weight) decays from Green to Red as contract ages even with healthy adoption. (2) PHI maps to natural-language labels customers can act on without formula knowledge. (3) Consistent with OBSERVABILITY §33.3 CHS "internal only" policy. (4) Privacy: two-signal summary (activation + WAU) only — no new data exposure beyond what is already in the Overview tab. (5) Economic case: ~$18.13/account/month CSM time saved in health-status escalations; 0.41 additional accounts per CSM capacity equivalent; ~$16,200 ARR preserved per 20-account cohort if PHI shifts one Red account to CSM-intervened recovery [ESTIMATE — to validate at M8 per OQ-08].
+- **Reverse cost:** Low. PHI is a read-only display endpoint. Removal: delete Worker route + Admin Dashboard card. No schema migration required.
+
+---
+
 ### DEC-091 · OQ-CS-01 Resolution: CS Hire vs. Founding Engineer Hire — Month 9 Decision Gate
 
 - **Decision:** CS-HIRE-GATE-01 two-criteria gate adopted: Criterion A (`active_enterprise_accounts ≥ 4`) + Criterion B (`estimated_monthly_qbr_hours ≥ 12`) evaluated at Month 9 board review. Gate-triggered: CS hire at M11 ($72.5k/yr midpoint), founding engineer deferred to M16. Not triggered: §22.3 Base scenario M13 engineer hire maintained; M12 re-evaluation scheduled. `enterprise.hiring_decision_logged` STANDARD/3yr DEC-030 event emitted regardless of outcome. Manual override path: `decision_basis: 'manual_override'` + DECISION_LOG note. Full specification in `docs/COST_MODEL.md §53`.

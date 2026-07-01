@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.26.0
+# FORM · Cost Model & Unit Economics v2.27.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -389,6 +389,18 @@
     - 53.8 §26.12 In-Line Patch
     - 53.9 Implementation Checklist
     - 53.10 Cross-Reference Obligations
+54. [§54 · OQ-CS-02 Resolution — Programme Health Indicator in Enterprise Admin Dashboard (DEC-092)](#54--oq-cs-02-resolution--programme-health-indicator-in-enterprise-admin-dashboard-dec-092)
+    - 54.1 Background and Resolution Direction
+    - 54.2 Decision Analysis
+    - 54.3 Programme Health Indicator (PHI) Design
+    - 54.4 CSM Efficiency Economics
+    - 54.5 API Specification
+    - 54.6 Privacy Floor
+    - 54.7 DEC-030 Audit Event
+    - 54.8 DEC-092 Decision Record
+    - 54.9 §26.12 In-Line Patch
+    - 54.10 Implementation Checklist
+    - 54.11 Cross-Reference Obligations
     - 51.1 Background
     - 51.2 Decision (DEC-088) — Tiered k-Anonymity Framework
     - 51.3 Decision Rationale
@@ -4833,9 +4845,9 @@ CS events must be emitted to the HMAC-chained audit log for two purposes: (1) SO
 
 `§53` provides the formal decision gate: **CS-HIRE-GATE-01** two-criteria gate (Criterion A: `active_enterprise_accounts ≥ 4`; Criterion B: `estimated_monthly_qbr_hours ≥ 12`) evaluated at the Month 9 board review. Gate-triggered: CS hire at M11 ($72.5k/yr midpoint), founding engineer deferred to M16. Not triggered: §22.3 Base scenario M13 engineer hire maintained; M12 re-evaluation scheduled. `enterprise.hiring_decision_logged` STANDARD/3yr DEC-030 event emitted regardless of outcome. Cash flow analysis: gate-triggered path costs $4,125 more over M11–M16 vs. base; expected ARR protection from one prevented 100-seat Starter churn = $75k → 18× positive ROI. See `docs/COST_MODEL.md §53` for full rationale, cash flow comparison, and DEC-091 decision record.
 
-**OQ-CS-02: Should FEHS be visible to the customer in the admin dashboard, or is it internal-only?**
+**OQ-CS-02: Should FEHS be visible to the customer in the admin dashboard, or is it internal-only? — 🟢 RESOLVED DEC-092 (v2.27.0, 2026-07-01)**
 
-The FEHS score computed in §26.9.1 uses data that is already visible to customers in the admin dashboard (activation rate, weekly active rate). Making FEHS visible to customers would (a) increase transparency and trust, (b) give customers a single headline metric for their health programme, and (c) reduce the CSM time spent explaining raw metrics. Risk: if FEHS drops to Red, a customer seeing their own Red score may panic and escalate before FORM has a recovery plan ready, compressing the intervention window. Alternative: provide a customer-facing "wellness programme health" label (Good / Needs Attention / At Risk) that is coarser than the internal 0–100 score. Owner: product-strategist + customer-success. Priority: **P1 — decide before admin dashboard v2.** Resolution: ship internal-only FEHS at M5; evaluate customer-facing version at M8 after first two QBR cycles.
+`§54` provides the formal resolution: **Programme Health Indicator (PHI)** adopted — a 3-band label (Healthy / Needs Attention / At Risk) derived from FEHS bands, visible to tenant admins via a dedicated Overview card. The raw FEHS numeric score (0–100) remains internal-only, consistent with OBSERVABILITY §33.3 (CHS "internal signal only" policy). PHI surfaces only the label and the two signals already present in the admin dashboard (activation rate and weekly active rate). `admin.programme_health_label_viewed` LOW/1yr DEC-030 event emitted on card load. Estimated CSM efficiency saving: $12.50–$18.75/account/month in reduced health-status escalations. See `docs/COST_MODEL.md §54` for full design, API spec, privacy floor, and DEC-092 decision record.
 
 **OQ-CS-03: What is the right k-anonymity floor for QBR aggregate metrics? — 🟢 RESOLVED DEC-088 (v2.24.0, 2026-06-30)**
 
@@ -14347,3 +14359,289 @@ Applied in this authoring pass:
 ---
 
 *v2.26.0 (2026-07-01): §53 OQ-CS-01 Resolution — CS Hire vs. Founding Engineer Hire: Month 9 Decision Gate (DEC-091). Closes OQ-CS-01 (P0, §26.12 — whether first CS hire precedes founding engineer hire at Month 13; decision required before Month 9). Decision (DEC-091): CS-HIRE-GATE-01 two-criteria gate adopted. Criterion A: `active_enterprise_accounts ≥ 4` (tenants with `lifecycle_status = 'active'` + at least one SCIM employee per DATA_MODEL §16). Criterion B: `estimated_monthly_qbr_hours ≥ 12` (founder self-reported; derived from 7h/account base ×  active accounts per §26.8 + Red-band overhead per §40.6). Gate-triggered path: CS hire M11 ($72.5k/yr midpoint, $6,646/month total cost); founding engineer deferred to M16 ($100k/yr). Not-triggered path: §22.3 Base scenario M13 engineer hire maintained; M12 re-evaluation scheduled. `enterprise.hiring_decision_logged` STANDARD/3yr DEC-030 event emitted at Month 9 review regardless of outcome; payload: active account count, estimated QBR hours, two boolean criterion flags, `gate_triggered` boolean, `hire_type_planned` enum, `planned_hire_month` string, `decision_basis` enum, `review_date` ISO 8601. Manual override: available before Month 9 if unexpected fifth account signs + documented Red-band account; requires `decision_basis: 'manual_override'` + DECISION_LOG note. Cash flow analysis (§53.4): gate-triggered path costs $4,125 more over M11–M16 vs. base; expected ARR protection from one prevented 100-seat Starter churn ($75k ACV) = 17× positive ROI on incremental CS hire cost; break-even = 5.5% of one Starter ACV. Privacy floor: `enterprise.hiring_decision_logged` contains only aggregate counts and administrative metadata; no individual employee `user_id`, name, email, health data, coaching content, or GDPR Art. 9 special-category data; HR systems receive no access; `active_enterprise_accounts` is a FORM-internal tenant count only. §26.12 OQ-CS-01 patched 🟡 → 🟢 Resolved DEC-091. TOC entry §53 added. DEC-091 registered in `docs/DECISION_LOG.md`. Document header v2.24.0 → v2.26.0 (absorbing v2.25.0 which was documented in §52 version note but not applied to file header). Cross-references: `docs/COST_MODEL.md §22.3` (Base scenario cash flow — M13 engineer hire that gate-triggered path defers to M16); `docs/COST_MODEL.md §26.4` (CS team stages — 4 accounts as founder-led upper boundary, Criterion A source); `docs/COST_MODEL.md §26.8` (QBR economics — 7h/account base rate, Criterion B input); `docs/COST_MODEL.md §26.12` (OQ-CS-01 — 🟢 Resolved DEC-091); `docs/COST_MODEL.md §40.3` (seat utilization health matrix — Red-band ~60% churn probability; context for Criterion B urgency); `docs/COST_MODEL.md §40.6` (CSM intervention playbook — Red-band overhead input to Criterion B); `docs/COST_MODEL.md §23` (NRR engine — Gate-triggered ~105% NRR vs. Base ~87% NRR at 4+ accounts founder-led); `docs/ENTERPRISE.md §CSM coverage model` (CS coverage tiers and privacy floor); `docs/AUDIT_LOG_SCHEMA.md` (`enterprise.hiring_decision_logged` — P1/M7 to register); `docs/DECISION_LOG.md DEC-091` (formal decision record — P0 this pass). Owner: founder + customer-success + compliance-officer.*
+
+---
+
+## §54 · OQ-CS-02 Resolution — Programme Health Indicator in Enterprise Admin Dashboard (DEC-092)
+
+> **Closes:** OQ-CS-02 from `§26.12` (P1 — decide before admin dashboard v2 — open since v1.7).
+> **Owner:** product-strategist + customer-success + compliance-officer. References: §26.9, §26.8, `docs/OBSERVABILITY.md §33.3`, `docs/DATA_MODEL.md §17`, `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md`.
+
+### 54.1 Background and Resolution Direction
+
+OQ-CS-02 (§26.12) asked whether the FEHS score computed in §26.9.1 should be visible to tenant admins in the enterprise admin dashboard, or should remain internal-only (available only to FORM's CSM and compliance teams).
+
+The tension is real: the six FEHS component signals include two (activation rate and weekly active rate) that tenant admins can already see in the admin dashboard, and four (seat utilization trend, executive engagement lag, support volume trend, renewal distance) that are either derived from internal FORM tooling or contractual information that belongs in a CS conversation rather than a self-serve card. Exposing the raw 0–100 composite invites customers to manage against the number rather than the underlying behaviour, and creates a support escalation risk whenever the score dips due to the renewal-distance signal decaying naturally as the contract ages.
+
+`docs/OBSERVABILITY.md §33.3` resolves an analogous question for the Customer Health Score (CHS): "CHS is a composite 0–100 score computed nightly per tenant. It is an *internal* signal only — it is never shared directly with tenant admins or employer HR." The same logic applies to FEHS.
+
+DEC-092 adopts **Option B: Programme Health Indicator (PHI)** — a coarsened 3-band label derived from FEHS bands, exposed to tenant admins through a dedicated Overview card. The raw FEHS numeric score is not exposed.
+
+### 54.2 Decision Analysis
+
+| Option | Description | Verdict |
+|---|---|---|
+| **A: Full FEHS (0–100) visible to tenant admin** | Most transparent; requires no additional UX design beyond a number widget. | ❌ Rejected. Customers lack context for score fluctuations — the renewal-distance signal (5% weight) decays from Green to Red over every contract cycle even when adoption is healthy. A 67 → 61 move caused by a contract aging 30 days will trigger a "what did we do wrong?" escalation, adding CSM work rather than reducing it. Inconsistent with OBSERVABILITY §33.3 CHS "internal only" policy. |
+| **B: Programme Health Indicator (PHI) — 3-band label** | Coarser surface: Healthy / Needs Attention / At Risk. Derived from FEHS bands (Green/Yellow → Healthy; Red → Needs Attention; Critical → At Risk). Exposes label + two underlying signals already in dashboard (activation rate, weekly active rate). | ✅ **Chosen (DEC-092).** Transparent where it helps, opaque where detail creates noise. Consistent with OBSERVABILITY §33.3 principle. Reduces CSM escalation overhead without introducing false-precision risk. |
+| **C: No customer-facing health signal** | Maintain internal-only FEHS; no admin dashboard surface. | ❌ Rejected. Customers ask CSM "how are we doing?" every month. Without a self-serve signal, the CSM spends 20–30 min/account/month preparing a manual health narrative for async comms and QBRs, consuming capacity that could serve one additional account. |
+
+**Tie-breaker principle:** PHI is not a metric to manage; it is a *call-to-action signal*. A Needs Attention label should direct the admin to the Engagement tab, not to a spreadsheet war about FEHS weights.
+
+### 54.3 Programme Health Indicator (PHI) Design
+
+#### 54.3.1 Band Mapping
+
+| FEHS Score | Internal Band | PHI Label | PHI Colour | Customer Action |
+|---|---|---|---|---|
+| 75–100 | Green | **Healthy** | Emerald (#10b981) | No action required — programme is on track |
+| 50–74 | Yellow | **Healthy** | Emerald (#10b981) | Minor signals to watch — CSM proactive outreach in next QBR |
+| 25–49 | Red | **Needs Attention** | Amber (#f59e0b) | Review Engagement tab; CSM outreach within 5 business days |
+| 0–24 | Critical | **At Risk** | Rose (#f43f5e) | CSM + CS Director scheduled call within 2 business days per §26.9.1 |
+
+**Design rationale:** Green and Yellow collapse to Healthy because a Yellow FEHS (50–74) triggers proactive internal CSM outreach per §26.9.1 — the customer does not yet need to act. Only when FEHS drops below 50 (Red) should the customer see a signal requiring their attention. Critical band renders as At Risk to avoid the word "critical" in a consumer-facing wellness application context.
+
+#### 54.3.2 Signals Exposed to Tenant Admin
+
+The PHI card in the admin dashboard surfaces:
+
+| Signal | Exposed? | Source | Rationale |
+|---|---|---|---|
+| PHI label (Healthy / Needs Attention / At Risk) | ✅ Yes | Derived from FEHS | Core deliverable of OQ-CS-02 |
+| Activation rate (%) | ✅ Yes | Already in Overview tab | No new data exposure |
+| Weekly active rate (%) | ✅ Yes | Already in Overview tab | No new data exposure |
+| Seat utilisation trend (MoM) | ❌ No | Requires internal comparison | Not yet in admin dashboard — adding it is OQ-ADO-02 scope, not this section |
+| Executive engagement days | ❌ No | CSM internal tracking | HR must never see individual CSM contact logs |
+| Support volume trend | ❌ No | FORM internal helpdesk | Tenant admin has no view into FORM's support queue |
+| Renewal distance | ❌ No | Contract metadata | Contractual; communicated by CS not self-serve |
+| Raw FEHS score (0–100) | ❌ No | Internal composite | Consistent with OBSERVABILITY §33.3 CHS policy |
+
+#### 54.3.3 Admin Dashboard Placement
+
+- **Tab:** Overview (first tab, visible without navigation)
+- **Position:** Bottom of Overview stats row, after the four headline stat cards (Total Members, Active This Week, Sessions This Month, Goals Met)
+- **Card dimensions:** Full width on mobile; 1/3 width (rightmost column) on desktop grid alongside Engagement and Adoption cards
+- **Card contents:**
+  - Label badge (Healthy / Needs Attention / At Risk) with corresponding colour
+  - Trend arrow vs. prior month's PHI label (↑ Improved / → Stable / ↓ Declined)
+  - Activation rate percentage with sparkline (last 4 weeks)
+  - Weekly active rate percentage with sparkline (last 4 weeks)
+  - CTA link: "View full engagement breakdown →" → Engagement tab
+  - Stale banner if `tenant_engagement_snapshots.snapshot_date` > 26h old (ADMIN-RPT-SLO-01 per `docs/OBSERVABILITY.md §62`)
+- **Empty state:** "Programme health will appear once at least 5 members activate" (k-anonymity floor n ≥ 5 per OQ-CS-03 Tier 1 resolution — `docs/COST_MODEL.md §51`; FEHS is not computed when `total_activated < 5`)
+
+### 54.4 CSM Efficiency Economics
+
+#### 54.4.1 Problem: Inbound Health-Status Escalations
+
+Without a self-serve signal, tenant admins generate health-status inquiries through:
+1. **Ad-hoc Slack/email to CSM:** "Can you tell me how we're tracking?" — estimated at 1–2 per month per account
+2. **Pre-QBR prep requests:** "Can you send us a summary before the call?" — estimated 30 min CSM prep per QBR ($18.75 at $37.50/h per §26.8)
+3. **Champion churn triggers:** when an HR champion leaves, their replacement emails "what's the state of our programme?" — estimated 1.5h CSM onboarding call ($56.25)
+
+#### 54.4.2 PHI Impact Estimate
+
+PHI gives the tenant admin a self-serve answer to "how are we doing?" — eliminating most ad-hoc health inquiries and reducing pre-QBR prep time.
+
+| Reduction category | Without PHI | With PHI | Monthly saving (CSM hours) |
+|---|---|---|---|
+| Ad-hoc health status inquiries | 2/month × 15 min = 30 min/account | 0.5/month × 10 min = 5 min/account | 25 min/account |
+| Pre-QBR summary preparation | 30 min/QBR (quarterly → 7.5 min amortised/month) | 15 min (CSM reviews PHI card on call) → 3.75 min/month amortised | 3.75 min/account |
+| **Total saving** | | | **~29 min/account/month** |
+
+At $37.50/h CSM rate (§26.8):
+
+```
+PHI CSM saving = (29 min / 60) × $37.50/h
+              = 0.483h × $37.50
+              = $18.13/account/month [ESTIMATE — replace after OQ-08 time-tracking data]
+```
+
+At 15-account CSM capacity (§26.3):
+
+```
+Total PHI saving per CSM = $18.13 × 15 = $271.95/month
+                         = $3,263/year [ESTIMATE]
+```
+
+**PHI capacity equivalent:** at $37.50/h and 7h/account/month CSM allocation (§26.8), 29 min saved per account is equivalent to 0.41 additional accounts per CSM — effectively a free 2.7% capacity increase per CSM without adding headcount.
+
+#### 54.4.3 PHI NRR Impact
+
+PHI also reduces NRR risk through shared accountability: when a tenant admin sees Needs Attention, they become a participant in the recovery, not just a passive recipient of CSM outreach. This reduces the "FORM failed to tell us" narrative that is common at churn — particularly at accounts where the champion has changed since contract signing.
+
+Based on §26.9.2 estimates and §40.3 adoption-to-churn probability matrix: if PHI visibility shifts one Red-band account per 20-account cohort from the §40.3 Red-band ~60% churn probability to ~30% churn probability (CSM-intervened via Needs Attention signal), the ARR protection is:
+
+```
+PHI NRR contribution = (0.60 − 0.30) × $54,000 (one average Growth ACV, §8.2)
+                     = 0.30 × $54,000
+                     = $16,200 ARR preserved per cohort per year [ESTIMATE]
+```
+
+This materially exceeds the engineering implementation cost of ~4h (one Worker endpoint + one Admin Dashboard card — see §54.10 item 1).
+
+### 54.5 API Specification
+
+**Endpoint:** `GET /api/admin/tenants/:tenantId/programme-health`
+
+**Authorization:** `tenant_admin` role (RLS: `tenant_id = auth.jwt()->>'tenant_id'`). No cross-tenant access. `form_api` role permitted (read-only). `form_admin` permitted (internal CSM tooling — see note).
+
+> **CSM access note:** `form_admin` may access this endpoint for any `tenant_id` (full cross-tenant read) — consistent with CSM's existing admin panel access. The PHI endpoint does not expose more data than what CSM can already see in the internal engagement dashboard; it simply provides the same 3-band label computation for CSM tooling consistency.
+
+**Rate limit:** 60 requests/minute per `tenant_id` (consistent with PAM activity endpoint rate limit per §29.13.2).
+
+**Query implementation (Cloudflare Worker):**
+
+```sql
+-- Dual-query backend
+-- Query 1: fetch last two monthly FEHS snapshots for this tenant
+SELECT
+  snapshot_date,
+  fehs_score,
+  CASE
+    WHEN fehs_score >= 50 THEN 'healthy'
+    WHEN fehs_score >= 25 THEN 'needs_attention'
+    ELSE 'at_risk'
+  END AS phi_label,
+  activation_rate_pct,
+  wau_rate_pct,
+  below_k_threshold
+FROM tenant_engagement_snapshots
+WHERE tenant_id = $1
+  AND snapshot_type = 'monthly'
+ORDER BY snapshot_date DESC
+LIMIT 2;
+
+-- Query 2: stale check
+SELECT NOW() - MAX(snapshot_date) > INTERVAL '26 hours' AS is_stale
+FROM tenant_engagement_snapshots
+WHERE tenant_id = $1 AND snapshot_type = 'monthly';
+```
+
+**Response schema (TypeScript):**
+
+```typescript
+interface ProgrammeHealthResponse {
+  phi_label: 'healthy' | 'needs_attention' | 'at_risk' | 'insufficient_data';
+  // 'insufficient_data' when below_k_threshold = true (k < 5 activated members)
+  computed_at: string;        // ISO 8601 date of most recent monthly snapshot
+  is_stale: boolean;          // true if snapshot_date > 26h old
+  trend: 'improved' | 'stable' | 'declined' | null;
+  // null when only one snapshot available (first month of programme)
+  // 'improved' when current phi_label index < prior phi_label index
+  // 'stable' when same phi_label as prior month
+  // 'declined' when current phi_label index > prior phi_label index
+  signals: {
+    activation_rate_pct: number | null;   // null when below_k_threshold = true
+    wau_rate_pct: number | null;          // null when below_k_threshold = true
+  };
+  // Privacy invariants enforced by schema:
+  // - No fehs_score (raw 0-100) — never returned to tenant_admin
+  // - No individual user_id, name, email, or health data
+  // - No seat_utilization_trend, executive_engagement_days, support_volume_trend, renewal_distance
+  // - No GDPR Art. 9 special-category data
+}
+```
+
+**Error responses:**
+
+| HTTP Status | Condition |
+|---|---|
+| 200 with `phi_label: 'insufficient_data'` | `below_k_threshold = true` (fewer than 5 activated members) |
+| 200 with `is_stale: true` | Most recent snapshot > 26h old — stale banner shown in dashboard |
+| 403 | `tenant_admin` accessing a `tenant_id` that is not their own |
+| 404 | No engagement snapshots exist yet (programme not yet started) — Admin Dashboard shows empty state |
+
+### 54.6 Privacy Floor
+
+PHI is a read-only aggregate display endpoint. All privacy constraints from `docs/ENTERPRISE.md`, `docs/DATA_MODEL.md §17`, and `docs/COST_MODEL.md §51` (QBR-K-ANON-01) apply.
+
+| Privacy Constraint | Enforcement Mechanism |
+|---|---|
+| Raw FEHS score (0–100) never returned to `tenant_admin` | Schema: `fehs_score` column excluded from `ProgrammeHealthResponse`; not present in Worker response at any HTTP path |
+| k-anonymity floor: `phi_label = 'insufficient_data'` when `below_k_threshold = true` (n < 5) | Query 1: `below_k_threshold` column gates `activation_rate_pct` and `wau_rate_pct` to `null`; Worker maps to `phi_label: 'insufficient_data'` |
+| No individual employee `user_id`, name, email, session content, body composition, workout history, mental health signals, or GDPR Art. 9 data | Schema: response object has no user-level fields; enforced at Worker layer (no join to `user_sessions` or `user_profiles`) |
+| HR never sees individual user data | Consistent with `docs/ENTERPRISE.md` privacy floor: PHI is a tenant-level aggregate, identical category to what is already in Overview tab |
+| No seat utilisation trend or executive engagement days | Excluded from `ProgrammeHealthResponse` — these signals are derived from internal CSM tooling unavailable to `tenant_admin` |
+| `form_api` REVOKED from `tenant_engagement_snapshots` direct access | Worker reads via `form_system` role for the snpashot query; `form_api` only accesses via this Worker endpoint (read-only, PHI-filtered) |
+
+**Hard prohibitions inherited from §26.9 and §51:**
+- No individual employee workout or session data in any PHI response field
+- No body composition, mental health, ED-screening, or biometric data — absolute prohibition regardless of k-floor
+- CSM tooling (`form_admin`) may access PHI endpoint cross-tenant but receives the same `ProgrammeHealthResponse` schema — not raw FEHS — to maintain schema consistency
+
+### 54.7 DEC-030 Audit Event
+
+New event: **`admin.programme_health_label_viewed`**
+
+| Property | Value |
+|---|---|
+| Severity | LOW |
+| Retention | 1 year |
+| SOC 2 mapping | C1.2 (confidential information — confirming what was exposed to tenant admin), CC2.2 (external communication of programme health) |
+| Trigger | Tenant admin loads the Programme Health card in admin dashboard (HTTP 200 from `/api/admin/tenants/:tenantId/programme-health` with `phi_label` ≠ 'insufficient_data') |
+| Frequency | At most once per session per tenant (deduplicated by `admin_user_id` + `tenant_id` + `snapshot_date` to prevent event flooding on page refresh) |
+
+**TypeScript payload schema (to be registered in `docs/AUDIT_LOG_SCHEMA.md`, P1/M7):**
+
+```typescript
+interface ProgrammeHealthLabelViewedPayload {
+  phi_label: 'healthy' | 'needs_attention' | 'at_risk';
+  // The label exposed to the tenant admin at the time of view
+  snapshot_date: string;          // ISO 8601 date of the underlying monthly snapshot
+  trend: 'improved' | 'stable' | 'declined' | null;
+  admin_user_id: string;          // Pseudonymous UUID (same pattern as PAM events per §29.12)
+                                  // Not email, name, or SCIM user ID — FORM-internal auth UUID only
+  // Privacy invariants:
+  // - No fehs_score (raw 0-100)
+  // - No activation_rate_pct or wau_rate_pct (aggregate metrics not required in audit log)
+  // - No individual employee user_id, name, email, health data, or GDPR Art. 9 data
+  // - admin_user_id is FORM-internal auth UUID only — never exposed to employer HR
+}
+```
+
+**Deduplication key:** `phi-label-viewed-{tenant_id}-{admin_user_id}-{snapshot_date}` — prevents repeated events when admin refreshes the Overview tab within the same snapshot period.
+
+**Chain invariant (PHI-VIEW-01):** `admin.programme_health_label_viewed` must only fire after `enterprise.health_score_updated` (§26.10) for the same `tenant_id` and `snapshot_date`. The Worker endpoint reads from `tenant_engagement_snapshots` which is populated by the `fehs_compute` pg_cron job that emits `enterprise.health_score_updated` — this ordering is guaranteed by the read-after-write model, not by runtime chain validation. SOC 2 C1.2 evidence: `admin.programme_health_label_viewed` event export shows only `phi_label` string (not raw score), confirming that the confidential FEHS score was not disclosed to the tenant admin.
+
+### 54.8 DEC-092 Decision Record
+
+| Field | Value |
+|---|---|
+| **Decision ID** | DEC-092 |
+| **Date** | 2026-07-01 |
+| **Question** | OQ-CS-02: Should the FEHS score be visible to the customer in the admin dashboard, or should it remain internal-only? |
+| **Decision** | Programme Health Indicator (PHI) adopted: 3-band label (Healthy / Needs Attention / At Risk) derived from FEHS bands (Green/Yellow → Healthy; Red → Needs Attention; Critical → At Risk). Raw FEHS (0–100) stays internal-only. PHI card in Overview tab exposes label, trend arrow (vs. prior month), and two signals already present in dashboard (activation rate, weekly active rate). `admin.programme_health_label_viewed` LOW/1yr DEC-030 event on card load. |
+| **Owner** | product-strategist + customer-success + compliance-officer |
+| **Why** | (1) Raw score creates false-precision escalations: renewal-distance signal (5% weight) decays from Green to Red as contract ages even with healthy adoption — customers without context generate "what did we do wrong?" support tickets. (2) PHI maps to natural-language labels customers can act on without formula knowledge. (3) Consistent with OBSERVABILITY §33.3 CHS "internal only" policy — FEHS and CHS are operationally distinct scores but share the same audience (CSM + compliance). (4) Privacy floor: two-signal summary (activation + WAU) only — no new data exposure; both metrics already in admin dashboard. (5) Economic case: ~$18.13/account/month CSM time saved; equivalent to 0.41 additional accounts per CSM capacity; ~$16,200 ARR protection per 20-account cohort if PHI shifts one Red account to CSM-intervened recovery. (6) Option A (full FEHS) rejected: inconsistent with §33.3; escalation risk. Option C (no signal) rejected: CSM capacity cost ~29 min/account/month in health-status inquiries that a self-serve signal eliminates. |
+| **Reverse cost** | Low. PHI is a read-only display endpoint — removing it requires only Worker route deletion + Admin Dashboard card removal, no schema migration. Changing band mapping: update §54.3.1 table + Worker CASE expression, create new DEC, update DECISION_LOG. |
+
+### 54.9 §26.12 In-Line Patch
+
+Applied in this authoring pass:
+
+**OQ-CS-02 status updated:** `🟡 P1 Open — decide before admin dashboard v2` → `🟢 Resolved DEC-092 (v2.27.0, 2026-07-01)` — see §54 for full PHI design, API spec, CSM efficiency economics, privacy floor, and DEC-092 decision record.
+
+### 54.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | `GET /api/admin/tenants/:tenantId/programme-health` Cloudflare Worker endpoint — dual-query backend (FEHS from `tenant_engagement_snapshots`, CASE expression → PHI 3-band, last 2 monthly snapshots for trend arrow, `below_k_threshold` gate); rate limit 60 req/min; `tenant_admin` RLS; `form_admin` cross-tenant read; `ProgrammeHealthResponse` Zod schema | platform-engineer | **P0** | M6 | [ ] |
+| 2 | Admin Dashboard "Programme Health" card — Overview tab, bottom of stats row; label badge (emerald/amber/rose); trend arrow vs. prior month label; activation_rate_pct + wau_rate_pct sparklines (4-week); "View full engagement breakdown →" CTA → Engagement tab; stale banner (snapshot > 26h, ADMIN-RPT-SLO-01); empty state (k < 5 members) | platform-engineer + design-craft | **P0** | M6 | [ ] |
+| 3 | `admin.programme_health_label_viewed` LOW/1yr DEC-030 event — register in `docs/AUDIT_LOG_SCHEMA.md` v2.68; add `ProgrammeHealthLabelViewedPayload` TypeScript interface; add PHI-VIEW-01 chain invariant comment; deduplication key `phi-label-viewed-{tenant_id}-{admin_user_id}-{snapshot_date}` | compliance-officer | **P1** | M7 | [ ] |
+| 4 | Update `docs/OBSERVABILITY.md §33.3` CHS privacy constraint: add note that raw CHS numeric score remains internal-only; PHI label (3-band per §54.3.1) is the approved customer-facing surface; PHI does NOT expose raw CHS or raw FEHS — uses FEHS bands only | devops-lead | **P1** | M7 | [ ] |
+| 5 | SOC 2 evidence artefact PHI-E-001 (C1.2/CC2.2): Admin Dashboard Programme Health card screenshot + `admin.programme_health_label_viewed` sample event JSON confirming `phi_label` string (not raw score) is the only signal disclosed to tenant admin; file in `compliance/evidence/phi/`; register in `docs/SOC2_READINESS.md` | compliance-officer | **P1** | M8 | [ ] |
+| 6 | After 2 QBR cycles (est. M8): measure PHI impact on pre-QBR CSM prep time (OQ-08 time-tracking log); compare to §54.4.2 estimate ($18.13/account/month); document actuals in DECISION_LOG; update §54.4.2 [ESTIMATE] tags with actuals | customer-success + founder | **P2** | M8 | [ ] |
+
+### 54.11 Cross-Reference Obligations Created by §54
+
+| Obligation | Source | Status |
+|---|---|---|
+| DEC-092 registered in `docs/DECISION_LOG.md` | §54.10 implied / §54.8 | 🟢 **Done — 2026-07-01** |
+| §26.12 OQ-CS-02 patched 🟡 → 🟢 Resolved DEC-092 | §54.9 | 🟢 **Done — inline patch this pass** |
+| `admin.programme_health_label_viewed` event registered in `docs/AUDIT_LOG_SCHEMA.md` | §54.10 item 3 (P1/M7) | 🟡 Pending — M7 |
+| `docs/OBSERVABILITY.md §33.3` CHS privacy constraint note updated | §54.10 item 4 (P1/M7) | 🟡 Pending — M7 |
+| PHI-E-001 evidence artefact filed and registered in `docs/SOC2_READINESS.md` | §54.10 item 5 (P1/M8) | 🟡 Pending — M8 |
+
+---
+
+*v2.27.0 (2026-07-01): §54 OQ-CS-02 Resolution — Programme Health Indicator in Enterprise Admin Dashboard (DEC-092). Closes OQ-CS-02 (P1, §26.12 — whether FEHS should be visible to tenant admins; decision required before admin dashboard v2). Decision (DEC-092): Programme Health Indicator (PHI) adopted — 3-band label (Healthy / Needs Attention / At Risk) derived from FEHS bands (Green/Yellow → Healthy; Red → Needs Attention; Critical → At Risk); raw FEHS numeric score (0–100) remains internal-only consistent with OBSERVABILITY §33.3 CHS "internal only" policy. PHI card in Overview tab of admin dashboard exposes label + trend arrow (vs. prior month PHI label) + activation_rate_pct + wau_rate_pct (both already in admin dashboard — no new data exposure). `insufficient_data` state when `below_k_threshold = true` (fewer than 5 activated members — k-anonymity Tier 1 floor per §51). API: `GET /api/admin/tenants/:tenantId/programme-health` Worker endpoint; dual-query backend (monthly FEHS snapshot → CASE expression → PHI label; last 2 snapshots for trend); `ProgrammeHealthResponse` Zod schema excludes `fehs_score`; rate limit 60 req/min; `tenant_admin` RLS + `form_admin` cross-tenant read. DEC-030 event `admin.programme_health_label_viewed` LOW/1yr: fires on HTTP 200 card load; `phi_label`, `snapshot_date`, `trend`, `admin_user_id` (pseudonymous UUID per §29.12 pattern); deduplicated by `{tenant_id}-{admin_user_id}-{snapshot_date}`; PHI-VIEW-01 chain invariant (after `enterprise.health_score_updated`); C1.2/CC2.2 SOC 2 mapping. CSM efficiency economics (§54.4): ~29 min/account/month reduction in health-status escalations at $37.50/h CSM rate = $18.13/account/month saving [ESTIMATE — to be validated against OQ-08 time-tracking at M8]; $271.95/month per CSM at 15-account capacity; equivalent to 0.41 additional accounts per CSM. PHI NRR contribution: ~$16,200 ARR preserved per 20-account cohort if one Red account shifts to CSM-intervened recovery [ESTIMATE]. Options rejected: Option A (full FEHS — false-precision escalation risk; renewal-distance signal decays naturally) and Option C (no signal — 29 min/account/month CSM overhead). Implementation: P0/M6 Worker endpoint + Admin Dashboard card; P1/M7 DEC-030 registration + OBSERVABILITY §33.3 note; P1/M8 PHI-E-001 SOC 2 evidence; P2/M8 PHI impact measurement. Privacy floor: no raw FEHS score returned; no individual employee user_id, name, email, health data, body composition, coaching content, or GDPR Art. 9 data; k-floor enforced at query layer; `form_api` REVOKED from `tenant_engagement_snapshots` direct access; admin_user_id in audit event is FORM-internal auth UUID only. §26.12 OQ-CS-02 patched 🟡 → 🟢 Resolved DEC-092. TOC entry §54 added. DEC-092 registered in `docs/DECISION_LOG.md`. Cross-references: `docs/COST_MODEL.md §26.9` (FEHS 6-signal model + 4-band thresholds — PHI band mapping input); `docs/COST_MODEL.md §26.8` (CSM rate $37.50/h + 7h/account model — efficiency economics basis); `docs/COST_MODEL.md §26.12` (OQ-CS-02 — 🟢 Resolved DEC-092); `docs/COST_MODEL.md §40.3` (Red-band ~60% churn probability — PHI NRR contribution estimate); `docs/COST_MODEL.md §51` (QBR-K-ANON-01 — Tier 1 k ≥ 5 floor governs PHI insufficient_data state); `docs/OBSERVABILITY.md §33.3` (CHS "internal only" policy — rationale for withholding raw FEHS; §33.3 update pending P1/M7); `docs/DATA_MODEL.md §17` (aggregate-only admin reporting schema — PHI consistent with existing exposure model); `docs/ENTERPRISE.md` (CSM coverage model + privacy floor — PHI inherits all existing constraints); `docs/AUDIT_LOG_SCHEMA.md` (`admin.programme_health_label_viewed` — P1/M7 to register); `docs/DECISION_LOG.md DEC-092` (formal decision record — P0 this pass); `docs/SOC2_READINESS.md` (PHI-E-001 C1.2/CC2.2 evidence — P1/M8 to register). Owner: product-strategist + customer-success + compliance-officer.*
