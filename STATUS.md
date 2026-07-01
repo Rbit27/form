@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v10.86.0** — 2026-07-01 · post-143 + post-2909 · post-143: «Силова тренованість і вік: що змінюється після 35, і що насправді не змінюється» · editorial training-methodology · clinical-safety NOT_REQUIRED · sports-scientist review pending · post-2909: «Як формулювати тренувальне рішення, яке можна відтворити через три місяці» · series «Тренувальна комунікація з собою» 2906–2915 (4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards added for post-143 and post-2909 · next: post-144 (editorial) + post-2910 («Коли змінювати програму, а коли — чекати: критерії, які не залежать від відчуттів»)
+
+**v10.85.1** — 2026-07-01 · enterprise: OBSERVABILITY §33.3 PHI note + AUDIT_LOG_SCHEMA hiring event · v2.69
+
 **v10.85.0** — 2026-07-01 · post-142 · «Коли «достатньо» — це не відмовка: MED і принцип мінімально ефективного стимулу» · editorial training-methodology · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-142 · README: post-142 → draft · next: post-143 («Силова тренованість і вік: що змінюється після 35, і що насправді не змінюється»)
 
 **v10.84.0** — 2026-07-01 · post-2908 + enterprise AUDIT_LOG_SCHEMA v2.68 · post-2908: «Три рівні пояснення пропущеного тренування — і чому перший завжди неточний» · series «Тренувальна комунікація з собою» 2906–2915 (3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2908 · AUDIT_LOG_SCHEMA.md v2.67→v2.68: +1 `admin.programme_health_label_viewed` LOW/1yr event (C1.2/CC2.2) — closes COST_MODEL §54.10 item 3 (P1/M7) · next: post-2909 («Як формулювати тренувальне рішення, яке можна відтворити через три місяці»)
