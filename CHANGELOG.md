@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.84.0] — 2026-07-01
+
+### Added
+- `content/post-2908-three-levels-explaining-missed-training.md` — Series «Тренувальна комунікація з собою» 2906–2915, post 3/10. «Три рівні пояснення пропущеного тренування — і чому перший завжди неточний». Рівень 1 (поверхнева причина: «не встиг», «ліньки») vs. рівень 2 (структурна: чому ці обставини виникли) vs. рівень 3 (системна: патерн і системна відповідь). Чому «ліньки» — рівень 0, а не відповідь. Практичні два питання після пропуску. Як Victor використовує рівень 2+ vs. рівень 1. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `docs/AUDIT_LOG_SCHEMA.md §Enterprise Admin Programme Health events` — нова секція з подією `admin.programme_health_label_viewed` (LOW, 1 рік, DEC-030 HMAC-chained, C1.2/CC2.2). Закриває `docs/COST_MODEL.md §54.10` item 3 (P1/M7). Zod v2 schema `ProgrammeHealthLabelViewedSchema` (4 поля: `phi_label` enum healthy/needs_attention/at_risk; `snapshot_date` ISO 8601 date; `trend` improved/stable/declined/null; `admin_user_id` UUID — FORM-internal auth UUID, §29.12 pattern). PHI-VIEW-01 invariant (read-after-write, не Worker HTTP 422). Dedup key `phi-label-viewed-{tenant_id}-{admin_user_id}-{snapshot_date}`. Emitter: Admin Dashboard backend на HTTP 200 від `/api/admin/tenants/:tenantId/programme-health` з `phi_label ≠ 'insufficient_data'`. AUDIT_LOG_SCHEMA header v2.67 → v2.68.
+- `blog.html` — card post-2908 added at top of feed.
+
+### Changed
+- `STATUS.md` — v10.83.0 → v10.84.0; next: post-2909 («Як формулювати тренувальне рішення, яке можна відтворити через три місяці»).
+- `VERSION` — 10.83.1 → 10.84.0.
+
+---
+
 ## [10.83.1] — 2026-07-01
 
 ### Added
