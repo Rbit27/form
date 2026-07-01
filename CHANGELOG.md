@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [10.80.0] — 2026-07-01
+
+### Added
+- `content/post-2905-training-decision-quality-synthesis.md` — Series «Якість тренувального рішення» 2896–2905 · 10/10 (SERIES COMPLETE). «Синтез 2896–2905: операційна модель якісного тренувального рішення для self-coached атлета». Десять компонентів: дані vs. інтуїція, горизонт рішення, типи рішень, оцінка після факту, когнітивні пастки, асиметрія помилок, сліпі зони журналу, ретроспектива, діагностика провалу, зведена операційна модель. 10-рядкова таблиця синтезу серії. Четири зони, де модель не замінює зовнішню компетентність. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card for post-2905 added at top of feed.
+
+### Changed
+- `STATUS.md` — series 2896–2905 updated to 10/10 COMPLETE · v10.80.0; new current version line added.
+- `VERSION` — 10.79.0 → 10.80.0.
+
 ## [10.79.0] — 2026-07-01
 
 ### Added
