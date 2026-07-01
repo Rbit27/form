@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [10.82.0] — 2026-07-01
+
+### Added
+- `content/post-2906-precise-language-self-coached-athlete.md` — Series «Тренувальна комунікація з собою» 2906–2915 · post 1/10. «Чому точна мова важлива для self-coached атлета: різниця між «погано» і «RPE 9 при плановому 7.5»». Три рівні опису тренування (оцінка / спостереження / контекстуалізоване спостереження); межа між спостереженням і інтерпретацією; RPE відносно плану як ключова метрика; п'ять поширених мовних помилок у журналі; мінімальний стандарт запису. Editorial-brutalist. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card для post-2906 доданий на початок стрічки.
+
+### Changed
+- `README.md` — post-2906 статус: proposed → draft · v10.82.0.
+- `STATUS.md` — поточна версія оновлена до v10.82.0; next: post-2907.
+- `VERSION` — 10.81.0 → 10.82.0.
+
+---
+
 ## [10.81.0] — 2026-07-01
 
 ### Added

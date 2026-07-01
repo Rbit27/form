@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v10.82.0** — 2026-07-01 · post-2906 · «Чому точна мова важлива для self-coached атлета: різниця між «погано» і «RPE 9 при плановому 7.5»» · series «Тренувальна комунікація з собою» 2906–2915 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2906 · next: post-2907 («Як описати власний тренувальний стан без самодіагностики: межа між спостереженням і інтерпретацією»)
+
+**v10.81.0** — 2026-07-01 · enterprise: COST_MODEL §53 OQ-CS-01 Resolution DEC-091 · CS Hire vs. Founding Engineer gate criteria · v2.26.0
+
 **v10.80.0** — 2026-07-01 · post-2905 · «Синтез 2896–2905: операційна модель якісного тренувального рішення для self-coached атлета» · series «Якість тренувального рішення» 2896–2905 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2905 · next: series 2906–2915 (тема TBD per roadmap)
 
 **v10.79.0** — 2026-07-01 · post-2904 · «Різниця між блоком, який не спрацював, і блоком, який не спрацював так, як планувалось» · series «Якість тренувального рішення» 2896–2905 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2904 · next: post-2905 (фінальний — «Синтез: операційна модель якісного тренувального рішення для self-coached атлета», series COMPLETE)
