@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.87.0** — 2026-07-01 · post-144 · «Операційна логіка прогресії: коли додавати навантаження, коли залишатись, коли відступати» · editorial training-methodology · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-144 · next: post-145 (editorial) + post-2910 («Коли змінювати програму, а коли — чекати: критерії, які не залежать від відчуттів»)
+
 **v10.86.0** — 2026-07-01 · post-143 + post-2909 · post-143: «Силова тренованість і вік: що змінюється після 35, і що насправді не змінюється» · editorial training-methodology · clinical-safety NOT_REQUIRED · sports-scientist review pending · post-2909: «Як формулювати тренувальне рішення, яке можна відтворити через три місяці» · series «Тренувальна комунікація з собою» 2906–2915 (4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards added for post-143 and post-2909 · next: post-144 (editorial) + post-2910 («Коли змінювати програму, а коли — чекати: критерії, які не залежать від відчуттів»)
 
 **v10.85.1** — 2026-07-01 · enterprise: OBSERVABILITY §33.3 PHI note + AUDIT_LOG_SCHEMA hiring event · v2.69
