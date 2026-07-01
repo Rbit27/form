@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.12.4
+# FORM · Observability & Monitoring Taxonomy v5.13.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -64,6 +64,9 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §57 | Amendment Rate Change Compliance Observability |
 | §63 | Enterprise Annual Filing Calendar & Fleet Maturity Chain Observability |
 | §64 | Cross-Reference Patch — §63.6 + §12.6 AUDIT_LOG_SCHEMA.md v2.63 Registration Closure |
+| §65 | Quarterly pg_cron Health Audit Protocol — Jobs 56 & 57 |
+| §66 | OQ-MOBILE-01 Resolution — EAS OTA Adoption Rate vs. Enterprise MDM Change Windows: Per-Tenant Exception Flag & 7-Day Contractual SLO Variant (DEC-090) |
+| §67 | Cross-Reference Patch — §66.9 Items 2 + 6 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.67 + ENTERPRISE_SLA.md v1.3) |
 
 ---
 
@@ -18889,11 +18892,11 @@ Scope: DEC-030 chain export of all `mobile.ota_change_window_updated` events dur
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 1 | Apply migration 0091 to staging: four columns + `chk_ota_slo_variant_consistency` CHECK on `tenants`; run staging validation checklist (§66.4); confirm `form_api` REVOKE; deploy to production before M12 | platform-engineer | **P1** | M12 (before enterprise GA M13) | [ ] |
-| 2 | Register `mobile.ota_change_window_updated` HIGH/7yr in `docs/AUDIT_LOG_SCHEMA.md` §Mobile subsection; include `OtaChangeWindowUpdatedSchema` Zod v2 definition; register OTA-WINDOW-CHAIN-01 invariant with HTTP 422 codes `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED` and `OTA_WINDOW_CHAIN_01_APPROVAL_REF_MISSING` | platform-engineer + compliance-officer | **P1** | M12 | [ ] |
+| 2 | Register `mobile.ota_change_window_updated` HIGH/7yr in `docs/AUDIT_LOG_SCHEMA.md` §Mobile subsection; include `OtaChangeWindowUpdatedSchema` Zod v2 definition; register OTA-WINDOW-CHAIN-01 invariant with HTTP 422 codes `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED` and `OTA_WINDOW_CHAIN_01_APPROVAL_REF_MISSING` | platform-engineer + compliance-officer | **P1** | M12 | [x] **Done — `docs/AUDIT_LOG_SCHEMA.md` v2.67, 2026-07-01. Closed by §67 cross-reference patch (v5.13.0, 2026-07-01); obligation was fulfilled in v5.12.1 but checklist row was not updated in that pass.** |
 | 3 | Implement `emit-audit-event` Worker OTA-WINDOW-CHAIN-01 enforcement; integration test: (a) first enable → 200; (b) second enable without disable → 422 `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED`; (c) disable after enable → 200; (d) re-enable after disable → 200 | platform-engineer | **P1** | M12 | [ ] |
 | 4 | Update AL-MOBILE-05 pg_cron trigger query to §66.5 SQL (dynamic threshold via `ota_change_window_enabled` join); update PagerDuty payload to include `ota_slo_variant` and `slo_hours`; deploy to staging; verify: Standard tenant fires at 48h, Premium-MDM tenant fires at 168h, no false positives in between | platform-engineer + devops-lead | **P1** | M12 | [ ] |
 | 5 | Build internal CSM tool endpoint `POST /internal/tenant/{slug}/ota-change-window`; validate staff JWT; enforce `compliance_officer_approval_ref` non-empty; enforce OTA-WINDOW-CHAIN-01; write four tenants columns; emit DEC-030 event; no public API exposure; endpoint behind `form-staff` Cloudflare Access policy | platform-engineer | **P1** | M12 | [ ] |
-| 6 | Update `docs/ENTERPRISE_SLA.md` MOBILE-SLO-06 entry: describe Standard (48h) and Premium-MDM (7d) variants; add `ota_slo_variant` column to the SLO schedule table; note that variant is set at contract time and requires written addendum to change; reference §66 as the authoritative specification | compliance-officer | **P1** | M12 | [ ] |
+| 6 | Update `docs/ENTERPRISE_SLA.md` MOBILE-SLO-06 entry: describe Standard (48h) and Premium-MDM (7d) variants; add `ota_slo_variant` column to the SLO schedule table; note that variant is set at contract time and requires written addendum to change; reference §66 as the authoritative specification | compliance-officer | **P1** | M12 | [x] **Done — `docs/ENTERPRISE_SLA.md` v1.3 §3.10, 2026-07-01. Closed by §67 cross-reference patch (v5.13.0, 2026-07-01); obligation was fulfilled in v5.12.1 but checklist row was not updated in that pass.** |
 | 7 | Update `docs/ENTERPRISE_ONBOARDING.md` CSM pilot kick-off checklist: add MDM change window declaration step referencing §66.7 five-step protocol; add qualifying question to pre-pilot questionnaire: "Does your organisation enforce MDM change control windows (Intune / Jamf / Workspace ONE) that restrict when mobile app bundles can be installed?" | customer-success | **P1** | M12 | [x] **Done — ENTERPRISE_ONBOARDING.md v0.5 §1.3 (qualifying checkbox) + §2.4 (five-step MDM protocol) + A.1 (MDM declaration checkbox), 2026-07-01.** |
 | 8 | Register OTA-WINDOW-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC3.2/A1.1, annual + per-activation, 7yr); add §80.3 R2 subfolder entry `compliance/evidence/ota-change-window/` (WORM 7yr, `form_api` NO ACCESS); add §80.4 Vanta mirror entry | compliance-officer | **P1** | M13 | [x] **Done — SOC2_READINESS.md v3.66.0, §140, 2026-07-01.** |
 | 9 | Update §28.13 OQ-MOBILE-01 row in this document from `🟡 P2 Open` → `🟢 Resolved DEC-090 (2026-07-01). See §66.` | compliance-officer | **P0** | This authoring pass | [x] **Done — §28.13 OQ-MOBILE-01 updated in this document version.** |
@@ -18917,6 +18920,71 @@ Scope: DEC-030 chain export of all `mobile.ota_change_window_updated` events dur
 | `docs/ENTERPRISE_ONBOARDING.md` | CSM onboarding checklist: MDM declaration step; qualifying pre-pilot question; §66.7 five-step protocol reference | 🟢 **Done — ENTERPRISE_ONBOARDING.md v0.5 §1.3 + §2.4 + A.1, 2026-07-01** |
 | `docs/SOC2_READINESS.md §79.4` | OTA-WINDOW-E-001 (CC3.2/A1.1, annual + per-activation, 7yr); §80.3 `compliance/evidence/ota-change-window/` WORM 7yr; §80.4 Vanta mirror | 🟢 **Done — SOC2_READINESS.md v3.66.0, §140, 2026-07-01** |
 | `docs/DECISION_LOG.md DEC-090` | Formal decision record (2026-07-01; hybrid Option B + modified C; owner platform-engineer + customer-success + compliance-officer) | 🟢 **Done — DECISION_LOG.md pre-existing** |
+
+---
+
+## §67 · Cross-Reference Patch — §66.9 Items 2 + 6 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.67 + ENTERPRISE_SLA.md v1.3)
+
+> Date: 2026-07-01. Trigger: §66.9 items 2 and 6 show `[ ]` in the live checklist despite both obligations being fulfilled in v5.12.1 (2026-07-01); §65 and §66 TOC entries were never added. Owner: compliance-officer + platform-engineer.
+
+### §67.1 Background
+
+When `docs/OBSERVABILITY.md §66` was authored (v5.12.0, 2026-07-01), the §66.11 cross-reference obligations table listed seven downstream obligations. Four of these were fulfilled in v5.12.1 (2026-07-01): `docs/AUDIT_LOG_SCHEMA.md` v2.67 (§66.9 item 2), `docs/DATA_MODEL.md` v1.41 §50 (§66.9 item 1 — documentation portion), `docs/ENTERPRISE_SLA.md` v1.3 §3.10 (§66.9 item 6), and `docs/DECISION_LOG.md DEC-090` confirmation. The §66.11 cross-reference obligations table was correctly updated to 🟢 Done for all four rows.
+
+However, the corresponding §66.9 implementation checklist rows were not updated in that pass: items 2 and 6 retained their `[ ]` status, creating a discrepancy between the §66.11 obligations table (which correctly reflects Done) and the §66.9 checklist (which incorrectly suggests pending). Note: §66.9 item 1 (`[ ]`) tracks the **operational** staging-deploy task, which remains genuinely pending (P1/M12 — migration 0091 not yet applied to staging); the v5.12.1 note's "§66.9 item 1 [x] Done" referred to the DATA_MODEL.md **documentation** obligation (§66.11 row), not the operational task. Items 1, 3, 4, 5 in §66.9 remain accurately `[ ]`.
+
+Additionally, §65 and §66 TOC entries were never added when those sections were authored (v5.11.0 and v5.12.0 respectively). This §67 corrects all three gaps inline.
+
+### §67.2 Inline Updates Applied by This Section
+
+| Update | Source location | Change |
+|---|---|---|
+| §66.9 item 2 checklist status | Line introduced by §66 (v5.12.0) | `[ ]` → `[x] Done — AUDIT_LOG_SCHEMA.md v2.67, 2026-07-01. Closed by §67 cross-reference patch (v5.13.0, 2026-07-01); obligation fulfilled in v5.12.1 but checklist row not updated in that pass.` |
+| §66.9 item 6 checklist status | Line introduced by §66 (v5.12.0) | `[ ]` → `[x] Done — ENTERPRISE_SLA.md v1.3 §3.10, 2026-07-01. Closed by §67 cross-reference patch (v5.13.0, 2026-07-01); obligation fulfilled in v5.12.1 but checklist row not updated in that pass.` |
+| TOC entry for §65 | TOC table (§19) | Added: `\| §65 \| Quarterly pg_cron Health Audit Protocol — Jobs 56 & 57 \|` |
+| TOC entry for §66 | TOC table (§19) | Added: `\| §66 \| OQ-MOBILE-01 Resolution — EAS OTA Adoption Rate vs. Enterprise MDM Change Windows: Per-Tenant Exception Flag & 7-Day Contractual SLO Variant (DEC-090) \|` |
+| TOC entry for §67 | TOC table (§19) | Added: `\| §67 \| Cross-Reference Patch — §66.9 Items 2 + 6 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.67 + ENTERPRISE_SLA.md v1.3) \|` |
+
+**Clarification on §66.9 item 1:** The v5.12.1 version note stated "§66.9 item 1 [x] Done" in the context of `docs/DATA_MODEL.md` v1.41 §50 — this referred to the **documentation** cross-reference obligation (§66.11 row: "Document migration 0091 in DATA_MODEL.md"), not the **operational** task in the §66.9 checklist ("Apply migration 0091 to staging"). The §66.9 item 1 operational checklist row remains `[ ]` (P1/M12) and is accurately open. This §67 patch does NOT change §66.9 item 1.
+
+### §67.3 Post-Patch §66.9 Checklist State Summary
+
+| Item | Task (abbreviated) | Status after §67 |
+|---|---|---|
+| 1 | Apply migration 0091 to staging | `[ ]` — genuinely pending (P1/M12 operational task) |
+| 2 | Register `mobile.ota_change_window_updated` in AUDIT_LOG_SCHEMA.md | `[x]` Done — AUDIT_LOG_SCHEMA.md v2.67, 2026-07-01 (closed by §67) |
+| 3 | Implement OTA-WINDOW-CHAIN-01 enforcement + integration tests | `[ ]` — genuinely pending (P1/M12 operational task) |
+| 4 | Update AL-MOBILE-05 dynamic threshold SQL + staging validation | `[ ]` — genuinely pending (P1/M12 operational task) |
+| 5 | Build `POST /internal/tenant/{slug}/ota-change-window` CSM tool endpoint | `[ ]` — genuinely pending (P1/M12 operational task) |
+| 6 | Update ENTERPRISE_SLA.md MOBILE-SLO-06 entry | `[x]` Done — ENTERPRISE_SLA.md v1.3 §3.10, 2026-07-01 (closed by §67) |
+| 7 | Update ENTERPRISE_ONBOARDING.md CSM checklist | `[x]` Done — ENTERPRISE_ONBOARDING.md v0.5, 2026-07-01 (closed by §66.9 item 7 per v5.12.3) |
+| 8 | Register OTA-WINDOW-E-001 in SOC2_READINESS.md §79.4 | `[x]` Done — SOC2_READINESS.md v3.66.0 §140, 2026-07-01 (closed by §66.9 item 8 per v5.12.2) |
+| 9 | Update §28.13 OQ-MOBILE-01 row | `[x]` Done — §28.13 updated in v5.12.0 (this document) |
+
+### §67.4 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Apply §66.9 item 2 checklist status update inline: `[ ]` → `[x] Done — AUDIT_LOG_SCHEMA.md v2.67, 2026-07-01` | compliance-officer | **P0** | [x] **Done — this patch (v5.13.0, 2026-07-01).** |
+| 2 | Apply §66.9 item 6 checklist status update inline: `[ ]` → `[x] Done — ENTERPRISE_SLA.md v1.3 §3.10, 2026-07-01` | compliance-officer | **P0** | [x] **Done — this patch (v5.13.0, 2026-07-01).** |
+| 3 | Add §65 TOC entry | compliance-officer | **P0** | [x] **Done — this patch (v5.13.0, 2026-07-01).** |
+| 4 | Add §66 TOC entry | compliance-officer | **P0** | [x] **Done — this patch (v5.13.0, 2026-07-01).** |
+| 5 | Add §67 TOC entry | compliance-officer | **P0** | [x] **Done — this patch (v5.13.0, 2026-07-01).** |
+
+### §67.5 Cross-Reference Obligations Closed
+
+| Stale item | Source version | Resolution |
+|---|---|---|
+| §66.9 item 2 `[ ]` — `mobile.ota_change_window_updated` AUDIT_LOG_SCHEMA.md registration | Authored §66 (v5.12.0, 2026-07-01); obligation fulfilled v5.12.1 but checklist not updated | 🟢 **§67 this patch (v5.13.0, 2026-07-01).** AUDIT_LOG_SCHEMA.md v2.67 registered all required fields; §66.9 item 2 status patched to `[x] Done`. |
+| §66.9 item 6 `[ ]` — ENTERPRISE_SLA.md MOBILE-SLO-06 update | Authored §66 (v5.12.0, 2026-07-01); obligation fulfilled v5.12.1 but checklist not updated | 🟢 **§67 this patch (v5.13.0, 2026-07-01).** ENTERPRISE_SLA.md v1.3 §3.10 authored; §66.9 item 6 status patched to `[x] Done`. |
+| §65 missing TOC entry | §65 authored v5.11.0 (2026-06-30) without TOC update | 🟢 **§67 this patch (v5.13.0, 2026-07-01).** TOC entry added. |
+| §66 missing TOC entry | §66 authored v5.12.0 (2026-07-01) without TOC update | 🟢 **§67 this patch (v5.13.0, 2026-07-01).** TOC entry added. |
+
+**Privacy floor:** No employee `user_id`, name, email, health value, coaching session content, or GDPR Art. 9 special-category data in any §67 content. All edits are metadata-only compliance tracking annotations.
+
+---
+
+*v5.13.0 (2026-07-01): §67 Cross-Reference Patch — §66.9 Items 2 + 6 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.67 + ENTERPRISE_SLA.md v1.3). Closes two stale `[ ]` checklist entries in §66.9 (MDM OTA change window implementation) and three missing TOC entries (§65, §66, §67). Root cause: v5.12.1 (2026-07-01) fulfilled the AUDIT_LOG_SCHEMA.md and ENTERPRISE_SLA.md obligations recorded in §66.11 but did not apply the corresponding `[ ]` → `[x] Done` updates to the §66.9 live checklist rows (items 2 and 6). Additionally, §65 (v5.11.0, 2026-06-30) and §66 (v5.12.0, 2026-07-01) were each authored without appending their TOC entries. §67.1 background: explains the discrepancy between §66.11 (correctly 🟢 Done for items 2 and 6) and §66.9 (incorrectly `[ ]` for the same obligations); clarifies §66.9 item 1 remains genuinely pending (operational staging-deploy task, not documentation). §67.2 inline updates: five-row table documenting exactly what was changed. §67.3 post-patch checklist summary: nine-row table confirming §66.9 final state (items 1/3/4/5 remain `[ ]` — all genuine P1/M12 operational tasks; items 2/6/7/8/9 `[x]` Done). §67.4 five-item implementation checklist (all `[x]` Done — this patch). §67.5 four-row cross-reference obligations closed table. Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 data in any §67 content — all edits are metadata-only compliance tracking annotations. Document header v5.12.4 → v5.13.0. Owner: compliance-officer + platform-engineer.*
 
 ---
 

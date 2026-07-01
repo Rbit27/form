@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [10.96.1] — 2026-07-01
+
+### Changed
+- `docs/OBSERVABILITY.md` — §67 Cross-Reference Patch: §66.9 items 2 + 6 stale-status closure (AUDIT_LOG_SCHEMA.md v2.67 + ENTERPRISE_SLA.md v1.3). Two §66.9 checklist rows (`mobile.ota_change_window_updated` AUDIT_LOG_SCHEMA registration; ENTERPRISE_SLA.md MOBILE-SLO-06 update) were fulfilled in v5.12.1 but not marked Done in the live checklist; §67 patches both to `[x] Done` and adds the missing TOC entries for §65 and §66. §67.3 post-patch summary confirms items 1/3/4/5 remain genuinely pending P1/M12 operational tasks. Document header v5.12.4 → v5.13.0. owners: compliance-officer + platform-engineer.
+- `VERSION` — 10.96.0 → 10.96.1.
+
 ## [10.96.0] — 2026-07-01
 
 ### Added
