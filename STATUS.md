@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.89.0** — 2026-07-01 · post-146 · «Як працює нейром'язова адаптація — і чому перші тижні сили не є «реальними»» · editorial series 141–150 (6/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-146 · next: post-147 («Тренувальний стрес і позатренувальний стрес: як система рахує загальне навантаження»)
+
 **v10.88.0** — 2026-07-01 · post-145 + post-2883 · post-145: «Що таке «хороший тренувальний блок» — 6 критеріїв без суб'єктивізму» · editorial series 141–150 (5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · post-2883: «Ознаки, що «мінімум» став занадто малим: коли треба розширюватись» · series «Мінімальна ефективна доза» 2876–2885 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards added for post-145 + post-2883 · next: post-146 (editorial) + post-2884 («Довгострокова стратегія: роки мінімального, місяці повного, тижні максимального»)
 
 **v10.87.0** — 2026-07-01 · post-144 · «Операційна логіка прогресії: коли додавати навантаження, коли залишатись, коли відступати» · editorial training-methodology · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-144 · next: post-145 (editorial) + post-2910 («Коли змінювати програму, а коли — чекати: критерії, які не залежать від відчуттів»)
