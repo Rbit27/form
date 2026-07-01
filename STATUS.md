@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.83.0** — 2026-07-01 · post-2907 · «Як описати власний тренувальний стан без самодіагностики: межа між спостереженням і інтерпретацією» · series «Тренувальна комунікація з собою» 2906–2915 (2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2907 · README roadmap extended to 3005 (серія 2996–3005 «Тренування і тіло: сигнали, яким можна довіряти») · next: post-2908 («Три рівні пояснення пропущеного тренування — і чому перший завжди неточний»)
+
 **v10.82.0** — 2026-07-01 · post-2906 · «Чому точна мова важлива для self-coached атлета: різниця між «погано» і «RPE 9 при плановому 7.5»» · series «Тренувальна комунікація з собою» 2906–2915 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2906 · next: post-2907 («Як описати власний тренувальний стан без самодіагностики: межа між спостереженням і інтерпретацією»)
 
 **v10.81.0** — 2026-07-01 · enterprise: COST_MODEL §53 OQ-CS-01 Resolution DEC-091 · CS Hire vs. Founding Engineer gate criteria · v2.26.0
