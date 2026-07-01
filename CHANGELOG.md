@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.87.1] — 2026-07-01
+
+### Changed
+- `docs/COST_MODEL.md §53.9 item 3, §53.10, §54.10 items 3–4, §54.11` — closed three stale P1/M7 cross-reference obligations. Marked `enterprise.hiring_decision_logged` (§53.9/§53.10) and `admin.programme_health_label_viewed` (§54.10 item 3) registration checkboxes as Done (both shipped in `docs/AUDIT_LOG_SCHEMA.md` v2.68–v2.69 per CHANGELOG v10.85.1). Marked `docs/OBSERVABILITY.md §33.3` PHI exception note (§54.10 item 4) as Done (shipped v5.12.4 per CHANGELOG v10.85.1). Cross-reference tables §53.10 and §54.11 patched 🟡 Pending → 🟢 Done. Updated `docs/COST_MODEL.md §33.3` back-reference text for `§33.3 update` from «pending P1/M7» to «🟢 Done v5.12.4 2026-07-01»; similarly `admin.programme_health_label_viewed` note updated to «🟢 Done v2.68». Header v2.27.0 → v2.27.1.
+- `VERSION` — 10.87.0 → 10.87.1.
+
+---
+
 ## [10.87.0] — 2026-07-01
 
 ### Added
