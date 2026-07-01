@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.91.0** — 2026-07-01 · post-148 · «Принцип специфічності: чому тренуватись «взагалі» не дає конкретних результатів» · editorial series 141–150 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-148 · next: post-149 («Деловантаження: що відбувається у тижні зниженого обсягу і чому більшість робить це неправильно») — editorial series 141–150 (9/10)
+
 **v10.90.0** — 2026-07-01 · post-147 + post-2884 · post-147: «Тренувальний стрес і позатренувальний стрес: як система рахує загальне навантаження» · editorial series 141–150 (7/10) · clinical-safety CONDITIONAL PASS · sports-scientist review pending · post-2884: «Довгострокова стратегія МЕД: роки мінімального, місяці повного, тижні максимального» · series «Мінімальна ефективна доза» 2876–2885 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards added for post-147 + post-2884 · next: post-148 («Принцип специфічності: чому тренуватись «взагалі» не дає конкретних результатів») + post-2885 (МЕД 10/10 SERIES COMPLETE — «МЕД як система: від разового інструменту до постійного принципу тренування»)
 
 **v10.89.0** — 2026-07-01 · post-146 · «Як працює нейром'язова адаптація — і чому перші тижні сили не є «реальними»» · editorial series 141–150 (6/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-146 · next: post-147 («Тренувальний стрес і позатренувальний стрес: як система рахує загальне навантаження»)
