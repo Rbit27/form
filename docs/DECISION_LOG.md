@@ -15,6 +15,15 @@
 
 ## 2026-07-01
 
+### DEC-091 · OQ-CS-01 Resolution: CS Hire vs. Founding Engineer Hire — Month 9 Decision Gate
+
+- **Decision:** CS-HIRE-GATE-01 two-criteria gate adopted: Criterion A (`active_enterprise_accounts ≥ 4`) + Criterion B (`estimated_monthly_qbr_hours ≥ 12`) evaluated at Month 9 board review. Gate-triggered: CS hire at M11 ($72.5k/yr midpoint), founding engineer deferred to M16. Not triggered: §22.3 Base scenario M13 engineer hire maintained; M12 re-evaluation scheduled. `enterprise.hiring_decision_logged` STANDARD/3yr DEC-030 event emitted regardless of outcome. Manual override path: `decision_basis: 'manual_override'` + DECISION_LOG note. Full specification in `docs/COST_MODEL.md §53`.
+- **Owner:** founder + customer-success + compliance-officer
+- **Why:** (1) Option B (premature CS hire at M7–8, sub-4-account stage) rejected — negative ROI: CS salary cost ($72.5k/yr) exceeds retention value when account base is too small to generate 12 QBR hours/month. (2) Option C (reactive-only judgment, no formal gate) rejected — CS arriving post-churn negates 9× FEHS ROI (§26.9.2 churn model). (3) 4-account threshold aligns with §26.4 founder-led upper boundary; 12 QBR hours/month is the empirical inflection above which founder QBR quality degrades. (4) Gate-triggered path costs $4,125 more over M11–M16 vs. Base scenario; expected ARR protection from one prevented 100-seat Starter churn = $75k → 18× positive ROI. Privacy floor: `enterprise.hiring_decision_logged` payload contains only aggregate counts (active accounts, QBR hours); no individual employee data.
+- **Reverse cost:** Low. CS-HIRE-GATE-01 is a documented evaluation protocol, not a system invariant. Reversal: amend §53.3 gate criteria + DECISION_LOG note. Any deviation from gate outcome logged as `decision_basis: 'manual_override'`.
+
+---
+
 ### DEC-090 · OQ-MOBILE-01 Resolution: EAS OTA Adoption Rate vs. Enterprise MDM Change Windows — Per-Tenant Exception Flag & 7-Day Contractual SLO Variant
 
 - **Decision:** Per-tenant `ota_change_window_enabled BOOLEAN NOT NULL DEFAULT FALSE` flag on `tenants` table. When `false` (default): MOBILE-SLO-06 = 48h (Standard). When `true`: MOBILE-SLO-06 = 7 days / 168h (Premium-MDM). Flag requires CSM documentation of MDM change control policy + compliance-officer approval + activation via `POST /internal/tenant/{slug}/ota-change-window` (form-staff Cloudflare Access only). Emits `mobile.ota_change_window_updated` HIGH/7yr DEC-030 event; OTA-WINDOW-CHAIN-01 invariant prevents double-enable and enforces non-empty `compliance_officer_approval_ref`. AL-MOBILE-05 breach alert dynamically thresholds 48h vs 168h by joining `tenants.ota_change_window_enabled`. OTA-WINDOW-E-001 SOC 2 evidence artefact (CC3.2/A1.1, annual + per-activation, 7yr). Migration 0091: four columns (`ota_change_window_enabled`, `ota_slo_variant`, `ota_change_window_enabled_at`, `ota_change_window_enabled_by`) + `chk_ota_slo_variant_consistency` DDL CHECK; `form_api` REVOKED from all four columns. Full specification in `docs/OBSERVABILITY.md §66`.

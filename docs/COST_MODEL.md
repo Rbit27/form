@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.24.0
+# FORM · Cost Model & Unit Economics v2.26.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -378,6 +378,17 @@
 50. [OQ-ENTERPRISE-ARR-04 Resolution — `evidence_artefact_id` Optionality & FLEET-MAT-CHAIN-02 (DEC-087)](#50--oq-enterprise-arr-04-resolution--evidence_artefact_id-schema-optionality-confirmed--fleet-mat-chain-02-evidence-linkage-invariant-dec-087)
 51. [§51 · OQ-CS-03 Resolution — Tiered k-Anonymity Floor for QBR Aggregate Metrics (DEC-088)](#51--oq-cs-03-resolution--tiered-k-anonymity-floor-for-qbr-aggregate-metrics-dec-088)
 52. [§52 · OQ-CS-04 Resolution — FEHS Signal Breakdown in `enterprise.qbr_completed` (DEC-089)](#52--oq-cs-04-resolution--fehs-signal-breakdown-in-enterpriseqbr_completed-dec-089)
+53. [§53 · OQ-CS-01 Resolution — CS Hire vs. Founding Engineer Hire: Month 9 Decision Gate (DEC-091)](#53--oq-cs-01-resolution--cs-hire-vs-founding-engineer-hire-month-9-decision-gate-dec-091)
+    - 53.1 Background and Resolution Direction
+    - 53.2 Decision Analysis
+    - 53.3 CS-HIRE-GATE-01 Named Invariant
+    - 53.4 Cash Flow Comparison
+    - 53.5 DEC-030 Hiring Decision Audit Event
+    - 53.6 Privacy Floor
+    - 53.7 DEC-091 Decision Record
+    - 53.8 §26.12 In-Line Patch
+    - 53.9 Implementation Checklist
+    - 53.10 Cross-Reference Obligations
     - 51.1 Background
     - 51.2 Decision (DEC-088) — Tiered k-Anonymity Framework
     - 51.3 Decision Rationale
@@ -4818,9 +4829,9 @@ CS events must be emitted to the HMAC-chained audit log for two purposes: (1) SO
 
 ### 26.12 Open Questions
 
-**OQ-CS-01: Should the first CS hire precede or follow the founding engineer hire at Month 13?**
+**OQ-CS-01: Should the first CS hire precede or follow the founding engineer hire at Month 13? — 🟢 RESOLVED DEC-091 (v2.26.0, 2026-07-01)**
 
-The §22.3 Base scenario defers all hiring to Month 13, where a founding engineer is assumed. If the customer count at Month 12 exceeds 5 (possible in the Bull scenario or with an accelerated pilot pipeline), a CS hire becomes the higher-priority hire. The CS hire ($70k–$75k) is cheaper than an engineer ($100k in §22.3.3), provides faster time-to-value for at-risk accounts, and protects the ARR base that funds the engineer hire later. Decision rule proposal: at Month 9, if active enterprise customers ≥ 4 AND founder QBR hours ≥ 12h/month, replace the M13 engineer hire with a M11 CS hire + M16 engineer hire. Owner: founder + product-manager. Priority: **P0 — decision must be made before Month 9 to allow recruiting lead time.** Resolution: establish a clear decision gate at the Month 9 board review using the trigger criteria above.
+`§53` provides the formal decision gate: **CS-HIRE-GATE-01** two-criteria gate (Criterion A: `active_enterprise_accounts ≥ 4`; Criterion B: `estimated_monthly_qbr_hours ≥ 12`) evaluated at the Month 9 board review. Gate-triggered: CS hire at M11 ($72.5k/yr midpoint), founding engineer deferred to M16. Not triggered: §22.3 Base scenario M13 engineer hire maintained; M12 re-evaluation scheduled. `enterprise.hiring_decision_logged` STANDARD/3yr DEC-030 event emitted regardless of outcome. Cash flow analysis: gate-triggered path costs $4,125 more over M11–M16 vs. base; expected ARR protection from one prevented 100-seat Starter churn = $75k → 18× positive ROI. See `docs/COST_MODEL.md §53` for full rationale, cash flow comparison, and DEC-091 decision record.
 
 **OQ-CS-02: Should FEHS be visible to the customer in the admin dashboard, or is it internal-only?**
 
@@ -14183,3 +14194,156 @@ At M10, `fehs_breakdown` transitions from optional to required in the Zod schema
 ---
 
 *v2.25.0 (2026-06-30): §52 OQ-CS-04 Resolution — FEHS Signal Breakdown in `enterprise.qbr_completed` (DEC-089). Closes OQ-CS-04 (P2, §26.12 — should `fehs_score_at_qbr` include per-signal breakdown; include from Day 1). Decision: add `fehs_breakdown` as optional field (→ required at M10) carrying all six FEHS signal scores with weights; `fehs_score_at_qbr` (total composite, 0–100) added as co-optional sibling. New FEHS-CHAIN-01 Worker invariant: score + breakdown must be co-present; |weighted_sum − fehs_score_at_qbr| ≤ 0.5; HTTP 422 on any violation (three error codes: FEHS_CHAIN_01_BREAKDOWN_REQUIRED, FEHS_CHAIN_01_SCORE_REQUIRED, FEHS_CHAIN_01_SCORE_MISMATCH). Admin Console "Complete QBR" modal to auto-populate from latest `health_score_updated` at M10; `fehs_breakdown` transitions optional → required at M10 in lockstep. Privacy floor: all six signals are tenant-aggregate only — headcount rates and date arithmetic; no individual `user_id`, name, email, or health value; HR systems excluded; k-floor inherited from QBR-K-ANON-01 (§51). AUDIT_LOG_SCHEMA.md updated v2.65 → v2.66 (P0, this pass). §26.12 OQ-CS-04 patched 🟡 → 🟢 Resolved DEC-089. TOC entry §52 added. DEC-089 registered in `docs/DECISION_LOG.md`. Document header v2.24.0 → v2.25.0. Cross-references: `docs/AUDIT_LOG_SCHEMA.md` (`QbrCompletedPayload` v2.66 — fehs fields + FEHS-CHAIN-01); `docs/DECISION_LOG.md DEC-089` (formal decision record); `docs/COST_MODEL.md §26.9` (FEHS composite definition — six signals, weights); `docs/COST_MODEL.md §26.10` (`enterprise.health_score_updated` source event for Admin Console pre-population); `docs/COST_MODEL.md §26.12` (OQ-CS-04 — 🟢 Resolved); `docs/COST_MODEL.md §51` (QBR-K-ANON-01 — k-floor inheritance); `docs/ENTERPRISE.md §Privacy floor` (absolute prohibition source). Owner: compliance-officer + data-engineer + security-engineer.*
+
+---
+
+## §53 · OQ-CS-01 Resolution — CS Hire vs. Founding Engineer Hire: Month 9 Decision Gate (DEC-091)
+
+> **Closes:** OQ-CS-01 from `§26.12` (P0 — decision before Month 9 — open since v1.7).
+> **Owner:** founder + customer-success + compliance-officer. References: §22.3, §26.4, §26.8, §34, §40, §23, `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md`.
+
+### 53.1 Background and Resolution Direction
+
+OQ-CS-01 (§26.12) asked whether the first CS hire at FORM should precede the founding engineer hire at Month 13. The §22.3 Base scenario defaults to a single M13 engineer hire. The concern: in the Bull scenario, FORM may reach 4+ active enterprise accounts by Month 12, placing the founder's QBR commitment above 12h/month — the threshold where solo management becomes the primary churn risk, since a Red-band account (§40.3 WAU < 20%) without CS intervention carries a ~60% churn probability per the §40.3 seat utilization health matrix.
+
+OQ-CS-01 specified the resolution direction: *"establish a clear decision gate at the Month 9 board review using the trigger criteria above."* DEC-091 adopts **Option A: a structured two-criteria gate (CS-HIRE-GATE-01)** with a formal named invariant, a DEC-030 audit event, and explicit cash flow consequences for each outcome.
+
+### 53.2 Decision Analysis
+
+| Option | Description | Verdict |
+|---|---|---|
+| **A: Formal Month 9 gate with two objective criteria** | CS-HIRE-GATE-01: two criteria evaluated simultaneously at Month 9. Both met → CS at M11, engineer deferred to M16. Either not met → §22.3 Base (M13 engineer). Emit `enterprise.hiring_decision_logged` STANDARD/3yr regardless of outcome. | ✅ **Chosen (DEC-091)** |
+| **B: Calendar trigger — hire CS at M12 regardless** | Simpler planning; avoids criteria ambiguity. | ❌ Rejected: premature hire at 1–2 accounts creates negative-ROI CS spend per §26.5 (CS cost 30–50% ARR at sub-4-account stage). |
+| **C: Founder judgment only** | No formal criteria; decide when QBR load is unsustainable. | ❌ Rejected: reactive timing means CS hire arrives post-churn, negating the 9× FEHS ROI benefit (§26.9.3) of early intervention. |
+
+**Tie-breaker principle:** FORM's ARR base funds both hires; protecting ARR (CS) takes priority over expanding engineering capacity when the two compete for the same cash slot. A lost $100k ARR contract costs more than five months of CS salary at any tier.
+
+### 53.3 CS-HIRE-GATE-01 Named Invariant
+
+> **CS-HIRE-GATE-01 (Month 9 CS Hire Decision Gate):** At the Month 9 founder review — defined as the 9th calendar month after FORM's first enterprise pilot go-live — evaluate two criteria simultaneously:
+>
+> **Criterion A (account volume):** `active_enterprise_accounts ≥ 4`, where "active" means `tenants.lifecycle_status = 'active'` with at least one SCIM-provisioned employee (DATA_MODEL §16).
+>
+> **Criterion B (founder capacity):** `estimated_monthly_qbr_hours ≥ 12`, computed as `active_enterprise_accounts × avg_account_hours`, where `avg_account_hours = 7` (§26.8 base) plus any Red-band intervention overhead logged in the prior quarter's QBR records (§40.6).
+>
+> **Gate outcomes:**
+> - **Both criteria met → CS-HIRE-GATE-01 TRIGGERED:** plan CS hire for M11 (2-month recruiting window from Month 9); defer founding engineer hire from M13 to M16. Emit `enterprise.hiring_decision_logged` with `gate_triggered: true`.
+> - **Either criterion not met → CS-HIRE-GATE-01 NOT TRIGGERED:** maintain §22.3 Base scenario M13 engineer hire; schedule M12 re-evaluation. Emit `enterprise.hiring_decision_logged` with `gate_triggered: false`.
+>
+> **Manual override:** founder may trigger CS-HIRE-GATE-01 before Month 9 if an unexpected fifth account signs AND there is a documented Red-band account in §40.3. Manual override requires `decision_basis: 'manual_override'` in the DEC-030 event payload and a founder note in DECISION_LOG.
+
+### 53.4 Cash Flow Comparison: Gate-Triggered Path vs. Base Scenario
+
+| Metric | Base Scenario (§22.3 — M13 Engineer) | Gate-Triggered Path (M11 CS + M16 Engineer) |
+|---|---|---|
+| First hire month | M13 | M11 |
+| First hire role | Founding engineer | CS hire |
+| First hire salary | $100k/yr | $72.5k/yr midpoint ($70k–$75k per §26.4) |
+| First hire fully-loaded cost (salary + 10% overhead) | $9,167/month | $6,646/month |
+| Second hire month | — (pre-Series A) | M16 |
+| Second hire role | — | Founding engineer ($100k/yr) |
+| Monthly net delta M11–M13 vs. base | $0 (no hire yet) | −$6,646/month (CS salary + overhead) |
+| Monthly net delta M14–M15 vs. base | −$9,167/month (engineer from M13) | −$6,646/month (CS only; engineer pending) |
+| Net additional cash cost M11–M16 vs. base | Reference (0) | 2 months CS early (M11–M12) = −$13,292; 1 month engineer saved (M13 deferred to M16 net timing) = +$9,167; **net = −$4,125** |
+| Churn risk without CS, 4+ accounts | High — Red-band accounts without CS ~60% churn probability (§40.3) | Low — CS coverage from M11; Green-band NRR ~105% per §23 |
+| Expected ARR protection (one 100-seat Starter prevented churn at $75k/yr ACV) | $0 (no CS to intervene) | $75k ARR preserved |
+| Net ROI if one churn prevented by gate-triggered CS | — | $75k preserved − $4,125 extra cost = **+$70,875 (17× ROI)** |
+
+**Summary:** The gate-triggered path costs $4,125 more over five months (M11–M16 window). This cost is recovered with 17× positive ROI if a single 100-seat Starter account is retained rather than churned. The break-even threshold is 5.5% of one Starter ACV — achievable with any single successful Red-band CS intervention.
+
+### 53.5 DEC-030 Hiring Decision Audit Event
+
+New event: **`enterprise.hiring_decision_logged`**
+
+| Property | Value |
+|---|---|
+| Severity | STANDARD |
+| Retention | 3 years |
+| SOC 2 mapping | CC4.2 (documented management review of operational decisions), CC1.4 (headcount planning as control environment input) |
+
+**TypeScript payload schema (to be registered in `docs/AUDIT_LOG_SCHEMA.md` v2.67, P1/M7):**
+
+```typescript
+interface HiringDecisionLoggedPayload {
+  // Gate evaluation inputs
+  active_enterprise_accounts: number;         // integer tenant count at gate review date
+  estimated_monthly_qbr_hours: number;        // founder self-reported, decimal hours
+  criterion_a_met: boolean;                   // active_enterprise_accounts >= 4
+  criterion_b_met: boolean;                   // estimated_monthly_qbr_hours >= 12
+  // Gate outcome
+  gate_triggered: boolean;                    // true iff both A + B met, or manual_override
+  hire_type_planned: 'cs_first' | 'engineer_first';
+  planned_hire_month: string;                 // e.g. "M11" or "M13"
+  decision_basis:
+    | 'cs_hire_gate_01_triggered'
+    | 'cs_hire_gate_01_not_triggered'
+    | 'manual_override';
+  review_date: string;                        // ISO 8601 date (YYYY-MM-DD)
+  // Privacy: no individual employee user_id, name, email, health data,
+  // coaching content, or GDPR Art. 9 special-category data.
+  // active_enterprise_accounts is a count of FORM-internal tenant rows.
+  // estimated_monthly_qbr_hours is founder self-reported capacity — no employee data.
+}
+```
+
+**Chain invariant (HIRE-GATE-01):** `enterprise.hiring_decision_logged` must be emitted at Month 9 board review closure and before any job requisition is posted. If gate is triggered, the DEC-030 event `occurred_at` timestamp must precede the job posting date recorded in DECISION_LOG. Auditor evidence: CC4.2 (hiring decision as documented management review).
+
+### 53.6 Privacy Floor
+
+CS-HIRE-GATE-01 is a FORM-internal headcount decision process. All payload fields are aggregate counts or administrative metadata:
+
+| Field | Source | Contains individual data? |
+|---|---|---|
+| `active_enterprise_accounts` | Count of `tenants` rows with `lifecycle_status = 'active'` | No — tenant record count only |
+| `estimated_monthly_qbr_hours` | Founder self-reported calendar estimate | No — founder capacity estimate, no employee data |
+| `criterion_a_met`, `criterion_b_met` | Boolean evaluation of A/B criteria | No — derived from aggregate inputs |
+| `gate_triggered`, `hire_type_planned` | Decision outcome | No — administrative metadata |
+| `review_date` | Date of board review | No — calendar date |
+
+**Hard prohibitions:**
+- No individual employee `user_id`, name, email, coaching content, workout history, body composition, or GDPR Art. 9 data in any field
+- HR systems must never receive `enterprise.hiring_decision_logged`; it is a FORM-internal operational record only
+- `active_enterprise_accounts` must never be cross-referenced with individual tenant names in the DEC-030 payload (tenant names belong in DECISION_LOG prose notes, not in the chain)
+
+### 53.7 DEC-091 Decision Record
+
+| Field | Value |
+|---|---|
+| **Decision ID** | DEC-091 |
+| **Date** | 2026-07-01 |
+| **Question** | OQ-CS-01: Should the first CS hire precede or follow the founding engineer hire at Month 13? |
+| **Decision** | CS-HIRE-GATE-01 adopted: formal two-criteria gate at Month 9 (Criterion A: active accounts ≥ 4; Criterion B: founder QBR hours ≥ 12/month). Gate-triggered: CS hire M11 ($72.5k/yr), engineer deferred to M16. Not triggered: §22.3 Base scenario M13 engineer maintained; M12 re-evaluation scheduled. `enterprise.hiring_decision_logged` STANDARD/3yr DEC-030 event emitted at gate review regardless of outcome. Manual override path available with `decision_basis: 'manual_override'` and DECISION_LOG note. |
+| **Owner** | founder + customer-success + compliance-officer |
+| **Why** | (1) Criteria-based gate eliminates premature hire (Option B: negative-ROI CS spend at sub-4-account stage) and reactive-only judgment (Option C: CS arrives post-churn). (2) 4 accounts is the §26.4 founder-led upper boundary — the inflection at which dedicated CS capacity switches from a cost to an ARR-protection necessity. (3) 12h/month QBR threshold is derived from §26.8 (7h/account × 4 accounts = 28h; 12h is the leading-indicator threshold at ~1.7 accounts of marginal load). (4) Gate-triggered path costs only $4,125 more over M11–M16; expected ARR protection from one prevented 100-seat Starter churn = $75k ARR → 17× positive ROI. |
+| **Reverse cost** | Low. Gate is documentation + calendar process only. No Worker code or schema changes required at decision time. Changing criteria: update §53.3, create new DEC, update DECISION_LOG. |
+
+### 53.8 §26.12 In-Line Patch
+
+Applied in this authoring pass:
+
+**OQ-CS-01 status updated:** `🟡 P0 Open — decision before Month 9` → `🟢 Resolved DEC-091 (v2.26.0, 2026-07-01)` — see §53 for full gate specification, cash flow comparison, and DEC-030 event schema.
+
+### 53.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register DEC-091 in `docs/DECISION_LOG.md` | compliance-officer | **P0** | This authoring pass | [x] **Done — 2026-07-01** |
+| 2 | Update §26.12 OQ-CS-01 status 🟡 → 🟢 Resolved DEC-091 (v2.26.0, 2026-07-01) | compliance-officer | **P0** | This authoring pass | [x] **Done — inline patch this pass** |
+| 3 | Register `enterprise.hiring_decision_logged` (STANDARD, 3yr) in `docs/AUDIT_LOG_SCHEMA.md`; add `HiringDecisionLoggedPayload` TypeScript interface; add HIRE-GATE-01 chain invariant comment | compliance-officer | **P1** | M7 | [ ] |
+| 4 | Add Month 9 board review to FORM's internal calendar with CS-HIRE-GATE-01 criteria pre-populated (active account count from `tenants` query + QBR hours estimate from QBR log) | founder | **P0** | M7 | [ ] |
+| 5 | At Month 9 review: document `active_enterprise_accounts` and `estimated_monthly_qbr_hours`, evaluate criteria, emit `enterprise.hiring_decision_logged` via Admin Console internal tooling | founder | **P0** | M9 | [ ] |
+| 6 | If gate triggered: post CS job requisition within 5 business days of Month 9 review; target M11 start date | founder | **P0** | On gate trigger (M9–M10) | [ ] |
+| 7 | If gate not triggered: schedule M12 re-evaluation of CS-HIRE-GATE-01 using same criteria; document in DECISION_LOG with current account count | founder | **P1** | M12 | [ ] |
+
+### 53.10 Cross-Reference Obligations Created by §53
+
+| Obligation | Source | Status |
+|---|---|---|
+| DEC-091 registered in `docs/DECISION_LOG.md` | §53.9 item 1 | 🟢 **Done — 2026-07-01** |
+| §26.12 OQ-CS-01 patched 🟡 → 🟢 Resolved DEC-091 | §53.8 / §53.9 item 2 | 🟢 **Done — inline patch this pass** |
+| `enterprise.hiring_decision_logged` event registered in `docs/AUDIT_LOG_SCHEMA.md` | §53.9 item 3 (P1/M7) | 🟡 Pending — M7 |
+| Month 9 board review scheduled with CS-HIRE-GATE-01 criteria pre-populated | §53.9 item 4 (P0/M7) | 🟡 Pending — M7 |
+
+---
+
+*v2.26.0 (2026-07-01): §53 OQ-CS-01 Resolution — CS Hire vs. Founding Engineer Hire: Month 9 Decision Gate (DEC-091). Closes OQ-CS-01 (P0, §26.12 — whether first CS hire precedes founding engineer hire at Month 13; decision required before Month 9). Decision (DEC-091): CS-HIRE-GATE-01 two-criteria gate adopted. Criterion A: `active_enterprise_accounts ≥ 4` (tenants with `lifecycle_status = 'active'` + at least one SCIM employee per DATA_MODEL §16). Criterion B: `estimated_monthly_qbr_hours ≥ 12` (founder self-reported; derived from 7h/account base ×  active accounts per §26.8 + Red-band overhead per §40.6). Gate-triggered path: CS hire M11 ($72.5k/yr midpoint, $6,646/month total cost); founding engineer deferred to M16 ($100k/yr). Not-triggered path: §22.3 Base scenario M13 engineer hire maintained; M12 re-evaluation scheduled. `enterprise.hiring_decision_logged` STANDARD/3yr DEC-030 event emitted at Month 9 review regardless of outcome; payload: active account count, estimated QBR hours, two boolean criterion flags, `gate_triggered` boolean, `hire_type_planned` enum, `planned_hire_month` string, `decision_basis` enum, `review_date` ISO 8601. Manual override: available before Month 9 if unexpected fifth account signs + documented Red-band account; requires `decision_basis: 'manual_override'` + DECISION_LOG note. Cash flow analysis (§53.4): gate-triggered path costs $4,125 more over M11–M16 vs. base; expected ARR protection from one prevented 100-seat Starter churn ($75k ACV) = 17× positive ROI on incremental CS hire cost; break-even = 5.5% of one Starter ACV. Privacy floor: `enterprise.hiring_decision_logged` contains only aggregate counts and administrative metadata; no individual employee `user_id`, name, email, health data, coaching content, or GDPR Art. 9 special-category data; HR systems receive no access; `active_enterprise_accounts` is a FORM-internal tenant count only. §26.12 OQ-CS-01 patched 🟡 → 🟢 Resolved DEC-091. TOC entry §53 added. DEC-091 registered in `docs/DECISION_LOG.md`. Document header v2.24.0 → v2.26.0 (absorbing v2.25.0 which was documented in §52 version note but not applied to file header). Cross-references: `docs/COST_MODEL.md §22.3` (Base scenario cash flow — M13 engineer hire that gate-triggered path defers to M16); `docs/COST_MODEL.md §26.4` (CS team stages — 4 accounts as founder-led upper boundary, Criterion A source); `docs/COST_MODEL.md §26.8` (QBR economics — 7h/account base rate, Criterion B input); `docs/COST_MODEL.md §26.12` (OQ-CS-01 — 🟢 Resolved DEC-091); `docs/COST_MODEL.md §40.3` (seat utilization health matrix — Red-band ~60% churn probability; context for Criterion B urgency); `docs/COST_MODEL.md §40.6` (CSM intervention playbook — Red-band overhead input to Criterion B); `docs/COST_MODEL.md §23` (NRR engine — Gate-triggered ~105% NRR vs. Base ~87% NRR at 4+ accounts founder-led); `docs/ENTERPRISE.md §CSM coverage model` (CS coverage tiers and privacy floor); `docs/AUDIT_LOG_SCHEMA.md` (`enterprise.hiring_decision_logged` — P1/M7 to register); `docs/DECISION_LOG.md DEC-091` (formal decision record — P0 this pass). Owner: founder + customer-success + compliance-officer.*

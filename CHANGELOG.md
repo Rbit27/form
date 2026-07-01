@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [10.81.0] — 2026-07-01
+
+### Added
+- `docs/COST_MODEL.md §53` — OQ-CS-01 Resolution: CS Hire vs. Founding Engineer Hire: Month 9 Decision Gate (DEC-091). CS-HIRE-GATE-01 two-criteria gate (Criterion A: `active_enterprise_accounts ≥ 4`; Criterion B: `estimated_monthly_qbr_hours ≥ 12`) evaluated at Month 9 board review. Gate-triggered: CS hire at M11 ($72.5k/yr), founding engineer deferred to M16. Cash flow comparison: gate-triggered path costs $4,125 extra over M11–M16; expected ARR protection from one prevented 100-seat Starter churn = $75k → 18× positive ROI. `enterprise.hiring_decision_logged` DEC-030 STANDARD/3yr event with `HiringDecisionLoggedPayload` TypeScript interface. COST_MODEL v2.26.0 (absorbs v2.25.0 from §52 header gap).
+
+### Changed
+- `docs/COST_MODEL.md §26.12` — OQ-CS-01 patched 🟡 open → 🟢 RESOLVED DEC-091 (v2.26.0, 2026-07-01). Inline summary: CS-HIRE-GATE-01 gate with cross-reference to §53.
+- `docs/DECISION_LOG.md` — DEC-091 registered (2026-07-01): CS-HIRE-GATE-01 gate, Option B/C rejected, 18× ROI case.
+- `VERSION` — 10.80.0 → 10.81.0.
+
 ## [10.80.0] — 2026-07-01
 
 ### Added
