@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.40
+# FORM · Multi-Tenant Data Model v1.41
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -57,6 +57,7 @@
 47. [`enterprise_contracts` Amendment Columns — Migration 0088](#47-enterprise_contracts-amendment-columns--migration-0088)
 48. [`enterprise_contracts.graduated_from_pilot_id` — Pilot-to-Paid Cohort FK — Migration 0089](#48-enterprise_contractsgraduated_from_pilot_id--pilot-to-paid-cohort-fk--migration-0089)
 49. [`tenants.data_region` — EU Data Residency Column — Migration 0090](#49-tenantsdata_region--eu-data-residency-column--migration-0090)
+50. [`tenants` OTA Change Window Columns — Migration 0091](#50-tenants-ota-change-window-columns--migration-0091)
 
 ---
 
@@ -18478,6 +18479,176 @@ ORDER BY t.country_code, t.id;
 | REGION-E-001 first annual collection run + R2 storage | §49.9 item 8 (P2/M10) | 🟡 **Pending — awaiting migration deploy + EU tenant onboarding** |
 
 ---
+
+## 50. `tenants` OTA Change Window Columns — Migration 0091
+
+> **Defined in:** `docs/OBSERVABILITY.md §66` (v5.12.0, 2026-07-01) — DEC-090 (EAS OTA Adoption Rate vs. Enterprise MDM Change Windows). Closes `docs/OBSERVABILITY.md §66.9` item 1 (P1/M12: DATA_MODEL documentation for migration 0091).
+
+### §50.1 Purpose
+
+Migration 0091 adds four columns to the `tenants` table supporting the per-tenant EAS OTA change-window exception flag introduced by DEC-090 (hybrid Option B + modified Option C). When `ota_change_window_enabled = FALSE` (default), MOBILE-SLO-06 Standard applies (≤ 48h delivery). When `ota_change_window_enabled = TRUE` (Premium-MDM opt-in, Addendum 7, compliance-officer approval required), MOBILE-SLO-06 Premium-MDM applies (≤ 168h / 7 days). The `chk_ota_slo_variant_consistency` DDL CHECK enforces co-consistency — `(enabled = TRUE, slo_variant = '48h')` is rejected at the Postgres layer.
+
+**Four design principles:**
+1. **Additive-only migration** (`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS`) — no table rewrite; no DEFAULT requiring a statement lock on large tables.
+2. **`form_api` REVOKED via selective column-level REVOKE** — the change-window flag is a FORM staff operation only; enterprise tenant admins cannot self-activate; write path is `POST /internal/tenant/{slug}/ota-change-window` (form-staff Cloudflare Access).
+3. **DDL CHECK enforcement** — `chk_ota_slo_variant_consistency` rejects the inconsistent state `(enabled = TRUE, slo_variant = '48h')` at the Postgres layer, making it structurally impossible regardless of application logic.
+4. **Nullable activation metadata** — `ota_change_window_enabled_at` and `ota_change_window_enabled_by` are nullable (`NULL` when `enabled = FALSE`); populated by `form_system` at enable time.
+
+### §50.2 Migration Dependency Chain
+
+`0083 → 0084 → 0085 → 0086 → 0087 → 0088 → 0089 → 0090 → 0091`
+
+Migration 0091 modifies the `tenants` table only — no structural FK dependency on 0083–0090. No outside-counsel production gate (DDL-only, no ASC 606 / financial reporting implications). Prerequisite: migration 0090 (`tenants.data_region`) must be applied first.
+
+### §50.3 Full DDL
+
+```sql
+-- Migration 0091: EAS OTA Change Window Exception Flag (DEC-090)
+-- Adds four columns to tenants for per-tenant MOBILE-SLO-06 variant selection.
+-- chk_ota_slo_variant_consistency enforces co-consistency at DB layer.
+-- form_api REVOKED from all four columns (form_system write path only).
+
+ALTER TABLE tenants
+  ADD COLUMN IF NOT EXISTS ota_change_window_enabled      BOOLEAN     NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS ota_slo_variant                VARCHAR(10) NOT NULL DEFAULT '48h'
+    CHECK (ota_slo_variant IN ('48h', '168h')),
+  ADD COLUMN IF NOT EXISTS ota_change_window_enabled_at   TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS ota_change_window_enabled_by   UUID;
+
+-- OTA-WINDOW-CONSISTENCY-01: enabled=TRUE requires slo_variant='168h'.
+ALTER TABLE tenants
+  ADD CONSTRAINT chk_ota_slo_variant_consistency
+    CHECK (NOT (ota_change_window_enabled = TRUE AND ota_slo_variant = '48h'));
+
+COMMENT ON COLUMN tenants.ota_change_window_enabled IS
+  'Per-tenant EAS OTA change-window exception flag (DEC-090). '
+  'FALSE (default) = Standard MOBILE-SLO-06 48h. '
+  'TRUE = Premium-MDM MOBILE-SLO-06 168h (7d); requires Addendum 7 + compliance-officer approval. '
+  'Write path: form_system only via POST /internal/tenant/{slug}/ota-change-window. '
+  'form_api REVOKED. DEC-030 event: mobile.ota_change_window_updated HIGH/7yr.';
+
+COMMENT ON COLUMN tenants.ota_slo_variant IS
+  'OTA SLO variant: ''48h'' (Standard, default) or ''168h'' (Premium-MDM, Addendum 7 opt-in). '
+  'Co-consistency with ota_change_window_enabled enforced by chk_ota_slo_variant_consistency. '
+  'Source: MOBILE-SLO-06 (ENTERPRISE_SLA.md §3.10). DEC-090.';
+
+COMMENT ON COLUMN tenants.ota_change_window_enabled_at IS
+  'Timestamp when ota_change_window_enabled was last set to TRUE. '
+  'NULL when ota_change_window_enabled = FALSE. Set by form_system at enable time.';
+
+COMMENT ON COLUMN tenants.ota_change_window_enabled_by IS
+  'UUID of FORM staff member who activated the Premium-MDM exception. '
+  'FORM-internal UUID only — not an enterprise employee identifier. '
+  'NULL when ota_change_window_enabled = FALSE. DEC-030 audit: changed_by_form_staff_id field.';
+
+COMMENT ON CONSTRAINT chk_ota_slo_variant_consistency ON tenants IS
+  'OTA-WINDOW-CONSISTENCY-01: rejects (enabled=TRUE, slo_variant=''48h''). '
+  'Ensures every Premium-MDM tenant has 168h variant. DEC-090.';
+
+-- Selective column-level REVOKE: form_api cannot UPDATE any of the four OTA columns.
+REVOKE UPDATE (ota_change_window_enabled, ota_slo_variant,
+               ota_change_window_enabled_at, ota_change_window_enabled_by)
+  ON tenants FROM form_api;
+```
+
+### §50.4 Staging Validation Checklist
+
+1. [ ] All four columns present with correct types and nullable/not-null status.
+2. [ ] `ota_change_window_enabled` default `FALSE`; `ota_slo_variant` default `'48h'`.
+3. [ ] `chk_ota_slo_variant_consistency` constraint registered (`SELECT conname FROM pg_constraint WHERE conrelid = 'tenants'::regclass`).
+4. [ ] Constraint rejects `(enabled = TRUE, slo_variant = '48h')` with expected error.
+5. [ ] Constraint accepts `(enabled = FALSE, slo_variant = '48h')` (default state).
+6. [ ] Constraint accepts `(enabled = TRUE, slo_variant = '168h')` (Premium-MDM state).
+7. [ ] `form_api` CANNOT `UPDATE` any of the four columns (expected: `ERROR: permission denied`).
+8. [ ] `form_system` CAN `UPDATE` all four columns.
+9. [ ] Existing `tenants` rows backfilled: `enabled = FALSE`, `slo_variant = '48h'`, `enabled_at = NULL`, `enabled_by = NULL`.
+
+Evidence path: `compliance/evidence/ota-change-window/migration-0091-validation_<YYYY-MM-DD>.txt`
+
+### §50.5 Column Semantics
+
+| Column | Type | Nullable | Default | Semantics |
+|---|---|---|---|---|
+| `ota_change_window_enabled` | `BOOLEAN` | NOT NULL | `FALSE` | Per-tenant MDM change-window exception flag; `FALSE` = Standard MOBILE-SLO-06 48h; `TRUE` = Premium-MDM MOBILE-SLO-06 168h (Addendum 7 opt-in) |
+| `ota_slo_variant` | `VARCHAR(10)` | NOT NULL | `'48h'` | OTA SLO tier: `'48h'` (Standard) or `'168h'` (Premium-MDM); co-consistent with `ota_change_window_enabled` via DDL CHECK |
+| `ota_change_window_enabled_at` | `TIMESTAMPTZ` | NULL | `NULL` | Timestamp of last enable activation; `NULL` when `enabled = FALSE` |
+| `ota_change_window_enabled_by` | `UUID` | NULL | `NULL` | FORM staff UUID who activated the exception; `NULL` when `enabled = FALSE`; FORM-internal — not enterprise employee identifier |
+
+### §50.6 RLS
+
+`form_api` is REVOKED from `UPDATE` on all four columns. The existing `tenants` RLS SELECT policies from §16 cover these columns — all roles with `SELECT` on `tenants` can read the four new columns. Write path is `form_system` only.
+
+| Role | Access |
+|---|---|
+| `form_api` | SELECT only (via tenant-scoped RLS; needed for AL-MOBILE-05 JOIN) |
+| `form_system` | ALL (sole write path) |
+| `form_admin` | SELECT |
+| `compliance_reviewer` | SELECT |
+| `tenant_owner` / `tenant_admin` | SELECT own row (`ota_change_window_enabled`, `ota_slo_variant`) |
+| `tenant_manager` | SELECT own row (`ota_change_window_enabled`, `ota_slo_variant`) |
+
+**DDL auditor proof queries:**
+```sql
+-- 1. Confirm form_api cannot UPDATE ota_change_window_enabled:
+SET ROLE form_api;
+UPDATE tenants SET ota_change_window_enabled = TRUE WHERE slug = 'test-tenant';
+-- Expected: ERROR: permission denied for relation tenants
+
+-- 2. Confirm chk_ota_slo_variant_consistency rejects inconsistent state:
+SET ROLE form_system;
+UPDATE tenants SET ota_change_window_enabled = TRUE, ota_slo_variant = '48h' WHERE slug = 'test-tenant';
+-- Expected: ERROR: new row for relation "tenants" violates check constraint "chk_ota_slo_variant_consistency"
+
+-- 3. Confirm compliance_reviewer can SELECT all four columns:
+SET ROLE compliance_reviewer;
+SELECT slug, ota_change_window_enabled, ota_slo_variant,
+       ota_change_window_enabled_at, ota_change_window_enabled_by FROM tenants LIMIT 1;
+```
+
+### §50.7 Privacy Floor
+
+| Column | GDPR classification | PHI / Art. 9 risk | Notes |
+|---|---|---|---|
+| `ota_change_window_enabled` | Technical config flag — not GDPR Art. 4 personal data | None | No individual identified |
+| `ota_slo_variant` | Technical config flag — not GDPR Art. 4 personal data | None | No individual identified |
+| `ota_change_window_enabled_at` | Operational timestamp — not GDPR Art. 4 personal data | None | No individual identified |
+| `ota_change_window_enabled_by` | FORM staff UUID — GDPR Art. 4 personal data (FORM employee) | None | FORM internal DPA; not enterprise employee identifier |
+
+IT contact (MDM admin) stored in CRM only — never in `enterprise_contracts.notes` or any FORM Postgres table.
+
+### §50.8 SOC 2 Evidence
+
+| Control | Evidence mechanism |
+|---|---|
+| **CC3.2** | `compliance_officer_approval_ref` in `mobile.ota_change_window_updated` chain + `ota_change_window_enabled_by` column — tamper-evident MDM risk assessment record per exception |
+| **A1.1** | `ota_slo_variant` is the persistent DB state driving AL-MOBILE-05 dynamic threshold; DEC-030 chain proves every Premium-MDM tenant has approval ref at activation |
+| **CC7.2** | `chk_ota_slo_variant_consistency` DDL CHECK prevents silent SLO misconfiguration at DB layer |
+| **CC9.2** | `mdm_platform` field in `mobile.ota_change_window_updated` provides MDM vendor fleet visibility; `ota_change_window_enabled_by` + `_at` provide activation audit trail |
+
+SOC 2 evidence artefact: **OTA-WINDOW-E-001** (CC3.2/A1.1, annual + per-activation, 7yr, `compliance/evidence/ota-change-window/`) — full spec in `docs/OBSERVABILITY.md §66.8`; registration pending `docs/SOC2_READINESS.md §79.4` (P1/M13).
+
+### §50.9 Implementation Checklist
+
+- [ ] **P0** — Migration 0091 staging apply + nine validation checks; evidence file to `compliance/evidence/ota-change-window/migration-0091-validation_<YYYY-MM-DD>.txt`
+- [ ] **P0** — Production deploy before M12 enterprise GA
+- [ ] **P1/M12** — `POST /internal/tenant/{slug}/ota-change-window` Worker endpoint + OTA-WINDOW-CHAIN-01 integration test
+- [ ] **P1/M12** — AL-MOBILE-05 SQL update (`JOIN tenants t ON t.slug = oe.tenant_id` + `CASE WHEN ota_change_window_enabled THEN 168 ELSE 48 END AS slo_hours`) + staging validation
+- [ ] **P1/M13** — `docs/SOC2_READINESS.md §79.4` OTA-WINDOW-E-001 registration (§66.9 item 8 — deferred)
+
+### §50.10 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md §Mobile OTA Change Window events` — `mobile.ota_change_window_updated` HIGH/7yr + Zod v2 + OTA-WINDOW-CHAIN-01 | §66.9 item 2 (P1/M12) | 🟢 **Done — AUDIT_LOG_SCHEMA.md v2.67, 2026-07-01** |
+| `docs/ENTERPRISE_SLA.md §3.10` — MOBILE-SLO-06 Standard/Premium-MDM variants | §66.9 item 6 (P1/M12) | 🟢 **Done — ENTERPRISE_SLA.md v1.3, 2026-07-01** |
+| `docs/OBSERVABILITY.md §66.11` — cross-reference table update | §66.11 (P1/M12) | 🟢 **Done — OBSERVABILITY.md v5.12.1, 2026-07-01** |
+| Migration 0091 staging apply + nine checks | §50.9 (P0) | 🟡 **Pending — staging deploy** |
+| `POST /internal/tenant/{slug}/ota-change-window` Worker implementation | §50.9 (P1/M12) | 🟡 **Pending — Worker implementation** |
+| `docs/SOC2_READINESS.md §79.4` OTA-WINDOW-E-001 | §66.9 item 8 (P1/M13) | 🟡 **Pending — next iteration** |
+
+---
+
+*v1.41 (2026-07-01): §50 `tenants` OTA Change Window Columns — Migration 0091 — closes `docs/OBSERVABILITY.md §66.9` item 1 (P1/M12). Four columns on `tenants`: `ota_change_window_enabled BOOLEAN NOT NULL DEFAULT FALSE` (per-tenant MDM exception flag; Standard MOBILE-SLO-06 = 48h when FALSE; Premium-MDM MOBILE-SLO-06 = 168h when TRUE; Addendum 7 opt-in + compliance-officer approval required); `ota_slo_variant VARCHAR(10) NOT NULL DEFAULT '48h' CHECK (IN '48h'|'168h')` (SLO tier enum co-consistent with enabled flag via DDL CHECK); `ota_change_window_enabled_at TIMESTAMPTZ` (activation timestamp; NULL when disabled); `ota_change_window_enabled_by UUID` (FORM staff UUID — never enterprise employee identifier; NULL when disabled). `chk_ota_slo_variant_consistency` DDL CHECK: `NOT (ota_change_window_enabled = TRUE AND ota_slo_variant = '48h')` — makes inconsistent state structurally impossible. `form_api` REVOKED from all four columns via selective column-level REVOKE (write path: `form_system` only). Migration dependency chain: 0083→…→0090→0091. Nine-item staging validation checklist (evidence path: `compliance/evidence/ota-change-window/migration-0091-validation_<YYYY-MM-DD>.txt`). §50.6 RLS: `form_api` SELECT only (AL-MOBILE-05 JOIN); `form_system` ALL; `form_admin`/`compliance_reviewer` SELECT; `tenant_owner`/`tenant_admin`/`tenant_manager` SELECT own row (ota_change_window_enabled/ota_slo_variant — contractual IT metadata). §50.7 privacy floor: `ota_change_window_enabled` + `ota_slo_variant` are technical config flags, not GDPR Art. 4 personal data; `ota_change_window_enabled_by` is FORM staff UUID (internal DPA) — not enterprise employee identifier. §50.8 SOC 2: CC3.2 (`compliance_officer_approval_ref` + `ota_change_window_enabled_by` column chain); A1.1 (`ota_slo_variant` drives AL-MOBILE-05 dynamic threshold); CC7.2 (`chk_ota_slo_variant_consistency` DDL prevention); CC9.2 (mdm_platform + enabled_by + enabled_at activation audit trail). OTA-WINDOW-E-001 evidence artefact (CC3.2/A1.1, annual + per-activation, 7yr) — full spec `docs/OBSERVABILITY.md §66.8`; registration pending `docs/SOC2_READINESS.md §79.4` (P1/M13). TOC updated (§50 added). Document header v1.40 → v1.41. Cross-references: `docs/OBSERVABILITY.md §66` (canonical spec; §66.4 migration 0091 DDL; §66.9 item 1 [x] Done 2026-07-01); `docs/AUDIT_LOG_SCHEMA.md §Mobile OTA Change Window events` (v2.67 — `mobile.ota_change_window_updated` HIGH/7yr + OTA-WINDOW-CHAIN-01); `docs/ENTERPRISE_SLA.md §3.10` (MOBILE-SLO-06 Standard/Premium-MDM variants); `docs/DATA_MODEL.md §16` (`tenants` baseline DDL — sole table modified by migration 0091); `docs/DECISION_LOG.md DEC-090` (formal decision record 2026-07-01). Owner: enterprise-architect + compliance-officer.*
 
 *v1.39 (2026-06-30): §49.9 item 7 + §49.10 cross-reference closure — REGION-E-001 registered in `docs/SOC2_READINESS.md §139` (v3.65.0, 2026-06-30): PI1.1/CC6.7/P5.1/C1.1, §79.4 count 107 → 108, `compliance/evidence/data-residency/` R2 subfolder, Vanta mirror entry. §49.9 item 7 status updated `[ ]` → `[x] Done`. §49.10 row 1 status updated 🟡 Pending → 🟢 Done. Document header v1.38 → v1.39. No schema changes. Owner: compliance-officer + enterprise-architect.*
 

@@ -1,4 +1,4 @@
-# FORM · Enterprise Service Level Agreement v1.2
+# FORM · Enterprise Service Level Agreement v1.3
 
 > Customer-facing SLA Terms. Attached to the Master Service Agreement (MSA) as **Exhibit B — Service Level Agreement**.
 > Owner: `compliance-officer` + `enterprise-architect`. Review: annually or after any P0 incident that results in a credit dispute.
@@ -231,6 +231,37 @@ SSO-SLO-01b distinguishes correlated platform failure (e.g., Cloudflare Worker b
 SOC 2 evidence artefact: **SSO-FLEET-E-001** (CC7.2/CC7.3 — quarterly PagerDuty export of AL-SSO-FLEET-01 firings; first filing M11). Full specification: `docs/OBSERVABILITY.md §49`. Implementation: pg_cron job 36 (`sso_fleet_health_check`, `*/5 * * * *`, `form_audit` role).
 
 *(OQ-SLA-01 resolved — see §18.)*
+
+---
+
+### 3.10 EAS OTA Update Delivery (MOBILE-SLO-06)
+
+> **Authoritative specification:** `docs/OBSERVABILITY.md §66` (v5.12.0, 2026-07-01) — DEC-090. Migration 0091: `docs/DATA_MODEL.md §50`.
+
+FORM delivers EAS OTA update bundles from bundle publication to device-side installation confirmation. Two variants apply depending on the tenant's MDM configuration:
+
+| Variant | `ota_slo_variant` | SLO | Eligibility |
+|---|---|---|---|
+| **Standard** | `'48h'` | ≤ **48 hours** from bundle publication | All tenants (`ota_change_window_enabled = FALSE`, default) |
+| **Premium-MDM** | `'168h'` | ≤ **7 calendar days** (168 hours) from bundle publication | Tenants with Addendum 7 opt-in (`ota_change_window_enabled = TRUE`); requires MDM change-window cycle ≤ 7 days + compliance-officer approval |
+
+**Measurement:** Delivery window is measured from `ota_update_events.event_type = 'published'` timestamp to `ota_update_events.event_type = 'installed'` timestamp per device. Alert rule AL-MOBILE-05 applies the per-tenant dynamic SLO threshold (`CASE WHEN tenants.ota_change_window_enabled THEN 168 ELSE 48 END AS slo_hours`).
+
+**Premium-MDM opt-in conditions (all required):**
+1. Tenant MDM change-control cycle ≤ 7 calendar days (Intune / Jamf Pro / Workspace ONE / other).
+2. Addendum 7 (Premium-MDM SLO Schedule) signed and attached to the Master Service Agreement.
+3. Compliance-officer approval reference (`compliance_officer_approval_ref`) provided at activation.
+4. Activation via FORM staff API endpoint only (`POST /internal/tenant/{slug}/ota-change-window`; Cloudflare Access form-staff gate). Enterprise tenant admins cannot self-activate.
+
+**Exclusions:** This SLO applies only to devices enrolled in FORM's MDM-managed deployment path. Personally-owned devices (BYOD) outside MDM management are excluded from MOBILE-SLO-06 measurement. Tenants with MDM change-control cycles > 7 calendar days are not eligible for the Premium-MDM variant.
+
+**Credits:** MOBILE-SLO-06 breaches are credited under §5 (Service Credits) at the Standard tier credit rate. Premium-MDM tenants who experience delivery outside the 168h window are credited at the Premium tier credit rate.
+
+**DEC-030 audit event:** Every change to the OTA change-window flag produces a `mobile.ota_change_window_updated` HIGH/7yr DEC-030 HMAC-chained event. OTA-WINDOW-CHAIN-01 ordering invariant: double-enable is rejected (HTTP 422 `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED`); activation without approval ref is rejected (HTTP 422 `OTA_WINDOW_CHAIN_01_APPROVAL_REF_MISSING`). Full event schema: `docs/AUDIT_LOG_SCHEMA.md §Mobile OTA Change Window events` (v2.67).
+
+**SOC 2 evidence:** OTA-WINDOW-E-001 (CC3.2/A1.1, annual + per-activation, 7yr, `compliance/evidence/ota-change-window/`). CC3.2: MDM risk formally assessed with compliance-officer sign-off before each Premium-MDM exception. A1.1: MOBILE-SLO-06 availability commitments calibrated to MDM context; DEC-030 chain export confirms every Premium-MDM tenant has approval ref at activation.
+
+*(MOBILE-SLO-06 registered v1.3 — 2026-07-01. Closes `docs/OBSERVABILITY.md §66.9` item 6 (P1/M12).)*
 
 ---
 
@@ -606,6 +637,8 @@ All events carry `tenant_id`, `actor_id`, `actor_type`, timestamp, and HMAC chai
 *v1.0 · 2026-06-06 · enterprise-builder cloud worker*
 
 *v1.1 · 2026-06-13 · enterprise-builder cloud worker — §3.6 update (OQ-SLA-02 resolved: auto-apply for all tiers; Starter Manual Credit Mode opt-in added); §3.7 new (OQ-SLA-03 resolved: SCIM deprovisioning latency SLA — P99 < 60 s session revocation; breach threshold > 5 min triggers P1 incident; probe S-014 with AL-SCIM-LAT-01/02); §16 updated (CC6.4, P8.1 added); §19 new (DSAR and Data Portability SLAs: 24-hour DSAR provision commitment, 30-day erasure certificate, self-serve Art. 20 portability, offboarding export window, five DEC-030 DSAR events). References: `docs/DATA_MODEL.md §30.2` (pseudonymisation on erasure), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 schema), `docs/ENTERPRISE.md` (Privacy Floor), `docs/INCIDENT_RESPONSE.md` (P1 incident classification), `docs/OBSERVABILITY.md §23` (SLA measurement spec). SOC 2 CC6.4 + P8.0 + P8.1 evidence.*
+
+*v1.3 · 2026-07-01 · enterprise cloud worker — §3.10 new (MOBILE-SLO-06 EAS OTA Update Delivery: Standard ≤ 48h (default, all tenants `ota_change_window_enabled = FALSE`) and Premium-MDM ≤ 7 calendar days / 168h (Addendum 7 opt-in, `ota_change_window_enabled = TRUE`, compliance-officer approval + MDM cycle ≤ 7d required); two-row variant table (Standard/Premium-MDM with `ota_slo_variant`, SLO, eligibility columns); measurement from `ota_update_events.event_type = 'published'` to `'installed'` per device; AL-MOBILE-05 dynamic threshold (`CASE WHEN tenants.ota_change_window_enabled THEN 168 ELSE 48 END`); four Premium-MDM opt-in conditions (MDM cycle ≤ 7d, Addendum 7 signed, compliance_officer_approval_ref non-null, form-staff Cloudflare Access activation only); BYOD exclusion note; credit schedule (Standard/Premium tier credit rates under §5); DEC-030 event `mobile.ota_change_window_updated` HIGH/7yr + OTA-WINDOW-CHAIN-01 two HTTP 422 codes; SOC 2 OTA-WINDOW-E-001 CC3.2/A1.1). Closes `docs/OBSERVABILITY.md §66.9` item 6 (P1/M12). Cross-references: `docs/OBSERVABILITY.md §66` (canonical spec — DEC-090); `docs/DATA_MODEL.md §50` (migration 0091); `docs/AUDIT_LOG_SCHEMA.md §Mobile OTA Change Window events` (v2.67); `docs/DECISION_LOG.md DEC-090`. compliance-officer + enterprise-architect.*
 
 *v1.2 · 2026-06-26 · enterprise-builder cloud worker — §3.8 new (CAEP/SSF Real-Time Session Control SLA: < 60 s commitment for PUSH-capable IdPs Okta/Entra ID/Google Workspace; Addendum 6 opt-in via Order Form; baseline JWT TTL ≤ 15 min for all tenants — no addendum required; AL-CAEP-03 dead-man's switch 4h; DEC-030 events sso.caep_event_received STANDARD 7yr + sso.caep_session_revoked HIGH 7yr + sso.caep_stream_health_breach HIGH 3yr + sso.caep_reregistration_queued STANDARD 7yr; CC6-E-CAEP-002 SOC 2 evidence artefact CC6.3 quarterly; excludes IdP PUSH delivery outages per §5; auto cert-rotation stream re-registration per DEC-072); §3.9 new (SSO Login Availability per-tenant SSO-SLO-01: ≥ 99% success rate 15-min rolling window with per-tenant SLA credit; fleet companion SSO-SLO-01b ≥ 3 tenants breach simultaneously → AL-SSO-FLEET-01 P1 IC + security-engineer — operational only, sla_credit_impact: 'none' hard invariant DEC-073; DEC-030 siem.sso_fleet_health_breach HIGH 3yr; SSO-FLEET-E-001 artefact CC7.2/CC7.3 quarterly M11+); §16 updated (CC6.3 added for CAEP/RISC revocation; CC7.2 updated for SSO-SLO-01b + SSO-FLEET-E-001; CC7.3 updated for AL-CAEP-03 + AL-SSO-FLEET-01 escalation paths); §17 updated (items 11–12 P1: CAEP pilot stream validation + AL-CAEP-03 confirmation, pg_cron job 36 validation + AL-SSO-FLEET-01 routing + SSO-FLEET-E-001 template); §18 OQ-SLA-01 marked 🟢 RESOLVED (per DEC-073 2026-06-20: per-tenant SSO-SLO-01, fleet SSO-SLO-01b, docs/OBSERVABILITY.md §49). Cross-references: docs/MSA_TEMPLATE.md §Addendum 6 (CAEP SLA contract language); docs/SSO_SCIM_IMPLEMENTATION.md §23 (CAEP/SSF architecture); docs/ENTERPRISE_ONBOARDING.md §2.3 (CAEP IdP prerequisite checklist); docs/OBSERVABILITY.md §49 (SSO-SLO-01/SSO-SLO-01b implementation); docs/DECISION_LOG.md DEC-072 (CAEP PUSH mandatory); docs/DECISION_LOG.md DEC-073 (per-tenant SSO-SLO-01 adoption). compliance-officer + enterprise-architect.*
 

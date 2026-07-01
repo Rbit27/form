@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.66
+# FORM · Audit Log Schema v2.67
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -322,6 +322,53 @@ const MobileReplayTierViolation = z.object({
 | **REPLAY-E-003** | CC7.2, P1.1 | Quarterly export of `mobile.replay_tier_violation` DEC-030 events; zero-event quarters filed as affirmative attestation confirming Art. 9 data was not captured in breach of FORM's privacy notice | Quarterly | 7 yr |
 
 **Auditor narrative for CC6.7:** FORM's Sentry session replay is gated by a four-layer defence-in-depth model (defined in `docs/OBSERVABILITY.md §46.9`). Layer 4 of this model is the DEC-030 HMAC chain: `mobile.replay_config_updated` records every enablement and disable action with Linear ticket traceability, and `mobile.replay_tier_violation` (expected steady-state count: zero) provides an auditable monitoring signal for any gate-bypass attempt. The REPLAY-CHAIN-01 invariant enforces temporal ordering — chain evidence must precede Sentry data. REPLAY-E-001 (per-debug-window configuration record + zero-violation confirmation) and REPLAY-E-003 (quarterly zero-event attestation) are the primary SOC 2 artefacts for CC6.7 and CC7.2/P1.1 respectively, as defined in `docs/SOC2_READINESS.md §86`.
+
+---
+
+### Mobile OTA Change Window events (DEC-030 HMAC-chained · OBSERVABILITY §66 · DEC-090 · SOC 2 A1.1/CC3.2/CC7.2/CC9.2)
+
+> Defined in `docs/OBSERVABILITY.md §66.6` (v5.12.0, 2026-07-01 — DEC-090 OQ-MOBILE-01 resolution). One event covering the per-tenant EAS OTA change-window exception flag lifecycle. Enterprise tier only. **Privacy floor:** No employee `user_id`, name, email, health data, coaching content, device identifiers, or individual OTA adoption rates in any payload. `tenant_id` is always an org slug, never a UUID. `changed_by_form_staff_id` is a FORM staff internal UUID — not an enterprise employee identifier. IT contact information is stored in CRM only, never in FORM's Postgres DB. **OTA-WINDOW-CHAIN-01 invariant:** Two conditions enforced by the `emit-audit-event` Worker: (1) if `new_enabled: true` and a prior `mobile.ota_change_window_updated` event already records `new_enabled: true` for the same `tenant_id` with no intervening `new_enabled: false` → HTTP 422 `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED`; (2) if `new_enabled: true` and `compliance_officer_approval_ref` is null or empty → HTTP 422 `OTA_WINDOW_CHAIN_01_APPROVAL_REF_MISSING`. Cross-ref: `docs/OBSERVABILITY.md §66` (authoritative spec — DEC-090, migration 0091, AL-MOBILE-05 dynamic threshold, five-step CSM protocol, SOC 2 mapping); `docs/DATA_MODEL.md §50` (migration 0091 DDL — four `tenants` columns + `chk_ota_slo_variant_consistency`); `docs/ENTERPRISE_SLA.md §3.10` (MOBILE-SLO-06 Standard 48h / Premium-MDM 7d variants); `docs/DECISION_LOG.md DEC-090`; `docs/ENTERPRISE_ONBOARDING.md` (CSM five-step protocol — pending P1/M12); `docs/SOC2_READINESS.md` (OTA-WINDOW-E-001 evidence artefact — pending P1/M13). **Closes `docs/OBSERVABILITY.md §66.11` item 2 (P1/M12 — register `mobile.ota_change_window_updated` in AUDIT_LOG_SCHEMA.md §Mobile namespace before M12 enterprise deploy).**
+
+| Event type | Severity | Retention | Payload fields | Trigger |
+|---|---|---|---|---|
+| `mobile.ota_change_window_updated` | **HIGH** | 7 yr | `event: 'mobile.ota_change_window_updated'`, `tenant_id` (org slug — **never UUID**), `previous_enabled` (bool), `new_enabled` (bool), `previous_slo_variant` (enum: `'48h'` \| `'168h'`), `new_slo_variant` (enum: `'48h'` \| `'168h'`), `mdm_platform` (optional enum: `'intune'` \| `'jamf_pro'` \| `'workspace_one'` \| `'other'`), `compliance_officer_approval_ref` (string — Linear/Notion ticket ref; required when `new_enabled: true`; null allowed when disabling), `changed_by_form_staff_id` (UUID — FORM staff only; **never enterprise employee identifier**), `changed_at` (ISO 8601 datetime) | CSM-activated `POST /internal/tenant/{slug}/ota-change-window` (form-staff Cloudflare Access only); emitted by `emit-audit-event` Worker before flag write completes — fail-closed |
+
+**HMAC chain requirement:** `mobile.ota_change_window_updated` is HIGH severity; must include `prev_hash`. Emitter: internal CSM endpoint `POST /internal/tenant/{slug}/ota-change-window` (`form_system`, on behalf of authenticated FORM staff initiating the §66.7 five-step protocol). OTA-WINDOW-CHAIN-01 violations return HTTP 422 before any flag write or chain append — fail-safe order: validate invariant → 422 if violated / chain-append → flag-write if valid.
+
+**Emitter assignment:** Internal CSM endpoint (form-staff Cloudflare Access only). `form_api` has NO access to this endpoint. Consumer builds never emit this event — OTA change-window exception is enterprise-only.
+
+```typescript
+// mobile.ota_change_window_updated — per-tenant EAS OTA change-window exception flag (HIGH, 7yr)
+// OTA-WINDOW-CHAIN-01: fail-closed — HTTP 422 on double-enable or missing approval ref
+const OtaChangeWindowUpdatedSchema = z.object({
+  event:                           z.literal('mobile.ota_change_window_updated'),
+  tenant_id:                       z.string(),                            // org slug — never UUID or employee PII
+  previous_enabled:                z.boolean(),
+  new_enabled:                     z.boolean(),
+  previous_slo_variant:            z.enum(['48h', '168h']),
+  new_slo_variant:                 z.enum(['48h', '168h']),
+  mdm_platform:                    z.enum(['intune', 'jamf_pro', 'workspace_one', 'other']).optional(),
+  compliance_officer_approval_ref: z.string().nullable(),                 // required (non-null) when new_enabled === true
+  changed_by_form_staff_id:        z.string().uuid(),                     // FORM staff UUID — never enterprise employee identifier
+  changed_at:                      z.string().datetime(),
+  // No employee name, email, health data, device identifiers, or individual OTA adoption rates
+});
+```
+
+**OTA-WINDOW-CHAIN-01 invariant — two HTTP 422 error codes:**
+
+| Code | Condition | Resolution |
+|---|---|---|
+| `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED` | `new_enabled: true` and prior chain record shows `new_enabled: true` for this `tenant_id` with no intervening `new_enabled: false` | CSM must first issue `new_enabled: false` call with new compliance-officer sign-off; then re-enable |
+| `OTA_WINDOW_CHAIN_01_APPROVAL_REF_MISSING` | `new_enabled: true` and `compliance_officer_approval_ref` is null or empty | Compliance-officer must create Linear/Notion approval ticket first; ref required in payload |
+
+**SOC 2 evidence mapping:**
+
+| Artefact | Criteria | Description | Cadence | Retention |
+|---|---|---|---|---|
+| **OTA-WINDOW-E-001** | CC3.2, A1.1 | Annual export of all `mobile.ota_change_window_updated` chain records; confirms every Premium-MDM `new_enabled: true` record has a non-null `compliance_officer_approval_ref`; zero-activation years filed as affirmative attestation confirming no MDM exception was granted without compliance-officer review; stored at `compliance/evidence/ota-change-window/OTA-WINDOW-E-001_<YYYY>.jsonl` | Annual + per-activation | 7 yr |
+
+**Auditor narrative for CC3.2 / A1.1:** The OTA-WINDOW-CHAIN-01 invariant ensures no tenant can receive the 7-day MOBILE-SLO-06 variant without documented compliance-officer approval — `compliance_officer_approval_ref` is validated before any flag write and permanently recorded in the HIGH-severity HMAC chain. OTA-WINDOW-E-001 (annual + per-activation) provides auditor-inspectable proof that every Premium-MDM exception was risk-assessed per CC3.2 and that availability commitments were appropriately calibrated to context per A1.1. Full specification: `docs/OBSERVABILITY.md §66`.
 
 ---
 
@@ -4778,6 +4825,8 @@ const NrrBridgeFilingMonitorRestoredSchema = z.object({
 **SOC 2 evidence:** FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr) — registered in `docs/SOC2_READINESS.md §137`. Per-activation: export of both stale/restored events for each R-53 activation. Annual zero-count: if no activations in the year, compliance-officer files an affirmative attestation confirming `R-53 activation count = 0` for the year with a supporting `pg_cron.job_run_details` health export for jobs 56 and 57.
 
 **Retention table additions:** `system.fleet_mat_chain_monitor_stale_declared` HIGH 7yr CC4.1/A1.1; `system.fleet_mat_chain_monitor_restored` LOW 3yr CC4.1; `system.nrr_bridge_filing_monitor_stale_declared` HIGH 7yr CC4.1/A1.1; `system.nrr_bridge_filing_monitor_restored` LOW 3yr CC4.1.
+
+*v2.67 (2026-07-01): +1 `mobile.*` event — `mobile.ota_change_window_updated` HIGH/7yr — closes `docs/OBSERVABILITY.md §66.9` item 2 (P1/M12). New section `### Mobile OTA Change Window events (DEC-030 HMAC-chained · OBSERVABILITY §66 · DEC-090 · SOC 2 A1.1/CC3.2/CC7.2/CC9.2)` inserted after `### Mobile Session Replay events`. `OtaChangeWindowUpdatedSchema` Zod v2 (ten fields: `event`, `tenant_id` slug, `previous_enabled`, `new_enabled`, `previous_slo_variant`, `new_slo_variant`, `mdm_platform` optional enum, `compliance_officer_approval_ref` nullable string, `changed_by_form_staff_id` UUID, `changed_at` ISO-8601). OTA-WINDOW-CHAIN-01 two HTTP 422 invariants (enforced at `emit-audit-event` Worker layer): `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED` (double-enable: `new_enabled = true` when prior chain entry has `new_enabled = true` for same `tenant_id`); `OTA_WINDOW_CHAIN_01_APPROVAL_REF_MISSING` (`new_enabled = true` but `compliance_officer_approval_ref = null`). Emitter: compliance-officer or FORM staff (PAM-elevated) via `POST /internal/tenant/{slug}/ota-change-window` (form-staff Cloudflare Access only) — not automated. SOC 2 evidence: OTA-WINDOW-E-001 (CC3.2/A1.1, annual + per-activation, 7yr, `compliance/evidence/ota-change-window/`); zero-activation attestation pattern (compliance-officer files affirmative attestation if no activations in the year). Four SOC 2 auditor narratives: CC3.2 (MDM risk formally assessed with compliance-officer sign-off; per-tenant exception flag + approval ref chain; DEC-030 HMAC chain is tamper-evident evidence of formal risk review at every activation); A1.1 (availability commitments calibrated to MDM context; 48h Standard vs 168h Premium-MDM; DEC-030 chain export confirms every Premium-MDM tenant has non-null approval ref — no unapproved exception possible); CC7.2 (AL-MOBILE-05 per-tenant dynamic threshold — `ota_slo_variant` field provides PagerDuty-auditable link from exception flag to SLO hours; every exception activation produces HIGH/7yr chain-anchored evidence); CC9.2 (`mdm_platform` field provides MDM vendor fleet visibility for supply-chain risk assessment — auditor can verify fleet MDM composition from chain export). Retention table: +1 row (`mobile.ota_change_window_updated` HIGH 7yr CC3.2/A1.1/CC7.2/CC9.2). Privacy floor: `tenant_id` is org slug only — never UUID or employee PII; `changed_by_form_staff_id` is a FORM staff internal UUID — not an enterprise employee identifier; no employee name, email, health data, device identifiers, or individual OTA adoption rates; `form_api` REVOKED from `tenants.ota_change_window_enabled`, `ota_slo_variant`, `ota_change_window_enabled_at`, `ota_change_window_enabled_by` (migration 0091 selective GRANT). Document header v2.66 → v2.67. Cross-references: `docs/OBSERVABILITY.md §66` (canonical spec — OTA-WINDOW-CHAIN-01 formal invariant; §66.6 Zod schema; §66.9 item 2 [x] Done 2026-07-01); `docs/DATA_MODEL.md §50` (migration 0091 — four columns + `chk_ota_slo_variant_consistency` DDL CHECK); `docs/ENTERPRISE_SLA.md §3.10` (MOBILE-SLO-06 Standard/Premium-MDM variants); `docs/DECISION_LOG.md DEC-090` (formal decision record — hybrid Option B + modified C; 2026-07-01); DEC-030. Owner: compliance-officer + security-engineer.*
 
 *v2.66 (2026-06-30): `QbrCompletedPayload` extended — `fehs_score_at_qbr` (z.number().min(0).max(100).optional()) and `fehs_breakdown` (z.object with six signal scores, optional) added per DEC-089 / COST_MODEL §52. New FEHS-CHAIN-01 Worker invariant: score + breakdown must be co-present (HTTP 422 `FEHS_CHAIN_01_BREAKDOWN_REQUIRED` / `FEHS_CHAIN_01_SCORE_REQUIRED`); |weighted_sum − fehs_score_at_qbr| ≤ 0.5 (HTTP 422 `FEHS_CHAIN_01_SCORE_MISMATCH`). Worker check order: QBR-PRIV-01 → FEHS-CHAIN-01 → Zod validation. Both fields optional now; mandatory at M10 Admin Console modal launch (Admin Console auto-populates from latest `enterprise.health_score_updated`). Privacy floor: all six signals are tenant-aggregate only — `activation_pct`, `wau_pct`, `seat_utilisation_pct`, `exec_engagement_score`, `support_volume_inverse`, `renewal_distance_score`; no individual `user_id`, name, email, or health value; k-floor inherited from QBR-K-ANON-01 Tier 1 (k ≥ 5, §51). Closes COST_MODEL.md §52.6 obligation (P0 this pass). Document header v2.65 → v2.66. Owner: compliance-officer + data-engineer + security-engineer.*
 

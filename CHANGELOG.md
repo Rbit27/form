@@ -1,5 +1,24 @@
 # Changelog · FORM
 
+## [10.75.0] — 2026-07-01
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §Mobile OTA Change Window events` — new section with `mobile.ota_change_window_updated` HIGH/7yr DEC-030 HMAC-chained event. `OtaChangeWindowUpdatedSchema` Zod v2 (ten fields). OTA-WINDOW-CHAIN-01 ordering invariant: two HTTP 422 codes (`OTA_WINDOW_CHAIN_01_ALREADY_ENABLED`, `OTA_WINDOW_CHAIN_01_APPROVAL_REF_MISSING`). Four SOC 2 auditor narratives (CC3.2/A1.1/CC7.2/CC9.2). OTA-WINDOW-E-001 evidence artefact reference. Privacy floor: `tenant_id` org slug only; `changed_by_form_staff_id` FORM-internal UUID; no enterprise employee identifier. Closes `docs/OBSERVABILITY.md §66.9` item 2 (P1/M12).
+- `docs/DATA_MODEL.md §50` — `tenants` OTA Change Window Columns — Migration 0091 (DEC-090). Four columns: `ota_change_window_enabled BOOLEAN NOT NULL DEFAULT FALSE`, `ota_slo_variant VARCHAR(10) NOT NULL DEFAULT '48h' CHECK (IN '48h'|'168h')`, `ota_change_window_enabled_at TIMESTAMPTZ`, `ota_change_window_enabled_by UUID`. `chk_ota_slo_variant_consistency` DDL CHECK prevents `(enabled=TRUE, slo_variant='48h')`. `form_api` REVOKED from all four columns. §50.3 full DDL + §50.4 nine-item staging validation checklist + §50.6 RLS + §50.7 privacy floor + §50.8 SOC 2 mapping + §50.10 cross-reference obligations. Migration dependency chain: 0083→…→0090→0091. Closes `docs/OBSERVABILITY.md §66.9` item 1 (P1/M12).
+- `docs/ENTERPRISE_SLA.md §3.10` — MOBILE-SLO-06 EAS OTA Update Delivery SLA. Two variants: Standard ≤ 48h (`ota_change_window_enabled = FALSE`, default, all tenants) and Premium-MDM ≤ 7 calendar days / 168h (Addendum 7 opt-in, `ota_change_window_enabled = TRUE`, compliance-officer approval required). Measurement, opt-in conditions, BYOD exclusion, credits, DEC-030 audit event ref, OTA-WINDOW-E-001 SOC 2 evidence. Closes `docs/OBSERVABILITY.md §66.9` item 6 (P1/M12).
+- `content/post-2901-error-asymmetry-training-decisions.md` — Editorial series post 2901. «Асиметрія помилок: чому «зробив занадто мало» і «зробив занадто багато» мають різну ціну». Серія «Якість тренувального рішення» 2896–2905 (6/10). Асиметрія вартості двох типів тренувальних помилок: Тип I (зробив зайве — накопичена перевтома, можлива травма, нелінійна відкидка назад) vs. Тип II (зробив замало — невидима в реальному часі, але накопичується повільно як платó і зміщення калібрування RPE). Три контексти, де асиметрія перевертається: базовий блок, повернення після хвороби, освоєння нової техніки. Зв'язок з попередніми постами про когнітивні спотворення. Практичне правило: не симетрична середина, а контекстна оцінка. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-2901 картка додана вгорі фіду.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — header updated v2.66 → v2.67.
+- `docs/DATA_MODEL.md` — header updated v1.40 → v1.41; TOC entry §50 added.
+- `docs/ENTERPRISE_SLA.md` — header updated v1.2 → v1.3.
+- `docs/OBSERVABILITY.md` — header updated v5.12.0 → v5.12.1; §66.11 cross-reference table: four rows updated from 🟡 Pending P1/M12 → 🟢 Done (AUDIT_LOG_SCHEMA §Mobile, DATA_MODEL, ENTERPRISE_SLA, DECISION_LOG DEC-090).
+- `STATUS.md` — series «Якість тренувального рішення» 2896–2905 прогрес 5/10 → 6/10; next: post-2902.
+- `VERSION` — 10.74.1 → 10.75.0.
+
+---
+
 ## [10.74.1] — 2026-07-01
 
 ### Changed
