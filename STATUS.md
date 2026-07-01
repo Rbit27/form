@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.76.0** — 2026-07-01 · post-2902 · «Інформація, яку ти ігноруєш — структурні сліпі зони в тренувальному журналі» · series «Якість тренувального рішення» 2896–2905 (7/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2902 · next: post-2903 («Структурні питання для ретроспективного аналізу тренувального блоку»)
+
 **v10.75.0** — 2026-07-01 · enterprise: AUDIT_LOG_SCHEMA §Mobile OTA Change Window events (v2.67) + DATA_MODEL §50 migration 0091 (v1.41) + ENTERPRISE_SLA §3.10 MOBILE-SLO-06 (v1.3) + OBSERVABILITY §66.11 cross-refs Done (v5.12.1) · post-2901 «Асиметрія помилок: чому «зробив занадто мало» і «зробив занадто багато» мають різну ціну» · series «Якість тренувального рішення» 2896–2905 (6/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · next: post-2902
 
 **v10.74.0** — 2026-07-01 · post-2900 · «Системна помилка в тренувальних рішеннях — як self-coached атлети програмують власні когнітивні пастки» · series «Якість тренувального рішення» 2896–2905 (5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2900 · next: post-2901 («Асиметрія помилок: чому «зробив занадто мало» і «зробив занадто багато» мають різну ціну»)
