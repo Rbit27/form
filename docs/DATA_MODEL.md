@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.41
+# FORM · Multi-Tenant Data Model v1.42
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -18625,7 +18625,7 @@ IT contact (MDM admin) stored in CRM only — never in `enterprise_contracts.not
 | **CC7.2** | `chk_ota_slo_variant_consistency` DDL CHECK prevents silent SLO misconfiguration at DB layer |
 | **CC9.2** | `mdm_platform` field in `mobile.ota_change_window_updated` provides MDM vendor fleet visibility; `ota_change_window_enabled_by` + `_at` provide activation audit trail |
 
-SOC 2 evidence artefact: **OTA-WINDOW-E-001** (CC3.2/A1.1, annual + per-activation, 7yr, `compliance/evidence/ota-change-window/`) — full spec in `docs/OBSERVABILITY.md §66.8`; registration pending `docs/SOC2_READINESS.md §79.4` (P1/M13).
+SOC 2 evidence artefact: **OTA-WINDOW-E-001** (CC3.2/A1.1, annual + per-activation, 7yr, `compliance/evidence/ota-change-window/`) — full spec in `docs/OBSERVABILITY.md §66.8`; registered in `docs/SOC2_READINESS.md §79.4` (§140, v3.66.0, 2026-07-01).
 
 ### §50.9 Implementation Checklist
 
@@ -18633,7 +18633,7 @@ SOC 2 evidence artefact: **OTA-WINDOW-E-001** (CC3.2/A1.1, annual + per-activati
 - [ ] **P0** — Production deploy before M12 enterprise GA
 - [ ] **P1/M12** — `POST /internal/tenant/{slug}/ota-change-window` Worker endpoint + OTA-WINDOW-CHAIN-01 integration test
 - [ ] **P1/M12** — AL-MOBILE-05 SQL update (`JOIN tenants t ON t.slug = oe.tenant_id` + `CASE WHEN ota_change_window_enabled THEN 168 ELSE 48 END AS slo_hours`) + staging validation
-- [ ] **P1/M13** — `docs/SOC2_READINESS.md §79.4` OTA-WINDOW-E-001 registration (§66.9 item 8 — deferred)
+- [x] **P1/M13** — `docs/SOC2_READINESS.md §79.4` OTA-WINDOW-E-001 registration (§66.9 item 8 — **Done: SOC2_READINESS §140, v3.66.0, 2026-07-01**)
 
 ### §50.10 Cross-Reference Obligations
 
@@ -18644,9 +18644,11 @@ SOC 2 evidence artefact: **OTA-WINDOW-E-001** (CC3.2/A1.1, annual + per-activati
 | `docs/OBSERVABILITY.md §66.11` — cross-reference table update | §66.11 (P1/M12) | 🟢 **Done — OBSERVABILITY.md v5.12.1, 2026-07-01** |
 | Migration 0091 staging apply + nine checks | §50.9 (P0) | 🟡 **Pending — staging deploy** |
 | `POST /internal/tenant/{slug}/ota-change-window` Worker implementation | §50.9 (P1/M12) | 🟡 **Pending — Worker implementation** |
-| `docs/SOC2_READINESS.md §79.4` OTA-WINDOW-E-001 | §66.9 item 8 (P1/M13) | 🟡 **Pending — next iteration** |
+| `docs/SOC2_READINESS.md §79.4` OTA-WINDOW-E-001 | §66.9 item 8 (P1/M13) | 🟢 **Done — SOC2_READINESS.md §140 (v3.66.0, 2026-07-01)** |
 
 ---
+
+*v1.42 (2026-07-01): §50.9 item 5 + §50.10 cross-reference closure — OTA-WINDOW-E-001 registered in `docs/SOC2_READINESS.md §140` (v3.66.0, 2026-07-01): CC3.2/A1.1, per-activation + annual + zero-activation nil attestation, 7yr, `compliance/evidence/ota-change-window/`; §80.3 R2 subfolder `ota-change-window/` (WORM 7yr, `form_api` NO ACCESS); §80.4 Vanta mirror entry. §50.9 item 5 status updated `[ ]` → `[x] Done`. §50.10 row 6 status updated 🟡 Pending → 🟢 Done. §50.8 OTA-WINDOW-E-001 "registration pending" note updated to "registered". Document header v1.41 → v1.42. No schema changes. Owner: compliance-officer + enterprise-architect.*
 
 *v1.41 (2026-07-01): §50 `tenants` OTA Change Window Columns — Migration 0091 — closes `docs/OBSERVABILITY.md §66.9` item 1 (P1/M12). Four columns on `tenants`: `ota_change_window_enabled BOOLEAN NOT NULL DEFAULT FALSE` (per-tenant MDM exception flag; Standard MOBILE-SLO-06 = 48h when FALSE; Premium-MDM MOBILE-SLO-06 = 168h when TRUE; Addendum 7 opt-in + compliance-officer approval required); `ota_slo_variant VARCHAR(10) NOT NULL DEFAULT '48h' CHECK (IN '48h'|'168h')` (SLO tier enum co-consistent with enabled flag via DDL CHECK); `ota_change_window_enabled_at TIMESTAMPTZ` (activation timestamp; NULL when disabled); `ota_change_window_enabled_by UUID` (FORM staff UUID — never enterprise employee identifier; NULL when disabled). `chk_ota_slo_variant_consistency` DDL CHECK: `NOT (ota_change_window_enabled = TRUE AND ota_slo_variant = '48h')` — makes inconsistent state structurally impossible. `form_api` REVOKED from all four columns via selective column-level REVOKE (write path: `form_system` only). Migration dependency chain: 0083→…→0090→0091. Nine-item staging validation checklist (evidence path: `compliance/evidence/ota-change-window/migration-0091-validation_<YYYY-MM-DD>.txt`). §50.6 RLS: `form_api` SELECT only (AL-MOBILE-05 JOIN); `form_system` ALL; `form_admin`/`compliance_reviewer` SELECT; `tenant_owner`/`tenant_admin`/`tenant_manager` SELECT own row (ota_change_window_enabled/ota_slo_variant — contractual IT metadata). §50.7 privacy floor: `ota_change_window_enabled` + `ota_slo_variant` are technical config flags, not GDPR Art. 4 personal data; `ota_change_window_enabled_by` is FORM staff UUID (internal DPA) — not enterprise employee identifier. §50.8 SOC 2: CC3.2 (`compliance_officer_approval_ref` + `ota_change_window_enabled_by` column chain); A1.1 (`ota_slo_variant` drives AL-MOBILE-05 dynamic threshold); CC7.2 (`chk_ota_slo_variant_consistency` DDL prevention); CC9.2 (mdm_platform + enabled_by + enabled_at activation audit trail). OTA-WINDOW-E-001 evidence artefact (CC3.2/A1.1, annual + per-activation, 7yr) — full spec `docs/OBSERVABILITY.md §66.8`; registration pending `docs/SOC2_READINESS.md §79.4` (P1/M13). TOC updated (§50 added). Document header v1.40 → v1.41. Cross-references: `docs/OBSERVABILITY.md §66` (canonical spec; §66.4 migration 0091 DDL; §66.9 item 1 [x] Done 2026-07-01); `docs/AUDIT_LOG_SCHEMA.md §Mobile OTA Change Window events` (v2.67 — `mobile.ota_change_window_updated` HIGH/7yr + OTA-WINDOW-CHAIN-01); `docs/ENTERPRISE_SLA.md §3.10` (MOBILE-SLO-06 Standard/Premium-MDM variants); `docs/DATA_MODEL.md §16` (`tenants` baseline DDL — sole table modified by migration 0091); `docs/DECISION_LOG.md DEC-090` (formal decision record 2026-07-01). Owner: enterprise-architect + compliance-officer.*
 

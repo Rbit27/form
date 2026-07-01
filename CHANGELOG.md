@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [10.78.1] — 2026-07-01
+
+### Changed
+- `docs/DATA_MODEL.md` — §50.9 item 5 + §50.10 cross-reference closure: OTA-WINDOW-E-001 registration in `docs/SOC2_READINESS.md §79.4` fulfilled by §140 (v3.66.0, 2026-07-01). §50.9 item 5 `[ ]` → `[x] Done`. §50.10 row 6 🟡 Pending → 🟢 Done. §50.8 "registration pending" note updated to "registered". Document header v1.41 → v1.42.
+- `VERSION` — 10.78.0 → 10.78.1.
+
+---
+
 ## [10.78.0] — 2026-07-01
 
 ### Added
