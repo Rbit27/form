@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.10.3
+# FORM · Observability & Monitoring Taxonomy v5.12.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -7293,7 +7293,7 @@ Mobile performance events are emitted at fleet level. Individual crash reports l
 
 | OQ | Question | Owner | Resolution Target | Priority |
 |---|---|---|---|---|
-| OQ-MOBILE-01 | **EAS OTA adoption rate vs. enterprise MDM change windows.** MOBILE-SLO-06 (≥ 95% adoption within 48 h) may be unachievable for enterprise tenants whose IT teams enforce MDM change control windows (Intune, Jamf) that block OTA installs outside approved maintenance windows. Options: (a) make MOBILE-SLO-06 a FORM-internal SLO only, exclude from enterprise DPA; (b) define a per-tenant SLO exception flag in `tenants.ota_change_window_enabled`; (c) negotiate a 7-day adoption window for enterprise tenants on the Premium SLO tier. Decision needed before enterprise GA so CSM onboarding script is correct. | platform-engineer + customer-success | Before enterprise GA (M13) | **P2** |
+| OQ-MOBILE-01 | **🟢 Resolved — DEC-090 (2026-07-01). See §66.** Per-tenant `ota_change_window_enabled BOOLEAN DEFAULT FALSE` flag adopted; Standard MOBILE-SLO-06 = 48h (default); Premium-MDM variant = 7d for tenants with confirmed MDM change control policies. Flag activation requires CSM documentation + compliance-officer approval + `mobile.ota_change_window_updated` HIGH/7yr DEC-030 chain event. Migration 0091; AL-MOBILE-05 per-tenant dynamic threshold; OTA-WINDOW-CHAIN-01 ordering invariant; OTA-WINDOW-E-001 SOC 2 evidence artefact. | platform-engineer + customer-success | 🟢 **Resolved — DEC-090 (2026-07-01)** | **🟢 Closed** |
 | OQ-MOBILE-02 | **🟢 Resolved — DEC-063 (2026-06-17). See §46.** Tier S screen allowlist adopted (14 routes: SsoLogin, SsoCallback, OnboardingStep1–4, Subscription, BillingConfirmation, AdminDashboard, AdminDashboardTeamActivity, AppError, NetworkError, Settings, SsoSettings); `maskAllText: true` + `maskAllInputs: true` mandatory; enterprise on-demand replay via §46.5 CSM protocol; `mobile.replay_config_updated` + `mobile.replay_tier_violation` DEC-030 events; REPLAY-CHAIN-01 ordering invariant; clinical-safety sign-off gate for all allowlist changes. | clinical-safety + security-engineer | 🟢 **Resolved — DEC-063 (2026-06-17)** | **🟢 Closed** |
 | OQ-MOBILE-03 | **🟢 Resolved — DEC-059 (2026-06-14).** System browser mandated (`expo-web-browser openAuthSessionAsync` → `ASWebAuthenticationSession` on iOS / Chrome Custom Tabs on Android); embedded WebView prohibited. Security rationale: RFC 9700 §4.1 non-compliance, process-isolation failure, TLS-bypass risk, credential-manager incompatibility. All supported IdPs (Okta, Entra, Google, PingFederate, generic SAML) are compatible with system browser. Azure AD B2C SAML tenants must migrate to OIDC PKCE mode before mobile SSO enablement. Universal Links (iOS) / App Links (Android) preferred callback scheme over `form://` custom scheme. Two DEC-030 events: `sso.mobile_browser_mode_set` (STANDARD, 7yr) and `sso.mobile_webview_blocked` (HIGH, 7yr). Alert AL-SSO-WEB-01 (P1) fires on any WebView attempt in production. Full specification in `docs/SSO_SCIM_IMPLEMENTATION.md §30`. | security-engineer + platform-engineer | 🟢 **Resolved — DEC-059 (2026-06-14)** | **🟢 Closed** |
 
@@ -18627,3 +18627,295 @@ Filename convention: `quarterly-{YYYY}-Q{1|2|3|4}.md` — e.g. `quarterly-2027-Q
 ---
 
 *v5.11.0 (2026-06-30): §65 Quarterly pg_cron Health Audit Protocol — Jobs 56 & 57. Fulfils `docs/INCIDENT_RESPONSE.md R-53.11` item 5 (P1/M14) documentation portion. §65.1 purpose: quarterly manual health check for pg_cron jobs 56 (`fleet_mat_chain_verify`) and 57 (`nrr_bridge_q1_calendar_check`) — primary preventive mechanism covering the N/A-freshness monitoring gap (both jobs excluded from automated `pg-cron-health-monitor` coverage per §12.6). §65.2 schedule: first Monday of each calendar quarter (Q1 January, Q2 April, Q3 July, Q4 October); owner devops-lead, backup compliance-officer; < 15 min. §65.3 queries: four read-only `form_audit` queries equivalent to INCIDENT_RESPONSE R-53-C1 through R-53-C4 — Q-C1/Q-C2 confirm `days_since_last_run` ≤ 7 / ≤ 2 days respectively from `pg_cron.job_run_details`; Q-C3/Q-C4 confirm registration and `active = true` from `cron.job`. §65.4 pass/fail criteria table: FAIL paths → H1 (re-register from §63.5.1/§63.5.2), H2 (re-enable `active`), H3 (Supabase maintenance window — acceptable gap), H4 (transient self-recovered); escalation to R-53 IC within 4 hours if root cause unresolved. §65.5 R2 artefact template (Markdown): `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md`; WORM 7yr; `r2:form-api` NO ACCESS; privacy attestation block; pre-deploy attestation mode for pre-GA quarters. §65.6 new SOC 2 evidence artefact CRON-HEALTH-AUDIT-E-001 (CC4.1/A1.1, quarterly, 7yr); two auditor narratives (CC4.1 preventive monitoring, A1.1 availability); privacy floor. §65.7 R2 subfolder `enterprise/cron-health-audits/` registration. §65.8 five-item implementation checklist: items 1 and 2 [x] Done (documentation portions — INCIDENT_RESPONSE.md v1.1 + SOC2_READINESS.md §138 v3.64.0, 2026-06-30); items 3–5 [ ] operational (R2 subfolder creation, calendar reminder, first artefact filing Q1-2027). §65.9 two cross-reference obligations: both 🟢 Done. Privacy floor: all queries surface only timestamps, `active` BOOL, schedule strings, integer counts, `days_since_last_run` NUMERIC — no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 data; CRON-HEALTH-AUDIT-E-001 artefact same privacy-safe fields only. Document header v5.10.3 → v5.11.0. Owner: devops-lead + compliance-officer.*
+
+---
+
+## §66 OQ-MOBILE-01 Resolution — EAS OTA Adoption Rate vs. Enterprise MDM Change Windows: Per-Tenant Exception Flag & 7-Day Contractual SLO Variant (DEC-090)
+
+> **Closes:** OQ-MOBILE-01 from `§28.13` (P2 — before enterprise GA M13 — open since v1.5, 2026-06-01).
+> **Decision date:** 2026-07-01 · **DEC reference:** DEC-090
+> **Owner:** platform-engineer + customer-success + compliance-officer
+
+### §66.1 Context & Problem Statement
+
+`§28.13` OQ-MOBILE-01 was opened when §28 (v1.5, 2026-06-01) defined MOBILE-SLO-06 as "≥ 95% of active users on the latest OTA bundle within 48 hours of publication." This SLO was designed for consumer and enterprise tenants whose devices accept EAS updates as they arrive. The problem surfaces specifically with enterprise tenants who have MDM (Mobile Device Management) change control policies.
+
+MDM platforms — Microsoft Intune, Jamf Pro, VMware Workspace ONE — allow IT departments to restrict when app bundles can be installed. Common policies include: weeknight-only update windows (e.g. Monday–Friday 01:00–05:00 UTC), weekend-only maintenance windows, end-of-month freeze periods (no updates in the 5 business days before month close), or on-demand approval workflows where each OTA version must be individually blessed by the IT helpdesk before devices pull it.
+
+Under any of these policies, a bundle published on a Tuesday afternoon may not reach employee devices until the next approved window, which may be Saturday night — more than 48 hours later. MOBILE-SLO-06 would be in breach without any defect in FORM's delivery infrastructure.
+
+Decision needed before enterprise GA (M13) because:
+1. CSM onboarding script must address how to characterise the OTA commitment to IT procurement leads
+2. DPA SLO Schedule in `docs/ENTERPRISE_SLA.md` must accurately reflect the contractual commitment FORM is willing to make — and any tier-based variant
+3. AL-MOBILE-05 (OTA adoption P2 alert) must not fire false positives against MDM-window tenants
+
+### §66.2 Option Analysis
+
+#### Option A — Exclude MOBILE-SLO-06 from enterprise DPA entirely
+
+**Rejected.** Three grounds:
+
+1. **SOC 2 A1.2 gap.** MOBILE-SLO-06 is the primary contractual basis for FORM's assertion that security patches (including critical bug fixes shipped as OTA bundles) reach enterprise endpoints in a bounded time window. Excluding it entirely removes the enterprise customer's evidence that FORM maintains an A1.2-compliant availability posture for software supply chain delivery. SOC 2 auditors will ask "what is your contractual OTA delivery SLA?" — "no commitment" is not consistent with A1.2 mapping.
+
+2. **Enterprise sales trust gap.** IT procurement leads and CISOs explicitly ask about OTA delivery SLAs. A response of "we make no commitment" undermines trust at the contract review stage, particularly when positioning against competitors who do publish delivery windows.
+
+3. **Internal fleet target insufficient.** Making MOBILE-SLO-06 FORM-internal only (no contractual commitment) means the customer has no recourse if FORM's OTA infrastructure degrades. The enterprise contract exists precisely to give customers recourse; removing a meaningful SLO weakens that bilateral commitment.
+
+#### Option B — Per-tenant `ota_change_window_enabled` flag (Adopted as the mechanism)
+
+**Adopted as the primary mechanism.** The flag preserves the 48h standard SLO for the majority of enterprise tenants (those without restrictive MDM policies, or those whose MDM is configured to allow EAS bundle downloads as a trusted managed app source) while providing a formal 7-day contractual variant for the subset of tenants with confirmed MDM change control restrictions.
+
+#### Option C — Universal 7-day window for all enterprise tenants
+
+**Rejected in its universal form.** The 48h window is achievable — and desirable as a quality signal — for the majority of enterprise deployments. Diluting it universally penalises tenants who do not need the relaxation, and creates the perception that FORM's OTA delivery is inherently slow. The 7-day variant is adopted only as an opt-in for tenants with documented MDM constraints.
+
+### §66.3 DEC-090 Decision: Hybrid Option B + Modified Option C
+
+**Adopted: per-tenant `ota_change_window_enabled` flag + 7-day `Premium-MDM` MOBILE-SLO-06 variant.**
+
+Three grounds for the hybrid:
+1. **Precision.** The relaxed SLO applies only to tenants with confirmed, documented MDM change control policies — not universally. Standard commitment (48h) is preserved as the default for all other enterprise tenants.
+2. **Governance traceability.** Activation of the flag requires a five-step CSM protocol (§66.7) with compliance-officer sign-off and DEC-030 HMAC-chained audit event. This creates an evidence trail auditors can verify: every tenant on the `Premium-MDM` variant has a documented justification, not an informal exception.
+3. **Contractual clarity.** The 7-day variant is named "`Premium-MDM`" in the MSA SLO Schedule — a named tier, not an exception clause. Customers receive a clean, unambiguous contractual commitment at signature.
+
+**SLO variant table:**
+
+| `ota_change_window_enabled` | MOBILE-SLO-06 commitment | AL-MOBILE-05 breach threshold | MSA SLO Schedule label |
+|---|---|---|---|
+| `false` (default) | ≥ 95% adoption within 48 h of publication | 48 h elapsed + `adoption_pct < 95%` | Standard |
+| `true` | ≥ 95% adoption within 7 calendar days (168 h) of publication | 168 h elapsed + `adoption_pct < 95%` | Premium-MDM |
+
+**Scope of "7 days":** the clock starts at `ota_update_events.event_type = 'published'` — the same timestamp used for the 48h measurement. If a tenant's MDM change window produces a cycle longer than 7 days (e.g. monthly freeze periods with no mid-month window), FORM cannot guarantee the `Premium-MDM` SLO and the CSM must not accept such a tenant for this variant. Tenants with > 7-day MDM cycles require a custom SLO negotiation tracked in the MSA and escalated to the founder before signature.
+
+### §66.4 Schema — Migration 0091
+
+```sql
+-- Migration 0091: ota_change_window_enabled (DEC-090, 2026-07-01)
+-- Depends on: initial tenants table (migration 0001)
+
+ALTER TABLE tenants
+  ADD COLUMN ota_change_window_enabled     BOOLEAN      NOT NULL DEFAULT FALSE,
+  ADD COLUMN ota_slo_variant               TEXT         NOT NULL DEFAULT '48h'
+                                             CHECK (ota_slo_variant IN ('48h', '7d')),
+  ADD COLUMN ota_change_window_enabled_at  TIMESTAMPTZ,
+  ADD COLUMN ota_change_window_enabled_by  TEXT;  -- FORM staff internal ID, never enterprise employee
+
+-- DDL invariant: flag and variant must be co-consistent
+ALTER TABLE tenants
+  ADD CONSTRAINT chk_ota_slo_variant_consistency
+    CHECK (
+      (ota_change_window_enabled = FALSE AND ota_slo_variant = '48h')
+      OR
+      (ota_change_window_enabled = TRUE  AND ota_slo_variant = '7d')
+    );
+
+COMMENT ON COLUMN tenants.ota_change_window_enabled IS
+  'DEC-090 (2026-07-01). When true, MOBILE-SLO-06 = 7d Premium-MDM variant. '
+  'Activation requires five-step CSM protocol + compliance-officer sign-off + '
+  'mobile.ota_change_window_updated HIGH/7yr DEC-030 event. No self-service toggle.';
+COMMENT ON COLUMN tenants.ota_slo_variant IS
+  '''48h'' = Standard MOBILE-SLO-06; ''7d'' = Premium-MDM. '
+  'Must be co-consistent with ota_change_window_enabled per chk_ota_slo_variant_consistency.';
+COMMENT ON COLUMN tenants.ota_change_window_enabled_at IS
+  'Timestamp when ota_change_window_enabled was last set to TRUE. NULL if never enabled.';
+COMMENT ON COLUMN tenants.ota_change_window_enabled_by IS
+  'FORM staff actor UUID who last enabled the flag. '
+  'Never an enterprise employee user_id. Nullable (NULL when never enabled).';
+
+-- RLS: form_api has no access to these four columns.
+-- These columns are written exclusively by the internal Worker endpoint
+-- (POST /internal/tenant/{slug}/ota-change-window) after compliance-officer approval.
+REVOKE ALL ON tenants FROM form_api;
+GRANT SELECT (
+  slug, display_name, tier, contracted_seats, sso_enabled, scim_enabled,
+  data_region, reporting_k_floor, caep_status
+  -- Omit ota_change_window_enabled, ota_slo_variant, ota_change_window_enabled_at,
+  -- ota_change_window_enabled_by from form_api grant.
+) ON tenants TO form_api;
+```
+
+**Staging validation checklist:**
+- `chk_ota_slo_variant_consistency` violation: `INSERT INTO tenants (..., ota_change_window_enabled = TRUE, ota_slo_variant = '48h')` → rejected with CHECK constraint violation
+- `form_api` REVOKE confirmed: `SELECT ota_change_window_enabled FROM tenants` as `form_api` → permission denied
+- Default values: new tenant row → `ota_change_window_enabled = FALSE`, `ota_slo_variant = '48h'`, `ota_change_window_enabled_at = NULL`
+
+### §66.5 AL-MOBILE-05 Per-Tenant Dynamic Threshold
+
+§28.8 defines AL-MOBILE-05 with a fixed 48h breach threshold. With the per-tenant flag, the OTA adoption snapshot pg_cron job (§28.5) must use a per-tenant dynamic threshold.
+
+**Updated AL-MOBILE-05 trigger query:**
+
+```sql
+-- Runs inside the pg_cron OTA adoption snapshot job (see §28.5)
+-- Read role: form_system (ota_change_window_enabled visible)
+SELECT
+  oe.tenant_id,
+  oe.runtime_version,
+  oe.adoption_pct,
+  t.ota_change_window_enabled,
+  t.ota_slo_variant,
+  CASE WHEN t.ota_change_window_enabled THEN 168 ELSE 48 END   AS slo_hours,
+  ROUND(EXTRACT(EPOCH FROM (NOW() - oe.created_at)) / 3600, 1) AS elapsed_hours
+FROM ota_update_events oe
+JOIN tenants t ON t.slug = oe.tenant_id
+WHERE
+  oe.event_type = 'adoption_snapshot'
+  AND oe.adoption_pct < 95
+  AND (
+    -- Standard 48h breach
+    (NOT t.ota_change_window_enabled
+     AND EXTRACT(EPOCH FROM (NOW() - oe.created_at)) / 3600 >= 48)
+    OR
+    -- Premium-MDM 7d (168h) breach
+    (t.ota_change_window_enabled
+     AND EXTRACT(EPOCH FROM (NOW() - oe.created_at)) / 3600 >= 168)
+  );
+```
+
+**PagerDuty alert payload additions:** `ota_slo_variant` (`'48h'` or `'7d'`) and `slo_hours` (integer) must be included so the on-call engineer immediately knows which contractual window applies without querying the database. Dedup key unchanged: `ota-adoption-breach-{tenant_id}-{runtime_version}`.
+
+**Alert severity:** unchanged P2. The MDM window does not change the operational severity of a missed target — it changes the time at which the target is considered missed. If a `Premium-MDM` tenant has not reached 95% adoption at the 168h mark, the same P2 response is appropriate (investigate EAS delivery, check MDM policy version, contact CSM lead).
+
+### §66.6 DEC-030 Event
+
+**`mobile.ota_change_window_updated`** — HIGH · 7yr · SOC 2: A1.1 / CC3.2
+
+```typescript
+// Zod v2 schema — OtaChangeWindowUpdatedSchema
+import { z } from 'zod/v4';
+
+export const OtaChangeWindowUpdatedSchema = z.object({
+  event_type:                      z.literal('mobile.ota_change_window_updated'),
+  severity:                        z.literal('HIGH'),
+  tenant_id:                       z.string().regex(/^[a-z0-9-]{3,40}$/),  // org slug only
+  previous_enabled:                z.boolean(),
+  new_enabled:                     z.boolean(),
+  previous_slo_variant:            z.enum(['48h', '7d']),
+  new_slo_variant:                 z.enum(['48h', '7d']),
+  mdm_platform:                    z.enum([
+                                     'intune', 'jamf_pro', 'workspace_one', 'other', 'unknown'
+                                   ]).optional(),
+  compliance_officer_approval_ref: z.string().min(1).max(200),  // Linear/Notion ticket ID
+  changed_by_form_staff_id:        z.string().uuid(),  // FORM staff UUID; NOT enterprise employee
+  changed_at:                      z.string().datetime(),
+});
+```
+
+**OTA-WINDOW-CHAIN-01 ordering invariant:** For any tenant T, a `mobile.ota_change_window_updated` event with `new_enabled = true` at position M in the HMAC chain MUST NOT be preceded by another `mobile.ota_change_window_updated` event with `new_enabled = true` for the same `tenant_id` without an intervening `mobile.ota_change_window_updated` with `new_enabled = false`. Violation: the flag may not be enabled while already enabled.
+
+`emit-audit-event` Worker enforcement: `HTTP 422 OTA_WINDOW_CHAIN_01_ALREADY_ENABLED` with response body `{"error": "OTA_WINDOW_CHAIN_01_ALREADY_ENABLED", "tenant_id": "<slug>", "current_enabled": true}` if the most recent `mobile.ota_change_window_updated` for the same `tenant_id` has `new_enabled = true` (i.e. the flag is already on).
+
+Rationale for HIGH severity and 7-year retention: changing the contractual SLO commitment for an active enterprise tenant is an MSA-level change event. The audit trail must be retained for the same period as the underlying contractual obligations (ENTERPRISE_SLA §19.5 — 7-year retention for MSA-related events).
+
+### §66.7 CSM Onboarding Protocol (MDM Change Window Declaration)
+
+This five-step protocol is triggered when an enterprise prospect or existing tenant discloses an MDM change control policy that would make the Standard 48h MOBILE-SLO-06 unachievable.
+
+**Step 1 — CSM documentation (before pilot contract signature).**
+
+CSM adds `[mdm-change-window]` to `enterprise_contracts.notes` with the following structured block:
+```
+[mdm-change-window]
+Platform: <intune | jamf_pro | workspace_one | other>
+Declared window schedule: <e.g. "Saturdays 02:00–08:00 UTC">
+Window recurrence: <weekly | biweekly | monthly | on-demand>
+Estimated max cycle from OTA publish to device delivery: <e.g. "7 days">
+IT contact: <Stored in CRM only — NOT in this field>
+```
+
+Privacy constraint: the IT contact name and email MUST be stored in the CRM (HubSpot) only — never in `enterprise_contracts.notes` or any FORM database field. `enterprise_contracts.notes` is a FORM-internal audit note, not a personal data register.
+
+**Step 2 — Compliance-officer review.**
+
+Compliance-officer verifies:
+- Declared max cycle ≤ 7 days (if > 7 days, the `Premium-MDM` variant cannot be offered; flag customer to founder for custom SLO negotiation)
+- Linear or Notion ticket created documenting the MDM policy and approval decision; ticket ID becomes `compliance_officer_approval_ref`
+- Written sign-off recorded in the ticket
+
+**Step 3 — Flag activation (CSM requests via internal tool).**
+
+CSM calls the internal-only Worker endpoint with `compliance_officer_approval_ref`:
+
+```
+POST /internal/tenant/{slug}/ota-change-window
+Authorization: Bearer <form-staff-jwt>
+Content-Type: application/json
+
+{
+  "enabled": true,
+  "mdm_platform": "intune",
+  "compliance_officer_approval_ref": "LINEAR-FORM-1234"
+}
+```
+
+Worker validates:
+1. Staff JWT is valid and `changed_by_form_staff_id` is populated from JWT claims
+2. `compliance_officer_approval_ref` is non-empty (422 `OTA_WINDOW_CHAIN_01_APPROVAL_REF_MISSING` if absent)
+3. OTA-WINDOW-CHAIN-01: current flag state is `false` (422 `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED` if already `true`)
+4. Writes `ota_change_window_enabled = TRUE`, `ota_slo_variant = '7d'`, `ota_change_window_enabled_at = NOW()`, `ota_change_window_enabled_by = <staff_uuid>`
+5. Emits `mobile.ota_change_window_updated` HIGH/7yr DEC-030 event
+
+**Step 4 — Contract documentation.**
+
+Pilot contract and eventual MSA SLO Schedule are issued with `Premium-MDM` variant in the MOBILE-SLO-06 row. The Standard 48h SLO does not appear for this tenant. The `compliance_officer_approval_ref` is noted in the SLO Schedule preamble as the rationale record.
+
+**Step 5 — Flag reversion (if IT policy changes).**
+
+If the tenant's IT department removes or relaxes the MDM change control policy, CSM follows the reverse process:
+- New Linear/Notion ticket documenting the policy change
+- Compliance-officer sign-off
+- Internal Worker call `{"enabled": false}` (emits a second `mobile.ota_change_window_updated` with `new_enabled = false, new_slo_variant = '48h'`)
+- MSA addendum issued confirming reversion to Standard SLO
+
+### §66.8 SOC 2 Mapping
+
+| Control | Evidence path | Notes |
+|---|---|---|
+| A1.1 — Availability commitments | `mobile.ota_change_window_updated` DEC-030 chain export; ENTERPRISE_SLA SLO Schedule showing 48h vs. 7d tier per tenant | Demonstrates commitments are calibrated to each tenant's operational context; SOC 2 auditor can verify every `Premium-MDM` tenant has an approval ref |
+| CC3.2 — Risk assessment | CSM documentation in `enterprise_contracts.notes` with `[mdm-change-window]` tag; compliance-officer Linear/Notion approval ticket | MDM policy formally assessed as a deployment constraint; risk accepted with documented justification, not silently tolerated |
+| CC7.2 — Anomaly monitoring | AL-MOBILE-05 per-tenant threshold logic (§66.5 SQL); AL-MOBILE-05 payload includes `ota_slo_variant` | Alert fires at 48h for Standard tenants and 168h for Premium-MDM tenants; no false positives or missed breach signals |
+| CC9.2 — Risk monitoring (vendors) | `mdm_platform` field in `mobile.ota_change_window_updated` DEC-030 event | Provides visibility into which third-party MDM platforms are present in the enterprise fleet; enables informed sub-processor review if MDM vendor changes |
+
+**Evidence artefact OTA-WINDOW-E-001** — CC3.2 / A1.1 — per-activation + annual zero-count — 7yr — `compliance/evidence/ota-change-window/`
+
+Scope: DEC-030 chain export of all `mobile.ota_change_window_updated` events during the SOC 2 observation period, grouped by `tenant_id`. Auditor use: confirms that every tenant deviating from the Standard 48h SLO has a `compliance_officer_approval_ref` in the event payload, and that OTA-WINDOW-CHAIN-01 was not violated (no double-enable pattern).
+
+**Zero-activation attestation:** In observation periods with no `mobile.ota_change_window_updated` events (all enterprise tenants on Standard SLO, or no enterprise tenants onboarded yet), file an affirmative attestation: "No `mobile.ota_change_window_updated` events in observation period [start] — [end]. All enterprise tenants are on Standard MOBILE-SLO-06 (48h). No `Premium-MDM` SLO variant is active for any tenant."
+
+### §66.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration 0091 to staging: four columns + `chk_ota_slo_variant_consistency` CHECK on `tenants`; run staging validation checklist (§66.4); confirm `form_api` REVOKE; deploy to production before M12 | platform-engineer | **P1** | M12 (before enterprise GA M13) | [ ] |
+| 2 | Register `mobile.ota_change_window_updated` HIGH/7yr in `docs/AUDIT_LOG_SCHEMA.md` §Mobile subsection; include `OtaChangeWindowUpdatedSchema` Zod v2 definition; register OTA-WINDOW-CHAIN-01 invariant with HTTP 422 codes `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED` and `OTA_WINDOW_CHAIN_01_APPROVAL_REF_MISSING` | platform-engineer + compliance-officer | **P1** | M12 | [ ] |
+| 3 | Implement `emit-audit-event` Worker OTA-WINDOW-CHAIN-01 enforcement; integration test: (a) first enable → 200; (b) second enable without disable → 422 `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED`; (c) disable after enable → 200; (d) re-enable after disable → 200 | platform-engineer | **P1** | M12 | [ ] |
+| 4 | Update AL-MOBILE-05 pg_cron trigger query to §66.5 SQL (dynamic threshold via `ota_change_window_enabled` join); update PagerDuty payload to include `ota_slo_variant` and `slo_hours`; deploy to staging; verify: Standard tenant fires at 48h, Premium-MDM tenant fires at 168h, no false positives in between | platform-engineer + devops-lead | **P1** | M12 | [ ] |
+| 5 | Build internal CSM tool endpoint `POST /internal/tenant/{slug}/ota-change-window`; validate staff JWT; enforce `compliance_officer_approval_ref` non-empty; enforce OTA-WINDOW-CHAIN-01; write four tenants columns; emit DEC-030 event; no public API exposure; endpoint behind `form-staff` Cloudflare Access policy | platform-engineer | **P1** | M12 | [ ] |
+| 6 | Update `docs/ENTERPRISE_SLA.md` MOBILE-SLO-06 entry: describe Standard (48h) and Premium-MDM (7d) variants; add `ota_slo_variant` column to the SLO schedule table; note that variant is set at contract time and requires written addendum to change; reference §66 as the authoritative specification | compliance-officer | **P1** | M12 | [ ] |
+| 7 | Update `docs/ENTERPRISE_ONBOARDING.md` CSM pilot kick-off checklist: add MDM change window declaration step referencing §66.7 five-step protocol; add qualifying question to pre-pilot questionnaire: "Does your organisation enforce MDM change control windows (Intune / Jamf / Workspace ONE) that restrict when mobile app bundles can be installed?" | customer-success | **P1** | M12 | [ ] |
+| 8 | Register OTA-WINDOW-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC3.2/A1.1, annual + per-activation, 7yr); add §80.3 R2 subfolder entry `compliance/evidence/ota-change-window/` (WORM 7yr, `form_api` NO ACCESS); add §80.4 Vanta mirror entry | compliance-officer | **P1** | M13 | [ ] |
+| 9 | Update §28.13 OQ-MOBILE-01 row in this document from `🟡 P2 Open` → `🟢 Resolved DEC-090 (2026-07-01). See §66.` | compliance-officer | **P0** | This authoring pass | [x] **Done — §28.13 OQ-MOBILE-01 updated in this document version.** |
+
+### §66.10 OQ Gap Tracker Update
+
+| OQ | Previous status | New status | Summary |
+|---|---|---|---|
+| **OQ-MOBILE-01** | 🟡 P2 Open — before enterprise GA (M13) | 🟢 **Resolved — DEC-090 (2026-07-01)** | Hybrid Option B + modified C: per-tenant `ota_change_window_enabled` flag; Standard 48h (default) vs. Premium-MDM 7d variant; migration 0091; AL-MOBILE-05 dynamic threshold; five-step CSM protocol; `mobile.ota_change_window_updated` HIGH/7yr; OTA-WINDOW-CHAIN-01; OTA-WINDOW-E-001. |
+
+**§28.13 source cross-update:** OQ-MOBILE-01 row in §28.13 has been updated to `🟢 Resolved — DEC-090 (2026-07-01). See §66.` in this document version.
+
+### §66.11 Cross-Reference Obligations Created by §66
+
+| Document | Obligation | Status |
+|---|---|---|
+| `docs/OBSERVABILITY.md §28.13` | OQ-MOBILE-01 row: `🟡 P2 Open` → `🟢 Resolved — DEC-090 (2026-07-01). See §66.` | 🟢 **Done — §28.13 updated in this document version.** |
+| `docs/AUDIT_LOG_SCHEMA.md §Mobile` | Register `mobile.ota_change_window_updated` HIGH/7yr; `OtaChangeWindowUpdatedSchema` Zod v2; OTA-WINDOW-CHAIN-01 invariant + two HTTP 422 codes | 🟡 Pending — P1/M12 (§66.9 item 2) |
+| `docs/DATA_MODEL.md` | Document migration 0091 — four columns + `chk_ota_slo_variant_consistency` on `tenants`; RLS note (`form_api` REVOKED from four columns); §66 cross-ref | 🟡 Pending — P1/M12 (§66.9 item 1) |
+| `docs/ENTERPRISE_SLA.md` | MOBILE-SLO-06 entry: Standard (48h) and Premium-MDM (7d) variants; `ota_slo_variant` column in SLO schedule; §66 as authoritative spec | 🟡 Pending — P1/M12 (§66.9 item 6) |
+| `docs/ENTERPRISE_ONBOARDING.md` | CSM onboarding checklist: MDM declaration step; qualifying pre-pilot question; §66.7 five-step protocol reference | 🟡 Pending — P1/M12 (§66.9 item 7) |
+| `docs/SOC2_READINESS.md §79.4` | OTA-WINDOW-E-001 (CC3.2/A1.1, annual + per-activation, 7yr); §80.3 `compliance/evidence/ota-change-window/` WORM 7yr; §80.4 Vanta mirror | 🟡 Pending — P1/M13 (§66.9 item 8) |
+| `docs/DECISION_LOG.md DEC-090` | Formal decision record (2026-07-01; hybrid Option B + modified C; owner platform-engineer + customer-success + compliance-officer) | 🟡 Pending — P1 (to be registered this session) |
+
+---
+
+*v5.12.0 (2026-07-01): §66 OQ-MOBILE-01 Resolution — EAS OTA Adoption Rate vs. Enterprise MDM Change Windows: Per-Tenant Exception Flag & 7-Day Contractual SLO Variant (DEC-090). Closes OQ-MOBILE-01 from §28.13 (P2 — before enterprise GA M13 — open since v1.5, 2026-06-01). Decision: **Hybrid Option B + modified Option C adopted**. §66.1 context: EAS OTA bundles blocked by MDM change control windows (Intune, Jamf Pro, Workspace ONE); 48h MOBILE-SLO-06 is achievable for most enterprise tenants but not for those with weekly/monthly maintenance windows; decision needed before M13 so CSM onboarding script, DPA SLO Schedule, and AL-MOBILE-05 are all consistent. §66.2 option analysis: Option A (exclude from DPA) rejected on three grounds — SOC 2 A1.2 gap, enterprise sales trust gap, internal fleet target insufficient for customer recourse; Option C universal 7-day rejected — dilutes SLO for tenants who don't need the relaxation. §66.3 DEC-090 decision: per-tenant `ota_change_window_enabled BOOLEAN NOT NULL DEFAULT FALSE`; when `false`: Standard MOBILE-SLO-06 = 48h; when `true`: Premium-MDM MOBILE-SLO-06 = 7 days (168h); `chk_ota_slo_variant_consistency` DDL CHECK enforces co-consistency (enabled=TRUE && slo_variant='48h' rejected); scope of "7 days" defined from `ota_update_events.event_type = 'published'` timestamp; tenants with MDM cycles > 7 days excluded from this variant. §66.4 migration 0091: four columns (`ota_change_window_enabled`, `ota_slo_variant`, `ota_change_window_enabled_at`, `ota_change_window_enabled_by`) + `chk_ota_slo_variant_consistency` CHECK; `form_api` REVOKED from all four columns via selective GRANT; staging validation checklist (three assertions). §66.5 AL-MOBILE-05 dynamic threshold SQL: `JOIN tenants t ON t.slug = oe.tenant_id`; `CASE WHEN t.ota_change_window_enabled THEN 168 ELSE 48 END AS slo_hours`; PagerDuty payload includes `ota_slo_variant` and `slo_hours`; dedup key unchanged; P2 severity unchanged. §66.6 one DEC-030 event: `mobile.ota_change_window_updated` HIGH/7yr; `OtaChangeWindowUpdatedSchema` Zod v2 (twelve fields: event_type, severity, tenant_id slug, previous_enabled, new_enabled, previous_slo_variant, new_slo_variant, mdm_platform optional, compliance_officer_approval_ref, changed_by_form_staff_id UUID, changed_at ISO); OTA-WINDOW-CHAIN-01 ordering invariant (double-enable → HTTP 422 `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED`; missing approval ref → HTTP 422 `OTA_WINDOW_CHAIN_01_APPROVAL_REF_MISSING`). §66.7 five-step CSM protocol: (1) document `[mdm-change-window]` block in `enterprise_contracts.notes` — IT contact in CRM ONLY, never in FORM DB; (2) compliance-officer review: verify ≤ 7d cycle + Linear/Notion approval ticket; (3) flag activation via `POST /internal/tenant/{slug}/ota-change-window` (form-staff Cloudflare Access only); (4) contract issued with Premium-MDM SLO Schedule; (5) reverse process if IT policy changes — new ticket + compliance-officer sign-off + `enabled: false` API call + MSA addendum. §66.8 SOC 2 mapping: A1.1 (availability commitments calibrated to context; DEC-030 chain export confirms every Premium-MDM tenant has approval ref), CC3.2 (MDM risk formally assessed with compliance-officer sign-off), CC7.2 (AL-MOBILE-05 per-tenant dynamic threshold documented and testable), CC9.2 (`mdm_platform` field provides MDM vendor fleet visibility). New evidence artefact OTA-WINDOW-E-001 (CC3.2/A1.1, annual + per-activation, 7yr, `compliance/evidence/ota-change-window/`); zero-activation attestation pattern. §66.9 nine-item checklist: 5× P1/M12 (migration 0091, AUDIT_LOG_SCHEMA event + invariant, Worker enforcement + integration test, AL-MOBILE-05 SQL update + staging validation, internal CSM endpoint), 2× P1/M12 (ENTERPRISE_SLA MOBILE-SLO-06 update, ENTERPRISE_ONBOARDING CSM checklist), 1× P1/M13 (SOC2_READINESS OTA-WINDOW-E-001 registration), 1× P0 this-pass [x] Done (§28.13 OQ-MOBILE-01 update). §66.10 OQ gap tracker: OQ-MOBILE-01 🟡 P2 Open → 🟢 Resolved DEC-090 (2026-07-01). §66.11 seven cross-reference obligations: §28.13 OQ-MOBILE-01 [x] Done (this pass); six others 🟡 Pending P1/M12–M13. Document header v5.10.3 → v5.12.0 (§65 v5.11.0 header update was not applied in the 2026-06-30 authoring pass; corrected simultaneously in this commit). Privacy floor: `tenants.ota_change_window_enabled` is a technical configuration flag — not a personal data element under GDPR Art. 4; no individual employee `user_id`, MDM policy details, device identifiers, individual OTA adoption rates, coaching content, or GDPR Art. 9 special-category data in migration 0091 columns, DEC-030 event payload, AL-MOBILE-05 query result, or OTA-WINDOW-E-001 artefact; `changed_by_form_staff_id` is a FORM staff internal UUID, not an enterprise employee identifier; IT contact information is stored in CRM only — never in `enterprise_contracts.notes` field values or any FORM Postgres table; `tenant_id` in DEC-030 events is an org slug only. Owner: platform-engineer + customer-success + compliance-officer.*

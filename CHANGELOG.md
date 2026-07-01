@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [10.74.1] — 2026-07-01
+
+### Changed
+- `docs/OBSERVABILITY.md` — §66 added: OQ-MOBILE-01 Resolution «EAS OTA Adoption Rate vs. Enterprise MDM Change Windows». Decision DEC-090 (2026-07-01): per-tenant `ota_change_window_enabled` flag; Standard MOBILE-SLO-06 = 48h (default); Premium-MDM MOBILE-SLO-06 = 7 days / 168h for tenants with confirmed MDM change control policies. §66.1–§66.11 covers: context & option analysis (Option A rejected, Option C universal rejected, Option B hybrid adopted); DEC-090 decision table; migration 0091 DDL (four columns + `chk_ota_slo_variant_consistency` CHECK; `form_api` REVOKED); AL-MOBILE-05 dynamic threshold SQL; `mobile.ota_change_window_updated` HIGH/7yr DEC-030 event (`OtaChangeWindowUpdatedSchema` Zod v2); OTA-WINDOW-CHAIN-01 ordering invariant (double-enable → HTTP 422 `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED`); five-step CSM protocol; SOC 2 mapping (A1.1/CC3.2/CC7.2/CC9.2) + OTA-WINDOW-E-001 evidence artefact (7yr WORM); nine-item implementation checklist (items 1–8 P1/M12–M13; item 9 done); six pending cross-reference obligations (AUDIT_LOG_SCHEMA, DATA_MODEL, ENTERPRISE_SLA, ENTERPRISE_ONBOARDING, SOC2_READINESS, DECISION_LOG). OQ-MOBILE-01 §28.13 row updated from `🟡 P2 Open` → `🟢 Resolved — DEC-090 (2026-07-01)`. Document header corrected v5.10.3 → v5.12.0 (v5.11.0 header update missed in 2026-06-30 pass).
+- `docs/DECISION_LOG.md` — DEC-090 registered (2026-07-01): OQ-MOBILE-01 Resolution, owner platform-engineer + customer-success + compliance-officer, reverse cost Medium.
+- `VERSION` — 10.74.0 → 10.74.1.
+
+---
+
 ## [10.74.0] — 2026-07-01
 
 ### Added

@@ -13,6 +13,17 @@
 
 ---
 
+## 2026-07-01
+
+### DEC-090 · OQ-MOBILE-01 Resolution: EAS OTA Adoption Rate vs. Enterprise MDM Change Windows — Per-Tenant Exception Flag & 7-Day Contractual SLO Variant
+
+- **Decision:** Per-tenant `ota_change_window_enabled BOOLEAN NOT NULL DEFAULT FALSE` flag on `tenants` table. When `false` (default): MOBILE-SLO-06 = 48h (Standard). When `true`: MOBILE-SLO-06 = 7 days / 168h (Premium-MDM). Flag requires CSM documentation of MDM change control policy + compliance-officer approval + activation via `POST /internal/tenant/{slug}/ota-change-window` (form-staff Cloudflare Access only). Emits `mobile.ota_change_window_updated` HIGH/7yr DEC-030 event; OTA-WINDOW-CHAIN-01 invariant prevents double-enable and enforces non-empty `compliance_officer_approval_ref`. AL-MOBILE-05 breach alert dynamically thresholds 48h vs 168h by joining `tenants.ota_change_window_enabled`. OTA-WINDOW-E-001 SOC 2 evidence artefact (CC3.2/A1.1, annual + per-activation, 7yr). Migration 0091: four columns (`ota_change_window_enabled`, `ota_slo_variant`, `ota_change_window_enabled_at`, `ota_change_window_enabled_by`) + `chk_ota_slo_variant_consistency` DDL CHECK; `form_api` REVOKED from all four columns. Full specification in `docs/OBSERVABILITY.md §66`.
+- **Owner:** platform-engineer + customer-success + compliance-officer
+- **Why:** (1) MOBILE-SLO-06 (≥ 95% EAS OTA adoption within 48h) is achievable for standard tenants but unreachable for tenants with MDM change control windows (Intune, Jamf Pro, Workspace ONE) operating on weekly/monthly schedules. (2) Option A (carve-out from DPA) rejected: SOC 2 A1.2 gap + enterprise sales trust gap. Option C (universal 7-day) rejected: dilutes SLO for tenants that do not need the relaxation. (3) Hybrid solution preserves 48h as the default (majority of tenants) while offering a contractual 7-day variant only for confirmed MDM-constrained tenants with compliance-officer sign-off — gating prevents abuse. (4) Required before enterprise GA (M13) so that CSM onboarding script, DPA SLO Schedule, and AL-MOBILE-05 are fully consistent. Privacy floor: `ota_change_window_enabled` is a technical configuration flag, not personal data; no individual user health data in any new column, event payload, or breach alert.
+- **Reverse cost:** Medium. Migration 0091 columns are additive (rollback requires dropping four columns). Reversal steps: disable OTA-WINDOW-CHAIN-01 Worker check → remove `POST /internal/tenant/{slug}/ota-change-window` endpoint → revert AL-MOBILE-05 SQL to fixed 48h threshold → drop four `tenants` columns. Any tenants in Premium-MDM tier must be notified of SLO reversion per MSA addendum; compliance-officer approval required before reversal.
+
+---
+
 ## 2026-06-30
 
 ### DEC-089 · OQ-CS-04 Resolution: FEHS Signal Breakdown in `enterprise.qbr_completed`
