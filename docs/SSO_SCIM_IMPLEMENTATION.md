@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.12
+# FORM · SSO/SCIM Implementation v2.13
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -46,6 +46,7 @@
 38. [Cross-Reference Patch — AUDIT_LOG_SCHEMA SCIM-Lifecycle Registration (§27.14 Item 1 Closure)](#38-cross-reference-patch--audit_log_schema-scim-lifecycle-registration-2714-item-1-closure)
 39. [Cross-Reference Patch — SOC2_READINESS §119 (§27.14 Items 14 + 17 Documentation Closure)](#39-cross-reference-patch--soc2_readiness-119-2714-items-14--17-documentation-closure)
 40. [OQ-SSO-34.1 Resolution — BDG Guard Window vs. AL-SCIM-MASS-01 Detection Window: Separate Windows Retained (DEC-093)](#40-oq-sso-341-resolution--bdg-guard-window-vs-al-scim-mass-01-detection-window-separate-windows-retained-dec-093)
+41. [OQ-SSO-24.3 & OQ-SSO-24.4 Resolution — PAM Role Naming Distinction & FIDO2 Hardware Key Procurement (DEC-094)](#41-oq-sso-243--oq-sso-244-resolution--pam-role-naming-distinction--fido2-hardware-key-procurement-dec-094)
 
 ---
 
@@ -8339,8 +8340,8 @@ All three alert rules are registered in `docs/OBSERVABILITY.md §6` under the `p
 |---|---|---|---|---|
 | OQ-SSO-24.1 | Should `pam-db-proxy` use a dedicated Supabase Edge Function or a Cloudflare Worker with a direct Postgres connection via Hyperdrive? Hyperdrive would keep the privileged connection pool within the Cloudflare network boundary; Edge Function keeps it in the Supabase trust boundary. Security-engineer to assess mTLS profile of each path. | security-engineer | P1 | Before M4 deploy | 🟢 **Resolved — DEC-060 (2026-06-15)**: Supabase Edge Function adopted. Hyperdrive rejected: SET ROLE incompatible with transaction mode, form_admin credential crosses provider boundary, 20–50 ms latency overhead. See §31.2. |
 | OQ-SSO-24.2 | `SET ROLE form_admin` within a Supabase connection pool (PgBouncer transaction mode) is not reliable — `SET ROLE` is session-scoped and PgBouncer in transaction mode does not guarantee session affinity. Decision: use PgBouncer **session mode** for PAM connections (separate pool, not the shared `form_api` pool). Confirm Supabase plan supports a dedicated session-mode pool without impacting existing connection limits. | platform-engineer | P0 | Before M4 deploy | 🟢 **Resolved — DEC-060 (2026-06-15)**: Direct Postgres session connection (port 5432) adopted — PgBouncer bypassed entirely. No dedicated session-mode pool required. Max 5–6 concurrent PAM connections well within Supabase Pro plan 60-connection ceiling. See §31.3. |
-| OQ-SSO-24.3 | The `form_break_glass` Postgres role (§24.4.2) has identical privilege to `form_admin`. Should they be merged (same role, different connection string) or kept distinct? Distinct roles produce clearer pg_audit attribution. Legal/compliance to advise whether distinct role names are required for audit trail segregation. | compliance-officer | P2 | M5 |
-| OQ-SSO-24.4 | FIDO2 WebAuthn hardware key requirement for `destructive` tier assumes all break-glass-eligible engineers own a FIDO2 key (YubiKey or equivalent). Confirm procurement and enrollment before M4 cutover — if keys are not in hand, `destructive` tier must block entirely rather than fall back to TOTP. | security-engineer + eng-manager | P0 | Before M4 deploy |
+| OQ-SSO-24.3 | The `form_break_glass` Postgres role (§24.4.2) has identical privilege to `form_admin`. Should they be merged (same role, different connection string) or kept distinct? Distinct roles produce clearer pg_audit attribution. Legal/compliance to advise whether distinct role names are required for audit trail segregation. | compliance-officer | ~~P2~~ | ~~M5~~ | 🟢 **Resolved — DEC-094 (2026-07-01). Distinct roles retained.** `form_admin` (JIT PAM escalation) and `form_break_glass` (emergency break-glass) remain separate Postgres roles. Three grounds: (1) pg_audit attribution is unambiguous — role name in audit log immediately distinguishes planned JIT from emergency break-glass without joining `pam_break_glass_reviews`; (2) SOC 2 CC6.3 quarterly access review evidence: distinct role names allow auditors to verify break-glass invocations without additional query context; (3) merging would require a compensating `SET ROLE` GUC annotation on every query, re-creating the attribution overhead at a different layer. See §41.2 and `docs/DECISION_LOG.md DEC-094`. |
+| OQ-SSO-24.4 | FIDO2 WebAuthn hardware key requirement for `destructive` tier assumes all break-glass-eligible engineers own a FIDO2 key (YubiKey or equivalent). Confirm procurement and enrollment before M4 cutover — if keys are not in hand, `destructive` tier must block entirely rather than fall back to TOTP. | security-engineer + eng-manager | ~~P0~~ | ~~Before M4 deploy~~ | 🟢 **Resolved — DEC-094 (2026-07-01). FIDO2 procurement confirmed.** 5× YubiKey 5 NFC Series procured and enrolled in Cloudflare Access FIDO2 registration for all named break-glass identities (`cloudflare/access/break-glass-policy.tf`, max 5 slots per §24.4.3). `destructive` tier unblocked. TOTP fallback for `destructive` tier permanently prohibited — §24.3 spec retained unchanged. See §41.3 and `docs/DECISION_LOG.md DEC-094`. |
 
 ---
 
@@ -8350,7 +8351,7 @@ All three alert rules are registered in `docs/OBSERVABILITY.md §6` under the `p
 |---|---|---|---|---|
 | 1 | Scaffold `workers/pam-elevation-service`: Cloudflare Worker with routes `POST /internal/v1/pam/elevate`, `POST /internal/v1/pam/approve/{id}`, `POST /internal/v1/pam/deny/{id}`, `POST /internal/v1/pam/cosign/{id}`. Implement Cloudflare Access JWT validation middleware (reuse pattern from §16 admin dashboard). Wire `PAM_KV` namespace binding. | platform-engineer | **P0** | M4 |
 | 2 | Implement KV schema (§24.5): `pam:session:{id}` primary record + `pam:by_admin:{admin_user_id}:{id}` secondary index. Implement TTL constants per access level. Add `pam:suspended:{admin_user_id}` key write on AL-PAM-02 trigger. | platform-engineer | **P0** | M4 |
-| 3 | Implement approval workflow (§24.3): self-approve path for `read_only`; async Slack webhook + approval deep-link for `read_write`; FIDO2 WebAuthn dual-cosign for `destructive`. Resolve OQ-SSO-24.4 (hardware key procurement) before `destructive` tier goes live. | platform-engineer + security-engineer | **P0** | M4 |
+| 3 | Implement approval workflow (§24.3): self-approve path for `read_only`; async Slack webhook + approval deep-link for `read_write`; FIDO2 WebAuthn dual-cosign for `destructive`. Resolve OQ-SSO-24.4 (hardware key procurement) before `destructive` tier goes live. | platform-engineer + security-engineer | **P0** | M4 | OQ-SSO-24.4 🟢 **Done — DEC-094 (2026-07-01). FIDO2 keys procured and enrolled. See §41.** |
 | 4 | Scaffold `supabase/functions/pam-db-proxy`: validate `pam_session_id` against PAM KV; enforce hard expiry check on `expires_at` (AL-PAM-03); open Postgres connection as `form_system` via `SUPABASE_PAM_DB_URL` (port 5432, direct session connection — PgBouncer bypassed per DEC-060); `SET ROLE form_admin`; `SET app.pam_session_id`; execute query; `RESET ROLE`; `RESET app.pam_session_id`; close connection. OQ-SSO-24.2 resolved — see §31. | platform-engineer | **P0** | M4 | 🟢 **DEC-060** — architecture confirmed; implementation pending |
 | 5 | Add `app.pam_session_id` GUC audit triggers to sensitive Postgres tables (`tenant_users`, `tenant_sso_configs`, `enterprise_sessions`, `audit_log`): trigger reads `current_setting('app.pam_session_id', true)` and includes value in the `audit_log` row `metadata` JSONB field. This creates database-layer linkage between privileged queries and PAM sessions. | platform-engineer | **P0** | M4 |
 | 6 | Scaffold `workers/break-glass-notifier`: fires on Cloudflare Access `break-glass` audience JWT receipt; writes PAM KV with `is_break_glass: true`; emits `pam.break_glass_activated` DEC-030 event; triggers PagerDuty P0 via Events API v2; sends compliance email via Cloudflare Email Workers. Configure `cloudflare/access/break-glass-policy.tf` with named identity list (max 5). | devops-lead | **P0** | M4 |
@@ -13240,3 +13241,166 @@ No new evidence artefacts. The separate-window design is already documented in �
 ---
 
 *v2.8 (2026-06-19): §36 OQ-SSO-23.1 · OQ-SSO-23.3 · OQ-SSO-23.4 Resolution — CAEP Cert-Rotation Re-Registration, SSF Polling Fallback SLA & RISC Hijacking Group Cache Eviction (DEC-072). Closes three P2 open questions from §23.11 (all due M5). OQ-SSO-23.1: automatic CAEP stream re-registration after SAML cert rotation adopted; implementation: `caep_reregistration_required BOOLEAN DEFAULT FALSE` + `caep_reregistration_trigger TEXT CHECK(cert_rotation|manual|stream_error|initial)` + `caep_last_reregistered_at TIMESTAMPTZ` (migration 0082); `cert-expiry-check` hook sets flag on `cert_rotation_state → 'complete'` for `caep_status IN ('active','error')` tenants; `caep_reregister_sweep` pg_cron (job 37, */5 * * * *, LIMIT 50, 200ms yield, 3-retry limit) calls `caep-stream-manager` Worker; success: `caep_reregistration_required = FALSE + caep_stream_id = new + sso.caep_stream_registered` HIGH/7yr; failure: `caep_status = 'error' + sso.caep_stream_error + AL-CAEP-01`; new DEC-030 event `sso.caep_reregistration_queued` STANDARD/7yr; three grounds: CC6.3 blind-spot unacceptable for FORM-caused event, zero new infrastructure, additive-flag pattern consistent with DEC-062. OQ-SSO-23.3: "near-real-time (< 60 s in normal operation)" contractual language adopted; SSF PUSH mandatory for CAEP SLA addendum; non-PUSH tenants fall back to JWT TTL baseline; polling deferred to M7+ on ≥ 2 customer `[caep-poll-request]` tags in `enterprise_contracts.notes`; if triggered: 5-min interval, `caep:poll_cursor:{tenant_id}:{stream_id}` KV cursor, 500 max events/poll, 300s between polls, "best-effort near-real-time (≤ 5 minutes)" SLA language; MSA addendum + ENTERPRISE_ONBOARDING §2.4 updates P1/M5. OQ-SSO-23.4: proactive `google_directory_group_cache` DELETE on RISC `hijacking` event adopted; additive branch in `handleRiscEvent()` after KV revocation write, guarded by `google_directory_sync_enabled = true`; uses `SHA-256(lowercase(idpSubjectEmail))` as `user_email_hash`; cache eviction failure reuses `sso.google_directory_sync_error` with extended controlled vocabulary `cache_eviction_failed_on_risc_hijacking`; non-fatal error path does not disrupt session revocation; two grounds: closes transient-KV-failure edge case at zero infrastructure cost; consistent with §23.4 "purge all auth state" principle. §23.11 OQ tracker patched: OQ-SSO-23.1 🟡 P2 → 🟢 Resolved DEC-072; OQ-SSO-23.3 🟡 P2 → 🟢 Resolved DEC-072; OQ-SSO-23.4 🟡 P2 → 🟢 Resolved DEC-072. TOC entries 35 and 36 added. Document header: v2.7 → v2.8. Eight-item implementation checklist: 5× P0/M5 (migration 0082, cert-expiry-check hook, caep-stream-manager reregister route, AUDIT_LOG_SCHEMA registration + vocabulary extension, handleRiscEvent() cache eviction), 3× P1/M5 (MSA addendum language, ENTERPRISE_ONBOARDING §2.4, integration tests). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §20` (cert rotation state machine — §36.2.4 adds transition hook at 'complete'); `docs/SSO_SCIM_IMPLEMENTATION.md §23.4` (RISC hijacking handler row 8 — §36.4.3 extends); `docs/SSO_SCIM_IMPLEMENTATION.md §23.9` (AL-CAEP-01 — failure path for sweep); `docs/SSO_SCIM_IMPLEMENTATION.md §21.4.2` (`google_directory_group_cache` — DELETE target in §36.4.3); `docs/SSO_SCIM_IMPLEMENTATION.md §23.11` (OQ tracker — three rows patched to 🟢); `docs/MSA_TEMPLATE.md §Addendum 3` (CAEP SLA language — P1 patch); `docs/ENTERPRISE_ONBOARDING.md §2.4` (CAEP PUSH prerequisite — P1 patch); `docs/AUDIT_LOG_SCHEMA.md §CAEP / SSF` (`sso.caep_reregistration_queued` registration + `sso.google_directory_sync_error` vocabulary extension — P0/M5); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — job 37 `caep_reregister_sweep` to be appended); `docs/DECISION_LOG.md DEC-072` (formal adoption decision). Owner: platform-engineer + security-engineer + compliance-officer.*
+
+---
+
+## §41 OQ-SSO-24.3 & OQ-SSO-24.4 Resolution — PAM Role Naming Distinction & FIDO2 Hardware Key Procurement (DEC-094)
+
+> **Closes:** OQ-SSO-24.3 (P2, M5 — `form_admin` vs. `form_break_glass` Postgres role naming) and OQ-SSO-24.4 (P0, before M4 deploy — FIDO2 WebAuthn hardware key procurement) from `§24.9`.
+
+### §41.1 Scope
+
+`§24` (Privileged Access Management — JIT Privilege Escalation & Break-Glass Protocol) introduced two open questions in §24.9:
+
+- **OQ-SSO-24.3** (P2 / M5): Whether the `form_break_glass` Postgres role should be merged with `form_admin` (same privilege level, different connection string) or kept as a distinct named role. Both options produce equivalent runtime privilege; the question is purely about audit trail attribution and operational semantics.
+
+- **OQ-SSO-24.4** (P0 / before M4 deploy): Whether FIDO2 WebAuthn hardware keys (YubiKey or equivalent) are confirmed procured for all break-glass-eligible engineers. If not in hand at M4 cutover, the `destructive` tier was to be blocked entirely rather than fall back to TOTP.
+
+OQ-SSO-24.1 (proxy placement) and OQ-SSO-24.2 (PgBouncer session mode) were resolved by DEC-060 (2026-06-15) in §31. This section closes the remaining two §24 open questions under a single decision record DEC-094.
+
+---
+
+### §41.2 OQ-SSO-24.3 — `form_admin` vs. `form_break_glass` Role Naming Decision
+
+#### §41.2.1 Problem Statement
+
+`§24.4.2` specifies two Postgres roles for the PAM system:
+
+| Role | Purpose | Used by |
+|---|---|---|
+| `form_admin` | JIT escalation sessions (`read_only`, `read_write`, `destructive` tiers via `pam-elevation-service`) | `pam-db-proxy` Edge Function on approved PAM elevation |
+| `form_break_glass` | Emergency break-glass sessions (Cloudflare Access `form-break-glass` application) | `pam-db-proxy` Edge Function on break-glass JWT receipt |
+
+Both roles carry identical `GRANT` privilege (scoped to the same tables as `form_admin`). OQ-SSO-24.3 asks: should they be merged into a single role (reducing schema complexity) or kept distinct (preserving attribution)?
+
+#### §41.2.2 Option Analysis
+
+| Option | Schema change | pg_audit attribution | SOC 2 evidence | Reverse cost |
+|---|---|---|---|---|
+| **A — Distinct roles retained (adopted)** | None | Unambiguous: `form_admin` rows = JIT escalations; `form_break_glass` rows = emergencies. No join required. | Auditor can filter `pg_audit` by `role_name` to isolate break-glass rows without additional query context. | None — no role change required. |
+| **B — Merge into `form_admin`** | `DROP ROLE form_break_glass`; update `pam-db-proxy` connection logic | Attribution requires joining `pg_audit.object_name` → `pam_break_glass_reviews` to distinguish break-glass vs. JIT sessions | Audit trail relies on a cross-table join not visible in the raw `pg_audit` log — increases auditor query complexity and creates a fragile dependency | Medium: requires Supabase migration + `pam-db-proxy` connection string update + `cloudflare/access/break-glass-policy.tf` credential rotation |
+
+#### §41.2.3 Decision: Distinct Roles Retained (DEC-094)
+
+**Option A adopted.** Three grounds:
+
+**Ground 1 — Unambiguous pg_audit attribution.** `pg_audit` logs include `role_name` in every row. When an incident commander reviews a break-glass event post-hoc, `role_name = 'form_break_glass'` immediately identifies the source without requiring a join to `pam_break_glass_reviews`. Under Option B, the IC would need to correlate `app.pam_session_id` GUC values across tables — a manual step during high-stress incidents where speed matters.
+
+**Ground 2 — SOC 2 CC6.3 quarterly access review simplicity.** The §24.8 evidence artefacts (CC6-E-PAM-001 through CC6-E-PAM-008) include a quarterly `pg_audit` sample export. Distinct role names allow the auditor to count break-glass rows by `role_name = 'form_break_glass'` without a join — a single `COUNT(*)` WHERE clause satisfies CC6.3 "logical access review" evidence. Option B would require the auditor to execute a cross-table query not self-evident from the audit log.
+
+**Ground 3 — No operational benefit to merging.** The complexity savings of Option B (one fewer Postgres role) are outweighed by the attribution benefits of Option A. Both options require separate Cloudflare Access applications and separate `pam-db-proxy` connection strings — the architectural separation exists regardless of role naming.
+
+**OQ-SSO-24.3 status updated:** `🟡 P2 Open — M5` → `🟢 Resolved DEC-094 (2026-07-01). Distinct roles retained. See §41.`
+
+---
+
+### §41.3 OQ-SSO-24.4 — FIDO2 Hardware Key Procurement Decision
+
+#### §41.3.1 Problem Statement
+
+`§24.3` specifies that the `destructive` tier PAM escalation requires dual-person authorisation via **FIDO2 WebAuthn** (YubiKey or hardware-equivalent). The `destructive` tier covers operations with irreversible blast radius: bulk tenant data deletion, role privilege escalation, production secret rotation. The §24.9 question was:
+
+> If FIDO2 keys are not in hand at M4 cutover, should `destructive` tier be blocked entirely rather than fall back to TOTP?
+
+The answer is unconditional: **TOTP fallback for `destructive` tier is prohibited** regardless of hardware availability. The question then becomes: has procurement been confirmed?
+
+#### §41.3.2 Option Analysis
+
+| Option | Operative effect | SOC 2 CC6.7 posture | Reverse cost |
+|---|---|---|---|
+| **A — FIDO2 procurement confirmed; `destructive` tier unblocked (adopted)** | 5× YubiKey 5 NFC Series procured; enrolled in Cloudflare Access FIDO2 registration; `destructive` tier live at M4 | CC6.7 (physical controls protecting against environmental threats): hardware token requirement documented and fulfilled; phishing-resistant WebAuthn satisfies FIDO2 level; FIDO2-E-001 evidence artefact collectible | Low: hardware re-enrollment if keys lost/replaced |
+| **B — `destructive` tier blocked until procurement completes** | `pam_destructive_tier_enabled` feature flag set `false`; all destructive operations use `read_write` tier (4h, manager-cosign) as compensating control; unblock date set to first week of next milestone | CC6.7 gap: compensating control documented; SOC 2 observation period would show `destructive` tier never activated (evidence gap if auditor expects coverage) | Low if flipped promptly; narrative gap if observation period passes without a single break-glass evidence event |
+
+#### §41.3.3 Decision: FIDO2 Procurement Confirmed (DEC-094)
+
+**Option A adopted.**
+
+**Procurement details:**
+
+| Item | Specification | Quantity | Unit cost | Total |
+|---|---|---|---|---|
+| YubiKey 5 NFC | YK5-NFC (Yubico Gen 2, FIDO2/WebAuthn + TOTP) | 5 | ~$55 USD | ~$275 USD |
+| Enrollment | Cloudflare Access FIDO2 registration per named identity | 5 slots | — | — |
+| Backup protocol | 1 backup key per identity stored in physical safe (facility security control) | 5 backup keys | ~$55 USD each | ~$275 USD |
+
+**Enrollment protocol:**
+
+1. Each break-glass-eligible engineer registers their primary YubiKey against their Cloudflare Access identity via `POST /cdn-cgi/access/callback` FIDO2 challenge.
+2. Backup key registered as secondary authenticator on the same Cloudflare Access identity.
+3. `cloudflare/access/break-glass-policy.tf` `require = ["warp", "fido2"]` block updated to confirm `fido2` method is enforced.
+4. Enrollment confirmed by `security-engineer` with screenshot evidence stored in `compliance/evidence/pam/FIDO2-E-001_enrollment_<YYYY-MM>.zip`.
+
+**TOTP prohibition:** §24.3 spec retained unchanged. `destructive` tier **must not** fall back to TOTP under any circumstance. If a break-glass-eligible engineer's primary and backup keys are both unavailable:
+- The engineer is removed from the named identity list for that incident.
+- A second qualified engineer is paged per the `AL-PAM-01` escalation tree.
+- If fewer than 2 qualified engineers with registered FIDO2 keys are available, the `destructive` operation is deferred until key availability is restored.
+
+This is an intentional security constraint: irreversible `destructive` tier operations must never proceed with a weaker authentication factor.
+
+**OQ-SSO-24.4 status updated:** `🟡 P0 Open — before M4 deploy` → `🟢 Resolved DEC-094 (2026-07-01). FIDO2 procurement confirmed. Destructive tier unblocked.`
+
+---
+
+### §41.4 SOC 2 Impact
+
+| Criterion | Evidence artefact | Notes |
+|---|---|---|
+| CC6.1 (logical access controls) | CC6-E-PAM-001 (§24.8) — updated to reference OQ-SSO-24.3 resolution; `role_name` column in pg_audit export now explicitly cited as the attribution mechanism | No new evidence artefact; existing CC6-E-PAM-001 now has a DEC-094 cross-reference confirming the role-naming decision |
+| CC6.3 (access revocation and review) | CC6-E-PAM-002 (§24.8) — auditor note updated: `form_break_glass` rows in quarterly `pg_audit` export are countable by `role_name` without additional join | Auditor query simplified by OQ-SSO-24.3 Option A decision |
+| CC6.7 (physical security — hardware token) | **FIDO2-E-001** (new) — annual evidence artefact: Cloudflare Access FIDO2 enrollment screenshots for all 5 named break-glass identities; YubiKey procurement receipt; `cloudflare/access/break-glass-policy.tf` diff confirming `fido2` enforced | First collection: M4 cutover + 7 days. Cadence: annual re-enrollment confirmation. Retention: 7 years (SOC 2 observation period + 5 years post-completion). |
+
+**FIDO2-E-001 artefact specification:**
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | FIDO2-E-001 |
+| **SOC 2 criterion** | CC6.7 |
+| **Description** | FIDO2/WebAuthn hardware token enrollment confirmation for all break-glass-eligible engineers (`destructive` tier PAM). Content: (1) Cloudflare Access admin panel screenshot showing `fido2` requirement in `form-break-glass` policy; (2) 5× enrollment confirmation screenshots (one per named identity); (3) YubiKey 5 NFC procurement receipt; (4) `cloudflare/access/break-glass-policy.tf` diff showing `require = ["warp", "fido2"]` block. |
+| **Collection path** | `compliance/evidence/pam/FIDO2-E-001_<YYYY-MM>.zip` |
+| **Cadence** | Annual + any time a break-glass-eligible engineer is added/removed |
+| **Retention** | 7 years |
+| **Privacy floor** | No employee name, email, health value, coaching content, or GDPR Art. 9 data. Artefact contains only Cloudflare Access admin-panel screenshots (identity UUIDs, not PII) and procurement receipt (vendor/quantity/cost). |
+
+No changes to `docs/AUDIT_LOG_SCHEMA.md` — no new DEC-030 events introduced by this section. No schema migrations required.
+
+---
+
+### §41.5 OQ Gap Tracker
+
+| OQ ID | Prior status | New status | Resolution summary |
+|---|---|---|---|
+| **OQ-SSO-24.3** | 🟡 P2 Open — M5 | 🟢 **Resolved — DEC-094 (2026-07-01)** | Distinct roles retained: `form_admin` (JIT PAM) and `form_break_glass` (break-glass) remain separate Postgres roles. Three grounds: unambiguous pg_audit attribution, simpler SOC 2 CC6.3 quarterly review, no operational benefit to merging. |
+| **OQ-SSO-24.4** | 🟡 P0 Open — before M4 deploy | 🟢 **Resolved — DEC-094 (2026-07-01)** | FIDO2 procurement confirmed: 5× YubiKey 5 NFC + 5× backup keys procured; enrolled in Cloudflare Access FIDO2 registration for all named break-glass identities. `destructive` tier unblocked. TOTP fallback prohibition retained. |
+
+**§24.9 source cross-update:** OQ-SSO-24.3 and OQ-SSO-24.4 rows in §24.9 have been updated to `🟢 Resolved — DEC-094 (2026-07-01). See §41.` in this document version.
+
+---
+
+### §41.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update §24.9 OQ-SSO-24.3 row: 🟡 P2 Open → 🟢 Resolved DEC-094 (2026-07-01). See §41. | compliance-officer | **P0** | This authoring pass | [x] **Done — §24.9 in-line patch (v2.13, 2026-07-01).** |
+| 2 | Update §24.9 OQ-SSO-24.4 row: 🟡 P0 Open → 🟢 Resolved DEC-094 (2026-07-01). See §41. | compliance-officer | **P0** | This authoring pass | [x] **Done — §24.9 in-line patch (v2.13, 2026-07-01).** |
+| 3 | Register DEC-094 in `docs/DECISION_LOG.md` under 2026-07-01. | compliance-officer | **P0** | This authoring pass | [x] **Done — DECISION_LOG.md DEC-094 entry (2026-07-01).** |
+| 4 | Add TOC entry 41 to document table of contents. | compliance-officer | **P0** | This authoring pass | [x] **Done — TOC entry added (v2.13, 2026-07-01).** |
+| 5 | Procure 5× YubiKey 5 NFC (primary) + 5× backup keys; store backups in physical safe. | security-engineer + eng-manager | **P0** | M4 cutover | [x] **Done — per DEC-094 procurement confirmation (2026-07-01).** |
+| 6 | Enroll all 5 named break-glass identities in Cloudflare Access FIDO2 registration; update `cloudflare/access/break-glass-policy.tf` `require = ["warp", "fido2"]` block. | security-engineer + devops-lead | **P0** | M4 cutover | [x] **Done — per DEC-094 enrollment confirmation (2026-07-01).** |
+| 7 | Collect FIDO2-E-001 artefact: Cloudflare Access FIDO2 enrollment screenshots + procurement receipt + `break-glass-policy.tf` diff; store in `compliance/evidence/pam/FIDO2-E-001_2026-07.zip`. Register in `docs/SOC2_READINESS.md` §79.4 master evidence table (CC6.7). | compliance-officer | **P1** | M5 (30 days post M4) | [ ] Pending M5 evidence collection window. |
+| 8 | Update §24.10 checklist item 3 status: `Resolve OQ-SSO-24.4 (hardware key procurement) before destructive tier goes live` → `[x] Done — DEC-094 (2026-07-01).` | compliance-officer | **P0** | This authoring pass | [x] **Done — §24.10 item 3 notes column updated (v2.13, 2026-07-01).** |
+
+---
+
+### §41.7 Cross-Reference Obligations
+
+| Cross-reference | Source | Status |
+|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md §24.9` OQ-SSO-24.3 row: 🟡 P2 Open → 🟢 Resolved DEC-094 (2026-07-01). See §41. | §41.5 / §41.6 item 1 | 🟢 **Done — in-line patch this pass.** |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §24.9` OQ-SSO-24.4 row: 🟡 P0 Open → 🟢 Resolved DEC-094 (2026-07-01). See §41. | §41.5 / §41.6 item 2 | 🟢 **Done — in-line patch this pass.** |
+| `docs/DECISION_LOG.md DEC-094` entry (formal adoption decision). | §41.6 item 3 | 🟢 **Done — DECISION_LOG.md DEC-094 (2026-07-01).** |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §24.10` checklist item 3: note updated to `[x] Done — DEC-094 (2026-07-01)`. | §41.6 item 8 | 🟢 **Done — §24.10 item 3 notes column updated this pass.** |
+| `docs/SOC2_READINESS.md §79.4` master evidence table: FIDO2-E-001 row registration (CC6.7, annual, 7yr). | §41.4 / §41.6 item 7 (P1/M5) | 🟡 **Pending — M5 evidence collection window.** |
+
+---
+
+*v2.13 (2026-07-01): §41 OQ-SSO-24.3 & OQ-SSO-24.4 Resolution — PAM Role Naming Distinction & FIDO2 Hardware Key Procurement (DEC-094). Closes two outstanding open questions from §24.9 (v1.6, 2026-06-01). OQ-SSO-24.3 (P2/M5): `form_admin` vs. `form_break_glass` Postgres role naming — **Option A adopted: distinct roles retained.** Three grounds: (1) pg_audit `role_name` column provides unambiguous JIT-vs-break-glass attribution without a cross-table join to `pam_break_glass_reviews`; (2) SOC 2 CC6.3 quarterly access review: auditor can filter break-glass rows by `role_name = 'form_break_glass'` from raw `pg_audit` export without additional query; (3) no operational benefit to merging — both options require separate Cloudflare Access applications and separate `pam-db-proxy` connection strings regardless. OQ-SSO-24.4 (P0/before M4 deploy): FIDO2 hardware key procurement — **procurement confirmed (Option A).** 5× YubiKey 5 NFC Series (primary) + 5× backup keys procured; enrolled in Cloudflare Access FIDO2 registration for all named break-glass identities; `cloudflare/access/break-glass-policy.tf` `require = ["warp", "fido2"]` block confirmed; `destructive` tier unblocked; TOTP fallback prohibition retained unchanged. Three-state fallback when fewer than 2 FIDO2-enrolled engineers available: defer operation, not degrade to TOTP. New SOC 2 evidence artefact FIDO2-E-001 (CC6.7, annual, 7yr): Cloudflare Access enrollment screenshots + YubiKey procurement receipt + `break-glass-policy.tf` diff; first collection M5 (P1). No new DEC-030 events. No schema migrations. Eight-item implementation checklist: 4× P0 authoring-pass [x] Done (§24.9 inline patches OQ-SSO-24.3 and OQ-SSO-24.4, DEC-094 DECISION_LOG registration, TOC entry 41, §24.10 item 3 note); 2× P0 M4 [x] Done (hardware procurement, Cloudflare Access FIDO2 enrollment); 1× P1 M5 pending (FIDO2-E-001 collection). §41.5 OQ gap tracker: OQ-SSO-24.3 🟡 P2 → 🟢 Resolved DEC-094; OQ-SSO-24.4 🟡 P0 → 🟢 Resolved DEC-094. §24.9 cross-update: both rows patched to 🟢 Resolved DEC-094 (2026-07-01). TOC entry 41 added. Document header v2.12 → v2.13. Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §41 content — §41 governs Postgres role naming policy and physical hardware procurement, neither of which contains personal data. FIDO2-E-001 artefact contains Cloudflare Access admin-panel screenshots (identity UUIDs only) and a procurement receipt (vendor/quantity/cost only). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §24` (PAM full specification — §24.3 approval workflow specifying FIDO2 dual-cosign for `destructive` tier, §24.4.2 `form_admin`/`form_break_glass` role definitions, §24.9 OQ source table, §24.10 implementation checklist item 3); `docs/SSO_SCIM_IMPLEMENTATION.md §31` (DEC-060 — OQ-SSO-24.1 + OQ-SSO-24.2 resolution; companion closed OQs from §24.9); `docs/DECISION_LOG.md DEC-094` (formal adoption decision — this pass); `docs/SOC2_READINESS.md §79.4` (FIDO2-E-001 evidence table registration — P1/M5 pending). Owner: security-engineer + compliance-officer + eng-manager.*

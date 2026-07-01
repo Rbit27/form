@@ -15,6 +15,17 @@
 
 ## 2026-07-01
 
+### DEC-094 · OQ-SSO-24.3 & OQ-SSO-24.4 Resolution: PAM Role Naming Distinction & FIDO2 Hardware Key Procurement
+
+- **Decision:** (1) **OQ-SSO-24.3** — `form_admin` and `form_break_glass` Postgres roles kept **distinct** (Option A). No merge. (2) **OQ-SSO-24.4** — FIDO2 hardware key procurement **confirmed**: 5× YubiKey 5 NFC (primary) + 5× backup keys procured; enrolled in Cloudflare Access FIDO2 registration for all named break-glass identities; `destructive` tier **unblocked**; TOTP fallback prohibition for `destructive` tier **retained unchanged**. Full specification in `docs/SSO_SCIM_IMPLEMENTATION.md §41`.
+- **Owner:** security-engineer + compliance-officer + eng-manager
+- **Why (OQ-SSO-24.3):** Distinct roles produce unambiguous pg_audit attribution — `role_name = 'form_break_glass'` in raw audit logs immediately identifies emergency break-glass sessions without a cross-table join to `pam_break_glass_reviews`. SOC 2 CC6.3 quarterly review is simpler. No operational benefit to merging since both options require separate Cloudflare Access applications and `pam-db-proxy` connection strings.
+- **Why (OQ-SSO-24.4):** FIDO2 phishing-resistant authentication is a non-negotiable requirement for `destructive` tier PAM operations (irreversible blast radius: bulk tenant data deletion, production secret rotation). TOTP is susceptible to real-time phishing and does not satisfy CC6.7 for this threat model. Hardware procurement (~$550 USD total for primary + backup keys) is a trivial one-time cost relative to the risk of a compromised `destructive` session.
+- **Reverse cost (OQ-SSO-24.3):** None — no role change, no migration. Only a DECISION_LOG entry and §41 documentation.
+- **Reverse cost (OQ-SSO-24.4):** Low — if a named break-glass identity changes, re-enroll replacement key in Cloudflare Access. Hardware procurement is sunk cost (~$550); replacement key if lost ~$55/unit.
+
+---
+
 ### DEC-093 · OQ-SSO-34.1 Resolution: BDG Guard Window vs. AL-SCIM-MASS-01 Detection Window — Separate Windows Retained
 
 - **Decision:** Separate windows retained: 5-min BDG guard (preventive — HTTP 422 before deprovisioning) + 10-min AL-SCIM-MASS-01 detection (reactive — PagerDuty after deprovisioning). Admin Dashboard SCIM configuration panel tooltip (§40.4) added to explain the relationship. Full specification in `docs/SSO_SCIM_IMPLEMENTATION.md §40`.

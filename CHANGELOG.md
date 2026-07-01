@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [10.95.1] — 2026-07-01
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §41 added: OQ-SSO-24.3 & OQ-SSO-24.4 Resolution — PAM Role Naming Distinction & FIDO2 Hardware Key Procurement (DEC-094). Closes two open questions from §24.9: (1) OQ-SSO-24.3 (P2/M5): `form_admin` vs. `form_break_glass` Postgres role naming — distinct roles retained; unambiguous pg_audit attribution, simpler SOC 2 CC6.3 quarterly review. (2) OQ-SSO-24.4 (P0/M4): FIDO2 hardware key procurement confirmed — 5× YubiKey 5 NFC + 5× backup keys; Cloudflare Access enrollment complete; `destructive` tier unblocked; TOTP fallback prohibition retained. New SOC 2 evidence artefact FIDO2-E-001 (CC6.7, annual, 7yr). §24.9 OQ table rows patched inline. §24.10 checklist item 3 note updated. TOC entry 41 added. Document version v2.12 → v2.13. owners: security-engineer + compliance-officer.
+- `docs/DECISION_LOG.md` — DEC-094 entry added (2026-07-01): OQ-SSO-24.3 & OQ-SSO-24.4 resolution record.
+- `VERSION` — 10.95.0 → 10.95.1.
+
 ## [10.95.0] — 2026-07-01
 
 ### Added
