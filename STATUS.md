@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.96.0** — 2026-07-01 · post-153 + post-2910 · post-153: «Навантаження без рахунку: як self-coached атлет оцінює тижневий обсяг без таблиць» · series «Програмування для реального світу» 151–160 (3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · post-2910: «Коли змінювати програму, а коли — чекати: критерії, які не залежать від відчуттів» · series «Тренувальна комунікація з собою» 2906–2915 (5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards added for post-153 and post-2910 · next: post-154 («Прогресія без прогресу: як self-coached атлет будує мезоцикл, коли лінійна прогресія перестала працювати») + post-2911 («Тренувальна мова для комунікації з тренером або партнером: як описати стан так, щоб отримати корисну відповідь»)
+
 **v10.95.0** — 2026-07-01 · post-152 · «Як тренувальна програма «застаріває»: механіка адаптації і ознаки, що пора змінити стимул» · series «Програмування для реального світу» 151–160 (2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-152 · next: post-153 («Навантаження без рахунку: як self-coached атлет оцінює тижневий обсяг без таблиць»)
 
 **v10.94.0** — 2026-07-01 · post-151 · «Тренування до відмови: метрика управління ризиком, а не прогресу» · series «Програмування для реального світу» 151–160 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-151 · next: post-152 («Як тренувальна програма «застаріває»: механіка адаптації і ознаки, що пора змінити стимул»)
