@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [10.85.1] — 2026-07-01
+
+### Changed
+- `docs/OBSERVABILITY.md §33.3` — PHI exception blockquote added after CHS "internal only" paragraph. Clarifies that raw CHS/FEHS score (0–100) remains internal-only while the derived Programme Health Indicator (PHI) 3-band label (Healthy / Needs Attention / At Risk) IS shared with tenant admins in the Admin Dashboard per DEC-092. Documents `insufficient_data` suppression (k < 5 — QBR-K-ANON-01 Tier 1 floor) and audit trail via `admin.programme_health_label_viewed`. Closes `docs/COST_MODEL.md §54.10` item 4 (P1/M7). Header v5.12.3 → v5.12.4.
+- `docs/AUDIT_LOG_SCHEMA.md` — new section `### Enterprise CS Hiring Governance events` added with `enterprise.hiring_decision_logged` STANDARD/3yr DEC-030 HMAC-chained event (DEC-091 / COST_MODEL §53). Records CS-HIRE-GATE-01 gate evaluation at Month 9 board review regardless of outcome: Criterion A (`active_enterprise_accounts ≥ 4`), Criterion B (`estimated_monthly_qbr_hours ≥ 12`), `gate_triggered` bool, `hire_type_planned` enum, `decision_basis` enum (gate_criteria / manual_override). `HiringDecisionLoggedSchema` Zod v2 (9 fields). SOC 2 CC1.4/CC5.2. Privacy floor: tenant count only — no individual employee data. Retention table +1 row. Closes `docs/COST_MODEL.md §53.9` item 3 (P1/M7). Header v2.68 → v2.69.
+- `VERSION` — 10.85.0 → 10.85.1.
+
+---
+
 ## [10.85.0] — 2026-07-01
 
 ### Added
