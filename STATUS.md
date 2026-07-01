@@ -6,6 +6,12 @@
 
 ## Current version
 
+**v10.79.0** — 2026-07-01 · post-2904 · «Різниця між блоком, який не спрацював, і блоком, який не спрацював так, як планувалось» · series «Якість тренувального рішення» 2896–2905 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2904 · next: post-2905 (фінальний — «Синтез: операційна модель якісного тренувального рішення для self-coached атлета», series COMPLETE)
+
+**v10.78.1** — 2026-07-01 · enterprise: DATA_MODEL §50.9 item 5 + §50.10 cross-reference closure · next: post-2904
+
+**v10.78.0** — 2026-07-01 · post-141 · next: post-2904
+
 **v10.77.0** — 2026-07-01 · post-2903 · «Структурні питання для ретроспективного аналізу тренувального блоку» · series «Якість тренувального рішення» 2896–2905 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2903 · enterprise: ENTERPRISE_ONBOARDING.md v0.5 §1.3 + §2.4 + A.1 (MDM Change Window Declaration Protocol — §66.9 item 7 Done) · OBSERVABILITY.md v5.12.3 (§66.9 item 7 [x], §66.11 all 🟢) · next: post-2904 («Різниця між блоком, який не спрацював, і блоком, який не спрацював так, як планувалось»)
 
 **v10.76.1** — 2026-07-01 · enterprise: OTA-WINDOW-E-001 registration in SOC2_READINESS.md §140 (count 108→109) · OBSERVABILITY.md v5.12.2 §66.9 item 8 Done, §66.11 closed · next: post-2903
