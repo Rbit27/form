@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [10.92.1] — 2026-07-01
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §40 added: OQ-SSO-34.1 Resolution (DEC-093) — BDG Guard Window vs. AL-SCIM-MASS-01 Detection Window: Separate Windows Retained. Closes the last open question from §34.12 (P2, before enterprise GA M13). Three grounds for Option A: complementary-not-competing two-layer model, override false-positive is an intentional IC touchpoint (CC7.2), operator confusion resolved by Admin Dashboard tooltip (§40.4). §34.12 OQ-SSO-34.1 row patched 🟡 P2 Open → 🟢 Resolved DEC-093. Four-item checklist: 3× P0 done this pass (§34.12 patch, DEC-093 registration, TOC entry), 1× P1/M13 (Admin Dashboard tooltip implementation). v2.11 → v2.12.
+- `docs/DECISION_LOG.md` — DEC-093 registered (2026-07-01): BDG guard window vs. AL-SCIM-MASS-01 detection window — separate windows retained; Admin Dashboard tooltip added; reverse cost near-zero.
+- `VERSION` — 10.92.0 → 10.92.1.
+
+---
+
 ## [10.92.0] — 2026-07-01
 
 ### Added

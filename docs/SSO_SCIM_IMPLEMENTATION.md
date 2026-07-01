@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.11
+# FORM · SSO/SCIM Implementation v2.12
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -45,6 +45,7 @@
 37. [Cross-Reference Patch — R-37 · R-38 · §36.6 Item 1 Closure (SSO Monitoring Recovery Runbooks)](#37-cross-reference-patch--r-37--r-38--366-item-1-closure-sso-monitoring-recovery-runbooks)
 38. [Cross-Reference Patch — AUDIT_LOG_SCHEMA SCIM-Lifecycle Registration (§27.14 Item 1 Closure)](#38-cross-reference-patch--audit_log_schema-scim-lifecycle-registration-2714-item-1-closure)
 39. [Cross-Reference Patch — SOC2_READINESS §119 (§27.14 Items 14 + 17 Documentation Closure)](#39-cross-reference-patch--soc2_readiness-119-2714-items-14--17-documentation-closure)
+40. [OQ-SSO-34.1 Resolution — BDG Guard Window vs. AL-SCIM-MASS-01 Detection Window: Separate Windows Retained (DEC-093)](#40-oq-sso-341-resolution--bdg-guard-window-vs-al-scim-mass-01-detection-window-separate-windows-retained-dec-093)
 
 ---
 
@@ -12481,7 +12482,7 @@ Cross-reference obligation: register GUARD-E-001 in `docs/SOC2_READINESS.md §91
 
 | ID | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
-| **OQ-SSO-34.1** | **Should the 5-minute guard window align with AL-SCIM-MASS-01's 10-minute window?** Separate windows (5-min guard / 10-min detection) mean the guard fires before detection, which is the intended order. Unified 5-minute windows would simplify operator mental model but increase AL-SCIM-MASS-01 false-positive risk. Recommendation: keep separate windows; document in Admin Dashboard tooltip. | P2 | enterprise-architect | Document in `docs/DECISION_LOG.md` if unification is adopted at M13 implementation. |
+| **OQ-SSO-34.1** | **Should the 5-minute guard window align with AL-SCIM-MASS-01's 10-minute window?** Separate windows (5-min guard / 10-min detection) mean the guard fires before detection, which is the intended order. Unified 5-minute windows would simplify operator mental model but increase AL-SCIM-MASS-01 false-positive risk. Recommendation: keep separate windows; document in Admin Dashboard tooltip. | ~~P2~~ | enterprise-architect | 🟢 **Resolved — DEC-093 (2026-07-01).** Separate windows retained. Admin Dashboard tooltip (§40.4) addresses operator mental model concern. See §40. |
 | **OQ-SSO-34.2** | **Should `contracted_seats` be sourced from `enterprise_contracts.contracted_seats` (static, 60s KV cache) or `COUNT(tenant_users WHERE is_active = true)` (real-time, per-request DB query)?** Static contracted_seats is stable and avoids per-request COUNT load during bulk syncs. Active count is more accurate but adds latency and DB connection pressure during the very scenario the guard is protecting against. Recommendation: `enterprise_contracts.contracted_seats` with 1-hour KV cache refreshed by `billing.seats_expanded`/`billing.seats_reduced` DEC-030 events. | ~~P1~~ | platform-engineer | 🟢 **Resolved — DEC-069 (2026-06-19).** Option A adopted. See §35. |
 
 ---
@@ -13150,6 +13151,87 @@ This patch closes the **documentation portion** of `docs/SSO_SCIM_IMPLEMENTATION
 |---|---|---|
 | `docs/SSO_SCIM_IMPLEMENTATION.md §27.14` item 14 (P1/M6) documentation portion: register SCIM-PROV-E-001 and SCIM-PROV-E-002 in SOC2_READINESS §79.4 master evidence table, §80.3 R2 folder registry, and §80.4 Vanta mirror list | §27.14 item 14 + §27.12 (SCIM-PROV-E-001/002 definitions, v1.9, 2026-06-13) | 🟢 **SOC2_READINESS §119 (v3.44.0, 2026-06-26) + §39 this patch (v2.11, 2026-06-26).** §27.14 item 14 status: `[ ]` → `[x] Done (documentation portion)`. |
 | `docs/SSO_SCIM_IMPLEMENTATION.md §27.14` item 17 (P2/M9) documentation portion: register SCIM-PROV-E-003 and SCIM-PROV-E-004 in SOC2_READINESS §79.4 master evidence table, §80.3 R2 folder registry, and §80.4 Vanta mirror list | §27.14 item 17 + §27.12 (SCIM-PROV-E-003/004 definitions, v1.9, 2026-06-13) | 🟢 **SOC2_READINESS §119 (v3.44.0, 2026-06-26) + §39 this patch (v2.11, 2026-06-26).** §27.14 item 17 status: `[ ]` → `[x] Done (documentation portion)`. |
+
+---
+
+*v2.12 (2026-07-01): §40 OQ-SSO-34.1 Resolution — BDG Guard Window vs. AL-SCIM-MASS-01 Detection Window: Separate Windows Retained (DEC-093). Closes OQ-SSO-34.1 (P2, §34.12, before enterprise GA M13 — whether the BDG 5-minute rolling guard window should be aligned with AL-SCIM-MASS-01's 10-minute detection window). Decision (DEC-093): **Option A adopted — separate windows retained.** Three grounds: (1) complementary, not competing — 5-min BDG is preventive (HTTP 422 before deprovisioning); 10-min AL-SCIM-MASS-01 is reactive (fires after deprovisioning for scenarios BDG cannot prevent: override-covered events, below-threshold H3 bugs, direct DB operations); unified windows would imply redundancy where none exists. (2) Override false-positive suppression requires AL-SCIM-MASS-01 complexity — the IC reviewing an AL-SCIM-MASS-01 alarm on an override-covered event checks the `scim.bulk_deprovision_override_issued`/`_used` chain and closes R-24 immediately per §34.9; removing this IC touchpoint would eliminate a CC7.2 audit-review point with no benefit. (3) Operator mental model resolved by documentation — the UX gap is a missing tooltip, not an architectural inconsistency. Option B (unify to 5 min) rejected: increases AL-SCIM-MASS-01 false-positive rate for override-covered legitimate bulk events; requires AL-SCIM-MASS-01 SQL redesign without architectural benefit. Option C (unify to 10 min) rejected: weakest outcome — extends the guard window and allows larger incremental batches to accumulate below threshold in 10 minutes without triggering HTTP 422. §40.4 Admin Dashboard tooltip copy: one-sentence `ⓘ` info-icon tooltip on `bulk_deprovision_threshold_pct` slider clarifying the 5-min/10-min relationship; no tooltip required on `bulk_deprovision_override_exp` (timestamp label is self-explanatory). §40.5 SOC 2 impact: no new evidence artefacts; CC3.2 (design decision documented as DEC-093); CC7.2 narrative gap closed (tooltip confirms operators understand alert semantics). §34.12 OQ-SSO-34.1 cross-update: 🟡 P2 Open → 🟢 Resolved DEC-093 (2026-07-01). §40.6 OQ gap tracker: OQ-SSO-34.1 🟡 → 🟢 Resolved DEC-093; OQ-SSO-34.2 status carried unchanged. §40.7 four-item implementation checklist: 3× P0 this-pass [x] Done (§34.12 in-line patch, DEC-093 DECISION_LOG registration, TOC entry 40); 1× P1/M13 (Admin Dashboard tooltip implementation). §40.8 three cross-reference obligations: two 🟢 Done this pass; one 🟡 Pending M13. TOC entry 40 added. Document header v2.11 → v2.12. Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §40 content — §40 governs only window durations and tooltip copy for an aggregate operational control. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §34` (BDG full specification — §34.4 guard implementation, §34.5 override protocol, §34.6 Admin Dashboard panel, §34.9 interaction with AL-SCIM-MASS-01, §34.12 OQ-SSO-34.1 source — in-line patch this pass); `docs/SSO_SCIM_IMPLEMENTATION.md §35` (OQ-SSO-34.2 resolution — DEC-069 `getGuardConfig()` seat source; companion OQ from same §34.12 source); `docs/INCIDENT_RESPONSE.md R-24` (SCIM mass deprovisioning runbook — §34.9 interaction; IC closes R-24 immediately on BDG-override-covered AL-SCIM-MASS-01 alarm); `docs/OBSERVABILITY.md §12.6` (job 24 `scim_mass_deprovision_check`, 10-min window, AL-SCIM-MASS-01 — detection-layer source for the window comparison); `docs/DECISION_LOG.md DEC-093` (formal adoption decision — this pass). Owner: enterprise-architect + compliance-officer.*
+
+---
+
+## §40 OQ-SSO-34.1 Resolution — BDG Guard Window vs. AL-SCIM-MASS-01 Detection Window: Separate Windows Retained (DEC-093)
+
+> **Closes:** OQ-SSO-34.1 from `§34.12` (P2 — before enterprise GA M13).
+
+### §40.1 Problem Statement
+
+OQ-SSO-34.1 was raised in §34.12 (v2.6, 2026-06-19) asking whether the SCIM Bulk Deprovision Guard (BDG) 5-minute rolling guard window (§34.4) should be aligned with AL-SCIM-MASS-01's 10-minute detection window (`docs/OBSERVABILITY.md §12.6` job 24 `scim_mass_deprovision_check`).
+
+The two-layer defence model documented in §34.9 specifies:
+
+| Layer | Mechanism | Timing | Threshold | Effect |
+|---|---|---|---|---|
+| **Preventive (§34 BDG)** | SCIM Worker pre-flight guard | Before deprovisioning occurs | 20% of contracted seats in 5-min window | HTTP 422 to IdP; no users deprovisioned; `scim.bulk_deprovision_blocked` emitted |
+| **Reactive (AL-SCIM-MASS-01, R-24)** | pg_cron `scim_mass_deprovision_check` | After deprovisioning has occurred | 10% of active seats in 10-min rolling window | PagerDuty P0/P1 dual-page; R-24 activated |
+
+OQ-SSO-34.1 noted that operators reviewing the Admin Dashboard SCIM configuration panel encounter both window values without explanation of why they differ — creating a potential mental model gap during a real bulk deprovision incident.
+
+### §40.2 Option Analysis
+
+| Option | BDG window | AL-SCIM-MASS-01 window | Key trade-off |
+|---|---|---|---|
+| **A — Retain separate windows (adopted)** | 5 min | 10 min | Guard fires before detection; override-covered events surface to AL-SCIM-MASS-01 as expected IC touchpoints; operator gap resolved by tooltip |
+| **B — Unify to 5 min (rejected)** | 5 min | 5 min | Simpler operator view; increased AL-SCIM-MASS-01 false-positive rate for override-covered legitimate bulk events; requires AL-SCIM-MASS-01 SQL redesign to suppress events when `scim.bulk_deprovision_override_used` precedes the alert window |
+| **C — Unify to 10 min (rejected)** | 10 min | 10 min | Worst outcome — extends the guard window; a bad actor or runaway IdP sync can deprovision up to 10 minutes of incremental below-threshold batches without triggering HTTP 422 before the reactive layer fires |
+
+### §40.3 Decision: Separate Windows Retained (DEC-093)
+
+**Option A adopted.** Three grounds:
+
+**Ground 1 — Complementary, not competing.** The 5-minute BDG window is the *preventive* layer: it fires HTTP 422 before any user is deprovisioned. The 10-minute AL-SCIM-MASS-01 window is the *reactive* layer: it fires after deprovisioning has occurred, catching the scenarios the guard cannot prevent — BDG override-covered events, below-threshold H3 (FORM-side SCIM Worker bug) sequences, and any direct DB operation that bypasses the Worker. Unified windows would imply the two layers are interchangeable; they are not.
+
+**Ground 2 — The override false-positive is an intentional IC touchpoint.** AL-SCIM-MASS-01 deliberately fires on BDG-override-covered events. Per §34.9: "planned bulk deprovision with override will auto-open R-24 P1 (CSM closes immediately citing override chain event)." Suppressing this alarm — which Option B would require via SQL redesign — would eliminate a CC7.2 audit-review touch with no benefit. The IC's one-minute R-24 close citing the `scim.bulk_deprovision_override_issued`/`_used` chain is the intended outcome, not a defect.
+
+**Ground 3 — The operator confusion is a UX gap, not an architecture gap.** The mental model problem cited in OQ-SSO-34.1 is resolved by a single tooltip line (§40.4). No architecture change is required.
+
+**OQ-SSO-34.1 status updated:** `🟡 P2 Open — before enterprise GA (M13)` → `🟢 Resolved DEC-093 (2026-07-01). See §40.`
+
+### §40.4 Admin Dashboard Tooltip Copy
+
+The following copy SHALL be rendered as a `ⓘ` info-icon tooltip adjacent to the `bulk_deprovision_threshold_pct` threshold slider in the Admin Dashboard SCIM configuration panel (§34.6):
+
+> **Guard window (5 min)** blocks bulk deprovisioning *before* it occurs. The separate **mass-deprovision alert (10 min)** detects any large-scale change that gets through — including approved bulk operations — and prompts an IC review. Both layers are intentional: the shorter window prevents impact, the longer window ensures audit visibility.
+
+No additional tooltip is required on the `bulk_deprovision_override_exp` field; the timestamp expiry label is self-explanatory.
+
+### §40.5 SOC 2 Impact
+
+No new evidence artefacts. The separate-window design is already documented in §34.8 (CC6.3 preventive access control, A1.2 availability protection) and §34.9 (AL-SCIM-MASS-01 complementary layer). This section formalises the design choice as DEC-093 under CC3.2 (risk assessment — significant design decisions documented and owned). The Admin Dashboard tooltip (§40.4) closes the CC7.2 evidence narrative gap ("operators understand alert semantics"). No new DEC-030 events are introduced.
+
+### §40.6 OQ Gap Tracker
+
+| OQ ID | Prior status | New status | Resolution summary |
+|---|---|---|---|
+| **OQ-SSO-34.1** | 🟡 P2 Open — before enterprise GA (M13) | 🟢 **Resolved — DEC-093 (2026-07-01)** | Separate windows retained: 5-min BDG (preventive) + 10-min AL-SCIM-MASS-01 (reactive). Admin Dashboard tooltip (§40.4) addresses operator mental model concern. No architecture change. |
+| **OQ-SSO-34.2** | ~~P1~~ | 🟢 **Resolved — DEC-069 (2026-06-19).** See §35. | (Unchanged — carried from §34.12 for tracker completeness.) |
+
+**§34.12 source cross-update:** OQ-SSO-34.1 row in §34.12 has been updated to `🟢 Resolved — DEC-093 (2026-07-01). See §40.` in this document version.
+
+### §40.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update §34.12 OQ-SSO-34.1 row: 🟡 P2 Open → 🟢 Resolved DEC-093 (2026-07-01). See §40. | compliance-officer | **P0** | This authoring pass | [x] **Done — §34.12 in-line patch (v2.12, 2026-07-01).** |
+| 2 | Register DEC-093 in `docs/DECISION_LOG.md` under 2026-07-01. | compliance-officer | **P0** | This authoring pass | [x] **Done — DECISION_LOG.md DEC-093 entry (2026-07-01).** |
+| 3 | Implement Admin Dashboard tooltip copy (§40.4) on `bulk_deprovision_threshold_pct` slider in the SCIM configuration panel (§34.6). | platform-engineer + design-craft | **P1** | M13 Admin Dashboard launch | [ ] |
+| 4 | Add TOC entry 40 to document table of contents. | compliance-officer | **P0** | This authoring pass | [x] **Done — TOC entry added (v2.12, 2026-07-01).** |
+
+### §40.8 Cross-Reference Obligations
+
+| Cross-reference | Source | Status |
+|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md §34.12` OQ-SSO-34.1 row: 🟡 P2 Open → 🟢 Resolved DEC-093 (2026-07-01). See §40. | §40.6 / §40.7 item 1 | 🟢 **Done — in-line patch this pass.** |
+| `docs/DECISION_LOG.md DEC-093` entry (formal adoption decision). | §40.7 item 2 | 🟢 **Done — DECISION_LOG.md DEC-093 (2026-07-01).** |
+| Admin Dashboard tooltip copy (§40.4) implemented in §34.6 SCIM configuration panel. | §40.7 item 3 (P1/M13) | 🟡 **Pending — M13 Admin Dashboard implementation.** |
 
 ---
 

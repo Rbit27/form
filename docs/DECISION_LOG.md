@@ -15,6 +15,15 @@
 
 ## 2026-07-01
 
+### DEC-093 · OQ-SSO-34.1 Resolution: BDG Guard Window vs. AL-SCIM-MASS-01 Detection Window — Separate Windows Retained
+
+- **Decision:** Separate windows retained: 5-min BDG guard (preventive — HTTP 422 before deprovisioning) + 10-min AL-SCIM-MASS-01 detection (reactive — PagerDuty after deprovisioning). Admin Dashboard SCIM configuration panel tooltip (§40.4) added to explain the relationship. Full specification in `docs/SSO_SCIM_IMPLEMENTATION.md §40`.
+- **Owner:** enterprise-architect + compliance-officer
+- **Why:** (1) Complementary, not competing — the two layers address different failure modes; unifying implies redundancy where none exists. (2) Unifying to 5 min increases AL-SCIM-MASS-01 false-positive rate for override-covered legitimate bulk events and requires SQL redesign to suppress the intended IC touchpoint on R-24 close. (3) The operator mental model gap identified in OQ-SSO-34.1 is a UX gap (missing tooltip), not an architecture gap — resolved by §40.4 tooltip copy at zero implementation cost. (4) Retaining the AL-SCIM-MASS-01 IC-review touchpoint on override-covered events preserves CC7.2 audit-review evidence with no false-positive burden on operators (R-24 closes in under one minute when the override chain event is present).
+- **Reverse cost:** Near-zero. The only deliverable requiring implementation is the Admin Dashboard tooltip copy (P1/M13 per §40.7 item 3). No schema, Worker, or DEC-030 event changes.
+
+---
+
 ### DEC-092 · OQ-CS-02 Resolution: Programme Health Indicator in Enterprise Admin Dashboard
 
 - **Decision:** Programme Health Indicator (PHI) adopted — 3-band label (Healthy / Needs Attention / At Risk) derived from FEHS bands (Green/Yellow → Healthy; Red → Needs Attention; Critical → At Risk). Raw FEHS numeric score (0–100) stays internal-only, consistent with OBSERVABILITY §33.3 CHS "internal only" policy. PHI card in Admin Dashboard Overview tab exposes label + trend arrow (vs. prior month) + activation_rate_pct + wau_rate_pct. `admin.programme_health_label_viewed` LOW/1yr DEC-030 event on card load. Full specification in `docs/COST_MODEL.md §54`.
