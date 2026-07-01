@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.93.0** — 2026-07-01 · post-150 · «Методологія без ілюзій: синтез серії 141–150 і операційна модель атлета, який тренується сам» · editorial series 141–150 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-150 · next: series 151–160 «Програмування для реального світу: як будувати тренувальний план, який виживає при контакті з реальністю» (post-151 opener)
+
 **v10.92.0** — 2026-07-01 · post-149 · «Деловантаження: що відбувається у тижні зниженого обсягу і чому більшість робить це неправильно» · editorial series 141–150 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-149 · next: post-150 (editorial series 141–150 — 10/10, фінальний синтез серії «Методологія тренувань без ілюзій»)
 
 **v10.91.0** — 2026-07-01 · post-148 · «Принцип специфічності: чому тренуватись «взагалі» не дає конкретних результатів» · editorial series 141–150 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-148 · next: post-149 («Деловантаження: що відбувається у тижні зниженого обсягу і чому більшість робить це неправильно») — editorial series 141–150 (9/10)

@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [10.93.0] — 2026-07-01
+
+### Added
+- `content/post-150-training-methodology-synthesis.md` — Editorial series 141–150 · 10/10 · SERIES COMPLETE. «Методологія без ілюзій: синтез серії 141–150 і операційна модель атлета, який тренується сам». Три рівні каркасу: гносеологічний (пастка відчуттів → 6 критеріїв блоку), фізіологічний (нейральна адаптація, специфічність SAID, алостатичне навантаження), операційний (MED, прогресійна логіка 3 опції, деловантаження, вік). Операційна модель у 6-кроковій рамці. Анонс серії 151–160 «Програмування для реального світу». clinical-safety: NOT_REQUIRED · sports-scientist review pending.
+- `blog.html` — post-150 card added at top of feed. Series 141–150 complete marker.
+
+### Changed
+- `VERSION` — 10.92.1 → 10.93.0.
+
+---
+
 ## [10.92.1] — 2026-07-01
 
 ### Changed
