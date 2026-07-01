@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.65.0
+# FORM · SOC 2 Type II Readiness v3.66.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -34009,5 +34009,94 @@ One row added to the §79.4 master evidence table (count 107 → 108), after CRO
 *v3.63.0 (2026-06-30): §137 Cross-Reference Patch — R-53 Stale Evidence Registration (FLEET-MAT-STALE-E-001 + NRR-FILING-STALE-E-001 · CC4.1/A1.1). Closes `docs/INCIDENT_RESPONSE.md R-53.11` item 2 (P0/M13). Two artefacts registered (count 104 → 106): FLEET-MAT-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr — per-activation IC export of `system.fleet_mat_chain_monitor_stale_declared` HIGH/7yr + `system.fleet_mat_chain_monitor_restored` LOW/3yr DEC-030 events with FLEET-MAT-STALE-CHAIN-01 ordering invariant; R-53-C5 chain integrity result; root cause H1-H4; time-to-recovery; zero-activation years as affirmative nil attestation with job 56 run-health export; `enterprise/fleet-mat-stale/FLEET-MAT-STALE-E-001-{YYYY}-{ic_run_id}.json`) and NRR-FILING-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr — per-activation IC export of `system.nrr_bridge_filing_monitor_stale_declared` HIGH/7yr + `system.nrr_bridge_filing_monitor_restored` LOW/3yr DEC-030 events with NRR-FILING-STALE-CHAIN-01 ordering invariant; R-53-C6 Q1 calendar check result; `q1_filing_confirmed` bool; zero-activation years as affirmative nil attestation with job 57 run-health export; `enterprise/nrr-filing-stale/NRR-FILING-STALE-E-001-{YYYY}-{ic_run_id}.json`). §137.3: two new R2 subfolders (`enterprise/fleet-mat-stale/` + `enterprise/nrr-filing-stale/`; WORM Object Lock Governance 7yr; `form_api` NO ACCESS). §137.4: two Vanta mirror entries (per-activation + annual Q1; 48h upload SLA; CC4.1/A1.1; `ic_run_id` UUID + operational enum fields only — no `user_id`, no GDPR Art. 9 data). §137.5: two §79.4 master evidence table rows (count 104 → 106; insertion after FLEET-FILING-E-001). §137.7: five-item implementation checklist (2× P1 per-activation filing; 1× P1 zero-count; 1× P1 NRR-FILING; 1× P2 calendar). §137.6: two cross-reference obligations closed (R-53.11 item 2 🟢 Done; R-53.9 artefact paths confirmed). Privacy floor: `ic_run_id` UUID + operational enum fields only — no employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data; `form_api` REVOKED. Document header v3.62.0 → v3.63.0. Owner: compliance-officer + devops-lead.*
 
 *v3.62.0 (2026-06-30): §132.8 FLEET-MAT-CHAIN-02 Auditor Queries (DEC-087). Closes `docs/COST_MODEL.md §50.8` item 3 (P2/M18) + §50.9 item 3: two complementary auditor queries added to FLEET-MAT-E-001 evidence collection notes in §132. Query 1: count `enterprise.fleet_maturity_declared` events with `consecutive_cycles_at_target >= 2` AND `evidence_artefact_id IS NULL` — expected 0 (any positive indicates FLEET-MAT-CHAIN-02 bypass). Query 2: count events with `consecutive_cycles_at_target < 2` AND `evidence_artefact_id IS NULL` — expected > 0 in years 1–2 (confirms zero-declaration-year affirmative attestation operating correctly). No change to FLEET-MAT-E-001 artefact scope, R2 path, Vanta mapping, or §79.4 evidence count. §132.6 cross-reference table: two new rows (§50.9 item 3 → 🟢 Closed; AUDIT_LOG_SCHEMA v2.64 FLEET-MAT-CHAIN-02 → 🟢 Registered). FLEET-MAT-CHAIN-02 documented in AUDIT_LOG_SCHEMA.md v2.64 (2026-06-30). Document header v3.61.0 → v3.62.0. Owner: compliance-officer.*
+
+---
+
+## §140 · Cross-Reference Patch — OTA-WINDOW-E-001 Registration (CC3.2 / A1.1 · OBSERVABILITY §66)
+
+> Date: 2026-07-01. Trigger: `docs/OBSERVABILITY.md §66.9` item 8 (P1/M13) — "Register OTA-WINDOW-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC3.2/A1.1, annual + per-activation, 7yr); add §80.3 R2 subfolder entry `compliance/evidence/ota-change-window/` (WORM 7yr, `form_api` NO ACCESS); add §80.4 Vanta mirror entry". Owner: compliance-officer.
+
+### §140.1 Purpose
+
+`docs/OBSERVABILITY.md §66` (v5.12.0, 2026-07-01) — the "OQ-MOBILE-01 Resolution — EAS OTA Adoption Rate vs. Enterprise MDM Change Windows: Per-Tenant Exception Flag & 7-Day Contractual SLO Variant (DEC-090)" — introduced SOC 2 evidence artefact OTA-WINDOW-E-001 and deferred its registration here to P1/M13. This §140 fulfils that obligation: §79.4 master evidence table row (count 108 → 109), §80.3 R2 subfolder description, §80.4 Vanta mirror entry, and implementation checklist. Closes `docs/OBSERVABILITY.md §66.9` item 8 (P1/M13 → 🟢 Done) and the last pending row in `docs/OBSERVABILITY.md §66.11`.
+
+OTA-WINDOW-E-001 is the per-activation and annual evidence artefact for the MDM change-window exception flag. Every time a FORM compliance officer enables or disables the `ota_change_window_enabled` flag via `POST /internal/tenant/{slug}/ota-change-window`, a `mobile.ota_change_window_updated` HIGH/7yr DEC-030 HMAC-chained event is emitted. OTA-WINDOW-E-001 exports those events — per activation and as an annual aggregate — to prove that every Premium-MDM tenant holds a `compliance_officer_approval_ref`, that OTA-WINDOW-CHAIN-01 was never violated (no double-enable), and that the per-tenant SLO relaxation mechanism operated within designed guardrails throughout the SOC 2 observation period.
+
+---
+
+### §140.2 Artefact Description
+
+**OTA-WINDOW-E-001** — Per-activation and annual compliance log for the MDM change-window exception flag (`ota_change_window_enabled`). Content: DEC-030 chain export of all `mobile.ota_change_window_updated` HIGH/7yr events during the period; per-activation record includes `tenant_id` (org slug), `previous_enabled`, `new_enabled`, `previous_slo_variant`, `new_slo_variant`, `compliance_officer_approval_ref`, `changed_by_form_staff_id` (FORM-internal UUID), `changed_at` ISO 8601, `mdm_platform` (optional); OTA-WINDOW-CHAIN-01 compliance assertion (no double-enable pattern). Annual summary: activation count, count of currently `enabled = TRUE` tenants, 100%-approval-ref-coverage assertion. Zero-activation attestation: affirmative statement that no `mobile.ota_change_window_updated` events occurred and all enterprise tenants are on Standard MOBILE-SLO-06 (48h). Privacy floor: `tenant_id` org slug only — no individual employee `user_id`, name, email, device identifiers, MDM policy contents, OTA adoption rates, coaching content, or GDPR Art. 9 special-category data; `changed_by_form_staff_id` is a FORM-internal staff UUID, not an enterprise employee identifier; IT contact information is stored in CRM only and never in this artefact.
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | OTA-WINDOW-E-001 |
+| **Name** | MDM Change-Window Exception Flag Activation Compliance Log |
+| **SOC 2 criteria** | CC3.2, A1.1 |
+| **Cadence** | Per-activation (each enable/disable event) + Annual (full-year aggregate; nil attestation in zero-activation years) |
+| **Retention** | 7 years |
+| **R2 path** | `compliance/evidence/ota-change-window/ota-window-e-001_{YYYY}.json` (annual); `ota-window-e-001_{YYYY}-act-{changed_at_yyyymmddThhmmss}.json` (per-activation); `ota-window-e-001_{YYYY}-nil.json` (zero-activation years) |
+| **Primary definition** | `docs/OBSERVABILITY.md §66.8` (v5.12.0, 2026-07-01) |
+
+**CC3.2 auditor narrative:** Each `mobile.ota_change_window_updated` event carries a `compliance_officer_approval_ref` (Linear/Notion ticket ID) created at the time of MDM risk assessment. Auditors verify that no Premium-MDM tenant activated the 7-day SLO variant without documented risk assessment and compliance-officer sign-off — satisfying CC3.2 (entity assesses and responds to risks through formalised approval controls).
+
+**A1.1 auditor narrative:** The per-activation export plus annual aggregate confirm that availability commitments (MOBILE-SLO-06) were calibrated on a per-tenant basis and each calibration required compliance-officer approval. Tenants with MDM cycles > 7 days are excluded from the Premium-MDM variant per the §66.7 five-step CSM protocol. Auditors verify that no tenant holds `ota_change_window_enabled = TRUE` without a matching `compliance_officer_approval_ref` in the DEC-030 HMAC chain.
+
+---
+
+### §140.3 §80.3 R2 Subfolder Addition
+
+New R2 subfolder added to the evidence bucket topology (§80.3):
+
+| Subfolder | Purpose | Access | Retention |
+|---|---|---|---|
+| `compliance/evidence/ota-change-window/` | OTA-WINDOW-E-001 per-activation and annual MDM change-window activation compliance logs | `form_system` (compliance-officer write via PAM session); `compliance_reviewer` + `r2:compliance-officer` read; `r2:form-api` **NO ACCESS** | WORM Object Lock Governance, 7yr minimum |
+
+Filename convention: annual files at `ota-window-e-001_{YYYY}.json`; per-activation files at `ota-window-e-001_{YYYY}-act-{changed_at_yyyymmddThhmmss}.json` (e.g. `ota-window-e-001_2026-act-20261015T143000.json`); zero-activation years at `ota-window-e-001_{YYYY}-nil.json` with the affirmative attestation text from OBSERVABILITY §66.8.
+
+---
+
+### §140.4 §80.4 Vanta Mirror Entry
+
+OTA-WINDOW-E-001 added to Vanta mirror schedule (§80.4):
+
+| Artefact ID | Vanta upload timing | TSC mapping | Privacy note |
+|---|---|---|---|
+| OTA-WINDOW-E-001 | Within 48h of each per-activation filing; annual aggregate within 48h of January collection run | CC3.2, A1.1 | `tenant_id` org slug, `previous_enabled` / `new_enabled` BOOL, `compliance_officer_approval_ref` ticket ID, `changed_by_form_staff_id` FORM-internal UUID, `changed_at` ISO 8601 — no enterprise employee `user_id`, name, email, device IDs, health values, or GDPR Art. 9 data |
+
+Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. Vanta access: compliance-officer + security-engineer only.
+
+---
+
+### §140.5 §79.4 Master Evidence Table Row
+
+One row added to the §79.4 master evidence table (count 108 → 109), after REGION-E-001 (§139):
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|
+| **OTA-WINDOW-E-001** | CC3.2, A1.1 | Per-activation and annual compliance log for the MDM change-window exception flag (`ota_change_window_enabled`). Per-activation: DEC-030 chain export of each `mobile.ota_change_window_updated` HIGH/7yr event — `tenant_id` slug, `previous_enabled`, `new_enabled`, `previous_slo_variant`, `new_slo_variant`, `compliance_officer_approval_ref`, `changed_by_form_staff_id` FORM-internal UUID, `changed_at`; OTA-WINDOW-CHAIN-01 compliance assertion. Annual: full-year aggregate + count of currently-enabled tenants + 100% approval-ref coverage assertion. Zero-activation years: affirmative nil attestation. CC3.2: every Premium-MDM SLO relaxation gated by documented compliance-officer risk assessment (approval ref in DEC-030 chain). A1.1: per-tenant availability commitment calibrated at contract time with compliance-officer approval. Privacy: `tenant_id` org slug + FORM-internal UUIDs only — no enterprise employee `user_id`, device IDs, MDM policy contents, health values, or GDPR Art. 9 data. Source: OBSERVABILITY §66.8 (v5.12.0, 2026-07-01). | Per-activation + Annual (January collection) | 7 yr | `compliance/evidence/ota-change-window/ota-window-e-001_{YYYY}.json` (annual); `ota-window-e-001_{YYYY}-act-{changed_at_yyyymmddThhmmss}.json` (per-activation); `ota-window-e-001_{YYYY}-nil.json` (zero-activation years) |
+
+---
+
+### §140.6 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/OBSERVABILITY.md §66.9` item 8 (P1/M13) — Register OTA-WINDOW-E-001 in §79.4 master evidence table (CC3.2/A1.1, annual + per-activation, 7yr); add §80.3 R2 subfolder entry `compliance/evidence/ota-change-window/` (WORM 7yr, `form_api` NO ACCESS); add §80.4 Vanta mirror entry | §66.9 item 8 (v5.12.0, 2026-07-01) | 🟢 **Done — 2026-07-01 (SOC2_READINESS.md v3.66.0, §140)** |
+| `docs/OBSERVABILITY.md §66.11` last pending row — `docs/SOC2_READINESS.md §79.4` OTA-WINDOW-E-001 registration (CC3.2/A1.1; §80.3 + §80.4) | §66.11 (v5.12.1, 2026-07-01) | 🟢 **Done — 2026-07-01 (SOC2_READINESS.md v3.66.0, §140)** |
+
+---
+
+### §140.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `compliance/evidence/ota-change-window/` subfolder on Cloudflare R2 `form-soc2-evidence` bucket; enable WORM Object Lock Governance 7yr; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). Prerequisite: `POST /internal/tenant/{slug}/ota-change-window` endpoint deployed (§66.9 item 5, P1/M12). | devops-lead | **P1** | M13 (before enterprise GA) | [ ] |
+| 2 | File first per-activation OTA-WINDOW-E-001 artefact on first production `mobile.ota_change_window_updated` event: export DEC-030 event payload; confirm `compliance_officer_approval_ref` non-null; confirm OTA-WINDOW-CHAIN-01 not violated; SHA-256 hash; upload to R2 at `compliance/evidence/ota-change-window/ota-window-e-001_{YYYY}-act-{changed_at_yyyymmddThhmmss}.json` (7yr WORM); upload to Vanta within 48h; add row to MASTER-INDEX. Privacy check: confirm output contains `tenant_id` org slug and FORM-internal UUIDs only — no enterprise employee PII. | compliance-officer | **P1** | On first production `ota_change_window_enabled` activation | [ ] |
+| 3 | File first annual OTA-WINDOW-E-001 artefact in January of first observation year: export all `mobile.ota_change_window_updated` events for the year; assert 100% `compliance_officer_approval_ref` coverage; assert OTA-WINDOW-CHAIN-01 not violated; upload to R2 at `ota-window-e-001_{YYYY}.json` (7yr WORM); SHA-256 hash; upload to Vanta within 48h; add to MASTER-INDEX. Zero-activation years: file nil attestation at `ota-window-e-001_{YYYY}-nil.json`. | compliance-officer | **P1** | Annual January collection (first year with production enterprise tenants) | [ ] |
+
+---
+
+*v3.66.0 (2026-07-01): §140 Cross-Reference Patch — OTA-WINDOW-E-001 Registration (CC3.2 / A1.1 · OBSERVABILITY §66). Closes `docs/OBSERVABILITY.md §66.9` item 8 (P1/M13) and §66.11 last pending row. New per-activation + annual SOC 2 evidence artefact registered (count 108 → 109): OTA-WINDOW-E-001 (CC3.2/A1.1, per-activation + annual + zero-activation nil attestation, 7yr — DEC-030 chain export of all `mobile.ota_change_window_updated` HIGH/7yr events; per-activation: `tenant_id` org slug, `previous_enabled`/`new_enabled` BOOL, `previous_slo_variant`/`new_slo_variant`, `compliance_officer_approval_ref` Linear/Notion ticket ID, `changed_by_form_staff_id` FORM-internal UUID, `changed_at` ISO 8601, optional `mdm_platform`; OTA-WINDOW-CHAIN-01 compliance assertion; R2 paths: `compliance/evidence/ota-change-window/ota-window-e-001_{YYYY}.json` annual, `ota-window-e-001_{YYYY}-act-{changed_at_yyyymmddThhmmss}.json` per-activation, `ota-window-e-001_{YYYY}-nil.json` zero-activation years; WORM 7yr; `r2:form-api` NO ACCESS). §140.3: new R2 subfolder `compliance/evidence/ota-change-window/` (WORM 7yr; `r2:form-api` NO ACCESS; compliance-officer write via PAM session; `compliance_reviewer` + `r2:compliance-officer` read). §140.4: Vanta mirror entry (per-activation within 48h; annual within 48h of January collection; CC3.2/A1.1; org slug + FORM-internal UUIDs only — no enterprise employee `user_id`, device IDs, health values, or GDPR Art. 9 data). §140.5: §79.4 master evidence table row (count 108 → 109; insertion after REGION-E-001). §140.6: two cross-reference obligations closed (OBSERVABILITY §66.9 item 8 P1/M13 → 🟢 Done; OBSERVABILITY §66.11 last pending row → 🟢 Done). §140.7: three-item implementation checklist (1× P1 R2 folder at M13; 1× P1 first per-activation filing on first production activation; 1× P1 first annual filing January of first observation year). Privacy floor: OTA-WINDOW-E-001 contains `tenant_id` org slug, BOOL flags, `compliance_officer_approval_ref` ticket ID, FORM-internal UUID, ISO 8601 timestamp, optional enum — no enterprise employee `user_id`, name, email, MDM policy contents, device identifiers, individual OTA adoption rates, coaching content, or GDPR Art. 9 special-category data; `changed_by_form_staff_id` is a FORM-internal staff UUID, not an enterprise employee identifier; IT contact information stored in CRM only, never in this artefact; `r2:form-api` REVOKED from `compliance/evidence/ota-change-window/`. Document header v3.65.0 → v3.66.0. Owner: compliance-officer.*
 
 *v3.61.0 (2026-06-30): §136 Cross-Reference Patch — FLEET-FILING-E-001 Registration in §79.4 Master Evidence Table (CC4.1 / A1.1 · OBSERVABILITY §63.7). Closes `docs/OBSERVABILITY.md §63.9` item 6 (P1/M15 — FLEET-FILING-E-001 registration in SOC2_READINESS §79.4 master evidence table + §80.3 R2 subfolder + §80.4 Vanta mirror). FLEET-FILING-E-001 is the "Enterprise Annual Filing Chain Integrity Report": annual Q1 evidence artefact covering (1) NRR Bridge Q1 filing calendar compliance per `reporting_year` (trigger condition met BOOL, filing date, `bridge_hash`, AL-FLEET-FILING-01 fired BOOL); (2) FLEET-MAT-CHAIN-01 weekly verification run history from pg_cron job 56 (52 Mondays: `events_verified_count` INT, `chain_consistent` BOOL, violation count); (3) NRR-BRIDGE-INV-01 structural compliance note (Worker-layer HTTP 422 enforcement). Primary definition: OBSERVABILITY §63.7 (v5.10.0, 2026-06-30). §136.5 adds FLEET-FILING-E-001 to §79.4 master evidence table (count 103 → 104; insertion after CRED-ROT-E-001). §136.3 adds `compliance/evidence/fleet-filing/` R2 subfolder (WORM Object Lock Governance 3yr; `form_api` NO ACCESS; `form_system` + `compliance_reviewer` + `r2:compliance-officer` access only). §136.4 adds FLEET-FILING-E-001 to §80.4 Vanta mirror schedule (annually Q1; 48h upload SLA; CC4.1/A1.1; fleet-level aggregates + chain-integrity counts only — no per-tenant ARR, no `user_id`, no GDPR Art. 9 data). §136.7 three-item implementation checklist: 1× P0 (R2 folder creation at M13 after job 56/57 deploy), 1× P1 (first filing Q1 est. M28), 1× P2 (§79.5 calendar entry before first filing). Three cross-reference obligations closed (§136.6): OBSERVABILITY §63.9 item 6 (P1/M15 registration obligation — 🟢 Done); OBSERVABILITY §63.10 cross-ref row (🟢 Done); OBSERVABILITY §63.7 Vanta mirror pending note (🟢 Done). Privacy floor: FLEET-FILING-E-001 contains fleet-level aggregates, chain-integrity counts, and filing-calendar booleans only — no per-tenant ARR, no individual employee `user_id`, name, email, or GDPR Art. 9 special-category data; `form_api` REVOKED from `audit_log_events` and `enterprise_renewals`. Document header v3.60.0 → v3.61.0. Owner: compliance-officer + devops-lead + enterprise-architect.*

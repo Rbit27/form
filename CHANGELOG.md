@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.76.1] — 2026-07-01
+
+### Added
+- `docs/SOC2_READINESS.md §140` — OTA-WINDOW-E-001 registration (CC3.2/A1.1, per-activation + annual, 7yr). §79.4 master evidence table count 108 → 109. §80.3 R2 subfolder `compliance/evidence/ota-change-window/` (WORM 7yr, `r2:form-api` NO ACCESS). §80.4 Vanta mirror entry (48h upload SLA; org slug + FORM-internal UUIDs only; no enterprise employee PII). Three-item implementation checklist (R2 folder M13; first per-activation filing on first production activation; first annual filing January of first observation year). Closes `docs/OBSERVABILITY.md §66.9` item 8 (P1/M13) and §66.11 last pending row.
+
+### Changed
+- `docs/SOC2_READINESS.md` — header v3.65.0 → v3.66.0; §79.4 evidence count 108 → 109.
+- `docs/OBSERVABILITY.md` — header v5.12.1 → v5.12.2; §66.9 item 8 `[ ]` → `[x] Done`; §66.11 last row `🟡 Pending P1/M13` → `🟢 Done`. All §66 cross-reference obligations closed except `docs/ENTERPRISE_ONBOARDING.md` CSM checklist (§66.9 item 7 — out of scope).
+- `VERSION` — 10.76.0 → 10.76.1.
+
+---
+
 ## [10.76.0] — 2026-07-01
 
 ### Added
