@@ -63,6 +63,7 @@ Confirm with the customer's IT lead before Day 0:
 - [ ] IP allowlist required? (optional; forces SSO device trust if enabled)
 - [ ] White-label required? (Enterprise tier only — see §8.2 for setup checklist)
 - [ ] Custom data residency requirement? (EU region: `eu-west-1` Supabase; default: `us-east-1`)
+- [ ] MDM change control policy for mobile apps? Ask: *"Does your organisation enforce MDM change control windows (Intune / Jamf / Workspace ONE) that restrict when mobile app bundles can be installed?"* — if yes: capture MDM platform and cycle length before contract execution; Premium-MDM SLO variant may apply (see §2.4)
 
 ---
 
@@ -108,6 +109,32 @@ Before assembling the MSA signature package, the CSM must confirm whether the cu
 - [ ] After SSO go-live: confirm CAEP stream status in Admin Dashboard → SSO Settings → CAEP Status; if stream shows `error`, escalate to platform-engineer before closing the CAEP SLA commitment
 
 > **Privacy floor:** The CAEP/RISC SET payload that FORM processes contains only `user_id_hash` (SHA-256 of the IdP subject identifier) and `tenant_id` — never plaintext email, health data, body composition values, or coaching content. This applies regardless of which IdP the customer uses. Reference: `docs/SSO_SCIM_IMPLEMENTATION.md §23.7.6`.
+
+### 2.4 MDM Change Window Declaration (if applicable)
+
+**Reference:** `docs/OBSERVABILITY.md §66` (DEC-090, 2026-07-01). Closes `docs/OBSERVABILITY.md §66.9` item 7 (P1/M12).
+
+Some enterprise tenants have MDM (Mobile Device Management) change control policies that restrict when mobile app bundles — including EAS OTA updates — can be installed on managed devices. Intune, Jamf Pro, and VMware Workspace ONE are the common platforms. These policies typically impose weekly or monthly maintenance windows; OTA bundles published outside those windows are queued until the next allowed window.
+
+This affects MOBILE-SLO-06 (EAS OTA adoption rate). The Standard SLO requires ≥ 95% of active users on the latest bundle within 48 hours. A tenant with a weekly MDM maintenance window cannot meet this SLO — instead, the Premium-MDM SLO variant (7 days / 168 hours) applies. This variant is only available for MDM cycles ≤ 7 days; tenants with longer cycles are excluded.
+
+**Qualifying question (pre-contract, §1.3):** *"Does your organisation enforce MDM change control windows (Intune / Jamf / Workspace ONE) that restrict when mobile app bundles can be installed?"*
+
+If the answer is yes, the CSM must complete the following five-step protocol before MSA signature:
+
+| Step | Action | Owner |
+|---|---|---|
+| 1 | Document `[mdm-change-window]` block in the account CRM (field: `mdm_platform` + `mdm_cycle_days`). **IT contact details go in CRM only — never in FORM's database or `enterprise_contracts.notes`.** | CSM |
+| 2 | Compliance-officer review: verify MDM cycle is ≤ 7 days; obtain Linear/Notion approval ticket reference (`compliance_officer_approval_ref`). | compliance-officer |
+| 3 | After contract execution: flag activation via `POST /internal/tenant/{slug}/ota-change-window` (form-staff Cloudflare Access only). Requires `compliance_officer_approval_ref` — endpoint enforces OTA-WINDOW-CHAIN-01 (double-enable → HTTP 422 `OTA_WINDOW_CHAIN_01_ALREADY_ENABLED`). Emits `mobile.ota_change_window_updated` audit event (DEC-030, HIGH, 7yr). | platform-engineer (CSM initiates ticket) |
+| 4 | Issue MSA with Premium-MDM SLO Schedule Addendum: MOBILE-SLO-06 = 7 days (168 hours). Standard 48h SLO does not apply for this tenant's mobile OTA commitment. | compliance-officer + legal |
+| 5 | If the customer's MDM policy changes (window removed, cycle length changes): new compliance-officer approval ticket → `enabled: false` API call → MSA addendum to revert to Standard SLO or re-set Premium-MDM variant. | CSM + compliance-officer |
+
+**SOC 2 note:** The OTA-WINDOW-CHAIN-01 invariant and `mobile.ota_change_window_updated` event provide the audit trail required for CC3.2 (MDM risk formally assessed) and A1.1 (availability commitments calibrated to per-tenant context). Evidence artefact: OTA-WINDOW-E-001 (`compliance/evidence/ota-change-window/`, WORM 7yr). Reference: `docs/OBSERVABILITY.md §66.8`.
+
+> **Privacy floor:** `ota_change_window_enabled` is a technical configuration flag — not a personal data element under GDPR Art. 4. IT contact information is stored in CRM only. The `changed_by_form_staff_id` in the audit event is a FORM staff internal UUID, not an enterprise employee identifier. No individual employee identifiers, device identifiers, or health data are involved.
+
+**If no MDM policy declared:** treat tenant as Standard — MOBILE-SLO-06 = 48 hours. No action required under §2.4.
 
 ---
 
@@ -591,6 +618,7 @@ Contract start: [Date]
 □ Success criteria agreed (90-day): [metric 1], [metric 2]
 □ Privacy model walkthrough completed
 □ Day-14 activation checkpoint explained (§6.4) — CSM will proactively contact if < 30% activation
+□ MDM change control policy declared? (Y/N) — if Y: compliance-officer approval ref obtained; §2.4 five-step protocol complete before MSA signature
 ```
 
 ### A.2 90-day QBR data pull (Admin Dashboard queries)
@@ -616,6 +644,10 @@ If a customer asks for individual-level data or proposes an excluded use case:
 Do not offer workarounds, do not say "we can look into it," do not escalate to engineering. Escalate to founder only.
 
 ---
+
+*v0.5 (2026-07-01): §1.3 MDM qualifying question — added checkbox: "Does your organisation enforce MDM change control windows (Intune / Jamf / Workspace ONE) that restrict when mobile app bundles can be installed?" with reference to §2.4. §2.4 MDM Change Window Declaration — new section: five-step CSM protocol for tenants with MDM change control policies; Standard (48h) vs Premium-MDM (7d) MOBILE-SLO-06 variant; OTA-WINDOW-CHAIN-01 enforcement via `POST /internal/tenant/{slug}/ota-change-window`; `mobile.ota_change_window_updated` HIGH/7yr audit event; OTA-WINDOW-E-001 SOC 2 evidence artefact; privacy floor note (CRM-only IT contact; `ota_change_window_enabled` not personal data). Appendix A.1: MDM declaration checkbox added. Closes `docs/OBSERVABILITY.md §66.9` item 7 (P1/M12). References: `docs/OBSERVABILITY.md §66` (DEC-090); `docs/ENTERPRISE_SLA.md §3.10` (MOBILE-SLO-06 variants); `docs/AUDIT_LOG_SCHEMA.md §Mobile OTA Change Window events`. Owner: customer-success + compliance-officer.*
+
+*v0.4 (2026-06-29): §6.4 Activation Health Milestones — CSM Save Protocol trigger spec (T0-Alpha / T0-Beta / T0-Gamma) per `COST_MODEL.md §46`. Added Day-14 checkpoint row to §6 milestone table. Added activation health monitoring note to §4.1. Closes `COST_MODEL.md §46.9` item 9 (P1 / M5). Owner: customer-success + compliance-officer.*
 
 *v0.3 (2026-06-20): §2.3 CAEP/SSF IdP prerequisite verification. Closes `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` item 7 (P1/M5 — "Update `docs/ENTERPRISE_ONBOARDING.md §2.4`: add CAEP PUSH capability as explicit prerequisite; add non-PUSH fallback note" — DEC-072). Added as §2.3 (Section 2 previously had only §2.1 and §2.2; §2.4 in the checklist was a drafting placeholder; §2.3 is the correct insertion point). Five-row IdP compatibility table: Okta (SSF Transmitter PUSH ✅ → Addendum 6), Microsoft Entra ID (Graph CAE/SSF ✅ → Addendum 6), Google Workspace OIDC (RISC API ✅ → Addendum 6), OneLogin (limited 🟡 → JWT TTL baseline), other SAML 2.0 (❌ → JWT TTL baseline). Two SLA paths: CAEP SLA Addendum 6 (< 60 s in normal operation, requires `active` stream) vs. baseline JWT TTL (≤ 15 min, SOC 2 CC6.3 compliant, no Addendum 6). Five-item CSM action checklist: IdP confirmation question script, Linear tracker `idp_type` field, Addendum 6 inclusion gate (PUSH-capable only), JWT TTL baseline note for non-PUSH, post-go-live stream status check in Admin Dashboard → SSO Settings → CAEP Status. Privacy floor note: CAEP SET payload = user_id_hash (SHA-256 idpSubject) + tenant_id only; no Art. 9 data. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §23` (CAEP/SSF architecture); `docs/SSO_SCIM_IMPLEMENTATION.md §36.3.2 Part 2` (source obligation — "PUSH mandatory; non-PUSH → JWT TTL baseline; no CAEP SLA addendum"); `docs/SSO_SCIM_IMPLEMENTATION.md §23.7.6` (privacy floor — SET payload fields); `docs/MSA_TEMPLATE.md §Addendum 6` (CAEP SLA Addendum full text); `docs/DECISION_LOG.md DEC-072` (PUSH mandatory decision). Owner: customer-success + enterprise-architect + compliance-officer.*
 

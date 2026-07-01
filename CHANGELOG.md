@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [10.77.0] — 2026-07-01
+
+### Added
+- `content/post-2903-retrospective-training-block-questions.md` — Series «Якість тренувального рішення» 2896–2905 · 8/10. «Структурні питання для ретроспективного аналізу тренувального блоку». Six question blocks: plan execution (sessions delivered vs missed, structural vs accidental gaps), load progression (per-exercise progress, RPE calibration), recovery (subjective readiness trend, HRV, non-training stressors), context match (plan vs real conditions, in-block adaptations), exercise selection (goal alignment, unexpected responders), data quality (systematic gaps, what's missing). Why «in general okay» is not analysis; how multi-block pattern recognition compounds. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `docs/ENTERPRISE_ONBOARDING.md §1.3` — MDM change control qualifying checkbox: *"Does your organisation enforce MDM change control windows (Intune / Jamf / Workspace ONE) that restrict when mobile app bundles can be installed?"* — with reference to §2.4 if yes.
+- `docs/ENTERPRISE_ONBOARDING.md §2.4` — New section: MDM Change Window Declaration Protocol. Five-step CSM protocol per `docs/OBSERVABILITY.md §66.7` (DEC-090): (1) CRM documentation of MDM platform + cycle (IT contact CRM-only, never in FORM DB); (2) compliance-officer review + Linear/Notion approval ref; (3) activation via `POST /internal/tenant/{slug}/ota-change-window` with OTA-WINDOW-CHAIN-01 enforcement; (4) Premium-MDM SLO Schedule addendum (MOBILE-SLO-06 = 7d / 168h); (5) reversal process. Standard vs Premium-MDM SLO context. Privacy floor. SOC 2 note (CC3.2/A1.1, OTA-WINDOW-E-001). If no MDM declared: Standard 48h applies, no action. Closes `docs/OBSERVABILITY.md §66.9` item 7 (P1/M12).
+- `docs/ENTERPRISE_ONBOARDING.md Appendix A.1` — MDM declaration checkbox added to pre-launch checklist (customer copy).
+- `blog.html` — card for post-2903 added at top of feed.
+
+### Changed
+- `docs/ENTERPRISE_ONBOARDING.md` — header v0.4 → v0.5.
+- `docs/OBSERVABILITY.md` — header v5.12.2 → v5.12.3; §66.9 item 7 `[ ]` → `[x] Done`; §66.11 ENTERPRISE_ONBOARDING.md row `🟡 Pending P1/M12` → `🟢 Done`. All §66.11 cross-reference obligations now 🟢 Closed.
+- `VERSION` — 10.76.1 → 10.77.0.
+
+---
+
 ## [10.76.1] — 2026-07-01
 
 ### Added

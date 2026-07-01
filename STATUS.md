@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v10.77.0** — 2026-07-01 · post-2903 · «Структурні питання для ретроспективного аналізу тренувального блоку» · series «Якість тренувального рішення» 2896–2905 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2903 · enterprise: ENTERPRISE_ONBOARDING.md v0.5 §1.3 + §2.4 + A.1 (MDM Change Window Declaration Protocol — §66.9 item 7 Done) · OBSERVABILITY.md v5.12.3 (§66.9 item 7 [x], §66.11 all 🟢) · next: post-2904 («Різниця між блоком, який не спрацював, і блоком, який не спрацював так, як планувалось»)
+
+**v10.76.1** — 2026-07-01 · enterprise: OTA-WINDOW-E-001 registration in SOC2_READINESS.md §140 (count 108→109) · OBSERVABILITY.md v5.12.2 §66.9 item 8 Done, §66.11 closed · next: post-2903
+
 **v10.76.0** — 2026-07-01 · post-2902 · «Інформація, яку ти ігноруєш — структурні сліпі зони в тренувальному журналі» · series «Якість тренувального рішення» 2896–2905 (7/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2902 · next: post-2903 («Структурні питання для ретроспективного аналізу тренувального блоку»)
 
 **v10.75.0** — 2026-07-01 · enterprise: AUDIT_LOG_SCHEMA §Mobile OTA Change Window events (v2.67) + DATA_MODEL §50 migration 0091 (v1.41) + ENTERPRISE_SLA §3.10 MOBILE-SLO-06 (v1.3) + OBSERVABILITY §66.11 cross-refs Done (v5.12.1) · post-2901 «Асиметрія помилок: чому «зробив занадто мало» і «зробив занадто багато» мають різну ціну» · series «Якість тренувального рішення» 2896–2905 (6/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · next: post-2902
