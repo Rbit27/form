@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · proposed next (45+) · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · roadmap extended to 2935 · series «Мінімальна ефективна доза» 2876–2885 active (7/10) · series «Що я знаю про своє тренування» 2926–2935 proposed · block 896–900 active · v10.54.0
+### Editorial series: 11–44 drafted · proposed next (45+) · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · roadmap extended to 2935 · series «Мінімальна ефективна доза» 2876–2885 active (8/10) · series «Що я знаю про своє тренування» 2926–2935 proposed · block 896–900 active · v10.88.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -141,7 +141,7 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 142 | Коли «достатньо» — це не відмовка: MED і принцип мінімально ефективного стимулу | draft · v10.85.0 |
 | 143 | Силова тренованість і вік: що змінюється після 35, і що насправді не змінюється | proposed |
 | 144 | Автономія vs структура: чому найкращі self-coached атлети мають і те, й інше | proposed |
-| 145 | Що таке «хороший тренувальний блок» — 6 критеріїв без суб'єктивізму | proposed |
+| 145 | Що таке «хороший тренувальний блок» — 6 критеріїв без суб'єктивізму | **draft · v10.88.0** · clinical-safety NOT_REQUIRED · review_pending: sports-scientist |
 | 146 | Як працює нейром'язова адаптація — і чому перші тижні сили не є «реальними» | proposed |
 | 147 | Тренувальний стрес і позатренувальний стрес: як система рахує загальне навантаження | proposed |
 | 148 | Принцип специфічності: чому тренуватись «взагалі» не дає конкретних результатів | proposed |
@@ -3086,7 +3086,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: мінімал
 | 2880 | Детренування: скільки реально втрачається і за скільки | draft · v10.52.0 · review_pending: sports-scientist |
 | 2881 | Мінімалістична програма при максимальному стресі: алгоритм рішення | **draft · v10.53.0** · clinical-safety CONDITIONAL PASS · review_pending: sports-scientist |
 | 2882 | Різниця між «підтримкою» і «прогресом» — і коли яка з них правильна ціль | **draft · v10.54.0** · clinical-safety NOT_REQUIRED · review_pending: sports-scientist |
-| 2883 | Ознаки, що «мінімум» став занадто малим: коли треба розширюватись | proposed · v10.32.0 |
+| 2883 | Ознаки, що «мінімум» став занадто малим: коли треба розширюватись | **draft · v10.88.0** · clinical-safety NOT_REQUIRED · review_pending: sports-scientist |
 | 2884 | Довгострокова стратегія: роки мінімального, місяці повного, тижні максимального | proposed · v10.32.0 |
 | 2885 | Синтез 2876–2885: рамка мінімалістичного тренування без самообману | proposed · v10.32.0 |
 
