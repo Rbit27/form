@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v10.95.0** — 2026-07-01 · post-152 · «Як тренувальна програма «застаріває»: механіка адаптації і ознаки, що пора змінити стимул» · series «Програмування для реального світу» 151–160 (2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-152 · next: post-153 («Навантаження без рахунку: як self-coached атлет оцінює тижневий обсяг без таблиць»)
+
 **v10.94.0** — 2026-07-01 · post-151 · «Тренування до відмови: метрика управління ризиком, а не прогресу» · series «Програмування для реального світу» 151–160 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-151 · next: post-152 («Як тренувальна програма «застаріває»: механіка адаптації і ознаки, що пора змінити стимул»)
 
 **v10.93.0** — 2026-07-01 · post-150 · «Методологія без ілюзій: синтез серії 141–150 і операційна модель атлета, який тренується сам» · editorial series 141–150 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-150 · next: series 151–160 «Програмування для реального світу: як будувати тренувальний план, який виживає при контакті з реальністю» (post-151 opener)
