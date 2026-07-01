@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [10.85.0] — 2026-07-01
+
+### Added
+- `content/post-142-med-minimum-effective-dose.md` — Editorial #142. «Коли «достатньо» — це не відмовка: MED і принцип мінімально ефективного стимулу». MEV/MAV/MRV як координати продуктивного тренування; три ситуації де нарощування об'єму шкодить (перший рік, повернення після перерви, паралельні стресори); практичний розрахунок MEV; ієрархія тренувальних рішень; три питання перед збільшенням об'єму. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card post-142 added at top of feed.
+
+### Changed
+- `STATUS.md` — v10.84.0 → v10.85.0; content library row 11–50 updated; next: post-143 («Силова тренованість і вік: що змінюється після 35»).
+- `VERSION` — 10.84.0 → 10.85.0.
+
+---
+
 ## [10.84.0] — 2026-07-01
 
 ### Added
