@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.27.1
+# FORM · Cost Model & Unit Economics v2.27.2
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -14629,7 +14629,7 @@ Applied in this authoring pass:
 | 2 | Admin Dashboard "Programme Health" card — Overview tab, bottom of stats row; label badge (emerald/amber/rose); trend arrow vs. prior month label; activation_rate_pct + wau_rate_pct sparklines (4-week); "View full engagement breakdown →" CTA → Engagement tab; stale banner (snapshot > 26h, ADMIN-RPT-SLO-01); empty state (k < 5 members) | platform-engineer + design-craft | **P0** | M6 | [ ] |
 | 3 | `admin.programme_health_label_viewed` LOW/1yr DEC-030 event — register in `docs/AUDIT_LOG_SCHEMA.md` v2.68; add `ProgrammeHealthLabelViewedPayload` TypeScript interface; add PHI-VIEW-01 chain invariant comment; deduplication key `phi-label-viewed-{tenant_id}-{admin_user_id}-{snapshot_date}` | compliance-officer | **P1** | M7 | [x] **Done — `docs/AUDIT_LOG_SCHEMA.md` v2.68, 2026-07-01 (CHANGELOG v10.85.1)** |
 | 4 | Update `docs/OBSERVABILITY.md §33.3` CHS privacy constraint: add note that raw CHS numeric score remains internal-only; PHI label (3-band per §54.3.1) is the approved customer-facing surface; PHI does NOT expose raw CHS or raw FEHS — uses FEHS bands only | devops-lead | **P1** | M7 | [x] **Done — `docs/OBSERVABILITY.md` v5.12.4, 2026-07-01 (CHANGELOG v10.85.1)** |
-| 5 | SOC 2 evidence artefact PHI-E-001 (C1.2/CC2.2): Admin Dashboard Programme Health card screenshot + `admin.programme_health_label_viewed` sample event JSON confirming `phi_label` string (not raw score) is the only signal disclosed to tenant admin; file in `compliance/evidence/phi/`; register in `docs/SOC2_READINESS.md` | compliance-officer | **P1** | M8 | [ ] |
+| 5 | SOC 2 evidence artefact PHI-E-001 (C1.2/CC2.2): Admin Dashboard Programme Health card screenshot + `admin.programme_health_label_viewed` sample event JSON confirming `phi_label` string (not raw score) is the only signal disclosed to tenant admin; file in `compliance/evidence/phi/`; register in `docs/SOC2_READINESS.md` | compliance-officer | **P1** | M8 | [x] **Done — 2026-07-01 (SOC2_READINESS.md v3.67.0, §141)** |
 | 6 | After 2 QBR cycles (est. M8): measure PHI impact on pre-QBR CSM prep time (OQ-08 time-tracking log); compare to §54.4.2 estimate ($18.13/account/month); document actuals in DECISION_LOG; update §54.4.2 [ESTIMATE] tags with actuals | customer-success + founder | **P2** | M8 | [ ] |
 
 ### 54.11 Cross-Reference Obligations Created by §54
@@ -14640,9 +14640,11 @@ Applied in this authoring pass:
 | §26.12 OQ-CS-02 patched 🟡 → 🟢 Resolved DEC-092 | §54.9 | 🟢 **Done — inline patch this pass** |
 | `admin.programme_health_label_viewed` event registered in `docs/AUDIT_LOG_SCHEMA.md` | §54.10 item 3 (P1/M7) | 🟢 **Done — `docs/AUDIT_LOG_SCHEMA.md` v2.68, 2026-07-01** |
 | `docs/OBSERVABILITY.md §33.3` CHS privacy constraint note updated | §54.10 item 4 (P1/M7) | 🟢 **Done — `docs/OBSERVABILITY.md` v5.12.4, 2026-07-01** |
-| PHI-E-001 evidence artefact filed and registered in `docs/SOC2_READINESS.md` | §54.10 item 5 (P1/M8) | 🟡 Pending — M8 |
+| PHI-E-001 evidence artefact filed and registered in `docs/SOC2_READINESS.md` | §54.10 item 5 (P1/M8) | 🟢 **Done — 2026-07-01 (SOC2_READINESS.md v3.67.0, §141)** |
 
 ---
+
+*v2.27.2 (2026-07-01): §54.10 item 5 + §54.11 cross-reference patch — PHI-E-001 Registration (C1.2 / CC2.2 · SOC2_READINESS §141). Closes `docs/COST_MODEL.md §54.10` item 5 (P1/M8) and `docs/COST_MODEL.md §54.11` last pending cross-reference row. SOC 2 evidence artefact PHI-E-001 registered in `docs/SOC2_READINESS.md §141` (v3.67.0, 2026-07-01) — count 109 → 110; C1.2/CC2.2; annual + per-schema-change supplement + pre-GA nil attestation; 3yr; R2 path `compliance/evidence/phi/phi-e-001_{YYYY}.json`; WORM 3yr; `r2:form-api` NO ACCESS. §54.10 item 5: `[ ]` → `[x] Done — 2026-07-01 (SOC2_READINESS.md v3.67.0, §141)`. §54.11 last pending row: `🟡 Pending — M8` → `🟢 Done — 2026-07-01 (SOC2_READINESS.md v3.67.0, §141)`. Document header v2.27.1 → v2.27.2. Owner: compliance-officer.*
 
 *v2.27.1 (2026-07-01): §53.9 item 3, §53.10, §54.10 items 3–4, §54.11 — closed three stale cross-reference obligations. `enterprise.hiring_decision_logged` (§53.9 item 3) confirmed Done — registered in `docs/AUDIT_LOG_SCHEMA.md` v2.69, 2026-07-01 (CHANGELOG v10.85.1). `admin.programme_health_label_viewed` (§54.10 item 3) confirmed Done — registered in `docs/AUDIT_LOG_SCHEMA.md` v2.68, 2026-07-01 (CHANGELOG v10.85.1). `docs/OBSERVABILITY.md §33.3` PHI exception note (§54.10 item 4) confirmed Done — v5.12.4, 2026-07-01 (CHANGELOG v10.85.1). Checklist statuses patched `[ ]` → `[x] Done`. Cross-reference table rows §53.10 and §54.11 patched `🟡 Pending — M7` → `🟢 Done`. Document header v2.27.0 → v2.27.1. Owner: compliance-officer.*
 

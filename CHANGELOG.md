@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [10.91.1] — 2026-07-01
+
+### Changed
+- `docs/SOC2_READINESS.md` — §141 added (PHI-E-001 · C1.2/CC2.2 · COST_MODEL §54): Programme Health Indicator privacy guarantee evidence artefact registered; §79.4 master evidence table count 109 → 110; §80.3 `compliance/evidence/phi/` R2 subfolder (WORM 3yr); §80.4 Vanta mirror entry; four-item implementation checklist; closes `docs/COST_MODEL.md §54.10` item 5 (P1/M8) and §54.11 last pending cross-reference row. v3.66.0 → v3.67.0.
+- `docs/COST_MODEL.md` — §54.10 item 5 status `[ ]` → `[x] Done (SOC2_READINESS.md v3.67.0, §141, 2026-07-01)`; §54.11 last pending cross-reference row `🟡 Pending — M8` → `🟢 Done`; version note v2.27.2 added. v2.27.1 → v2.27.2.
+- `VERSION` — 10.91.0 → 10.91.1.
+
+---
+
 ## [10.91.0] — 2026-07-01
 
 ### Added

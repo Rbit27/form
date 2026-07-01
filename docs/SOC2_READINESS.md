@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.66.0
+# FORM · SOC 2 Type II Readiness v3.67.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -34100,3 +34100,93 @@ One row added to the §79.4 master evidence table (count 108 → 109), after REG
 *v3.66.0 (2026-07-01): §140 Cross-Reference Patch — OTA-WINDOW-E-001 Registration (CC3.2 / A1.1 · OBSERVABILITY §66). Closes `docs/OBSERVABILITY.md §66.9` item 8 (P1/M13) and §66.11 last pending row. New per-activation + annual SOC 2 evidence artefact registered (count 108 → 109): OTA-WINDOW-E-001 (CC3.2/A1.1, per-activation + annual + zero-activation nil attestation, 7yr — DEC-030 chain export of all `mobile.ota_change_window_updated` HIGH/7yr events; per-activation: `tenant_id` org slug, `previous_enabled`/`new_enabled` BOOL, `previous_slo_variant`/`new_slo_variant`, `compliance_officer_approval_ref` Linear/Notion ticket ID, `changed_by_form_staff_id` FORM-internal UUID, `changed_at` ISO 8601, optional `mdm_platform`; OTA-WINDOW-CHAIN-01 compliance assertion; R2 paths: `compliance/evidence/ota-change-window/ota-window-e-001_{YYYY}.json` annual, `ota-window-e-001_{YYYY}-act-{changed_at_yyyymmddThhmmss}.json` per-activation, `ota-window-e-001_{YYYY}-nil.json` zero-activation years; WORM 7yr; `r2:form-api` NO ACCESS). §140.3: new R2 subfolder `compliance/evidence/ota-change-window/` (WORM 7yr; `r2:form-api` NO ACCESS; compliance-officer write via PAM session; `compliance_reviewer` + `r2:compliance-officer` read). §140.4: Vanta mirror entry (per-activation within 48h; annual within 48h of January collection; CC3.2/A1.1; org slug + FORM-internal UUIDs only — no enterprise employee `user_id`, device IDs, health values, or GDPR Art. 9 data). §140.5: §79.4 master evidence table row (count 108 → 109; insertion after REGION-E-001). §140.6: two cross-reference obligations closed (OBSERVABILITY §66.9 item 8 P1/M13 → 🟢 Done; OBSERVABILITY §66.11 last pending row → 🟢 Done). §140.7: three-item implementation checklist (1× P1 R2 folder at M13; 1× P1 first per-activation filing on first production activation; 1× P1 first annual filing January of first observation year). Privacy floor: OTA-WINDOW-E-001 contains `tenant_id` org slug, BOOL flags, `compliance_officer_approval_ref` ticket ID, FORM-internal UUID, ISO 8601 timestamp, optional enum — no enterprise employee `user_id`, name, email, MDM policy contents, device identifiers, individual OTA adoption rates, coaching content, or GDPR Art. 9 special-category data; `changed_by_form_staff_id` is a FORM-internal staff UUID, not an enterprise employee identifier; IT contact information stored in CRM only, never in this artefact; `r2:form-api` REVOKED from `compliance/evidence/ota-change-window/`. Document header v3.65.0 → v3.66.0. Owner: compliance-officer.*
 
 *v3.61.0 (2026-06-30): §136 Cross-Reference Patch — FLEET-FILING-E-001 Registration in §79.4 Master Evidence Table (CC4.1 / A1.1 · OBSERVABILITY §63.7). Closes `docs/OBSERVABILITY.md §63.9` item 6 (P1/M15 — FLEET-FILING-E-001 registration in SOC2_READINESS §79.4 master evidence table + §80.3 R2 subfolder + §80.4 Vanta mirror). FLEET-FILING-E-001 is the "Enterprise Annual Filing Chain Integrity Report": annual Q1 evidence artefact covering (1) NRR Bridge Q1 filing calendar compliance per `reporting_year` (trigger condition met BOOL, filing date, `bridge_hash`, AL-FLEET-FILING-01 fired BOOL); (2) FLEET-MAT-CHAIN-01 weekly verification run history from pg_cron job 56 (52 Mondays: `events_verified_count` INT, `chain_consistent` BOOL, violation count); (3) NRR-BRIDGE-INV-01 structural compliance note (Worker-layer HTTP 422 enforcement). Primary definition: OBSERVABILITY §63.7 (v5.10.0, 2026-06-30). §136.5 adds FLEET-FILING-E-001 to §79.4 master evidence table (count 103 → 104; insertion after CRED-ROT-E-001). §136.3 adds `compliance/evidence/fleet-filing/` R2 subfolder (WORM Object Lock Governance 3yr; `form_api` NO ACCESS; `form_system` + `compliance_reviewer` + `r2:compliance-officer` access only). §136.4 adds FLEET-FILING-E-001 to §80.4 Vanta mirror schedule (annually Q1; 48h upload SLA; CC4.1/A1.1; fleet-level aggregates + chain-integrity counts only — no per-tenant ARR, no `user_id`, no GDPR Art. 9 data). §136.7 three-item implementation checklist: 1× P0 (R2 folder creation at M13 after job 56/57 deploy), 1× P1 (first filing Q1 est. M28), 1× P2 (§79.5 calendar entry before first filing). Three cross-reference obligations closed (§136.6): OBSERVABILITY §63.9 item 6 (P1/M15 registration obligation — 🟢 Done); OBSERVABILITY §63.10 cross-ref row (🟢 Done); OBSERVABILITY §63.7 Vanta mirror pending note (🟢 Done). Privacy floor: FLEET-FILING-E-001 contains fleet-level aggregates, chain-integrity counts, and filing-calendar booleans only — no per-tenant ARR, no individual employee `user_id`, name, email, or GDPR Art. 9 special-category data; `form_api` REVOKED from `audit_log_events` and `enterprise_renewals`. Document header v3.60.0 → v3.61.0. Owner: compliance-officer + devops-lead + enterprise-architect.*
+
+---
+
+## §141 · Cross-Reference Patch — PHI-E-001 Registration (C1.2 / CC2.2 · COST_MODEL §54)
+
+> Date: 2026-07-01. Trigger: `docs/COST_MODEL.md §54.10` item 5 (P1/M8) — "SOC 2 evidence artefact PHI-E-001 (C1.2/CC2.2): Admin Dashboard Programme Health card screenshot + `admin.programme_health_label_viewed` sample event JSON confirming `phi_label` string (not raw score) is the only signal disclosed to tenant admin; file in `compliance/evidence/phi/`; register in `docs/SOC2_READINESS.md`". Owner: compliance-officer.
+
+### §141.1 Purpose
+
+`docs/COST_MODEL.md §54` (DEC-092, v2.27.0, 2026-07-01) — the "OQ-CS-02 Resolution — Programme Health Indicator in Enterprise Admin Dashboard" — introduced SOC 2 evidence artefact PHI-E-001 and deferred its registration here to P1/M8. This §141 fulfils that obligation: §79.4 master evidence table row (count 109 → 110), §80.3 R2 subfolder description, §80.4 Vanta mirror entry, and implementation checklist. Closes `docs/COST_MODEL.md §54.10` item 5 (P1/M8 → 🟢 Done) and the last pending row in `docs/COST_MODEL.md §54.11`.
+
+PHI-E-001 demonstrates that the Programme Health Indicator endpoint (`GET /api/admin/tenants/:tenantId/programme-health`) never discloses the raw FEHS numeric score (0–100) to `tenant_admin`. The artefact is the primary control evidence for two commitments: C1.2 (personal information access) — FORM's composite health score is withheld from employers; CC2.2 (internal communication) — FORM communicates transparently what information about employees is shared with their employer. The PHI label (`healthy` / `needs_attention` / `at_risk` / `insufficient_data`) is the only health-adjacent signal disclosed; `fehs_score` is excluded at the `ProgrammeHealthResponse` schema layer, enforced by the Zod v2 definition in `admin-api` Worker type definitions.
+
+---
+
+### §141.2 Artefact Description
+
+**PHI-E-001** — Annual SOC 2 evidence artefact for the Programme Health Indicator privacy guarantee: `phi_label` string (not raw FEHS score) is the only health-adjacent signal returned to `tenant_admin`. Content: (1) Admin Dashboard PHI card screenshot or `ProgrammeHealthResponse` JSON confirming `fehs_score` field is absent; (2) a representative sample (10–20 events) of `admin.programme_health_label_viewed` LOW/1yr DEC-030 events from the observation period, showing `phi_label` enum only — no `fehs_score` field; (3) a schema assertion confirming `ProgrammeHealthResponse` Zod v2 schema excludes `fehs_score`; (4) PHI-VIEW-01 chain invariant compliance note — all sampled `admin.programme_health_label_viewed` events preceded by `enterprise.health_score_updated` for same `tenant_id` + `snapshot_date`. `insufficient_data` state documented for cohorts with fewer than 5 activated members (QBR-K-ANON-01 k ≥ 5 floor per COST_MODEL §51). Per-schema-change supplement: if `ProgrammeHealthResponse` is modified (new fields, type changes), a supplement is filed within 30 days re-confirming `fehs_score` exclusion. Privacy floor: no raw `fehs_score`; no individual employee `user_id`, name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data; `admin_user_id` in DEC-030 event samples is the FORM-internal auth UUID of the requesting admin (pseudonymous UUID per §29.12 pattern, not an enterprise employee identifier); `tenant_id` is FORM-internal UUID; `signals.activation_rate_pct` and `signals.wau_rate_pct` are tenant-aggregate metrics — null when `below_k_threshold = true` (k < 5).
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | PHI-E-001 |
+| **Name** | Programme Health Indicator Privacy Guarantee Evidence |
+| **SOC 2 criteria** | C1.2, CC2.2 |
+| **Cadence** | Annual (during SOC 2 observation period); per-schema-change supplement within 30 days of any `ProgrammeHealthResponse` field addition |
+| **Retention** | 3 years |
+| **R2 path** | `compliance/evidence/phi/phi-e-001_{YYYY}.json` (annual); `phi-e-001_{YYYY}-schema-change-{YYYYMMDD}.json` (per-change supplement); `phi-e-001_{YYYY}-nil.json` (zero-observation or pre-GA years) |
+| **Primary definition** | `docs/COST_MODEL.md §54` (DEC-092, v2.27.0, 2026-07-01) |
+
+**C1.2 auditor narrative:** FORM collects FEHS (a composite health-engagement score derived from activation and usage behaviour) for enterprise tenants. C1.2 requires FORM to restrict access to personal information and disclose only what is appropriate to each audience. PHI-E-001 demonstrates that `tenant_admin` (the employer) receives only a 3-band label (`healthy` / `needs_attention` / `at_risk`) — never the numeric FEHS score — and that the schema-layer exclusion of `fehs_score` in `ProgrammeHealthResponse` is an enforced technical control (Zod v2 schema), not merely a procedural commitment. The `insufficient_data` state when k < 5 further prevents small-cohort health inference, consistent with the QBR-K-ANON-01 invariant (COST_MODEL §51).
+
+**CC2.2 auditor narrative:** CC2.2 requires the entity to communicate externally what information about their workforce is shared and what is not. PHI-E-001, combined with the enterprise admin dashboard documentation and privacy floor commitments in `docs/ENTERPRISE.md §Privacy floor`, demonstrates that FORM has implemented a technical control enforcing the documented commitment: employers see aggregate engagement health (label + trend + activation rate + WAU rate), not individual health scores or the underlying FEHS numeric composite. The DEC-030 event audit trail (`admin.programme_health_label_viewed`) creates a tamper-evident record confirming every API response was limited to the approved schema.
+
+---
+
+### §141.3 §80.3 R2 Subfolder Addition
+
+New R2 subfolder added to the evidence bucket topology (§80.3):
+
+| Subfolder | Purpose | Access | Retention |
+|---|---|---|---|
+| `compliance/evidence/phi/` | PHI-E-001 annual and per-schema-change Programme Health Indicator privacy evidence | `form_system` (compliance-officer write via PAM session); `compliance_reviewer` + `r2:compliance-officer` read; `r2:form-api` **NO ACCESS** | WORM Object Lock Governance, 3yr minimum |
+
+Filename convention: annual files at `phi-e-001_{YYYY}.json` (e.g. `phi-e-001_2027.json`); per-schema-change supplements at `phi-e-001_{YYYY}-schema-change-{YYYYMMDD}.json`; zero-observation or pre-GA years (before enterprise GA, M13) at `phi-e-001_{YYYY}-nil.json` with affirmative attestation: "PHI endpoint not yet in production. Enterprise GA milestone (M13) not reached. No `admin.programme_health_label_viewed` events in this observation period."
+
+---
+
+### §141.4 §80.4 Vanta Mirror Entry
+
+PHI-E-001 added to Vanta mirror schedule (§80.4):
+
+| Artefact ID | Vanta upload timing | TSC mapping | Privacy note |
+|---|---|---|---|
+| PHI-E-001 | Within 48h of annual collection run; within 48h of each per-schema-change supplement | C1.2, CC2.2 | `phi_label` enum (healthy/needs_attention/at_risk/insufficient_data), `snapshot_date` ISO 8601, `trend` enum, `signals.activation_rate_pct` NUMERIC or null (null when k < 5), `signals.wau_rate_pct` NUMERIC or null — no `fehs_score`, no individual employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data |
+
+Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. Vanta access: compliance-officer + security-engineer only.
+
+---
+
+### §141.5 §79.4 Master Evidence Table Row
+
+One row added to the §79.4 master evidence table (count 109 → 110), after OTA-WINDOW-E-001 (§140):
+
+| Evidence artefact | Criteria | Description | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|
+| **PHI-E-001** | C1.2, CC2.2 | Programme Health Indicator privacy guarantee. Annual evidence that `GET /api/admin/tenants/:tenantId/programme-health` never returns raw `fehs_score` to `tenant_admin`. Content: (1) `ProgrammeHealthResponse` schema extract confirming `fehs_score` excluded from Zod v2 definition; (2) representative `admin.programme_health_label_viewed` DEC-030 event samples showing `phi_label` enum only; (3) PHI-VIEW-01 chain invariant compliance note (all sampled events preceded by `enterprise.health_score_updated` for same `tenant_id` + `snapshot_date`); (4) `insufficient_data` state documented for k < 5 cohorts (QBR-K-ANON-01). Per-schema-change supplement within 30 days of any `ProgrammeHealthResponse` field addition. Pre-GA nil attestation when PHI endpoint not yet in production. C1.2: schema-layer exclusion of `fehs_score` enforced as technical control. CC2.2: tamper-evident DEC-030 audit trail confirming every API response limited to approved PHI label schema. Privacy: no `fehs_score`; no individual employee `user_id`, name, email, health value, or GDPR Art. 9 data; `admin_user_id` is FORM-internal auth UUID; aggregate signals null when k < 5. Source: COST_MODEL §54 (DEC-092, v2.27.0, 2026-07-01). | Annual + per-schema-change supplement | 3 yr | `compliance/evidence/phi/phi-e-001_{YYYY}.json` (annual); `phi-e-001_{YYYY}-schema-change-{YYYYMMDD}.json` (per-change); `phi-e-001_{YYYY}-nil.json` (pre-GA years) |
+
+---
+
+### §141.6 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/COST_MODEL.md §54.10` item 5 (P1/M8) — SOC 2 evidence artefact PHI-E-001 (C1.2/CC2.2): Admin Dashboard PHI card screenshot + `admin.programme_health_label_viewed` sample event JSON confirming `phi_label` string only; register in `docs/SOC2_READINESS.md` | §54.10 item 5 (v2.27.0, 2026-07-01) | 🟢 **Done — 2026-07-01 (SOC2_READINESS.md v3.67.0, §141)** |
+| `docs/COST_MODEL.md §54.11` cross-reference table — last pending row: "PHI-E-001 evidence artefact filed and registered in `docs/SOC2_READINESS.md`" | §54.11 (v2.27.1, 2026-07-01) | 🟢 **Done — 2026-07-01 (SOC2_READINESS.md v3.67.0, §141)** |
+
+---
+
+### §141.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `compliance/evidence/phi/` subfolder on Cloudflare R2 `form-soc2-evidence` bucket; enable WORM Object Lock Governance 3yr; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). Prerequisite: `GET /api/admin/tenants/:tenantId/programme-health` endpoint deployed to production (§54.10 item 1, P0/M6). | devops-lead | **P1** | M8 (before first SOC 2 observation period collection) | [ ] |
+| 2 | File first annual PHI-E-001 artefact: collect 10–20 `admin.programme_health_label_viewed` DEC-030 event samples from `audit_log_events`; export `ProgrammeHealthResponse` TypeScript interface + Zod v2 schema (confirm `fehs_score` absent); note PHI-VIEW-01 chain compliance; SHA-256 hash; upload to R2 at `compliance/evidence/phi/phi-e-001_{YYYY}.json` (3yr WORM); upload to Vanta within 48h; add to MASTER-INDEX. Privacy check: confirm no `fehs_score`, no employee `user_id` names, no emails, no GDPR Art. 9 data in any sample field. | compliance-officer | **P1** | Annual collection (first SOC 2 observation year; before annual audit) | [ ] |
+| 3 | If enterprise GA (M13) not reached by first SOC 2 observation year boundary, file pre-GA nil attestation: upload `phi-e-001_{YYYY}-nil.json` to R2; upload to Vanta within 48h; add to MASTER-INDEX. | compliance-officer | **P2** | M13 (if enterprise GA not reached before observation year closes) | [ ] |
+| 4 | On any `ProgrammeHealthResponse` schema change (new fields, type changes, `fehs_score` inadvertently added): file per-change supplement `phi-e-001_{YYYY}-schema-change-{YYYYMMDD}.json` within 30 days; re-confirm `fehs_score` exclusion in updated Zod schema; upload to R2; upload to Vanta within 48h; update MASTER-INDEX. Treat any schema change that would expose `fehs_score` to `tenant_admin` as a P0 privacy incident requiring INCIDENT_RESPONSE R-01 assessment. | compliance-officer + platform-engineer | **P1** | Within 30 days of each schema change | [ ] |
+
+---
+
+*v3.67.0 (2026-07-01): §141 Cross-Reference Patch — PHI-E-001 Registration (C1.2 / CC2.2 · COST_MODEL §54). Closes `docs/COST_MODEL.md §54.10` item 5 (P1/M8) and `docs/COST_MODEL.md §54.11` last pending cross-reference row. New annual SOC 2 evidence artefact registered (count 109 → 110): PHI-E-001 (C1.2/CC2.2, annual + per-schema-change supplement + pre-GA nil attestation, 3yr — Programme Health Indicator privacy guarantee evidence confirming that `GET /api/admin/tenants/:tenantId/programme-health` never returns raw `fehs_score` to `tenant_admin`; content: `ProgrammeHealthResponse` Zod v2 schema extract (`fehs_score` absent), representative `admin.programme_health_label_viewed` DEC-030 event samples (`phi_label` enum only, no `fehs_score`), PHI-VIEW-01 chain invariant compliance note, `insufficient_data` state documented for k < 5 cohorts per QBR-K-ANON-01; R2 path `compliance/evidence/phi/phi-e-001_{YYYY}.json`; per-schema-change supplements at `phi-e-001_{YYYY}-schema-change-{YYYYMMDD}.json`; WORM 3yr; `r2:form-api` NO ACCESS). §141.3: new R2 subfolder `compliance/evidence/phi/` (WORM 3yr; `r2:form-api` NO ACCESS; `form_system` PAM session write; `compliance_reviewer` + `r2:compliance-officer` read). §141.4: Vanta mirror entry (annual + per-schema-change within 48h; C1.2/CC2.2; `phi_label` enum + aggregate signals — no `fehs_score`, no individual employee `user_id`, health values, or GDPR Art. 9 data). §141.5: §79.4 master evidence table row (count 109 → 110; insertion after OTA-WINDOW-E-001). §141.6: two cross-reference obligations closed (COST_MODEL §54.10 item 5 P1/M8 → 🟢 Done; COST_MODEL §54.11 last pending row → 🟢 Done). §141.7: four-item implementation checklist (1× P1 R2 folder M8; 1× P1 first annual collection; 1× P2 pre-GA nil attestation; 1× P1 per-schema-change supplement — treat inadvertent `fehs_score` exposure as P0 privacy incident). Privacy floor: PHI-E-001 contains `phi_label` enum (3-band label only), `snapshot_date` ISO 8601, `trend` enum, aggregate `activation_rate_pct` and `wau_rate_pct` (null when k < 5, QBR-K-ANON-01) — no `fehs_score`, no individual employee `user_id`, name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data; `admin_user_id` in DEC-030 event samples is FORM-internal auth UUID only, not an enterprise employee identifier; `tenant_id` is FORM-internal UUID; `r2:form-api` REVOKED from `compliance/evidence/phi/`. Document header v3.66.0 → v3.67.0. Owner: compliance-officer.*
