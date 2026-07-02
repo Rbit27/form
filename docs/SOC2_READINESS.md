@@ -19013,6 +19013,63 @@ OQ-ENC-02 is closed as a design question. What remains is operational execution:
 
 ---
 
+### 58.16 Chain Ordering Invariant — KEY-IC-CHAIN-01 Cross-Reference (INCIDENT_RESPONSE §R-54)
+
+> **Source:** `docs/INCIDENT_RESPONSE.md §R-54.4` (v3.19.0, 2026-07-02). **Closes:** §R-54.7 item 5 (P1/M8). **Owner:** compliance-officer.
+
+`docs/INCIDENT_RESPONSE.md §R-54` (OQ-KEY-01 Resolution, 2026-07-02) introduced two DEC-030 event types — `admin.key_rotation_incident_opened` and `admin.key_rotation_incident_closed` — and the **KEY-IC-CHAIN-01** ordering invariant directly relevant to the chain integrity model in this section.
+
+**KEY-IC-CHAIN-01:** `admin.key_rotation_incident_closed` MUST be preceded in the DEC-030 chain by `admin.key_rotation_incident_opened` carrying the same `incident_id`. The `emit-audit-event` Worker returns HTTP 422 with error code `KEY_IC_CHAIN_01_VIOLATION` if `admin.key_rotation_incident_closed` is received for an `incident_id` with no preceding `admin.key_rotation_incident_opened` in the chain.
+
+**Relevance to §58:** The three DEC-030 rotation events in §58.10 (`admin.hmac_key_rotation_initiated`, `admin.hmac_key_rotated`, `admin.hmac_key_rotation_verified`) previously had no IC anchor in the chain. KEY-IC-CHAIN-01 closes this gap: every `HMAC_AUDIT_CHAIN_KEY` rotation is now bounded by an incident-control pair, with `incident_id` as the cross-reference key linking the PagerDuty incident, the DEC-030 chain, and all IR-KEY-E-001 through IR-KEY-E-006 evidence artefacts.
+
+**Five-event chain per rotation (ordered by `created_at`):**
+
+```
+admin.key_rotation_incident_opened    ← KEY-IC-CHAIN-01 opens  (HIGH/7yr, CC6.8/CC7.2/CC7.3)
+  admin.hmac_key_rotation_initiated   ← §58.10 event 1         (CRITICAL/7yr, CC6.7/CC6.8)
+  admin.hmac_key_rotated              ← §58.10 event 2         (CRITICAL/7yr, CC6.7/CC6.8)
+  admin.hmac_key_rotation_verified    ← §58.10 event 3         (HIGH/7yr, CC6.7/CC6.8)
+admin.key_rotation_incident_closed    ← KEY-IC-CHAIN-01 closes (HIGH/7yr, CC6.8/CC5.3/CC7.5)
+```
+
+| Invariant | Description | SOC 2 mapping | Enforcement |
+|---|---|---|---|
+| **KEY-IC-CHAIN-01** | `admin.key_rotation_incident_closed` MUST follow `admin.key_rotation_incident_opened` for same `incident_id`. Max window: 48h for `HMAC_AUDIT_CHAIN_KEY` (2-hour rotation SLA per R-21.3 × 24h outer bound); 72h for other key types. | CC6.8 — active management of the cryptographic key inventory; full IC lifecycle demonstrable from the HMAC chain without relying on external PagerDuty records | `emit-audit-event` Worker — HTTP 422 `KEY_IC_CHAIN_01_VIOLATION` if order violated; stale-window breach triggers PagerDuty monitoring alert |
+
+**Auditor query — retrieve full `HMAC_AUDIT_CHAIN_KEY` rotation lifecycle by `incident_id`:**
+
+```sql
+SELECT
+  event_type,
+  severity,
+  created_at,
+  metadata->>'incident_id'  AS incident_id,
+  metadata->>'key_type'     AS key_type,
+  metadata->>'resolution'   AS resolution,
+  hmac                      AS chain_hash
+FROM audit_log_events
+WHERE metadata->>'incident_id' = '<uuid>'
+  AND event_type IN (
+    'admin.key_rotation_incident_opened',
+    'admin.hmac_key_rotation_initiated',
+    'admin.hmac_key_rotated',
+    'admin.hmac_key_rotation_verified',
+    'admin.key_rotation_incident_closed'
+  )
+ORDER BY created_at;
+```
+
+Expected result: exactly 5 rows in order. Zero rows indicates an unknown `incident_id`; fewer than 5 indicates a partial rotation requiring investigation. The `chain_hash` column confirms HMAC linkage across all five events. The IC pair (`incident_opened` / `incident_closed`) confirms the rotation was performed under a formally opened and resolved incident control.
+
+**SOC 2 CC6.8 auditor note:** The prior chain model had the three §58.10 events with no preceding IC anchor, meaning an auditor examining the chain had no chain-level proof that a documented IC was opened and closed around the rotation. KEY-IC-CHAIN-01 closes that gap: the `incident_opened` event flanks the rotation sequence at the chain layer, not only in the PagerDuty timeline.
+
+**Privacy floor:** `incident_id` is a FORM-internal UUID. No enterprise employee `user_id`, name, email, health value, coaching content, biometric data, or GDPR Art. 9 special-category data appears in either event — `ic_user_id` is a FORM staff auth UUID only; `deferred_reason` is operational text only (max 200 chars); `key_type` enum values are system component names.
+
+**Registration note:** AUDIT_LOG_SCHEMA.md registration and `emit-audit-event` Worker deployment for both events remain pending (§R-54.7 items 1–2, P0/M7). This §58.16 entry closes the SOC2_READINESS.md documentation cross-reference obligation (§R-54.7 item 5, P1/M8). Operational enforcement is gated on the AUDIT_LOG_SCHEMA.md registration.
+
+---
+
 ---
 
 ## §59 Vendor Risk Management (CC9.2) — Third-Party Risk Program
@@ -34282,3 +34339,37 @@ One row added to the §79.4 master evidence table (count 110 → 111), after PHI
 ---
 
 *v3.68.0 (2026-07-02): §142 Cross-Reference Patch — FIDO2-E-001 Registration (CC6.7 · SSO_SCIM_IMPLEMENTATION §41). Closes `docs/SSO_SCIM_IMPLEMENTATION.md §41.6` item 7 (P1/M5) and `docs/SSO_SCIM_IMPLEMENTATION.md §41.7` last pending cross-reference row. New annual + per-change SOC 2 evidence artefact registered (count 110 → 111): FIDO2-E-001 (CC6.7, annual + per-change, 7yr — FIDO2/WebAuthn hardware token enrollment confirmation for all five break-glass-eligible engineers; `destructive` tier PAM; four-component artefact: Cloudflare Access `form-break-glass` policy screenshot confirming `require = ["warp", "fido2"]`; 5× individual enrollment confirmation screenshots with Cloudflare Access identity UUIDs; YubiKey 5 NFC procurement receipt 5+5; sanitized `cloudflare/access/break-glass-policy.tf` diff; TOTP fallback unconditionally prohibited for `destructive` tier; R2 path `compliance/evidence/pam/FIDO2-E-001_<YYYY-MM>.zip`; WORM 7yr; `r2:form-api` NO ACCESS). §142.2 artefact description with CC6.7 auditor narrative: hardware-token requirement enforced at both identity-provider layer (Cloudflare Access `form-break-glass` policy) and IaC layer (`break-glass-policy.tf` PR-reviewed); four components together constitute a technically verifiable control rather than a purely procedural commitment; no TOTP fallback path exists for `destructive` tier. §142.3 §80.3 folder note: no new subfolder — `compliance/evidence/pam/` already exists (§107, v3.32.0, 2026-06-25); §80.3 inline folder description updated to include `FIDO2-E-001 [annual + per-change]`. §142.4 Vanta mirror entry (annual + per-change within 48h; CC6.7; identity UUIDs + procurement metadata + IaC diff — no employee `user_id`, email, health value, or GDPR Art. 9 data). §142.5 §79.4 master evidence table row (count 110 → 111; insertion after PHI-E-001 (§141)). §142.6 two cross-reference obligations closed (SSO_SCIM_IMPLEMENTATION §41.6 item 7 P1/M5 → 🟢 Done; SSO_SCIM_IMPLEMENTATION §41.7 last pending row → 🟢 Done). §142.7 four-item implementation checklist (1× P1 first collection M5; 1× P1 annual re-collection; 1× P1 per-change collection; 1× P2 §15 calendar + PAM offboarding checklist). Privacy floor: FIDO2-E-001 contains Cloudflare Access identity UUIDs (not employee names or emails), procurement receipt (vendor/quantity/cost only), and `break-glass-policy.tf` diff (role labels only) — no employee `user_id`, name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data; `admin_user_id` not present in this artefact (enrollment screenshots show Cloudflare Access identity UUIDs only); `r2:form-api` REVOKED from `compliance/evidence/pam/` (§80.3 invariant inherited from §107). Document header v3.67.0 → v3.68.0. Owner: compliance-officer + security-engineer.*
+
+---
+
+## §143 · Cross-Reference Patch — INCIDENT_RESPONSE §R-54 · KEY-IC-CHAIN-01 Registration in §58.16 (CC6.8 · DEC-030 Chain Integrity)
+
+> **Date:** 2026-07-02. **Trigger:** `docs/INCIDENT_RESPONSE.md §R-54.9` cross-reference obligation — "`docs/SOC2_READINESS.md §58` — KEY-IC-CHAIN-01 cross-reference | §R-54.7 item 5 (P1/M8) | 🟡 Pending." **Owner:** compliance-officer.
+
+### §143.1 Purpose
+
+`docs/INCIDENT_RESPONSE.md §R-54` (v3.19.0, 2026-07-02 — OQ-KEY-01 Resolution) introduced `admin.key_rotation_incident_opened` and `admin.key_rotation_incident_closed` as DEC-030 event types, and the KEY-IC-CHAIN-01 ordering invariant. §R-54.7 item 5 created an obligation: register KEY-IC-CHAIN-01 in `docs/SOC2_READINESS.md §58` (HMAC chain integrity controls section). This §143 fulfils that obligation via an inline §58.16 subsection addition and closes the §R-54.9 cross-reference row and §R-54.7 item 5 checklist entry in `docs/INCIDENT_RESPONSE.md` (v3.19.1, 2026-07-02).
+
+### §143.2 Change Summary
+
+| Document | Change | Status |
+|---|---|---|
+| `docs/SOC2_READINESS.md §58` | Added §58.16 — Chain Ordering Invariant — KEY-IC-CHAIN-01 Cross-Reference: full invariant definition, five-event rotation chain diagram, SOC 2 CC6.8 mapping table, auditor SQL query, privacy floor note, registration note (AUDIT_LOG_SCHEMA.md + Worker deployment remain P0/M7 pending operational tasks) | 🟢 **Done — this pass** |
+| `docs/INCIDENT_RESPONSE.md §R-54.7 item 5` | `[ ]` → `[x] Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02` | 🟢 **Done — inline patch INCIDENT_RESPONSE.md v3.19.1** |
+| `docs/INCIDENT_RESPONSE.md §R-54.9` cross-reference row | `🟡 Pending` → `🟢 Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02` | 🟢 **Done — inline patch INCIDENT_RESPONSE.md v3.19.1** |
+
+### §143.3 What KEY-IC-CHAIN-01 Adds to §58 Chain Integrity
+
+The three §58.10 DEC-030 rotation events (`admin.hmac_key_rotation_initiated`, `admin.hmac_key_rotated`, `admin.hmac_key_rotation_verified`) previously had no IC anchor in the chain. KEY-IC-CHAIN-01 adds an IC boundary pair: every future `HMAC_AUDIT_CHAIN_KEY` rotation produces five ordered events, with `incident_id` as the cross-reference key across all six IR-KEY-E-001 through IR-KEY-E-006 evidence artefacts and the PagerDuty incident timeline. SOC 2 CC6.8 auditors can now query the HMAC chain directly to confirm the rotation lifecycle was bookended by a formally opened and formally resolved incident control — without relying on external PagerDuty records as primary evidence.
+
+### §143.4 Obligations Remaining Open After This Patch
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md` — register `admin.key_rotation_incident_opened` + `admin.key_rotation_incident_closed` (HIGH/7yr); Zod v2 schemas; KEY-IC-CHAIN-01 invariant with HTTP 422 `KEY_IC_CHAIN_01_VIOLATION` | §R-54.7 item 1 (P0/M7) | 🟡 **Pending** |
+| `emit-audit-event` Worker — deploy both events; KEY-IC-CHAIN-01 enforcement; integration tests A + B | §R-54.7 item 2 (P0/M7) | 🟡 **Pending** |
+| IR-KEY-E-001..E-006 evidence templates — `incident_id` JSON field + auditor cross-reference query | §R-54.7 item 4 (P1/M7) | 🟡 **Pending** |
+
+---
+
+*v3.69.0 (2026-07-02): §143 Cross-Reference Patch — INCIDENT_RESPONSE §R-54 · KEY-IC-CHAIN-01 Registration in §58.16 (CC6.8 · DEC-030 Chain Integrity). Closes §R-54.7 item 5 (P1/M8 — register KEY-IC-CHAIN-01 cross-reference in docs/SOC2_READINESS.md §58 HMAC chain integrity controls section). §58.16 added inline to §58: KEY-IC-CHAIN-01 invariant definition (`admin.key_rotation_incident_closed` MUST follow `admin.key_rotation_incident_opened` for same `incident_id`; HTTP 422 `KEY_IC_CHAIN_01_VIOLATION`; enforced by `emit-audit-event` Worker per §R-54.4); five-event chain diagram showing IC pair bracketing the three §58.10 HMAC rotation events; SOC 2 CC6.8 mapping table (max window: 48h for HMAC_AUDIT_CHAIN_KEY, 72h for other key types); five-column auditor SQL query returning exactly 5 rows per rotation (IC-opened → hmac_rotation_initiated → hmac_key_rotated → hmac_rotation_verified → IC-closed, all keyed on `incident_id`); auditor CC6.8 note explaining the gap closed by KEY-IC-CHAIN-01 (prior chain had no IC anchor — reliance on external PagerDuty records as primary evidence was a CC6.8 gap); privacy floor note (FORM staff UUID only; no enterprise employee PII or GDPR Art. 9 data); registration note (AUDIT_LOG_SCHEMA.md registration + Worker deployment remain P0/M7 pending). §143.2 change summary (three-row table). §143.3 CC6.8 impact explanation. §143.4 three obligations remaining open (§R-54.7 items 1, 2, 4 — all operational P0-P1/M7). INCIDENT_RESPONSE.md v3.19.1 inline patches (simultaneous commit): §R-54.7 item 5 `[ ]` → `[x] Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02`; §R-54.9 cross-reference row `🟡 Pending` → `🟢 Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02`. Privacy floor: §58.16 and §143 contain no personal data — KEY-IC-CHAIN-01 governs event ordering for HMAC key management audit events (FORM-internal UUIDs and system component names only). Document header v3.68.0 → v3.69.0. Cross-references: `docs/INCIDENT_RESPONSE.md §R-54` (KEY-IC-CHAIN-01 authoritative definition: §R-54.4; event payload specs: §R-54.3; Zod v2 schemas: §R-54.5; step sequence integration: §R-54.6); `docs/INCIDENT_RESPONSE.md §R-54.7 item 5` ([x] Done — 2026-07-02); `docs/INCIDENT_RESPONSE.md §R-54.9` (🟢 Done — 2026-07-02); `docs/SOC2_READINESS.md §58.10` (three HMAC rotation DEC-030 events — IC chain now spans all five); `docs/SOC2_READINESS.md §58.12` (CC6.8 mapping — extended by §58.16 IC chain guarantee); `docs/OBSERVABILITY.md §30` (AL-KEY-01..04 trigger alert IDs referenced in KEY-IC-CHAIN-01 stale-window monitoring). Owner: compliance-officer + security-engineer.*

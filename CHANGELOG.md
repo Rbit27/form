@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.11.0] — 2026-07-02
+
+### Added
+- `docs/SOC2_READINESS.md §58.16` — Chain Ordering Invariant — KEY-IC-CHAIN-01 Cross-Reference (SOC2_READINESS v3.69.0). Closes `docs/INCIDENT_RESPONSE.md §R-54.7` item 5 (P1/M8). KEY-IC-CHAIN-01 invariant registered in §58 HMAC chain integrity controls section: `admin.key_rotation_incident_closed` MUST follow `admin.key_rotation_incident_opened` for same `incident_id`; HTTP 422 `KEY_IC_CHAIN_01_VIOLATION`; enforced by `emit-audit-event` Worker. Five-event chain diagram (IC-opened → hmac_rotation_initiated → hmac_key_rotated → hmac_rotation_verified → IC-closed); CC6.8 auditor SQL query (5-row expected result per rotation); gap note: prior chain had no IC anchor at chain layer (PagerDuty-only IC was insufficient for primary CC6.8 evidence); privacy floor (FORM staff UUID only; no enterprise employee PII or GDPR Art. 9 data).
+- `docs/SOC2_READINESS.md §143` — Cross-Reference Patch tracking section for KEY-IC-CHAIN-01 registration; three pending obligations confirmed open (AUDIT_LOG_SCHEMA.md registration P0/M7; Worker deployment P0/M7; evidence template `incident_id` field P1/M7). SOC2_READINESS v3.68.0 → v3.69.0.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md §R-54.7 item 5` — `[ ]` → `[x] Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02`.
+- `docs/INCIDENT_RESPONSE.md §R-54.9` — cross-reference row `🟡 Pending` → `🟢 Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02`. INCIDENT_RESPONSE v3.19.0 → v3.19.1.
+- `VERSION` — 11.10.0 → 11.11.0.
+
+---
+
 ## [11.10.0] — 2026-07-02
 
 ### Added
