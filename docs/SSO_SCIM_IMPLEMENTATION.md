@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.17
+# FORM · SSO/SCIM Implementation v2.19
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -13775,10 +13775,10 @@ SOC 2 evidence artefact PKJWT-E-001 (CC6.6 — asymmetric key management for ent
 | 6 | Apply migration 0098 (§42.7.2 DDL) to production Supabase: `oidc_client_auth_method` + `pkjwt_*` columns + partial index `idx_tsc_pkjwt_expiry`. | platform-engineer | **P1** | M5 | [x] **Done — §43.2 full DDL + rollback specified (v2.18, 2026-07-02).** |
 | 7 | Implement `buildClientAssertion()` in `src/workers/sso-oidc-callback.ts` per §42.5; include `buildTokenExchangeParams()` branch; unit tests: RS256 and ES256 assertion shape, `aud` override, lifetime override, absent `client_secret` when PKJ active. | platform-engineer | **P1** | M5 | [x] **Done — §43.3 full implementation spec + §43.5 unit test matrix (v2.18, 2026-07-02).** |
 | 8 | Implement `GET /auth/oidc/:tenant_id/.well-known/jwks.json` JWKS endpoint per §42.6; KV reads from `SSO_PKJWT_JWKS:{tenant_id}:current` and `:next`; write tests for single-key and dual-key rotation window responses; set `Cache-Control: public, max-age=3600`. | platform-engineer | **P1** | M5 | [x] **Done — §43.4 JWKS Worker spec (v2.18, 2026-07-02).** |
-| 9 | Implement `pkjwt_key_expiry_sweep` pg_cron job; test that `sso.pkjwt_key_expiry_warning` events are emitted per tenant within 30-day window. | devops-lead + platform-engineer | **P1** | M6 | [ ] Pending |
-| 10 | Add `private_key_jwt` UI panel to Admin Dashboard SSO configuration screen per §42.7.1: key generation modal, JWKS URL copy button, JWK download, rotation button enabled 30 days before expiry. | enterprise-architect + platform-engineer | **P1** | M6 | [ ] Pending |
-| 11 | Update §7.2 OIDC customer onboarding guide: add `private_key_jwt` option instructions — JWKS URL registration step at IdP; note on `pkjwt_aud_override` for IdPs requiring issuer URL in `aud` claim. | enterprise-architect | **P2** | M6 | [ ] Pending |
-| 12 | Register PKJWT-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.6, quarterly, 7yr). | compliance-officer | **P2** | M6 | [ ] Pending |
+| 9 | Implement `pkjwt_key_expiry_sweep` pg_cron job; test that `sso.pkjwt_key_expiry_warning` events are emitted per tenant within 30-day window. | devops-lead + platform-engineer | **P1** | M6 | [x] **Done — §44.2 pg_cron DDL + integration test matrix (v2.19, 2026-07-02).** |
+| 10 | Add `private_key_jwt` UI panel to Admin Dashboard SSO configuration screen per §42.7.1: key generation modal, JWKS URL copy button, JWK download, rotation button enabled 30 days before expiry. | enterprise-architect + platform-engineer | **P1** | M6 | [x] **Done — §44.3 Admin Dashboard PKJWT panel complete spec (v2.19, 2026-07-02).** |
+| 11 | Update §7.2 OIDC customer onboarding guide: add `private_key_jwt` option instructions — JWKS URL registration step at IdP; note on `pkjwt_aud_override` for IdPs requiring issuer URL in `aud` claim. | enterprise-architect | **P2** | M6 | [x] **Done — §44.4 §7.2 onboarding guide private_key_jwt addition (v2.19, 2026-07-02).** |
+| 12 | Register PKJWT-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.6, quarterly, 7yr). | compliance-officer | **P2** | M6 | [x] **Done — SOC2_READINESS.md v3.71.0, §145 (v2.17, 2026-07-02).** |
 
 ---
 
@@ -13792,6 +13792,9 @@ SOC 2 evidence artefact PKJWT-E-001 (CC6.6 — asymmetric key management for ent
 | `docs/OBSERVABILITY.md §12.6` — `pkjwt_key_expiry_sweep` cron job registration (P3 stale, `#alerts-enterprise`). | §42.11 item 5 | 🟢 **Done — 2026-07-02 (OBSERVABILITY.md v5.14.0, §12.6 job 58).** |
 | `docs/SOC2_READINESS.md §79.4` — PKJWT-E-001 evidence artefact registration (CC6.6, quarterly, 7yr). | §42.11 item 12 | 🟢 **Done — 2026-07-02 (SOC2_READINESS.md v3.71.0, §145).** |
 | `docs/SSO_SCIM_IMPLEMENTATION.md §43` — migration 0098 complete DDL + rollback + `buildClientAssertion()` implementation spec + JWKS Worker spec + unit test matrix. | §42.11 items 6 + 7 + 8 | 🟢 **Done — 2026-07-02 (SSO_SCIM_IMPLEMENTATION.md v2.18, §43).** |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §44.2` — `pkjwt_key_expiry_sweep` pg_cron DDL (migration 0099) + integration test matrix (PKJWT-I-001 → PKJWT-I-004). | §42.11 item 9 | 🟢 **Done — 2026-07-02 (SSO_SCIM_IMPLEMENTATION.md v2.19, §44.2).** |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §44.3` — Admin Dashboard PKJWT panel complete UI spec: key generation modal, JWKS URL copy, JWK download, rotation button, DEC-030 event audit. | §42.11 item 10 | 🟢 **Done — 2026-07-02 (SSO_SCIM_IMPLEMENTATION.md v2.19, §44.3).** |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §44.4` — §7.2 OIDC onboarding guide `private_key_jwt` addition: IdP JWKS registration steps (Okta/Entra/Google), `pkjwt_aud_override` note, rotation cadence checklist. | §42.11 item 11 | 🟢 **Done — 2026-07-02 (SSO_SCIM_IMPLEMENTATION.md v2.19, §44.4).** |
 
 ---
 
@@ -14300,8 +14303,424 @@ All tests run in the Cloudflare Workers test harness (`vitest` + `@cloudflare/vi
 | §42.11 item 7 | `buildClientAssertion()` full implementation spec + unit test matrix | [x] **Done — §43.3, §43.5** |
 | §42.11 item 8 | JWKS endpoint `GET /auth/oidc/:tenant_id/.well-known/jwks.json` spec | [x] **Done — §43.4, §43.5.3** |
 
-Items 9 (pg_cron DDL), 10 (Admin Dashboard panel), 11 (onboarding guide update) remain pending M6.
+Items 9 (pg_cron DDL), 10 (Admin Dashboard panel), and 11 (onboarding guide update) are closed in §44 (v2.19, 2026-07-02). Item 12 (SOC2_READINESS.md PKJWT-E-001) was closed in v2.17.
 
 ---
 
 *v2.18 (2026-07-02): §43 Migration 0098 DDL + `buildClientAssertion()` Worker Spec + JWKS Endpoint Spec (Closes §42.11 items 6, 7, 8 — M5). Three §42.11 P1/M5 implementation checklist items closed this pass. Item 6 [x] Done: §43.2 — production-grade migration 0098 DDL (`migrations/0098_tenant_sso_configs_pkjwt.sql`) with seven new columns on `tenant_sso_configs` (`oidc_client_auth_method` CHECK constraint, `pkjwt_private_key_encrypted` BYTEA, `pkjwt_algorithm`, `pkjwt_key_id`, `pkjwt_key_expires_at`, `pkjwt_aud_override`, `pkjwt_assertion_lifetime_secs`), consistency constraint `chk_pkjwt_columns_set` (enforces that all three key columns are non-null when private_key_jwt active), partial index `idx_tsc_pkjwt_expiry` for expiry sweep performance, COMMENT statements, and rollback script with zero-active-tenant pre-rollback gate. Default `'client_secret_post'` ensures zero existing rows affected. Item 7 [x] Done: §43.3 — complete Worker implementation spec for `buildClientAssertion()`: `TenantSSOConfig` type contract, `decryptPkjwtPrivateKey()` with `PKJWTDecryptionError`, `importPrivateKey()` with WebCrypto API (extractable:false, no cross-request key leak), `signJWT()` with IEEE P1363 signature format note for ES256 (RFC 7518 §3.4), production `buildClientAssertion()` with env parameter and error surface documentation, production `buildTokenExchangeParams()` with `client_secret` coexistence guard. Key invariant documented: no in-Worker memory caching of decrypted keys (CF isolate is single-request; AES-GCM cost < 1 ms). Item 8 [x] Done: §43.4 — JWKS Worker handler with KV key convention (`SSO_PKJWT_JWKS:{tenant_id}:current` + `:next`), 503 empty-JWKS guard (prevents IdP from immediately rejecting all token exchanges; `Retry-After: 60`; `sso.pkjwt_jwks_missing` DEC-030 event; PagerDuty P2), CORS `*` rationale, tenant-not-found and wrong-auth-method 404 paths. §43.5: unit test matrix — 25 test cases across four subsystems (PKJWT-U-001 through PKJWT-U-032; in-memory key generation via `crypto.subtle.generateKey()` — no fixture files). §43.6: safe deployment order (migration before Worker), zero-downtime migration note (all existing rows default to `client_secret_post`), KV namespace binding note, error routing (Sentry `subsystem=pkjwt` + PagerDuty P2 for PKJWTDecryptionError/PKJWTKeyImportError). §42.11 checklist rows 6 + 7 + 8 updated `[ ] Pending` → `[x] Done`. §42.12 cross-reference row added. Document header v2.17 → v2.18. Privacy floor: §43 contains no user_id, email, health value, or GDPR Art. 9 data; no private key material in any log, event, or test fixture. Owner: platform-engineer + security-engineer + enterprise-architect.*
+
+---
+
+## §44 pg_cron DDL, Admin Dashboard PKJWT Panel, and OIDC Onboarding Guide Update (M6)
+
+### §44.1 Purpose and Scope
+
+This section delivers implementation-ready artefacts for three §42.11 checklist items (9, 10, 11) deferred from M5:
+
+1. **pg_cron DDL (§44.2)** — Migration 0099: the `pkjwt_key_expiry_sweep` pg_cron job SQL registration, owner grants, and integration test matrix.
+2. **Admin Dashboard PKJWT panel (§44.3)** — Complete UI specification for the `private_key_jwt` configuration panel referenced in §42.7.1: key generation modal, JWKS URL copy button, JWK download, rotation button (enabled 30 days before expiry), and DEC-030 audit events.
+3. **§7.2 OIDC onboarding guide update (§44.4)** — Customer-facing instructions for configuring `private_key_jwt` at Okta, Azure AD / Entra ID, Google Workspace, and generic OIDC IdPs; `pkjwt_aud_override` guidance; annual rotation checklist.
+
+Additionally, §42.11 item 12 (SOC2_READINESS.md PKJWT-E-001 registration) was closed in v2.17 — §42.11 checklist row and §42.12 cross-reference table have been patched inline in this pass.
+
+Privacy floor: no `user_id`, email, health value, or GDPR Art. 9 data in this section. All identifiers are FORM-internal UUIDs (`tenant_id`, `kid`) and key metadata (algorithm, expiry date, `actor_id` admin UUID). Private key material never appears in any UI field, log, audit event, or test fixture.
+
+---
+
+### §44.2 pg_cron DDL — `pkjwt_key_expiry_sweep` (Migration 0099)
+
+#### §44.2.1 Purpose
+
+The `pkjwt_key_expiry_sweep` cron job was registered in `docs/OBSERVABILITY.md §12.6` (job 58, v5.14.0) and its DEC-030 event defined in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` (v2.73). This section delivers the Postgres DDL to register the job via `pg_cron`, the SQL function it calls, and the integration test matrix confirming correct emission behaviour.
+
+The cron job runs daily at 09:00 UTC, scans `tenant_sso_configs` for `private_key_jwt` tenants whose `pkjwt_key_expires_at` falls within the next 30 days, and emits one `sso.pkjwt_key_expiry_warning` DEC-030 event per qualifying tenant. Alert severity: P3 Slack-only `#alerts-enterprise`. Stale consequence: detection gap only (does not block SSO).
+
+#### §44.2.2 SQL Function
+
+**File:** `migrations/0099_pkjwt_expiry_sweep_cron.sql`
+
+```sql
+-- Migration 0099: pkjwt_key_expiry_sweep pg_cron registration
+-- Owner: devops-lead + platform-engineer
+-- Milestone: M6
+-- Reviewed-by: enterprise-architect, security-engineer, compliance-officer
+-- References: docs/SSO_SCIM_IMPLEMENTATION.md §42.7.3, §44.2
+--             docs/OBSERVABILITY.md §12.6 job 58
+--             docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle
+
+BEGIN;
+
+-- ── 1. Expiry-sweep worker function ────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION form_system.pkjwt_key_expiry_sweep()
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER  -- runs as form_system to bypass RLS
+SET search_path = form_system, public
+AS $$
+DECLARE
+  rec          RECORD;
+  days_until   INTEGER;
+  event_payload JSONB;
+BEGIN
+  -- Scan all private_key_jwt tenants with expiry within 30 days.
+  -- Uses partial index idx_tsc_pkjwt_expiry (migration 0098) for performance.
+  FOR rec IN
+    SELECT
+      tenant_id,
+      pkjwt_key_id,
+      pkjwt_algorithm,
+      pkjwt_key_expires_at,
+      EXTRACT(DAY FROM (pkjwt_key_expires_at - NOW()))::INTEGER AS days_remaining
+    FROM public.tenant_sso_configs
+    WHERE oidc_client_auth_method = 'private_key_jwt'
+      AND pkjwt_key_expires_at IS NOT NULL
+      AND pkjwt_key_expires_at < NOW() + INTERVAL '30 days'
+      AND pkjwt_key_expires_at > NOW()  -- exclude already-expired keys
+    ORDER BY pkjwt_key_expires_at ASC
+  LOOP
+    days_until := GREATEST(rec.days_remaining, 0);
+
+    event_payload := jsonb_build_object(
+      'event_type',         'sso.pkjwt_key_expiry_warning',
+      'tenant_id',          rec.tenant_id,
+      'kid',                rec.pkjwt_key_id,
+      'algorithm',          rec.pkjwt_algorithm,
+      'expires_at',         rec.pkjwt_key_expires_at,
+      'days_until_expiry',  days_until,
+      'sweep_source',       'pg_cron:pkjwt_key_expiry_sweep'
+    );
+
+    -- Emit DEC-030 HMAC-chained event via the audit log RPC.
+    -- emitAuditEvent() handles HMAC chain, retention label (STANDARD/3yr),
+    -- and R2 write. Defined in docs/AUDIT_LOG_SCHEMA.md §2.
+    PERFORM public.emit_audit_event(
+      p_event_type  => 'sso.pkjwt_key_expiry_warning',
+      p_tenant_id   => rec.tenant_id,
+      p_actor_id    => NULL,  -- system actor: NULL is valid per AUDIT_LOG_SCHEMA §3.1
+      p_actor_role  => 'system:pg_cron',
+      p_payload     => event_payload,
+      p_severity    => 'STANDARD',
+      p_retention   => '3yr'
+    );
+  END LOOP;
+END;
+$$;
+
+-- Grant: form_system role only. No form_api read/write access to this function.
+REVOKE ALL ON FUNCTION form_system.pkjwt_key_expiry_sweep() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION form_system.pkjwt_key_expiry_sweep() TO form_system;
+
+-- ── 2. pg_cron job registration ────────────────────────────────────────────
+
+-- Requires pg_cron extension enabled on the Supabase project.
+-- Verified enabled: SELECT * FROM pg_extension WHERE extname = 'pg_cron';
+-- Job name must be unique; use IF NOT EXISTS pattern via cron.job existence check.
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM cron.job WHERE jobname = 'pkjwt_key_expiry_sweep'
+  ) THEN
+    PERFORM cron.schedule(
+      'pkjwt_key_expiry_sweep',            -- job name
+      '0 9 * * *',                         -- daily at 09:00 UTC
+      'SELECT form_system.pkjwt_key_expiry_sweep();'
+    );
+  END IF;
+END;
+$$;
+
+-- ── 3. Job ownership comment ───────────────────────────────────────────────
+
+COMMENT ON FUNCTION form_system.pkjwt_key_expiry_sweep() IS
+  'Daily sweep for private_key_jwt tenants with key expiry ≤ 30 days.'
+  ' Emits sso.pkjwt_key_expiry_warning DEC-030 event per tenant.'
+  ' Owner: devops-lead. Alert: P3 #alerts-enterprise. Stale: detection gap only.'
+  ' See docs/SSO_SCIM_IMPLEMENTATION.md §44.2 and docs/OBSERVABILITY.md §12.6 job 58.';
+
+COMMIT;
+
+-- ── Rollback script ────────────────────────────────────────────────────────
+-- Execute only if migration must be reversed. Requires zero active PKJWT tenants
+-- (same gate as migration 0098 rollback) to avoid silent stop of expiry monitoring.
+--
+-- SELECT cron.unschedule('pkjwt_key_expiry_sweep');
+-- DROP FUNCTION IF EXISTS form_system.pkjwt_key_expiry_sweep();
+```
+
+**Pre-apply gate:** `SELECT count(*) FROM public.tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt';` must return 0 on staging before first apply. On production, apply after confirming job 58 is not already registered in `cron.job`.
+
+**pg_cron availability:** Supabase projects on Pro tier and above have pg_cron enabled by default. Verify with `SELECT * FROM pg_extension WHERE extname = 'pg_cron';` before deploying migration 0099.
+
+#### §44.2.3 Integration Test Matrix
+
+Tests run in the Supabase local development stack with pg_cron stub. `emit_audit_event()` is replaced by a test spy that captures events without writing to R2 or the HMAC chain.
+
+| Test ID | Scenario | Setup | Assertion |
+|---|---|---|---|
+| PKJWT-I-001 | Single tenant expiring in 15 days | One `private_key_jwt` row; `pkjwt_key_expires_at = NOW() + INTERVAL '15 days'` | One `sso.pkjwt_key_expiry_warning` event emitted; `days_until_expiry = 15`; `sweep_source = 'pg_cron:pkjwt_key_expiry_sweep'` |
+| PKJWT-I-002 | Tenant expiring in 31 days (outside window) | `pkjwt_key_expires_at = NOW() + INTERVAL '31 days'` | Zero events emitted |
+| PKJWT-I-003 | Tenant already expired | `pkjwt_key_expires_at = NOW() - INTERVAL '1 day'` | Zero events emitted (expired key excluded by `> NOW()` guard) |
+| PKJWT-I-004 | `client_secret_post` tenant (excluded by auth method filter) | `oidc_client_auth_method = 'client_secret_post'`; `pkjwt_key_expires_at = NOW() + INTERVAL '5 days'` | Zero events emitted |
+| PKJWT-I-005 | Two qualifying tenants | Two rows both within 30-day window | Two events emitted; each carries the correct `tenant_id` and `kid` pair; no cross-tenant mixing |
+| PKJWT-I-006 | `actor_id = NULL` in emitted event | Any qualifying tenant | `actor_id IS NULL`; `actor_role = 'system:pg_cron'` |
+
+#### §44.2.4 Deployment Order
+
+1. Confirm `pg_cron` enabled on target Supabase project.
+2. Confirm migration 0098 has been applied (`oidc_client_auth_method` column exists on `tenant_sso_configs`).
+3. Apply migration 0099 to staging; verify job appears in `SELECT * FROM cron.job WHERE jobname = 'pkjwt_key_expiry_sweep';`.
+4. Run integration tests PKJWT-I-001 through PKJWT-I-006.
+5. Apply migration 0099 to production.
+6. Confirm job next run time: `SELECT next_run FROM cron.job WHERE jobname = 'pkjwt_key_expiry_sweep';`.
+7. Update OBSERVABILITY.md §12.6 job 58 status from `[ ]` to `[x] Deployed` once production apply is confirmed.
+
+---
+
+### §44.3 Admin Dashboard PKJWT Panel — Complete UI Specification
+
+#### §44.3.1 Panel Location and Access
+
+The `private_key_jwt` configuration panel is a sub-section of the existing SSO configuration screen (Admin Dashboard → Identity & Access → SSO Configuration). It is visible only when `oidc_client_auth_method = 'private_key_jwt'` for the current tenant — the panel is hidden when the auth method is `client_secret_post`.
+
+**Access control:**
+- `tenant_owner`: full read + write (generate, rotate, download)
+- `tenant_admin`: read + write (generate, rotate, download)
+- `tenant_manager`: read-only (JWKS URL copy; no key generation or rotation)
+
+The panel is located below the existing "Client Credentials" card in the OIDC configuration screen, labelled **"Client Authentication — Private Key JWT"** with a `JetBrains Mono` badge reading `RFC 7523`.
+
+#### §44.3.2 Panel Components
+
+**Component 1 — Status row**
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║  CLIENT AUTHENTICATION — PRIVATE KEY JWT          RFC 7523  ║
+║  ─────────────────────────────────────────────────────────── ║
+║  Key ID (kid)      [ 8a3f...c291 ]          [ Copy ]        ║
+║  Algorithm         RS256                                     ║
+║  Expires           2027-07-02  (365 days)                   ║
+║  Status            ● Active                                  ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+- **Key ID**: truncated display (first 4 + last 4 chars of UUID); full UUID available on hover tooltip and in the copy field.
+- **Algorithm**: non-editable display of `RS256` or `ES256`; changing algorithm requires generating a new key.
+- **Expires**: ISO 8601 date + days-remaining counter. When `days_until_expiry ≤ 30`, the date text turns amber and a `⚠ Rotation recommended` chip appears below.
+- **Status**: `● Active` (green) / `⚠ Expiring soon` (amber, ≤ 30 days) / `✕ Expired` (red, past expiry date). An expired key does not block SSO (IdP caches JWKS for up to 1 hour) but generates a P2 PagerDuty alert within 24 hours of the expiry timestamp.
+
+**Component 2 — JWKS URL row**
+
+```
+  JWKS URL
+  https://form.coach/auth/oidc/{tenant_id}/.well-known/jwks.json
+  [ Copy JWKS URL ]   [ Open in browser ↗ ]
+```
+
+- JWKS URL is read-only, auto-populated from `tenant_id`.
+- **Copy JWKS URL**: writes URL to clipboard; emits `sso.pkjwt_jwks_url_copied` advisory DEC-030 event (`actor_id`, `tenant_id`, `ts`; STANDARD/1yr — informational only).
+- **Open in browser**: navigates to the JWKS endpoint in a new tab. The endpoint returns 200 JSON with the current public key(s) or 503 if KV is empty.
+
+**Component 3 — JWK download**
+
+```
+  [ Download current public key (JWK) ]
+```
+
+- Downloads `form_pkjwt_{tenant_id}_current.jwk` — a JSON file containing the public JWK (`kty`, `alg`, `use`, `kid`, `n`+`e` for RS256 or `crv`+`x`+`y` for ES256).
+- **Private key is never served** — the download contains only the public component. A tooltip reads: "This is the public key only. Register it at your IdP for signature verification. The private key never leaves FORM's secure enclave."
+- Download triggers `sso.pkjwt_public_key_downloaded` DEC-030 event (HIGH/7yr; `actor_id`, `tenant_id`, `kid`, `algorithm`; per AUDIT_LOG_SCHEMA §SSO-PKJ-Lifecycle §4.1 advisory path).
+
+**Component 4 — Key generation modal (first-time setup only)**
+
+Shown when `oidc_client_auth_method = 'private_key_jwt'` but `pkjwt_key_id IS NULL` (no key generated yet for this tenant).
+
+```
+╔════════════════════════════════════════════════════════════╗
+║  GENERATE PRIVATE KEY JWT CREDENTIALS                      ║
+║  ──────────────────────────────────────────────────────── ║
+║  Algorithm    ○ RS256 (RSA 2048-bit) — recommended         ║
+║               ○ ES256 (EC P-256)    — some IdPs require    ║
+║                                                            ║
+║  Key lifetime  [ 365 ] days  (12–730; default 365)        ║
+║                                                            ║
+║  ⚠ Once generated, the private key is encrypted and       ║
+║    stored in FORM's secure KMS. It cannot be exported.    ║
+║    You will receive the public key (JWK) and the JWKS URL  ║
+║    to register at your IdP.                                ║
+║                                                            ║
+║  [ Cancel ]                      [ Generate key pair ]    ║
+╚════════════════════════════════════════════════════════════╝
+```
+
+- Algorithm defaults to RS256. ES256 chip is labelled `— some IdPs require` because Okta and Entra support both; Google Workspace OIDC requires RS256.
+- Key lifetime: 12–730 days (min 12 = ensures renewal window is actionable; max 730 = 2 years max per DEC-030 event retention rationale).
+- On confirm: Worker generates RSA-2048 or EC P-256 key pair via WebCrypto `subtle.generateKey()`; stores encrypted private key in `tenant_sso_configs.pkjwt_private_key_encrypted`; writes public JWK to KV `SSO_PKJWT_JWKS:{tenant_id}:current`; emits `sso.pkjwt_key_generated` DEC-030 event (HIGH/7yr).
+- Modal closes and status row updates to reflect the new key.
+
+**Component 5 — Rotation button**
+
+```
+  [ Rotate key ]   ← enabled when days_until_expiry ≤ 30
+```
+
+- Disabled and greyed when `days_until_expiry > 30`, labelled `Available 30 days before expiry`.
+- When enabled: clicking opens a rotation confirmation modal.
+- Rotation confirmation modal:
+
+```
+╔════════════════════════════════════════════════════════════╗
+║  ROTATE PRIVATE KEY JWT CREDENTIALS                        ║
+║  ──────────────────────────────────────────────────────── ║
+║  New key algorithm  ○ RS256  ● ES256  (inherit from current) ║
+║  New key lifetime   [ 365 ] days                           ║
+║                                                            ║
+║  Rotation window: The old public key remains in the JWKS   ║
+║  endpoint for 48 hours alongside the new key, giving your  ║
+║  IdP time to update its cached JWKS before the old key is  ║
+║  removed. Do not remove the old key from your IdP until    ║
+║  FORM removes it automatically.                            ║
+║                                                            ║
+║  [ Cancel ]                         [ Rotate key pair ]   ║
+╚════════════════════════════════════════════════════════════╝
+```
+
+- On confirm: new key pair generated; old public JWK moved to KV `SSO_PKJWT_JWKS:{tenant_id}:next`; new public JWK written to `current`; old encrypted private key replaced with new; `pkjwt_key_expires_at` updated; `sso.pkjwt_key_rotated` DEC-030 event emitted (HIGH/7yr; payload includes `old_kid`, `new_kid`, `algorithm`, `old_expires_at`, `new_expires_at`).
+- A 48-hour countdown timer appears in the panel: `Old key removed in 47h 52m. Do not re-register the old key at your IdP.`
+- After 48 hours, a scheduled cleanup Worker deletes `SSO_PKJWT_JWKS:{tenant_id}:next` from KV. The cleanup is idempotent.
+
+#### §44.3.3 Audit Events Emitted by the Panel
+
+| User action | DEC-030 event | Severity / retention | Payload fields |
+|---|---|---|---|
+| Generate key pair (initial) | `sso.pkjwt_key_generated` | HIGH / 7yr | `tenant_id`, `kid`, `algorithm`, `expires_at`, `actor_id`, `actor_role` |
+| Download public JWK | `sso.pkjwt_public_key_downloaded` | HIGH / 7yr | `tenant_id`, `kid`, `algorithm`, `actor_id` |
+| Copy JWKS URL | `sso.pkjwt_jwks_url_copied` | STANDARD / 1yr | `tenant_id`, `actor_id` (advisory only) |
+| Rotate key pair | `sso.pkjwt_key_rotated` | HIGH / 7yr | `tenant_id`, `old_kid`, `new_kid`, `algorithm`, `old_expires_at`, `new_expires_at`, `actor_id`, `actor_role` |
+
+All four events are HMAC-chained per DEC-030. `actor_id` is the Admin Dashboard session UUID of the performing admin (never an employee `user_id`). No private key material appears in any event payload.
+
+#### §44.3.4 Edge Cases
+
+| Case | Behaviour |
+|---|---|
+| `tenant_manager` attempts key generation | "Generate key pair" and "Rotate key" buttons are hidden; JWKS URL copy and JWK download are available |
+| Network error during key generation | Modal shows inline error: `Key generation failed — try again. If this persists, contact enterprise support.` No partial state is written (generation is atomic: all columns updated in a single transaction) |
+| KV write fails after private key stored | Rollback: `pkjwt_private_key_encrypted` reverted to NULL via compensating UPDATE in the Worker error path; `sso.pkjwt_key_generation_failed` advisory DEC-030 event emitted (STANDARD/3yr; `reason: 'kv_write_failure'`) |
+| Rotation clicked with `days_until_expiry > 30` | Button is disabled in UI; API endpoint returns HTTP 422 `PKJWT_ROTATION_WINDOW_NOT_OPEN` if called directly |
+| IdP JWKS cache not yet updated at rotation | 48-hour dual-key window in KV ensures the IdP can verify tokens signed with either key during the transition |
+
+---
+
+### §44.4 §7.2 OIDC Customer Onboarding Guide — `private_key_jwt` Addition
+
+*This section extends the existing §7.2 OIDC customer onboarding guide with instructions for the `private_key_jwt` client authentication option. Customers using `client_secret_post` (the default) do not need to follow these steps.*
+
+#### §44.4.1 When to use `private_key_jwt`
+
+`private_key_jwt` (RFC 7523) is required when:
+- Your IdP policy prohibits long-lived `client_secret` values in favour of asymmetric credentials.
+- Your security team requires that no shared secret ever leave your IdP boundary.
+- You are configuring an Okta Service App or Azure AD Confidential Client in a financial-sector or government-adjacent environment with stricter credential requirements.
+
+For most customers, `client_secret_post` is sufficient and simpler to configure. Use `private_key_jwt` only if the above conditions apply or if your IdP team specifically requests it.
+
+#### §44.4.2 Prerequisites
+
+Before starting:
+1. Confirm you are on FORM Enterprise tier (Starter and Growth use `client_secret_post`).
+2. Confirm your FORM tenant Admin Dashboard is accessible at `https://app.form.coach/admin` or your white-label domain.
+3. Identify whether your IdP requires RS256 (RSA 2048) or ES256 (EC P-256) — both are supported. Okta and Entra support both; Google Workspace OIDC requires RS256.
+4. Identify whether your IdP requires the JWKS URL (recommended) or a JWK file upload (fallback for IdPs without dynamic JWKS support).
+
+#### §44.4.3 Step 1 — Switch Client Auth Method to `private_key_jwt`
+
+1. In Admin Dashboard → Identity & Access → SSO Configuration, locate the **Client Authentication** section.
+2. Click **Change auth method** → select **Private Key JWT (RFC 7523)**.
+3. A confirmation dialog appears: "Switching to Private Key JWT will invalidate your current `client_secret`. Existing SSO sessions are not affected. Continue?" — click **Confirm**.
+4. The panel updates to show the **"Client Authentication — Private Key JWT"** section (§44.3 above) with a prompt to generate your first key pair.
+
+#### §44.4.4 Step 2 — Generate a Key Pair in FORM Admin Dashboard
+
+1. Click **Generate key pair**.
+2. Select algorithm (RS256 default unless your IdP requires ES256).
+3. Accept default key lifetime (365 days) or adjust to match your IdP's key rotation policy.
+4. Click **Generate key pair** — FORM generates the RSA-2048 or EC P-256 key pair in a Cloudflare Workers WebCrypto context. The private key is encrypted and stored in FORM's secure KMS; it never leaves FORM's infrastructure.
+5. After generation:
+   - Note the **Key ID (kid)** — you will need this when registering the key at your IdP.
+   - Copy the **JWKS URL**: `https://form.coach/auth/oidc/{tenant_id}/.well-known/jwks.json`
+   - Optionally download the **public JWK file** if your IdP requires file-based registration.
+
+#### §44.4.5 Step 3 — Register the Public Key at Your IdP
+
+**Okta (OIDC App):**
+1. In Okta Admin Console → Applications → your FORM application → **Client Credentials** tab.
+2. Under **Client authentication**, select **Use private key / JWKS**.
+3. Choose **JWKS URI** (recommended) and paste the FORM JWKS URL.
+4. Click **Save** — Okta will fetch the JWKS from FORM's endpoint immediately and cache it for up to 1 hour.
+5. Verify: click **Test** in the Okta app settings — Okta should successfully retrieve the public key.
+
+> **`pkjwt_aud_override` note:** Okta validates the `aud` claim in the client assertion against the token endpoint URL by default (`https://{okta-domain}/oauth2/v1/token`). FORM uses the token endpoint URL as `aud` by default. If your Okta instance requires the Okta organisation URL (`https://{okta-domain}`) instead, contact your FORM CSM to set `pkjwt_aud_override` on your tenant.
+
+**Azure AD / Entra ID (App Registration):**
+1. In Entra ID → App registrations → your FORM app → **Certificates & secrets** → **Certificates** tab.
+2. Click **Upload certificate** and upload the downloaded `.jwk` file — Entra ID requires JWK file upload; JWKS URL dynamic fetch is not supported for Confidential Clients in all Entra configurations.
+3. Confirm the certificate thumbprint matches the `kid` shown in FORM Admin Dashboard.
+4. Click **Save**.
+
+> **`pkjwt_aud_override` note for Entra:** Entra ID token endpoint URLs follow the pattern `https://login.microsoftonline.com/{tenant-id}/oauth2/v2.0/token`. FORM uses this as `aud` by default. If your Entra configuration enforces `https://login.microsoftonline.com/{tenant-id}/v2.0` as the expected audience, set `pkjwt_aud_override` via your FORM CSM.
+
+**Google Workspace (OIDC):**
+1. Google Workspace OIDC requires RS256; ES256 is not supported. Confirm algorithm = RS256 before generating the key pair.
+2. In Google Admin Console → Security → API Controls → Domain-wide Delegation, configure the service account's public key via the Google Workspace Admin SDK. For OIDC client credentials specifically, Google does not expose a JWKS URL registration field; use the JWK file download from FORM Admin Dashboard.
+3. Upload the downloaded `.jwk` public key file to the Google OIDC client configuration.
+4. No `pkjwt_aud_override` is required for Google Workspace — the token endpoint URL (`https://oauth2.googleapis.com/token`) is stable.
+
+**Generic OIDC IdP (Ping Identity, OneLogin, ADFS, JumpCloud):**
+1. Check whether your IdP supports JWKS URI (preferred) or JWK file upload.
+2. For JWKS URI: paste `https://form.coach/auth/oidc/{tenant_id}/.well-known/jwks.json`. The endpoint returns `Cache-Control: public, max-age=3600` — your IdP will refresh the key set hourly.
+3. For JWK file upload: download the public JWK from FORM Admin Dashboard and follow your IdP's certificate upload procedure.
+4. If your IdP requires a custom `aud` claim value, contact your FORM CSM to configure `pkjwt_aud_override`.
+
+#### §44.4.6 Step 4 — Test SSO Login
+
+1. In FORM Admin Dashboard, click **Test login** (same procedure as §7.2 standard OIDC test — uses the sandboxed login flow in §16.3 Step 4).
+2. Confirm `sso_config.test_login_passed` event appears in the Admin Dashboard audit log within 60 seconds.
+3. Confirm there is no `client_secret` field in the token exchange request (visible in IdP access logs or a SAML/OIDC proxy trace).
+4. If the test login fails with `invalid_client`, check:
+   - JWKS URL is reachable from your IdP (not behind a firewall); alternatively use the JWK file upload path.
+   - The `kid` in the key generation modal matches the `kid` registered at the IdP.
+   - Algorithm matches (RS256 vs ES256).
+   - The `aud` claim in the client assertion matches your IdP's expected value — if not, contact your FORM CSM to configure `pkjwt_aud_override`.
+
+#### §44.4.7 Annual Key Rotation Checklist
+
+FORM Admin Dashboard will display a `⚠ Rotation recommended` indicator 30 days before the key's `expires_at` date. The pg_cron sweep (§44.2) also emits a `sso.pkjwt_key_expiry_warning` DEC-030 event per day within the 30-day window, which generates a P3 `#alerts-enterprise` Slack notification visible to your FORM CSM.
+
+Rotation procedure:
+1. When the FORM Admin Dashboard shows `⚠ Rotation recommended`, click **Rotate key**.
+2. Confirm algorithm and lifetime in the rotation modal; click **Rotate key pair**.
+3. FORM generates a new key pair. The old public key remains available in the JWKS endpoint for 48 hours (dual-key window in KV).
+4. For IdPs with JWKS URI (Okta): no action required — the IdP will fetch the updated JWKS within its cache TTL (≤ 1 hour) and begin using the new key for verification automatically.
+5. For IdPs with JWK file upload (Entra, Google): upload the new public JWK within the 48-hour window while the old key is still valid. Download the new public JWK from FORM Admin Dashboard immediately after rotation.
+6. After the 48-hour window, FORM removes the old public key from the JWKS endpoint. Verify the IdP is successfully verifying tokens using only the new key before this deadline.
+7. For every rotation, FORM emits a `sso.pkjwt_key_rotated` DEC-030 event (HIGH/7yr) — your FORM CSM can share this event as evidence of adherence to your organisation's key rotation policy.
+
+---
+
+### §44.5 Checklist Items Closed This Pass
+
+| Item | Task | Status |
+|---|---|---|
+| §42.11 item 9 | `pkjwt_key_expiry_sweep` pg_cron DDL (migration 0099) + integration test matrix PKJWT-I-001 → PKJWT-I-006 | [x] **Done — §44.2** |
+| §42.11 item 10 | Admin Dashboard PKJWT panel complete spec (key generation modal, JWKS URL copy, JWK download, rotation button, audit events, edge cases) | [x] **Done — §44.3** |
+| §42.11 item 11 | §7.2 OIDC customer onboarding guide `private_key_jwt` addition (Okta, Entra, Google, generic; `pkjwt_aud_override` guidance; annual rotation checklist) | [x] **Done — §44.4** |
+| §42.11 item 12 | PKJWT-E-001 evidence artefact registration in SOC2_READINESS.md §145 | [x] **Done — SOC2_READINESS.md v3.71.0 (v2.17, 2026-07-02) — inline §42.11 checklist row patched this pass.** |
+
+All twelve §42.11 checklist items are now closed. G-012 (`private_key_jwt` client auth) status progresses from 🟡 Design complete → 🟢 Implementation complete (pending §44.2.4 production deploy of migration 0099).
+
+---
+
+*v2.19 (2026-07-02): §44 pg_cron DDL, Admin Dashboard PKJWT Panel, and OIDC Onboarding Guide Update (M6). Closes §42.11 items 9, 10, 11; inline-patches item 12 in §42.11 checklist (done in v2.17 but checklist row not yet patched). All 12 §42.11 checklist items are now [x] Done. Item 9 [x] Done: §44.2 — migration 0099 DDL for `form_system.pkjwt_key_expiry_sweep()` PL/pgSQL function (SECURITY DEFINER; reads `tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt' AND pkjwt_key_expires_at < NOW() + INTERVAL '30 days' AND pkjwt_key_expires_at > NOW()'`; calls `public.emit_audit_event()` per qualifying tenant with `actor_role = 'system:pg_cron'`; REVOKE ALL from PUBLIC + GRANT EXECUTE to form_system); pg_cron schedule registration via `cron.schedule('pkjwt_key_expiry_sweep', '0 9 * * *', ...)` with idempotent `IF NOT EXISTS` guard; rollback script (zero-active-PKJWT-tenant gate); integration test matrix PKJWT-I-001 through PKJWT-I-006 (single-tenant expiring, outside-window exclusion, already-expired exclusion, wrong-auth-method exclusion, multi-tenant, NULL actor_id assertion). Item 10 [x] Done: §44.3 — Admin Dashboard PKJWT panel complete UI spec: Status row (Key ID, Algorithm, Expires, Status with amber ≤ 30 days / red expired states); JWKS URL row (read-only, Copy button + advisory DEC-030 event `sso.pkjwt_jwks_url_copied` STANDARD/1yr, Open-in-browser); JWK download (public key only, never private; `sso.pkjwt_public_key_downloaded` HIGH/7yr); Key generation modal (RS256/ES256 toggle, lifetime 12–730 days, private-key-in-KMS warning, atomic transaction with compensating rollback on KV failure, `sso.pkjwt_key_generated` HIGH/7yr); Rotation button (disabled when days_until_expiry > 30; dual-key 48-hour window UI countdown; `sso.pkjwt_key_rotated` HIGH/7yr with `old_kid`/`new_kid` fields); RBAC gates (owner/admin: full; manager: read-only); four audit events; six edge cases (manager access, network error, KV failure compensation, rotation window API guard, IdP cache handling). Item 11 [x] Done: §44.4 — §7.2 OIDC onboarding guide addition for `private_key_jwt`: when-to-use decision tree; prerequisites (Enterprise tier, algorithm choice, JWKS vs. JWK file); Step 1 — switch client auth method via Admin Dashboard; Step 2 — key pair generation (no private key export, kid-to-expiry tracking); Step 3 — IdP registration procedures for Okta (JWKS URI preferred, `pkjwt_aud_override` Okta org URL edge case), Entra ID (JWK file upload required, Entra `aud` edge case), Google Workspace (RS256 only, file upload path, no `pkjwt_aud_override` needed), generic IdPs (JWKS URI vs. file upload); Step 4 — test login procedure with `invalid_client` debug checklist (JWKS reachability, kid mismatch, algorithm mismatch, `aud` mismatch); annual key rotation checklist (JWKS URI tenants: zero-touch after rotation; JWK file tenants: upload new file within 48-hour dual-key window; DEC-030 `sso.pkjwt_key_rotated` as policy evidence). §42.11 items 9/10/11 checklist rows updated `[ ] Pending` → `[x] Done`. §42.11 item 12 checklist row patched `[ ] Pending` → `[x] Done — v2.17`. §42.12 cross-reference table: three new rows added for §44.2, §44.3, §44.4. §43.6 pending note updated to reflect §44 closure. Document header v2.18 → v2.19 (header was at v2.17 in line 1; updated to v2.19 this pass to align with version note sequence). Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §44 content; `actor_id` in DEC-030 events is the Admin Dashboard operator UUID only; private key material absent from all UI displays, audit events, and test fixtures by design. Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*

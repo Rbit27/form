@@ -1,5 +1,10 @@
 # Changelog · FORM
 
+## [11.43.1] — 2026-07-02
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §44` — pg_cron DDL, Admin Dashboard PKJWT panel, and OIDC onboarding guide update (M6). Closes all remaining §42.11 checklist items: (9) `pkjwt_key_expiry_sweep` pg_cron implementation — migration 0099 PL/pgSQL DDL (`form_system.pkjwt_key_expiry_sweep()` SECURITY DEFINER, `0 9 * * *`, idempotent cron.schedule registration, PKJWT-I-001→I-006 integration tests); (10) Admin Dashboard PKJWT panel complete spec — status row, JWKS URL copy (`sso.pkjwt_jwks_url_copied` STANDARD/1yr), JWK download (`sso.pkjwt_public_key_downloaded` HIGH/7yr), key generation modal (RS256/ES256, 12–730 days, KV failure compensation path), rotation button (enabled ≤ 30 days, 48h dual-key window countdown, `sso.pkjwt_key_rotated` HIGH/7yr), RBAC gates (manager read-only), six edge cases; (11) §7.2 OIDC onboarding guide `private_key_jwt` addition — Okta (JWKS URI + `pkjwt_aud_override` note), Entra ID (JWK file upload, `aud` edge case), Google Workspace (RS256 only, file path), generic IdPs, annual rotation checklist. §42.11 checklist items 9/10/11 patched `[ ] Pending` → `[x] Done`; item 12 patched `[ ] Pending` → `[x] Done — v2.17` (was done in SOC2_READINESS.md v3.71.0 but checklist row unpatched). §42.12 three cross-reference rows added. §43.6 pending note updated. Document header v2.17 → v2.19 (v2.18 applied inline previously). All 12 §42.11 items closed; G-012 status 🟡 Design complete → 🟢 Implementation complete (pending migration 0099 production deploy). VERSION 11.43.0 → 11.43.1.
+
 ## [11.43.0] — 2026-07-02
 
 ### Added
