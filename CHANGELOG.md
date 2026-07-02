@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [11.24.0] — 2026-07-02
+
+### Added
+- `content/post-32-how-to-read-research-paper.md` — Original editorial series post 32. «Як читати наукову статтю про тренування і не зробити неправильних висновків». Ієрархія доказів (case report → RCT → meta-analysis), p-значення vs. розмір ефекту (Cohen's d), характеристики вибірки (training age, вік, стать), surrogate vs. real outcomes (EMG ≠ гіпертрофія), funding bias (Lundh et al. 2017), ecological validity (лабораторія → реальний зал), мета-аналіз і гетерогенність (I²), практичний 7-кроковий алгоритм. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-2931-knowing-your-body-vs-having-data.md` — Series «Що я знаю про своє тренування» 2926–2935 (6/10). «Різниця між «я знаю своє тіло» і «у мене є дані про своє тіло»». Три значення «знаю своє тіло»: інтероцепція, узагальнений досвідний патерн, твердження про параметри відгуку. Де відчуття надійне: поточний рівень зусилля (Borg 1982), гострі сигнали. Де систематично помиляється: confirmation bias, адаптація базової лінії, мотиваційне викривлення, recency bias. Що є «даними»: тренувальні записи, відновлювальні маркери, перформансні тренди. Операційна таблиця і практичний тест. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — cards for post-32 and post-2931 added at top of feed.
+
+### Changed
+- `STATUS.md` — current version updated to v11.24.0; next: post-33 («Самостійне програмування: де воно краще за коуча, де гірше») + post-2932 (series 2926–2935 7/10: «Якість тренувального знання: джерела, яким можна довіряти — і яким ні»).
+- `VERSION` — 11.23.1 → 11.24.0.
+
 ## [11.23.1] — 2026-07-02
 
 ### Changed
