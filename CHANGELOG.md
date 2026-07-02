@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.19.0] — 2026-07-02
+
+### Added
+- `content/post-28-progressive-overload-mechanics.md` — Editorial series post-28. «Прогресивне перевантаження — механізм адаптації, а не мотиваційна мантра». SRA-крива і repeated bout effect як фундаментальна логіка прогресивного перевантаження. Механотрансдукція, mTORC1, net protein accretion. Ієрархія форм прогресії: навантаження, об'єм, щільність, частота, ROM, технічна якість. Чому лінійна прогресія ламається для intermediate-атлета: нейронна адаптація вичерпана, накопичення втоми приховує fitness. Double progression, авторегуляція через RPE/RIR, deload як інструмент суперкомпенсації. Helms et al. autoregulation. Schoenfeld (2017) dose-response, Krieger (2010) sets meta-analysis. clinical-safety: PASS. sports-scientist review pending.
+- `content/post-2927-training-journal-what-it-measures.md` — Series «Що я знаю про своє тренування» 2926–2935 (2/10). «Що тренувальний журнал насправді вимірює — і що він не може виміряти ніколи». Журнал фіксує: навантаження, наявність, траєкторію, RPE як суб'єктивну оцінку, вибір і порядок вправ. Журнал не вимірює: м'язові пошкодження, справжній стан відновлення, гормональний контекст, продуктивність стимулу, причинно-наслідкові зв'язки. Три помилки читання журналу: confirmation bias, attribution error, optimization for good-looking logs. Практичні рекомендації: мінімально достатня фіксація, якісні нотатки для аномалій, читання на рівні патернів (місяць/квартал). Kreher & Schwartz (2012), Halson (2014), Kiely (2012). clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — published feed cards prepended at top: post-28, post-2927, post-27 (catch-up from v11.18.0), post-2926 (catch-up from v11.18.0). v11.18.0 had added post-2926 only to the bottom draft section and relied on pre-existing draft for post-27; this commit adds proper published cards for all four to the top of the feed.
+
+### Changed
+- `VERSION` — 11.17.1 → 11.19.0 (note: 11.18.0 was previously committed but then superseded by enterprise patch 11.17.1; advancing to 11.19.0 to continue clean MINOR versioning from the content track).
+
+---
+
 ## [11.17.1] — 2026-07-02
 
 ### Changed
