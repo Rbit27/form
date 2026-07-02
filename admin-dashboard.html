@@ -270,6 +270,99 @@
         </div>
       </div>
 
+      <!-- ── Programme Health Indicator · DEC-092 · v11.4.1 ──────────────────────────────
+           3-band label (Healthy / Needs Attention / At Risk) derived from FEHS engagement
+           bands. Privacy floor enforced: NO raw FEHS score (0–100) exposed — aggregate
+           3-band label only. k-anonymity floor k≥5; label suppressed when k < 5.
+           Stale banner fires when snapshot age > 26h → ADMIN-RPT-SLO-01.
+           admin.programme_health_label_viewed LOW/1yr event fires on HTTP 200 card load.
+           API: GET /api/admin/tenants/:tenantId/programme-health ──────────────────────── -->
+      <div class="stat-card mb-10" id="phi-card">
+
+        <!-- Empty state — shown when k < 5 activated members; label suppressed per k-anonymity floor -->
+        <div id="phi-empty" style="display:none">
+          <div class="label mb-3">Programme Health Indicator</div>
+          <div class="flex items-center gap-4 py-4">
+            <span class="font-mono text-mute text-3xl leading-none">◌</span>
+            <div>
+              <div class="text-paper text-sm font-light">Insufficient data — label suppressed</div>
+              <div class="text-mute text-xs font-mono mt-1">k-anonymity floor: fewer than 5 activated members in this cohort</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stale-data banner — snapshot > 26h · ADMIN-RPT-SLO-01 · OBSERVABILITY §62.8 -->
+        <div id="phi-stale" class="flex items-center gap-3 mb-5 px-4 py-3 rounded-xl" style="display:none; background:rgba(251,191,36,0.07); border:1px solid rgba(251,191,36,0.28)">
+          <span class="font-mono flex-shrink-0" style="color:#FBBF24">⚠</span>
+          <span class="text-xs font-mono" style="color:#FBBF24">Programme health snapshot &gt; 26 h stale · ADMIN-RPT-SLO-01 · data may not reflect current state</span>
+        </div>
+
+        <!-- Main PHI content — shown when k≥5 and snapshot is fresh (or within warn threshold) -->
+        <div id="phi-content">
+          <div class="flex items-start justify-between mb-6">
+            <div>
+              <div class="label mb-3">Programme Health Indicator</div>
+              <div class="flex items-center gap-4 flex-wrap">
+                <!-- 3-band badge: emerald = Healthy · amber = Needs Attention · rose/ember = At Risk -->
+                <!-- Production: badge class and colour toggled server-side by PHI band value -->
+                <span class="font-serif font-light" style="display:inline-block; background:rgba(52,211,153,0.12); color:#34D399; border:1px solid rgba(52,211,153,0.35); border-radius:999px; padding:6px 20px; font-size:16px; letter-spacing:0.04em">
+                  <em>Healthy</em>
+                </span>
+                <!-- Trend vs prior month snapshot -->
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-lg leading-none" style="color:#34D399">↑</span>
+                  <span class="text-mute text-xs font-mono">vs prior month</span>
+                </div>
+              </div>
+            </div>
+            <div class="text-right flex-shrink-0 ml-6">
+              <div class="label mb-1">Snapshot</div>
+              <div class="text-dim text-xs font-mono">2026-07-02 · 02:30 UTC</div>
+              <div class="text-mute font-mono mt-2" style="font-size:9px; letter-spacing:0.1em; text-transform:uppercase">Aggregate · k≥5 · no raw score</div>
+            </div>
+          </div>
+
+          <!-- Sparklines: activation_rate_pct + wau_rate_pct — 4-week window -->
+          <div class="grid grid-cols-2 gap-8 mb-6">
+            <div>
+              <div class="label mb-3">Activation rate · 4-week</div>
+              <div class="flex items-end gap-2 h-14">
+                <div class="chart-bar flex-1"><div style="height:34px"></div></div>
+                <div class="chart-bar flex-1"><div style="height:38px"></div></div>
+                <div class="chart-bar flex-1"><div style="height:44px"></div></div>
+                <div class="chart-bar flex-1"><div style="height:48px"></div></div>
+              </div>
+              <div class="flex justify-between mt-2">
+                <span class="text-mute text-xs font-mono">W−4</span>
+                <span class="text-acid text-xs font-mono">70% ↑</span>
+              </div>
+            </div>
+            <div>
+              <div class="label mb-3">Weekly active rate · 4-week</div>
+              <div class="flex items-end gap-2 h-14">
+                <div class="chart-bar flex-1"><div style="height:30px"></div></div>
+                <div class="chart-bar flex-1"><div style="height:36px"></div></div>
+                <div class="chart-bar flex-1"><div style="height:42px"></div></div>
+                <div class="chart-bar flex-1"><div style="height:48px"></div></div>
+              </div>
+              <div class="flex justify-between mt-2">
+                <span class="text-mute text-xs font-mono">W−4</span>
+                <span class="text-acid text-xs font-mono">68% ↑</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-5 border-t border-line">
+            <p class="text-dim text-xs leading-relaxed" style="max-width:440px">
+              3-band label derived from programme engagement signals. No individual scores or profiles accessible here — aggregate only. Body composition, ED-screening, and mental health data excluded from employer view per privacy floor.
+            </p>
+            <button onclick="navigateTo('engagement')" class="text-acid text-xs font-mono hover:underline flex-shrink-0 ml-6" style="background:none; border:none; cursor:pointer; padding:0">
+              View full engagement breakdown →
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="grid grid-cols-3 gap-4 mb-10">
         <div class="stat-card col-span-2">
           <div class="flex justify-between items-start mb-6">

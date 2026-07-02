@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [11.4.1] — 2026-07-02
+
+### Changed
+- `admin-dashboard.html` — Programme Health Indicator (PHI) card added to Overview tab (DEC-092). Shows 3-band label (Healthy / Needs Attention / At Risk) with trend arrow vs prior month and 4-week sparklines for activation_rate_pct + wau_rate_pct. Includes stale banner (snapshot > 26h → ADMIN-RPT-SLO-01), empty state (k < 5 members → label suppressed per k-anonymity floor). Privacy floor enforced: no raw FEHS score (0–100) shown; body comp, ED-screening, mental health excluded. `admin.programme_health_label_viewed` LOW/1yr event fires on card load. CTA → Engagement tab via `navigateTo('engagement')`.
+- `VERSION` — 11.4.0 → 11.4.1.
+
+---
+
 ## [11.4.0] — 2026-07-02
 
 ### Added
