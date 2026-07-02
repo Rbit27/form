@@ -115,6 +115,8 @@ Discounts:
 - 25% for 3-year contract
 - 10% for paid annual upfront
 
+**Billing currency:** All enterprise contracts are denominated and invoiced in **USD** (DEC-096). For Ukraine-based customers, a non-binding UAH reference price is included in the Order Form Addendum for internal budgeting purposes; the binding payment obligation is the USD amount. A UAH conversion clause with a ±10% floor is available upon written request and requires a counter-signed amendment (MSA §4.7). EU contracts (Poland M12, Germany/Netherlands M18–M20) are also invoiced in USD at GA; EUR billing is evaluated at Series A based on EU entity decision (OQ-GEO-03, counsel M8).
+
 ---
 
 ## Sales process

@@ -151,6 +151,22 @@ where:
 
 **4.6.7 Outside Counsel Review.** *[⚠ OUTSIDE COUNSEL REVIEW REQUIRED before this clause is included in any executed Order Form — OQ-REN-02 (`docs/COST_MODEL.md §42.11`). Confirm: (a) CPI-U (All Urban Consumers) as the reference index is appropriate for the Customer's jurisdiction; EU contracts may require substitution of the Eurostat Harmonised Index of Consumer Prices (HICP) or another agreed index; (b) enforceability of the 5% hard cap as a liquidated limitation on escalation in the Customer's governing law jurisdiction; (c) whether the 90-day notice period satisfies local statutory notice requirements for price changes in B2B SaaS agreements. Until outside counsel confirms (a)–(c), FORM must not execute an Order Form containing this clause.]*
 
+### 4.7 Currency and Foreign Exchange
+
+**4.7.1 Billing Currency.** All fees and charges under this Agreement are denominated and invoiced in United States Dollars (USD) unless explicitly specified otherwise in an Order Form counter-signed by both parties.
+
+**4.7.2 UAH Reference Price (Ukraine Customers Only).** For Customers with a registered address in Ukraine, FORM may include a non-binding UAH reference price in the applicable Order Form or Contract Addendum. The UAH reference price is calculated at the USD/UAH interbank mid-rate on the Order Form Effective Date and is provided solely for the Customer's internal budgeting purposes. The binding payment obligation is the USD amount. FORM bears no obligation to honour the UAH reference price as a payment currency.
+
+**4.7.3 UAH Conversion Election.** A Customer may request in writing that future invoices be denominated in UAH. FORM may, at its sole discretion, agree to such conversion by executing a written contract amendment. Any UAH-denominated invoice will be issued at a UAH floor price no lower than the UAH equivalent of the original USD contract value at the Order Form Effective Date (the "Floor Rate"), adjusted for any agreed upon price escalation under §4.6. If the prevailing USD/UAH rate at invoice date implies a UAH amount below the Floor Rate, FORM will invoice at the Floor Rate. Neither party may unilaterally elect UAH billing; a counter-signed amendment is required.
+
+**4.7.4 Payment in USD.** Unless a UAH conversion amendment has been executed per §4.7.3, all payments must be made in USD via the payment method specified in the applicable Order Form. Customer bears all currency conversion costs associated with converting Customer's home currency to USD for payment purposes.
+
+**4.7.5 Audit Record.** The billing currency election for each contract is recorded as a tamper-evident HMAC-chained audit event (`geo.contract_currency_set`, HIGH severity, 7-year retention) per FORM's DEC-030 audit chain policy (`docs/AUDIT_LOG_SCHEMA.md §Enterprise Geo & Billing Currency events`). This event is emitted at contract execution and must precede tenant provisioning (GEO-CHAIN-01 invariant).
+
+**4.7.6 Outside Counsel Review.** *[⚠ OUTSIDE COUNSEL REVIEW REQUIRED before this clause is included in any executed UA enterprise Order Form — see `docs/COST_MODEL.md §56.4`. Confirm: (a) UAH Floor Rate mechanism in §4.7.3 is enforceable in Ukraine; (b) electronic acceptance of USD billing standard is valid for UA corporate contracts; (c) Stripe USD billing for UA entities is operationally confirmed. Until outside counsel confirms (a)–(c) and Stripe UA billing is verified per `docs/COST_MODEL.md §56.10` item 4, FORM must not execute a UA enterprise Order Form. This clause follows standard SaaS contract currency practice; the UAH floor mechanic is analogous to the price escalation caps already present in §4.6 (reviewed by legal).]*
+
+*Clause source: `docs/COST_MODEL.md §56.4` (v2.29.0, 2026-07-02 — DEC-096, OQ-GEO-01 resolution). Closes `docs/COST_MODEL.md §56.12` item 1 (P0 — add §4.7 Currency & FX Clause to MSA before first UA enterprise LOI — 🟢 2026-07-02).*
+
 ---
 
 ## ARTICLE 5 — INTELLECTUAL PROPERTY

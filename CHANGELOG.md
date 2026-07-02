@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [11.23.1] — 2026-07-02
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.71 → v2.72. New `### Enterprise Geo & Billing Currency events` section: registers `geo.contract_currency_set` HIGH/7yr DEC-030 HMAC-chained event (CC1.3/CC3.1). GEO-CHAIN-01 invariant: `emit-audit-event` Worker returns HTTP 422 `GEO_CHAIN_01_VIOLATION` if `enterprise.tenant_created` arrives without prior `contract_currency_set` for the same `tenant_id`. Zod v2 schema: `tenant_id`, `contract_id`, `billing_currency` enum (USD/EUR/GBP), `reference_currency` nullable, `reference_rate_at_signing` nullable, `floor_protection_pct` nullable, `contract_effective_date`, `signed_by` FORM-internal UUID. Evidence artefact GEO-E-001 (annual, 7yr). SOC 2 CC1.3 auditor narrative (USD billing policy operationalised at contract execution); CC3.1 (FX risk documented per-contract). Privacy floor: no customer employee identifier, health value, or GDPR Art. 9 data. Closes `docs/COST_MODEL.md §56.12` item 2 (P0 — 🟢 Done).
+- `docs/MSA_TEMPLATE.md` — §4.7 Currency and Foreign Exchange added to ARTICLE 4 (after §4.6 Multi-Year Price Escalation). Five sub-clauses: §4.7.1 Billing Currency (USD standard), §4.7.2 UAH Reference Price (UA customers only — non-binding, internal budgeting), §4.7.3 UAH Conversion Election (±10% floor, counter-signed amendment required), §4.7.4 Payment in USD, §4.7.5 Audit Record (`geo.contract_currency_set` DEC-030 reference), §4.7.6 Outside Counsel Review gate (UA LOI block until counsel confirms enforceability + Stripe UA billing). Verbatim clause text from `docs/COST_MODEL.md §56.4`. Closes `docs/COST_MODEL.md §56.12` item 1 (P0 — 🟢 Done).
+- `docs/ENTERPRISE.md` — Billing currency note added to §Pricing section: USD standard for all enterprise contracts (DEC-096); UA UAH reference addendum and ±10% floor conversion clause; EU (Poland M12, Germany/Netherlands M18–M20) also USD at GA; EUR billing deferred to Series A / OQ-GEO-03 counsel M8. Closes `docs/COST_MODEL.md §56.12` item 3 (P0 — 🟢 Done).
+- `VERSION` — 11.23.0 → 11.23.1
+
 ## [11.23.0] — 2026-07-02
 
 ### Added
