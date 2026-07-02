@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [11.43.0] — 2026-07-02
+
+### Added
+- `content/post-3055-plateau-diagnosis-protocol.md` — Series «Програмування без коуча» (3051–3060) post 5/10. «Як читати плато: технічне, програмне, відновлювальне або нормальне — протокол розрізнення». Four structurally distinct plateau types: (1) Technical — Fitts & Posner (1967) autonomous-phase compensation patterns; video-based diagnosis; technical deload 2–4 weeks; (2) Programmatic — Zatsiorsky & Kraemer (2006) specificity of adaptation; Schoenfeld (2010) progressive overload as prerequisite; Ralston et al. (2017) ≥70% 1RM minimum; change one variable, not the whole program; (3) Recovery — Meeusen et al. (2013) FOR→NFOR→OTS spectrum; Halson (2014) subjective sleep quality as earliest sensitive marker; adding volume worsens state; (4) Normal (not a plateau) — Damas et al. (2016) weeks 3–5 MPS reduction = phase shift, not failure; supercompensation post-deload. Five-question differentiation protocol. Three failure modes addressed: program change at normal plateau, volume addition at recovery plateau, technical deload at programmatic plateau. 13 min read. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3055 card prepended at top of feed.
+
+### Changed
+- `STATUS.md` — v11.43.0 entry.
+- `VERSION` — 11.42.0 → 11.43.0.
+
 ## [11.42.0] — 2026-07-02
 
 ### Added
