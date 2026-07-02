@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · 34 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 active (7/10) · block 896–900 active · block 901–910 proposed · v11.26.0
+### Editorial series: 11–44 drafted · 34 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 active (9/10) · block 896–900 active · block 901–910 proposed · v11.31.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3174,15 +3174,15 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: метаког
 
 | Post | Topic | Status |
 |---|---|---|
-| 2926 | Як відрізнити власний досвід від упередженої вибірки: ілюзії тренувального знання | proposed · v10.54.0 |
-| 2927 | П'ять речей, які більшість self-coached атлетів «знають» але ніколи не перевіряли | proposed · v10.54.0 |
-| 2928 | Тренувальна інтуїція: коли вона калібрована — і коли ні | proposed · v10.54.0 |
-| 2929 | Як перевірити власне припущення: мінімальний self-experiment без надмірного контролю | proposed · v10.54.0 |
-| 2930 | Confirmation bias в оцінці власного прогресу: структурований антидот | proposed · v10.54.0 |
+| 2926 | Що ти знаєш про своє тренування — і звідки ти це знаєш? | **draft · v11.18.0 → post-2926-what-i-know-about-my-training-opener.md** |
+| 2927 | Що тренувальний журнал насправді вимірює — і що він не може виміряти ніколи | **draft · v11.19.0 → post-2927-training-journal-what-it-measures.md** |
+| 2928 | Чому «прогрес» у тренуванні так важко виміряти — і як це змінити | **draft · v11.20.0 → post-2928-progress-measurement-why-hard.md** |
+| 2929 | Суб'єктивне і об'єктивне: чому відчуття і дані потрібні разом — і де кожне з них бреше | **draft · v11.22.0 → post-2929-subjective-objective-training-data.md** |
+| 2930 | Що ти знаєш про своє відновлення — і як виміряти те, що не можна виміряти прямо | **draft · v11.23.0 → post-2930-recovery-measurement.md** |
 | 2931 | Різниця між «я знаю своє тіло» і «у мене є дані про своє тіло» | **draft · v11.24.0 → post-2931-knowing-your-body-vs-having-data.md** |
 | 2932 | Якість тренувального знання: джерела, яким можна довіряти — і яким ні | **draft · v11.26.0 → post-2932-training-knowledge-quality-sources.md** |
-| 2933 | Коли запитати тренера — і що саме: межа між знанням і незнанням | proposed · v10.54.0 |
-| 2934 | Невідоме незнання у тренуванні: сліпі плями, яких ти не знаєш | proposed · v10.54.0 |
+| 2933 | Коли запитати тренера — і що саме: межа між знанням і незнанням | **draft · v11.28.0 → post-2933-when-to-ask-a-coach.md** |
+| 2934 | Невідоме незнання у тренуванні: сліпі плями, яких ти не знаєш | **draft · v11.31.0 → post-2934-unknown-unknowns-training-blind-spots.md** |
 | 2935 | Синтез 2926–2935: рамка тренувального знання self-coached атлета | proposed · v10.54.0 |
 
 ---
