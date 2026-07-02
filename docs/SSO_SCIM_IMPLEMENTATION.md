@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.14
+# FORM · SSO/SCIM Implementation v2.15
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -47,6 +47,7 @@
 39. [Cross-Reference Patch — SOC2_READINESS §119 (§27.14 Items 14 + 17 Documentation Closure)](#39-cross-reference-patch--soc2_readiness-119-2714-items-14--17-documentation-closure)
 40. [OQ-SSO-34.1 Resolution — BDG Guard Window vs. AL-SCIM-MASS-01 Detection Window: Separate Windows Retained (DEC-093)](#40-oq-sso-341-resolution--bdg-guard-window-vs-al-scim-mass-01-detection-window-separate-windows-retained-dec-093)
 41. [OQ-SSO-24.3 & OQ-SSO-24.4 Resolution — PAM Role Naming Distinction & FIDO2 Hardware Key Procurement (DEC-094)](#41-oq-sso-243--oq-sso-244-resolution--pam-role-naming-distinction--fido2-hardware-key-procurement-dec-094)
+42. [OIDC `private_key_jwt` Client Authentication — RFC 7523 Design & Key Management (DEC-097, Closes G-012)](#42-oidc-private_key_jwt-client-authentication--rfc-7523-design--key-management-closes-g-012)
 
 ---
 
@@ -1175,7 +1176,7 @@ The following items are not yet built or require a decision before implementatio
 | G-009 | **Session blocklist persistence.** The design uses a Supabase table for session blocklisting. Under high-revocation scenarios (large tenant SCIM deactivation of 1000+ users simultaneously), this table lookup on every request becomes a hot-path bottleneck. | Medium — performance, not correctness | devops-lead + platform-engineer | Options: Redis cache layer, Bloom filter, JWT short-TTL with revocation threshold. Needs decision before >100-seat enterprise customers. |
 | G-010 | **Magic link fallback security design.** The current fallback design in 8.3 and 8.4 uses verified email as the trust anchor. The exact verification flow (OTP via email, rate limiting, abuse detection) is not specified. | ~~High — security-critical~~  **Resolved — see §10** | security-engineer | Design specified in §10. Implementation pending. |
 | G-011 | **Tenant SSO configuration test environment.** Customers currently have no sandbox/staging environment to test SSO config before production. This leads to live testing, which breaks existing users if misconfigured. | ~~Medium~~ **Design resolved — see §16.11** | enterprise-architect | Design: dedicated `{slug}-staging.form.coach` endpoint with linked staging `tenant_id`; one-button config copy to production. Implementation pending. |
-| G-012 | **OIDC private key JWT client authentication.** Some enterprise IdPs require `private_key_jwt` client auth instead of `client_secret_post`. Not supported yet. | Low — affects <5% of prospective customers (primarily financial sector) | platform-engineer | Estimate: 1 week once RFC 7523 is understood |
+| G-012 | **OIDC private key JWT client authentication.** Some enterprise IdPs require `private_key_jwt` client auth instead of `client_secret_post`. ~~Not supported yet.~~ **🟡 Design complete — see §42.** RFC 7523 JWT assertion spec, per-tenant RSA-2048/EC P-256 key management, JWKS endpoint, zero-downtime rotation, Admin Dashboard panel, and 12-item implementation checklist specified. | ~~Low — affects <5% of prospective customers (primarily financial sector)~~ **🟡 Design complete; implementation pending §42.11 P1/M5.** | platform-engineer | ~~Estimate: 1 week once RFC 7523 is understood~~ **Design complete (DEC-097, 2026-07-02). Implementation per §42.11 checklist (M5/M6).** |
 | G-013 | **Legal: DPA clause for SCIM data processing.** SCIM provisioning involves FORM processing employee directory data (names, emails, departments) on behalf of the customer. The standard DPA template needs a clause explicitly covering SCIM as a processing activity. | High — GDPR Art. 28 compliance | compliance-officer + outside counsel | Block: do not enable SCIM for any customer until DPA is updated |
 
 ---
@@ -13406,3 +13407,391 @@ No changes to `docs/AUDIT_LOG_SCHEMA.md` — no new DEC-030 events introduced by
 *v2.13 (2026-07-01): §41 OQ-SSO-24.3 & OQ-SSO-24.4 Resolution — PAM Role Naming Distinction & FIDO2 Hardware Key Procurement (DEC-094). Closes two outstanding open questions from §24.9 (v1.6, 2026-06-01). OQ-SSO-24.3 (P2/M5): `form_admin` vs. `form_break_glass` Postgres role naming — **Option A adopted: distinct roles retained.** Three grounds: (1) pg_audit `role_name` column provides unambiguous JIT-vs-break-glass attribution without a cross-table join to `pam_break_glass_reviews`; (2) SOC 2 CC6.3 quarterly access review: auditor can filter break-glass rows by `role_name = 'form_break_glass'` from raw `pg_audit` export without additional query; (3) no operational benefit to merging — both options require separate Cloudflare Access applications and separate `pam-db-proxy` connection strings regardless. OQ-SSO-24.4 (P0/before M4 deploy): FIDO2 hardware key procurement — **procurement confirmed (Option A).** 5× YubiKey 5 NFC Series (primary) + 5× backup keys procured; enrolled in Cloudflare Access FIDO2 registration for all named break-glass identities; `cloudflare/access/break-glass-policy.tf` `require = ["warp", "fido2"]` block confirmed; `destructive` tier unblocked; TOTP fallback prohibition retained unchanged. Three-state fallback when fewer than 2 FIDO2-enrolled engineers available: defer operation, not degrade to TOTP. New SOC 2 evidence artefact FIDO2-E-001 (CC6.7, annual, 7yr): Cloudflare Access enrollment screenshots + YubiKey procurement receipt + `break-glass-policy.tf` diff; first collection M5 (P1). No new DEC-030 events. No schema migrations. Eight-item implementation checklist: 4× P0 authoring-pass [x] Done (§24.9 inline patches OQ-SSO-24.3 and OQ-SSO-24.4, DEC-094 DECISION_LOG registration, TOC entry 41, §24.10 item 3 note); 2× P0 M4 [x] Done (hardware procurement, Cloudflare Access FIDO2 enrollment); 1× P1 M5 pending (FIDO2-E-001 collection). §41.5 OQ gap tracker: OQ-SSO-24.3 🟡 P2 → 🟢 Resolved DEC-094; OQ-SSO-24.4 🟡 P0 → 🟢 Resolved DEC-094. §24.9 cross-update: both rows patched to 🟢 Resolved DEC-094 (2026-07-01). TOC entry 41 added. Document header v2.12 → v2.13. Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §41 content — §41 governs Postgres role naming policy and physical hardware procurement, neither of which contains personal data. FIDO2-E-001 artefact contains Cloudflare Access admin-panel screenshots (identity UUIDs only) and a procurement receipt (vendor/quantity/cost only). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §24` (PAM full specification — §24.3 approval workflow specifying FIDO2 dual-cosign for `destructive` tier, §24.4.2 `form_admin`/`form_break_glass` role definitions, §24.9 OQ source table, §24.10 implementation checklist item 3); `docs/SSO_SCIM_IMPLEMENTATION.md §31` (DEC-060 — OQ-SSO-24.1 + OQ-SSO-24.2 resolution; companion closed OQs from §24.9); `docs/DECISION_LOG.md DEC-094` (formal adoption decision — this pass); `docs/SOC2_READINESS.md §79.4` (FIDO2-E-001 evidence table registration — P1/M5 pending). Owner: security-engineer + compliance-officer + eng-manager.*
 
 *v2.14 (2026-07-02): §41.6 item 7 + §41.7 cross-reference patch — FIDO2-E-001 Registration (CC6.7 · SOC2_READINESS §142). Closes `docs/SSO_SCIM_IMPLEMENTATION.md §41.6` item 7 (P1/M5 documentation portion) and `docs/SSO_SCIM_IMPLEMENTATION.md §41.7` last pending cross-reference row. `docs/SOC2_READINESS.md §142` (v3.68.0, 2026-07-02) registers FIDO2-E-001 in §79.4 master evidence table (CC6.7, annual + per-change, 7yr; count 110 → 111): FIDO2/WebAuthn hardware token enrollment confirmation for all five break-glass-eligible engineers (`destructive` tier PAM); four-component artefact (Cloudflare Access `form-break-glass` policy screenshot; 5× enrollment confirmation screenshots; YubiKey 5 NFC procurement receipt 5+5; sanitized `break-glass-policy.tf` diff); stored at `compliance/evidence/pam/FIDO2-E-001_<YYYY-MM>.zip`; WORM 7yr; `r2:form-api` NO ACCESS (§80.3 pam/ invariant inherited from §107). §41.6 item 7 status: `[ ] Pending M5 evidence collection window` → `[x] Done (documentation portion — SOC2_READINESS.md v3.68.0, §142, 2026-07-02); [ ] (operational — first physical collection M5)`. §41.7 cross-reference row: `🟡 Pending — M5 evidence collection window` → `🟢 Done — 2026-07-02 (SOC2_READINESS.md v3.68.0, §142)`. Document header v2.13 → v2.14. Owner: compliance-officer + security-engineer.*
+
+---
+
+## §42 OIDC `private_key_jwt` Client Authentication — RFC 7523 Design & Key Management (Closes G-012)
+
+### §42.1 Purpose and Scope
+
+This section specifies the design for OIDC `private_key_jwt` client authentication (RFC 7523 / RFC 7521). Currently FORM uses `client_secret_post` for OIDC token exchange at all enterprise tenants. A small but strategically important segment of enterprise customers — primarily UK/EU regulated financial institutions, some healthcare networks, and German Mittelstand companies with hardened IT policies — requires `private_key_jwt` at their IdP's token endpoint.
+
+`private_key_jwt` replaces the shared secret (`client_secret`) with an asymmetric key pair: FORM signs a short-lived JWT with a per-tenant private key; the IdP verifies the signature against FORM's registered public key. This eliminates the shared-secret-in-transit risk at the cost of key management overhead.
+
+**Scope:**
+- Applies to enterprise tenants with OIDC configured (`tenant_sso_configs.sso_protocol = 'oidc'`)
+- Activated per tenant via `tenant_sso_configs.oidc_client_auth_method = 'private_key_jwt'`
+- Does not apply to SAML 2.0 tenants (SAML uses XML signatures — different mechanism)
+- Does not apply to consumer mobile (Apple Sign In — out of scope)
+
+**Not in scope:** OIDC `client_secret_jwt` (RFC 7523 §2.2, HMAC-based). FORM does not implement this variant — the security profile of HMAC-signed client assertions is inferior to RSA/EC-signed assertions because both parties must hold the same secret. If an IdP requires `client_secret_jwt` specifically, escalate to enterprise-architect for case-by-case evaluation.
+
+---
+
+### §42.2 Why `private_key_jwt`? Security Comparison
+
+| Dimension | `client_secret_post` (current) | `private_key_jwt` (this section) |
+|---|---|---|
+| Secret type | Shared symmetric secret sent in POST body | Asymmetric: FORM holds private key; IdP holds public key only |
+| Secret in transit | Yes — `client_secret` POSTed to token endpoint on every exchange | No — only a signed JWT is sent; private key never leaves FORM infrastructure |
+| Compromise surface | Token endpoint network interception; IdP credential store breach | Private key exfiltration from `tenant_sso_configs` encrypted column or KV cache |
+| Key rotation mechanism | IdP admin rotates secret; both sides update simultaneously | FORM generates new key pair; POSTs new public key to IdP JWKS registration endpoint; rotates with zero-downtime dual-key period |
+| IdP visibility | IdP stores `client_secret` — exfiltration from IdP's credential store exposes FORM | IdP stores only public key — IdP credential store breach does not expose FORM's private key |
+| SOC 2 relevance | CC6.6: weaker — shared secret at rest on IdP side | CC6.6: stronger — asymmetric; private key never exits FORM control plane |
+| Regulatory driver | Sufficient for most enterprise customers | Required by some UK FCA-regulated IdPs, DORA-aligned EU fintech policies, German BSI IT-Grundschutz |
+
+**Decision (DEC-097):** `client_secret_post` remains the default. `private_key_jwt` is activated per tenant on customer request, confirmed by `enterprise-architect` during SSO onboarding. Activating `private_key_jwt` requires no changes to the OIDC authorization flow — it affects only the `/token` endpoint call. All other OIDC spec behaviour (PKCE, nonce, state, scope, ID token validation) is unchanged.
+
+---
+
+### §42.3 RFC 7523 JWT Assertion Specification
+
+When `oidc_client_auth_method = 'private_key_jwt'`, FORM constructs a client assertion JWT on every token exchange. The assertion is a JWS (JSON Web Signature) compact serialization.
+
+#### §42.3.1 JWT Header
+
+```json
+{
+  "alg": "RS256",
+  "kid": "{tenant_pkjwt_key_id}",
+  "typ": "JWT"
+}
+```
+
+- `alg`: `RS256` (RSA-2048 + SHA-256) by default. EC P-256 (`ES256`) offered on request for tenants with strict key-size policies — see §42.4.3.
+- `kid`: Matches the `kid` field in the corresponding entry in FORM's JWKS endpoint (§42.6). The IdP uses `kid` to select the correct public key when FORM has multiple active keys during rotation.
+- `typ`: `"JWT"` per RFC 7523 §3.
+
+#### §42.3.2 JWT Payload
+
+```json
+{
+  "iss": "{oidc_client_id}",
+  "sub": "{oidc_client_id}",
+  "aud": "{oidc_token_endpoint_url}",
+  "jti": "{uuid_v4}",
+  "iat": 1751500000,
+  "exp": 1751500300
+}
+```
+
+| Field | Value | Notes |
+|---|---|---|
+| `iss` | `tenant_sso_configs.oidc_client_id` | RFC 7523 §3: issuer must equal the client identifier |
+| `sub` | `tenant_sso_configs.oidc_client_id` | RFC 7523 §3: subject must equal the client identifier |
+| `aud` | `tenant_sso_configs.oidc_token_endpoint_url` | RFC 7523 §3: audience is the IdP's token endpoint URL. Some IdPs require the issuer URL instead — configurable per §42.7.3 |
+| `jti` | `crypto.randomUUID()` | Per-assertion UUID prevents replay. FORM does not track consumed JTIs (single-use enforcement is the IdP's responsibility per RFC 7523 §4) |
+| `iat` | Current UNIX timestamp | Issued-at |
+| `exp` | `iat + 300` (5 minutes) | Short-lived. Maximum `exp − iat` accepted by most IdPs is 5 minutes. FORM uses 5 minutes; configurable to 1–5 minutes per §42.7.3 |
+
+**No custom claims.** FORM does not add non-standard claims to the client assertion JWT. Some IdPs advertise optional custom claim extensions; FORM ignores them to minimise assertion surface area.
+
+#### §42.3.3 Token Exchange Request
+
+The client assertion replaces `client_secret` in the token exchange POST body:
+
+```http
+POST {oidc_token_endpoint_url}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code
+&code={auth_code}
+&redirect_uri=https://form.coach/auth/callback/{tenant_id}
+&client_id={oidc_client_id}
+&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer
+&client_assertion={signed_jwt}
+&code_verifier={pkce_verifier}
+```
+
+PKCE (`code_verifier`) is retained — `private_key_jwt` does not replace PKCE. Both defences are active simultaneously.
+
+---
+
+### §42.4 Key Management Design
+
+#### §42.4.1 Key Storage
+
+Per-tenant private keys are stored in `tenant_sso_configs.pkjwt_private_key_encrypted` (see migration 0098, §42.7.2):
+
+| Column | Type | Purpose |
+|---|---|---|
+| `pkjwt_private_key_encrypted` | `TEXT` | AES-256-GCM encrypted private key (PEM PKCS#8) |
+| `pkjwt_key_id` | `UUID` | `kid` value for the current active key |
+| `pkjwt_algorithm` | `TEXT` | `'RS256'` or `'ES256'` |
+| `pkjwt_key_generated_at` | `TIMESTAMPTZ` | Key creation timestamp |
+| `pkjwt_key_expires_at` | `TIMESTAMPTZ` | Rotation due date (`generated_at + 365 days`) |
+| `oidc_client_auth_method` | `TEXT` | `'client_secret_post'` (default) or `'private_key_jwt'` |
+
+Encryption: `pkjwt_private_key_encrypted` is encrypted with Supabase column-level AES-256-GCM (same mechanism as `oidc_client_secret_encrypted` in §4.2). The Supabase encryption key is a Cloudflare Worker secret (`SUPABASE_COLUMN_ENC_KEY`), never written to disk outside the Worker environment.
+
+#### §42.4.2 Key Generation Procedure
+
+Key generation occurs at SSO onboarding when `oidc_client_auth_method = 'private_key_jwt'` is requested:
+
+1. Cloudflare Worker calls `crypto.subtle.generateKey(...)` with `RS256` (RSA-2048, SHA-256) or `ES256` (EC P-256) per tenant preference.
+2. Private key exported as PEM PKCS#8 via `crypto.subtle.exportKey('pkcs8', privateKey)` → base64-encode → PEM wrap.
+3. Public key exported as JWK via `crypto.subtle.exportKey('jwk', publicKey)`.
+4. `kid` generated: `crypto.randomUUID()`.
+5. Private key encrypted with `SUPABASE_COLUMN_ENC_KEY` and stored in `pkjwt_private_key_encrypted`.
+6. `pkjwt_key_id`, `pkjwt_algorithm`, `pkjwt_key_generated_at`, `pkjwt_key_expires_at` (+ 365 days) written to `tenant_sso_configs`.
+7. Public key JWK (with `kid`) written to KV namespace `SSO_PKJWT_JWKS` under key `{tenant_id}:current` (no TTL — persistent until rotated).
+8. `sso.pkjwt_key_generated` DEC-030 HMAC-chained event emitted: `{ tenant_id, kid, algorithm, key_generated_at, key_expires_at }`. No private key material in the event.
+9. Onboarding guide (§7.2) updated at checklist step: customer IT admin registers the public key JWK or JWKS URL at the IdP.
+
+#### §42.4.3 Algorithm Selection
+
+| Algorithm | Key type | Use case |
+|---|---|---|
+| `RS256` (default) | RSA-2048 + SHA-256 | All enterprise customers unless otherwise requested |
+| `ES256` | EC P-256 + SHA-256 | Tenants with key-size policies preferring smaller payloads (e.g., German BSI IT-Grundschutz policies) |
+
+RSA-4096 is not offered — assertion JWT overhead exceeds the security benefit, and some IdPs impose assertion size limits. EC P-384 (`ES384`) is not offered — no IdP in FORM's current ICP (§2) requires it. Requests for `ES384` escalate to security-engineer.
+
+#### §42.4.4 Zero-Downtime Key Rotation
+
+Annual rotation triggered by: (a) `pkjwt_key_expires_at` approaching (30-day advance warning via `sso.pkjwt_key_expiry_warning` event and pg_cron sweep); (b) security incident; (c) customer IT admin request.
+
+Rotation procedure:
+1. Generate new key pair → new `kid` → encrypt and store new private key in `tenant_sso_configs` under a temporary column `pkjwt_next_private_key_encrypted` (migration 0099, implementation time).
+2. Write new public key JWK to KV under `{tenant_id}:next`. JWKS endpoint (§42.6) now serves both `current` and `next` keys.
+3. Customer IT admin registers new public key at IdP (or IdP auto-discovers via JWKS URL if the IdP polls the JWKS endpoint).
+4. After 48-hour dual-key window: promote `next` → `current` in KV; update `tenant_sso_configs.pkjwt_key_id` to new `kid`; delete `next` slot from KV.
+5. Emit `sso.pkjwt_key_rotated` DEC-030 event: `{ tenant_id, old_kid, new_kid, rotation_reason }`.
+
+Rotation does not interrupt active FORM sessions — it only affects new token exchange calls at the `/token` endpoint. Existing `enterprise_sessions` rows remain valid until natural expiry.
+
+---
+
+### §42.5 Cloudflare Worker Implementation
+
+Token exchange path in `src/workers/sso-oidc-callback.ts` branches on `oidc_client_auth_method`:
+
+```typescript
+async function buildTokenExchangeParams(
+  tenant: TenantSSOConfig,
+  code: string,
+  codeVerifier: string,
+): Promise<URLSearchParams> {
+  const base = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: `https://form.coach/auth/callback/${tenant.tenant_id}`,
+    client_id: tenant.oidc_client_id,
+    code_verifier: codeVerifier,
+  });
+
+  if (tenant.oidc_client_auth_method === 'private_key_jwt') {
+    const assertion = await buildClientAssertion(tenant);
+    base.set('client_assertion_type', 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer');
+    base.set('client_assertion', assertion);
+    // client_secret intentionally absent when using private_key_jwt
+  } else {
+    // client_secret_post (default)
+    base.set('client_secret', await decryptClientSecret(tenant.oidc_client_secret_encrypted));
+  }
+
+  return base;
+}
+
+async function buildClientAssertion(tenant: TenantSSOConfig): Promise<string> {
+  const privateKeyPem = await decryptPkjwtPrivateKey(tenant.pkjwt_private_key_encrypted);
+  const privateKey = await importPrivateKey(privateKeyPem, tenant.pkjwt_algorithm);
+
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: tenant.oidc_client_id,
+    sub: tenant.oidc_client_id,
+    aud: tenant.pkjwt_aud_override ?? tenant.oidc_token_endpoint_url,
+    jti: crypto.randomUUID(),
+    iat: now,
+    exp: now + (tenant.pkjwt_assertion_lifetime_secs ?? 300),
+  };
+
+  const header = {
+    alg: tenant.pkjwt_algorithm, // 'RS256' | 'ES256'
+    kid: tenant.pkjwt_key_id,
+    typ: 'JWT',
+  };
+
+  return signJWT(header, payload, privateKey);
+}
+```
+
+The private key is decrypted from `pkjwt_private_key_encrypted` on every token exchange. No in-Worker memory cache — the CF Worker isolate lifetime is single-request and re-use across requests is not guaranteed. The per-request decryption cost is acceptable: AES-GCM decryption of a 2048-bit PEM key is < 1 ms.
+
+**`client_secret` coexistence guard:** When `oidc_client_auth_method = 'private_key_jwt'`, the Worker must not include `client_secret` in the POST body even if `oidc_client_secret_encrypted` is present in the tenant config row. The branch above enforces this at code level. See also §42.8 security controls.
+
+---
+
+### §42.6 JWKS Endpoint Design
+
+FORM exposes a per-tenant JWKS (JSON Web Key Set) endpoint for IdPs that support dynamic public key discovery:
+
+```
+GET https://form.coach/auth/oidc/{tenant_id}/.well-known/jwks.json
+```
+
+Response — single active key (normal operation):
+```json
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "alg": "RS256",
+      "kid": "{pkjwt_key_id}",
+      "n": "{base64url_modulus}",
+      "e": "AQAB"
+    }
+  ]
+}
+```
+
+Response — dual-key window (during rotation, 48-hour overlap):
+```json
+{
+  "keys": [
+    { "kty": "RSA", "use": "sig", "alg": "RS256", "kid": "{current_kid}", "n": "...", "e": "AQAB" },
+    { "kty": "RSA", "use": "sig", "alg": "RS256", "kid": "{next_kid}",    "n": "...", "e": "AQAB" }
+  ]
+}
+```
+
+**Caching:** `Cache-Control: public, max-age=3600`. Allows IdPs that poll the JWKS endpoint to cache for up to 1 hour. During key rotation the old `current` key remains in KV for 48 hours before deletion, ensuring IdPs that cached the prior JWKS continue to verify successfully throughout the window.
+
+**Access control:** The JWKS endpoint is public (no authentication required). It contains only public key material. The `{tenant_id}` path segment prevents cross-tenant key serving; the tenant_id itself is not secret — it is already embedded in the FORM SSO callback URL shared with the customer.
+
+**For IdPs that require manual key upload:** Customer IT admin clicks "Download Public Key (JWK)" in the Admin Dashboard (§42.7.1). This downloads the current public key as a `.jwk` JSON file for upload to the IdP.
+
+---
+
+### §42.7 Tenant Configuration
+
+#### §42.7.1 Admin Dashboard (§16) — `private_key_jwt` Panel
+
+When an enterprise admin or FORM onboarding engineer selects `private_key_jwt` in the Admin Dashboard SSO config panel (§16), the following UI elements appear:
+
+| UI element | Behaviour |
+|---|---|
+| **Client auth method** dropdown | Options: `Client Secret (default)` / `Private Key JWT (RFC 7523)`. Changing to PKJ triggers key generation confirmation modal. |
+| **Generate Key Pair** button | Triggers key generation per §42.4.2. Displays `kid`, algorithm, expiry date. Private key is never shown in the UI. |
+| **Algorithm** selector | `RS256` (default) / `ES256`. Visible only when PKJ selected. Disabled after first key generation (algorithm change requires rotation). |
+| **JWKS Endpoint URL** (read-only) | `https://form.coach/auth/oidc/{tenant_id}/.well-known/jwks.json` — copy-to-clipboard button. Customer IT admin registers this URL at the IdP. |
+| **Download Public Key (JWK)** | Downloads current public key as a `.jwk` JSON file for IdPs requiring manual key upload. |
+| **Key Rotation** button | Available 30 days before `pkjwt_key_expires_at`. Initiates zero-downtime rotation per §42.4.4. |
+
+#### §42.7.2 `tenant_sso_configs` Schema Extension (Migration 0098)
+
+```sql
+-- Migration 0098: pkjwt columns
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS oidc_client_auth_method       TEXT
+    NOT NULL DEFAULT 'client_secret_post'
+    CHECK (oidc_client_auth_method IN ('client_secret_post', 'private_key_jwt')),
+  ADD COLUMN IF NOT EXISTS pkjwt_private_key_encrypted   TEXT,
+  ADD COLUMN IF NOT EXISTS pkjwt_key_id                  UUID,
+  ADD COLUMN IF NOT EXISTS pkjwt_algorithm               TEXT
+    CHECK (pkjwt_algorithm IS NULL OR pkjwt_algorithm IN ('RS256', 'ES256')),
+  ADD COLUMN IF NOT EXISTS pkjwt_key_generated_at        TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS pkjwt_key_expires_at          TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS pkjwt_aud_override            TEXT,
+  ADD COLUMN IF NOT EXISTS pkjwt_assertion_lifetime_secs SMALLINT
+    CHECK (pkjwt_assertion_lifetime_secs IS NULL
+           OR pkjwt_assertion_lifetime_secs BETWEEN 60 AND 300);
+
+-- Partial index: only tenants using private_key_jwt with approaching expiry
+CREATE INDEX IF NOT EXISTS idx_tsc_pkjwt_expiry
+  ON tenant_sso_configs (pkjwt_key_expires_at)
+  WHERE oidc_client_auth_method = 'private_key_jwt';
+```
+
+Migration number `0098` is provisional — confirmed at implementation time by devops-lead against the live migration sequence.
+
+#### §42.7.3 Per-Tenant Overrides
+
+| Column | Type | Purpose | Constraint |
+|---|---|---|---|
+| `pkjwt_aud_override` | `TEXT` | Override the `aud` claim. Some IdPs require the IdP issuer URL rather than the token endpoint URL. Set to issuer URL if token exchange returns `invalid_client`. Default: `NULL` (use `oidc_token_endpoint_url`). | — |
+| `pkjwt_assertion_lifetime_secs` | `SMALLINT` | Override assertion `exp − iat`. Default: 300 (5 min). Use 60 if IdP enforces a strict 1-minute window. | 60–300 inclusive |
+
+---
+
+### §42.8 Security Controls
+
+| Control | Implementation | SOC 2 criterion |
+|---|---|---|
+| Private key never in transit | Key generated in Worker; stored encrypted in Supabase; only signed assertion leaves FORM | CC6.6 |
+| Column-level encryption | `pkjwt_private_key_encrypted` encrypted with `SUPABASE_COLUMN_ENC_KEY` (AES-256-GCM) — same mechanism as `oidc_client_secret_encrypted` (§4.2) | CC6.6, CC6.7 |
+| Private key never logged | Worker explicitly omits `pkjwt_private_key_encrypted` from all DEC-030 audit events and error logs | CC2.2, Privacy floor |
+| Short-lived assertions | `exp − iat ≤ 300 s` — prevents assertion replay after token exchange completes | CC6.6 |
+| JTI uniqueness | `crypto.randomUUID()` per assertion — replay prevention delegated to IdP per RFC 7523 §4 | CC6.6 |
+| PKCE retained | `code_verifier` still present in token exchange body — `private_key_jwt` does not weaken PKCE posture | CC6.6 |
+| `client_secret` coexistence guard | When `oidc_client_auth_method = 'private_key_jwt'`, Worker branch excludes `client_secret` from POST body even if the column is populated — prevents silent downgrade | CC6.6 |
+| Key rotation alerting | pg_cron job `pkjwt_key_expiry_sweep` (daily 09:00 UTC) emits `sso.pkjwt_key_expiry_warning` 30 days before `pkjwt_key_expires_at`; PagerDuty P3 via `form-enterprise`, Slack `#alerts-enterprise` | CC7.1 |
+| JWKS public key only | Endpoint at `GET /auth/oidc/{tenant_id}/.well-known/jwks.json` serves public JWK material only — no private key fields | CC6.6 |
+| RLS isolation | `tenant_sso_configs` is subject to existing RLS policy `tenant_sso_configs_isolation` — cross-tenant reads blocked at DB level; `pkjwt_private_key_encrypted` inherits this protection | CC6.3 |
+
+---
+
+### §42.9 SOC 2 Impact
+
+Three new DEC-030 HMAC-chained audit events:
+
+| Event name | Trigger | Payload fields | Retention |
+|---|---|---|---|
+| `sso.pkjwt_key_generated` | New private_key_jwt key pair generated for a tenant | `tenant_id`, `kid`, `algorithm`, `key_generated_at`, `key_expires_at` | 7 years |
+| `sso.pkjwt_key_rotated` | Key rotation: old key replaced by new key | `tenant_id`, `old_kid`, `new_kid`, `rotation_reason` (`scheduled` / `incident` / `customer_request`), `rotated_at` | 7 years |
+| `sso.pkjwt_key_expiry_warning` | 30 days before `pkjwt_key_expires_at` (daily pg_cron sweep) | `tenant_id`, `kid`, `key_expires_at`, `days_until_expiry` | 3 years |
+
+No employee `user_id`, name, email, health value, or GDPR Art. 9 data in any of these events. All three events operate on FORM-internal UUIDs (`tenant_id`, `kid`) and timestamps only.
+
+New pg_cron job (to be registered in `docs/OBSERVABILITY.md §12.6` at M5):
+
+| Job name | Schedule | Purpose | Stale consequence |
+|---|---|---|---|
+| `pkjwt_key_expiry_sweep` | `0 9 * * *` (daily 09:00 UTC) | Scan `tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt' AND pkjwt_key_expires_at < NOW() + INTERVAL '30 days'`; emit one `sso.pkjwt_key_expiry_warning` per matching row | Detection gap only — stale sweep does not affect existing sessions or active token exchanges. Risk: key expiry unnoticed if tenant also does not monitor their IdP logs. PagerDuty P3 Slack-only `#alerts-enterprise`. Manual recovery: `SELECT cron.run_job(...)`. |
+
+SOC 2 evidence artefact PKJWT-E-001 (CC6.6 — asymmetric key management for enterprise OIDC clients) to be registered in `docs/SOC2_READINESS.md §79.4` master evidence table at implementation completion (M6). Content: `tenant_sso_configs` schema snapshot confirming column-level encryption annotation for `pkjwt_private_key_encrypted`; quarterly export of `sso.pkjwt_key_generated` and `sso.pkjwt_key_rotated` DEC-030 events from the HMAC chain; JWKS endpoint availability check from monitoring dashboard.
+
+---
+
+### §42.10 Gap Closure
+
+| Gap | Prior status | New status |
+|---|---|---|
+| **G-012** OIDC `private_key_jwt` client authentication (RFC 7523) | 🔴 Not designed | 🟡 **Design complete — see §42.** Implementation pending §42.11 checklist (P1 M5/M6). |
+
+---
+
+### §42.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Update §9 G-012 row: severity → 🟡 Design complete — see §42 | compliance-officer | **P0** | This authoring pass | [x] **Done — §9 in-line patch (v2.15, 2026-07-02).** |
+| 2 | Register DEC-097 in `docs/DECISION_LOG.md` under 2026-07-02. | compliance-officer | **P0** | This authoring pass | [x] **Done — DECISION_LOG.md DEC-097 entry (2026-07-02).** |
+| 3 | Add TOC entry §42 to document table of contents. | compliance-officer | **P0** | This authoring pass | [x] **Done — TOC entry added (v2.15, 2026-07-02).** |
+| 4 | Register `sso.pkjwt_key_generated`, `sso.pkjwt_key_rotated`, `sso.pkjwt_key_expiry_warning` in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` with Zod v2 schemas and retention labels (7yr / 7yr / 3yr). | compliance-officer + platform-engineer | **P1** | M5 | [ ] Pending |
+| 5 | Register `pkjwt_key_expiry_sweep` cron job (daily 09:00 UTC) in `docs/OBSERVABILITY.md §12.6`. Stale consequence: P3 Slack-only `#alerts-enterprise`. | devops-lead | **P1** | M5 | [ ] Pending |
+| 6 | Apply migration 0098 (§42.7.2 DDL) to production Supabase: `oidc_client_auth_method` + `pkjwt_*` columns + partial index `idx_tsc_pkjwt_expiry`. | platform-engineer | **P1** | M5 | [ ] Pending |
+| 7 | Implement `buildClientAssertion()` in `src/workers/sso-oidc-callback.ts` per §42.5; include `buildTokenExchangeParams()` branch; unit tests: RS256 and ES256 assertion shape, `aud` override, lifetime override, absent `client_secret` when PKJ active. | platform-engineer | **P1** | M5 | [ ] Pending |
+| 8 | Implement `GET /auth/oidc/:tenant_id/.well-known/jwks.json` JWKS endpoint per §42.6; KV reads from `SSO_PKJWT_JWKS:{tenant_id}:current` and `:next`; write tests for single-key and dual-key rotation window responses; set `Cache-Control: public, max-age=3600`. | platform-engineer | **P1** | M5 | [ ] Pending |
+| 9 | Implement `pkjwt_key_expiry_sweep` pg_cron job; test that `sso.pkjwt_key_expiry_warning` events are emitted per tenant within 30-day window. | devops-lead + platform-engineer | **P1** | M6 | [ ] Pending |
+| 10 | Add `private_key_jwt` UI panel to Admin Dashboard SSO configuration screen per §42.7.1: key generation modal, JWKS URL copy button, JWK download, rotation button enabled 30 days before expiry. | enterprise-architect + platform-engineer | **P1** | M6 | [ ] Pending |
+| 11 | Update §7.2 OIDC customer onboarding guide: add `private_key_jwt` option instructions — JWKS URL registration step at IdP; note on `pkjwt_aud_override` for IdPs requiring issuer URL in `aud` claim. | enterprise-architect | **P2** | M6 | [ ] Pending |
+| 12 | Register PKJWT-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.6, quarterly, 7yr). | compliance-officer | **P2** | M6 | [ ] Pending |
+
+---
+
+### §42.12 Cross-Reference Obligations
+
+| Cross-reference | Source | Status |
+|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md §9` G-012 row: 🔴 Not designed → 🟡 Design complete — see §42 | §42.11 item 1 | 🟢 **Done — in-line patch this pass.** |
+| `docs/DECISION_LOG.md DEC-097` entry (formal design adoption). | §42.11 item 2 | 🟢 **Done — DECISION_LOG.md DEC-097 (2026-07-02).** |
+| `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` — three DEC-030 events with Zod schemas + retention labels. | §42.11 item 4 | 🟡 **Pending — M5.** |
+| `docs/OBSERVABILITY.md §12.6` — `pkjwt_key_expiry_sweep` cron job registration (P3 stale, `#alerts-enterprise`). | §42.11 item 5 | 🟡 **Pending — M5.** |
+| `docs/SOC2_READINESS.md §79.4` — PKJWT-E-001 evidence artefact registration (CC6.6, quarterly, 7yr). | §42.11 item 12 | 🟡 **Pending — M6.** |
+
+---
+
+*v2.15 (2026-07-02): §42 OIDC `private_key_jwt` Client Authentication — RFC 7523 Design & Key Management (DEC-097, Closes G-012). Closes G-012 (`private_key_jwt` client auth not yet designed — status: 🔴 Not designed → 🟡 Design complete; implementation pending §42.11 P1/M5 checklist). Design covers: client assertion JWT structure per RFC 7523 §3 (`iss = sub = client_id`; `aud = token endpoint URL` or `pkjwt_aud_override`; `jti = crypto.randomUUID()`; `exp = iat + pkjwt_assertion_lifetime_secs` (default 300 s)); per-tenant RSA-2048 (`RS256`, default) or EC P-256 (`ES256`) private key stored as PEM PKCS#8 in `tenant_sso_configs.pkjwt_private_key_encrypted` (AES-256-GCM column encryption, same mechanism as `oidc_client_secret_encrypted` §4.2); JWKS public-key discovery endpoint `GET /auth/oidc/{tenant_id}/.well-known/jwks.json` (KV-backed, `Cache-Control: public, max-age=3600`); zero-downtime annual key rotation via dual-key KV slots (`current`/`next`, 48-hour overlap window); `client_secret` coexistence guard prevents silent downgrade when PKJ active; PKCE (`code_verifier`) retained alongside PKJ assertion. Three new DEC-030 HMAC-chained events: `sso.pkjwt_key_generated` (7yr), `sso.pkjwt_key_rotated` (7yr), `sso.pkjwt_key_expiry_warning` (3yr). New pg_cron job `pkjwt_key_expiry_sweep` (daily 09:00 UTC; P3 Slack-only `#alerts-enterprise`; stale = detection gap only). Migration 0098 DDL: `oidc_client_auth_method` + six `pkjwt_*` columns on `tenant_sso_configs` + partial index `idx_tsc_pkjwt_expiry`. Admin Dashboard §16 panel: key generation modal, JWKS URL copy, JWK download, rotation button (30-day advance). SOC 2 CC6.6: asymmetric posture — private key never in transit, never stored at IdP, never logged. PKJWT-E-001 evidence artefact registration deferred to M6 implementation completion. 12-item checklist: 3× P0 this-pass [x] Done (§9 G-012 inline patch, DEC-097 DECISION_LOG, TOC entry 42); 9× P1/P2 pending M5–M6 (AUDIT_LOG_SCHEMA §SSO-PKJ-Lifecycle, OBSERVABILITY §12.6 cron, migration 0098, Worker implementation + JWKS endpoint, pg_cron job, Admin Dashboard panel, onboarding guide update, SOC2_READINESS PKJWT-E-001 registration). Document header v2.14 → v2.15. Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §42 content — all three DEC-030 events contain only FORM-internal UUIDs (`tenant_id`, `kid`) and timestamps; no user identity dimension. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §9` (G-012 source — in-line patch this pass); `docs/SSO_SCIM_IMPLEMENTATION.md §4.2` (`oidc_client_secret_encrypted` column-level encryption, same AES-256-GCM mechanism); `docs/SSO_SCIM_IMPLEMENTATION.md §6.4` (logout flows — PKCE retained); `docs/SSO_SCIM_IMPLEMENTATION.md §16` (Admin Dashboard SSO config — §42.7.1 new panel); `docs/DECISION_LOG.md DEC-097` (formal design adoption — this pass); `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` (pending M5); `docs/OBSERVABILITY.md §12.6` (pending M5 — `pkjwt_key_expiry_sweep`); `docs/SOC2_READINESS.md §79.4` (pending M6 — PKJWT-E-001). Owner: enterprise-architect + security-engineer + platform-engineer.*

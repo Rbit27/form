@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.36.0] — 2026-07-02
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md §42` — OIDC `private_key_jwt` Client Authentication — RFC 7523 Design & Key Management (DEC-097). Closes G-012 (not designed → 🟡 design complete). Per-tenant RSA-2048/EC P-256 private key management: key stored AES-256-GCM encrypted in `tenant_sso_configs.pkjwt_private_key_encrypted`; JWKS discovery endpoint `GET /auth/oidc/{tenant_id}/.well-known/jwks.json` (KV-backed, `Cache-Control: public, max-age=3600`); zero-downtime annual key rotation via dual-key KV slots (`current`/`next`, 48-hour window); JWT assertion spec (RFC 7523 §3: `iss=sub=client_id`, `aud=token_endpoint`, `jti=UUID`, `exp=iat+300s`); `client_secret` coexistence guard; PKCE retained alongside PKJ. Three new DEC-030 HMAC-chained events: `sso.pkjwt_key_generated` (7yr), `sso.pkjwt_key_rotated` (7yr), `sso.pkjwt_key_expiry_warning` (3yr). Migration 0098 DDL: `oidc_client_auth_method` + 6 `pkjwt_*` columns + partial index `idx_tsc_pkjwt_expiry`. New pg_cron job `pkjwt_key_expiry_sweep` (daily 09:00 UTC, P3 Slack-only `#alerts-enterprise`). Admin Dashboard §16 panel spec: key generation modal, JWKS URL copy, JWK download, rotation button. 12-item implementation checklist: 3× P0 [x] Done this pass (§9 G-012 patch, DEC-097 DECISION_LOG, TOC entry); 9× P1/P2 pending M5–M6. SOC 2 CC6.6: asymmetric posture — private key never in transit or at IdP. Privacy floor: no employee `user_id`, name, email, health value, or GDPR Art. 9 data; all PKJ events carry only FORM-internal UUIDs and timestamps. enterprise-architect + security-engineer + platform-engineer.
+- `docs/DECISION_LOG.md DEC-097` — OIDC `private_key_jwt` client authentication design adopted. Rationale: SOC 2 CC6.6 posture improvement; required by UK FCA-regulated fintech, DORA-aligned EU financial institutions, German BSI IT-Grundschutz customers; low engineering cost relative to deal-unlock value. `client_secret_post` remains default. Reverse cost: low (no PKJ tenants in production yet).
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §9` — G-012 row updated: `Low — affects <5% of prospective customers` → 🟡 Design complete — see §42 (DEC-097, 2026-07-02).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — document header v2.14 → v2.15. TOC entry §42 added.
+- `STATUS.md` — v11.36.0 current; next: AUDIT_LOG_SCHEMA §SSO-PKJ-Lifecycle (3 events, M5) + OBSERVABILITY §12.6 `pkjwt_key_expiry_sweep` registration + migration 0098 DDL.
+- `VERSION` — 11.35.0 → 11.36.0.
+
 ## [11.34.0] — 2026-07-02
 
 ### Added
