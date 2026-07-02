@@ -1,4 +1,4 @@
-# FORM · Growth Loops v0.1
+# FORM · Growth Loops v0.2
 
 > Механіка органічного і вірального росту FORM — від beta до публічного запуску.
 > Власник: `growth-lead` + `product-strategist`. Клінічний review: `clinical-safety`. Правки через PR.
@@ -9,6 +9,7 @@
 - [`docs/RETENTION_PLAYBOOK.md`](RETENTION_PLAYBOOK.md) — D0/D7/D30/D90 retention windows
 - [`docs/ANALYTICS_SETUP.md`](ANALYTICS_SETUP.md) — PostHog events для tracking loops
 - [`docs/PRODUCT_SPEC.md`](PRODUCT_SPEC.md) — технічна база для sharing механіки
+- [`docs/COST_MODEL.md §56`](COST_MODEL.md) — EU market entry order, GEO-GATE-PL-DE-01, demand gen budget (DEC-096)
 
 ---
 
@@ -361,8 +362,83 @@ UA:
 
 ---
 
-**v0.1 · травень 2026 · live document — update після beta M3 з реальними даними**
+## 11 · EU Market Entry — Localisation Sequencing (Poland-First · DEC-096)
+
+> **DEC-096 (2026-07-02):** Порядок виходу на ринок ЄС підтверджено — **Польща (M12) → Німеччина/Нідерланди (M18–M20)**. Повне обґрунтування: `docs/COST_MODEL.md §56`. Цей розділ кодифікує наслідки для growth loops і localisation sequencing. Closes `docs/COST_MODEL.md §56.10` item 5.
+
+### Чому Польща перша
+
+| Чинник | Польща (M12) | Германія/Нідерланди (M18–M20) |
+|---|---|---|
+| CAC [ESTIMATE] | $25–$60 | $80–$150 |
+| Швидкість payback | 3–5× краще | Baseline |
+| UA діаспора | ~1.5M — founder-network channel | Немає |
+| GDPR infrastructure | Спільна — будується раз для PL+DE | Інкрементальна після PL |
+| Market validation | PL GDPR compliance ops ≥ 3 місяців → відкриваємо DE | — |
+
+**PL-first ≠ DE-never.** PL ARR фінансує вхід до DE. DPIA, EU Representative, SCCs — будується один раз і покриває обидва ринки.
+
+### Gate умови (GEO-GATE-PL-DE-01)
+
+Перехід PL → DE/NL гейтований п'ятьма умовами (`docs/COST_MODEL.md §56.7`):
+
+| # | Умова | Відповідальний | OKR tracking |
+|---|---|---|---|
+| 1 | PL D30 retention ≥ 35% | growth-lead | Q4 2026 |
+| 2 | PL MRR ≥ $5,000 | founder | Q4 2026 |
+| 3 | GDPR compliance ops ≥ 3 місяців з PL launch | compliance-officer | Q4 2026 |
+| 4 | DE App Store localisation complete (UI + copy) | platform-engineer | Q2 2027 |
+| 5 | DE enterprise legal review complete | compliance-officer | Q2 2027 |
+
+**Hard gate:** `geo.market_activated` DEC-030 event вимагає поле `compliance_checklist_ref`. `emit-audit-event` Worker повертає HTTP 422 `GEO_MARKET_01_CHECKLIST_MISSING` якщо поле відсутнє — market activation блокується на рівні chain.
+
+### Localisation sequencing — Consumer Growth Loops
+
+**Пріоритет мов:** Ukrainian (default) → Polish (M12) → German (M18–M20) → English (global).
+
+| Loop | Poland (M12) | Germany/Netherlands (M18–M20) |
+|---|---|---|
+| Loop 1 (Form Share Card) | Польськомовна card copy; Victor cue локалізований | Німецькомовна card copy |
+| Loop 2 (Streak Share) | PL milestone copy («5 treningów z FORM») | DE milestone copy |
+| Loop 3 (Victor WOM) | PL attribution питання в onboarding survey | DE attribution питання |
+| Loop 4 (Referral Program) | Polish invite copy + PL deep-link | German invite copy + DE deep-link |
+| Loop 5 (Beta FOMO) | Polish waitlist page (PL App Store landing) | German waitlist page |
+
+**Implementation rule:** Polish-language assets підготовлені і протестовані **до** PL App Store launch (M12). German assets не розробляються до закриття GEO-GATE-PL-DE-01 умов 1–3 (Q4 2026 OKR gate).
+
+### Referral asset sequencing
+
+```
+M10–M11  Polish referral copy + PL deep-link generation (Loop 4 localisation)
+M12      PL App Store launch → Polish growth loops active
+         PL Loop 1–5 copy live; `geo.market_activated` event filed (compliance_checklist_ref mandatory)
+M16      German referral copy + DE App Store ASA creative (6 weeks before target M18)
+M18–M20  DE/NL launch — conditional on all 5 GEO-GATE-PL-DE-01 conditions met
+```
+
+`clinical-safety` review обов'язковий для кожного локалізованого share-контенту (PL і DE) відповідно до §7.
+
+### Enterprise demand gen channels (summary)
+
+Детальний бюджет і OKR tracking у `docs/COST_MODEL.md §28.6.1`.
+
+| Market | Milestone | Channels | Budget [ESTIMATE] |
+|---|---|---|---|
+| Poland | M12 | Polish LinkedIn · Warsaw HR-tech events · PL App Store ASA | +$300–$700/month |
+| Germany/Netherlands | M18–M20 | German LinkedIn · XING · DE HR-tech events · DE App Store ASA | +$905–$2,224/month |
+
+### Cross-references
+
+- `docs/COST_MODEL.md §56` — DEC-096 full rationale (OQ-GEO-02); GEO-GATE-PL-DE-01 gate conditions §56.7
+- `docs/COST_MODEL.md §28.6.1` — EU demand gen budget sequencing (v2.29.2, 2026-07-02)
+- `docs/DECISION_LOG.md DEC-096` — formal decision record (2026-07-02)
+- `docs/ENTERPRISE.md §Pricing` — USD billing for all markets including EU
+- `docs/GDPR_DPIA.md` — shared GDPR infrastructure covering PL + DE
+
+---
+
+**v0.2 · липень 2026 · live document — §11 EU market entry localisation sequencing added (DEC-096)**
 
 **Власник:** `growth-lead` + `product-strategist`
 **Клінічний review:** `clinical-safety` (HARD VETO)
-**Пов'язані рішення:** DEC-002 (no in-app social), DEC-016 (no free tier), DEC-029
+**Пов'язані рішення:** DEC-002 (no in-app social), DEC-016 (no free tier), DEC-029, DEC-096 (Poland-first EU entry)

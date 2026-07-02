@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [11.41.1] — 2026-07-02
+
+### Added
+- `docs/GROWTH_LOOPS.md §11` — EU Market Entry Localisation Sequencing (Poland-First · DEC-096). Closes `docs/COST_MODEL.md §56.10` item 5 and `§56.12` cross-reference row. New section encodes: GEO-GATE-PL-DE-01 five gate conditions with OKR tracking cadence (Q4 2026: PL D30 ≥ 35%, PL MRR ≥ $5k, GDPR ops ≥ 3 months; Q2 2027: DE localisation + DE enterprise legal review); per-loop localisation sequencing table (Loop 1–5 × PL M12 / DE M18–M20); referral asset timeline (M10–M11 Polish copy + PL deep-link → M12 PL launch → M16 DE copy → M18–M20 DE/NL conditional launch); `geo.market_activated` hard gate note (HTTP 422 `GEO_MARKET_01_CHECKLIST_MISSING` if `compliance_checklist_ref` absent); enterprise demand gen channel summary (PL: Polish LinkedIn + Warsaw HR-tech + PL App Store ASA +$300–$700/month; DE/NL: German LinkedIn + XING + DE HR-tech + DE App Store ASA +$905–$2,224/month); clinical-safety review requirement for all localised share content per §7. Document header v0.1 → v0.2. DEC-096 added to "Пов'язані рішення".
+
+### Changed
+- `docs/COST_MODEL.md §56.10` item 5 — `[ ]` → `[x] Done — 2026-07-02 (GROWTH_LOOPS.md §11, v0.2)`. `§56.12` cross-reference row `🟡 Pending — P1/M12` → `🟢 Done`. Version note v2.29.3 added. Document header v2.29.2 → v2.29.3.
+- `VERSION` — 11.41.0 → 11.41.1.
+
+---
+
 ## [11.41.0] — 2026-07-02
 
 ### Added
