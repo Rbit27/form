@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.6.0] — 2026-07-02
+
+### Added
+- `content/post-16-overtraining-vs-underrecovery-signals.md` — original series post-16. «Перетренованість або недовідновлення: як self-coached атлет читає сигнали тіла». Спектр від гострої втоми до OTS (четири рівні: acute fatigue → FOR → NFOR → OTS), чому суб'єктивних сигналів недостатньо, об'єктивні маркери у журналі (RPE-тренд, регрес на тих самих вагах, session RPE вище очікуваного), маркери другого рівня (HRV, сон, розминка), диференціація від лінощів і травми, практичний алгоритм з тестом деловантаженням. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card for post-16 added at top of feed.
+- `README.md` — post-16 status updated to draft · v11.6.0; roadmap extended with series 3026–3030 «Тренувальна практика під зовнішнім тиском».
+
+### Changed
+- `STATUS.md` — current version v11.5.0 → v11.6.0; next: post-17 («AI-coach проти персонального тренера: чесний trade-off»).
+- `VERSION` — 11.5.0 → 11.6.0.
+
+---
+
 ## [11.5.0] — 2026-07-02
 
 ### Added

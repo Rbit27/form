@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v11.6.0** — 2026-07-02 · post-16 · «Перетренованість або недовідновлення: як self-coached атлет читає сигнали тіла» · original series post-16 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-16 · README roadmap extended: series 3026–3030 «Тренувальна практика під зовнішнім тиском» · next: post-17 («AI-coach проти персонального тренера: чесний trade-off»)
+
 **v11.5.0** — 2026-07-02 · post-160 + post-2917 · post-160: «Синтез 151–160: десять рішень без тренера» · series «Програмування для реального світу» 151–160 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · post-2917: «Різниця між гнучкістю і безструктурністю у тренуванні: де межа» · series «Тренувальна стійкість» 2916–2925 (2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards added for post-160 and post-2917 · next: post-12 («Техніка понад інтенсивністю: чому форма вибудовує тренованість») + post-2918 («Повернення після перерви: чому "підхопити з місця де зупинився" майже ніколи не спрацьовує»)
 
 **v11.4.0** — 2026-07-02 · post-11 · «Тиждень деловантаження: фізіологія, ритміка, і коли це насправді потрібно» · original series post-11 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-11 · next: post-12 («Техніка понад інтенсивністю: чому форма вибудовує тренованість») + post-2917 («Різниця між гнучкістю і безструктурністю у тренуванні: де межа») + post-160 («Синтез 151–160: десять рішень без тренера» — editorial series 151–160, 10/10 SERIES COMPLETE)
