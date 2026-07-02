@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [11.27.0] — 2026-07-02
+
+### Added
+- `content/post-35-breathing-valsalva-core.md` — Original editorial series post 35. «Дихання під час підйому ваги — Valsalva, внутрішньочеревний тиск і core stability». Механізм: маневр Вальсальви підвищує ВЧТ → черевна порожнина як жорсткий розпір навколо поперека (Cholewicki et al. 1999, Barker et al. 2006). Три режими: ритмічне (<60% 1ПМ), bracing (70–85%), повний Valsalva (>85% 1ПМ). Анатомія bracing: 360-градусне напруження (TA, косі, тазове дно, діафрагма). Bracing vs hollowing — McGill 2001: hollowing знижує спінальну ригідність при підйомі. Де видих шкодить: нижня точка присідання і ініціація становій. Протипоказання: гіпертонія, серцево-судинні стани, глаукома, вагітність. Пояс підсилює навик, не замінює його (McGill et al. 2013). Гіпервентиляція = ризик синкопе. Покроковий протокол навчання брейсингу. clinical-safety: CONDITIONAL PASS. sports-scientist review pending. blog.html card added.
+
+### Changed
+- `blog.html` — card for post-35 prepended to published feed.
+- `STATUS.md` — current version updated to v11.27.0.
+- `VERSION` — 11.26.0 → 11.27.0.
+
 ## [11.26.0] — 2026-07-02
 
 ### Added
