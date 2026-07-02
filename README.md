@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · 24 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · roadmap extended to 2935 · series «Мінімальна ефективна доза» 2876–2885 active (9/10) · series «Тренувальна стійкість» 2916–2925 active (9/10) · series «Що я знаю про своє тренування» 2926–2935 proposed · block 896–900 active · block 901–910 proposed · v11.15.0
+### Editorial series: 11–44 drafted · 34 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 active (7/10) · block 896–900 active · block 901–910 proposed · v11.26.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -30,7 +30,7 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 31 | Мобільність або гнучкість — де та межа, яка важлива для силового атлета | draft · v5.11.1 |
 | 32 | Як читати наукову статтю про тренування і не зробити неправильних висновків | **draft · v11.24.0 → post-32-how-to-read-research-paper.md** |
 | 33 | Самостійне програмування: де воно краще за коуча, де гірше | proposed |
-| 34 | Чому більшість людей кидають тренування — і що з цим робити без self-help риторики | proposed |
+| 34 | Supersets і antagonist pairs — ефективність без втрати продуктивності | **draft · v11.26.0 → post-34-supersets-antagonist-pairs.md** |
 | 35 | Breathing mechanics під час підйому ваги — Valsalva, внутрішньочеревний тиск, core stability | proposed |
 | 36 | Як будувати тренувальний тиждень навколо реального розкладу, а не ідеального | proposed |
 | 37 | Що таке «чиста техніка» і чому вона залежить від цілі, а не від естетики | draft · v6.6.1 |
@@ -3180,7 +3180,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: метаког
 | 2929 | Як перевірити власне припущення: мінімальний self-experiment без надмірного контролю | proposed · v10.54.0 |
 | 2930 | Confirmation bias в оцінці власного прогресу: структурований антидот | proposed · v10.54.0 |
 | 2931 | Різниця між «я знаю своє тіло» і «у мене є дані про своє тіло» | **draft · v11.24.0 → post-2931-knowing-your-body-vs-having-data.md** |
-| 2932 | Якість тренувального знання: джерела, яким можна довіряти — і яким ні | proposed · v10.54.0 |
+| 2932 | Якість тренувального знання: джерела, яким можна довіряти — і яким ні | **draft · v11.26.0 → post-2932-training-knowledge-quality-sources.md** |
 | 2933 | Коли запитати тренера — і що саме: межа між знанням і незнанням | proposed · v10.54.0 |
 | 2934 | Невідоме незнання у тренуванні: сліпі плями, яких ти не знаєш | proposed · v10.54.0 |
 | 2935 | Синтез 2926–2935: рамка тренувального знання self-coached атлета | proposed · v10.54.0 |

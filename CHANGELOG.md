@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.26.0] — 2026-07-02
+
+### Added
+- `content/post-34-supersets-antagonist-pairs.md` — Original editorial series post 34. «Supersets і antagonist pairs — ефективність без втрати продуктивності». Таксономія superset vs antagonist pair vs compound superset vs pre-exhaust. Antagonist potentiation: Robbins et al. (2010) — +4–5% силового виходу через reciprocal inhibition і PAP; Baker & Newton (2005) — explosive output; Schoenfeld et al. (2016) — інтервали відпочинку. Де продуктивність зберігається (antagonist pairs 70–85% 1ПМ), де страждає (агоністичні суперсети −12–15% потужності, Kagamiyama et al. 2021). Протипоказання: 90%+ 1ПМ, технічно складні рухи, pre-exhaust для силової роботи. Практичні пари, структура відпочинку, місце у периодизації, Victor CV velocity-loss proxy. clinical-safety: PASS. sports-scientist review pending. blog.html card added.
+- `content/post-2932-training-knowledge-quality-sources.md` — Series «Що я знаю про своє тренування» (2926–2935) post 7/10. «Якість тренувального знання: джерела, яким можна довіряти — і яким ні». Таксономія шести джерел: наукова база (точна для механізму, мало специфічна для тебе), тренер (унікальний зовнішній погляд, але якість залежна від ринку), популярні медіа (бізнес-модель заохочує новизну над достовірністю), особистий досвід (максимальна специфічність, висока зашумленість без структури), спільнота (мотивація, але confirmation bias), трекери і AI (об'єктивні дані, непрозора інтерпретація). Операційна таблиця: яке джерело для якого рішення. Два мета-правила: механізм ≠ протокол; простота звучання ≠ достовірність. clinical-safety: NOT_REQUIRED. sports-scientist review pending. blog.html card added.
+
+### Changed
+- `blog.html` — cards for post-34 and post-2932 prepended to published feed.
+- `STATUS.md` — current version updated to v11.26.0.
+- `README.md` — editorial series note updated: post-34 drafted, series 2926–2935 at 7/10.
+- `VERSION` — 11.25.1 → 11.26.0.
+
 ## [11.25.1] — 2026-07-02
 
 ### Changed
