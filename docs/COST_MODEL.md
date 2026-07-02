@@ -14793,7 +14793,7 @@ Applied in this authoring pass:
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 1 | CV-ADO-EXCL-01 Worker guard — add `cv_session_count` column-presence check to `fehs_compute` pg_cron Worker; emit `compliance.dpia_override_missing` HIGH event if column present without `dpia_override_log` approval; abort snapshot batch; TypeScript guard per §55.6 | platform-engineer | **P1** | M8 (pre-CV enterprise GA audit) | [ ] |
-| 2 | Register `compliance.dpia_override_missing` HIGH/3yr event in `docs/AUDIT_LOG_SCHEMA.md`; Zod v2 schema: `invariant` (string), `table` (string), `column` (string); SOC 2 mapping CC7.3/CC2.2; PagerDuty routing via standard HIGH severity | compliance-officer | **P1** | M8 | [ ] |
+| 2 | Register `compliance.dpia_override_missing` HIGH/3yr event in `docs/AUDIT_LOG_SCHEMA.md`; Zod v2 schema: `invariant` (string), `table` (string), `column` (string); SOC 2 mapping CC7.3/CC2.2; PagerDuty routing via standard HIGH severity | compliance-officer | **P1** | M8 | [x] Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.70) |
 | 3 | At M8 pre-CV enterprise GA audit: evaluate §55.5 DPIA update path viability based on CV-enabled tenant cohort sizes; if majority of CV-enabled tenants have < 10 activated seats, document as permanently excluded in DECISION_LOG update; otherwise initiate DPIA supplement per §55.5 items 1–6 | compliance-officer + customer-success | **P2** | M8 | [ ] |
 | 4 | If DPIA update approved: complete §55.5 items 1–6 (DPIA supplement, DPA Schedule A amendment with customer counter-sign, employee consent UI update, CV-QBR-E-001 SOC 2 evidence, new DEC-0XX, migration adding `cv_session_count`); deactivate CV-ADO-EXCL-01 guard via `dpia_override_log` entry | compliance-officer + platform-engineer | **P2** | Post-M8 (if DPIA approved) | [ ] |
 
@@ -14804,7 +14804,7 @@ Applied in this authoring pass:
 | DEC-095 registered in `docs/DECISION_LOG.md` | §55.7 | 🟢 **Done — 2026-07-02** |
 | §40.11 OQ-ADO-03 patched P1 Open → 🟢 Resolved DEC-095 | §55.8 | 🟢 **Done — inline patch this pass** |
 | CV-ADO-EXCL-01 Worker guard implemented in `fehs_compute` | §55.6, §55.9 item 1 | 🟡 Pending — M8 (pre-CV enterprise GA) |
-| `compliance.dpia_override_missing` HIGH/3yr event registered in `docs/AUDIT_LOG_SCHEMA.md` | §55.6, §55.9 item 2 | 🟡 Pending — M8 |
+| `compliance.dpia_override_missing` HIGH/3yr event registered in `docs/AUDIT_LOG_SCHEMA.md` | §55.6, §55.9 item 2 | 🟢 **Done — 2026-07-02** (AUDIT_LOG_SCHEMA.md v2.70) |
 | M8 pre-CV GA audit: DPIA update path viability evaluation | §55.9 item 3 | 🟡 Pending — M8 |
 
 ---

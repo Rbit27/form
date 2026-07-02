@@ -6,7 +6,13 @@
 
 ## Current version
 
-**v11.2.0** — 2026-07-02 · post-2915 · «Синтез 2906–2915: операційна модель тренувальної комунікації з собою для self-coached атлета» · series «Тренувальна комунікація з собою» 2906–2915 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2915 · README roadmap extended: series 3016–3025 «Тренувальна стійкість без самопримусу» added · next: post-159-cont («Коли зупинятися на програмі, а коли рухатися далі: рамка рішення для self-coached атлета» — editorial series 151–160, 9/10) + series 2916–2925 opener
+**v11.3.0** — 2026-07-02 · post-2916 · «Коли «план» перестає бути планом: чотири сценарії реального зриву і що з ними робити» · series «Тренувальна стійкість» 2916–2925 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2916 · next: post-2917 («Різниця між гнучкістю і безструктурністю у тренуванні: де межа») + post-160 («Синтез 151–160: десять рішень без тренера» — editorial series 151–160, 10/10 SERIES COMPLETE)
+
+**v11.2.0** — 2026-07-02 · post-159 · «Коли зупинятися на програмі, а коли рухатися далі: рамка рішення для self-coached атлета» · series «Програмування для реального світу» 151–160 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-159 · next: post-2916 (series «Тренувальна стійкість» 2916–2925 opener) + post-160
+
+**v11.1.2** — 2026-07-02 · enterprise: AUDIT_LOG_SCHEMA v2.69→v2.70 · +1 `compliance.dpia_override_missing` HIGH/3yr event (CV-ADO-EXCL-01 invariant alert) · closes COST_MODEL §55.9 item 2 (P1/M8) · COST_MODEL §55.9 item 2 [x] Done + §55.10 cross-ref row 🟢 Done
+
+**v11.2.0** (prev) — 2026-07-02 · post-2915 · «Синтез 2906–2915: операційна модель тренувальної комунікації з собою для self-coached атлета» · series «Тренувальна комунікація з собою» 2906–2915 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2915 · README roadmap extended: series 3016–3025 «Тренувальна стійкість без самопримусу» added
 
 **v11.1.0** — 2026-07-02 · post-158 + post-2914 · post-158: «Як збирати зворотний зв'язок із програми і ухвалювати рішення на основі даних, а не відчуттів» · series «Програмування для реального світу» 151–160 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · post-2914: «Як писати тренувальний план, який ти зможеш прочитати через рік і зрозуміти, що відбувалося» · series «Тренувальна комунікація з собою» 2906–2915 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards added for post-158 and post-2914 · next: post-159 («Коли зупинятися на програмі, а коли рухатися далі: рамка рішення для self-coached атлета») + post-2915 («Синтез 2906–2915: операційна модель тренувальної комунікації з собою для self-coached атлета»)
 

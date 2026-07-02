@@ -1,5 +1,43 @@
 # Changelog · FORM
 
+## [11.3.0] — 2026-07-02
+
+### Added
+- `content/post-2916-when-plan-fails-four-scenarios.md` — Series «Тренувальна стійкість: як self-coached атлет тримає курс коли все йде не за планом» 2916–2925 · 1/10. «Коли «план» перестає бути планом: чотири сценарії реального зриву і що з ними робити». Пропущена сесія vs. пропущений тиждень vs. зруйнований тижневий ритм vs. зникла мотивація — чотири принципово різні ситуації з різними правильними відповідями. Ключовий принцип: мінімальне ефективне рішення переважає максимальну компенсацію; повернення ваг після перерви (80–90% до 2 тижнів, 70–80% за 2–4 тижні, перезапуск понад 4 тижні); ситуативний стан vs. сигнал перетренованості. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card added for post-2916 at top of feed.
+
+### Changed
+- `README.md` — post-2916 status: proposed → draft v11.3.0.
+- `STATUS.md` — current version v11.2.0 → v11.3.0; next: post-2917 («Різниця між гнучкістю і безструктурністю у тренуванні: де межа») + post-160 («Синтез 151–160: десять рішень без тренера»).
+- `VERSION` — 11.2.0 → 11.3.0.
+
+---
+
+## [11.2.0] — 2026-07-02
+
+### Added
+- `content/post-159-when-to-stay-program-decision-framework.md` — Editorial series post 159. «Коли зупинятися на програмі, а коли рухатися далі: рамка рішення для self-coached атлета». Серія «Програмування для реального світу» 151–160 · 9/10. Чотири питання рамки рішення: дані за 4–6 тижнів, конкретна діагностика стагнації, аналіз причини (відновлення → техніка → RPE → плато), мінімальне втручання перед повним рестартом. Критерії «залишатися» vs. «рухатися далі». Практичний алгоритм 5 кроків. Попередження про роль тренувального журналу як передумови для будь-якого рішення. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card added for post-159 at top of feed.
+
+### Changed
+- `README.md` — post-159 status: proposed → draft v11.2.0 (тема змінена на «Коли зупинятися на програмі, а коли рухатися далі»).
+- `STATUS.md` — current version v11.1.2 → v11.2.0; next: post-2916 (series 2916–2925 opener) + post-160.
+- `VERSION` — 11.1.2 → 11.2.0.
+
+---
+
+## [11.1.2] — 2026-07-02
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §C1 operating evidence events` — `compliance.dpia_override_missing` HIGH/3yr event registered (DEC-030 HMAC-chained). CV-ADO-EXCL-01 Worker invariant alert: emitted by `fehs_compute` pg_cron Worker when `cv_session_count` column found in `enterprise_adoption_snapshots` without `dpia_override_log` approval; aborts snapshot batch; PagerDuty via standard HIGH severity routing. Zod schema: `invariant` (string), `table` (string), `column` (string). No chain predecessor (advisory single-event alert). SOC 2: CC7.3 (anomalous data processing detection) + CC2.2 (compliance control failure communication). Retention table: +1 row. Closes `docs/COST_MODEL.md §55.9` item 2 (P1/M8). Document header v2.69 → v2.70.
+
+### Changed
+- `docs/COST_MODEL.md §55.9` — item 2 status: `[ ]` → `[x] Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.70)`.
+- `docs/COST_MODEL.md §55.10` — cross-reference row for `compliance.dpia_override_missing` registration: `🟡 Pending — M8` → `🟢 Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.70)`.
+- `VERSION` — 11.1.1 → 11.1.2.
+
+---
+
 ## [11.1.1] — 2026-07-02
 
 ### Added
