@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.29.3
+# FORM · Cost Model & Unit Economics v2.29.4
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -12054,7 +12054,7 @@ CREATE POLICY ece_compliance_read ON enterprise_churn_events
 REVOKE ALL ON enterprise_churn_events FROM form_api;
 ```
 
-**Cross-reference obligation:** The authoritative DDL registration — with full EXPLAIN ANALYZE, RLS verification, and SOC 2 TSC mapping — belongs in `docs/DATA_MODEL.md §44`. That document must be created before migration 0085 is applied to production. Status: **[ ] Pending — DATA_MODEL §44** (§43.10 item 2).
+**Cross-reference obligation:** The authoritative DDL registration — with full EXPLAIN ANALYZE, RLS verification, and SOC 2 TSC mapping — belongs in `docs/DATA_MODEL.md §44`. Status: **[x] Done — `docs/DATA_MODEL.md §44` v1.26 (2026-06-23).** Three ENUMs, 22-column DDL, three CHECKs (`ece_offboarding_before_deletion`, `ece_winback_acv_requires_converted`, `ece_deletion_sla_respected`), three indexes with EXPLAIN ANALYZE at 500-row scale, RLS verification queries, FEHS sourcing query, SOC 2 TSC mapping, and chain invariant compliance queries (OFFBOARD-CHAIN-01, WINBACK-CHAIN-01, DELETION-CHAIN-01) are all authored in §44. **Remaining operational (§44.10 item 1 — P0/M10):** apply migration 0085 to staging (run §44.3.2 six-item validation checklist including day 36 `ece_deletion_sla_respected` test), then apply to production.
 
 ---
 
@@ -15148,6 +15148,8 @@ No new SOC 2 evidence artefact is required for the billing currency decision its
 | OQ-GEO-03 EU privacy counsel memo (M8) | §56.8, §56.10 item 7 | 🟡 Pending — P0/M8 |
 
 ---
+
+*v2.29.4 (2026-07-02): §43.8 Cross-Reference Patch — DATA_MODEL §44 Stale-Status Closure (`enterprise_churn_events` migration 0085). Closes stale inline status field in §43.8 DDL summary: `Status: **[ ] Pending — DATA_MODEL §44** (§43.10 item 2)` updated to `[x] Done — DATA_MODEL.md §44 v1.26 (2026-06-23)`. Root cause: `docs/DATA_MODEL.md §44` was authored on 2026-06-23 (v1.26) — providing the authoritative DDL registration with full three-ENUM schema, 22-column DDL, three CHECK constraints (`ece_offboarding_before_deletion`, `ece_winback_acv_requires_converted`, `ece_deletion_sla_respected`), three-index EXPLAIN ANALYZE at 500-row scale, RLS verification queries, FEHS sourcing query (§44.7), SOC 2 TSC mapping (§44.9), and OFFBOARD-CHAIN-01/WINBACK-CHAIN-01/DELETION-CHAIN-01 compliance queries — and §43.10 item 2 was simultaneously marked `[x] Documentation done — 2026-06-23 (DATA_MODEL v1.26)`. However, the inline body-text Status field in §43.8 (authored in v1.0, 2026-06-23) was not patched at that time, retaining the original `[ ] Pending` wording. §43.8 body text updated: status clause replaced with full Done notation including DDL scope summary and remaining operational obligation (§44.10 item 1 — apply migration 0085 to staging with §44.3.2 validation, then production — P0/M10, not yet applied). No schema, DDL, or economic model changes in this patch. Privacy floor: §43.8 is migration DDL documentation only — no employee `user_id`, name, email, health value, coaching content, body composition, or GDPR Art. 9 special-category data. `fehs_at_churn` is a tenant-aggregate score with k ≥ 10 floor (§33.7 enforcement) — not an individual-level metric. Document header v2.29.3 → v2.29.4. Owner: compliance-officer + enterprise-architect.*
 
 *v2.29.3 (2026-07-02): §56.10 item 5 + §56.12 cross-reference patch — GROWTH_LOOPS.md §11 EU market entry localisation sequencing. Closes `docs/COST_MODEL.md §56.10` item 5 (growth-lead, P1, before EU App Store launch M12) and `docs/COST_MODEL.md §56.12` cross-reference row for `docs/GROWTH_LOOPS.md`. New §11 added to `docs/GROWTH_LOOPS.md` (v0.2, 2026-07-02): §11 encodes GEO-GATE-PL-DE-01 five gate conditions with OKR tracking cadence (Q4 2026: conditions 1–3; Q2 2027: conditions 4–5); per-loop localisation sequencing table (Loop 1–5 × PL M12 / DE M18–M20); referral asset timeline (M10–M11 Polish copy + PL deep-link → M12 PL launch → M16 DE copy → M18–M20 DE/NL launch); `geo.market_activated` hard gate note (`compliance_checklist_ref` mandatory; HTTP 422 `GEO_MARKET_01_CHECKLIST_MISSING`); enterprise demand gen channel summary (+$300–$700/month PL at M12; +$905–$2,224/month DE/NL at M18–M20); clinical-safety review requirement for all localised share content; cross-references to COST_MODEL §56, §28.6.1, DECISION_LOG DEC-096. §56.10 item 5 `[ ]` → `[x] Done — 2026-07-02`. §56.12 `docs/GROWTH_LOOPS.md` row `🟡 Pending — P1/M12` → `🟢 Done — 2026-07-02`. Document header v2.29.2 → v2.29.3. Owner: growth-lead + compliance-officer.*
 

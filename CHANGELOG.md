@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [11.45.1] — 2026-07-02
+
+### Changed
+- `docs/COST_MODEL.md` — v2.29.3 → v2.29.4; §43.8 cross-reference patch: stale `[ ] Pending — DATA_MODEL §44` status field updated to `[x] Done — DATA_MODEL.md §44 v1.26 (2026-06-23)`. Root cause: DATA_MODEL §44 was authored 2026-06-23 (v1.26); §43.10 item 2 correctly marked documentation-done at that time; §43.8 inline status body-text not patched. Remaining operational obligation documented: apply migration 0085 to staging + production (§44.10 item 1, P0/M10).
+- `VERSION` — 11.45.0 → 11.45.1.
+
 ## [11.45.0] — 2026-07-02
 
 ### Added
