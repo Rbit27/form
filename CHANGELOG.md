@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [11.32.1] — 2026-07-02
+
+### Changed
+- `docs/COST_MODEL.md` — v2.29.1 → v2.29.2. §28.6.1 EU and US Demand Gen Budget Sequencing (DEC-096). Closes `docs/COST_MODEL.md §56.10` item 6 (data-engineer, P1, before EU App Store launch M12) and `§56.12` cross-reference row for `§28.6 EU demand gen budget sequence`. New §28.6.1 sub-section added to §28.6 Enterprise Demand Generation Budget: confirms Poland-first EU entry M12, Germany/Netherlands M18–M20 per DEC-096; four-phase sequencing table (UA Phase 1 / PL Phase 2a M12 / DE-NL Phase 2b M18–M20 / US Phase 3 M24+); PL demand gen budget detail ($300–$700/month [ESTIMATE] at M12 — Polish-language LinkedIn + Warsaw HR-tech events + PL App Store ASA); DE/NL demand gen budget detail ($905–$2,224/month [ESTIMATE] at M18–M20 — German LinkedIn + XING + DE HR-tech events + DE App Store ASA + HubSpot Starter + Apollo.io); combined EU founder-led demand gen total $1,505–$4,124/month before AE hire; GEO-GATE-PL-DE-01 OKR tracking three-step protocol (Q4 2026 OKR KRs for conditions 1–3, `geo.market_activated` hard gate via `compliance_checklist_ref` HTTP 422 enforcement, Q2 2027 OKR KRs for conditions 4–5). §56.10 item 6 `[ ]` → `[x] Done`. §56.12 `§28.6` row `🟡 Pending` → `🟢 Done`.
+- `VERSION` — 11.32.0 → 11.32.1.
+
 ## [11.32.0] — 2026-07-02
 
 ### Added

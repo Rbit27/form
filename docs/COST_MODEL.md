@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.29.1
+# FORM · Cost Model & Unit Economics v2.29.2
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -5279,6 +5279,62 @@ This is included in the §22.3 Marketing/UA line alongside consumer marketing. T
 | Content marketing agency (case studies, reports) | $2,000–$4,000/month | Only at Series A; founder-led content is the correct strategy pre-PMF |
 
 **Post-Series A enterprise demand gen: $7,600–$19,450/month [ESTIMATE].** This is an order of magnitude above the pre-seed level and must be modeled separately in the Series A budget (not in §22.3 which covers Months 1–18 only).
+
+---
+
+#### §28.6.1 EU and US Demand Gen Budget Sequencing (DEC-096)
+
+Per DEC-096 (§56, v2.29.0, 2026-07-02), the enterprise demand gen budget follows a **Poland-first EU entry sequence**. The table below encodes the confirmed market-entry order and the incremental demand gen cash required at each phase. This closes `docs/COST_MODEL.md §56.10 item 6` and `§56.12` cross-reference obligation.
+
+**Phase sequencing and demand gen unlock conditions:**
+
+| Phase | Market | Entry milestone | Gate | Enterprise demand gen add-on |
+|---|---|---|---|---|
+| Phase 1 | Ukraine (UA) | M1–M12 (active) | — | Founder-led: $300–$1,200/month (§28.6 above) |
+| Phase 2a | Poland (PL) | M12 | GEO-GATE-PL-DE-01 conditions 1–3 (§56.7) | +$300–$700/month (see PL detail below) |
+| Phase 2b | Germany / Netherlands (DE/NL) | M18–M20 | GEO-GATE-PL-DE-01 all 5 conditions (§56.7) | +$905–$2,224/month (see DE/NL detail below) |
+| Phase 3 | United States (US) | M24+ | GEO-GATE-02 (§29.7) | Post-Series A full ABM: $7,600–$19,450/month (§28.6 above) |
+
+**PL demand gen budget detail (Phase 2a — M12 entry):**
+
+No AE hire is assumed at M12 (AE hire is post-Series A, §19.4). PL demand gen is founder-led, incremental to UA spend, same model.
+
+| Activity | Monthly cash cost | Notes |
+|---|---|---|
+| Polish-language LinkedIn content (translated + local CTA) | $0 (founder + content-strategist) | Polish copy from content-strategist agent; zero cash cost |
+| Warsaw HR-tech events (1–2/year) | $200–$400/event | Registration + travel from UA; ~$400–$800/year at PL entry |
+| PL App Store ASA (Polish keyword targeting) | $100–$300/month | Only after MKT-UA-GATE-01 is green and PL App Store is live |
+| HubSpot CRM (PL prospects tagged in existing instance) | $0 incremental | Same CRM; `market: PL` tag added |
+
+**Total PL enterprise demand gen add-on: $300–$700/month [ESTIMATE] at M12 entry.**
+
+Combined with UA founder-led budget ($300–$1,200/month), total EU Phase 2a spend is $600–$1,900/month. This fits within the §22.3 Marketing/UA envelope with a ~$400 monthly top-up to the EU launch budget line.
+
+**DE/NL demand gen budget detail (Phase 2b — M18–M20 entry):**
+
+DE/NL entry requires GEO-GATE-PL-DE-01 conditions 4 and 5 (DE localisation complete + DE enterprise legal review complete — §56.7). DE demand gen is structurally similar to PL but with higher event costs and XING as the dominant professional network.
+
+| Activity | Monthly cash cost | Notes |
+|---|---|---|
+| German-language LinkedIn and XING content | $100–$200/month | XING (~19M DE-speaking users) complementary to LinkedIn DE; content-strategist agent with DE copy |
+| DE HR-tech events (Zukunft Personal, HR Tech Germany) | $500–$1,000/event (1–2/year) | Higher registration + travel cost than Warsaw; ~$1,000–$2,000/year |
+| DE App Store ASA (DE/AT/CH keyword targeting) | $200–$500/month | Run only after PL ASA confirms LTV:CAC ≥ 3× at 90-day cohort |
+| HubSpot Starter (required at 10+ active EU prospects) | $45/month | Upgrade trigger: 10 EU enterprise prospects in active stage |
+| Apollo.io individual plan (DE/NL outbound email sequences) | $60–$79/month | Founder-as-SDR; structured outbound sequence for DE market |
+
+**Total DE/NL enterprise demand gen add-on: $905–$2,224/month [ESTIMATE] at M18–M20 entry.**
+
+Combined EU demand gen (UA + PL + DE/NL) at Phase 2b: **$1,505–$4,124/month [ESTIMATE]** before AE hire. This enters the post-Series A budget planning as a known cost band, not a surprise.
+
+**GEO-GATE-PL-DE-01 OKR tracking protocol:**
+
+The five gate conditions from §56.7 must be tracked in the OKR system to prevent informal waiver. Three-step tracking protocol:
+
+1. **Q4 2026 OKR cycle** (data-engineer): Add conditions 1–3 as Key Results to the Q4 2026 / Q1 2027 OKR cycle — format: "PL D30 ≥ 35% trailing 3-month average (condition 1)"; "PL MRR ≥ $5,000 (condition 2)"; "GDPR compliance operations ≥ 3 months documented — DPIA filed, DPO engaged, SCCs signed, EU Rep contracted (condition 3)."
+2. **Hard gate at activation** (platform-engineer + compliance-officer): The `geo.market_activated` DEC-030 event (§29.8) requires a non-null `compliance_checklist_ref` field linking to the Linear ticket confirming all five GEO-GATE-PL-DE-01 conditions. The `emit-audit-event` Worker returns HTTP 422 `GEO_MARKET_01_CHECKLIST_MISSING` if `compliance_checklist_ref` is absent — this creates a hard gate at activation, not a planning-only note.
+3. **Q2 2027 OKR cycle** (founder): Add conditions 4–5 as Key Results — format: "DE localisation complete: App Store metadata, UI copy, Victor EN voice (condition 4)"; "DE enterprise legal review complete: outside counsel memo on DE entity requirements on file (condition 5)."
+
+**Privacy floor:** §28.6.1 content is marketing budget planning only. No employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in this section or in any OKR KR derived from it. `compliance_checklist_ref` in `geo.market_activated` is a Linear ticket URL — no personal data.
 
 ---
 
@@ -15060,7 +15116,7 @@ No new SOC 2 evidence artefact is required for the billing currency decision its
 | 3 | Update `docs/ENTERPRISE.md` pricing section: note USD billing standard for all markets; add note on UAH reference addendum for UA customers | enterprise-architect | **P0** | Before first UA enterprise pilot | [x] **Done — 2026-07-02 (`docs/ENTERPRISE.md` billing currency note added, CHANGELOG v11.23.1)** |
 | 4 | Stripe configuration: ensure all UA enterprise subscriptions use `currency: "usd"` in Stripe Customer/Subscription creation; confirm Stripe supports USD billing for UA entities (bank wire fallback if Stripe UA bank link unavailable) | platform-engineer | **P0** | Before first UA Stripe enterprise billing cycle | [ ] |
 | 5 | Update `docs/GROWTH_LOOPS.md`: encode PL-first EU entry order; update EU referral and viral loop localisation sequencing (Polish-language referral assets before German) | growth-lead | **P1** | Before EU App Store launch (M12) | [ ] |
-| 6 | Update `docs/COST_MODEL.md §28.6`: confirm EU demand gen budget allocation sequence — PL at M12, DE/NL at M18–M20; confirm GEO-GATE-PL-DE-01 conditions are tracked in OKR system | data-engineer | **P1** | Before EU App Store launch (M12) | [ ] |
+| 6 | Update `docs/COST_MODEL.md §28.6`: confirm EU demand gen budget allocation sequence — PL at M12, DE/NL at M18–M20; confirm GEO-GATE-PL-DE-01 conditions are tracked in OKR system | data-engineer | **P1** | Before EU App Store launch (M12) | [x] **Done — 2026-07-02 (`docs/COST_MODEL.md §28.6.1`, v2.29.2). PL M12 ($300–$700/month add-on); DE/NL M18–M20 ($905–$2,224/month add-on); GEO-GATE-PL-DE-01 three-step OKR tracking protocol documented.** |
 | 7 | Engage EU privacy counsel by M8: outside counsel memo on UA entity + SCCs + EU Representative viability; file memo in `compliance/` directory; update OQ-GEO-03 with DEC-0XX when counsel delivers opinion | compliance-officer | **P0** | M8 | [ ] |
 | 8 | At M8: evaluate whether PL App Store localisation requires separate EU Stripe merchant account (vs. UA merchant account with EUR settlement); if required, engage Stripe EU entity onboarding | platform-engineer | **P1** | M8 | [ ] |
 
@@ -15088,10 +15144,12 @@ No new SOC 2 evidence artefact is required for the billing currency decision its
 | `docs/ENTERPRISE.md` billing currency note added | §56.3, §56.10 item 3 | 🟢 **Done — 2026-07-02 (CHANGELOG v11.23.1)** |
 | Stripe UA enterprise billing currency = USD confirmed | §56.3, §56.10 item 4 | 🟡 Pending — P0/before first UA Stripe enterprise billing cycle |
 | `docs/GROWTH_LOOPS.md` PL-first EU entry order encoded | §56.7, §56.10 item 5 | 🟡 Pending — P1/M12 |
-| `docs/COST_MODEL.md §28.6` EU demand gen budget sequence confirmed PL-M12/DE-M18 | §56.7, §56.10 item 6 | 🟡 Pending — P1/M12 |
+| `docs/COST_MODEL.md §28.6` EU demand gen budget sequence confirmed PL-M12/DE-M18 | §56.7, §56.10 item 6 | 🟢 **Done — 2026-07-02 (`docs/COST_MODEL.md §28.6.1`, v2.29.2).** PL M12 (+$300–$700/month); DE/NL M18–M20 (+$905–$2,224/month); GEO-GATE-PL-DE-01 OKR tracking three-step protocol. |
 | OQ-GEO-03 EU privacy counsel memo (M8) | §56.8, §56.10 item 7 | 🟡 Pending — P0/M8 |
 
 ---
+
+*v2.29.2 (2026-07-02): §28.6.1 EU and US Demand Gen Budget Sequencing (DEC-096). Closes `docs/COST_MODEL.md §56.10` item 6 (data-engineer, P1, before EU App Store launch M12) and `docs/COST_MODEL.md §56.12` cross-reference row for `§28.6 EU demand gen budget sequence`. New §28.6.1 sub-section appended to §28.6 Enterprise Demand Generation Budget: confirms Poland-first EU entry M12, Germany/Netherlands M18–M20 per DEC-096 (§56.6–§56.7); four-phase sequencing table (UA Phase 1 / PL Phase 2a M12 / DE-NL Phase 2b M18–M20 / US Phase 3 M24+); PL demand gen budget detail ($300–$700/month [ESTIMATE] at M12 — Polish-language LinkedIn + Warsaw HR-tech events + PL App Store ASA); DE/NL demand gen budget detail ($905–$2,224/month [ESTIMATE] at M18–M20 — German LinkedIn + XING + DE HR-tech events + DE App Store ASA + HubSpot Starter + Apollo.io); combined EU founder-led demand gen $1,505–$4,124/month before AE hire; GEO-GATE-PL-DE-01 OKR tracking three-step protocol: Q4 2026 OKR additions for conditions 1–3 (data-engineer), hard gate via `geo.market_activated` `compliance_checklist_ref` HTTP 422 `GEO_MARKET_01_CHECKLIST_MISSING` enforcement (platform-engineer + compliance-officer), Q2 2027 OKR additions for conditions 4–5 (founder). §56.10 item 6 `[ ]` → `[x] Done — 2026-07-02`. §56.12 `§28.6 EU demand gen budget sequence` row `🟡 Pending — P1/M12` → `🟢 Done — 2026-07-02`. Document header v2.29.1 → v2.29.2. Privacy floor: §28.6.1 is marketing budget planning only — no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data; `compliance_checklist_ref` is a Linear ticket URL only. Owner: data-engineer + growth-lead + compliance-officer.*
 
 *v2.29.1 (2026-07-02): §56.10 + §56.12 cross-reference patch — GEO-01/GEO-02 obligations 1–3 closed. Three §56.10 checklist items and three §56.12 cross-reference rows updated 🟡 Pending → 🟢 Done: item 1 — `docs/MSA_TEMPLATE.md §4.7` Currency & FX Clause added (CHANGELOG v11.23.1, 2026-07-02); item 2 — `geo.contract_currency_set` HIGH/7yr registered in `docs/AUDIT_LOG_SCHEMA.md` v2.72 (CHANGELOG v11.23.1, 2026-07-02); item 3 — `docs/ENTERPRISE.md` billing currency note added to §Pricing (CHANGELOG v11.23.1, 2026-07-02). Remaining open: item 4 (Stripe USD config — platform-engineer, pre-first billing cycle), items 5–6 (P1/M12 GROWTH_LOOPS + §28.6 demand gen sequence), item 7 (OQ-GEO-03 counsel memo — P0/M8), item 8 (Stripe EU merchant onboarding — P1/M8). Document header v2.29.0 → v2.29.1. Owner: compliance-officer.*
 
