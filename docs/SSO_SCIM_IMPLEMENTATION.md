@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.16
+# FORM · SSO/SCIM Implementation v2.17
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -13790,7 +13790,7 @@ SOC 2 evidence artefact PKJWT-E-001 (CC6.6 — asymmetric key management for ent
 | `docs/DECISION_LOG.md DEC-097` entry (formal design adoption). | §42.11 item 2 | 🟢 **Done — DECISION_LOG.md DEC-097 (2026-07-02).** |
 | `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` — three DEC-030 events with Zod schemas + retention labels. | §42.11 item 4 | 🟢 **Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.73, §SSO-PKJ-Lifecycle).** |
 | `docs/OBSERVABILITY.md §12.6` — `pkjwt_key_expiry_sweep` cron job registration (P3 stale, `#alerts-enterprise`). | §42.11 item 5 | 🟢 **Done — 2026-07-02 (OBSERVABILITY.md v5.14.0, §12.6 job 58).** |
-| `docs/SOC2_READINESS.md §79.4` — PKJWT-E-001 evidence artefact registration (CC6.6, quarterly, 7yr). | §42.11 item 12 | 🟡 **Pending — M6.** |
+| `docs/SOC2_READINESS.md §79.4` — PKJWT-E-001 evidence artefact registration (CC6.6, quarterly, 7yr). | §42.11 item 12 | 🟢 **Done — 2026-07-02 (SOC2_READINESS.md v3.71.0, §145).** |
 
 ---
 
@@ -13799,3 +13799,7 @@ SOC 2 evidence artefact PKJWT-E-001 (CC6.6 — asymmetric key management for ent
 ---
 
 *v2.16 (2026-07-02): §42.11 Items 4 + 5 Closed — AUDIT_LOG_SCHEMA.md v2.73 + OBSERVABILITY.md v5.14.0 PKJWT Event & Cron Registration. Closes two P1/M5 implementation checklist items from §42 OIDC `private_key_jwt` design (v2.15, 2026-07-02). Item 4 [x] Done: `docs/AUDIT_LOG_SCHEMA.md` v2.73 — new section `§SSO-PKJ-Lifecycle` registers three DEC-030 HMAC-chained events (`sso.pkjwt_key_generated` HIGH/7yr, `sso.pkjwt_key_rotated` HIGH/7yr, `sso.pkjwt_key_expiry_warning` STANDARD/3yr) with full Zod v2 schemas (`SsoPkjwtKeyGeneratedPayload`, `SsoPkjwtKeyRotatedPayload`, `SsoPkjwtKeyExpiryWarningPayload`), retention labels, SOC 2 CC6.6 evidence table (PKJWT-E-001, quarterly, 7yr), and auditor narrative; privacy floor confirmed (only `tenant_id` UUID + `kid` UUID + timestamps — no user identity dimension, no private key material in event payload). Item 5 [x] Done: `docs/OBSERVABILITY.md` v5.14.0 — §12.6 job registry entry for `pkjwt_key_expiry_sweep` (job 58; daily 09:00 UTC; `0 9 * * *`; 26h freshness window; scans `tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt' AND pkjwt_key_expires_at < NOW() + INTERVAL '30 days'`; P3 Slack-only `#alerts-enterprise`; non-blocking; stale consequence: detection gap only; role `form_system`; SOC 2 CC6.6). §42.11 checklist rows 4 + 5 updated `[ ] Pending` → `[x] Done`. §42.12 cross-reference table rows 3 + 4 updated `🟡 Pending — M5` → `🟢 Done`. Document header v2.15 → v2.16. Owner: compliance-officer + devops-lead + platform-engineer.*
+
+---
+
+*v2.17 (2026-07-02): §42.12 Row 5 Closed — SOC2_READINESS.md v3.71.0 §145 PKJWT-E-001 Registration. Closes last pending cross-reference obligation from §42 OIDC `private_key_jwt` design: §42.12 row 5 (`docs/SOC2_READINESS.md §79.4` — PKJWT-E-001 evidence artefact registration CC6.6/quarterly/7yr — 🟡 Pending M6 → 🟢 Done 2026-07-02). `docs/SOC2_READINESS.md` v3.71.0 (2026-07-02) §145 registers PKJWT-E-001 (count 112 → 113): quarterly CSV export of `sso.pkjwt_key_generated` + `sso.pkjwt_key_rotated` DEC-030 events; two assertions (rotation-policy + payload-privacy); per-incident supplement path; nil-attestation path; R2 `compliance/evidence/sso/PKJWT-E-001_<YYYY-QN>.csv`; 7yr WORM; `r2:form-api` NO ACCESS; Vanta mirror within 48h. §42.12 cross-reference table row 5 updated `🟡 Pending — M6` → `🟢 Done — 2026-07-02 (SOC2_READINESS.md v3.71.0, §145)`. Document header v2.16 → v2.17. Privacy floor unchanged: all §42 content contains only FORM-internal UUIDs and timestamps — no employee `user_id`, health value, or GDPR Art. 9 data; private key material absent from all chain event payloads by Zod v2 schema constraint. Owner: compliance-officer.*

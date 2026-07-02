@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [11.39.0] — 2026-07-02
+
+### Added
+- `docs/SOC2_READINESS.md §145` — Cross-Reference Patch: PKJWT-E-001 Registration (CC6.6 · AUDIT_LOG_SCHEMA v2.73 · DEC-097). Closes `docs/SSO_SCIM_IMPLEMENTATION.md §42.12` row 5 (🟡 Pending M6 → 🟢 Done). New quarterly + per-incident SOC 2 evidence artefact registered (count 112 → 113): PKJWT-E-001 — quarterly CSV export of `sso.pkjwt_key_generated` + `sso.pkjwt_key_rotated` DEC-030 HMAC-chain events for all PKJWT-enabled tenants; rotation-policy assertion (annual rotation compliance); payload-privacy assertion (no private key material in chain — Zod v2 schema constraint); per-incident supplement path (`rotation_reason: 'incident'/'customer_request'`); nil-attestation path for zero-PKJWT-tenant quarters; R2 `compliance/evidence/sso/PKJWT-E-001_<YYYY-QN>.csv`; 7yr WORM; `r2:form-api` NO ACCESS; Vanta mirror within 48h; CC6.6 auditor narrative (three assurances: key existence, rotation compliance, structural payload privacy). §80.3 `sso/` subfolder listing updated; §80.4 Vanta mirror list extended. SOC2_READINESS.md v3.70.0 → v3.71.0.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §42.12` — row 5 updated: `🟡 Pending — M6` → `🟢 Done — 2026-07-02 (SOC2_READINESS.md v3.71.0, §145)`. SSO_SCIM_IMPLEMENTATION.md v2.16 → v2.17.
+- `VERSION` — 11.38.0 → 11.39.0.
+
 ## [11.38.0] — 2026-07-02
 
 ### Added
