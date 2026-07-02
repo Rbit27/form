@@ -1213,6 +1213,115 @@
         </div>
       </div>
 
+      <!-- Bulk Deprovision Guard (§34.6 SSO_SCIM_IMPLEMENTATION · DEC-093 tooltip §40.4) -->
+      <div class="stat-card mb-6">
+        <div class="flex items-start justify-between mb-6">
+          <div>
+            <div class="label">Bulk Deprovision Guard</div>
+            <div class="text-paper font-medium mt-1">Preventive threshold — blocks mass deprovisioning before it occurs</div>
+          </div>
+          <span id="bdgStatusBadge" class="badge badge-active">active · ≤ 83 users / 5 min</span>
+        </div>
+
+        <div class="text-mute text-sm mb-8 leading-relaxed" style="max-width:640px;">
+          The guard intercepts SCIM deprovisioning requests that exceed your configured threshold and returns HTTP 422 to the IdP — no users are deprovisioned. An override requires CSM countersign.
+        </div>
+
+        <!-- Threshold slider -->
+        <div class="mb-8">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="label">Deprovision threshold</div>
+            <!-- §40.4 DEC-093 tooltip -->
+            <div class="relative group">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6F6A60;cursor:default;border:1px solid #2A2820;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;">ⓘ</span>
+              <div class="absolute left-6 top-0 z-20 hidden group-hover:block"
+                   style="width:340px;background:#13110C;border:1px solid #2A2820;border-radius:12px;padding:14px 16px;font-size:12px;line-height:1.65;color:#A39D8E;">
+                <span style="color:#F3EEE0;font-weight:500;">Guard window (5 min)</span> blocks bulk deprovisioning <em>before</em> it occurs.
+                The separate <span style="color:#F3EEE0;font-weight:500;">mass-deprovision alert (10 min)</span> detects any large-scale change
+                that gets through — including approved bulk operations — and prompts an IC review.
+                Both layers are intentional: the shorter window prevents impact, the longer window ensures audit visibility.
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-6">
+            <input type="range" id="bdgSlider" min="5" max="100" value="20"
+                   oninput="updateBdg(this.value)"
+                   style="-webkit-appearance:none;appearance:none;width:100%;max-width:480px;height:2px;background:#1F1D16;border-radius:9999px;outline:none;cursor:pointer;">
+            <div class="num text-paper text-2xl font-light" id="bdgPct">20<span class="text-mute text-sm">%</span></div>
+          </div>
+          <div class="text-mute text-xs mt-3 font-mono" id="bdgLabel">
+            Block if more than <span id="bdgCount">83</span> users deprovisioned within 5 minutes
+          </div>
+        </div>
+
+        <style>
+          #bdgSlider::-webkit-slider-thumb {
+            -webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+            background:#DDFF2D;cursor:pointer;border:2px solid #0B0A07;box-shadow:0 0 0 1px #DDFF2D;
+          }
+          #bdgSlider::-moz-range-thumb {
+            width:18px;height:18px;border-radius:50%;
+            background:#DDFF2D;cursor:pointer;border:2px solid #0B0A07;
+          }
+        </style>
+
+        <!-- Override controls (tenant_owner only) -->
+        <div class="grid grid-cols-2 gap-6">
+          <div class="bg-deep border border-line rounded-xl p-5">
+            <div class="label mb-2">Override status</div>
+            <div class="text-paper text-sm font-medium">No override active</div>
+            <div class="text-mute text-xs mt-1">Guard enforced at current threshold</div>
+            <button class="btn-ghost mt-4" style="padding:8px 16px;font-size:10px;letter-spacing:0.14em;"
+                    onclick="document.getElementById('bdgOverrideModal').style.display='flex'">
+              Request bulk override
+            </button>
+          </div>
+          <div class="bg-deep border border-line rounded-xl p-5">
+            <div class="label mb-2">Last 30 days</div>
+            <div class="flex gap-4 mt-2">
+              <div>
+                <div class="num text-acid text-2xl font-light">0</div>
+                <div class="text-mute text-xs mt-1">guard triggers</div>
+              </div>
+              <div>
+                <div class="num text-paper text-2xl font-light">8</div>
+                <div class="text-mute text-xs mt-1">deprovisioned</div>
+              </div>
+              <div>
+                <div class="num text-paper text-2xl font-light">412</div>
+                <div class="text-mute text-xs mt-1">contracted seats</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Override request modal (hidden) -->
+        <div id="bdgOverrideModal" style="display:none;position:fixed;inset:0;background:rgba(11,10,7,0.85);z-index:200;align-items:center;justify-content:center;">
+          <div style="background:#13110C;border:1px solid #1F1D16;border-radius:20px;padding:40px;max-width:520px;width:100%;margin:0 1rem;">
+            <div class="label mb-2">Request bulk override</div>
+            <h3 class="font-serif text-2xl text-paper mb-4" style="font-weight:300;letter-spacing:-0.02em;">CSM countersign <em>required</em></h3>
+            <p class="text-mute text-sm mb-6 leading-relaxed">Overrides allow a one-time bulk deprovisioning above the guard threshold. Your CSM must countersign before the override becomes active. Override auto-revokes after the first bulk sync session.</p>
+            <div class="mb-4">
+              <div class="label mb-2">Reason</div>
+              <textarea style="width:100%;background:#0B0A07;border:1px solid #1F1D16;border-radius:8px;color:#F3EEE0;font-family:'Manrope',sans-serif;font-size:13px;padding:12px;outline:none;resize:vertical;min-height:80px;" placeholder="e.g. Planned 2026-Q3 restructure — 180 seats to be deprovisioned on Friday 04 July"></textarea>
+            </div>
+            <div class="mb-6">
+              <div class="label mb-2">Override duration</div>
+              <select style="background:#0B0A07;border:1px solid #1F1D16;border-radius:8px;color:#F3EEE0;font-family:'JetBrains Mono',monospace;font-size:12px;padding:10px 14px;outline:none;width:100%;">
+                <option>4 hours</option>
+                <option>8 hours</option>
+                <option>24 hours</option>
+                <option>48 hours</option>
+              </select>
+            </div>
+            <div class="flex gap-3">
+              <button class="btn-acid" style="flex:1;" onclick="document.getElementById('bdgOverrideModal').style.display='none'">Submit for CSM approval</button>
+              <button class="btn-out" onclick="document.getElementById('bdgOverrideModal').style.display='none'">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Directory Sync IP Restriction (§26.3.4 SSO_SCIM_IMPLEMENTATION) -->
       <div class="stat-card mb-6">
         <div class="flex items-start justify-between mb-4">
@@ -3492,6 +3601,23 @@
       if (s) s.classList.add('active');
     });
   });
+
+  function updateBdg(pct) {
+    const seats = 412;
+    const count = Math.ceil(seats * pct / 100);
+    document.getElementById('bdgPct').innerHTML = pct + '<span class="text-mute text-sm">%</span>';
+    if (parseInt(pct) === 100) {
+      document.getElementById('bdgCount').textContent = '';
+      document.getElementById('bdgLabel').textContent = 'Guard disabled — any bulk deprovision allowed';
+      document.getElementById('bdgStatusBadge').textContent = 'disabled';
+      document.getElementById('bdgStatusBadge').className = 'badge badge-err';
+    } else {
+      document.getElementById('bdgCount').textContent = count;
+      document.getElementById('bdgLabel').innerHTML = 'Block if more than <span id="bdgCount">' + count + '</span> users deprovisioned within 5 minutes';
+      document.getElementById('bdgStatusBadge').textContent = 'active · ≤ ' + count + ' users / 5 min';
+      document.getElementById('bdgStatusBadge').className = 'badge badge-active';
+    }
+  }
 
   function toggleScimIp(enabled) {
     document.getElementById('scimIpStatus').textContent = enabled

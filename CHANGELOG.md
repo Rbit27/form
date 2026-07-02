@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [11.8.1] — 2026-07-02
+
+### Changed
+- `admin-dashboard.html` — Bulk Deprovision Guard card added to the SSO · SCIM tab (§34.6 SSO_SCIM_IMPLEMENTATION). Threshold slider (5–100 %) with live seat-count label, guard status badge (ACTIVE / DISABLED), last-30-day stats panel, CSM override request modal. §40.4 DEC-093 tooltip on the threshold slider explains the 5-min guard window (preventive) vs. 10-min AL-SCIM-MASS-01 detection window (reactive). Closes P1/M13 checklist item — §40.7 item 3.
+- `VERSION` — 11.8.0 → 11.8.1.
+
+---
+
 ## [11.8.0] — 2026-07-02
 
 ### Added
