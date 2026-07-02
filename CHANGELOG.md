@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [11.13.1] — 2026-07-02
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.70 → v2.71: +2 `admin.*` key rotation incident events registered — `admin.key_rotation_incident_opened` (HIGH/7yr, CC6.8/CC7.2/CC7.3) and `admin.key_rotation_incident_closed` (HIGH/7yr, CC6.8/CC5.3/CC7.5). Closes `docs/INCIDENT_RESPONSE.md §R-54.7` item 1 (P0/M7 — register both DEC-030 event types before R-21 can be used in a live production incident). Events added to `### Admin (key management)` section after `admin.key_rotation_overdue`. KEY-IC-CHAIN-01 ordering invariant documented: `admin.key_rotation_incident_closed` MUST follow `admin.key_rotation_incident_opened` for same `incident_id`; HTTP 422 `KEY_IC_CHAIN_01_VIOLATION`; max window 48h (HMAC_AUDIT_CHAIN_KEY/KEYPOINTS_ENC_KEY) or 72h (other keys). Zod v2 schemas (`KeyRotationIncidentOpenedPayload` + `KeyRotationIncidentClosedPayload`) added inline; INCIDENT_RESPONSE §R-54.5 remains canonical source. HMAC chain requirement note: five-event chain diagram (IC-opened → encryption_key_rotation_initiated → encryption_key_rotated → encryption_key_rotation_verified → IC-closed) + auditor CC6.8 SQL query + stale-IC monitoring. Retention table: +2 rows (both HIGH/7yr). Privacy floor: `ic_user_id` is FORM-internal auth UUID only — no enterprise employee `user_id`, name, email, health value, or GDPR Art. 9 data.
+- `docs/INCIDENT_RESPONSE.md` — v3.19.0 → v3.19.2 (absorbing v3.19.1 header omission): §R-54.7 item 1 `[ ]` → `[x] Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)`; §R-54.9 first pending cross-reference row `🟡 Pending — AUDIT_LOG_SCHEMA.md registration` → `🟢 Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)`. Two obligations remain open: Worker deployment (§R-54.7 item 2, P0/M7) + IR-KEY evidence template `incident_id` field (§R-54.7 item 4, P1/M7).
+- `docs/SOC2_READINESS.md` — v3.68.0 → v3.69.1 (absorbing v3.69.0 header omission): §143.4 first pending obligation `🟡 Pending` → `🟢 Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)`.
+- `VERSION` — 11.13.0 → 11.13.1.
+
+---
+
 ## [11.13.0] — 2026-07-02
 
 ### Added
