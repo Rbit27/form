@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [11.21.0] — 2026-07-02
+
+### Added
+- `docs/COST_MODEL.md` — §56 OQ-GEO-01 & OQ-GEO-02 Resolution: UA Enterprise Billing Currency (USD) & EU Market Entry Order: Poland-First (DEC-096). Closes OQ-GEO-01 (P0 — UA enterprise contracts denominated and billed in USD; non-binding UAH reference addendum at signing spot rate; UAH conversion clause ±10% floor via counter-signed amendment; MSA §4.7 clause drafted; DEC-030 event `geo.contract_currency_set` HIGH/7yr specified) and OQ-GEO-02 (P1 — Poland-first EU entry M12; Germany/Netherlands M18–M20; GEO-GATE-PL-DE-01 gate conditions formalised). OQ-GEO-03 (EU legal entity question) remains open — lean path (UA entity + SCCs + EU Rep) documented in §56.8; outside counsel M8. §29.10 OQ-GEO-01 and OQ-GEO-02 patched inline → 🟢 Resolved DEC-096. TOC §56 entry added. DEC-096 registered in `docs/DECISION_LOG.md`. v2.28.0 → v2.29.0.
+
+### Changed
+- `VERSION` — 11.20.0 → 11.21.0
+
+---
+
 ## [11.19.0] — 2026-07-02
 
 ### Added

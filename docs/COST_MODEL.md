@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.28.0
+# FORM · Cost Model & Unit Economics v2.29.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -394,6 +394,19 @@
     - 54.1 Background and Resolution Direction
     - 54.2 Decision Analysis
     - 54.3 Programme Health Indicator (PHI) Design
+56. [§56 · OQ-GEO-01 & OQ-GEO-02 Resolution — UA Enterprise Billing Currency (USD) & EU Market Entry Order: Poland-First (DEC-096)](#56--oq-geo-01--oq-geo-02-resolution--ua-enterprise-billing-currency-usd--eu-market-entry-order-poland-first-dec-096)
+    - 56.1 Context
+    - 56.2 OQ-GEO-01 Analysis — UA Enterprise Billing Currency
+    - 56.3 OQ-GEO-01 Decision — USD-Denominated Billing (DEC-096)
+    - 56.4 MSA Currency Clause Language
+    - 56.5 DEC-030 Audit Event — `geo.contract_currency_set`
+    - 56.6 OQ-GEO-02 Analysis — EU Market Entry Order
+    - 56.7 OQ-GEO-02 Decision — Poland-First (DEC-096)
+    - 56.8 OQ-GEO-03 Interim Status
+    - 56.9 SOC 2 / Compliance Notes
+    - 56.10 Implementation Checklist
+    - 56.11 OQ Gap Tracker
+    - 56.12 Cross-Reference Obligations
     - 54.4 CSM Efficiency Economics
     - 54.5 API Specification
     - 54.6 Privacy Floor
@@ -5833,11 +5846,15 @@ If FORM bills a UA enterprise customer in UAH at ₴6,000/month (approximately $
 
 **Recommended resolution:** Bill UA enterprise contracts in USD with a UAH reference price in the contract addendum (for customer internal budgeting purposes only; the USD amount is the binding obligation). Include a clause allowing conversion to UAH billing upon customer request, subject to a UAH floor price that preserves the USD equivalent at the time of signing ±10%. Owner: founder. Priority: **P0 — before first UA enterprise pilot.** Resolution: confirm billing currency in enterprise contract template before first UA enterprise LOI is signed; document in `docs/ENTERPRISE.md`.
 
+**OQ-GEO-01 status updated:** `**P0** | founder | Before first UA enterprise LOI` → `🟢 **Resolved DEC-096** (v2.29.0, 2026-07-02) — USD billing; UAH reference addendum; ±10% floor conversion clause; MSA §4.7 clause drafted; see §56 for full analysis, DEC-030 event spec, and implementation checklist.`
+
 **OQ-GEO-02: What is the right EU entry order — Germany first (highest LTV, highest CAC) or Poland first (lower CAC, adjacent to founder network)?**
 
 Germany represents the highest LTV EU market ($134–$170 at M24) but also the highest CAC ($80–$150 effective, competitive fitness market) and the most demanding compliance expectations (German users and enterprises have high data protection awareness). Poland represents lower LTV ($90–$120 at M24) but significantly lower CAC ($25–$60, founder network adjacency, Eastern European fitness community) and a linguistic/cultural bridge from the UA founding team. The standard startup argument favours Germany (larger market, higher LTV) but the unit economics argument favours Poland (faster payback, lower capital requirement at EU entry, lower risk of compliance misstep before GDPR machine is running smoothly).
 
 **Recommended resolution:** Enter Poland first as EU validation market; enter Germany/Netherlands six months later when PL App Store distribution, retention, and GDPR compliance operations are proven. The PL cohort validates the EU GDPR workflow at lower cost and CAC before FORM invests in DE-specific creative, Meta DE campaigns, and higher-CAC acquisition. Owner: founder + growth-lead. Priority: **P1 — before EU App Store launch (M12).** Resolution: confirm EU entry order in `docs/GROWTH_LOOPS.md` and encode in §28.6 EU demand gen plan.
+
+**OQ-GEO-02 status updated:** `**P1** | founder + growth-lead | Before EU App Store launch (M12)` → `🟢 **Resolved DEC-096** (v2.29.0, 2026-07-02) — Poland-first M12; Germany/Netherlands M18–M20; GEO-GATE-PL-DE-01 conditions documented; see §56 for full analysis, gate conditions, and downstream obligations.`
 
 **OQ-GEO-03: Does FORM need a separate EU legal entity (e.g., Estonian e-Residency OÜ or Irish Ltd.) for GDPR data controller compliance, or can a Ukrainian legal entity with SCCs suffice?**
 
@@ -14816,3 +14833,264 @@ Applied in this authoring pass:
 *v2.27.1 (2026-07-01): §53.9 item 3, §53.10, §54.10 items 3–4, §54.11 — closed three stale cross-reference obligations. `enterprise.hiring_decision_logged` (§53.9 item 3) confirmed Done — registered in `docs/AUDIT_LOG_SCHEMA.md` v2.69, 2026-07-01 (CHANGELOG v10.85.1). `admin.programme_health_label_viewed` (§54.10 item 3) confirmed Done — registered in `docs/AUDIT_LOG_SCHEMA.md` v2.68, 2026-07-01 (CHANGELOG v10.85.1). `docs/OBSERVABILITY.md §33.3` PHI exception note (§54.10 item 4) confirmed Done — v5.12.4, 2026-07-01 (CHANGELOG v10.85.1). Checklist statuses patched `[ ]` → `[x] Done`. Cross-reference table rows §53.10 and §54.11 patched `🟡 Pending — M7` → `🟢 Done`. Document header v2.27.0 → v2.27.1. Owner: compliance-officer.*
 
 *v2.27.0 (2026-07-01): §54 OQ-CS-02 Resolution — Programme Health Indicator in Enterprise Admin Dashboard (DEC-092). Closes OQ-CS-02 (P1, §26.12 — whether FEHS should be visible to tenant admins; decision required before admin dashboard v2). Decision (DEC-092): Programme Health Indicator (PHI) adopted — 3-band label (Healthy / Needs Attention / At Risk) derived from FEHS bands (Green/Yellow → Healthy; Red → Needs Attention; Critical → At Risk); raw FEHS numeric score (0–100) remains internal-only consistent with OBSERVABILITY §33.3 CHS "internal only" policy. PHI card in Overview tab of admin dashboard exposes label + trend arrow (vs. prior month PHI label) + activation_rate_pct + wau_rate_pct (both already in admin dashboard — no new data exposure). `insufficient_data` state when `below_k_threshold = true` (fewer than 5 activated members — k-anonymity Tier 1 floor per §51). API: `GET /api/admin/tenants/:tenantId/programme-health` Worker endpoint; dual-query backend (monthly FEHS snapshot → CASE expression → PHI label; last 2 snapshots for trend); `ProgrammeHealthResponse` Zod schema excludes `fehs_score`; rate limit 60 req/min; `tenant_admin` RLS + `form_admin` cross-tenant read. DEC-030 event `admin.programme_health_label_viewed` LOW/1yr: fires on HTTP 200 card load; `phi_label`, `snapshot_date`, `trend`, `admin_user_id` (pseudonymous UUID per §29.12 pattern); deduplicated by `{tenant_id}-{admin_user_id}-{snapshot_date}`; PHI-VIEW-01 chain invariant (after `enterprise.health_score_updated`); C1.2/CC2.2 SOC 2 mapping. CSM efficiency economics (§54.4): ~29 min/account/month reduction in health-status escalations at $37.50/h CSM rate = $18.13/account/month saving [ESTIMATE — to be validated against OQ-08 time-tracking at M8]; $271.95/month per CSM at 15-account capacity; equivalent to 0.41 additional accounts per CSM. PHI NRR contribution: ~$16,200 ARR preserved per 20-account cohort if one Red account shifts to CSM-intervened recovery [ESTIMATE]. Options rejected: Option A (full FEHS — false-precision escalation risk; renewal-distance signal decays naturally) and Option C (no signal — 29 min/account/month CSM overhead). Implementation: P0/M6 Worker endpoint + Admin Dashboard card; P1/M7 DEC-030 registration + OBSERVABILITY §33.3 note; P1/M8 PHI-E-001 SOC 2 evidence; P2/M8 PHI impact measurement. Privacy floor: no raw FEHS score returned; no individual employee user_id, name, email, health data, body composition, coaching content, or GDPR Art. 9 data; k-floor enforced at query layer; `form_api` REVOKED from `tenant_engagement_snapshots` direct access; admin_user_id in audit event is FORM-internal auth UUID only. §26.12 OQ-CS-02 patched 🟡 → 🟢 Resolved DEC-092. TOC entry §54 added. DEC-092 registered in `docs/DECISION_LOG.md`. Cross-references: `docs/COST_MODEL.md §26.9` (FEHS 6-signal model + 4-band thresholds — PHI band mapping input); `docs/COST_MODEL.md §26.8` (CSM rate $37.50/h + 7h/account model — efficiency economics basis); `docs/COST_MODEL.md §26.12` (OQ-CS-02 — 🟢 Resolved DEC-092); `docs/COST_MODEL.md §40.3` (Red-band ~60% churn probability — PHI NRR contribution estimate); `docs/COST_MODEL.md §51` (QBR-K-ANON-01 — Tier 1 k ≥ 5 floor governs PHI insufficient_data state); `docs/OBSERVABILITY.md §33.3` (CHS "internal only" policy — rationale for withholding raw FEHS; §33.3 update 🟢 Done v5.12.4 2026-07-01); `docs/DATA_MODEL.md §17` (aggregate-only admin reporting schema — PHI consistent with existing exposure model); `docs/ENTERPRISE.md` (CSM coverage model + privacy floor — PHI inherits all existing constraints); `docs/AUDIT_LOG_SCHEMA.md` (`admin.programme_health_label_viewed` — 🟢 Done v2.68 2026-07-01); `docs/DECISION_LOG.md DEC-092` (formal decision record — P0 this pass); `docs/SOC2_READINESS.md` (PHI-E-001 C1.2/CC2.2 evidence — pending P1/M8). Owner: product-strategist + customer-success + compliance-officer.*
+
+## §56 · OQ-GEO-01 & OQ-GEO-02 Resolution — UA Enterprise Billing Currency (USD) & EU Market Entry Order: Poland-First (DEC-096)
+
+**Status:** 🟢 Resolved (2026-07-02) | **Closes:** OQ-GEO-01 (§29.10), OQ-GEO-02 (§29.10) | **Decision:** DEC-096
+
+### 56.1 Context
+
+§29 (Geographic Expansion Unit Economics & FX Risk Model, v1.9) established the financial foundations for FORM's UA → EU → US market sequencing. §29.10 documented three open questions. Two of them — OQ-GEO-01 and OQ-GEO-02 — have clear recommended resolutions already encoded in the text and are unblocked today. OQ-GEO-03 (EU legal entity vs. UA entity + SCCs) requires outside counsel review by M8 and remains open, with the lean path documented in §56.8.
+
+**OQ-GEO-01** (Priority: **P0** — must resolve before first UA enterprise LOI) asks whether UA enterprise contracts should be denominated in UAH or USD. The answer determines MSA contract language, Stripe billing configuration, and FX risk allocation between FORM and the customer.
+
+**OQ-GEO-02** (Priority: **P1** — must resolve before EU App Store launch, est. M12) asks whether the EU entry order should be Germany first (highest LTV, highest CAC) or Poland first (lower CAC, founder network adjacency). The answer drives demand gen budget allocation, localisation sequencing, and GDPR compliance workflow validation sequence.
+
+Both questions are decision-ready as of 2026-07-02 based on the unit economics analysis in §29 and the MSA framework in `docs/MSA_TEMPLATE.md`. No additional market data is required to commit.
+
+---
+
+### 56.2 OQ-GEO-01 Analysis — UA Enterprise Billing Currency (UAH vs. USD)
+
+#### 56.2.1 The FX Risk Allocation Problem
+
+FORM's enterprise contracts are annual ($50k–$500k range per `docs/ENTERPRISE.md`). The UA market entry price ($50–$150/seat/month) was calibrated in USD with a PPP discount (§29.4). If FORM bills a UA enterprise customer in UAH:
+
+| Scenario | USD/UAH | Contract value (UAH) | USD equivalent | Revenue impact |
+|---|---|---|---|---|
+| At signing | ₴40/$ | ₴6,000/month | $150/month | Baseline |
+| 20% UAH devaluation | ₴48/$ | ₴6,000/month | $125/month | **-17% revenue** |
+| 30% UAH devaluation | ₴52/$ | ₴6,000/month | $115/month | **-23% revenue** |
+| 40% UAH devaluation | ₴56/$ | ₴6,000/month | $107/month | **-29% revenue** |
+
+UAH devaluation scenarios are not theoretical: UAH lost ~30% of its USD value between 2022 and 2024. FORM's team costs are partially UAH-denominated (a natural hedge on operating expenses), but enterprise contract revenue is the primary driver of ARR — absorbing devaluation at the revenue line produces operating losses while headcount costs decline at a slower rate.
+
+#### 56.2.2 Customer Perspective on USD Billing
+
+A UA enterprise customer billing in USD faces:
+
+1. **FX budget risk:** A USD-denominated SaaS expense requires the customer's finance function to hold or procure USD monthly. For Ukrainian SMEs, USD procurement adds 0.5–1.5% transaction cost (interbank spread) and requires currency account management.
+2. **Internal budgeting complexity:** HR/IT budget holders typically operate in UAH. A $150/seat/month contract must be translated to UAH for budget approval — which creates variance each month as UAH moves.
+3. **Counterparty perception:** USD billing signals FORM is a global product operating under hard-currency discipline — a positioning asset for a UA-founded company closing enterprise deals with tech-forward organisations.
+
+**Mitigation for the customer:** The UAH reference price in the contract addendum addresses items 1 and 2 without transferring FX risk back to FORM. The addendum states the UAH equivalent at signing for internal budgeting purposes only — the binding obligation is the USD amount.
+
+#### 56.2.3 Options Analysis
+
+| Option | Description | FORM FX Exposure | Customer Burden | Assessment |
+|---|---|---|---|---|
+| **A — UAH billing** | Contract in UAH at spot-rate equivalent | FORM absorbs all UAH devaluation | Lowest friction for customer internal budgeting | Rejected: FORM carries structural FX loss risk on multi-year contracts |
+| **B — USD billing, no reference price** | Contract in USD, customer manages FX internally | Zero | Customer must translate for internal budgets; no FORM support | Rejected: unnecessary friction; available customers in UA tech sector are USD-comfortable but appreciate the reference |
+| **C — USD billing + UAH reference addendum** ✅ | Binding USD obligation; non-binding UAH reference in addendum at signing spot rate; UAH conversion clause ±10% floor | Minimal (conversion clause ±10% floor) | Low: UAH reference covers internal budgeting; conversion clause available if needed | **Adopted** |
+| **D — Dual-currency billing (UAH or USD at customer election per quarter)** | Customer chooses currency each quarter; FORM holds UAH risk in UAH-billed quarters | Partial, variable | Complex; billing system requires dual-currency logic before first deal | Rejected: operational complexity disproportionate to benefit at pre-PMF scale; revisit post-Series A if UA enterprise volume warrants |
+
+---
+
+### 56.3 OQ-GEO-01 Decision — USD-Denominated Billing with UAH Reference Addendum (DEC-096)
+
+**Decision (OQ-GEO-01, DEC-096):** All UA enterprise contracts are denominated and billed in **USD**. A non-binding UAH reference price — calculated at the UAH/USD spot rate on the contract signing date — is included in the Contract Addendum for customer internal budgeting purposes. The addendum includes a UAH conversion clause: upon written customer request, FORM may (at founder discretion) convert the billing currency to UAH, subject to a UAH floor price that preserves the USD contract value at signing ±10%. The conversion clause requires a formal contract amendment counter-signed by both parties; conversion cannot be effected unilaterally by FORM without customer consent. The `geo.contract_currency_set` DEC-030 audit event (§56.5) is emitted at contract execution.
+
+**Downstream actions required:**
+- `docs/MSA_TEMPLATE.md`: Add §4.7 Currency & FX Clause (see §56.4 below)
+- `docs/ENTERPRISE.md`: Note USD billing standard for all markets; UAH reference addendum for UA deals
+- Stripe configuration: All UA enterprise subscriptions created in USD currency code
+- `docs/AUDIT_LOG_SCHEMA.md`: Register `geo.contract_currency_set` (see §56.5)
+
+---
+
+### 56.4 MSA Currency Clause Language
+
+The following clause is to be added to `docs/MSA_TEMPLATE.md` as **§4.7 Currency and Foreign Exchange**:
+
+---
+
+> **§4.7 Currency and Foreign Exchange**
+>
+> **4.7.1 Billing Currency.** All fees and charges under this Agreement are denominated and invoiced in United States Dollars (USD) unless explicitly specified otherwise in an Order Form counter-signed by both parties.
+>
+> **4.7.2 UAH Reference Price (Ukraine Customers Only).** For Customers with a registered address in Ukraine, FORM may include a non-binding UAH reference price in the applicable Order Form or Contract Addendum. The UAH reference price is calculated at the USD/UAH interbank mid-rate on the Order Form Effective Date and is provided solely for the Customer's internal budgeting purposes. The binding payment obligation is the USD amount. FORM bears no obligation to honour the UAH reference price as a payment currency.
+>
+> **4.7.3 UAH Conversion Election.** A Customer may request in writing that future invoices be denominated in UAH. FORM may, at its sole discretion, agree to such conversion by executing a written contract amendment. Any UAH-denominated invoice will be issued at a UAH floor price no lower than the UAH equivalent of the original USD contract value at the Order Form Effective Date (the "Floor Rate"), adjusted for any agreed upon price escalation under §4.6. If the prevailing USD/UAH rate at invoice date implies a UAH amount below the Floor Rate, FORM will invoice at the Floor Rate. Neither party may unilaterally elect UAH billing; a counter-signed amendment is required.
+>
+> **4.7.4 Payment in USD.** Unless a UAH conversion amendment has been executed per §4.7.3, all payments must be made in USD via the payment method specified in the applicable Order Form. Customer bears all currency conversion costs associated with converting Customer's home currency to USD for payment purposes.
+
+---
+
+**Review required:** Outside counsel must review §4.7 before first UA enterprise LOI is signed. Drafting is FORM-internal; the clause follows standard SaaS contract currency practice and the UAH floor mechanic is analogous to price escalation clauses already present in MSA §4.6 (reviewed by legal). Estimated review time: 1 business day when bundled with full MSA review. See `docs/MSA_TEMPLATE.md §11.6.9` for outside counsel review gate.
+
+---
+
+### 56.5 DEC-030 Audit Event — `geo.contract_currency_set`
+
+A new HMAC-chained DEC-030 event must be registered in `docs/AUDIT_LOG_SCHEMA.md` to record the billing currency election at the time of contract execution.
+
+**Event:** `geo.contract_currency_set`
+**Severity:** HIGH
+**Retention:** 7 years (contract record — ASC 606 + GDPR DPA evidence)
+**Trigger:** Emitted once per contract execution when billing currency is confirmed
+
+**Payload schema (Zod v2):**
+
+```typescript
+const GeoContractCurrencySetSchema = z.object({
+  tenant_id: z.string().uuid(),
+  contract_id: z.string().uuid(),       // internal Order Form / MSA reference ID
+  billing_currency: z.enum(["USD", "EUR", "GBP"]),  // binding billing currency
+  reference_currency: z.string().nullable(),          // e.g. "UAH" for UA addendum; null otherwise
+  reference_rate_at_signing: z.number().positive().nullable(),  // spot rate at signing; null if no reference
+  floor_protection_pct: z.number().min(0).max(100).nullable(),  // e.g. 10.0 for ±10% floor; null if no conversion clause
+  contract_effective_date: z.string().datetime(),
+  signed_by: z.string().uuid(),   // FORM-internal auth UUID of founder/signatory; NOT customer name or email
+  // No individual employee user_id, name, email, health data, or GDPR Art. 9 data in this event
+});
+```
+
+**Privacy floor:** `signed_by` is the FORM-internal auth UUID of the executing signatory (founder or designated AE). No customer employee user_id, name, email, health value, coaching content, or GDPR Art. 9 special-category data may appear in this event.
+
+**Chain invariant:** `geo.contract_currency_set` must precede `enterprise.tenant_created` for the same `tenant_id`. The HMAC chain validates this ordering during the SOC 2 audit evidence review.
+
+**SOC 2 mapping:** CC1.3 (management communication of objectives), CC3.1 (risk identification — FX risk documented at contract level).
+
+---
+
+### 56.6 OQ-GEO-02 Analysis — EU Market Entry Order (Germany vs. Poland)
+
+#### 56.6.1 Market Comparison
+
+| Dimension | Germany / Netherlands (DE/NL) | Poland (PL) |
+|---|---|---|
+| Consumer ARPU (M24 LTV) | $134–$170 | $90–$120 |
+| Enterprise seat price | €199–€299/seat/month | €150–€250/seat/month |
+| Effective consumer CAC (Meta, performance) | $80–$150 | $25–$60 |
+| Founder network adjacency | Low | High (Eastern European fitness community) |
+| GDPR compliance marginal cost | Higher (German data protection scrutiny) | Equal (GDPR shared; PL adds no incremental GDPR overhead) |
+| Language localisation | DE localisation required (separate from EN) | PL localisation required; EN widely accepted in tech segment |
+| App Store competitive density (fitness) | Very high | Moderate |
+| UA diaspora community size | ~220k | ~1.5M+ |
+
+#### 56.6.2 Unit Economics of Entry Order
+
+**If FORM enters Germany first:**
+- CAC $80–$150, requiring ~9–17 months payback at $134 M24 LTV
+- Demands DE-specific creative, Meta DE campaigns, and German App Store metadata (separate keyword set, separate screenshots)
+- Any GDPR misstep in Germany risks reputational damage with Germany's data-protection-aware user base and potential DPA action from the Bundesdatenschutzbeauftragte
+- Compliance operations at launch for the first EU GDPR DPIA / DPO retainer are at full cost before PL volume validates the compliance infrastructure
+
+**If FORM enters Poland first:**
+- CAC $25–$60, payback ~3–6 months at $90 M24 LTV
+- PL App Store distribution at lower spend validates EU GDPR operations before FORM enters the tougher DE market
+- Founder network adjacency (Eastern European fitness community, UA diaspora proximity) accelerates early adopter acquisition at near-zero marginal CAC
+- PL distribution validates ASO metadata (EU App Store ranking signals transfer partially to DE ranking)
+- 6-month PL cohort data on D30, D90, and EU pricing acceptance before committing to DE CAC spend
+
+**Phase 2 incremental cost (§29.7):** The Phase 2 entry cost of $6.5k–$14.5k is largely fixed regardless of which country enters first (GDPR DPIA + DPO retainer + EU Stripe config are shared). Localisation incremental cost (PL or DE): $2k–$4k translation + $500–$1,000 App Store screenshots per market. Entering PL first defers DE localisation cost by 6 months, allowing DE entry to be funded by PL ARR.
+
+#### 56.6.3 EU App Store Distribution Mechanics
+
+App Store ranking signals within the EU are partially cross-border for related-language markets. PL → DE ranking transfer is limited (separate store, separate keyword analysis). However, early review volume, install velocity, and conversion rate signals on PL App Store generate the algorithmic momentum that editorial placements and App Store search rank require — these take time to build and are more efficiently built in PL where CAC is lower. A DE market entry at Month 18–20 (6 months after PL Month 12 launch) benefits from: (a) PL-validated onboarding flow, (b) EU GDPR compliance infrastructure already operational, (c) D30 and D90 cohort data from EU users available for growth loop calibration, (d) PL ARR available to partially fund DE acquisition spend.
+
+---
+
+### 56.7 OQ-GEO-02 Decision — Poland-First EU Entry (DEC-096)
+
+**Decision (OQ-GEO-02, DEC-096):** FORM's EU market entry order is **Poland first (M12), Germany/Netherlands second (M18–M20)**. The recommended entry gap is 6 months or until the PL D30 retention rate ≥ 35% and PL MRR ≥ $5k, whichever is later. This decision is encoded in the expansion gate conditions below.
+
+**Rationale:**
+1. Poland's CAC/LTV ratio ($25–$60 CAC vs. $90–$120 M24 LTV) produces a faster payback period than Germany ($80–$150 vs. $134–$170), enabling faster capital recycling at EU entry.
+2. Founder network adjacency and UA diaspora proximity (~1.5M UA citizens in Poland as of 2024) provides an early-adopter acquisition channel at near-zero marginal cost not available in Germany.
+3. GDPR compliance operations (DPIA, DPO retainer, EU Representative, SCCs) are shared infrastructure — PL entry establishes this infrastructure once; DE entry 6 months later is incremental.
+4. Germany's data-protection-aware market is more sensitive to GDPR compliance quality; entering PL first validates FORM's GDPR operations before exposure to BfDI/state DPA scrutiny.
+5. PL localisation content (Polish-language App Store metadata, onboarding) represents a lower capital outlay than DE localisation; PL ARR partially offsets DE localisation cost.
+
+**EU Entry Gate — PL-to-DE Transition (`GEO-GATE-PL-DE-01`):**
+
+| Gate Condition | Description | Owner | Verification |
+|---|---|---|---|
+| PL D30 ≥ 35% | Validated EU retention before DE investment | growth-lead | PostHog cohort, EU-only segment |
+| PL MRR ≥ $5k | Minimal viable PL revenue signal | data-engineer | ARR bridge §23.1 |
+| PL GDPR ops live ≥ 3 months | DPIA operational, DPO on retainer, EU Stripe active | compliance-officer | Vanta/Drata compliance dashboard |
+| DE localisation complete | German App Store metadata, onboarding copy | brand-voice | Store listing QA review |
+| DE enterprise legal review | MSA/DPA reviewed by outside counsel with DE jurisdiction knowledge | compliance-officer | Legal memo filed |
+
+**Downstream actions required:**
+- `docs/GROWTH_LOOPS.md`: Encode PL-first EU entry order; update EU referral localisation sequencing
+- `docs/COST_MODEL.md §28.6`: EU demand gen budget confirms PL at M12, DE/NL at M18–M20
+- `docs/ENTERPRISE.md`: Note PL-first EU enterprise pilot sequencing
+- `docs/AUDIT_LOG_SCHEMA.md`: `geo.market_activated` event (already specified in §29.8) fires at PL activation — `compliance_checklist_ref` must reference GEO-GATE-01 checklist and the GEO-GATE-PL-DE-01 conditions above
+
+---
+
+### 56.8 OQ-GEO-03 Interim Status — Lean Path Documented, Counsel Deferred to M8
+
+**OQ-GEO-03** (Does FORM need a separate EU legal entity for GDPR data controller compliance, or can a UA entity with SCCs suffice?) is **not resolved in this pass**. It is deferred to M8 (approximately 4 months before target EU entry M12) for outside EU privacy counsel review per the recommendation in §29.10.
+
+**Interim lean path (documented, not yet formally adopted):**
+
+GDPR does not require a data controller to be incorporated in the EU. A non-EU controller can process EU personal data using Standard Contractual Clauses (SCCs, EU Commission Decision 2021/914). FORM's UA entity would:
+1. Execute SCCs with all EU-region infrastructure sub-processors (Cloudflare EU data centre routing, Supabase EU region if selected)
+2. Appoint an EU Representative under GDPR Art. 27 (~$500–$1,000/year; available as a service from firms such as DataRep or Prighter)
+3. Register with the relevant EU supervisory authority as required under Art. 30 (records of processing activities)
+
+The lean path is viable at EU entry scale ($0–$50k ARR). The EU entity question should be revisited at Series A, when (a) legal infrastructure budget allows and (b) enterprise sales in the EU may require an EU contracting entity (some German enterprise procurement teams require an EU-registered counterparty for DPA counter-signing).
+
+**OQ-GEO-03 remains 🟡 Open. Owner: founder + EU privacy counsel. Target: M8 outside counsel memo.**
+
+---
+
+### 56.9 SOC 2 Compliance Notes
+
+| Control | Implication | Evidence Artefact |
+|---|---|---|
+| CC3.1 (Risk identification) | FX risk documented at contract level via `geo.contract_currency_set` DEC-030 event | Event log + HMAC chain audit |
+| CC1.3 (Management communication) | Billing currency policy documented in MSA §4.7 and this section | §56.4 clause + signed MSA |
+| CC6.1 (Logical access) | `geo.contract_currency_set` restricted to founder/AE role; `signed_by` is FORM internal UUID only | Event payload schema (§56.5) |
+| A1.2 (Availability — EU entry gate) | GEO-GATE-PL-DE-01 formalises readiness checks before EU infrastructure expansion; EU Stripe config included | §56.7 gate table |
+| P4.1 (Data use — purpose limitation) | `geo.contract_currency_set` contains no individual employee data; billing currency policy cannot create new personal data processing purposes | §56.5 privacy floor annotation |
+
+No new SOC 2 evidence artefact is required for the billing currency decision itself (it is contractual, not a technical control). The `geo.contract_currency_set` DEC-030 event will be counted as supporting evidence for CC3.1 at the next SOC 2 Type II audit cycle once `docs/AUDIT_LOG_SCHEMA.md` is updated.
+
+---
+
+### 56.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Add §4.7 Currency & FX Clause to `docs/MSA_TEMPLATE.md` (verbatim text from §56.4); flag for outside counsel review before first UA enterprise LOI signing | compliance-officer + legal | **P0** | Before first UA enterprise LOI | [ ] |
+| 2 | Register `geo.contract_currency_set` HIGH/7yr event in `docs/AUDIT_LOG_SCHEMA.md`; Zod v2 schema per §56.5; SOC 2 mapping CC3.1/CC1.3; HMAC chain invariant (precedes `enterprise.tenant_created`) | compliance-officer | **P0** | Before first UA enterprise contract execution | [ ] |
+| 3 | Update `docs/ENTERPRISE.md` pricing section: note USD billing standard for all markets; add note on UAH reference addendum for UA customers | enterprise-architect | **P0** | Before first UA enterprise pilot | [ ] |
+| 4 | Stripe configuration: ensure all UA enterprise subscriptions use `currency: "usd"` in Stripe Customer/Subscription creation; confirm Stripe supports USD billing for UA entities (bank wire fallback if Stripe UA bank link unavailable) | platform-engineer | **P0** | Before first UA Stripe enterprise billing cycle | [ ] |
+| 5 | Update `docs/GROWTH_LOOPS.md`: encode PL-first EU entry order; update EU referral and viral loop localisation sequencing (Polish-language referral assets before German) | growth-lead | **P1** | Before EU App Store launch (M12) | [ ] |
+| 6 | Update `docs/COST_MODEL.md §28.6`: confirm EU demand gen budget allocation sequence — PL at M12, DE/NL at M18–M20; confirm GEO-GATE-PL-DE-01 conditions are tracked in OKR system | data-engineer | **P1** | Before EU App Store launch (M12) | [ ] |
+| 7 | Engage EU privacy counsel by M8: outside counsel memo on UA entity + SCCs + EU Representative viability; file memo in `compliance/` directory; update OQ-GEO-03 with DEC-0XX when counsel delivers opinion | compliance-officer | **P0** | M8 | [ ] |
+| 8 | At M8: evaluate whether PL App Store localisation requires separate EU Stripe merchant account (vs. UA merchant account with EUR settlement); if required, engage Stripe EU entity onboarding | platform-engineer | **P1** | M8 | [ ] |
+
+---
+
+### 56.11 OQ Gap Tracker
+
+| OQ | Status | Decision | Section | Next action |
+|---|---|---|---|---|
+| OQ-GEO-01 | 🟢 **Resolved DEC-096** (v2.29.0, 2026-07-02) | USD billing; UAH reference addendum; ±10% floor conversion clause | §56.2–§56.5 | §56.10 items 1–4 (P0) |
+| OQ-GEO-02 | 🟢 **Resolved DEC-096** (v2.29.0, 2026-07-02) | Poland-first M12; Germany/Netherlands M18–M20; GEO-GATE-PL-DE-01 | §56.6–§56.7 | §56.10 items 5–6 (P1) |
+| OQ-GEO-03 | 🟡 **Open — Deferred to M8** | Lean path (UA entity + SCCs + EU Rep) documented; counsel review M8 | §56.8 | §56.10 item 7 (P0/M8) |
+
+---
+
+### 56.12 Cross-Reference Obligations Created by §56
+
+| Obligation | Source | Status |
+|---|---|---|
+| DEC-096 registered in `docs/DECISION_LOG.md` | §56.11 | 🟢 **Done — 2026-07-02** |
+| §29.10 OQ-GEO-01 patched P0 Open → 🟢 Resolved DEC-096 | §56.11 | 🟢 **Done — inline patch this pass** |
+| §29.10 OQ-GEO-02 patched P1 Open → 🟢 Resolved DEC-096 | §56.11 | 🟢 **Done — inline patch this pass** |
+| `docs/MSA_TEMPLATE.md §4.7` Currency clause added | §56.4, §56.10 item 1 | 🟡 Pending — P0/before first UA enterprise LOI |
+| `geo.contract_currency_set` HIGH/7yr registered in `docs/AUDIT_LOG_SCHEMA.md` | §56.5, §56.10 item 2 | 🟡 Pending — P0/before first UA enterprise contract |
+| `docs/ENTERPRISE.md` billing currency note added | §56.3, §56.10 item 3 | 🟡 Pending — P0/before first UA enterprise pilot |
+| Stripe UA enterprise billing currency = USD confirmed | §56.3, §56.10 item 4 | 🟡 Pending — P0/before first UA Stripe enterprise billing cycle |
+| `docs/GROWTH_LOOPS.md` PL-first EU entry order encoded | §56.7, §56.10 item 5 | 🟡 Pending — P1/M12 |
+| `docs/COST_MODEL.md §28.6` EU demand gen budget sequence confirmed PL-M12/DE-M18 | §56.7, §56.10 item 6 | 🟡 Pending — P1/M12 |
+| OQ-GEO-03 EU privacy counsel memo (M8) | §56.8, §56.10 item 7 | 🟡 Pending — P0/M8 |
+
+---
+
+*v2.29.0 (2026-07-02): §56 OQ-GEO-01 & OQ-GEO-02 Resolution — UA Enterprise Billing Currency (USD) & EU Market Entry Order: Poland-First (DEC-096). Closes OQ-GEO-01 (P0, §29.10 — whether UA enterprise pricing should be denominated in UAH or USD; decision required before first UA enterprise LOI) and OQ-GEO-02 (P1, §29.10 — whether EU entry order should be Germany-first or Poland-first; decision required before EU App Store launch M12). Decision OQ-GEO-01 (DEC-096): USD-denominated billing for all UA enterprise contracts; non-binding UAH reference price in Contract Addendum at signing spot rate for customer internal budgeting; UAH conversion clause ±10% floor available upon written customer request with counter-signed amendment. Rationale: (1) 20%–40% UAH devaluation scenarios are documented historical risk — billing in UAH transfers this FX risk to FORM's revenue without countervailing operational benefit (team payroll hedge is a partial and declining offset); (2) USD billing signals global product positioning; (3) UAH reference addendum removes the primary customer friction point (internal budgeting) without exposing FORM to devaluation risk. MSA §4.7 clause drafted (§56.4). DEC-030 event `geo.contract_currency_set` HIGH/7yr (§56.5): fires at contract execution; SOC 2 CC3.1/CC1.3 mapping; HMAC chain precedes `enterprise.tenant_created`. Decision OQ-GEO-02 (DEC-096): Poland-first EU market entry at M12; Germany/Netherlands at M18–M20 minimum; conditioned on GEO-GATE-PL-DE-01 (PL D30 ≥ 35%, PL MRR ≥ $5k, GDPR ops ≥ 3 months, DE localisation complete, DE enterprise legal review complete). Rationale: (1) PL CAC ($25–$60) vs. DE CAC ($80–$150) produces 3–5× better payback speed at EU entry; (2) UA diaspora ~1.5M in PL provides founder-network early-adopter channel not available in DE; (3) GDPR compliance infrastructure (DPIA, DPO, EU Rep, SCCs) is shared — PL entry establishes it once; DE entry is incremental 6 months later funded by PL ARR; (4) PL GDPR compliance operations validated before FORM faces BfDI/state DPA scrutiny in Germany. OQ-GEO-03 remains 🟡 Open: lean path (UA entity + SCCs + EU Representative) documented in §56.8; outside EU privacy counsel engaged by M8 per original §29.10 recommendation. §29.10 OQ-GEO-01 patched P0 Open → 🟢 Resolved DEC-096 (inline). §29.10 OQ-GEO-02 patched P1 Open → 🟢 Resolved DEC-096 (inline). TOC entry §56 added. DEC-096 registered in `docs/DECISION_LOG.md`. Eight pending cross-references (§56.12): MSA §4.7 clause (P0), AUDIT_LOG_SCHEMA.md `geo.contract_currency_set` (P0), ENTERPRISE.md billing note (P0), Stripe USD config (P0), GROWTH_LOOPS.md EU entry order (P1/M12), §28.6 demand gen sequence (P1/M12), OQ-GEO-03 counsel memo (P0/M8), Stripe EU merchant onboarding (P1/M8). Privacy floor: `geo.contract_currency_set` event contains no individual employee user_id, name, email, health value, coaching content, or GDPR Art. 9 special-category data; `signed_by` is FORM-internal auth UUID only. Document header v2.28.0 → v2.29.0. Owner: compliance-officer + enterprise-architect + founder.*
