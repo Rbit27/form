@@ -13,6 +13,17 @@
 
 ---
 
+## 2026-07-02
+
+### DEC-095 · OQ-ADO-03 Resolution: CV Session Count Exclusion from `enterprise_adoption_snapshots`
+
+- **Decision:** `cv_session_count` excluded from `enterprise_adoption_snapshots` and the §40.4.1 QBR permissible metrics list until a formal DPIA update is completed (Option B). Exclusion enforced by schema absence + CV-ADO-EXCL-01 Worker invariant (column-presence check in `fehs_compute` pg_cron job; aborts snapshot batch + emits `compliance.dpia_override_missing` HIGH event if column present without `dpia_override_log` approval) + QBR modal gate (Admin Console must not offer `cv_session_count` as a selectable signal until a superseding DEC is registered). Future inclusion requires: DPIA supplement + DPA Schedule A amendment (existing customer counter-sign) + employee consent update + SOC 2 CV-QBR-E-001 evidence (C1.2/P6.1) + new DEC-0XX. k ≥ 10 floor (§51 Tier 2) to be confirmed at DPIA update time; if CV-enabled tenant cohort majority has < 10 activated seats at M8 audit, DPIA update may be uneconomical and OQ-ADO-03 closes as permanently excluded. Full specification in `docs/COST_MODEL.md §55`.
+- **Owner:** compliance-officer + platform-engineer
+- **Why:** (1) CV pose estimation is GDPR Art. 9 biometric data at the individual level — body geometry inferred from video is biometric per EDPB Guidelines 3/2019 on video device processing. (2) Aggregate `cv_session_count` creates a new processing purpose (employer-facing QBR reporting) not covered by FORM's current DPIA, which scopes CV data to employee-benefit form feedback only. (3) Art. 22 profiling risk: small-cohort tenants near the k = 5 Tier 1 floor allow inference of individual CV usage from monthly delta changes even in aggregate. (4) §40.4.1 permissible QBR metrics are explicitly Art. 9-free — `cv_session_count` would be the first biometric-derived aggregate in employer-facing reporting, constituting a material DPIA scope expansion under Art. 35. (5) Option C (k ≥ 10 Tier 2 floor) rejected: higher floor reduces re-identification risk but does not resolve purpose-expansion obligation — DPIA update is required regardless of floor choice.
+- **Reverse cost:** Zero for the exclusion itself (schema absence, no active change). Superseding this decision to include `cv_session_count` requires DPIA supplement + legal review + DPA amendment with customer counter-sign: estimated 4–6 weeks.
+
+---
+
 ## 2026-07-01
 
 ### DEC-094 · OQ-SSO-24.3 & OQ-SSO-24.4 Resolution: PAM Role Naming Distinction & FIDO2 Hardware Key Procurement

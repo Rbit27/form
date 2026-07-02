@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.27.2
+# FORM · Cost Model & Unit Economics v2.28.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -390,6 +390,7 @@
     - 53.9 Implementation Checklist
     - 53.10 Cross-Reference Obligations
 54. [§54 · OQ-CS-02 Resolution — Programme Health Indicator in Enterprise Admin Dashboard (DEC-092)](#54--oq-cs-02-resolution--programme-health-indicator-in-enterprise-admin-dashboard-dec-092)
+55. [§55 · OQ-ADO-03 Resolution — CV Session Count Exclusion from `enterprise_adoption_snapshots` (DEC-095)](#55--oq-ado-03-resolution--cv-session-count-exclusion-from-enterprise_adoption_snapshots-dec-095)
     - 54.1 Background and Resolution Direction
     - 54.2 Decision Analysis
     - 54.3 Programme Health Indicator (PHI) Design
@@ -10693,7 +10694,7 @@ const qbrCompletedSchema = z.object({
 |---|---|---|---|---|
 | **OQ-ADO-01** | **What are FORM's actual adoption-to-renewal probability values?** §40.5.1 uses SaaS wellness sector proxies. These will be replaced with actuals after the first 5 enterprise renewals. Gate: run §40.5.1 analysis on renewal cohort; update table; emit `enterprise.win_loss_analysis_recalibrated` equivalent for adoption model; create DECISION_LOG entry. | **P2** | data-engineer + founder | After Deal 5 renewal (est. M18) |
 | **OQ-ADO-02** | **Should the k-anonymity floor (n ≥ 5) for `coaching_engaged_seats` be configurable per tenant?** Some enterprise contracts (financial sector) may require a higher floor (n ≥ 10) as a procurement condition. A per-tenant `min_k_anon_floor` column in `tenant_sso_configs` (or a new `tenant_privacy_config` table) would allow FORM to honour stricter requirements contractually without removing the floor globally. Privacy risk: lowering below 5 is prohibited (ENTERPRISE.md privacy floor). | **P2** | compliance-officer + enterprise-architect | Evaluate at first customer requesting stricter floor; before then, n ≥ 5 is non-negotiable. |
-| **OQ-ADO-03** | **Should `enterprise_adoption_snapshots` include a `cv_session_count` aggregate for tenants with CV pose estimation enabled?** CV usage rate could be a valuable additional engagement signal in the QBR. Risk: CV sessions are processed under GDPR Art. 9 (biometric data) classification at the individual level — even aggregate CV counts require a DPIA update if used for reporting to the employer. Resolution: compliance-officer reviews GDPR Art. 22 profiling risk before adding CV metrics to the snapshot. Until then, exclude CV metrics from the snapshot entirely. | **P1** | compliance-officer + platform-engineer | Before CV feature goes live for enterprise tenants (est. M8); DPIA update required if included. |
+| **OQ-ADO-03** | **Should `enterprise_adoption_snapshots` include a `cv_session_count` aggregate for tenants with CV pose estimation enabled?** CV usage rate could be a valuable additional engagement signal in the QBR. Risk: CV sessions are processed under GDPR Art. 9 (biometric data) classification at the individual level — even aggregate CV counts require a DPIA update if used for reporting to the employer. Resolution: compliance-officer reviews GDPR Art. 22 profiling risk before adding CV metrics to the snapshot. Until then, exclude CV metrics from the snapshot entirely. | 🟢 **Resolved DEC-095** (v2.28.0, 2026-07-02) — excluded until DPIA supplement + DPA Schedule A amendment + employee consent update complete; see §55 for full Art. 9/22 analysis, CV-ADO-EXCL-01 Worker invariant, and future inclusion path (§55.5). | compliance-officer + platform-engineer | 🟢 Resolved — see §55 |
 
 ---
 
@@ -14643,6 +14644,172 @@ Applied in this authoring pass:
 | PHI-E-001 evidence artefact filed and registered in `docs/SOC2_READINESS.md` | §54.10 item 5 (P1/M8) | 🟢 **Done — 2026-07-01 (SOC2_READINESS.md v3.67.0, §141)** |
 
 ---
+
+## §55 · OQ-ADO-03 Resolution — CV Session Count Exclusion from `enterprise_adoption_snapshots` (DEC-095)
+
+**Status:** 🟢 Resolved (2026-07-02) | **Closes:** OQ-ADO-03 (§40.11) | **Decision:** DEC-095
+
+### 55.1 Context
+
+`enterprise_adoption_snapshots` (§40.7) tracks six aggregate engagement signals for enterprise tenants: activated seats, WAU, habitual seats, coaching sessions, coaching-engaged seats, and workout sessions. OQ-ADO-03 (§40.11) asked whether a seventh signal — `cv_session_count` — should be added for tenants with CV pose estimation enabled, on the grounds that CV usage rate is a meaningful additional engagement signal for QBR reporting.
+
+CV pose estimation processes video frames of the user's body during workouts to deliver real-time exercise form feedback. At the individual level this data is biometric under GDPR Art. 9: body geometry inferred from video (joint angles, segment lengths, posture) constitutes biometric data per EDPB Guidelines 3/2019 on video device processing. Individual-level CV data is not transmitted to `enterprise_adoption_snapshots`; however, the question is whether an aggregate `cv_session_count` column — a count of CV sessions across the tenant — can be added without a DPIA update.
+
+### 55.2 Regulatory Analysis
+
+#### 55.2.1 GDPR Art. 9 Classification
+
+FORM's CV pipeline applies per-individual, per-session joint-angle extraction from video. EDPB Guidelines 3/2019 classify inferred body geometry as biometric data when processed for the purpose of characterising the physical state of a natural person. The individual-level processing is scoped to the on-device (or edge-server) CV inference step and is not exposed to the employer. However, any downstream aggregate derived from Art. 9 source processing inherits the obligation to document its new processing purpose in the DPIA.
+
+#### 55.2.2 GDPR Art. 22 Profiling Risk
+
+Aggregate CV session counts reported to the employer in a QBR context raise a profiling question under Art. 22: does a count of "how many CV-enabled sessions this tenant's employees completed" constitute profiling of natural persons even in aggregate?
+
+Compliance-officer analysis:
+
+1. **Direct profiling risk:** An aggregate `cv_session_count` across a tenant does not by itself constitute individual automated decision-making. However, at the small-cohort level (tenants near the k = 5 floor), a `cv_session_count` of 0 in a 6-member cohort effectively discloses that none of the visible members uses CV — and a count of 5 in that cohort narrows to near-identification of who does.
+
+2. **Inference risk:** Employer HR teams receiving QBR materials can infer individual engagement with biometric-data features. At the 6–10 member cohort size, monthly delta changes in `cv_session_count` (e.g., "increased by 3") could identify specific individuals when combined with knowledge of which employees recently onboarded the CV feature.
+
+3. **Purpose-expansion into Art. 22 scope:** Using CV session aggregate counts to evaluate tenant engagement quality in a CSM context involves the employer assessing employees via a signal derived from biometric processing — a consequential-assessment pattern that Art. 22 governs when the assessment can influence HR decisions (retention, performance review).
+
+**Finding:** Even as an aggregate, `cv_session_count` creates a processing chain that extends Art. 9 biometric source data into employer-facing reporting — a new purpose not covered by FORM's existing employee-consent model or the current DPA Schedule A permissible QBR metrics list (§40.4.1). Adding it requires a DPIA update and DPA amendment.
+
+#### 55.2.3 Existing DPIA Scope
+
+FORM's current DPIA covers:
+- On-device CV inference for real-time form feedback (Art. 9, employee consent)
+- Individual session storage for coaching continuity (no employer disclosure)
+- Aggregate engagement metrics for employer QBR (§40.4.1 permissible list — explicitly Art. 9-free)
+
+The §40.4.1 permissible QBR metrics — activated seats, WAU rate, coaching engagement rate, workout log rate, streak cohort size ≥ 5, Victor session volume — are all engagement-tier aggregates with no Art. 9 source data. Adding `cv_session_count` would be the first biometric-derived aggregate in the QBR permissible set: a material scope expansion requiring DPIA documentation under GDPR Art. 35.
+
+### 55.3 Decision
+
+**OQ-ADO-03 is resolved: `cv_session_count` is excluded from `enterprise_adoption_snapshots` and the QBR permissible metrics list (§40.4.1) until a formal DPIA update is completed, approved by the compliance-officer, and a new DECISION_LOG entry records the updated scope.**
+
+Exclusion is enforced by three layers:
+1. **Schema absence (CV-ADO-EXCL-01):** The `enterprise_adoption_snapshots` DDL (§40.7) does not include a `cv_session_count` column. Any migration adding this column must reference the superseding DEC-0XX in its comment.
+2. **Worker invariant (CV-ADO-EXCL-01):** The `fehs_compute` pg_cron job and the `enterprise.adoption_snapshot_filed` event Worker (§40.8) must not include `cv_session_count` in any computed aggregate, query, or event payload. A column-presence check aborts the snapshot batch if the column is found without a `dpia_override_log` approval entry.
+3. **QBR modal gate:** The Admin Console "Complete QBR" modal (§40.10 item 4) must not offer `cv_session_count` as a selectable reporting signal until the DPIA update DEC is registered and a `tenant_cv_qbr_enabled` feature flag is activated by compliance-officer.
+
+### 55.4 Rationale and Rejected Alternatives
+
+| Option | Description | Outcome |
+|---|---|---|
+| **A — Permanent exclusion** | `cv_session_count` never added; QBR metrics permanently Art. 9-free | Rejected: forecloses a legitimate adoption signal if a future DPIA update is warranted |
+| **B — Exclude until DPIA update** ✅ | `cv_session_count` excluded until DPIA supplement + DPA amendment + new DEC approved | **Adopted** |
+| **C — Include with k ≥ 10 floor** | Add column with Tier 2 k-anonymity floor (§51) to reduce inference risk | Rejected: higher floor reduces re-identification risk but does not address purpose-expansion — DPIA update required regardless of floor; premature before CV feature has enterprise tenant load data |
+| **D — Include as opt-in per tenant** | Per-tenant `cv_qbr_enabled` flag requiring employee consent refresh | Rejected: requires DPIA update and DPA amendment regardless; opt-in flag design should be scoped in the DPIA update, not as a pre-emptive schema change |
+
+**Why Option C was specifically rejected:** The k ≥ 10 Tier 2 floor (§51) reduces re-identification risk but does not resolve the purpose-expansion problem. The current DPIA scopes biometric data to employee benefit (form feedback); employer-side engagement reporting derived from that same biometric source is a new purpose requiring DPIA documentation under Art. 35 regardless of aggregate floor. This is the compliance-officer's determination binding until DEC supersedes it.
+
+### 55.5 Future Inclusion Path (DPIA Update Requirements)
+
+If FORM decides to include `cv_session_count` in `enterprise_adoption_snapshots` in the future, all of the following must be completed before any schema migration:
+
+| # | Requirement | Owner | Gate |
+|---|---|---|---|
+| 1 | DPIA supplement: document `cv_session_count` as a new processing purpose; Art. 9 basis for aggregate derivation; Art. 22 profiling risk assessment with Tier 2 k ≥ 10 mitigation; residual risk acceptance | compliance-officer | Before migration |
+| 2 | DPA Schedule A amendment: add `cv_session_count` to permissible QBR metrics list with k ≥ 10 floor notation; existing customer counter-sign required | customer-success + legal | Before first CV QBR |
+| 3 | Employee consent update: FORM's employee-facing consent UI discloses that CV session aggregate counts (k ≥ 10 anonymised) may appear in employer QBR reports | platform-engineer | Before new onboarding post-DPIA |
+| 4 | SOC 2 evidence artefact CV-QBR-E-001 (C1.2/P6.1): DPIA supplement + DPA amendment signature page + consent UI screenshot; file in `compliance/evidence/cv-qbr/`; register in `docs/SOC2_READINESS.md §79.4` | compliance-officer | Within 48h of first CV QBR |
+| 5 | New DECISION_LOG entry (DEC-0XX): records DPIA approval, k-floor choice, DPA amendment date and signatories; supersedes DEC-095 | compliance-officer | Before migration |
+| 6 | Migration adds `cv_session_count INTEGER DEFAULT NULL CHECK (cv_session_count >= 0)` with comment `-- CV-ADO-EXCL-01 lifted by DEC-0XX`; CV-ADO-EXCL-01 Worker guard deactivated via `dpia_override_log` approval entry | platform-engineer | After items 1–5 complete |
+
+**Estimated effort:** ~4–6 weeks (DPIA supplement + legal review + customer DPA amendment cycle). Minimum viable timeline: before CV feature enterprise GA (est. M8).
+
+**k-floor decision at DPIA update time:** Under §51 Tier 2 classification (health-adjacent, k ≥ 10), `cv_session_count` requires k ≥ 10 at the query layer. The compliance-officer will confirm or adjust at DPIA update time based on actual CV-enabled enterprise tenant cohort sizes. If the majority of CV-enabled enterprise tenants have fewer than 10 activated seats, the column becomes practically unusable (insufficient_data for most tenants) — in which case the DPIA update may not be economically justified, and OQ-ADO-03 closes as permanently excluded.
+
+### 55.6 CV-ADO-EXCL-01 Worker Invariant
+
+**Name:** `CV-ADO-EXCL-01`
+**Scope:** `fehs_compute` pg_cron job + `enterprise.adoption_snapshot_filed` Worker
+**Rule:** The `enterprise_adoption_snapshots` table must not contain a `cv_session_count` column unless a row exists in `dpia_override_log` with `{override_key: 'CV-ADO-EXCL-01', status: 'approved'}`. If the column exists without this override, the Worker emits a `compliance.dpia_override_missing` HIGH event and aborts the snapshot batch.
+
+**TypeScript guard (to be added to `fehs_compute` Worker at M8 pre-CV-GA audit):**
+
+```typescript
+const CV_ADO_EXCL_COLUMN = 'cv_session_count';
+
+// CV-ADO-EXCL-01: Abort snapshot batch if cv_session_count column exists
+// without a registered DPIA override. See docs/COST_MODEL.md §55.6 and §55.5.
+const columnCheck = await db.query(
+  `SELECT column_name FROM information_schema.columns
+   WHERE table_name = 'enterprise_adoption_snapshots'
+   AND column_name = $1`,
+  [CV_ADO_EXCL_COLUMN]
+);
+
+if (columnCheck.rows.length > 0) {
+  const overrideCheck = await db.query(
+    `SELECT id FROM dpia_override_log
+     WHERE override_key = 'CV-ADO-EXCL-01' AND status = 'approved'`
+  );
+  if (overrideCheck.rows.length === 0) {
+    await emitDec030Event('compliance.dpia_override_missing', {
+      invariant: 'CV-ADO-EXCL-01',
+      table: 'enterprise_adoption_snapshots',
+      column: CV_ADO_EXCL_COLUMN,
+    });
+    throw new Error(
+      'CV-ADO-EXCL-01: cv_session_count column present without DPIA override — aborting snapshot batch'
+    );
+  }
+}
+```
+
+**`compliance.dpia_override_missing` event spec (to register in `docs/AUDIT_LOG_SCHEMA.md`):**
+
+| Field | Value |
+|---|---|
+| Event name | `compliance.dpia_override_missing` |
+| Severity | HIGH |
+| Retention | 3yr (DEC-030) |
+| Payload fields | `invariant` (string — e.g. `'CV-ADO-EXCL-01'`), `table` (string), `column` (string) |
+| Chain invariant | None — this event is itself the alert; PagerDuty escalation via standard HIGH severity routing |
+| SOC 2 mapping | CC7.3 (detection of anomalous data processing), CC2.2 (communication of compliance control failure) |
+
+### 55.7 DEC-095 Decision Record
+
+| Field | Value |
+|---|---|
+| **Decision ID** | DEC-095 |
+| **Date** | 2026-07-02 |
+| **Question** | OQ-ADO-03: Should `enterprise_adoption_snapshots` include a `cv_session_count` aggregate for tenants with CV pose estimation enabled? |
+| **Decision** | **Excluded until DPIA update (Option B).** `cv_session_count` is not added to `enterprise_adoption_snapshots` or the §40.4.1 QBR permissible metrics list. Enforced by schema absence + CV-ADO-EXCL-01 Worker invariant + QBR modal gate. Future inclusion requires: DPIA supplement + DPA Schedule A amendment (existing customer counter-sign) + employee consent update + SOC 2 CV-QBR-E-001 (C1.2/P6.1) + new DEC-0XX. k ≥ 10 floor (§51 Tier 2) to be confirmed at DPIA update time. |
+| **Owner** | compliance-officer + platform-engineer |
+| **Why** | (1) CV pose estimation is GDPR Art. 9 biometric data at the individual level — body geometry from video is biometric per EDPB Guidelines 3/2019. (2) Aggregate `cv_session_count` creates a new processing purpose (employer-facing QBR reporting) not in FORM's current DPIA scope (employee-benefit form feedback only). (3) Art. 22 profiling risk: small-cohort tenants near k = 5 floor allow inference of individual CV usage from monthly delta changes. (4) §40.4.1 permissible QBR metrics are explicitly Art. 9-free — `cv_session_count` would be the first biometric-derived aggregate in employer-facing reporting, constituting material DPIA scope expansion. (5) Option C (k ≥ 10 floor) rejected: higher floor reduces re-identification risk but does not address purpose-expansion obligation — DPIA update required regardless of floor. |
+| **Reverse cost** | Zero for the exclusion itself (schema absence, not an active change). Superseding this decision (i.e., including `cv_session_count`) requires DPIA supplement + legal review + DPA amendment counter-sign from existing customers: estimated 4–6 weeks. |
+
+### 55.8 §40.11 In-Line Patch
+
+Applied in this authoring pass:
+
+**OQ-ADO-03 status updated:** `**P1** | compliance-officer + platform-engineer | Before CV feature goes live for enterprise tenants (est. M8); DPIA update required if included.` → `🟢 **Resolved DEC-095** (v2.28.0, 2026-07-02) — excluded until DPIA supplement + DPA Schedule A amendment + employee consent update complete; see §55 for full Art. 9/22 analysis, CV-ADO-EXCL-01 Worker invariant, and future inclusion path (§55.5).`
+
+### 55.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | CV-ADO-EXCL-01 Worker guard — add `cv_session_count` column-presence check to `fehs_compute` pg_cron Worker; emit `compliance.dpia_override_missing` HIGH event if column present without `dpia_override_log` approval; abort snapshot batch; TypeScript guard per §55.6 | platform-engineer | **P1** | M8 (pre-CV enterprise GA audit) | [ ] |
+| 2 | Register `compliance.dpia_override_missing` HIGH/3yr event in `docs/AUDIT_LOG_SCHEMA.md`; Zod v2 schema: `invariant` (string), `table` (string), `column` (string); SOC 2 mapping CC7.3/CC2.2; PagerDuty routing via standard HIGH severity | compliance-officer | **P1** | M8 | [ ] |
+| 3 | At M8 pre-CV enterprise GA audit: evaluate §55.5 DPIA update path viability based on CV-enabled tenant cohort sizes; if majority of CV-enabled tenants have < 10 activated seats, document as permanently excluded in DECISION_LOG update; otherwise initiate DPIA supplement per §55.5 items 1–6 | compliance-officer + customer-success | **P2** | M8 | [ ] |
+| 4 | If DPIA update approved: complete §55.5 items 1–6 (DPIA supplement, DPA Schedule A amendment with customer counter-sign, employee consent UI update, CV-QBR-E-001 SOC 2 evidence, new DEC-0XX, migration adding `cv_session_count`); deactivate CV-ADO-EXCL-01 guard via `dpia_override_log` entry | compliance-officer + platform-engineer | **P2** | Post-M8 (if DPIA approved) | [ ] |
+
+### 55.10 Cross-Reference Obligations Created by §55
+
+| Obligation | Source | Status |
+|---|---|---|
+| DEC-095 registered in `docs/DECISION_LOG.md` | §55.7 | 🟢 **Done — 2026-07-02** |
+| §40.11 OQ-ADO-03 patched P1 Open → 🟢 Resolved DEC-095 | §55.8 | 🟢 **Done — inline patch this pass** |
+| CV-ADO-EXCL-01 Worker guard implemented in `fehs_compute` | §55.6, §55.9 item 1 | 🟡 Pending — M8 (pre-CV enterprise GA) |
+| `compliance.dpia_override_missing` HIGH/3yr event registered in `docs/AUDIT_LOG_SCHEMA.md` | §55.6, §55.9 item 2 | 🟡 Pending — M8 |
+| M8 pre-CV GA audit: DPIA update path viability evaluation | §55.9 item 3 | 🟡 Pending — M8 |
+
+---
+
+*v2.28.0 (2026-07-02): §55 OQ-ADO-03 Resolution — CV Session Count Exclusion from `enterprise_adoption_snapshots` (DEC-095). — CV Session Count Exclusion from `enterprise_adoption_snapshots` (DEC-095). Closes OQ-ADO-03 (P1, §40.11 — whether `cv_session_count` should be added to `enterprise_adoption_snapshots` for CV-enabled tenants; resolution required before CV feature enterprise GA est. M8). Decision (DEC-095): `cv_session_count` excluded until formal DPIA update completed (Option B). Rationale: (1) CV pose estimation is GDPR Art. 9 biometric data at individual level — body geometry inferred from video is biometric per EDPB Guidelines 3/2019; (2) aggregate `cv_session_count` creates a new processing purpose (employer-facing QBR reporting) not covered by current DPIA scope (employee-benefit form feedback only); (3) GDPR Art. 22 profiling risk: small-cohort tenants near k = 5 floor allow inference of individual CV usage from monthly delta changes; (4) §40.4.1 permissible QBR metrics list is explicitly Art. 9-free — `cv_session_count` would be the first biometric-derived aggregate in employer-facing reporting, constituting material DPIA scope expansion; (5) Option C (k ≥ 10 Tier 2 floor) rejected: higher floor reduces re-identification risk but does not address purpose-expansion obligation — DPIA update is required regardless of floor. Future inclusion path (§55.5): DPIA supplement + DPA Schedule A amendment (customer counter-sign required for existing contracts) + employee consent update + SOC 2 CV-QBR-E-001 evidence (C1.2/P6.1) + new DEC-0XX. k ≥ 10 floor to confirm at DPIA time per §51 Tier 2; if CV-enabled tenant majority has < 10 activated seats at M8, DPIA update may be uneconomical. CV-ADO-EXCL-01 Worker invariant: `fehs_compute` pg_cron job checks for `cv_session_count` column presence; if found without `dpia_override_log` approval entry, emits `compliance.dpia_override_missing` HIGH event and aborts snapshot batch. Enforcement: schema absence (no migration) + CV-ADO-EXCL-01 Worker guard + QBR modal gate (no `cv_session_count` as selectable signal until DEC override registered). §40.11 OQ-ADO-03 patched P1 Open → 🟢 Resolved DEC-095 (inline patch this pass). TOC entry §55 added. DEC-095 registered in `docs/DECISION_LOG.md`. Two pending cross-references: CV-ADO-EXCL-01 Worker guard (P1/M8) + `compliance.dpia_override_missing` event registration in `docs/AUDIT_LOG_SCHEMA.md` (P1/M8). Privacy floor: exclusion decision prevents biometric-derived aggregates from entering employer-facing QBR reports; any future inclusion requires DPIA supplement + employee consent update per §55.5. Document header v2.27.2 → v2.28.0. Owner: compliance-officer + platform-engineer.*
 
 *v2.27.2 (2026-07-01): §54.10 item 5 + §54.11 cross-reference patch — PHI-E-001 Registration (C1.2 / CC2.2 · SOC2_READINESS §141). Closes `docs/COST_MODEL.md §54.10` item 5 (P1/M8) and `docs/COST_MODEL.md §54.11` last pending cross-reference row. SOC 2 evidence artefact PHI-E-001 registered in `docs/SOC2_READINESS.md §141` (v3.67.0, 2026-07-01) — count 109 → 110; C1.2/CC2.2; annual + per-schema-change supplement + pre-GA nil attestation; 3yr; R2 path `compliance/evidence/phi/phi-e-001_{YYYY}.json`; WORM 3yr; `r2:form-api` NO ACCESS. §54.10 item 5: `[ ]` → `[x] Done — 2026-07-01 (SOC2_READINESS.md v3.67.0, §141)`. §54.11 last pending row: `🟡 Pending — M8` → `🟢 Done — 2026-07-01 (SOC2_READINESS.md v3.67.0, §141)`. Document header v2.27.1 → v2.27.2. Owner: compliance-officer.*
 

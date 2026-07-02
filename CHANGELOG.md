@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.1.1] — 2026-07-02
+
+### Added
+- `docs/COST_MODEL.md §55` — OQ-ADO-03 Resolution: CV Session Count Exclusion from `enterprise_adoption_snapshots` (DEC-095). GDPR Art. 9/22 analysis confirming that aggregate `cv_session_count` cannot be added to the enterprise adoption snapshot or QBR permissible metrics list (§40.4.1) without a DPIA update. CV-ADO-EXCL-01 Worker invariant spec (column-presence guard in `fehs_compute` pg_cron job; aborts snapshot batch + emits `compliance.dpia_override_missing` HIGH event if column found without `dpia_override_log` approval). Future inclusion path: DPIA supplement + DPA Schedule A amendment + employee consent update + CV-QBR-E-001 SOC 2 evidence + new DEC-0XX. Implementation checklist: CV-ADO-EXCL-01 guard (P1/M8), `compliance.dpia_override_missing` event registration (P1/M8), M8 DPIA viability audit (P2/M8). Document header v2.27.2 → v2.28.0. Two pending cross-references (M8).
+
+### Changed
+- `docs/COST_MODEL.md §40.11` — OQ-ADO-03 status patched: P1 Open → 🟢 Resolved DEC-095 (v2.28.0, 2026-07-02).
+- `docs/DECISION_LOG.md` — DEC-095 registered (2026-07-02): CV session count excluded from `enterprise_adoption_snapshots` until DPIA supplement + DPA Schedule A amendment + employee consent update complete.
+- `VERSION` — 11.1.0 → 11.1.1.
+
+---
+
 ## [11.1.0] — 2026-07-02
 
 ### Added
