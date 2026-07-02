@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.69.1
+# FORM · SOC 2 Type II Readiness v3.69.2
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -34368,9 +34368,11 @@ The three §58.10 DEC-030 rotation events (`admin.hmac_key_rotation_initiated`, 
 |---|---|---|
 | `docs/AUDIT_LOG_SCHEMA.md` — register `admin.key_rotation_incident_opened` + `admin.key_rotation_incident_closed` (HIGH/7yr); Zod v2 schemas; KEY-IC-CHAIN-01 invariant with HTTP 422 `KEY_IC_CHAIN_01_VIOLATION` | §R-54.7 item 1 (P0/M7) | 🟢 **Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)** |
 | `emit-audit-event` Worker — deploy both events; KEY-IC-CHAIN-01 enforcement; integration tests A + B | §R-54.7 item 2 (P0/M7) | 🟡 **Pending** |
-| IR-KEY-E-001..E-006 evidence templates — `incident_id` JSON field + auditor cross-reference query | §R-54.7 item 4 (P1/M7) | 🟡 **Pending** |
+| IR-KEY-E-001..E-006 evidence templates — `incident_id` JSON field + auditor cross-reference query | §R-54.7 item 4 (P1/M7) | 🟢 **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.20.0, R-21.9)** |
 
 ---
+
+*v3.69.2 (2026-07-02): §143.4 second obligation closed — IR-KEY-E-001..E-006 evidence templates `incident_id` field + auditor cross-reference SQL added to `docs/INCIDENT_RESPONSE.md` R-21.9 Evidence Package (v3.20.0, 2026-07-02). §143.4 second pending row: `🟡 Pending` → `🟢 Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.20.0, R-21.9)`. One obligation remains open: `emit-audit-event` Worker deployment + KEY-IC-CHAIN-01 integration tests (§R-54.7 item 2, P0/M7). Document header v3.69.1 → v3.69.2. Owner: compliance-officer.*
 
 *v3.69.1 (2026-07-02): §143.4 first obligation closed — `admin.key_rotation_incident_opened` + `admin.key_rotation_incident_closed` registered in `docs/AUDIT_LOG_SCHEMA.md v2.71` (2026-07-02). §143.4 first pending row: `🟡 Pending` → `🟢 Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)`. Two obligations remain open in §143.4: `emit-audit-event` Worker deployment + KEY-IC-CHAIN-01 integration tests (§R-54.7 item 2, P0/M7); IR-KEY-E-001..E-006 evidence template `incident_id` field (§R-54.7 item 4, P1/M7). Document header v3.68.0 → v3.69.1 (absorbing v3.69.0 header update which was recorded in version note but not applied to file header). Owner: compliance-officer.*
 

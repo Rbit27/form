@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [11.14.0] — 2026-07-02
+
+### Added
+- `content/post-23-return-after-break-why-picking-up-fails.md` — Editorial series post 23. «Повернення після перерви: чому "підхопити з місця де зупинився" майже ніколи не спрацьовує». Детренінг по компонентах: нейром'язова ефективність (перша деградує, 1–2 тижні), толерантність до об'єму (падає швидше за максимальну силу), м'язова сила (Grgic et al. 2018 — мінімальна втрата до 4 тижнів), сполучна тканина (відстає від м'язової готовності). Пастка м'язової пам'яті: не означає повернення, означає швидше повернення. Три помилки при «підхопити з місця»: та сама вага/об'єм, ігнорування DOMS, відсутність вхідного діагнозу. Фаза повернення як окремий фазіс: таблиця тривалості за перервою від 1–2 тижнів до 3+ місяців. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `content/post-2923-mental-resilience-just-do-it.md` — Серія «Тренувальна стійкість» 2916–2925, пост 8/10. «Ментальна стійкість у тренуванні: коли "просто зроби" — відповідь, а коли — ні». Класифікація: інерція (зникає після розминки) vs. сигнал (не зникає, може погіршитись). Коли «просто зроби» правильно: мотиваційний спад без фізіологічного підґрунтя, нормальний cyclical spад у блоці (Atkinson et al. 2007), середовищні фактори. Коли помилка: накопичена втома (знижена мотивація як маркер non-functional overreaching — Halson & Jeukendrup 2004), продромальна стадія хвороби, висока кумулятивна стресова навантаженість (McEwen 2004). 3-рівнева перевірка: перед виходом → 10-хвилинний тест → аварійний вихід. Третій варіант — модифіковане тренування. clinical-safety: CONDITIONAL PASS (guard rail: клінічні симптоми ментального здоров'я виходять за рамки → фахівець). sports-scientist review pending. Blog card added.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.19.2 → v3.20.0: R-21.9 Evidence Package updated — `incident_id` requirement block added: кожен з IR-KEY-E-001 через IR-KEY-E-006 MUST містити `"incident_id": "<uuid>"` як top-level JSON field; 5-row auditor cross-reference SQL (`audit_log_events WHERE payload->>'incident_id' = '<uuid>'`; expected: 5 rows ordered by chain sequence; deviation = KEY-IC-CHAIN-01 violation). §R-54.7 item 4: `[ ]` → `[x] Done`. §R-54.9 second cross-reference row: `🟡 Pending` → `🟢 Done`.
+- `docs/SOC2_READINESS.md` — v3.69.1 → v3.69.2: §143.4 second pending obligation closed — IR-KEY-E-001..E-006 templates `incident_id` field (§R-54.7 item 4, P1/M7). One obligation remains: `emit-audit-event` Worker + KEY-IC-CHAIN-01 integration tests (§R-54.7 item 2, P0/M7).
+- `blog.html` — cards added for post-23 and post-2923 (at top of grid).
+- `STATUS.md` — current version updated to v11.14.0.
+- `VERSION` — 11.13.1 → 11.14.0.
+
+---
+
 ## [11.13.1] — 2026-07-02
 
 ### Changed
