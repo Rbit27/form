@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.41.0] — 2026-07-02
+
+### Added
+- `content/post-41-discipline-vs-programming-error.md` — Editorial series post-41. «Де закінчується дисципліна — і починається помилка у програмуванні». Різниця між послідовністю і програмною інерцією: Peterson et al. (2011) — adherence найсильніший предиктор результатів; Hubal et al. (2005) — варіабельність відповіді на однакову програму (−2% до +59% об'єм, 0–250% сила). П'ять маркерів програмної помилки: RPE-дрейф при незмінному навантаженні; нульовий прогрес 4+ тижнів (Schoenfeld 2010); технічна регресія у відпочилому стані (Meeusen et al. 2013 — раннє попередження NFOR); зникнення варіативності між сесіями; відчуття «відбуваю номер». Три рішення: деловантаження + переоцінка; мікроадаптація (Ralston et al. 2017); перебудова блоку (Zatsiorsky & Kraemer 2006). Парадокс Meeusen: NFOR найчастіше у наймотивованіших. Алгоритм 4 кроки. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — картка post-41 prepended at top of feed (before post-3053).
+- `README.md` — editorial series 3071–3080 «Технічна самодіагностика» added (10 proposed topics · v11.41.0).
+
+### Changed
+- `VERSION` — 11.40.0 → 11.41.0.
+
+---
+
 ## [11.40.0] — 2026-07-02
 
 ### Added
