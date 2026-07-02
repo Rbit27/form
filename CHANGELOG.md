@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [11.25.1] — 2026-07-02
+
+### Changed
+- `docs/COST_MODEL.md` — v2.29.0 → v2.29.1. §56.10 + §56.12 cross-reference patch: three stale "🟡 Pending" items closed to "🟢 Done". Item 1 — `docs/MSA_TEMPLATE.md §4.7` Currency & FX Clause (completed CHANGELOG v11.23.1); item 2 — `geo.contract_currency_set` HIGH/7yr registered in `docs/AUDIT_LOG_SCHEMA.md` v2.72 (completed CHANGELOG v11.23.1); item 3 — `docs/ENTERPRISE.md` billing currency note added (completed CHANGELOG v11.23.1). Remaining open: item 4 Stripe USD config (platform-engineer), items 5–6 P1/M12, item 7 OQ-GEO-03 counsel M8, item 8 Stripe EU M8.
+- `VERSION` — 11.25.0 → 11.25.1.
+
 ## [11.25.0] — 2026-07-02
 
 ### Added
