@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.37.0] — 2026-07-02
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` — three DEC-030 HMAC-chained events registered: `sso.pkjwt_key_generated` HIGH/7yr, `sso.pkjwt_key_rotated` HIGH/7yr, `sso.pkjwt_key_expiry_warning` STANDARD/3yr. Full Zod v2 schemas (`SsoPkjwtKeyGeneratedPayload`, `SsoPkjwtKeyRotatedPayload`, `SsoPkjwtKeyExpiryWarningPayload`). SOC 2 CC6.6 evidence table (PKJWT-E-001, quarterly, 7yr). CC6.6 auditor narrative. Privacy floor: event payloads contain only `tenant_id` UUID + `kid` UUID + timestamps — no user identity, no private key material. AUDIT_LOG_SCHEMA.md v2.72 → v2.73.
+- `docs/OBSERVABILITY.md §12.6` — job 58 `pkjwt_key_expiry_sweep` registered in canonical pg_cron job registry: `0 9 * * *` (daily 09:00 UTC); 26h freshness window; scans `tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt' AND pkjwt_key_expires_at < NOW() + INTERVAL '30 days'`; emits `sso.pkjwt_key_expiry_warning` per matching tenant; P3 Slack-only `#alerts-enterprise`; non-blocking; SOC 2 CC6.6. Freshness window note updated. OBSERVABILITY.md v5.13.2 → v5.14.0.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §42.11` — items 4 + 5 closed: `[ ] Pending` → `[x] Done` (AUDIT_LOG_SCHEMA.md v2.73 §SSO-PKJ-Lifecycle; OBSERVABILITY.md v5.14.0 §12.6 job 58).
+- `docs/SSO_SCIM_IMPLEMENTATION.md §42.12` — cross-reference rows 3 + 4 updated `🟡 Pending — M5` → `🟢 Done — 2026-07-02`. SSO_SCIM_IMPLEMENTATION.md v2.15 → v2.16.
+- `STATUS.md` — v11.37.0 current; next: SSO_SCIM migration 0098 DDL (M5) + `buildClientAssertion()` Worker implementation + JWKS endpoint + pg_cron job impl.
+- `VERSION` — 11.36.0 → 11.37.0.
+
 ## [11.36.0] — 2026-07-02
 
 ### Added
