@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v11.17.0** — 2026-07-02 · post-26 · «Адаптація сухожиль і зв'язок: чому сполучна тканина не встигає за м'язами» · original series post-26 · clinical-safety PASS · sports-scientist review pending · blog.html card added for post-26 · next: post-27 («Тренувальний вік проти хронологічного: чому "пізно починати" — не та проблема») + series 2926–2935 «Що я знаю про своє тренування» (opener post-2926)
+
 **v11.16.0** — 2026-07-02 · post-25 + post-2925 · post-25: «Скільки разів на тиждень качати м'яз: що каже наука і що з цим реально робити» · original series post-25 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-25 · post-2925: «Синтез 2916–2925: рамка тренувальної стійкості для self-coached атлета» · series «Тренувальна стійкість» 2916–2925 (10/10 — SERIES COMPLETE) · clinical-safety PASS · sports-scientist review pending · blog.html card added for post-2925 · next: post-26 (original editorial series) + series 2926–2935 «Що я знаю про своє тренування» (opener post-2926) + §R-55.7 items 1–9 platform-engineer M7 operational deploy + PRE-55-E-001 evidence collection
 
 **v11.15.1** — 2026-07-02 · enterprise: INCIDENT_RESPONSE v3.21.0 (§R-55 `emit-audit-event` Worker Extension · KEY-IC-CHAIN-01 enforcement + Integration Tests A+B · closes §R-54.7 item 2 P0/M7 documentation obligation) · SOC2_READINESS v3.69.3 (§143.4 all obligations closed · SOC 2 readiness ~96.5% → ~97%) · next: §R-55.7 items 1–9 platform-engineer M7 operational deploy + PRE-55-E-001 evidence collection
