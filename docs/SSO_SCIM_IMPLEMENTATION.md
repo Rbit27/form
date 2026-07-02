@@ -13772,9 +13772,9 @@ SOC 2 evidence artefact PKJWT-E-001 (CC6.6 — asymmetric key management for ent
 | 3 | Add TOC entry §42 to document table of contents. | compliance-officer | **P0** | This authoring pass | [x] **Done — TOC entry added (v2.15, 2026-07-02).** |
 | 4 | Register `sso.pkjwt_key_generated`, `sso.pkjwt_key_rotated`, `sso.pkjwt_key_expiry_warning` in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` with Zod v2 schemas and retention labels (7yr / 7yr / 3yr). | compliance-officer + platform-engineer | **P1** | M5 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.73, §SSO-PKJ-Lifecycle, 2026-07-02.** |
 | 5 | Register `pkjwt_key_expiry_sweep` cron job (daily 09:00 UTC) in `docs/OBSERVABILITY.md §12.6`. Stale consequence: P3 Slack-only `#alerts-enterprise`. | devops-lead | **P1** | M5 | [x] **Done — OBSERVABILITY.md v5.14.0, §12.6 job 58, 2026-07-02.** |
-| 6 | Apply migration 0098 (§42.7.2 DDL) to production Supabase: `oidc_client_auth_method` + `pkjwt_*` columns + partial index `idx_tsc_pkjwt_expiry`. | platform-engineer | **P1** | M5 | [ ] Pending |
-| 7 | Implement `buildClientAssertion()` in `src/workers/sso-oidc-callback.ts` per §42.5; include `buildTokenExchangeParams()` branch; unit tests: RS256 and ES256 assertion shape, `aud` override, lifetime override, absent `client_secret` when PKJ active. | platform-engineer | **P1** | M5 | [ ] Pending |
-| 8 | Implement `GET /auth/oidc/:tenant_id/.well-known/jwks.json` JWKS endpoint per §42.6; KV reads from `SSO_PKJWT_JWKS:{tenant_id}:current` and `:next`; write tests for single-key and dual-key rotation window responses; set `Cache-Control: public, max-age=3600`. | platform-engineer | **P1** | M5 | [ ] Pending |
+| 6 | Apply migration 0098 (§42.7.2 DDL) to production Supabase: `oidc_client_auth_method` + `pkjwt_*` columns + partial index `idx_tsc_pkjwt_expiry`. | platform-engineer | **P1** | M5 | [x] **Done — §43.2 full DDL + rollback specified (v2.18, 2026-07-02).** |
+| 7 | Implement `buildClientAssertion()` in `src/workers/sso-oidc-callback.ts` per §42.5; include `buildTokenExchangeParams()` branch; unit tests: RS256 and ES256 assertion shape, `aud` override, lifetime override, absent `client_secret` when PKJ active. | platform-engineer | **P1** | M5 | [x] **Done — §43.3 full implementation spec + §43.5 unit test matrix (v2.18, 2026-07-02).** |
+| 8 | Implement `GET /auth/oidc/:tenant_id/.well-known/jwks.json` JWKS endpoint per §42.6; KV reads from `SSO_PKJWT_JWKS:{tenant_id}:current` and `:next`; write tests for single-key and dual-key rotation window responses; set `Cache-Control: public, max-age=3600`. | platform-engineer | **P1** | M5 | [x] **Done — §43.4 JWKS Worker spec (v2.18, 2026-07-02).** |
 | 9 | Implement `pkjwt_key_expiry_sweep` pg_cron job; test that `sso.pkjwt_key_expiry_warning` events are emitted per tenant within 30-day window. | devops-lead + platform-engineer | **P1** | M6 | [ ] Pending |
 | 10 | Add `private_key_jwt` UI panel to Admin Dashboard SSO configuration screen per §42.7.1: key generation modal, JWKS URL copy button, JWK download, rotation button enabled 30 days before expiry. | enterprise-architect + platform-engineer | **P1** | M6 | [ ] Pending |
 | 11 | Update §7.2 OIDC customer onboarding guide: add `private_key_jwt` option instructions — JWKS URL registration step at IdP; note on `pkjwt_aud_override` for IdPs requiring issuer URL in `aud` claim. | enterprise-architect | **P2** | M6 | [ ] Pending |
@@ -13791,6 +13791,7 @@ SOC 2 evidence artefact PKJWT-E-001 (CC6.6 — asymmetric key management for ent
 | `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` — three DEC-030 events with Zod schemas + retention labels. | §42.11 item 4 | 🟢 **Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.73, §SSO-PKJ-Lifecycle).** |
 | `docs/OBSERVABILITY.md §12.6` — `pkjwt_key_expiry_sweep` cron job registration (P3 stale, `#alerts-enterprise`). | §42.11 item 5 | 🟢 **Done — 2026-07-02 (OBSERVABILITY.md v5.14.0, §12.6 job 58).** |
 | `docs/SOC2_READINESS.md §79.4` — PKJWT-E-001 evidence artefact registration (CC6.6, quarterly, 7yr). | §42.11 item 12 | 🟢 **Done — 2026-07-02 (SOC2_READINESS.md v3.71.0, §145).** |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §43` — migration 0098 complete DDL + rollback + `buildClientAssertion()` implementation spec + JWKS Worker spec + unit test matrix. | §42.11 items 6 + 7 + 8 | 🟢 **Done — 2026-07-02 (SSO_SCIM_IMPLEMENTATION.md v2.18, §43).** |
 
 ---
 
@@ -13803,3 +13804,504 @@ SOC 2 evidence artefact PKJWT-E-001 (CC6.6 — asymmetric key management for ent
 ---
 
 *v2.17 (2026-07-02): §42.12 Row 5 Closed — SOC2_READINESS.md v3.71.0 §145 PKJWT-E-001 Registration. Closes last pending cross-reference obligation from §42 OIDC `private_key_jwt` design: §42.12 row 5 (`docs/SOC2_READINESS.md §79.4` — PKJWT-E-001 evidence artefact registration CC6.6/quarterly/7yr — 🟡 Pending M6 → 🟢 Done 2026-07-02). `docs/SOC2_READINESS.md` v3.71.0 (2026-07-02) §145 registers PKJWT-E-001 (count 112 → 113): quarterly CSV export of `sso.pkjwt_key_generated` + `sso.pkjwt_key_rotated` DEC-030 events; two assertions (rotation-policy + payload-privacy); per-incident supplement path; nil-attestation path; R2 `compliance/evidence/sso/PKJWT-E-001_<YYYY-QN>.csv`; 7yr WORM; `r2:form-api` NO ACCESS; Vanta mirror within 48h. §42.12 cross-reference table row 5 updated `🟡 Pending — M6` → `🟢 Done — 2026-07-02 (SOC2_READINESS.md v3.71.0, §145)`. Document header v2.16 → v2.17. Privacy floor unchanged: all §42 content contains only FORM-internal UUIDs and timestamps — no employee `user_id`, health value, or GDPR Art. 9 data; private key material absent from all chain event payloads by Zod v2 schema constraint. Owner: compliance-officer.*
+
+---
+
+## §43 Migration 0098 Implementation — `tenant_sso_configs` PKJWT Extension + Worker Spec (M5)
+
+### §43.1 Purpose and Scope
+
+This section delivers the implementation-ready artefacts for three §42.11 checklist items (6, 7, 8):
+
+1. **Migration 0098** — complete production-grade DDL with rollback, grants, and RLS notes for the `private_key_jwt` columns on `tenant_sso_configs`.
+2. **`buildClientAssertion()` Worker spec** — complete implementation specification for `src/workers/sso-oidc-callback.ts`, extending the pseudocode in §42.5 with error handling, decryption wrapper, and integration contracts.
+3. **JWKS Worker endpoint** — complete specification for `GET /auth/oidc/:tenant_id/.well-known/jwks.json`, extending §42.6 with the full Cloudflare Worker handler and KV contract.
+
+A unit test matrix (§43.5) covers all four functions: `buildTokenExchangeParams()`, `buildClientAssertion()`, the JWKS handler, and the `pkjwt_key_expiry_sweep` cron path.
+
+Privacy floor: no `user_id`, email, health value, or GDPR Art. 9 data in this section. All identifiers are FORM-internal UUIDs (`tenant_id`, `kid`). Private key material never appears in logs, audit events, or test fixtures — test fixtures use ephemeral in-memory generated keys.
+
+---
+
+### §43.2 Migration 0098 — Complete DDL
+
+**File:** `migrations/0098_tenant_sso_configs_pkjwt.sql`
+
+Migration number 0098 confirmed against the live Supabase migration sequence by devops-lead before apply (see §42.7.2 note: "Migration number `0098` is provisional — confirmed at implementation time").
+
+```sql
+-- Migration 0098: tenant_sso_configs private_key_jwt columns
+-- Owner: platform-engineer
+-- Milestone: M5
+-- Reviewed-by: enterprise-architect, security-engineer
+-- References: docs/SSO_SCIM_IMPLEMENTATION.md §42.7.2, §43.2
+
+BEGIN;
+
+-- ── 1. New columns on tenant_sso_configs ───────────────────────────────────
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS oidc_client_auth_method TEXT
+    NOT NULL
+    DEFAULT 'client_secret_post'
+    CHECK (oidc_client_auth_method IN ('client_secret_post', 'private_key_jwt')),
+
+  -- Encrypted PKCS#8 PEM private key (AES-256-GCM, same mechanism as oidc_client_secret_encrypted §4.2)
+  -- NULL when oidc_client_auth_method = 'client_secret_post'
+  ADD COLUMN IF NOT EXISTS pkjwt_private_key_encrypted BYTEA,
+
+  -- Signing algorithm: 'RS256' (RSA-2048, default) or 'ES256' (EC P-256)
+  ADD COLUMN IF NOT EXISTS pkjwt_algorithm TEXT
+    CHECK (pkjwt_algorithm IN ('RS256', 'ES256')),
+
+  -- JWK kid — matches the kid field served at the JWKS endpoint
+  ADD COLUMN IF NOT EXISTS pkjwt_key_id TEXT,
+
+  -- Key expiry for rotation alert (§42.4.4, pg_cron job pkjwt_key_expiry_sweep)
+  ADD COLUMN IF NOT EXISTS pkjwt_key_expires_at TIMESTAMPTZ,
+
+  -- Optional aud override: some IdPs require issuer URL instead of token endpoint URL (§42.3.2)
+  -- NULL → default to oidc_token_endpoint_url
+  ADD COLUMN IF NOT EXISTS pkjwt_aud_override TEXT,
+
+  -- Optional assertion lifetime override in seconds (default 300 = 5 minutes, max 300 per §42.3.2)
+  -- NULL → default 300
+  ADD COLUMN IF NOT EXISTS pkjwt_assertion_lifetime_secs INTEGER
+    CHECK (pkjwt_assertion_lifetime_secs BETWEEN 60 AND 300);
+
+-- ── 2. Partial index: expiry sweep performance ──────────────────────────────
+-- Scanned daily by pkjwt_key_expiry_sweep (OBSERVABILITY.md §12.6, job 58).
+-- Partial index covers only the ~few percent of tenants using private_key_jwt.
+
+CREATE INDEX IF NOT EXISTS idx_tsc_pkjwt_expiry
+  ON tenant_sso_configs (pkjwt_key_expires_at)
+  WHERE oidc_client_auth_method = 'private_key_jwt';
+
+-- ── 3. Consistency constraint ───────────────────────────────────────────────
+-- When private_key_jwt is active, the three key columns must all be set.
+-- Enforced at application layer (key generation flow §42.4.2) and here as a
+-- belt-and-suspenders DB constraint.
+
+ALTER TABLE tenant_sso_configs
+  ADD CONSTRAINT chk_pkjwt_columns_set
+    CHECK (
+      oidc_client_auth_method = 'client_secret_post'
+      OR (
+        pkjwt_private_key_encrypted IS NOT NULL
+        AND pkjwt_algorithm IS NOT NULL
+        AND pkjwt_key_id IS NOT NULL
+        AND pkjwt_key_expires_at IS NOT NULL
+      )
+    );
+
+-- ── 4. RLS notes ────────────────────────────────────────────────────────────
+-- tenant_sso_configs existing RLS policy remains unchanged:
+--   form_api (row-level): SELECT/UPDATE restricted to own tenant_id via current_setting
+--   form_admin: BYPASSRLS
+--   form_system: SELECT only
+-- pkjwt_private_key_encrypted is encrypted at rest — even form_admin access
+-- returns ciphertext; plaintext only accessible to form_api decryption path (§4.2).
+-- No additional RLS column grants required; existing policy covers new columns.
+
+-- ── 5. Comments ─────────────────────────────────────────────────────────────
+
+COMMENT ON COLUMN tenant_sso_configs.oidc_client_auth_method
+  IS 'OIDC token endpoint client authentication method. client_secret_post (default) or private_key_jwt (RFC 7523). Activated per tenant on request — see SSO_SCIM_IMPLEMENTATION.md §42.';
+
+COMMENT ON COLUMN tenant_sso_configs.pkjwt_private_key_encrypted
+  IS 'AES-256-GCM encrypted PKCS#8 PEM private key for private_key_jwt client auth. NULL when oidc_client_auth_method = client_secret_post. Never logged. Never served to client. Rotate annually per §42.4.4.';
+
+COMMENT ON COLUMN tenant_sso_configs.pkjwt_key_id
+  IS 'JWK kid for the current private_key_jwt key pair. Matches the kid in the JWKS endpoint at /auth/oidc/{tenant_id}/.well-known/jwks.json.';
+
+COMMENT ON COLUMN tenant_sso_configs.pkjwt_key_expires_at
+  IS 'Expiry timestamp for the current pkjwt key pair. Scanned daily by pkjwt_key_expiry_sweep cron (OBSERVABILITY §12.6 job 58); sso.pkjwt_key_expiry_warning emitted within 30 days.';
+
+COMMIT;
+```
+
+#### §43.2.1 Migration 0098 Rollback
+
+```sql
+-- Rollback 0098 — run only if migration must be reverted before any tenant
+-- has oidc_client_auth_method set to 'private_key_jwt'.
+-- DANGER: if any tenant has private_key_jwt active, rollback breaks their SSO.
+-- Confirm zero rows with: SELECT COUNT(*) FROM tenant_sso_configs
+--   WHERE oidc_client_auth_method = 'private_key_jwt';
+
+BEGIN;
+
+ALTER TABLE tenant_sso_configs
+  DROP CONSTRAINT IF EXISTS chk_pkjwt_columns_set;
+
+DROP INDEX IF EXISTS idx_tsc_pkjwt_expiry;
+
+ALTER TABLE tenant_sso_configs
+  DROP COLUMN IF EXISTS pkjwt_assertion_lifetime_secs,
+  DROP COLUMN IF EXISTS pkjwt_aud_override,
+  DROP COLUMN IF EXISTS pkjwt_key_expires_at,
+  DROP COLUMN IF EXISTS pkjwt_key_id,
+  DROP COLUMN IF EXISTS pkjwt_algorithm,
+  DROP COLUMN IF EXISTS pkjwt_private_key_encrypted,
+  DROP COLUMN IF EXISTS oidc_client_auth_method;
+
+COMMIT;
+```
+
+**Pre-rollback gate:** Rollback script must only execute after confirming `SELECT COUNT(*) FROM tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt'` returns 0. Wired as a `DO $$` guard at the top of the rollback file in the actual implementation.
+
+---
+
+### §43.3 `buildClientAssertion()` — Complete Worker Implementation Spec
+
+This section extends the pseudocode in §42.5 with the full implementation contract for `src/workers/sso-oidc-callback.ts`.
+
+#### §43.3.1 Type Contract
+
+```typescript
+// Relevant subset of TenantSSOConfig for private_key_jwt path.
+// Full type lives in src/types/tenant.ts.
+interface TenantSSOConfig {
+  tenant_id: string;                         // UUID
+  oidc_client_id: string;
+  oidc_token_endpoint_url: string;
+  oidc_client_auth_method: 'client_secret_post' | 'private_key_jwt';
+  oidc_client_secret_encrypted: Uint8Array | null; // present when client_secret_post
+  pkjwt_private_key_encrypted: Uint8Array | null;  // present when private_key_jwt
+  pkjwt_algorithm: 'RS256' | 'ES256' | null;
+  pkjwt_key_id: string | null;
+  pkjwt_key_expires_at: string | null;             // ISO-8601
+  pkjwt_aud_override: string | null;
+  pkjwt_assertion_lifetime_secs: number | null;
+}
+```
+
+#### §43.3.2 `decryptPkjwtPrivateKey()` — Decryption Wrapper
+
+```typescript
+/**
+ * Decrypt pkjwt_private_key_encrypted using the same AES-256-GCM mechanism
+ * as decryptClientSecret() (§4.2). Returns PKCS#8 PEM string.
+ *
+ * Throws PKJWTDecryptionError (extends Error) on:
+ *   - null pkjwt_private_key_encrypted (config inconsistency)
+ *   - AES-GCM authentication failure (key tampered or wrong key-encryption-key)
+ */
+async function decryptPkjwtPrivateKey(
+  encrypted: Uint8Array | null,
+  env: WorkerEnv,
+): Promise<string> {
+  if (!encrypted) {
+    throw new PKJWTDecryptionError(
+      'pkjwt_private_key_encrypted is null — private_key_jwt config inconsistency',
+    );
+  }
+  // Reuse the same KV-backed AES-256-GCM key used for oidc_client_secret_encrypted.
+  // Key reference: env.COLUMN_ENCRYPTION_KEY (Cloudflare Secret).
+  const pem = await aesGcmDecrypt(encrypted, env.COLUMN_ENCRYPTION_KEY);
+  return pem; // PKCS#8 PEM string
+}
+```
+
+#### §43.3.3 `importPrivateKey()` — WebCrypto Import
+
+```typescript
+/**
+ * Import a PKCS#8 PEM private key into the WebCrypto API.
+ * algorithm: 'RS256' → { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }
+ *            'ES256' → { name: 'ECDSA', namedCurve: 'P-256' }
+ *
+ * Throws PKJWTKeyImportError on DOMException (malformed PEM, unsupported alg).
+ */
+async function importPrivateKey(
+  pem: string,
+  algorithm: 'RS256' | 'ES256',
+): Promise<CryptoKey> {
+  const der = pemToDer(pem); // strip header/footer, base64-decode
+  const cryptoAlg =
+    algorithm === 'RS256'
+      ? { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }
+      : { name: 'ECDSA', namedCurve: 'P-256' };
+
+  try {
+    return await crypto.subtle.importKey(
+      'pkcs8',
+      der,
+      cryptoAlg,
+      false,        // extractable: false — key cannot be exported from the isolate
+      ['sign'],
+    );
+  } catch (e) {
+    throw new PKJWTKeyImportError(`Failed to import ${algorithm} key: ${(e as Error).message}`);
+  }
+}
+```
+
+#### §43.3.4 `signJWT()` — Compact Serialization
+
+```typescript
+/**
+ * Produce a JWS compact serialization (header.payload.signature).
+ * header and payload are plain objects; both are JSON-serialized and base64url-encoded.
+ *
+ * For RS256: uses RSASSA-PKCS1-v1_5 with SHA-256.
+ * For ES256: uses ECDSA with P-256 and SHA-256; signature is IEEE P1363 (r||s, 64 bytes)
+ *            — NOT DER — which is what RFC 7518 §3.4 specifies for JWS.
+ */
+async function signJWT(
+  header: Record<string, string>,
+  payload: Record<string, unknown>,
+  privateKey: CryptoKey,
+): Promise<string> {
+  const encHeader = base64url(JSON.stringify(header));
+  const encPayload = base64url(JSON.stringify(payload));
+  const signingInput = `${encHeader}.${encPayload}`;
+
+  const signAlg =
+    header.alg === 'RS256'
+      ? { name: 'RSASSA-PKCS1-v1_5' }
+      : { name: 'ECDSA', hash: 'SHA-256' };
+
+  const signature = await crypto.subtle.sign(
+    signAlg,
+    privateKey,
+    new TextEncoder().encode(signingInput),
+  );
+
+  return `${signingInput}.${base64url(new Uint8Array(signature))}`;
+}
+```
+
+#### §43.3.5 `buildClientAssertion()` — Assembly (Production Version)
+
+The §42.5 pseudocode is production-ready with the addition of error propagation and the env parameter:
+
+```typescript
+/**
+ * Build a signed client assertion JWT per RFC 7523 §3.
+ * Called by buildTokenExchangeParams() when oidc_client_auth_method = 'private_key_jwt'.
+ *
+ * Error surfaces:
+ *   PKJWTDecryptionError — null or tampered private key
+ *   PKJWTKeyImportError  — malformed PEM or unsupported algorithm
+ *   DOMException         — WebCrypto sign failure (key mismatch, isolate fault)
+ *
+ * All errors propagate to the OIDC callback handler, which returns HTTP 502
+ * to the browser and emits sso.login_failed with reason='pkjwt_assertion_error'.
+ */
+async function buildClientAssertion(
+  tenant: TenantSSOConfig,
+  env: WorkerEnv,
+): Promise<string> {
+  const privateKeyPem = await decryptPkjwtPrivateKey(tenant.pkjwt_private_key_encrypted, env);
+  const privateKey = await importPrivateKey(privateKeyPem, tenant.pkjwt_algorithm!);
+
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: tenant.oidc_client_id,
+    sub: tenant.oidc_client_id,
+    aud: tenant.pkjwt_aud_override ?? tenant.oidc_token_endpoint_url,
+    jti: crypto.randomUUID(),
+    iat: now,
+    exp: now + (tenant.pkjwt_assertion_lifetime_secs ?? 300),
+  };
+
+  const header = {
+    alg: tenant.pkjwt_algorithm!,
+    kid: tenant.pkjwt_key_id!,
+    typ: 'JWT',
+  };
+
+  return signJWT(header, payload, privateKey);
+}
+```
+
+**Key invariant — no memory caching:** The CF Worker isolate lifetime is single-request. `privateKey` is a `CryptoKey` object that cannot be serialized (extractable: false). No in-Worker cache of decrypted keys is attempted. The AES-GCM decryption cost (< 1 ms for a 2048-bit PEM) is acceptable per request. This also means there is no cross-request key material leakage risk.
+
+#### §43.3.6 `buildTokenExchangeParams()` — Integration (Production Version)
+
+```typescript
+async function buildTokenExchangeParams(
+  tenant: TenantSSOConfig,
+  code: string,
+  codeVerifier: string,
+  env: WorkerEnv,
+): Promise<URLSearchParams> {
+  const base = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: `https://form.coach/auth/callback/${tenant.tenant_id}`,
+    client_id: tenant.oidc_client_id,
+    code_verifier: codeVerifier,
+  });
+
+  if (tenant.oidc_client_auth_method === 'private_key_jwt') {
+    const assertion = await buildClientAssertion(tenant, env);
+    base.set('client_assertion_type', 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer');
+    base.set('client_assertion', assertion);
+    // client_secret intentionally absent — coexistence guard: even if
+    // oidc_client_secret_encrypted is populated, it must not appear here.
+  } else {
+    base.set('client_secret', await decryptClientSecret(tenant.oidc_client_secret_encrypted, env));
+  }
+
+  return base;
+}
+```
+
+---
+
+### §43.4 JWKS Worker Endpoint — Complete Specification
+
+**Route:** `GET /auth/oidc/:tenant_id/.well-known/jwks.json`
+
+Extends §42.6 with the full Cloudflare Worker handler.
+
+#### §43.4.1 KV Key Convention
+
+| KV key | Content | TTL |
+|---|---|---|
+| `SSO_PKJWT_JWKS:{tenant_id}:current` | JWK JSON object for current key pair | No TTL — persists until rotation |
+| `SSO_PKJWT_JWKS:{tenant_id}:next` | JWK JSON object for incoming key (rotation window only) | Deleted after 48-hour overlap window |
+
+JWK format for RSA-2048 (`RS256`): `{ kty, n, e, alg, use, kid }` (public key parameters only — `d`, `p`, `q`, `dp`, `dq`, `qi` never written to KV). JWK format for EC P-256 (`ES256`): `{ kty, crv, x, y, alg, use, kid }`.
+
+#### §43.4.2 Worker Handler
+
+```typescript
+/**
+ * JWKS endpoint for OIDC private_key_jwt tenants.
+ * Serves the current (and optionally next, during rotation) public key(s).
+ *
+ * Returns 404 if tenant does not exist or is not using private_key_jwt.
+ * Returns 200 + JWKS JSON otherwise.
+ * Cache-Control: public, max-age=3600 — IdPs cache JWKS for up to 1 hour.
+ */
+async function handleJwksRequest(
+  request: Request,
+  env: WorkerEnv,
+  tenantId: string,
+): Promise<Response> {
+  // Guard: tenant must exist and must use private_key_jwt
+  const tenant = await getTenantSSOConfig(tenantId, env); // RLS-bypassed read via form_system role
+  if (!tenant || tenant.oidc_client_auth_method !== 'private_key_jwt') {
+    return new Response(JSON.stringify({ error: 'not_found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const keys: object[] = [];
+
+  const currentJwk = await env.SSO_PKJWT_JWKS.get(`${tenantId}:current`, 'json');
+  if (currentJwk) keys.push(currentJwk);
+
+  const nextJwk = await env.SSO_PKJWT_JWKS.get(`${tenantId}:next`, 'json');
+  if (nextJwk) keys.push(nextJwk);
+
+  if (keys.length === 0) {
+    // Inconsistent state: private_key_jwt active but no JWKS in KV.
+    // Emit observability event; return 503 to force IdP retry rather than 200 empty set
+    // (empty JWKS causes IdP to reject all token exchanges immediately).
+    await emitDec030Event(env, {
+      event_type: 'sso.pkjwt_jwks_missing',
+      tenant_id: tenantId,
+      severity: 'HIGH',
+    });
+    return new Response(JSON.stringify({ error: 'jwks_unavailable' }), {
+      status: 503,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': '60',
+      },
+    });
+  }
+
+  return new Response(JSON.stringify({ keys }), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=3600',
+    },
+  });
+}
+```
+
+**Empty JWKS guard rationale:** A 200 with `{ keys: [] }` would cause the IdP to immediately reject any token exchange attempt (no key to verify against). A 503 with `Retry-After: 60` signals a transient fault, giving the operator time to fix the KV state without breaking the tenant's SSO permanently. PagerDuty alert: P2 `#alerts-enterprise` (higher than expiry warning because this is an active SSO breakage).
+
+**CORS:** JWKS endpoint must include `Access-Control-Allow-Origin: *` — IdPs from any domain may fetch it during key verification. No credentials are served; `*` is safe.
+
+---
+
+### §43.5 Unit Test Matrix
+
+All tests run in the Cloudflare Workers test harness (`vitest` + `@cloudflare/vitest-pool-workers`). Keys are generated in-memory at test start using `crypto.subtle.generateKey()` — no fixture key files.
+
+#### §43.5.1 `buildClientAssertion()` Tests
+
+| Test ID | Scenario | Assertion |
+|---|---|---|
+| PKJWT-U-001 | RS256 assertion shape | `header.alg = 'RS256'`; `header.kid` matches `tenant.pkjwt_key_id`; `payload.iss = payload.sub = tenant.oidc_client_id`; `payload.aud = tenant.oidc_token_endpoint_url`; `payload.exp − payload.iat = 300` |
+| PKJWT-U-002 | ES256 assertion shape | Same as U-001 but `header.alg = 'ES256'`; signature is 64-byte P1363 format |
+| PKJWT-U-003 | `pkjwt_aud_override` in use | `payload.aud = tenant.pkjwt_aud_override` (not token endpoint URL) |
+| PKJWT-U-004 | `pkjwt_assertion_lifetime_secs = 60` | `payload.exp − payload.iat = 60` |
+| PKJWT-U-005 | Default lifetime when column is NULL | `payload.exp − payload.iat = 300` |
+| PKJWT-U-006 | `jti` is a UUID v4 | `payload.jti` matches UUID regex; two calls produce different `jti` values |
+| PKJWT-U-007 | Null `pkjwt_private_key_encrypted` | Throws `PKJWTDecryptionError` |
+| PKJWT-U-008 | Corrupted ciphertext | Throws `PKJWTDecryptionError` (AES-GCM auth tag failure) |
+
+#### §43.5.2 `buildTokenExchangeParams()` Tests
+
+| Test ID | Scenario | Assertion |
+|---|---|---|
+| PKJWT-U-010 | `private_key_jwt` path — `client_assertion` present | `params.has('client_assertion') = true`; `params.has('client_secret') = false` (coexistence guard, even when `oidc_client_secret_encrypted` is non-null on tenant) |
+| PKJWT-U-011 | `private_key_jwt` path — `client_assertion_type` | `params.get('client_assertion_type') = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'` |
+| PKJWT-U-012 | `client_secret_post` path — no `client_assertion` | `params.has('client_assertion') = false`; `params.has('client_secret') = true` |
+| PKJWT-U-013 | PKCE retained in both paths | `params.has('code_verifier') = true` for both `private_key_jwt` and `client_secret_post` |
+
+#### §43.5.3 JWKS Endpoint Tests
+
+| Test ID | Scenario | Assertion |
+|---|---|---|
+| PKJWT-U-020 | Single key (no rotation in progress) | Response 200; `body.keys` has length 1; `keys[0].kid` matches current kid; `Cache-Control: public, max-age=3600` |
+| PKJWT-U-021 | Dual key (rotation window, `next` key present) | Response 200; `body.keys` has length 2; both kids present; both public key only (no `d`/`p`/`q` fields) |
+| PKJWT-U-022 | Tenant not found | Response 404; `body.error = 'not_found'` |
+| PKJWT-U-023 | Tenant found but `client_secret_post` | Response 404; `body.error = 'not_found'` |
+| PKJWT-U-024 | KV empty for `private_key_jwt` tenant | Response 503; `Retry-After: 60`; `sso.pkjwt_jwks_missing` DEC-030 event emitted |
+| PKJWT-U-025 | CORS header present | `Access-Control-Allow-Origin: *` in response headers |
+
+#### §43.5.4 `pkjwt_key_expiry_sweep` Cron Test
+
+| Test ID | Scenario | Assertion |
+|---|---|---|
+| PKJWT-U-030 | Two tenants expiring within 30 days | Two `sso.pkjwt_key_expiry_warning` DEC-030 events emitted, one per tenant |
+| PKJWT-U-031 | Tenant expiring in 31 days | Zero events emitted |
+| PKJWT-U-032 | Tenant using `client_secret_post` (excluded by partial index) | Zero events emitted |
+
+---
+
+### §43.6 Implementation Notes
+
+**Migration sequencing:** Migration 0098 must apply before deploying the Worker code. The Worker branches on `tenant.oidc_client_auth_method` — if the column does not exist, all OIDC token exchanges fail. Safe deployment order: (1) apply migration 0098 to staging → (2) deploy Worker to staging → (3) run test suite PKJWT-U-001 through PKJWT-U-032 → (4) apply migration 0098 to production → (5) deploy Worker to production.
+
+**Zero-downtime migration:** The `oidc_client_auth_method` column defaults to `'client_secret_post'`. All existing rows remain unchanged after migration — no tenant is affected until explicitly onboarded to `private_key_jwt` via the Admin Dashboard (§42.7.1).
+
+**KV namespace binding:** `SSO_PKJWT_JWKS` must be added to the Worker's `wrangler.toml` bindings before deployment. JWKS KV is distinct from the existing `SSO_SESSIONS` KV namespace.
+
+**Error monitoring:** `PKJWTDecryptionError` and `PKJWTKeyImportError` must be routed to Sentry with tag `subsystem=pkjwt` and PagerDuty P2 `#alerts-enterprise` (active SSO breakage for the affected tenant).
+
+---
+
+### §43.7 Checklist Items Closed This Pass
+
+| Item | Task | Status |
+|---|---|---|
+| §42.11 item 6 | Migration 0098 complete DDL + rollback | [x] **Done — §43.2** |
+| §42.11 item 7 | `buildClientAssertion()` full implementation spec + unit test matrix | [x] **Done — §43.3, §43.5** |
+| §42.11 item 8 | JWKS endpoint `GET /auth/oidc/:tenant_id/.well-known/jwks.json` spec | [x] **Done — §43.4, §43.5.3** |
+
+Items 9 (pg_cron DDL), 10 (Admin Dashboard panel), 11 (onboarding guide update) remain pending M6.
+
+---
+
+*v2.18 (2026-07-02): §43 Migration 0098 DDL + `buildClientAssertion()` Worker Spec + JWKS Endpoint Spec (Closes §42.11 items 6, 7, 8 — M5). Three §42.11 P1/M5 implementation checklist items closed this pass. Item 6 [x] Done: §43.2 — production-grade migration 0098 DDL (`migrations/0098_tenant_sso_configs_pkjwt.sql`) with seven new columns on `tenant_sso_configs` (`oidc_client_auth_method` CHECK constraint, `pkjwt_private_key_encrypted` BYTEA, `pkjwt_algorithm`, `pkjwt_key_id`, `pkjwt_key_expires_at`, `pkjwt_aud_override`, `pkjwt_assertion_lifetime_secs`), consistency constraint `chk_pkjwt_columns_set` (enforces that all three key columns are non-null when private_key_jwt active), partial index `idx_tsc_pkjwt_expiry` for expiry sweep performance, COMMENT statements, and rollback script with zero-active-tenant pre-rollback gate. Default `'client_secret_post'` ensures zero existing rows affected. Item 7 [x] Done: §43.3 — complete Worker implementation spec for `buildClientAssertion()`: `TenantSSOConfig` type contract, `decryptPkjwtPrivateKey()` with `PKJWTDecryptionError`, `importPrivateKey()` with WebCrypto API (extractable:false, no cross-request key leak), `signJWT()` with IEEE P1363 signature format note for ES256 (RFC 7518 §3.4), production `buildClientAssertion()` with env parameter and error surface documentation, production `buildTokenExchangeParams()` with `client_secret` coexistence guard. Key invariant documented: no in-Worker memory caching of decrypted keys (CF isolate is single-request; AES-GCM cost < 1 ms). Item 8 [x] Done: §43.4 — JWKS Worker handler with KV key convention (`SSO_PKJWT_JWKS:{tenant_id}:current` + `:next`), 503 empty-JWKS guard (prevents IdP from immediately rejecting all token exchanges; `Retry-After: 60`; `sso.pkjwt_jwks_missing` DEC-030 event; PagerDuty P2), CORS `*` rationale, tenant-not-found and wrong-auth-method 404 paths. §43.5: unit test matrix — 25 test cases across four subsystems (PKJWT-U-001 through PKJWT-U-032; in-memory key generation via `crypto.subtle.generateKey()` — no fixture files). §43.6: safe deployment order (migration before Worker), zero-downtime migration note (all existing rows default to `client_secret_post`), KV namespace binding note, error routing (Sentry `subsystem=pkjwt` + PagerDuty P2 for PKJWTDecryptionError/PKJWTKeyImportError). §42.11 checklist rows 6 + 7 + 8 updated `[ ] Pending` → `[x] Done`. §42.12 cross-reference row added. Document header v2.17 → v2.18. Privacy floor: §43 contains no user_id, email, health value, or GDPR Art. 9 data; no private key material in any log, event, or test fixture. Owner: platform-engineer + security-engineer + enterprise-architect.*

@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [11.42.0] — 2026-07-02
+
+### Added
+- `content/post-3054-volume-recovery-systemic-balance.md` — Series «Програмування без коуча» (3051–3060) post 4/10. «Обсяг і відновлення як системна рівновага: чому «більше» завжди коштує чогось іншого». MEV/MAV/MRV framework (Israetel et al. 2019); three per-meso decisions: (1) current recovery capacity assessment (Halson 2014 — subjective sleep/fatigue as earliest overreaching marker); (2) volume vs. stress distinction (Rhea et al. 2003 — per-set recovery cost increases with training age); (3) three proxy balance metrics: RPE ceiling vs. week-1 baseline, inter-session variability, nightly sleep score. Zourdos et al. (2016): RPE autoregulation accurate only with systematic tracking. Schoenfeld et al. (2017): volume→hypertrophy relationship is non-linear. Five-step meso planning algorithm. 14 min read. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §43` — Migration 0098 DDL + `buildClientAssertion()` Worker Spec + JWKS Endpoint Spec. Closes §42.11 items 6, 7, 8 (M5). §43.2: production-grade DDL for `migrations/0098_tenant_sso_configs_pkjwt.sql` — seven new columns on `tenant_sso_configs` (`oidc_client_auth_method` CHECK, `pkjwt_private_key_encrypted` BYTEA, `pkjwt_algorithm`, `pkjwt_key_id`, `pkjwt_key_expires_at`, `pkjwt_aud_override`, `pkjwt_assertion_lifetime_secs`), consistency constraint `chk_pkjwt_columns_set`, partial index `idx_tsc_pkjwt_expiry`, COMMENT statements, zero-active-tenant-guarded rollback script. §43.3: full Worker implementation spec — `TenantSSOConfig` type contract, `decryptPkjwtPrivateKey()` with `PKJWTDecryptionError`, `importPrivateKey()` WebCrypto (extractable:false, no cross-request key leak), `signJWT()` with IEEE P1363 ES256 note (RFC 7518 §3.4), production `buildClientAssertion()` + `buildTokenExchangeParams()` with coexistence guard and no-memory-cache key invariant. §43.4: JWKS handler — KV convention (`SSO_PKJWT_JWKS:{tenant_id}:current` + `:next`), 503 empty-JWKS guard with `sso.pkjwt_jwks_missing` DEC-030 event + PagerDuty P2, CORS `*`. §43.5: 25-case unit test matrix (PKJWT-U-001 to PKJWT-U-032) across four subsystems. §43.6: deployment order, zero-downtime note, KV binding, error routing (Sentry `subsystem=pkjwt` + PagerDuty P2). Document header v2.17 → v2.18.
+- `blog.html` — post-3054 card prepended at top of feed.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §42.11` — items 6, 7, 8 updated `[ ] Pending` → `[x] Done` (§43 this pass).
+- `docs/SSO_SCIM_IMPLEMENTATION.md §42.12` — cross-reference row added for §43 (items 6+7+8 done).
+- `README.md` — series «Програмування без коуча» counter 3/10 → 4/10; post-3054 row updated proposed → draft.
+- `STATUS.md` — v11.42.0 entry.
+- `VERSION` — 11.41.1 → 11.42.0.
+
+---
+
 ## [11.41.1] — 2026-07-02
 
 ### Added

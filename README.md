@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · 35 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 active 3/10 · series «Силові метрики» 3061–3070 proposed · series «Технічна самодіагностика» 3071–3080 proposed · block 896–900 active · block 901–910 proposed · v11.41.0
+### Editorial series: 11–44 drafted · 35 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 active 4/10 · series «Силові метрики» 3061–3070 proposed · series «Технічна самодіагностика» 3071–3080 proposed · block 896–900 active · block 901–910 proposed · v11.42.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3421,7 +3421,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3051 | Як приймати програмні рішення без зовнішнього арбітра: рамка «ставок, а не правил» | **draft · v11.34.0 → post-3051-programming-decisions-framework.md** |
 | 3052 | Коли залишатись на програмі, а коли змінювати: три сигнали і три помилки | **draft · v11.37.0 → post-3052-when-to-stay-when-to-change-program.md** |
 | 3053 | Прогресія без лінійної моделі: що робити, коли «+2,5 кг кожне тренування» більше не працює | proposed |
-| 3054 | Обсяг і відновлення як системна рівновага: чому «більше» завжди коштує чогось іншого | proposed |
+| 3054 | Обсяг і відновлення як системна рівновага: чому «більше» завжди коштує чогось іншого | **draft · v11.42.0 → post-3054-volume-recovery-systemic-balance.md** |
 | 3055 | Як читати плато: технічне, програмне, відновлювальне або нормальне — протокол розрізнення | proposed |
 | 3056 | Вибір допоміжних вправ: логіка, а не традиція | proposed |
 | 3057 | Деload без страху: коли відступ — це частина прогресії, а не капітуляція | proposed |
