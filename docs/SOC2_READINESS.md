@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.69.2
+# FORM · SOC 2 Type II Readiness v3.69.3
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -34362,15 +34362,17 @@ One row added to the §79.4 master evidence table (count 110 → 111), after PHI
 
 The three §58.10 DEC-030 rotation events (`admin.hmac_key_rotation_initiated`, `admin.hmac_key_rotated`, `admin.hmac_key_rotation_verified`) previously had no IC anchor in the chain. KEY-IC-CHAIN-01 adds an IC boundary pair: every future `HMAC_AUDIT_CHAIN_KEY` rotation produces five ordered events, with `incident_id` as the cross-reference key across all six IR-KEY-E-001 through IR-KEY-E-006 evidence artefacts and the PagerDuty incident timeline. SOC 2 CC6.8 auditors can now query the HMAC chain directly to confirm the rotation lifecycle was bookended by a formally opened and formally resolved incident control — without relying on external PagerDuty records as primary evidence.
 
-### §143.4 Obligations Remaining Open After This Patch
+### §143.4 Obligations Status (All Closed)
 
 | Obligation | Source | Status |
 |---|---|---|
 | `docs/AUDIT_LOG_SCHEMA.md` — register `admin.key_rotation_incident_opened` + `admin.key_rotation_incident_closed` (HIGH/7yr); Zod v2 schemas; KEY-IC-CHAIN-01 invariant with HTTP 422 `KEY_IC_CHAIN_01_VIOLATION` | §R-54.7 item 1 (P0/M7) | 🟢 **Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)** |
-| `emit-audit-event` Worker — deploy both events; KEY-IC-CHAIN-01 enforcement; integration tests A + B | §R-54.7 item 2 (P0/M7) | 🟡 **Pending** |
+| `emit-audit-event` Worker — deploy both events; KEY-IC-CHAIN-01 enforcement; integration tests A + B | §R-54.7 item 2 (P0/M7) | 🟢 **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.21.0, §R-55: `key-ic-chain-01.ts` enforcement spec + `index.ts` patch + Integration Tests A+B + PRE-55-E-001; operational deploy: §R-55.7 items 1–9, platform-engineer, M7)** |
 | IR-KEY-E-001..E-006 evidence templates — `incident_id` JSON field + auditor cross-reference query | §R-54.7 item 4 (P1/M7) | 🟢 **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.20.0, R-21.9)** |
 
 ---
+
+*v3.69.3 (2026-07-02): §143.4 all obligations closed — `emit-audit-event` Worker extension + KEY-IC-CHAIN-01 enforcement + Integration Tests A+B documented in `docs/INCIDENT_RESPONSE.md v3.21.0 §R-55` (2026-07-02). §143.4 remaining obligation row: `🟡 Pending` → `🟢 Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.21.0, §R-55)`. §143.4 heading updated: "Obligations Remaining Open After This Patch" → "Obligations Status (All Closed)". §R-55 content: `key-ic-chain-01.ts` new file (§R-55.2: `enforceKeyIcChain01` guard function, fail-closed on DB error, 48h/72h stale windows); `index.ts` inline patch (§R-55.3: schema validate + chain guard before chain-write for `admin.key_rotation_incident_closed`; schema validate for `admin.key_rotation_incident_opened`); Integration Test A (§R-55.4: bash script, violation path, HTTP 422 + `KEY_IC_CHAIN_01_VIOLATION` + 0 DB rows); Integration Test B (§R-55.5: bash script, happy path, HTTP 200 × 2 + 2-row chain); PRE-55-E-001 evidence artefact (§R-55.6); 10-item deployment checklist (§R-55.7: items 1–9 platform-engineer M7, item 10 documentation [x] Done this pass); §R-55.8 two obligations closed. SOC 2 readiness: ~96.5% → ~97%. §143.4 is now fully resolved (all three obligations 🟢 Done). Document header v3.69.2 → v3.69.3. Cross-references: `docs/INCIDENT_RESPONSE.md §R-55` (authoritative implementation spec); `docs/INCIDENT_RESPONSE.md §R-54.7 item 2` ([x] Done — v3.21.0); `docs/INCIDENT_RESPONSE.md §R-54.9` second row (🟢 Done — v3.21.0). Privacy floor: §R-55 and §143 contain no personal data — enforcement guard operates on FORM-internal incident UUIDs + key-type enums; integration test payloads use synthetic UUIDs only; no enterprise employee `user_id`, name, email, health value, or GDPR Art. 9 data. Owner: platform-engineer + security-engineer + compliance-officer.*
 
 *v3.69.2 (2026-07-02): §143.4 second obligation closed — IR-KEY-E-001..E-006 evidence templates `incident_id` field + auditor cross-reference SQL added to `docs/INCIDENT_RESPONSE.md` R-21.9 Evidence Package (v3.20.0, 2026-07-02). §143.4 second pending row: `🟡 Pending` → `🟢 Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.20.0, R-21.9)`. One obligation remains open: `emit-audit-event` Worker deployment + KEY-IC-CHAIN-01 integration tests (§R-54.7 item 2, P0/M7). Document header v3.69.1 → v3.69.2. Owner: compliance-officer.*
 

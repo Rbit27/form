@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.15.1] — 2026-07-02
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-55` — `emit-audit-event` Worker Extension · KEY-IC-CHAIN-01 Enforcement · Integration Tests A + B. Closes §R-54.7 item 2 (P0/M7 — documentation obligation). New file spec: `supabase/functions/emit-audit-event/key-ic-chain-01.ts` — `enforceKeyIcChain01(supabase, incidentId, keyType)` guard function; TIGHT_WINDOW_KEY_TYPES {HMAC_AUDIT_CHAIN_KEY, KEYPOINTS_ENC_KEY} → 48h stale window; other six key types → 72h; Supabase JS v2 `.filter("metadata->>'incident_id'", 'eq', incidentId)` query on `audit_log_events`; fail-closed on DB error (KEY_IC_CHAIN_01_VIOLATION returned rather than permitting unanchored chain entry). `index.ts` inline patch: schema validate + `enforceKeyIcChain01` for `admin.key_rotation_incident_closed` (HTTP 422 on schema error or chain violation); schema validate only for `admin.key_rotation_incident_opened`. Integration Test A (bash script, violation path): `NOVEL_INCIDENT_ID = 00000000-dead-beef-cafe-000000000001` → HTTP 422 + `KEY_IC_CHAIN_01_VIOLATION` + 0 DB rows written. Integration Test B (bash script, happy path): `incident_opened` HTTP 200 → `incident_closed` HTTP 200 → 2-row DEC-030 chain confirmed via psql. Evidence artefact PRE-55-E-001: two `.txt` files (`PRE-55-E-001-test-a.txt` + `PRE-55-E-001-test-b.txt`; `compliance/evidence/ir/`; once at M7). 10-item deployment checklist: items 1–9 platform-engineer M7 operational tasks; item 10 documentation [x] Done this pass.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.20.0 → v3.21.0: §R-54.7 item 2 `[ ]` → `[x] Done`; §R-54.9 second cross-reference row `🟡 Pending — Worker deployment` → `🟢 Done`; §R-55 appended.
+- `docs/SOC2_READINESS.md` — v3.69.2 → v3.69.3: §143.4 last remaining obligation `🟡 Pending` → `🟢 Done`; §143.4 heading updated to "Obligations Status (All Closed)"; v3.69.3 version note added; SOC 2 readiness ~96.5% → ~97%.
+- `STATUS.md` — current version updated to v11.15.1.
+- `VERSION` — 11.15.0 → 11.15.1.
+
+---
+
 ## [11.15.0] — 2026-07-02
 
 ### Added

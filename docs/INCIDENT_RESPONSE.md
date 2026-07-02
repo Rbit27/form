@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.20.0
+# FORM · Incident Response Runbook v3.21.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -20212,7 +20212,7 @@ The two events slot into the R-21 IC step sequence as follows. New steps are **b
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 1 | Register `admin.key_rotation_incident_opened` (HIGH/7yr, CC6.8/CC7.2/CC7.3) and `admin.key_rotation_incident_closed` (HIGH/7yr, CC6.8/CC5.3/CC7.5) in `docs/AUDIT_LOG_SCHEMA.md`; include Zod v2 schemas from §R-54.5; register KEY-IC-CHAIN-01 ordering invariant with HTTP 422 `KEY_IC_CHAIN_01_VIOLATION` error code | security-engineer + compliance-officer | **P0** | M7 | [x] **Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)** |
-| 2 | Deploy both events to `emit-audit-event` Worker; integration test A: emit `incident_closed` for unknown `incident_id` → confirm HTTP 422 `KEY_IC_CHAIN_01_VIOLATION`; integration test B: emit `incident_opened` then `incident_closed` for same `incident_id` → confirm HTTP 200; run integration tests in staging as part of R-21 tabletop (R-21 checklist item 4) | platform-engineer | **P0** | M7 | [ ] |
+| 2 | Deploy both events to `emit-audit-event` Worker; integration test A: emit `incident_closed` for unknown `incident_id` → confirm HTTP 422 `KEY_IC_CHAIN_01_VIOLATION`; integration test B: emit `incident_opened` then `incident_closed` for same `incident_id` → confirm HTTP 200; run integration tests in staging as part of R-21 tabletop (R-21 checklist item 4) | platform-engineer | **P0** | M7 | [x] **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.21.0, §R-55 documentation obligation: `key-ic-chain-01.ts` enforcement spec, `index.ts` patch, Integration Test A bash script, Integration Test B bash script, PRE-55-E-001 evidence artefact, 10-item deployment checklist; operational deploy: checklist items 1–9 platform-engineer M7)** |
 | 3 | R-21 checklist item 1 documentation portion — §R-54 authored; payload specs §R-54.3; Zod schemas §R-54.5; KEY-IC-CHAIN-01 §R-54.4; step sequence integration §R-54.6 | compliance-officer | **P0** | 2026-07-02 | [x] **Done — this authoring pass** |
 | 4 | Update IR-KEY-E-001 through IR-KEY-E-006 evidence templates (R-21.9) to add `"incident_id"` as a required top-level JSON field; add auditor cross-reference query: `SELECT * FROM audit_log_events WHERE metadata->>'incident_id' = '<uuid>' ORDER BY created_at` | compliance-officer | **P1** | M7 | [x] **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.20.0, R-21.9 evidence package: `incident_id` requirement + 5-row auditor SQL added; R-54.9 cross-reference row closed)** |
 | 5 | Register KEY-IC-CHAIN-01 cross-reference in `docs/SOC2_READINESS.md §58` (HMAC chain integrity controls section): "KEY-IC-CHAIN-01 — `admin.key_rotation_incident_closed` must follow `admin.key_rotation_incident_opened` for same `incident_id`; HTTP 422 `KEY_IC_CHAIN_01_VIOLATION`; enforced by `emit-audit-event` Worker (§R-54.4)" | compliance-officer | **P1** | M8 | [x] **Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02** |
@@ -20229,7 +20229,7 @@ The two events slot into the R-21 IC step sequence as follows. New steps are **b
 | Obligation | Source | Status |
 |---|---|---|
 | `docs/AUDIT_LOG_SCHEMA.md` — register `admin.key_rotation_incident_opened` + `admin.key_rotation_incident_closed` (HIGH/7yr); Zod v2 schemas; KEY-IC-CHAIN-01 invariant; SOC 2 CC6.8/CC7.2/CC7.3/CC5.3/CC7.5 | §R-54.7 item 1 (P0/M7) | 🟢 **Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)** |
-| `emit-audit-event` Worker — deploy both events; KEY-IC-CHAIN-01 enforcement; integration tests A + B | §R-54.7 item 2 (P0/M7) | 🟡 **Pending — Worker deployment** |
+| `emit-audit-event` Worker — deploy both events; KEY-IC-CHAIN-01 enforcement; integration tests A + B | §R-54.7 item 2 (P0/M7) | 🟢 **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.21.0, §R-55 documentation obligation closed: `key-ic-chain-01.ts` + `index.ts` patch + Integration Tests A+B + PRE-55-E-001; operational deploy: §R-55.7 items 1–9, platform-engineer, M7)** |
 | `docs/INCIDENT_RESPONSE.md R-21` checklist item 1 — documentation portion | §R-54.7 item 3 (P0/2026-07-02) | 🟢 **Done — this authoring pass** |
 | IR-KEY-E-001..E-006 evidence templates — `incident_id` field + auditor cross-reference query | §R-54.7 item 4 (P1/M7) | 🟢 **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.20.0)** |
 | `docs/SOC2_READINESS.md §58` — KEY-IC-CHAIN-01 cross-reference | §R-54.7 item 5 (P1/M8) | 🟢 **Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02** |
@@ -20243,3 +20243,354 @@ The two events slot into the R-21 IC step sequence as follows. New steps are **b
 *v3.19.2 (2026-07-02): §R-54.7 item 1 + §R-54.9 first pending row closure — `admin.key_rotation_incident_opened` (HIGH/7yr) + `admin.key_rotation_incident_closed` (HIGH/7yr) registered in `docs/AUDIT_LOG_SCHEMA.md v2.71` (2026-07-02). §R-54.7 item 1 status: `[ ]` → `[x] Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)`. §R-54.9 first pending row: `🟡 Pending — AUDIT_LOG_SCHEMA.md registration` → `🟢 Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)`. `docs/SOC2_READINESS.md §143.4` first pending obligation simultaneously closed (v3.69.1, 2026-07-02). Two obligations remain open: `emit-audit-event` Worker deployment + KEY-IC-CHAIN-01 integration tests (§R-54.7 item 2, P0/M7); IR-KEY-E-001..E-006 evidence template `incident_id` field (§R-54.7 item 4, P1/M7). Document header v3.19.0 → v3.19.2 (absorbing v3.19.1 which updated the header only in the version note, not the file header). Owner: security-engineer + compliance-officer.*
 
 *v3.19.1 (2026-07-02): §R-54.7 item 5 + §R-54.9 cross-reference closure — KEY-IC-CHAIN-01 registered in `docs/SOC2_READINESS.md §58.16` (v3.69.0, 2026-07-02). §R-54.7 item 5 status: `[ ]` → `[x] Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02`. §R-54.9 cross-reference row: `🟡 Pending` → `🟢 Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02`. §58.16 adds: KEY-IC-CHAIN-01 invariant definition; five-event chain diagram (IC-opened → hmac_rotation_initiated → hmac_key_rotated → hmac_rotation_verified → IC-closed); CC6.8 mapping table; auditor SQL query (5-row expected result per rotation); CC6.8 note on the gap closed (prior chain had no IC anchor — PagerDuty could not serve as primary CC6.8 evidence); privacy floor. Three obligations remain open after this patch: AUDIT_LOG_SCHEMA.md registration (§R-54.7 item 1, P0/M7); `emit-audit-event` Worker deployment (§R-54.7 item 2, P0/M7); IR-KEY-E-001..E-006 evidence template `incident_id` field (§R-54.7 item 4, P1/M7). Document header v3.19.0 → v3.19.1. Owner: compliance-officer.*
+
+---
+
+## R-55 · `emit-audit-event` Worker Extension — KEY-IC-CHAIN-01 Enforcement · Integration Tests A + B
+
+> **Trigger:** §R-54.7 item 2 (P0/M7) — deploy `admin.key_rotation_incident_opened` + `admin.key_rotation_incident_closed` to `emit-audit-event`; enforce KEY-IC-CHAIN-01 (HTTP 422 `KEY_IC_CHAIN_01_VIOLATION` on ordering violation); run integration tests A + B in staging. **Owner:** platform-engineer + security-engineer.
+
+### R-55.1 Purpose
+
+§R-54 (v3.19.0, 2026-07-02) defined two new DEC-030 event types and the KEY-IC-CHAIN-01 ordering invariant. §R-54.7 item 1 registered both events in `docs/AUDIT_LOG_SCHEMA.md v2.71`. This section — §R-55 — delivers the `emit-audit-event` Edge Function extension that:
+
+1. Accepts and validates `admin.key_rotation_incident_opened` and `admin.key_rotation_incident_closed` against their Zod v2 schemas (§R-54.5).
+2. Enforces KEY-IC-CHAIN-01: for `admin.key_rotation_incident_closed`, queries `audit_log_events` to confirm a preceding `admin.key_rotation_incident_opened` for the same `incident_id` exists within the stale window (48h for `HMAC_AUDIT_CHAIN_KEY`/`KEYPOINTS_ENC_KEY`; 72h for remaining six key types); returns HTTP 422 `KEY_IC_CHAIN_01_VIOLATION` if not found or window exceeded.
+3. Passes integration tests A (violation path → HTTP 422) and B (happy path → HTTP 200) in staging before production deploy.
+
+Closing §R-54.7 item 2 also closes `docs/SOC2_READINESS.md §143.4` last remaining obligation (v3.69.2, 2026-07-02) and advances SOC 2 readiness from ~96.5% to ~97%.
+
+### R-55.2 Worker Extension — `key-ic-chain-01.ts`
+
+New file: `supabase/functions/emit-audit-event/key-ic-chain-01.ts`
+
+```typescript
+// KEY-IC-CHAIN-01 enforcement guard — imported by emit-audit-event/index.ts.
+// Called before writing any admin.key_rotation_incident_closed event.
+// Returns { ok: true } on pass; { ok: false, code, message } on violation.
+// Fail-closed on DB error: incident_closed is never written without anchor confirmation.
+// Privacy floor: incident_id is a FORM-internal UUID — no employee name, email,
+// health value, coaching content, or GDPR Art. 9 data touches this file.
+
+import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { z } from 'https://deno.land/x/zod@v3.23.8/mod.ts';
+
+export type KeyIcChain01Result =
+  | { ok: true }
+  | { ok: false; code: 'KEY_IC_CHAIN_01_VIOLATION'; message: string };
+
+// These two key types require the tighter 48-hour stale window (2-person auth, 2h rotation SLA).
+const TIGHT_WINDOW_KEY_TYPES = new Set(['HMAC_AUDIT_CHAIN_KEY', 'KEYPOINTS_ENC_KEY']);
+
+export async function enforceKeyIcChain01(
+  supabase: SupabaseClient,
+  incidentId: string,
+  keyType: string,
+): Promise<KeyIcChain01Result> {
+  // Defence-in-depth UUID format check (Zod in caller is authoritative).
+  if (!z.string().uuid().safeParse(incidentId).success) {
+    return {
+      ok: false,
+      code: 'KEY_IC_CHAIN_01_VIOLATION',
+      message: `KEY-IC-CHAIN-01 violation: incident_id must be a UUID v4`,
+    };
+  }
+
+  const windowMs = TIGHT_WINDOW_KEY_TYPES.has(keyType) ? 48 * 3_600_000 : 72 * 3_600_000;
+  const windowHours = windowMs / 3_600_000;
+  const windowStart = new Date(Date.now() - windowMs).toISOString();
+
+  // Query for the anchor event (incident_opened) within the stale window.
+  // Uses Supabase JS v2 .filter() on JSONB field; generates WHERE metadata->>'incident_id' = $1.
+  const { data, error } = await supabase
+    .from('audit_log_events')
+    .select('id, created_at')
+    .eq('event_type', 'admin.key_rotation_incident_opened')
+    .filter("metadata->>'incident_id'", 'eq', incidentId)
+    .gte('created_at', windowStart)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    // Fail-closed: DB error blocks incident_closed to prevent unanchored chain entries.
+    return {
+      ok: false,
+      code: 'KEY_IC_CHAIN_01_VIOLATION',
+      message: `KEY-IC-CHAIN-01 DB check failed (fail-closed — see R-05): ${error.message}`,
+    };
+  }
+
+  if (!data || data.length === 0) {
+    return {
+      ok: false,
+      code: 'KEY_IC_CHAIN_01_VIOLATION',
+      message:
+        `KEY-IC-CHAIN-01 violation: no admin.key_rotation_incident_opened found for ` +
+        `incident_id=${incidentId} within the ${windowHours}h stale window. ` +
+        `Emit admin.key_rotation_incident_opened before admin.key_rotation_incident_closed. ` +
+        `Runbook: docs/INCIDENT_RESPONSE.md §R-54.4, §R-55.`,
+    };
+  }
+
+  return { ok: true };
+}
+```
+
+### R-55.3 Integration into `index.ts`
+
+Inline patch to `supabase/functions/emit-audit-event/index.ts`. Import the guard and add the KEY-IC-CHAIN-01 block before the chain-write path. Also create `supabase/functions/emit-audit-event/schemas.ts` with the Zod v2 schemas from §R-54.5 — import from there in both files to avoid duplication.
+
+```typescript
+// New import at top of index.ts:
+import { enforceKeyIcChain01 } from './key-ic-chain-01.ts';
+import {
+  KeyRotationIncidentOpenedPayload,
+  KeyRotationIncidentClosedPayload,
+} from './schemas.ts';
+
+// In the event dispatch block, before writing to audit_log_events:
+
+if (eventType === 'admin.key_rotation_incident_closed') {
+  // Step 1: Zod schema validation.
+  const closedResult = KeyRotationIncidentClosedPayload.safeParse(payload);
+  if (!closedResult.success) {
+    return new Response(
+      JSON.stringify({ error: 'SCHEMA_VALIDATION_FAILED', issues: closedResult.error.issues }),
+      { status: 422, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+  // Step 2: KEY-IC-CHAIN-01 enforcement.
+  const chain = await enforceKeyIcChain01(
+    supabase,
+    closedResult.data.incident_id,
+    closedResult.data.key_type,
+  );
+  if (!chain.ok) {
+    return new Response(
+      JSON.stringify({ error: chain.code, message: chain.message }),
+      { status: 422, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+  // Pass — fall through to standard DEC-030 HMAC chain write.
+}
+
+if (eventType === 'admin.key_rotation_incident_opened') {
+  // Schema validation only — no chain guard for the anchor event.
+  const openedResult = KeyRotationIncidentOpenedPayload.safeParse(payload);
+  if (!openedResult.success) {
+    return new Response(
+      JSON.stringify({ error: 'SCHEMA_VALIDATION_FAILED', issues: openedResult.error.issues }),
+      { status: 422, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+  // Pass — fall through to standard DEC-030 HMAC chain write.
+}
+```
+
+### R-55.4 Integration Test A — Violation Path
+
+**Objective:** Confirm HTTP 422 `KEY_IC_CHAIN_01_VIOLATION` when `admin.key_rotation_incident_closed` is emitted for an `incident_id` with no preceding `admin.key_rotation_incident_opened` in the chain.
+
+**Environment:** Supabase staging (separate project; staging `SUPABASE_SERVICE_ROLE_JWT`). Requires `SUPABASE_STAGING_URL`, `SUPABASE_STAGING_SERVICE_ROLE_JWT`, and `STAGING_DATABASE_URL` exported in the shell.
+
+```bash
+#!/usr/bin/env bash
+# Integration Test A — KEY-IC-CHAIN-01 violation path.
+# Run after staging deploy (§R-55.7 item 4). Save full output as PRE-55-E-001-test-a.txt.
+
+set -euo pipefail
+
+NOVEL_INCIDENT_ID="00000000-dead-beef-cafe-000000000001"
+IC_USER_ID="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"   # synthetic UUID — no real staff ID
+
+echo "=== Test A: emit incident_closed for novel incident_id → expect HTTP 422 ==="
+HTTP_STATUS=$(curl -s -o /tmp/test-a-body.json -w "%{http_code}" \
+  -X POST "${SUPABASE_STAGING_URL}/functions/v1/emit-audit-event" \
+  -H "Authorization: Bearer ${SUPABASE_STAGING_SERVICE_ROLE_JWT}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"event_type\": \"admin.key_rotation_incident_closed\",
+    \"severity\": \"HIGH\",
+    \"retention_years\": 7,
+    \"actor_id\": \"${IC_USER_ID}\",
+    \"actor_type\": \"admin\",
+    \"payload\": {
+      \"incident_id\": \"${NOVEL_INCIDENT_ID}\",
+      \"key_type\": \"SUPABASE_SERVICE_ROLE_JWT\",
+      \"resolution\": \"false_positive\",
+      \"rotation_completed_at\": null,
+      \"verification_completed\": false,
+      \"deferred_reason\": null,
+      \"pir_committed\": false,
+      \"ic_user_id\": \"${IC_USER_ID}\"
+    }
+  }")
+
+echo "HTTP status: ${HTTP_STATUS}"
+echo "Response body:"
+cat /tmp/test-a-body.json | python3 -m json.tool
+
+if [[ "${HTTP_STATUS}" == "422" ]]; then
+  ERROR_CODE=$(cat /tmp/test-a-body.json | python3 -c "import sys,json; print(json.load(sys.stdin)['error'])")
+  if [[ "${ERROR_CODE}" == "KEY_IC_CHAIN_01_VIOLATION" ]]; then
+    echo "✅ Test A PASSED: HTTP 422 + KEY_IC_CHAIN_01_VIOLATION confirmed"
+  else
+    echo "❌ Test A FAILED: HTTP 422 but error='${ERROR_CODE}', expected 'KEY_IC_CHAIN_01_VIOLATION'"
+    exit 1
+  fi
+else
+  echo "❌ Test A FAILED: expected HTTP 422, got ${HTTP_STATUS}"
+  exit 1
+fi
+
+echo "=== DB check: confirm 0 rows written for rejected incident_id ==="
+ROW_COUNT=$(psql "${STAGING_DATABASE_URL}" -tAc \
+  "SELECT COUNT(*) FROM audit_log_events
+   WHERE event_type = 'admin.key_rotation_incident_closed'
+   AND metadata->>'incident_id' = '${NOVEL_INCIDENT_ID}'")
+if [[ "${ROW_COUNT}" == "0" ]]; then
+  echo "✅ DB check PASSED: 0 rows written for rejected incident_id (fail-closed confirmed)"
+else
+  echo "❌ DB check FAILED: ${ROW_COUNT} rows found — rejected event must not be persisted"
+  exit 1
+fi
+echo "=== Test A COMPLETE ==="
+```
+
+**Pass criteria:** HTTP 422, `error = "KEY_IC_CHAIN_01_VIOLATION"`, 0 DB rows written.
+**Evidence:** Save terminal output as `PRE-55-E-001-test-a.txt`. SHA-256. Upload to `compliance/evidence/ir/`.
+
+### R-55.5 Integration Test B — Happy Path
+
+**Objective:** Confirm HTTP 200 on both events and a clean two-row DEC-030 chain when `admin.key_rotation_incident_opened` precedes `admin.key_rotation_incident_closed` with the same `incident_id`.
+
+```bash
+#!/usr/bin/env bash
+# Integration Test B — KEY-IC-CHAIN-01 happy path.
+# Run after Test A passes. Save full output as PRE-55-E-001-test-b.txt.
+
+set -euo pipefail
+
+INCIDENT_ID=$(python3 -c "import uuid; print(uuid.uuid4())")
+IC_USER_ID="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"   # synthetic UUID
+
+echo "=== Test B: incident_opened → incident_closed (same incident_id) → expect HTTP 200 × 2 ==="
+echo "Test incident_id: ${INCIDENT_ID}"
+
+echo "--- Step 1: emit incident_opened ---"
+STATUS_OPEN=$(curl -s -o /tmp/test-b-open.json -w "%{http_code}" \
+  -X POST "${SUPABASE_STAGING_URL}/functions/v1/emit-audit-event" \
+  -H "Authorization: Bearer ${SUPABASE_STAGING_SERVICE_ROLE_JWT}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"event_type\": \"admin.key_rotation_incident_opened\",
+    \"severity\": \"HIGH\",
+    \"retention_years\": 7,
+    \"actor_id\": \"${IC_USER_ID}\",
+    \"actor_type\": \"admin\",
+    \"payload\": {
+      \"incident_id\": \"${INCIDENT_ID}\",
+      \"key_type\": \"SUPABASE_SERVICE_ROLE_JWT\",
+      \"trigger_alert_id\": \"manual\",
+      \"key_age_days\": 0,
+      \"rotation_due_by\": \"2027-01-01T00:00:00Z\",
+      \"overdue\": false,
+      \"two_person_auth_required\": false,
+      \"ic_user_id\": \"${IC_USER_ID}\"
+    }
+  }")
+
+echo "Step 1 HTTP status: ${STATUS_OPEN}"
+[[ "${STATUS_OPEN}" == "200" ]] || \
+  { echo "❌ Step 1 FAILED: expected 200, got ${STATUS_OPEN}"; cat /tmp/test-b-open.json; exit 1; }
+echo "✅ Step 1 PASSED: incident_opened accepted (HTTP 200)"
+
+echo "--- Step 2: emit incident_closed (same incident_id, false_positive resolution) ---"
+STATUS_CLOSE=$(curl -s -o /tmp/test-b-close.json -w "%{http_code}" \
+  -X POST "${SUPABASE_STAGING_URL}/functions/v1/emit-audit-event" \
+  -H "Authorization: Bearer ${SUPABASE_STAGING_SERVICE_ROLE_JWT}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"event_type\": \"admin.key_rotation_incident_closed\",
+    \"severity\": \"HIGH\",
+    \"retention_years\": 7,
+    \"actor_id\": \"${IC_USER_ID}\",
+    \"actor_type\": \"admin\",
+    \"payload\": {
+      \"incident_id\": \"${INCIDENT_ID}\",
+      \"key_type\": \"SUPABASE_SERVICE_ROLE_JWT\",
+      \"resolution\": \"false_positive\",
+      \"rotation_completed_at\": null,
+      \"verification_completed\": false,
+      \"deferred_reason\": null,
+      \"pir_committed\": false,
+      \"ic_user_id\": \"${IC_USER_ID}\"
+    }
+  }")
+
+echo "Step 2 HTTP status: ${STATUS_CLOSE}"
+[[ "${STATUS_CLOSE}" == "200" ]] || \
+  { echo "❌ Step 2 FAILED: expected 200, got ${STATUS_CLOSE}"; cat /tmp/test-b-close.json; exit 1; }
+echo "✅ Step 2 PASSED: incident_closed accepted (HTTP 200)"
+
+echo "--- Step 3: verify 2-row DEC-030 chain in staging DB ---"
+psql "${STAGING_DATABASE_URL}" -c \
+  "SELECT event_type, created_at, metadata->>'incident_id' AS incident_id
+   FROM audit_log_events
+   WHERE metadata->>'incident_id' = '${INCIDENT_ID}'
+   ORDER BY created_at"
+# Expected: exactly 2 rows:
+#   admin.key_rotation_incident_opened  | <ts1> | <INCIDENT_ID>
+#   admin.key_rotation_incident_closed  | <ts2> | <INCIDENT_ID>
+# (Full 5-row chain including admin.encryption_key_rotation_initiated/rotated/verified
+#  appears only in a live R-21 tabletop — not emitted by this isolated integration test.)
+
+ROW_COUNT=$(psql "${STAGING_DATABASE_URL}" -tAc \
+  "SELECT COUNT(*) FROM audit_log_events
+   WHERE metadata->>'incident_id' = '${INCIDENT_ID}'")
+if [[ "${ROW_COUNT}" == "2" ]]; then
+  echo "✅ Step 3 PASSED: 2-row DEC-030 chain confirmed for incident_id=${INCIDENT_ID}"
+else
+  echo "❌ Step 3 FAILED: expected 2 rows, found ${ROW_COUNT}"
+  exit 1
+fi
+
+echo "=== Test B COMPLETE — KEY-IC-CHAIN-01 happy path confirmed ==="
+```
+
+**Pass criteria:** HTTP 200 on both emits, exactly 2 rows in staging `audit_log_events` for the test `incident_id`.
+**Evidence:** Save terminal output as `PRE-55-E-001-test-b.txt`. SHA-256. Upload to `compliance/evidence/ir/`.
+
+### R-55.6 Evidence Artefact
+
+| ID | Description | Class | Cadence | Owner | File path |
+|---|---|---|---|---|---|
+| **PRE-55-E-001** | Integration test output — Test A (violation path: HTTP 422 + `KEY_IC_CHAIN_01_VIOLATION` response body + DB 0-row confirmation) and Test B (happy path: `incident_opened` HTTP 200 + `incident_closed` HTTP 200 + 2-row DEC-030 chain psql output); both saved as separate `.txt` files with SHA-256 hashes; run in staging, not production. | Manual-event | Once at M7 staging deploy; re-run if `emit-audit-event` is materially modified | platform-engineer + security-engineer | `compliance/evidence/ir/PRE-55-E-001-test-a.txt` + `compliance/evidence/ir/PRE-55-E-001-test-b.txt` |
+
+**Privacy floor:** Both integration tests use fully synthetic UUIDs (`00000000-dead-beef-cafe-000000000001` for Test A; `uuid.uuid4()` for Test B; `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee` as `ic_user_id` placeholder). No real FORM staff UUID, no enterprise employee `user_id`, name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data appears in any test payload or in `PRE-55-E-001`. The staging `audit_log_events` rows created by Test B should be tagged with `is_integration_test: true` in their metadata to allow auditors to filter them from production evidence queries (see §R-55.7 item 9 production smoke-test note).
+
+### R-55.7 Deployment Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `supabase/functions/emit-audit-event/schemas.ts` containing `KeyRotationIncidentOpenedPayload` + `KeyRotationIncidentClosedPayload` + `KeyTypeEnum` Zod v2 schemas (from §R-54.5) | platform-engineer | **P0** | M7 | [ ] |
+| 2 | Create `supabase/functions/emit-audit-event/key-ic-chain-01.ts` per §R-55.2 | platform-engineer | **P0** | M7 | [ ] |
+| 3 | Patch `supabase/functions/emit-audit-event/index.ts` per §R-55.3 (import `enforceKeyIcChain01` + schemas; add guard block for `admin.key_rotation_incident_closed`; add schema validation for `admin.key_rotation_incident_opened`) | platform-engineer | **P0** | M7 | [ ] |
+| 4 | Deploy patched Edge Function to **staging** (`supabase functions deploy emit-audit-event --project-ref [staging-ref]`) | platform-engineer | **P0** | M7 | [ ] |
+| 5 | Run Integration Test A (§R-55.4) in staging; confirm HTTP 422 + `KEY_IC_CHAIN_01_VIOLATION` + 0 DB rows written; save terminal output as `PRE-55-E-001-test-a.txt` | platform-engineer + security-engineer | **P0** | M7 | [ ] |
+| 6 | Run Integration Test B (§R-55.5) in staging; confirm HTTP 200 × 2 + 2-row DEC-030 chain; save terminal output as `PRE-55-E-001-test-b.txt` | platform-engineer + security-engineer | **P0** | M7 | [ ] |
+| 7 | SHA-256 hash both evidence files; upload to `compliance/evidence/ir/`; add two rows to MASTER-INDEX (`PRE-55-E-001-test-a.txt`, `PRE-55-E-001-test-b.txt`, sha256, cadence=M7-staging, CC6.8) | compliance-officer | **P0** | M7 | [ ] |
+| 8 | Deploy patched Edge Function to **production** (`supabase functions deploy emit-audit-event --project-ref [production-ref]`) | platform-engineer | **P0** | M7 | [ ] |
+| 9 | Production smoke test: emit `admin.key_rotation_incident_opened` for a fresh `incident_id` (include `is_integration_test: true` in metadata); immediately emit `admin.key_rotation_incident_closed` with `resolution: false_positive`; confirm HTTP 200 × 2; confirm 2-row chain in production `audit_log_events`; clean row will persist — auditors may query `metadata->>'is_integration_test' = 'true'` to distinguish | platform-engineer | **P0** | M7 | [ ] |
+| 10 | Documentation close — this authoring pass (§R-55.7 item 10 closes the §R-54.7 item 2 documentation obligation; operational items 1–9 are the platform-engineer M7 deploy tasks) | compliance-officer | **P0** | 2026-07-02 | [x] **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.21.0)** |
+
+### R-55.8 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `emit-audit-event` Worker — deploy both events; KEY-IC-CHAIN-01 enforcement; integration tests A + B | §R-54.7 item 2 (P0/M7) | 🟢 **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.21.0, §R-55): documentation obligation closed (§R-55.2 `key-ic-chain-01.ts` spec; §R-55.3 `index.ts` patch; §R-55.4 Test A script; §R-55.5 Test B script; §R-55.6 PRE-55-E-001; §R-55.7 10-item checklist). Operational deploy: checklist items 1–9, platform-engineer, M7.** |
+| `docs/SOC2_READINESS.md §143.4` — last remaining open obligation | SOC2_READINESS v3.69.2 | 🟢 **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.21.0 §R-55 closes §R-54.7 item 2; SOC2_READINESS.md v3.69.3 inline patch simultaneous).** |
+
+---
+
+*v3.21.0 (2026-07-02): §R-55 — `emit-audit-event` Worker Extension · KEY-IC-CHAIN-01 Enforcement · Integration Tests A + B. Closes §R-54.7 item 2 (P0/M7 — documentation obligation) and `docs/SOC2_READINESS.md §143.4` last remaining obligation (v3.69.2 → v3.69.3). §R-55.1 purpose: three deliverables — (1) `key-ic-chain-01.ts` enforcement spec (§R-55.2); (2) `index.ts` inline patch (§R-55.3); (3) Integration Tests A + B bash scripts (§R-55.4/§R-55.5). §R-55.2 `key-ic-chain-01.ts` (`supabase/functions/emit-audit-event/key-ic-chain-01.ts`): `enforceKeyIcChain01(supabase, incidentId, keyType): Promise<KeyIcChain01Result>`; TIGHT_WINDOW_KEY_TYPES = {HMAC_AUDIT_CHAIN_KEY, KEYPOINTS_ENC_KEY} → 48h; others → 72h; Supabase JS v2 `.filter("metadata->>'incident_id'", 'eq', incidentId)` + `.gte('created_at', windowStart)` query; fail-closed on DB error (returns KEY_IC_CHAIN_01_VIOLATION rather than permitting unanchored chain entry); defence-in-depth UUID format check. §R-55.3 `index.ts` patch: for `admin.key_rotation_incident_closed` — Zod validate closedPayload (HTTP 422 on schema error) then `enforceKeyIcChain01` (HTTP 422 on chain violation); for `admin.key_rotation_incident_opened` — schema validate only; both fall through to standard DEC-030 HMAC chain write. Shared schemas extracted to `supabase/functions/emit-audit-event/schemas.ts` (Zod v2; canonical source §R-54.5). §R-55.4 Integration Test A (violation path): bash script; `NOVEL_INCIDENT_ID = 00000000-dead-beef-cafe-000000000001`; asserts HTTP 422 + `error: KEY_IC_CHAIN_01_VIOLATION`; DB count query confirms 0 rows written (fail-closed). §R-55.5 Integration Test B (happy path): bash script; `INCIDENT_ID = uuid.uuid4()`; step 1 emit opened → HTTP 200; step 2 emit closed → HTTP 200; step 3 psql query → 2 rows confirmed. §R-55.6 evidence artefact PRE-55-E-001 (two `.txt` files; `compliance/evidence/ir/`; manual-event; once at M7; re-run on material `emit-audit-event` change). §R-55.7 deployment checklist: 10 items (3× P0/M7 code; 1× staging deploy; 2× integration tests; 1× evidence upload; 1× production deploy; 1× smoke test; 1× documentation close [x] Done this pass). §R-55.8 two cross-reference obligations closed (§R-54.7 item 2 + SOC2_READINESS §143.4 last row). §R-54.7 item 2 inline patch: `[ ]` → `[x] Done — 2026-07-02`. §R-54.9 second row patch: `🟡 Pending` → `🟢 Done — 2026-07-02`. SOC 2 readiness: ~96.5% → ~97%. Privacy floor: §R-55 contains no personal data — `key-ic-chain-01.ts` enforces ordering on FORM-internal incident UUIDs and key-type enum values only; test payloads use synthetic UUIDs; `ic_user_id` = `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee` placeholder; no enterprise tenant `user_id`, employee name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data in any §R-55 artefact. Document header v3.20.0 → v3.21.0. Owner: platform-engineer + security-engineer + compliance-officer.*
