@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v11.12.0** — 2026-07-02 · post-21 + post-2921 · post-21: «Плато — це не стеля. Це діагноз.» · original series post-21 · clinical-safety PASS · sports-scientist review pending · blog.html card added for post-21 · post-2921: «Як зберегти силовий прогрес при тренуванні двічі на тиждень» · series «Тренувальна стійкість» 2916–2925 (6/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2921 · next: post-22 («Як будувати тренування без тренажерного залу: принципи замість вибачень») + post-2922 («Тренування під час подорожі: мінімальний операційний стандарт»)
+
 **v11.10.0** — 2026-07-02 · post-20 · «Крепатура — це не індикатор тренування. Ось що вона насправді означає» · original series post-20 · clinical-safety PASS · sports-scientist review pending · blog.html card added for post-20 · README roadmap extended: series 3031–3040 «Тренування і відновлення: операційна рамка» proposed · next: post-21 («Плато — це не стеля. Це діагноз.»)
 
 **v11.9.0** — 2026-07-02 · post-19 + post-2920 · post-19: «Як читати тіло: коли м'язовий біль — сигнал адаптації, а коли — сигнал зупинки» · original series post-19 · clinical-safety CONDITIONAL PASS · sports-scientist review pending · blog.html card added for post-19 · post-2920: «Тренування в умовах часових обмежень: операційна модель 30-хвилинної сесії» · series «Тренувальна стійкість» 2916–2925 (5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2920 · next: post-20 («Крепатура — це не індикатор тренування») + post-2921 («Як зберегти силовий прогрес при тренуванні двічі на тиждень»)
