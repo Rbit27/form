@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [11.27.1] — 2026-07-02
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.21.1 → v3.21.2. §R-56 Cross-Reference Patch: closes three stale "pending" SOC2_READINESS §79.4 registration body-text references — R-42.8 (SCA-STALE-E-001, registered §108 v3.33.0, 2026-06-25), R-44.8 (CHN-OBS-E-001, registered §111 v3.36.0, 2026-06-25), R-46.13 (PRICE-STALE-E-001, registered §115 v3.40.0, 2026-06-26). §R-56.1 background, §R-56.2 three-row inline updates table, §R-56.3 checklist, §R-56.4 obligations closed table. Also adds v3.21.1 footer note (inline-only R-50.8/R-51.8 patch applied as part of OBSERVABILITY §68 commit).
+- `docs/OBSERVABILITY.md` — v5.13.1 → v5.13.2. §69 Cross-Reference Patch: closes two stale "pending" SOC2_READINESS registration body-text references — §56.8 SCIM-PROV-MON-E-001 "Register in" field (registered §120 v3.45.0, 2026-06-26) and §12.6 job 48 AMEND-OBS-E-001 cross-ref cell (registered §124 v3.48.0, 2026-06-27). §69 TOC entry added. §69.1–§69.4 sections added.
+- `VERSION` — 11.27.0 → 11.27.1.
+
 ## [11.27.0] — 2026-07-02
 
 ### Added

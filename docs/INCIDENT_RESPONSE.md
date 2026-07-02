@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.21.1
+# FORM · Incident Response Runbook v3.21.2
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -16117,7 +16117,7 @@ const ScaMonitorStaleRestoredSchema = z.object({
 
 **SCA-STALE-E-001 — Quarterly pg_cron job 42 health report (CC7.2/CC6.8, 3yr)**
 
-Quarterly export of all `cron.job_run_details` for job 42: run count, failure count, stale-window activations (count and max-stale-minutes), `open_critical_sla_breached_at_declared` for any R-42 activations. Zero-activation quarters filed as affirmative attestation. Path: `compliance/evidence/security/sca-sla-monitor-stale/sca-stale-e-001-YYYY-QN.csv`. Cross-ref: SOC2_READINESS §79.4 (pending registration — R-42.11 item 4).
+Quarterly export of all `cron.job_run_details` for job 42: run count, failure count, stale-window activations (count and max-stale-minutes), `open_critical_sla_breached_at_declared` for any R-42 activations. Zero-activation quarters filed as affirmative attestation. Path: `compliance/evidence/security/sca-sla-monitor-stale/sca-stale-e-001-YYYY-QN.csv`. Cross-ref: SOC2_READINESS §79.4 🟢 **Registered — SOC2_READINESS §108 (v3.33.0, 2026-06-25).** Closed by §R-56 cross-reference patch (INCIDENT_RESPONSE.md v3.21.2, 2026-07-02).
 
 ### R-42.9 SOC 2 Criteria Mapping
 
@@ -16474,7 +16474,7 @@ z.object({
 | Stale-window exception note | Per-tenant exception detail when any breach confirmed (tenant_id UUIDs only; `form_api` REVOKED) | C1.1 / CC7.2 | 7 yr | `compliance/evidence/offboarding/offboard-chain-monitor-stale/r44-<incident_id>/stale-window-note.md` |
 | DEC-030 event pair | `system.offboard_chain_monitor_stale_declared` (HIGH/7yr) + `system.offboard_chain_monitor_restored` (STANDARD/3yr) in `audit_log_events` — HMAC-chained, independently verifiable per HMAC-VERIFY-ALGO-001 | CC7.2 | per event | `audit_log_events` table (tamper-evident via DEC-030) |
 
-**Quarterly evidence artefact:** CHN-OBS-E-001 (CC6.1/CC7.1/CC7.2, quarterly, 3yr — `compliance/evidence/offboarding/CHN-OBS-E-001_<YYYY-QN>.md`). Covers OFFL-SLO-01 performance, job 44 run statistics, and AL-OFFL-01 activation log. R-44 activations are included as stale-window incidents in the AL-OFFL-01 activation log section. Registration in `docs/SOC2_READINESS.md §79.4` per §53.10 item 5 (P1/M11 — pending).
+**Quarterly evidence artefact:** CHN-OBS-E-001 (CC6.1/CC7.1/CC7.2, quarterly, 3yr — `compliance/evidence/offboarding/CHN-OBS-E-001_<YYYY-QN>.md`). Covers OFFL-SLO-01 performance, job 44 run statistics, and AL-OFFL-01 activation log. R-44 activations are included as stale-window incidents in the AL-OFFL-01 activation log section. Registration in `docs/SOC2_READINESS.md §79.4`: 🟢 **Registered — SOC2_READINESS §111 (v3.36.0, 2026-06-25).** Closed by §R-56 cross-reference patch (INCIDENT_RESPONSE.md v3.21.2, 2026-07-02).
 
 ---
 
@@ -17393,7 +17393,7 @@ z.object({
 | Quarterly trigger stale-window note | Manual quarterly audit trigger record when R-46-C3 positive | CC4.1 / A1.1 | 3 yr | `compliance/evidence/pricing-exceptions/quarterly-trigger-stale/r46-<incident_id>/stale-window-note.md` |
 | DEC-030 event pair | `system.pricing_exception_monitor_stale_declared` (HIGH/7yr) + `system.pricing_exception_monitor_restored` (STANDARD/3yr) in `audit_log_events` — HMAC-chained, independently verifiable per HMAC-VERIFY-ALGO-001 | CC7.2 | per event | `audit_log_events` table (tamper-evident via DEC-030) |
 
-**Annual artefact:** PRICE-STALE-E-001 (CC5.2/CC4.1/CC7.2, annual, 3yr — `compliance/evidence/pricing-exceptions/PRICE-STALE-E-001_<YYYY>.md`). Covers job 46 run statistics, R-46 stale-window activation log, `reentry_violations_found_during_stale` totals, and PRICE-SLO-01/02 performance. Zero-activation years filed as affirmative attestation. Registration in `docs/SOC2_READINESS.md §79.4` per §R-46.13 item 4 (P1/M11 — pending).
+**Annual artefact:** PRICE-STALE-E-001 (CC5.2/CC4.1/CC7.2, annual, 3yr — `compliance/evidence/pricing-exceptions/PRICE-STALE-E-001_<YYYY>.md`). Covers job 46 run statistics, R-46 stale-window activation log, `reentry_violations_found_during_stale` totals, and PRICE-SLO-01/02 performance. Zero-activation years filed as affirmative attestation. Registration in `docs/SOC2_READINESS.md §79.4`: 🟢 **Registered — SOC2_READINESS §115 (v3.40.0, 2026-06-26).** Closed by §R-56 cross-reference patch (INCIDENT_RESPONSE.md v3.21.2, 2026-07-02).
 
 ---
 
@@ -20590,6 +20590,56 @@ echo "=== Test B COMPLETE — KEY-IC-CHAIN-01 happy path confirmed ==="
 |---|---|---|
 | `emit-audit-event` Worker — deploy both events; KEY-IC-CHAIN-01 enforcement; integration tests A + B | §R-54.7 item 2 (P0/M7) | 🟢 **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.21.0, §R-55): documentation obligation closed (§R-55.2 `key-ic-chain-01.ts` spec; §R-55.3 `index.ts` patch; §R-55.4 Test A script; §R-55.5 Test B script; §R-55.6 PRE-55-E-001; §R-55.7 10-item checklist). Operational deploy: checklist items 1–9, platform-engineer, M7.** |
 | `docs/SOC2_READINESS.md §143.4` — last remaining open obligation | SOC2_READINESS v3.69.2 | 🟢 **Done — 2026-07-02 (INCIDENT_RESPONSE.md v3.21.0 §R-55 closes §R-54.7 item 2; SOC2_READINESS.md v3.69.3 inline patch simultaneous).** |
+
+---
+
+*v3.21.1 (2026-07-02): Inline-only patch — §R-50.8 + §R-51.8 stale AUDIT_LOG_SCHEMA.md registration status closure. Applied as companion update to `docs/OBSERVABILITY.md §68` (v5.13.1, 2026-07-02). R-50.8: `Pending §59.10 item 2 (P0/M6)` → 🟢 Done — AUDIT_LOG_SCHEMA.md v2.57, 2026-06-29. R-51.8: `Pending §60.10 item 2 (P0/M6)` → 🟢 Done — AUDIT_LOG_SCHEMA.md v2.57, 2026-06-29. No new section. Document header v3.21.0 → v3.21.1. Owner: compliance-officer.*
+
+---
+
+## R-56 · Cross-Reference Patch — R-42.8 / R-44.8 / R-46.13 Stale SOC2_READINESS §79.4 Registration Status Closure
+
+> **Authored:** 2026-07-02 · **Owner:** compliance-officer + security-engineer
+
+### R-56.1 Background
+
+During authorship of R-42 (SCA SLA Monitor Stale, v1.0, 2026-06-25), R-44 (Offboard Chain Monitor Stale, v1.0, 2026-06-25), and R-46 (Pricing Exception Compliance Monitor Stale, v1.0, 2026-06-25), three evidence artefact body-text descriptions recorded a "pending" registration status for `docs/SOC2_READINESS.md §79.4`:
+
+- **R-42.8** (SCA-STALE-E-001): `Cross-ref: SOC2_READINESS §79.4 (pending registration — R-42.11 item 4).`
+- **R-44.8** (CHN-OBS-E-001): `Registration in docs/SOC2_READINESS.md §79.4 per §53.10 item 5 (P1/M11 — pending).`
+- **R-46.13** (PRICE-STALE-E-001): `Registration in docs/SOC2_READINESS.md §79.4 per §R-46.13 item 4 (P1/M11 — pending).`
+
+All three obligations were subsequently fulfilled: SCA-STALE-E-001 registered in SOC2_READINESS §108 (v3.33.0, 2026-06-25); CHN-OBS-E-001 registered in SOC2_READINESS §111 (v3.36.0, 2026-06-25) per §53.10 item 5; PRICE-STALE-E-001 registered in SOC2_READINESS §115 (v3.40.0, 2026-06-26). The corresponding implementation checklist items (R-42.11 item 4, §53.10 item 5 closure for CHN-OBS-E-001, R-46.13 item 4) were correctly marked `[x] Done` in those commits, but the three body-text evidence artefact paragraphs retained their original "pending" wording. This section closes all three discrepancies. Two parallel stale body-text items in `docs/OBSERVABILITY.md` (§12.6 job 48 AMEND-OBS-E-001 cross-ref field and §56.8 "Register in" field) are closed simultaneously by the §69 cross-reference patch (OBSERVABILITY.md v5.13.2, 2026-07-02).
+
+### R-56.2 Inline Updates Applied (this patch)
+
+| Location | Stale text (before) | Resolution |
+|---|---|---|
+| R-42.8 (SCA-STALE-E-001 body text) | `Cross-ref: SOC2_READINESS §79.4 (pending registration — R-42.11 item 4).` | 🟢 **Registered — SOC2_READINESS §108 (v3.33.0, 2026-06-25).** |
+| R-44.8 (CHN-OBS-E-001 body text) | `Registration in docs/SOC2_READINESS.md §79.4 per §53.10 item 5 (P1/M11 — pending).` | 🟢 **Registered — SOC2_READINESS §111 (v3.36.0, 2026-06-25).** |
+| R-46.13 (PRICE-STALE-E-001 body text) | `Registration in docs/SOC2_READINESS.md §79.4 per §R-46.13 item 4 (P1/M11 — pending).` | 🟢 **Registered — SOC2_READINESS §115 (v3.40.0, 2026-06-26).** |
+
+### R-56.3 Implementation Checklist
+
+| # | Action | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Apply R-42.8 inline SOC2_READINESS §79.4 registration status update | compliance-officer | **P0** | [x] **Done — this patch (v3.21.2, 2026-07-02).** |
+| 2 | Apply R-44.8 inline SOC2_READINESS §79.4 registration status update | compliance-officer | **P0** | [x] **Done — this patch (v3.21.2, 2026-07-02).** |
+| 3 | Apply R-46.13 inline SOC2_READINESS §79.4 registration status update | compliance-officer | **P0** | [x] **Done — this patch (v3.21.2, 2026-07-02).** |
+
+### R-56.4 Cross-Reference Obligations Closed
+
+| Stale item | Source version | Resolution |
+|---|---|---|
+| R-42.8 SCA-STALE-E-001 "pending registration" | Authored R-42 (v1.0, 2026-06-25); obligation fulfilled same day (SOC2_READINESS §108, v3.33.0) but body text not patched | 🟢 **§R-56 this patch (v3.21.2, 2026-07-02).** Body text updated to 🟢 Registered. |
+| R-44.8 CHN-OBS-E-001 "pending" | Authored R-44 (v1.0, 2026-06-25); obligation fulfilled same day (SOC2_READINESS §111, v3.36.0 — §53.10 item 5) but body text not patched | 🟢 **§R-56 this patch (v3.21.2, 2026-07-02).** Body text updated to 🟢 Registered. |
+| R-46.13 PRICE-STALE-E-001 "pending" | Authored R-46 (v1.0, 2026-06-25); obligation fulfilled 2026-06-26 (SOC2_READINESS §115, v3.40.0) but body text not patched | 🟢 **§R-56 this patch (v3.21.2, 2026-07-02).** Body text updated to 🟢 Registered. |
+
+**Privacy floor:** No employee `user_id`, name, email, health value, coaching content, body composition, or GDPR Art. 9 special-category data in any §R-56 content. All edits are metadata-only compliance tracking annotations.
+
+---
+
+*v3.21.2 (2026-07-02): §R-56 Cross-Reference Patch — R-42.8 / R-44.8 / R-46.13 Stale SOC2_READINESS §79.4 Registration Status Closure. Closes three stale "pending" body-text references: R-42.8 (SCA-STALE-E-001, registered SOC2_READINESS §108 v3.33.0, 2026-06-25 — R-42.11 item 4 [x] Done), R-44.8 (CHN-OBS-E-001, registered SOC2_READINESS §111 v3.36.0, 2026-06-25 — §53.10 item 5 [x] Done), R-46.13 (PRICE-STALE-E-001, registered SOC2_READINESS §115 v3.40.0, 2026-06-26 — R-46.13 item 4 [x] Done). Root cause: all three SOC2_READINESS §79.4 registrations were fulfilled promptly in the same week they were obligated, and the implementation checklist items correctly recorded the completed work, but the human-readable body paragraphs below the evidence tables retained their original "pending" wording. §R-56.1 background. §R-56.2 three-row inline updates table. §R-56.3 three-item implementation checklist (all [x] Done this patch). §R-56.4 three-row cross-reference obligations closed table. Parallel §69 patch in docs/OBSERVABILITY.md (v5.13.2, 2026-07-02) closes two companion stale items (§12.6 job 48 AMEND-OBS-E-001 cross-ref and §56.8 SCIM-PROV-MON-E-001 "Register in" field). Privacy floor: no employee user_id, name, email, health value, coaching content, body composition, or GDPR Art. 9 special-category data — all edits are metadata-only compliance tracking annotations. Document header v3.21.1 → v3.21.2. Owner: compliance-officer + security-engineer.*
 
 ---
 
