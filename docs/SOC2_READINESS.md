@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.69.3
+# FORM · SOC 2 Type II Readiness v3.70.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -34315,6 +34315,7 @@ One row added to the §79.4 master evidence table (count 110 → 111), after PHI
 | Evidence ID | TSC Domain | Criterion | Description | Class | Cadence | Owner | File path |
 |---|---|---|---|---|---|---|---|
 | **FIDO2-E-001** | CC6 | CC6.7 | FIDO2/WebAuthn hardware token enrollment confirmation for all break-glass-eligible engineers (`destructive` tier PAM). Content: (1) Cloudflare Access admin panel screenshot showing `fido2` enforced in `form-break-glass` policy; (2) 5× enrollment confirmation screenshots (Cloudflare Access identity UUIDs, one per named engineer); (3) YubiKey 5 NFC procurement receipt (5 primary + 5 backup); (4) sanitized `cloudflare/access/break-glass-policy.tf` diff confirming `require = ["warp", "fido2"]` block. Proves `destructive` tier PAM cannot activate without phishing-resistant hardware-token authentication; TOTP fallback unconditionally prohibited (§24.3 SSO_SCIM_IMPLEMENTATION.md). No employee PII — identity UUIDs, procurement metadata, role-label IaC diff only. Source: SSO_SCIM_IMPLEMENTATION §41 (DEC-094, v2.13, 2026-07-01). 7yr retention. | Manual-event | Annual + on any break-glass engineer roster change (add/remove/key-replacement) | compliance-officer + security-engineer | `compliance/evidence/pam/FIDO2-E-001_<YYYY-MM>.zip` |
+| **GEO-E-001** | CC1, CC3 | CC1.3, CC3.1 | Annual export confirming `billing_currency = 'USD'` on all `geo.contract_currency_set` DEC-030 HMAC-chain records for the observation year and GEO-CHAIN-01 predecessor coverage for every `enterprise.tenant_created` event in the period (`geo.contract_currency_set` with matching `tenant_id` precedes each tenant creation in the chain). CC1.3: immutable DEC-030 HMAC-chain record that management communicated the USD billing-policy commitment at the individual contract level before tenant onboarding; 100% coverage assertion = no tenant onboarded without a documented currency commitment. CC3.1: FX risk documented per-contract (DEC-096, 2026-07-02), not only at policy level; consistent application across all new enterprise contracts in the observation period. GEO-CHAIN-01 invariant: `geo.contract_currency_set` MUST precede `enterprise.tenant_created` for same `tenant_id` in the DEC-030 HMAC chain; HTTP 422 `GEO_CHAIN_01_VIOLATION` on violation; enforced by `emit-audit-event` Worker. Five-column CSV: `tenant_id` UUID, `contract_currency` ('USD'), `geo_chain_predecessor_present` BOOL, `event_id` UUID, `changed_at` ISO 8601. Zero-tenant-created years filed as nil attestation at `GEO-E-001_<YYYY>-nil.json`. Privacy: `tenant_id` FORM-internal UUID + commercial metadata only — no individual employee `user_id`, name, email, health value, coaching transcript, or GDPR Art. 9 special-category data; `r2:form-api` REVOKED from `compliance/evidence/geo/` (§80.3 invariant). Source: AUDIT_LOG_SCHEMA.md v2.72 (2026-07-02); DEC-096 (2026-07-02). Registered: §144 (SOC2_READINESS v3.70.0, 2026-07-02). 7yr retention. | Manual-event | Annual (Q4 of each SOC 2 observation year; first collection: Q4 of year 1 or end of first observation year, whichever is later; zero-onboarding years filed as nil attestation) | compliance-officer | `compliance/evidence/geo/GEO-E-001_<YYYY>.csv` |
 
 ---
 
@@ -34379,3 +34380,93 @@ The three §58.10 DEC-030 rotation events (`admin.hmac_key_rotation_initiated`, 
 *v3.69.1 (2026-07-02): §143.4 first obligation closed — `admin.key_rotation_incident_opened` + `admin.key_rotation_incident_closed` registered in `docs/AUDIT_LOG_SCHEMA.md v2.71` (2026-07-02). §143.4 first pending row: `🟡 Pending` → `🟢 Done — 2026-07-02 (AUDIT_LOG_SCHEMA.md v2.71)`. Two obligations remain open in §143.4: `emit-audit-event` Worker deployment + KEY-IC-CHAIN-01 integration tests (§R-54.7 item 2, P0/M7); IR-KEY-E-001..E-006 evidence template `incident_id` field (§R-54.7 item 4, P1/M7). Document header v3.68.0 → v3.69.1 (absorbing v3.69.0 header update which was recorded in version note but not applied to file header). Owner: compliance-officer.*
 
 *v3.69.0 (2026-07-02): §143 Cross-Reference Patch — INCIDENT_RESPONSE §R-54 · KEY-IC-CHAIN-01 Registration in §58.16 (CC6.8 · DEC-030 Chain Integrity). Closes §R-54.7 item 5 (P1/M8 — register KEY-IC-CHAIN-01 cross-reference in docs/SOC2_READINESS.md §58 HMAC chain integrity controls section). §58.16 added inline to §58: KEY-IC-CHAIN-01 invariant definition (`admin.key_rotation_incident_closed` MUST follow `admin.key_rotation_incident_opened` for same `incident_id`; HTTP 422 `KEY_IC_CHAIN_01_VIOLATION`; enforced by `emit-audit-event` Worker per §R-54.4); five-event chain diagram showing IC pair bracketing the three §58.10 HMAC rotation events; SOC 2 CC6.8 mapping table (max window: 48h for HMAC_AUDIT_CHAIN_KEY, 72h for other key types); five-column auditor SQL query returning exactly 5 rows per rotation (IC-opened → hmac_rotation_initiated → hmac_key_rotated → hmac_rotation_verified → IC-closed, all keyed on `incident_id`); auditor CC6.8 note explaining the gap closed by KEY-IC-CHAIN-01 (prior chain had no IC anchor — reliance on external PagerDuty records as primary evidence was a CC6.8 gap); privacy floor note (FORM staff UUID only; no enterprise employee PII or GDPR Art. 9 data); registration note (AUDIT_LOG_SCHEMA.md registration + Worker deployment remain P0/M7 pending). §143.2 change summary (three-row table). §143.3 CC6.8 impact explanation. §143.4 three obligations remaining open (§R-54.7 items 1, 2, 4 — all operational P0-P1/M7). INCIDENT_RESPONSE.md v3.19.1 inline patches (simultaneous commit): §R-54.7 item 5 `[ ]` → `[x] Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02`; §R-54.9 cross-reference row `🟡 Pending` → `🟢 Done — SOC2_READINESS.md v3.69.0, §58.16 + §143, 2026-07-02`. Privacy floor: §58.16 and §143 contain no personal data — KEY-IC-CHAIN-01 governs event ordering for HMAC key management audit events (FORM-internal UUIDs and system component names only). Document header v3.68.0 → v3.69.0. Cross-references: `docs/INCIDENT_RESPONSE.md §R-54` (KEY-IC-CHAIN-01 authoritative definition: §R-54.4; event payload specs: §R-54.3; Zod v2 schemas: §R-54.5; step sequence integration: §R-54.6); `docs/INCIDENT_RESPONSE.md §R-54.7 item 5` ([x] Done — 2026-07-02); `docs/INCIDENT_RESPONSE.md §R-54.9` (🟢 Done — 2026-07-02); `docs/SOC2_READINESS.md §58.10` (three HMAC rotation DEC-030 events — IC chain now spans all five); `docs/SOC2_READINESS.md §58.12` (CC6.8 mapping — extended by §58.16 IC chain guarantee); `docs/OBSERVABILITY.md §30` (AL-KEY-01..04 trigger alert IDs referenced in KEY-IC-CHAIN-01 stale-window monitoring). Owner: compliance-officer + security-engineer.*
+
+---
+
+## §144 · Cross-Reference Patch — GEO-E-001 Registration (CC1.3 / CC3.1 · AUDIT_LOG_SCHEMA v2.72 · DEC-096)
+
+> **Date:** 2026-07-02. **Trigger:** `docs/AUDIT_LOG_SCHEMA.md v2.72` (2026-07-02) introduced evidence artefact GEO-E-001 (CC1.3/CC3.1, annual, 7yr) as part of the `geo.contract_currency_set` HIGH/7yr DEC-030 event (DEC-096 UA enterprise billing in USD). `docs/COST_MODEL.md §56.9` had stated "No new SOC 2 evidence artefact is required for the billing currency decision itself", so `docs/COST_MODEL.md §56.12` contains no obligation row for SOC2_READINESS registration. This §144 closes the resulting gap. **Owner:** compliance-officer.
+
+### §144.1 Purpose
+
+`docs/AUDIT_LOG_SCHEMA.md v2.72` (2026-07-02) — the `geo.contract_currency_set` HIGH/7yr DEC-030 event for DEC-096 (UA enterprise billing governance, USD only, EU entry order) — named a new SOC 2 evidence artefact: **GEO-E-001** (CC1.3/CC3.1, annual, 7yr, R2 path `compliance/evidence/geo/GEO-E-001_<YYYY>.csv`).
+
+At the time COST_MODEL §56 (v2.29.0, 2026-07-02) was authored, §56.9 explicitly stated: *"No new SOC 2 evidence artefact is required for the billing currency decision itself (it is contractual, not a technical control)."* Consequently §56.12 (the DEC-096 cross-reference completion table) contains no row obligating SOC2_READINESS.md to register GEO-E-001. AUDIT_LOG_SCHEMA v2.72 then created the artefact anyway — closing the gap between the policy statement and the audit-log event model — but left SOC2_READINESS unnotified.
+
+The result: GEO-E-001 is fully specified in AUDIT_LOG_SCHEMA.md and carries two named SOC 2 criteria (CC1.3, CC3.1), but does not appear anywhere in this document. Every other named artefact in the system has been registered via a cross-reference patch (§§136–143 all follow this pattern). This §144 closes that registration gap: §79.4 master evidence table row (count 111 → 112), §80.3 R2 subfolder description for `compliance/evidence/geo/`, §80.4 Vanta mirror entry, and implementation checklist.
+
+### §144.2 GEO-E-001 Artefact Description
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | GEO-E-001 |
+| **TSC Domain** | CC1, CC3 |
+| **Criteria** | CC1.3, CC3.1 |
+| **Class** | Manual-event (annual) |
+| **Cadence** | Annual (Q4 of each SOC 2 observation year) |
+| **Retention** | 7 yr WORM Object Lock Governance |
+| **R2 path** | `compliance/evidence/geo/GEO-E-001_<YYYY>.csv` |
+| **Owner** | compliance-officer |
+| **Source** | `docs/AUDIT_LOG_SCHEMA.md` (v2.72, 2026-07-02); DEC-096 (2026-07-02) |
+
+**Artefact content:** Annual five-column CSV export confirming: (1) `billing_currency = 'USD'` on all `geo.contract_currency_set` DEC-030 HMAC-chain records for the observation year; (2) GEO-CHAIN-01 predecessor coverage — for every `enterprise.tenant_created` event in the period, a matching `geo.contract_currency_set` event with the same `tenant_id` precedes it in the DEC-030 HMAC chain. Columns: `tenant_id` (FORM-internal UUID), `contract_currency` ('USD'), `geo_chain_predecessor_present` (BOOL), `event_id` (UUID), `changed_at` (ISO 8601). Zero-enterprise-tenant-created years filed as nil attestation at `GEO-E-001_<YYYY>-nil.json`.
+
+**CC1.3 auditor narrative:** `geo.contract_currency_set` is an immutable DEC-030 HMAC-chained record that management communicated the USD billing-policy commitment at the individual contract level before each enterprise tenant was onboarded. The annual CSV demonstrates 100% GEO-CHAIN-01 predecessor coverage — no tenant in the observation period was created without a documented, chain-verifiable currency commitment. Management policy (DEC-096) and individual-contract evidence (DEC-030 chain) are therefore aligned at the artefact level.
+
+**CC3.1 auditor narrative:** FX risk is documented at the individual contract level (one `geo.contract_currency_set` event per tenant), not only at the policy level. The annual export confirms that the FX risk assessment decision (USD billing — DEC-096, 2026-07-02) was applied consistently to every new enterprise contract in the observation period. Auditors can verify risk assessment was performed before, not after, each tenant onboarding by confirming `geo_chain_predecessor_present = TRUE` for all rows.
+
+**GEO-CHAIN-01 invariant:** `geo.contract_currency_set` MUST precede `enterprise.tenant_created` for the same `tenant_id` in the DEC-030 HMAC chain. A `enterprise.tenant_created` event without a preceding `geo.contract_currency_set` for the same `tenant_id` is a GEO-CHAIN-01 violation; the `emit-audit-event` Worker returns HTTP 422 `GEO_CHAIN_01_VIOLATION`. Source: `docs/AUDIT_LOG_SCHEMA.md v2.72` (2026-07-02).
+
+**Privacy floor:** GEO-E-001 contains `tenant_id` (FORM-internal UUID), `contract_currency` ('USD' literal), `geo_chain_predecessor_present` (BOOL), `event_id` (UUID), `changed_at` (ISO 8601 timestamp). No individual employee `user_id`, name, email, health value, coaching transcript, body-composition data, or GDPR Art. 9 special-category data. `r2:form-api` REVOKED from `compliance/evidence/geo/` per §80.3 bucket policy invariant. Vanta access: compliance-officer only.
+
+---
+
+### §144.3 §80.3 R2 Subfolder Addition
+
+New R2 subfolder added to the evidence bucket topology (§80.3):
+
+| Subfolder | Purpose | Access | Retention |
+|---|---|---|---|
+| `compliance/evidence/geo/` | GEO-E-001 annual billing-currency governance export — `geo.contract_currency_set` DEC-030 HMAC-chain confirmations for the observation year; GEO-CHAIN-01 predecessor coverage assertion for all `enterprise.tenant_created` events in the period | `form_system` (compliance-officer write via PAM session); `compliance_reviewer` + `r2:compliance-officer` read; `r2:form-api` **NO ACCESS** | WORM Object Lock Governance, 7yr minimum |
+
+Filename convention: annual file at `GEO-E-001_<YYYY>.csv` (e.g. `GEO-E-001_2026.csv`); nil attestation for zero-enterprise-tenant-created years at `GEO-E-001_<YYYY>-nil.json`.
+
+---
+
+### §144.4 §80.4 Vanta Mirror Entry
+
+GEO-E-001 added to Vanta mirror schedule (§80.4):
+
+| Artefact ID | Vanta upload timing | TSC mapping | Privacy note |
+|---|---|---|---|
+| GEO-E-001 | Within 48h of annual Q4 collection run; nil attestation within 48h of year-end for zero-onboarding years | CC1.3, CC3.1 | `tenant_id` FORM-internal UUID, `contract_currency` 'USD' literal, `geo_chain_predecessor_present` BOOL, `event_id` UUID, `changed_at` ISO 8601 — no enterprise employee `user_id`, name, email, health value, coaching transcript, or GDPR Art. 9 special-category data |
+
+Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. Vanta access: compliance-officer only.
+
+---
+
+### §144.5 §79.4 Master Evidence Table Row
+
+One row added to the §79.4 master evidence table (count 111 → 112), after FIDO2-E-001 (§142). See §142.5 above — the GEO-E-001 row has been inserted inline at that position in this document version.
+
+---
+
+### §144.6 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md v2.72` (2026-07-02) — GEO-E-001 evidence artefact introduced (CC1.3/CC3.1, annual, 7yr, R2 path `compliance/evidence/geo/GEO-E-001_<YYYY>.csv`) with no matching SOC2_READINESS registration obligation in `docs/COST_MODEL.md §56.12` (§56.9 had stated "No new SOC 2 evidence artefact is required for the billing currency decision itself" — AUDIT_LOG_SCHEMA v2.72 created one anyway, creating the registration gap this §144 closes) | `docs/AUDIT_LOG_SCHEMA.md v2.72` (2026-07-02) — implicit registration gap vs `docs/COST_MODEL.md §56.9` | 🟢 **Done — 2026-07-02 (SOC2_READINESS.md v3.70.0, §144)** |
+
+---
+
+### §144.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `compliance/evidence/geo/` subfolder on Cloudflare R2 `form-soc2-evidence` bucket (EU region); enable WORM Object Lock Governance 7yr; confirm `r2:form-api` has NO ACCESS (§80.3 bucket policy invariant). Prerequisite: `emit-audit-event` Worker updated to emit `geo.contract_currency_set` events (per AUDIT_LOG_SCHEMA v2.72, DEC-096). | devops-lead | **P1** | M4 (before first enterprise tenant onboarding) | [ ] |
+| 2 | Execute first GEO-E-001 annual collection: query all `geo.contract_currency_set` DEC-030 HMAC-chain events in the SOC 2 observation year; cross-reference against `enterprise.tenant_created` events for the same period using `tenant_id` as key; confirm `geo_chain_predecessor_present = TRUE` for all rows (100% GEO-CHAIN-01 coverage); export five-column CSV (`tenant_id`, `contract_currency`, `geo_chain_predecessor_present`, `event_id`, `changed_at`) to `compliance/evidence/geo/GEO-E-001_<YYYY>.csv` (7yr WORM); SHA-256 hash; upload to Vanta within 48h; add to MASTER-INDEX. If zero enterprise tenant onboardings in the period: file nil attestation at `GEO-E-001_<YYYY>-nil.json`. Privacy check: confirm no employee `user_id`, no health values before upload. | compliance-officer | **P2** | Q4 of first SOC 2 observation year | [ ] |
+| 3 | Add GEO-E-001 to §15 compliance calendar: annual Q4 collection slot with compliance-officer as owner. Note that the nil-attestation path applies in any year where zero enterprise tenants were onboarded — this is a positive attestation, not a gap. | compliance-officer | **P2** | Before first SOC 2 observation year end | [ ] |
+
+---
+
+*v3.70.0 (2026-07-02): §144 Cross-Reference Patch — GEO-E-001 Registration (CC1.3 / CC3.1 · AUDIT_LOG_SCHEMA v2.72 · DEC-096). Closes implicit SOC2_READINESS registration gap: AUDIT_LOG_SCHEMA.md v2.72 (2026-07-02) introduced GEO-E-001 (CC1.3/CC3.1, annual, 7yr — annual export confirming `billing_currency = 'USD'` on all `geo.contract_currency_set` DEC-030 HMAC-chain records and GEO-CHAIN-01 predecessor coverage for every `enterprise.tenant_created` in the observation period; R2 path `compliance/evidence/geo/GEO-E-001_<YYYY>.csv`; 7yr WORM; `r2:form-api` NO ACCESS) without a SOC2_READINESS registration obligation in COST_MODEL §56.12 (§56.9 stated "No new SOC 2 evidence artefact is required" — AUDIT_LOG_SCHEMA v2.72 created one anyway). New annual SOC 2 evidence artefact registered (count 111 → 112): GEO-E-001. §144.1 purpose and gap explanation (COST_MODEL §56.9 vs AUDIT_LOG_SCHEMA v2.72 discrepancy). §144.2 artefact description: five-column CSV schema (`tenant_id` UUID, `contract_currency` 'USD', `geo_chain_predecessor_present` BOOL, `event_id` UUID, `changed_at` ISO 8601); CC1.3 auditor narrative (100% GEO-CHAIN-01 predecessor coverage = management policy and individual-contract evidence aligned at artefact level); CC3.1 auditor narrative (FX risk documented per-contract — consistent application of DEC-096 across all new enterprise contracts in observation period); GEO-CHAIN-01 invariant definition (HTTP 422 `GEO_CHAIN_01_VIOLATION` on `enterprise.tenant_created` without prior `geo.contract_currency_set` for same `tenant_id`); nil-attestation path for zero-onboarding years. §144.3 new R2 subfolder `compliance/evidence/geo/` (WORM 7yr; `r2:form-api` NO ACCESS; `compliance_reviewer` + `r2:compliance-officer` read; filename convention `GEO-E-001_<YYYY>.csv` annual + `GEO-E-001_<YYYY>-nil.json` nil-attestation). §144.4 Vanta mirror entry (annual Q4 within 48h; nil attestation within 48h of year-end; CC1.3/CC3.1; five-column commercial metadata — no employee `user_id`, health value, or GDPR Art. 9 data; compliance-officer only). §144.5 §79.4 master evidence table row (count 111 → 112; inserted inline after FIDO2-E-001 (§142) in §142.5 table). §144.6 one cross-reference obligation closed (AUDIT_LOG_SCHEMA v2.72 vs COST_MODEL §56.9 gap → 🟢 Done). §144.7 three-item implementation checklist (1× P1 R2 folder M4; 1× P2 first annual collection Q4 Year 1; 1× P2 compliance calendar). Privacy floor: GEO-E-001 contains `tenant_id` FORM-internal UUID + 'USD' literal + BOOL + UUID + timestamp only — no individual employee `user_id`, name, email, health value, body-composition data, coaching transcript, or GDPR Art. 9 special-category data; `r2:form-api` REVOKED from `compliance/evidence/geo/`; Vanta access: compliance-officer only. Document header v3.69.3 → v3.70.0. Owner: compliance-officer.*

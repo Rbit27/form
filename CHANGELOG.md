@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [11.30.0] — 2026-07-02
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.69.3 → v3.70.0. §144 Cross-Reference Patch — GEO-E-001 Registration (CC1.3 / CC3.1 · AUDIT_LOG_SCHEMA v2.72 · DEC-096). Closes implicit SOC2_READINESS registration gap: AUDIT_LOG_SCHEMA.md v2.72 (2026-07-02) introduced evidence artefact GEO-E-001 without a matching obligation in COST_MODEL §56.12 (§56.9 had stated no new artefact was needed — AUDIT_LOG_SCHEMA v2.72 created one anyway). New annual evidence artefact registered (count 111 → 112): GEO-E-001 (CC1.3/CC3.1, annual Q4, 7yr — annual export confirming `billing_currency = 'USD'` on all `geo.contract_currency_set` DEC-030 HMAC-chain records and GEO-CHAIN-01 predecessor coverage for every `enterprise.tenant_created` in the observation period; R2 path `compliance/evidence/geo/GEO-E-001_<YYYY>.csv`; nil attestation for zero-onboarding years; `r2:form-api` NO ACCESS). §144.2 artefact description + auditor narratives (CC1.3: management-to-contract policy alignment; CC3.1: per-contract FX risk documentation consistent with DEC-096). §144.3 new R2 subfolder `compliance/evidence/geo/` (WORM 7yr). §144.4 Vanta mirror entry. §144.5 §79.4 master evidence table row inserted after FIDO2-E-001. §144.6 one obligation closed. §144.7 three-item implementation checklist.
+- `VERSION` — 11.29.0 → 11.30.0.
+
 ## [11.29.0] — 2026-07-02
 
 ### Added
