@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.13.0
+# FORM · Observability & Monitoring Taxonomy v5.13.1
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -67,6 +67,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §65 | Quarterly pg_cron Health Audit Protocol — Jobs 56 & 57 |
 | §66 | OQ-MOBILE-01 Resolution — EAS OTA Adoption Rate vs. Enterprise MDM Change Windows: Per-Tenant Exception Flag & 7-Day Contractual SLO Variant (DEC-090) |
 | §67 | Cross-Reference Patch — §66.9 Items 2 + 6 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.67 + ENTERPRISE_SLA.md v1.3) |
+| §68 | Cross-Reference Patch — §59.7 / §59.8 / §60.7 / §60.8 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.57 + SOC2_READINESS.md v3.52.0) |
 
 ---
 
@@ -16935,7 +16936,7 @@ Emitted by IC at R-50 Step 5 (PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 terminal
 
 **Privacy floor (both events):** No employee `user_id`, name, email, champion session count value, tenant name, coaching exchange content, or GDPR Art. 9 special-category health data. Only booleans, numeric counts, H1–H4 enum, and FORM-internal `incident_id` UUID.
 
-**AUDIT_LOG_SCHEMA.md registration:** Pending §59.10 item 2 (P0/M6). Events not yet in AUDIT_LOG_SCHEMA.md; Zod v2 schemas to be authored at §R-50.9 in INCIDENT_RESPONSE.md.
+**AUDIT_LOG_SCHEMA.md registration:** 🟢 **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57).** Both events (`system.champion_login_monitor_stale_declared` HIGH/7yr + `system.champion_login_monitor_stale_resolved` STANDARD/3yr) registered per §59.10 item 2 (🟢 Done). Zod v2 schemas authored at `INCIDENT_RESPONSE.md §R-50.9`. Closed by §68 cross-reference patch (v5.13.1, 2026-07-02).
 
 ---
 
@@ -16945,7 +16946,7 @@ Emitted by IC at R-50 Step 5 (PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 terminal
 |---|---|---|---|---|---|
 | **CHAMP-LOGIN-STALE-E-001** | CC7.2 / A1.1 / CC3.2 | IC narrative per R-50 activation: stale window (hours), root cause (H1–H4), Day-45 cohort status, T0-Beta gap found/resolved. Filed within 48 h of job 50 restoration. | Per incident | 7 yr if T0-Beta gap found; 3 yr if no gap | `compliance/evidence/pilots/champion-login/CHAMP-LOGIN-STALE-E-001_<incident_id>.md` |
 
-**SOC2_READINESS.md registration:** Pending §59.10 item 4 (P1/M6). Subfolder policy `pilots/champion-login/` to be established alongside existing `pilots/save-protocol/` (SOC2_READINESS §126).
+**SOC2_READINESS.md registration:** 🟢 **Done — 2026-06-29 (SOC2_READINESS.md v3.52.0, §126).** Subfolder policy `pilots/champion-login/` established alongside existing `pilots/save-protocol/` per §59.10 item 4 (🟢 Done). Evidence path: `compliance/evidence/pilots/champion-login/CHAMP-LOGIN-STALE-E-001_<incident_id>.md`. Closed by §68 cross-reference patch (v5.13.1, 2026-07-02).
 
 ---
 
@@ -17246,7 +17247,7 @@ Emitted by IC at R-51 Step 5 (PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 terminal
 
 **Privacy floor (both events):** No employee `user_id`, name, email, WAU values, tenant name, session content, body metrics, or GDPR Art. 9 special-category health data. Only booleans, numeric counts/days, H1–H4 enum, and FORM-internal `incident_id` UUID.
 
-**AUDIT_LOG_SCHEMA.md registration:** Pending §60.10 item 2 (P0/M6). Zod v2 schemas to be authored at §R-51.9 in INCIDENT_RESPONSE.md.
+**AUDIT_LOG_SCHEMA.md registration:** 🟢 **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57).** Both events (`system.wau_decline_monitor_stale_declared` HIGH/7yr + `system.wau_decline_monitor_stale_resolved` STANDARD/3yr) registered per §60.10 item 2 (🟢 Done). Zod v2 schemas authored at `INCIDENT_RESPONSE.md §R-51.9`. Closed by §68 cross-reference patch (v5.13.1, 2026-07-02).
 
 ---
 
@@ -17256,7 +17257,7 @@ Emitted by IC at R-51 Step 5 (PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 terminal
 |---|---|---|---|---|---|
 | **WAU-DECLINE-STALE-E-001** | CC7.2 / A1.1 / CC3.2 | IC narrative per R-51 activation: stale window (days), root cause (H1–H4), mature pilot cohort status, T0-Gamma gap found/resolved. Filed within 48 h of job 51 restoration. | Per incident | 7 yr if T0-Gamma gap found; 3 yr if no gap | `compliance/evidence/pilots/wau-decline/WAU-DECLINE-STALE-E-001_<incident_id>.md` |
 
-**SOC2_READINESS.md registration:** Pending §60.10 item 4 (P1/M6). Subfolder `pilots/wau-decline/` to be established in the R2 compliance bucket alongside existing `pilots/save-protocol/` and `pilots/champion-login/` (SOC2_READINESS §126).
+**SOC2_READINESS.md registration:** 🟢 **Done — 2026-06-29 (SOC2_READINESS.md v3.52.0, §126).** Subfolder `pilots/wau-decline/` established in R2 compliance bucket alongside existing `pilots/save-protocol/` and `pilots/champion-login/` per §60.10 item 4 (🟢 Done). Evidence path: `compliance/evidence/pilots/wau-decline/WAU-DECLINE-STALE-E-001_<incident_id>.md`. Closed by §68 cross-reference patch (v5.13.1, 2026-07-02).
 
 ---
 
@@ -18981,6 +18982,54 @@ Additionally, §65 and §66 TOC entries were never added when those sections wer
 | §66 missing TOC entry | §66 authored v5.12.0 (2026-07-01) without TOC update | 🟢 **§67 this patch (v5.13.0, 2026-07-01).** TOC entry added. |
 
 **Privacy floor:** No employee `user_id`, name, email, health value, coaching session content, or GDPR Art. 9 special-category data in any §67 content. All edits are metadata-only compliance tracking annotations.
+
+---
+
+## §68 Cross-Reference Patch — §59.7 / §59.8 / §60.7 / §60.8 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.57 + SOC2_READINESS.md v3.52.0)
+
+### §68.1 Background
+
+During authorship of §59 (T0-Beta Champion Login Observability, job 50) and §60 (T0-Gamma WAU Decline Observability, job 51), four status fields in the §59.7, §59.8, §60.7, and §60.8 subsections recorded "Pending" for two cross-document obligations each: registration of events in `docs/AUDIT_LOG_SCHEMA.md` and establishment of R2 evidence subfolder policies in `docs/SOC2_READINESS.md`. Those obligations were subsequently fulfilled in a 2026-06-29 commit, updating `AUDIT_LOG_SCHEMA.md` to v2.57 and `SOC2_READINESS.md` to v3.52.0. The implementation checklists at §59.10 and §60.10 were correctly updated (`[x] Done — 2026-06-29`), but the four inline body-text status lines were not patched in the same commit. Two parallel stale lines existed in `docs/INCIDENT_RESPONSE.md` §R-50.8 and §R-51.8. This section closes all six discrepancies.
+
+### §68.2 Inline Updates Applied (this patch)
+
+| Location | Stale text (before) | Resolution |
+|---|---|---|
+| §59.7 AUDIT_LOG_SCHEMA.md registration | `Pending §59.10 item 2 (P0/M6). Events not yet in AUDIT_LOG_SCHEMA.md; Zod v2 schemas to be authored at §R-50.9 in INCIDENT_RESPONSE.md.` | 🟢 **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57).** Both events registered; Zod v2 schemas at `INCIDENT_RESPONSE.md §R-50.9`. |
+| §59.8 SOC2_READINESS.md registration | `Pending §59.10 item 4 (P1/M6). Subfolder policy \`pilots/champion-login/\` to be established alongside existing \`pilots/save-protocol/\` (SOC2_READINESS §126).` | 🟢 **Done — 2026-06-29 (SOC2_READINESS.md v3.52.0, §126).** Subfolder `pilots/champion-login/` established. |
+| §60.7 AUDIT_LOG_SCHEMA.md registration | `Pending §60.10 item 2 (P0/M6). Zod v2 schemas to be authored at §R-51.9 in INCIDENT_RESPONSE.md.` | 🟢 **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57).** Both events registered; Zod v2 schemas at `INCIDENT_RESPONSE.md §R-51.9`. |
+| §60.8 SOC2_READINESS.md registration | `Pending §60.10 item 4 (P1/M6). Subfolder \`pilots/wau-decline/\` to be established alongside \`pilots/save-protocol/\` and \`pilots/champion-login/\`.` | 🟢 **Done — 2026-06-29 (SOC2_READINESS.md v3.52.0, §126).** Subfolder `pilots/wau-decline/` established. |
+| `INCIDENT_RESPONSE.md §R-50.8` AUDIT_LOG_SCHEMA.md registration | `Pending §59.10 item 2 (P0/M6). Zod v2 schemas to be authored at §R-50.9 in this document.` | 🟢 **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57).** Zod v2 schemas authored at `§R-50.9`. Closed by this patch (INCIDENT_RESPONSE.md v3.21.1, 2026-07-02). |
+| `INCIDENT_RESPONSE.md §R-51.8` AUDIT_LOG_SCHEMA.md registration | `Pending §60.10 item 2 (P0/M6). Zod v2 schemas to be authored at §R-51.9 in this document.` | 🟢 **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57).** Zod v2 schemas authored at `§R-51.9`. Closed by this patch (INCIDENT_RESPONSE.md v3.21.1, 2026-07-02). |
+
+### §68.3 Implementation Checklist
+
+| # | Action | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Apply §59.7 inline AUDIT_LOG_SCHEMA.md registration status update | compliance-officer | **P0** | [x] **Done — this patch (v5.13.1, 2026-07-02).** |
+| 2 | Apply §59.8 inline SOC2_READINESS.md registration status update | compliance-officer | **P0** | [x] **Done — this patch (v5.13.1, 2026-07-02).** |
+| 3 | Apply §60.7 inline AUDIT_LOG_SCHEMA.md registration status update | compliance-officer | **P0** | [x] **Done — this patch (v5.13.1, 2026-07-02).** |
+| 4 | Apply §60.8 inline SOC2_READINESS.md registration status update | compliance-officer | **P0** | [x] **Done — this patch (v5.13.1, 2026-07-02).** |
+| 5 | Apply `INCIDENT_RESPONSE.md §R-50.8` status update | compliance-officer | **P0** | [x] **Done — this patch (INCIDENT_RESPONSE.md v3.21.1, 2026-07-02).** |
+| 6 | Apply `INCIDENT_RESPONSE.md §R-51.8` status update | compliance-officer | **P0** | [x] **Done — this patch (INCIDENT_RESPONSE.md v3.21.1, 2026-07-02).** |
+| 7 | Add §68 TOC entry | compliance-officer | **P0** | [x] **Done — this patch (v5.13.1, 2026-07-02).** |
+
+### §68.4 Cross-Reference Obligations Closed
+
+| Stale item | Source version | Resolution |
+|---|---|---|
+| §59.7 AUDIT_LOG_SCHEMA.md registration "Pending" | Authored §59 (v3.0.0-era); obligation fulfilled 2026-06-29 but body text not patched | 🟢 **§68 this patch (v5.13.1, 2026-07-02).** Body text updated to 🟢 Done. |
+| §59.8 SOC2_READINESS.md registration "Pending" | Authored §59 (v3.0.0-era); obligation fulfilled 2026-06-29 (SOC2_READINESS.md v3.52.0, §126) but body text not patched | 🟢 **§68 this patch (v5.13.1, 2026-07-02).** Body text updated to 🟢 Done. |
+| §60.7 AUDIT_LOG_SCHEMA.md registration "Pending" | Authored §60 (v3.0.0-era); obligation fulfilled 2026-06-29 but body text not patched | 🟢 **§68 this patch (v5.13.1, 2026-07-02).** Body text updated to 🟢 Done. |
+| §60.8 SOC2_READINESS.md registration "Pending" | Authored §60 (v3.0.0-era); obligation fulfilled 2026-06-29 (SOC2_READINESS.md v3.52.0, §126) but body text not patched | 🟢 **§68 this patch (v5.13.1, 2026-07-02).** Body text updated to 🟢 Done. |
+| `INCIDENT_RESPONSE.md §R-50.8` "Pending" | Authored §R-50 alongside §59; obligation fulfilled 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57 + §R-50.9 schemas) but body text not patched | 🟢 **§68 this patch — INCIDENT_RESPONSE.md v3.21.1, 2026-07-02.** Body text updated to 🟢 Done. |
+| `INCIDENT_RESPONSE.md §R-51.8` "Pending" | Authored §R-51 alongside §60; obligation fulfilled 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57 + §R-51.9 schemas) but body text not patched | 🟢 **§68 this patch — INCIDENT_RESPONSE.md v3.21.1, 2026-07-02.** Body text updated to 🟢 Done. |
+
+**Privacy floor:** No employee `user_id`, name, email, health value, coaching session content, body composition metric, or GDPR Art. 9 special-category data in any §68 content. All edits are metadata-only compliance tracking annotations.
+
+---
+
+*v5.13.1 (2026-07-02): §68 Cross-Reference Patch — §59.7 / §59.8 / §60.7 / §60.8 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.57 + SOC2_READINESS.md v3.52.0). Closes six stale "Pending" body-text status lines: four in this document (§59.7, §59.8, §60.7, §60.8) and two in `docs/INCIDENT_RESPONSE.md` (§R-50.8, §R-51.8). Root cause: AUDIT_LOG_SCHEMA.md v2.57 event registration and SOC2_READINESS.md v3.52.0 §126 subfolder policy obligations for the Champion Login Monitor Stale (job 50, §59) and WAU Decline Monitor Stale (job 51, §60) observability sections were fulfilled 2026-06-29 — checklist items §59.10 item 2, §59.10 item 4, §60.10 item 2, §60.10 item 4 all correctly marked `[x] Done` at that time — but the corresponding inline body-text status fields in §59.7, §59.8, §60.7, §60.8 (this document) and §R-50.8, §R-51.8 (INCIDENT_RESPONSE.md) retained their original "Pending" wording. §68.1 background: root cause analysis. §68.2 inline updates table: six rows, stale text → 🟢 Done resolution. §68.3 seven-item implementation checklist (all `[x]` Done — this patch). §68.4 six-row cross-reference obligations closed table. Privacy floor: no employee `user_id`, name, email, health value, coaching session content, body composition metric, or GDPR Art. 9 special-category data in any §68 content — all edits are metadata-only compliance tracking annotations. Also in this commit: `docs/INCIDENT_RESPONSE.md` header v3.21.0 → v3.21.1. Document header v5.13.0 → v5.13.1. Owner: compliance-officer + security-engineer + enterprise-architect.*
 
 ---
 

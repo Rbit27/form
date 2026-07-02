@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [11.17.1] — 2026-07-02
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.13.0 → v5.13.1. §68 Cross-Reference Patch: closes six stale "Pending" body-text status lines in §59.7, §59.8, §60.7, §60.8 (Champion Login Monitor Stale + WAU Decline Monitor Stale AUDIT_LOG_SCHEMA.md and SOC2_READINESS.md registrations fulfilled 2026-06-29 but body text not patched). §68 TOC entry added. Inline updates: all four OBSERVABILITY.md body-text status fields updated to 🟢 Done.
+- `docs/INCIDENT_RESPONSE.md` — v3.21.0 → v3.21.1. Stale "Pending" status lines in §R-50.8 and §R-51.8 updated to 🟢 Done (AUDIT_LOG_SCHEMA.md v2.57; Zod v2 schemas at §R-50.9 and §R-51.9 respectively).
+- `VERSION` — 11.17.0 → 11.17.1.
+
+---
+
 ## [11.17.0] — 2026-07-02
 
 ### Added

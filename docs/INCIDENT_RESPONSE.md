@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.21.0
+# FORM · Incident Response Runbook v3.21.1
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -18775,7 +18775,7 @@ Emitted by IC at Step 6 (PAM-elevated). CHAMP-LOGIN-STALE-CHAIN-01 terminal even
 
 **Privacy floor (both events):** No employee `user_id`, name, email, champion session content, body metrics, or GDPR Art. 9 special-category health data. Only booleans, numeric counts/hours, H1–H4 enum, and FORM-internal `incident_id` UUID.
 
-**AUDIT_LOG_SCHEMA.md registration:** Pending §59.10 item 2 (P0/M6). Zod v2 schemas to be authored at §R-50.9 in this document.
+**AUDIT_LOG_SCHEMA.md registration:** 🟢 **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57).** Both events (`system.champion_login_monitor_stale_declared` HIGH/7yr + `system.champion_login_monitor_stale_resolved` STANDARD/3yr) registered per §59.10 item 2 (🟢 Done). Zod v2 schemas authored at §R-50.9 in this document. Closed by OBSERVABILITY.md §68 cross-reference patch (v3.21.1, 2026-07-02).
 
 ### R-50.9 Zod v2 Schemas (canonical source: this document §R-50.9)
 
@@ -19180,7 +19180,7 @@ Emitted by IC at Step 6 (PAM-elevated). WAU-DECLINE-STALE-CHAIN-01 terminal even
 
 **Privacy floor (both events):** No employee `user_id`, name, email, WAU values, tenant name, session content, body metrics, or GDPR Art. 9 special-category health data. Only booleans, numeric counts/days, H1–H4 enum, and FORM-internal `incident_id` UUID.
 
-**AUDIT_LOG_SCHEMA.md registration:** Pending §60.10 item 2 (P0/M6). Zod v2 schemas to be authored at §R-51.9 in this document.
+**AUDIT_LOG_SCHEMA.md registration:** 🟢 **Done — 2026-06-29 (AUDIT_LOG_SCHEMA.md v2.57).** Both events (`system.wau_decline_monitor_stale_declared` HIGH/7yr + `system.wau_decline_monitor_stale_resolved` STANDARD/3yr) registered per §60.10 item 2 (🟢 Done). Zod v2 schemas authored at §R-51.9 in this document. Closed by OBSERVABILITY.md §68 cross-reference patch (v3.21.1, 2026-07-02).
 
 ### R-51.9 Zod v2 Schemas (canonical source: this document §R-51.9)
 
