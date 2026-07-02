@@ -1,7 +1,7 @@
 ---
 title: "Як оцінити власну програму: 5 ознак, що вона більше не працює для тебе"
 slug: how-to-evaluate-your-own-training-program
-date: 2026-06-20
+date: 2026-07-02
 author: George (FORM founder)
 category: training-science
 estimated_reading_time: 13 хв
