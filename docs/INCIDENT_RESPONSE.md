@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.18.5
+# FORM · Incident Response Runbook v3.19.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -7748,7 +7748,7 @@ All evidence under `compliance/evidence/incidents/<slug>/` with SHA-256 manifest
 
 **OQ-KEY-01: Should `admin.key_rotation_incident_opened` be a new DEC-030 event type, or tracked only in the PagerDuty timeline?**
 
-Adding this event to the DEC-030 chain links the alert-to-resolution evidence package for auditors. However, it requires registration in `docs/AUDIT_LOG_SCHEMA.md` before any production incident can use it. The alternative (PagerDuty-only) loses the HMAC-chained incident-to-resolution link. Recommendation: register the event type as part of the R-21 implementation checklist item 1. Owner: security-engineer + compliance-officer. Priority: **P0 — must be registered before R-21 is used in a production incident.** Target: M7.
+Adding this event to the DEC-030 chain links the alert-to-resolution evidence package for auditors. However, it requires registration in `docs/AUDIT_LOG_SCHEMA.md` before any production incident can use it. The alternative (PagerDuty-only) loses the HMAC-chained incident-to-resolution link. Recommendation: register the event type as part of the R-21 implementation checklist item 1. Owner: security-engineer + compliance-officer. Priority: **P0 — must be registered before R-21 is used in a production incident.** Target: M7. **🟢 Resolved — §R-54 authored 2026-07-02. Option A (DEC-030 event types) adopted; full payload specs §R-54.3; Zod schemas §R-54.5; KEY-IC-CHAIN-01 invariant §R-54.4. AUDIT_LOG_SCHEMA.md registration + Worker deployment pending (§R-54.7 items 1–2, P0/M7).**
 
 **OQ-KEY-02: For KEYPOINTS_ENC_KEY rotation, is live re-encryption (dual-key overlap) or a maintenance window required?**
 
@@ -7758,7 +7758,7 @@ Live re-encryption avoids service disruption but expands the attack surface duri
 
 | # | Action | Priority | Milestone | Owner | Status |
 |---|---|---|---|---|---|
-| 1 | Register `admin.key_rotation_incident_opened` and `admin.key_rotation_incident_closed` as new DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md`; validate Zod schema; deploy to `emit-audit-event` Worker endpoint; close OQ-KEY-01 | P0 | M7 | security-engineer | [ ] |
+| 1 | Register `admin.key_rotation_incident_opened` and `admin.key_rotation_incident_closed` as new DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md`; validate Zod schema; deploy to `emit-audit-event` Worker endpoint; close OQ-KEY-01 | P0 | M7 | security-engineer | [x] **Done (documentation portion — §R-54 authored 2026-07-02; payload specs §R-54.3; Zod schemas §R-54.5; KEY-IC-CHAIN-01 §R-54.4); [ ] (operational — AUDIT_LOG_SCHEMA.md registration + Worker deployment: §R-54.7 items 1–2, P0/M7)** |
 | 2 | Add `runbook: "docs/INCIDENT_RESPONSE.md#r-21"` to AL-KEY-02 and AL-KEY-04 PagerDuty alert configs in OBSERVABILITY.md §30.4 and §30.5 §6.2 | P0 | M7 | devops-lead | [ ] |
 | 3 | Implement key-rotation-scheduler Worker and confirm AL-KEY-01/02 fire against a staging synthetic overdue-key scenario (per OBSERVABILITY.md §30.10 item 1) | P0 | M4 | platform-engineer + devops-lead | [ ] |
 | 4 | Write R-21 tabletop exercise: simulate AL-KEY-02 P0 for SUPABASE_SERVICE_ROLE_JWT; IC opens incident channel; C1–C4 queries run; rotation executed; DEC-030 events emitted; IR-KEY-E-001 through IR-KEY-E-006 collected; PIR completed; measure elapsed time vs. 2-hour rotation SLA | P1 | M8 | security-engineer | [ ] |
@@ -20033,3 +20033,196 @@ Next scheduled run: {date/time UTC}
 **Next scheduled review: June 2027 or after first activation — whichever comes first.**
 
 *v1.1 (2026-06-30): R-53.11 item 5 documentation portion closed. Status updated `[ ]` → `[x] Done (documentation portion — OBSERVABILITY §65, v5.11.0, 2026-06-30)`. OBSERVABILITY §65 authors the full quarterly pg_cron health audit protocol: four-query runbook (Q-C1 through Q-C4, equivalent to R-53-C1 through R-53-C4); pass/fail criteria table with H1-H4 root cause mapping; R2 artefact template at `enterprise/cron-health-audits/quarterly-{YYYY}-Q{N}.md`; CRON-HEALTH-AUDIT-E-001 SOC 2 evidence artefact (CC4.1/A1.1, quarterly, 7yr); SOC2_READINESS §138 registration (v3.64.0, 2026-06-30; count 106 → 107). Operational items remain [ ] pending: R2 subfolder creation (devops-lead, M14), calendar reminder (devops-lead, M14), first artefact filing Q1-2027. Owner: compliance-officer + devops-lead.*
+
+---
+
+## R-54 · OQ-KEY-01 Resolution — Key Rotation Incident DEC-030 Event Types (`admin.key_rotation_incident_opened` / `admin.key_rotation_incident_closed`)
+
+**Owner:** security-engineer + compliance-officer · **Date:** 2026-07-02
+
+> **Resolves:** OQ-KEY-01 (R-21 Open Questions, v3.18.5) — whether `admin.key_rotation_incident_opened` and `admin.key_rotation_incident_closed` should be DEC-030 HMAC-chained event types or tracked in PagerDuty only. **Decision: Option A — DEC-030 event types adopted.** R-21 checklist item 1 documentation portion closed (🟢 Done this pass); AUDIT_LOG_SCHEMA.md registration + Worker deployment are the remaining P0 obligations (§R-54.7 items 1–2).
+
+### R-54.1 Purpose
+
+OQ-KEY-01 (R-21 Open Questions) asked: **Should `admin.key_rotation_incident_opened` be a new DEC-030 event type, or tracked only in the PagerDuty timeline?**
+
+R-21 already references `admin.key_rotation_incident_opened` in its step sequence ("Emit DEC-030 admin.key_rotation_incident_opened BEFORE any rotation action") and in the scope assessment preamble — but the event had no registered payload schema, no Zod type, and no AUDIT_LOG_SCHEMA.md entry. R-21 checklist item 1 (P0/M7) required that registration before R-21 could be used in a live production incident.
+
+This section:
+1. Documents the adopted option (Option A — DEC-030 event types)
+2. Specifies full payload schemas for both events
+3. Defines the KEY-IC-CHAIN-01 ordering invariant
+4. Integrates both events into the R-21 step sequence
+5. Closes R-21 checklist item 1 (documentation portion)
+6. Patches OQ-KEY-01 status to 🟢 Resolved
+
+### R-54.2 Option Analysis
+
+| | **Option A — DEC-030 HMAC-chained events** ✅ | Option B — PagerDuty-only |
+|---|---|---|
+| **Auditor evidence** | Complete IC lifecycle in HMAC chain: `incident_opened` → `encryption_key_rotation_initiated` → `encryption_key_rotated` → `encryption_key_rotation_verified` → `incident_closed`; cross-referenceable by `incident_id` UUID | PagerDuty incident history (IR-KEY-E-003) captures timeline but is external to the HMAC chain; `admin.encryption_key_rotation_initiated` has no in-chain IC anchor |
+| **SOC 2 CC6.8** | IC event pair flanks the rotation events in a single verifiable chain; auditor confirms no rotation occurred outside a documented IC | Rotation events exist in chain; no chain-level confirmation that a documented IC was opened and closed |
+| **Cross-system link** | `incident_id` UUID bridges PagerDuty incident + DEC-030 chain + six IR-KEY-E-001..E-006 artefact files | PagerDuty self-contained; no DEC-030 linkage; artefacts reference incident title string only |
+| **Privacy floor** | IC payload contains only FORM-internal UUIDs (`ic_user_id`, `incident_id`) and key type enum — zero employee PII or Art. 9 data | Equivalent — PagerDuty holds no health data in key rotation context |
+| **Implementation cost** | Two new event types in AUDIT_LOG_SCHEMA.md; Zod schemas; Worker registration (P0/M7) | Zero new implementation; relies on existing PagerDuty config |
+
+**Decision: Option A adopted.** Rationale: (1) DEC-030 chain is the authoritative FORM audit record — external PagerDuty timelines are supporting evidence, not primary evidence; (2) SOC 2 CC6.8 requires demonstrating active management of the cryptographic key inventory — an IC event anchoring the rotation sequence closes the chain gap where `admin.encryption_key_rotation_initiated` had no preceding IC anchor; (3) `incident_id` UUID correlation field enables a single auditor SQL cross-reference across the DEC-030 chain, PagerDuty, and R2 evidence artefacts; (4) R-21 step sequence already assumed these events exist — formalising them removes the step-sequence/schema gap that would have caused production confusion on first use.
+
+### R-54.3 Event Specifications
+
+#### `admin.key_rotation_incident_opened`
+
+| Field | Value |
+|---|---|
+| **Event name** | `admin.key_rotation_incident_opened` |
+| **Severity** | HIGH |
+| **Retention** | 7 yr |
+| **SOC 2 mapping** | CC6.8 (cryptographic key protection lifecycle — IC opened before any rotation action), CC7.2 (system event monitoring — IC linked to AL-KEY-01/02/03/04 trigger), CC7.3 (anomaly evaluation — IC opened in response to anomalous key age or missing verification event) |
+| **Emit condition** | IC opens before any key rotation or forensic action; must be the first DEC-030 event in the R-21 step sequence for any key type (R-54.6 gate) |
+| **KEY-IC-CHAIN-01** | Precedes `admin.key_rotation_incident_closed` for same `incident_id` (see §R-54.4) |
+
+**Payload fields:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `incident_id` | UUID | ✅ | FORM-internal IC correlation UUID; bridges PagerDuty incident and DEC-030 chain; used as JSON key in IR-KEY-E-001..E-006 artefact files |
+| `key_type` | enum | ✅ | Key affected: `HMAC_AUDIT_CHAIN_KEY` \| `KEYPOINTS_ENC_KEY` \| `SUPABASE_SERVICE_ROLE_JWT` \| `CLOUDFLARE_WORKERS_SECRET` \| `ANTHROPIC_API_KEY` \| `SENTRY_DSN` \| `POSTHOG_API_KEY` \| `SUPABASE_ANON_KEY` (eight-key production inventory per R-21.2) |
+| `trigger_alert_id` | string | ✅ | Alert that triggered R-21 activation: `AL-KEY-01` \| `AL-KEY-02` \| `AL-KEY-03` \| `AL-KEY-04` \| `manual` |
+| `key_age_days` | integer (≥ 0) | ✅ | Age of affected key in days at IC open time; `0` if age unknown (e.g., manual trigger on newly discovered key) |
+| `rotation_due_by` | string (ISO 8601) | ✅ | Scheduled rotation deadline per R-21.3 cadence table; IC open time may precede or follow this timestamp |
+| `overdue` | boolean | ✅ | `true` if `key_age_days` exceeds the scheduled cadence for `key_type`; `false` for proactive IC (e.g., AL-KEY-01 early warning before breach) |
+| `two_person_auth_required` | boolean | ✅ | `true` for `HMAC_AUDIT_CHAIN_KEY` and `KEYPOINTS_ENC_KEY` (two-person auth policy per R-21.4); `false` for remaining six key types |
+| `ic_user_id` | UUID | ✅ | FORM staff auth UUID of the IC opener (pseudonymous — FORM-internal identity only; no enterprise employee identifier) |
+
+**Privacy floor:** `ic_user_id` is the FORM staff member opening the IC — a FORM-internal auth UUID, not an enterprise employee identifier. No enterprise tenant `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in this event. The eight `key_type` enum values are system component names, not personal data.
+
+#### `admin.key_rotation_incident_closed`
+
+| Field | Value |
+|---|---|
+| **Event name** | `admin.key_rotation_incident_closed` |
+| **Severity** | HIGH |
+| **Retention** | 7 yr |
+| **SOC 2 mapping** | CC6.8 (rotation completion evidence; this event confirms IC closure after `admin.encryption_key_rotation_verified`), CC5.3 (control activities performed as designed — IC lifecycle closed after verification; no rotation left open), CC7.5 (post-incident review — `pir_committed` field flags P0/P1 IC closure requiring PIR within 5 business days) |
+| **Emit condition** | IC closes after key rotation + verification complete (or after resolution as `deferred_approved` or `false_positive`); must follow `admin.key_rotation_incident_opened` for same `incident_id` (KEY-IC-CHAIN-01) |
+
+**Payload fields:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `incident_id` | UUID | ✅ | Same UUID as the paired `admin.key_rotation_incident_opened` event |
+| `key_type` | enum | ✅ | Same key type enum as opened event (redundant for query convenience) |
+| `resolution` | enum | ✅ | `rotated_on_schedule` \| `rotated_emergency` \| `deferred_approved` \| `false_positive` |
+| `rotation_completed_at` | string (ISO 8601) \| null | ✅ | Timestamp of `admin.encryption_key_rotation_verified` for this key; `null` if `resolution = 'false_positive'` or `'deferred_approved'` |
+| `verification_completed` | boolean | ✅ | `true` if `admin.encryption_key_rotation_verified` was emitted before this close event; `false` only for `false_positive` or `deferred_approved` resolutions |
+| `deferred_reason` | string \| null | conditional | Required if `resolution = 'deferred_approved'`; operational context only (max 200 chars: key type, schedule context, approver); no employee name or health data permitted |
+| `pir_committed` | boolean | ✅ | `true` if IC severity ≥ P1 (per R-21.3) — PIR required within 5 business days of close; `false` for P2/P3 |
+| `ic_user_id` | UUID | ✅ | FORM staff auth UUID of the IC closer (may differ from opener; both captured in chain) |
+
+**Privacy floor:** Same as `admin.key_rotation_incident_opened`. `deferred_reason` is operational text only — no employee name, display name, email, health value, coaching content, or GDPR Art. 9 data permitted in this field.
+
+### R-54.4 KEY-IC-CHAIN-01 Ordering Invariant
+
+**Name:** `KEY-IC-CHAIN-01`
+
+**Rule:** For a given `incident_id`, `admin.key_rotation_incident_closed` MUST be preceded in the DEC-030 chain by `admin.key_rotation_incident_opened` with the same `incident_id`.
+
+**Enforcement:** `emit-audit-event` Worker returns HTTP 422 with error code `KEY_IC_CHAIN_01_VIOLATION` if `admin.key_rotation_incident_closed` is received for an `incident_id` that has no preceding `admin.key_rotation_incident_opened` in the chain. Integration test: emit `incident_closed` for a novel `incident_id` → confirm HTTP 422 `KEY_IC_CHAIN_01_VIOLATION`; emit `incident_opened` then `incident_closed` for same UUID → confirm HTTP 200.
+
+**Max window:** The `incident_closed` event must arrive within 48h of `incident_opened` for `HMAC_AUDIT_CHAIN_KEY` and `KEYPOINTS_ENC_KEY` (2-hour rotation SLA per R-21.3 means 48h is a generous outer bound; stale IC triggers AL-KEY-02 equivalent monitoring). For remaining six key types the outer window is 72h. Exceeding the window without a `incident_closed` event triggers a monitoring alert (devops-lead: stale IC, no close event found).
+
+**Rationale:** Prevents the rotation evidence sequence from being split across incidents; ensures every rotation event has a containing IC even when R-21 is activated manually before PagerDuty fires.
+
+### R-54.5 Zod v2 Schemas
+
+```typescript
+import { z } from 'zod';
+
+const KeyTypeEnum = z.enum([
+  'HMAC_AUDIT_CHAIN_KEY',
+  'KEYPOINTS_ENC_KEY',
+  'SUPABASE_SERVICE_ROLE_JWT',
+  'CLOUDFLARE_WORKERS_SECRET',
+  'ANTHROPIC_API_KEY',
+  'SENTRY_DSN',
+  'POSTHOG_API_KEY',
+  'SUPABASE_ANON_KEY',
+]);
+
+export const KeyRotationIncidentOpenedPayload = z.object({
+  incident_id: z.string().uuid(),
+  key_type: KeyTypeEnum,
+  trigger_alert_id: z.enum(['AL-KEY-01', 'AL-KEY-02', 'AL-KEY-03', 'AL-KEY-04', 'manual']),
+  key_age_days: z.number().int().min(0),
+  rotation_due_by: z.string().datetime(),
+  overdue: z.boolean(),
+  two_person_auth_required: z.boolean(),
+  ic_user_id: z.string().uuid(),
+});
+
+export const KeyRotationIncidentClosedPayload = z.object({
+  incident_id: z.string().uuid(),
+  key_type: KeyTypeEnum,
+  resolution: z.enum([
+    'rotated_on_schedule',
+    'rotated_emergency',
+    'deferred_approved',
+    'false_positive',
+  ]),
+  rotation_completed_at: z.string().datetime().nullable(),
+  verification_completed: z.boolean(),
+  deferred_reason: z.string().max(200).nullable(),
+  pir_committed: z.boolean(),
+  ic_user_id: z.string().uuid(),
+});
+```
+
+### R-54.6 R-21 Step Sequence Integration
+
+The two events slot into the R-21 IC step sequence as follows. New steps are **bolded**; existing steps are unchanged.
+
+1. AL-KEY-02 / AL-KEY-04 fires → IC opens `#incident-key-rotation-{date}` Slack channel
+2. **IC generates `incident_id = crypto.randomUUID()` — this UUID is the correlation key for all artefacts**
+3. **IC emits `admin.key_rotation_incident_opened` (HIGH/7yr): `incident_id`, `key_type`, `trigger_alert_id`, `key_age_days`, `rotation_due_by`, `overdue = true`, `two_person_auth_required`** ← **gate: this event must appear in DEC-030 chain before proceeding to any rotation action**
+4. IC runs scope assessment queries C1–C4
+5. If CRYPTO-CHAIN-02 detected → stop R-21; co-activate R-05 + R-20
+6. IC initiates rotation per R-21.4 (HMAC dual-key or KEYPOINTS maintenance window); two-person auth activated if required
+7. `admin.encryption_key_rotation_initiated` emitted (existing R-21 event; include `incident_id` in metadata)
+8. Rotation executed; `admin.encryption_key_rotated` emitted
+9. Verification run; `admin.encryption_key_rotation_verified` emitted
+10. **IC emits `admin.key_rotation_incident_closed` (HIGH/7yr): same `incident_id`, `resolution`, `rotation_completed_at`, `verification_completed = true`, `pir_committed = (severity >= P1)`** ← **KEY-IC-CHAIN-01 closes**
+11. IC collects evidence artefacts IR-KEY-E-001 through IR-KEY-E-006; each artefact JSON must include `"incident_id": "<uuid>"` for cross-reference
+12. PIR if `pir_committed = true` (P0/P1 incidents; 5-business-day deadline)
+
+**`incident_id` as artefact correlation key:** Step 11 requires that all six IR-KEY-E-001 through IR-KEY-E-006 evidence files include `"incident_id"` as a top-level JSON field. This allows a single DEC-030 chain query joining on `incident_id` to surface the complete IC lifecycle alongside the R2 artefact references.
+
+### R-54.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `admin.key_rotation_incident_opened` (HIGH/7yr, CC6.8/CC7.2/CC7.3) and `admin.key_rotation_incident_closed` (HIGH/7yr, CC6.8/CC5.3/CC7.5) in `docs/AUDIT_LOG_SCHEMA.md`; include Zod v2 schemas from §R-54.5; register KEY-IC-CHAIN-01 ordering invariant with HTTP 422 `KEY_IC_CHAIN_01_VIOLATION` error code | security-engineer + compliance-officer | **P0** | M7 | [ ] |
+| 2 | Deploy both events to `emit-audit-event` Worker; integration test A: emit `incident_closed` for unknown `incident_id` → confirm HTTP 422 `KEY_IC_CHAIN_01_VIOLATION`; integration test B: emit `incident_opened` then `incident_closed` for same `incident_id` → confirm HTTP 200; run integration tests in staging as part of R-21 tabletop (R-21 checklist item 4) | platform-engineer | **P0** | M7 | [ ] |
+| 3 | R-21 checklist item 1 documentation portion — §R-54 authored; payload specs §R-54.3; Zod schemas §R-54.5; KEY-IC-CHAIN-01 §R-54.4; step sequence integration §R-54.6 | compliance-officer | **P0** | 2026-07-02 | [x] **Done — this authoring pass** |
+| 4 | Update IR-KEY-E-001 through IR-KEY-E-006 evidence templates (R-21.9) to add `"incident_id"` as a required top-level JSON field; add auditor cross-reference query: `SELECT * FROM audit_log_events WHERE metadata->>'incident_id' = '<uuid>' ORDER BY created_at` | compliance-officer | **P1** | M7 | [ ] |
+| 5 | Register KEY-IC-CHAIN-01 cross-reference in `docs/SOC2_READINESS.md §58` (HMAC chain integrity controls section): "KEY-IC-CHAIN-01 — `admin.key_rotation_incident_closed` must follow `admin.key_rotation_incident_opened` for same `incident_id`; HTTP 422 `KEY_IC_CHAIN_01_VIOLATION`; enforced by `emit-audit-event` Worker (§R-54.4)" | compliance-officer | **P1** | M8 | [ ] |
+
+### R-54.8 R-21 Open Questions Patch
+
+| OQ | Prior status | New status |
+|---|---|---|
+| **OQ-KEY-01** | **P0 Open** — register `admin.key_rotation_incident_opened` + `admin.key_rotation_incident_closed` as DEC-030 event types, or track in PagerDuty only | 🟢 **Resolved — Option A (DEC-030 event types) adopted 2026-07-02 (§R-54). Full payload specs: §R-54.3. Zod v2 schemas: §R-54.5. KEY-IC-CHAIN-01 invariant: §R-54.4. Step sequence integration: §R-54.6. AUDIT_LOG_SCHEMA.md registration + Worker deployment pending (§R-54.7 items 1–2, P0/M7).** |
+| **OQ-KEY-02** | P1 Open — KEYPOINTS_ENC_KEY live re-encryption vs. maintenance window | 🟡 **Unchanged — P1 Open. Decision required before M12 (first KEYPOINTS_ENC_KEY rotation).** |
+
+### R-54.9 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md` — register `admin.key_rotation_incident_opened` + `admin.key_rotation_incident_closed` (HIGH/7yr); Zod v2 schemas; KEY-IC-CHAIN-01 invariant; SOC 2 CC6.8/CC7.2/CC7.3/CC5.3/CC7.5 | §R-54.7 item 1 (P0/M7) | 🟡 **Pending — AUDIT_LOG_SCHEMA.md registration** |
+| `emit-audit-event` Worker — deploy both events; KEY-IC-CHAIN-01 enforcement; integration tests A + B | §R-54.7 item 2 (P0/M7) | 🟡 **Pending — Worker deployment** |
+| `docs/INCIDENT_RESPONSE.md R-21` checklist item 1 — documentation portion | §R-54.7 item 3 (P0/2026-07-02) | 🟢 **Done — this authoring pass** |
+| IR-KEY-E-001..E-006 evidence templates — `incident_id` field + auditor cross-reference query | §R-54.7 item 4 (P1/M7) | 🟡 **Pending** |
+| `docs/SOC2_READINESS.md §58` — KEY-IC-CHAIN-01 cross-reference | §R-54.7 item 5 (P1/M8) | 🟡 **Pending** |
+
+---
+
+*v3.19.0 (2026-07-02): R-54 OQ-KEY-01 Resolution — Key Rotation Incident DEC-030 Event Type Adoption. Resolves OQ-KEY-01 (R-21 Open Questions, v3.18.5): whether `admin.key_rotation_incident_opened` / `admin.key_rotation_incident_closed` should be DEC-030 HMAC-chained event types or PagerDuty-only. Decision: **Option A adopted** — DEC-030 event types. Rationale: (1) DEC-030 chain is FORM's authoritative audit record; PagerDuty timelines are supporting evidence only; (2) SOC 2 CC6.8 requires demonstrating active cryptographic key inventory management — an IC event anchoring the rotation sequence closes the chain gap where `admin.encryption_key_rotation_initiated` had no preceding IC anchor; (3) `incident_id` UUID correlation field bridges PagerDuty incident, DEC-030 chain, and IR-KEY-E-001..E-006 R2 artefacts for a single auditor cross-reference query; (4) R-21 step sequence already assumed these events existed — formalising them removes the step/schema gap. Event specs (§R-54.3): `admin.key_rotation_incident_opened` (HIGH/7yr, CC6.8/CC7.2/CC7.3): payload — `incident_id` UUID (IC correlation key across all artefacts), `key_type` enum (eight-key production inventory), `trigger_alert_id` (AL-KEY-01..04 or manual), `key_age_days` int, `rotation_due_by` ISO 8601, `overdue` bool, `two_person_auth_required` bool (true for HMAC_AUDIT_CHAIN_KEY + KEYPOINTS_ENC_KEY), `ic_user_id` FORM-staff UUID. `admin.key_rotation_incident_closed` (HIGH/7yr, CC6.8/CC5.3/CC7.5): payload — `incident_id` UUID (same as opened), `key_type` enum, `resolution` enum (rotated_on_schedule | rotated_emergency | deferred_approved | false_positive), `rotation_completed_at` ISO 8601 | null, `verification_completed` bool, `deferred_reason` string | null (max 200 chars, operational text only), `pir_committed` bool. KEY-IC-CHAIN-01 ordering invariant (§R-54.4): `incident_closed` MUST follow `incident_opened` for same `incident_id`; HTTP 422 `KEY_IC_CHAIN_01_VIOLATION` if order violated; max window 48h (HMAC/KEYPOINTS) or 72h (other keys). R-21 step sequence integration (§R-54.6): IC generates `incident_id = crypto.randomUUID()` before rotation; emits `incident_opened` as chain gate before scope queries; emits `incident_closed` after `encryption_key_rotation_verified`; all six IR-KEY-E-001..E-006 artefact files include `"incident_id"` JSON field. R-21 inline patches: OQ-KEY-01 → 🟢 Resolved; checklist item 1 → [x] Done (documentation portion). Five-item implementation checklist: 2× P0/M7 (AUDIT_LOG_SCHEMA.md registration + Worker deployment + KEY-IC-CHAIN-01 integration tests); 1× P0/2026-07-02 ([x] Done — documentation portion); 2× P1/M7–M8 (evidence template `incident_id` field + SOC2_READINESS §58 cross-ref). Cross-references: `docs/AUDIT_LOG_SCHEMA.md` (registration pending P0/M7); `docs/INCIDENT_RESPONSE.md R-21` (OQ-KEY-01 🟢 Done; checklist item 1 documentation portion [x] Done); `docs/SOC2_READINESS.md §58` (KEY-IC-CHAIN-01 cross-ref pending P1/M8); `docs/OBSERVABILITY.md §30` (AL-KEY-01 through AL-KEY-04 — trigger alert IDs sourced here); DEC-030. Privacy floor: `ic_user_id` is FORM staff auth UUID only — no enterprise employee `user_id`, name, email, health value, coaching content, biometric data, or GDPR Art. 9 special-category data in either event; `deferred_reason` is operational text only; `key_type` enum values are system component names. Owner: security-engineer + compliance-officer.*

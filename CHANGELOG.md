@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.6.1] — 2026-07-02
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-54` — OQ-KEY-01 Resolution: Key Rotation Incident DEC-030 Event Types (`admin.key_rotation_incident_opened` / `admin.key_rotation_incident_closed`). Option A adopted — DEC-030 HMAC-chained events over PagerDuty-only tracking. Full payload specs (§R-54.3), Zod v2 schemas (§R-54.5), KEY-IC-CHAIN-01 ordering invariant (§R-54.4), R-21 step sequence integration (§R-54.6), five-item implementation checklist.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md R-21` — OQ-KEY-01 patched 🟡 P0 Open → 🟢 Resolved (§R-54); checklist item 1 updated [x] Done (documentation portion).
+- `docs/INCIDENT_RESPONSE.md` — header v3.18.5 → v3.19.0.
+- `VERSION` — 11.6.0 → 11.6.1.
+
+---
+
 ## [11.6.0] — 2026-07-02
 
 ### Added
