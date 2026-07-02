@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [11.0.1] — 2026-07-02
+
+### Added
+- `docs/SOC2_READINESS.md §142` — Cross-Reference Patch: FIDO2-E-001 Registration (CC6.7 · SSO_SCIM_IMPLEMENTATION §41). New annual + per-change SOC 2 evidence artefact FIDO2-E-001 registered in §79.4 master evidence table (count 110 → 111): FIDO2/WebAuthn hardware token enrollment confirmation for all five break-glass-eligible engineers (`destructive` tier PAM). Four-component artefact: Cloudflare Access `form-break-glass` policy screenshot (confirming `require = ["warp", "fido2"]`); 5× individual enrollment confirmation screenshots (Cloudflare Access identity UUIDs); YubiKey 5 NFC procurement receipt (5 primary + 5 backup); sanitized `cloudflare/access/break-glass-policy.tf` diff. CC6.7: hardware-token requirement enforced at both IdP layer (Cloudflare Access policy) and IaC layer (PR-reviewed Terraform); TOTP fallback unconditionally prohibited for `destructive` tier. No new R2 subfolder (`compliance/evidence/pam/` already exists, §107); §80.3 folder description updated. §80.4 Vanta mirror entry added. §142.7 four-item implementation checklist. Closes `docs/SSO_SCIM_IMPLEMENTATION.md §41.6` item 7 (P1/M5) and §41.7 last pending cross-reference row. Document header v3.67.0 → v3.68.0. owners: compliance-officer + security-engineer.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §41.6 item 7 status patched `[ ] Pending M5` → `[x] Done (documentation portion — SOC2_READINESS.md v3.68.0, §142, 2026-07-02); [ ] (operational — first physical collection M5)`; §41.7 last cross-reference row patched `🟡 Pending — M5 evidence collection window` → `🟢 Done — 2026-07-02 (SOC2_READINESS.md v3.68.0, §142)`. Header v2.13 → v2.14.
+- `VERSION` — 11.0.0 → 11.0.1.
+
+---
+
 ## [11.0.0] — 2026-07-02
 
 ### Added

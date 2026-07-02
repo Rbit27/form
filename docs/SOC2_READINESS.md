@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.67.0
+# FORM · SOC 2 Type II Readiness v3.68.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -30957,7 +30957,7 @@ Post-§107 §79.4 primary evidence row count: 56.
 One new folder added to the §80.3 R2 primary store architecture:
 
 ```
-pam/  (PAM / Privileged Access Management observability — CC6-E-PAM-001/002 [quarterly]; CC6-E-PAM-003 [manual-event]; CC6-E-PAM-004 [annual + quarterly]; CC7-E-PAM-001 [quarterly]; form-api NO ACCESS) — added by §107 (2026-06-25)
+pam/  (PAM / Privileged Access Management observability — CC6-E-PAM-001/002 [quarterly]; CC6-E-PAM-003 [manual-event]; CC6-E-PAM-004 [annual + quarterly]; CC7-E-PAM-001 [quarterly]; FIDO2-E-001 [annual + per-change]; form-api NO ACCESS) — added by §107 (2026-06-25); FIDO2-E-001 added by §142 (2026-07-02)
 ```
 
 **Access invariant:** `form_api` has NO ACCESS to `compliance/evidence/pam/` — consistent with all restricted evidence subfolders. CC6-E-PAM-001 and CC6-E-PAM-002 contain internal `admin_user_id` and `pam_session_id` UUIDs that must not be accessible to application-layer service accounts.
@@ -34190,3 +34190,95 @@ One row added to the §79.4 master evidence table (count 109 → 110), after OTA
 ---
 
 *v3.67.0 (2026-07-01): §141 Cross-Reference Patch — PHI-E-001 Registration (C1.2 / CC2.2 · COST_MODEL §54). Closes `docs/COST_MODEL.md §54.10` item 5 (P1/M8) and `docs/COST_MODEL.md §54.11` last pending cross-reference row. New annual SOC 2 evidence artefact registered (count 109 → 110): PHI-E-001 (C1.2/CC2.2, annual + per-schema-change supplement + pre-GA nil attestation, 3yr — Programme Health Indicator privacy guarantee evidence confirming that `GET /api/admin/tenants/:tenantId/programme-health` never returns raw `fehs_score` to `tenant_admin`; content: `ProgrammeHealthResponse` Zod v2 schema extract (`fehs_score` absent), representative `admin.programme_health_label_viewed` DEC-030 event samples (`phi_label` enum only, no `fehs_score`), PHI-VIEW-01 chain invariant compliance note, `insufficient_data` state documented for k < 5 cohorts per QBR-K-ANON-01; R2 path `compliance/evidence/phi/phi-e-001_{YYYY}.json`; per-schema-change supplements at `phi-e-001_{YYYY}-schema-change-{YYYYMMDD}.json`; WORM 3yr; `r2:form-api` NO ACCESS). §141.3: new R2 subfolder `compliance/evidence/phi/` (WORM 3yr; `r2:form-api` NO ACCESS; `form_system` PAM session write; `compliance_reviewer` + `r2:compliance-officer` read). §141.4: Vanta mirror entry (annual + per-schema-change within 48h; C1.2/CC2.2; `phi_label` enum + aggregate signals — no `fehs_score`, no individual employee `user_id`, health values, or GDPR Art. 9 data). §141.5: §79.4 master evidence table row (count 109 → 110; insertion after OTA-WINDOW-E-001). §141.6: two cross-reference obligations closed (COST_MODEL §54.10 item 5 P1/M8 → 🟢 Done; COST_MODEL §54.11 last pending row → 🟢 Done). §141.7: four-item implementation checklist (1× P1 R2 folder M8; 1× P1 first annual collection; 1× P2 pre-GA nil attestation; 1× P1 per-schema-change supplement — treat inadvertent `fehs_score` exposure as P0 privacy incident). Privacy floor: PHI-E-001 contains `phi_label` enum (3-band label only), `snapshot_date` ISO 8601, `trend` enum, aggregate `activation_rate_pct` and `wau_rate_pct` (null when k < 5, QBR-K-ANON-01) — no `fehs_score`, no individual employee `user_id`, name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data; `admin_user_id` in DEC-030 event samples is FORM-internal auth UUID only, not an enterprise employee identifier; `tenant_id` is FORM-internal UUID; `r2:form-api` REVOKED from `compliance/evidence/phi/`. Document header v3.66.0 → v3.67.0. Owner: compliance-officer.*
+
+---
+
+## §142 · Cross-Reference Patch — FIDO2-E-001 Registration (CC6.7 · SSO_SCIM_IMPLEMENTATION §41)
+
+> Date: 2026-07-02. Trigger: `docs/SSO_SCIM_IMPLEMENTATION.md §41.7` cross-reference obligation — "`docs/SOC2_READINESS.md §79.4` master evidence table: FIDO2-E-001 row registration (CC6.7, annual, 7yr) — 🟡 Pending — M5 evidence collection window." (v2.13, 2026-07-01). Owner: compliance-officer.
+
+### §142.1 Purpose
+
+`docs/SSO_SCIM_IMPLEMENTATION.md §41` (DEC-094, v2.13, 2026-07-01) — "OQ-SSO-24.3 & OQ-SSO-24.4 Resolution — PAM Role Naming Distinction & FIDO2 Hardware Key Procurement" — introduced SOC 2 evidence artefact FIDO2-E-001 and deferred its registration here to P1/M5. §141.4 specifies: "Collect FIDO2-E-001 artefact: Cloudflare Access FIDO2 enrollment screenshots + procurement receipt + `break-glass-policy.tf` diff; store in `compliance/evidence/pam/FIDO2-E-001_2026-07.zip`. Register in `docs/SOC2_READINESS.md` §79.4 master evidence table (CC6.7)."
+
+This §142 fulfils that obligation: §79.4 master evidence table row (count 110 → 111), §80.4 Vanta mirror entry, §80.3 pam/ folder updated, and implementation checklist. Closes `docs/SSO_SCIM_IMPLEMENTATION.md §41.6` item 7 (P1/M5 → 🟢 Done) and the last pending row in `docs/SSO_SCIM_IMPLEMENTATION.md §41.7`.
+
+FIDO2-E-001 demonstrates that all break-glass-eligible engineers have enrolled FIDO2-compliant hardware tokens (YubiKey 5 NFC) in Cloudflare Access for the `form-break-glass` application, satisfying the `destructive` PAM tier's phishing-resistant WebAuthn requirement per §24.3 of `docs/SSO_SCIM_IMPLEMENTATION.md`. No TOTP fallback exists for `destructive` tier — the hardware token enrollment artefact is the only mechanism by which the `destructive` tier can be activated, making FIDO2-E-001 the definitive CC6.7 control evidence.
+
+---
+
+### §142.2 Artefact Description
+
+**FIDO2-E-001** — Annual SOC 2 evidence artefact confirming FIDO2/WebAuthn hardware token enrollment for all break-glass-eligible engineers (`destructive` tier PAM). Content: (1) Cloudflare Access admin panel screenshot showing `fido2` method enforced in the `form-break-glass` policy (`require = ["warp", "fido2"]` block); (2) 5× individual enrollment confirmation screenshots — one per named break-glass-eligible engineer (Cloudflare Access identity UUID visible; no email address or name in the screenshot per privacy floor); (3) YubiKey 5 NFC procurement receipt confirming 5 primary + 5 backup keys purchased; (4) sanitized diff of `cloudflare/access/break-glass-policy.tf` showing `fido2` requirement is declared as infrastructure-as-code (CC8.1 change management chain — every `require` block change goes through PR review per `docs/DEPLOYMENT.md`). First collection: M4 cutover + 7 days (per DEC-094). Annual re-collection: on each SOC 2 observation year end; earlier if a break-glass-eligible engineer is added, removed, or replaces their hardware key.
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | FIDO2-E-001 |
+| **Name** | FIDO2/WebAuthn Hardware Token Enrollment Confirmation |
+| **SOC 2 criteria** | CC6.7 |
+| **Cadence** | Annual + on any break-glass engineer roster change (add/remove/key-replacement) |
+| **Retention** | 7 years |
+| **R2 path** | `compliance/evidence/pam/FIDO2-E-001_<YYYY-MM>.zip` (e.g. `FIDO2-E-001_2026-07.zip` for first collection) |
+| **Primary definition** | `docs/SSO_SCIM_IMPLEMENTATION.md §41` (DEC-094, v2.13, 2026-07-01) |
+
+**CC6.7 auditor narrative:** CC6.7 (information transmission protection / physical and environmental security) requires that FORM implements physical controls that restrict unauthorised access to information assets. In FORM's architecture, the highest-risk operation — `destructive` tier PAM (irreversible bulk data deletion, privilege escalation, secret rotation) — requires dual-person authorisation via FIDO2/WebAuthn hardware tokens. FIDO2-E-001 proves: (a) the `form-break-glass` Cloudflare Access policy has `fido2` declared in its `require` block (screenshot evidence); (b) all five named break-glass-eligible engineers have enrolled FIDO2 hardware keys against their Cloudflare Access identities (enrollment confirmation screenshots, one per named identity); (c) the procurement of 5× YubiKey 5 NFC primary + 5× backup keys was completed before the `destructive` tier was unblocked (procurement receipt); (d) the `require = ["warp", "fido2"]` block is infrastructure-as-code, version-controlled, and PR-reviewed (Terraform diff). Together, these four components demonstrate that the hardware-token requirement for the most privileged PAM tier is implemented as a technical control at both the identity-provider layer (Cloudflare Access policy enforcement) and the code layer (`break-glass-policy.tf` IaC), not as a purely procedural commitment. TOTP fallback for `destructive` tier is unconditionally prohibited per §24.3 of `docs/SSO_SCIM_IMPLEMENTATION.md` — there is no policy path that would allow a `destructive` operation without FIDO2 authentication.
+
+**Privacy floor:** FIDO2-E-001 contains only: Cloudflare Access admin panel screenshots (showing identity UUIDs, not employee names or emails — Cloudflare Access admin UI does not display PII beyond what the admin chose to use as an identifier; the `form-break-glass` policy in FORM's implementation uses internal role-label identifiers per §41.3.3); procurement receipt (vendor: Yubico, quantity: 10, cost: ~$550 USD — no PII, no employee names); `cloudflare/access/break-glass-policy.tf` diff (role labels only; no email addresses, no employee names). The five individual enrollment screenshots show Cloudflare Access identity UUIDs and the `fido2` authenticator type — no employee name, email, health value, coaching content, or GDPR Art. 9 special-category data. `form_api` has NO ACCESS to `compliance/evidence/pam/` (§80.3 bucket policy invariant).
+
+---
+
+### §142.3 §80.3 R2 Folder Note
+
+**No new R2 subfolder required.** `compliance/evidence/pam/` already exists (created by §107, v3.32.0, 2026-06-25) with WORM Object Lock Governance, `form_api` NO ACCESS invariant, and `compliance_reviewer` + `r2:compliance-officer` read access. FIDO2-E-001 artefacts are stored at `compliance/evidence/pam/FIDO2-E-001_<YYYY-MM>.zip` within this existing folder structure.
+
+The §80.3 `pam/` folder description has been updated inline in this document version to include `FIDO2-E-001 [annual + per-change]` alongside the existing CC6-E-PAM-001/002/003/004 and CC7-E-PAM-001 artefacts (per §107 folder entry).
+
+| Subfolder | Artefacts | Access | Retention |
+|---|---|---|---|
+| `compliance/evidence/pam/` | CC6-E-PAM-001/002/003/004, CC7-E-PAM-001 (§107), **FIDO2-E-001** (§142) | `form_system` PAM session write; `compliance_reviewer` + `r2:compliance-officer` read; `r2:form-api` **NO ACCESS** | WORM Object Lock Governance; CC6-E-PAM-001/CC6-E-PAM-004/FIDO2-E-001: 7yr; CC6-E-PAM-002/CC6-E-PAM-003/CC7-E-PAM-001: 3yr |
+
+---
+
+### §142.4 §80.4 Vanta Mirror Entry
+
+FIDO2-E-001 added to Vanta mirror schedule (§80.4):
+
+| Artefact ID | Vanta upload timing | TSC mapping | Privacy note |
+|---|---|---|---|
+| FIDO2-E-001 | Within 48h of annual collection; within 48h of each per-change supplement (roster change / key replacement) | CC6.7 | Cloudflare Access identity UUIDs (not employee names or emails); YubiKey procurement receipt (vendor/quantity/cost only); `break-glass-policy.tf` diff (role labels only) — no employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data |
+
+Standard Vanta mirror-log entry required in `mirror-log/YYYY-MM.jsonl` per §80.4 protocol. Vanta access: compliance-officer + security-engineer only. The FIDO2-E-001 artefact is a `.zip` file — verify Vanta accepts ZIP uploads for CC6.7 manual evidence category; if not, extract screenshots and receipt to individual files before upload.
+
+---
+
+### §142.5 §79.4 Master Evidence Table Row
+
+One row added to the §79.4 master evidence table (count 110 → 111), after PHI-E-001 (§141):
+
+| Evidence ID | TSC Domain | Criterion | Description | Class | Cadence | Owner | File path |
+|---|---|---|---|---|---|---|---|
+| **FIDO2-E-001** | CC6 | CC6.7 | FIDO2/WebAuthn hardware token enrollment confirmation for all break-glass-eligible engineers (`destructive` tier PAM). Content: (1) Cloudflare Access admin panel screenshot showing `fido2` enforced in `form-break-glass` policy; (2) 5× enrollment confirmation screenshots (Cloudflare Access identity UUIDs, one per named engineer); (3) YubiKey 5 NFC procurement receipt (5 primary + 5 backup); (4) sanitized `cloudflare/access/break-glass-policy.tf` diff confirming `require = ["warp", "fido2"]` block. Proves `destructive` tier PAM cannot activate without phishing-resistant hardware-token authentication; TOTP fallback unconditionally prohibited (§24.3 SSO_SCIM_IMPLEMENTATION.md). No employee PII — identity UUIDs, procurement metadata, role-label IaC diff only. Source: SSO_SCIM_IMPLEMENTATION §41 (DEC-094, v2.13, 2026-07-01). 7yr retention. | Manual-event | Annual + on any break-glass engineer roster change (add/remove/key-replacement) | compliance-officer + security-engineer | `compliance/evidence/pam/FIDO2-E-001_<YYYY-MM>.zip` |
+
+---
+
+### §142.6 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md §41.6` item 7 (P1/M5) — "Collect FIDO2-E-001 artefact: Cloudflare Access FIDO2 enrollment screenshots + procurement receipt + `break-glass-policy.tf` diff; store in `compliance/evidence/pam/FIDO2-E-001_2026-07.zip`. Register in `docs/SOC2_READINESS.md` §79.4 master evidence table (CC6.7)." | §41.6 item 7 (v2.13, 2026-07-01) | 🟢 **Done — 2026-07-02 (SOC2_READINESS.md v3.68.0, §142)** |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §41.7` cross-reference table — last pending row: "`docs/SOC2_READINESS.md §79.4` master evidence table: FIDO2-E-001 row registration (CC6.7, annual, 7yr)" | §41.7 (v2.13, 2026-07-01) | 🟢 **Done — 2026-07-02 (SOC2_READINESS.md v3.68.0, §142)** |
+
+---
+
+### §142.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Collect first FIDO2-E-001 artefact (first collection: M4 + 7 days per DEC-094): export Cloudflare Access admin panel screenshot (CC6.7 policy view showing `fido2` in `form-break-glass` require block); capture 5× individual enrollment confirmation screenshots (one per named engineer, Cloudflare Access identity UUID visible); attach YubiKey 5 NFC procurement receipt (already procured per DEC-094, 2026-07-01); export `cloudflare/access/break-glass-policy.tf` diff (sanitize to show role labels only — no email addresses); assemble into `FIDO2-E-001_2026-07.zip`; SHA-256 hash; upload to `compliance/evidence/pam/FIDO2-E-001_2026-07.zip` (7yr WORM); upload to Vanta within 48h; add to MASTER-INDEX. Privacy check: confirm no employee email, name, health value, or GDPR Art. 9 data in any file. | compliance-officer + security-engineer | **P1** | M5 (30 days post M4 cutover) | [ ] |
+| 2 | Annual re-collection: at each SOC 2 observation year end, re-run the four-component collection; confirm all currently enrolled engineers are still break-glass-eligible (quarterly identity-list review per CC6-E-PAM-004 §107 is the roster source); file `FIDO2-E-001_<YYYY-MM>.zip`; upload to R2 + Vanta within 48h; add MASTER-INDEX row. | compliance-officer | **P1** | Annual (each observation year; first: Year 1 end) | [ ] |
+| 3 | Per-change collection: on any break-glass engineer roster change (addition or removal) or hardware key replacement event — re-collect updated enrollment screenshots and updated `break-glass-policy.tf` diff; file per-change supplement at `FIDO2-E-001_<YYYY-MM>_change-<YYYYMMDD>.zip`; upload to R2 + Vanta within 48h; add MASTER-INDEX row. Treat any `destructive` tier activation with fewer than 2 FIDO2-enrolled engineers available as a P0 PAM incident (§24.3 fallback protocol). | compliance-officer + security-engineer | **P1** | On each roster change / key replacement | [ ] |
+| 4 | Add FIDO2-E-001 annual collection to §15 compliance calendar alongside CC6-E-PAM-004 annual policy refresh; add per-change trigger to PAM offboarding checklist (parallel to `pam-db-proxy` key rotation). | compliance-officer | **P2** | After §15 calendar update | [ ] |
+
+---
+
+*v3.68.0 (2026-07-02): §142 Cross-Reference Patch — FIDO2-E-001 Registration (CC6.7 · SSO_SCIM_IMPLEMENTATION §41). Closes `docs/SSO_SCIM_IMPLEMENTATION.md §41.6` item 7 (P1/M5) and `docs/SSO_SCIM_IMPLEMENTATION.md §41.7` last pending cross-reference row. New annual + per-change SOC 2 evidence artefact registered (count 110 → 111): FIDO2-E-001 (CC6.7, annual + per-change, 7yr — FIDO2/WebAuthn hardware token enrollment confirmation for all five break-glass-eligible engineers; `destructive` tier PAM; four-component artefact: Cloudflare Access `form-break-glass` policy screenshot confirming `require = ["warp", "fido2"]`; 5× individual enrollment confirmation screenshots with Cloudflare Access identity UUIDs; YubiKey 5 NFC procurement receipt 5+5; sanitized `cloudflare/access/break-glass-policy.tf` diff; TOTP fallback unconditionally prohibited for `destructive` tier; R2 path `compliance/evidence/pam/FIDO2-E-001_<YYYY-MM>.zip`; WORM 7yr; `r2:form-api` NO ACCESS). §142.2 artefact description with CC6.7 auditor narrative: hardware-token requirement enforced at both identity-provider layer (Cloudflare Access `form-break-glass` policy) and IaC layer (`break-glass-policy.tf` PR-reviewed); four components together constitute a technically verifiable control rather than a purely procedural commitment; no TOTP fallback path exists for `destructive` tier. §142.3 §80.3 folder note: no new subfolder — `compliance/evidence/pam/` already exists (§107, v3.32.0, 2026-06-25); §80.3 inline folder description updated to include `FIDO2-E-001 [annual + per-change]`. §142.4 Vanta mirror entry (annual + per-change within 48h; CC6.7; identity UUIDs + procurement metadata + IaC diff — no employee `user_id`, email, health value, or GDPR Art. 9 data). §142.5 §79.4 master evidence table row (count 110 → 111; insertion after PHI-E-001 (§141)). §142.6 two cross-reference obligations closed (SSO_SCIM_IMPLEMENTATION §41.6 item 7 P1/M5 → 🟢 Done; SSO_SCIM_IMPLEMENTATION §41.7 last pending row → 🟢 Done). §142.7 four-item implementation checklist (1× P1 first collection M5; 1× P1 annual re-collection; 1× P1 per-change collection; 1× P2 §15 calendar + PAM offboarding checklist). Privacy floor: FIDO2-E-001 contains Cloudflare Access identity UUIDs (not employee names or emails), procurement receipt (vendor/quantity/cost only), and `break-glass-policy.tf` diff (role labels only) — no employee `user_id`, name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data; `admin_user_id` not present in this artefact (enrollment screenshots show Cloudflare Access identity UUIDs only); `r2:form-api` REVOKED from `compliance/evidence/pam/` (§80.3 invariant inherited from §107). Document header v3.67.0 → v3.68.0. Owner: compliance-officer + security-engineer.*
