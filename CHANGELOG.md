@@ -1,5 +1,25 @@
 # Changelog · FORM
 
+## [11.34.0] — 2026-07-02
+
+### Added
+- `content/post-3051-programming-decisions-framework.md` — Series «Програмування без коуча» 3051–3060 · 1/10. «Як приймати програмні рішення без зовнішнього арбітра: рамка «ставок, а не правил»». Рамка: тренувальні рішення — це ставки при невизначеності, а не правила з правильними відповідями. Три компоненти ставки: гіпотеза, очікуваний результат, критерій перегляду. Ієрархія даних: N=1 контрольований → механістична база → популяційні дані → відчуття. П'ять запитань: яке рішення, які дані, яка гіпотеза, яка дія тестує, критерій перегляду. Три помилки: confirmation bias у гіпотезі, WYSIATI (Kahneman), commitment bias після ставки. Операційний мінімум серії. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — posts 3051 and 39 added at top of feed.
+
+### Changed
+- `STATUS.md` — v11.34.0 current; next: post-3052 («Коли залишатись на програмі, а коли змінювати: три сигнали і три помилки») + editorial post-38.
+- `VERSION` — 11.33.0 → 11.34.0.
+
+## [11.33.0] — 2026-07-02
+
+### Added
+- `content/post-39-training-partner.md` — published to blog feed. Editorial series post-39. «Тренування з партнером: де соціальна фасилітація підсилює прогрес, де вона його блокує». Zajonc 1965: присутність підвищує arousal → підсилює домінантні реакції, погіршує нові патерни. Baron 1986: distraction-conflict mechanism. Чотири ситуації де партнер підсилює (adherence, максимальні зусилля, страховка, готовність до важкого). Три ситуації де заважає (нові рухи/технічна робота, несумісні програми, залежність від розкладу). Carron et al. 1996: cohesion vs. індивідуальна ефективність при різних цілях. Köhler effect (Feltz et al. 2011): слабкий у силовому тренуванні. Три типи партнерства: accountability-only, parallel, shared program. Два операційних питання. Протокол трьох правил. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-39 card prepended at top of feed (promoted from draft section to main feed).
+
+### Changed
+- `STATUS.md` — v11.33.0 current; next: post-3051 + editorial post-38.
+- `VERSION` — 11.32.1 → 11.33.0.
+
 ## [11.32.1] — 2026-07-02
 
 ### Changed
