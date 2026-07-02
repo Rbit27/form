@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v11.4.0** — 2026-07-02 · post-11 · «Тиждень деловантаження: фізіологія, ритміка, і коли це насправді потрібно» · original series post-11 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-11 · next: post-12 («Техніка понад інтенсивністю: чому форма вибудовує тренованість») + post-2917 («Різниця між гнучкістю і безструктурністю у тренуванні: де межа») + post-160 («Синтез 151–160: десять рішень без тренера» — editorial series 151–160, 10/10 SERIES COMPLETE)
+
 **v11.3.0** — 2026-07-02 · post-2916 · «Коли «план» перестає бути планом: чотири сценарії реального зриву і що з ними робити» · series «Тренувальна стійкість» 2916–2925 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2916 · next: post-2917 («Різниця між гнучкістю і безструктурністю у тренуванні: де межа») + post-160 («Синтез 151–160: десять рішень без тренера» — editorial series 151–160, 10/10 SERIES COMPLETE)
 
 **v11.2.0** — 2026-07-02 · post-159 · «Коли зупинятися на програмі, а коли рухатися далі: рамка рішення для self-coached атлета» · series «Програмування для реального світу» 151–160 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-159 · next: post-2916 (series «Тренувальна стійкість» 2916–2925 opener) + post-160

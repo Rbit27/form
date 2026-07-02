@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.4.0] — 2026-07-02
+
+### Added
+- `content/post-11-deload-week-physiology-timing-signals.md` — «Тиждень деловантаження: фізіологія, ритміка, і коли це насправді потрібно». Фізіологія суперкомпенсації (стрес → відновлення → адаптація вище базової лінії); три параметри правильного деловантаження (об'єм −40–60%, інтенсивність ≥75–80%, тривалість 5–7 днів); плановий vs реактивний ритм; п'ять конкретних сигналів у журналі (RPE-дрейф, регрес e1RM, технічний дрейф, якість сну, небажання тренуватися); розмежування functional overreaching / non-functional overreaching / overtraining syndrome; п'ять поширених помилок. Джерела: Israetel et al. 2019, Mujika & Padilla 2000, Hortobágyi et al. 1993, Meeusen et al. 2013, Chennaoui et al. 2015. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card added for post-11 at top of feed.
+
+### Changed
+- `STATUS.md` — current version v11.3.0 → v11.4.0; next: post-12 («Техніка понад інтенсивністю: чому форма вибудовує тренованість»).
+- `VERSION` — 11.3.0 → 11.4.0.
+
+---
+
 ## [11.3.0] — 2026-07-02
 
 ### Added
