@@ -1,7 +1,7 @@
 ---
 title: "Крепатура — це не індикатор тренування. Ось що вона насправді означає"
 slug: doms-muscle-soreness-science
-date: 2026-05-16
+date: 2026-07-02
 author: George (FORM founder)
 category: science
 estimated_reading_time: 13 хв

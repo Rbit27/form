@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v11.10.0** — 2026-07-02 · post-20 · «Крепатура — це не індикатор тренування. Ось що вона насправді означає» · original series post-20 · clinical-safety PASS · sports-scientist review pending · blog.html card added for post-20 · README roadmap extended: series 3031–3040 «Тренування і відновлення: операційна рамка» proposed · next: post-21 («Плато — це не стеля. Це діагноз.»)
+
 **v11.9.0** — 2026-07-02 · post-19 + post-2920 · post-19: «Як читати тіло: коли м'язовий біль — сигнал адаптації, а коли — сигнал зупинки» · original series post-19 · clinical-safety CONDITIONAL PASS · sports-scientist review pending · blog.html card added for post-19 · post-2920: «Тренування в умовах часових обмежень: операційна модель 30-хвилинної сесії» · series «Тренувальна стійкість» 2916–2925 (5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2920 · next: post-20 («Крепатура — це не індикатор тренування») + post-2921 («Як зберегти силовий прогрес при тренуванні двічі на тиждень»)
 
 **v11.8.0** — 2026-07-02 · post-18 + post-2919 · post-18: «Як відслідковувати прогрес без тренера: три рівні самооцінки» · original series post-18 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-18 · post-2919: «Тренування при стресі: коли "просто зроби це" — правильна відповідь, а коли — ні» · series «Тренувальна стійкість» 2916–2925 (4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-2919 · next: post-19 («Як читати тіло: коли м'язовий біль — сигнал адаптації, а коли — сигнал зупинки») + post-2920 («Тренування в умовах часових обмежень: операційна модель 30-хвилинної сесії»)
