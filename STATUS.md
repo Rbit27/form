@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v11.83.0** — 2026-07-03 · content · post-62 · «Від ідентичності до програми: як правильно описати власний рівень тренованості і не помилитись» (editorial series 61–70, 2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-62 · next: post-63 («Мета як операційна змінна: як формулювати тренувальну ціль, щоб вона визначала програму, а не просто надихала»)
+
 **v11.82.0** — 2026-07-03 · content · post-3080 + post-61 · «Синтез серії: 10 принципів технічної самодіагностики для self-coached атлета» (series «Технічна самодіагностика» 3071–3080, 10/10 · SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · «Тренувальна ідентичність: хто ти як атлет — і чому це питання має практичні наслідки» (editorial series 61–70, 1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards prepended for post-3080 + post-61 · next: post-62 («Від ідентичності до програми: як правильно описати власний рівень тренованості і не помилитись»)
 
 **v11.80.0** — 2026-07-03 · content · post-3079 · «Warm-up як технічна діагностика: два завдання розминки і чому більшість використовує одне» (series «Технічна самодіагностика» 3071–3080, 9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3079 · next: post-3080 («Синтез серії: 10 принципів технічної самодіагностики для self-coached атлета» · SERIES COMPLETE 10/10) + post-61 («Тренувальна ідентичність: хто ти як атлет — і чому це питання має практичні наслідки»)
