@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [12.11.0] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-70: `pam_postgres_sync` stale companion runbook (CC6.2/CC6.6 · job 20). Trigger: 35h stale, P2 default (escalate P1 if non-break-glass gaps found; P0 if break-glass gaps or stale >72h). R-70-C1 gap-check SQL (PAM-elevated, security-engineer + IC only). Four root-cause discriminators (H1 deleted / H2 disabled / H3 pg_cron infra / H4 pg_net). Evidence artefact: PAM-SYNC-STALE-E-001. Header v3.35.1 → v3.36.0.
+- `docs/AUDIT_LOG_SCHEMA.md` — §PAM Postgres Sync Stale events: `security.pam_postgres_sync_stale_declared` (HIGH, 7yr, DEC-030 HMAC-chained, `PamPostgresSyncStaleDeclaredSchema` Zod v2) + `security.pam_postgres_sync_restored` (LOW, 3yr, `PamPostgresSyncRestoredSchema` Zod v2). PAM-SYNC-STALE-CHAIN-01 ordering invariant: `restored` blocked (HTTP 422 `PAM_SYNC_STALE_CHAIN_01_VIOLATION`) without prior `stale_declared` for same `incident_id`; co-activates R-05. Header v2.83 → v2.84.
+- `docs/SOC2_READINESS.md` — §158: PAM-SYNC-STALE-E-001 registered in §79.4 master evidence table (count 124 → 125; CC6.2/CC6.6; per-activation; 7yr WORM; R2 path `compliance/evidence/pam/pam-sync-stale-e-001-<YYYY-MM-DD>/`; NEW R2 subfolder — no pre-existing parent; two-envelope artefact: public cover sheet + restricted inner envelope). Header v3.83.0 → v3.84.0.
+
+### Changed
+- `docs/OBSERVABILITY.md` — §12.6 job 20 (`pam_postgres_sync`) cross-reference column: appended `INCIDENT_RESPONSE R-70 (§R-70; v1.0, 2026-07-03 — companion stale recovery runbook for job 20)`. Header v5.15.4 → v5.15.5.
+- `VERSION` — 12.10.0 → 12.11.0.
+
 ## [12.10.0] — 2026-07-03
 
 ### Added

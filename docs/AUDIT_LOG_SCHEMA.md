@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.83
+# FORM · Audit Log Schema v2.84
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -6068,6 +6068,78 @@ const WearableFreshnessCheckRestoredSchema = z.object({
 #### CC7.2 Auditor Narrative
 
 CC7.2 requires FORM to monitor for anomalous activity — including ensuring that monitoring controls themselves remain operational. `wearable_sync_freshness_check` (pg_cron job 31, `5 7 * * *`, daily 07:05 UTC) is FORM's automated daily measurement of wearable integration fleet freshness: `fn_wearable_sync_freshness_check()` queries `wearable_sync_events` per connected tenant to compute the percentage of devices with a sync event within the prior 24h, applying a k-anonymity gate (k ≥ 5 connected devices per tenant before emitting), and emits `wearable.fleet_freshness_assessed` DEC-030 with aggregate `fresh_pct`, `total_connected`, and `slo_met` scalars. The emitted aggregate feeds WS-SLO-06 (≥ 95% fleet freshness — `docs/OBSERVABILITY.md §41`) and the quarterly WS-E-002 compliance evidence artefact. When job 31 goes stale, FORM cannot confirm WS-SLO-06 status for the missed run windows without manual compensating measurement (R-69-C3). `system.wearable_freshness_check_stale_declared` HIGH is the IC-anchoring tamper-evident record of the monitoring gap; `system.wearable_freshness_check_restored` LOW captures root cause, total stale duration, and the R-69-C3 compensating measurement result. Distinction from R-68 (P0 default): R-69 is P1 default — stale `wearable_sync_freshness_check` creates a compliance measurement gap, not a chain integrity break; the WS-SLO-06 monitoring gap is remediated by the R-69-C3 compensating manual snapshot. Retention 7yr for `stale_declared`: multi-cycle SOC 2 CC7.2 evidence that FORM detected and responded to monitoring control lapses.
+
+---
+
+### PAM Postgres Sync Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-70 · CC6.2 / CC6.6)
+
+> Closes `docs/INCIDENT_RESPONSE.md R-70.12` item 1 (P0). Owner: compliance-officer + security-engineer.
+
+**Events:**
+
+| Event type | Severity | Retention | Emitter |
+|---|---|---|---|
+| `security.pam_postgres_sync_stale_declared` | HIGH | 7 yr | IC (PAM-elevated, via `emit-audit-event` Worker — T+5 min of R-70 activation) |
+| `security.pam_postgres_sync_restored` | LOW | 3 yr | IC (PAM-elevated, via `emit-audit-event` Worker — post-recovery confirmation) |
+
+**`security.pam_postgres_sync_stale_declared` payload:**
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Fresh UUID per R-70 activation. Anchors PAM-SYNC-STALE-CHAIN-01 ordering invariant. |
+| `confirmed_stale_since` | datetime | Last confirmed successful run of `pam_postgres_sync` from R-70-C2 `cron.job_run_details` query. |
+| `stale_hours` | int ≥ 0 | Hours since last successful run (35h freshness window; every-30-min cadence). |
+| `missed_runs_estimate` | int ≥ 0 | `stale_hours × 2` rounded down — number of 30-min run windows missed. |
+| `manual_gap_count` | int ≥ −1 | −1 = R-70-C1 gap check not yet run at declaration time; updated in `restored` event. |
+| `initial_severity` | enum | `p2` (stale only, gap check pending) / `p1_escalate` (R-70-C1 returns non-break-glass gap rows) / `p0_escalate` (break-glass gap confirmed OR stale > 72h). |
+
+**`security.pam_postgres_sync_stale_declared` Zod v2 schema** (canonical source: this section):
+
+```typescript
+export const PamPostgresSyncStaleDeclaredSchema = z.object({
+  incident_id:           z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),
+  stale_hours:           z.number().int().nonneg(),
+  missed_runs_estimate:  z.number().int().nonneg(),
+  manual_gap_count:      z.number().int().min(-1),
+  initial_severity:      z.enum(['p2', 'p1_escalate', 'p0_escalate']),
+});
+```
+
+**`security.pam_postgres_sync_restored` payload:**
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Must match `stale_declared` event. PAM-SYNC-STALE-CHAIN-01 enforced. |
+| `restored_at` | datetime | Timestamp IC confirms `pam_postgres_sync` healthy after `cron.run_job()` and `cron.job_run_details` shows successful run. |
+| `root_cause` | enum | `h1_deleted` / `h2_disabled` / `h3_infra` / `h4_pg_net_degraded`. |
+| `stale_hours_total` | int ≥ 0 | Total hours `pam_postgres_sync` was stale (declaration to restoration). |
+| `manual_gap_count` | int ≥ 0 | Final count from R-70-C1: `pam.elevation_approved` events in stale window without matching `admin_jit_escalations` row. 0 = no gap; > 0 = gap confirmed and remediated via R-70.5 step 4. |
+| `gap_remediated` | boolean | `true` if R-70.5 manual sync reconciliation (step 4) was executed; `false` if `manual_gap_count = 0`. |
+
+**`security.pam_postgres_sync_restored` Zod v2 schema** (canonical source: this section):
+
+```typescript
+export const PamPostgresSyncRestoredSchema = z.object({
+  incident_id:       z.string().uuid(),
+  restored_at:       z.string().datetime(),
+  root_cause:        z.enum(['h1_deleted', 'h2_disabled', 'h3_infra', 'h4_pg_net_degraded']),
+  stale_hours_total: z.number().int().nonneg(),
+  manual_gap_count:  z.number().int().nonneg(),
+  gap_remediated:    z.boolean(),
+});
+```
+
+#### PAM-SYNC-STALE-CHAIN-01 Ordering Invariant
+
+`security.pam_postgres_sync_restored` for a given `incident_id` is blocked (HTTP 422 `PAM_SYNC_STALE_CHAIN_01_VIOLATION`) by the `emit-audit-event` Worker if no prior `security.pam_postgres_sync_stale_declared` exists for the same `incident_id`. Co-activates R-05 on violation. Implementation pending — platform-engineer (R-70.12 item 2).
+
+**CC6.2 / CC6.6 auditor narrative:**
+
+CC6.2 requires that privileged access is authorised, logged, and that the logging mechanism is itself monitored for failures. `pam_postgres_sync` (pg_cron job 20, `*/30 * * * *`, every 30 min) is FORM's automated control verifying that every `pam.elevation_approved` DEC-030 event in `audit_log_events` has a corresponding row in `admin_jit_escalations` (the Postgres-layer PAM record, sourced from KV). When job 20 goes stale, FORM cannot confirm with automated frequency that the KV-to-Postgres PAM sync is intact — a gap could exist without detection for up to 35h (the freshness window). `security.pam_postgres_sync_stale_declared` HIGH is the tamper-evident IC-anchoring record of the monitoring gap; `security.pam_postgres_sync_restored` LOW captures the root cause and the result of the R-70-C1 compensating gap check (which bridges the detection gap for the stale window). CC6.6 significance: if R-70-C1 reveals that a `pam.break_glass_activated` event lacks a matching `admin_jit_escalations` row, FORM has a CC6.6 break-glass audit completeness breach — escalating to P0 and requiring manual reconciliation (R-70.5 step 4) plus co-activation of R-20 (Insider Threat path). P2 default (distinct from R-68 P0 and R-69 P1): stale `pam_postgres_sync` creates an audit-sync detection gap, not a confirmed chain break; the R-70-C1 compensating SQL bridges the detection gap immediately, and the 35h freshness window gives substantial time before alert.
+
+**v2.84 · 2026-07-03 · owner: compliance-officer + security-engineer**
+*v2.84 (2026-07-03): +2 events — `security.pam_postgres_sync_stale_declared` (HIGH/7yr) and `security.pam_postgres_sync_restored` (LOW/3yr) — in new section `### PAM Postgres Sync Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-70 · CC6.2 / CC6.6)`. Closes `docs/INCIDENT_RESPONSE.md R-70.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, PAM-SYNC-STALE-CHAIN-01 ordering invariant, and CC6.2/CC6.6 auditor narrative). PAM-SYNC-STALE-CHAIN-01: `security.pam_postgres_sync_restored` blocked (HTTP 422 `PAM_SYNC_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-70.12 item 2). Six-field Zod v2 `PamPostgresSyncStaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime — last confirmed successful run from R-70-C2), `stale_hours` (int≥0 — 35h freshness window, every-30-min cadence), `missed_runs_estimate` (int≥0 — stale_hours×2 rounded down), `manual_gap_count` (int≥−1, −1 = gate not yet run; final count in `restored`), `initial_severity` (enum p2/p1_escalate/p0_escalate — p0_escalate if break-glass gap confirmed OR stale > 72h; p1_escalate if non-break-glass gap confirmed). Six-field Zod v2 `PamPostgresSyncRestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum h1_deleted/h2_disabled/h3_infra/h4_pg_net_degraded — 4 values; consistent with R-67/R-69 4-value pattern), `stale_hours_total` (int≥0), `manual_gap_count` (int≥0 — final; 0 if no gap during stale window), `gap_remediated` (bool — true if R-70.5 step 4 manual sync reconciliation executed). CC6.2 significance: job 20 (`pam_postgres_sync`, every 30 min, 35h freshness) verifies every `pam.elevation_approved` DEC-030 event has a matching `admin_jit_escalations` row (KV-to-Postgres PAM sync integrity); stale window is a detection gap remediated by R-70-C1 compensating SQL — P2 default (distinct from R-68 P0 chain integrity; distinct from R-69 P1 SLO measurement gap). CC6.6 significance: if R-70-C1 finds a break-glass session without `admin_jit_escalations` row, escalates to P0 + R-20 co-activation. Privacy floor (both schemas): `manual_gap_count` is an aggregate integer count; `gap_remediated` is a boolean — no `admin_user_id` (UUID pseudonym), no plaintext name, email, justification text, or target tenant data in either event payload; R-70-C1 scope query output restricted to security-engineer + IC (not Slack); `form_api` REVOKED from emission path; IC PAM-elevated emission only. Retention table: +2 rows (`security.pam_postgres_sync_stale_declared` HIGH 7yr CC6.2/CC6.6; `security.pam_postgres_sync_restored` LOW 3yr CC6.2/CC6.6). Document header v2.83 → v2.84. Owner: compliance-officer + security-engineer.*
 
 **v2.83 · 2026-07-03 · owner: compliance-officer + devops-lead**
 *v2.83 (2026-07-03): +2 events — `system.wearable_freshness_check_stale_declared` (HIGH/7yr) and `system.wearable_freshness_check_restored` (LOW/3yr) — in new section `### Wearable Sync Freshness Check Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-69 · CC7.2)`. Closes `docs/INCIDENT_RESPONSE.md R-69.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, WEAR-FRESH-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative). WEAR-FRESH-STALE-CHAIN-01: `system.wearable_freshness_check_restored` blocked (HTTP 422 `WEAR_FRESH_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-69.12 item 2). Five-field Zod v2 `WearableFreshnessCheckStaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime — last confirmed successful run from R-69-C1), `stale_hours` (int≥0 — hours not minutes; 26h freshness window, daily 07:05 UTC cadence), `missed_run_count` (int≥0 — number of 07:05 UTC run windows missed), `r03_co_active` (bool — true if H3 Supabase pg_cron degradation; ≥ 2 peer daily jobs simultaneously stale). Six-field Zod v2 `WearableFreshnessCheckRestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum h1_deleted/h2_disabled/h3_infra/h4_emit_function_degraded — 4 values; same structure as R-67 4-value enum), `stale_hours_total` (int≥0), `manual_fresh_pct` (float 0–100 or null — R-69-C3 compensating snapshot `fresh_count/total_connected×100`; null if stale ≤ 26h and no enterprise SLA assessment triggered), `slo_met_during_stale` (bool or null — WS-SLO-06 status from R-69-C3; null if snapshot not run). CC7.2 significance: job 31 feeds WS-SLO-06 (≥ 95% fleet freshness) and the quarterly WS-E-002 evidence artefact; stale window is a P1 measurement gap remediated by R-69-C3 manual compensating snapshot — distinct from R-68 (P0 default; audit chain integrity break). Privacy floor (both schemas): `manual_fresh_pct` and `slo_met_during_stale` are aggregate scalars only — no `user_id`, individual wearable reading, HRV value, employee name, email, coaching content, body composition metric, or GDPR Art. 9 special-category data in either event payload; `form_api` REVOKED from emission path; IC PAM-elevated emission only. Retention table: +2 rows (`system.wearable_freshness_check_stale_declared` HIGH 7yr CC7.2; `system.wearable_freshness_check_restored` LOW 3yr CC7.2). Document header v2.82 → v2.83. Owner: compliance-officer + devops-lead.*

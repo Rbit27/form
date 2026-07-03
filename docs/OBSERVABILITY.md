@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.15.4
+# FORM · Observability & Monitoring Taxonomy v5.15.5
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -1253,7 +1253,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `workout-export` | `0 1 * * *` | 26 h | A1.2 — user-facing export pipeline; stale = visible feature failure | PagerDuty P1 → devops-lead |
 | `audit-event-flush` | `*/30 * * * *` | 2 h | A1.2 / DEC-030 — audit event KV buffer flush; stale = potential event loss | PagerDuty **P0** → platform-engineer |
 | `security-counter-daily-cleanup` | `0 4 * * *` | 26 h | CC7.2 — `security_counters` table hygiene; stale = rate-limit memory growth | PagerDuty P1 → devops-lead |
-| `pam_postgres_sync` | `*/30 * * * *` | 35 h | CC6.2/CC6.6 — verifies every `pam.elevation_approved` DEC-030 event has a matching `admin_jit_escalations` row; gap → `security.pam_postgres_sync_gap` HIGH + PagerDuty P2 to security-engineer | PagerDuty P2 → security-engineer (DATA_MODEL §29.10 item 7, job 20) |
+| `pam_postgres_sync` | `*/30 * * * *` | 35 h | CC6.2/CC6.6 — verifies every `pam.elevation_approved` DEC-030 event has a matching `admin_jit_escalations` row; gap → `security.pam_postgres_sync_gap` HIGH + PagerDuty P2 to security-engineer | PagerDuty P2 → security-engineer (DATA_MODEL §29.10 item 7, job 20); INCIDENT_RESPONSE R-70 (§R-70; v1.0, 2026-07-03 — companion stale recovery runbook for job 20) |
 | `pam_bg_review_alert` | `0 8 * * *` | 26 h | CC6.6 — enforces 72-hour break-glass post-hoc review SLA; `pam_break_glass_reviews.review_due_at < now() AND reviewed_at IS NULL` → PagerDuty P1 AL-PAM-BG-01 | PagerDuty P1 → compliance-officer (DATA_MODEL §29.10 item 8, job 21); INCIDENT_RESPONSE R-64 (§R-64; v1.0, 2026-07-03 — companion stale recovery runbook for job 21) |
 | `rate_limit_violations_cleanup` | `0 3 * * *` | 26 h | CC6.6 / CC4.1 — `rate_limit_violations` 90-day rolling retention; stale = table growth unbounded; RLS prevents cross-tenant leak but size degrades query performance | PagerDuty P1 `form-devops` → devops-lead; dedup `rl-cron-stale-rate_limit_violations_cleanup` (§35, job 16) |
 | `api_quota_usage_archive` | `30 0 1 * *` | 48 h | CC6.1 / CC4.1 — `api_quota_usage` 36-month billing evidence retention; emits `data.quota_records_archived` DEC-030 STANDARD 1yr before DELETE; stale = billing retention policy breached | PagerDuty P1 `form-devops` → devops-lead; 48 h window (monthly cadence); dedup `rl-cron-stale-api_quota_usage_archive` (§35, job 17) |

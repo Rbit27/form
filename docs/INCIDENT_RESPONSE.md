@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.35.1
+# FORM · Incident Response Runbook v3.36.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -25130,3 +25130,286 @@ Both events are HMAC-chained (DEC-030), emitted by IC (devops-lead, PAM-elevated
 ---
 
 *v1.0 (2026-07-03): R-69 Wearable Sync Freshness Check Stale (`wearable_sync_freshness_check` · job 31) — sixty-ninth runbook. Closes the companion stale recovery documentation gap for the last pg_cron job in the §12.6 canonical registry without a dedicated INCIDENT_RESPONSE runbook. Job 31 `wearable_sync_freshness_check` (`5 7 * * *`; 26h freshness window; daily 07:05 UTC) was registered in OBSERVABILITY.md §12.6 (v0.4 patch, 2026-06-19) as part of the ten-job registration batch covering jobs 28–37; no stale recovery runbook was authored at that time. §41 canonical observability spec (OBSERVABILITY.md v3.7.0, 2026-06-14) defines WS-SLO-06 (≥ 95% fleet freshness) and §41.5 DDL spec. Critical characteristic: P1 default (unlike R-68 P0 default for HMAC chain integrity) — stale `wearable_sync_freshness_check` creates a monitoring measurement gap, not a chain break or data loss; the affected daily run is a single compliance data point in the quarterly WS-E-002 artefact (OBSERVABILITY.md §41.9). Key distinction: this is the only wearable-namespace stale runbook; it complements AL-WS-06 (the freshness SLO breach alert, which requires the job to run and detect < 95% — if the job is stale, AL-WS-06 cannot fire even if the fleet is unhealthy). R-69-C3 manual compensating measurement closes this blind spot during the stale window. Two DEC-030 HMAC-chained events: `system.wearable_freshness_check_stale_declared` HIGH/7yr (WEAR-FRESH-STALE-CHAIN-01 anchor; IC PAM-elevated at T+0; CC7.2); `system.wearable_freshness_check_restored` LOW/3yr (terminal; IC PAM-elevated post-recovery; `manual_fresh_pct` and `slo_met_during_stale` capture R-69-C3 compensating measurement result). Three scope queries: R-69-C1 (pg_cron run history — stale_hours, root cause); R-69-C2 (peer job health — H3 discriminator); R-69-C3 (manual fleet freshness snapshot — compensating WS-SLO-06 measurement). Four root causes: H1 (deleted — `cron.job` no row); H2 (disabled — `active = false`); H3 (Supabase pg_cron degradation → R-03 co-active); H4 (`emit_dec030_event` / pg_net degraded). Three Slack communication templates (T-69-A detection; T-69-B resolution; T-69-C enterprise SLA escalation — fires only if P0 escalated). One evidence artefact: WEAR-FRESH-STALE-E-001 (per-activation; CC7.2; 7yr; `compliance/evidence/wearable/`). Five implementation checklist items: AUDIT_LOG_SCHEMA.md event registration (P0/pending), WEAR-FRESH-STALE-CHAIN-01 Worker enforcement (P1/pending), SOC2_READINESS.md §79.4 artefact registration (P1/pending), §12.6 OBSERVABILITY cross-ref update (P0 — [x] Done this pass), authoring complete ([x] Done this pass). Privacy floor: no individual employee `user_id`, HRV value, wearable reading, or GDPR Art. 9 special-category data in any R-69 artefact; all scope queries return aggregate scalars or pg_cron metadata only; `tenant_manager` (HR) excluded from any wearable fleet dashboard visibility. Cross-references: `docs/OBSERVABILITY.md §41`; `docs/OBSERVABILITY.md §12.6`; `docs/ENTERPRISE_SLA.md §3.4`; R-03; R-05. Owner: devops-lead + compliance-officer + platform-engineer.*
+
+---
+
+## R-70 · PAM Postgres Sync Stale — `pam_postgres_sync` (job 20) — CC6.2/CC6.6 detection gap
+
+> **Trigger:** `pg-cron-health-monitor` freshness sentinel detects `pam_postgres_sync` job has not run in > 35h. Emits `system.cron_job_stale` HIGH with `job_name = 'pam_postgres_sync'`. PagerDuty P2 `form-security` → security-engineer. **Owner:** security-engineer + compliance-officer.
+
+### R-70.1 Trigger Conditions
+
+| Signal | Details |
+|---|---|
+| **Primary trigger** | `system.cron_job_stale` DEC-030 HIGH event in `audit_log_events` with `job_name = 'pam_postgres_sync'`; emitted by `pg-cron-health-monitor` Edge Function when `cron.job_run_details` shows no successful run in the prior 35h |
+| **Freshness window** | 35h (every-30-min cadence, `*/30 * * * *`; 35h gives ~70 missed runs before alert — generous window because PAM elevation events are human-initiated and day-scale, not high-frequency automation) |
+| **Alert routing** | PagerDuty P2 `form-security` → security-engineer; dedup key `pam-postgres-sync-stale`; no auto-resolve |
+| **Gap signal** | `security.pam_postgres_sync_gap` HIGH DEC-030 event (fired by job 20 itself when a mismatch is detected during a run — **distinct from the stale event above**, which fires when job 20 does not run at all) |
+| **Escalation path** | P2 → P1 if R-70-C1 confirms non-break-glass gap; P2/P1 → P0 if R-70-C1 confirms break-glass gap OR stale > 72h |
+
+### R-70.2 Severity Classification
+
+| Condition | Severity | Response |
+|---|---|---|
+| Stale detected, R-70-C1 gap check not yet run | **P2** | Security-engineer acknowledges; begins R-70.3 within 60 min |
+| R-70-C1 returns ≥ 1 `pam.elevation_approved` row with no matching `admin_jit_escalations` row (non-break-glass session) | **P1 escalate** | Add `initial_severity: p1_escalate` in `stale_declared` event; notify compliance-officer; begin R-70.5 step 4 gap remediation |
+| R-70-C1 returns ≥ 1 gap row where `is_break_glass = true` (break-glass session without audit row) | **P0 escalate** | Add `initial_severity: p0_escalate`; page compliance-officer + founder; co-activate R-20 (Insider Threat path); immediate PAM-gated manual reconciliation required |
+| Stale > 72h regardless of gap check result | **P0 escalate** | 72h without sync verification is a CC6.2 evidence gap regardless of whether a gap is found |
+
+### R-70.3 Immediate Actions (T+0 to T+60 min)
+
+```
+T+0   Security-engineer acknowledges PagerDuty P2. Open Slack thread in #security-alerts.
+T+5   Emit security.pam_postgres_sync_stale_declared (HIGH/7yr) via PAM-elevated emit-audit-event
+      Worker with initial_severity = 'p2', manual_gap_count = -1 (gate not yet run).
+T+10  Run R-70-C1 (PAM-elevated DB session — do NOT share output in Slack):
+      → 0 rows: set manual_gap_count = 0, severity stays P2.
+      → ≥ 1 rows with is_break_glass = false: escalate to P1; notify compliance-officer.
+      → ≥ 1 rows with is_break_glass = true: escalate to P0; page compliance-officer + founder;
+        co-activate R-20; stop public Slack updates until IC directs otherwise.
+T+15  Run R-70-C2 (pg_cron job health — H1/H2 discriminator; see §R-70.4).
+T+20  Run R-70-C3 (peer job health — H3 discriminator; see §R-70.4).
+T+30  Identify root cause (H1–H4). Begin recovery per §R-70.5.
+T+50  Confirm job running: check cron.job_run_details for ≥ 1 successful run since T+30.
+T+60  If job confirmed healthy and manual_gap_count = 0: emit security.pam_postgres_sync_restored
+      (LOW/3yr) with gap_remediated = false. Close PagerDuty P2.
+      If gap was confirmed (manual_gap_count > 0): complete R-70.5 step 4 before emitting restored.
+```
+
+### R-70.4 Root Cause Hypotheses and Scope Queries
+
+#### R-70-C1 — PAM elevation gap check (security-sensitive; PAM-elevated DB session required; output restricted to security-engineer + IC)
+
+```sql
+-- Finds pam.elevation_approved DEC-030 events in the stale window that lack
+-- a matching admin_jit_escalations row. Any row = CC6.2 sync gap.
+-- is_break_glass = true on any row = P0 escalate + R-20 co-activation.
+SELECT
+  ale.event_id,
+  ale.created_at,
+  ale.payload->>'pam_session_id'  AS pam_session_id,
+  ale.payload->>'admin_user_id'   AS admin_user_id,   -- UUID pseudonym, not plaintext name
+  ale.payload->>'access_level'    AS access_level,
+  EXISTS (
+    SELECT 1 FROM audit_log_events bg
+    WHERE bg.event_type = 'pam.break_glass_activated'
+      AND bg.payload->>'pam_session_id' = ale.payload->>'pam_session_id'
+  ) AS is_break_glass
+FROM audit_log_events ale
+WHERE ale.event_type = 'pam.elevation_approved'
+  AND ale.created_at >= :confirmed_stale_since   -- from R-70-C2 last_run timestamp
+  AND ale.created_at <= NOW()
+  AND NOT EXISTS (
+    SELECT 1 FROM admin_jit_escalations aje
+    WHERE aje.pam_session_id = (ale.payload->>'pam_session_id')::uuid
+  )
+ORDER BY ale.created_at DESC;
+```
+
+**Privacy constraint:** R-70-C1 output contains `admin_user_id` (UUID pseudonym — not a plaintext name or email) and `pam_session_id`. This is FORM-internal privileged access metadata, not end-user health or GDPR Art. 9 data. Output must not be posted to Slack or shared outside the security-engineer + compliance-officer + IC group.
+
+#### R-70-C2 — pg_cron job health (H1/H2 discriminator)
+
+```sql
+-- H1: returns 0 rows (job deleted from cron.job).
+-- H2: returns row with active = false (job disabled).
+-- Healthy: returns row with active = true.
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'pam_postgres_sync';
+```
+
+Supplementary: pg_cron run history for the stale window:
+
+```sql
+SELECT runid, jobid, start_time, end_time, return_message, status
+FROM cron.job_run_details
+WHERE start_time >= NOW() - INTERVAL '48 hours'
+  AND jobid = (SELECT jobid FROM cron.job WHERE jobname = 'pam_postgres_sync')
+ORDER BY start_time DESC;
+```
+
+#### R-70-C3 — Peer job health (H3 discriminator)
+
+```sql
+-- If ≥ 2 other jobs simultaneously stale → H3 (Supabase pg_cron infra degradation).
+-- Co-activate R-02 P1 if H3 confirmed.
+SELECT
+  jobname,
+  MAX(start_time)                   AS last_run,
+  NOW() - MAX(start_time)           AS stale_duration,
+  EXTRACT(EPOCH FROM (NOW() - MAX(start_time)))/3600  AS stale_hours
+FROM cron.job_run_details jrd
+JOIN cron.job j USING (jobid)
+WHERE jrd.start_time >= NOW() - INTERVAL '72 hours'
+GROUP BY j.jobname
+HAVING MAX(jrd.start_time) < NOW() - INTERVAL '35 hours'
+ORDER BY last_run ASC;
+```
+
+If ≥ 2 peer jobs return rows → **H3** (Supabase pg_cron infrastructure degradation). Co-activate R-02 P1. Escalate to Supabase support with `cron.job_run_details` export.
+
+### R-70.5 Recovery Procedure
+
+**H1 — Job deleted:**
+1. Re-register `pam_postgres_sync` via PAM-elevated DB session:
+   ```sql
+   SELECT cron.schedule(
+     'pam_postgres_sync',
+     '*/30 * * * *',
+     $$
+     SELECT pam_postgres_sync_fn();
+     $$
+   );
+   ```
+2. Confirm row exists in `cron.job` with `active = true`.
+3. Trigger immediate run: `SELECT cron.run_job('pam_postgres_sync');`
+4. Verify `cron.job_run_details` shows successful completion.
+
+**H2 — Job disabled:**
+1. Re-enable via PAM-elevated DB session: `UPDATE cron.job SET active = true WHERE jobname = 'pam_postgres_sync';`
+2. Trigger immediate run: `SELECT cron.run_job('pam_postgres_sync');`
+3. Verify.
+
+**H3 — Supabase pg_cron infrastructure degradation:**
+1. Co-activate R-02 P1 (Service Outage path for background job degradation).
+2. Escalate to Supabase support: provide `cron.job_run_details` export for all stale jobs covering the stale window.
+3. Do not attempt manual re-registration until Supabase confirms pg_cron health restored.
+4. After Supabase confirmation: verify all stale jobs resume within one cadence cycle.
+
+**H4 — pg_net degraded (job runs but `security.pam_postgres_sync_gap` events fail to emit):**
+1. Confirm pg_net status: `SELECT * FROM pg_extension WHERE extname = 'pg_net';`
+2. Check `pg_net.http_request_queue` for stuck requests.
+3. Escalate to devops-lead if pg_net extension is unhealthy.
+4. Once pg_net restored, trigger `SELECT cron.run_job('pam_postgres_sync');`.
+
+**Step 4 (all root causes, if R-70-C1 manual_gap_count > 0) — Manual sync reconciliation:**
+For each unmatched `pam.elevation_approved` row returned by R-70-C1:
+1. Retrieve the PAM session record from PAM KV namespace (`pam:session:{pam_session_id}`) under PAM-elevated session.
+2. Confirm the PAM session is legitimate (cross-check `pam.elevation_requested` DEC-030 event for same `pam_session_id`).
+3. If legitimate: INSERT the missing `admin_jit_escalations` row via PAM-gated DB session (security-engineer + compliance-officer two-person authorization required).
+4. If unrecognised or suspicious: co-activate R-20 (Insider Threat / Privileged Access Abuse) immediately; do not insert the row without IC + compliance-officer + founder sign-off.
+
+### R-70.6 Communication Templates
+
+**T-70-A — Slack #security-alerts (P2 detection; omit gap-check output from Slack)**
+
+```
+[R-70 P2] pam_postgres_sync (job 20) stale — CC6.2 detection gap
+Stale since: {confirmed_stale_since} UTC
+Stale hours: {stale_hours}h (35h freshness window, every-30-min cadence)
+Root cause: investigating (H1/H2/H3/H4)
+DEC-030 stale_declared emitted: {incident_id}
+IC: @security-engineer
+R-70-C1 gap check: running (result restricted to IC + compliance-officer)
+```
+
+**T-70-B — Slack #security-alerts (resolution)**
+
+```
+[R-70 RESOLVED] pam_postgres_sync restored
+Root cause: {root_cause} ({h_code_description})
+Total stale: {stale_hours_total}h
+PAM elevation gap found: {manual_gap_count} sessions ({gap_remediated ? 'remediated' : 'none required'})
+DEC-030 restored emitted: {incident_id}
+PAM-SYNC-STALE-E-001 filed: compliance/evidence/pam/pam-sync-stale-e-001-{date}/
+```
+
+**T-70-C — P0/P1 escalation (break-glass gap confirmed; restrict distribution)**
+
+```
+[R-70 ESCALATED TO {P0|P1}] PAM break-glass session without admin_jit_escalations row
+pam_session_id: {pam_session_id} [RESTRICTED — security-engineer + compliance-officer + founder only]
+CC6.6 evidence completeness breach confirmed.
+Action required: R-70.5 step 4 manual reconciliation; R-20 co-activation assessment.
+Do not post pam_session_id or admin_user_id in public Slack channels.
+```
+
+### R-70.7 DEC-030 Chain Specification
+
+| Event | Severity | Retention | Chain role |
+|---|---|---|---|
+| `security.pam_postgres_sync_stale_declared` | HIGH | 7 yr | PAM-SYNC-STALE-CHAIN-01 anchor — must exist before `restored` |
+| `security.pam_postgres_sync_restored` | LOW | 3 yr | PAM-SYNC-STALE-CHAIN-01 terminal — blocked by Worker (HTTP 422 `PAM_SYNC_STALE_CHAIN_01_VIOLATION`) if no prior `stale_declared` for same `incident_id` |
+
+**PAM-SYNC-STALE-CHAIN-01 Ordering Invariant:** `security.pam_postgres_sync_restored` for a given `incident_id` is blocked by `emit-audit-event` Worker if no prior `security.pam_postgres_sync_stale_declared` exists for the same `incident_id`. Co-activates R-05 on violation. Enforcement implementation: pending (platform-engineer — §R-70.12 item 2).
+
+**Chain notes:**
+- Both events emitted by IC under PAM-elevated session via `emit-audit-event` Worker (`form_api` REVOKED from both).
+- `security.pam_postgres_sync_gap` HIGH (emitted by job 20 itself when running and a gap is detected) is a **separate event** from the stale-declared event — it fires during a successful job run when the job detects a mismatch. Both can appear in the same incident if job 20 resumes and finds a gap left over from the stale window.
+- `pam_session_id` in the `stale_declared` payload is the IC's own PAM session ID (not the PAM session IDs found by R-70-C1). The IC's pam_session_id links the stale-declared emission to the IC's authorised access to the `emit-audit-event` Worker endpoint.
+
+### R-70.8 Evidence Artefact
+
+**PAM-SYNC-STALE-E-001** — per-activation evidence artefact for R-70 incidents.
+
+| Field | Value |
+|---|---|
+| Evidence ID | PAM-SYNC-STALE-E-001 |
+| TSC | CC6.2 / CC6.6 |
+| Trigger | R-70 activation (`pam_postgres_sync` stale) |
+| Collection | Per-activation (one artefact per R-70 incident) |
+| Retention | 7 years (WORM, Cloudflare R2) |
+| Vanta mirror | Within 48h of filing |
+| R2 path | `compliance/evidence/pam/pam-sync-stale-e-001-<YYYY-MM-DD>/` |
+| Owner | security-engineer + compliance-officer |
+
+**Contents:**
+1. `security.pam_postgres_sync_stale_declared` DEC-030 HIGH event (PAM-elevated IC emission, T+5 min).
+2. `security.pam_postgres_sync_restored` DEC-030 LOW event (PAM-elevated IC emission, post-recovery).
+3. PAM-SYNC-STALE-CHAIN-01 predecessor assertion confirmation (HTTP 422 `PAM_SYNC_STALE_CHAIN_01_VIOLATION` enforced by `emit-audit-event` Worker — pending platform-engineer implementation).
+4. R-70-C1 gap check output: list of `pam.elevation_approved` events in stale window without matching `admin_jit_escalations` row (aggregate count only in artefact cover sheet; full row list in restricted inner envelope accessible only to security-engineer + compliance-officer). **If `manual_gap_count = 0`: a nil-gap attestation signed by security-engineer.**
+5. R-70-C2 pg_cron job health output: `cron.job` row for `pam_postgres_sync` and `cron.job_run_details` export covering stale window. No individual user data.
+6. R-70-C3 peer job health output (H3 discriminator): stale job list. No individual user data.
+7. Root cause classification and recovery action trace (H1–H4 determination; timestamps for each recovery step).
+8. Gap remediation record (if `manual_gap_count > 0`): two-person sign-off by security-engineer + compliance-officer; list of `pam_session_id`s reconciled (restricted inner envelope); confirmation that all sessions were verified as legitimate.
+
+**R2 path note:** `compliance/evidence/pam/` is a **new** R2 subfolder — must be provisioned before first R-70 activation (§R-70.12 item 3 checklist). `r2:form-api` REVOKED (§80.3 invariant — IC PAM-elevated manual upload only). `YYYY-MM-DD` is the UTC date of the `stale_declared` emission.
+
+### R-70.9 SOC 2 Evidence Mapping
+
+| TSC | Control | How R-70 satisfies |
+|---|---|---|
+| **CC6.2** | Privileged access authorised, logged, and monitored | `pam_postgres_sync` is the continuous monitoring control ensuring every `pam.elevation_approved` DEC-030 event has a matching `admin_jit_escalations` row; R-70 is the stale-recovery runbook ensuring the monitoring control itself is restored within the 35h freshness window and the stale window is bridged by R-70-C1 |
+| **CC6.6** | Break-glass access audit completeness | R-70-C1 specifically flags `is_break_glass = true` rows that lack `admin_jit_escalations` entries; PAM-SYNC-STALE-E-001 captures the remediation record for any such gap |
+| **CC7.2** | Monitoring of controls | `pam_postgres_sync` stale = CC7.2 control degradation; the INCIDENT_RESPONSE runbook is the compensating control; `security.pam_postgres_sync_stale_declared` HIGH event is the tamper-evident record of the degradation |
+
+### R-70.10 Post-Incident Controls
+
+| # | Control | Trigger | Owner |
+|---|---|---|---|
+| 1 | Root cause remediation: if H1 (deletion) — add migration CI guard asserting `pam_postgres_sync` job exists in `cron.job` after any PAM-related migration | Per H1 incident | platform-engineer + devops-lead |
+| 2 | PAM-SYNC-STALE-CHAIN-01 Worker enforcement (`emit-audit-event` Worker: HTTP 422 on unanchored `restored` emit) | P1 — implementation pending (platform-engineer) | platform-engineer |
+| 3 | Quarterly PAM sync audit: independently verify R-70-C1 query returns 0 rows for the prior 90 days (belt-and-suspenders outside of stale windows) | Quarterly, at SOC 2 evidence collection cycle | security-engineer + compliance-officer |
+| 4 | Post-mortem if stale > 72h or if R-70-C1 finds any gap | Per-activation when stale_hours_total ≥ 72 OR manual_gap_count > 0 | security-engineer + compliance-officer |
+
+### R-70.11 Cross-References
+
+| Document | Section | Note |
+|---|---|---|
+| OBSERVABILITY.md | §12.6, job 20 `pam_postgres_sync` | pg_cron canonical registry; `*/30 * * * *`; freshness window 35h; CC6.2/CC6.6; `security.pam_postgres_sync_gap` HIGH on mismatch detection |
+| DATA_MODEL.md | §29 | PAM schema — `admin_jit_escalations` table definition (columns: `pam_session_id`, `access_level`, `elevation_approved_at`, `expires_at`, `is_break_glass`); `pam_postgres_sync` is the enforcement mechanism for §29.10 item 7 |
+| SSO_SCIM_IMPLEMENTATION.md | §24 | PAM architecture — KV namespace `pam:session:{pam_session_id}`, JIT elevation flow, break-glass protocol; `pam_postgres_sync` syncs KV state to Postgres `admin_jit_escalations` |
+| AUDIT_LOG_SCHEMA.md | §PAM events | `pam.elevation_approved` chain spec (must follow `pam.elevation_requested` with same `pam_request_id`); `pam.break_glass_activated` CRITICAL (no preceding `elevation_requested` — expected); both are the source events verified by job 20 |
+| AUDIT_LOG_SCHEMA.md | §PAM Postgres Sync Stale events | `security.pam_postgres_sync_stale_declared` and `security.pam_postgres_sync_restored` schemas; PAM-SYNC-STALE-CHAIN-01 invariant; v2.84, 2026-07-03 |
+| SOC2_READINESS.md | §158 | PAM-SYNC-STALE-E-001 evidence artefact registration; §79.4 master evidence table count 124 → 125 |
+| INCIDENT_RESPONSE.md | R-05 | HMAC chain break — co-activate if PAM-SYNC-STALE-CHAIN-01 violated (unanchored `restored` emit) |
+| INCIDENT_RESPONSE.md | R-20 | Insider Threat / Privileged Access Abuse — co-activate if R-70-C1 returns `is_break_glass = true` row with no `admin_jit_escalations` match AND the session cannot be verified as legitimate |
+| INCIDENT_RESPONSE.md | R-02 | Service Outage — co-activate path for H3 (Supabase pg_cron infrastructure degradation) |
+
+### R-70.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `security.pam_postgres_sync_stale_declared` (HIGH/7yr) and `security.pam_postgres_sync_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, PAM-SYNC-STALE-CHAIN-01 ordering invariant, and CC6.2/CC6.6 auditor narrative | compliance-officer + security-engineer | **P0** | [x] **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.84).** |
+| 2 | Implement PAM-SYNC-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker (HTTP 422 `PAM_SYNC_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit) | platform-engineer | **P1** | [ ] Pending — platform-engineer |
+| 3 | Provision `compliance/evidence/pam/` R2 subfolder (new folder — not pre-existing); configure WORM + `r2:form-api` REVOKED policy consistent with §80.3 invariant | devops-lead + compliance-officer | **P1** | [ ] Pending — devops-lead |
+| 4 | Register PAM-SYNC-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.2/CC6.6; per-activation; 7yr; `compliance/evidence/pam/pam-sync-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer + security-engineer | **P1** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.84.0, §158).** |
+| 5 | Update `docs/OBSERVABILITY.md §12.6` job 20 row cross-reference column: add `; INCIDENT_RESPONSE R-70 (§R-70; v1.0, 2026-07-03 — companion stale recovery runbook for job 20)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.15.5).** |
+| 6 | Authoring complete — §R-70 documentation obligation fulfilled | compliance-officer + security-engineer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.36.0).** |
+
+**Privacy floor (invariant throughout R-70):** `admin_user_id` in R-70-C1 output is a UUID pseudonym — not a plaintext name, email, or personally identifying string. R-70-C1 scope query output is restricted to security-engineer + compliance-officer + IC (never posted to Slack or shared outside the incident group). `manual_gap_count` and `gap_remediated` in DEC-030 event payloads are aggregate scalar values — no `pam_session_id` of the *affected* PAM sessions appears in the public DEC-030 events (`pam_session_id` in the events refers to the *IC's own* PAM session authorising the emission). PAM-SYNC-STALE-E-001 artefact contains two envelopes: an outer cover sheet (aggregate counts, timeline, root cause — accessible to compliance-officer and auditors) and a restricted inner envelope (full R-70-C1 row list with pam_session_id + admin_user_id — accessible to security-engineer + compliance-officer only, never auditor-shared without redaction). No enterprise tenant employee `user_id`, health metric, coaching content, body composition, or GDPR Art. 9 special-category data is present in any R-70 scope query, event payload, communication template, or evidence artefact.
+
+---
+
+*v1.0 (2026-07-03): R-70 PAM Postgres Sync Stale (`pam_postgres_sync` · job 20) — seventieth runbook and first companion stale recovery runbook in the security namespace (all prior companion stale runbooks R-28 through R-69 were in the `system.*` or wearable namespace). Job 20 `pam_postgres_sync` (`*/30 * * * *`; 35h freshness window; every 30 min UTC) was registered in OBSERVABILITY.md §12.6 (v2.5, 2026-06-10) as part of the PAM observability authoring pass (DATA_MODEL §29.10 items 7–8); no stale recovery runbook was authored at that time. The CC6.2/CC6.6 control significance: `pam_postgres_sync` verifies every `pam.elevation_approved` DEC-030 event has a matching `admin_jit_escalations` row — it is the KV-to-Postgres PAM audit sync integrity sentinel. Stale window = potential undetected gap between KV PAM state and Postgres audit record for any elevation events occurring during the stale period. P2 default (lower than R-68 P0 and R-69 P1): a stale `pam_postgres_sync` creates a detection latency gap, not a confirmed chain break (PAM events are human-initiated and infrequent; 35h window tolerates scheduling failures while maintaining audit integrity); the R-70-C1 compensating SQL immediately bridges the gap for the stale window. Key escalation path: P2 → P0 if R-70-C1 finds any `pam.elevation_approved` without `admin_jit_escalations` match AND `is_break_glass = true` — this is a CC6.6 break-glass audit completeness breach requiring co-activation of R-20. Two DEC-030 HMAC-chained events (AUDIT_LOG_SCHEMA.md v2.84, 2026-07-03): `security.pam_postgres_sync_stale_declared` HIGH/7yr (PAM-SYNC-STALE-CHAIN-01 anchor; IC PAM-elevated at T+5; CC6.2/CC6.6); `security.pam_postgres_sync_restored` LOW/3yr (terminal; IC PAM-elevated post-recovery; `manual_gap_count` and `gap_remediated` capture R-70-C1 result). Three scope queries: R-70-C1 (PAM elevation gap check — security-sensitive, restricted distribution; `manual_gap_count`); R-70-C2 (pg_cron job health — H1/H2 discriminator); R-70-C3 (peer job health — H3 discriminator). Four root causes: H1 (deleted — `cron.job` no row); H2 (disabled — `active = false`); H3 (Supabase pg_cron degradation → R-02 co-active); H4 (pg_net degraded). Three communication templates (T-70-A detection; T-70-B resolution; T-70-C escalation — restricted distribution when break-glass gap confirmed). One evidence artefact: PAM-SYNC-STALE-E-001 (per-activation; CC6.2/CC6.6; 7yr; `compliance/evidence/pam/pam-sync-stale-e-001-<YYYY-MM-DD>/`; new R2 subfolder — §R-70.12 item 3 pending devops-lead). Six implementation checklist items: AUDIT_LOG_SCHEMA.md event registration (P0/Done), PAM-SYNC-STALE-CHAIN-01 Worker enforcement (P1/pending platform-engineer), R2 pam/ subfolder provision (P1/pending devops-lead), SOC2_READINESS.md §79.4 artefact registration (P1/Done §158), §12.6 OBSERVABILITY cross-ref update (P0/Done v5.15.5), authoring complete (P0/Done). Privacy floor: R-70-C1 output restricted to security-engineer + IC; `manual_gap_count` and `gap_remediated` are aggregate scalars in DEC-030 events; PAM-SYNC-STALE-E-001 uses two-envelope structure (outer public cover sheet + restricted inner row list); no enterprise tenant employee user_id, health data, or GDPR Art. 9 data. Cross-references: OBSERVABILITY.md §12.6 job 20; DATA_MODEL.md §29; SSO_SCIM_IMPLEMENTATION.md §24; AUDIT_LOG_SCHEMA.md §PAM events; R-05; R-20; R-02. Owner: security-engineer + compliance-officer + platform-engineer.*

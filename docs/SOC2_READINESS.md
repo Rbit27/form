@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.83.0
+# FORM · SOC 2 Type II Readiness v3.84.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -35293,3 +35293,47 @@ WEAR-FRESH-STALE-E-001 added to §80.4 Vanta mirror protocol. Mirror deadline: w
 | 2 | `compliance/evidence/wearable/` R2 subfolder pre-exists (provisioned for WS-E-002, OBSERVABILITY.md §41.9); no new provisioning required | platform-engineer | **n/a** | [x] **Pre-existing — no action required.** |
 | 3 | Add WEAR-FRESH-STALE-E-001 to §80.4 Vanta mirror protocol | compliance-officer + devops-lead | **P1** | [x] **Done — 2026-07-03 (§157.4, this section).** |
 | 4 | Authoring complete — §157 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.83.0).** |
+
+---
+
+## §158 · PAM-SYNC-STALE-E-001 Registration (CC6.2/CC6.6 · INCIDENT_RESPONSE R-70)
+
+> **Date:** 2026-07-03. **Trigger:** INCIDENT_RESPONSE.md §R-70.12 item 4 (P1) — "Register PAM-SYNC-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.2/CC6.6; per-activation; 7yr; `compliance/evidence/pam/pam-sync-stale-e-001-<YYYY-MM-DD>/`)." **Owner:** compliance-officer + security-engineer.
+
+### §158.1 Background
+
+`pam_postgres_sync` (job 20, `*/30 * * * *`, 35h freshness window) is FORM's automated bi-hourly verifier that every `pam.elevation_approved` DEC-030 HMAC-chained event has a matching row in `admin_jit_escalations` (Postgres). The job bridges the PAM KV layer (real-time session state, ephemeral) with the Postgres audit layer (durable, SOC 2 CC6.2/CC6.6 evidence). When job 20 goes stale, the PAM KV→Postgres sync is offline: any `pam.elevation_approved` events emitted during the stale window may have no corresponding `admin_jit_escalations` row, creating an unverifiable privileged-access gap. INCIDENT_RESPONSE.md R-70 is the companion stale recovery runbook; it triggers at 35h stale (pg-cron-health-monitor, `system.cron_job_stale` HIGH with `job_name = 'pam_postgres_sync'`, PagerDuty P2 `form-security` → security-engineer). The PAM-SYNC-STALE-E-001 evidence artefact captures: (1) the DEC-030 HMAC chain (`security.pam_postgres_sync_stale_declared` HIGH + `security.pam_postgres_sync_restored` LOW); (2) R-70-C1 gap check SQL output (list of `pam.elevation_approved` events lacking `admin_jit_escalations` rows during the stale window, including `is_break_glass` discriminator — restricted to security-engineer + IC, two-envelope artefact structure); (3) root-cause discriminator (H1 job deleted / H2 job disabled / H3 pg_cron infra degradation / H4 pg_net degraded); (4) remediation confirmation and gap closure attestation. TSC: CC6.2 (privileged access provisioning control), CC6.6 (break-glass access — the gap check must identify any break-glass events lacking Postgres row coverage). PAM-SYNC-STALE-CHAIN-01 ordering invariant: `security.pam_postgres_sync_restored` blocked (HTTP 422 `PAM_SYNC_STALE_CHAIN_01_VIOLATION`) without prior `security.pam_postgres_sync_stale_declared` for same `incident_id`; co-activates R-05 if chain violation detected.
+
+### §158.2 §79.4 Registration
+
+PAM-SYNC-STALE-E-001 registered in §79.4 master evidence table (count 124 → 125). Evidence class: per-activation (one artefact per R-70 stale incident). Retention: 7yr WORM. TSC: CC6.2/CC6.6. R2 path: `compliance/evidence/pam/pam-sync-stale-e-001-<YYYY-MM-DD>/`. Owner: compliance-officer + security-engineer (IC PAM-elevated upload; R-05 co-sign required if `is_break_glass = true` gap rows present in R-70-C1 output; two-envelope artefact — public cover sheet + restricted inner envelope containing `admin_user_id` UUIDs and `access_level` values).
+
+### §158.3 §80.3 R2 Storage Update
+
+`compliance/evidence/pam/` is a **new** top-level subfolder under `compliance/evidence/` — unlike §157.3 (`wearable/`, which was pre-existing from WS-E-002), no parent folder exists for PAM evidence from any prior §80.3 registration. Platform-engineer must provision `compliance/evidence/pam/` in R2 (write-once policy, versioning enabled) prior to the first R-70 activation. Per-incident path: `compliance/evidence/pam/pam-sync-stale-e-001-<YYYY-MM-DD>/` where `YYYY-MM-DD` is the UTC date of the R-70 `stale_declared` emission. Two-envelope structure within each per-incident path: `cover-sheet.pdf` (public, SOC 2 auditor-accessible — incident timeline, root cause, resolution, job registry cross-reference, artefact manifest) + `restricted/gap-check-output.enc` (security-engineer + IC only — R-70-C1 SQL output with `admin_user_id` UUIDs, `pam_session_id` values, `access_level` strings, `is_break_glass` flags). `r2:form-api` REVOKED (§80.3 invariant — no automated R2 write path for compliance evidence; IC PAM-elevated manual upload only).
+
+### §158.4 §80.4 Vanta Mirror Update
+
+PAM-SYNC-STALE-E-001 added to §80.4 Vanta mirror protocol. Mirror deadline: within 48h of per-activation artefact filing. Evidence class: per-activation (one artefact per R-70 stale incident). Only the public cover sheet (§158.3) is mirrored to Vanta — the restricted inner envelope (`gap-check-output.enc`) is retained in R2 only and is not mirrored. R-05 co-sign attestation must be present on the cover sheet before Vanta mirror if break-glass gap rows were found in R-70-C1 output. Zero-activation period: no nil attestation required (per-activation artefact only; absence = no R-70 incidents in period).
+
+### §158.5 Cross-Reference Obligations Closed
+
+| Cross-reference | Status |
+|---|---|
+| INCIDENT_RESPONSE.md §R-70.12 item 1 (P0 — register DEC-030 events in AUDIT_LOG_SCHEMA.md) | [x] Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.84) |
+| INCIDENT_RESPONSE.md §R-70.12 item 4 (P1 — register PAM-SYNC-STALE-E-001 in §79.4) | [x] Done — 2026-07-03 (§158.2, this section) |
+| INCIDENT_RESPONSE.md §R-70.12 item 5 (P0 — update OBSERVABILITY.md §12.6 job 20 cross-ref) | [x] Done — 2026-07-03 (OBSERVABILITY.md v5.15.5) |
+
+### §158.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register PAM-SYNC-STALE-E-001 in §79.4 master evidence table (CC6.2/CC6.6, per-activation, 7yr) | compliance-officer + security-engineer | **P1** | [x] **Done — 2026-07-03 (§158.2, this section).** |
+| 2 | Provision `compliance/evidence/pam/` R2 subfolder (new — no parent; write-once policy + versioning; two-envelope structure per §158.3) | platform-engineer | **P1** | [ ] **Pending — platform-engineer.** |
+| 3 | Add PAM-SYNC-STALE-E-001 to §80.4 Vanta mirror protocol (cover sheet only, not restricted inner envelope) | compliance-officer + security-engineer | **P1** | [x] **Done — 2026-07-03 (§158.4, this section).** |
+| 4 | PAM-SYNC-STALE-CHAIN-01 Worker enforcement (HTTP 422 `PAM_SYNC_STALE_CHAIN_01_VIOLATION` on ordering violation) | platform-engineer | **P1** | [ ] **Pending — platform-engineer.** |
+| 5 | Authoring complete — §158 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.84.0).** |
+
+---
+
+*v3.84.0 (2026-07-03): §158 — PAM-SYNC-STALE-E-001 Registration (CC6.2/CC6.6 · INCIDENT_RESPONSE R-70). PAM-SYNC-STALE-E-001 registered in §79.4 master evidence table (count 124 → 125). Evidence class: per-activation. Retention: 7yr WORM. TSC: CC6.2/CC6.6. R2 path: `compliance/evidence/pam/pam-sync-stale-e-001-<YYYY-MM-DD>/` (NEW subfolder — no pre-existing parent). Two-envelope artefact structure: public cover sheet (Vanta-mirrored) + restricted inner envelope (security-engineer + IC only). Closes INCIDENT_RESPONSE.md §R-70.12 items 4 and cross-references OBSERVABILITY.md v5.15.5 (§12.6 job 20 cross-ref update) and AUDIT_LOG_SCHEMA.md v2.84 (DEC-030 event registration). Owner: compliance-officer + security-engineer.*
