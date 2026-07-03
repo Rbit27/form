@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [11.53.1] — 2026-07-03
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.72.0. §146 Cross-Reference Patch: adds FIDO2-E-001 (CC6.7), GEO-E-001 (CC1.3/CC3.1), and PKJWT-E-001 (CC6.6) to the §15.1 Master Compliance Calendar. Four rows added inline: FIDO2-E-001 annual (Q1 Jan, alongside CC6-E-PAM-004 policy snapshot), FIDO2-E-001 per-change event-triggered (PAM offboarding checklist parallel step), GEO-E-001 annual Q4 (nil-attestation path for zero-onboarding years), PKJWT-E-001 quarterly (Jan 5 / Apr 5 / Jul 5 / Oct 5 fixed dates; per-incident supplement within 48h on `rotation_reason: 'incident'/'customer_request'`). Closes §142.7 item 4, §144.7 item 3, and §145.7 item 4 (all → 🟢 Done). No change to §79.4 evidence artefact count (113 total — artefacts already registered via §142/§144/§145).
+- `VERSION` — 11.53.0 → 11.53.1.
+
+---
+
 ## [11.53.0] — 2026-07-03
 
 ### Added
