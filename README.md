@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 proposed · series «Тренування в реальних умовах» 3106–3115 proposed · editorial 61–70 COMPLETE 10/10 · editorial 71–80 in progress 2/10 · block 896–900 active · block 901–910 proposed · v12.3.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 proposed · series «Тренування в реальних умовах» 3106–3115 proposed · editorial 61–70 COMPLETE 10/10 · editorial 71–80 in progress 3/10 · block 896–900 active · block 901–910 proposed · v12.4.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -69,7 +69,7 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 70 | Синтез 61–70: десять орієнтирів для self-coached атлета без зовнішнього супроводу | **draft · v12.1.0 → post-70-editorial-series-synthesis.md · СЕРІЯ 61–70 ЗАВЕРШЕНА** |
 | 71 | Навантаження і відновлення: єдина система чи два окремих процеси? | **draft · v12.2.0 → post-71-load-recovery-unified-system.md · Редакційна серія 71–80 1/10** |
 | 72 | Як читати сигнали тіла через контекст блоку: коли RPE, сон і мотивація говорять правду — і коли вони в пастці втоми | **draft · v12.3.0 → post-72-reading-body-signals-through-block-context.md · Редакційна серія 71–80 2/10** |
-| 73 | Перший рік з коучем: що делегувати, а що тримати за собою | proposed |
+| 73 | Як RPE змінюється через блок: що означає зростання або зниження суб'єктивної оцінки при тому ж навантаженні | **draft · v12.4.0 → post-73-rpe-trajectory-through-block.md · Редакційна серія 71–80 3/10** |
 | 74 | Тренування і когніція: що спортивна наука каже про вплив на ментальну продуктивність | proposed |
 | 75 | Синтез блоку 61–75: FORM editorial compass — 15 принципів без мотиваційного шуму | proposed |
 | 76 | Другий рік тренувань: де закінчується новачковий ефект і що відбувається далі | proposed |
