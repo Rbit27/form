@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [12.10.0] — 2026-07-03
+
+### Added
+- `content/post-3106-training-after-sleepless-night.md` — NEW SERIES «Тренування в реальних умовах» 3106–3115, post 1/10. «Тренування після безсонної ночі: що реально змінюється і що можна зберегти». Гострий дефіцит сну vs. хронічне недосипання. Нейром'язова ефективність (Oliver et al. 2009). Вибухова потужність vs. субмаксимальна сила (Knowles et al. 2018). RPE-зсув +1–2 пункти (Souissi et al. 2003). Технічний контроль (Czeisler et al. 1990). Ієрархія вразливості + рамка прийняття рішень за кількістю годин сну. clinical-safety: NOT_REQUIRED. sports-scientist review pending. blog.html card prepended.
+
+### Changed
+- `blog.html` — post-3106 card prepended to top of feed.
+- `README.md` — series «Тренування в реальних умовах» 3106–3115: proposed → in progress 1/10; post-3106 draft link added; editorial 71–80 5/10 → 6/10; header → v12.10.0.
+- `STATUS.md` — v12.10.0 entry added.
+- `VERSION` — 12.9.0 → 12.10.0.
+
 ## [12.9.0] — 2026-07-03
 
 ### Added

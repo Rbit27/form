@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 in progress 1/10 · series «Тренування в реальних умовах» 3106–3115 proposed · editorial 61–70 COMPLETE 10/10 · editorial 71–80 in progress 5/10 · series «Самодіагностика без тренера» 3116–3125 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.7.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 in progress 1/10 · series «Тренування в реальних умовах» 3106–3115 in progress 1/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 in progress 6/10 · series «Самодіагностика без тренера» 3116–3125 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.10.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3498,13 +3498,13 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3104 | Програмування мікропрогресій для intermediate і advanced атлета | proposed |
 | 3105 | Синтез 3096–3105: операційна система прогресії для self-coached атлета | proposed |
 
-### Series «Тренування в реальних умовах» 3106–3115 · proposed · v11.89.0
+### Series «Тренування в реальних умовах» 3106–3115 · in progress 1/10 · v12.10.0
 
 Серія про те, як self-coached атлет адаптує практику до обставин реального життя — без скасування тренувань і без ілюзії «ідеальних умов». Фокус: операційні рішення в умовах дефіциту сну, середовищного стресу, відновлення після хвороби і непостійного розкладу. Тон: editorial-brutalist, 13-min read.
 
 | Post | Topic | Status |
 |---|---|---|
-| 3106 | Тренування після безсонної ночі: що реально змінюється і що можна зберегти | proposed |
+| 3106 | Тренування після безсонної ночі: що реально змінюється і що можна зберегти | **draft · v12.10.0 → post-3106-training-after-sleepless-night.md** |
 | 3107 | Хвороба і тренування: де межа між «можна» і «не варто» — і хто її визначає | proposed |
 | 3108 | Тренування у відрядженні або подорожі: мінімальний протокол без залу | proposed |
 | 3109 | Коли немає часу на повну сесію: скорочений формат без втрати стимулу | proposed |
