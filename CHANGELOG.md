@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [11.55.1] — 2026-07-03
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.21.2 → v3.22.0. §R-57: PKJWT Key Expiry Sweep Stale (`pkjwt_key_expiry_sweep`, job 58) — companion stale recovery runbook for the OIDC `private_key_jwt` advance-warning sweep registered in OBSERVABILITY §12.6 (v5.14.0, 2026-07-02). Closes the documentation gap: job 58 was the only pg_cron job without a companion runbook among R-31 through R-57. SOC 2 CC6.6. P3 Slack-only default; P1 upgrade if stale AND any PKJWT tenant has `pkjwt_key_expires_at < NOW() + INTERVAL '7 days'`. Four scope queries (R-57-C1 through R-57-C4). Four root-cause hypotheses (H1–H4). DEC-030 chain: `system.pkjwt_expiry_sweep_stale_declared` HIGH/7yr + `system.pkjwt_expiry_sweep_restored` LOW/3yr; PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant (HTTP 422 `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION`). Evidence artefact PKJWT-SWEEP-STALE-E-001 (per-activation, CC6.6, 7yr). Five implementation checklist items (three pending: AUDIT_LOG_SCHEMA registration, OBSERVABILITY §12.6 cross-ref update, SOC2_READINESS §79.4 PKJWT-SWEEP-STALE-E-001 registration; one pending M8: emit-audit-event enforcement; one [x] Done this pass). Privacy floor: no employee user_id, name, email, health value, or GDPR Art. 9 special-category data in any R-57 artefact.
+- `VERSION` — 11.55.0 → 11.55.1.
+
+---
+
 ## [11.55.0] — 2026-07-03
 
 ### Added

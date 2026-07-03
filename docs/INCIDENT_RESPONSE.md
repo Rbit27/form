@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.21.2
+# FORM · Incident Response Runbook v3.22.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -20644,3 +20644,347 @@ All three obligations were subsequently fulfilled: SCA-STALE-E-001 registered in
 ---
 
 *v3.21.0 (2026-07-02): §R-55 — `emit-audit-event` Worker Extension · KEY-IC-CHAIN-01 Enforcement · Integration Tests A + B. Closes §R-54.7 item 2 (P0/M7 — documentation obligation) and `docs/SOC2_READINESS.md §143.4` last remaining obligation (v3.69.2 → v3.69.3). §R-55.1 purpose: three deliverables — (1) `key-ic-chain-01.ts` enforcement spec (§R-55.2); (2) `index.ts` inline patch (§R-55.3); (3) Integration Tests A + B bash scripts (§R-55.4/§R-55.5). §R-55.2 `key-ic-chain-01.ts` (`supabase/functions/emit-audit-event/key-ic-chain-01.ts`): `enforceKeyIcChain01(supabase, incidentId, keyType): Promise<KeyIcChain01Result>`; TIGHT_WINDOW_KEY_TYPES = {HMAC_AUDIT_CHAIN_KEY, KEYPOINTS_ENC_KEY} → 48h; others → 72h; Supabase JS v2 `.filter("metadata->>'incident_id'", 'eq', incidentId)` + `.gte('created_at', windowStart)` query; fail-closed on DB error (returns KEY_IC_CHAIN_01_VIOLATION rather than permitting unanchored chain entry); defence-in-depth UUID format check. §R-55.3 `index.ts` patch: for `admin.key_rotation_incident_closed` — Zod validate closedPayload (HTTP 422 on schema error) then `enforceKeyIcChain01` (HTTP 422 on chain violation); for `admin.key_rotation_incident_opened` — schema validate only; both fall through to standard DEC-030 HMAC chain write. Shared schemas extracted to `supabase/functions/emit-audit-event/schemas.ts` (Zod v2; canonical source §R-54.5). §R-55.4 Integration Test A (violation path): bash script; `NOVEL_INCIDENT_ID = 00000000-dead-beef-cafe-000000000001`; asserts HTTP 422 + `error: KEY_IC_CHAIN_01_VIOLATION`; DB count query confirms 0 rows written (fail-closed). §R-55.5 Integration Test B (happy path): bash script; `INCIDENT_ID = uuid.uuid4()`; step 1 emit opened → HTTP 200; step 2 emit closed → HTTP 200; step 3 psql query → 2 rows confirmed. §R-55.6 evidence artefact PRE-55-E-001 (two `.txt` files; `compliance/evidence/ir/`; manual-event; once at M7; re-run on material `emit-audit-event` change). §R-55.7 deployment checklist: 10 items (3× P0/M7 code; 1× staging deploy; 2× integration tests; 1× evidence upload; 1× production deploy; 1× smoke test; 1× documentation close [x] Done this pass). §R-55.8 two cross-reference obligations closed (§R-54.7 item 2 + SOC2_READINESS §143.4 last row). §R-54.7 item 2 inline patch: `[ ]` → `[x] Done — 2026-07-02`. §R-54.9 second row patch: `🟡 Pending` → `🟢 Done — 2026-07-02`. SOC 2 readiness: ~96.5% → ~97%. Privacy floor: §R-55 contains no personal data — `key-ic-chain-01.ts` enforces ordering on FORM-internal incident UUIDs and key-type enum values only; test payloads use synthetic UUIDs; `ic_user_id` = `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee` placeholder; no enterprise tenant `user_id`, employee name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data in any §R-55 artefact. Document header v3.20.0 → v3.21.0. Owner: platform-engineer + security-engineer + compliance-officer.*
+
+---
+
+## R-57 · PKJWT Key Expiry Sweep Stale — `pkjwt_key_expiry_sweep` (job 58) — CC6.6 detection gap
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `pkjwt_key_expiry_sweep` pg_cron job 58 exceeds the 26-hour freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` Edge Function (§12.6) emits `system.cron_job_stale` with `job_name = 'pkjwt_key_expiry_sweep'`; routes to Slack P3 `#alerts-enterprise` with dedup key `pkjwt-expiry-sweep-stale` per §12.6 registry
+> **Primary owners:** security-engineer · compliance-officer · enterprise-architect
+> **SOC 2 criteria:** CC6.6 — cryptographic key management monitoring gap
+> **SLO risk:** Job 58 (`0 9 * * *`) scans `tenant_sso_configs` for PKJWT tenants whose `pkjwt_key_expires_at` falls within the next 30 days and emits `sso.pkjwt_key_expiry_warning` (HIGH / 7yr) per qualifying tenant (SSO_SCIM §44.2, migration 0099). A stale job 58 means affected tenants do not receive advance-warning events. At P3 (the default), the 30-day detection window provides sufficient buffer — a single missed daily run does not immediately endanger any tenant's ability to authenticate, since Supabase Auth JWKS resolution is independent of this sweep job. At P1 upgrade (stale AND R-57-C1 finds a PKJWT tenant with `pkjwt_key_expires_at < NOW() + INTERVAL '7 days'`), a key expiry is imminent during the detection gap; the tenant's SSO integrations may fail if the PKJWT key expires without rotation.
+> **Critical distinction from peer stale runbooks:** Unlike R-33/R-34 (data mutation risk), R-35 (SLO cert risk), or R-44 (off-board chain risk), job 58 is a **non-blocking advance-warning job only** — it does not gate any tenant's current authentication flow. P3 is the correct default; the only risk is that tenants do not receive the automated 30-day warning event in their DEC-030 audit chain. P1 upgrade applies exclusively when a PKJWT key is demonstrably within 7 days of expiry during the stale window.
+
+---
+
+### R-57.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | Routing |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 58)** | `pg-cron-health-monitor` Edge Function (§12.6) | No successful `pkjwt_key_expiry_sweep` run in `pg_cron.job_run_details` within the prior 26 h | **P3** (Slack-only `#alerts-enterprise`; escalates to P1 if R-57-C1 returns count > 0) | Slack `#alerts-enterprise`; dedup key `pkjwt-expiry-sweep-stale`; non-blocking |
+| **Manual discovery** | security-engineer or compliance-officer observes stale job during routine §12.6 review or PKJWT-E-001 quarterly evidence collection | Post-evidence-collection or routine check | **P3 → assess R-57-C1 for P1 upgrade** | Slack `#alerts-enterprise` |
+
+> **P1 escalation criterion:** Upon any R-57 activation, security-engineer runs R-57-C1 immediately. If the query returns count > 0 (any PKJWT tenant with `pkjwt_key_expires_at < NOW() + INTERVAL '7 days'`), severity escalates to **P1** — at least one tenant's PKJWT key is within 7 days of expiry while the sweep job is stale and no automated warning has been emitted. Notify enterprise-architect and compliance-officer; proceed to §R-57.5 Step 3 before restoring the job.
+
+---
+
+### R-57.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P3** | Stale; R-57-C1 returns zero PKJWT tenants with `pkjwt_key_expires_at < NOW() + INTERVAL '7 days'` | 4 h investigation; monitoring gap only; no key is imminently at risk; tenant authentication unaffected | Diagnose root cause; restore job 58; verify `sso.pkjwt_key_expiry_warning` events resume on next qualifying run; emit DEC-030 chain |
+| **P1** | Stale AND R-57-C1 returns ≥ 1 PKJWT tenant with `pkjwt_key_expires_at < NOW() + INTERVAL '7 days'` | 30 min; manually run the sweep logic (R-57-C1 → identify affected tenants → manually emit `sso.pkjwt_key_expiry_warning` per qualifying tenant → notify affected tenants via CSM; restore job 58) | Manual sweep execution; tenant notification; restore job; emit DEC-030 stale + restored chain |
+
+---
+
+### R-57.3 Immediate Actions (T+0 to T+60 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `system.pkjwt_expiry_sweep_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker | security-engineer | Required at ALL severity levels. Do this FIRST before any DB queries. PKJWT-SWEEP-STALE-CHAIN-01 anchor event. |
+| **T+5** | Run R-57-C1 (P1 gate scope query) | security-engineer | Count of PKJWT tenants with `pkjwt_key_expires_at < NOW() + INTERVAL '7 days'`. If count > 0 → escalate to P1 and notify enterprise-architect + compliance-officer immediately. |
+| **T+10** | Run R-57-C2 (pg_cron run history for job 58) | security-engineer | Confirm stale start time, missed-run count, `return_message` for root cause classification. |
+| **T+15** | Run R-57-C3 (catalog registration check) | security-engineer | Confirm job 58 exists in `cron.job` with `active = true`. If missing → H1 (deleted); if `active = false` → H2 (disabled). |
+| **T+15** *(P1 only)* | Run R-57-C4 (full expiry sweep — manual execution) | security-engineer + enterprise-architect | Retrieve all PKJWT tenants with `pkjwt_key_expires_at < NOW() + INTERVAL '30 days'`; emit `sso.pkjwt_key_expiry_warning` manually per qualifying tenant via `emit-audit-event` Worker; notify affected tenants via CSM. |
+| **T+30–T+60** | Fix underlying cause and restore job 58 per root cause diagnosis | devops-lead + security-engineer | See §R-57.5 Steps 4–5. Emit `system.pkjwt_expiry_sweep_restored` on confirmed first successful run. |
+
+---
+
+### R-57.4 Root Cause Hypotheses and Scope Queries
+
+#### R-57-C1 — P1 gate: imminent key expiry during stale window
+
+```sql
+-- Role: form_audit (read-only on tenant_sso_configs)
+-- Privacy floor: returns aggregate count only — no tenant_id, no kid, no hostname
+SELECT COUNT(*) AS at_risk_tenant_count
+FROM tenant_sso_configs
+WHERE oidc_client_auth_method = 'private_key_jwt'
+  AND pkjwt_key_expires_at IS NOT NULL
+  AND pkjwt_key_expires_at < NOW() + INTERVAL '7 days'
+  AND pkjwt_key_expires_at > NOW();
+-- 0   → P3 confirmed; monitoring gap only; no key imminently at risk
+-- > 0 → P1 escalation; at least one PKJWT key is within 7 days of expiry during the stale window
+```
+
+> **Privacy floor:** This query returns an aggregate integer count only. No `tenant_id`, no `kid`, no company name, no contact email, no health value, and no GDPR Art. 9 special-category data are surfaced at this step. Preserve the R-57-C1 count output as the severity attestation in the DEC-030 `system.pkjwt_expiry_sweep_stale_declared` payload field `at_risk_tenant_count`.
+
+#### R-57-C2 — pg_cron run history for job 58
+
+```sql
+-- Role: form_audit
+-- Returns last 10 runs of pkjwt_key_expiry_sweep (succeeded and failed)
+SELECT
+  jobid,
+  jobname,
+  runid,
+  job_pid,
+  database,
+  username,
+  command,
+  status,
+  return_message,
+  start_time,
+  end_time
+FROM pg_cron.job_run_details
+WHERE jobname = 'pkjwt_key_expiry_sweep'
+ORDER BY start_time DESC
+LIMIT 10;
+-- Confirm: (1) time of last successful run (stale window start),
+--          (2) missed-run count (daily 09:00 UTC cadence),
+--          (3) return_message for root cause classification (H1–H4)
+```
+
+#### R-57-C3 — Catalog registration check
+
+```sql
+-- Role: form_audit
+-- Confirms job 58 is still registered in cron.job catalog
+-- Zero rows = job deleted (H1); active = false = job disabled (H2)
+SELECT
+  jobid,
+  schedule,
+  jobname,
+  nodename,
+  active
+FROM cron.job
+WHERE jobname = 'pkjwt_key_expiry_sweep';
+```
+
+#### R-57-C4 — Manual sweep (P1 only): identify all qualifying PKJWT tenants
+
+```sql
+-- Role: form_system (SECURITY DEFINER) — elevated access required to read pkjwt_key_expires_at
+-- Run ONLY at P1 to substitute for the missed job 58 execution(s)
+-- Privacy floor: surfaces tenant_id UUID, kid UUID, key_expires_at, days_until_expiry ONLY
+--   No employee name, email, health value, or GDPR Art. 9 special-category data
+SELECT
+  tenant_id,
+  pkjwt_kid                                                    AS kid,
+  pkjwt_key_expires_at                                         AS key_expires_at,
+  EXTRACT(EPOCH FROM (pkjwt_key_expires_at - NOW())) / 86400.0 AS days_until_expiry
+FROM tenant_sso_configs
+WHERE oidc_client_auth_method = 'private_key_jwt'
+  AND pkjwt_key_expires_at IS NOT NULL
+  AND pkjwt_key_expires_at < NOW() + INTERVAL '30 days'
+  AND pkjwt_key_expires_at > NOW()
+ORDER BY pkjwt_key_expires_at ASC;
+-- Use this result set to emit one sso.pkjwt_key_expiry_warning DEC-030 event per qualifying row
+-- via emit-audit-event Worker (see §R-57.5 Step 3)
+```
+
+#### Root cause hypotheses
+
+| Hypothesis | Description | Primary signal | Recovery path |
+|---|---|---|---|
+| **H1 — Job deleted / deregistered** | `pkjwt_key_expiry_sweep` was removed from `cron.job` catalog | R-57-C3 returns zero rows | Re-register job 58 per SSO_SCIM §44.2 migration 0099 DDL (idempotent `IF NOT EXISTS` guard); `cron.schedule('pkjwt_key_expiry_sweep', '0 9 * * *', 'SELECT form_system.pkjwt_key_expiry_sweep();')` |
+| **H2 — Job disabled (`active = false`)** | Job 58 is registered but `active = false` (e.g. flagged during a migration rollback) | R-57-C3 returns 1 row with `active = false` | `UPDATE cron.job SET active = true WHERE jobname = 'pkjwt_key_expiry_sweep'`; investigate why it was disabled |
+| **H3 — Supabase scheduled maintenance** | `pg_cron` scheduler was suspended during a Supabase maintenance window; all pg_cron jobs missing runs simultaneously | No `return_message` entries after stale start time; Supabase status page maintenance log; other jobs also stale | Monitor Supabase status page; job 58 will self-recover on next 09:00 UTC run after maintenance window closes; no re-registration required |
+| **H4 — SECURITY DEFINER function broken** | `form_system.pkjwt_key_expiry_sweep()` function body raised an unhandled PL/pgSQL exception (e.g. schema migration changed a referenced column in `tenant_sso_configs`) | R-57-C3 shows job registered and active; R-57-C2 shows `status = 'failed'` with `return_message` containing a PL/pgSQL exception | Inspect `return_message`; fix underlying schema mismatch; redeploy `form_system.pkjwt_key_expiry_sweep()` from SSO_SCIM §44.2 migration 0099 DDL; trigger manual run to verify |
+
+---
+
+### R-57.5 Recovery Procedure
+
+#### Step 1 — Emit stale-declared event (T+0, all severities)
+
+Emit `system.pkjwt_expiry_sweep_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker before any DB queries. Supply `at_risk_tenant_count = 0` as a placeholder; update the payload if R-57-C1 subsequently confirms count > 0 (amend the in-flight incident record, not the emitted audit event — the initial emission anchors the DEC-030 chain).
+
+#### Step 2 — Run R-57-C1 and classify severity
+
+Preserve R-57-C1 terminal output as the severity attestation. If count = 0 → P3 (proceed to Step 4). If count > 0 → P1 (proceed to Step 3 before Step 4).
+
+#### Step 3 — P1 only: manual sweep execution and tenant notification
+
+3a. Run R-57-C4 (elevated `form_system` role) to retrieve all PKJWT tenants with `pkjwt_key_expires_at < NOW() + INTERVAL '30 days'`.
+
+3b. For each row returned by R-57-C4, emit one `sso.pkjwt_key_expiry_warning` (HIGH/7yr) event via `emit-audit-event` Worker with the following payload (matching the automated job 58 schema from SSO_SCIM §44.2):
+
+```typescript
+// sso.pkjwt_key_expiry_warning payload — identical schema as emitted by pkjwt_key_expiry_sweep()
+{
+  tenant_id:         "<UUID>",   // FORM-internal UUID only; no company name or hostname
+  kid:               "<UUID>",   // PKJWT key ID (kid) being warned about
+  key_expires_at:    "<ISO-8601 datetime>",
+  days_until_expiry: <number>,
+  manually_emitted:  true        // distinguishes manual-sweep emission from automated job emission
+}
+```
+
+> **Privacy floor:** Only `tenant_id` UUID, `kid` UUID, `key_expires_at`, and `days_until_expiry` in each emitted event. No employee `user_id`, name, email, company hostname, health value, coaching content, or GDPR Art. 9 special-category data.
+
+3c. Notify each affected tenant's Customer Success Manager (CSM) with the affected `tenant_id` and `days_until_expiry` so the CSM can coordinate key rotation per SSO_SCIM §43 (PKJWT lifecycle). Do not include PKJWT private key material in any notification. Log notification timestamp per tenant.
+
+#### Step 4 — Diagnose root cause and restore job 58
+
+| Root cause | Restoration action | Validation |
+|---|---|---|
+| **H1 — Job deleted** | Re-register: `SELECT cron.schedule('pkjwt_key_expiry_sweep', '0 9 * * *', 'SELECT form_system.pkjwt_key_expiry_sweep();')` | `SELECT * FROM cron.job WHERE jobname = 'pkjwt_key_expiry_sweep'` returns 1 row with `active = true`; next 09:00 UTC run shows `status = 'succeeded'` |
+| **H2 — Job disabled** | `UPDATE cron.job SET active = true WHERE jobname = 'pkjwt_key_expiry_sweep'` | `SELECT active FROM cron.job WHERE jobname = 'pkjwt_key_expiry_sweep'` returns `true` |
+| **H3 — Supabase maintenance** | Await platform recovery; no action required | Next 09:00 UTC run after maintenance closure shows `status = 'succeeded'` in `pg_cron.job_run_details` |
+| **H4 — Function broken** | Fix schema mismatch in `form_system.pkjwt_key_expiry_sweep()`; redeploy from SSO_SCIM §44.2 migration 0099 DDL | `pg_cron.job_run_details` shows `status = 'succeeded'` and no `return_message` exception after manual trigger |
+
+#### Step 5 — Trigger manual run and confirm restoration
+
+```sql
+-- Role: form_system
+-- Triggers immediate execution (does not wait for next 09:00 UTC scheduled run)
+SELECT cron.run_job(jobid)
+FROM cron.job
+WHERE jobname = 'pkjwt_key_expiry_sweep';
+```
+
+Confirm `pg_cron.job_run_details` shows `status = 'succeeded'` for `pkjwt_key_expiry_sweep` post-fix. Verify `sso.pkjwt_key_expiry_warning` events are emitting in the audit log for any qualifying tenants (if none qualify, the job runs successfully with no events emitted — this is the healthy no-op case). Emit `system.pkjwt_expiry_sweep_restored` (LOW/3yr) — see §R-57.7.
+
+---
+
+### R-57.6 Communication Templates
+
+#### Slack `#alerts-enterprise` — Stale declaration (P3, all activations)
+
+```
+[P3 · PKJWT Expiry Sweep Stale] job 58 (`pkjwt_key_expiry_sweep`) exceeded 26 h freshness window.
+Incident: {incident_id}
+Declared: {timestamp UTC}
+Stale since: {confirmed_stale_since UTC}
+Missed runs: {missed_runs}
+At-risk tenants (key < 7 days): {at_risk_tenant_count}
+IC: security-engineer
+Status: Root cause investigation underway (R-57-C2, R-57-C3).
+Next update: T+30 min or on severity change.
+Dedup: pkjwt-expiry-sweep-stale
+```
+
+#### P1 escalation template (if R-57-C1 count > 0)
+
+```
+[P1 ESCALATION · PKJWT Key Expiry Imminent During Sweep Stale]
+Incident: {incident_id}
+At-risk tenant count: {at_risk_tenant_count} (pkjwt_key_expires_at < 7 days)
+Earliest expiry: {earliest_key_expires_at UTC}
+IC: security-engineer
+Action: Manual R-57-C4 sweep underway; sso.pkjwt_key_expiry_warning events being emitted manually;
+        affected tenant CSMs being notified.
+CC: enterprise-architect · compliance-officer · @security-oncall
+```
+
+#### Post-resolution template (all severities)
+
+```
+[RESOLVED · PKJWT Expiry Sweep Stale] job 58 (`pkjwt_key_expiry_sweep`) restored.
+Incident: {incident_id}
+Restored at: {restored_at UTC}
+Root cause: {root_cause — H1/H2/H3/H4}
+Tenants warned during recovery: {tenants_warned_during_recovery}
+DEC-030: system.pkjwt_expiry_sweep_restored emitted.
+IC: security-engineer
+```
+
+---
+
+### R-57.7 DEC-030 Chain Specification
+
+Two DEC-030 HMAC-chained events are required for every R-57 activation. Both events are emitted via `emit-audit-event` Worker.
+
+#### Event 1 — `system.pkjwt_expiry_sweep_stale_declared` (HIGH · 7yr retention)
+
+**When:** T+0 of every R-57 activation, before any DB scope queries. PKJWT-SWEEP-STALE-CHAIN-01 anchor.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:             z.string().uuid(),
+  confirmed_stale_since:   z.string().datetime(),
+  stale_hours:             z.number().positive(),
+  missed_runs:             z.number().int().nonneg(),
+  at_risk_tenant_count:    z.number().int().nonneg(),  // from R-57-C1; 0 if emitting before query
+  trigger:                 z.enum(['pagerduty_alert', 'slack_alert', 'manual_discovery']),
+  initial_severity:        z.enum(['P3', 'P1']),
+})
+```
+
+> **Privacy invariant:** No `tenant_id`, no `kid`, no company name, no employee `user_id`, no health value, no GDPR Art. 9 special-category data. `at_risk_tenant_count` is an aggregate integer. Operational incident metadata only.
+
+#### Event 2 — `system.pkjwt_expiry_sweep_restored` (LOW · 3yr retention)
+
+**When:** After Step 5 confirms first successful post-restoration run. Closes the PKJWT-SWEEP-STALE-CHAIN-01 DEC-030 chain for this incident.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:                    z.string().uuid(),
+  restored_at:                    z.string().datetime(),
+  root_cause:                     z.enum(['H1_job_deleted', 'H2_job_disabled', 'H3_maintenance', 'H4_function_broken']),
+  tenants_warned_during_recovery: z.number().int().nonneg(), // count of sso.pkjwt_key_expiry_warning events manually emitted at P1; 0 at P3
+})
+```
+
+> **Privacy invariant:** No `tenant_id`, no `kid`, no employee-identifying data. `tenants_warned_during_recovery` is an aggregate count.
+
+#### PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant
+
+`system.pkjwt_expiry_sweep_stale_declared` **must** precede `system.pkjwt_expiry_sweep_restored` for the same `incident_id` within any HMAC audit chain window. The `emit-audit-event` Worker enforces this constraint: a `system.pkjwt_expiry_sweep_restored` emit for an `incident_id` with no prior `system.pkjwt_expiry_sweep_stale_declared` in the chain returns HTTP 422 with error code `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION`.
+
+---
+
+### R-57.8 SOC 2 Evidence
+
+#### Evidence artefact: PKJWT-SWEEP-STALE-E-001
+
+| Field | Value |
+|---|---|
+| **ID** | PKJWT-SWEEP-STALE-E-001 |
+| **Description** | Per-activation incident record: `system.pkjwt_expiry_sweep_stale_declared` event JSON (with `at_risk_tenant_count`), root cause classification (H1–H4), `system.pkjwt_expiry_sweep_restored` event JSON, terminal output of R-57-C1 (P1 gate count), R-57-C2 (pg_cron run history), and R-57-C3 (catalog check). If P1 activated: R-57-C4 row count (aggregate only, not per-tenant detail) and Slack notification timestamp log per CSM. SHA-256 hashed; uploaded to `compliance/evidence/ir/pkjwt-sweep-stale/`. |
+| **SOC 2 criterion** | CC6.6 — cryptographic key management; monitoring gap in PKJWT key expiry advance-warning sweep |
+| **Cadence** | Per activation (not on schedule; no evidence artefact to collect if R-57 is never triggered) |
+| **Owner** | security-engineer + compliance-officer |
+| **File path** | `compliance/evidence/ir/pkjwt-sweep-stale/PKJWT-SWEEP-STALE-E-001-{incident_id}.txt` |
+| **Retention** | 7yr (HIGH, per DEC-030; aligns with `system.pkjwt_expiry_sweep_stale_declared` retention tier) |
+
+**Privacy floor:** PKJWT-SWEEP-STALE-E-001 contains only FORM-internal `incident_id` UUIDs, aggregate integer counts, root cause classification enums, and timestamps. No employee `user_id`, name, email, `tenant_id` (individual), `kid`, health value, coaching content, or GDPR Art. 9 special-category data. The R-57-C4 per-tenant detail (used for manual P1 emission) is NOT preserved in PKJWT-SWEEP-STALE-E-001; only the row count (`tenants_warned_during_recovery`) is recorded.
+
+---
+
+### R-57.9 Post-Incident Controls
+
+| # | Control | Owner | Trigger condition |
+|---|---|---|---|
+| 1 | Root cause post-mortem within 48 h of restoration: document H1/H2/H3/H4 and prevention measures | devops-lead + security-engineer | Every R-57 activation |
+| 2 | If H1 (job deleted): audit `cron.job` mutation history to identify which migration or manual SQL deleted job 58; add migration test to assert `pkjwt_key_expiry_sweep` present and `active = true` after every schema migration | devops-lead | H1 only |
+| 3 | If H2 (job disabled): audit which operator disabled job 58 and under what authority; add `cron.job SET active = false` guard to deployment runbooks | devops-lead + enterprise-architect | H2 only |
+| 4 | If H4 (function broken): add a schema-change test in CI that verifies `form_system.pkjwt_key_expiry_sweep()` compiles and runs against a snapshot of `tenant_sso_configs` schema | platform-engineer | H4 only |
+| 5 | Update §12.6 OBSERVABILITY job 58 row to reference R-57 in the stale-routing column (see §R-57.11 implementation checklist item 2) | compliance-officer | First R-57 activation if item 2 not yet complete |
+| 6 | Verify PKJWT-E-001 quarterly evidence collection (SOC2_READINESS §145) was not blocked by the stale period; if next collection date falls within stale window, collect manually and note in PKJWT-E-001 artefact | compliance-officer | If stale period overlaps with Q1/Q2/Q3/Q4 collection dates (Jan 5, Apr 5, Jul 5, Oct 5) |
+
+---
+
+### R-57.10 Cross-References
+
+| Reference | Location | Relationship |
+|---|---|---|
+| Job 58 registry | `docs/OBSERVABILITY.md §12.6` (v5.14.0, 2026-07-02) | Canonical registration of `pkjwt_key_expiry_sweep` — schedule, freshness 26h, P3 Slack-only routing, dedup key, CC6.6, privacy invariant |
+| PKJWT design and migration 0099 DDL | `docs/SSO_SCIM_IMPLEMENTATION.md §42` + `§44.2` (v2.19, 2026-07-02) | `form_system.pkjwt_key_expiry_sweep()` SECURITY DEFINER function body; `cron.schedule()` registration; `sso.pkjwt_key_expiry_warning` event schema |
+| Audit log event schemas | `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` | Canonical DEC-030 schema for `sso.pkjwt_key_expiry_warning` events emitted by job 58 |
+| PKJWT evidence artefact | `docs/SOC2_READINESS.md §145` (v3.71.0) | PKJWT-E-001 — CC6.6 quarterly artefact; collection cadence Jan 5 / Apr 5 / Jul 5 / Oct 5 |
+| SOC 2 compliance calendar | `docs/SOC2_READINESS.md §146` (v3.72.0, 2026-07-03) | PKJWT-E-001 in §15.1 Master Compliance Calendar |
+| DEC-030 HMAC chain protocol | `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) | HMAC-chained audit log pattern governing all events emitted in this runbook |
+
+---
+
+### R-57.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.pkjwt_expiry_sweep_stale_declared` (HIGH/7yr) and `system.pkjwt_expiry_sweep_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` (or nearest SYSTEM-class event section); include Zod v2 schemas from §R-57.7 and PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant | security-engineer + platform-engineer | **P0** | [ ] |
+| 2 | Update `docs/OBSERVABILITY.md §12.6` job 58 row: in the stale-routing / cross-reference column, add `companion runbook: INCIDENT_RESPONSE R-57` | compliance-officer | **P0** | [ ] |
+| 3 | Register PKJWT-SWEEP-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` evidence artefact registry (per-activation cadence, CC6.6, 7yr, owner: security-engineer + compliance-officer) | compliance-officer | **P0** | [ ] |
+| 4 | Implement PKJWT-SWEEP-STALE-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`: create `pkjwt-sweep-stale-chain-01.ts` with `enforcePkjwtSweepStaleChain01(supabase, incidentId)` — queries `audit_log_events` for prior `system.pkjwt_expiry_sweep_stale_declared` within a 72h window for same `incident_id`; fail-closed on DB error; returns HTTP 422 + `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` if no anchor found when `system.pkjwt_expiry_sweep_restored` is emitted; patch `index.ts` to import and invoke | platform-engineer + security-engineer | **P0** / M8 | [ ] |
+| 5 | Authoring complete — §R-57 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.22.0).** |
+
+**Privacy floor (invariant throughout R-57):** No employee `user_id`, name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data appears in any R-57 query result, DEC-030 event payload, evidence artefact, or Slack communication template. R-57-C1 and R-57-C4 aggregate counts and timestamps only. `tenant_id` fields in all event payloads are FORM-internal UUIDs — not linked to company name, employee roster, or any personal identifier in this runbook.
+
+---
+
+*v3.22.0 (2026-07-03): §R-57 — PKJWT Key Expiry Sweep Stale (`pkjwt_key_expiry_sweep`, job 58) — CC6.6 detection gap companion runbook. Closes the documentation gap identified post-OBSERVABILITY v5.14.0 (job 58 registered 2026-07-02): no stale recovery runbook existed for job 58 despite all peer pg_cron jobs (R-31 through R-53) having companion runbooks. §R-57.1 trigger matrix: `system.cron_job_stale` job 58 → Slack P3 `#alerts-enterprise` dedup `pkjwt-expiry-sweep-stale`; P1 escalation if R-57-C1 count > 0. §R-57.2 severity: P3 default (30-day advance-warning buffer; authentication unaffected); P1 (stale AND PKJWT key < 7 days from expiry). §R-57.3 five-step immediate actions (T+0 stale-declared emit; T+5 R-57-C1 P1 gate; T+10 R-57-C2 run history; T+15 R-57-C3 catalog check; T+15 P1 manual R-57-C4 sweep + tenant notification). §R-57.4 four scope queries (R-57-C1 P1 gate aggregate count; R-57-C2 pg_cron history; R-57-C3 catalog check; R-57-C4 P1 manual sweep — form_system role) and four root-cause hypotheses (H1 deleted, H2 disabled, H3 maintenance, H4 function broken). §R-57.5 five-step recovery: (1) stale-declared emit; (2) R-57-C1 classify; (3) P1 R-57-C4 manual sweep + tenant notification via CSM; (4) H1–H4 restoration table; (5) manual run + DEC-030 restored emit. §R-57.6 three Slack templates (P3 stale, P1 escalation, post-resolution). §R-57.7 DEC-030 chain: two events — `system.pkjwt_expiry_sweep_stale_declared` HIGH/7yr (Zod: incident_id, confirmed_stale_since, stale_hours, missed_runs, at_risk_tenant_count, trigger, initial_severity) and `system.pkjwt_expiry_sweep_restored` LOW/3yr (Zod: incident_id, restored_at, root_cause, tenants_warned_during_recovery); PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant (HTTP 422 PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION on unanchored restore). §R-57.8 PKJWT-SWEEP-STALE-E-001 per-activation artefact (CC6.6; per-activation; 7yr). §R-57.9 six post-incident controls (post-mortem; H1/H2/H4 specific guards; OBSERVABILITY §12.6 cross-ref; PKJWT-E-001 collection overlap check). §R-57.10 five cross-references (OBSERVABILITY §12.6; SSO_SCIM §42/§44.2; AUDIT_LOG_SCHEMA §SSO-PKJ-Lifecycle; SOC2_READINESS §145/§146). §R-57.11 five-item implementation checklist (AUDIT_LOG_SCHEMA registration; OBSERVABILITY §12.6 companion-runbook cross-ref update; SOC2_READINESS §79.4 PKJWT-SWEEP-STALE-E-001 registration; emit-audit-event PKJWT-SWEEP-STALE-CHAIN-01 enforcement implementation; documentation [x] Done this pass). Privacy floor throughout: no employee user_id, name, email, health value, coaching content, body composition, or GDPR Art. 9 special-category data; all event payloads aggregate-count or FORM-internal UUID only. Document header v3.21.2 → v3.22.0. Owner: security-engineer + compliance-officer + enterprise-architect.*
