@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v11.76.0** — 2026-07-03 · content · post-3076 + post-59 · «Двосторонні vs. односторонні вправи у контексті технічної діагностики» (series «Технічна самодіагностика» 3071–3080, 6/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · «Як читати власний тренувальний журнал, щоб він давав рішення, а не просто зберігав дані» (editorial series 51–60, 9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards prepended for post-3076 + post-59 · next: post-3077 («Кінематичний аналіз присідання: що читає атлет без тренера і що пропускає») + post-60 («Синтез блоку 51–60: 10 принципів, якими керується FORM при написанні програми»)
+
 **v11.74.0** — 2026-07-03 · content · post-3075 · «Самооцінка мобільності як технічного обмеження» (series «Технічна самодіагностика» 3071–3080, 5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3075 · next: post-3076 («Двосторонні vs. односторонні вправи у контексті технічної діагностики») + post-59 («Як читати власний тренувальний журнал, щоб він давав рішення, а не просто зберігав дані»)
 
 **v11.73.0** — 2026-07-03 · enterprise · R-60.12 items 1+3 closed · AUDIT_LOG_SCHEMA v2.75 + SOC2_READINESS §148 · compliance-officer + devops-lead

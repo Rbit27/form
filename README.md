@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–57 drafted · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 in progress 3/10 · series «Мезоцикл без тренера» 3081–3090 proposed · series «Прогресія без тренера» 3096–3105 proposed · block 896–900 active · block 901–910 proposed · v11.70.0
+### Editorial series: 11–59 drafted · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 in progress 6/10 · series «Мезоцикл без тренера» 3081–3090 proposed · series «Прогресія без тренера» 3096–3105 proposed · block 896–900 active · block 901–910 proposed · v11.76.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -54,8 +54,8 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 55 | Що означає «закінчити тренування з резервом» і чому більшість це неправильно розуміє | **draft · v11.62.0 → post-55-what-finishing-with-reserve-actually-means.md** |
 | 56 | Чому більшість warm-up протоколів написано під когось іншого | **draft · v11.64.0 → post-56-warmup-protocols-written-for-someone-else.md** |
 | 57 | Функціональне перевантаження vs. системна помилка: що вирізняє overreaching від overtraining | **draft · v11.70.0 → post-57-overreaching-vs-overtraining.md** |
-| 58 | Як ставити тренувальні цілі, щоб їх можна було виміряти | proposed |
-| 59 | Деадаптація: що відбувається коли атлет зупиняється і що повертається першим | proposed |
+| 58 | Як ставити тренувальні цілі, щоб їх можна було виміряти | **draft · v11.71.0 → post-58-setting-measurable-training-goals.md** |
+| 59 | Як читати власний тренувальний журнал, щоб він давав рішення, а не просто зберігав дані | **draft · v11.76.0 → post-59-reading-training-journal-for-decisions.md** |
 | 60 | Синтез блоку 51–60: 10 принципів, якими керується FORM при написанні програми | proposed |
 | 61 | Тренувальна ідентичність: хто ти як атлет — і чому це питання має практичні наслідки | proposed |
 | 62 | Обсяг і частота: чому ці два параметри не незалежні | proposed |
