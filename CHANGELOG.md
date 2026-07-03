@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.1.0] — 2026-07-03
+
+### Added
+- `content/post-70-editorial-series-synthesis.md` — Редакційна серія 61–70 10/10 (SERIES COMPLETE). Синтез: десять орієнтирів для self-coached атлета без зовнішнього супроводу. Ідентичність як операційна категорія; конкретизація від вектора до програми; «важче» не є универсальним (Schoenfeld et al. 2017); середовище модерує, але не скасовує; специфічність і варіативність як ієрархія; якість сесії = техніка (McGill 2007); індивідуальні відмінності — вхідний параметр (Timmons 2011); система > план; довгострокова структурна пам'ять (Enoka 2008; Bruusgaard et al. 2010; Kjaer 2004); self-coached — інша структура допомоги, не відмова від неї. clinical-safety: NOT_REQUIRED.
+- `content/post-3088-mesocycle-adaptation-monitoring.md` — «Мезоцикл без тренера» 3081–3090, 8/10. Моніторинг адаптації всередині блоку: три джерела сигналів (об'єктивні: velocity loss, Споерлін & Голлінгхед 2018; суб'єктивні: session RPE і pre-training readiness, Stults-Kolehmainen et al. 2014; функціональні: velocity drop test, CMJ, grip, Baker 2003). Нормальна картина блоку тижнями 1–6. P0/P1/P2 сигнали і ієрархія коригуючих дій (обсяг спочатку, Haff & Triplett 2016). Мінімальний протокол запису. clinical-safety: NOT_REQUIRED.
+- `blog.html` — posts 70 та 3088 prepended at top of feed. Серія 61–70 помічена SERIES COMPLETE.
+
+### Changed
+- `STATUS.md` — editorial 61–70 9/10 → 10/10 (SERIES COMPLETE); Мезоцикл без тренера 7/10 → 8/10; next: post-71 (editorial series 71–80, opener) + post-3089 («Деловантаження як діагностичний інструмент: що видно після деловантаження, чого не видно всередині блоку»).
+- `VERSION` — 12.0.0 → 12.1.0.
+
+---
+
 ## [12.0.0] — 2026-07-03
 
 ### Added
