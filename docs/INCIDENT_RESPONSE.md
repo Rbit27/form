@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.34.0
+# FORM · Incident Response Runbook v3.35.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -24808,3 +24808,325 @@ Both events are HMAC-chained (DEC-030), emitted by IC (security-engineer + compl
 **Privacy floor (invariant throughout R-68):** No individual `user_id`, employee name, email, coaching content, body composition metric, or GDPR Art. 9 special-category data appears in any R-68 scope query result, communication template payload, DEC-030 event payload, or AUDIT-CHAIN-CHECK-STALE-E-001 evidence artefact. R-68-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-68-C2 surfaces only `sequence_number` integers, HMAC hash strings, `event_type` strings, and `created_at` timestamps — no individual employee identifiers, health values, coaching session content, or GDPR Art. 9 data. R-68-C3 surfaces only pg_cron job metadata and run timestamps. `manual_chain_break_count` and `missed_run_count` are scalar integer counts only.
 
 ---
+
+---
+
+## R-69 · Wearable Sync Freshness Check Stale (`wearable_sync_freshness_check` · job 31)
+
+**Trigger:** `system.cron_job_stale` for `wearable_sync_freshness_check`, fired by `pg-cron-health-monitor` when no successful run is recorded within the 26-hour freshness window (daily 07:05 UTC cadence — one missed run = stale). Alert: AL-WS-FRESH-01 (P1); dedup `wearable-freshness-check-stale`. TSC: CC7.2.
+
+**Classification:** P1 default. Stale consequence: WS-SLO-06 fleet freshness compliance measurement gap — FORM cannot automatically detect a fleet-wide `fresh_pct` < 95% breach for the stale window. No individual user data is lost; no HMAC chain break; no DEC-030 emission gap (the job emits the freshness measurement, not control-plane events). Escalates to P0 if stale > 48h (two consecutive missed daily runs) AND enterprise customer reports wearable data unavailability concurrent with the stale window (SLA credit implications).
+
+**Owner:** devops-lead (IC, pg_cron restoration, peer job health); platform-engineer (wearable pipeline health); compliance-officer (WS-E-002 quarterly evidence, CC7.2 monitoring gap assessment).
+
+---
+
+### §R-69.1 Trigger Matrix
+
+| Signal | Source | Threshold | PagerDuty route | Severity |
+|---|---|---|---|---|
+| `system.cron_job_stale` (`wearable_sync_freshness_check`) | `pg-cron-health-monitor` Edge Function | 26 h (daily 07:05 UTC cadence — one missed run) | P1 → `form-devops`: devops-lead | P1 default; P0 if stale > 48h AND enterprise SLA impact confirmed |
+| R-03 co-activation | `pg-cron-health-monitor` | All monitored jobs stale | Co-active with R-03 | P0 override — follow R-03 first |
+
+**Dedup key:** `wearable-freshness-check-stale`. **Alert:** AL-WS-FRESH-01. **Auto-resolve:** yes — when `pg-cron-health-monitor` records a successful `wearable_sync_freshness_check` run within the next 26h window.
+
+---
+
+### §R-69.2 Severity Classification
+
+| Condition | Severity | Additional action |
+|---|---|---|
+| `wearable_sync_freshness_check` stale (≤ 48 h, single missed run) | P1 | devops-lead IC; restore and verify; file WEAR-FRESH-STALE-E-001 note |
+| Stale > 48h (two+ consecutive missed runs) | P1 elevated | Add platform-engineer to IC; enterprise tenant status check |
+| Stale > 48h AND enterprise customer reports wearable data issue concurrent with stale window | P0 escalate | Co-activate enterprise SLA credit assessment; customer-success notification E-WEARABLE-01 per ENTERPRISE_SLA §3.4 within 4h |
+| R-03 co-active (all monitored jobs stale) | P0 override | Follow R-03 first; R-69 runs in parallel |
+
+**Key distinction from R-28 through R-68:** R-69 is P1 default — consistent with other non-security-critical daily monitoring jobs (R-28 renewal notice, R-29 mid-contract risk, R-30 GDPR purge). Unlike R-68 (P0 — HMAC chain integrity) or R-67 (P0 SCIM mass deprovision detection), a stale `wearable_sync_freshness_check` creates a monitoring gap only: FORM cannot detect a `fresh_pct` < 95% breach for the missed period. No audit chain integrity risk; no GDPR Art. 17 breach; no evidence artefact gap (WS-E-002 is quarterly and the affected daily run is a single data point in the quarterly export).
+
+---
+
+### §R-69.3 Immediate Action Timeline
+
+| Step | Time | Action |
+|---|---|---|
+| T+0 | 0 min | PagerDuty AL-WS-FRESH-01 fires. IC (devops-lead) acknowledges. Emit `system.wearable_freshness_check_stale_declared` HIGH (DEC-030 HMAC-chained) via PAM-elevated `POST /audit/emit-event`. |
+| T+5 | 5 min | Run **R-69-C1** (pg_cron run history for `wearable_sync_freshness_check`) to determine root cause (H1–H4) and measure stale_hours. |
+| T+10 | 10 min | Run **R-69-C2** (peer job health): check whether other daily jobs (`workout_data_purge`, `victor_safety_baseline_refresh`, `wearable_sync_freshness_check`) are also stale. If ≥ 3 daily jobs stale simultaneously → H3 (Supabase infra) and R-03 co-active. |
+| T+15 | 15 min | Run **R-69-C3** (manual fleet freshness snapshot) as compensating measurement during the stale window — does NOT replace the pg_cron event emission but provides manual WS-SLO-06 status for any concurrent enterprise SLA assessment. |
+| T+20 | 20 min | Restore `wearable_sync_freshness_check` per root-cause hypothesis (H1–H4). Confirm via `SELECT cron.run_job(jobid) FROM cron.job WHERE jobname = 'wearable_sync_freshness_check';` and verify `wearable.fleet_freshness_assessed` event appears in `audit_log_events` within 60 s. |
+| T+25 | 25 min | Emit `system.wearable_freshness_check_restored` LOW (DEC-030 HMAC-chained). File WEAR-FRESH-STALE-E-001 evidence artefact. If P0 escalated: notify customer-success for enterprise SLA check per ENTERPRISE_SLA §3.4. |
+
+---
+
+### §R-69.4 Scope Queries
+
+#### R-69-C1 — pg_cron Run History (`wearable_sync_freshness_check`)
+
+```sql
+SELECT
+  runid,
+  job_id,
+  job_pid,
+  database,
+  username,
+  command,
+  status,
+  return_message,
+  start_time,
+  end_time
+FROM cron.job_run_details
+WHERE jobname = 'wearable_sync_freshness_check'
+ORDER BY start_time DESC
+LIMIT 20;
+```
+
+Purpose: Identify last successful run timestamp, missed run count, and error detail. Supports H1 (deleted — job absent from `cron.job`) vs H2 (disabled — `cron.job.active = false`) vs H3 (Supabase infra outage — peer jobs also stale) vs H4 (`emit_dec030_event` function or pg_net degraded — `status = 'failed'` with `return_message` error).
+
+**Stale hours calculation:**
+```sql
+SELECT
+  EXTRACT(EPOCH FROM (NOW() - MAX(start_time))) / 3600.0 AS stale_hours,
+  COUNT(*) AS total_run_count,
+  COUNT(*) FILTER (WHERE status = 'succeeded') AS succeeded_count,
+  COUNT(*) FILTER (WHERE status = 'failed') AS failed_count
+FROM cron.job_run_details
+WHERE jobname = 'wearable_sync_freshness_check';
+```
+
+**Privacy invariant:** `cron.job_run_details` contains pg_cron internal metadata only — timestamps, status strings, return messages. No `user_id`, no wearable readings, no HRV values, no health data, no GDPR Art. 9 special-category data.
+
+#### R-69-C2 — Peer Job Health
+
+```sql
+-- Part A: Peer daily jobs (shared pg_cron engine health discriminator)
+SELECT
+  jobname,
+  schedule,
+  active,
+  jobid,
+  (
+    SELECT MAX(start_time)
+    FROM cron.job_run_details jrd
+    WHERE jrd.job_id = j.jobid
+      AND jrd.status = 'succeeded'
+  ) AS last_successful_run,
+  EXTRACT(EPOCH FROM (NOW() - (
+    SELECT MAX(start_time)
+    FROM cron.job_run_details jrd
+    WHERE jrd.job_id = j.jobid
+      AND jrd.status = 'succeeded'
+  ))) / 3600.0 AS hours_since_last_success
+FROM cron.job j
+WHERE jobname IN (
+  'workout_data_purge',
+  'victor_safety_baseline_refresh',
+  'ci_telemetry_daily_sync',
+  'audit-chain-daily-check'
+)
+ORDER BY jobname;
+```
+
+Purpose: If ≥ 2 peer daily jobs show hours_since_last_success > 26, suspect H3 (Supabase pg_cron engine degradation) → co-activate R-03.
+
+```sql
+-- Part B: Job catalog check
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'wearable_sync_freshness_check';
+```
+
+Purpose: H1 discriminator (no row = job deleted); H2 discriminator (`active = false` = job disabled).
+
+#### R-69-C3 — Manual Fleet Freshness Snapshot (Compensating Measurement)
+
+```sql
+-- Manual WS-SLO-06 measurement for the stale window.
+-- Run ONLY if stale > 26h and enterprise SLA impact assessment is required.
+-- Privacy invariant: aggregate counts only — no user_id, no individual readings.
+-- k-anonymity gate: sources with N < 5 users are NOT reported individually.
+SELECT
+  COUNT(*) FILTER (WHERE latest_reading_age_hours < 26) AS fresh_count,
+  COUNT(*)                                               AS total_connected,
+  ROUND(
+    (COUNT(*) FILTER (WHERE latest_reading_age_hours < 26))::NUMERIC /
+    NULLIF(COUNT(*), 0) * 100.0,
+    1
+  ) AS fresh_pct,
+  (ROUND(
+    (COUNT(*) FILTER (WHERE latest_reading_age_hours < 26))::NUMERIC /
+    NULLIF(COUNT(*), 0) * 100.0,
+    1
+  ) >= 95.0) AS slo_met
+FROM (
+  SELECT
+    EXTRACT(EPOCH FROM (NOW() - MAX(recorded_at))) / 3600.0 AS latest_reading_age_hours
+  FROM wearable_readings
+  WHERE deleted_at IS NULL
+    AND recorded_at > NOW() - INTERVAL '48 hours'
+  GROUP BY user_id
+) sub;
+```
+
+**Privacy invariant:** Returns aggregate scalars only — `fresh_count` (integer), `total_connected` (integer), `fresh_pct` (float), `slo_met` (boolean). No `user_id`, no source attribution below k=5 threshold, no HRV values, no individual reading timestamps, no GDPR Art. 9 special-category data. R-69-C3 result is recorded in WEAR-FRESH-STALE-E-001 as a manual compensating measurement note — not as a replacement for the missed DEC-030 emission.
+
+---
+
+### §R-69.5 Root-Cause Hypotheses
+
+| Hypothesis | Discriminator | Recovery |
+|---|---|---|
+| **H1 — Job deleted** | R-69-C2 Part B returns 0 rows for `wearable_sync_freshness_check` | Re-register via `cron.schedule('wearable_sync_freshness_check', '5 7 * * *', ...)` per `OBSERVABILITY.md §41.5` DDL spec; verify `active = true`; trigger manual run |
+| **H2 — Job disabled** | R-69-C2 Part B returns row with `active = false` | `UPDATE cron.job SET active = true WHERE jobname = 'wearable_sync_freshness_check'; SELECT cron.run_job(jobid) FROM cron.job WHERE jobname = 'wearable_sync_freshness_check';` |
+| **H3 — Supabase pg_cron engine degradation** | R-69-C2 Part A shows ≥ 2 peer daily jobs also stale | Co-activate R-03; follow R-03 recovery protocol; R-69 closes after first successful `wearable_sync_freshness_check` run post-R-03 recovery |
+| **H4 — `emit_dec030_event` / pg_net degraded** | R-69-C1 shows `status = 'failed'` with `return_message` containing error from `emit_dec030_event` or `pg_net.http_post` | Check pg_net extension: `SELECT * FROM pg_net.http_response_queue LIMIT 10;`; check `emit_dec030_event` function: `SELECT proname, prosrc FROM pg_proc WHERE proname = 'emit_dec030_event';`; if pg_net degraded, follow `docs/OBSERVABILITY.md §12.7` `pg-cron-health-monitor` notes; if function missing, re-deploy from migration history |
+
+---
+
+### §R-69.6 Recovery Steps
+
+1. Acknowledge PagerDuty AL-WS-FRESH-01. Emit `system.wearable_freshness_check_stale_declared` HIGH (DEC-030 HMAC-chained; PAM-elevated; `stale_hours` from R-69-C1).
+2. Run R-69-C1 (pg_cron run history) to identify stale_hours and root cause hypothesis.
+3. Run R-69-C2 (peer job health) to discriminate H3 vs H1/H2/H4.
+4. If H3 (R-03 co-active): follow R-03 recovery; return here after pg_cron engine restored.
+5. Apply root-cause recovery per H1–H4 table above.
+6. Trigger manual run: `SELECT cron.run_job(jobid) FROM cron.job WHERE jobname = 'wearable_sync_freshness_check';`
+7. Confirm `wearable.fleet_freshness_assessed` DEC-030 event appears in `audit_log_events` within 60 s.
+8. If stale > 26h AND enterprise SLA impact suspected: run R-69-C3 (manual fleet freshness snapshot) and record result in WEAR-FRESH-STALE-E-001.
+9. Emit `system.wearable_freshness_check_restored` LOW (DEC-030 HMAC-chained; PAM-elevated; `root_cause` from H1–H4 enum; `stale_hours_total` from R-69-C1).
+10. File WEAR-FRESH-STALE-E-001 evidence artefact (§R-69.9) in `compliance/evidence/wearable/wear-fresh-stale-e-001-<YYYY-MM-DD>/`.
+
+---
+
+### §R-69.7 Slack Communication Templates
+
+**T-69-A — Detection (IC → #security-restricted)**
+
+```
+[R-69 DETECTION] wearable_sync_freshness_check (job 31) STALE
+Stale since: {last_successful_run_timestamp} UTC ({stale_hours}h ago)
+Consequence: WS-SLO-06 monitoring blind spot — fresh_pct measurement unavailable for stale window
+Root cause hypothesis: {H1 / H2 / H3 / H4}
+IC: {devops-lead}
+Status: Investigating
+R-03 co-active: {Yes / No}
+```
+
+**T-69-B — Resolution (IC → #security-restricted)**
+
+```
+[R-69 RESOLVED] wearable_sync_freshness_check (job 31) RESTORED
+Root cause: {H1 / H2 / H3 / H4} — {one-line description}
+Stale window: {stale_hours_total}h ({start_timestamp} → {restored_timestamp} UTC)
+WS-SLO-06 manual snapshot: fresh_pct = {value}% ({slo_met: ✓ / ✗}) — compensating measurement per R-69-C3
+Enterprise SLA impact: {None / Assessed — {details}}
+Evidence filed: WEAR-FRESH-STALE-E-001
+```
+
+**T-69-C — Enterprise SLA escalation (IC → customer-success, if P0 escalated)**
+
+```
+[WEARABLE FRESHNESS MONITORING GAP] Enterprise impact assessment required.
+pg_cron job 31 (`wearable_sync_freshness_check`) was stale {stale_hours_total}h.
+Manual fleet freshness during stale window: fresh_pct = {value}% (SLO-06 threshold: 95%).
+Action required: check enterprise tenant wearable sync status for the stale period; apply ENTERPRISE_SLA §3.4 P1 communication if SLA-relevant impact confirmed.
+```
+
+---
+
+### §R-69.8 DEC-030 Chain
+
+Both events are HMAC-chained (DEC-030), emitted by IC (devops-lead, PAM-elevated) via `POST /audit/emit-event`. No automated emission path — PAM elevation required.
+
+**`system.wearable_freshness_check_stale_declared`** — severity: HIGH; retention: 7 years; TSC: CC7.2.
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Fresh UUID per R-69 activation. Anchors WEAR-FRESH-STALE-CHAIN-01 ordering invariant. |
+| `confirmed_stale_since` | datetime | Timestamp of last confirmed successful `wearable_sync_freshness_check` run (from R-69-C1). |
+| `stale_hours` | int ≥ 0 | Hours since last successful run (26h freshness window; daily 07:05 UTC cadence). |
+| `missed_run_count` | int ≥ 0 | Number of 07:05 UTC run windows missed (1 for first detection within 26h; > 1 for multi-day stale). |
+| `r03_co_active` | boolean | `true` if H3 (Supabase pg_cron engine degradation) — R-03 co-activation flag. |
+
+**`system.wearable_freshness_check_restored`** — severity: LOW; retention: 3 years; TSC: CC7.2.
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Must match the `stale_declared` event for same R-69 activation. WEAR-FRESH-STALE-CHAIN-01 enforced. |
+| `restored_at` | datetime | Timestamp IC confirms `wearable_sync_freshness_check` healthy after `cron.run_job()` and `wearable.fleet_freshness_assessed` observed. |
+| `root_cause` | enum | `h1_deleted` / `h2_disabled` / `h3_infra` / `h4_emit_function_degraded`. |
+| `stale_hours_total` | int ≥ 0 | Total hours `wearable_sync_freshness_check` was stale (declaration to restoration). |
+| `manual_fresh_pct` | float or null | R-69-C3 compensating snapshot result (null if stale ≤ 26h and no enterprise SLA assessment triggered). |
+| `slo_met_during_stale` | boolean or null | WS-SLO-06 status from R-69-C3 manual snapshot (null if snapshot not run). |
+
+**WEAR-FRESH-STALE-CHAIN-01 Ordering Invariant:** `system.wearable_freshness_check_restored` for a given `incident_id` is blocked (HTTP 422 `WEAR_FRESH_STALE_CHAIN_01_VIOLATION`) by the `emit-audit-event` Worker if no prior `system.wearable_freshness_check_stale_declared` exists for the same `incident_id`. Co-activates R-05 on violation.
+
+---
+
+### §R-69.9 Evidence Artefact
+
+**WEAR-FRESH-STALE-E-001** — per-activation evidence artefact for R-69 incidents.
+
+| Field | Value |
+|---|---|
+| Evidence ID | WEAR-FRESH-STALE-E-001 |
+| TSC | CC7.2 |
+| Trigger | R-69 activation (`wearable_sync_freshness_check` stale) |
+| Collection | Per-activation (one artefact per R-69 incident) |
+| Retention | 7 years (WORM, Cloudflare R2) |
+| Vanta mirror | Within 48h of filing |
+| R2 path | `compliance/evidence/wearable/wear-fresh-stale-e-001-<YYYY-MM-DD>/` |
+| Owner | devops-lead + compliance-officer |
+
+**Contents:**
+1. `system.wearable_freshness_check_stale_declared` DEC-030 HIGH event (PAM-elevated IC emission, T+0).
+2. `system.wearable_freshness_check_restored` DEC-030 LOW event (PAM-elevated IC emission, post-recovery).
+3. WEAR-FRESH-STALE-CHAIN-01 predecessor assertion confirmation (HTTP 422 `WEAR_FRESH_STALE_CHAIN_01_VIOLATION` enforced by `emit-audit-event` Worker).
+4. IC runbook timestamp trace (T+0 detection → T+25 closure steps per §R-69.3).
+5. R-69-C1 scope query output: `cron.job_run_details` export for `wearable_sync_freshness_check` covering the stale window (`runid`, `status`, `start_time`, `end_time`, `return_message`). No individual `user_id`, HRV value, wearable source reading, or GDPR Art. 9 data.
+6. R-69-C2 peer job health output (discriminates H3 from H1/H2/H4).
+7. R-69-C3 manual fleet freshness snapshot result (if stale > 26h or enterprise SLA assessment triggered): aggregate `fresh_pct`, `total_connected`, `slo_met` scalars only — no `user_id`, no individual readings.
+8. Enterprise SLA impact assessment note (or signed nil-impact attestation if no enterprise SLA impact).
+
+**R2 path note:** `compliance/evidence/wearable/` subfolder is consistent with OBSERVABILITY.md §41 wearable evidence. `r2:form-api` REVOKED (§80.3 invariant — IC PAM-elevated manual upload only). `wear-fresh-stale-e-001-<YYYY-MM-DD>/` subdirectory created per activation.
+
+---
+
+### §R-69.10 Post-Incident Controls
+
+| # | Control | Trigger | Owner |
+|---|---|---|---|
+| 1 | Post-mortem if stale > 48h (two+ consecutive missed runs) | Per-activation when stale_hours_total ≥ 48 | devops-lead + compliance-officer |
+| 2 | WEAR-FRESH-STALE-CHAIN-01 Worker enforcement (`emit-audit-event` Worker: HTTP 422 on unanchored `restored` emit) | P1 — implementation pending (platform-engineer) | platform-engineer |
+| 3 | H1/H2 CI lint guard: `wearable_sync_freshness_check` job existence and `active = true` checked in migration CI after any wearable-related migration | Post any H1/H2 incident | platform-engineer |
+| 4 | Quarterly runbook gap sweep: cross-reference §12.6 pg_cron canonical registry against companion runbook list | Quarterly | compliance-officer |
+
+---
+
+### §R-69.11 Cross-References
+
+| Document | Section | Note |
+|---|---|---|
+| OBSERVABILITY.md | §12.6, job 31 `wearable_sync_freshness_check` | pg_cron canonical registry; `5 7 * * *`; freshness window 26h; AL-WS-FRESH-01; v5.15.4 (2026-07-03) |
+| OBSERVABILITY.md | §41 | Wearable Integration & Health Platform Sync Pipeline Observability — WS-SLO-06 (≥ 95% fleet freshness), §41.5 pg_cron job 31 DDL spec, §41.6 DEC-030 events, WS-E-002 quarterly evidence artefact |
+| OBSERVABILITY.md | §41.5 | `wearable_sync_freshness_check` full PL/pgSQL DDL — k-anonymity gate, `wearable.fleet_freshness_assessed` emission logic |
+| INCIDENT_RESPONSE.md | R-03 | H3 discriminator — co-activate if ≥ 2 peer daily jobs simultaneously stale |
+| INCIDENT_RESPONSE.md | R-05 | HMAC chain inversion co-activation on WEAR-FRESH-STALE-CHAIN-01 violation |
+| ENTERPRISE_SLA.md | §3.4 | P1 communication SLA (4h) — applies if stale > 48h AND enterprise wearable impact confirmed |
+
+---
+
+### §R-69.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.wearable_freshness_check_stale_declared` (HIGH/7yr) and `system.wearable_freshness_check_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, WEAR-FRESH-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative | compliance-officer | **P0** | [ ] Pending — compliance-officer |
+| 2 | Implement WEAR-FRESH-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker (HTTP 422 `WEAR_FRESH_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit) | platform-engineer | **P1** | [ ] Pending — platform-engineer |
+| 3 | Register WEAR-FRESH-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2; per-activation; 7yr; `compliance/evidence/wearable/wear-fresh-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [ ] Pending — compliance-officer |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 31 row cross-reference column: add `; INCIDENT_RESPONSE R-69 (§R-69; v1.0, 2026-07-03 — companion stale recovery runbook for job 31)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.15.4).** |
+| 5 | Authoring complete — §R-69 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.35.0).** |
+
+**Privacy floor (invariant throughout R-69):** No individual `user_id`, employee name, email, HRV reading, wearable source data, coaching content, body composition metric, or GDPR Art. 9 special-category data appears in any R-69 scope query result, communication template payload, DEC-030 event payload, or WEAR-FRESH-STALE-E-001 evidence artefact. R-69-C1 surfaces only pg_cron run metadata (timestamps, status strings, return messages). R-69-C2 surfaces only pg_cron job metadata and aggregate timestamps. R-69-C3 surfaces only aggregate fleet counts (`fresh_count`, `total_connected`, `fresh_pct`, `slo_met`) — no `user_id`, no per-source breakdown below k=5. `stale_hours_total` and `missed_run_count` are scalar integer counts only. `tenant_manager` (HR) and `enterprise_admin` excluded from dashboard visibility — wearable fleet freshness is an aggregate operational metric, not an individual employee wellness report.
+
+---
+
+*v1.0 (2026-07-03): R-69 Wearable Sync Freshness Check Stale (`wearable_sync_freshness_check` · job 31) — sixty-ninth runbook. Closes the companion stale recovery documentation gap for the last pg_cron job in the §12.6 canonical registry without a dedicated INCIDENT_RESPONSE runbook. Job 31 `wearable_sync_freshness_check` (`5 7 * * *`; 26h freshness window; daily 07:05 UTC) was registered in OBSERVABILITY.md §12.6 (v0.4 patch, 2026-06-19) as part of the ten-job registration batch covering jobs 28–37; no stale recovery runbook was authored at that time. §41 canonical observability spec (OBSERVABILITY.md v3.7.0, 2026-06-14) defines WS-SLO-06 (≥ 95% fleet freshness) and §41.5 DDL spec. Critical characteristic: P1 default (unlike R-68 P0 default for HMAC chain integrity) — stale `wearable_sync_freshness_check` creates a monitoring measurement gap, not a chain break or data loss; the affected daily run is a single compliance data point in the quarterly WS-E-002 artefact (OBSERVABILITY.md §41.9). Key distinction: this is the only wearable-namespace stale runbook; it complements AL-WS-06 (the freshness SLO breach alert, which requires the job to run and detect < 95% — if the job is stale, AL-WS-06 cannot fire even if the fleet is unhealthy). R-69-C3 manual compensating measurement closes this blind spot during the stale window. Two DEC-030 HMAC-chained events: `system.wearable_freshness_check_stale_declared` HIGH/7yr (WEAR-FRESH-STALE-CHAIN-01 anchor; IC PAM-elevated at T+0; CC7.2); `system.wearable_freshness_check_restored` LOW/3yr (terminal; IC PAM-elevated post-recovery; `manual_fresh_pct` and `slo_met_during_stale` capture R-69-C3 compensating measurement result). Three scope queries: R-69-C1 (pg_cron run history — stale_hours, root cause); R-69-C2 (peer job health — H3 discriminator); R-69-C3 (manual fleet freshness snapshot — compensating WS-SLO-06 measurement). Four root causes: H1 (deleted — `cron.job` no row); H2 (disabled — `active = false`); H3 (Supabase pg_cron degradation → R-03 co-active); H4 (`emit_dec030_event` / pg_net degraded). Three Slack communication templates (T-69-A detection; T-69-B resolution; T-69-C enterprise SLA escalation — fires only if P0 escalated). One evidence artefact: WEAR-FRESH-STALE-E-001 (per-activation; CC7.2; 7yr; `compliance/evidence/wearable/`). Five implementation checklist items: AUDIT_LOG_SCHEMA.md event registration (P0/pending), WEAR-FRESH-STALE-CHAIN-01 Worker enforcement (P1/pending), SOC2_READINESS.md §79.4 artefact registration (P1/pending), §12.6 OBSERVABILITY cross-ref update (P0 — [x] Done this pass), authoring complete ([x] Done this pass). Privacy floor: no individual employee `user_id`, HRV value, wearable reading, or GDPR Art. 9 special-category data in any R-69 artefact; all scope queries return aggregate scalars or pg_cron metadata only; `tenant_manager` (HR) excluded from any wearable fleet dashboard visibility. Cross-references: `docs/OBSERVABILITY.md §41`; `docs/OBSERVABILITY.md §12.6`; `docs/ENTERPRISE_SLA.md §3.4`; R-03; R-05. Owner: devops-lead + compliance-officer + platform-engineer.*

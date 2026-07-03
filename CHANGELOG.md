@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.5.0] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-69` — Companion stale recovery runbook for `wearable_sync_freshness_check` (pg_cron job 31). Closes the last documentation gap in the §12.6 canonical job registry: all 58 numbered pg_cron jobs now have companion stale recovery runbooks. Covers P1 default severity; §R-69.1 trigger matrix; §R-69.3 immediate action timeline; §R-69.4 scope queries (R-69-C1 pg_cron run history, R-69-C2 peer job health, R-69-C3 manual fleet freshness compensating measurement); §R-69.5 root-cause hypotheses H1–H4 (deleted / disabled / Supabase pg_cron degradation / emit function degraded); §R-69.8 DEC-030 HMAC chain (`system.wearable_freshness_check_stale_declared` HIGH/7yr + `system.wearable_freshness_check_restored` LOW/3yr; WEAR-FRESH-STALE-CHAIN-01 ordering invariant); §R-69.9 WEAR-FRESH-STALE-E-001 evidence artefact (CC7.2; 7yr WORM; `compliance/evidence/wearable/`); §R-69.12 implementation checklist. Privacy floor: no individual `user_id`, HRV reading, or GDPR Art. 9 data in any artefact; R-69-C3 returns aggregate scalars only (`fresh_count`, `total_connected`, `fresh_pct`, `slo_met`); `tenant_manager` (HR) excluded from wearable fleet dashboard.
+
+### Changed
+- `docs/OBSERVABILITY.md §12.6` — Job 31 `wearable_sync_freshness_check` cross-reference column extended: added `INCIDENT_RESPONSE R-69 (§R-69; v1.0, 2026-07-03)`. Version: v5.15.3 → v5.15.4.
+- `docs/INCIDENT_RESPONSE.md` — Version header: v3.34.0 → v3.35.0.
+- `VERSION` — 12.4.0 → 12.5.0.
+
+---
+
 ## [12.4.0] — 2026-07-03
 
 ### Added
