@@ -23606,3 +23606,262 @@ Evidence: PAM-BG-STALE-E-001 will include this count
 ---
 
 *v3.30.0 (2026-07-03): R-64 — PAM Break-Glass Review Alert Stale (`pam_bg_review_alert`, job 21) — CC6.6 PAM break-glass post-hoc review SLA enforcement blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 21 was the highest-priority remaining daily pg_cron job without a companion stale recovery runbook — CC6.6 PAM break-glass review SLA enforcement is security-critical for SOC 2 and a direct compliance gap when the job is stale. §R-64.1 trigger matrix: AL-PAM-BG-STALE-01 `system.cron_job_stale` for job 21 → P1 PagerDuty `form-devops` → devops-lead + compliance-officer (mandatory co-page); dedup `pam-bg-review-check-stale`; 26h freshness window. §R-64.2 severity: P1 default; P1-escalate with security-engineer co-page if R-64-C2 returns rows (overdue break-glass reviews confirmed during stale window); co-active R-03 on all-jobs-stale discriminator. §R-64.3 six-step immediate action timeline (T+0 to T+30): emit stale_declared at T+0; R-64-C2 P1-escalate gate at T+5; R-64-C1 root cause at T+15; R-64-C3 peer health at T+20; recovery at T+25; confirm + emit restored + file evidence at T+30. §R-64.4 three scope queries: R-64-C1 (pg_cron run history for job 21); R-64-C2 (manual AL-PAM-BG-01 — overdue `pam_break_glass_reviews` with missed 72-hour review SLA; `pam_session_id` UUIDs and `review_due_at` timestamps only — no employee PII, no break-glass action details); R-64-C3 Part A (peer jobs: pam_postgres_sync/rate_limit_violations_cleanup/siem_bridge_cr02_impossible_travel/siem_bridge_cr03_priv_escalation) + Part B (catalog check). §R-64.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (function broken — DDL change to `pam_break_glass_reviews`). §R-64.6 seven-step recovery: (1) emit stale_declared; (2) R-64-C2 P1-escalate gate — if rows, page security-engineer + compliance-officer manual reviews; (3) restore job by H1–H4; (4) confirm via `cron.run_job(21)`; (5) compliance-officer sign-off if R-64-C2 returned rows; (6) emit restored; (7) file PAM-BG-STALE-E-001. §R-64.7 two Slack templates (T-64-A for #alerts-devops; T-64-B P1-escalate notification for overdue review breach). §R-64.8 DEC-030 chain: `system.pam_bg_review_stale_declared` HIGH/7yr + `system.pam_bg_review_restored` LOW/3yr; PAM-BG-STALE-CHAIN-01 ordering invariant (HTTP 422 `PAM_BG_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, employee name, break-glass action targets, coaching content, body composition, or GDPR Art. 9 data in any payload; `overdue_review_count_at_declared` is scalar integer count only. §R-64.9 PAM-BG-STALE-E-001 per-activation evidence artefact (CC6.6; per-activation; 7yr WORM; `compliance/evidence/pam/pam-bg-stale-e-001-<YYYY-MM-DD>/`; compliance-officer sign-off required if R-64-C2 returned rows; Vanta mirror within 48h). §R-64.10 five post-incident controls: post-mortem if stale > 48h or overdue reviews confirmed; PAM-BG-STALE-CHAIN-01 Worker enforcement; H4 CI schema-compat guard; H1/H2 CI lint guard; quarterly runbook gap sweep. §R-64.11 six cross-references: OBSERVABILITY §12.6 (job 21, v5.14.9); OBSERVABILITY §29.5 (AL-PAM-BG-01); DATA_MODEL §29.10 item 8; INCIDENT_RESPONSE R-03 + R-05; SOC2_READINESS §152 + §79.4 (v3.78.0). §R-64.12 five-item implementation checklist: items 3, 4, 5 [x] Done this pass (SOC2_READINESS.md v3.78.0 §152 PAM-BG-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.14.9 §12.6 job 21 cross-ref; authoring complete); items 1, 2 pending (compliance-officer + platform-engineer — AUDIT_LOG_SCHEMA event registration + PAM-BG-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker). Document header v3.29.0 → v3.30.0. Owner: devops-lead + compliance-officer.*
+
+---
+
+## R-65 · SIEM Bridge CR-02 Impossible Travel Monitor Stale (`siem_bridge_cr02_impossible_travel`, job 22)
+
+> **Severity:** P2 (default) → P2-escalate if R-65-C2 returns rows  
+> **Owner:** platform-engineer (primary IC); security-engineer (mandatory co-page on escalation)  
+> **SOC 2 criteria:** CC7.2 (Anomalous Activity Monitoring — impossible travel correlation rule)  
+> **pg_cron job:** `siem_bridge_cr02_impossible_travel` — every 5 min (`*/5 * * * *`) — job 22  
+> **Freshness window:** 6 min — alert: `system.cron_job_stale` WHERE `job_name = 'siem_bridge_cr02_impossible_travel'`
+
+---
+
+### §R-65.1 Trigger Matrix
+
+| Trigger | Condition | Routing | Dedup key |
+|---|---|---|---|
+| **AL-SIEM-BRIDGE-01** `system.cron_job_stale` | `job_name = 'siem_bridge_cr02_impossible_travel'` AND `freshness_window_exceeded = true` (6 min) | PagerDuty P2 `form-devops` → platform-engineer | `siem-cr02-check-stale` |
+
+**Co-activation triggers (not exclusive):**
+- R-03 (Supabase infrastructure failure) — if R-65-C3 discriminator shows all pg_cron jobs stale simultaneously
+- R-05 (HMAC audit chain break) — if SIEM-CR02-STALE-CHAIN-01 ordering violation detected (see §R-65.8)
+
+**Security significance:** When `siem_bridge_cr02_impossible_travel` is stale, FORM loses its only automated near-real-time detector for CR-02 (intercontinental impossible travel — login from two different continents within a 2-hour window). A compromised account could perform intercontinental access during the stale window with no DEC-030 `siem.correlation_rule_matched` event emitted and no PagerDuty alert fired. The stale window duration equals the detection lag; at 6 min freshness, even a single missed run creates a security monitoring blind spot. R-65-C2 provides immediate compensating coverage.
+
+---
+
+### §R-65.2 Severity and Escalation
+
+| Condition | Severity | Additional action |
+|---|---|---|
+| `siem_bridge_cr02_impossible_travel` stale; R-65-C2 returns zero rows | **P2** | platform-engineer restores job per H1–H4 |
+| `siem_bridge_cr02_impossible_travel` stale; R-65-C2 returns ≥ 1 row (undetected impossible travel during stale window) | **P2-escalate** | Page security-engineer immediately; treat returned rows as active security incidents; initiate account investigation per each affected `actor_user_sha256` |
+| All pg_cron jobs stale (R-65-C3 discriminator) | **P2 + R-03 co-activate** | R-03 is the primary runbook; R-65 remains co-active for SIEM-specific recovery |
+
+---
+
+### §R-65.3 Immediate Action Timeline
+
+| Time | Action | Owner |
+|---|---|---|
+| **T+0** | Page fires. platform-engineer acknowledges. Emit `system.siem_cr02_stale_declared` DEC-030 HIGH event under PAM elevation (see §R-65.8). | platform-engineer |
+| **T+5** | Run R-65-C2 (manual CR-02 check — detect any impossible travel missed during stale window). If rows returned: escalate to P2-escalate; page security-engineer immediately. | platform-engineer |
+| **T+10** | Run R-65-C1 (pg_cron run history for job 22). Identify last successful run, missed runs, approximate stale duration. | platform-engineer |
+| **T+15** | Run R-65-C3 (peer job health + catalog check). If all jobs stale: activate R-03. If job 22 absent from `cron.job` catalog: H1 (deleted). | platform-engineer |
+| **T+20** | Apply recovery per H1–H4 (see §R-65.5 and §R-65.6). | platform-engineer |
+| **T+25** | Confirm job restored via `SELECT cron.run_job(22)` and R-65-C1 recheck. Emit `system.siem_cr02_restored` DEC-030 LOW event (see §R-65.8). File SIEM-CR02-STALE-E-001 evidence artefact (see §R-65.9). | platform-engineer + security-engineer (if escalated) |
+
+---
+
+### §R-65.4 Scope Queries
+
+**R-65-C1 — pg_cron run history for job 22:**
+```sql
+SELECT status, run_at
+FROM cron.job_run_details
+WHERE jobname = 'siem_bridge_cr02_impossible_travel'
+ORDER BY run_at DESC
+LIMIT 20;
+```
+*Purpose:* Identify last successful run, stale duration (now − last_succeeded), and whether job is failing (`failed` status rows) or simply not running (H1/H2/H3). Output: timestamps and status codes only — no user data.
+
+**R-65-C2 — Manual CR-02 impossible travel check during stale window:**
+```sql
+-- Replace <stale_since> with confirmed_stale_since timestamp from R-65-C1.
+-- This reproduces fn_siem_bridge_cr02() detection logic across the stale window.
+-- Run as form_system role (security_reviewer GRANT on fn_siem_continent).
+WITH login_events AS (
+  SELECT
+    actor_user_id,
+    event_ts,
+    metadata->>'ip_country_code'  AS country_code,
+    tenant_id,
+    id
+  FROM audit_log_events
+  WHERE
+    event_type IN ('sso.login_succeeded', 'auth.token_created')
+    AND event_ts > '<stale_since>'::timestamptz
+    AND event_ts < now()
+    AND metadata->>'ip_country_code' IS NOT NULL
+    AND actor_user_id IS NOT NULL
+)
+SELECT
+  encode(sha256(a1.actor_user_id::text::bytea), 'hex') AS actor_user_sha256,
+  fn_siem_continent(a1.country_code)                   AS continent_from,
+  fn_siem_continent(a2.country_code)                   AS continent_to,
+  a1.event_ts                                          AS ts_first,
+  a2.event_ts                                          AS ts_second,
+  EXTRACT(EPOCH FROM (a2.event_ts - a1.event_ts))::int AS gap_seconds,
+  COALESCE(a1.tenant_id::text, 'none')                 AS tenant_id_ref
+FROM login_events a1
+JOIN login_events a2
+  ON  a2.actor_user_id = a1.actor_user_id
+  AND a2.event_ts      > a1.event_ts
+  AND a2.event_ts      < a1.event_ts + INTERVAL '2 hours'
+WHERE
+  fn_siem_continent(a1.country_code) != fn_siem_continent(a2.country_code)
+  AND fn_siem_continent(a1.country_code) != 'UNKNOWN'
+  AND fn_siem_continent(a2.country_code) != 'UNKNOWN'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events dedup
+    WHERE dedup.event_type  = 'siem.correlation_rule_matched'
+      AND dedup.metadata->>'rule_id'           = 'CR-02'
+      AND dedup.metadata->>'trigger_event_id'  = a2.id::text
+  )
+ORDER BY a2.event_ts DESC;
+```
+*Purpose:* Enumerate any CR-02 impossible travel pairs that occurred during the stale window and were NOT already detected (no matching `siem.correlation_rule_matched` CR-02 DEC-030 event). Row count is the `manual_cr02_match_count` field value for both DEC-030 events (§R-65.8).  
+*Gate:* If any rows returned → P2-escalate; page security-engineer; initiate account investigation for each distinct `actor_user_sha256` returned. Security-engineer determines whether a security incident should be opened under R-01 or R-07.  
+*Privacy invariant:* `actor_user_id` is SHA-256 hashed before output. No plain UUID in R-65-C2 results. Country codes (2-char ISO) only — no full IP. `tenant_id_ref` is the raw UUID string (FORM-internal) for tenant scope context — not employee PII.
+
+**R-65-C3 — Peer job health and catalog check:**
+```sql
+-- Part A: Peer job health (jobs adjacent in §12.6 registry)
+SELECT jobname, last_run_at
+FROM pg_cron_health_monitor_view
+WHERE jobname IN (
+  'siem_bridge_cr03_priv_escalation',
+  'pam_bg_review_alert',
+  'rate_limit_violations_cleanup',
+  'api_quota_usage_archive'
+)
+ORDER BY jobname;
+
+-- Part B: Catalog check — confirm job 22 exists in cron.job
+SELECT jobid, schedule, active
+FROM cron.job
+WHERE jobname = 'siem_bridge_cr02_impossible_travel';
+```
+*Purpose:* Discriminate H3 (Supabase infra — all jobs stale) from H1/H2/H4 (job-specific or function-specific). If all peers show stale: activate R-03. If job 22 absent from Part B: H1 (deleted). If present but `active = false`: H2 (disabled). If present and active but showing `failed` status in R-65-C1: H4 (function broken, GUC missing, or dependency change).
+
+---
+
+### §R-65.5 Root-Cause Hypotheses
+
+| Hypothesis | Condition | Recovery |
+|---|---|---|
+| **H1 — Job deleted** | `siem_bridge_cr02_impossible_travel` absent from `cron.job` catalog (R-65-C3 Part B returns no rows) | Re-create via `SELECT cron.schedule('siem_bridge_cr02_impossible_travel', '*/5 * * * *', $$ SELECT fn_siem_bridge_cr02() $$)` |
+| **H2 — Job disabled** | `cron.job` row exists but `active = false` | `UPDATE cron.job SET active = true WHERE jobname = 'siem_bridge_cr02_impossible_travel'` |
+| **H3 — Supabase infrastructure failure** | All pg_cron jobs stale (R-65-C3 Part A shows multiple peers stale) | R-03 is primary; after Supabase recovery, confirm `siem_bridge_cr02_impossible_travel` resumes on next scheduled run and R-65-C2 returns zero rows |
+| **H4 — Function broken or dependency unavailable** | R-65-C1 shows job running with `failed` status; error text in `cron.job_run_details.return_message` | Sub-causes: (a) `app.emit_audit_event_worker_url` GUC unset — RAISE EXCEPTION in fn_siem_bridge_cr02; fix: `ALTER DATABASE form SET app.emit_audit_event_worker_url = 'https://...'`; (b) `fn_siem_bridge_cr02` function dropped or replaced — redeploy migration `0059_siem_bridge.sql`; (c) `siem_country_continent` table dropped or renamed — restore from migration; (d) `audit_log_events` schema change broke query — audit recent migrations, fix column names; (e) pg_net extension disabled — `CREATE EXTENSION IF NOT EXISTS pg_net` (devops-lead PAM-elevated) |
+
+---
+
+### §R-65.6 Recovery Procedure
+
+1. **Emit `system.siem_cr02_stale_declared`** DEC-030 HIGH event under PAM elevation (§R-65.8). This is T+0 — do not defer. SIEM-CR02-STALE-CHAIN-01 ordering is enforced; failure to emit before restoration will trigger HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION` on `system.siem_cr02_restored`.
+2. **Run R-65-C2 P2-escalate gate** (T+5). If rows returned, page security-engineer immediately; treat as active security incidents; record row count as `manual_cr02_match_count` for DEC-030 stale_declared payload update.
+3. **Restore job** per H1–H4 root cause determined at T+10–T+15.
+4. **Confirm restoration** via `SELECT cron.run_job(22)` — should return without error. Re-run R-65-C1 to confirm a new `succeeded` row appears in `cron.job_run_details`.
+5. **Security-engineer confirmation** (if R-65-C2 returned rows): verify each `actor_user_sha256` from R-65-C2 has been assessed; confirm no active compromise; security-engineer sign-off before closing incident.
+6. **Emit `system.siem_cr02_restored`** DEC-030 LOW event (§R-65.8). SIEM-CR02-STALE-CHAIN-01 ordering enforced — must follow `system.siem_cr02_stale_declared` for same `incident_id`.
+7. **File SIEM-CR02-STALE-E-001** evidence artefact (§R-65.9). Upload to R2 `compliance/evidence/siem-bridge-stale/siem-cr02-stale-e-001-<YYYY-MM-DD>/`. Mirror to Vanta within 48 h.
+
+---
+
+### §R-65.7 Communication Templates
+
+**T-65-A · Initial #alerts-devops notification (T+0):**
+```
+🔴 R-65 ACTIVATED — siem_bridge_cr02_impossible_travel (job 22) STALE
+Stale since: <confirmed_stale_since>
+Freshness window: 6 min (3-run tolerance; cadence */5 * * * *)
+Owner: platform-engineer (primary IC)
+DEC-030 stale_declared emitted: <yes/pending>
+R-65-C2 gate: PENDING — run immediately to check for missed CR-02 impossible travel events
+Next step: R-65-C2, then R-65-C1 root cause
+```
+
+**T-65-B · P2-escalate notification (if R-65-C2 returns rows):**
+```
+⚠️ R-65 ESCALATED — UNDETECTED CR-02 IMPOSSIBLE TRAVEL EVENTS DURING STALE WINDOW
+Missed CR-02 detections: <manual_cr02_match_count> row(s)
+security-engineer: co-paged — CC7.2 impossible travel detection gap confirmed
+Each returned row represents an intercontinental login pair during the stale window
+Action: security-engineer to assess each actor_user_sha256 for active compromise
+Evidence: SIEM-CR02-STALE-E-001 will include R-65-C2 results
+```
+
+---
+
+### §R-65.8 DEC-030 Event Chain
+
+**SIEM-CR02-STALE-CHAIN-01 ordering invariant:** `system.siem_cr02_restored` MUST be preceded by `system.siem_cr02_stale_declared` with the same `incident_id`. The `emit-audit-event` Worker enforces this with HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION` on ordering inversion. An HTTP 422 co-activates R-05 (HMAC audit chain break).
+
+| Event | DEC-030 class | Retention | TSC | Payload fields |
+|---|---|---|---|---|
+| `system.siem_cr02_stale_declared` | HIGH | 7 yr | CC7.2 | `incident_id` (UUID), `confirmed_stale_since` (ISO-8601), `stale_minutes` (INT), `missed_runs_estimate` (INT — stale_minutes ÷ 5, rounded), `manual_cr02_match_count` (INT — R-65-C2 row count; −1 if gate not yet run at emit time), `initial_severity` (enum: `p2` \| `p2_escalate`) |
+| `system.siem_cr02_restored` | LOW | 3 yr | CC7.2 | `incident_id` (UUID), `restored_at` (ISO-8601), `root_cause` (enum: `h1_deleted` \| `h2_disabled` \| `h3_infra` \| `h4_function_broken`), `stale_minutes_total` (INT), `manual_cr02_match_count` (INT — final count from R-65-C2; 0 if no missed detections), `security_engineer_sign_off` (BOOL — true if R-65-C2 returned ≥ 1 row and security-engineer confirmed no active compromise) |
+
+**Privacy floor:** Neither DEC-030 payload contains `user_id`, `actor_user_sha256`, plain IP address, country code, coaching content, body composition data, or GDPR Art. 9 special-category data. `manual_cr02_match_count` is a scalar integer count — no `actor_user_sha256` values, country codes, or tenant identifiers appear in the chain event payload. `actor_user_sha256` values appear only in R-65-C2 scope query output and SIEM-CR02-STALE-E-001 evidence artefact (SHA-256 pseudonyms — not recoverable to PII by `form_api` or `form_system`; recovery requires IC PAM elevation to the `security_reviewer` role and cross-reference with `pam.elevation_approved` for a named `security_reviewer` session).
+
+---
+
+### §R-65.9 Evidence Artefact: SIEM-CR02-STALE-E-001
+
+| Field | Value |
+|---|---|
+| Evidence ID | **SIEM-CR02-STALE-E-001** |
+| TSC criteria | CC7.2 |
+| Retention | **7 yr WORM** — Cloudflare R2 `form-soc2-evidence` |
+| R2 path | `compliance/evidence/siem-bridge-stale/siem-cr02-stale-e-001-<YYYY-MM-DD>/` |
+| Vanta upload | Within 48 h of incident closure (SOC2_READINESS §80.4) |
+| Security-engineer sign-off | **Required** if R-65-C2 returned ≥ 1 row (undetected CR-02 events existed during stale window) |
+
+**Artefact contents:**
+- `stale_declared` DEC-030 event export (JSON)
+- `restored` DEC-030 event export (JSON)
+- R-65-C1 pg_cron run history (CSV — timestamps and status only)
+- R-65-C2 missed CR-02 check result (row count only if zero; `actor_user_sha256`, continent pair, gap_seconds, tenant_id_ref if non-zero — SHA-256 pseudonyms only, no plain user UUID or PII)
+- R-65-C3 peer job health (CSV — job names, timestamps, status)
+- Incident timeline (Slack thread export — #alerts-devops)
+- Root-cause classification (H1–H4) and recovery action taken
+- Security-engineer sign-off attestation (if R-65-C2 returned rows; required before Vanta upload)
+
+**Auditor narrative (CC7.2):** FORM maintains a pg_cron bridge (`siem_bridge_cr02_impossible_travel`, job 22, every 5 min) that implements SOC 2 CC7.2 anomalous activity monitoring for CR-02 (intercontinental impossible travel — login from two different continents within a 2-hour window). When the bridge goes stale, FORM initiates R-65 within the 6 min freshness window, runs R-65-C2 immediately to reproduce the CR-02 detection logic across the stale window, escalates to security-engineer with P2-escalate if any missed events are found, restores the job, and files per-activation WORM evidence on Cloudflare R2 with Vanta mirror within 48 h. This satisfies CC7.2 (Anomalous Activity Monitoring — the CR-02 impossible travel detection mechanism is continuously monitored for its own operational health, and compensating manual detection runs cover any stale window) requirements.
+
+---
+
+### §R-65.10 Post-Incident Controls
+
+| # | Control | Trigger |
+|---|---|---|
+| 1 | Post-mortem required if stale > 30 min or R-65-C2 returned ≥ 1 row (undetected CR-02 events confirmed). Filing deadline: 5 business days. | Stale duration > 30 min OR `manual_cr02_match_count > 0` |
+| 2 | Implement SIEM-CR02-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts` (HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit). Owner: platform-engineer. | First occurrence of R-65 |
+| 3 | If H4(a) (GUC unset): add deployment checklist item confirming `app.emit_audit_event_worker_url` GUC is set before any `0059_siem_bridge.sql` migration; add CI smoke-test that calls `fn_siem_bridge_cr02()` against staging and confirms no RAISE EXCEPTION. Owner: devops-lead. | H4(a) confirmed |
+| 4 | If H1 or H2: add CI lint guard that prevents accidental deletion or disabling of job 22, consistent with the R-62 §R-62.10 item 4 and R-64 §R-64.10 item 4 pattern. Owner: devops-lead. | H1 or H2 confirmed |
+| 5 | Quarterly: cross-reference OBSERVABILITY §12.6 pg_cron canonical registry against all companion runbooks R-03 through R-65+. Any job with a PagerDuty P0/P1/P2 alert and no companion stale runbook must be assigned in the same sprint. Owner: devops-lead + compliance-officer. | Quarterly (next: 2026-10-01) |
+
+---
+
+### §R-65.11 Cross-References
+
+- **OBSERVABILITY §12.6** — pg_cron canonical registry job 22 row · v5.15.0 (companion runbook column updated this pass)
+- **OBSERVABILITY §34.4.2** — `fn_siem_bridge_cr02()` function implementation (CR-02 impossible travel detection logic; `siem_country_continent` reference table; `actor_user_sha256` privacy pseudonym)
+- **OBSERVABILITY §34.5** — AL-SIEM-BRIDGE-01 staleness alert definition (P2 `form-devops`)
+- **AUDIT_LOG_SCHEMA.md §SIEM Bridge CR-02 Stale events** — `system.siem_cr02_stale_declared` (HIGH/7yr) + `system.siem_cr02_restored` (LOW/3yr) with Zod v2 schemas and SIEM-CR02-STALE-CHAIN-01 invariant
+- **INCIDENT_RESPONSE R-03** — Supabase infrastructure failure (co-active on all-jobs-stale discriminator)
+- **INCIDENT_RESPONSE R-05** — HMAC audit chain break (co-active on SIEM-CR02-STALE-CHAIN-01 violation)
+- **SOC2_READINESS §153 + §79.4** — SIEM-CR02-STALE-E-001 evidence registration · v3.79.0
+
+---
+
+### §R-65.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.siem_cr02_stale_declared` (HIGH/7yr) and `system.siem_cr02_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, SIEM-CR02-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative | compliance-officer + platform-engineer | **P0** | [x] **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.79).** |
+| 2 | Implement SIEM-CR02-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts`: HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION` on `system.siem_cr02_restored` emitted without matching `system.siem_cr02_stale_declared` for same `incident_id` | platform-engineer | **P0** | [ ] |
+| 3 | Register SIEM-CR02-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2; per-activation; 7yr; `compliance/evidence/siem-bridge-stale/siem-cr02-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.79.0, §153).** |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 22 row cross-reference column: add `; INCIDENT_RESPONSE R-65 (§R-65; v1.0, 2026-07-03 — companion stale recovery runbook for job 22)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.15.0).** |
+| 5 | Authoring complete — §R-65 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.31.0).** |
+
+**Privacy floor (invariant throughout R-65):** No `user_id`, plain `actor_user_id` UUID, full IP address, coaching content, body composition metric, or GDPR Art. 9 special-category data appears in any R-65 scope query result, communication template payload, DEC-030 event payload, or SIEM-CR02-STALE-E-001 evidence artefact. R-65-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-65-C2 surfaces only `actor_user_sha256` (SHA-256 pseudonym — not the raw UUID), continent codes, gap_seconds, and `tenant_id_ref` (FORM-internal UUID) — no employee name, email, coaching session content, body composition values, or GDPR Art. 9 data. R-65-C3 surfaces only pg_cron job metadata and run timestamps. `siem_country_continent` table is a static geography reference with no PII.
+
+---
+
+*v3.31.0 (2026-07-03): R-65 — SIEM Bridge CR-02 Impossible Travel Monitor Stale (`siem_bridge_cr02_impossible_travel`, job 22) — CC7.2 impossible travel detection blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 22 was the highest-priority remaining pg_cron monitoring job without a companion stale recovery runbook — CC7.2 near-real-time impossible travel detection (5-min cadence, 6-min freshness) is a security-critical SOC 2 control and any stale window creates an immediate anomalous-activity detection blind spot. §R-65.1 trigger matrix: AL-SIEM-BRIDGE-01 `system.cron_job_stale` for job 22 → P2 PagerDuty `form-devops` → platform-engineer; dedup `siem-cr02-check-stale`; 6-min freshness window (3-run tolerance at */5 * * * * cadence). §R-65.2 severity: P2 default; P2-escalate with security-engineer co-page if R-65-C2 returns rows (undetected CR-02 intercontinental travel pairs during stale window); co-active R-03 on all-jobs-stale discriminator. §R-65.3 six-step immediate action timeline (T+0 to T+25): emit stale_declared at T+0; R-65-C2 P2-escalate gate at T+5; R-65-C1 root cause at T+10; R-65-C3 peer health at T+15; recovery at T+20; confirm + emit restored + file evidence at T+25. §R-65.4 three scope queries: R-65-C1 (pg_cron run history for job 22 — 20 rows); R-65-C2 (manual CR-02 detection SQL reproducing fn_siem_bridge_cr02() logic across stale window — self-JOIN on login_events for intercontinental pairs with NOT EXISTS dedup against existing `siem.correlation_rule_matched` CR-02 events; actor_user_sha256 pseudonym output only; privacy invariant: no plain UUID, no IP); R-65-C3 Part A (peer jobs: siem_bridge_cr03_priv_escalation/pam_bg_review_alert/rate_limit_violations_cleanup/api_quota_usage_archive) + Part B (catalog check). §R-65.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (function broken — five sub-causes: GUC unset RAISE EXCEPTION, fn_siem_bridge_cr02 dropped, siem_country_continent table gone, audit_log_events schema change, pg_net extension disabled). §R-65.6 seven-step recovery: (1) emit stale_declared; (2) R-65-C2 P2-escalate gate — if rows, page security-engineer; (3) restore job by H1–H4; (4) confirm via cron.run_job(22); (5) security-engineer sign-off if R-65-C2 returned rows; (6) emit restored; (7) file SIEM-CR02-STALE-E-001. §R-65.7 two Slack templates (T-65-A for #alerts-devops; T-65-B P2-escalate notification for undetected CR-02 breach). §R-65.8 DEC-030 chain: `system.siem_cr02_stale_declared` HIGH/7yr + `system.siem_cr02_restored` LOW/3yr; SIEM-CR02-STALE-CHAIN-01 ordering invariant (HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, actor_user_sha256, country code, IP, coaching content, or GDPR Art. 9 data in any payload; `manual_cr02_match_count` is scalar integer count only. §R-65.9 SIEM-CR02-STALE-E-001 per-activation evidence artefact (CC7.2; per-activation; 7yr WORM; `compliance/evidence/siem-bridge-stale/siem-cr02-stale-e-001-<YYYY-MM-DD>/`; security-engineer sign-off required if R-65-C2 returned rows; Vanta mirror within 48h). §R-65.10 five post-incident controls: post-mortem if stale > 30 min or missed CR-02 events confirmed; SIEM-CR02-STALE-CHAIN-01 Worker enforcement; H4(a) GUC CI guard; H1/H2 CI lint guard; quarterly runbook gap sweep. §R-65.11 six cross-references: OBSERVABILITY §12.6 (job 22, v5.15.0); OBSERVABILITY §34.4.2 (fn_siem_bridge_cr02 function implementation); OBSERVABILITY §34.5 (AL-SIEM-BRIDGE-01); AUDIT_LOG_SCHEMA §SIEM Bridge CR-02 Stale events (v2.79); INCIDENT_RESPONSE R-03 + R-05; SOC2_READINESS §153 + §79.4 (v3.79.0). §R-65.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.79 event registration; SOC2_READINESS.md v3.79.0 §153 SIEM-CR02-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.15.0 §12.6 job 22 cross-ref; authoring complete); item 2 pending (platform-engineer — SIEM-CR02-STALE-CHAIN-01 enforcement in emit-audit-event Worker). Document header v3.30.0 → v3.31.0. Owner: platform-engineer + compliance-officer + security-engineer.*

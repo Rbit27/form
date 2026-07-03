@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.92.1] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-65 `siem_bridge_cr02_impossible_travel` (job 22, CC7.2) companion stale recovery runbook. Covers trigger matrix (6-min freshness, 5-min cron cadence), P2/P2-escalate severity, 5-step action timeline, 3 scope queries (C1 pg_cron history / C2 manual CR-02 impossible-travel detection via `audit_log_events` self-JOIN / C3 restoration check), 4 root causes H1–H4 (H4 with 5 sub-causes for `fn_siem_bridge_cr02()` breakage), 7-step recovery, 2 Slack templates, DEC-030 event chain with SIEM-CR02-STALE-CHAIN-01 ordering invariant (HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION`), SIEM-CR02-STALE-E-001 evidence spec, 5 post-incident controls, implementation checklist. Part of the four-file coordinated pg_cron companion stale runbook pattern. INCIDENT_RESPONSE.md v3.30.0 → v3.31.0.
+- `docs/AUDIT_LOG_SCHEMA.md` — New §SIEM Bridge CR-02 Impossible Travel Monitor Stale events section with Zod v2 schemas for `system.siem_cr02_stale_declared` (HIGH/7yr; fields: `incident_id`, `confirmed_stale_since`, `stale_minutes`, `missed_runs_estimate`, `manual_cr02_match_count`, `initial_severity`) and `system.siem_cr02_restored` (LOW/3yr; fields: `incident_id`, `restored_at`, `root_cause`, `stale_minutes_total`, `manual_cr02_match_count`, `security_engineer_sign_off`). SIEM-CR02-STALE-CHAIN-01 ordering invariant documented. CC7.2 auditor narrative. v2.78 → v2.79.
+- `docs/SOC2_READINESS.md` — §153 SIEM-CR02-STALE-E-001 Registration (CC7.2 · INCIDENT_RESPONSE R-65). New evidence artefact SIEM-CR02-STALE-E-001 registered in §79.4 master evidence table (count 119 → 120; per-activation; 7yr WORM; `compliance/evidence/siem-bridge-stale/siem-cr02-stale-e-001-<YYYY-MM-DD>/`). New `siem-bridge-stale/` subfolder added to §80.3 R2 storage. SIEM-CR02-STALE-E-001 added to §80.4 Vanta mirror protocol. v3.78.0 → v3.79.0.
+
+### Changed
+- `docs/OBSERVABILITY.md` — §12.6 job 22 (`siem_bridge_cr02_impossible_travel`) cross-reference column updated with `; INCIDENT_RESPONSE R-65 (§R-65; v1.0, 2026-07-03 — companion stale recovery runbook for job 22)`. Closes R-65.12 item 4 (P0). v5.14.9 → v5.15.0.
+- `VERSION` — 11.92.0 → 11.92.1.
+
+---
+
 ## [11.92.0] — 2026-07-03
 
 ### Added

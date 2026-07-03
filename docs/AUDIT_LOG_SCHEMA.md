@@ -5696,6 +5696,75 @@ A1.2 requires FORM to maintain system monitoring availability. The `victor_safet
 
 ---
 
+### SIEM Bridge CR-02 Impossible Travel Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-65 · CC7.2)
+
+> Defined in `docs/INCIDENT_RESPONSE.md` R-65 (v3.31.0, 2026-07-03). Two DEC-030 HMAC-chained events for job 22 (`siem_bridge_cr02_impossible_travel`, every 5 min `*/5 * * * *`, 6-min freshness) staleness. SIEM-CR02-STALE-CHAIN-01 ordering invariant: `system.siem_cr02_restored` blocked (HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION`) without prior `system.siem_cr02_stale_declared` for same `incident_id`. Security significance: when job 22 is stale, FORM has no automated near-real-time detector for CR-02 (intercontinental impossible travel — login from two continents within 2 hours). A compromised account could perform cross-continental access with no DEC-030 `siem.correlation_rule_matched` event emitted and no security alert fired. R-65-C2 manual SQL provides compensating coverage throughout the stale window. Privacy floor (both events): no `user_id`, plain `actor_user_id` UUID, full IP address, coaching content, body composition data, or GDPR Art. 9 special-category data; `manual_cr02_match_count` is a scalar integer count — no actor pseudonyms or country codes in the chain event payload. Registered v2.79 (2026-07-03).
+
+#### `system.siem_cr02_stale_declared` — HIGH / 7 years
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `incident_id` | UUID | ✓ | SIEM-CR02-STALE-CHAIN-01 anchor — must match `restored` `incident_id` |
+| `confirmed_stale_since` | datetime | ✓ | Timestamp of last succeeded job 22 run (from `cron.job_run_details`) |
+| `stale_minutes` | int ≥ 0 | ✓ | Minutes elapsed since `confirmed_stale_since` (minutes, not hours — 6-min freshness window) |
+| `missed_runs_estimate` | int ≥ 0 | ✓ | Estimated missed 5-min runs (`stale_minutes ÷ 5`, rounded down) |
+| `manual_cr02_match_count` | int ≥ −1 | ✓ | R-65-C2 row count: intercontinental login pairs missed during stale window; −1 = gate not yet run at emit time |
+| `initial_severity` | enum `p2`\|`p2_escalate` | ✓ | `p2_escalate` if `manual_cr02_match_count > 0`; `p2` default |
+
+```typescript
+const SiemCr02StaleDeclaredSchema = z.object({
+  incident_id:              z.string().uuid(),
+  confirmed_stale_since:    z.string().datetime(),
+  stale_minutes:            z.number().int().nonnegative(),
+  missed_runs_estimate:     z.number().int().nonnegative(),
+  manual_cr02_match_count:  z.number().int().min(-1),
+  initial_severity:         z.enum(["p2", "p2_escalate"]),
+})
+```
+
+#### `system.siem_cr02_restored` — LOW / 3 years
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `incident_id` | UUID | ✓ | Must match `stale_declared` `incident_id` — SIEM-CR02-STALE-CHAIN-01 assertion |
+| `restored_at` | datetime | ✓ | Timestamp of successful `cron.run_job(22)` |
+| `root_cause` | enum | ✓ | `h1_deleted` \| `h2_disabled` \| `h3_infra` \| `h4_function_broken` |
+| `stale_minutes_total` | int ≥ 0 | ✓ | Total stale duration in minutes |
+| `manual_cr02_match_count` | int ≥ 0 | ✓ | Final R-65-C2 row count; 0 if no missed detections confirmed |
+| `security_engineer_sign_off` | bool | ✓ | true if R-65-C2 returned ≥ 1 row and security-engineer confirmed no active compromise; false if clean (no rows) |
+
+```typescript
+const SiemCr02RestoredSchema = z.object({
+  incident_id:                  z.string().uuid(),
+  restored_at:                  z.string().datetime(),
+  root_cause:                   z.enum(["h1_deleted", "h2_disabled", "h3_infra", "h4_function_broken"]),
+  stale_minutes_total:          z.number().int().nonnegative(),
+  manual_cr02_match_count:      z.number().int().nonnegative(),
+  security_engineer_sign_off:   z.boolean(),
+})
+```
+
+#### SIEM-CR02-STALE-CHAIN-01 Ordering Invariant
+
+| Invariant | Rule | Enforcement | Co-activation |
+|---|---|---|---|
+| SIEM-CR02-STALE-CHAIN-01 | `system.siem_cr02_restored` must not be emitted unless a `system.siem_cr02_stale_declared` with matching `incident_id` exists in the DEC-030 HMAC chain | HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION` returned by `emit-audit-event` Worker on invariant violation | R-05 (HMAC chain break runbook) |
+
+Implementation status: **pending** (platform-engineer — R-65.12 item 2).
+
+#### CC7.2 Auditor Narrative
+
+CC7.2 requires FORM to monitor for anomalous activity — including monitoring the monitoring controls themselves. Job 22 (`siem_bridge_cr02_impossible_travel`, every 5 min) is the automated detector for CR-02 (intercontinental login pairs within a 2-hour window). When job 22 goes stale, FORM initiates R-65 within the 6 min freshness window: R-65-C2 manual SQL immediately reproduces the CR-02 detection logic across the stale window, providing compensating coverage; security-engineer is co-paged if any missed events are found. `system.siem_cr02_stale_declared` is the IC-anchoring tamper-evident record that the CC7.2 impossible travel detection control lapsed; `manual_cr02_match_count` attests whether any intercontinental access went undetected during the stale window. Retention 7yr: multi-cycle SOC 2 coverage for CC7.2 anomalous activity monitoring obligations.
+
+**Emitters:** Both events emitted by IC (platform-engineer, PAM-elevated) via `POST /audit/emit-event` (DEC-030 HMAC-chained). `stale_declared` at R-65 T+0 after PagerDuty AL-SIEM-BRIDGE-01 P2 fires; `manual_cr02_match_count` field may be updated (amendment acceptable) after R-65-C2 scope query completes at T+5. `restored` at R-65 Step 6 after `cron.run_job(22)` confirmed healthy. No automated emission path — both events require IC PAM elevation.
+
+---
+
+**v2.79 · 2026-07-03 · owner: compliance-officer + security-engineer**
+*v2.79 (2026-07-03): +2 events — `system.siem_cr02_stale_declared` (HIGH/7yr) and `system.siem_cr02_restored` (LOW/3yr) — in new section `### SIEM Bridge CR-02 Impossible Travel Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-65 · CC7.2)`. Closes `docs/INCIDENT_RESPONSE.md R-65.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, SIEM-CR02-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative). SIEM-CR02-STALE-CHAIN-01: `system.siem_cr02_restored` blocked (HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-65.12 item 2). Six-field Zod v2 `SiemCr02StaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime), `stale_minutes` (int≥0 — minutes not hours; 6-min freshness cadence), `missed_runs_estimate` (int≥0 — stale_minutes÷5 rounded down), `manual_cr02_match_count` (int≥−1, −1 = gate not yet run; final count in `restored`), `initial_severity` (enum p2|p2_escalate — p2_escalate if manual_cr02_match_count > 0). Six-field Zod v2 `SiemCr02RestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum h1_deleted/h2_disabled/h3_infra/h4_function_broken — 4 values; no H5 for job 22 unlike R-62 H5 which was unique to KV write failure for job 14), `stale_minutes_total` (int≥0), `manual_cr02_match_count` (int≥0 — final; 0 if no missed CR-02 detections), `security_engineer_sign_off` (bool — true if R-65-C2 returned ≥ 1 row and security-engineer confirmed no active compromise). Security significance: job 22 is FORM's only automated near-real-time CC7.2 impossible travel detector (5-min cadence); any stale window is an immediate anomalous-activity monitoring blind spot; R-65-C2 compensating SQL provides bridging coverage for the stale window. Privacy floor (both schemas): scalar integers, UUIDs, enum strings, datetime, and boolean only — no `user_id`, `actor_user_sha256`, country code pair, full IP, coaching content, body composition, or GDPR Art. 9 data in chain event payloads; `form_api` REVOKED from emission path. Retention table: +2 rows (`system.siem_cr02_stale_declared` HIGH 7yr CC7.2; `system.siem_cr02_restored` LOW 3yr CC7.2). Document header v2.78 → v2.79. Owner: compliance-officer + security-engineer.*
+
+---
+
 **v2.78 · 2026-07-03 · owner: compliance-officer + security-engineer**
 *v2.78 (2026-07-03): +2 events — `system.victor_safety_chain_monitor_stale_declared` (HIGH/7yr) and `system.victor_safety_chain_monitor_restored` (LOW/3yr) — in new section `### Victor Safety Chain Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-63 · CC7.4/A1.2)`. Closes `docs/INCIDENT_RESPONSE.md R-63.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, VSAFETY-CHAIN-MON-STALE-CHAIN-01 ordering invariant, and CC7.4/A1.2 auditor narratives). VSAFETY-CHAIN-MON-STALE-CHAIN-01: `system.victor_safety_chain_monitor_restored` blocked (HTTP 422 `VSAFETY_CHAIN_MON_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-63.12 item 2). Nine-field Zod v2 `VictorSafetyChainMonitorStaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime), `stale_hours` (int≥0), `missed_runs` (int≥0), `vsafety_chain_01_violations` (int≥−1, −1 = gate not yet run), `vsafety_chain_02_violations` (int≥−1, −1 = gate not yet run), `initial_severity` (enum P0|P1 — P0 if any chain violation confirmed), `trigger` (literal `system.cron_job_stale`), `r23_co_activated` (bool — true if R-23 activated). Seven-field Zod v2 `VictorSafetyChainMonitorRestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum H1_deleted/H2_disabled/H3_infra/H4_function_broken — 4 values; note no H5 for job 15, unlike R-62/H5 which was specific to KV write failure for job 14's baseline KV store), `stale_hours_total` (number≥0), `r23_co_activated` (bool), `chain_01_clear` (bool), `chain_02_clear` (bool). Clinical-safety significance: job 15 staleness creates a blind spot for VSAFETY-CHAIN-01 (P0 incidents uncontained > 60 min) and VSAFETY-CHAIN-02 (Victor disabled > 48 h without re-enable); P0 upgrade and R-23 co-activation required if R-63-C2 or R-63-C3 returns rows; clinical-safety is co-paged on all R-63 activations regardless of severity. Privacy floor (both schemas): incident UUID, duration integers, and boolean flags only — no `user_id`, `session_id`, coaching session content, body composition metrics, individual safety incident UUIDs (beyond R-63's own `incident_id`), or GDPR Art. 9 data; `form_api` REVOKED from emission path. Retention table: +2 rows (`system.victor_safety_chain_monitor_stale_declared` HIGH 7yr CC7.4/A1.2; `system.victor_safety_chain_monitor_restored` LOW 3yr CC7.4/A1.2). Document header v2.77 → v2.78. Owner: compliance-officer + security-engineer.*
 
