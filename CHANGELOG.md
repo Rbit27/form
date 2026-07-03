@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.67.0] — 2026-07-03
+
+### Added
+- `content/post-3072-three-classes-technical-errors.md` — Series «Технічна самодіагностика» 3071–3080, 2/10. «Три класи технічних помилок і як кожну виявляти без зовнішнього погляду». Три класи: позиційні (стоп-кадр, Клас 1; Van Dieën et al. 2003); помилки послідовності (0.25x відео 120fps, Клас 2; Swinnen 2002; González-Badillo & Sánchez-Medina 2010); компенсаторні (порівняння навантажень, Клас 3; Stanton et al. 2004; Zatsiorsky & Kraemer 2006). Таблиця відповідності клас → інструмент → непрямий сигнал. Ієрархія виправлення (Magill & Anderson 2014). Покроковий діагностичний протокол. clinical-safety: NOT_REQUIRED.
+
+### Changed
+- `blog.html` — card for post-3072 prepended at top of feed.
+- `STATUS.md` — current version updated to v11.67.0; content engine next updated to post-3073.
+- `VERSION` — 11.66.0 → 11.67.0.
+
+---
+
 ## [11.66.0] — 2026-07-03
 
 ### Added
