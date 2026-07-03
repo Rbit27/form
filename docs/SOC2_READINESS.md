@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.73.0
+# FORM · SOC 2 Type II Readiness v3.74.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -34687,6 +34687,72 @@ PKJWT-SWEEP-STALE-E-001 has been added to the §79.4 master evidence table (row 
 | 2 | Add `pkjwt-sweep-stale/` subfolder to §80.3 R2 bucket structure | compliance-officer | **P0** | [x] Done — 2026-07-03 (this patch, §80.3) |
 | 3 | Add PKJWT-SWEEP-STALE-E-001 to §80.4 Vanta mirror list | compliance-officer | **P0** | [x] Done — 2026-07-03 (this patch, §80.4) |
 | 4 | Close R-57.11 item 3 in INCIDENT_RESPONSE.md | compliance-officer | **P0** | [x] Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.22.1) |
+
+---
+
+*v3.74.0 (2026-07-03): §148 Cross-Reference Patch — INVITE-STALE-E-001 Registration (CC6.3/P5.1/P5.2 · AUDIT_LOG_SCHEMA v2.75 · INCIDENT_RESPONSE R-60). Registers INVITE-STALE-E-001 in §79.4 master evidence table (row 115 — after PKJWT-SWEEP-STALE-E-001): per-activation incident record for R-60 `invite_expiry_sweep` (pg_cron job 10, daily 02:30 UTC, 26h freshness) + `invite_email_expiry_cleanup` (pg_cron job 12, daily 04:00 UTC, 26h freshness) combined stale events; CC6.3 timely access revocation gap, P5.1 PII access restriction gap, P5.2 PII disposal monitoring gap; P0 upgrade gate at `pii_at_risk_count > 0` (37-day threshold — GDPR Art. 17 active breach → Art. 33 72h supervisory authority notification); two DEC-030 HMAC-chain events (`system.invite_expiry_sweep_stale_declared` HIGH/7yr IC PAM-elevated + `system.invite_expiry_sweep_restored` LOW/3yr IC declaration) with INVITE-SWEEP-STALE-CHAIN-01 predecessor invariant enforced at `emit-audit-event` Worker layer (HTTP 422 `INVITE_SWEEP_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); payload privacy floor: `incident_id` UUID + `seat_inflation_count` INT ≥ 0 + `pii_at_risk_count` INT ≥ 0 + operational metadata only — no `tenant_id`, `user_id`, `invited_email`, `invited_email_hash`, or GDPR Art. 9 special-category data; 7yr WORM per-activation; owner: compliance-officer + security-engineer; path: `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/`. §80.3 `invite/` subfolder added to R2 `form-soc2-evidence` bucket structure. §80.4 Vanta mirror list updated: INVITE-STALE-E-001 upload within 48h of `system.invite_expiry_sweep_restored` emission. §148.1 background, §148.2 §79.4 registration table, §148.3 cross-reference obligations closed, §148.4 implementation checklist. Closes INCIDENT_RESPONSE.md §R-60.12 item 3 (P1). Companion edit this pass: AUDIT_LOG_SCHEMA.md v2.75 (R-60.12 item 1 — two DEC-030 events + Zod v2 schemas + INVITE-SWEEP-STALE-CHAIN-01 invariant + CC6.3/P5.1/P5.2 auditor narratives). Document header v3.73.0 → v3.74.0. Owner: compliance-officer + security-engineer.*
+
+---
+
+## §148 · Cross-Reference Patch — INVITE-STALE-E-001 Registration (CC6.3/P5.1/P5.2 · AUDIT_LOG_SCHEMA v2.75 · INCIDENT_RESPONSE R-60)
+
+> **Date:** 2026-07-03. **Trigger:** INCIDENT_RESPONSE.md §R-60.12 item 3 (P1) — "Register INVITE-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` evidence artefact registry (per-activation cadence, CC6.3/P5.1/P5.2, 7yr, owner: compliance-officer + security-engineer)." **Owner:** compliance-officer + security-engineer.
+
+### §148.1 Background
+
+`docs/INCIDENT_RESPONSE.md` v3.26.0 (2026-07-03) added runbook R-60 for `invite_expiry_sweep` (pg_cron job 10, schedule `30 2 * * *`, 26h freshness) and `invite_email_expiry_cleanup` (pg_cron job 12, schedule `0 4 * * *`, 26h freshness). R-60 is a combined stale-recovery runbook because job 12 depends on job 10 having set `tenant_invitations.status = 'expired'` before it can execute the 30-day GDPR Art. 17 email erasure (`invited_email = '[erased]'`).
+
+R-60.12 implementation checklist item 3 (P1) required registering the per-activation incident evidence artefact INVITE-STALE-E-001 in this document's §79.4 master evidence artefact registry, and updating §80.3 (R2 bucket folder structure) and §80.4 (Vanta mirror list).
+
+Two companion events support this artefact:
+- `system.invite_expiry_sweep_stale_declared` (HIGH, 7yr, CC6.3/P5.1/P5.2) — IC PAM-elevated declaration at R-60 T+0; anchor event for INVITE-SWEEP-STALE-CHAIN-01 ordering invariant
+- `system.invite_expiry_sweep_restored` (LOW, 3yr, CC6.3/P5.1/P5.2 advisory) — IC declaration after recovery (R-60 Step 5); terminal event for INVITE-SWEEP-STALE-CHAIN-01
+
+Both events are DEC-030 HMAC-chained. The INVITE-SWEEP-STALE-CHAIN-01 ordering invariant enforced by the `emit-audit-event` Worker ensures the declared event precedes the restored event for the same `incident_id` (HTTP 422 `INVITE_SWEEP_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05 HMAC chain inversion runbook). Registered in `docs/AUDIT_LOG_SCHEMA.md` v2.75 (R-60.12 item 1, 2026-07-03).
+
+**P0 upgrade gate:** When `pii_at_risk_count > 0` (job 12 stale ≥ 37 days — at least one `invited_email` value has passed the 30-day erasure window without erasure), the incident severity upgrades to P0. `pii_at_risk_count > 0` constitutes a GDPR Art. 17 active breach → GDPR Art. 33 72h supervisory authority notification obligation. The `pii_at_risk_count` field is an aggregate INT count only — no `tenant_id`, `user_id`, `invited_email`, `invited_email_hash`, or GDPR Art. 9 data.
+
+§80.3 `invite/` subfolder added to R2 `form-soc2-evidence` bucket structure (new path: `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/`; WORM Object Lock Governance 7yr; `r2:form-api` NO ACCESS invariant). §80.4 Vanta mirror list updated: INVITE-STALE-E-001 upload within 48h of `system.invite_expiry_sweep_restored` emission; compliance-officer access only.
+
+### §148.2 §79.4 Registration
+
+INVITE-STALE-E-001 has been added to the §79.4 master evidence table (row 115) after PKJWT-SWEEP-STALE-E-001 (row 114). See §79.4 for the complete artefact row.
+
+**Summary:**
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | INVITE-STALE-E-001 |
+| **TSC Domain** | CC6, P5 |
+| **Criterion** | CC6.3, P5.1, P5.2 |
+| **Class** | Manual-event (incident-triggered, IC PAM-elevated) |
+| **Cadence** | Per-activation (one artefact per R-60 stale incident) |
+| **Retention** | 7yr WORM Object Lock (CC6.3 timely access revocation + P5.1 PII access restriction + P5.2 PII disposal monitoring gap) |
+| **Owner** | compliance-officer + security-engineer |
+| **Path** | `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/` |
+| **Privacy floor** | `incident_id` UUID + `seat_inflation_count` INT ≥ 0 + `pii_at_risk_count` INT ≥ 0 + operational metadata + H1–H4 root-cause enum only — no `tenant_id`, `user_id`, `invited_email`, `invited_email_hash`, or GDPR Art. 9 special-category data |
+
+**CC6.3 auditor narrative:** CC6.3 requires timely removal of access when no longer needed. FORM's `invite_expiry_sweep` (pg_cron job 10) marks `tenant_invitations.status = 'expired'` and revokes `enterprise_seat_assignments.revoked_at` daily at 02:30 UTC. When job 10 becomes stale, expired invitations and their associated seat revocations are delayed — directly impairing FORM's CC6.3 timely-access-revocation control. INVITE-STALE-E-001 provides the incident anchor: the declaration event (`system.invite_expiry_sweep_stale_declared`) records the stale duration (`stale_hours_job10`), the seat-revocation backlog (`seat_inflation_count`), and the IC declaration timestamp. The recovery event (`system.invite_expiry_sweep_restored`) records the resolution method (root cause H1–H4) and the count of invites manually expired during the incident. Together they close the CC6.3 evidence gap for the stale period.
+
+**P5.1 auditor narrative:** P5.1 requires restricting access to personal information to individuals with a legitimate need. Pending-invitation `invited_email` values in `tenant_invitations` remain accessible (not yet erased by job 12) after the 30-day post-expiry window. A stale job 10 prevents job 12 from executing its GDPR Art. 17 erasure, prolonging PII access beyond the retention window. `pii_at_risk_count` in the declaration event quantifies this risk as an aggregate INT count (no individual email values in any payload). INVITE-STALE-E-001 provides P5.1 evidence that FORM monitored and responded to every instance where PII access was prolonged beyond policy, and that the IC declared and resolved each incident under PAM elevation.
+
+**P5.2 auditor narrative:** P5.2 requires disposing of personal data in accordance with the organisation's retention schedule. FORM's GDPR Art. 17 erasure schedule for `invited_email` is 30 days post-expiry (enforced by pg_cron job 12). A stale job 12 directly delays disposal. INVITE-STALE-E-001 provides P5.2 evidence that every disposal-delay incident was declared by an IC under PAM elevation, the aggregate `pii_at_risk_count` was recorded (privacy floor respected), and recovery was completed with `emails_erased_manually` count documented. The 7yr WORM retention for the declaration event ensures P5.2 monitoring evidence survives the full SOC 2 observation window and any subsequent litigation hold.
+
+### §148.3 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/INCIDENT_RESPONSE.md §R-60.12 item 3 [ ]` — "Register INVITE-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` evidence artefact registry (per-activation cadence, CC6.3/P5.1/P5.2, 7yr, owner: compliance-officer + security-engineer)" | §R-60.12 item 3 (v3.26.0, 2026-07-03) | 🟢 **Done — 2026-07-03 (SOC2_READINESS.md v3.74.0, §148)** |
+
+### §148.4 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register INVITE-STALE-E-001 in §79.4 master evidence table (CC6.3/P5.1/P5.2, per-activation, 7yr) | compliance-officer | **P1** | [x] Done — 2026-07-03 (this patch, §79.4 row 115) |
+| 2 | Add `invite/` subfolder to §80.3 R2 `form-soc2-evidence` bucket (path: `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/`; WORM Object Lock Governance 7yr; `r2:form-api` NO ACCESS) | devops-lead | **P1** | [x] Done — 2026-07-03 (this patch, §80.3) |
+| 3 | Add INVITE-STALE-E-001 to §80.4 Vanta mirror list (upload within 48h of `system.invite_expiry_sweep_restored` emission; CC6.3/P5.1/P5.2; compliance-officer only) | compliance-officer | **P1** | [x] Done — 2026-07-03 (this patch, §80.4) |
+| 4 | Close R-60.12 item 3 in INCIDENT_RESPONSE.md | compliance-officer | **P1** | [x] Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.26.1) |
+| 5 | On first R-60 activation: collect INVITE-STALE-E-001 artefact bundle at `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/` — include `system.invite_expiry_sweep_stale_declared` DEC-030 event export, `system.invite_expiry_sweep_restored` DEC-030 event export, IC declaration attestation, root-cause analysis (H1–H4), and GDPR Art. 33 notification log if `pii_at_risk_count > 0`. SHA-256 hash all files; upload to R2 WORM; upload to Vanta within 48h of restoration; add MASTER-INDEX row. | compliance-officer | **P2** | [ ] (on first R-60 activation) |
 
 ---
 

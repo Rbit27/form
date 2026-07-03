@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.73.0] — 2026-07-03
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md` v2.75 — R-60.12 item 1 (P0): two DEC-030 HMAC-chained events for Invite Expiry Sweep & Email Cleanup Stale incidents registered: `system.invite_expiry_sweep_stale_declared` (HIGH/7yr, IC PAM-elevated) + `system.invite_expiry_sweep_restored` (LOW/3yr, IC PAM-elevated); Zod v2 schemas for both events; INVITE-SWEEP-STALE-CHAIN-01 ordering invariant (HTTP 422 `INVITE_SWEEP_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); CC6.3/P5.1/P5.2 auditor narratives; P0 upgrade gate: `pii_at_risk_count > 0` = GDPR Art. 17 active breach → Art. 33 72h supervisory authority notification; payload privacy floor: `seat_inflation_count` + `pii_at_risk_count` aggregate INT counts only — no `tenant_id`, `user_id`, `invited_email`, `invited_email_hash`, or GDPR Art. 9 data. Retention table: +2 rows (7yr + 3yr). Document header v2.74 → v2.75.
+- `docs/SOC2_READINESS.md` v3.74.0 §148 — R-60.12 item 3 (P1): INVITE-STALE-E-001 registered in §79.4 master evidence table (row 115, after PKJWT-SWEEP-STALE-E-001); per-activation incident artefact for R-60 `invite_expiry_sweep` (pg_cron job 10) + `invite_email_expiry_cleanup` (pg_cron job 12) combined stale incidents; CC6.3 (timely access revocation), P5.1 (PII access restriction), P5.2 (PII disposal monitoring); 7yr WORM; path `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/`. §148.1 background (GDPR Art. 17 P0 upgrade gate at `pii_at_risk_count > 0`; §80.3 R2 `invite/` subfolder; §80.4 Vanta mirror entry added). §148.2 §79.4 registration summary table + CC6.3/P5.1/P5.2 auditor narratives. §148.3 cross-reference obligations closed. §148.4 implementation checklist. Document header v3.73.0 → v3.74.0.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — R-60.12 item 1 (P0) marked [x] Done (AUDIT_LOG_SCHEMA.md v2.75); item 3 (P1) marked [x] Done (SOC2_READINESS.md v3.74.0, §148); document header v3.26.0 → v3.26.1. Item 2 (P0 — INVITE-SWEEP-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts`) remains pending (platform-engineer).
+- `VERSION` — 11.72.0 → 11.73.0.
+
+---
+
 ## [11.72.0] — 2026-07-03
 
 ### Added
