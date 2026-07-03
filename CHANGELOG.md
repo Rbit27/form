@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.95.0] — 2026-07-03
+
+### Added
+- `content/post-11-deload-weeks-science-and-rhythm.md` — «Деловантаження: що це таке, коли потрібно і як не переплутати з лінощами». Фітнес-втомна модель (Chiu & Barnes 2003): деловантаження знімає маску накопиченої втоми і дозволяє адаптації проявитись. Ритміка: початківці 6–8 тижнів, інтермедіати 3–5, просунуті 2–3. Три класи сигналів (продуктивність / відновлення / суб'єктивне). Правильне деловантаження: обсяг –30–50% від пікового тижня (Zourdos et al. 2016, Israetel et al.) при помірній інтенсивності (Haff & Triplett 2016: збереження нервово-м'язової готовності). Три помилки. Що вимірювати до і після. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — картка post-11 prepended at top of feed.
+- `STATUS.md` — current version v11.94.0 → v11.95.0; content engine table updated.
+- `VERSION` — 11.94.0 → 11.95.0.
+
+---
+
 ## [11.94.0] — 2026-07-03
 
 ### Added
