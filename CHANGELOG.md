@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.66.0] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` R-59 — Quarterly Performance Regression Check Stale recovery runbook (§R-59.1–§R-59.9; P2, devops-lead + compliance-officer). Covers `quarterly_perf_regression_check` pg_cron job 30 (§12.6): schedule `0 9 1 4,7,10 1`, 35-day freshness window. Stale consequence: PERF-SLO-06 quarterly evaluation missed — `system.perf_regression_detected` not emitted and LT-E-002 SOC 2 A1.2/CC7.2 quarterly evidence artefact goes unfiled; performance headroom degradation accumulates undetected for the quarter (soft gate — no deployment block, no SLA credit exposure). Five root-cause hypotheses: H1 (job deleted), H2 (job disabled), H3 (Supabase infrastructure), H4 (`perf_regression_check_quarterly()` function broken or LOAD_TEST_TELEMETRY connectivity failure), H5 (k6 Cloud quarterly run not triggered — wider gap). Scope queries: R-59-C1 (pg_cron run history), R-59-C2 (audit log `system.quarterly_perf_reference_completed` — k6 Cloud data availability and P95 drift), R-59-C3 (`system.perf_regression_detected` missed breach check), R-59-C4 two-part (peer job health + job catalog registration). Recovery: trigger k6 Cloud `workflow_dispatch` as compensating control; draft LT-E-002; restore job by hypothesis; confirm via `cron.run_job()`; file LT-E-002 with dual sign-off. P2 → P1 escalation on confirmed P95 drift > 20% or k6 Cloud run missing. New alert: AL-PERF-STALE-01 (P2, `form-devops`; dedup `perf-regression-check-stale`).
+
+### Changed
+- `docs/OBSERVABILITY.md` — §12.6 job 30 cross-reference updated: `; INCIDENT_RESPONSE R-59 (§R-59; v1.0, 2026-07-03 — companion stale recovery runbook for job 30)` added to `quarterly_perf_regression_check` registry entry. Document header v5.14.2 → v5.14.3 (R-59.9 item 1 closed).
+- `docs/INCIDENT_RESPONSE.md` — document header v3.23.0 → v3.24.0.
+- `STATUS.md` — current version updated to v11.66.0.
+- `VERSION` — 11.65.0 → 11.66.0.
+
+---
+
 ## [11.65.0] — 2026-07-03
 
 ### Added

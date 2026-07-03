@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.23.0
+# FORM · Incident Response Runbook v3.24.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -21274,6 +21274,297 @@ Post-mortem: [Linear ticket URL]
 ---
 
 *v3.22.1 (2026-07-03): §R-57.11 Cross-Reference Patch — Items 1–3 Closed (AUDIT_LOG_SCHEMA v2.74 · OBSERVABILITY v5.14.1 · SOC2_READINESS v3.73.0). Closes three P0 implementation checklist items from §R-57.11 (v3.22.0, 2026-07-03): item 1 — `system.pkjwt_expiry_sweep_stale_declared` (HIGH/7yr) and `system.pkjwt_expiry_sweep_restored` (LOW/3yr) registered in `docs/AUDIT_LOG_SCHEMA.md` v2.74 (§R-57 PKJWT Key Expiry Sweep Stale events section — two DEC-030 events, Zod v2 schemas `PkjwtExpirySweepStaleDeclaredPayload` + `PkjwtExpirySweepRestoredPayload`, PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant table [HTTP 422 `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` on unanchored restore for same `incident_id`], PKJWT-SWEEP-STALE-E-001 evidence artefact table); item 2 — `docs/OBSERVABILITY.md §12.6` job 58 row cross-reference column updated in v5.14.1 to add `; INCIDENT_RESPONSE R-57 (§R-57; v3.22.0, 2026-07-03 — companion stale recovery runbook for job 58)` before `— **job 58** |`; item 3 — PKJWT-SWEEP-STALE-E-001 registered in `docs/SOC2_READINESS.md §79.4` master evidence table (row 114) in v3.73.0 (§147 — §80.3 `pkjwt-sweep-stale/` R2 subfolder added; §80.4 Vanta mirror list updated; §147.1–§147.4 cross-reference patch section). Document header v3.22.0 → v3.22.1. Owner: security-engineer + compliance-officer.*
+
+---
+
+## R-59 · Quarterly Performance Regression Check Stale — `quarterly_perf_regression_check` (job 30) — A1.2 / CC7.2 evidence gap
+
+**Classification:** P2 · DevOps · devops-lead primary
+**Trigger:** `system.cron_job_stale` for `quarterly_perf_regression_check`; dedup `perf-regression-check-stale`
+**Version:** v1.0 · 2026-07-03
+**Owner:** devops-lead + compliance-officer
+**Review:** After every activation; minimum annual. Next: July 2027 or first activation.
+
+> **Core impact: SOC 2 evidence gap and undetected performance headroom degradation, not a live SLA breach.** The `quarterly_perf_regression_check` job runs at 09:00 UTC on the first Monday of April, July, and October (schedule `0 9 1 4,7,10 1`). It calls `perf_regression_check_quarterly()`, which queries LOAD_TEST_TELEMETRY Analytics Engine for the most recent k6 Cloud quarterly reference run (OBSERVABILITY §45, DEC-058) and compares P95 API latency to the prior quarter's baseline. A > 20% drift on any monitored endpoint triggers `system.perf_regression_detected` (HIGH/7yr) and AL-PERF-05 (P2, `form-devops`, Slack `#observability`). A stale job 30 means: (1) `system.perf_regression_detected` is not emitted even if regression occurred; (2) LT-E-002 (`compliance/evidence/a1/lt-e-002-YYYY-QN.md`) — the SOC 2 A1.2/CC7.2 quarterly PERF-SLO-06 evidence artefact — goes unfiled for the quarter; (3) performance headroom degradation accumulates undetected. PERF-SLO-06 is a **soft gate** — a stale job 30 does not block any in-flight deployment and does not trigger ENTERPRISE_SLA §3 SLA credits. However, the LT-E-002 evidence gap is a SOC 2 A1.2 finding risk if observed by auditors.
+
+---
+
+### R-59.1 Trigger Conditions
+
+This runbook activates when `pg-cron-health-monitor` (OBSERVABILITY §12.7) emits `system.cron_job_stale` for `quarterly_perf_regression_check` and routes AL-PERF-STALE-01 via PagerDuty:
+
+| Alert ID | Trigger | PagerDuty routing | Dedup key |
+|---|---|---|---|
+| **AL-PERF-STALE-01** | No `pg_cron.job_run_details` succeeded entry for `quarterly_perf_regression_check` within the 35-day freshness window — fires only when a full quarter elapses without a successful run | P2 `form-devops` → devops-lead | `perf-regression-check-stale` |
+
+**When the alert fires:** The 35-day freshness window ensures the alert fires only when at least one complete quarterly run has been missed (the window spans 5 additional days beyond the approximate quarterly cadence to absorb scheduling jitter). devops-lead and compliance-officer are the primary responders; no IC declaration or PAM elevation is required for the compensating control.
+
+**Quarterly schedule note:** Job 30 runs on the first Monday of April, July, and October at 09:00 UTC (schedule `0 9 1 4,7,10 1`). In years where April 1, July 1, or October 1 does not fall on a Monday, the job runs on the first Monday of that month. January 1 is not in the schedule — Q4/Q1 transition is measured via the LT-E-002 evidence filing cadence rather than a January pg_cron run.
+
+---
+
+### R-59.2 Severity Classification
+
+| Severity | Condition |
+|---|---|
+| **P2** | Alert fires — job 30 stale for a full quarter; LT-E-002 evidence gap; PERF-SLO-06 monitoring blind spot for the quarter |
+| **P2 → P1 escalation** | R-59-C2 finds `system.quarterly_perf_reference_completed` events for the affected quarter AND P95 drift > 20% on any endpoint — or R-59-C2 returns no rows at all (k6 Cloud run itself was missed, not just the pg_cron evaluation) |
+| **P2 co-active R-03** | R-59-C4 Part A shows all peer jobs also stale at similar timestamps → Supabase infrastructure event probable; activate R-03 in parallel |
+
+**Severity rationale:** PERF-SLO-06 is a soft gate — it is an investigation signal, not a deployment gate (OBSERVABILITY §40.3). A stale job 30 creates a SOC 2 A1.2 evidence gap (LT-E-002 unfiled) and a performance monitoring blind spot, but does not directly cause a customer-visible SLA breach or data integrity issue. The P1 upgrade path is reserved for confirmed regression: where k6 Cloud reference run data exists but the pg_cron evaluation job failed to process it, and the P95 drift would have triggered AL-PERF-05 under normal operation.
+
+---
+
+### R-59.3 Immediate Actions (T+0 to T+60 min)
+
+**Step 1 — Acknowledge PagerDuty and identify the missed quarter boundary:**
+
+Acknowledge AL-PERF-STALE-01. Note the current date and determine which quarterly run was missed (e.g., if the alert fires on 2026-07-25, the missed run was the first Monday of July — Q3 evaluation). Check whether the corresponding k6 Cloud quarterly reference run (OBSERVABILITY §45) was triggered for that quarter.
+
+**Step 2 — Run scope queries R-59-C1 through R-59-C4:**
+
+**R-59-C1 — pg_cron run history for job 30 (staleness confirmation):**
+```sql
+SELECT
+  jobname,
+  MAX(start_time)                                                AS last_run,
+  NOW() - MAX(start_time)                                        AS gap,
+  EXTRACT(EPOCH FROM (NOW() - MAX(start_time))) / 86400          AS stale_days,
+  COUNT(*) FILTER (WHERE start_time >= NOW() - INTERVAL '365 days') AS runs_last_year
+FROM cron.job_run_details
+WHERE jobname = 'quarterly_perf_regression_check'
+GROUP BY jobname;
+-- stale_days > 35: confirms freshness window breached; alert valid
+-- NULL last_run: job has never successfully run (new deployment or H1 deletion)
+-- runs_last_year = 0: no runs in last year → likely H1 (deleted) or H2 (disabled)
+```
+
+**R-59-C2 — Audit log scan: last two quarters of performance reference run data:**
+```sql
+SELECT
+  ale.created_at                                                AS run_completed_at,
+  ale.payload->>'quarter'                                       AS quarter,
+  ale.payload->>'cloud_run_id'                                  AS cloud_run_id,
+  ale.payload->'slo_results'->>'perf_slo_01_p95_ms'            AS p95_ms,
+  ale.payload->'slo_results'->>'perf_slo_01_drift_pct'         AS drift_pct,
+  ale.payload->>'node_region'                                   AS region
+FROM audit_log_events ale
+WHERE ale.event_type = 'system.quarterly_perf_reference_completed'
+  AND ale.created_at >= NOW() - INTERVAL '200 days'
+ORDER BY ale.created_at DESC
+LIMIT 10;
+-- No rows for current quarter: k6 Cloud run was not triggered — broader gap (H5)
+-- drift_pct > 20 on any row: regression that was missed by stale job 30 → P1 upgrade
+-- cloud_run_id present for current quarter: k6 Cloud run succeeded; pg_cron evaluation failed separately
+-- Privacy: payload contains only aggregate latency metrics and synthetic run IDs; no user PII
+```
+
+**R-59-C3 — Recent system.perf_regression_detected events (missed breach detection check):**
+```sql
+SELECT
+  ale.created_at                                                AS detected_at,
+  ale.payload->>'quarter'                                       AS quarter,
+  ale.payload->>'endpoint'                                      AS endpoint,
+  ale.payload->>'drift_pct'                                     AS drift_pct,
+  ale.payload->>'p95_current_ms'                                AS p95_current_ms,
+  ale.payload->>'p95_reference_ms'                              AS p95_reference_ms
+FROM audit_log_events ale
+WHERE ale.event_type = 'system.perf_regression_detected'
+  AND ale.created_at >= NOW() - INTERVAL '200 days'
+ORDER BY ale.created_at DESC;
+-- No rows but R-59-C2 shows drift_pct > 20: regression would have triggered AL-PERF-05 → P1 upgrade
+-- Rows from prior quarters: job previously ran and emitted events correctly
+-- Privacy: aggregate performance data only; no user PII or GDPR Art. 9 data
+```
+
+**R-59-C4 — Peer job health and job registration (root cause discriminator):**
+```sql
+-- Part A: peer job run history (infrastructure discriminator)
+SELECT
+  jobname,
+  MAX(start_time)                                                AS last_run,
+  NOW() - MAX(start_time)                                        AS gap,
+  COUNT(*) FILTER (WHERE start_time >= NOW() - INTERVAL '90 days') AS runs_last_90_days
+FROM cron.job_run_details
+WHERE jobname IN (
+  'quarterly_perf_regression_check',
+  'backup_age_monitor',
+  'ci_telemetry_daily_sync',
+  'litigation_hold_compliance_monitor',
+  'amendment_rate_compliance_monitor'
+)
+GROUP BY jobname
+ORDER BY gap DESC NULLS FIRST;
+-- quarterly_perf_regression_check gap >> all peer gaps → H1/H2/H4 (job-specific issue)
+-- All jobs show large gaps at similar timestamps → H3 (Supabase maintenance / infrastructure)
+
+-- Part B: job catalog registration
+SELECT
+  jobid,
+  jobname,
+  schedule,
+  active,
+  username
+FROM cron.job
+WHERE jobname = 'quarterly_perf_regression_check';
+-- No rows → H1 (job deleted)
+-- active = false → H2 (job disabled)
+-- schedule ≠ '0 9 1 4,7,10 1' → schedule tampered (H3/H4 — devops-lead investigate)
+-- active = true, schedule correct, no recent runs → H4 (function broken or pg_cron failure)
+```
+
+---
+
+### R-59.4 Root Cause Hypotheses
+
+| Hypothesis | Indicator | Resolution |
+|---|---|---|
+| **H1 — Job deleted** | R-59-C4 Part B returns no rows | Recreate job (§R-59.5 Step 3, Option A) |
+| **H2 — Job disabled** | R-59-C4 Part B shows `active = false` | Re-enable: `UPDATE cron.job SET active = true WHERE jobname = 'quarterly_perf_regression_check'` (devops-lead, `supabase_admin` role) |
+| **H3 — Supabase maintenance / infrastructure event** | R-59-C4 Part A shows all peer jobs stale at similar timestamps; check Supabase status page | Wait for infrastructure resolution; co-activate R-03 if unresolved; trigger k6 Cloud run manually as compensating control (§R-59.5 Step 1) |
+| **H4 — Function broken or pg_cron scheduling error** | R-59-C4 Part B shows job active + schedule correct but no recent `cron.job_run_details` rows; or recent rows show `status = 'failed'` | Check pg_cron `return_message` for SQL errors from `perf_regression_check_quarterly()`; verify LOAD_TEST_TELEMETRY Analytics Engine connectivity from Supabase; patch the function SQL if broken |
+| **H5 — k6 Cloud quarterly run not triggered** | R-59-C2 returns no `system.quarterly_perf_reference_completed` for the affected quarter | Wider gap — both the k6 Cloud evidence input and the pg_cron evaluation are missing; trigger `.github/workflows/load-test-quarterly.yml` via `workflow_dispatch` first, then restore job 30 |
+
+---
+
+### R-59.5 Recovery Procedure
+
+**Step 1 — Compensating control: trigger the quarterly k6 Cloud reference run (all hypotheses):**
+
+Do not wait for root cause analysis. Trigger the k6 Cloud quarterly reference run immediately to generate the PERF-SLO-06 evidence input for the affected quarter (OBSERVABILITY §45.8, DEC-058):
+
+```
+# Trigger via GitHub Actions workflow_dispatch (devops-lead, requires form-infra repo write)
+# .github/workflows/load-test-quarterly.yml — manual trigger with quarter input
+# Input: quarter = "YYYY-QN" (e.g., "2026-Q3")
+# This emits system.quarterly_perf_reference_initiated + system.quarterly_perf_reference_completed
+# Cloud run ID is captured in DEC-030 payload for LT-E-002 evidence filing
+```
+
+If R-59-C2 shows that the k6 Cloud run for the affected quarter already completed successfully (cloud_run_id present), skip this step — job 30 failed to evaluate existing results.
+
+**Step 2 — Assess for P1 upgrade and draft LT-E-002:**
+
+After the k6 Cloud run completes (or is confirmed already completed):
+- If R-59-C2 or the new run shows P95 drift > 20% on any endpoint: escalate to P1, open a Linear investigation ticket, notify platform-engineer and compliance-officer immediately.
+- If no regression: devops-lead + compliance-officer manually draft `compliance/evidence/a1/lt-e-002-YYYY-QN.md` (p95 current vs. prior quarter per endpoint; dual sign-off). File after pg_cron job 30 is restored and confirms the same result (Step 4). This closes the SOC 2 A1.2 evidence gap for the quarter.
+
+**Step 3 — Restore pg_cron job by root cause:**
+
+*Option A (H1 — recreate):*
+```sql
+-- Execute as supabase_admin role
+SELECT cron.schedule(
+  'quarterly_perf_regression_check',
+  '0 9 1 4,7,10 1',
+  $$SELECT perf_regression_check_quarterly()$$
+);
+-- Confirm: SELECT jobname, schedule, active FROM cron.job WHERE jobname = 'quarterly_perf_regression_check';
+```
+
+*Option B (H2 — re-enable):*
+```sql
+UPDATE cron.job SET active = true WHERE jobname = 'quarterly_perf_regression_check';
+```
+
+*Option C (H3 — infrastructure):*
+Await Supabase infrastructure resolution per R-03 protocol. k6 Cloud run already triggered in Step 1 as compensating control. Re-enable job once infrastructure is confirmed stable.
+
+*Option D (H4 — function/schedule):*
+Investigate `cron.job_run_details.return_message` for failing rows; check LOAD_TEST_TELEMETRY Analytics Engine API connectivity from Supabase (network policy, token expiry). Patch `perf_regression_check_quarterly()` SQL if broken; confirm with `SELECT perf_regression_check_quarterly()` as `form_system` before restoring.
+
+*Option E (H5 — k6 Cloud workflow stale):*
+Trigger `.github/workflows/load-test-quarterly.yml` via `workflow_dispatch` first (Step 1 already covers this). Once `system.quarterly_perf_reference_completed` is confirmed in `audit_log_events`, restore job 30 per whichever of Option A–D applies to the pg_cron failure.
+
+**Step 4 — Confirm restoration:**
+```sql
+-- Force immediate test run via pg_cron
+SELECT cron.run_job(
+  (SELECT jobid FROM cron.job WHERE jobname = 'quarterly_perf_regression_check')
+);
+
+-- Verify success
+SELECT jobname, start_time, end_time, status, return_message
+FROM cron.job_run_details
+WHERE jobname = 'quarterly_perf_regression_check'
+ORDER BY start_time DESC
+LIMIT 3;
+-- Expected: most recent row shows status = 'succeeded'
+-- Note: a forced test run may emit system.perf_regression_detected if P95 drift > 20%;
+-- this is expected and correct — do not suppress the event
+```
+
+**Step 5 — File LT-E-002 and close the evidence gap:**
+
+devops-lead + compliance-officer sign off and file `compliance/evidence/a1/lt-e-002-YYYY-QN.md` covering: (1) k6 Cloud `cloud_run_id` for the affected quarter; (2) P95 current vs. prior quarter per endpoint; (3) PERF-SLO-06 pass/fail determination; (4) if P1 upgraded — Linear investigation ticket URL and root cause summary. This fulfils the SOC 2 A1.2/CC7.2 evidence obligation for the quarter.
+
+---
+
+### R-59.6 Communication Templates
+
+**Slack `#observability` — Stale job detected:**
+```
+⚠️  AL-PERF-STALE-01 · quarterly_perf_regression_check stale · job 30
+Last successful run: [last_run] UTC · stale [stale_days] days
+Impact: PERF-SLO-06 monitoring blind spot for Q[X]; LT-E-002 SOC 2 evidence gap
+Responders: @devops-lead + @compliance-officer · R-59 runbook active
+k6 Cloud quarterly reference run being triggered as compensating control
+```
+
+**Slack `#observability` — Regression confirmed during gap (if R-59-C2 / R-59-C3 positive):**
+```
+🔴  P1 upgrade · PERF-SLO-06 regression confirmed during job 30 stale window
+Endpoint: [endpoint] · Current P95: [p95_current_ms] ms · Reference: [p95_reference_ms] ms · Drift: [drift_pct]%
+Quarter: Q[X] · Gap start: [last_successful_run] UTC
+Action: @devops-lead opening investigation ticket; @platform-engineer notified; LT-E-002 filing pending root-cause determination
+```
+
+**Slack `#observability` — Post-resolution:**
+```
+✅  R-59 resolved · job 30 quarterly_perf_regression_check restored
+k6 Cloud run: [cloud_run_id] · PERF-SLO-06: [PASS / BREACH — endpoint, drift_pct%]
+Root cause: [H1 deleted / H2 disabled / H3 Supabase / H4 function error / H5 k6 Cloud workflow stale] · [one-sentence summary]
+LT-E-002 filed: compliance/evidence/a1/lt-e-002-[YYYY-QN].md · Sign-off: devops-lead + compliance-officer
+Post-mortem: [Linear ticket URL — if regression confirmed; otherwise N/A]
+```
+
+---
+
+### R-59.7 Post-Incident Controls
+
+1. **LT-E-002 proactive quarterly verification:** devops-lead confirms a `quarterly_perf_regression_check` succeeded row in `cron.job_run_details` within 48h of each quarterly run date (first Monday of April, July, October) as part of the quarterly SOC 2 evidence sweep.
+2. **H5 guard:** Add a GitHub Actions workflow-run health check to the quarterly evidence collection process — verify that `.github/workflows/load-test-quarterly.yml` ran successfully for the current quarter before assuming job 30's LOAD_TEST_TELEMETRY input data is available.
+3. **H1/H2 guard:** Consistent with R-58 §R-58.7 item 2 — CI lint rule detecting pg_cron job deletions in migration files without a corresponding recreation statement in the same migration.
+4. **OBSERVABILITY §12.6 cross-reference:** Confirm job 30 row now references R-59 (§R-59.9 item 1).
+
+---
+
+### R-59.8 Cross-References
+
+| Source | Reference |
+|---|---|
+| `docs/OBSERVABILITY.md §12.6` | Job 30 canonical pg_cron registry entry (schedule, freshness window, AL-PERF-STALE-01 alert routing) |
+| `docs/OBSERVABILITY.md §40.3` | PERF-SLO-06 definition — quarterly p95 drift ≤ +20%; soft gate (does not block deployments) |
+| `docs/OBSERVABILITY.md §40.4` | AL-PERF-05 canonical definition — P2 `form-devops` Slack + PagerDuty alert on PERF-SLO-06 breach |
+| `docs/OBSERVABILITY.md §40.6` | Job 30 SQL spec — `perf_regression_check_quarterly()` LOAD_TEST_TELEMETRY query; pg_cron schedule; 35-day check window |
+| `docs/OBSERVABILITY.md §45` / DEC-058 | k6 Cloud EU-West quarterly reference run — `system.quarterly_perf_reference_completed` DEC-030 event as input to `perf_regression_check_quarterly()` |
+| `docs/SOC2_READINESS.md §33.3` | k6 VU scenario parameters for quarterly PERF-SLO-06 reference run |
+| `docs/INCIDENT_RESPONSE.md R-03` | Supabase infrastructure failure runbook — co-activate if R-59-C4 Part A shows all-jobs-stale discriminator |
+
+---
+
+### R-59.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Update `docs/OBSERVABILITY.md §12.6` job 30 cross-reference column: add `; INCIDENT_RESPONSE R-59 (§R-59; v1.0, 2026-07-03 — companion stale recovery runbook for job 30)` before `— **job 30**` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.14.3).** |
+| 2 | Authoring complete — §R-59 documentation obligation fulfilled | devops-lead | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.24.0).** |
+
+**Privacy floor (invariant throughout R-59):** No employee `user_id`, name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data appears in any R-59 query result, scope query output, or communication template. R-59-C1 surfaces only pg_cron run metadata (timestamps, run counts). R-59-C2 surfaces only `quarter` identifiers, `cloud_run_id` (k6 Cloud UUID with no FORM user mapping), and aggregate latency metrics. R-59-C3 surfaces only aggregate performance metrics per endpoint. R-59-C4 surfaces only pg_cron job metadata and run timestamps. All metrics are derived from synthetic k6 load test data (`lt-synthetic-{N}` tenants, `lt-user-{N}@test.form.coach`) per OBSERVABILITY §45.3 ANON invariants — no real user or health data.
+
+---
+
+*v3.24.0 (2026-07-03): R-59 — Quarterly Performance Regression Check Stale (`quarterly_perf_regression_check`, job 30) — A1.2 / CC7.2 SOC 2 evidence gap and performance monitoring blind spot companion runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 30 was the remaining quarterly pg_cron job without a companion stale recovery runbook after R-58 closed the job 36 gap (v3.23.0, 2026-07-03). §R-59 trigger matrix: AL-PERF-STALE-01 `system.cron_job_stale` for job 30 → P2 `form-devops` → devops-lead; dedup `perf-regression-check-stale`; 35-day freshness window. §R-59.1 trigger conditions: single alert AL-PERF-STALE-01 (P2, `form-devops`); quarterly cadence (first Monday of April, July, October at 09:00 UTC — schedule `0 9 1 4,7,10 1`); stale consequence: `system.perf_regression_detected` not emitted and LT-E-002 SOC 2 A1.2/CC7.2 evidence artefact goes unfiled for the quarter. §R-59.2 severity: P2 default (PERF-SLO-06 is a soft gate — no deployment block, no SLA credit exposure); P1 upgrade on confirmed P95 drift > 20% or k6 Cloud run itself missing for the quarter; P2 co-active R-03 on all-jobs-stale discriminator. §R-59.3 four scope queries: R-59-C1 (pg_cron run history for job 30 — staleness confirmation); R-59-C2 (audit log — last two quarters of `system.quarterly_perf_reference_completed` events — k6 Cloud run data availability and drift values); R-59-C3 (`system.perf_regression_detected` events — missed breach detection check); R-59-C4 two-part (Part A: peer job health discriminator; Part B: job catalog registration). §R-59.4 five root-cause hypotheses: H1 (deleted); H2 (disabled); H3 (Supabase maintenance / infrastructure); H4 (function broken or pg_cron scheduling error — `perf_regression_check_quarterly()` or LOAD_TEST_TELEMETRY Analytics Engine connectivity); H5 (k6 Cloud quarterly run not triggered — both evidence input and pg_cron evaluation missing). §R-59.5 five-step recovery: (1) trigger k6 Cloud quarterly run via `workflow_dispatch` as compensating control; (2) assess for P1 upgrade and draft LT-E-002; (3) restore job 30 by H1–H5 option (A: recreate; B: re-enable; C: await Supabase resolution; D: patch function; E: k6 Cloud workflow first); (4) confirm restoration via `cron.run_job()` + `job_run_details` succeeded row (note: forced test run may legitimately emit `system.perf_regression_detected` — do not suppress); (5) file LT-E-002 with dual devops-lead + compliance-officer sign-off to close SOC 2 A1.2 evidence gap. §R-59.6 three Slack communication templates (stale detected; regression confirmed — P1 upgrade; post-resolution). §R-59.7 four post-incident controls (LT-E-002 proactive quarterly verification; H5 k6 Cloud workflow health guard; H1/H2 CI lint guard consistent with R-58 §R-58.7 item 2; §12.6 cross-reference check). §R-59.8 seven cross-references (OBSERVABILITY §12.6 + §40.3 + §40.4 + §40.6 + §45/DEC-058; SOC2_READINESS §33.3; INCIDENT_RESPONSE R-03). §R-59.9 two-item implementation checklist (both [x] Done this pass — OBSERVABILITY §12.6 cross-ref update v5.14.3 + authoring complete). Privacy floor: all R-59 scope queries surface only pg_cron run metadata and aggregate k6 synthetic latency metrics — no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data; synthetic tenants use `lt-synthetic-{N}` IDs and `lt-user-{N}@test.form.coach` per OBSERVABILITY §45.3 ANON invariants. Document header v3.23.0 → v3.24.0. Owner: devops-lead + compliance-officer.*
 
 ---
 
