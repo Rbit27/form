@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.25.0
+# FORM · Incident Response Runbook v3.26.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -21838,6 +21838,389 @@ Post-mortem: [Linear ticket URL — if regression confirmed; otherwise N/A]
 | 2 | Authoring complete — §R-59 documentation obligation fulfilled | devops-lead | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.24.0).** |
 
 **Privacy floor (invariant throughout R-59):** No employee `user_id`, name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data appears in any R-59 query result, scope query output, or communication template. R-59-C1 surfaces only pg_cron run metadata (timestamps, run counts). R-59-C2 surfaces only `quarter` identifiers, `cloud_run_id` (k6 Cloud UUID with no FORM user mapping), and aggregate latency metrics. R-59-C3 surfaces only aggregate performance metrics per endpoint. R-59-C4 surfaces only pg_cron job metadata and run timestamps. All metrics are derived from synthetic k6 load test data (`lt-synthetic-{N}` tenants, `lt-user-{N}@test.form.coach`) per OBSERVABILITY §45.3 ANON invariants — no real user or health data.
+
+---
+
+## §R-60 — Invite Expiry Sweep & Email Cleanup Stale (`invite_expiry_sweep` job 10, `invite_email_expiry_cleanup` job 12)
+
+**Combined stale recovery runbook for two adjacent nightly pg_cron jobs that share the `tenant_invitations` table and a common compliance-officer + devops-lead owner. Both carry P1 PagerDuty alerts and have no precedent runbook — this §R-60 closes that documentation gap.**
+
+---
+
+### R-60.1 Trigger Conditions
+
+| Alert | Job | Trigger | Severity | Channel | Dedup Key |
+|---|---|---|---|---|---|
+| AL-INVITE-SWEEP-STALE-01 | Job 10 `invite_expiry_sweep` | `system.cron_job_stale` — no successful run in > 26 h | **P1** | PagerDuty `form-compliance` → compliance-officer + devops-lead | `invite-expiry-sweep-stale` |
+| AL-INVITE-EMAIL-STALE-01 | Job 12 `invite_email_expiry_cleanup` | `system.cron_job_stale` — no successful run in > 26 h | **P1** | PagerDuty `form-compliance` → compliance-officer | `invite-email-cleanup-stale` |
+
+**Schedules:** Job 10 `30 2 * * *` (02:30 UTC nightly); job 12 `0 4 * * *` (04:00 UTC nightly). Staggered 90 minutes — job 10 always completes before job 12 begins, since job 10 marks rows `expired` that job 12 then sweeps for PII erasure. A stale job 10 therefore implies a stale or partially degraded job 12 (it cannot erase emails for rows that job 10 failed to mark `expired`).
+
+**Co-activation:** both alerts co-active R-03 (Supabase infrastructure failure runbook) when R-60-C4 Part A shows all peer daily compliance jobs stale at similar timestamps.
+
+---
+
+### R-60.2 Severity Classification
+
+| Condition | Classification | Escalation |
+|---|---|---|
+| AL-INVITE-SWEEP-STALE-01 alone (job 10 only) | **P1** — seat reservation inflation risk; DEC-030 chain gap | compliance-officer + devops-lead paged |
+| AL-INVITE-EMAIL-STALE-01 alone (job 12 only) | **P1** — GDPR Art. 17 PII retention obligation at risk | compliance-officer paged; devops-lead Slack |
+| Both alerts co-active | **P1** (compound) — both consequences active simultaneously | compliance-officer + devops-lead dual-paged; treat as P0 if R-60-C3 confirms invites with `invited_email` ≠ `'[erased]'` older than 37 days post-expiry (30-day grace + 7-day stale window) |
+| HMAC chain break detected during stale window | **P0** — co-activate R-05 immediately | security-engineer + IC paged per R-05 |
+
+**Stale consequence — job 10 (`invite_expiry_sweep`):**
+
+Rows in `tenant_invitations` whose `expires_at < NOW()` remain at `status = 'pending'`. Pending invites count against the contracted seat total in `enterprise_seat_assignments` (seat reservation held by `chk_seat_assignment_not_orphan` CHECK constraint). A stale window of > 26 h means:
+
+1. **Seat overbooking risk** — tenant-admin dashboards show fewer available seats than are actually free; new bulk imports or SCIM provisions may be incorrectly rejected with `assertSeatAvailable()` throwing a capacity error.
+2. **DEC-030 chain gap** — `tenant.invite_expired` STANDARD/3yr events are not emitted for the stale batch; the HMAC chain for the affected tenant(s) has a missing link; auditors querying the chain will see a gap in event sequence.
+3. **`enterprise_seat_assignments.revoked_at`** is not written for the corresponding pending-seat rows — the seat remains formally allocated past expiry.
+
+**Stale consequence — job 12 (`invite_email_expiry_cleanup`):**
+
+`tenant_invitations` rows where `status IN ('expired', 'revoked') AND expires_at < NOW() - INTERVAL '30 days'` retain their original `invited_email` value (TEXT personal data, GDPR Art. 4(1)) instead of `'[erased]'`. A stale window > 26 h beyond the 30-day grace period constitutes an active GDPR Art. 17 retention violation for any invite whose nullification deadline fell within the stale window. ENTERPRISE_SLA §17.2 contractual data disposal commitment is at risk.
+
+---
+
+### R-60.3 Immediate Actions (T+0 to T+30)
+
+| Step | Time | Action | Owner |
+|---|---|---|---|
+| 1 | T+0 | Acknowledge PagerDuty alert; note exact stale-declared timestamp from `pg-cron-health-monitor` | compliance-officer |
+| 2 | T+5 | Run R-60-C1 to confirm staleness (both jobs or one); run R-60-C3 to determine P0 gate (invites with unErased email past 37 days) | compliance-officer |
+| 3 | T+10 | If R-60-C3 row count > 0 for 37+ days post-expiry: escalate to P0; brief devops-lead + security-engineer; prepare manual SQL from §R-60.6 Step 1 | compliance-officer |
+| 4 | T+15 | Run R-60-C2 (seat impact) and R-60-C4 (root cause discriminator) | devops-lead |
+| 5 | T+20 | Execute manual compensating controls per §R-60.6 Steps 1–2 (IC PAM elevation required for write on `tenant_invitations`; `form_system` role; IC session logged) | devops-lead (PAM-elevated) |
+| 6 | T+30 | Restore pg_cron jobs per root cause hypothesis (§R-60.6 Step 3); confirm via forced test run (§R-60.6 Step 4) | devops-lead |
+
+---
+
+### R-60.4 Scope Queries
+
+All queries use `form_system` role (read access). `form_api` is REVOKED from `tenant_invitations` and `enterprise_seat_assignments`. No `invited_email` value is read in any scope query — counts only.
+
+**R-60-C1 — pg_cron run history (staleness confirmation, both jobs):**
+```sql
+SELECT
+  jobname,
+  MAX(start_time)                                               AS last_run,
+  NOW() - MAX(start_time)                                       AS gap,
+  COUNT(*) FILTER (WHERE start_time >= NOW() - INTERVAL '7 days') AS runs_last_7_days,
+  COUNT(*) FILTER (WHERE status = 'failed')                     AS failed_runs_ever
+FROM cron.job_run_details
+WHERE jobname IN ('invite_expiry_sweep', 'invite_email_expiry_cleanup')
+GROUP BY jobname
+ORDER BY gap DESC NULLS FIRST;
+-- Confirms which jobs are stale and by how long
+-- Privacy: pg_cron run metadata only; no tenant or user PII
+```
+
+**R-60-C2 — Seat impact (job 10 stale consequence — seat inflation count per tenant):**
+```sql
+SELECT
+  ti.tenant_id,
+  COUNT(*)                                                       AS pending_past_expiry_count,
+  MIN(ti.expires_at)                                             AS oldest_expired_at,
+  NOW() - MIN(ti.expires_at)                                     AS max_stale_duration
+FROM tenant_invitations ti
+WHERE ti.status = 'pending'
+  AND ti.expires_at < NOW()
+GROUP BY ti.tenant_id
+ORDER BY pending_past_expiry_count DESC;
+-- Privacy: tenant_id (FORM-internal UUID) + aggregate counts only
+-- No invited_email, invited_by_user_id, or individual invite data
+-- Row count > 0 → job 10 stale consequence confirmed; seats over-counted for each affected tenant
+```
+
+**R-60-C3 — PII exposure gate (job 12 stale consequence — P0 escalation query):**
+```sql
+SELECT
+  COUNT(*)                                                       AS at_risk_invite_count,
+  COUNT(DISTINCT tenant_id)                                      AS affected_tenant_count,
+  MIN(expires_at)                                                AS earliest_expiry_at,
+  NOW() - MIN(expires_at)                                        AS max_pii_stale_age
+FROM tenant_invitations
+WHERE status IN ('expired', 'revoked')
+  AND expires_at < NOW() - INTERVAL '37 days'
+  AND invited_email != '[erased]';
+-- 37 days = 30-day erasure grace period + 7-day stale tolerance
+-- count > 0 → P0 escalation required (active GDPR Art. 17 breach)
+-- Privacy: aggregate counts and timestamps only; invited_email is NOT selected
+```
+
+**R-60-C4 — Root cause discriminator:**
+```sql
+-- Part A: peer daily compliance job health
+SELECT
+  jobname,
+  MAX(start_time)                  AS last_run,
+  NOW() - MAX(start_time)          AS gap,
+  COUNT(*) FILTER (WHERE start_time >= NOW() - INTERVAL '3 days') AS runs_last_3_days
+FROM cron.job_run_details
+WHERE jobname IN (
+  'invite_expiry_sweep',
+  'invite_email_expiry_cleanup',
+  'c1-erasure-sla-monitor',
+  'invite_email_expiry_cleanup',
+  'api_key_chain_monitor',
+  'victor_safety_baseline_refresh'
+)
+GROUP BY jobname
+ORDER BY gap DESC NULLS FIRST;
+-- invite_expiry_sweep gap >> peer gaps → H1/H2/H4 (job-specific issue)
+-- All daily jobs stale at similar timestamp → H3 (Supabase infrastructure)
+
+-- Part B: job catalog registration (both jobs)
+SELECT
+  jobid,
+  jobname,
+  schedule,
+  active,
+  username
+FROM cron.job
+WHERE jobname IN ('invite_expiry_sweep', 'invite_email_expiry_cleanup');
+-- No rows for a job → H1 (deleted)
+-- active = false → H2 (disabled)
+-- schedule differs from expected → tampered (devops-lead investigate)
+-- active = true, schedule correct, no recent runs → H4 (function/SQL broken)
+```
+
+---
+
+### R-60.5 Root Cause Hypotheses
+
+| Hypothesis | Indicator | Resolution |
+|---|---|---|
+| **H1 — Job(s) deleted** | R-60-C4 Part B returns no row for the affected job | Recreate job(s) per §R-60.6 Step 3, Option A |
+| **H2 — Job(s) disabled** | R-60-C4 Part B shows `active = false` | Re-enable: `UPDATE cron.job SET active = true WHERE jobname IN ('invite_expiry_sweep', 'invite_email_expiry_cleanup')` (`supabase_admin` role) |
+| **H3 — Supabase infrastructure** | R-60-C4 Part A shows all peer daily jobs stale at similar timestamps; check Supabase status page | Wait for infrastructure resolution; co-activate R-03; execute compensating SQL (§R-60.6 Steps 1–2) as a manual bridge |
+| **H4 — SQL function broken** | R-60-C4 Part B shows job active + schedule correct but recent `cron.job_run_details` rows show `status = 'failed'`; `return_message` contains SQL error | Check `return_message` for DDL changes to `tenant_invitations` that broke the job's WHERE clause; check `enterprise_seat_assignments.revoked_at` column existence; patch and redeploy |
+
+---
+
+### R-60.6 Recovery Procedure
+
+**Step 1 — Compensating control: execute job 10 logic manually (IC PAM elevation — `form_system` role):**
+
+Run only if R-60-C2 shows pending-past-expiry rows. PAM session must be opened before writing. Log the PAM session ID and link to this incident.
+
+```sql
+-- Part A: mark expired invites (job 10 logic — form_system role, PAM-elevated)
+-- Execute in a single transaction
+BEGIN;
+
+UPDATE tenant_invitations
+SET status = 'expired'
+WHERE status = 'pending'
+  AND expires_at < NOW();
+-- Returns: number of rows updated (pending_past_expiry_count from R-60-C2)
+
+UPDATE enterprise_seat_assignments esa
+SET revoked_at = NOW()
+FROM tenant_invitations ti
+WHERE ti.id = esa.invitation_id
+  AND ti.status = 'expired'
+  AND esa.revoked_at IS NULL
+  AND ti.expires_at < NOW();
+-- Returns: number of seat assignment rows revoked
+
+COMMIT;
+-- Note: tenant.invite_expired DEC-030 events are normally emitted by the pg_cron job's
+-- Worker call after the UPDATE. For the compensating manual update, compliance-officer
+-- must emit these events via the Admin Console "Manual Event Emit" PAM action
+-- (one per affected tenant_id; batch payload: expired_count INT aggregate only).
+-- Do NOT emit individual per-invite events from this SQL — the DEC-030 batch approach
+-- in the pg_cron function is the auditable path.
+```
+
+**Step 2 — Compensating control: execute job 12 logic manually (IC PAM elevation — `form_system` role):**
+
+Run only if R-60-C3 shows non-erased invited_email rows older than 30 days post-expiry. This is the critical P0 path.
+
+```sql
+-- Part B: nullify PII for stale expired/revoked invites (job 12 logic — form_system role, PAM-elevated)
+BEGIN;
+
+UPDATE tenant_invitations
+SET invited_email = '[erased]'
+WHERE status IN ('expired', 'revoked')
+  AND expires_at < NOW() - INTERVAL '30 days'
+  AND invited_email != '[erased]';
+-- Returns: at_risk_invite_count from R-60-C3 (should drop to 0 after this UPDATE)
+
+-- Verify: confirm no rows remain
+SELECT COUNT(*)
+FROM tenant_invitations
+WHERE status IN ('expired', 'revoked')
+  AND expires_at < NOW() - INTERVAL '30 days'
+  AND invited_email != '[erased]';
+-- Expected: 0 rows
+
+COMMIT;
+```
+
+**Step 3 — Restore pg_cron jobs by root cause:**
+
+*Option A (H1 — recreate):*
+```sql
+-- Execute as supabase_admin role
+-- Job 10
+SELECT cron.schedule(
+  'invite_expiry_sweep',
+  '30 2 * * *',
+  $$SELECT invite_expiry_sweep()$$
+);
+-- Job 12
+SELECT cron.schedule(
+  'invite_email_expiry_cleanup',
+  '0 4 * * *',
+  $$SELECT invite_email_expiry_cleanup()$$
+);
+-- Verify:
+SELECT jobname, schedule, active
+FROM cron.job
+WHERE jobname IN ('invite_expiry_sweep', 'invite_email_expiry_cleanup');
+```
+
+*Option B (H2 — re-enable):*
+```sql
+UPDATE cron.job
+SET active = true
+WHERE jobname IN ('invite_expiry_sweep', 'invite_email_expiry_cleanup');
+```
+
+*Option C (H3 — infrastructure):*
+Wait for Supabase infrastructure resolution per R-03. Steps 1–2 already executed as manual compensating controls. Re-enable after infrastructure confirmed stable.
+
+*Option D (H4 — function broken):*
+Check `cron.job_run_details.return_message` for SQL errors. Identify DDL changes to `tenant_invitations` that may have altered column names or RLS policies blocking `form_system`. Patch the affected SQL function; redeploy via Supabase Migrations. Confirm with `SELECT invite_expiry_sweep()` as `form_system` on staging before production.
+
+**Step 4 — Confirm restoration via forced test run:**
+```sql
+-- Force immediate execution of both jobs
+SELECT cron.run_job(
+  (SELECT jobid FROM cron.job WHERE jobname = 'invite_expiry_sweep')
+);
+SELECT cron.run_job(
+  (SELECT jobid FROM cron.job WHERE jobname = 'invite_email_expiry_cleanup')
+);
+
+-- Verify success
+SELECT jobname, start_time, end_time, status, return_message
+FROM cron.job_run_details
+WHERE jobname IN ('invite_expiry_sweep', 'invite_email_expiry_cleanup')
+ORDER BY start_time DESC
+LIMIT 4;
+-- Expected: most recent row per job shows status = 'succeeded'
+
+-- Re-run R-60-C2 and R-60-C3 to confirm zero residual rows
+```
+
+**Step 5 — File evidence and close:**
+
+devops-lead + compliance-officer sign off on `compliance/evidence/invite/INVITE-STALE-E-001-<YYYY-MM-DD>.md` (incident_id; stale duration; at_risk_invite_count from R-60-C3; seat_inflation_count from R-60-C2; manual SQL executed; PAM session ID; root cause; restoration timestamp; post-run R-60-C3 zero count confirmation). This closes the CC6.3/P5.1/P5.2 SOC 2 evidence obligation for the activation.
+
+---
+
+### R-60.7 Communication Templates
+
+**Slack `#alerts-enterprise` — Stale jobs detected:**
+```
+⚠️  AL-INVITE-SWEEP-STALE-01 + AL-INVITE-EMAIL-STALE-01 · invite pg_cron jobs stale · jobs 10 + 12
+Last successful run: [last_run_10] UTC (job 10) · [last_run_12] UTC (job 12)
+Impact: seat inflation [N invites / M tenants — R-60-C2] · PII erasure gap [K invites — R-60-C3]
+Responders: @compliance-officer + @devops-lead · R-60 runbook active
+P0 gate: R-60-C3 count for 37+ day invites → [0 / N — current status]
+```
+
+**Slack `#alerts-enterprise` — P0 escalation (R-60-C3 positive):**
+```
+🔴  P0 upgrade · GDPR Art. 17 active breach confirmed · R-60-C3 positive
+Affected invites: [N] across [M] tenants · Max PII stale age: [X] days past 30-day grace
+Compliance-officer executing PAM-elevated SQL per R-60.6 Step 2 immediately
+Security-engineer notified for R-05 co-evaluation (no chain break confirmed yet)
+GDPR Art. 33 72-hour notification clock: [started at T+0 timestamp if breach confirmed, else N/A]
+```
+
+**Slack `#alerts-enterprise` — Post-resolution:**
+```
+✅  R-60 resolved · invite_expiry_sweep (job 10) + invite_email_expiry_cleanup (job 12) restored
+R-60-C2 seat inflation rows remediated: [N] · R-60-C3 PII rows erased: [K] (post-run count: 0)
+Root cause: [H1 deleted / H2 disabled / H3 Supabase / H4 function broken] · [one-sentence summary]
+PAM session: [session_id] · INVITE-STALE-E-001 filed: compliance/evidence/invite/INVITE-STALE-E-001-<date>.md
+Post-mortem: [Linear ticket URL — if P0 GDPR breach; otherwise N/A]
+```
+
+---
+
+### R-60.8 DEC-030 Chain Events
+
+Two events constitute the INVITE-SWEEP-STALE-CHAIN-01 ordered pair per activation. Both must be registered in `docs/AUDIT_LOG_SCHEMA.md` (§R-60.12 item 1).
+
+| Event | Type | Retention | Zod Schema (key fields) | Emitter |
+|---|---|---|---|---|
+| `system.invite_expiry_sweep_stale_declared` | HIGH | 7yr | `incident_id` UUID; `confirmed_stale_since` ISO 8601; `stale_hours_job10` UINT; `stale_hours_job12` UINT (0 if job 12 healthy); `seat_inflation_count` INT (aggregate from R-60-C2); `pii_at_risk_count` INT (aggregate from R-60-C3; 0 if < 37d); `initial_severity` enum `P0\|P1`; `trigger` literal `'AL-INVITE-SWEEP-STALE-01'` | compliance-officer via `emit-audit-event` Worker (PAM-elevated IC session) |
+| `system.invite_expiry_sweep_restored` | LOW | 3yr | `incident_id` UUID (must match `stale_declared`); `restored_at` ISO 8601; `root_cause` enum `H1\|H2\|H3\|H4`; `invites_expired_manually` INT; `emails_erased_manually` INT; `jobs_restored` array `['invite_expiry_sweep', 'invite_email_expiry_cleanup']` | compliance-officer via `emit-audit-event` Worker (same IC session) |
+
+**INVITE-SWEEP-STALE-CHAIN-01 invariant:** `system.invite_expiry_sweep_restored` MUST NOT be emitted without a preceding `system.invite_expiry_sweep_stale_declared` for the same `incident_id`. The `emit-audit-event` Worker enforces this with HTTP 422 `INVITE_SWEEP_STALE_CHAIN_01_VIOLATION` on inversion (§R-60.12 item 2).
+
+**Privacy floor:** `seat_inflation_count` and `pii_at_risk_count` are aggregate INT counts — no `tenant_id`, `user_id`, `invited_email`, `invited_email_hash`, or GDPR Art. 9 data in either event payload. `incident_id` is a FORM-internal UUID with no FORM user mapping.
+
+---
+
+### R-60.9 Evidence Artefact
+
+| Artefact | Content | Collection Trigger | Cadence | Retention | R2 Path | SOC 2 Criteria |
+|---|---|---|---|---|---|---|
+| **INVITE-STALE-E-001** | Incident ID; stale-declared and restored timestamps; stale duration (hours per job); R-60-C2 seat inflation count (pre-remediation); R-60-C3 PII at-risk count (pre-remediation); PAM session ID for compensating SQL; root cause; R-60-C3 zero-count post-run confirmation | Per activation of AL-INVITE-SWEEP-STALE-01 or AL-INVITE-EMAIL-STALE-01 | Per-activation | 7yr | `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/` | CC6.3, P5.1, P5.2 |
+
+Register INVITE-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§R-60.12 item 3). Storage path note: date in folder name is the stale-declared date, not the resolution date, to allow unambiguous correlation with the DEC-030 `stale_declared` event.
+
+---
+
+### R-60.10 Post-Incident Controls
+
+1. **GDPR Art. 33 assessment (P0 activations only):** compliance-officer determines whether the PII stale duration and breach scope require supervisory authority notification under GDPR Art. 33 (72-hour window from first detection). Document determination in INVITE-STALE-E-001. If notification required, compliance-officer + legal engage per `docs/GDPR_DPIA.md §8` breach notification procedure.
+2. **H1/H2 CI guard:** extend the CI lint rule from R-58 §R-58.7 item 2 to also flag migration files that drop `invite_expiry_sweep` or `invite_email_expiry_cleanup` from `cron.job` without a corresponding `cron.schedule()` recreation in the same migration.
+3. **Sequencing re-validation:** after each restoration, confirm job 10 (02:30 UTC) precedes job 12 (04:00 UTC) in the `cron.job` schedule — job 12's efficacy depends on job 10 having marked rows `expired` first. If schedules were tampered, restore the canonical staggered schedule.
+4. **OBSERVABILITY §12.6 cross-reference check:** confirm both job 10 and job 12 rows reference R-60 (§R-60.12 items 4–5 must show [x] Done before this control is satisfied).
+5. **Quarterly proactive sweep:** devops-lead confirms `invite_expiry_sweep` and `invite_email_expiry_cleanup` each show `status = 'succeeded'` in `cron.job_run_details` within the preceding 26 hours as part of the quarterly SOC 2 compliance job health sweep.
+
+---
+
+### R-60.11 Cross-References
+
+| Source | Reference |
+|---|---|
+| `docs/OBSERVABILITY.md §12.6` | Job 10 canonical pg_cron registry entry (`invite_expiry_sweep`, 02:30 UTC, 26h freshness, AL-INVITE-SWEEP-STALE-01 P1 routing) |
+| `docs/OBSERVABILITY.md §12.6` | Job 12 canonical pg_cron registry entry (`invite_email_expiry_cleanup`, 04:00 UTC, 26h freshness, AL-INVITE-EMAIL-STALE-01 P1 routing) |
+| `docs/DATA_MODEL.md §27` | `tenant_invitations` table DDL; invite state machine; `invited_email` GDPR Art. 17 retention logic; `enterprise_seat_assignments` FK relationship; pg_cron jobs 10 and 12 specification (§27.14 items 8 and 9) |
+| `docs/DATA_MODEL.md §27.4` | `tenant_invitations` RLS policy table; `form_api` REVOKE confirmation; `form_system` full-access policy |
+| `docs/INCIDENT_RESPONSE.md R-03` | Supabase infrastructure failure runbook — co-activate when R-60-C4 Part A shows all-jobs-stale discriminator |
+| `docs/INCIDENT_RESPONSE.md R-05` | HMAC chain break runbook — co-activate immediately if chain verification fails during stale window |
+| `docs/GDPR_DPIA.md §8` | Breach notification procedure — GDPR Art. 33 72-hour supervisory authority notification (P0 activations only) |
+| `docs/ENTERPRISE_SLA.md §17.2` | Contractual data disposal commitment — stale job 12 beyond 37 days post-expiry is an ENTERPRISE_SLA breach trigger |
+| `docs/AUDIT_LOG_SCHEMA.md` | `system.invite_expiry_sweep_stale_declared` HIGH/7yr + `system.invite_expiry_sweep_restored` LOW/3yr (pending registration — §R-60.12 item 1) |
+
+---
+
+### R-60.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.invite_expiry_sweep_stale_declared` (HIGH/7yr) and `system.invite_expiry_sweep_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas and INVITE-SWEEP-STALE-CHAIN-01 ordering invariant table | compliance-officer + platform-engineer | **P0** | [ ] |
+| 2 | Implement INVITE-SWEEP-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts`: HTTP 422 `INVITE_SWEEP_STALE_CHAIN_01_VIOLATION` on `system.invite_expiry_sweep_restored` emitted without matching `system.invite_expiry_sweep_stale_declared` for same `incident_id` | platform-engineer | **P0** | [ ] |
+| 3 | Register INVITE-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.3/P5.1/P5.2; per-activation; 7yr; `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [ ] |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 10 row cross-reference column: add `; INCIDENT_RESPONSE R-60 (§R-60; v1.0, 2026-07-03 — companion stale recovery runbook for jobs 10 + 12)` before `— **job 10**` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.14.5).** |
+| 5 | Update `docs/OBSERVABILITY.md §12.6` job 12 row cross-reference column: add `; INCIDENT_RESPONSE R-60 (§R-60; v1.0, 2026-07-03 — companion stale recovery runbook for jobs 10 + 12)` before `— **job 12**` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.14.5).** |
+| 6 | Authoring complete — §R-60 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.26.0).** |
+
+**Privacy floor (invariant throughout R-60):** No `invited_email` value, individual `user_id`, `tenant_id` breakdown beyond aggregate counts, body composition metric, coaching session content, or GDPR Art. 9 special-category data appears in any R-60 scope query result, communication template payload, or INVITE-STALE-E-001 evidence artefact. R-60-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-60-C2 surfaces only aggregate `pending_past_expiry_count` and `max_stale_duration` per `tenant_id` (FORM-internal UUID). R-60-C3 surfaces only aggregate `at_risk_invite_count`, `affected_tenant_count`, and duration timestamps — `invited_email != '[erased]'` is a filter predicate, never a selected column. R-60-C4 surfaces only pg_cron job metadata and run timestamps. The compensating SQL in §R-60.6 Steps 1–2 sets `invited_email = '[erased]'` (write-only erasure) — the pre-erasure email value is never read, logged, or transmitted.
+
+---
+
+*v3.26.0 (2026-07-03): R-60 — Invite Expiry Sweep & Email Cleanup Stale (`invite_expiry_sweep` job 10, `invite_email_expiry_cleanup` job 12) — CC6.3 / P5.1 / P5.2 companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: jobs 10 and 12 were the remaining daily P1-alert pg_cron jobs without companion stale recovery runbooks after R-57 (job 58), R-58 (job 36), R-59 (job 30), and R-43 (job 11) closed the gaps for their respective jobs (2026-07-03, 2026-07-03, 2026-07-03, 2026-07-03). Both jobs operate on the `tenant_invitations` table (DATA_MODEL §27) and share the compliance-officer + devops-lead owner; they are combined into a single §R-60 because job 12's erasure scope depends on job 10 having completed the expiry-mark step first. §R-60.1 trigger matrix: AL-INVITE-SWEEP-STALE-01 `system.cron_job_stale` for job 10 → P1 `form-compliance` → compliance-officer + devops-lead; dedup `invite-expiry-sweep-stale`; AL-INVITE-EMAIL-STALE-01 `system.cron_job_stale` for job 12 → P1 `form-compliance` → compliance-officer; dedup `invite-email-cleanup-stale`; both 26h freshness windows. §R-60.2 severity: P1 default (both); compound P1 on co-activation; P0 upgrade if R-60-C3 confirms invites with `invited_email != '[erased]'` older than 37 days post-expiry (Art. 17 active breach); co-active R-03 on all-jobs-stale discriminator; co-active R-05 on HMAC chain break during stale window. §R-60.3 six-step immediate action timeline (T+0 to T+30): acknowledge; R-60-C1 staleness + R-60-C3 P0 gate; P0 escalation; R-60-C2 seat impact + R-60-C4 root cause; execute PAM-elevated manual SQL; restore and confirm. §R-60.4 four scope queries: R-60-C1 (pg_cron run history both jobs — staleness confirmation); R-60-C2 (job 10 seat inflation — pending-past-expiry count per tenant_id, no invited_email); R-60-C3 (job 12 P0 gate — at_risk_invite_count for 37+ days post-expiry, invited_email used as filter predicate only, never selected); R-60-C4 two-part (Part A: peer daily job health discriminator; Part B: job catalog registration both jobs). §R-60.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infrastructure), H4 (SQL function broken — DDL change to tenant_invitations breaking WHERE clause or RLS). §R-60.6 five-step recovery: (1) job 10 compensating SQL — UPDATE tenant_invitations status + enterprise_seat_assignments revoked_at (PAM-elevated `form_system`, BEGIN/COMMIT); (2) job 12 compensating SQL — UPDATE invited_email = '[erased]' for eligible rows + zero-count verification (PAM-elevated); (3) restore both jobs by H1–H4 option (A: cron.schedule(); B: SET active=true; C: await infrastructure; D: patch function); (4) forced cron.run_job() + job_run_details confirmation + re-run R-60-C2/R-60-C3 to confirm zero residual; (5) file INVITE-STALE-E-001 with dual devops-lead + compliance-officer sign-off. §R-60.7 three Slack communication templates (stale detected; P0 GDPR breach escalation; post-resolution). §R-60.8 DEC-030 chain: `system.invite_expiry_sweep_stale_declared` HIGH/7yr (aggregate counts only — seat_inflation_count INT, pii_at_risk_count INT; no invited_email, tenant breakdown, or GDPR Art. 9 data) and `system.invite_expiry_sweep_restored` LOW/3yr (invites_expired_manually INT, emails_erased_manually INT, root_cause enum, jobs_restored array); INVITE-SWEEP-STALE-CHAIN-01 ordering invariant (HTTP 422 INVITE_SWEEP_STALE_CHAIN_01_VIOLATION on unanchored restore). §R-60.9 INVITE-STALE-E-001 per-activation evidence artefact (CC6.3/P5.1/P5.2; per-activation; 7yr; `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/`). §R-60.10 five post-incident controls (Art. 33 breach notification assessment; H1/H2 CI guard extending R-58 §R-58.7 item 2; schedule sequencing re-validation job 10 before job 12; §12.6 cross-reference check; quarterly proactive run history sweep). §R-60.11 nine cross-references (OBSERVABILITY §12.6 ×2; DATA_MODEL §27 + §27.4; INCIDENT_RESPONSE R-03 + R-05; GDPR_DPIA §8; ENTERPRISE_SLA §17.2; AUDIT_LOG_SCHEMA ×2 pending). §R-60.12 six-item implementation checklist: items 1–3 pending (AUDIT_LOG_SCHEMA registration; INVITE-SWEEP-STALE-CHAIN-01 enforcement; SOC2_READINESS §79.4 INVITE-STALE-E-001 registration); items 4–6 [x] Done this pass (OBSERVABILITY §12.6 job 10 cross-ref update v5.14.5; OBSERVABILITY §12.6 job 12 cross-ref update v5.14.5; authoring complete). Privacy floor throughout: no `invited_email` value read, logged, or transmitted in any query, template, or artefact — R-60-C3 uses `invited_email != '[erased]'` as a filter predicate only; the compensating SQL writes `'[erased]'` without reading the prior value into any application layer; all event payloads carry aggregate INT counts and FORM-internal UUIDs only. Document header v3.25.0 → v3.26.0. Owner: compliance-officer + devops-lead + security-engineer.*
 
 ---
 
