@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.82.0
+# FORM · SOC 2 Type II Readiness v3.83.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -35255,3 +35255,41 @@ AUDIT-CHAIN-CHECK-STALE-E-001 added to §80.4 Vanta mirror protocol. Mirror dead
 | 1 | Register AUDIT-CHAIN-CHECK-STALE-E-001 in §79.4 master evidence table (CC7.2, per-activation, 7yr) | security-engineer + compliance-officer | **P1** | [x] **Done — 2026-07-03 (§156.2, this section).** |
 | 2 | Provision `compliance/evidence/audit-chain-check-stale/` R2 subfolder (new — no parent) with write-once policy and versioning (§80.3 R2 storage update) | platform-engineer | **P1** | [ ] **Pending — platform-engineer.** |
 | 3 | Add AUDIT-CHAIN-CHECK-STALE-E-001 to §80.4 Vanta mirror protocol | security-engineer + compliance-officer | **P1** | [x] **Done — 2026-07-03 (§156.4, this section).** |
+
+---
+
+## §157 · WEAR-FRESH-STALE-E-001 Registration (CC7.2 · INCIDENT_RESPONSE R-69)
+
+> **Date:** 2026-07-03. **Trigger:** INCIDENT_RESPONSE.md §R-69.12 item 3 (P1) — "Register WEAR-FRESH-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2; per-activation; 7yr; `compliance/evidence/wearable/wear-fresh-stale-e-001-<YYYY-MM-DD>/`)." **Owner:** compliance-officer + devops-lead.
+
+### §157.1 Background
+
+Job 31 (`wearable_sync_freshness_check`, `5 7 * * *`, daily 07:05 UTC) is FORM's automated daily measurement of wearable integration fleet freshness: `fn_wearable_sync_freshness_check()` queries `wearable_sync_events` per connected tenant, applies a k-anonymity gate (k ≥ 5 connected devices), computes `fresh_pct = fresh_count / total_connected × 100`, and emits `wearable.fleet_freshness_assessed` DEC-030 with aggregate scalars only. The emitted aggregate feeds WS-SLO-06 (≥ 95% fleet freshness — `docs/OBSERVABILITY.md §41`) and the quarterly WS-E-002 compliance evidence artefact. When job 31 goes stale, FORM cannot confirm WS-SLO-06 status for the missed run windows without manual compensating measurement (R-69-C3). INCIDENT_RESPONSE.md R-69 is the companion stale recovery runbook; it is P1 default (distinct from R-68 which is P0 default — a stale wearable freshness check creates a compliance measurement gap, not a chain integrity break). The WEAR-FRESH-STALE-E-001 evidence artefact captures: (1) the DEC-030 HMAC chain (`system.wearable_freshness_check_stale_declared` HIGH + `system.wearable_freshness_check_restored` LOW); (2) R-69-C1 pg_cron run history output (timestamps, status strings, return messages — no user data); (3) R-69-C2 peer job health output (H3 discriminator); (4) R-69-C3 manual fleet freshness snapshot result (aggregate `fresh_pct`, `total_connected`, `slo_met` only — no `user_id`, no individual readings). WEAR-FRESH-STALE-CHAIN-01 ordering invariant: `wearable_freshness_check_restored` blocked (HTTP 422 `WEAR_FRESH_STALE_CHAIN_01_VIOLATION`) without prior `stale_declared` for same `incident_id`; co-activates R-05.
+
+### §157.2 §79.4 Registration
+
+WEAR-FRESH-STALE-E-001 registered in §79.4 master evidence table (count 123 → 124). Evidence class: per-activation (one artefact per R-69 stale incident). Retention: 7yr WORM. TSC: CC7.2. R2 path: `compliance/evidence/wearable/wear-fresh-stale-e-001-<YYYY-MM-DD>/`. Owner: compliance-officer + devops-lead (enterprise SLA assessment note required in artefact if stale > 48h and enterprise wearable impact confirmed; nil-impact signed attestation if no SLA impact).
+
+### §157.3 §80.3 R2 Storage Update
+
+`compliance/evidence/wearable/` is a **pre-existing** top-level subfolder under `compliance/evidence/` — it was first provisioned for the quarterly WS-E-002 wearable integration fleet freshness evidence artefact (`docs/OBSERVABILITY.md §41.9`). No new R2 subfolder provisioning is required for WEAR-FRESH-STALE-E-001; the per-incident path `compliance/evidence/wearable/wear-fresh-stale-e-001-<YYYY-MM-DD>/` simply adds a new subdirectory within the already-provisioned `wearable/` folder on each R-69 activation. `r2:form-api` REVOKED (§80.3 invariant — no automated R2 write path for compliance evidence; IC PAM-elevated manual upload only). `YYYY-MM-DD` is the UTC date of the R-69 `stale_declared` emission.
+
+### §157.4 §80.4 Vanta Mirror Update
+
+WEAR-FRESH-STALE-E-001 added to §80.4 Vanta mirror protocol. Mirror deadline: within 48h of per-activation artefact filing. Evidence class: per-activation (one artefact per R-69 stale incident). Enterprise SLA impact assessment note (or signed nil-impact attestation) must be present in artefact before Vanta mirror if stale > 48h. Zero-activation period: no nil attestation required (per-activation artefact only; absence = no R-69 incidents in period).
+
+### §157.5 Cross-Reference Obligations Closed
+
+| Cross-reference | Status |
+|---|---|
+| INCIDENT_RESPONSE.md §R-69.12 item 1 (P0 — register DEC-030 events in AUDIT_LOG_SCHEMA.md) | [x] Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.83) |
+| INCIDENT_RESPONSE.md §R-69.12 item 3 (P1 — register WEAR-FRESH-STALE-E-001 in §79.4) | [x] Done — 2026-07-03 (§157.2, this section) |
+
+### §157.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register WEAR-FRESH-STALE-E-001 in §79.4 master evidence table (CC7.2, per-activation, 7yr) | compliance-officer + devops-lead | **P1** | [x] **Done — 2026-07-03 (§157.2, this section).** |
+| 2 | `compliance/evidence/wearable/` R2 subfolder pre-exists (provisioned for WS-E-002, OBSERVABILITY.md §41.9); no new provisioning required | platform-engineer | **n/a** | [x] **Pre-existing — no action required.** |
+| 3 | Add WEAR-FRESH-STALE-E-001 to §80.4 Vanta mirror protocol | compliance-officer + devops-lead | **P1** | [x] **Done — 2026-07-03 (§157.4, this section).** |
+| 4 | Authoring complete — §157 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.83.0).** |

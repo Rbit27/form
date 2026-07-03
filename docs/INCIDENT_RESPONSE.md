@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.35.0
+# FORM · Incident Response Runbook v3.35.1
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -25119,9 +25119,9 @@ Both events are HMAC-chained (DEC-030), emitted by IC (devops-lead, PAM-elevated
 
 | # | Task | Owner | Priority | Status |
 |---|---|---|---|---|
-| 1 | Register `system.wearable_freshness_check_stale_declared` (HIGH/7yr) and `system.wearable_freshness_check_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, WEAR-FRESH-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative | compliance-officer | **P0** | [ ] Pending — compliance-officer |
+| 1 | Register `system.wearable_freshness_check_stale_declared` (HIGH/7yr) and `system.wearable_freshness_check_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, WEAR-FRESH-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative | compliance-officer | **P0** | [x] **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.83).** |
 | 2 | Implement WEAR-FRESH-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker (HTTP 422 `WEAR_FRESH_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit) | platform-engineer | **P1** | [ ] Pending — platform-engineer |
-| 3 | Register WEAR-FRESH-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2; per-activation; 7yr; `compliance/evidence/wearable/wear-fresh-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [ ] Pending — compliance-officer |
+| 3 | Register WEAR-FRESH-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2; per-activation; 7yr; `compliance/evidence/wearable/wear-fresh-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.83.0, §157).** |
 | 4 | Update `docs/OBSERVABILITY.md §12.6` job 31 row cross-reference column: add `; INCIDENT_RESPONSE R-69 (§R-69; v1.0, 2026-07-03 — companion stale recovery runbook for job 31)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.15.4).** |
 | 5 | Authoring complete — §R-69 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.35.0).** |
 

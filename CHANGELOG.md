@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.8.0] — 2026-07-03
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §Wearable Sync Freshness Check Stale events` — +2 DEC-030 HMAC-chained events: `system.wearable_freshness_check_stale_declared` (HIGH/7yr/CC7.2) and `system.wearable_freshness_check_restored` (LOW/3yr/CC7.2). Zod v2 schemas, payload tables, WEAR-FRESH-STALE-CHAIN-01 ordering invariant, CC7.2 auditor narrative. Closes `docs/INCIDENT_RESPONSE.md §R-69.12` item 1 (P0). Privacy floor: `manual_fresh_pct` and `slo_met_during_stale` are aggregate scalars only — no `user_id`, HRV value, or GDPR Art. 9 data in either event payload.
+- `docs/SOC2_READINESS.md §157` — WEAR-FRESH-STALE-E-001 registered in §79.4 master evidence table (count 123 → 124). Per-activation; CC7.2; 7yr WORM; `compliance/evidence/wearable/wear-fresh-stale-e-001-<YYYY-MM-DD>/` (pre-existing R2 subfolder — no provisioning required). §80.4 Vanta mirror protocol updated. Closes `docs/INCIDENT_RESPONSE.md §R-69.12` item 3 (P1).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — Version v2.82 → v2.83.
+- `docs/SOC2_READINESS.md` — Version v3.82.0 → v3.83.0.
+- `docs/INCIDENT_RESPONSE.md` — §R-69.12 items 1 and 3 marked `[x] Done`; version v3.35.0 → v3.35.1.
+- `VERSION` — 12.7.0 → 12.8.0.
+
 ## [12.7.0] — 2026-07-03
 
 ### Added

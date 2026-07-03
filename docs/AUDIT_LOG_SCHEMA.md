@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.82
+# FORM · Audit Log Schema v2.83
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -5996,6 +5996,81 @@ const AuditChainCheckRestoredSchema = z.object({
 #### CC7.2 Auditor Narrative
 
 CC7.2 requires FORM to monitor for anomalous activity — including monitoring the integrity monitoring controls themselves. `audit-chain-daily-check` (daily 06:00 UTC, Supabase Edge Function, `supabase/functions/audit-chain-daily-check/index.ts`) is FORM's sole automated daily verifier of DEC-030 HMAC chain integrity across the full `audit_log_events` table: it reads the last 1,000 rows ordered by `sequence_number`, recomputes HMAC-SHA256(`AUDIT_CHAIN_SECRET`, `hmac_prev` ‖ canonical payload) per row using the Web Crypto API, and emits `system.audit_chain_verified` LOW on success or `system.audit_chain_break_detected` CRITICAL + R-05 trigger on failure. When `audit-chain-daily-check` goes stale (>26h without a successful run), FORM initiates R-68 within the freshness window: `system.audit_chain_check_stale_declared` HIGH is the IC-anchoring tamper-evident record that the CC7.2 HMAC chain integrity verification control lapsed; R-68-C2 manual chain linkage SQL immediately provides compensating partial coverage; security-engineer signs off confirming chain linkage intact (or R-05 forensic track is active). Distinction from all prior stale runbooks (R-60 through R-67): R-68 is P0 default with no P1 fallback — the audit chain is foundational to every other SOC 2 CC7 control's evidence record. Retention 7yr: multi-cycle SOC 2 coverage for CC7.2 chain integrity monitoring obligation.
+
+---
+
+### Wearable Sync Freshness Check Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-69 · CC7.2)
+
+> Closes `docs/INCIDENT_RESPONSE.md R-69.12` item 1 (P0). Owner: compliance-officer + devops-lead.
+
+#### system.wearable_freshness_check_stale_declared
+
+**Severity:** HIGH · **Retention:** 7 years · **TSC:** CC7.2 · **Emitter:** devops-lead (IC, PAM-elevated) via `POST /audit/emit-event`
+
+```typescript
+// Zod v2 schema
+const WearableFreshnessCheckStaleDeclaredSchema = z.object({
+  incident_id:            z.string().uuid(),
+  confirmed_stale_since:  z.string().datetime(),
+  stale_hours:            z.number().int().min(0),
+  missed_run_count:       z.number().int().min(0),
+  r03_co_active:          z.boolean(),
+});
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Fresh UUID per R-69 activation. Anchors WEAR-FRESH-STALE-CHAIN-01 ordering invariant. |
+| `confirmed_stale_since` | datetime | Timestamp of last confirmed successful `wearable_sync_freshness_check` run (from R-69-C1 `cron.job_run_details` query). |
+| `stale_hours` | int ≥ 0 | Hours since last successful run. Freshness window: 26h; normal cadence: daily 07:05 UTC. |
+| `missed_run_count` | int ≥ 0 | Number of 07:05 UTC run windows missed (1 for first detection within 26h; > 1 for multi-day stale). |
+| `r03_co_active` | boolean | `true` if H3 hypothesis (Supabase pg_cron engine degradation) — R-03 (pg_cron Engine Degradation) co-activation flag. Set to `true` only when ≥ 2 peer daily jobs are simultaneously stale, satisfying R-03 trigger criteria. |
+
+#### system.wearable_freshness_check_restored
+
+**Severity:** LOW · **Retention:** 3 years · **TSC:** CC7.2 · **Emitter:** devops-lead (IC, PAM-elevated) via `POST /audit/emit-event`
+
+```typescript
+// Zod v2 schema
+const WearableFreshnessCheckRestoredSchema = z.object({
+  incident_id:           z.string().uuid(),
+  restored_at:           z.string().datetime(),
+  root_cause:            z.enum([
+    'h1_deleted',
+    'h2_disabled',
+    'h3_infra',
+    'h4_emit_function_degraded',
+  ]),
+  stale_hours_total:     z.number().int().min(0),
+  manual_fresh_pct:      z.number().min(0).max(100).nullable(),
+  slo_met_during_stale:  z.boolean().nullable(),
+});
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Must match the `stale_declared` event for same R-69 activation. WEAR-FRESH-STALE-CHAIN-01 enforced. |
+| `restored_at` | datetime | Timestamp IC confirms `wearable_sync_freshness_check` healthy after `cron.run_job()` and `wearable.fleet_freshness_assessed` observed in audit log. |
+| `root_cause` | enum | `h1_deleted` — `cron.job` row absent; `h2_disabled` — `active = false`; `h3_infra` — Supabase pg_cron engine degradation (R-03 co-active); `h4_emit_function_degraded` — `emit_dec030_event()` / pg_net degraded. |
+| `stale_hours_total` | int ≥ 0 | Total hours `wearable_sync_freshness_check` was stale (declaration timestamp → restoration timestamp). |
+| `manual_fresh_pct` | float 0–100 or null | R-69-C3 compensating snapshot result (`fresh_count / total_connected × 100`). `null` if stale ≤ 26h and no enterprise SLA assessment was triggered. |
+| `slo_met_during_stale` | boolean or null | WS-SLO-06 status from R-69-C3 manual snapshot (`manual_fresh_pct ≥ 95`). `null` if R-69-C3 was not run. |
+
+#### WEAR-FRESH-STALE-CHAIN-01 Ordering Invariant
+
+`system.wearable_freshness_check_restored` for a given `incident_id` is blocked (HTTP 422 `WEAR_FRESH_STALE_CHAIN_01_VIOLATION`) by the `emit-audit-event` Worker if no prior `system.wearable_freshness_check_stale_declared` exists for the same `incident_id`. Co-activates R-05 on violation. Implementation pending (platform-engineer — INCIDENT_RESPONSE.md R-69.12 item 2).
+
+#### Retention Summary
+
+- `system.wearable_freshness_check_stale_declared` — HIGH — 7 years — CC7.2
+- `system.wearable_freshness_check_restored` — LOW — 3 years — CC7.2
+
+#### CC7.2 Auditor Narrative
+
+CC7.2 requires FORM to monitor for anomalous activity — including ensuring that monitoring controls themselves remain operational. `wearable_sync_freshness_check` (pg_cron job 31, `5 7 * * *`, daily 07:05 UTC) is FORM's automated daily measurement of wearable integration fleet freshness: `fn_wearable_sync_freshness_check()` queries `wearable_sync_events` per connected tenant to compute the percentage of devices with a sync event within the prior 24h, applying a k-anonymity gate (k ≥ 5 connected devices per tenant before emitting), and emits `wearable.fleet_freshness_assessed` DEC-030 with aggregate `fresh_pct`, `total_connected`, and `slo_met` scalars. The emitted aggregate feeds WS-SLO-06 (≥ 95% fleet freshness — `docs/OBSERVABILITY.md §41`) and the quarterly WS-E-002 compliance evidence artefact. When job 31 goes stale, FORM cannot confirm WS-SLO-06 status for the missed run windows without manual compensating measurement (R-69-C3). `system.wearable_freshness_check_stale_declared` HIGH is the IC-anchoring tamper-evident record of the monitoring gap; `system.wearable_freshness_check_restored` LOW captures root cause, total stale duration, and the R-69-C3 compensating measurement result. Distinction from R-68 (P0 default): R-69 is P1 default — stale `wearable_sync_freshness_check` creates a compliance measurement gap, not a chain integrity break; the WS-SLO-06 monitoring gap is remediated by the R-69-C3 compensating manual snapshot. Retention 7yr for `stale_declared`: multi-cycle SOC 2 CC7.2 evidence that FORM detected and responded to monitoring control lapses.
+
+**v2.83 · 2026-07-03 · owner: compliance-officer + devops-lead**
+*v2.83 (2026-07-03): +2 events — `system.wearable_freshness_check_stale_declared` (HIGH/7yr) and `system.wearable_freshness_check_restored` (LOW/3yr) — in new section `### Wearable Sync Freshness Check Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-69 · CC7.2)`. Closes `docs/INCIDENT_RESPONSE.md R-69.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, WEAR-FRESH-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative). WEAR-FRESH-STALE-CHAIN-01: `system.wearable_freshness_check_restored` blocked (HTTP 422 `WEAR_FRESH_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-69.12 item 2). Five-field Zod v2 `WearableFreshnessCheckStaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime — last confirmed successful run from R-69-C1), `stale_hours` (int≥0 — hours not minutes; 26h freshness window, daily 07:05 UTC cadence), `missed_run_count` (int≥0 — number of 07:05 UTC run windows missed), `r03_co_active` (bool — true if H3 Supabase pg_cron degradation; ≥ 2 peer daily jobs simultaneously stale). Six-field Zod v2 `WearableFreshnessCheckRestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum h1_deleted/h2_disabled/h3_infra/h4_emit_function_degraded — 4 values; same structure as R-67 4-value enum), `stale_hours_total` (int≥0), `manual_fresh_pct` (float 0–100 or null — R-69-C3 compensating snapshot `fresh_count/total_connected×100`; null if stale ≤ 26h and no enterprise SLA assessment triggered), `slo_met_during_stale` (bool or null — WS-SLO-06 status from R-69-C3; null if snapshot not run). CC7.2 significance: job 31 feeds WS-SLO-06 (≥ 95% fleet freshness) and the quarterly WS-E-002 evidence artefact; stale window is a P1 measurement gap remediated by R-69-C3 manual compensating snapshot — distinct from R-68 (P0 default; audit chain integrity break). Privacy floor (both schemas): `manual_fresh_pct` and `slo_met_during_stale` are aggregate scalars only — no `user_id`, individual wearable reading, HRV value, employee name, email, coaching content, body composition metric, or GDPR Art. 9 special-category data in either event payload; `form_api` REVOKED from emission path; IC PAM-elevated emission only. Retention table: +2 rows (`system.wearable_freshness_check_stale_declared` HIGH 7yr CC7.2; `system.wearable_freshness_check_restored` LOW 3yr CC7.2). Document header v2.82 → v2.83. Owner: compliance-officer + devops-lead.*
 
 **v2.82 · 2026-07-03 · owner: compliance-officer + security-engineer**
 *v2.82 (2026-07-03): +2 events — `system.audit_chain_check_stale_declared` (HIGH/7yr) and `system.audit_chain_check_restored` (LOW/3yr) — in new section `### Audit Chain Check Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-68 · CC7.2)`. Closes `docs/INCIDENT_RESPONSE.md R-68.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, AUDIT-CHAIN-CHECK-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative). AUDIT-CHAIN-CHECK-STALE-CHAIN-01: `system.audit_chain_check_restored` blocked (HTTP 422 `AUDIT_CHAIN_CHECK_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-68.12 item 2). Six-field Zod v2 `AuditChainCheckStaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime), `stale_hours` (int≥0 — hours not minutes; 26h freshness window, daily 06:00 UTC cadence), `missed_run_count` (int≥0 — number of 06:00 UTC run windows missed), `manual_chain_break_count` (int≥−1, −1 = R-68-C2 gate not yet run; final count in `restored`), `initial_severity` (enum p0|p0_escalate — p0_escalate if R-68-C2 returns chain breaks). Seven-field Zod v2 `AuditChainCheckRestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum h1_deleted/h2_disabled/h3_infra/h4a_function_missing/h4b_secret_missing/h4c_permission_denied/h4d_pg_net_disabled — 7 values, extended from R-67 4-value enum to cover secret-rotation and permission sub-causes unique to Edge Function deployment), `stale_hours_total` (int≥0), `manual_chain_break_count` (int≥0 — final; 0 if chain intact during stale window), `r05_activated` (bool — true if R-68-C2 detected chain breaks and R-05 was co-activated). CC7.2 significance: `audit-chain-daily-check` is FORM's sole automated daily verifier of DEC-030 HMAC chain integrity — when stale, FORM has no automated evidence that the audit trail has not been tampered with; this is a P0 default (all prior companion stale runbooks R-60 through R-67 were P1 or P2 default); P0-escalate + R-05 co-activation if R-68-C2 detects chain breaks. Privacy floor (both schemas): scalar integers, UUIDs, enum strings, datetime, boolean, and HMAC hash strings only — no user_id, employee name, email, health value, or GDPR Art. 9 data in chain event payloads; `form_api` REVOKED from emission path. Retention table: +2 rows (`system.audit_chain_check_stale_declared` HIGH 7yr CC7.2; `system.audit_chain_check_restored` LOW 3yr CC7.2). Document header v2.78 → v2.82 (header was previously stale — last updated at v2.78; body content reached v2.81 in prior passes without header sync; corrected this pass). Owner: compliance-officer + security-engineer.*
