@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.54.0] — 2026-07-03
+
+### Added
+- `content/post-3066-hrv-as-recovery-metric.md` — Series «Силові метрики» 3061–3070 · 6/10. HRV (RMSSD) як маркер вегетативного балансу: доказова база (Buchheit 2014; Plews et al. 2013 — CV щоденного HRV ~15% vs 7-денний rolling average ~5%; Kiviniemi et al. 2010 — HRV-guided > фіксоване планування; Meeusen et al. 2013 — реагує на системний стрес), що перебільшуємо (одне значення = шум; Oura/Whoop алгоритми невалідовані клінічно — de Zambotti et al. 2019; хибно-позитивний сигнал при OTS; слабша база для силового тренування vs витривалісного), де реальна цінність (7-денний rolling average vs індивідуальна базова лінія; перехресна перевірка з суб'єктивним сном і RPE — Halson 2014; мінімальний протокол: ранок/лежачи/до кофе/5 хв/60+ днів; третій рівень ієрархії метрик — контекстуальний). clinical-safety: NOT_REQUIRED.
+- `blog.html` — post-3066 card prepended at top of feed.
+
+### Changed
+- `README.md` — post-3066 updated proposed → draft; series «Силові метрики» counter 5/10 → 6/10.
+- `STATUS.md` — current version updated to v11.54.0; next: post-3067.
+- `VERSION` — 11.53.1 → 11.54.0.
+
+---
+
 ## [11.53.1] — 2026-07-03
 
 ### Changed
