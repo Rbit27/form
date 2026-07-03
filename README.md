@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 in progress 5/10 · series «Прогресія без тренера» 3096–3105 proposed · series «Тренування в реальних умовах» 3106–3115 proposed · editorial 61–70 in progress 6/10 · block 896–900 active · block 901–910 proposed · v11.92.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 in progress 6/10 · series «Прогресія без тренера» 3096–3105 proposed · series «Тренування в реальних умовах» 3106–3115 proposed · editorial 61–70 in progress 7/10 · block 896–900 active · block 901–910 proposed · v11.94.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -63,7 +63,7 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 64 | Тренування в спеку, мороз і поганий повітря: що змінює середовище, а що ні | **draft · v11.89.0 → post-64-training-heat-cold-air-quality.md** |
 | 65 | Специфічність проти різноманітності: скільки варіацій реально потрібно програмі | proposed |
 | 66 | Як оцінити якість сесії: не за вагою, не за болем, а за ключовими сигналами | proposed |
-| 67 | Індивідуальні відмінності в реакції на тренування: чому «що працює для всіх» не існує | proposed |
+| 67 | Індивідуальні відмінності в реакції на тренування: чому «що працює для всіх» не існує | **draft · v11.94.0 → post-67-individual-differences-training-response.md** |
 | 68 | Тренувальний план vs. тренувальна система: у чому різниця і що важливіше | proposed |
 | 69 | Коли відпочивати активно, а коли пасивно: розбір логіки відновлення | proposed |
 | 70 | Силовий прогрес після 35: що змінюється, а що — ні | proposed |
@@ -3461,7 +3461,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3079 | Warm-up як технічна діагностика: два завдання розминки і чому більшість використовує одне | **draft · v11.80.0 → post-3079-warmup-as-technical-diagnostics.md** |
 | 3080 | Синтез 3071–3080: технічна операційна система для self-coached атлета | **draft · v11.82.0 → post-3080-technical-self-diagnostics-synthesis-10-principles.md** |
 
-### Series «Мезоцикл без тренера» 3081–3090 · in progress 4/10
+### Series «Мезоцикл без тренера» 3081–3090 · in progress 6/10
 
 | Post | Topic | Status |
 |---|---|---|
@@ -3469,8 +3469,8 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3082 | Вибір тривалості блоку: 4, 6, 8 чи 12 тижнів — і від чого це реально залежить | **draft · v11.86.0 → post-3082-mesocycle-duration-4-6-8-12-weeks.md** |
 | 3083 | Ціль мезоциклу: сила, гіпертрофія, технічна робота — чому змішані цілі ускладнюють оцінку результату | **draft · v11.88.0 → post-3083-mesocycle-goal-strength-hypertrophy-technical-mixed.md** |
 | 3084 | Структура тижня всередині блоку: від логіки навантаження до відновлення | **draft · v11.89.0 → post-3084-mesocycle-weekly-structure-load-recovery.md** |
-| 3085 | Прогресія навантаження всередині мезоциклу: три моделі для різних рівнів тренованості | proposed |
-| 3086 | Деловантаження як частина блоку, а не виняток: коли планувати і скільки знижувати | proposed |
+| 3085 | Прогресія навантаження всередині мезоциклу: три моделі для різних рівнів тренованості | **draft · v11.92.0 → post-3085-mesocycle-load-progression-three-models.md** |
+| 3086 | Деловантаження як частина блоку, а не виняток: коли планувати і скільки знижувати | **draft · v11.94.0 → post-3086-mesocycle-deload-planning-and-magnitude.md** |
 | 3087 | Перехід між блоками: типові помилки і що вони говорять про самоаналіз атлета | proposed |
 | 3088 | Ретроспективний аналіз блоку: п'ять питань, які варто задати після завершення | proposed |
 | 3089 | Адаптація програми в реальному часі: що можна змінювати всередині блоку, що — ні | proposed |
