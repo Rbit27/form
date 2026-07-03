@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 in progress 9/10 · series «Мезоцикл без тренера» 3081–3090 proposed · series «Прогресія без тренера» 3096–3105 proposed · block 896–900 active · block 901–910 proposed · v11.80.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 in progress 1/10 · series «Прогресія без тренера» 3096–3105 proposed · block 896–900 active · block 901–910 proposed · v11.85.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3446,26 +3446,26 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3069 | Коли метрики брешуть: систематичні помилки в тренувальних даних | **draft · v11.59.0 → post-3069-when-metrics-lie-systematic-errors-training-data.md** |
 | 3070 | Синтез 3061–3070: операційна система вимірювань для self-coached атлета | **draft · v11.60.0 → post-3070-strength-metrics-synthesis-measurement-system.md** |
 
-### Editorial series: 3071–3080 · Технічна самодіагностика: що бачить атлет без тренера — і як навчитись бачити більше (proposed · v11.41.0)
+### Editorial series: 3071–3080 · Технічна самодіагностика: що бачить атлет без тренера — і як навчитись бачити більше (COMPLETE 10/10 · v11.82.0)
 
 | Post | Topic | Status |
 |---|---|---|
 | 3071 | Відеоаналіз власного тренування: мінімальний протокол без тренера | **draft · v11.63.0 → post-3071-video-analysis-self-coached-minimum-protocol.md** |
 | 3072 | Три класи технічних помилок і як кожну виявляти без зовнішнього погляду | **draft · v11.67.0 → post-3072-three-classes-technical-errors.md** |
 | 3073 | Моторне навчання і рухова пам'ять: що закріплюється і як це змінити | **draft · v11.69.0 → post-3073-motor-learning-movement-memory.md** |
-| 3074 | Технічний дрейф під втомою: коли зупинятись і що це говорить про програму | proposed |
-| 3075 | Компенсаторні патерни: де вони прогресу допомагають, де системно шкодять | proposed |
-| 3076 | Кінестетичне відчуття і реальна техніка: чому «відчуваю правильно» — не аргумент | proposed |
+| 3074 | Технічний дрейф під втомою: коли зупинятись і що це говорить про програму | **draft · v11.71.0 → post-3074-technical-drift-under-fatigue.md** |
+| 3075 | Мобільність як технічне обмеження: самооцінка без тренера | **draft · v11.73.0 → post-3075-mobility-self-assessment-technical-limitation.md** |
+| 3076 | Двосторонні vs. односторонні вправи у технічній діагностиці | **draft · v11.76.0 → post-3076-bilateral-vs-unilateral-technical-diagnostics.md** |
 | 3077 | Силова крива і вузькі місця руху: як читати де саме ти втрачаєш | **draft · v11.78.0 → post-3077-force-curve-sticking-points-diagnostics.md** |
 | 3078 | Технічна регресія після перерви: скільки потрібно для відновлення рухового навику | **draft · v11.79.0 → post-3078-technical-regression-after-break-motor-skill-recovery.md** |
 | 3079 | Warm-up як технічна діагностика: два завдання розминки і чому більшість використовує одне | **draft · v11.80.0 → post-3079-warmup-as-technical-diagnostics.md** |
-| 3080 | Синтез 3071–3080: технічна операційна система для self-coached атлета | proposed |
+| 3080 | Синтез 3071–3080: технічна операційна система для self-coached атлета | **draft · v11.82.0 → post-3080-technical-self-diagnostics-synthesis-10-principles.md** |
 
-### Series «Мезоцикл без тренера» 3081–3090 · proposed
+### Series «Мезоцикл без тренера» 3081–3090 · in progress 1/10
 
 | Post | Topic | Status |
 |---|---|---|
-| 3081 | Що таке мезоцикл і для чого він потрібен self-coached атлету: структура, функція, мінімум | proposed |
+| 3081 | Що таке мезоцикл і для чого він потрібен self-coached атлету: структура, функція, мінімум | **draft · v11.84.0 → post-3081-mesocycle-structure-function-minimum.md** |
 | 3082 | Вибір тривалості блоку: 4, 6, 8 чи 12 тижнів — і від чого це реально залежить | proposed |
 | 3083 | Ціль мезоциклу: сила, гіпертрофія, технічна робота — чому змішані цілі ускладнюють оцінку результату | proposed |
 | 3084 | Структура тижня всередині блоку: від логіки навантаження до відновлення | proposed |

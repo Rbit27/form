@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.85.0] — 2026-07-03
+
+### Added
+- `content/post-3081-mesocycle-structure-function-minimum.md` — NEW SERIES «Мезоцикл без тренера» 3081–3090 · post 1/10. «Що таке мезоцикл і для чого він потрібен self-coached атлету: структура, функція, мінімум». Точне визначення мезоциклу як тренувального блоку з єдиним домінантним акцентом і логічною прогресією усередині (≠ «тренуватись тижнями»). Три функції: (1) управління накопиченням втоми — розрізнення продуктивного і контрпродуктивного накопичення (Stone et al. 2002 — стрес-відновлення-адаптація); (2) концентрація адаптивного сигналу — блокова vs. паралельна модель (Issurin 2008); (3) горизонт для оцінки — тиждень занадто малий для більшості адаптацій. П'ять елементів мінімального мезоциклу: визначений акцент, дата завершення, логіка прогресії, фіксований підбір вправ, критерій оцінки. Що мезоцикл не є: гарантія прогресу, жорсткий контракт, метод тільки для елітних. Поширені помилки без структури: нескінченна акумуляція без deload, безперервна зміна вправ, оцінка за відчуттям тижня, реактивне програмування. clinical-safety: NOT_REQUIRED.
+- `blog.html` — post-3081 card prepended at top of feed. Category: Programming. Series marker: «Мезоцикл без тренера» 1/10.
+
+### Changed
+- `README.md` — Series «Технічна самодіагностика» 3071–3080: header updated (proposed → COMPLETE 10/10 · v11.82.0); table rows for posts 3074, 3075, 3076, 3080 corrected from «proposed» to draft status with correct version tags and filenames. Series «Мезоцикл без тренера» 3081–3090: header updated (proposed → in progress 1/10); post-3081 row marked draft. Content roadmap summary line updated to v11.85.0.
+- `STATUS.md` — v11.85.0 current iteration added.
+- `VERSION` — 11.84.0 → 11.85.0.
+
+---
+
 ## [11.84.0] — 2026-07-03
 
 ### Changed
