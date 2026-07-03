@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.60.0] — 2026-07-03
+
+### Added
+- `content/post-3069-when-metrics-lie-systematic-errors-training-data.md` — Block 3061–3070 cluster «Силові метрики» post 9/10. «Коли метрики брешуть: систематичні помилки в тренувальних даних». Три класи систематичних помилок: (1) вимірювання — anchoring bias у RPE (Tversky & Kahneman 1974); novelty effect на суб'єктивну важкість; mood і arousal (Blumert et al. 2007: ±4–8% сила залежно від часу доби); e1RM похибка ±5–12% (Dorsman et al. 2021 мета-аналіз); неконтрольовані повтори, ROM-дрейф і RIR-зміщення у Volume Load; (2) когнітивні — confirmation bias (Nickerson 1998); self-serving attribution; recency bias (Kahneman & Tversky 1973: availability heuristic); (3) порівняльні — baseline drift і необхідність абсолютних маркерів; змішані умови між вимірюваннями. Рівні достовірності 1–4: від одиничної точки (не приймати рішень) до підтвердженого мультиметричного тренду. Практичний аудит власних даних: питання до RPE, e1RM, Volume Load і інтерпретаційної логіки. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-3070-strength-metrics-synthesis-measurement-system.md` — Block 3061–3070 cluster «Силові метрики» post 10/10 — SERIES COMPLETE. «Синтез 3061–3070: операційна система вимірювань для self-coached атлета». Три функції системи вимірювань: підтвердження стимулу, відстеження прогресу, управління навантаженням. Ієрархія метрик: Рівень 1 первинні (RPE, виконаний план, e1RM-тренд); Рівень 2 вторинні (Effective Sets/MEV/MRV, wellness 3 параметри, RPE-drift); Рівень 3 допоміжні (HRV rolling average, відеоаналіз, Volume Load як архів). Мінімальна конфігурація: 30 сек/день + warm-up тест + RPE в журнал + тижневий огляд 5 хв + e1RM-тест раз на 3–4 тижні. Операційна логіка: три таблиці щоденних/тижневих/блокових рішень на основі даних. Критерії хорошої системи: відтворюваність, мінімально необхідний рівень, стійкість до упередженості, дієвість. Таблиця синтезу всіх 10 постів серії. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — posts 3070 і 3069 prepended at top of feed (у порядку зворотньої хронології).
+- `README.md` — серія «Силові метрики» 3061–3070 оновлена: active (8/10) → COMPLETE 10/10; пости 3069 і 3070 оновлені proposed → draft; series header оновлено до v11.60.0.
+- `STATUS.md` — current version оновлено до v11.60.0 з описом обох постів і наступних кроків.
+- `VERSION` — 11.58.0 → 11.60.0.
+
 ## [11.58.0] — 2026-07-03
 
 ### Changed

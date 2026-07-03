@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–53 drafted · 36 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 active (8/10) · series «Технічна самодіагностика» 3071–3080 proposed · series «Мезоцикл без тренера» 3081–3090 proposed · block 896–900 active · block 901–910 proposed · v11.57.0
+### Editorial series: 11–53 drafted · 36 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 proposed · series «Мезоцикл без тренера» 3081–3090 proposed · block 896–900 active · block 901–910 proposed · v11.60.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3429,7 +3429,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3059 | Як складати тренувальний журнал, який справді допомагає: мінімум даних для максимальних рішень | **draft · v11.47.0 → post-3059-training-journal-minimum-data.md** |
 | 3060 | Синтез 3051–3060: операційний протокол програмних рішень для self-coached атлета | **draft · v11.48.0 → post-3060-programming-decisions-synthesis.md** |
 
-### Editorial series: 3061–3070 — Силові метрики: як читати числа і будувати ієрархію орієнтирів (active · v11.49.0)
+### Editorial series: 3061–3070 — Силові метрики: як читати числа і будувати ієрархію орієнтирів (COMPLETE 10/10 · v11.60.0)
 
 Блок про те, як self-coached атлет вибудовує систему вимірювань — яким числам довіряти, яким ні, і як будувати ієрархію метрик без ілюзії точності. Фокус: практика читання власних тренувальних даних без external validation. Тон: editorial-brutalist, 13-min read.
 
@@ -3443,8 +3443,8 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3066 | HRV як метрика відновлення: що ми знаємо, що перебільшуємо, де реальна цінність | **draft · v11.54.0 → post-3066-hrv-as-recovery-metric.md** |
 | 3067 | Як відстежувати технічну якість без тренера: відео, velocity, RPE | **draft · v11.55.0 → post-3067-tracking-technical-quality-no-coach.md** |
 | 3068 | Як читати міжсесійне відновлення: сигнали що означають зупинитись vs продовжити | **draft · v11.56.0 → post-3068-inter-session-recovery-signals-stop-vs-continue.md** |
-| 3069 | Коли метрики брешуть: систематичні помилки в тренувальних даних | proposed |
-| 3070 | Синтез 3061–3070: операційна система вимірювань для self-coached атлета | proposed |
+| 3069 | Коли метрики брешуть: систематичні помилки в тренувальних даних | **draft · v11.59.0 → post-3069-when-metrics-lie-systematic-errors-training-data.md** |
+| 3070 | Синтез 3061–3070: операційна система вимірювань для self-coached атлета | **draft · v11.60.0 → post-3070-strength-metrics-synthesis-measurement-system.md** |
 
 ### Editorial series: 3071–3080 · Технічна самодіагностика: що бачить атлет без тренера — і як навчитись бачити більше (proposed · v11.41.0)
 
