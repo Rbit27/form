@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 in progress 1/10 · series «Тренування в реальних умовах» 3106–3115 in progress 1/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 in progress 6/10 · series «Самодіагностика без тренера» 3116–3125 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.10.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 in progress 3/10 · series «Тренування в реальних умовах» 3106–3115 in progress 2/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 in progress 7/10 · series «Самодіагностика без тренера» 3116–3125 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.12.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -73,7 +73,7 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 74 | Тренування і когніція: що спортивна наука каже про вплив на ментальну продуктивність | proposed |
 | 75 | Синтез блоку 61–75: FORM editorial compass — 15 орієнтирів без мотиваційного шуму | **draft · v12.7.0 → post-75-editorial-compass-synthesis-61-75.md** |
 | 76 | Другий рік тренувань: де закінчується новачковий ефект і що відбувається далі | proposed |
-| 77 | Як будувати програму навколо двох пріоритетів одночасно | proposed |
+| 77 | Тренування і сон: що спортивна наука знає про двонапрямковий зв'язок | **draft · v12.11.0 → post-77-training-and-sleep-bidirectional-relationship.md · Редакційна серія 71–80 7/10** |
 | 78 | Варіабельність тренувального відгуку: чому одна і та сама програма дає різні результати | proposed |
 | 79 | Як зрозуміти, що тренування не досягає цілі — без зовнішнього тренера | proposed |
 | 80 | Деload без відчуття марнування часу: перепрограмування очікувань | proposed |
@@ -3489,7 +3489,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 |---|---|---|
 | 3096 | Прогресивне перевантаження без коуча: чому число у журналі — не той показник | proposed |
 | 3097 | Три типи плато і як розрізнити їх без зовнішнього погляду | proposed |
-| 3098 | Коли додавати вагу, а коли — ні: операційний алгоритм для self-coached атлета | proposed |
+| 3098 | Прогресія при нерегулярному розкладі: як будувати і читати прогрес, коли тренування пропускаються | **draft · v12.11.0 → post-3098-progression-irregular-schedule.md · «Прогресія без тренера» 3/10** |
 | 3099 | Якісний vs. кількісний прогрес: що вважається і що ні | proposed |
 | 3100 | Адаптаційний lag: чому прогрес часто з'являється пізніше, ніж очікується | proposed |
 | 3101 | Нелінійний прогрес як норма: як виглядає здорова крива адаптації | proposed |
@@ -3505,7 +3505,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | Post | Topic | Status |
 |---|---|---|
 | 3106 | Тренування після безсонної ночі: що реально змінюється і що можна зберегти | **draft · v12.10.0 → post-3106-training-after-sleepless-night.md** |
-| 3107 | Хвороба і тренування: де межа між «можна» і «не варто» — і хто її визначає | proposed |
+| 3107 | Хвороба і тренування: де межа між «можна» і «не варто» — і хто її визначає | **draft · v12.11.0 → post-3107-illness-and-training-boundary.md · «Тренування в реальних умовах» 2/10 · clinical-safety CONDITIONAL PASS** |
 | 3108 | Тренування у відрядженні або подорожі: мінімальний протокол без залу | proposed |
 | 3109 | Коли немає часу на повну сесію: скорочений формат без втрати стимулу | proposed |
 | 3110 | Тренування під час стресового тижня: де знизити навантаження, де не треба | proposed |

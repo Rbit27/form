@@ -2,6 +2,21 @@
 
 ## [12.11.0] — 2026-07-03
 
+## [12.12.0] — 2026-07-03
+
+### Added
+- `content/post-77-training-and-sleep-bidirectional-relationship.md` — Editorial series 71–80, post 7/10. «Тренування і сон: що спортивна наука знає про двонапрямковий зв'язок». Двонапрямковий зв'язок: сон впливає на тренування — і тренування впливає на сон. Напрям 1: GH-секреція (до 70% добової — під час SWS; Van Cauter et al. 2000); тестостерон (1 тиждень обмеження сну → -10–15%, Leproult & Van Cauter 2011); Dattilo et al. 2011 (катаболічне середовище при хронічному недосипанні); нейром'язова функція і моторна консолідація (Walker & Stickgold 2004); Fullagar et al. 2015 (аеробна і когнітивна функція деградують раніше за максимальну силу). Напрям 2: тренування покращує якість сну (Youngstedt & Kline 2006 метааналіз); Stutz et al. 2019 (вечірні тренування — реальна картина vs. міф); циркадна синхронізація через постійний час тренування. HRV як точка перетину обох процесів (Buchheit 2014). Позитивний і негативний цикли. Операційна таблиця реакцій за сценаріями дефіциту сну. clinical-safety: NOT_REQUIRED. sports-scientist review pending. blog.html card prepended.
+- `content/post-3098-progression-irregular-schedule.md` — Series «Прогресія без тренера» 3096–3105, post 3/10. «Прогресія при нерегулярному розкладі: як будувати і читати прогрес, коли тренування пропускаються». Дві ментальні моделі: «водоспад» (борг, надолужити) vs. «ріка» (перерва без боргу). Фізіологія детренінгу (Mujika & Padilla 2000): до 2 тижнів — мінімальна втрата силових показників у тренованих атлетів; нейром'язова ефективність є найбільш стійким показником. Чотирирівневий алгоритм повернення (<5 / 5–14 / 14–30 / >30 днів). Кластерна оцінка прогресу замість тижневої: N сесій як одиниця порівняння незалежно від часових рамок. Фактична vs. запланована частота (Isaacs & Pohlman 2019). Нумерація сесій замість тижнів. Три специфічних виклики нерегулярного розкладу і рішення. clinical-safety: NOT_REQUIRED. sports-scientist review pending. blog.html card prepended.
+- `content/post-3107-illness-and-training-boundary.md` — Series «Тренування в реальних умовах» 3106–3115, post 2/10. «Хвороба і тренування: де межа між «можна» і «не варто» — і хто її визначає». Neck check rule (Eichner 1993): симптоми вище шиї без температури vs. нижче шиї або температура. Температурний гейт: абсолютний, без виключень (Kluger 1986 — температура = частина імунної відповіді; фізичне навантаження + температура = адитивний тепловий стрес). Міокардит при вірусній інфекції (Maron & Udelson 2015) — кардіальні симптоми = зупинка + лікар. Операційний алгоритм рішення. Прийнятне тренування при симптомах вище шиї (технічна робота 65–70%, аеробна 60–65% ЧСС). Протокол поступового повернення після хвороби. Постковідний синдром / ME/CFS явно виключені зі скопу. clinical-safety: CONDITIONAL PASS (fever gate absolute; below-neck = stop; cardiac symptoms → physician redirect; scope: mild URTI in healthy adult athlete only). sports-scientist review pending. blog.html card prepended.
+
+### Changed
+- `blog.html` — post-3107, post-3098, post-77 cards prepended to top of feed.
+- `README.md` — editorial 71–80 6/10 → 7/10; «Прогресія без тренера» 3096–3105 in progress 2/10 → 3/10; «Тренування в реальних умовах» 3106–3115 in progress 1/10 → 2/10; header → v12.12.0.
+- `STATUS.md` — v12.12.0 entry added.
+- `VERSION` — 12.11.0 → 12.12.0.
+
+## [12.11.0] — 2026-07-03
+
 ### Added
 - `docs/INCIDENT_RESPONSE.md` — R-70: `pam_postgres_sync` stale companion runbook (CC6.2/CC6.6 · job 20). Trigger: 35h stale, P2 default (escalate P1 if non-break-glass gaps found; P0 if break-glass gaps or stale >72h). R-70-C1 gap-check SQL (PAM-elevated, security-engineer + IC only). Four root-cause discriminators (H1 deleted / H2 disabled / H3 pg_cron infra / H4 pg_net). Evidence artefact: PAM-SYNC-STALE-E-001. Header v3.35.1 → v3.36.0.
 - `docs/AUDIT_LOG_SCHEMA.md` — §PAM Postgres Sync Stale events: `security.pam_postgres_sync_stale_declared` (HIGH, 7yr, DEC-030 HMAC-chained, `PamPostgresSyncStaleDeclaredSchema` Zod v2) + `security.pam_postgres_sync_restored` (LOW, 3yr, `PamPostgresSyncRestoredSchema` Zod v2). PAM-SYNC-STALE-CHAIN-01 ordering invariant: `restored` blocked (HTTP 422 `PAM_SYNC_STALE_CHAIN_01_VIOLATION`) without prior `stale_declared` for same `incident_id`; co-activates R-05. Header v2.83 → v2.84.
@@ -9,6 +24,8 @@
 
 ### Changed
 - `docs/OBSERVABILITY.md` — §12.6 job 20 (`pam_postgres_sync`) cross-reference column: appended `INCIDENT_RESPONSE R-70 (§R-70; v1.0, 2026-07-03 — companion stale recovery runbook for job 20)`. Header v5.15.4 → v5.15.5.
+- `VERSION` — 12.10.0 → 12.11.0.
+
 - `VERSION` — 12.10.0 → 12.11.0.
 
 ## [12.10.0] — 2026-07-03
