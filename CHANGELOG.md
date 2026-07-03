@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [11.56.0] — 2026-07-03
+
+### Added
+- `content/post-3068-inter-session-recovery-signals-stop-vs-continue.md` — Editorial series post 3068. «Як читати міжсесійне відновлення: сигнали що означають зупинитись vs продовжити». Три рівні читання сигналів відновлення: (1) гострий — DOMS як нейтральний сигнал (Damas et al. 2016: repeated bout effect; тренуватися при крепатурі можна), warm-up тест, суб'єктивна якість сну (Halson 2014: найранніший маркер накопиченої втоми); guard rail: гострий суглобовий/сухожильний біль, набряк, нейрологічні симптоми → redirect до лікаря; (2) субгострий — RPE-drift між сесіями (Helms et al. 2016: при фіксованому % від 1RM стабільний стан → стабільний RPE), inter-session RPE варіабельність (Zourdos et al. 2016), якість першого важкого підходу (Meeusen et al. 2013: ранній маркер overreaching); (3) системний — 7-денний HRV rolling average (Plews et al. 2013: CV ~5% проти ~15% точкового), wellness-тренд за Meeusen et al. 2013, стагнація без погіршення стану (Kreher & Schwartz 2012: не питання відновлення, а програмне питання). Операційна карта 9 рядків. Мінімальний практичний протокол (30 сек/день, warm-up тест, щотижневий огляд 5 хв). clinical-safety: CONDITIONAL PASS (guard rail: суглобовий/сухожильний біль/набряк/нейросимптоми → лікар). sports-scientist review pending. Blog card prepended at top of feed.
+
+### Changed
+- `blog.html` — post-3068 card prepended at top of feed.
+- `README.md` — post-3067 updated proposed → draft (v11.55.0); post-3068 topic updated (was «Прогрес без числових маркерів» → «Як читати міжсесійне відновлення») and marked draft; series counter 6/10 → 8/10; version reference updated.
+- `VERSION` — 11.55.1 → 11.56.0.
+
 ## [11.55.1] — 2026-07-03
 
 ### Changed

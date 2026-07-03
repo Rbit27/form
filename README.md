@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · 35 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 active (6/10) · series «Технічна самодіагностика» 3071–3080 proposed · block 896–900 active · block 901–910 proposed · v11.54.0
+### Editorial series: 11–44 drafted · 35 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 active (8/10) · series «Технічна самодіагностика» 3071–3080 proposed · block 896–900 active · block 901–910 proposed · v11.56.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3441,8 +3441,8 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3064 | Що тренувальний журнал вимірює точно, а що він систематично спотворює | **draft · v11.52.0 → post-3064-training-log-what-it-measures-and-distorts.md** |
 | 3065 | Volume load і effective sets: дві мови про обсяг і де кожна корисна | **draft · v11.53.0 → post-3065-volume-load-vs-effective-sets.md** |
 | 3066 | HRV як метрика відновлення: що ми знаємо, що перебільшуємо, де реальна цінність | **draft · v11.54.0 → post-3066-hrv-as-recovery-metric.md** |
-| 3067 | Як відстежувати технічну якість без тренера: відео, velocity, RPE | proposed |
-| 3068 | Прогрес без числових маркерів: що ще можна вимірювати | proposed |
+| 3067 | Як відстежувати технічну якість без тренера: відео, velocity, RPE | **draft · v11.55.0 → post-3067-tracking-technical-quality-no-coach.md** |
+| 3068 | Як читати міжсесійне відновлення: сигнали що означають зупинитись vs продовжити | **draft · v11.56.0 → post-3068-inter-session-recovery-signals-stop-vs-continue.md** |
 | 3069 | Коли метрики брешуть: систематичні помилки в тренувальних даних | proposed |
 | 3070 | Синтез 3061–3070: операційна система вимірювань для self-coached атлета | proposed |
 
