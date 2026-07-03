@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 in progress 6/10 · series «Мезоцикл без тренера» 3081–3090 proposed · series «Прогресія без тренера» 3096–3105 proposed · block 896–900 active · block 901–910 proposed · v11.77.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 in progress 8/10 · series «Мезоцикл без тренера» 3081–3090 proposed · series «Прогресія без тренера» 3096–3105 proposed · block 896–900 active · block 901–910 proposed · v11.79.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3456,8 +3456,8 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3074 | Технічний дрейф під втомою: коли зупинятись і що це говорить про програму | proposed |
 | 3075 | Компенсаторні патерни: де вони прогресу допомагають, де системно шкодять | proposed |
 | 3076 | Кінестетичне відчуття і реальна техніка: чому «відчуваю правильно» — не аргумент | proposed |
-| 3077 | Силова крива і вузькі місця руху: як читати де саме ти втрачаєш | proposed |
-| 3078 | Технічна регресія після перерви: скільки потрібно для відновлення рухового навику | proposed |
+| 3077 | Силова крива і вузькі місця руху: як читати де саме ти втрачаєш | **draft · v11.78.0 → post-3077-force-curve-sticking-points-diagnostics.md** |
+| 3078 | Технічна регресія після перерви: скільки потрібно для відновлення рухового навику | **draft · v11.79.0 → post-3078-technical-regression-after-break-motor-skill-recovery.md** |
 | 3079 | Warm-up як технічна діагностика: два завдання розминки і чому більшість використовує одне | proposed |
 | 3080 | Синтез 3071–3080: технічна операційна система для self-coached атлета | proposed |
 
