@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · 35 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 active (3/10) · series «Технічна самодіагностика» 3071–3080 proposed · block 896–900 active · block 901–910 proposed · v11.51.0
+### Editorial series: 11–44 drafted · 35 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 active (4/10) · series «Технічна самодіагностика» 3071–3080 proposed · block 896–900 active · block 901–910 proposed · v11.52.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3438,7 +3438,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3061 | Ієрархія метрик у силовому тренуванні: що вимірювати, коли і чому | **draft · v11.49.0 → post-3061-strength-metrics-hierarchy.md** |
 | 3062 | e1RM як операційний орієнтир: де він надійний, де брехливий | **draft · v11.50.0 → post-3062-e1rm-operational-benchmark.md** |
 | 3063 | RPE vs % від 1RM: не «що краще» — а що коли і для кого | **draft · v11.51.0 → post-3063-rpe-vs-percentage-1rm.md** |
-| 3064 | Що тренувальний журнал вимірює точно, а що він систематично спотворює | proposed |
+| 3064 | Що тренувальний журнал вимірює точно, а що він систематично спотворює | **draft · v11.52.0 → post-3064-training-log-what-it-measures-and-distorts.md** |
 | 3065 | Volume load і effective sets: дві мови про обсяг і де кожна корисна | proposed |
 | 3066 | HRV як метрика відновлення: що ми знаємо, що перебільшуємо, де реальна цінність | proposed |
 | 3067 | Як відстежувати технічну якість без тренера: відео, velocity, RPE | proposed |

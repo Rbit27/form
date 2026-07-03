@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.52.0] — 2026-07-03
+
+### Added
+- `content/post-3064-training-log-what-it-measures-and-distorts.md` — Series «Силові метрики» (3061–3070) post 4/10. «Що тренувальний журнал вимірює точно, а що він систематично спотворює». Точно: зовнішнє навантаження (вага × рeps × sets), хронологічна прогресія, особисті рекорди (якщо записані в момент). Спотворює: RPE записаний ретроспективно — peak-end rule (Kahneman et al. 1993): оцінка визначається піком і завершенням, не інтегрованою сумою; контекст між сесіями системно відсутній (Halson 2014: той самий підхід при різному відновленні = різне відносне зусилля); технічна якість не фіксується (ефективний vs загальний об'єм — Krieger 2010); confirmation bias при аналізі (Meehl 1954). Session RPE за методом Foster (2001): через 30 хв після завершення, не одразу. Ієрархія довіри: вага штанги — висока; RPE підходу — середня (тільки якщо відразу); загальне «відчуття» — низька; технічна якість — дуже низька. Мінімальний запис: вага × reps × RPE (одразу) + контекстний блок readiness + сон. Джерела: Borresen & Lambert 2009, Foster et al. 2001, Halson 2014, Helms et al. 2016, Impellizzeri et al. 2004, Kahneman et al. 1993, Krieger 2010, Meehl 1954, Morgan & Pollock 1977. clinical-safety: NOT_REQUIRED.
+- `blog.html` — картка post-3064 prepended at top of feed.
+
+### Changed
+- `README.md` — series «Силові метрики» 3061–3070 counter 3/10 → 4/10; post-3064 updated proposed → draft; v11.52.0.
+- `STATUS.md` — v11.52.0 current version added; next updated to post-3065.
+- `VERSION` — 11.51.0 → 11.52.0.
+
+---
+
 ## [11.51.0] — 2026-07-03
 
 ### Added
