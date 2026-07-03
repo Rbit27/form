@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [12.6.0] — 2026-07-03
+
+### Added
+- `content/post-74-training-and-cognition.md` — Редакційна серія 71–80 · 4/10. «Тренування і когніція: що спортивна наука каже про вплив вправ на ментальну продуктивність». BDNF і нейропластичність (Cotman & Berchtold 2002, Nature Rev Neuroscience); гіпокампальна нейрогенеза при аеробних тренуваннях (Erickson et al. 2011, PNAS: +2% об'єму за рік); гострий ефект помірного аеробного навантаження на виконавчу функцію у вікні 20–60 хвилин (Chang et al. 2012, мета-аналіз 79 досліджень); силові тренування і когніція — RCT Liu-Ambrose et al. (2010, Arch Int Med): 12 місяців → Stroop/Trail Making B; інвертована U-крива інтенсивності (Lambourne & Tomporowski 2010); перевтома і когнітивне зниження як маркер overreaching (Meeusen et al. 2013 ACSM); практичні висновки для self-coached атлета. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-3096-progressive-overload-no-coach.md` — Серія «Прогресія без тренера» 3096–3105 · 1/10. «Прогресивне перевантаження без коуча: чому число у журналі — не той показник». Три механізми гіпертрофії (Schoenfeld 2010); параметри прогресії (вага, об'єм, RoM, RIR, темп, частота); три моделі прогресії (лінійна / DUP / блокова); RIR як операційна мова прогресії без зовнішнього спостерігача (Zourdos et al. 2016); пастка «прогресивного накопичення втоми» без фіксації внутрішнього навантаження; одиниця виміру — блок, не тренування. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — картки post-74 і post-3096 додані на вершину фіду.
+
+### Changed
+- `README.md` — editorial 71–80 in progress 3/10 → 4/10; block 896–900 active → COMPLETE; block 901–910 proposed → COMPLETE; block 911–929 active (позначено поточний реальний стан); series «Прогресія без тренера» 3096–3105 proposed → in progress 1/10; VERSION оновлено до v12.6.0.
+- `VERSION` — 12.5.0 → 12.6.0.
+
 ## [12.5.0] — 2026-07-03
 
 ### Added
