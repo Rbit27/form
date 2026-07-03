@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.88.0] — 2026-07-03
+
+### Added
+- `content/post-3083-mesocycle-goal-strength-hypertrophy-technical-mixed.md` — Серія «Мезоцикл без тренера» 3/10. «Ціль мезоциклу: сила, гіпертрофія, технічна робота — чому змішані цілі ускладнюють оцінку результату». Три типи блоків оптимізують різні адаптації через різні механізми (Schoenfeld 2010, 2017; Krieger 2010; Fry 2004; Sale 1988); конкуренція за ресурси відновлення; операційний принцип ієрархії цілей (первинна + вторинна «підтримуюча»); технічний блок як окремий тип (низька втома, висока частота); чому визначеність цілі = наявність метрики оцінки. clinical-safety: NOT_REQUIRED. sports-scientist review pending. blog.html card added.
+- `content/post-63-when-harder-is-not-the-answer.md` — Редакційна серія 61–70 3/10. «Коли «важче» — не відповідь: три ситуації, де більше навантаження шкодить прогресу». Три ситуації: накопичена втома що маскується під плато (Gathercole et al. 2015 — функціональний overreaching), технічне обмеження в специфічній зоні амплітуди (додавання ваги тренує помилку), прогрес за неправильною метрикою. Операційний алгоритм три питання до збільшення навантаження. Когнітивне спотворення «зусилля = результат» у спортивній психології. clinical-safety: NOT_REQUIRED. sports-scientist review pending. blog.html card added.
+
+### Changed
+- `blog.html` — cards for post-3083 and post-63 prepended at top of feed.
+- `README.md` — post-3083 and post-63 status updated proposed → draft; series «Мезоцикл без тренера» updated 2/10 → 3/10; version reference v11.86.0 → v11.88.0.
+- `VERSION` — 11.87.0 → 11.88.0.
+
+---
+
 ## [11.87.0] — 2026-07-03
 
 ### Added

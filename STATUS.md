@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v11.88.0** — 2026-07-03 · content · post-3083 + post-63 · «Ціль мезоциклу: сила, гіпертрофія, технічна робота — чому змішані цілі ускладнюють оцінку результату» (series «Мезоцикл без тренера» 3081–3090, 3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · «Коли «важче» — не відповідь: три ситуації, де більше навантаження шкодить прогресу» (editorial series 61–70, 3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards prepended for post-3083 + post-63 · README: series «Мезоцикл без тренера» updated 2/10 → 3/10 · next: post-3084 («Структура тижня всередині блоку: від логіки навантаження до відновлення») + post-64 («Тренування в спеку, мороз і поганий повітря: що змінює середовище, а що ні»)
+
 **v11.86.0** — 2026-07-03 · content · post-3082 · «Вибір тривалості блоку: 4, 6, 8 чи 12 тижнів — і від чого це реально залежить» · series «Мезоцикл без тренера» 3081–3090 (2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3082 · README: series «Мезоцикл без тренера» updated 1/10 → 2/10 · next: post-3083 («Ціль мезоциклу і чому змішані цілі ускладнюють оцінку»)
 
 **v11.85.0** — 2026-07-03 · content · post-3081 · «Що таке мезоцикл і для чого він потрібен self-coached атлету: структура, функція, мінімум» · NEW SERIES «Мезоцикл без тренера» 3081–3090 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3081 · README: series 3071–3080 COMPLETE 10/10 (all 10 draft-status rows corrected); series 3081–3090 in progress 1/10 · next: post-3082 («Вибір тривалості блоку: 4, 6, 8 чи 12 тижнів — і від чого це реально залежить»)
