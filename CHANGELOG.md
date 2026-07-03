@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.90.0] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` v3.30.0 — R-64 · PAM Break-Glass Review Alert Stale (`pam_bg_review_alert`, job 21, CC6.6) companion stale recovery runbook. Closes the pg_cron §12.6 companion-runbook gap for job 21: 72-hour break-glass post-hoc review SLA enforcement blind spot detection and recovery. Trigger matrix (AL-PAM-BG-STALE-01, P1 PagerDuty `form-devops`, devops-lead + compliance-officer mandatory co-page, 26h freshness); P1-escalate + security-engineer co-page if R-64-C2 confirms overdue reviews during stale window; three scope queries (R-64-C1 pg_cron history, R-64-C2 `pam_break_glass_reviews` overdue SLA manual SQL — `pam_session_id` UUIDs + `review_due_at` timestamps only, R-64-C3 peer health); four root-cause hypotheses H1–H4; seven recovery steps; PAM-BG-STALE-E-001 evidence artefact (7yr WORM CC6.6). Privacy floor: no `user_id`, employee name, or break-glass action details in any query result, DEC-030 payload, or evidence artefact. Document header v3.29.0 → v3.30.0.
+- `docs/SOC2_READINESS.md` v3.78.0 — §152 PAM-BG-STALE-E-001 registration in §79.4 master evidence table (CC6.6, per-activation, 7yr WORM, `compliance/evidence/pam/pam-bg-stale-e-001-<YYYY-MM-DD>/`; count 118 → 119); §80.3 `pam/` subfolder updated to include PAM-BG-STALE-E-001; §80.4 Vanta mirror protocol entry added (upload within 48h; compliance-officer sign-off required if R-64-C2 returned overdue reviews).
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.14.9 — §12.6 pg_cron canonical registry job 21 (`pam_bg_review_alert`) row: cross-reference column updated with `INCIDENT_RESPONSE R-64 (§R-64; v1.0, 2026-07-03 — companion stale recovery runbook for job 21)`.
+- `VERSION` — 11.89.0 → 11.90.0.
+
+---
+
 ## [11.89.0] — 2026-07-03
 
 ### Added

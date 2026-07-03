@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.29.0
+# FORM · Incident Response Runbook v3.30.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -23394,3 +23394,215 @@ Implementation status: **pending** (platform-engineer — §R-63.12 item 2).
 ---
 
 *v3.29.0 (2026-07-03): R-63 — Victor Safety Chain Monitor Stale (`victor_safety_chain_monitor`, job 15) — CC7.4 / A1.2 clinical-safety chain integrity blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 15 was the highest-priority remaining daily pg_cron job without a companion stale recovery runbook after R-62 (job 14), R-61 (job 13), R-60 (jobs 10 + 12), R-59 (job 30), R-58 (job 36), and R-57 (job 58) closed gaps for their respective jobs. §R-63.1 trigger matrix: AL-VSAFETY-CHAIN-STALE-01 `system.cron_job_stale` for job 15 → P1 PagerDuty `form-devops` → devops-lead + clinical-safety; dedup `victor-chain-stale`; 26h freshness window. §R-63.2 severity: P1 default; P0 upgrade if R-63-C2 returns rows (VSAFETY-CHAIN-01 violation: P0 incident open > 60 min uncontained) or R-63-C3 returns rows (VSAFETY-CHAIN-02 violation: Victor disabled > 48 h without re-enable); co-active R-23 on P0; co-active R-03 on all-jobs-stale discriminator. §R-63.3 five-step immediate action timeline (T+0 to T+30): emit stale_declared at T+0; R-63-C2 P0 gate at T+5; R-63-C3 P0 gate + mandatory clinical-safety notification at T+10; R-63-C1 root cause at T+15; R-63-C4 peer health at T+20; recovery at T+25; confirm + emit restored + file evidence at T+30. §R-63.4 four scope queries: R-63-C1 (pg_cron run history for job 15); R-63-C2 (manual VSAFETY-CHAIN-01 — open P0 incidents > 60 min with no `ai.safety_incident_contained`; incident UUIDs and durations only); R-63-C3 (manual VSAFETY-CHAIN-02 — Victor disabled > 48 h with no `ai.victor_reenabled`; incident UUIDs and durations only); R-63-C4 Part A (peer jobs: victor_safety_baseline_refresh/api_key_chain_monitor/invite_expiry_sweep/audit_log_retention_purge) + Part B (catalog check). §R-63.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (function broken — DDL change to `audit_log_events` schema). §R-63.6 seven-step recovery: (1) emit stale_declared; (2) P0 gate — activate R-23 if chain violations confirmed; (3) restore job 15 by H1–H4; (4) confirm via `cron.run_job(15)`; (5) re-run R-63-C2/C3 post-restoration; (6) emit stale_restored; (7) file VSAFETY-CHAIN-STALE-E-001. §R-63.7 three Slack templates (T-63-A for #alerts-devops; T-63-B mandatory clinical-safety notification; T-63-C P0 chain-violation upgrade). §R-63.8 DEC-030 chain: `system.victor_safety_chain_monitor_stale_declared` HIGH/7yr + `system.victor_safety_chain_monitor_restored` LOW/3yr; VSAFETY-CHAIN-MON-STALE-CHAIN-01 ordering invariant (HTTP 422 `VSAFETY_CHAIN_MON_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, session_id, coaching content, body composition, or GDPR Art. 9 data in any payload. §R-63.9 VSAFETY-CHAIN-STALE-E-001 per-activation evidence artefact (CC7.4/A1.2; per-activation; 7yr WORM; `compliance/evidence/victor-safety/vsafety-chain-stale-e-001-<YYYY-MM-DD>/`; clinical-safety sign-off required if R-23 co-activated; Vanta mirror within 48h). §R-63.10 five post-incident controls: post-mortem if stale > 48h or R-23 co-activated; VSAFETY-CHAIN-MON-STALE-CHAIN-01 Worker enforcement; H4 CI schema-compat guard; H1/H2 CI lint guard; quarterly runbook gap sweep. §R-63.11 eight cross-references: OBSERVABILITY §12.6 (job 15, v5.14.8); OBSERVABILITY §32.6 (VSAFETY-CHAIN SQL); AUDIT_LOG_SCHEMA §Victor-Safety-Chain-Monitor-Stale (v2.78); INCIDENT_RESPONSE R-03 + R-05 + R-23 + R-62; SOC2_READINESS §151 + §79.4 (v3.77.0). §R-63.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.78 chain events + invariant; SOC2_READINESS.md v3.77.0 §151 VSAFETY-CHAIN-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.14.8 §12.6 job 15 cross-ref; authoring complete); item 2 pending (platform-engineer — VSAFETY-CHAIN-MON-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker). Document header v3.27.0 → v3.29.0 (cumulative: v3.28.0 was R-62's intended bump; header corrected and advanced to v3.29.0 in this pass). Owner: devops-lead + compliance-officer + clinical-safety.*
+
+---
+
+## R-64 · PAM Break-Glass Review Alert Stale (`pam_bg_review_alert`, job 21)
+
+> **Severity:** P1 (default) → P1-escalate if R-64-C2 returns rows  
+> **Owner:** devops-lead (primary IC); compliance-officer (mandatory co-page)  
+> **SOC 2 criteria:** CC6.6 (Privileged Access Management — break-glass post-hoc review SLA)  
+> **pg_cron job:** `pam_bg_review_alert` — daily 08:00 UTC — job 21  
+> **Freshness window:** 26 h — alert: `system.cron_job_stale` WHERE `job_name = 'pam_bg_review_alert'`
+
+---
+
+### §R-64.1 Trigger Matrix
+
+| Trigger | Condition | Routing | Dedup key |
+|---|---|---|---|
+| **AL-PAM-BG-STALE-01** `system.cron_job_stale` | `job_name = 'pam_bg_review_alert'` AND `freshness_window_exceeded = true` (26 h) | PagerDuty P1 `form-devops` → devops-lead + compliance-officer (mandatory co-page) | `pam-bg-review-check-stale` |
+
+**Co-activation triggers (not exclusive):**
+- R-03 (Supabase infrastructure failure) — if R-64-C3 discriminator shows all pg_cron jobs stale simultaneously
+- R-05 (HMAC audit chain break) — if PAM-BG-STALE-CHAIN-01 violation detected (see §R-64.8)
+
+---
+
+### §R-64.2 Severity and Escalation
+
+| Condition | Severity | Additional action |
+|---|---|---|
+| `pam_bg_review_alert` stale; R-64-C2 returns zero rows | **P1** | devops-lead + compliance-officer |
+| `pam_bg_review_alert` stale; R-64-C2 returns ≥ 1 row (overdue break-glass reviews exist) | **P1-escalate** | Escalate to security-engineer; compliance-officer mandatory co-page; CC6.6 PAM review SLA breach confirmed |
+| All pg_cron jobs stale (R-64-C3 discriminator) | **P1 + R-03 co-activate** | R-03 is the primary runbook; R-64 remains co-active for PAM-specific recovery steps |
+
+---
+
+### §R-64.3 Immediate Action Timeline
+
+| Time | Action | Owner |
+|---|---|---|
+| **T+0** | Page fires. devops-lead acknowledges. Emit `system.pam_bg_review_stale_declared` DEC-030 HIGH event under PAM elevation (see §R-64.8). | devops-lead |
+| **T+5** | Run R-64-C2 (overdue break-glass review check). If rows returned: escalate to P1-escalate; mandatory page to security-engineer. compliance-officer starts manual review cycle for all returned `pam_session_id` UUIDs. | devops-lead + compliance-officer |
+| **T+15** | Run R-64-C1 (pg_cron run history for job 21). Identify last successful run, number of missed runs, approximate stale duration. | devops-lead |
+| **T+20** | Run R-64-C3 (peer job health + catalog check). If all jobs stale: activate R-03. If job 21 absent from `cron.job` catalog: H1 (deleted). | devops-lead |
+| **T+25** | Apply recovery per H1–H4 (see §R-64.5 and §R-64.6). | devops-lead |
+| **T+30** | Confirm job restored via `SELECT cron.run_job(21)` and R-64-C1 recheck. Emit `system.pam_bg_review_restored` DEC-030 LOW event (see §R-64.8). File PAM-BG-STALE-E-001 evidence artefact (see §R-64.9). | devops-lead + compliance-officer |
+
+---
+
+### §R-64.4 Scope Queries
+
+**R-64-C1 — pg_cron run history for job 21:**
+```sql
+SELECT status, run_at
+FROM cron.job_run_details
+WHERE jobname = 'pam_bg_review_alert'
+ORDER BY run_at DESC
+LIMIT 10;
+```
+*Purpose:* Identify last successful run and stale duration. Output: timestamps and status codes only — no user data.
+
+**R-64-C2 — Overdue break-glass reviews (AL-PAM-BG-01 manual check):**
+```sql
+SELECT pam_session_id, review_due_at
+FROM pam_break_glass_reviews
+WHERE review_due_at < now()
+  AND reviewed_at IS NULL;
+```
+*Purpose:* Enumerate break-glass sessions whose 72-hour post-hoc review SLA has been missed during the stale window. Output: `pam_session_id` (FORM-internal UUID) + `review_due_at` timestamp only — no `user_id`, no employee name, no break-glass action details.
+*Gate:* If any rows returned → P1-escalate; compliance-officer initiates manual review cycle; security-engineer co-paged.
+
+**R-64-C3 — Peer job health and catalog check:**
+```sql
+-- Part A: Peer job health (jobs adjacent to job 21 in §12.6 registry)
+SELECT jobname, last_run_at
+FROM pg_cron_health_monitor_view
+WHERE jobname IN ('pam_postgres_sync', 'rate_limit_violations_cleanup', 'siem_bridge_cr02_impossible_travel', 'siem_bridge_cr03_priv_escalation')
+ORDER BY jobname;
+
+-- Part B: Catalog check — confirm job 21 exists in cron.job
+SELECT jobid, schedule, active
+FROM cron.job
+WHERE jobname = 'pam_bg_review_alert';
+```
+*Purpose:* Discriminate H3 (Supabase infra — all jobs stale) from H1/H2 (job-specific). If all peers show stale: activate R-03. If job 21 absent from Part B: H1 (deleted). If present but `active = false`: H2 (disabled).
+
+---
+
+### §R-64.5 Root-Cause Hypotheses
+
+| Hypothesis | Condition | Recovery |
+|---|---|---|
+| **H1 — Job deleted** | `pam_bg_review_alert` absent from `cron.job` catalog (R-64-C3 Part B returns no rows) | Re-create via `SELECT cron.schedule('pam_bg_review_alert', '0 8 * * *', $$ SELECT pam_bg_review_alert() $$)` |
+| **H2 — Job disabled** | `cron.job` row exists but `active = false` | `UPDATE cron.job SET active = true WHERE jobname = 'pam_bg_review_alert'` |
+| **H3 — Supabase infrastructure failure** | All pg_cron jobs stale (R-64-C3 Part A shows multiple peers stale) | R-03 is primary; after Supabase recovery, confirm `pam_bg_review_alert` resumes on next scheduled run |
+| **H4 — DDL schema change to `pam_break_glass_reviews`** | R-64-C1 shows job running but with `failed` status after a migration; R-64-C2 query fails with relation error | Fix DDL (revert migration or update function signature); redeploy `pam_bg_review_alert()` function; validate via `SELECT cron.run_job(21)` |
+
+---
+
+### §R-64.6 Recovery Procedure
+
+1. **Emit `system.pam_bg_review_stale_declared`** DEC-030 HIGH event under PAM elevation (§R-64.8). This is T+0 — do not defer. PAM-BG-STALE-CHAIN-01 ordering is enforced; failure to emit before restoration will trigger HTTP 422 `PAM_BG_STALE_CHAIN_01_VIOLATION` on `system.pam_bg_review_restored`.
+2. **Run R-64-C2 P1-escalate gate** (T+5). If rows returned, page security-engineer; compliance-officer starts manual review for each returned `pam_session_id`.
+3. **Restore job** per H1–H4 root cause determined at T+15–T+20.
+4. **Confirm restoration** via `SELECT cron.run_job(21)` — should return without error. Re-run R-64-C1 to confirm a new `succeeded` row appears.
+5. **Compliance-officer confirmation** (if R-64-C2 returned rows): verify all overdue `pam_session_id` UUIDs have had manual review initiated; confirm compliance-officer sign-off before closing incident.
+6. **Emit `system.pam_bg_review_restored`** DEC-030 LOW event (§R-64.8). PAM-BG-STALE-CHAIN-01 ordering enforced — must follow `system.pam_bg_review_stale_declared` for same `incident_id`.
+7. **File PAM-BG-STALE-E-001** evidence artefact (§R-64.9). Upload to R2 `compliance/evidence/pam/pam-bg-stale-e-001-<YYYY-MM-DD>/`. Mirror to Vanta within 48 h.
+
+---
+
+### §R-64.7 Communication Templates
+
+**T-64-A · Initial #alerts-devops notification (T+0):**
+```
+🔴 R-64 ACTIVATED — pam_bg_review_alert (job 21) STALE
+Stale since: <confirmed_stale_since>
+Freshness window: 26 h
+Owner: devops-lead (primary IC) + compliance-officer (mandatory co-page)
+DEC-030 stale_declared emitted: <yes/pending>
+R-64-C2 gate: PENDING — run immediately to check for overdue PAM reviews
+Next step: R-64-C2, then R-64-C1 root cause
+```
+
+**T-64-B · P1-escalate notification (if R-64-C2 returns rows):**
+```
+⚠️ R-64 ESCALATED — OVERDUE PAM BREAK-GLASS REVIEWS DETECTED
+pam_session_ids with missed 72-hour review SLA: <count> sessions
+compliance-officer: manual review cycle required for each listed pam_session_id
+security-engineer: co-paged — CC6.6 PAM review SLA breach confirmed
+PAM break-glass review SLA: 72 h from session close
+Action: compliance-officer to confirm manual review status for each session
+Evidence: PAM-BG-STALE-E-001 will include this count
+```
+
+---
+
+### §R-64.8 DEC-030 Event Chain
+
+**PAM-BG-STALE-CHAIN-01 ordering invariant:** `system.pam_bg_review_restored` MUST be preceded by `system.pam_bg_review_stale_declared` with the same `incident_id`. The `emit-audit-event` Worker enforces this with HTTP 422 `PAM_BG_STALE_CHAIN_01_VIOLATION` on ordering inversion. An HTTP 422 co-activates R-05 (HMAC audit chain break).
+
+| Event | DEC-030 class | Retention | TSC | Payload fields |
+|---|---|---|---|---|
+| `system.pam_bg_review_stale_declared` | HIGH | 7 yr | CC6.6 | `incident_id` (UUID), `confirmed_stale_since` (ISO-8601), `stale_hours` (INT), `missed_runs` (INT), `overdue_review_count_at_declared` (INT — count only; no `pam_session_id` values in payload), `initial_severity` (enum: `p1` \| `p1_escalate`) |
+| `system.pam_bg_review_restored` | LOW | 3 yr | CC6.6 | `incident_id` (UUID), `restored_at` (ISO-8601), `root_cause` (enum: `h1_deleted` \| `h2_disabled` \| `h3_infra` \| `h4_ddl`), `stale_hours_total` (INT), `overdue_review_count_closed` (INT — count of reviews manually initiated during stale window; 0 if R-64-C2 returned no rows), `compliance_officer_sign_off` (BOOL) |
+
+**Privacy floor:** Neither DEC-030 payload contains `user_id`, employee name, break-glass access targets, engineering system names, coaching content, body composition data, or GDPR Art. 9 special-category data. `overdue_review_count_at_declared` is a scalar integer count — no `pam_session_id` values appear in the chain event payload. `pam_session_id` values appear only in R-64-C2 scope query output and PAM-BG-STALE-E-001 evidence artefact (FORM-internal UUIDs — not PII).
+
+---
+
+### §R-64.9 Evidence Artefact: PAM-BG-STALE-E-001
+
+| Field | Value |
+|---|---|
+| Evidence ID | **PAM-BG-STALE-E-001** |
+| TSC criteria | CC6.6 |
+| Retention | **7 yr WORM** — Cloudflare R2 `form-soc2-evidence` |
+| R2 path | `compliance/evidence/pam/pam-bg-stale-e-001-<YYYY-MM-DD>/` |
+| Vanta upload | Within 48 h of incident closure (SOC2_READINESS §80.4) |
+| Compliance-officer sign-off | **Required** if R-64-C2 returned ≥ 1 row (overdue reviews existed during stale window) |
+
+**Artefact contents:**
+- `stale_declared` DEC-030 event export (JSON)
+- `restored` DEC-030 event export (JSON)
+- R-64-C1 pg_cron run history (CSV — timestamps and status only)
+- R-64-C2 overdue review check result (row count only if zero; `pam_session_id` + `review_due_at` list if non-zero — FORM-internal UUIDs only, no employee PII)
+- R-64-C3 peer job health (CSV — job names, timestamps, status)
+- Incident timeline (Slack thread export — #alerts-devops)
+- Root-cause classification (H1–H4) and recovery action taken
+- Compliance-officer sign-off attestation (if R-64-C2 returned rows; required before Vanta upload)
+
+**Auditor narrative (CC6.6):** FORM maintains a daily pg_cron monitor (`pam_bg_review_alert`, job 21, 08:00 UTC) that enforces the 72-hour break-glass post-hoc review SLA by checking `pam_break_glass_reviews.review_due_at < now() AND reviewed_at IS NULL` and raising PagerDuty P1 AL-PAM-BG-01 on any overdue session. When the monitor goes stale, FORM initiates R-64 within the 26 h freshness window, runs manual R-64-C2 check to enumerate any overdue reviews, escalates to P1-escalate and pages security-engineer if breaches are confirmed, restores the job, and files per-activation WORM evidence on Cloudflare R2 with Vanta mirror within 48 h. This satisfies CC6.6 (Privileged Access Management — post-hoc review controls are continuously enforced even during monitoring downtime) requirements.
+
+---
+
+### §R-64.10 Post-Incident Controls
+
+| # | Control | Trigger |
+|---|---|---|
+| 1 | Post-mortem required if stale > 48 h or R-64-C2 returned ≥ 1 row (overdue reviews confirmed). Filing deadline: 5 business days. | Stale duration > 48 h OR `overdue_review_count_at_declared > 0` |
+| 2 | Implement PAM-BG-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts` (HTTP 422 `PAM_BG_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit). Owner: platform-engineer. | First occurrence of R-64 |
+| 3 | If H4 (function broken): add CI guard that validates `pam_break_glass_reviews` schema compatibility with `pam_bg_review_alert()` function before any migration deploying changes to that table. Owner: devops-lead. | H4 confirmed |
+| 4 | If H1 or H2: add CI lint guard that prevents accidental deletion or disabling of job 21, consistent with R-63 §R-63.10 item 4 and R-62 §R-62.10 item 4 pattern. Owner: devops-lead. | H1 or H2 confirmed |
+| 5 | Quarterly: cross-reference OBSERVABILITY §12.6 pg_cron canonical registry against all companion runbooks R-03 through R-64+. Any job with a PagerDuty P0/P1 alert and no companion stale runbook must be assigned in the same sprint. Owner: devops-lead + compliance-officer. | Quarterly (next: 2026-10-01) |
+
+---
+
+### §R-64.11 Cross-References
+
+- **OBSERVABILITY §12.6** — pg_cron canonical registry job 21 row · v5.14.9 (companion runbook column updated this pass)
+- **OBSERVABILITY §29.5** — AL-PAM-BG-01 break-glass review overdue alert definition
+- **DATA_MODEL §29.10 item 8** — `pam_break_glass_reviews` table and `review_due_at` column (job 21 data source)
+- **INCIDENT_RESPONSE R-03** — Supabase infrastructure failure (co-active on all-jobs-stale discriminator)
+- **INCIDENT_RESPONSE R-05** — HMAC audit chain break (co-active on PAM-BG-STALE-CHAIN-01 violation)
+- **SOC2_READINESS §152 + §79.4** — PAM-BG-STALE-E-001 evidence registration · v3.78.0
+
+---
+
+### §R-64.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.pam_bg_review_stale_declared` (HIGH/7yr) and `system.pam_bg_review_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, PAM-BG-STALE-CHAIN-01 ordering invariant, and CC6.6 auditor narrative | compliance-officer + platform-engineer | **P0** | [ ] |
+| 2 | Implement PAM-BG-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts`: HTTP 422 `PAM_BG_STALE_CHAIN_01_VIOLATION` on `system.pam_bg_review_restored` emitted without matching `system.pam_bg_review_stale_declared` for same `incident_id` | platform-engineer | **P0** | [ ] |
+| 3 | Register PAM-BG-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.6; per-activation; 7yr; `compliance/evidence/pam/pam-bg-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.78.0, §152).** |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 21 row cross-reference column: add `; INCIDENT_RESPONSE R-64 (§R-64; v1.0, 2026-07-03 — companion stale recovery runbook for job 21)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.14.9).** |
+| 5 | Authoring complete — §R-64 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.30.0).** |
+
+**Privacy floor (invariant throughout R-64):** No `user_id`, employee name, break-glass action targets, engineering system name, coaching content, body composition metric, or GDPR Art. 9 special-category data appears in any R-64 scope query result, communication template payload, DEC-030 event payload, or PAM-BG-STALE-E-001 evidence artefact. R-64-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-64-C2 surfaces only `pam_session_id` (FORM-internal UUID pseudonym) and `review_due_at` timestamp — no `user_id`, no employee identity, no break-glass action details, no coaching content, no body composition values. R-64-C3 surfaces only pg_cron job metadata and run timestamps.
+
+---
+
+*v3.30.0 (2026-07-03): R-64 — PAM Break-Glass Review Alert Stale (`pam_bg_review_alert`, job 21) — CC6.6 PAM break-glass post-hoc review SLA enforcement blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 21 was the highest-priority remaining daily pg_cron job without a companion stale recovery runbook — CC6.6 PAM break-glass review SLA enforcement is security-critical for SOC 2 and a direct compliance gap when the job is stale. §R-64.1 trigger matrix: AL-PAM-BG-STALE-01 `system.cron_job_stale` for job 21 → P1 PagerDuty `form-devops` → devops-lead + compliance-officer (mandatory co-page); dedup `pam-bg-review-check-stale`; 26h freshness window. §R-64.2 severity: P1 default; P1-escalate with security-engineer co-page if R-64-C2 returns rows (overdue break-glass reviews confirmed during stale window); co-active R-03 on all-jobs-stale discriminator. §R-64.3 six-step immediate action timeline (T+0 to T+30): emit stale_declared at T+0; R-64-C2 P1-escalate gate at T+5; R-64-C1 root cause at T+15; R-64-C3 peer health at T+20; recovery at T+25; confirm + emit restored + file evidence at T+30. §R-64.4 three scope queries: R-64-C1 (pg_cron run history for job 21); R-64-C2 (manual AL-PAM-BG-01 — overdue `pam_break_glass_reviews` with missed 72-hour review SLA; `pam_session_id` UUIDs and `review_due_at` timestamps only — no employee PII, no break-glass action details); R-64-C3 Part A (peer jobs: pam_postgres_sync/rate_limit_violations_cleanup/siem_bridge_cr02_impossible_travel/siem_bridge_cr03_priv_escalation) + Part B (catalog check). §R-64.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (function broken — DDL change to `pam_break_glass_reviews`). §R-64.6 seven-step recovery: (1) emit stale_declared; (2) R-64-C2 P1-escalate gate — if rows, page security-engineer + compliance-officer manual reviews; (3) restore job by H1–H4; (4) confirm via `cron.run_job(21)`; (5) compliance-officer sign-off if R-64-C2 returned rows; (6) emit restored; (7) file PAM-BG-STALE-E-001. §R-64.7 two Slack templates (T-64-A for #alerts-devops; T-64-B P1-escalate notification for overdue review breach). §R-64.8 DEC-030 chain: `system.pam_bg_review_stale_declared` HIGH/7yr + `system.pam_bg_review_restored` LOW/3yr; PAM-BG-STALE-CHAIN-01 ordering invariant (HTTP 422 `PAM_BG_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, employee name, break-glass action targets, coaching content, body composition, or GDPR Art. 9 data in any payload; `overdue_review_count_at_declared` is scalar integer count only. §R-64.9 PAM-BG-STALE-E-001 per-activation evidence artefact (CC6.6; per-activation; 7yr WORM; `compliance/evidence/pam/pam-bg-stale-e-001-<YYYY-MM-DD>/`; compliance-officer sign-off required if R-64-C2 returned rows; Vanta mirror within 48h). §R-64.10 five post-incident controls: post-mortem if stale > 48h or overdue reviews confirmed; PAM-BG-STALE-CHAIN-01 Worker enforcement; H4 CI schema-compat guard; H1/H2 CI lint guard; quarterly runbook gap sweep. §R-64.11 six cross-references: OBSERVABILITY §12.6 (job 21, v5.14.9); OBSERVABILITY §29.5 (AL-PAM-BG-01); DATA_MODEL §29.10 item 8; INCIDENT_RESPONSE R-03 + R-05; SOC2_READINESS §152 + §79.4 (v3.78.0). §R-64.12 five-item implementation checklist: items 3, 4, 5 [x] Done this pass (SOC2_READINESS.md v3.78.0 §152 PAM-BG-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.14.9 §12.6 job 21 cross-ref; authoring complete); items 1, 2 pending (compliance-officer + platform-engineer — AUDIT_LOG_SCHEMA event registration + PAM-BG-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker). Document header v3.29.0 → v3.30.0. Owner: devops-lead + compliance-officer.*
