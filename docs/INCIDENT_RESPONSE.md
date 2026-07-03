@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.33.0
+# FORM · Incident Response Runbook v3.34.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -24486,8 +24486,325 @@ Both events are HMAC-chained (DEC-030), emitted by IC (platform-engineer + compl
 
 ---
 
-*v3.32.0 (2026-07-03): R-66 — SIEM Bridge CR-03 Privilege Escalation Monitor Stale (`siem_bridge_cr03_priv_escalation`, job 23) — CC7.2/CC6.6 privilege-escalation-after-denial detection blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 23 was the highest-priority remaining pg_cron monitoring job without a companion stale recovery runbook after R-65 (job 22, `siem_bridge_cr02_impossible_travel`) was authored this same pass — CC7.2/CC6.6 near-real-time privilege escalation detection (5-min cadence, 6-min freshness) is a security-critical SOC 2 control and any stale window creates an immediate anomalous-activity and privileged-access detection blind spot. §R-66.1 trigger matrix: AL-SIEM-BRIDGE-02 `system.cron_job_stale` for job 23 → P2 PagerDuty `form-devops` → platform-engineer; dedup `siem-cr03-check-stale`; 6-min freshness window (3-run tolerance at */5 * * * * cadence). §R-66.2 severity: P2 default; P2-escalate with security-engineer co-page if R-66-C2 returns rows (undetected CR-03 privilege-escalation-after-denial pairs during stale window); co-active R-03 on all-jobs-stale discriminator. §R-66.3 six-step immediate action timeline (T+0 to T+25): emit stale_declared at T+0; R-66-C2 P2-escalate gate at T+5; R-66-C1 root cause at T+10; R-66-C3 peer health at T+15; recovery at T+20; confirm + emit restored + file evidence at T+25. §R-66.4 three scope queries: R-66-C1 (pg_cron run history for job 23 — 20 rows); R-66-C2 (manual CR-03 detection SQL reproducing fn_siem_bridge_cr03() logic across stale window — JOIN on audit_log_events for pam.elevation_denied → pam.session_started within 30 min for same actor with NOT EXISTS dedup against existing siem.correlation_rule_matched CR-03 events; actor_user_sha256 pseudonym output only; privacy invariant: no plain UUID, no IP); R-66-C3 Part A (peer jobs: siem_bridge_cr02_impossible_travel/pam_bg_review_alert/rate_limit_violations_cleanup/api_quota_usage_archive) + Part B (catalog check). §R-66.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (function broken — four sub-causes: H4(a) GUC unset RAISE EXCEPTION, H4(b) fn_siem_bridge_cr03 dropped, H4(c) pam.elevation_denied schema change, H4(d) pg_net extension disabled). §R-66.6 seven-step recovery: (1) emit stale_declared; (2) R-66-C2 P2-escalate gate — if rows, page security-engineer; (3) restore job by H1–H4; (4) confirm via cron.run_job(23); (5) security-engineer sign-off if R-66-C2 returned rows; (6) emit restored; (7) file SIEM-CR03-STALE-E-001. §R-66.7 two Slack templates (T-66-A for #alerts-devops; T-66-B P2-escalate notification for undetected CR-03 breach). §R-66.8 DEC-030 chain: `system.siem_cr03_stale_declared` HIGH/7yr + `system.siem_cr03_restored` LOW/3yr; SIEM-CR03-STALE-CHAIN-01 ordering invariant (HTTP 422 `SIEM_CR03_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, actor_user_sha256 pseudonym only, no IP, no coaching content, no GDPR Art. 9 data in any payload; `manual_cr03_match_count` is scalar integer count only. §R-66.9 SIEM-CR03-STALE-E-001 per-activation evidence artefact (CC7.2/CC6.6; per-activation; 7yr WORM; `compliance/evidence/siem-bridge-stale/siem-cr03-stale-e-001-<YYYY-MM-DD>/`; security-engineer sign-off required if R-66-C2 returned rows; Vanta mirror within 48h). §R-66.10 five post-incident controls: post-mortem if stale > 30 min or missed CR-03 events confirmed; SIEM-CR03-STALE-CHAIN-01 Worker enforcement; H4(a) GUC CI guard; H1/H2 CI lint guard; quarterly runbook gap sweep. §R-66.11 eight cross-references: OBSERVABILITY §12.6 (job 23, v5.15.1); OBSERVABILITY §34.5 (AL-SIEM-BRIDGE-02); AUDIT_LOG_SCHEMA §SIEM Bridge CR-03 Stale events (v2.80); INCIDENT_RESPONSE R-03 + R-05 + R-65; SOC2_READINESS §154 + §79.4 (v3.80.0). §R-66.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.80 event registration; SOC2_READINESS.md v3.80.0 §154 SIEM-CR03-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.15.1 §12.6 job 23 cross-ref; authoring complete); item 2 pending (platform-engineer — SIEM-CR03-STALE-CHAIN-01 enforcement in emit-audit-event Worker). Document header v3.31.0 → v3.32.0. Owner: platform-engineer + compliance-officer + security-engineer.*
+*v3.34.0 (2026-07-03): R-68 — Audit Chain Daily Check Stale (`audit-chain-daily-check`) — CC7.2 DEC-030 HMAC chain integrity verification blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against companion runbooks: `audit-chain-daily-check` was the highest-priority remaining unnumbered early pg_cron job without a companion stale recovery runbook — and uniquely is the only P0-severity job in the original 9-job registry without a runbook. `audit-chain-daily-check` (daily 06:00 UTC, 26h freshness) is FORM's sole automated daily verifier of DEC-030 HMAC chain integrity across the full `audit_log_events` table; when stale, FORM has no automated evidence that the audit trail has not been tampered with — making this a P0 incident from the moment of detection, distinct from all prior stale runbooks (R-60 through R-67) which were P1 or P2 default. §R-68.1 trigger matrix: AL-AUDIT-CHAIN-CHECK-01 `system.cron_job_stale` for `audit-chain-daily-check` → P0 PagerDuty `form-security` → security-engineer + devops-lead dual page; dedup `audit-chain-check-stale`; 26h freshness window (daily 06:00 UTC cadence). §R-68.2 severity: P0 default (DEC-030 HMAC chain integrity verification lapsed — CC7.2 SOC 2 monitoring control offline); P0-escalate with R-05 co-activation if R-68-C2 detects any chain breaks during stale window; co-active R-03 on all-jobs-stale discriminator. §R-68.3 six-step immediate action timeline (T+0 to T+25): emit stale_declared at T+0; R-68-C2 chain integrity gate at T+5; R-68-C1 root cause at T+10; R-68-C3 peer health at T+15; recovery at T+20; confirm + emit restored + file evidence at T+25. §R-68.4 three scope queries: R-68-C1 (pg_cron run history for audit-chain-daily-check — 20 rows); R-68-C2 (manual chain linkage SQL: LAG() over sequence_number ordering detects broken hmac_prev → predecessor hmac linkage across last 1,000 rows — partial compensating check; full HMAC recompute requires AUDIT_CHAIN_SECRET — not in SQL; privacy invariant: sequence numbers + HMAC hash values only, no user_id, no health data, no GDPR Art. 9 data); R-68-C3 Part A (peer jobs: audit-event-flush, row-count-monitor, mfa-enforcement-log-cleanup, audit_log_retention_purge) + Part B (catalog check for audit-chain-daily-check). §R-68.5 four root-cause hypotheses: H1 (deleted — 0 rows in cron.job), H2 (disabled — cron.job.active = false), H3 (Supabase infra — R-03 co-active), H4 (Edge Function broken — four sub-causes: H4(a) function file missing / deployment issue, H4(b) AUDIT_CHAIN_SECRET Worker Secret missing or rotated without notice, H4(c) audit_log_events RLS or permission change, H4(d) pg_net disabled). §R-68.6 seven-step recovery: (1) emit stale_declared; (2) R-68-C2 chain integrity gate — if rows, co-activate R-05 immediately; (3) restore Edge Function schedule by H1–H4; (4) confirm via cron.run_job; (5) security-engineer sign-off after R-68-C2 confirms chain intact; (6) emit restored; (7) file AUDIT-CHAIN-CHECK-STALE-E-001. §R-68.7 two Slack templates (T-68-A for #alerts-security P0 initial; T-68-B P0-escalate for chain breaks confirmed during stale window). §R-68.8 DEC-030 chain: `system.audit_chain_check_stale_declared` HIGH/7yr + `system.audit_chain_check_restored` LOW/3yr; AUDIT-CHAIN-CHECK-STALE-CHAIN-01 ordering invariant (HTTP 422 `AUDIT_CHAIN_CHECK_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, no health data, no GDPR Art. 9 data in any payload — `missed_run_count` is scalar integer, chain hash values are HMAC hash strings only. §R-68.9 AUDIT-CHAIN-CHECK-STALE-E-001 per-activation evidence artefact (CC7.2; per-activation; 7yr WORM; `compliance/evidence/audit-chain-check-stale/audit-chain-check-stale-e-001-<YYYY-MM-DD>/`; security-engineer sign-off required; Vanta mirror within 48h). §R-68.10 five post-incident controls: post-mortem if stale > 26h (single missed run) or R-68-C2 detected chain breaks; AUDIT-CHAIN-CHECK-STALE-CHAIN-01 Worker enforcement; H4(b) AUDIT_CHAIN_SECRET rotation protocol; H1/H2 CI lint guard; quarterly runbook gap sweep. §R-68.11 eight cross-references: OBSERVABILITY §12.6 (audit-chain-daily-check unnumbered early job, v5.15.3); OBSERVABILITY §14.3 / SOC2_READINESS §46 (audit-chain-daily-check Edge Function canonical spec); AUDIT_LOG_SCHEMA §Audit Chain Check Stale events (v2.82); INCIDENT_RESPONSE R-03 + R-05; SOC2_READINESS §156 + §79.4 (v3.82.0). §R-68.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.82 event registration; SOC2_READINESS.md v3.82.0 §156 AUDIT-CHAIN-CHECK-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.15.3 §12.6 audit-chain-daily-check cross-ref; authoring complete); item 2 pending (platform-engineer — AUDIT-CHAIN-CHECK-STALE-CHAIN-01 enforcement in emit-audit-event Worker). Document header v3.33.0 → v3.34.0. Owner: security-engineer + compliance-officer.*
+
+---
+
+*v3.33.0 (2026-07-03): R-67 — SCIM Mass Deprovisioning Monitor Stale (`scim_mass_deprovision_check`, job 24) — CC7.2/CC6.6 privilege-escalation-after-denial detection blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 23 was the highest-priority remaining pg_cron monitoring job without a companion stale recovery runbook after R-65 (job 22, `siem_bridge_cr02_impossible_travel`) was authored this same pass — CC7.2/CC6.6 near-real-time privilege escalation detection (5-min cadence, 6-min freshness) is a security-critical SOC 2 control and any stale window creates an immediate anomalous-activity and privileged-access detection blind spot. §R-66.1 trigger matrix: AL-SIEM-BRIDGE-02 `system.cron_job_stale` for job 23 → P2 PagerDuty `form-devops` → platform-engineer; dedup `siem-cr03-check-stale`; 6-min freshness window (3-run tolerance at */5 * * * * cadence). §R-66.2 severity: P2 default; P2-escalate with security-engineer co-page if R-66-C2 returns rows (undetected CR-03 privilege-escalation-after-denial pairs during stale window); co-active R-03 on all-jobs-stale discriminator. §R-66.3 six-step immediate action timeline (T+0 to T+25): emit stale_declared at T+0; R-66-C2 P2-escalate gate at T+5; R-66-C1 root cause at T+10; R-66-C3 peer health at T+15; recovery at T+20; confirm + emit restored + file evidence at T+25. §R-66.4 three scope queries: R-66-C1 (pg_cron run history for job 23 — 20 rows); R-66-C2 (manual CR-03 detection SQL reproducing fn_siem_bridge_cr03() logic across stale window — JOIN on audit_log_events for pam.elevation_denied → pam.session_started within 30 min for same actor with NOT EXISTS dedup against existing siem.correlation_rule_matched CR-03 events; actor_user_sha256 pseudonym output only; privacy invariant: no plain UUID, no IP); R-66-C3 Part A (peer jobs: siem_bridge_cr02_impossible_travel/pam_bg_review_alert/rate_limit_violations_cleanup/api_quota_usage_archive) + Part B (catalog check). §R-66.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (function broken — four sub-causes: H4(a) GUC unset RAISE EXCEPTION, H4(b) fn_siem_bridge_cr03 dropped, H4(c) pam.elevation_denied schema change, H4(d) pg_net extension disabled). §R-66.6 seven-step recovery: (1) emit stale_declared; (2) R-66-C2 P2-escalate gate — if rows, page security-engineer; (3) restore job by H1–H4; (4) confirm via cron.run_job(23); (5) security-engineer sign-off if R-66-C2 returned rows; (6) emit restored; (7) file SIEM-CR03-STALE-E-001. §R-66.7 two Slack templates (T-66-A for #alerts-devops; T-66-B P2-escalate notification for undetected CR-03 breach). §R-66.8 DEC-030 chain: `system.siem_cr03_stale_declared` HIGH/7yr + `system.siem_cr03_restored` LOW/3yr; SIEM-CR03-STALE-CHAIN-01 ordering invariant (HTTP 422 `SIEM_CR03_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, actor_user_sha256 pseudonym only, no IP, no coaching content, no GDPR Art. 9 data in any payload; `manual_cr03_match_count` is scalar integer count only. §R-66.9 SIEM-CR03-STALE-E-001 per-activation evidence artefact (CC7.2/CC6.6; per-activation; 7yr WORM; `compliance/evidence/siem-bridge-stale/siem-cr03-stale-e-001-<YYYY-MM-DD>/`; security-engineer sign-off required if R-66-C2 returned rows; Vanta mirror within 48h). §R-66.10 five post-incident controls: post-mortem if stale > 30 min or missed CR-03 events confirmed; SIEM-CR03-STALE-CHAIN-01 Worker enforcement; H4(a) GUC CI guard; H1/H2 CI lint guard; quarterly runbook gap sweep. §R-66.11 eight cross-references: OBSERVABILITY §12.6 (job 23, v5.15.1); OBSERVABILITY §34.5 (AL-SIEM-BRIDGE-02); AUDIT_LOG_SCHEMA §SIEM Bridge CR-03 Stale events (v2.80); INCIDENT_RESPONSE R-03 + R-05 + R-65; SOC2_READINESS §154 + §79.4 (v3.80.0). §R-66.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.80 event registration; SOC2_READINESS.md v3.80.0 §154 SIEM-CR03-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.15.1 §12.6 job 23 cross-ref; authoring complete); item 2 pending (platform-engineer — SIEM-CR03-STALE-CHAIN-01 enforcement in emit-audit-event Worker). Document header v3.31.0 → v3.32.0. Owner: platform-engineer + compliance-officer + security-engineer.*
 
 ---
 
 *v3.31.0 (2026-07-03): R-65 — SIEM Bridge CR-02 Impossible Travel Monitor Stale (`siem_bridge_cr02_impossible_travel`, job 22) — CC7.2 impossible travel detection blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 22 was the highest-priority remaining pg_cron monitoring job without a companion stale recovery runbook — CC7.2 near-real-time impossible travel detection (5-min cadence, 6-min freshness) is a security-critical SOC 2 control and any stale window creates an immediate anomalous-activity detection blind spot. §R-65.1 trigger matrix: AL-SIEM-BRIDGE-01 `system.cron_job_stale` for job 22 → P2 PagerDuty `form-devops` → platform-engineer; dedup `siem-cr02-check-stale`; 6-min freshness window (3-run tolerance at */5 * * * * cadence). §R-65.2 severity: P2 default; P2-escalate with security-engineer co-page if R-65-C2 returns rows (undetected CR-02 intercontinental travel pairs during stale window); co-active R-03 on all-jobs-stale discriminator. §R-65.3 six-step immediate action timeline (T+0 to T+25): emit stale_declared at T+0; R-65-C2 P2-escalate gate at T+5; R-65-C1 root cause at T+10; R-65-C3 peer health at T+15; recovery at T+20; confirm + emit restored + file evidence at T+25. §R-65.4 three scope queries: R-65-C1 (pg_cron run history for job 22 — 20 rows); R-65-C2 (manual CR-02 detection SQL reproducing fn_siem_bridge_cr02() logic across stale window — self-JOIN on login_events for intercontinental pairs with NOT EXISTS dedup against existing `siem.correlation_rule_matched` CR-02 events; actor_user_sha256 pseudonym output only; privacy invariant: no plain UUID, no IP); R-65-C3 Part A (peer jobs: siem_bridge_cr03_priv_escalation/pam_bg_review_alert/rate_limit_violations_cleanup/api_quota_usage_archive) + Part B (catalog check). §R-65.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (function broken — five sub-causes: GUC unset RAISE EXCEPTION, fn_siem_bridge_cr02 dropped, siem_country_continent table gone, audit_log_events schema change, pg_net extension disabled). §R-65.6 seven-step recovery: (1) emit stale_declared; (2) R-65-C2 P2-escalate gate — if rows, page security-engineer; (3) restore job by H1–H4; (4) confirm via cron.run_job(22); (5) security-engineer sign-off if R-65-C2 returned rows; (6) emit restored; (7) file SIEM-CR02-STALE-E-001. §R-65.7 two Slack templates (T-65-A for #alerts-devops; T-65-B P2-escalate notification for undetected CR-02 breach). §R-65.8 DEC-030 chain: `system.siem_cr02_stale_declared` HIGH/7yr + `system.siem_cr02_restored` LOW/3yr; SIEM-CR02-STALE-CHAIN-01 ordering invariant (HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, actor_user_sha256, country code, IP, coaching content, or GDPR Art. 9 data in any payload; `manual_cr02_match_count` is scalar integer count only. §R-65.9 SIEM-CR02-STALE-E-001 per-activation evidence artefact (CC7.2; per-activation; 7yr WORM; `compliance/evidence/siem-bridge-stale/siem-cr02-stale-e-001-<YYYY-MM-DD>/`; security-engineer sign-off required if R-65-C2 returned rows; Vanta mirror within 48h). §R-65.10 five post-incident controls: post-mortem if stale > 30 min or missed CR-02 events confirmed; SIEM-CR02-STALE-CHAIN-01 Worker enforcement; H4(a) GUC CI guard; H1/H2 CI lint guard; quarterly runbook gap sweep. §R-65.11 six cross-references: OBSERVABILITY §12.6 (job 22, v5.15.0); OBSERVABILITY §34.4.2 (fn_siem_bridge_cr02 function implementation); OBSERVABILITY §34.5 (AL-SIEM-BRIDGE-01); AUDIT_LOG_SCHEMA §SIEM Bridge CR-02 Stale events (v2.79); INCIDENT_RESPONSE R-03 + R-05; SOC2_READINESS §153 + §79.4 (v3.79.0). §R-65.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.79 event registration; SOC2_READINESS.md v3.79.0 §153 SIEM-CR02-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.15.0 §12.6 job 22 cross-ref; authoring complete); item 2 pending (platform-engineer — SIEM-CR02-STALE-CHAIN-01 enforcement in emit-audit-event Worker). Document header v3.30.0 → v3.31.0. Owner: platform-engineer + compliance-officer + security-engineer.*
+
+## R-68 · Audit Chain Daily Check Stale (`audit-chain-daily-check`)
+
+**Trigger:** `system.cron_job_stale` for `audit-chain-daily-check`, fired by `pg-cron-health-monitor` when no successful run is recorded within the 26-hour freshness window (daily 06:00 UTC cadence — one missed run = stale). Alert: AL-AUDIT-CHAIN-CHECK-01; dedup `audit-chain-check-stale`. TSC: CC7.2.
+
+**Classification:** P0 default (`audit-chain-daily-check` is the only automated daily verifier of DEC-030 HMAC chain integrity — when stale, FORM has no automated evidence that the audit trail has not been tampered with; CC7.2 anomaly-detection monitoring control is offline); P0-escalate (security-engineer + devops-lead; co-activate R-05 immediately) if R-68-C2 detects any chain breaks in `audit_log_events` during the stale window.
+
+**Owner:** security-engineer (IC); compliance-officer (DEC-030, evidence); devops-lead (pg_cron restoration, peer job health).
+
+---
+
+### §R-68.1 Trigger Matrix
+
+| Signal | Source | Threshold | PagerDuty route | Severity |
+|---|---|---|---|---|
+| `system.cron_job_stale` (`audit-chain-daily-check`) | `pg-cron-health-monitor` Edge Function | 26 h (daily 06:00 UTC cadence — one missed run) | P0 → `form-security` dual page: security-engineer + devops-lead | P0 default; P0-escalate + R-05 co-activation if R-68-C2 detects chain breaks |
+| R-03 co-activation | `pg-cron-health-monitor` | All monitored jobs stale | Co-active with R-03 | P0 |
+
+**Dedup key:** `audit-chain-check-stale`. PagerDuty alert: AL-AUDIT-CHAIN-CHECK-01.
+
+---
+
+### §R-68.2 Severity Classification
+
+| Condition | Severity | Additional action |
+|---|---|---|
+| `audit-chain-daily-check` stale only, R-68-C2 = 0 rows | P0 | security-engineer + compliance-officer; run manual chain check within freshness window |
+| `audit-chain-daily-check` stale + R-68-C2 returns ≥ 1 row (chain break detected) | P0-escalate | Co-activate R-05 immediately; security-engineer forensic lead |
+| R-03 co-active (all monitored jobs stale) | P0 override | Follow R-03 protocol first; R-68 runs in parallel |
+
+**Key distinction from R-60 through R-67:** R-68 is P0 default — the first stale runbook in this series with no P1 or P2 fallback. `audit-chain-daily-check` is the only P0-severity job among the original 9 unnumbered §12.6 jobs; all prior stale runbooks were P1 or P2. The criticality is structural: if this job is stale, FORM cannot provide automated SOC 2 CC7.2 evidence of HMAC chain integrity for the stale window. An audit without a stale-declared DEC-030 record would have a gap.
+
+---
+
+### §R-68.3 Immediate Action Timeline
+
+| Step | Time | Action |
+|---|---|---|
+| T+0 | 0 min | PagerDuty AL-AUDIT-CHAIN-CHECK-01 fires. IC (security-engineer) acknowledges. Emit `system.audit_chain_check_stale_declared` HIGH (DEC-030 HMAC-chained) via PAM-elevated `POST /audit/emit-event`. Set `manual_chain_break_count = -1` (R-68-C2 not yet run). |
+| T+5 | 5 min | Run **R-68-C2** (manual chain linkage check across stale window). If rows returned: upgrade to P0-escalate; co-activate R-05 immediately; page devops-lead via Slack T-68-B. Amendment-emit to update `manual_chain_break_count` after R-68-C2 completes. |
+| T+10 | 10 min | Run **R-68-C1** (pg_cron run history for `audit-chain-daily-check`) to determine root cause (H1–H4). |
+| T+15 | 15 min | Run **R-68-C3** (peer job health): Part A — `audit-event-flush`, `row-count-monitor`, `mfa-enforcement-log-cleanup`, `audit_log_retention_purge`; Part B — `cron.job` catalog check for `audit-chain-daily-check`. |
+| T+20 | 20 min | Restore `audit-chain-daily-check` per root-cause hypothesis (H1–H4). Confirm via `SELECT cron.run_job(jobid) FROM cron.job WHERE jobname = 'audit-chain-daily-check';`. |
+| T+25 | 25 min | Security-engineer sign-off confirming R-68-C2 returned 0 rows (chain intact during stale window) or R-05 track active (chain breaks found). Emit `system.audit_chain_check_restored` LOW (DEC-030 HMAC-chained). File AUDIT-CHAIN-CHECK-STALE-E-001 evidence artefact. |
+
+---
+
+### §R-68.4 Scope Queries
+
+#### R-68-C1 — pg_cron Run History (`audit-chain-daily-check`)
+
+```sql
+SELECT
+  runid,
+  job_id,
+  job_pid,
+  database,
+  username,
+  command,
+  status,
+  return_message,
+  start_time,
+  end_time
+FROM cron.job_run_details
+WHERE jobname = 'audit-chain-daily-check'
+ORDER BY start_time DESC
+LIMIT 20;
+```
+
+Purpose: Identify last successful run timestamp, missed run count, and error detail. Supports H1 (deleted — job absent from `cron.job`) vs H2 (disabled — `cron.job.active = false`) vs H3 (Supabase infra — R-03 co-active) vs H4 (Edge Function broken — `status = 'failed'` + `return_message` error detail). Daily cadence at 06:00 UTC means ≤ 2 rows per day.
+
+#### R-68-C2 — Manual Chain Linkage Check (Stale Window)
+
+```sql
+-- Manual DEC-030 HMAC chain linkage check for the stale window.
+-- Detects rows where hmac_prev does not match the hmac of the preceding row.
+-- This is a PARTIAL compensating check: verifies chain linkage structure only.
+-- Full HMAC recomputation (HMAC-SHA256 of secret_key || canonical_payload) requires
+-- AUDIT_CHAIN_SECRET — not available in plain SQL. Chain breaks surfaced here are
+-- sufficient to trigger R-05; clean result does not guarantee payload integrity.
+-- Privacy invariant: sequence_number, HMAC hash strings, event_type, created_at only.
+-- No user_id, tenant_id, health value, employee name, email, or GDPR Art. 9 data.
+WITH recent_chain AS (
+  SELECT
+    id,
+    sequence_number,
+    event_type,
+    hmac_prev,
+    hmac                                          AS current_hmac,
+    created_at,
+    LAG(hmac) OVER (ORDER BY sequence_number ASC) AS expected_hmac_prev
+  FROM audit_log_events
+  ORDER BY sequence_number DESC
+  LIMIT 1000
+),
+stale_window_chain AS (
+  SELECT *
+  FROM recent_chain
+  WHERE created_at >= :stale_window_start   -- from R-68-C1: last confirmed successful run timestamp
+)
+SELECT
+  id,
+  sequence_number,
+  event_type,
+  created_at,
+  hmac_prev,
+  expected_hmac_prev,
+  CASE
+    WHEN expected_hmac_prev IS NULL THEN 'CHAIN_HEAD'
+    WHEN hmac_prev IS DISTINCT FROM expected_hmac_prev THEN 'CHAIN_BREAK'
+    ELSE 'OK'
+  END AS chain_status
+FROM stale_window_chain
+WHERE expected_hmac_prev IS NOT NULL
+  AND hmac_prev IS DISTINCT FROM expected_hmac_prev
+ORDER BY sequence_number ASC;
+```
+
+**Parameters:** `:stale_window_start` = timestamp of last confirmed successful `audit-chain-daily-check` run (from R-68-C1).
+
+**Privacy invariant:** `sequence_number` (integer), `hmac_prev` (HMAC hash string), `expected_hmac_prev` (HMAC hash string), `event_type` (string), `created_at` (timestamp), `id` (UUID) only. No individual `user_id`, employee name, email, health value, coaching session content, body composition metric, or GDPR Art. 9 special-category data in result set or evidence artefact. `manual_chain_break_count` is a scalar integer count of broken chain links only.
+
+**Result interpretation:**
+- 0 rows: No chain linkage breaks detected in stale window. Severity remains P0 (job was stale; chain integrity unconfirmed for payload HMAC — document as partial compensating check). Proceed with recovery.
+- ≥ 1 row with `chain_status = 'CHAIN_BREAK'`: Chain break detected. Upgrade to **P0-escalate**. Co-activate R-05 immediately. Security-engineer leads forensic investigation before any restoration.
+
+#### R-68-C3 — Peer Job Health
+
+**Part A — Peer pg_cron jobs:**
+
+```sql
+SELECT jobname, schedule, active, jobid
+FROM cron.job
+WHERE jobname IN (
+  'audit-event-flush',
+  'row-count-monitor',
+  'mfa-enforcement-log-cleanup',
+  'audit_log_retention_purge'
+)
+ORDER BY jobname;
+```
+
+Purpose: Determine if peer audit-pipeline and integrity jobs are also stale (H3 discriminator). If `audit-event-flush` (P0) and/or `row-count-monitor` (P0) are also stale, follow R-03 concurrently — the Supabase pg_cron engine may be failing across all jobs. `audit_log_retention_purge` (job 27, monthly) stale alongside `audit-chain-daily-check` suggests a broader cron engine failure. If all monitored jobs are stale, R-03 is co-active — follow R-03 first.
+
+**Part B — Catalog check:**
+
+```sql
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'audit-chain-daily-check';
+```
+
+Purpose: Confirm job exists and is active (H1 vs H2 discriminator). 0 rows = H1 (deleted). `active = false` = H2 (disabled).
+
+---
+
+### §R-68.5 Root-Cause Hypotheses
+
+| Hypothesis | Indicator | Recovery |
+|---|---|---|
+| **H1 — Job deleted** | `cron.job` returns 0 rows for `audit-chain-daily-check` | Re-create: `SELECT cron.schedule('audit-chain-daily-check', '0 6 * * *', $$SELECT net.http_post(url := current_setting('app.audit_chain_check_url'), body := '{}', headers := '{"Content-Type":"application/json"}')$$);` — exact command from `docs/SOC2_READINESS.md §46.6` |
+| **H2 — Job disabled** | `cron.job.active = false` | Re-enable: `UPDATE cron.job SET active = true WHERE jobname = 'audit-chain-daily-check';` |
+| **H3 — Supabase infra** | All monitored pg_cron jobs stale; R-03 co-active | Follow R-03 protocol; no DB-level recovery possible until infra restored |
+| **H4 — Edge Function broken** | Job exists and active; `cron.job_run_details.status = 'failed'`; `return_message` has error detail | See H4 sub-causes below |
+
+**H4 Sub-Causes:**
+
+| Sub-cause | Indicator | Recovery |
+|---|---|---|
+| H4(a) — Edge Function missing / deploy issue | `return_message` contains `function does not exist` or `404` from Edge Function invocation URL | Re-deploy `supabase/functions/audit-chain-daily-check/` from source control; verify `supabase functions deploy audit-chain-daily-check` succeeds; confirm function appears in Supabase Dashboard → Edge Functions |
+| H4(b) — `AUDIT_CHAIN_SECRET` missing or rotated without notice | `return_message` contains `missing secret` or `unauthorized` from Edge Function; or function succeeds but emits `system.audit_chain_check_failed` with `reason: 'hmac_secret_unavailable'` | Restore or re-provision `AUDIT_CHAIN_SECRET` Worker Secret in Supabase Dashboard → Edge Functions → Secrets; if rotated, update secret with new value and re-run dual-key HMAC verification per `docs/SOC2_READINESS.md §46` dual-key rotation protocol |
+| H4(c) — `audit_log_events` RLS or permission change | `return_message` contains `permission denied` or `RLS policy blocked` referencing `audit_log_events` | Review most recent migration history; confirm `form_audit` role (the Edge Function execution role) retains SELECT on `audit_log_events`; restore RLS policy if altered |
+| H4(d) — `pg_net` disabled | `return_message` contains `pg_net extension not found` or pg_net schema error | Re-enable: `CREATE EXTENSION IF NOT EXISTS pg_net;`; escalate to Supabase support if extension unavailable |
+
+---
+
+### §R-68.6 Recovery Steps
+
+1. **Emit `system.audit_chain_check_stale_declared`** (DEC-030 HMAC-chained, HIGH/7yr) via PAM-elevated IC `POST /audit/emit-event`. Set `manual_chain_break_count = -1` at T+0.
+2. **Run R-68-C2** at T+5. If rows returned with `chain_status = 'CHAIN_BREAK'`: upgrade to P0-escalate; co-activate R-05 immediately (security-engineer forensic lead); alert devops-lead via Slack T-68-B; amendment-emit updated `manual_chain_break_count` after R-68-C2 completes.
+3. **Restore `audit-chain-daily-check`** per H1–H4 root-cause hypothesis (R-68-C1 and R-68-C3 Part B discriminators).
+4. **Confirm recovery** via `SELECT cron.run_job(jobid) FROM cron.job WHERE jobname = 'audit-chain-daily-check';` — verify next run succeeds in `cron.job_run_details` and `system.audit_chain_verified` LOW event is emitted to `audit_log_events`.
+5. **Security-engineer sign-off**: confirm R-68-C2 returned 0 rows (chain intact) or that R-05 track is active and forensic investigation is in progress.
+6. **Emit `system.audit_chain_check_restored`** (DEC-030 HMAC-chained, LOW/3yr) after `audit-chain-daily-check` confirmed healthy and `system.audit_chain_verified` event observed. AUDIT-CHAIN-CHECK-STALE-CHAIN-01 invariant: `restored` blocked (HTTP 422 `AUDIT_CHAIN_CHECK_STALE_CHAIN_01_VIOLATION`) without prior `stale_declared` for same `incident_id`; co-activates R-05.
+7. **File AUDIT-CHAIN-CHECK-STALE-E-001** evidence artefact: `compliance/evidence/audit-chain-check-stale/audit-chain-check-stale-e-001-<YYYY-MM-DD>/`. Mirror to Vanta within 48h.
+
+---
+
+### §R-68.7 Slack Communication Templates
+
+**T-68-A — #alerts-security (P0 initial):**
+
+```
+[R-68 ACTIVE — Audit Chain Daily Check Stale]
+audit-chain-daily-check has not run within its 26-hour freshness window.
+DEC-030 HMAC chain integrity verification is OFFLINE.
+IC: @security-engineer + @compliance-officer. Severity: P0. Alert: AL-AUDIT-CHAIN-CHECK-01.
+Action: R-68 playbook. R-68-C2 manual chain linkage check in progress.
+Dedup: audit-chain-check-stale.
+```
+
+**T-68-B — P0-escalate (if R-68-C2 returns chain breaks):**
+
+```
+[R-68 P0-ESCALATE — Chain Break Detected During Stale Window]
+R-68-C2 returned [N] broken chain link(s) in audit_log_events during stale window.
+Broken sequence numbers: [list from R-68-C2 output — hash values only].
+ACTIVATING R-05 (HMAC Chain Break) immediately.
+IC @security-engineer: forensic lead; @devops-lead: support.
+DO NOT restore audit-chain-daily-check until R-05 chain forensic investigation completes.
+```
+
+---
+
+### §R-68.8 DEC-030 Chain
+
+Both events are HMAC-chained (DEC-030), emitted by IC (security-engineer + compliance-officer, PAM-elevated) via `POST /audit/emit-event`. No automated emission path — PAM elevation required.
+
+**`system.audit_chain_check_stale_declared`** — severity: HIGH; retention: 7 years; TSC: CC7.2.
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Fresh UUID per R-68 activation. Anchors AUDIT-CHAIN-CHECK-STALE-CHAIN-01 ordering invariant. |
+| `confirmed_stale_since` | datetime | Timestamp of last confirmed successful `audit-chain-daily-check` run (from R-68-C1). |
+| `stale_hours` | int ≥ 0 | Hours since last successful run (26h freshness; daily 06:00 UTC cadence). |
+| `missed_run_count` | int ≥ 0 | Number of 06:00 UTC run windows missed (typically 1 for first detection within 26h; >1 indicates multi-day outage). |
+| `manual_chain_break_count` | int ≥ −1 | −1 = R-68-C2 not yet run at declaration time; amended to actual broken-link count after T+5 scope query. |
+| `initial_severity` | enum | `p0` (R-68-C2 not yet run or 0 chain breaks); `p0_escalate` (R-68-C2 ≥ 1 chain break detected — R-05 co-activated). |
+
+**`system.audit_chain_check_restored`** — severity: LOW; retention: 3 years; TSC: CC7.2.
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Must match the `stale_declared` event for same R-68 activation. AUDIT-CHAIN-CHECK-STALE-CHAIN-01 enforced. |
+| `restored_at` | datetime | Timestamp IC confirms `audit-chain-daily-check` healthy after `cron.run_job()` and `system.audit_chain_verified` observed. |
+| `root_cause` | enum | `h1_deleted` / `h2_disabled` / `h3_infra` / `h4a_function_missing` / `h4b_secret_missing` / `h4c_permission_denied` / `h4d_pg_net_disabled`. |
+| `stale_hours_total` | int ≥ 0 | Total hours `audit-chain-daily-check` was stale (declaration to restoration). |
+| `manual_chain_break_count` | int ≥ 0 | Final count of broken chain links detected by R-68-C2 (0 = chain intact during stale window). |
+| `r05_activated` | boolean | `true` if R-68-C2 detected chain breaks and R-05 was co-activated. |
+
+**AUDIT-CHAIN-CHECK-STALE-CHAIN-01 Ordering Invariant:** `system.audit_chain_check_restored` for a given `incident_id` is blocked (HTTP 422 `AUDIT_CHAIN_CHECK_STALE_CHAIN_01_VIOLATION`) by the `emit-audit-event` Worker if no prior `system.audit_chain_check_stale_declared` exists for the same `incident_id`. Co-activates R-05 on violation.
+
+---
+
+### §R-68.9 Evidence Artefact
+
+**AUDIT-CHAIN-CHECK-STALE-E-001** — per-activation evidence artefact for R-68 incidents.
+
+| Field | Value |
+|---|---|
+| Evidence ID | AUDIT-CHAIN-CHECK-STALE-E-001 |
+| TSC | CC7.2 |
+| Trigger | R-68 activation (`audit-chain-daily-check` stale) |
+| Collection | Per-activation (one artefact per R-68 incident) |
+| Retention | 7 years (WORM, Cloudflare R2) |
+| Vanta mirror | Within 48h of filing |
+| R2 path | `compliance/evidence/audit-chain-check-stale/audit-chain-check-stale-e-001-<YYYY-MM-DD>/` |
+| Owner | security-engineer + compliance-officer (R-05 co-sign required if `r05_activated = true`) |
+
+**Contents:**
+1. `system.audit_chain_check_stale_declared` DEC-030 HIGH event (PAM-elevated IC emission, T+0).
+2. `system.audit_chain_check_restored` DEC-030 LOW event (PAM-elevated IC emission, post-recovery).
+3. AUDIT-CHAIN-CHECK-STALE-CHAIN-01 predecessor assertion confirmation (HTTP 422 `AUDIT_CHAIN_CHECK_STALE_CHAIN_01_VIOLATION` enforced by `emit-audit-event` Worker).
+4. IC runbook timestamp trace (T+0 detection → T+25 closure steps per §R-68.3).
+5. R-68-C2 scope query output: broken chain link rows (`id`, `sequence_number`, `event_type`, `created_at`, `hmac_prev`, `expected_hmac_prev`, `chain_status`). No individual `user_id`, employee name, email, health value, or GDPR Art. 9 data. `manual_chain_break_count` scalar integer.
+6. `cron.job_run_details WHERE jobname = 'audit-chain-daily-check'` export covering the stale window (confirms stale start time, missed-run timestamps, daily cadence miss count).
+7. Post-recovery `system.audit_chain_verified` DEC-030 LOW event (confirming first successful run after restoration).
+8. R-05 activation confirmation (required if `r05_activated = true`): R-05 incident ID cross-reference.
+
+**R2 path note:** `compliance/evidence/audit-chain-check-stale/` is a new subfolder created by §156. `r2:form-api` REVOKED (§80.3 invariant — IC PAM-elevated manual upload only).
+
+---
+
+### §R-68.10 Post-Incident Controls
+
+| # | Control | Trigger | Owner |
+|---|---|---|---|
+| 1 | Post-mortem if stale > 26h (single missed run) or R-68-C2 detected chain breaks | Per-activation | security-engineer + compliance-officer |
+| 2 | AUDIT-CHAIN-CHECK-STALE-CHAIN-01 Worker enforcement (`emit-audit-event` Worker: HTTP 422 on unanchored `restored` emit) | P0 — implementation pending (platform-engineer) | platform-engineer |
+| 3 | H4(b) AUDIT_CHAIN_SECRET rotation protocol: secret rotation must trigger a verification test run before next scheduled 06:00 UTC execution; devops-lead signs off on rotation confirmation | Post any H4(b) incident | devops-lead + security-engineer |
+| 4 | H1/H2 CI lint guard: `audit-chain-daily-check` job existence and `active = true` checked in migration CI | Post any H1/H2 incident | platform-engineer |
+| 5 | Quarterly runbook gap sweep: cross-reference §12.6 pg_cron canonical registry against companion runbook list | Quarterly | compliance-officer |
+
+---
+
+### §R-68.11 Cross-References
+
+| Document | Section | Note |
+|---|---|---|
+| OBSERVABILITY.md | §12.6, `audit-chain-daily-check` (unnumbered early job) | pg_cron canonical registry; freshness window 26h; AL-AUDIT-CHAIN-CHECK-01; v5.15.3 (2026-07-03) |
+| OBSERVABILITY.md | §14.3 | `audit-chain-daily-check` Edge Function operational spec (schedule, sequence, DEC-030 emission) |
+| SOC2_READINESS.md | §46 | `audit-chain-daily-check` canonical specification — HMAC-SHA256 verification logic, dual-key rotation protocol, six evidence artefacts PRE-46-E-001 through PRE-46-E-006 |
+| AUDIT_LOG_SCHEMA.md | §Audit Chain Check Stale events | v2.82 (2026-07-03) — `system.audit_chain_check_stale_declared` HIGH/7yr + `system.audit_chain_check_restored` LOW/3yr |
+| INCIDENT_RESPONSE.md | R-03 | All-jobs-stale discriminator; co-activate if R-03 fires |
+| INCIDENT_RESPONSE.md | R-05 | HMAC chain inversion co-activation on AUDIT-CHAIN-CHECK-STALE-CHAIN-01 violation; co-activate if R-68-C2 returns chain breaks |
+| SOC2_READINESS.md | §156 | AUDIT-CHAIN-CHECK-STALE-E-001 registration (CC7.2); v3.82.0 (2026-07-03) |
+| SOC2_READINESS.md | §79.4 | AUDIT-CHAIN-CHECK-STALE-E-001 row in master evidence table (count 122 → 123) |
+
+---
+
+### §R-68.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.audit_chain_check_stale_declared` (HIGH/7yr) and `system.audit_chain_check_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, AUDIT-CHAIN-CHECK-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative | compliance-officer | **P0** | [x] **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.82).** |
+| 2 | Implement AUDIT-CHAIN-CHECK-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker (HTTP 422 `AUDIT_CHAIN_CHECK_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit) | platform-engineer | **P1** | [ ] Pending — platform-engineer |
+| 3 | Register AUDIT-CHAIN-CHECK-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2; per-activation; 7yr; `compliance/evidence/audit-chain-check-stale/audit-chain-check-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [x] **Done — 2026-07-03 (§156.2, SOC2_READINESS.md v3.82.0).** |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` `audit-chain-daily-check` row cross-reference column: add `; INCIDENT_RESPONSE R-68 (§R-68; v1.0, 2026-07-03 — companion stale recovery runbook for audit-chain-daily-check)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.15.3).** |
+| 5 | Authoring complete — §R-68 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.34.0).** |
+
+**Privacy floor (invariant throughout R-68):** No individual `user_id`, employee name, email, coaching content, body composition metric, or GDPR Art. 9 special-category data appears in any R-68 scope query result, communication template payload, DEC-030 event payload, or AUDIT-CHAIN-CHECK-STALE-E-001 evidence artefact. R-68-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-68-C2 surfaces only `sequence_number` integers, HMAC hash strings, `event_type` strings, and `created_at` timestamps — no individual employee identifiers, health values, coaching session content, or GDPR Art. 9 data. R-68-C3 surfaces only pg_cron job metadata and run timestamps. `manual_chain_break_count` and `missed_run_count` are scalar integer counts only.
+
+---

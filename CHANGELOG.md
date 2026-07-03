@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [12.2.1] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` R-68 — Audit Chain Daily Check Stale (`audit-chain-daily-check`) — CC7.2 companion stale recovery runbook. First P0-default stale runbook in the series (R-60–R-67 were P1/P2). Covers six-step timeline, three scope queries (R-68-C1 pg_cron run history; R-68-C2 manual chain linkage SQL with partial compensating HMAC linkage check; R-68-C3 peer job health), four root-cause hypotheses with seven sub-causes (H4a–H4d covering Edge Function and secret rotation scenarios), R-05 co-activation if chain breaks detected during stale window, two DEC-030 events, AUDIT-CHAIN-CHECK-STALE-E-001 evidence artefact, five post-incident controls.
+- `docs/AUDIT_LOG_SCHEMA.md` §Audit Chain Check Stale events (v2.82) — `system.audit_chain_check_stale_declared` HIGH/7yr + `system.audit_chain_check_restored` LOW/3yr. Zod v2 schemas with six/seven-field payloads; AUDIT-CHAIN-CHECK-STALE-CHAIN-01 ordering invariant; CC7.2 auditor narrative.
+- `docs/SOC2_READINESS.md` §156 — AUDIT-CHAIN-CHECK-STALE-E-001 Registration (v3.82.0). §79.4 evidence count 122 → 123; new R2 subfolder `compliance/evidence/audit-chain-check-stale/`; §80.4 Vanta mirror entry.
+
+### Changed
+- `docs/OBSERVABILITY.md` §12.6 — `audit-chain-daily-check` row updated with INCIDENT_RESPONSE R-68 cross-reference (v5.15.3).
+- `docs/INCIDENT_RESPONSE.md` — document header v3.33.0 → v3.34.0.
+- `docs/AUDIT_LOG_SCHEMA.md` — document header v2.78 → v2.82 (header was previously stale — last updated at v2.78; body content reached v2.81 in prior passes without header sync; corrected this pass).
+- `docs/SOC2_READINESS.md` — document header v3.81.0 → v3.82.0.
+- `VERSION` — 12.2.0 → 12.2.1.
+
+---
+
 ## [12.2.0] — 2026-07-03
 
 ### Added

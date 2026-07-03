@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.78
+# FORM · Audit Log Schema v2.82
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -5923,6 +5923,82 @@ CC7.2 requires FORM to monitor for anomalous activity — including monitoring t
 - `system.scim_mass_deprovision_monitor_restored` — LOW — 3 years — CC7.2, A1.1
 
 ---
+
+### Audit Chain Check Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-68 · CC7.2)
+
+#### system.audit_chain_check_stale_declared
+
+**Severity:** HIGH · **Retention:** 7 years · **TSC:** CC7.2 · **Emitter:** security-engineer (IC, PAM-elevated) via `POST /audit/emit-event`
+
+```typescript
+// Zod v2 schema
+const AuditChainCheckStaleDeclaredSchema = z.object({
+  incident_id:              z.string().uuid(),
+  confirmed_stale_since:    z.string().datetime(),
+  stale_hours:              z.number().int().min(0),
+  missed_run_count:         z.number().int().min(0),
+  manual_chain_break_count: z.number().int().min(-1),
+  initial_severity:         z.enum(['p0', 'p0_escalate']),
+});
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Fresh UUID per R-68 activation. Anchors AUDIT-CHAIN-CHECK-STALE-CHAIN-01 ordering invariant. |
+| `confirmed_stale_since` | datetime | Timestamp of last confirmed successful `audit-chain-daily-check` run (from R-68-C1 `cron.job_run_details`). |
+| `stale_hours` | int ≥ 0 | Hours since last successful run. 26h freshness window; daily 06:00 UTC cadence. |
+| `missed_run_count` | int ≥ 0 | Number of 06:00 UTC run windows missed during the stale period (typically 1 for first detection within 26h). |
+| `manual_chain_break_count` | int ≥ −1 | −1 = R-68-C2 not yet run at declaration time; amendment-emitted after T+5 scope query with actual count. |
+| `initial_severity` | enum | `p0` (R-68-C2 not yet run or 0 chain breaks detected); `p0_escalate` (R-68-C2 ≥ 1 chain break — R-05 co-activated). |
+
+#### system.audit_chain_check_restored
+
+**Severity:** LOW · **Retention:** 3 years · **TSC:** CC7.2 · **Emitter:** security-engineer (IC, PAM-elevated) via `POST /audit/emit-event`
+
+```typescript
+// Zod v2 schema
+const AuditChainCheckRestoredSchema = z.object({
+  incident_id:              z.string().uuid(),
+  restored_at:              z.string().datetime(),
+  root_cause:               z.enum([
+    'h1_deleted',
+    'h2_disabled',
+    'h3_infra',
+    'h4a_function_missing',
+    'h4b_secret_missing',
+    'h4c_permission_denied',
+    'h4d_pg_net_disabled',
+  ]),
+  stale_hours_total:        z.number().int().min(0),
+  manual_chain_break_count: z.number().int().min(0),
+  r05_activated:            z.boolean(),
+});
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Must match the `stale_declared` event for same R-68 activation. AUDIT-CHAIN-CHECK-STALE-CHAIN-01 enforced. |
+| `restored_at` | datetime | Timestamp IC confirms `audit-chain-daily-check` healthy after `cron.run_job()` and `system.audit_chain_verified` observed. |
+| `root_cause` | enum | 7-value enum (vs. 4-value for job-based runbooks): `h1_deleted`, `h2_disabled`, `h3_infra`, `h4a_function_missing`, `h4b_secret_missing` (`AUDIT_CHAIN_SECRET` absent/rotated), `h4c_permission_denied` (RLS or GRANT change), `h4d_pg_net_disabled`. |
+| `stale_hours_total` | int ≥ 0 | Total hours `audit-chain-daily-check` was stale (declaration to restoration). |
+| `manual_chain_break_count` | int ≥ 0 | Final count of broken chain links detected by R-68-C2 (0 = chain intact during stale window). |
+| `r05_activated` | boolean | `true` if R-68-C2 detected chain breaks and R-05 (HMAC Chain Break) was co-activated concurrently. |
+
+#### AUDIT-CHAIN-CHECK-STALE-CHAIN-01 Ordering Invariant
+
+`system.audit_chain_check_restored` for a given `incident_id` is blocked (HTTP 422 `AUDIT_CHAIN_CHECK_STALE_CHAIN_01_VIOLATION`) by the `emit-audit-event` Worker if no prior `system.audit_chain_check_stale_declared` exists for the same `incident_id`. Co-activates R-05 on violation. Implementation pending (platform-engineer — INCIDENT_RESPONSE.md R-68.12 item 2).
+
+#### Retention Summary
+
+- `system.audit_chain_check_stale_declared` — HIGH — 7 years — CC7.2
+- `system.audit_chain_check_restored` — LOW — 3 years — CC7.2
+
+#### CC7.2 Auditor Narrative
+
+CC7.2 requires FORM to monitor for anomalous activity — including monitoring the integrity monitoring controls themselves. `audit-chain-daily-check` (daily 06:00 UTC, Supabase Edge Function, `supabase/functions/audit-chain-daily-check/index.ts`) is FORM's sole automated daily verifier of DEC-030 HMAC chain integrity across the full `audit_log_events` table: it reads the last 1,000 rows ordered by `sequence_number`, recomputes HMAC-SHA256(`AUDIT_CHAIN_SECRET`, `hmac_prev` ‖ canonical payload) per row using the Web Crypto API, and emits `system.audit_chain_verified` LOW on success or `system.audit_chain_break_detected` CRITICAL + R-05 trigger on failure. When `audit-chain-daily-check` goes stale (>26h without a successful run), FORM initiates R-68 within the freshness window: `system.audit_chain_check_stale_declared` HIGH is the IC-anchoring tamper-evident record that the CC7.2 HMAC chain integrity verification control lapsed; R-68-C2 manual chain linkage SQL immediately provides compensating partial coverage; security-engineer signs off confirming chain linkage intact (or R-05 forensic track is active). Distinction from all prior stale runbooks (R-60 through R-67): R-68 is P0 default with no P1 fallback — the audit chain is foundational to every other SOC 2 CC7 control's evidence record. Retention 7yr: multi-cycle SOC 2 coverage for CC7.2 chain integrity monitoring obligation.
+
+**v2.82 · 2026-07-03 · owner: compliance-officer + security-engineer**
+*v2.82 (2026-07-03): +2 events — `system.audit_chain_check_stale_declared` (HIGH/7yr) and `system.audit_chain_check_restored` (LOW/3yr) — in new section `### Audit Chain Check Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-68 · CC7.2)`. Closes `docs/INCIDENT_RESPONSE.md R-68.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, AUDIT-CHAIN-CHECK-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative). AUDIT-CHAIN-CHECK-STALE-CHAIN-01: `system.audit_chain_check_restored` blocked (HTTP 422 `AUDIT_CHAIN_CHECK_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-68.12 item 2). Six-field Zod v2 `AuditChainCheckStaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime), `stale_hours` (int≥0 — hours not minutes; 26h freshness window, daily 06:00 UTC cadence), `missed_run_count` (int≥0 — number of 06:00 UTC run windows missed), `manual_chain_break_count` (int≥−1, −1 = R-68-C2 gate not yet run; final count in `restored`), `initial_severity` (enum p0|p0_escalate — p0_escalate if R-68-C2 returns chain breaks). Seven-field Zod v2 `AuditChainCheckRestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum h1_deleted/h2_disabled/h3_infra/h4a_function_missing/h4b_secret_missing/h4c_permission_denied/h4d_pg_net_disabled — 7 values, extended from R-67 4-value enum to cover secret-rotation and permission sub-causes unique to Edge Function deployment), `stale_hours_total` (int≥0), `manual_chain_break_count` (int≥0 — final; 0 if chain intact during stale window), `r05_activated` (bool — true if R-68-C2 detected chain breaks and R-05 was co-activated). CC7.2 significance: `audit-chain-daily-check` is FORM's sole automated daily verifier of DEC-030 HMAC chain integrity — when stale, FORM has no automated evidence that the audit trail has not been tampered with; this is a P0 default (all prior companion stale runbooks R-60 through R-67 were P1 or P2 default); P0-escalate + R-05 co-activation if R-68-C2 detects chain breaks. Privacy floor (both schemas): scalar integers, UUIDs, enum strings, datetime, boolean, and HMAC hash strings only — no user_id, employee name, email, health value, or GDPR Art. 9 data in chain event payloads; `form_api` REVOKED from emission path. Retention table: +2 rows (`system.audit_chain_check_stale_declared` HIGH 7yr CC7.2; `system.audit_chain_check_restored` LOW 3yr CC7.2). Document header v2.78 → v2.82 (header was previously stale — last updated at v2.78; body content reached v2.81 in prior passes without header sync; corrected this pass). Owner: compliance-officer + security-engineer.*
 
 **v2.81 · 2026-07-03 · owner: compliance-officer + security-engineer**
 *v2.81 (2026-07-03): +2 events — `system.scim_mass_deprovision_monitor_stale_declared` (HIGH/7yr) and `system.scim_mass_deprovision_monitor_restored` (LOW/3yr) — in new section `### SCIM Mass Deprovision Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-67 · CC7.2 / A1.1)`. Closes `docs/INCIDENT_RESPONSE.md R-67.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, SCIM-MASS-MON-STALE-CHAIN-01 ordering invariant, and CC7.2/A1.1 auditor narrative). SCIM-MASS-MON-STALE-CHAIN-01: `system.scim_mass_deprovision_monitor_restored` blocked (HTTP 422 `SCIM_MASS_MON_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-67.12 item 2). Six-field Zod v2 `ScimMassDeprovMonStaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime), `stale_minutes` (int≥0 — minutes not hours; 6-min freshness cadence), `missed_runs_estimate` (int≥0 — stale_minutes÷5 rounded down), `manual_mass_deprov_match_count` (int≥−1, −1 = gate not yet run; final count in `restored`), `initial_severity` (enum p1|p0_escalate — p0_escalate if R-67-C2 returns rows with already_detected=false). Six-field Zod v2 `ScimMassDeprovMonRestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum h1_deleted/h2_disabled/h3_infra/h4_function_broken — 4 values; no H5 for job 24), `stale_minutes_total` (int≥0), `manual_mass_deprov_match_count` (int≥0 — final; 0 if no missed mass deprovisioning events during stale window), `r24_activated` (bool — true if R-24 SCIM Mass Deprovisioning Emergency was activated concurrently due to undetected bursts). A1.1 significance: job 24 is FORM's only automated A1.1 availability-threat detector for SCIM-initiated bulk access revocation (5-min cadence); stale window means enterprise tenants could lose bulk access without detection — P1 default (higher than R-65/R-66 P2 because A1.1 availability impact, not just CC7.2 monitoring gap); P0-escalate if undetected bursts found during stale window. Privacy floor (both schemas): scalar integers, UUIDs, enum strings, datetime, and boolean only — no user_id, employee name, email, health value, or GDPR Art. 9 data in chain event payloads; `form_api` REVOKED from emission path. Retention table: +2 rows (`system.scim_mass_deprovision_monitor_stale_declared` HIGH 7yr CC7.2/A1.1; `system.scim_mass_deprovision_monitor_restored` LOW 3yr CC7.2/A1.1). Document header v2.80 → v2.81. Owner: compliance-officer + security-engineer.*

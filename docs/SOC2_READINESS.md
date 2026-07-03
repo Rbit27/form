@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.81.0
+# FORM · SOC 2 Type II Readiness v3.82.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -35219,3 +35219,39 @@ SCIM-MASS-MON-STALE-E-001 added to §80.4 Vanta mirror protocol. Mirror deadline
 | 2 | Provision `compliance/evidence/scim-mass-deprovision/` R2 subfolder (new — no parent) with write-once policy and versioning (§80.3 R2 storage update) | platform-engineer | **P1** | [ ] **Pending — platform-engineer.** |
 | 3 | Add SCIM-MASS-MON-STALE-E-001 to §80.4 Vanta mirror protocol | compliance-officer | **P1** | [x] **Done — 2026-07-03 (§155.4, this section).** |
 | 4 | Authoring complete — §155 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.81.0).** |
+
+## §156 · AUDIT-CHAIN-CHECK-STALE-E-001 Registration (CC7.2 · INCIDENT_RESPONSE R-68)
+
+> **Date:** 2026-07-03. **Trigger:** INCIDENT_RESPONSE.md §R-68.12 item 3 (P1) — "Register AUDIT-CHAIN-CHECK-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2; per-activation; 7yr; `compliance/evidence/audit-chain-check-stale/audit-chain-check-stale-e-001-<YYYY-MM-DD>/`)." **Owner:** security-engineer + compliance-officer.
+
+### §156.1 Background
+
+`audit-chain-daily-check` (daily 06:00 UTC, Supabase Edge Function, 26h freshness window) is FORM's sole automated daily verifier of DEC-030 HMAC chain integrity across the full `audit_log_events` table. It is the only P0-severity job among the original 9 unnumbered §12.6 pg_cron registry entries. Unlike all prior companion stale runbooks (R-60 through R-67, which were P1 or P2 default), R-68 is P0 default with no severity fallback: when `audit-chain-daily-check` goes stale, FORM's CC7.2 HMAC chain integrity verification control is offline and FORM cannot provide automated SOC 2 evidence that the audit trail has not been tampered with during the stale window. INCIDENT_RESPONSE.md R-68 is the companion stale recovery runbook; it requires a per-activation AUDIT-CHAIN-CHECK-STALE-E-001 evidence artefact capturing: (1) the DEC-030 HMAC chain (`system.audit_chain_check_stale_declared` HIGH + `system.audit_chain_check_restored` LOW); (2) R-68-C2 manual chain linkage SQL output (sequence numbers + HMAC hash strings — no user data); (3) security-engineer sign-off confirming chain intact or R-05 co-activation record if chain breaks were detected. AUDIT-CHAIN-CHECK-STALE-CHAIN-01 ordering invariant: `audit_chain_check_restored` blocked (HTTP 422 `AUDIT_CHAIN_CHECK_STALE_CHAIN_01_VIOLATION`) without prior `stale_declared` for same `incident_id`; co-activates R-05.
+
+### §156.2 §79.4 Registration
+
+AUDIT-CHAIN-CHECK-STALE-E-001 registered in §79.4 master evidence table (count 122 → 123). Evidence class: per-activation (one artefact per R-68 stale incident). Retention: 7yr WORM. TSC: CC7.2. R2 path: `compliance/evidence/audit-chain-check-stale/audit-chain-check-stale-e-001-<YYYY-MM-DD>/`. Owner: security-engineer + compliance-officer (R-05 co-sign required if `r05_activated = true`).
+
+### §156.3 §80.3 R2 Storage Update
+
+`audit-chain-check-stale/` is a **new** top-level subfolder under `compliance/evidence/` — no parent folder exists from a prior §80.3 registration. Platform-engineer must provision `compliance/evidence/audit-chain-check-stale/` in R2 (write-once policy, versioning enabled) prior to the first R-68 activation. Per-incident path: `compliance/evidence/audit-chain-check-stale/audit-chain-check-stale-e-001-<YYYY-MM-DD>/` where `YYYY-MM-DD` is the UTC date of R-68 `stale_declared` emission. `r2:form-api` REVOKED (§80.3 invariant — no automated R2 write path for compliance evidence; IC PAM-elevated manual upload only).
+
+### §156.4 §80.4 Vanta Mirror Update
+
+AUDIT-CHAIN-CHECK-STALE-E-001 added to §80.4 Vanta mirror protocol. Mirror deadline: within 48h of per-activation artefact filing. Evidence class: per-activation (one artefact per R-68 stale incident). Security-engineer sign-off attestation must be present in artefact before Vanta mirror. R-05 co-sign attestation required if `r05_activated = true`. Zero-activation period: no nil attestation required (per-activation artefact only; absence = no R-68 incidents in period).
+
+### §156.5 Cross-Reference Obligations Closed
+
+| Cross-reference | Status |
+|---|---|
+| INCIDENT_RESPONSE.md §R-68.12 item 1 (P0 — register DEC-030 events in AUDIT_LOG_SCHEMA.md) | [x] Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.82) |
+| INCIDENT_RESPONSE.md §R-68.12 item 3 (P1 — register AUDIT-CHAIN-CHECK-STALE-E-001 in §79.4) | [x] Done — 2026-07-03 (§156.2, this section) |
+| INCIDENT_RESPONSE.md §R-68.12 item 4 (P0 — update OBSERVABILITY.md §12.6 audit-chain-daily-check cross-ref) | [x] Done — 2026-07-03 (OBSERVABILITY.md v5.15.3) |
+
+### §156.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register AUDIT-CHAIN-CHECK-STALE-E-001 in §79.4 master evidence table (CC7.2, per-activation, 7yr) | security-engineer + compliance-officer | **P1** | [x] **Done — 2026-07-03 (§156.2, this section).** |
+| 2 | Provision `compliance/evidence/audit-chain-check-stale/` R2 subfolder (new — no parent) with write-once policy and versioning (§80.3 R2 storage update) | platform-engineer | **P1** | [ ] **Pending — platform-engineer.** |
+| 3 | Add AUDIT-CHAIN-CHECK-STALE-E-001 to §80.4 Vanta mirror protocol | security-engineer + compliance-officer | **P1** | [x] **Done — 2026-07-03 (§156.4, this section).** |
