@@ -6,6 +6,12 @@
 
 ## Current version
 
+**v11.74.0** — 2026-07-03 · content · post-3075 · «Самооцінка мобільності як технічного обмеження» (series «Технічна самодіагностика» 3071–3080, 5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3075 · next: post-3076 («Двосторонні vs. односторонні вправи у контексті технічної діагностики») + post-59 («Як читати власний тренувальний журнал, щоб він давав рішення, а не просто зберігав дані»)
+
+**v11.73.0** — 2026-07-03 · enterprise · R-60.12 items 1+3 closed · AUDIT_LOG_SCHEMA v2.75 + SOC2_READINESS §148 · compliance-officer + devops-lead
+
+**v11.72.0** — 2026-07-03 · docs · R-60 Invite Expiry Sweep & Email Cleanup Stale runbook · compliance-officer + devops-lead
+
 **v11.71.0** — 2026-07-03 · content · post-3074 + post-58 · «Технічний дрейф під втомою: коли зупинятись і що це говорить про програму» (series «Технічна самодіагностика» 3071–3080, 4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · «Як ставити тренувальні цілі, щоб їх можна було виміряти» (editorial series 51–60, 8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards prepended for post-3074 + post-58 · next: post-3075 («Самооцінка мобільності як технічного обмеження») + post-59 («Як читати власний тренувальний журнал, щоб він давав рішення, а не просто зберігав дані»)
 
 **v11.70.0** — 2026-07-03 · content · post-3073 + post-57 · «Моторне навчання і рухова пам'ять: що закріплюється і як це змінити» (series «Технічна самодіагностика» 3071–3080, 3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · «Функціональне перевантаження vs. системна помилка: що вирізняє overreaching від overtraining» (editorial series 51–60, 7/10) · clinical-safety CONDITIONAL PASS · sports-scientist review pending · blog.html cards prepended for post-3073 + post-57 · README: post-3073 proposed → draft (v11.69.0); post-57 proposed → draft (v11.70.0) · next: post-3074 («Технічний дрейф під втомою: коли зупинятись і що це говорить про програму») + post-58 («Як ставити тренувальні цілі, щоб їх можна було виміряти»)
