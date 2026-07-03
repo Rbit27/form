@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 in progress 1/10 · series «Прогресія без тренера» 3096–3105 proposed · block 896–900 active · block 901–910 proposed · v11.85.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 in progress 2/10 · series «Прогресія без тренера» 3096–3105 proposed · block 896–900 active · block 901–910 proposed · v11.86.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3461,12 +3461,12 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3079 | Warm-up як технічна діагностика: два завдання розминки і чому більшість використовує одне | **draft · v11.80.0 → post-3079-warmup-as-technical-diagnostics.md** |
 | 3080 | Синтез 3071–3080: технічна операційна система для self-coached атлета | **draft · v11.82.0 → post-3080-technical-self-diagnostics-synthesis-10-principles.md** |
 
-### Series «Мезоцикл без тренера» 3081–3090 · in progress 1/10
+### Series «Мезоцикл без тренера» 3081–3090 · in progress 2/10
 
 | Post | Topic | Status |
 |---|---|---|
-| 3081 | Що таке мезоцикл і для чого він потрібен self-coached атлету: структура, функція, мінімум | **draft · v11.84.0 → post-3081-mesocycle-structure-function-minimum.md** |
-| 3082 | Вибір тривалості блоку: 4, 6, 8 чи 12 тижнів — і від чого це реально залежить | proposed |
+| 3081 | Що таке мезоцикл і для чого він потрібен self-coached атлету: структура, функція, мінімум | **draft · v11.85.0 → post-3081-mesocycle-structure-function-minimum.md** |
+| 3082 | Вибір тривалості блоку: 4, 6, 8 чи 12 тижнів — і від чого це реально залежить | **draft · v11.86.0 → post-3082-mesocycle-duration-4-6-8-12-weeks.md** |
 | 3083 | Ціль мезоциклу: сила, гіпертрофія, технічна робота — чому змішані цілі ускладнюють оцінку результату | proposed |
 | 3084 | Структура тижня всередині блоку: від логіки навантаження до відновлення | proposed |
 | 3085 | Прогресія навантаження всередині мезоциклу: три моделі для різних рівнів тренованості | proposed |
