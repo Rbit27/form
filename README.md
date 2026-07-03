@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · 35 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 active 9/10 · series «Силові метрики» 3061–3070 proposed · series «Технічна самодіагностика» 3071–3080 proposed · block 896–900 active · block 901–910 proposed · v11.47.0
+### Editorial series: 11–44 drafted · 35 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 proposed · series «Технічна самодіагностика» 3071–3080 proposed · block 896–900 active · block 901–910 proposed · v11.48.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3412,7 +3412,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3049 | Техніка при зміні ваги, втомі і відсутності відпочинку — операційний стандарт | proposed |
 | 3050 | Синтез 3041–3050: рамка технічного самоменеджменту для self-coached атлета | proposed |
 
-### Editorial series: 3051–3060 — Програмування без коуча: рішення в умовах невизначеності (active · v11.34.0)
+### Editorial series: 3051–3060 — Програмування без коуча: рішення в умовах невизначеності (COMPLETE · v11.48.0)
 
 Блок про практику прийняття програмних рішень, коли немає зовнішнього арбітра. Фокус: як self-coached атлет обирає між варіантами, де немає «правильної відповіді» — тільки кращі і гірші ставки при поточних даних. Тон: editorial-brutalist, 13-min read.
 
@@ -3427,7 +3427,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3057 | Деload без страху: коли відступ — це частина прогресії, а не капітуляція | proposed |
 | 3058 | Як оцінювати власний мезоцикл: п'ять питань після кожного блоку | proposed |
 | 3059 | Як складати тренувальний журнал, який справді допомагає: мінімум даних для максимальних рішень | **draft · v11.47.0 → post-3059-training-journal-minimum-data.md** |
-| 3060 | Синтез 3051–3060: операційний протокол програмних рішень для self-coached атлета | proposed |
+| 3060 | Синтез 3051–3060: операційний протокол програмних рішень для self-coached атлета | **draft · v11.48.0 → post-3060-programming-decisions-synthesis.md** |
 
 ### Editorial series: 3061–3070 — Силові метрики: як читати числа і будувати ієрархію орієнтирів (proposed · v11.37.0)
 

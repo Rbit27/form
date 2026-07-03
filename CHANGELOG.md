@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [11.48.0] — 2026-07-03
+
+### Added
+- `content/post-3060-programming-decisions-synthesis.md` — Series «Програмування без коуча» (3051–3060) post 10/10. SERIES COMPLETE. «Синтез 3051–3060: операційний протокол програмних рішень для self-coached атлета». Операційна рамка у п'яти кроках: (1) тест тренувального віку → відповідна модель прогресії (Haff і Triplett 2016); (2) п'ять елементів мезоциклу до першого тренування: акцент · стартовий обсяг · вектор прогресії · дата deload · критерії раннього виходу (Israetel et al. 2019); (3) мінімальний журнал 4 поля + три рівні перегляду (Halson 2014, Zourdos et al. 2016, Helms et al. 2016); (4) таблиця сигналів і класів рішень (Meeusen et al. 2013, Ralston 2017); (5) горизонти рішень — коли залишатись / коли deload / чотири типи плато. П'ять даних після першого мезоциклу. Три обмеження self-coached підходу: технічна регресія, конкурентна підготовка, системна незрозумілість. clinical-safety: NOT_REQUIRED.
+- `blog.html` — картка post-3060 prepended at top of feed.
+
+### Changed
+- `README.md` — series «Програмування без коуча» 3051–3060 marked COMPLETE 10/10; post-3060 row updated proposed → draft · v11.48.0; series header updated active → COMPLETE.
+- `STATUS.md` — v11.48.0 current entry added; next: series «Силові метрики» 3061–3070 opener post-3061.
+- `VERSION` — 11.47.0 → 11.48.0.
+
 ## [11.47.0] — 2026-07-03
 
 ### Added
