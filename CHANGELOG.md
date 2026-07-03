@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.87.0] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` v3.29.0 — R-63 · Victor Safety Chain Monitor Stale (`victor_safety_chain_monitor`, job 15, CC7.4/A1.2) companion stale recovery runbook. Closes the pg_cron §12.6 companion-runbook gap for job 15: VSAFETY-CHAIN-01 (P0 incident uncontained > 60 min) + VSAFETY-CHAIN-02 (Victor disabled > 48 h) clinical-safety chain integrity blind spot detection and recovery. Trigger matrix (AL-VSAFETY-CHAIN-STALE-01, P1 PagerDuty `form-devops`, devops-lead + clinical-safety mandatory co-page, 26h freshness); P0 upgrade + R-23 co-activation on confirmed chain violations; four scope queries (R-63-C1 pg_cron history, R-63-C2 VSAFETY-CHAIN-01 manual SQL, R-63-C3 VSAFETY-CHAIN-02 manual SQL, R-63-C4 peer health); four root-cause hypotheses H1–H4; seven recovery steps; VSAFETY-CHAIN-STALE-E-001 evidence artefact (7yr WORM CC7.4/A1.2). Document header v3.27.0 → v3.29.0 (cumulative correction for missed R-62 header bump).
+- `docs/AUDIT_LOG_SCHEMA.md` v2.78 — two new DEC-030 HMAC-chained events: `system.victor_safety_chain_monitor_stale_declared` (HIGH/7yr, CC7.4/A1.2) and `system.victor_safety_chain_monitor_restored` (LOW/3yr); VSAFETY-CHAIN-MON-STALE-CHAIN-01 ordering invariant (HTTP 422 `VSAFETY_CHAIN_MON_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05; pending platform-engineer implementation); Zod v2 schemas; CC7.4 and A1.2 auditor narratives. Privacy floor: incident UUID, duration integers, and boolean flags only.
+- `docs/SOC2_READINESS.md` v3.77.0 — §151 VSAFETY-CHAIN-STALE-E-001 registration in §79.4 master evidence table (CC7.4/A1.2, per-activation, 7yr WORM, `compliance/evidence/victor-safety/vsafety-chain-stale-e-001-<YYYY-MM-DD>/`); §80.3 `victor-safety/` subfolder updated; §80.4 Vanta mirror protocol entry added (upload within 48h; clinical-safety sign-off required if R-23 co-activated).
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.14.8 — §12.6 pg_cron canonical registry job 15 (`victor_safety_chain_monitor`) row: cross-reference column updated with `INCIDENT_RESPONSE R-63 (§R-63; v1.0, 2026-07-03 — companion stale recovery runbook for job 15)`.
+- `VERSION` — 11.86.0 → 11.87.0.
+
+---
+
 ## [11.86.0] — 2026-07-03
 
 ### Added

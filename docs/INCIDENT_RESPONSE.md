@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.27.0
+# FORM · Incident Response Runbook v3.29.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -23030,3 +23030,367 @@ VBASE-STALE-E-001 filed: {R2 path}
 ---
 
 *v3.22.0 (2026-07-03): §R-57 — PKJWT Key Expiry Sweep Stale (`pkjwt_key_expiry_sweep`, job 58) — CC6.6 detection gap companion runbook. Closes the documentation gap identified post-OBSERVABILITY v5.14.0 (job 58 registered 2026-07-02): no stale recovery runbook existed for job 58 despite all peer pg_cron jobs (R-31 through R-53) having companion runbooks. §R-57.1 trigger matrix: `system.cron_job_stale` job 58 → Slack P3 `#alerts-enterprise` dedup `pkjwt-expiry-sweep-stale`; P1 escalation if R-57-C1 count > 0. §R-57.2 severity: P3 default (30-day advance-warning buffer; authentication unaffected); P1 (stale AND PKJWT key < 7 days from expiry). §R-57.3 five-step immediate actions (T+0 stale-declared emit; T+5 R-57-C1 P1 gate; T+10 R-57-C2 run history; T+15 R-57-C3 catalog check; T+15 P1 manual R-57-C4 sweep + tenant notification). §R-57.4 four scope queries (R-57-C1 P1 gate aggregate count; R-57-C2 pg_cron history; R-57-C3 catalog check; R-57-C4 P1 manual sweep — form_system role) and four root-cause hypotheses (H1 deleted, H2 disabled, H3 maintenance, H4 function broken). §R-57.5 five-step recovery: (1) stale-declared emit; (2) R-57-C1 classify; (3) P1 R-57-C4 manual sweep + tenant notification via CSM; (4) H1–H4 restoration table; (5) manual run + DEC-030 restored emit. §R-57.6 three Slack templates (P3 stale, P1 escalation, post-resolution). §R-57.7 DEC-030 chain: two events — `system.pkjwt_expiry_sweep_stale_declared` HIGH/7yr (Zod: incident_id, confirmed_stale_since, stale_hours, missed_runs, at_risk_tenant_count, trigger, initial_severity) and `system.pkjwt_expiry_sweep_restored` LOW/3yr (Zod: incident_id, restored_at, root_cause, tenants_warned_during_recovery); PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant (HTTP 422 PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION on unanchored restore). §R-57.8 PKJWT-SWEEP-STALE-E-001 per-activation artefact (CC6.6; per-activation; 7yr). §R-57.9 six post-incident controls (post-mortem; H1/H2/H4 specific guards; OBSERVABILITY §12.6 cross-ref; PKJWT-E-001 collection overlap check). §R-57.10 five cross-references (OBSERVABILITY §12.6; SSO_SCIM §42/§44.2; AUDIT_LOG_SCHEMA §SSO-PKJ-Lifecycle; SOC2_READINESS §145/§146). §R-57.11 five-item implementation checklist (AUDIT_LOG_SCHEMA registration; OBSERVABILITY §12.6 companion-runbook cross-ref update; SOC2_READINESS §79.4 PKJWT-SWEEP-STALE-E-001 registration; emit-audit-event PKJWT-SWEEP-STALE-CHAIN-01 enforcement implementation; documentation [x] Done this pass). Privacy floor throughout: no employee user_id, name, email, health value, coaching content, body composition, or GDPR Art. 9 special-category data; all event payloads aggregate-count or FORM-internal UUID only. Document header v3.21.2 → v3.22.0. Owner: security-engineer + compliance-officer + enterprise-architect.*
+
+---
+
+## R-63 · Victor Safety Chain Monitor Stale
+
+**`victor_safety_chain_monitor` — job 15 — CC7.4 / A1.2 — clinical-safety chain integrity blind spot companion stale recovery runbook**
+
+> Companion to: OBSERVABILITY §12.6 (job 15, v5.14.8) · §32.6 (VSAFETY-CHAIN SQL) · SOC2_READINESS §151 (v3.77.0) · AUDIT_LOG_SCHEMA §Victor-Safety-Chain-Monitor-Stale (v2.78)
+
+---
+
+### §R-63.1 Trigger Matrix
+
+| Alert ID | Event | Job | Severity | Channel | Owners | Dedup Key | Freshness |
+|---|---|---|---|---|---|---|---|
+| AL-VSAFETY-CHAIN-STALE-01 | `system.cron_job_stale` | 15 — `victor_safety_chain_monitor` | **P1** (default); see §R-63.2 for P0 upgrade | PagerDuty `form-devops` | devops-lead + **clinical-safety** | `victor-chain-stale` | 26 h |
+
+**SOC 2 mapping:** CC7.4 (respond to security and safety events) · A1.2 (system availability monitoring).
+
+When `victor_safety_chain_monitor` goes stale the platform is blind to two clinical-safety chain violations:
+- **VSAFETY-CHAIN-01**: a P0 Victor AI safety incident open for > 60 min with no `ai.safety_incident_contained` event — meaning a patient-facing AI coach may be actively mis-behaving without documented containment.
+- **VSAFETY-CHAIN-02**: Victor disabled for > 48 h with no `ai.victor_reenabled` event — meaning the coach may be silently inactive for an extended period without documented re-enablement.
+
+Both are CC7.4 SOC 2 criteria failures if undetected. clinical-safety is co-paged on all activations of R-63.
+
+---
+
+### §R-63.2 Severity Classification
+
+| Condition | Severity | Co-active Runbooks |
+|---|---|---|
+| Default (stale detected, no chain violations confirmed yet) | **P1** | — |
+| R-63-C2 returns ≥ 1 row (VSAFETY-CHAIN-01 violation: open P0 incident > 60 min uncontained) | **P0** | R-23 (Victor AI safety incident) |
+| R-63-C3 returns ≥ 1 row (VSAFETY-CHAIN-02 violation: Victor disabled > 48 h with no re-enable) | **P0** | R-23 (Victor AI safety incident) |
+| All pg_cron jobs stale simultaneously (R-63-C4 Part A shows ≥ 3 peer jobs also stale) | P1 or P0 per above | R-03 (Supabase infrastructure) |
+
+**Mandatory:** clinical-safety must be notified within T+10 of P1 trigger (before chain violation queries complete) — not only on P0 upgrade. Use template T-63-B (§R-63.7).
+
+---
+
+### §R-63.3 Immediate Action Timeline
+
+| Time | Action | Owner |
+|---|---|---|
+| **T+0** | Acknowledge PagerDuty alert. Emit `system.victor_safety_chain_monitor_stale_declared` (DEC-030 HIGH; §R-63.8) with `incident_id`, `confirmed_stale_since`, `stale_hours`, `vsafety_chain_01_violations_before_stale: -1` (placeholder), `vsafety_chain_02_violations_before_stale: -1` (placeholder), `initial_severity: "P1"`. Post T-63-A to #alerts-devops. | devops-lead |
+| **T+5** | Run R-63-C2 (VSAFETY-CHAIN-01 manual check). If returns ≥ 1 row → upgrade to **P0**, activate R-23, update stale_declared payload fields to actual counts, post T-63-C to #alerts-safety. | devops-lead |
+| **T+10** | Notify clinical-safety via T-63-B (#alerts-safety) regardless of P0/P1 status. Run R-63-C3 (VSAFETY-CHAIN-02 manual check). If returns ≥ 1 row → upgrade to **P0** (if not already), activate R-23. | devops-lead + clinical-safety |
+| **T+15** | Run R-63-C1 (pg_cron run history — root cause). Classify by §R-63.5 hypotheses H1–H4. | devops-lead |
+| **T+20** | Run R-63-C4 (peer job health + catalog check). If ≥ 3 peers stale → co-activate R-03. | devops-lead |
+| **T+25** | Execute recovery per §R-63.6 based on H1–H4 classification. | devops-lead |
+| **T+30** | Confirm via `SELECT cron.run_job(15)` + `SELECT * FROM cron.job_run_details WHERE jobid = 15 ORDER BY start_time DESC LIMIT 1` (must show `succeeded`). Emit `system.victor_safety_chain_monitor_restored` (DEC-030 LOW; §R-63.8). File VSAFETY-CHAIN-STALE-E-001 (§R-63.9). Post T-63-A resolution update. | devops-lead + clinical-safety (if R-23 co-activated) |
+
+---
+
+### §R-63.4 Scope Queries
+
+All queries run as `form_system` role. No `user_id`, `session_id`, body composition data, or GDPR Art. 9 special-category data is surfaced in any result.
+
+#### R-63-C1 — pg_cron Run History (root cause)
+
+```sql
+SELECT
+  jobid,
+  start_time,
+  end_time,
+  status,
+  return_message
+FROM cron.job_run_details
+WHERE jobid = 15
+ORDER BY start_time DESC
+LIMIT 20;
+```
+
+*Surfaces: run timestamps and status only. No user data.*
+
+#### R-63-C2 — VSAFETY-CHAIN-01 Manual Check (P0 gate)
+
+```sql
+-- Manual execution of VSAFETY-CHAIN-01 logic (from OBSERVABILITY §32.6)
+SELECT
+  opened.id          AS incident_event_id,
+  opened.metadata->>'incident_id' AS incident_id,
+  opened.event_ts,
+  (now() - opened.event_ts) AS open_duration
+FROM audit_log_events opened
+WHERE opened.event_type = 'ai.safety_incident_opened'
+  AND (opened.metadata->>'severity') = 'P0'
+  AND opened.event_ts >= now() - INTERVAL '7 days'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events contained
+    WHERE contained.event_type = 'ai.safety_incident_contained'
+      AND contained.metadata->>'incident_id' = opened.metadata->>'incident_id'
+  )
+  AND (now() - opened.event_ts) > INTERVAL '60 minutes';
+```
+
+*If returns ≥ 1 row → P0 upgrade, activate R-23. Surfaces: incident UUID and duration only. No user data, no coaching content, no body composition metrics.*
+
+#### R-63-C3 — VSAFETY-CHAIN-02 Manual Check (P0 gate)
+
+```sql
+-- Manual execution of VSAFETY-CHAIN-02 logic (from OBSERVABILITY §32.6)
+SELECT
+  disabled.id          AS disable_event_id,
+  disabled.metadata->>'incident_id' AS incident_id,
+  disabled.event_ts,
+  (now() - disabled.event_ts) AS disabled_duration
+FROM audit_log_events disabled
+WHERE disabled.event_type = 'ai.victor_disabled'
+  AND disabled.event_ts >= now() - INTERVAL '30 days'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events reenabled
+    WHERE reenabled.event_type = 'ai.victor_reenabled'
+      AND reenabled.metadata->>'incident_id' = disabled.metadata->>'incident_id'
+  )
+  AND (now() - disabled.event_ts) > INTERVAL '48 hours';
+```
+
+*If returns ≥ 1 row → P0 upgrade, activate R-23. Surfaces: incident UUID and duration only. No user data.*
+
+#### R-63-C4 — Peer Job Health + Catalog Check
+
+**Part A — Peer job health discriminator:**
+
+```sql
+SELECT
+  j.jobname,
+  j.schedule,
+  j.active,
+  MAX(d.start_time) AS last_started,
+  MAX(CASE WHEN d.status = 'succeeded' THEN d.start_time END) AS last_succeeded
+FROM cron.job j
+LEFT JOIN cron.job_run_details d ON d.jobid = j.jobid
+  AND d.start_time >= now() - INTERVAL '72 hours'
+WHERE j.jobname IN (
+  'victor_safety_baseline_refresh',  -- job 14; peer clinical-safety job
+  'api_key_chain_monitor',           -- job 13; peer security chain job
+  'invite_expiry_sweep',             -- job 11; peer security job
+  'audit_log_retention_purge'        -- job 2; peer audit job
+)
+GROUP BY j.jobname, j.schedule, j.active
+ORDER BY j.jobname;
+```
+
+*If ≥ 3 peers show no `last_succeeded` in 72 h → co-activate R-03 (Supabase infra).*
+
+**Part B — Job catalog check:**
+
+```sql
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'victor_safety_chain_monitor';
+```
+
+*If 0 rows → H1 (deleted). If `active = false` → H2 (disabled).*
+
+---
+
+### §R-63.5 Root-Cause Hypotheses
+
+| ID | Hypothesis | Discriminator |
+|---|---|---|
+| **H1** | `victor_safety_chain_monitor` job deleted from `cron.job` | R-63-C4 Part B returns 0 rows |
+| **H2** | Job disabled (`active = false`) | R-63-C4 Part B shows `active = false` |
+| **H3** | Supabase infrastructure issue (scheduler not firing) | R-63-C1 shows no recent starts; R-63-C4 Part A shows multiple peer jobs also not running → co-activate R-03 |
+| **H4** | `victor_safety_chain_monitor()` function broken — DDL change to `audit_log_events` schema (column rename, type change, dropped event_type enum) | R-63-C1 shows recent starts but `status = 'failed'`; `return_message` contains SQL error |
+
+---
+
+### §R-63.6 Recovery Steps
+
+1. **Emit `system.victor_safety_chain_monitor_stale_declared`** at T+0 (if not already emitted). Include actual violation counts from R-63-C2/C3 once known; update payload fields from placeholder `−1` values.
+
+2. **P0 gate — if R-63-C2 or R-63-C3 returned rows:** Activate R-23 (Victor AI safety incident response). clinical-safety takes lead on chain-violation containment. R-63 continues in parallel for job restoration. Do not restore the job and suppress chain violation events — let them surface in the audit log.
+
+3. **Restore job 15 per root cause:**
+
+   | Root cause | Action |
+   |---|---|
+   | **H1** (deleted) | `SELECT cron.schedule('victor_safety_chain_monitor', '30 0 * * *', $$SELECT victor_safety_chain_monitor()$$);` — requires dual sign-off (devops-lead + compliance-officer) |
+   | **H2** (disabled) | `UPDATE cron.job SET active = true WHERE jobname = 'victor_safety_chain_monitor';` |
+   | **H3** (infra) | Await Supabase resolution via R-03; no local action. Monitor peer job recovery in R-63-C4 Part A. |
+   | **H4** (function broken) | Inspect `victor_safety_chain_monitor()` function body. Apply DDL-compatible patch (column alias update, event_type enum addition). Test via `SELECT victor_safety_chain_monitor()` in isolation before re-scheduling. |
+
+4. **Confirm restoration:** `SELECT cron.run_job(15);` followed by `SELECT status, return_message FROM cron.job_run_details WHERE jobid = 15 ORDER BY start_time DESC LIMIT 1;` — must show `status = 'succeeded'`.
+
+5. **Re-run R-63-C2 and R-63-C3** after job restoration to confirm chain violations clear (expected: 0 rows within one job cycle). If violations persist beyond the next scheduled run (26 h), escalate to R-23 if not already active.
+
+6. **Emit `system.victor_safety_chain_monitor_restored`** (DEC-030 LOW; §R-63.8).
+
+7. **File VSAFETY-CHAIN-STALE-E-001** evidence artefact (§R-63.9). If R-23 was co-activated, clinical-safety sign-off is required before Vanta upload.
+
+---
+
+### §R-63.7 Communication Templates
+
+#### T-63-A · #alerts-devops — Stale Detected / Resolved
+
+```
+[P1] victor_safety_chain_monitor STALE — job 15 — {confirmed_stale_since} UTC
+Freshness window: 26 h · Missed runs: {missed_runs}
+Chain-01 gate (R-63-C2): running... | Chain-02 gate (R-63-C3): running...
+Incident ID: {incident_id}
+Runbook: INCIDENT_RESPONSE §R-63
+Owner: @devops-lead  Co-paged: @clinical-safety
+```
+
+*(Update at T+10 with actual gate results; update at T+30 with resolution.)*
+
+#### T-63-B · #alerts-safety — Clinical-Safety Notification
+
+```
+[NOTICE] Victor safety chain monitor stale — clinical-safety co-page
+Job 15 (victor_safety_chain_monitor) has been stale since {confirmed_stale_since} UTC.
+Platform is blind to VSAFETY-CHAIN-01 (P0 incident containment) and VSAFETY-CHAIN-02 (Victor re-enable) during this window.
+Manual chain checks in progress (R-63-C2 + R-63-C3).
+If either returns rows → P0 upgrade + R-23 activation.
+Incident ID: {incident_id}
+```
+
+#### T-63-C · #alerts-safety — P0 Upgrade (chain violation confirmed)
+
+```
+[P0 UPGRADE] Victor safety chain violation confirmed during stale window
+VSAFETY-CHAIN-01 rows: {chain_01_count} | VSAFETY-CHAIN-02 rows: {chain_02_count}
+R-23 activated. clinical-safety takes lead on violation containment.
+Incident ID: {incident_id}
+```
+
+---
+
+### §R-63.8 DEC-030 Audit Event Chain
+
+#### Event 1 — `system.victor_safety_chain_monitor_stale_declared`
+
+| Field | Value |
+|---|---|
+| `event_type` | `system.victor_safety_chain_monitor_stale_declared` |
+| Severity class | **HIGH** |
+| Retention | **7 yr WORM** (Cloudflare R2 `form-soc2-evidence`) |
+| SOC 2 criteria | CC7.4 · A1.2 |
+| Emit trigger | T+0 of R-63 activation |
+
+**Zod v2 payload schema:**
+
+```typescript
+z.object({
+  incident_id:                          z.string().uuid(),
+  confirmed_stale_since:                z.string().datetime(),
+  stale_hours:                          z.number().nonnegative(),
+  missed_runs:                          z.number().int().nonnegative(),
+  vsafety_chain_01_violations:          z.number().int().min(-1), // -1 = pending gate
+  vsafety_chain_02_violations:          z.number().int().min(-1), // -1 = pending gate
+  initial_severity:                     z.enum(["P0", "P1"]),
+  trigger:                              z.literal("system.cron_job_stale"),
+  r23_co_activated:                     z.boolean(),
+})
+```
+
+*Privacy floor: no `user_id`, `session_id`, coaching content, body composition, individual incident UUID (beyond the stale-monitor's own `incident_id`), or GDPR Art. 9 special-category data.*
+
+#### Event 2 — `system.victor_safety_chain_monitor_restored`
+
+| Field | Value |
+|---|---|
+| `event_type` | `system.victor_safety_chain_monitor_restored` |
+| Severity class | **LOW** |
+| Retention | **3 yr** |
+| SOC 2 criteria | CC7.4 · A1.2 |
+| Emit trigger | T+30 of R-63 after confirmed `cron.run_job(15)` success |
+
+**Zod v2 payload schema:**
+
+```typescript
+z.object({
+  incident_id:       z.string().uuid(), // same as stale_declared
+  restored_at:       z.string().datetime(),
+  root_cause:        z.enum(["H1_deleted", "H2_disabled", "H3_infra", "H4_function_broken"]),
+  stale_hours_total: z.number().nonnegative(),
+  r23_co_activated:  z.boolean(),
+  chain_01_clear:    z.boolean(), // true = R-63-C2 returned 0 rows post-restoration
+  chain_02_clear:    z.boolean(), // true = R-63-C3 returned 0 rows post-restoration
+})
+```
+
+#### Ordering Invariant — VSAFETY-CHAIN-MON-STALE-CHAIN-01
+
+`system.victor_safety_chain_monitor_restored` MUST NOT be emitted without a matching `system.victor_safety_chain_monitor_stale_declared` sharing the same `incident_id`.
+
+`emit-audit-event` Worker enforces this: **HTTP 422 `VSAFETY_CHAIN_MON_STALE_CHAIN_01_VIOLATION`** on attempt to emit `restored` without an anchoring `stale_declared` for the same `incident_id`. Co-activates R-05 (HMAC chain break response) on violation.
+
+Implementation status: **pending** (platform-engineer — §R-63.12 item 2).
+
+---
+
+### §R-63.9 Evidence Artefact — VSAFETY-CHAIN-STALE-E-001
+
+| Field | Value |
+|---|---|
+| Artefact ID | **VSAFETY-CHAIN-STALE-E-001** |
+| SOC 2 criteria | CC7.4 · A1.2 |
+| Cadence | Per activation |
+| Retention | **7 yr WORM** — Cloudflare R2 `form-soc2-evidence` |
+| R2 path | `compliance/evidence/victor-safety/vsafety-chain-stale-e-001-<YYYY-MM-DD>/` |
+| Vanta upload | Within 48 h of incident closure (SOC2_READINESS §80.4) |
+| Clinical-safety sign-off | **Required** if R-23 was co-activated during this stale incident |
+
+**Artefact contents:**
+- `stale_declared` DEC-030 event export (JSON)
+- `restored` DEC-030 event export (JSON)
+- R-63-C1 pg_cron run history (CSV — timestamps and status only)
+- R-63-C2 VSAFETY-CHAIN-01 manual check result (row count + duration values; no user data)
+- R-63-C3 VSAFETY-CHAIN-02 manual check result (row count + duration values; no user data)
+- R-63-C4 Part A peer job health (CSV — job names, timestamps, status)
+- Incident timeline (Slack thread export — #alerts-devops + #alerts-safety)
+- Root-cause classification (H1–H4) and recovery action taken
+- clinical-safety sign-off (if R-23 co-activated; required before Vanta upload)
+
+**Auditor narrative (CC7.4):** FORM maintains a daily pg_cron monitor (`victor_safety_chain_monitor`, job 15, 00:30 UTC) that detects clinical-safety audit chain violations: open P0 Victor AI safety incidents lacking a `contained` event beyond 60 min (VSAFETY-CHAIN-01), and Victor disabled beyond 48 h without a re-enable event (VSAFETY-CHAIN-02). When the monitor goes stale, FORM initiates R-63 within the 26 h freshness window, runs manual chain-violation checks, escalates to P0 and R-23 if violations are confirmed, restores the job, and files per-activation WORM evidence on Cloudflare R2 with Vanta mirror within 48 h. This satisfies CC7.4 (respond to and monitor security/safety events) and A1.2 (availability monitoring) requirements.
+
+---
+
+### §R-63.10 Post-Incident Controls
+
+| # | Control | Trigger |
+|---|---|---|
+| 1 | Post-mortem required if stale > 48 h or R-23 was co-activated during this incident. Filing deadline: 5 business days. | Stale duration > 48 h OR `r23_co_activated = true` |
+| 2 | Implement VSAFETY-CHAIN-MON-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts` (HTTP 422 on unanchored `restored` emit). Owner: platform-engineer. | First occurrence of R-63 (§R-63.12 item 2) |
+| 3 | If H4 (function broken): add CI guard that validates `audit_log_events` schema compatibility with `victor_safety_chain_monitor()` function before any migration deploying changes to `event_type` enum or `metadata` column. Owner: devops-lead. | H4 confirmed |
+| 4 | If H1 or H2: add CI lint guard that prevents accidental deletion or disabling of job 15, consistent with R-62 §R-62.10 item 4 pattern. Owner: devops-lead. | H1 or H2 confirmed |
+| 5 | Quarterly: cross-reference OBSERVABILITY §12.6 pg_cron canonical registry against all companion runbooks R-03 through R-63+. Any job with a PagerDuty P0/P1 alert and no companion stale runbook must be assigned in the same sprint. Owner: devops-lead + compliance-officer. | Quarterly (next: 2026-10-01) |
+
+---
+
+### §R-63.11 Cross-References
+
+- **OBSERVABILITY §12.6** — pg_cron canonical registry job 15 row · v5.14.8 (companion runbook column updated this pass)
+- **OBSERVABILITY §32.6** — VSAFETY-CHAIN-01 + VSAFETY-CHAIN-02 SQL definitions; VSAFETY-CHAIN-03 write-guard note
+- **AUDIT_LOG_SCHEMA §Victor-Safety-Chain-Monitor-Stale** — `system.victor_safety_chain_monitor_stale_declared` + `system.victor_safety_chain_monitor_restored` + VSAFETY-CHAIN-MON-STALE-CHAIN-01 invariant · v2.78
+- **INCIDENT_RESPONSE R-03** — Supabase infrastructure failure (co-active on all-jobs-stale discriminator)
+- **INCIDENT_RESPONSE R-05** — HMAC audit chain break (co-active on VSAFETY-CHAIN-MON-STALE-CHAIN-01 violation)
+- **INCIDENT_RESPONSE R-23** — Victor AI safety incident (co-active when VSAFETY-CHAIN-01 or VSAFETY-CHAIN-02 violations confirmed during stale window)
+- **INCIDENT_RESPONSE R-62** — Victor Safety Baseline Refresh Stale (peer clinical-safety companion runbook, job 14) · v3.28.0
+- **SOC2_READINESS §151 + §79.4** — VSAFETY-CHAIN-STALE-E-001 evidence registration · v3.77.0
+
+---
+
+### §R-63.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.victor_safety_chain_monitor_stale_declared` (HIGH/7yr) and `system.victor_safety_chain_monitor_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, VSAFETY-CHAIN-MON-STALE-CHAIN-01 ordering invariant, and CC7.4/A1.2 auditor narratives | compliance-officer + platform-engineer | **P0** | [x] **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.78).** |
+| 2 | Implement VSAFETY-CHAIN-MON-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts`: HTTP 422 `VSAFETY_CHAIN_MON_STALE_CHAIN_01_VIOLATION` on `system.victor_safety_chain_monitor_restored` emitted without matching `system.victor_safety_chain_monitor_stale_declared` for same `incident_id` | platform-engineer | **P0** | [ ] |
+| 3 | Register VSAFETY-CHAIN-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.4/A1.2; per-activation; 7yr; `compliance/evidence/victor-safety/vsafety-chain-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.77.0, §151).** |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 15 row cross-reference column: add `; INCIDENT_RESPONSE R-63 (§R-63; v1.0, 2026-07-03 — companion stale recovery runbook for job 15)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.14.8).** |
+| 5 | Authoring complete — §R-63 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.29.0).** |
+
+**Privacy floor (invariant throughout R-63):** No `user_id`, `session_id`, coaching session content, body composition metric, individual safety telemetry record, or GDPR Art. 9 special-category data appears in any R-63 scope query result, communication template payload, DEC-030 event payload, or VSAFETY-CHAIN-STALE-E-001 evidence artefact. R-63-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-63-C2 surfaces only incident UUIDs and open durations — no coaching content, no user identifiers, no body composition values; `ai.safety_incident_opened` payload fields such as `trigger_category` are not surfaced. R-63-C3 surfaces only incident UUIDs and disabled durations — no user identifiers, no coaching content. R-63-C4 surfaces only pg_cron job metadata and run timestamps.
+
+---
+
+*v3.29.0 (2026-07-03): R-63 — Victor Safety Chain Monitor Stale (`victor_safety_chain_monitor`, job 15) — CC7.4 / A1.2 clinical-safety chain integrity blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 15 was the highest-priority remaining daily pg_cron job without a companion stale recovery runbook after R-62 (job 14), R-61 (job 13), R-60 (jobs 10 + 12), R-59 (job 30), R-58 (job 36), and R-57 (job 58) closed gaps for their respective jobs. §R-63.1 trigger matrix: AL-VSAFETY-CHAIN-STALE-01 `system.cron_job_stale` for job 15 → P1 PagerDuty `form-devops` → devops-lead + clinical-safety; dedup `victor-chain-stale`; 26h freshness window. §R-63.2 severity: P1 default; P0 upgrade if R-63-C2 returns rows (VSAFETY-CHAIN-01 violation: P0 incident open > 60 min uncontained) or R-63-C3 returns rows (VSAFETY-CHAIN-02 violation: Victor disabled > 48 h without re-enable); co-active R-23 on P0; co-active R-03 on all-jobs-stale discriminator. §R-63.3 five-step immediate action timeline (T+0 to T+30): emit stale_declared at T+0; R-63-C2 P0 gate at T+5; R-63-C3 P0 gate + mandatory clinical-safety notification at T+10; R-63-C1 root cause at T+15; R-63-C4 peer health at T+20; recovery at T+25; confirm + emit restored + file evidence at T+30. §R-63.4 four scope queries: R-63-C1 (pg_cron run history for job 15); R-63-C2 (manual VSAFETY-CHAIN-01 — open P0 incidents > 60 min with no `ai.safety_incident_contained`; incident UUIDs and durations only); R-63-C3 (manual VSAFETY-CHAIN-02 — Victor disabled > 48 h with no `ai.victor_reenabled`; incident UUIDs and durations only); R-63-C4 Part A (peer jobs: victor_safety_baseline_refresh/api_key_chain_monitor/invite_expiry_sweep/audit_log_retention_purge) + Part B (catalog check). §R-63.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (function broken — DDL change to `audit_log_events` schema). §R-63.6 seven-step recovery: (1) emit stale_declared; (2) P0 gate — activate R-23 if chain violations confirmed; (3) restore job 15 by H1–H4; (4) confirm via `cron.run_job(15)`; (5) re-run R-63-C2/C3 post-restoration; (6) emit stale_restored; (7) file VSAFETY-CHAIN-STALE-E-001. §R-63.7 three Slack templates (T-63-A for #alerts-devops; T-63-B mandatory clinical-safety notification; T-63-C P0 chain-violation upgrade). §R-63.8 DEC-030 chain: `system.victor_safety_chain_monitor_stale_declared` HIGH/7yr + `system.victor_safety_chain_monitor_restored` LOW/3yr; VSAFETY-CHAIN-MON-STALE-CHAIN-01 ordering invariant (HTTP 422 `VSAFETY_CHAIN_MON_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, session_id, coaching content, body composition, or GDPR Art. 9 data in any payload. §R-63.9 VSAFETY-CHAIN-STALE-E-001 per-activation evidence artefact (CC7.4/A1.2; per-activation; 7yr WORM; `compliance/evidence/victor-safety/vsafety-chain-stale-e-001-<YYYY-MM-DD>/`; clinical-safety sign-off required if R-23 co-activated; Vanta mirror within 48h). §R-63.10 five post-incident controls: post-mortem if stale > 48h or R-23 co-activated; VSAFETY-CHAIN-MON-STALE-CHAIN-01 Worker enforcement; H4 CI schema-compat guard; H1/H2 CI lint guard; quarterly runbook gap sweep. §R-63.11 eight cross-references: OBSERVABILITY §12.6 (job 15, v5.14.8); OBSERVABILITY §32.6 (VSAFETY-CHAIN SQL); AUDIT_LOG_SCHEMA §Victor-Safety-Chain-Monitor-Stale (v2.78); INCIDENT_RESPONSE R-03 + R-05 + R-23 + R-62; SOC2_READINESS §151 + §79.4 (v3.77.0). §R-63.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.78 chain events + invariant; SOC2_READINESS.md v3.77.0 §151 VSAFETY-CHAIN-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.14.8 §12.6 job 15 cross-ref; authoring complete); item 2 pending (platform-engineer — VSAFETY-CHAIN-MON-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker). Document header v3.27.0 → v3.29.0 (cumulative: v3.28.0 was R-62's intended bump; header corrected and advanced to v3.29.0 in this pass). Owner: devops-lead + compliance-officer + clinical-safety.*

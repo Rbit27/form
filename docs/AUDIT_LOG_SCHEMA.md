@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.77
+# FORM · Audit Log Schema v2.78
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -1420,6 +1420,8 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `system.apikey_chain_monitor_restored` | 3 years | SOC 2 CC6.4/CC7.2 advisory — R-61 IC-confirmed job 13 restoration terminal event; APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 terminal; 3yr sufficient (primary CC6.4/CC7.2 evidence carried by 7yr `system.apikey_chain_monitor_stale_declared`); registered v2.76 |
 | `system.victor_baseline_refresh_stale_declared` | 7 years | SOC 2 CC7.2/A1.2 — R-62 IC-declared job 14 (`victor_safety_baseline_refresh`) stale incident anchor; VBASE-REFRESH-STALE-CHAIN-01 ordering invariant (HTTP 422 `VBASE_REFRESH_STALE_CHAIN_01_VIOLATION` on inversion); VBASE-STALE-E-001 per-activation evidence source; registered v2.77 |
 | `system.victor_baseline_refresh_restored` | 3 years | SOC 2 CC7.2/A1.2 advisory — R-62 IC-confirmed job 14 restoration terminal event; VBASE-REFRESH-STALE-CHAIN-01 terminal; 3yr sufficient (primary CC7.2/A1.2 evidence carried by 7yr `system.victor_baseline_refresh_stale_declared`); registered v2.77 |
+| `system.victor_safety_chain_monitor_stale_declared` | 7 years | SOC 2 CC7.4/A1.2 — R-63 IC-declared job 15 (`victor_safety_chain_monitor`) stale incident anchor; VSAFETY-CHAIN-MON-STALE-CHAIN-01 ordering invariant (HTTP 422 `VSAFETY_CHAIN_MON_STALE_CHAIN_01_VIOLATION` on inversion); P0 upgrade if R-63-C2 or R-63-C3 return rows (VSAFETY-CHAIN-01/02 violations confirmed during stale window); VSAFETY-CHAIN-STALE-E-001 per-activation evidence source; registered v2.78 |
+| `system.victor_safety_chain_monitor_restored` | 3 years | SOC 2 CC7.4/A1.2 advisory — R-63 IC-confirmed job 15 restoration terminal event; VSAFETY-CHAIN-MON-STALE-CHAIN-01 terminal; 3yr sufficient (primary CC7.4/A1.2 evidence carried by 7yr `system.victor_safety_chain_monitor_stale_declared`); registered v2.78 |
 | `mobile.replay_config_updated` | 3 years | STANDARD — enterprise replay feature-flag state record; REPLAY-CHAIN-01 ordering invariant anchor; REPLAY-E-001 evidence artefact (SOC 2 CC6.7); `docs/OBSERVABILITY.md §46.6` (DEC-063) |
 | `mobile.replay_tier_violation` | 7 years | HIGH-severity zero-fire Tier S gate-bypass detection; SOC 2 CC7.2 (anomaly monitoring) + P1.1 (privacy notice conformance); any emission triggers P1 PagerDuty `form-compliance` + `form-devops` and §46.7 inadvertent capture escalation; REPLAY-E-003 evidence artefact; `docs/OBSERVABILITY.md §46.6` (DEC-063) |
 | `pam.*` | 7 years | SOC 2 CC6.1/CC6.2/CC6.3 JIT privilege access evidence; break-glass record |
@@ -5613,6 +5615,89 @@ CC7.2 requires FORM to monitor system components for anomalies that indicate pot
 A1.2 requires FORM to maintain availability of system components — including the control systems that protect availability. The Victor safety threshold system (FORM-VICTOR-001 through -004) is a control-system component: it guards the availability of safe, clinically appropriate AI coaching by detecting anomalous safety flag rates. Job 14's KV baseline store is the threshold calibration substrate. When job 14 is stale, FORM-VICTOR-002/003/004 thresholds become uncalibrated — either stale-high (masking a real spike) or stale-low (generating false-positive noise that degrades IC-response bandwidth). `system.victor_baseline_refresh_stale_declared` documents the availability impairment of this calibration control; `compensating_computation_executed` in `restored` attests that calibration was restored. `clinical_safety_review_required = true` signals the IC must obtain victor-safety-lead attestation before closure when elevated safety activity occurred during the stale window. Note: FORM-VICTOR-001 (P0, any VT-03/04/05/06 trigger — threshold-independent) is unaffected by baseline staleness; A1.2 coverage here applies specifically to the VICTOR-002/003/004 proportional alert tiers.
 
 **Emitters:** Both events emitted by IC (devops-lead, PAM-elevated) via `POST /audit/emit-event` (DEC-030 HMAC-chained). `stale_declared` at R-62 T+0 after PagerDuty AL-VBASE-STALE-01 P1 fires; populate `missing_categories` (R-62-C2 Wrangler KV probe) and `safety_incident_count_at_declared` (R-62-C3) after scope queries complete (amendment acceptable before closure). `restored` at R-62 Step 6 after job 14 confirmed healthy and R-62-C2 returns no missing categories. No automated emission path — both events require IC PAM elevation.
+
+---
+
+---
+
+### Victor Safety Chain Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-63 · CC7.4/A1.2)
+
+> Defined in `docs/INCIDENT_RESPONSE.md` R-63 (v3.29.0, 2026-07-03). Two DEC-030 HMAC-chained events for job 15 (`victor_safety_chain_monitor`, daily 00:30 UTC, 26h freshness) staleness. VSAFETY-CHAIN-MON-STALE-CHAIN-01 ordering invariant: `system.victor_safety_chain_monitor_restored` blocked (HTTP 422 `VSAFETY_CHAIN_MON_STALE_CHAIN_01_VIOLATION`) without prior `system.victor_safety_chain_monitor_stale_declared` for same `incident_id`. Clinical-safety significance: when job 15 is stale the platform is blind to two clinical-safety chain violations — VSAFETY-CHAIN-01 (P0 Victor AI safety incident open > 60 min with no `ai.safety_incident_contained` event) and VSAFETY-CHAIN-02 (Victor AI coach disabled > 48 h with no `ai.victor_reenabled` event). A confirmed violation during the stale window triggers P0 upgrade and co-activates R-23 (Victor AI safety incident response). clinical-safety is co-paged on all R-63 activations. Privacy floor (both events): incident UUID and duration/count fields only — no `user_id`, `session_id`, coaching session content, body composition metrics, or GDPR Art. 9 special-category data. Registered v2.78 (2026-07-03).
+
+#### `system.victor_safety_chain_monitor_stale_declared` — HIGH / 7 years
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `incident_id` | UUID | ✓ | VSAFETY-CHAIN-MON-STALE-CHAIN-01 anchor — must match `restored` `incident_id` |
+| `confirmed_stale_since` | datetime | ✓ | Timestamp of last succeeded job 15 run (from `cron.job_run_details`) |
+| `stale_hours` | int ≥ 0 | ✓ | Hours elapsed since `confirmed_stale_since` |
+| `missed_runs` | int ≥ 0 | ✓ | Estimated missed daily runs |
+| `vsafety_chain_01_violations` | int ≥ −1 | ✓ | R-63-C2 result row count; −1 = gate not yet run at emit time |
+| `vsafety_chain_02_violations` | int ≥ −1 | ✓ | R-63-C3 result row count; −1 = gate not yet run at emit time |
+| `initial_severity` | enum `P0`\|`P1` | ✓ | P0 if any violation confirmed; P1 default |
+| `trigger` | literal `system.cron_job_stale` | ✓ | Source alert event type |
+| `r23_co_activated` | bool | ✓ | true if R-23 (Victor AI safety incident) activated due to confirmed chain violation |
+
+```typescript
+const VictorSafetyChainMonitorStaleDeclaredSchema = z.object({
+  incident_id:                z.string().uuid(),
+  confirmed_stale_since:      z.string().datetime(),
+  stale_hours:                z.number().int().nonnegative(),
+  missed_runs:                z.number().int().nonnegative(),
+  vsafety_chain_01_violations: z.number().int().min(-1),
+  vsafety_chain_02_violations: z.number().int().min(-1),
+  initial_severity:           z.enum(["P0", "P1"]),
+  trigger:                    z.literal("system.cron_job_stale"),
+  r23_co_activated:           z.boolean(),
+})
+```
+
+#### `system.victor_safety_chain_monitor_restored` — LOW / 3 years
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `incident_id` | UUID | ✓ | Must match `stale_declared` `incident_id` — VSAFETY-CHAIN-MON-STALE-CHAIN-01 assertion |
+| `restored_at` | datetime | ✓ | Timestamp of successful `cron.run_job(15)` |
+| `root_cause` | enum | ✓ | `H1_deleted` \| `H2_disabled` \| `H3_infra` \| `H4_function_broken` |
+| `stale_hours_total` | number ≥ 0 | ✓ | Total stale duration |
+| `r23_co_activated` | bool | ✓ | Must match `stale_declared` value |
+| `chain_01_clear` | bool | ✓ | true = R-63-C2 returned 0 rows post-restoration |
+| `chain_02_clear` | bool | ✓ | true = R-63-C3 returned 0 rows post-restoration |
+
+```typescript
+const VictorSafetyChainMonitorRestoredSchema = z.object({
+  incident_id:        z.string().uuid(),
+  restored_at:        z.string().datetime(),
+  root_cause:         z.enum(["H1_deleted", "H2_disabled", "H3_infra", "H4_function_broken"]),
+  stale_hours_total:  z.number().nonnegative(),
+  r23_co_activated:   z.boolean(),
+  chain_01_clear:     z.boolean(),
+  chain_02_clear:     z.boolean(),
+})
+```
+
+#### VSAFETY-CHAIN-MON-STALE-CHAIN-01 Ordering Invariant
+
+| Invariant | Rule | Enforcement | Co-activation |
+|---|---|---|---|
+| VSAFETY-CHAIN-MON-STALE-CHAIN-01 | `system.victor_safety_chain_monitor_restored` must not be emitted unless a `system.victor_safety_chain_monitor_stale_declared` with matching `incident_id` exists in the DEC-030 HMAC chain | HTTP 422 `VSAFETY_CHAIN_MON_STALE_CHAIN_01_VIOLATION` returned by `emit-audit-event` Worker on invariant violation | R-05 (HMAC chain break runbook) |
+
+Implementation status: **pending** (platform-engineer — R-63.12 item 2).
+
+#### CC7.4 Auditor Narrative
+
+CC7.4 requires FORM to respond to and monitor security and safety events — including monitoring the monitoring controls themselves. Job 15 (`victor_safety_chain_monitor`, daily 00:30 UTC) is the automated check that VSAFETY-CHAIN-01 (P0 Victor AI safety incidents are contained within 60 min) and VSAFETY-CHAIN-02 (Victor is not silently disabled > 48 h) clinical-safety invariants hold. When job 15 goes stale, FORM initiates R-63 within the 26 h freshness window: manual execution of VSAFETY-CHAIN-01 and VSAFETY-CHAIN-02 SQL provides compensating coverage; confirmed chain violations trigger P0 escalation and R-23 co-activation. `system.victor_safety_chain_monitor_stale_declared` is the IC-anchoring tamper-evident record that the clinical-safety chain integrity control lapsed; `vsafety_chain_01_violations` and `vsafety_chain_02_violations` attest the scope of any chain violations detected during the stale window. Retention 7yr: multi-cycle SOC 2 coverage for CC7.4 monitoring response obligations.
+
+#### A1.2 Auditor Narrative
+
+A1.2 requires FORM to maintain system monitoring availability. The `victor_safety_chain_monitor` pg_cron job is a safety monitoring system component. When it is stale, the automated clinical-safety chain oversight of the Victor AI coach is unavailable. `system.victor_safety_chain_monitor_stale_declared` records the availability impairment; `r23_co_activated` and `chain_01_clear`/`chain_02_clear` in `restored` attest to the scope of impact and the completeness of recovery. The mandatory clinical-safety co-page at R-63 T+10 (regardless of severity level) ensures human oversight compensates for the automated monitoring gap throughout the stale window.
+
+**Emitters:** Both events emitted by IC (devops-lead, PAM-elevated) via `POST /audit/emit-event` (DEC-030 HMAC-chained). `stale_declared` at R-63 T+0 after PagerDuty AL-VSAFETY-CHAIN-STALE-01 P1 fires; `vsafety_chain_01_violations` and `vsafety_chain_02_violations` fields may be updated (amendment acceptable) after R-63-C2/C3 scope queries complete. `restored` at R-63 Step 6 after `cron.run_job(15)` confirmed healthy and R-63-C2/C3 return 0 rows. No automated emission path — both events require IC PAM elevation.
+
+---
+
+**v2.78 · 2026-07-03 · owner: compliance-officer + security-engineer**
+*v2.78 (2026-07-03): +2 events — `system.victor_safety_chain_monitor_stale_declared` (HIGH/7yr) and `system.victor_safety_chain_monitor_restored` (LOW/3yr) — in new section `### Victor Safety Chain Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-63 · CC7.4/A1.2)`. Closes `docs/INCIDENT_RESPONSE.md R-63.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, VSAFETY-CHAIN-MON-STALE-CHAIN-01 ordering invariant, and CC7.4/A1.2 auditor narratives). VSAFETY-CHAIN-MON-STALE-CHAIN-01: `system.victor_safety_chain_monitor_restored` blocked (HTTP 422 `VSAFETY_CHAIN_MON_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-63.12 item 2). Nine-field Zod v2 `VictorSafetyChainMonitorStaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime), `stale_hours` (int≥0), `missed_runs` (int≥0), `vsafety_chain_01_violations` (int≥−1, −1 = gate not yet run), `vsafety_chain_02_violations` (int≥−1, −1 = gate not yet run), `initial_severity` (enum P0|P1 — P0 if any chain violation confirmed), `trigger` (literal `system.cron_job_stale`), `r23_co_activated` (bool — true if R-23 activated). Seven-field Zod v2 `VictorSafetyChainMonitorRestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum H1_deleted/H2_disabled/H3_infra/H4_function_broken — 4 values; note no H5 for job 15, unlike R-62/H5 which was specific to KV write failure for job 14's baseline KV store), `stale_hours_total` (number≥0), `r23_co_activated` (bool), `chain_01_clear` (bool), `chain_02_clear` (bool). Clinical-safety significance: job 15 staleness creates a blind spot for VSAFETY-CHAIN-01 (P0 incidents uncontained > 60 min) and VSAFETY-CHAIN-02 (Victor disabled > 48 h without re-enable); P0 upgrade and R-23 co-activation required if R-63-C2 or R-63-C3 returns rows; clinical-safety is co-paged on all R-63 activations regardless of severity. Privacy floor (both schemas): incident UUID, duration integers, and boolean flags only — no `user_id`, `session_id`, coaching session content, body composition metrics, individual safety incident UUIDs (beyond R-63's own `incident_id`), or GDPR Art. 9 data; `form_api` REVOKED from emission path. Retention table: +2 rows (`system.victor_safety_chain_monitor_stale_declared` HIGH 7yr CC7.4/A1.2; `system.victor_safety_chain_monitor_restored` LOW 3yr CC7.4/A1.2). Document header v2.77 → v2.78. Owner: compliance-officer + security-engineer.*
 
 ---
 
