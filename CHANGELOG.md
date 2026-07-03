@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [11.89.0] — 2026-07-03
+
+### Added
+- `content/post-3084-mesocycle-weekly-structure-load-recovery.md` — Серія «Мезоцикл без тренера» 4/10. «Структура тижня всередині блоку: від логіки навантаження до відновлення». Три параметри тижневої структури: час між стимулами, взаємодія між м'язовими групами, розподіл пікового навантаження. Три шаблони: full body 3x (Schoenfeld et al. 2016; McLester et al. 2000), upper/lower 4x (Ralston et al. 2017), PPL 5–6x (Aube et al. 2022; Dankel et al. 2017). Частота адаптується до типу блоку: гіпертрофія / сила (Colquhoun et al. 2018) / технічний. Відновлювальні конфлікти: системна втома від ніг 24–48 год. Рівномірна vs. хвилеподібна (DUP) структура (Rhea et al. 2002). Операційний протокол чотирьох питань. clinical-safety: NOT_REQUIRED. sports-scientist review pending. blog.html card added.
+- `content/post-64-training-heat-cold-air-quality.md` — Редакційна серія 61–70 4/10. «Тренування в спеку, мороз і поганий повітря: що змінює середовище, а що ні». Спека: конкуренція за кровотік, RPE вище при тій самій механічній інтенсивності, захисне зниження нейром'язового рекрутування при гіпертермії (Moran et al. 2017; González-Alonso et al. 1999). Холод: нейром'язова провідність і м'язова температура (González-Alonso et al. 1996; Castellani & Young 2016 — більшість зниження зникає при коректному warm-up). Якість повітря: PM2.5 і газообмін при аеробній роботі (Giles & Marshall 2020); дегідратація як незалежний фактор (Judelson et al. 2007). Операційний протокол трьох сценаріїв. Середовище = умови виконання, не механіка адаптації. clinical-safety: NOT_REQUIRED. sports-scientist review pending. blog.html card added.
+
+### Changed
+- `blog.html` — cards for post-3084 and post-64 prepended at top of feed.
+- `README.md` — post-3084 proposed → draft; post-64 proposed → draft; series «Мезоцикл без тренера» 3/10 → 4/10; series «Тренування в реальних умовах» 3106–3115 added (proposed); header updated → v11.89.0.
+- `STATUS.md` — current version updated to v11.89.0.
+- `VERSION` — 11.88.0 → 11.89.0.
+
+---
+
 ## [11.88.0] — 2026-07-03
 
 ### Added
