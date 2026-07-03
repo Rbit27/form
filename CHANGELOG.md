@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [11.83.1] — 2026-07-03
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — R-61 API Key Chain Monitor Stale runbook (§R-61.1–§R-61.12): companion stale recovery runbook for `api_key_chain_monitor` (job 13, daily 03:00 UTC, P1 `form-security`). CC6.4/CC7.2. Covers APIKEY-CHAIN-01 (DEC-030 bypass detection) and APIKEY-CHAIN-02 (rotation-gap detection). P0 upgrade paths for active credential exposure. APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 DEC-030 ordering invariant. APIKEY-CHAIN-STALE-E-001 per-activation SOC 2 evidence artefact. Header v3.26.1 → v3.27.0.
+- `docs/AUDIT_LOG_SCHEMA.md` — `system.apikey_chain_monitor_stale_declared` (HIGH/7yr) and `system.apikey_chain_monitor_restored` (LOW/3yr) registered with Zod v2 schemas, APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant, CC6.4/CC7.2 auditor narratives. v2.75 → v2.76.
+- `docs/SOC2_READINESS.md` — §149 APIKEY-CHAIN-STALE-E-001 registration (CC6.4/CC7.2, §79.4, §80.3, §80.4). Fixes missing INVITE-STALE-E-001 row in §79.4 table (gap from §148). v3.74.0 → v3.75.0.
+- `docs/OBSERVABILITY.md` — §12.6 job 13 cross-reference updated (INCIDENT_RESPONSE R-61). Header v5.14.5 → v5.14.6.
+- `VERSION` — 11.83.0 → 11.83.1.
+
+---
+
 ## [11.83.0] — 2026-07-03
 
 ### Added

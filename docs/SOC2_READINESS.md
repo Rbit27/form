@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.74.0
+# FORM · SOC 2 Type II Readiness v3.75.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -34322,6 +34322,8 @@ One row added to the §79.4 master evidence table (count 110 → 111), after PHI
 | **FIDO2-E-001** | CC6 | CC6.7 | FIDO2/WebAuthn hardware token enrollment confirmation for all break-glass-eligible engineers (`destructive` tier PAM). Content: (1) Cloudflare Access admin panel screenshot showing `fido2` enforced in `form-break-glass` policy; (2) 5× enrollment confirmation screenshots (Cloudflare Access identity UUIDs, one per named engineer); (3) YubiKey 5 NFC procurement receipt (5 primary + 5 backup); (4) sanitized `cloudflare/access/break-glass-policy.tf` diff confirming `require = ["warp", "fido2"]` block. Proves `destructive` tier PAM cannot activate without phishing-resistant hardware-token authentication; TOTP fallback unconditionally prohibited (§24.3 SSO_SCIM_IMPLEMENTATION.md). No employee PII — identity UUIDs, procurement metadata, role-label IaC diff only. Source: SSO_SCIM_IMPLEMENTATION §41 (DEC-094, v2.13, 2026-07-01). 7yr retention. | Manual-event | Annual + on any break-glass engineer roster change (add/remove/key-replacement) | compliance-officer + security-engineer | `compliance/evidence/pam/FIDO2-E-001_<YYYY-MM>.zip` |
 | **GEO-E-001** | CC1, CC3 | CC1.3, CC3.1 | Annual export confirming `billing_currency = 'USD'` on all `geo.contract_currency_set` DEC-030 HMAC-chain records for the observation year and GEO-CHAIN-01 predecessor coverage for every `enterprise.tenant_created` event in the period (`geo.contract_currency_set` with matching `tenant_id` precedes each tenant creation in the chain). CC1.3: immutable DEC-030 HMAC-chain record that management communicated the USD billing-policy commitment at the individual contract level before tenant onboarding; 100% coverage assertion = no tenant onboarded without a documented currency commitment. CC3.1: FX risk documented per-contract (DEC-096, 2026-07-02), not only at policy level; consistent application across all new enterprise contracts in the observation period. GEO-CHAIN-01 invariant: `geo.contract_currency_set` MUST precede `enterprise.tenant_created` for same `tenant_id` in the DEC-030 HMAC chain; HTTP 422 `GEO_CHAIN_01_VIOLATION` on violation; enforced by `emit-audit-event` Worker. Five-column CSV: `tenant_id` UUID, `contract_currency` ('USD'), `geo_chain_predecessor_present` BOOL, `event_id` UUID, `changed_at` ISO 8601. Zero-tenant-created years filed as nil attestation at `GEO-E-001_<YYYY>-nil.json`. Privacy: `tenant_id` FORM-internal UUID + commercial metadata only — no individual employee `user_id`, name, email, health value, coaching transcript, or GDPR Art. 9 special-category data; `r2:form-api` REVOKED from `compliance/evidence/geo/` (§80.3 invariant). Source: AUDIT_LOG_SCHEMA.md v2.72 (2026-07-02); DEC-096 (2026-07-02). Registered: §144 (SOC2_READINESS v3.70.0, 2026-07-02). 7yr retention. | Manual-event | Annual (Q4 of each SOC 2 observation year; first collection: Q4 of year 1 or end of first observation year, whichever is later; zero-onboarding years filed as nil attestation) | compliance-officer | `compliance/evidence/geo/GEO-E-001_<YYYY>.csv` |
 | **PKJWT-SWEEP-STALE-E-001** | CC6 | CC6.6 | Per-activation incident record for R-57 PKJWT key expiry sweep stale events. Content: (1) `system.pkjwt_expiry_sweep_stale_declared` DEC-030 HIGH event from IC PAM-elevated emission at R-57 T+0 (`incident_id` UUID, `confirmed_stale_since`, `stale_hours`, `missed_runs`, `at_risk_tenant_count`, `trigger`, `initial_severity`); (2) `system.pkjwt_expiry_sweep_restored` DEC-030 LOW event from IC after R-57 Step 5 recovery confirmation (`incident_id` UUID, `restored_at`, `root_cause` enum, `tenants_warned_during_recovery`); (3) PKJWT-SWEEP-STALE-CHAIN-01 predecessor assertion: `stale_declared` event precedes `restored` event for matching `incident_id` in DEC-030 HMAC chain (HTTP 422 `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` on inversion enforced by `emit-audit-event` Worker); (4) IC runbook timestamp trace (R-57.1 detection → R-57.5 recovery steps → stale hours calculated); (5) `at_risk_tenant_count` reconciliation — count of PKJWT-enabled tenants with keys expiring within 30 days during the stale window. CC6.6 auditor narrative: any gap in daily `pkjwt_key_expiry_sweep` execution is a cryptographic key management monitoring blind spot; this artefact proves FORM detected and remediated the stale condition via IC-declared incident (PAM-elevated), confirms the HMAC chain captured both the stale declaration and restoration as immutable DEC-030 events, and documents the blast radius (`at_risk_tenant_count`) over the gap window. Privacy: `incident_id` FORM-internal UUID + operational metadata + counts only — no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data; `r2:form-api` REVOKED from `compliance/evidence/ir/pkjwt-sweep-stale/` (§80.3 invariant). Source: AUDIT_LOG_SCHEMA.md v2.74 (2026-07-03, §R-57 PKJWT Key Expiry Sweep Stale events); INCIDENT_RESPONSE.md R-57 (v3.22.0, 2026-07-03). Registered: §147 (SOC2_READINESS v3.73.0, 2026-07-03). 7yr retention. | Manual-event | Per-activation (incident-triggered; one artefact per R-57 stale incident) | security-engineer + compliance-officer | `compliance/evidence/ir/pkjwt-sweep-stale/PKJWT-SWEEP-STALE-E-001-{incident_id}.txt` |
+| **INVITE-STALE-E-001** | CC6, P5 | CC6.3, P5.1, P5.2 | Per-activation incident record for R-60 `invite_expiry_sweep` (job 10) + `invite_email_expiry_cleanup` (job 12) stale events. Content: (1) `system.invite_expiry_sweep_stale_declared` DEC-030 HIGH event from IC PAM-elevated emission at R-60 T+0 (`incident_id`, `stale_declared_at`, `seat_inflation_count` INT, `pii_at_risk_count` INT); (2) `system.invite_expiry_sweep_restored` DEC-030 LOW event from IC after R-60 Step 5 (`incident_id`, `invites_expired_manually` INT, `emails_erased_manually` INT, `root_cause` enum, `jobs_restored` array); (3) INVITE-SWEEP-STALE-CHAIN-01 predecessor assertion (HTTP 422 `INVITE_SWEEP_STALE_CHAIN_01_VIOLATION` on inversion); (4) IC runbook timestamp trace (R-60 detection → recovery steps); (5) R-60-C2 aggregate seat-inflation output (no `invited_email`); (6) R-60-C3 aggregate at-risk-invite count (`invited_email` as filter predicate only); (7) compensating SQL execution log if applicable. CC6.3 auditor narrative: job 10 is the automated seat-release control; stale window = unreleased seats; artefact proves IC detected and remediated via PAM-elevated incident. P5.1/P5.2 auditor narrative: `invited_email` is PII with no access need after 30 days post-expiry; `pii_at_risk_count` in stale_declared is IC-attested aggregate without selecting individual emails; `emails_erased_manually` in restored attests compensating erasure. Privacy: aggregate INT counts + FORM-internal UUID only — no `invited_email` value, individual `user_id`, `tenant_id` breakdown, body composition metric, coaching content, or GDPR Art. 9 data. Source: AUDIT_LOG_SCHEMA.md v2.75 (2026-07-03); INCIDENT_RESPONSE.md R-60 (v3.26.0, 2026-07-03). Note: row omitted from §148 (v3.74.0) despite R-60.12 item 3 noting §79.4 registration — gap fixed by §149 (v3.75.0, 2026-07-03). 7yr retention. | Manual-event | Per-activation (one artefact per R-60 stale incident) | compliance-officer + devops-lead | `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/` |
+| **APIKEY-CHAIN-STALE-E-001** | CC6, CC7 | CC6.4, CC7.2 | Per-activation incident record for R-61 `api_key_chain_monitor` (job 13) stale events. Content: (1) `system.apikey_chain_monitor_stale_declared` DEC-030 HIGH event from IC PAM-elevated emission at R-61 T+0 (`incident_id`, `stale_declared_at`, `rotation_gap_count_at_declared` INT, `bypass_check_count_at_declared` INT); (2) `system.apikey_chain_monitor_restored` DEC-030 LOW event from IC after R-61 Step 5 (`incident_id`, `rotation_gap_count_closed` INT, `bypass_check_count_closed` INT, `root_cause` enum, `compensating_sql_executed` BOOL); (3) APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 predecessor assertion (HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION` on inversion); (4) IC runbook timestamp trace (R-61 T+0 to T+30 → recovery steps); (5) R-61-C1 pg_cron run history for job 13; (6) R-61-C2 aggregate rotation-gap counts (`open_rotation_gap_count`, `min_gap_hours`, `max_gap_hours` — no `key_id`); (7) R-61-C3 aggregate `unmatched_live_key_count` (no `key_id`); (8) compensating SQL execution log if applicable (P0 only); (9) R-61-C4 restoration confirmation. CC6.4 auditor narrative: CC6.4 requires timely revocation when credentials change; APIKEY-SLO-03 mandates revocation within 26h of rotation (`ENTERPRISE_SLA.md §17.2`); R-61-C2 > 0 at declaration = direct CC6.4 gap evidence; compensating SQL log evidences immediate remediation; `rotation_gap_count_closed = 0` is the closure assertion. CC7.2 auditor narrative: job 13 (APIKEY-CHAIN-01) is the automated anomaly-detection control for DEC-030 bypass; `bypass_check_count_at_declared` is the IC-attested aggregate anomaly count (no `key_id`); DEC-030 HMAC chain on both events proves monitoring control health is tamper-evidently recorded. Privacy: aggregate INT counts + FORM-internal UUID only — no `key_id`, `key_preview`, raw API key material, `tenant_id` breakdown, `client_ip`, coaching content, body composition, or GDPR Art. 9 data; `r2:form-api` REVOKED from `compliance/evidence/api-key/` (§149.3 invariant). Source: AUDIT_LOG_SCHEMA.md v2.76 (2026-07-03); INCIDENT_RESPONSE.md R-61 (v3.27.0, 2026-07-03). Registered: §149 (SOC2_READINESS v3.75.0, 2026-07-03). 7yr retention. | Manual-event | Per-activation (one artefact per R-61 stale incident) | security-engineer + compliance-officer | `compliance/evidence/api-key/apikey-chain-stale-e-001-<YYYY-MM-DD>/` |
 | **PKJWT-E-001** | CC6 | CC6.6 | Quarterly export of all `sso.pkjwt_key_generated` and `sso.pkjwt_key_rotated` DEC-030 HMAC-chain events for the observation quarter, confirming: (1) every PKJWT-enabled tenant (`oidc_client_auth_method = 'private_key_jwt'`) has a documented key-generation or rotation record within the preceding 12 months (annual rotation policy per SSO_SCIM_IMPLEMENTATION §42.9); (2) private key material is absent from all chain event payloads (Zod schema constraint — `SsoPkjwtKeyGeneratedPayload` and `SsoPkjwtKeyRotatedPayload` contain `tenant_id` UUID, `kid` UUID, and timestamps only, no `private_key` field); (3) `rotation_reason` for any supplemental collection triggered by `rotation_reason: 'incident'` or `rotation_reason: 'customer_request'`. CC6.6 auditor narrative: FORM's `private_key_jwt` client authentication (DEC-097, RFC 7523) eliminates the shared-secret exposure risk inherent in `client_secret_post` by using per-tenant RSA-2048/EC P-256 asymmetric key pairs; private key is generated on FORM infrastructure, stored AES-256-GCM encrypted in `tenant_sso_configs.pkjwt_private_key_encrypted`, and never transmitted to the IdP. PKJWT-E-001 quarterly chain export demonstrates that: (a) every PKJWT tenant has a documented key-generation record in the immutable DEC-030 HMAC chain; (b) all keys in the covered tenants were rotated within the 12-month policy window; (c) private key material is structurally excluded from the evidence artefact by Zod v2 schema enforcement. Supplemental per-incident collection: triggered on any `sso.pkjwt_key_rotated` event with `rotation_reason: 'incident'` or `rotation_reason: 'customer_request'` — filed as `PKJWT-E-001_<YYYY-QN>_sup-<YYYYMMDD>.csv` within 48h. Zero-PKJWT-tenant-quarters filed as affirmative nil attestation. Privacy: `tenant_id` FORM-internal UUID + `kid` UUID + timestamps + `rotation_reason` enum only — no individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data; `r2:form-api` REVOKED from `compliance/evidence/sso/` (§80.3 invariant). Source: AUDIT_LOG_SCHEMA.md v2.73 (2026-07-02, §SSO-PKJ-Lifecycle); DEC-097 (2026-07-02); SSO_SCIM_IMPLEMENTATION §42.9 (2026-07-02). Registered: §145 (SOC2_READINESS v3.71.0, 2026-07-02). 7yr retention. | Manual-periodic | Quarterly; supplemental per `rotation_reason: 'incident'/'customer_request'` event; zero-PKJWT-tenant quarters as nil attestation | compliance-officer + security-engineer | `compliance/evidence/sso/PKJWT-E-001_<YYYY-QN>.csv` |
 
 ---
@@ -34753,6 +34755,95 @@ INVITE-STALE-E-001 has been added to the §79.4 master evidence table (row 115) 
 | 3 | Add INVITE-STALE-E-001 to §80.4 Vanta mirror list (upload within 48h of `system.invite_expiry_sweep_restored` emission; CC6.3/P5.1/P5.2; compliance-officer only) | compliance-officer | **P1** | [x] Done — 2026-07-03 (this patch, §80.4) |
 | 4 | Close R-60.12 item 3 in INCIDENT_RESPONSE.md | compliance-officer | **P1** | [x] Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.26.1) |
 | 5 | On first R-60 activation: collect INVITE-STALE-E-001 artefact bundle at `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/` — include `system.invite_expiry_sweep_stale_declared` DEC-030 event export, `system.invite_expiry_sweep_restored` DEC-030 event export, IC declaration attestation, root-cause analysis (H1–H4), and GDPR Art. 33 notification log if `pii_at_risk_count > 0`. SHA-256 hash all files; upload to R2 WORM; upload to Vanta within 48h of restoration; add MASTER-INDEX row. | compliance-officer | **P2** | [ ] (on first R-60 activation) |
+
+---
+
+## §149 · APIKEY-CHAIN-STALE-E-001 Registration + INVITE-STALE-E-001 Gap Fix (CC6.4/CC7.2 · AUDIT_LOG_SCHEMA v2.76 · INCIDENT_RESPONSE R-61)
+
+### §149.1 Background
+
+`api_key_chain_monitor` (job 13, daily 03:00 UTC, 26h freshness, PagerDuty P1 `form-security` → security-engineer) was identified as the only remaining daily P1-alert pg_cron job without a companion stale recovery runbook in `docs/INCIDENT_RESPONSE.md`. R-61 closes this gap (v3.27.0, 2026-07-03). R-61 covers two security monitoring checks:
+
+- **APIKEY-CHAIN-01** (`docs/AUDIT_LOG_SCHEMA.md §31.6`): detects live `tenant_api_keys` rows with no DEC-030 audit event (`api_key.created` or `api_key.rotated`) in 90 days — potential DEC-030 audit trail bypass.
+- **APIKEY-CHAIN-02** (`docs/AUDIT_LOG_SCHEMA.md §31.6`): detects rotation-overlap without revocation — old key not revoked within 26h of rotation (APIKEY-SLO-03 breach, `ENTERPRISE_SLA.md §17.2`).
+
+P0 upgrade conditions: `rotation_gap_count_at_declared > 0` (active CC6.4 credential exposure) or `bypass_check_count_at_declared > 0` (potential DEC-030 bypass) — both trigger co-active R-01 (security incident) and dual security-engineer + compliance-officer sign-off.
+
+**INVITE-STALE-E-001 gap fix:** §148 (v3.74.0, 2026-07-03) documented INVITE-STALE-E-001 registration in the `*v3.26.1` INCIDENT_RESPONSE.md changelog (R-60.12 item 3), but the actual §79.4 table row was not inserted. Gap confirmed by inspecting lines 34324–34325: table went directly from PKJWT-SWEEP-STALE-E-001 to PKJWT-E-001 with no INVITE row. Both rows are inserted by §149.2 (this section).
+
+---
+
+### §149.2 §79.4 Master Evidence Table Registration
+
+Two new rows added to the §79.4 master evidence table, inserted after PKJWT-SWEEP-STALE-E-001:
+
+1. **INVITE-STALE-E-001** (CC6.3/P5.1/P5.2) — per-activation artefact for R-60 stale incidents; `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/`; 7yr WORM; compliance-officer + devops-lead; gap fix from §148.
+2. **APIKEY-CHAIN-STALE-E-001** (CC6.4/CC7.2) — per-activation artefact for R-61 stale incidents; `compliance/evidence/api-key/apikey-chain-stale-e-001-<YYYY-MM-DD>/`; 7yr WORM; security-engineer + compliance-officer; new this pass.
+
+See §79.4 table rows for full description of each artefact's content, auditor narratives, and privacy floor.
+
+---
+
+### §149.3 §80.3 R2 Storage Addition
+
+`api-key/` subfolder added to R2 primary store (`r2:form-compliance`). Access policy: `r2:form-api` NO ACCESS (same invariant as `ir/`, `sso/`, `pam/`, `geo/`, `invite/`). WORM Object Lock: 7yr minimum (CC6.4/CC7.2 evidence retention for APIKEY-CHAIN-STALE-E-001).
+
+```
+compliance/evidence/
+├── ...
+├── api-key/                                        ← NEW (v3.75.0, 2026-07-03)
+│   └── apikey-chain-stale-e-001-<YYYY-MM-DD>/
+│       ├── stale_declared.json          (system.apikey_chain_monitor_stale_declared event)
+│       ├── r61_c1_run_history.csv       (pg_cron run history — job 13; no user data)
+│       ├── r61_c2_rotation_gaps.json    (aggregate counts — no key_id, no key material)
+│       ├── r61_c3_bypass_check.json     (aggregate unmatched_live_key_count — no key_id)
+│       ├── compensating_sql.log         (P0 only — execution log; no key material logged)
+│       ├── restoration_confirm.json     (R-61-C4 confirmation query result)
+│       ├── restored.json               (system.apikey_chain_monitor_restored event)
+│       └── sign_off.txt                (dual: security-engineer + compliance-officer)
+└── ...
+```
+
+Access invariant (§80.3): `r2:form-api` is REVOKED from `compliance/evidence/api-key/` — no API key material can flow from the application layer into the evidence store.
+
+---
+
+### §149.4 §80.4 Vanta Mirror Addition
+
+The following additional artefacts require Vanta upload within 48 h of their terminal DEC-030 event emission:
+
+| Artefact ID | Upload trigger | Retention | Criteria | Note |
+|---|---|---|---|---|
+| INVITE-STALE-E-001 | `system.invite_expiry_sweep_restored` emission | 7yr | CC6.3/P5.1/P5.2 | Gap fix — omitted from §148 Vanta table; added here alongside APIKEY-CHAIN-STALE-E-001 |
+| APIKEY-CHAIN-STALE-E-001 | `system.apikey_chain_monitor_restored` emission | 7yr | CC6.4/CC7.2 | New — R-61 per-activation artefact; `compliance/evidence/api-key/` R2 path → Vanta SOC 2 evidence library |
+
+Upload label convention: `<ARTEFACT-ID>_<YYYY-MM-DD>_<incident_id_short>` — allows auditor disambiguation across multiple activations in the same observation year.
+
+---
+
+### §149.5 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/INCIDENT_RESPONSE.md R-60.12` item 3 (P1) — "Register INVITE-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table" | R-60.12 checklist item 3, INCIDENT_RESPONSE.md v3.26.0 | 🟢 **Done — 2026-07-03 (SOC2_READINESS.md v3.74.0, §148)** — *actual table row omitted from §148.2; gap fixed by §149.2 (v3.75.0, 2026-07-03)* |
+| `docs/INCIDENT_RESPONSE.md R-61.12` item 3 (P1) — "Register APIKEY-CHAIN-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.4/CC7.2; per-activation; 7yr; `compliance/evidence/api-key/apikey-chain-stale-e-001-<YYYY-MM-DD>/`)" | R-61.12 checklist item 3, INCIDENT_RESPONSE.md v3.27.0 | 🟢 **Done — 2026-07-03 (SOC2_READINESS.md v3.75.0, §149.2)** |
+| `docs/AUDIT_LOG_SCHEMA.md` — register `system.apikey_chain_monitor_stale_declared` (HIGH/7yr) and `system.apikey_chain_monitor_restored` (LOW/3yr) with APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 invariant and CC6.4/CC7.2 auditor narratives | R-61.12 item 1, INCIDENT_RESPONSE.md v3.27.0 | 🟢 **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.76)** |
+| `docs/OBSERVABILITY.md §12.6` job 13 cross-reference update (add R-61 companion runbook reference) | R-61.12 item 4, INCIDENT_RESPONSE.md v3.27.0 | 🟢 **Done — 2026-07-03 (OBSERVABILITY.md v5.14.6)** |
+
+---
+
+### §149.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register INVITE-STALE-E-001 and APIKEY-CHAIN-STALE-E-001 in §79.4 master evidence table | compliance-officer | **P1** | [x] **Done — 2026-07-03 (§149.2, this section).** |
+| 2 | Add `api-key/` subfolder to §80.3 R2 storage architecture with `r2:form-api` NO ACCESS invariant | compliance-officer | **P1** | [x] **Done — 2026-07-03 (§149.3, this section).** |
+| 3 | Add INVITE-STALE-E-001 and APIKEY-CHAIN-STALE-E-001 to §80.4 Vanta mirror protocol | compliance-officer | **P1** | [x] **Done — 2026-07-03 (§149.4, this section).** |
+| 4 | Authoring complete — §149 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.75.0).** |
+
+---
+
+*v3.75.0 (2026-07-03): §149 — APIKEY-CHAIN-STALE-E-001 Registration + INVITE-STALE-E-001 Gap Fix (CC6.4/CC7.2 · AUDIT_LOG_SCHEMA v2.76 · INCIDENT_RESPONSE R-61). Closes documentation gap for `api_key_chain_monitor` (job 13, daily 03:00 UTC, P1 `form-security`) companion stale recovery runbook: R-61 (INCIDENT_RESPONSE.md v3.27.0, 2026-07-03) was the highest-priority missing enterprise security document, covering APIKEY-CHAIN-01 (DEC-030 bypass detection — live `tenant_api_keys` rows without 90-day audit event) and APIKEY-CHAIN-02 (APIKEY-SLO-03 rotation-gap detection — old key not revoked within 26h). §149.2 inserts two new rows in §79.4 master evidence table after PKJWT-SWEEP-STALE-E-001: (1) INVITE-STALE-E-001 (CC6.3/P5.1/P5.2, per-activation, 7yr, `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/`) — gap fix from §148 which documented but omitted the row; (2) APIKEY-CHAIN-STALE-E-001 (CC6.4/CC7.2, per-activation, 7yr, `compliance/evidence/api-key/apikey-chain-stale-e-001-<YYYY-MM-DD>/`) — new artefact for R-61 activations. §149.3 adds `api-key/` subfolder to §80.3 R2 storage (`r2:form-api` NO ACCESS invariant; WORM 7yr). §149.4 adds both artefacts to §80.4 Vanta mirror protocol (upload within 48h of `restored` event emission). §149.5 four cross-reference obligations closed: R-60.12 item 3 (INVITE-STALE-E-001 §79.4 row — gap fix); R-61.12 item 3 (APIKEY-CHAIN-STALE-E-001 §79.4 row); R-61.12 item 1 (AUDIT_LOG_SCHEMA.md v2.76 event registration → Done); R-61.12 item 4 (OBSERVABILITY.md v5.14.6 §12.6 job 13 cross-ref → Done). §149.6 four-item implementation checklist: all [x] Done this pass. Document header v3.74.0 → v3.75.0. Owner: compliance-officer + security-engineer.*
 
 ---
 

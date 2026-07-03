@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.26.1
+# FORM · Incident Response Runbook v3.27.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -22221,6 +22221,408 @@ Register INVITE-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence t
 ---
 
 *v3.26.0 (2026-07-03): R-60 — Invite Expiry Sweep & Email Cleanup Stale (`invite_expiry_sweep` job 10, `invite_email_expiry_cleanup` job 12) — CC6.3 / P5.1 / P5.2 companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: jobs 10 and 12 were the remaining daily P1-alert pg_cron jobs without companion stale recovery runbooks after R-57 (job 58), R-58 (job 36), R-59 (job 30), and R-43 (job 11) closed the gaps for their respective jobs (2026-07-03, 2026-07-03, 2026-07-03, 2026-07-03). Both jobs operate on the `tenant_invitations` table (DATA_MODEL §27) and share the compliance-officer + devops-lead owner; they are combined into a single §R-60 because job 12's erasure scope depends on job 10 having completed the expiry-mark step first. §R-60.1 trigger matrix: AL-INVITE-SWEEP-STALE-01 `system.cron_job_stale` for job 10 → P1 `form-compliance` → compliance-officer + devops-lead; dedup `invite-expiry-sweep-stale`; AL-INVITE-EMAIL-STALE-01 `system.cron_job_stale` for job 12 → P1 `form-compliance` → compliance-officer; dedup `invite-email-cleanup-stale`; both 26h freshness windows. §R-60.2 severity: P1 default (both); compound P1 on co-activation; P0 upgrade if R-60-C3 confirms invites with `invited_email != '[erased]'` older than 37 days post-expiry (Art. 17 active breach); co-active R-03 on all-jobs-stale discriminator; co-active R-05 on HMAC chain break during stale window. §R-60.3 six-step immediate action timeline (T+0 to T+30): acknowledge; R-60-C1 staleness + R-60-C3 P0 gate; P0 escalation; R-60-C2 seat impact + R-60-C4 root cause; execute PAM-elevated manual SQL; restore and confirm. §R-60.4 four scope queries: R-60-C1 (pg_cron run history both jobs — staleness confirmation); R-60-C2 (job 10 seat inflation — pending-past-expiry count per tenant_id, no invited_email); R-60-C3 (job 12 P0 gate — at_risk_invite_count for 37+ days post-expiry, invited_email used as filter predicate only, never selected); R-60-C4 two-part (Part A: peer daily job health discriminator; Part B: job catalog registration both jobs). §R-60.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infrastructure), H4 (SQL function broken — DDL change to tenant_invitations breaking WHERE clause or RLS). §R-60.6 five-step recovery: (1) job 10 compensating SQL — UPDATE tenant_invitations status + enterprise_seat_assignments revoked_at (PAM-elevated `form_system`, BEGIN/COMMIT); (2) job 12 compensating SQL — UPDATE invited_email = '[erased]' for eligible rows + zero-count verification (PAM-elevated); (3) restore both jobs by H1–H4 option (A: cron.schedule(); B: SET active=true; C: await infrastructure; D: patch function); (4) forced cron.run_job() + job_run_details confirmation + re-run R-60-C2/R-60-C3 to confirm zero residual; (5) file INVITE-STALE-E-001 with dual devops-lead + compliance-officer sign-off. §R-60.7 three Slack communication templates (stale detected; P0 GDPR breach escalation; post-resolution). §R-60.8 DEC-030 chain: `system.invite_expiry_sweep_stale_declared` HIGH/7yr (aggregate counts only — seat_inflation_count INT, pii_at_risk_count INT; no invited_email, tenant breakdown, or GDPR Art. 9 data) and `system.invite_expiry_sweep_restored` LOW/3yr (invites_expired_manually INT, emails_erased_manually INT, root_cause enum, jobs_restored array); INVITE-SWEEP-STALE-CHAIN-01 ordering invariant (HTTP 422 INVITE_SWEEP_STALE_CHAIN_01_VIOLATION on unanchored restore). §R-60.9 INVITE-STALE-E-001 per-activation evidence artefact (CC6.3/P5.1/P5.2; per-activation; 7yr; `compliance/evidence/invite/invite-stale-e-001-<YYYY-MM-DD>/`). §R-60.10 five post-incident controls (Art. 33 breach notification assessment; H1/H2 CI guard extending R-58 §R-58.7 item 2; schedule sequencing re-validation job 10 before job 12; §12.6 cross-reference check; quarterly proactive run history sweep). §R-60.11 nine cross-references (OBSERVABILITY §12.6 ×2; DATA_MODEL §27 + §27.4; INCIDENT_RESPONSE R-03 + R-05; GDPR_DPIA §8; ENTERPRISE_SLA §17.2; AUDIT_LOG_SCHEMA ×2 pending). §R-60.12 six-item implementation checklist: items 1–3 pending (AUDIT_LOG_SCHEMA registration; INVITE-SWEEP-STALE-CHAIN-01 enforcement; SOC2_READINESS §79.4 INVITE-STALE-E-001 registration); items 4–6 [x] Done this pass (OBSERVABILITY §12.6 job 10 cross-ref update v5.14.5; OBSERVABILITY §12.6 job 12 cross-ref update v5.14.5; authoring complete). Privacy floor throughout: no `invited_email` value read, logged, or transmitted in any query, template, or artefact — R-60-C3 uses `invited_email != '[erased]'` as a filter predicate only; the compensating SQL writes `'[erased]'` without reading the prior value into any application layer; all event payloads carry aggregate INT counts and FORM-internal UUIDs only. Document header v3.25.0 → v3.26.0. Owner: compliance-officer + devops-lead + security-engineer.*
+
+---
+
+## R-61 · API Key Chain Monitor Stale (`api_key_chain_monitor`, job 13)
+
+**Trigger:** `AL-APIKEY-CHAIN-STALE-01` — `system.cron_job_stale` for `api_key_chain_monitor` (job 13) → PagerDuty P1 `form-security` → security-engineer; dedup `apikey-chain-stale`; freshness window: 26 h.
+
+**SOC 2:** CC6.4 (access modification when credentials change), CC7.2 (system monitoring for anomalies).
+
+**Owners:** security-engineer (primary), compliance-officer (SOC 2 evidence), devops-lead (infrastructure).
+
+---
+
+### §R-61.1 Trigger Matrix
+
+| Alert ID | Source | Job | Freshness | PagerDuty route | Dedup key |
+|---|---|---|---|---|---|
+| AL-APIKEY-CHAIN-STALE-01 | `system.cron_job_stale` | `api_key_chain_monitor` (job 13) | 26 h | P1 `form-security` → security-engineer | `apikey-chain-stale` |
+
+Job 13 runs daily at 03:00 UTC (`0 3 * * *`) and performs two checks:
+
+- **APIKEY-CHAIN-01** — detects live `tenant_api_keys` rows with no `api_key.created` or `api_key.rotated` DEC-030 event in 90 days (potential DEC-030 audit trail bypass).
+- **APIKEY-CHAIN-02** — detects rotation-overlap without revocation: old key not revoked within 26 h after a new key was issued (APIKEY-SLO-03 breach — dual-key active window exceeded).
+
+---
+
+### §R-61.2 Severity
+
+| Condition | Severity | Co-active runbooks |
+|---|---|---|
+| Default (job stale, scope unknown) | **P1** | — |
+| R-61-C2 `open_rotation_gap_count > 0` (active rotation gap — dual-key window exceeded) | **P0** | R-01 (security incident) |
+| R-61-C3 `unmatched_live_key_count > 0` (unmatched live keys — potential DEC-030 bypass) | **P0** | R-01 (security incident) |
+| All daily jobs stale (R-61-C4 Part A discriminator shows ≥ 3 peer jobs stale) | **P1** + co-active | R-03 (Supabase infra) |
+| HMAC chain break detected during stale window | Any | R-05 (chain break) |
+
+P0 requires dual sign-off: security-engineer (primary) + compliance-officer (SOC 2 CC6.4 reporting decision).
+
+---
+
+### §R-61.3 Immediate Action Timeline
+
+| Time | Action |
+|---|---|
+| **T+0** | Acknowledge PagerDuty. Emit `system.apikey_chain_monitor_stale_declared` (DEC-030 HMAC-chained; see §R-61.8). Set `rotation_gap_count_at_declared = -1` and `bypass_check_count_at_declared = -1` as placeholders until R-61-C2/C3 complete. |
+| **T+5** | Run **R-61-C2** (APIKEY-CHAIN-02 manual run — open rotation gaps). If `open_rotation_gap_count > 0` → **P0 escalation** (§R-61.2); co-activate R-01; update stale_declared payload with actual `rotation_gap_count_at_declared`. |
+| **T+10** | Run **R-61-C3** (APIKEY-CHAIN-01 manual run — unmatched live keys). If `unmatched_live_key_count > 0` → **P0 escalation** (if not already); update stale_declared payload with actual `bypass_check_count_at_declared`. |
+| **T+15** | If P0: page compliance-officer. Post #alerts-security P0 Slack message (§R-61.7 Template B). Execute PAM-elevated compensating SQL (§R-61.6 Step 2) for active rotation gaps. |
+| **T+20** | Run **R-61-C1** (pg_cron run history — staleness confirmation). Identify root cause hypothesis H1–H4 (§R-61.5). |
+| **T+30** | Run **R-61-C4** (peer job health + job catalog). Post Slack update. Begin restoration by H1–H4 (§R-61.6 Step 3). |
+
+---
+
+### §R-61.4 Scope Queries
+
+#### R-61-C1 · pg_cron run history (staleness confirmation)
+
+```sql
+-- PAM-elevated read-only (form_readonly)
+SELECT
+  j.jobname,
+  j.schedule,
+  j.active,
+  r.runid,
+  r.start_time,
+  r.end_time,
+  r.status,
+  r.return_message
+FROM cron.job j
+LEFT JOIN cron.job_run_details r ON r.jobid = j.jobid
+WHERE j.jobname = 'api_key_chain_monitor'
+ORDER BY r.start_time DESC NULLS LAST
+LIMIT 10;
+```
+
+Expected: at least one `succeeded` row within the past 26 h. Absence → stale confirmed.
+
+#### R-61-C2 · Manual APIKEY-CHAIN-02 run — open rotation gaps (P0 gate)
+
+```sql
+-- PAM-elevated read-only (form_readonly)
+-- Returns aggregate counts only — no key_id, raw key material, or tenant breakdown
+SELECT
+  COUNT(*)                                                                           AS open_rotation_gap_count,
+  MIN(EXTRACT(EPOCH FROM (now() - rot.event_time)) / 3600)::int                     AS min_gap_hours,
+  MAX(EXTRACT(EPOCH FROM (now() - rot.event_time)) / 3600)::int                     AS max_gap_hours
+FROM audit_log rot
+WHERE rot.event_type = 'api_key.rotated'
+  AND rot.event_time > now() - INTERVAL '90 days'
+  AND NOT EXISTS (
+    SELECT 1 FROM audit_log rev
+    WHERE rev.event_type = 'api_key.revoked'
+      AND rev.metadata->>'old_key_id' = rot.metadata->>'old_key_id'
+      AND rev.event_time BETWEEN rot.event_time AND rot.event_time + INTERVAL '26 hours'
+  );
+```
+
+**If `open_rotation_gap_count > 0` → immediate P0 escalation + co-active R-01.**
+
+Result carries aggregate INT counts only — `old_key_id`, `key_preview`, `tenant_id` breakdown never surfaced.
+
+#### R-61-C3 · Manual APIKEY-CHAIN-01 run — unmatched live keys (P0 gate)
+
+```sql
+-- PAM-elevated read-only (form_readonly)
+-- Returns aggregate count only — no key_id or tenant_id surfaced
+SELECT
+  COUNT(*) AS unmatched_live_key_count
+FROM tenant_api_keys k
+WHERE k.revoked_at IS NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM audit_log a
+    WHERE a.event_type IN ('api_key.created', 'api_key.rotated')
+      AND a.metadata->>'key_id' = k.key_id::text
+      AND a.event_time > now() - INTERVAL '90 days'
+  );
+```
+
+**If `unmatched_live_key_count > 0` → P0 escalation (if not already) + co-active R-01.**
+
+`key_id` is used as a join predicate only — never selected, never logged.
+
+#### R-61-C4 · Peer job health discriminator + job catalog
+
+**Part A — peer daily job health (all-jobs-stale discriminator):**
+
+```sql
+-- PAM-elevated read-only (form_readonly)
+SELECT
+  j.jobname,
+  j.active,
+  MAX(r.start_time)                                                    AS last_run,
+  EXTRACT(EPOCH FROM (now() - MAX(r.start_time))) / 3600               AS hours_since_last_run
+FROM cron.job j
+LEFT JOIN cron.job_run_details r ON r.jobid = j.jobid
+WHERE j.jobname IN (
+  'invite_expiry_sweep',
+  'c1_erasure_sla_monitor',
+  'victor_safety_baseline_refresh',
+  'workout_data_purge'
+)
+GROUP BY j.jobname, j.active
+ORDER BY last_run ASC NULLS FIRST;
+```
+
+If ≥ 3 peer jobs show `hours_since_last_run > 26` → co-active **R-03** (Supabase infrastructure failure).
+
+**Part B — job catalog check:**
+
+```sql
+SELECT jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'api_key_chain_monitor';
+```
+
+Expected: `jobname = 'api_key_chain_monitor'`, `schedule = '0 3 * * *'`, `active = true`.
+
+---
+
+### §R-61.5 Root Cause Hypotheses
+
+| ID | Hypothesis | Discriminator |
+|---|---|---|
+| H1 | Job deleted from `cron.job` | R-61-C1 returns zero rows; R-61-C4 Part B returns zero rows |
+| H2 | Job disabled (`active = false`) | R-61-C4 Part B shows `active = false`; R-61-C1 shows last succeeded row older than 26 h |
+| H3 | Supabase infrastructure failure (pg_cron daemon not running) | R-61-C4 Part A shows ≥ 3 peer jobs also stale |
+| H4 | `api_key_chain_monitor()` function broken (DDL change to `tenant_api_keys` or `audit_log`) | R-61-C1 shows recent `failed` status row with error in `return_message`; R-61-C4 Part A shows peers healthy |
+
+---
+
+### §R-61.6 Recovery Steps
+
+**Step 1 — Emit stale-declared DEC-030 event** (T+0; do not skip even if recovering quickly):
+
+Emit `system.apikey_chain_monitor_stale_declared` via `POST /audit/emit-event` Worker with:
+- `rotation_gap_count_at_declared`: result of R-61-C2 `open_rotation_gap_count` (or `-1` if run not yet complete)
+- `bypass_check_count_at_declared`: result of R-61-C3 `unmatched_live_key_count` (or `-1` if run not yet complete)
+- `incident_id`: new UUID (correlates to APIKEY-CHAIN-STALE-E-001 artefact and terminal `restored` event)
+
+**Step 2 — Compensating SQL for active rotation gaps (P0 only, if R-61-C2 > 0):**
+
+PAM-elevated `form_system` role; requires dual security-engineer + compliance-officer sign-off before execution:
+
+```sql
+-- PAM-elevated write (form_system); dual sign-off required
+-- key_id used as join predicate only — never selected, never logged
+BEGIN;
+
+UPDATE tenant_api_keys
+SET revoked_at         = now(),
+    revocation_reason  = 'emergency_r61_compensating_control'
+WHERE key_id IN (
+  SELECT k.key_id
+  FROM tenant_api_keys k
+  JOIN audit_log rot
+    ON rot.metadata->>'old_key_id' = k.key_id::text
+   AND rot.event_type               = 'api_key.rotated'
+   AND rot.event_time               > now() - INTERVAL '90 days'
+  WHERE k.revoked_at IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM audit_log rev
+      WHERE rev.event_type          = 'api_key.revoked'
+        AND rev.metadata->>'old_key_id' = k.key_id::text
+        AND rev.event_time BETWEEN rot.event_time AND rot.event_time + INTERVAL '26 hours'
+    )
+);
+
+-- Verify: must return 0 after COMMIT
+SELECT COUNT(*) AS must_be_zero
+FROM tenant_api_keys
+WHERE revocation_reason = 'emergency_r61_compensating_control'
+  AND revoked_at IS NULL;
+
+COMMIT;
+```
+
+Emit `api_key.revoked` DEC-030 event for each key revoked (batch emit; `revocation_reason = 'r61_compensating_control'`). Raw key material is never included in any event payload.
+
+**Step 3 — Restore job 13:**
+
+| Root cause | Restoration action |
+|---|---|
+| H1 (deleted) | `SELECT cron.schedule('api_key_chain_monitor', '0 3 * * *', 'SELECT api_key_chain_monitor()');` |
+| H2 (disabled) | `UPDATE cron.job SET active = true WHERE jobname = 'api_key_chain_monitor';` |
+| H3 (Supabase infra) | Await Supabase infrastructure recovery; verify via R-61-C4 Part A all peer jobs restored. |
+| H4 (function broken) | Patch `api_key_chain_monitor()` DDL; deploy via migration; verify no breaking change to `tenant_api_keys` or `audit_log` schema. |
+
+**Step 4 — Confirm restoration:**
+
+```sql
+SELECT cron.run_job(jobid)
+FROM cron.job
+WHERE jobname = 'api_key_chain_monitor';
+
+-- Wait 30 s, then verify:
+SELECT start_time, end_time, status, return_message
+FROM cron.job_run_details r
+JOIN cron.job j ON j.jobid = r.jobid
+WHERE j.jobname = 'api_key_chain_monitor'
+ORDER BY start_time DESC
+LIMIT 3;
+```
+
+Expected: `status = 'succeeded'` in latest row. Re-run R-61-C2 and R-61-C3 to confirm `open_rotation_gap_count = 0` and `unmatched_live_key_count = 0` before filing APIKEY-CHAIN-STALE-E-001.
+
+**Step 5 — File APIKEY-CHAIN-STALE-E-001:**
+
+Emit `system.apikey_chain_monitor_restored` DEC-030 event (APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 terminal) with `rotation_gap_count_closed`, `bypass_check_count_closed`, `root_cause` (H1–H4 enum), `compensating_sql_executed` (bool), `incident_id` (must match `stale_declared`). File APIKEY-CHAIN-STALE-E-001 artefact under `compliance/evidence/api-key/apikey-chain-stale-e-001-<YYYY-MM-DD>/` (7yr WORM; dual security-engineer + compliance-officer sign-off; Vanta mirror upload within 48 h of `restored` emission).
+
+---
+
+### §R-61.7 Slack Communication Templates
+
+**Template A — Stale detected (P1 default):**
+
+```
+🔴 [FORM] api_key_chain_monitor (job 13) stale — P1 · #alerts-security
+
+Job 13 has not run successfully in the past 26 h. Immediate action underway.
+Scope queries running: R-61-C2 (rotation gaps) and R-61-C3 (DEC-030 bypass check).
+Will update when scope is confirmed.
+
+Owner: @security-engineer | IC: [name]
+Incident ID: [uuid]
+DEC-030 event: system.apikey_chain_monitor_stale_declared emitted ✓
+```
+
+**Template B — P0 upgrade (R-61-C2 or R-61-C3 positive):**
+
+```
+🚨 [FORM] api_key_chain_monitor ESCALATED TO P0 · #alerts-security
+
+P0 condition confirmed:
+- open_rotation_gap_count: [N] (active credential exposure — APIKEY-SLO-03 breach)
+- unmatched_live_key_count: [N] (potential DEC-030 audit trail bypass)
+
+Co-activating R-01 (security incident). Compensating SQL executing.
+compliance-officer paged for CC6.4 reporting decision.
+
+Owner: @security-engineer + @compliance-officer | IC: [name]
+Incident ID: [uuid]
+```
+
+**Template C — Post-resolution:**
+
+```
+✅ [FORM] api_key_chain_monitor restored — P1/P0 resolved · #alerts-security
+
+Job 13 confirmed running. Scope clear:
+- open_rotation_gap_count (post): 0
+- unmatched_live_key_count (post): 0
+
+Root cause: [H1/H2/H3/H4]
+Duration stale: [N] h
+Compensating SQL: [executed | not required]
+APIKEY-CHAIN-STALE-E-001: filed ✓ | system.apikey_chain_monitor_restored emitted ✓
+
+Owner: @security-engineer
+```
+
+---
+
+### §R-61.8 DEC-030 Chain Events
+
+| Event type | Severity | Retention | Role |
+|---|---|---|---|
+| `system.apikey_chain_monitor_stale_declared` | HIGH | 7 years | Anchor — must precede `restored` for same `incident_id` |
+| `system.apikey_chain_monitor_restored` | LOW | 3 years | Terminal — APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 |
+
+**Payload for `system.apikey_chain_monitor_stale_declared`:**
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Correlates stale_declared → restored; also keyed in APIKEY-CHAIN-STALE-E-001 |
+| `job_id` | INT | 13 (constant) |
+| `stale_declared_at` | timestamptz | UTC, ISO 8601 |
+| `last_succeeded_at` | timestamptz \| null | From R-61-C1; null if job deleted (H1) |
+| `hours_stale` | INT | Derived: `stale_declared_at − last_succeeded_at` |
+| `rotation_gap_count_at_declared` | INT | R-61-C2 `open_rotation_gap_count`; −1 if R-61-C2 not yet run |
+| `bypass_check_count_at_declared` | INT | R-61-C3 `unmatched_live_key_count`; −1 if R-61-C3 not yet run |
+
+**Payload for `system.apikey_chain_monitor_restored`:**
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Must match `stale_declared` `incident_id` |
+| `job_id` | INT | 13 (constant) |
+| `restored_at` | timestamptz | UTC, ISO 8601 |
+| `rotation_gap_count_closed` | INT | R-61-C2 result post-compensating SQL (must be 0 at time of filing) |
+| `bypass_check_count_closed` | INT | R-61-C3 result post-restoration (must be 0 at time of filing) |
+| `root_cause` | ENUM | `deleted` \| `disabled` \| `infra` \| `function_broken` |
+| `compensating_sql_executed` | BOOL | `true` if §R-61.6 Step 2 was required |
+
+**Privacy floor (both events):** Aggregate INT counts only — `key_id`, `tenant_id`, `key_preview`, raw API key material, `client_ip`, or GDPR Art. 9 special-category data are never included in any payload field.
+
+**APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 Ordering Invariant:**
+
+| Invariant ID | Rule | Enforcement |
+|---|---|---|
+| APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 | `system.apikey_chain_monitor_restored` must not be emitted unless a `system.apikey_chain_monitor_stale_declared` exists with matching `incident_id` in the DEC-030 HMAC chain | HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION` returned by `emit-audit-event` Worker on inversion; co-activates R-05 |
+
+---
+
+### §R-61.9 APIKEY-CHAIN-STALE-E-001 Evidence Artefact
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | APIKEY-CHAIN-STALE-E-001 |
+| **SOC 2 criteria** | CC6.4, CC7.2 |
+| **Frequency** | Per-activation (one artefact per R-61 incident) |
+| **Retention** | 7 years WORM |
+| **Storage path** | `compliance/evidence/api-key/apikey-chain-stale-e-001-<YYYY-MM-DD>/` |
+| **Owners** | security-engineer (primary) + compliance-officer (sign-off) |
+| **Vanta mirror** | Upload within 48 h of `system.apikey_chain_monitor_restored` emission |
+| **Contents** | `system.apikey_chain_monitor_stale_declared` event JSON; R-61-C1 output (pg_cron run history); R-61-C2 output (aggregate rotation-gap counts — no key_id or key material); R-61-C3 output (aggregate bypass count — no key_id); compensating SQL execution log if applicable; R-61-C4 restoration confirmation query result; `system.apikey_chain_monitor_restored` event JSON; dual sign-off record (security-engineer + compliance-officer) |
+| **Registered** | SOC2_READINESS.md §79.4 (v3.75.0, 2026-07-03) |
+
+---
+
+### §R-61.10 Post-Incident Controls
+
+| # | Control | Owner | Trigger |
+|---|---|---|---|
+| 1 | Verify APIKEY-SLO-03 not breached by rotation-gap window for this incident; file CC6.4 finding in SOC 2 evidence if any gap exceeded 26 h | security-engineer + compliance-officer | Post every P0 activation |
+| 2 | H1/H2 CI guard: add lint rule (consistent with R-58 §R-58.7 item 2) blocking `DROP FUNCTION api_key_chain_monitor` and `UPDATE cron.job SET active = false WHERE jobname = 'api_key_chain_monitor'` without required approvals | devops-lead | After first H1 or H2 occurrence |
+| 3 | Implement APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts` (HTTP 422 on inversion) | platform-engineer | Pending — §R-61.12 item 2 |
+| 4 | Quarterly proactive run history sweep: verify job 13 has ≥ 85 successful runs in the trailing 90 days; < 85 triggers investigation (no PagerDuty P1 required, but documents monitoring continuity) | devops-lead + security-engineer | Quarterly |
+| 5 | Re-run APIKEY-CHAIN-01 (R-61-C3) 24 h post-restoration to confirm no new unmatched live keys emerged during the stale window | security-engineer | Post every activation |
+
+---
+
+### §R-61.11 Cross-References
+
+| Reference | Relationship |
+|---|---|
+| `docs/OBSERVABILITY.md §12.6` (job 13 row) | pg_cron canonical registry — AL-APIKEY-CHAIN-STALE-01 alert source; cross-reference updated v5.14.6 (this pass) |
+| `docs/AUDIT_LOG_SCHEMA.md §31.6` | APIKEY-CHAIN-01, APIKEY-CHAIN-02, APIKEY-CHAIN-03 check definitions (source for scope queries) |
+| `docs/AUDIT_LOG_SCHEMA.md` | `system.apikey_chain_monitor_stale_declared` HIGH/7yr + `system.apikey_chain_monitor_restored` LOW/3yr with APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 invariant; registered v2.76 (this pass) |
+| `docs/INCIDENT_RESPONSE.md R-01` | Security incident runbook — co-activate on any P0 R-61 activation |
+| `docs/INCIDENT_RESPONSE.md R-03` | Supabase infrastructure failure runbook — co-activate when R-61-C4 Part A shows all-jobs-stale discriminator |
+| `docs/INCIDENT_RESPONSE.md R-05` | HMAC chain break runbook — co-activate if chain verification fails during stale window or APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 emits 422 |
+| `docs/SOC2_READINESS.md §79.4` | APIKEY-CHAIN-STALE-E-001 master evidence table registration (CC6.4/CC7.2; v3.75.0, this pass) |
+| `docs/SOC2_READINESS.md §80.3` | R2 storage `api-key/` subfolder (WORM Object Lock 7yr; `r2:form-api` NO ACCESS; v3.75.0, this pass) |
+| `docs/ENTERPRISE_SLA.md §17.2` | APIKEY-SLO-03 — 26h rotation-revocation window; breach confirmed by R-61-C2 > 0 |
+
+---
+
+### §R-61.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.apikey_chain_monitor_stale_declared` (HIGH/7yr) and `system.apikey_chain_monitor_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant, and CC6.4/CC7.2 auditor narratives | compliance-officer + platform-engineer | **P0** | [x] **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.76).** |
+| 2 | Implement APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts`: HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION` on `system.apikey_chain_monitor_restored` emitted without matching `system.apikey_chain_monitor_stale_declared` for same `incident_id` | platform-engineer | **P0** | [ ] |
+| 3 | Register APIKEY-CHAIN-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.4/CC7.2; per-activation; 7yr; `compliance/evidence/api-key/apikey-chain-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.75.0, §149).** |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 13 row cross-reference column: add `; INCIDENT_RESPONSE R-61 (§R-61; v1.0, 2026-07-03 — companion stale recovery runbook for job 13)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.14.6).** |
+| 5 | Authoring complete — §R-61 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.27.0).** |
+
+**Privacy floor (invariant throughout R-61):** No `key_id`, `key_preview`, raw API key material, `tenant_id` breakdown beyond aggregate counts, `client_ip`, coaching session content, body composition metric, or GDPR Art. 9 special-category data appears in any R-61 scope query result, communication template payload, DEC-030 event payload, or APIKEY-CHAIN-STALE-E-001 evidence artefact. R-61-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-61-C2 surfaces only aggregate `open_rotation_gap_count`, `min_gap_hours`, and `max_gap_hours` — `old_key_id` is used as a join predicate only, never selected. R-61-C3 surfaces only aggregate `unmatched_live_key_count` — `key_id` is used as a join predicate only, never selected. R-61-C4 surfaces only pg_cron job metadata and run timestamps. The compensating SQL in §R-61.6 Step 2 uses `key_id` exclusively as a join predicate within an UPDATE WHERE subquery — the value is never read into application memory, never logged, never transmitted; only `revoked_at` and `revocation_reason` are written.
+
+---
+
+*v3.27.0 (2026-07-03): R-61 — API Key Chain Monitor Stale (`api_key_chain_monitor`, job 13) — CC6.4 / CC7.2 companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 13 was the only remaining daily P1-alert pg_cron job routing to `form-security` without a companion stale recovery runbook after R-57 (job 58), R-58 (job 36), R-59 (job 30), R-60 (jobs 10 + 12), and R-43 (job 11) closed the gaps for their respective jobs. §R-61.1 trigger matrix: AL-APIKEY-CHAIN-STALE-01 `system.cron_job_stale` for job 13 → P1 `form-security` → security-engineer; dedup `apikey-chain-stale`; 26h freshness window. §R-61.2 severity: P1 default; P0 upgrade if R-61-C2 `open_rotation_gap_count > 0` (active credential exposure — APIKEY-SLO-03 breach) or R-61-C3 `unmatched_live_key_count > 0` (potential DEC-030 bypass); co-active R-01 (security incident) on P0; co-active R-03 (Supabase infra) on all-jobs-stale discriminator; co-active R-05 on HMAC chain break during stale window. §R-61.3 six-step immediate action timeline (T+0 to T+30): acknowledge + emit stale_declared at T+0; R-61-C2 P0 gate at T+5; R-61-C3 P0 gate at T+10; P0 escalation + compensating SQL at T+15; R-61-C1 staleness confirmation at T+20; R-61-C4 peer health + root cause at T+30. §R-61.4 four scope queries: R-61-C1 (pg_cron run history for job 13); R-61-C2 (manual APIKEY-CHAIN-02 — aggregate `open_rotation_gap_count`, `min_gap_hours`, `max_gap_hours`; `old_key_id` as join predicate only); R-61-C3 (manual APIKEY-CHAIN-01 — aggregate `unmatched_live_key_count`; `key_id` as join predicate only); R-61-C4 Part A (peer job health: invite_expiry_sweep, c1_erasure_sla_monitor, victor_safety_baseline_refresh, workout_data_purge) + Part B (job catalog check). §R-61.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infrastructure), H4 (`api_key_chain_monitor()` function broken — DDL change to `tenant_api_keys` or `audit_log`). §R-61.6 five-step recovery: (1) emit `system.apikey_chain_monitor_stale_declared` at T+0 with `incident_id`, placeholders `−1` for counts before scope queries; (2) P0 compensating SQL — `UPDATE tenant_api_keys SET revoked_at = now()` for open rotation-gap old keys (`key_id` as join predicate only — never selected or logged; dual sign-off required); emit `api_key.revoked` batch events; (3) restore job 13 by H1–H4; (4) confirm via `cron.run_job()` + re-run R-61-C2/C3 (both must be 0); (5) file APIKEY-CHAIN-STALE-E-001 + emit `system.apikey_chain_monitor_restored`. §R-61.7 three Slack templates (#alerts-security): stale detected (P1); P0 upgrade; post-resolution. §R-61.8 DEC-030 chain: `system.apikey_chain_monitor_stale_declared` HIGH/7yr + `system.apikey_chain_monitor_restored` LOW/3yr; APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant (HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: aggregate INT counts only — no `key_id`, `tenant_id`, `key_preview`, raw key material, `client_ip`, or GDPR Art. 9 data in any payload field. §R-61.9 APIKEY-CHAIN-STALE-E-001 per-activation evidence artefact (CC6.4/CC7.2; per-activation; 7yr WORM; `compliance/evidence/api-key/apikey-chain-stale-e-001-<YYYY-MM-DD>/`; Vanta mirror upload within 48 h). §R-61.10 five post-incident controls: APIKEY-SLO-03 breach assessment + CC6.4 SOC 2 finding (post P0); H1/H2 CI guard (post first H1/H2); APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker (pending platform-engineer); quarterly 90-day run-history sweep (< 85 runs triggers investigation); 24h post-restoration R-61-C3 re-run. §R-61.11 nine cross-references: OBSERVABILITY §12.6 (job 13, v5.14.6); AUDIT_LOG_SCHEMA §31.6 (check definitions) + §API-Key-Chain-Monitor-Stale events section (v2.76); INCIDENT_RESPONSE R-01 + R-03 + R-05; SOC2_READINESS §79.4 (v3.75.0) + §80.3; ENTERPRISE_SLA §17.2 (APIKEY-SLO-03). §R-61.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.76 chain events + invariant; SOC2_READINESS.md v3.75.0 §149 APIKEY-CHAIN-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.14.6 §12.6 job 13 cross-ref; authoring complete); item 2 pending (platform-engineer — APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker). Document header v3.26.1 → v3.27.0. Owner: security-engineer + compliance-officer.*
 
 ---
 

@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.75
+# FORM · Audit Log Schema v2.76
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -1416,6 +1416,8 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `system.pkjwt_expiry_sweep_restored` | 3 years | SOC 2 CC6.6 advisory — R-57 IC-confirmed job 58 restoration after `pkjwt_key_expiry_sweep` recovery; PKJWT-SWEEP-STALE-CHAIN-01 terminal event; 3yr sufficient as recovery record (primary CC6.6 evidence carried by 7yr `system.pkjwt_expiry_sweep_stale_declared`); registered v2.74 |
 | `system.invite_expiry_sweep_stale_declared` | 7 years | SOC 2 CC6.3/P5.1/P5.2 — R-60 IC-declared jobs 10 + 12 (`invite_expiry_sweep` + `invite_email_expiry_cleanup`) stale incident anchor; INVITE-SWEEP-STALE-CHAIN-01 ordering invariant (HTTP 422 `INVITE_SWEEP_STALE_CHAIN_01_VIOLATION` on inversion); P0 upgrade if `pii_at_risk_count > 0` (GDPR Art. 17 active breach); INVITE-STALE-E-001 per-activation evidence source; registered v2.75 |
 | `system.invite_expiry_sweep_restored` | 3 years | SOC 2 CC6.3/P5.1/P5.2 advisory — R-60 IC-confirmed jobs 10 + 12 restoration terminal event; INVITE-SWEEP-STALE-CHAIN-01 terminal; 3yr sufficient as recovery record (primary CC6.3/P5.1/P5.2 evidence carried by 7yr `system.invite_expiry_sweep_stale_declared`); registered v2.75 |
+| `system.apikey_chain_monitor_stale_declared` | 7 years | SOC 2 CC6.4/CC7.2 — R-61 IC-declared job 13 (`api_key_chain_monitor`) stale incident anchor; APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant (HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION` on inversion); P0 upgrade if `rotation_gap_count_at_declared > 0` (active CC6.4 credential exposure — APIKEY-SLO-03 breach) or `bypass_check_count_at_declared > 0` (potential DEC-030 bypass); APIKEY-CHAIN-STALE-E-001 per-activation evidence source; registered v2.76 |
+| `system.apikey_chain_monitor_restored` | 3 years | SOC 2 CC6.4/CC7.2 advisory — R-61 IC-confirmed job 13 restoration terminal event; APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 terminal; 3yr sufficient (primary CC6.4/CC7.2 evidence carried by 7yr `system.apikey_chain_monitor_stale_declared`); registered v2.76 |
 | `mobile.replay_config_updated` | 3 years | STANDARD — enterprise replay feature-flag state record; REPLAY-CHAIN-01 ordering invariant anchor; REPLAY-E-001 evidence artefact (SOC 2 CC6.7); `docs/OBSERVABILITY.md §46.6` (DEC-063) |
 | `mobile.replay_tier_violation` | 7 years | HIGH-severity zero-fire Tier S gate-bypass detection; SOC 2 CC7.2 (anomaly monitoring) + P1.1 (privacy notice conformance); any emission triggers P1 PagerDuty `form-compliance` + `form-devops` and §46.7 inadvertent capture escalation; REPLAY-E-003 evidence artefact; `docs/OBSERVABILITY.md §46.6` (DEC-063) |
 | `pam.*` | 7 years | SOC 2 CC6.1/CC6.2/CC6.3 JIT privilege access evidence; break-glass record |
@@ -5454,6 +5456,85 @@ Structural peers: WAU-DECLINE-STALE-CHAIN-01 (R-51 / v2.57); CHAMP-LOGIN-STALE-C
 **P5.1 auditor narrative:** P5.1 requires FORM to restrict access to PII to those with a legitimate need. `invited_email` in `tenant_invitations` is PII with no legitimate access need after 30 days post-expiry. `pii_at_risk_count` in `stale_declared` is the IC's auditor-inspectable aggregate count of at-risk records at declaration time — zero is an affirmative attestation; non-zero drives the P0 path and Art. 33 assessment. R-60-C3 uses `invited_email != '[erased]'` as a filter predicate only — the value is never selected, logged, or transmitted into any chain event payload.
 
 **P5.2 auditor narrative:** P5.2 requires disposal of personal data per retention policy. Job 12 (`invite_email_expiry_cleanup`) is the automated erasure control. `emails_erased_manually` in `restored` is the IC attestation of compensating manual erasure via R-60.6 Step 2 (`UPDATE tenant_invitations SET invited_email = '[erased]'` — write-only; the prior email value is never read into any application layer, log, or chain payload). INVITE-STALE-E-001 (CC6.3/P5.1/P5.2, per-activation, 7yr) registered in `docs/SOC2_READINESS.md §148` (v3.74.0, 2026-07-03).
+
+---
+
+### API Key Chain Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-61 · CC6.4/CC7.2)
+
+> Defined in `docs/INCIDENT_RESPONSE.md` R-61 (v3.27.0, 2026-07-03). Two DEC-030 HMAC-chained events for job 13 (`api_key_chain_monitor`, daily 03:00 UTC, 26h freshness) staleness. APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant: `system.apikey_chain_monitor_restored` blocked (HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION`) without prior `system.apikey_chain_monitor_stale_declared` for same `incident_id`. P0 severity if `rotation_gap_count_at_declared > 0` (active CC6.4 credential exposure — APIKEY-SLO-03 breach) or `bypass_check_count_at_declared > 0` (potential DEC-030 bypass). Privacy floor (both events): aggregate INT counts only — no `key_id`, `tenant_id`, `key_preview`, raw API key material, `client_ip`, or GDPR Art. 9 data. Registered v2.76 (2026-07-03).
+
+#### `system.apikey_chain_monitor_stale_declared` — HIGH / 7 years
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `incident_id` | UUID | ✓ | Correlates stale_declared → restored; keyed in APIKEY-CHAIN-STALE-E-001 |
+| `job_id` | INT | ✓ | `13` (constant for `api_key_chain_monitor`) |
+| `stale_declared_at` | timestamptz | ✓ | UTC, ISO 8601 — IC acknowledgement timestamp |
+| `last_succeeded_at` | timestamptz \| null | ✓ | From R-61-C1 pg_cron run history; null if job deleted (H1) |
+| `hours_stale` | INT | ✓ | `stale_declared_at − last_succeeded_at` in hours; 0 if `last_succeeded_at` null |
+| `rotation_gap_count_at_declared` | INT | ✓ | R-61-C2 `open_rotation_gap_count`; −1 if R-61-C2 not yet run at declaration time |
+| `bypass_check_count_at_declared` | INT | ✓ | R-61-C3 `unmatched_live_key_count`; −1 if R-61-C3 not yet run at declaration time |
+
+**Zod v2 schema:**
+
+```typescript
+const ApiKeyChainMonitorStaleDeclaredPayloadSchema = z.object({
+  incident_id:                    z.string().uuid(),
+  job_id:                         z.literal(13),
+  stale_declared_at:              z.string().datetime({ offset: true }),
+  last_succeeded_at:              z.string().datetime({ offset: true }).nullable(),
+  hours_stale:                    z.number().int().nonnegative(),
+  rotation_gap_count_at_declared: z.number().int().min(-1),
+  bypass_check_count_at_declared: z.number().int().min(-1),
+});
+```
+
+#### `system.apikey_chain_monitor_restored` — LOW / 3 years
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `incident_id` | UUID | ✓ | Must match `stale_declared` `incident_id` — APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 assertion |
+| `job_id` | INT | ✓ | `13` (constant) |
+| `restored_at` | timestamptz | ✓ | UTC, ISO 8601 — IC closure timestamp |
+| `rotation_gap_count_closed` | INT | ✓ | R-61-C2 result post-compensating SQL; must be `0` at time of filing |
+| `bypass_check_count_closed` | INT | ✓ | R-61-C3 result post-restoration; must be `0` at time of filing |
+| `root_cause` | ENUM | ✓ | `deleted` \| `disabled` \| `infra` \| `function_broken` (H1–H4) |
+| `compensating_sql_executed` | BOOL | ✓ | `true` if §R-61.6 Step 2 PAM-elevated UPDATE was required |
+
+**Zod v2 schema:**
+
+```typescript
+const ApiKeyChainMonitorRestoredPayloadSchema = z.object({
+  incident_id:                 z.string().uuid(),
+  job_id:                      z.literal(13),
+  restored_at:                 z.string().datetime({ offset: true }),
+  rotation_gap_count_closed:   z.number().int().nonnegative(),
+  bypass_check_count_closed:   z.number().int().nonnegative(),
+  root_cause:                  z.enum(['deleted', 'disabled', 'infra', 'function_broken']),
+  compensating_sql_executed:   z.boolean(),
+});
+```
+
+#### APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 Ordering Invariant
+
+| Invariant ID | Rule | Enforcement | Co-activates |
+|---|---|---|---|
+| APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 | `system.apikey_chain_monitor_restored` must not be emitted unless a `system.apikey_chain_monitor_stale_declared` with matching `incident_id` exists in the DEC-030 HMAC chain | HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION` returned by `emit-audit-event` Worker on invariant violation | R-05 (HMAC chain break runbook) |
+
+#### CC6.4 Auditor Narrative
+
+CC6.4 requires FORM to modify access promptly when a user's responsibilities change — for API credentials this means revoking the old key within 26 h of rotation (APIKEY-SLO-03, `ENTERPRISE_SLA.md §17.2`). `api_key_chain_monitor` (job 13, APIKEY-CHAIN-02) is the automated daily control detecting rotation-overlap-without-revocation. `system.apikey_chain_monitor_stale_declared` is the tamper-evident IC incident anchor when this control lapses; `rotation_gap_count_at_declared` surfaces the CC6.4 exposure count (aggregate INT — no `key_id`) at declaration. `rotation_gap_count_closed = 0` in `system.apikey_chain_monitor_restored` is the IC's post-remediation closure assertion. Retention 7yr for `stale_declared` (CC6.4 access-modification audit trail — multi-cycle SOC 2 coverage); 3yr for `restored` (recovery confirmation — primary evidence carried by 7yr anchor).
+
+#### CC7.2 Auditor Narrative
+
+CC7.2 requires FORM to monitor system components for anomalies that indicate potential system failure or impairment. Job 13 (APIKEY-CHAIN-01) is the automated daily control detecting live `tenant_api_keys` rows with no DEC-030 audit event in 90 days — a DEC-030 bypass anomaly that CC7.2 demands be surfaced. `bypass_check_count_at_declared` in `system.apikey_chain_monitor_stale_declared` is the IC-attested aggregate count of unmatched live keys at declaration time (`key_id` as join predicate only — never selected); zero is affirmative attestation of clean DEC-030 coverage; non-zero triggers P0 + co-active R-01 (security incident). The DEC-030 HMAC chain tamper-evidence on both events ensures SOC 2 auditors can verify the monitoring control's health and the IC's response was recorded immutably.
+
+**Emitters:** Both events emitted by IC (security-engineer, PAM-elevated) via `POST /audit/emit-event` (DEC-030 HMAC-chained). `stale_declared` at R-61 T+0 after PagerDuty AL-APIKEY-CHAIN-STALE-01 P1 fires; populate `rotation_gap_count_at_declared` (R-61-C2) and `bypass_check_count_at_declared` (R-61-C3) after scope queries complete (amendment acceptable before closure). `restored` at R-61 Step 5 after job 13 confirmed healthy and R-61-C2/C3 both return 0. No automated emission path — both events require IC PAM elevation.
+
+---
+
+**v2.76 · 2026-07-03 · owner: compliance-officer + security-engineer**
+*v2.76 (2026-07-03): +2 events — `system.apikey_chain_monitor_stale_declared` (HIGH/7yr) and `system.apikey_chain_monitor_restored` (LOW/3yr) — in new section `### API Key Chain Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-61 · CC6.4/CC7.2)`. Closes `docs/INCIDENT_RESPONSE.md R-61.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant, and CC6.4/CC7.2 auditor narratives). APIKEY-CHAIN-MONITOR-STALE-CHAIN-01: `system.apikey_chain_monitor_restored` blocked (HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05. Seven-field Zod v2 `ApiKeyChainMonitorStaleDeclaredPayloadSchema`: `incident_id` (UUID), `job_id` (literal 13), `stale_declared_at` (datetime), `last_succeeded_at` (datetime|null — null on H1/deleted), `hours_stale` (int≥0), `rotation_gap_count_at_declared` (int≥−1, −1 = not yet run), `bypass_check_count_at_declared` (int≥−1). Seven-field Zod v2 `ApiKeyChainMonitorRestoredPayloadSchema`: `incident_id` (UUID), `job_id` (literal 13), `restored_at` (datetime), `rotation_gap_count_closed` (int≥0, must be 0 at filing), `bypass_check_count_closed` (int≥0, must be 0 at filing), `root_cause` (enum deleted/disabled/infra/function_broken), `compensating_sql_executed` (bool). Privacy floor (both schemas): no `key_id`, `tenant_id`, `key_preview`, raw key material, `client_ip`, or GDPR Art. 9 data — aggregate INT counts only. Retention table: +2 rows (`system.apikey_chain_monitor_stale_declared` 7yr CC6.4/CC7.2; `system.apikey_chain_monitor_restored` 3yr CC6.4/CC7.2 advisory). Owner: compliance-officer + security-engineer.*
 
 ---
 
