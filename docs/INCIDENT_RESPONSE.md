@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.30.0
+# FORM · Incident Response Runbook v3.32.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -23861,6 +23861,304 @@ Evidence: SIEM-CR02-STALE-E-001 will include R-65-C2 results
 | 5 | Authoring complete — §R-65 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.31.0).** |
 
 **Privacy floor (invariant throughout R-65):** No `user_id`, plain `actor_user_id` UUID, full IP address, coaching content, body composition metric, or GDPR Art. 9 special-category data appears in any R-65 scope query result, communication template payload, DEC-030 event payload, or SIEM-CR02-STALE-E-001 evidence artefact. R-65-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-65-C2 surfaces only `actor_user_sha256` (SHA-256 pseudonym — not the raw UUID), continent codes, gap_seconds, and `tenant_id_ref` (FORM-internal UUID) — no employee name, email, coaching session content, body composition values, or GDPR Art. 9 data. R-65-C3 surfaces only pg_cron job metadata and run timestamps. `siem_country_continent` table is a static geography reference with no PII.
+
+---
+
+## R-66 · SIEM Bridge CR-03 Privilege Escalation Monitor Stale (`siem_bridge_cr03_priv_escalation`, job 23)
+
+**Trigger:** `system.cron_job_stale` for job 23 (`siem_bridge_cr03_priv_escalation`), fired by `pg-cron-health-monitor` when no successful run is recorded within the 6-minute freshness window (3-run tolerance at `*/5 * * * *` cadence). Alert: AL-SIEM-BRIDGE-02; dedup `siem-cr03-check-stale`. TSC: CC7.2 / CC6.6.
+
+**Classification:** P2 default (SIEM CR-03 detection blind spot); P2-escalate (security-engineer co-page) if R-66-C2 returns any rows (missed privilege-escalation-after-denial detections during stale window).
+
+**Owner:** platform-engineer (IC); security-engineer (co-page on P2-escalate); compliance-officer (DEC-030, evidence).
+
+---
+
+### §R-66.1 Trigger Matrix
+
+| Signal | Source | Threshold | PagerDuty route | Severity |
+|---|---|---|---|---|
+| `system.cron_job_stale` (job 23) | `pg-cron-health-monitor` Edge Function | 6 min (3-run tolerance at `*/5 * * * *`) | P2 → `form-devops` → platform-engineer | P2 default; P2-escalate if R-66-C2 returns rows |
+| R-03 co-activation | `pg-cron-health-monitor` | All 9 monitored jobs stale | Co-active with R-03 | P0 |
+
+**Dedup key:** `siem-cr03-check-stale`. PagerDuty alert: AL-SIEM-BRIDGE-02.
+
+---
+
+### §R-66.2 Severity Classification
+
+| Condition | Severity | Additional page |
+|---|---|---|
+| Job 23 stale only, R-66-C2 = 0 rows | P2 | platform-engineer only |
+| Job 23 stale + R-66-C2 returns rows (missed CR-03 events during stale window) | P2-escalate | + security-engineer |
+| R-03 co-active (all-jobs-stale) | P0 override | Follow R-03 protocol first |
+
+---
+
+### §R-66.3 Immediate Action Timeline
+
+| Step | Time | Action |
+|---|---|---|
+| T+0 | 0 min | PagerDuty AL-SIEM-BRIDGE-02 fires. IC acknowledges. Emit `system.siem_cr03_stale_declared` HIGH (DEC-030 HMAC-chained) via PAM-elevated `POST /audit/emit-event`. Set `manual_cr03_match_count = -1` (scope query not yet run). |
+| T+5 | 5 min | Run **R-66-C2** (manual CR-03 detection across stale window). If rows returned: upgrade to P2-escalate; co-page security-engineer via Slack T-66-B; amendment-emit to update `manual_cr03_match_count` after R-66-C2 completes. |
+| T+10 | 10 min | Run **R-66-C1** (pg_cron run history for job 23) to determine root cause (H1–H4). |
+| T+15 | 15 min | Run **R-66-C3** (peer job health): Part A — jobs 22, 21, 16, 17; Part B — `cron.job` catalog check for `siem_bridge_cr03_priv_escalation`. |
+| T+20 | 20 min | Restore job 23 per root-cause hypothesis (H1–H4). Confirm via `SELECT cron.run_job(23)`. |
+| T+25 | 25 min | Security-engineer sign-off (if R-66-C2 returned rows). Emit `system.siem_cr03_restored` LOW (DEC-030 HMAC-chained). File SIEM-CR03-STALE-E-001 evidence artefact. |
+
+---
+
+### §R-66.4 Scope Queries
+
+#### R-66-C1 — pg_cron Run History (job 23)
+
+```sql
+SELECT
+  runid,
+  job_id,
+  job_pid,
+  database,
+  username,
+  command,
+  status,
+  return_message,
+  start_time,
+  end_time
+FROM cron.job_run_details
+WHERE jobname = 'siem_bridge_cr03_priv_escalation'
+ORDER BY start_time DESC
+LIMIT 20;
+```
+
+Purpose: Identify last successful run timestamp, number of missed runs, and status/error message. Supports H1 (deleted — job absent from `cron.job`) vs H2 (disabled) vs H3 (Supabase infra — all jobs stale, R-03 co-active) vs H4 (function broken — `status = 'failed'` + `return_message` error detail).
+
+#### R-66-C2 — Manual CR-03 Detection (Privilege Escalation After Denial)
+
+```sql
+-- Manual reproduction of fn_siem_bridge_cr03() logic across the stale window.
+-- Detects: pam.elevation_denied → pam.session_started for the same actor within 30 minutes.
+-- Privacy invariant: actor_user_sha256 (SHA-256 pseudonym) only — no plain actor_user_id UUID.
+SELECT
+  ed.tenant_id,
+  encode(sha256(ed.actor_user_id::text::bytea), 'hex')   AS actor_user_sha256,
+  ed.created_at                                           AS denied_at,
+  ss.created_at                                           AS session_started_at,
+  EXTRACT(EPOCH FROM (ss.created_at - ed.created_at))::int / 60
+                                                          AS minutes_between,
+  NOT EXISTS (
+    SELECT 1
+    FROM siem.correlation_rule_matched crm
+    WHERE crm.rule_id         = 'CR-03'
+      AND crm.actor_user_sha256 = encode(sha256(ed.actor_user_id::text::bytea), 'hex')
+      AND crm.matched_at BETWEEN ed.created_at AND ss.created_at
+  ) AS not_already_matched
+FROM audit_log_events ed
+JOIN audit_log_events ss
+  ON  ss.event_type    = 'pam.session_started'
+  AND ss.actor_user_id = ed.actor_user_id
+  AND ss.tenant_id     = ed.tenant_id
+  AND ss.created_at BETWEEN ed.created_at AND ed.created_at + INTERVAL '30 minutes'
+WHERE ed.event_type = 'pam.elevation_denied'
+  AND ed.created_at >= :stale_window_start
+  AND ed.created_at <= :stale_window_end
+ORDER BY ed.created_at;
+```
+
+**Parameters:** `:stale_window_start` = timestamp of last confirmed successful job 23 run (from R-66-C1); `:stale_window_end` = `NOW()`.
+
+**Privacy invariant:** `actor_user_sha256` (SHA-256 pseudonym) only. No plain `actor_user_id` UUID, employee name, email, coaching session content, body composition metrics, or GDPR Art. 9 special-category data in result set or evidence artefact. `manual_cr03_match_count` is a scalar integer count only.
+
+**Result interpretation:**
+- 0 rows: No missed CR-03 privilege-escalation-after-denial events during stale window. Severity remains P2.
+- ≥ 1 row: Missed CR-03 detections confirmed. Upgrade to P2-escalate. Co-page security-engineer. Security-engineer reviews each `actor_user_sha256` row and confirms disposition (accounted-for test activity vs. active privilege escalation attempt).
+
+#### R-66-C3 — Peer Job Health
+
+**Part A — Peer pg_cron jobs:**
+
+```sql
+SELECT jobname, schedule, active, jobid
+FROM cron.job
+WHERE jobname IN (
+  'siem_bridge_cr02_impossible_travel',
+  'pam_bg_review_alert',
+  'rate_limit_violations_cleanup',
+  'api_quota_usage_archive'
+)
+ORDER BY jobname;
+```
+
+Purpose: Determine if related monitoring jobs are also stale (H3 discriminator). If `siem_bridge_cr02_impossible_travel` (job 22) is also stale, follow both R-65 and R-66 concurrently. If all 9 monitored jobs are stale, R-03 is co-active — follow R-03 first.
+
+**Part B — Catalog check:**
+
+```sql
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'siem_bridge_cr03_priv_escalation';
+```
+
+Purpose: Confirm job exists and is active (H1 vs H2 discriminator). 0 rows = H1 (deleted). `active = false` = H2 (disabled).
+
+---
+
+### §R-66.5 Root-Cause Hypotheses
+
+| Hypothesis | Indicator | Recovery |
+|---|---|---|
+| **H1 — Job deleted** | `cron.job` returns 0 rows for `siem_bridge_cr03_priv_escalation` | Re-create: `SELECT cron.schedule('siem_bridge_cr03_priv_escalation', '*/5 * * * *', 'SELECT fn_siem_bridge_cr03();');` |
+| **H2 — Job disabled** | `cron.job.active = false` | Re-enable: `UPDATE cron.job SET active = true WHERE jobname = 'siem_bridge_cr03_priv_escalation';` |
+| **H3 — Supabase infra** | All 9 monitored pg_cron jobs stale; R-03 co-active | Follow R-03 protocol; no DB-level recovery possible until infra restored |
+| **H4 — Function broken** | Job exists and active; `cron.job_run_details.status = 'failed'`; `return_message` has error detail | See H4 sub-causes below |
+
+**H4 Sub-Causes:**
+
+| Sub-cause | Indicator | Recovery |
+|---|---|---|
+| H4(a) — GUC unset (`RAISE EXCEPTION`) | `return_message` contains `unrecognized configuration parameter` or GUC-related exception | Re-set missing GUC: `ALTER DATABASE postgres SET <guc_name> = '<value>';`; add CI guard per §R-66.10 item 3 |
+| H4(b) — `fn_siem_bridge_cr03` dropped | `return_message` contains `function fn_siem_bridge_cr03() does not exist` | Re-deploy function from source control; add CI lint guard per §R-66.10 item 4 |
+| H4(c) — `pam.elevation_denied` schema change | `return_message` contains column-not-found or type-mismatch referencing `pam.elevation_denied` or `pam.session_started` | Review migration history; update `fn_siem_bridge_cr03` column references to match updated schema |
+| H4(d) — `pg_net` disabled | `return_message` contains `pg_net extension not found` or pg_net schema error | Re-enable: `CREATE EXTENSION IF NOT EXISTS pg_net;`; escalate to Supabase support if extension unavailable |
+
+---
+
+### §R-66.6 Recovery Steps
+
+1. **Emit `system.siem_cr03_stale_declared`** (DEC-030 HMAC-chained, HIGH/7yr) via PAM-elevated IC `POST /audit/emit-event`. Set `manual_cr03_match_count = -1` at T+0.
+2. **Run R-66-C2** at T+5. If rows returned: upgrade to P2-escalate; co-page security-engineer (Slack T-66-B); amendment-emit updated `manual_cr03_match_count` after R-66-C2 completes.
+3. **Restore job 23** per H1–H4 root-cause hypothesis (R-66-C1 and R-66-C3 Part B discriminators).
+4. **Confirm recovery** via `SELECT cron.run_job(23);` — verify next run succeeds in `cron.job_run_details`.
+5. **Security-engineer sign-off** (if R-66-C2 returned ≥ 1 row): security-engineer reviews each `actor_user_sha256` row, confirms whether rows indicate an active privilege-escalation attempt or accounted-for activity; sign-off documented in SIEM-CR03-STALE-E-001.
+6. **Emit `system.siem_cr03_restored`** (DEC-030 HMAC-chained, LOW/3yr) after job 23 confirmed healthy. SIEM-CR03-STALE-CHAIN-01 invariant: `restored` blocked (HTTP 422 `SIEM_CR03_STALE_CHAIN_01_VIOLATION`) without prior `stale_declared` for same `incident_id`; co-activates R-05.
+7. **File SIEM-CR03-STALE-E-001** evidence artefact: `compliance/evidence/siem-bridge-stale/siem-cr03-stale-e-001-<YYYY-MM-DD>/`. Mirror to Vanta within 48h.
+
+---
+
+### §R-66.7 Slack Communication Templates
+
+**T-66-A — #alerts-devops (P2 initial):**
+
+```
+[R-66 ACTIVE — SIEM Bridge CR-03 Stale]
+Job 23 (siem_bridge_cr03_priv_escalation) has not run within its 6-minute freshness window.
+CR-03 privilege-escalation-after-denial detection is BLIND.
+IC: @platform-engineer. Severity: P2. Alert: AL-SIEM-BRIDGE-02.
+Action: R-66 playbook. R-66-C2 manual check in progress.
+Dedup: siem-cr03-check-stale.
+```
+
+**T-66-B — P2-escalate (if R-66-C2 returns rows):**
+
+```
+[R-66 P2-ESCALATE — Missed CR-03 Events]
+R-66-C2 returned [N] row(s): privilege-escalation-after-denial pairs detected during stale window.
+Undetected during CR-03 blind spot — security-engineer co-page required.
+IC @platform-engineer + @security-engineer: review actor_user_sha256 rows and confirm disposition.
+Security-engineer sign-off required before SIEM-CR03-STALE-E-001 can be filed.
+```
+
+---
+
+### §R-66.8 DEC-030 Chain
+
+Both events are HMAC-chained (DEC-030), emitted by IC (platform-engineer, PAM-elevated) via `POST /audit/emit-event`. No automated emission path — PAM elevation required.
+
+**`system.siem_cr03_stale_declared`** — severity: HIGH; retention: 7 years; TSC: CC7.2 / CC6.6.
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Fresh UUID per R-66 activation. Anchors SIEM-CR03-STALE-CHAIN-01 ordering invariant. |
+| `confirmed_stale_since` | datetime | Timestamp of last confirmed successful job 23 run (from R-66-C1). |
+| `stale_minutes` | int ≥ 0 | Minutes since last successful run (6-min freshness cadence at 5-min interval). |
+| `missed_runs_estimate` | int ≥ 0 | `stale_minutes ÷ 5` rounded down (5-min cadence). |
+| `manual_cr03_match_count` | int ≥ −1 | −1 = R-66-C2 not yet run at declaration time; amended to actual count after T+5 scope query. |
+| `initial_severity` | enum | `p2` (R-66-C2 not yet run or 0 rows); `p2_escalate` (R-66-C2 ≥ 1 row). |
+
+**`system.siem_cr03_restored`** — severity: LOW; retention: 3 years; TSC: CC7.2 / CC6.6.
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Must match the `stale_declared` event for same R-66 activation. SIEM-CR03-STALE-CHAIN-01 enforced. |
+| `restored_at` | datetime | Timestamp IC confirms job 23 healthy after `cron.run_job(23)`. |
+| `root_cause` | enum | `h1_deleted` / `h2_disabled` / `h3_infra` / `h4_function_broken`. |
+| `stale_minutes_total` | int ≥ 0 | Total minutes job 23 was stale (declaration to restoration). |
+| `manual_cr03_match_count` | int ≥ 0 | Final count of missed CR-03 detections (0 = no missed escalation events). |
+| `security_engineer_sign_off` | boolean | `true` if R-66-C2 returned ≥ 1 row and security-engineer confirmed disposition. |
+
+**SIEM-CR03-STALE-CHAIN-01 Ordering Invariant:** `system.siem_cr03_restored` for a given `incident_id` is blocked (HTTP 422 `SIEM_CR03_STALE_CHAIN_01_VIOLATION`) by the `emit-audit-event` Worker if no prior `system.siem_cr03_stale_declared` exists for the same `incident_id`. Co-activates R-05 on violation.
+
+---
+
+### §R-66.9 Evidence Artefact
+
+**SIEM-CR03-STALE-E-001** — per-activation evidence artefact for R-66 incidents.
+
+| Field | Value |
+|---|---|
+| Evidence ID | SIEM-CR03-STALE-E-001 |
+| TSC | CC7.2, CC6.6 |
+| Trigger | R-66 activation (job 23 stale, `siem_bridge_cr03_priv_escalation`) |
+| Collection | Per-activation (one artefact per R-66 incident) |
+| Retention | 7 years (WORM, Cloudflare R2) |
+| Vanta mirror | Within 48h of filing |
+| R2 path | `compliance/evidence/siem-bridge-stale/siem-cr03-stale-e-001-<YYYY-MM-DD>/` |
+| Owner | security-engineer + compliance-officer |
+
+**Contents:**
+1. `system.siem_cr03_stale_declared` DEC-030 HIGH event (PAM-elevated IC emission, T+0).
+2. `system.siem_cr03_restored` DEC-030 LOW event (PAM-elevated IC emission, post-recovery).
+3. SIEM-CR03-STALE-CHAIN-01 predecessor assertion confirmation (HTTP 422 `SIEM_CR03_STALE_CHAIN_01_VIOLATION` enforced by `emit-audit-event` Worker).
+4. IC runbook timestamp trace (T+0 detection → T+25 closure steps per §R-66.3).
+5. R-66-C2 scope query output: aggregate count + per-pair rows (`actor_user_sha256`, `denied_at`, `session_started_at`, `minutes_between`, `not_already_matched`). No plain `actor_user_id` UUID.
+6. `pg_cron.job_run_details WHERE jobname = 'siem_bridge_cr03_priv_escalation'` export covering the stale window (confirms stale start time, missed-run timestamps, 5-min cadence miss count).
+7. Security-engineer sign-off attestation (required if `manual_cr03_match_count > 0`).
+
+**R2 path note:** `siem-bridge-stale/` subfolder was created by §153 (SIEM-CR02-STALE-E-001). §154 adds `siem-cr03-stale-e-001-<YYYY-MM-DD>/` within it. `r2:form-api` REVOKED (§80.3 invariant).
+
+---
+
+### §R-66.10 Post-Incident Controls
+
+| # | Control | Trigger | Owner |
+|---|---|---|---|
+| 1 | Post-mortem if stale > 30 min or ≥ 1 missed CR-03 event confirmed (R-66-C2 > 0) | Per-activation | security-engineer + compliance-officer |
+| 2 | SIEM-CR03-STALE-CHAIN-01 Worker enforcement (`emit-audit-event` Worker: HTTP 422 on unanchored `restored` emit) | P0 — implementation pending (platform-engineer) | platform-engineer |
+| 3 | H4(a) CI guard: `fn_siem_bridge_cr03` RAISE EXCEPTION on missing GUC — CI must set all required GUCs | Post any H4(a) incident | platform-engineer |
+| 4 | H1/H2 CI lint guard: `siem_bridge_cr03_priv_escalation` job existence and `active = true` checked in migration CI | Post any H1/H2 incident | platform-engineer |
+| 5 | Quarterly runbook gap sweep: cross-reference §12.6 pg_cron canonical registry against companion runbook list | Quarterly | compliance-officer |
+
+---
+
+### §R-66.11 Cross-References
+
+| Document | Section | Note |
+|---|---|---|
+| OBSERVABILITY.md | §12.6, job 23 | pg_cron canonical registry; freshness window 6 min; AL-SIEM-BRIDGE-02; v5.15.1 (2026-07-03) |
+| OBSERVABILITY.md | §34.5 | AL-SIEM-BRIDGE-02 alert definition |
+| AUDIT_LOG_SCHEMA.md | §SIEM Bridge CR-03 Stale events | v2.80 (2026-07-03) — `system.siem_cr03_stale_declared` HIGH/7yr + `system.siem_cr03_restored` LOW/3yr |
+| INCIDENT_RESPONSE.md | R-03 | All-jobs-stale discriminator; co-activate if R-03 fires |
+| INCIDENT_RESPONSE.md | R-05 | HMAC chain inversion co-activation on SIEM-CR03-STALE-CHAIN-01 violation |
+| INCIDENT_RESPONSE.md | R-65 | Peer SIEM Bridge CR-02 Impossible Travel Monitor companion stale runbook (job 22) |
+| SOC2_READINESS.md | §154 | SIEM-CR03-STALE-E-001 registration (CC7.2/CC6.6); v3.80.0 (2026-07-03) |
+| SOC2_READINESS.md | §79.4 | SIEM-CR03-STALE-E-001 row in master evidence table (count 120 → 121) |
+
+---
+
+### §R-66.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.siem_cr03_stale_declared` (HIGH/7yr) and `system.siem_cr03_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, SIEM-CR03-STALE-CHAIN-01 ordering invariant, and CC7.2/CC6.6 auditor narrative | compliance-officer | **P0** | [x] **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.80).** |
+| 2 | Implement SIEM-CR03-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker (HTTP 422 `SIEM_CR03_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit) | platform-engineer | **P1** | [ ] Pending — platform-engineer |
+| 3 | Register SIEM-CR03-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC6.6; per-activation; 7yr; `compliance/evidence/siem-bridge-stale/siem-cr03-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [x] **Done — 2026-07-03 (§154.2, SOC2_READINESS.md v3.80.0).** |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 23 row cross-reference column: add `; INCIDENT_RESPONSE R-66 (§R-66; v1.0, 2026-07-03 — companion stale recovery runbook for job 23)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.15.1).** |
+| 5 | Authoring complete — §R-66 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.32.0).** |
+
+**Privacy floor (invariant throughout R-66):** No `user_id`, plain `actor_user_id` UUID, full IP address, coaching content, body composition metric, or GDPR Art. 9 special-category data appears in any R-66 scope query result, communication template payload, DEC-030 event payload, or SIEM-CR03-STALE-E-001 evidence artefact. R-66-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-66-C2 surfaces only `actor_user_sha256` (SHA-256 pseudonym — not the raw UUID), timestamps of denied elevation and session start, minutes between events, and a dedup flag — no employee name, email, coaching session content, body composition values, or GDPR Art. 9 data. R-66-C3 surfaces only pg_cron job metadata and run timestamps. `manual_cr03_match_count` and `missed_runs_estimate` are scalar integer counts only.
+
+---
+
+*v3.32.0 (2026-07-03): R-66 — SIEM Bridge CR-03 Privilege Escalation Monitor Stale (`siem_bridge_cr03_priv_escalation`, job 23) — CC7.2/CC6.6 privilege-escalation-after-denial detection blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 23 was the highest-priority remaining pg_cron monitoring job without a companion stale recovery runbook after R-65 (job 22, `siem_bridge_cr02_impossible_travel`) was authored this same pass — CC7.2/CC6.6 near-real-time privilege escalation detection (5-min cadence, 6-min freshness) is a security-critical SOC 2 control and any stale window creates an immediate anomalous-activity and privileged-access detection blind spot. §R-66.1 trigger matrix: AL-SIEM-BRIDGE-02 `system.cron_job_stale` for job 23 → P2 PagerDuty `form-devops` → platform-engineer; dedup `siem-cr03-check-stale`; 6-min freshness window (3-run tolerance at */5 * * * * cadence). §R-66.2 severity: P2 default; P2-escalate with security-engineer co-page if R-66-C2 returns rows (undetected CR-03 privilege-escalation-after-denial pairs during stale window); co-active R-03 on all-jobs-stale discriminator. §R-66.3 six-step immediate action timeline (T+0 to T+25): emit stale_declared at T+0; R-66-C2 P2-escalate gate at T+5; R-66-C1 root cause at T+10; R-66-C3 peer health at T+15; recovery at T+20; confirm + emit restored + file evidence at T+25. §R-66.4 three scope queries: R-66-C1 (pg_cron run history for job 23 — 20 rows); R-66-C2 (manual CR-03 detection SQL reproducing fn_siem_bridge_cr03() logic across stale window — JOIN on audit_log_events for pam.elevation_denied → pam.session_started within 30 min for same actor with NOT EXISTS dedup against existing siem.correlation_rule_matched CR-03 events; actor_user_sha256 pseudonym output only; privacy invariant: no plain UUID, no IP); R-66-C3 Part A (peer jobs: siem_bridge_cr02_impossible_travel/pam_bg_review_alert/rate_limit_violations_cleanup/api_quota_usage_archive) + Part B (catalog check). §R-66.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (function broken — four sub-causes: H4(a) GUC unset RAISE EXCEPTION, H4(b) fn_siem_bridge_cr03 dropped, H4(c) pam.elevation_denied schema change, H4(d) pg_net extension disabled). §R-66.6 seven-step recovery: (1) emit stale_declared; (2) R-66-C2 P2-escalate gate — if rows, page security-engineer; (3) restore job by H1–H4; (4) confirm via cron.run_job(23); (5) security-engineer sign-off if R-66-C2 returned rows; (6) emit restored; (7) file SIEM-CR03-STALE-E-001. §R-66.7 two Slack templates (T-66-A for #alerts-devops; T-66-B P2-escalate notification for undetected CR-03 breach). §R-66.8 DEC-030 chain: `system.siem_cr03_stale_declared` HIGH/7yr + `system.siem_cr03_restored` LOW/3yr; SIEM-CR03-STALE-CHAIN-01 ordering invariant (HTTP 422 `SIEM_CR03_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, actor_user_sha256 pseudonym only, no IP, no coaching content, no GDPR Art. 9 data in any payload; `manual_cr03_match_count` is scalar integer count only. §R-66.9 SIEM-CR03-STALE-E-001 per-activation evidence artefact (CC7.2/CC6.6; per-activation; 7yr WORM; `compliance/evidence/siem-bridge-stale/siem-cr03-stale-e-001-<YYYY-MM-DD>/`; security-engineer sign-off required if R-66-C2 returned rows; Vanta mirror within 48h). §R-66.10 five post-incident controls: post-mortem if stale > 30 min or missed CR-03 events confirmed; SIEM-CR03-STALE-CHAIN-01 Worker enforcement; H4(a) GUC CI guard; H1/H2 CI lint guard; quarterly runbook gap sweep. §R-66.11 eight cross-references: OBSERVABILITY §12.6 (job 23, v5.15.1); OBSERVABILITY §34.5 (AL-SIEM-BRIDGE-02); AUDIT_LOG_SCHEMA §SIEM Bridge CR-03 Stale events (v2.80); INCIDENT_RESPONSE R-03 + R-05 + R-65; SOC2_READINESS §154 + §79.4 (v3.80.0). §R-66.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.80 event registration; SOC2_READINESS.md v3.80.0 §154 SIEM-CR03-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.15.1 §12.6 job 23 cross-ref; authoring complete); item 2 pending (platform-engineer — SIEM-CR03-STALE-CHAIN-01 enforcement in emit-audit-event Worker). Document header v3.31.0 → v3.32.0. Owner: platform-engineer + compliance-officer + security-engineer.*
 
 ---
 

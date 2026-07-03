@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.98.0] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-66` — SIEM Bridge CR-03 Privilege Escalation Monitor Stale (`siem_bridge_cr03_priv_escalation`, job 23) companion stale recovery runbook (CC7.2/CC6.6). Six-minute freshness window; AL-SIEM-BRIDGE-02; P2 default with P2-escalate on missed CR-03 detections; R-66-C2 manual compensation SQL (`pam.elevation_denied` → `pam.session_started` within 30 min for same actor). DEC-030 HMAC chain: `system.siem_cr03_stale_declared` HIGH/7yr + `system.siem_cr03_restored` LOW/3yr; SIEM-CR03-STALE-CHAIN-01 ordering invariant (HTTP 422 on inversion; co-activates R-05). Evidence: SIEM-CR03-STALE-E-001.
+- `docs/AUDIT_LOG_SCHEMA.md §SIEM Bridge CR-03 Stale events` — registers `system.siem_cr03_stale_declared` (HIGH/7yr, CC7.2/CC6.6) and `system.siem_cr03_restored` (LOW/3yr, CC7.2/CC6.6) with Zod v2 schemas, payload tables, SIEM-CR03-STALE-CHAIN-01 ordering invariant, and CC7.2/CC6.6 auditor narrative. v2.79 → v2.80.
+- `docs/SOC2_READINESS.md §154` — SIEM-CR03-STALE-E-001 registration (CC7.2/CC6.6; per-activation; 7yr WORM; `compliance/evidence/siem-bridge-stale/siem-cr03-stale-e-001-<YYYY-MM-DD>/`); §79.4 master evidence table updated (+1 row; count 120 → 121). v3.79.0 → v3.80.0.
+
+### Changed
+- `docs/OBSERVABILITY.md §12.6` — job 23 (`siem_bridge_cr03_priv_escalation`) cross-reference column updated with INCIDENT_RESPONSE R-66 companion stale recovery runbook reference. v5.15.0 → v5.15.1.
+- `VERSION` — 11.97.0 → 11.98.0.
+
+---
+
 ## [11.97.0] — 2026-07-03
 
 ### Added

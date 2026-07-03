@@ -5760,6 +5760,93 @@ CC7.2 requires FORM to monitor for anomalous activity — including monitoring t
 
 ---
 
+### SIEM Bridge CR-03 Privilege Escalation Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-66 · CC7.2 / CC6.6)
+
+#### system.siem_cr03_stale_declared
+
+| Field | Type | Severity | Retention | TSC |
+|---|---|---|---|---|
+| `incident_id` | UUID | HIGH | 7 years | CC7.2, CC6.6 |
+| `confirmed_stale_since` | datetime | — | — | — |
+| `stale_minutes` | int ≥ 0 | — | — | — |
+| `missed_runs_estimate` | int ≥ 0 | — | — | — |
+| `manual_cr03_match_count` | int ≥ −1 | — | — | — |
+| `initial_severity` | enum: `p2` \| `p2_escalate` | — | — | — |
+
+**Zod v2 schema:**
+
+```typescript
+const SiemCr03StaleDeclaredSchema = z.object({
+  incident_id:             z.string().uuid(),
+  confirmed_stale_since:   z.string().datetime(),
+  stale_minutes:           z.number().int().min(0),
+  missed_runs_estimate:    z.number().int().min(0),
+  manual_cr03_match_count: z.number().int().min(-1),
+  initial_severity:        z.enum(['p2', 'p2_escalate']),
+});
+```
+
+**Field notes:**
+- `stale_minutes`: minutes since last successful run (not hours; 6-min freshness cadence at 5-min interval).
+- `missed_runs_estimate`: `stale_minutes ÷ 5` rounded down (5-min cadence).
+- `manual_cr03_match_count`: −1 at declaration (R-66-C2 not yet run); amended to actual integer count after T+5 scope query.
+- `initial_severity`: `p2_escalate` if `manual_cr03_match_count > 0` after R-66-C2 completes.
+
+#### system.siem_cr03_restored
+
+| Field | Type | Severity | Retention | TSC |
+|---|---|---|---|---|
+| `incident_id` | UUID | LOW | 3 years | CC7.2, CC6.6 |
+| `restored_at` | datetime | — | — | — |
+| `root_cause` | enum: `h1_deleted` \| `h2_disabled` \| `h3_infra` \| `h4_function_broken` | — | — | — |
+| `stale_minutes_total` | int ≥ 0 | — | — | — |
+| `manual_cr03_match_count` | int ≥ 0 | — | — | — |
+| `security_engineer_sign_off` | boolean | — | — | — |
+
+**Zod v2 schema:**
+
+```typescript
+const SiemCr03RestoredSchema = z.object({
+  incident_id:                z.string().uuid(),
+  restored_at:                z.string().datetime(),
+  root_cause:                 z.enum(['h1_deleted', 'h2_disabled', 'h3_infra', 'h4_function_broken']),
+  stale_minutes_total:        z.number().int().min(0),
+  manual_cr03_match_count:    z.number().int().min(0),
+  security_engineer_sign_off: z.boolean(),
+});
+```
+
+**Field notes:**
+- `incident_id`: must match the `stale_declared` event for the same R-66 activation — SIEM-CR03-STALE-CHAIN-01 enforced.
+- `manual_cr03_match_count`: final count of missed CR-03 detections (0 = no missed escalation-after-denial events during stale window).
+- `security_engineer_sign_off`: `true` if R-66-C2 returned ≥ 1 row and security-engineer confirmed disposition of each `actor_user_sha256` row.
+- `root_cause` enum matches INCIDENT_RESPONSE.md §R-66.5 H1–H4 (no H5 for job 23 — unlike R-62/H5 `kv_write_failure` which was specific to job 14's KV write path).
+
+#### SIEM-CR03-STALE-CHAIN-01 Ordering Invariant
+
+| Rule | Constraint | HTTP response on violation | Co-activation |
+|---|---|---|---|
+| SIEM-CR03-STALE-CHAIN-01 | `system.siem_cr03_restored` blocked without prior `system.siem_cr03_stale_declared` for same `incident_id` | HTTP 422 `SIEM_CR03_STALE_CHAIN_01_VIOLATION` | R-05 |
+
+#### CC7.2 / CC6.6 Auditor Narrative
+
+CC7.2 requires FORM to monitor for anomalous activity — including monitoring the monitoring controls themselves. Job 23 (`siem_bridge_cr03_priv_escalation`, every 5 min) is the automated detector for CR-03: `pam.elevation_denied` followed by `pam.session_started` for the same actor within 30 minutes (privilege escalation after denial). When job 23 goes stale, FORM initiates R-66 within the 6-min freshness window: R-66-C2 manual SQL immediately reproduces the CR-03 detection logic across the stale window, providing compensating coverage; security-engineer is co-paged if any missed events are found. `system.siem_cr03_stale_declared` is the IC-anchoring tamper-evident record that the CC7.2/CC6.6 privilege-escalation detection control lapsed; `manual_cr03_match_count` attests whether any privilege-escalation-after-denial went undetected during the stale window. CC6.6: PAM elevation events (`pam.elevation_denied`, `pam.session_started`) are the subject of CR-03 detection; any stale window means PAM bypass attempts may go undetected — a CC6.6 restricted-logical-access monitoring gap. Retention 7yr: multi-cycle SOC 2 coverage for CC7.2/CC6.6 anomalous-activity and privileged-access monitoring obligations.
+
+**Emitters:** Both events emitted by IC (platform-engineer, PAM-elevated) via `POST /audit/emit-event` (DEC-030 HMAC-chained). `stale_declared` at R-66 T+0 after PagerDuty AL-SIEM-BRIDGE-02 P2 fires; `manual_cr03_match_count` field may be updated (amendment acceptable) after R-66-C2 scope query completes at T+5. `restored` at R-66 Step 6 after `cron.run_job(23)` confirmed healthy. No automated emission path — both events require IC PAM elevation.
+
+**Privacy floor (both schemas):** Scalar integers, UUIDs, enum strings, datetime, and boolean only — no `user_id`, `actor_user_sha256` pseudonym, plain `actor_user_id` UUID, IP address, coaching content, body composition, or GDPR Art. 9 data in chain event payloads. `form_api` REVOKED from emission path. `manual_cr03_match_count` is a scalar integer count only — no individual actor identifiers in the DEC-030 event payload.
+
+**Retention table:**
+- `system.siem_cr03_stale_declared` — HIGH — 7 years — CC7.2, CC6.6
+- `system.siem_cr03_restored` — LOW — 3 years — CC7.2, CC6.6
+
+---
+
+**v2.80 · 2026-07-03 · owner: compliance-officer + security-engineer**
+*v2.80 (2026-07-03): +2 events — `system.siem_cr03_stale_declared` (HIGH/7yr) and `system.siem_cr03_restored` (LOW/3yr) — in new section `### SIEM Bridge CR-03 Privilege Escalation Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-66 · CC7.2 / CC6.6)`. Closes `docs/INCIDENT_RESPONSE.md R-66.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, SIEM-CR03-STALE-CHAIN-01 ordering invariant, and CC7.2/CC6.6 auditor narrative). SIEM-CR03-STALE-CHAIN-01: `system.siem_cr03_restored` blocked (HTTP 422 `SIEM_CR03_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-66.12 item 2). Six-field Zod v2 `SiemCr03StaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime), `stale_minutes` (int≥0 — minutes not hours; 6-min freshness cadence), `missed_runs_estimate` (int≥0 — stale_minutes÷5 rounded down), `manual_cr03_match_count` (int≥−1, −1 = gate not yet run; final count in `restored`), `initial_severity` (enum p2|p2_escalate — p2_escalate if manual_cr03_match_count > 0). Six-field Zod v2 `SiemCr03RestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum h1_deleted/h2_disabled/h3_infra/h4_function_broken — 4 values; no H5 for job 23 unlike R-62 H5 which was unique to KV write failure for job 14), `stale_minutes_total` (int≥0), `manual_cr03_match_count` (int≥0 — final; 0 if no missed CR-03 detections), `security_engineer_sign_off` (bool — true if R-66-C2 returned ≥ 1 row and security-engineer confirmed no active compromise). Security significance: job 23 is FORM's only automated near-real-time CC7.2/CC6.6 privilege-escalation-after-denial detector (5-min cadence); any stale window is an immediate anomalous-activity and privileged-access monitoring blind spot; R-66-C2 compensating SQL provides bridging coverage for the stale window by JOINing pam.elevation_denied → pam.session_started within 30 min for same actor. Privacy floor (both schemas): scalar integers, UUIDs, enum strings, datetime, and boolean only — no `user_id`, `actor_user_sha256` pseudonym, plain actor UUID, IP, coaching content, body composition, or GDPR Art. 9 data in chain event payloads; `form_api` REVOKED from emission path. Retention table: +2 rows (`system.siem_cr03_stale_declared` HIGH 7yr CC7.2/CC6.6; `system.siem_cr03_restored` LOW 3yr CC7.2/CC6.6). Document header v2.79 → v2.80. Owner: compliance-officer + security-engineer.*
+
+---
+
 **v2.79 · 2026-07-03 · owner: compliance-officer + security-engineer**
 *v2.79 (2026-07-03): +2 events — `system.siem_cr02_stale_declared` (HIGH/7yr) and `system.siem_cr02_restored` (LOW/3yr) — in new section `### SIEM Bridge CR-02 Impossible Travel Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-65 · CC7.2)`. Closes `docs/INCIDENT_RESPONSE.md R-65.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, SIEM-CR02-STALE-CHAIN-01 ordering invariant, and CC7.2 auditor narrative). SIEM-CR02-STALE-CHAIN-01: `system.siem_cr02_restored` blocked (HTTP 422 `SIEM_CR02_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05 on violation; implementation pending (platform-engineer — R-65.12 item 2). Six-field Zod v2 `SiemCr02StaleDeclaredSchema`: `incident_id` (UUID), `confirmed_stale_since` (datetime), `stale_minutes` (int≥0 — minutes not hours; 6-min freshness cadence), `missed_runs_estimate` (int≥0 — stale_minutes÷5 rounded down), `manual_cr02_match_count` (int≥−1, −1 = gate not yet run; final count in `restored`), `initial_severity` (enum p2|p2_escalate — p2_escalate if manual_cr02_match_count > 0). Six-field Zod v2 `SiemCr02RestoredSchema`: `incident_id` (UUID), `restored_at` (datetime), `root_cause` (enum h1_deleted/h2_disabled/h3_infra/h4_function_broken — 4 values; no H5 for job 22 unlike R-62 H5 which was unique to KV write failure for job 14), `stale_minutes_total` (int≥0), `manual_cr02_match_count` (int≥0 — final; 0 if no missed CR-02 detections), `security_engineer_sign_off` (bool — true if R-65-C2 returned ≥ 1 row and security-engineer confirmed no active compromise). Security significance: job 22 is FORM's only automated near-real-time CC7.2 impossible travel detector (5-min cadence); any stale window is an immediate anomalous-activity monitoring blind spot; R-65-C2 compensating SQL provides bridging coverage for the stale window. Privacy floor (both schemas): scalar integers, UUIDs, enum strings, datetime, and boolean only — no `user_id`, `actor_user_sha256`, country code pair, full IP, coaching content, body composition, or GDPR Art. 9 data in chain event payloads; `form_api` REVOKED from emission path. Retention table: +2 rows (`system.siem_cr02_stale_declared` HIGH 7yr CC7.2; `system.siem_cr02_restored` LOW 3yr CC7.2). Document header v2.78 → v2.79. Owner: compliance-officer + security-engineer.*
 
