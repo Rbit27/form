@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [11.64.0] — 2026-07-03
+
+### Added
+- `content/post-56-warmup-protocols-written-for-someone-else.md` — editorial series post-56. «Чому більшість warm-up протоколів написано під когось іншого». Три джерела generic-протоколів: клінічна фізіотерапія, елітний спорт, групові фітнес-класи — жоден не для self-coached recreational athlete. Три функції warm-up: термальна, нейром'язова (PAP — Hamada et al. 2000), психомоторна. Статичне розтягування 45+ с знижує пікову силу на 5–8% протягом 30–60 хв (Behm & Chaouachi 2011; Simic et al. 2013: мета-аналіз 104 досліджень). Динамічна розминка випереджає статичне розтягування (McCrary et al. 2015; Hough et al. 2009). Нейром'язова підготовка специфічна до руху. Foam rolling: ефективний для DOMS (MacDonald et al. 2013), не показує гострого ефекту на силові показники (Peacock et al. 2014; Schroeder & Best 2015). Час доби: циркадні ефекти, ранок потребує +5–7 хв (Chtourou & Souissi 2012; Winget et al. 1985). Варіативність за типом сесії: силова, гіпертрофійна, технічна, відновлювальна. Чотири питання-фреймворк замість fixed-протоколу. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `README.md` — series «Прогресія без тренера» 3096–3105 added to roadmap (10 нових proposed тем).
+
+### Changed
+- `blog.html` — post-56 card prepended at top of feed.
+- `README.md` — post-56 updated proposed → draft · v11.64.0; editorial series counter 11–56, 37 canonical; series header updated to v11.64.0.
+- `STATUS.md` — current version updated to v11.64.0.
+- `VERSION` — 11.63.0 → 11.64.0.
+
+---
+
 ## [11.63.0] — 2026-07-03
 
 ### Added
