@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 in progress 7/10 · series «Прогресія без тренера» 3096–3105 proposed · series «Тренування в реальних умовах» 3106–3115 proposed · editorial 61–70 in progress 8/10 · block 896–900 active · block 901–910 proposed · v11.97.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 proposed · series «Тренування в реальних умовах» 3106–3115 proposed · editorial 61–70 COMPLETE 10/10 · editorial 71–80 in progress 2/10 · block 896–900 active · block 901–910 proposed · v12.3.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -65,10 +65,10 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 66 | Як оцінити якість сесії: не за вагою, не за болем, а за ключовими сигналами | proposed |
 | 67 | Індивідуальні відмінності в реакції на тренування: чому «що працює для всіх» не існує | **draft · v11.94.0 → post-67-individual-differences-training-response.md** |
 | 68 | Тренувальний план vs. тренувальна система: у чому різниця і що важливіше | **draft · v11.97.0 → post-68-plan-vs-system-what-matters.md** |
-| 69 | Коли відпочивати активно, а коли пасивно: розбір логіки відновлення | proposed |
-| 70 | Силовий прогрес після 35: що змінюється, а що — ні | proposed |
-| 71 | Психологія провальної сесії: як переробити невдачу в дані, а не в нарратив | proposed |
-| 72 | Виміряти тренованість за межами 1RM: п'ять маркерів, що говорять більше | proposed |
+| 69 | Довгострокова прогресія без зовнішнього супроводу: що зберігається через роки | **draft · v11.98.0 → post-69-long-term-progression-without-coach.md** |
+| 70 | Синтез 61–70: десять орієнтирів для self-coached атлета без зовнішнього супроводу | **draft · v12.1.0 → post-70-editorial-series-synthesis.md · СЕРІЯ 61–70 ЗАВЕРШЕНА** |
+| 71 | Навантаження і відновлення: єдина система чи два окремих процеси? | **draft · v12.2.0 → post-71-load-recovery-unified-system.md · Редакційна серія 71–80 1/10** |
+| 72 | Як читати сигнали тіла через контекст блоку: коли RPE, сон і мотивація говорять правду — і коли вони в пастці втоми | **draft · v12.3.0 → post-72-reading-body-signals-through-block-context.md · Редакційна серія 71–80 2/10** |
 | 73 | Перший рік з коучем: що делегувати, а що тримати за собою | proposed |
 | 74 | Тренування і когніція: що спортивна наука каже про вплив на ментальну продуктивність | proposed |
 | 75 | Синтез блоку 61–75: FORM editorial compass — 15 принципів без мотиваційного шуму | proposed |
@@ -3461,7 +3461,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3079 | Warm-up як технічна діагностика: два завдання розминки і чому більшість використовує одне | **draft · v11.80.0 → post-3079-warmup-as-technical-diagnostics.md** |
 | 3080 | Синтез 3071–3080: технічна операційна система для self-coached атлета | **draft · v11.82.0 → post-3080-technical-self-diagnostics-synthesis-10-principles.md** |
 
-### Series «Мезоцикл без тренера» 3081–3090 · in progress 7/10
+### Series «Мезоцикл без тренера» 3081–3090 · COMPLETE 10/10 · v12.3.0
 
 | Post | Topic | Status |
 |---|---|---|
@@ -3472,9 +3472,9 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3085 | Прогресія навантаження всередині мезоциклу: три моделі для різних рівнів тренованості | **draft · v11.92.0 → post-3085-mesocycle-load-progression-three-models.md** |
 | 3086 | Деловантаження як частина блоку, а не виняток: коли планувати і скільки знижувати | **draft · v11.94.0 → post-3086-mesocycle-deload-planning-and-magnitude.md** |
 | 3087 | Перехід між блоками: типові помилки і що вони говорять про самоаналіз атлета | **draft · v11.97.0 → post-3087-mesocycle-block-transition-mistakes.md** |
-| 3088 | Ретроспективний аналіз блоку: п'ять питань, які варто задати після завершення | proposed |
-| 3089 | Адаптація програми в реальному часі: що можна змінювати всередині блоку, що — ні | proposed |
-| 3090 | Синтез 3081–3090: мезоцикл як одиниця планування для self-coached атлета | proposed |
+| 3088 | Ретроспективний аналіз блоку: п'ять питань, які варто задати після завершення | **draft · v12.1.0 → post-3088-mesocycle-adaptation-monitoring.md** |
+| 3089 | Адаптація програми в реальному часі: що можна змінювати всередині блоку, що — ні | **draft · v12.2.0 → post-3089-deload-as-diagnostic-tool.md** |
+| 3090 | Синтез 3081–3090: мезоцикл як одиниця планування для self-coached атлета | **draft · v12.3.0 → post-3090-mesocycle-self-coached-synthesis.md · СЕРІЯ ЗАВЕРШЕНА** |
 | 3091 | Тренування при дефіциті сну: що реально змінюється і що можна компенсувати | proposed |
 | 3092 | Як сформувати операційну звичку тренувального журналу — не «записувати», а «читати» | proposed |
 | 3093 | Технічна деградація під накопиченою втомою: як розпізнати і що робити | proposed |
