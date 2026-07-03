@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–56 drafted · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 proposed · series «Мезоцикл без тренера» 3081–3090 proposed · series «Прогресія без тренера» 3096–3105 proposed · block 896–900 active · block 901–910 proposed · v11.64.0
+### Editorial series: 11–57 drafted · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 in progress 3/10 · series «Мезоцикл без тренера» 3081–3090 proposed · series «Прогресія без тренера» 3096–3105 proposed · block 896–900 active · block 901–910 proposed · v11.70.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -53,7 +53,7 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 54 | Коли змінювати програму — і коли «зміна» є помилкою | **draft · v11.61.0 → post-54-when-to-change-your-program.md** |
 | 55 | Що означає «закінчити тренування з резервом» і чому більшість це неправильно розуміє | **draft · v11.62.0 → post-55-what-finishing-with-reserve-actually-means.md** |
 | 56 | Чому більшість warm-up протоколів написано під когось іншого | **draft · v11.64.0 → post-56-warmup-protocols-written-for-someone-else.md** |
-| 57 | Функціональне перевантаження vs. системна помилка: що вирізняє overreaching від overtraining | proposed |
+| 57 | Функціональне перевантаження vs. системна помилка: що вирізняє overreaching від overtraining | **draft · v11.70.0 → post-57-overreaching-vs-overtraining.md** |
 | 58 | Як ставити тренувальні цілі, щоб їх можна було виміряти | proposed |
 | 59 | Деадаптація: що відбувається коли атлет зупиняється і що повертається першим | proposed |
 | 60 | Синтез блоку 51–60: 10 принципів, якими керується FORM при написанні програми | proposed |
@@ -3452,7 +3452,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 |---|---|---|
 | 3071 | Відеоаналіз власного тренування: мінімальний протокол без тренера | **draft · v11.63.0 → post-3071-video-analysis-self-coached-minimum-protocol.md** |
 | 3072 | Три класи технічних помилок і як кожну виявляти без зовнішнього погляду | **draft · v11.67.0 → post-3072-three-classes-technical-errors.md** |
-| 3073 | Моторне навчання і рухова пам'ять: що закріплюється і як це змінити | proposed |
+| 3073 | Моторне навчання і рухова пам'ять: що закріплюється і як це змінити | **draft · v11.69.0 → post-3073-motor-learning-movement-memory.md** |
 | 3074 | Технічний дрейф під втомою: коли зупинятись і що це говорить про програму | proposed |
 | 3075 | Компенсаторні патерни: де вони прогресу допомагають, де системно шкодять | proposed |
 | 3076 | Кінестетичне відчуття і реальна техніка: чому «відчуваю правильно» — не аргумент | proposed |
