@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v11.80.0** — 2026-07-03 · content · post-3079 · «Warm-up як технічна діагностика: два завдання розминки і чому більшість використовує одне» (series «Технічна самодіагностика» 3071–3080, 9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3079 · next: post-3080 («Синтез серії: 10 принципів технічної самодіагностики для self-coached атлета» · SERIES COMPLETE 10/10) + post-61 («Тренувальна ідентичність: хто ти як атлет — і чому це питання має практичні наслідки»)
+
 **v11.79.0** — 2026-07-03 · content · post-3078 · «Технічна регресія після перерви: скільки потрібно для відновлення рухового навику» (series «Технічна самодіагностика» 3071–3080, 8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3078 · next: post-3079 («Warm-up як технічна діагностика: два завдання розминки і чому більшість використовує одне») + post-61 («Тренувальна ідентичність: хто ти як атлет — і чому це питання має практичні наслідки»)
 
 **v11.78.0** — 2026-07-03 · content · post-3077 · «Силова крива і вузькі місця руху: як читати де саме ти втрачаєш» (series «Технічна самодіагностика» 3071–3080, 7/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3077 · next: post-3078 («Технічна регресія після перерви: скільки потрібно для відновлення рухового навику»)
