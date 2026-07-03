@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v11.99.0** — 2026-07-03 · content · post-69 · «Довгострокова прогресія без зовнішнього супроводу: що зберігається через роки» (editorial series 61–70, 9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-69 · editorial 61–70 8/10 → 9/10 · content-engine: post-69 ✓ · next: post-70 (editorial 61–70 10/10 — синтез серії) + post-3088 («Моніторинг адаптації всередині блоку: сигнали прогресу і сигнали корекції»)
+
 **v11.97.0** — 2026-07-03 · content · post-3087 + post-68 · «Перехід між блоками: типові помилки і що вони говорять про самоаналіз атлета» (series «Мезоцикл без тренера» 3081–3090, 7/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · «Тренувальний план vs. тренувальна система: у чому різниця і що важливіше» (editorial series 61–70, 8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards prepended for post-3087 + post-68 · README: Мезоцикл без тренера 6/10 → 7/10; editorial 61–70 7/10 → 8/10 · next: post-3088 («Моніторинг адаптації всередині блоку: сигнали прогресу і сигнали корекції») + post-69 («Довгострокова прогресія без зовнішнього супроводу: що зберігається через роки»)
 
 **v11.95.0** — 2026-07-03 · content · post-11 · «Деловантаження: що це таке, коли потрібно і як не переплутати з лінощами» · editorial standalone · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-11 · content-engine: post-11 ✓ · next: post-3087 («Перехід між блоками: типові помилки і що вони говорять про самоаналіз атлета») + post-68 («Тренувальний план vs. тренувальна система: у чому різниця і що важливіше»)
