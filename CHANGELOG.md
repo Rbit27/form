@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.0.0] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-67` — SCIM Mass Deprovisioning Monitor Stale (`scim_mass_deprovision_check`, job 24) companion stale recovery runbook (A1.1/CC7.2). Six-minute freshness window; AL-SCIM-MASS-MON-01 (new alert); P1 default with P0-escalate on undetected mass deprovisioning bursts during stale window (concurrent R-24 activation). R-67-C2 manual compensation SQL reproduces `fn_scim_mass_deprovision_check()` logic (10-min burst windows, ≥10% seat threshold, `already_detected` flag). DEC-030 HMAC chain: `system.scim_mass_deprovision_monitor_stale_declared` HIGH/7yr + `system.scim_mass_deprovision_monitor_restored` LOW/3yr; SCIM-MASS-MON-STALE-CHAIN-01 ordering invariant (HTTP 422 `SCIM_MASS_MON_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05). Evidence: SCIM-MASS-MON-STALE-E-001.
+- `docs/AUDIT_LOG_SCHEMA.md §SCIM Mass Deprovision Monitor Stale events` — registers `system.scim_mass_deprovision_monitor_stale_declared` (HIGH/7yr, CC7.2/A1.1) and `system.scim_mass_deprovision_monitor_restored` (LOW/3yr, CC7.2/A1.1) with Zod v2 schemas (`ScimMassDeprovMonStaleDeclaredSchema`, `ScimMassDeprovMonRestoredSchema`), payload tables, SCIM-MASS-MON-STALE-CHAIN-01 ordering invariant, and CC7.2/A1.1 auditor narrative. v2.80 → v2.81.
+- `docs/SOC2_READINESS.md §155` — SCIM-MASS-MON-STALE-E-001 registration (CC7.2/A1.1; per-activation; 7yr WORM; `compliance/evidence/scim-mass-deprovision/scim-mass-mon-stale-e-001-<YYYY-MM-DD>/` — new top-level subfolder); §79.4 master evidence table updated (+1 row; count 121 → 122). v3.80.0 → v3.81.0.
+
+### Changed
+- `docs/OBSERVABILITY.md §12.6` — job 24 (`scim_mass_deprovision_check`) cross-reference column updated with INCIDENT_RESPONSE R-67 companion stale recovery runbook reference. v5.15.1 → v5.15.2.
+- `VERSION` — 11.99.0 → 12.0.0.
+
+---
+
 ## [11.99.0] — 2026-07-03
 
 ### Added

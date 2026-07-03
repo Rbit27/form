@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.32.0
+# FORM · Incident Response Runbook v3.33.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -24155,6 +24155,334 @@ Both events are HMAC-chained (DEC-030), emitted by IC (platform-engineer, PAM-el
 | 5 | Authoring complete — §R-66 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.32.0).** |
 
 **Privacy floor (invariant throughout R-66):** No `user_id`, plain `actor_user_id` UUID, full IP address, coaching content, body composition metric, or GDPR Art. 9 special-category data appears in any R-66 scope query result, communication template payload, DEC-030 event payload, or SIEM-CR03-STALE-E-001 evidence artefact. R-66-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-66-C2 surfaces only `actor_user_sha256` (SHA-256 pseudonym — not the raw UUID), timestamps of denied elevation and session start, minutes between events, and a dedup flag — no employee name, email, coaching session content, body composition values, or GDPR Art. 9 data. R-66-C3 surfaces only pg_cron job metadata and run timestamps. `manual_cr03_match_count` and `missed_runs_estimate` are scalar integer counts only.
+
+---
+
+## R-67 · SCIM Mass Deprovisioning Monitor Stale (`scim_mass_deprovision_check`, job 24)
+
+**Trigger:** `system.cron_job_stale` for job 24 (`scim_mass_deprovision_check`), fired by `pg-cron-health-monitor` when no successful run is recorded within the 6-minute freshness window (3-run tolerance at `*/5 * * * *` cadence). Alert: AL-SCIM-MASS-MON-01; dedup `scim-mass-deprovision-check-stale`. TSC: CC7.2 / A1.1.
+
+**Classification:** P1 default (SCIM mass deprovisioning detection blind spot — enterprise employee access availability threat); P0-escalate (security-engineer + CSM lead co-page, activate R-24 protocol) if R-67-C2 returns any rows with `already_detected = false` (undetected mass deprovisioning events during stale window).
+
+**Owner:** platform-engineer (IC); compliance-officer (DEC-030, evidence); security-engineer + CSM lead (P0-escalate co-page).
+
+---
+
+### §R-67.1 Trigger Matrix
+
+| Signal | Source | Threshold | PagerDuty route | Severity |
+|---|---|---|---|---|
+| `system.cron_job_stale` (job 24) | `pg-cron-health-monitor` Edge Function | 6 min (3-run tolerance at `*/5 * * * *`) | P1 → `form-customer-success` + `form-platform` dual page | P1 default; P0-escalate if R-67-C2 returns undetected rows |
+| R-03 co-activation | `pg-cron-health-monitor` | All 9 monitored jobs stale | Co-active with R-03 | P0 |
+
+**Dedup key:** `scim-mass-deprovision-check-stale`. PagerDuty alert: AL-SCIM-MASS-MON-01.
+
+---
+
+### §R-67.2 Severity Classification
+
+| Condition | Severity | Additional page |
+|---|---|---|
+| Job 24 stale only, R-67-C2 = 0 undetected rows | P1 | platform-engineer + compliance-officer |
+| Job 24 stale + R-67-C2 returns rows with `already_detected = false` | P0-escalate | + security-engineer + CSM lead; activate R-24 concurrently for each affected tenant |
+| R-03 co-active (all-jobs-stale) | P0 override | Follow R-03 protocol first |
+
+---
+
+### §R-67.3 Immediate Action Timeline
+
+| Step | Time | Action |
+|---|---|---|
+| T+0 | 0 min | PagerDuty AL-SCIM-MASS-MON-01 fires. IC acknowledges. Emit `system.scim_mass_deprovision_monitor_stale_declared` HIGH (DEC-030 HMAC-chained) via PAM-elevated `POST /audit/emit-event`. Set `manual_mass_deprov_match_count = -1` (scope query not yet run). |
+| T+5 | 5 min | Run **R-67-C2** (manual mass deprovisioning detection across stale window). If rows returned with `already_detected = false`: upgrade to P0-escalate; co-page security-engineer + CSM lead via Slack T-67-B; activate R-24 for each affected tenant. Amendment-emit to update `manual_mass_deprov_match_count` after R-67-C2 completes. |
+| T+10 | 10 min | Run **R-67-C1** (pg_cron run history for job 24) to determine root cause (H1–H4). |
+| T+15 | 15 min | Run **R-67-C3** (peer job health): Part A — jobs 22, 23, 21, 16; Part B — `cron.job` catalog check for `scim_mass_deprovision_check`. |
+| T+20 | 20 min | Restore job 24 per root-cause hypothesis (H1–H4). Confirm via `SELECT cron.run_job(24)`. |
+| T+25 | 25 min | Security-engineer + CSM lead sign-off (if R-67-C2 returned undetected rows; R-24 may still be active). Emit `system.scim_mass_deprovision_monitor_restored` LOW (DEC-030 HMAC-chained). File SCIM-MASS-MON-STALE-E-001 evidence artefact. |
+
+---
+
+### §R-67.4 Scope Queries
+
+#### R-67-C1 — pg_cron Run History (job 24)
+
+```sql
+SELECT
+  runid,
+  job_id,
+  job_pid,
+  database,
+  username,
+  command,
+  status,
+  return_message,
+  start_time,
+  end_time
+FROM cron.job_run_details
+WHERE jobname = 'scim_mass_deprovision_check'
+ORDER BY start_time DESC
+LIMIT 20;
+```
+
+Purpose: Identify last successful run timestamp, number of missed runs, and status/error message. Supports H1 (deleted — job absent from `cron.job`) vs H2 (disabled) vs H3 (Supabase infra — all jobs stale, R-03 co-active) vs H4 (function broken — `status = 'failed'` + `return_message` error detail).
+
+#### R-67-C2 — Manual Mass Deprovisioning Detection
+
+```sql
+-- Manual reproduction of fn_scim_mass_deprovision_check() logic across the stale window.
+-- Detects: scim.user_deprovisioned burst >= MAX(0.10 x seat_count, 10) in any 10-min window per tenant.
+-- Privacy invariant: tenant_id UUID + per-tenant aggregate counts only.
+-- No individual user_id, employee name, email, health value, or GDPR Art. 9 data.
+WITH stale_window AS (
+  SELECT
+    :stale_window_start  AS window_start,  -- from R-67-C1: last successful job 24 run timestamp
+    NOW()                AS window_end
+),
+deprovisioning_events AS (
+  SELECT
+    ael.tenant_id,
+    ael.created_at,
+    date_trunc('minute', ael.created_at)
+      - (EXTRACT(EPOCH FROM ael.created_at)::int % 600) * INTERVAL '1 second'
+      AS window_start_10min
+  FROM audit_log_events ael
+  CROSS JOIN stale_window sw
+  WHERE ael.event_type = 'scim.user_deprovisioned'
+    AND ael.created_at BETWEEN sw.window_start AND sw.window_end
+),
+bursts AS (
+  SELECT
+    de.tenant_id,
+    de.window_start_10min,
+    COUNT(*)                              AS deprovisioned_in_window,
+    t.seat_count,
+    GREATEST(0.10 * t.seat_count, 10)    AS threshold
+  FROM deprovisioning_events de
+  JOIN tenants t ON de.tenant_id = t.id
+  GROUP BY de.tenant_id, de.window_start_10min, t.seat_count
+  HAVING COUNT(*) >= GREATEST(0.10 * t.seat_count, 10)
+),
+already_detected AS (
+  SELECT DISTINCT (payload->>'tenant_id') AS tenant_id
+  FROM audit_log_events
+  WHERE event_type = 'scim.mass_deprovision_detected'
+    AND created_at BETWEEN :stale_window_start AND NOW()
+)
+SELECT
+  b.tenant_id,
+  b.window_start_10min,
+  b.deprovisioned_in_window,
+  b.seat_count,
+  b.threshold,
+  ROUND(b.deprovisioned_in_window * 100.0 / NULLIF(b.seat_count, 0), 1)     AS pct_of_seats,
+  (ad.tenant_id IS NOT NULL)                                                   AS already_detected,
+  CASE
+    WHEN b.deprovisioned_in_window >= 0.50 * b.seat_count THEN 'p0_threshold'
+    ELSE 'p1_threshold'
+  END AS r24_severity
+FROM bursts b
+LEFT JOIN already_detected ad ON b.tenant_id::text = ad.tenant_id
+ORDER BY b.deprovisioned_in_window DESC;
+```
+
+**Parameters:** `:stale_window_start` = timestamp of last confirmed successful job 24 run (from R-67-C1).
+
+**Privacy invariant:** `tenant_id` UUID + aggregate deprovisioned counts + seat counts + operational timestamps only. No individual `user_id`, employee name, email, health value, coaching session content, body composition metrics, or GDPR Art. 9 special-category data in result set or evidence artefact. `manual_mass_deprov_match_count` is a scalar integer count of affected tenants only.
+
+**Result interpretation:**
+- 0 rows: No mass deprovisioning events occurred during stale window. Severity remains P1.
+- ≥ 1 row, all `already_detected = true`: Events occurred but were detected before the stale window fully opened. Severity remains P1; cross-reference R-24 incident record.
+- ≥ 1 row with `already_detected = false`: Undetected mass deprovisioning confirmed. Upgrade to **P0-escalate**. Activate R-24 immediately for each affected `tenant_id`. Use `r24_severity` column to determine R-24 P0 vs P1 threshold per tenant.
+
+#### R-67-C3 — Peer Job Health
+
+**Part A — Peer pg_cron jobs:**
+
+```sql
+SELECT jobname, schedule, active, jobid
+FROM cron.job
+WHERE jobname IN (
+  'siem_bridge_cr02_impossible_travel',
+  'siem_bridge_cr03_priv_escalation',
+  'pam_bg_review_alert',
+  'rate_limit_violations_cleanup'
+)
+ORDER BY jobname;
+```
+
+Purpose: Determine if related monitoring jobs are also stale (H3 discriminator). If `siem_bridge_cr02_impossible_travel` (job 22) and/or `siem_bridge_cr03_priv_escalation` (job 23) are also stale, follow R-65/R-66/R-67 concurrently. If all 9 monitored jobs are stale, R-03 is co-active — follow R-03 first.
+
+**Part B — Catalog check:**
+
+```sql
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'scim_mass_deprovision_check';
+```
+
+Purpose: Confirm job exists and is active (H1 vs H2 discriminator). 0 rows = H1 (deleted). `active = false` = H2 (disabled).
+
+---
+
+### §R-67.5 Root-Cause Hypotheses
+
+| Hypothesis | Indicator | Recovery |
+|---|---|---|
+| **H1 — Job deleted** | `cron.job` returns 0 rows for `scim_mass_deprovision_check` | Re-create: `SELECT cron.schedule('scim_mass_deprovision_check', '*/5 * * * *', 'SELECT fn_scim_mass_deprovision_check();');` |
+| **H2 — Job disabled** | `cron.job.active = false` | Re-enable: `UPDATE cron.job SET active = true WHERE jobname = 'scim_mass_deprovision_check';` |
+| **H3 — Supabase infra** | All 9 monitored pg_cron jobs stale; R-03 co-active | Follow R-03 protocol; no DB-level recovery possible until infra restored |
+| **H4 — Function broken** | Job exists and active; `cron.job_run_details.status = 'failed'`; `return_message` has error detail | See H4 sub-causes below |
+
+**H4 Sub-Causes:**
+
+| Sub-cause | Indicator | Recovery |
+|---|---|---|
+| H4(a) — `fn_scim_mass_deprovision_check` dropped | `return_message` contains `function fn_scim_mass_deprovision_check() does not exist` | Re-deploy function from source control; add CI lint guard per §R-67.10 item 4 |
+| H4(b) — `scim.user_deprovisioned` schema change | `return_message` contains column-not-found or type-mismatch referencing `audit_log_events.event_type` or `scim.user_deprovisioned` | Review migration history; update `fn_scim_mass_deprovision_check` column references to match updated schema |
+| H4(c) — `tenants.seat_count` unavailable | `return_message` contains `column "seat_count" does not exist` or column-not-found referencing `tenants` | Review migration history; update JOIN predicate in `fn_scim_mass_deprovision_check` |
+| H4(d) — `pg_net` disabled | `return_message` contains `pg_net extension not found` or pg_net schema error | Re-enable: `CREATE EXTENSION IF NOT EXISTS pg_net;`; escalate to Supabase support if extension unavailable |
+
+---
+
+### §R-67.6 Recovery Steps
+
+1. **Emit `system.scim_mass_deprovision_monitor_stale_declared`** (DEC-030 HMAC-chained, HIGH/7yr) via PAM-elevated IC `POST /audit/emit-event`. Set `manual_mass_deprov_match_count = -1` at T+0.
+2. **Run R-67-C2** at T+5. If rows returned with `already_detected = false`: upgrade to P0-escalate; co-page security-engineer + CSM lead (Slack T-67-B); activate R-24 for each affected tenant; amendment-emit updated `manual_mass_deprov_match_count` after R-67-C2 completes.
+3. **Restore job 24** per H1–H4 root-cause hypothesis (R-67-C1 and R-67-C3 Part B discriminators).
+4. **Confirm recovery** via `SELECT cron.run_job(24);` — verify next run succeeds in `cron.job_run_details`.
+5. **Security-engineer + CSM lead sign-off** (if R-67-C2 returned ≥ 1 undetected row): security-engineer reviews per-tenant aggregate counts and confirms disposition; CSM lead notified for each affected tenant per R-24.7 MD-01 template if not already sent under R-24.
+6. **Emit `system.scim_mass_deprovision_monitor_restored`** (DEC-030 HMAC-chained, LOW/3yr) after job 24 confirmed healthy. SCIM-MASS-MON-STALE-CHAIN-01 invariant: `restored` blocked (HTTP 422 `SCIM_MASS_MON_STALE_CHAIN_01_VIOLATION`) without prior `stale_declared` for same `incident_id`; co-activates R-05.
+7. **File SCIM-MASS-MON-STALE-E-001** evidence artefact: `compliance/evidence/scim-mass-deprovision/scim-mass-mon-stale-e-001-<YYYY-MM-DD>/`. Mirror to Vanta within 48h.
+
+---
+
+### §R-67.7 Slack Communication Templates
+
+**T-67-A — #alerts-enterprise (P1 initial):**
+
+```
+[R-67 ACTIVE — SCIM Mass Deprovision Monitor Stale]
+Job 24 (scim_mass_deprovision_check) has not run within its 6-minute freshness window.
+AL-SCIM-MASS-01 mass deprovisioning detection is BLIND.
+IC: @platform-engineer + @compliance-officer. Severity: P1. Alert: AL-SCIM-MASS-MON-01.
+Action: R-67 playbook. R-67-C2 manual check in progress.
+Dedup: scim-mass-deprovision-check-stale.
+```
+
+**T-67-B — P0-escalate (if R-67-C2 returns undetected rows):**
+
+```
+[R-67 P0-ESCALATE — Undetected Mass Deprovisioning Confirmed]
+R-67-C2 returned [N] tenant(s) with undetected mass deprovisioning during stale window.
+Affected tenant count: [N] (tenant_id UUIDs in R-67-C2 output — aggregate counts only).
+Max pct_of_seats breached: [X%]. R24_severity: [p0_threshold / p1_threshold].
+ACTIVATING R-24 for each affected tenant concurrently.
+IC @platform-engineer + @security-engineer + @csm-lead: R-24 protocol running in parallel.
+Sign-off required before SCIM-MASS-MON-STALE-E-001 can be filed.
+```
+
+---
+
+### §R-67.8 DEC-030 Chain
+
+Both events are HMAC-chained (DEC-030), emitted by IC (platform-engineer + compliance-officer, PAM-elevated) via `POST /audit/emit-event`. No automated emission path — PAM elevation required.
+
+**`system.scim_mass_deprovision_monitor_stale_declared`** — severity: HIGH; retention: 7 years; TSC: CC7.2 / A1.1.
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Fresh UUID per R-67 activation. Anchors SCIM-MASS-MON-STALE-CHAIN-01 ordering invariant. |
+| `confirmed_stale_since` | datetime | Timestamp of last confirmed successful job 24 run (from R-67-C1). |
+| `stale_minutes` | int ≥ 0 | Minutes since last successful run (6-min freshness cadence at 5-min interval). |
+| `missed_runs_estimate` | int ≥ 0 | `stale_minutes ÷ 5` rounded down (5-min cadence). |
+| `manual_mass_deprov_match_count` | int ≥ −1 | −1 = R-67-C2 not yet run at declaration time; amended to actual affected-tenant count after T+5 scope query. |
+| `initial_severity` | enum | `p1` (R-67-C2 not yet run or 0 undetected rows); `p0_escalate` (R-67-C2 ≥ 1 undetected row). |
+
+**`system.scim_mass_deprovision_monitor_restored`** — severity: LOW; retention: 3 years; TSC: CC7.2 / A1.1.
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Must match the `stale_declared` event for same R-67 activation. SCIM-MASS-MON-STALE-CHAIN-01 enforced. |
+| `restored_at` | datetime | Timestamp IC confirms job 24 healthy after `cron.run_job(24)`. |
+| `root_cause` | enum | `h1_deleted` / `h2_disabled` / `h3_infra` / `h4_function_broken`. |
+| `stale_minutes_total` | int ≥ 0 | Total minutes job 24 was stale (declaration to restoration). |
+| `manual_mass_deprov_match_count` | int ≥ 0 | Final count of affected tenants with undetected mass deprovisioning (0 = no undetected events). |
+| `r24_activated` | boolean | `true` if R-67-C2 returned ≥ 1 undetected row and R-24 was activated concurrently. |
+
+**SCIM-MASS-MON-STALE-CHAIN-01 Ordering Invariant:** `system.scim_mass_deprovision_monitor_restored` for a given `incident_id` is blocked (HTTP 422 `SCIM_MASS_MON_STALE_CHAIN_01_VIOLATION`) by the `emit-audit-event` Worker if no prior `system.scim_mass_deprovision_monitor_stale_declared` exists for the same `incident_id`. Co-activates R-05 on violation.
+
+---
+
+### §R-67.9 Evidence Artefact
+
+**SCIM-MASS-MON-STALE-E-001** — per-activation evidence artefact for R-67 incidents.
+
+| Field | Value |
+|---|---|
+| Evidence ID | SCIM-MASS-MON-STALE-E-001 |
+| TSC | CC7.2, A1.1 |
+| Trigger | R-67 activation (job 24 stale, `scim_mass_deprovision_check`) |
+| Collection | Per-activation (one artefact per R-67 incident) |
+| Retention | 7 years (WORM, Cloudflare R2) |
+| Vanta mirror | Within 48h of filing |
+| R2 path | `compliance/evidence/scim-mass-deprovision/scim-mass-mon-stale-e-001-<YYYY-MM-DD>/` |
+| Owner | compliance-officer + security-engineer (co-sign if R-24 activated) |
+
+**Contents:**
+1. `system.scim_mass_deprovision_monitor_stale_declared` DEC-030 HIGH event (PAM-elevated IC emission, T+0).
+2. `system.scim_mass_deprovision_monitor_restored` DEC-030 LOW event (PAM-elevated IC emission, post-recovery).
+3. SCIM-MASS-MON-STALE-CHAIN-01 predecessor assertion confirmation (HTTP 422 `SCIM_MASS_MON_STALE_CHAIN_01_VIOLATION` enforced by `emit-audit-event` Worker).
+4. IC runbook timestamp trace (T+0 detection → T+25 closure steps per §R-67.3).
+5. R-67-C2 scope query output: per-tenant aggregate rows (`tenant_id`, `window_start_10min`, `deprovisioned_in_window`, `seat_count`, `threshold`, `pct_of_seats`, `already_detected`, `r24_severity`). No individual `user_id`, employee name, email, or GDPR Art. 9 data.
+6. `pg_cron.job_run_details WHERE jobname = 'scim_mass_deprovision_check'` export covering the stale window (confirms stale start time, missed-run timestamps, 5-min cadence miss count).
+7. R-24 activation confirmation (required if `r24_activated = true`): per-tenant R-24 incident ID cross-references.
+
+**R2 path note:** `compliance/evidence/scim-mass-deprovision/` is a new subfolder created by §155. `r2:form-api` REVOKED (§80.3 invariant — IC PAM-elevated manual upload only).
+
+---
+
+### §R-67.10 Post-Incident Controls
+
+| # | Control | Trigger | Owner |
+|---|---|---|---|
+| 1 | Post-mortem if stale > 30 min or R-24 co-activated | Per-activation | security-engineer + compliance-officer |
+| 2 | SCIM-MASS-MON-STALE-CHAIN-01 Worker enforcement (`emit-audit-event` Worker: HTTP 422 on unanchored `restored` emit) | P0 — implementation pending (platform-engineer) | platform-engineer |
+| 3 | H1/H2 CI lint guard: `scim_mass_deprovision_check` job existence and `active = true` checked in migration CI | Post any H1/H2 incident | platform-engineer |
+| 4 | H4(a) CI guard: `fn_scim_mass_deprovision_check` function existence verified in migration CI | Post any H4(a) incident | platform-engineer |
+| 5 | Quarterly runbook gap sweep: cross-reference §12.6 pg_cron canonical registry against companion runbook list | Quarterly | compliance-officer |
+
+---
+
+### §R-67.11 Cross-References
+
+| Document | Section | Note |
+|---|---|---|
+| OBSERVABILITY.md | §12.6, job 24 | pg_cron canonical registry; freshness window 6 min; AL-SCIM-MASS-MON-01; v5.15.2 (2026-07-03) |
+| OBSERVABILITY.md | §26.7a | AL-SCIM-MASS-01 alert definition + `fn_scim_mass_deprovision_check()` pg_cron implementation SQL |
+| AUDIT_LOG_SCHEMA.md | §SCIM Mass Deprovision Monitor Stale events | v2.81 (2026-07-03) — `system.scim_mass_deprovision_monitor_stale_declared` HIGH/7yr + `system.scim_mass_deprovision_monitor_restored` LOW/3yr |
+| INCIDENT_RESPONSE.md | R-03 | All-jobs-stale discriminator; co-activate if R-03 fires |
+| INCIDENT_RESPONSE.md | R-05 | HMAC chain inversion co-activation on SCIM-MASS-MON-STALE-CHAIN-01 violation |
+| INCIDENT_RESPONSE.md | R-24 | SCIM Mass Deprovisioning Emergency — activate concurrently if R-67-C2 returns undetected rows |
+| SOC2_READINESS.md | §155 | SCIM-MASS-MON-STALE-E-001 registration (CC7.2/A1.1); v3.81.0 (2026-07-03) |
+| SOC2_READINESS.md | §79.4 | SCIM-MASS-MON-STALE-E-001 row in master evidence table (count 121 → 122) |
+
+---
+
+### §R-67.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.scim_mass_deprovision_monitor_stale_declared` (HIGH/7yr) and `system.scim_mass_deprovision_monitor_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, SCIM-MASS-MON-STALE-CHAIN-01 ordering invariant, and CC7.2/A1.1 auditor narrative | compliance-officer | **P0** | [x] **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.81).** |
+| 2 | Implement SCIM-MASS-MON-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker (HTTP 422 `SCIM_MASS_MON_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit) | platform-engineer | **P1** | [ ] Pending — platform-engineer |
+| 3 | Register SCIM-MASS-MON-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/A1.1; per-activation; 7yr; `compliance/evidence/scim-mass-deprovision/scim-mass-mon-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [x] **Done — 2026-07-03 (§155.2, SOC2_READINESS.md v3.81.0).** |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 24 row cross-reference column: add `; INCIDENT_RESPONSE R-67 (§R-67; v1.0, 2026-07-03 — companion stale recovery runbook for job 24)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.15.2).** |
+| 5 | Authoring complete — §R-67 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.33.0).** |
+
+**Privacy floor (invariant throughout R-67):** No individual `user_id`, employee name, email, coaching content, body composition metric, or GDPR Art. 9 special-category data appears in any R-67 scope query result, communication template payload, DEC-030 event payload, or SCIM-MASS-MON-STALE-E-001 evidence artefact. R-67-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-67-C2 surfaces only `tenant_id` UUIDs and per-tenant aggregate deprovisioning counts, seat counts, timestamps, and threshold calculations — no individual employee identifiers, health values, coaching session content, or GDPR Art. 9 data. R-67-C3 surfaces only pg_cron job metadata and run timestamps. `manual_mass_deprov_match_count` and `missed_runs_estimate` are scalar integer counts only.
+
+---
+
+*v3.33.0 (2026-07-03): R-67 — SCIM Mass Deprovisioning Monitor Stale (`scim_mass_deprovision_check`, job 24) — CC7.2/A1.1 mass deprovisioning detection blind spot companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against companion runbooks: job 24 was the highest-priority remaining pg_cron monitoring job without a companion stale recovery runbook — `scim_mass_deprovision_check` (5-min cadence, 6-min freshness) is FORM's only automated near-real-time detector for mass SCIM deprovisioning events (AL-SCIM-MASS-01, CC7.2 / A1.1); any stale window means enterprise employees could lose FORM access without FORM detecting or responding. §R-67.1 trigger matrix: AL-SCIM-MASS-MON-01 `system.cron_job_stale` for job 24 → P1 PagerDuty `form-customer-success` + `form-platform` dual page; dedup `scim-mass-deprovision-check-stale`; 6-min freshness window (3-run tolerance at */5 * * * * cadence). §R-67.2 severity: P1 default; P0-escalate with security-engineer + CSM lead co-page if R-67-C2 returns undetected mass deprovisioning rows (activate R-24 concurrently for each affected tenant); co-active R-03 on all-jobs-stale discriminator. §R-67.3 six-step immediate action timeline (T+0 to T+25): emit stale_declared at T+0; R-67-C2 P0-escalate gate at T+5; R-67-C1 root cause at T+10; R-67-C3 peer health at T+15; recovery at T+20; confirm + emit restored + file evidence at T+25. §R-67.4 three scope queries: R-67-C1 (pg_cron run history for job 24 — 20 rows); R-67-C2 (manual mass deprovisioning detection SQL reproducing fn_scim_mass_deprovision_check() logic across stale window — rolls up scim.user_deprovisioned events by tenant in 10-min windows against tenants.seat_count; deduplicates against existing scim.mass_deprovision_detected CRITICAL events; per-tenant aggregate counts only; privacy invariant: no individual user_id, employee name, email, health data, or GDPR Art. 9 data); R-67-C3 Part A (peer jobs: siem_bridge_cr02_impossible_travel/siem_bridge_cr03_priv_escalation/pam_bg_review_alert/rate_limit_violations_cleanup) + Part B (catalog check). §R-67.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (function broken — four sub-causes: H4(a) fn_scim_mass_deprovision_check dropped, H4(b) scim.user_deprovisioned schema change, H4(c) tenants.seat_count unavailable, H4(d) pg_net disabled). §R-67.6 seven-step recovery: (1) emit stale_declared; (2) R-67-C2 P0-escalate gate — if undetected rows, page security-engineer + CSM lead + activate R-24 per affected tenant; (3) restore job by H1–H4; (4) confirm via cron.run_job(24); (5) security-engineer + CSM lead sign-off if R-67-C2 returned undetected rows; (6) emit restored; (7) file SCIM-MASS-MON-STALE-E-001. §R-67.7 two Slack templates (T-67-A for #alerts-enterprise P1 initial; T-67-B P0-escalate for undetected mass deprovisioning confirmed). §R-67.8 DEC-030 chain: `system.scim_mass_deprovision_monitor_stale_declared` HIGH/7yr + `system.scim_mass_deprovision_monitor_restored` LOW/3yr; SCIM-MASS-MON-STALE-CHAIN-01 ordering invariant (HTTP 422 `SCIM_MASS_MON_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: no user_id, employee name, health data, or GDPR Art. 9 data in any payload; `manual_mass_deprov_match_count` is scalar integer affected-tenant count only. §R-67.9 SCIM-MASS-MON-STALE-E-001 per-activation evidence artefact (CC7.2/A1.1; per-activation; 7yr WORM; `compliance/evidence/scim-mass-deprovision/scim-mass-mon-stale-e-001-<YYYY-MM-DD>/`; security-engineer + CSM lead co-sign required if R-24 activated; Vanta mirror within 48h). §R-67.10 five post-incident controls: post-mortem if stale > 30 min or R-24 co-activated; SCIM-MASS-MON-STALE-CHAIN-01 Worker enforcement; H1/H2 CI lint guard; H4(a) CI function-existence guard; quarterly runbook gap sweep. §R-67.11 eight cross-references: OBSERVABILITY §12.6 (job 24, v5.15.2); OBSERVABILITY §26.7a (AL-SCIM-MASS-01 + fn_scim_mass_deprovision_check SQL); AUDIT_LOG_SCHEMA §SCIM Mass Deprovision Monitor Stale events (v2.81); INCIDENT_RESPONSE R-03 + R-05 + R-24; SOC2_READINESS §155 + §79.4 (v3.81.0). §R-67.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.81 event registration; SOC2_READINESS.md v3.81.0 §155 SCIM-MASS-MON-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.15.2 §12.6 job 24 cross-ref; authoring complete); item 2 pending (platform-engineer — SCIM-MASS-MON-STALE-CHAIN-01 enforcement in emit-audit-event Worker). Document header v3.32.0 → v3.33.0. Owner: platform-engineer + compliance-officer + security-engineer.*
 
 ---
 
