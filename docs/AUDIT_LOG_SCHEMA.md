@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.73
+# FORM · Audit Log Schema v2.74
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -1412,6 +1412,8 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `sso.mobile_webview_blocked` | 7 years | HIGH-severity zero-fire violation detection; SOC 2 CC6.1/CC6.2/CC8.1; any emission triggers AL-SSO-WEB-01 P1 + R-05 investigation; `docs/SSO_SCIM_IMPLEMENTATION.md §30.9` (DEC-059) |
 | `sso.pkjwt_key_generated` / `sso.pkjwt_key_rotated` | 7 years | SOC 2 CC6.6 — OIDC `private_key_jwt` asymmetric key management (RFC 7523, DEC-097); private key never in transit, never stored at IdP, never logged (§42.8 security control); PKJWT-E-001 quarterly evidence source; `docs/SSO_SCIM_IMPLEMENTATION.md §42.9`; registered v2.73 |
 | `sso.pkjwt_key_expiry_warning` | 3 years | SOC 2 CC6.6 advisory — pg_cron job 58 (`pkjwt_key_expiry_sweep`, daily 09:00 UTC) 30-day advance key expiry signal; P3 Slack-only `#alerts-enterprise`; non-blocking; 3yr sufficient as operational rotation-reminder record (primary CC6.6 evidence carried by 7yr `sso.pkjwt_key_generated`/`sso.pkjwt_key_rotated`); `docs/OBSERVABILITY.md §12.6` (job 58); registered v2.73 |
+| `system.pkjwt_expiry_sweep_stale_declared` | 7 years | SOC 2 CC6.6 — R-57 IC-declared job 58 (`pkjwt_key_expiry_sweep`) stale incident anchor; PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant (HTTP 422 `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` on inversion); PKJWT-SWEEP-STALE-E-001 per-activation evidence source; registered v2.74 |
+| `system.pkjwt_expiry_sweep_restored` | 3 years | SOC 2 CC6.6 advisory — R-57 IC-confirmed job 58 restoration after `pkjwt_key_expiry_sweep` recovery; PKJWT-SWEEP-STALE-CHAIN-01 terminal event; 3yr sufficient as recovery record (primary CC6.6 evidence carried by 7yr `system.pkjwt_expiry_sweep_stale_declared`); registered v2.74 |
 | `mobile.replay_config_updated` | 3 years | STANDARD — enterprise replay feature-flag state record; REPLAY-CHAIN-01 ordering invariant anchor; REPLAY-E-001 evidence artefact (SOC 2 CC6.7); `docs/OBSERVABILITY.md §46.6` (DEC-063) |
 | `mobile.replay_tier_violation` | 7 years | HIGH-severity zero-fire Tier S gate-bypass detection; SOC 2 CC7.2 (anomaly monitoring) + P1.1 (privacy notice conformance); any emission triggers P1 PagerDuty `form-compliance` + `form-devops` and §46.7 inadvertent capture escalation; REPLAY-E-003 evidence artefact; `docs/OBSERVABILITY.md §46.6` (DEC-063) |
 | `pam.*` | 7 years | SOC 2 CC6.1/CC6.2/CC6.3 JIT privilege access evidence; break-glass record |
@@ -3152,6 +3154,60 @@ export const SsoPkjwtKeyExpiryWarningPayload = z.object({
 | **PKJWT-E-001** | CC6.6 | Quarterly export of all `sso.pkjwt_key_generated` and `sso.pkjwt_key_rotated` DEC-030 HMAC-chain events for the observation quarter; confirms that every active PKJWT tenant has a documented key-generation or rotation record within the past 12 months (annual rotation policy per §42.9); per-incident supplemental: triggered for each `rotation_reason: 'incident'` or `rotation_reason: 'customer_request'` event | 7 yr | `compliance/evidence/sso/PKJWT-E-001_<YYYY-QN>.csv` |
 
 **Auditor narrative for CC6.6:** FORM's OIDC `private_key_jwt` client authentication (DEC-097, RFC 7523) uses per-tenant RSA-2048 (RS256, default) or EC P-256 (ES256) asymmetric key pairs. The private key is generated on FORM infrastructure, stored AES-256-GCM encrypted at rest in `tenant_sso_configs.pkjwt_private_key_encrypted`, and is never transmitted to the IdP — only the public key is published via the JWKS discovery endpoint (`GET /auth/oidc/{tenant_id}/.well-known/jwks.json`, KV-backed). This eliminates the shared-secret exposure risk inherent in `client_secret_post`. PKJWT-E-001 quarterly chain export (all `sso.pkjwt_key_generated` and `sso.pkjwt_key_rotated` events for active PKJWT tenants) demonstrates to auditors that: (1) every PKJWT tenant has a documented key-generation record in the immutable HMAC chain; (2) all keys were rotated within the 12-month policy window (§42.9); (3) private key material is absent from all chain event payloads — confirmed by Zod schema validation at `emit-audit-event` Worker layer (no `private_key` field in `SsoPkjwtKeyGeneratedPayload` or `SsoPkjwtKeyRotatedPayload`). The pg_cron job 58 (`pkjwt_key_expiry_sweep`) daily sweep provides a belt-and-suspenders 30-day advance warning (`sso.pkjwt_key_expiry_warning`) before any key reaches its expiry date — the STANDARD/3yr event is a rotation-reminder operational record; primary CC6.6 evidence is carried by the 7yr HIGH key-generation and rotation chain. Registration: `docs/SSO_SCIM_IMPLEMENTATION.md §42.11` item 4 (closed 2026-07-02, AUDIT_LOG_SCHEMA.md v2.73).
+
+---
+
+### R-57 PKJWT Key Expiry Sweep Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-57 · CC6.6)
+
+> Companion stale-recovery lifecycle events for pg_cron job 58 (`pkjwt_key_expiry_sweep`, `0 9 * * *`, 26h freshness). Registered per `docs/INCIDENT_RESPONSE.md §R-57.11` item 1 (P0 — closes 2026-07-03, AUDIT_LOG_SCHEMA.md v2.74). **Emitter:** security-engineer (IC) via PAM-elevated `emit-audit-event` Worker call. Event 1 (`stale_declared`) is emitted at R-57 T+0 before any DB scope queries; Event 2 (`restored`) is emitted after job 58 recovery is confirmed. **PKJWT-SWEEP-STALE-CHAIN-01 invariant:** `system.pkjwt_expiry_sweep_stale_declared` must precede `system.pkjwt_expiry_sweep_restored` for the same `incident_id`; `emit-audit-event` Worker returns HTTP 422 `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` on ordering inversion → R-05. Enforcement implementation pending `docs/INCIDENT_RESPONSE.md §R-57.11` item 4 (P0/M8). **Privacy floor (both events):** no `tenant_id`, no `kid`, no company name, no employee `user_id`, no health value, no GDPR Art. 9 special-category data — `at_risk_tenant_count` and `tenants_warned_during_recovery` are aggregate integers; `incident_id` is a FORM-internal UUID. Cross-ref: `docs/INCIDENT_RESPONSE.md §R-57` (canonical runbook — step sequence, R-57-C1 through R-57-C4 scope queries, H1–H4 root-cause hypotheses, Slack templates); `docs/OBSERVABILITY.md §12.6` (job 58 registry entry — companion runbook cross-ref added v5.14.1, 2026-07-03); `docs/SOC2_READINESS.md §147` (PKJWT-SWEEP-STALE-E-001 registered v3.73.0, 2026-07-03); `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` (operational PKJWT key lifecycle events — primary CC6.6 evidence that this stale runbook protects); DEC-030; SOC 2 CC6.6.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `system.pkjwt_expiry_sweep_stale_declared` | HIGH | 7 yr | IC (security-engineer, PAM-elevated) at R-57 T+0 before any DB scope queries; PKJWT-SWEEP-STALE-CHAIN-01 anchor; `at_risk_tenant_count = 0` permitted at emission (amend in-flight incident record if R-57-C1 later confirms count > 0 — do NOT re-emit the chain event) | `incident_id` (UUID — correlation key across DEC-030 chain + PKJWT-SWEEP-STALE-E-001), `confirmed_stale_since` (ISO 8601 — last successful `pkjwt_key_expiry_sweep` run from `pg_cron.job_run_details`), `stale_hours` (float > 0), `missed_runs` (int ≥ 0), `at_risk_tenant_count` (int ≥ 0 — aggregate count from R-57-C1; 0 at P3 default; > 0 triggers P1 escalation), `trigger` (enum: `pagerduty_alert`\|`slack_alert`\|`manual_discovery`), `initial_severity` (enum: `P3`\|`P1`) |
+| `system.pkjwt_expiry_sweep_restored` | LOW | 3 yr | IC (security-engineer) after Step 5 of R-57.5 confirms first successful post-restoration run of `pkjwt_key_expiry_sweep`; PKJWT-SWEEP-STALE-CHAIN-01 terminal event; HTTP 422 `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` if no prior `stale_declared` for same `incident_id` | `incident_id` (UUID — same as `stale_declared`), `restored_at` (ISO 8601 — timestamp of confirmed first successful post-fix run), `root_cause` (enum: `H1_job_deleted`\|`H2_job_disabled`\|`H3_maintenance`\|`H4_function_broken`), `tenants_warned_during_recovery` (int ≥ 0 — count of `sso.pkjwt_key_expiry_warning` events manually emitted via CSM at P1; 0 at P3) |
+
+```typescript
+import { z } from 'zod/v4';
+
+// system.pkjwt_expiry_sweep_stale_declared — R-57 PKJWT-SWEEP-STALE-CHAIN-01 anchor (HIGH · 7yr · CC6.6)
+// Canonical source: docs/INCIDENT_RESPONSE.md §R-57.7
+export const PkjwtExpirySweepStaleDeclaredPayload = z.object({
+  incident_id:           z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),
+  stale_hours:           z.number().positive(),
+  missed_runs:           z.number().int().nonneg(),
+  at_risk_tenant_count:  z.number().int().nonneg(), // 0 if emitting before R-57-C1; update in-flight record post-query
+  trigger:               z.enum(['pagerduty_alert', 'slack_alert', 'manual_discovery']),
+  initial_severity:      z.enum(['P3', 'P1']),
+  // Privacy floor: no tenant_id, kid, company name, user_id, health value, or GDPR Art. 9 data
+});
+
+// system.pkjwt_expiry_sweep_restored — R-57 PKJWT-SWEEP-STALE-CHAIN-01 terminal (LOW · 3yr · CC6.6)
+// Canonical source: docs/INCIDENT_RESPONSE.md §R-57.7
+export const PkjwtExpirySweepRestoredPayload = z.object({
+  incident_id:                    z.string().uuid(),
+  restored_at:                    z.string().datetime(),
+  root_cause:                     z.enum(['H1_job_deleted', 'H2_job_disabled', 'H3_maintenance', 'H4_function_broken']),
+  tenants_warned_during_recovery: z.number().int().nonneg(), // 0 at P3; count at P1
+  // Privacy floor: no tenant_id, kid, company name, user_id, health value, or GDPR Art. 9 data
+});
+```
+
+**PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant**
+
+| Invariant ID | Rule | HTTP 422 error code | Enforcement |
+|---|---|---|---|
+| PKJWT-SWEEP-STALE-CHAIN-01 | `system.pkjwt_expiry_sweep_stale_declared` must precede `system.pkjwt_expiry_sweep_restored` for the same `incident_id` within any HMAC audit chain window | `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` | Pending `emit-audit-event` Worker deployment (`docs/INCIDENT_RESPONSE.md §R-57.11` item 4, P0/M8) → R-05 on violation |
+
+**SOC 2 evidence artefact:**
+
+| Artefact ID | Criterion | Collection trigger | Retention | Storage path |
+|---|---|---|---|---|
+| **PKJWT-SWEEP-STALE-E-001** | CC6.6 — PKJWT key expiry advance-warning sweep monitoring gap | Per-activation (each R-57 invocation); annual zero-activation nil attestation at `PKJWT-SWEEP-STALE-E-001-<YYYY>-nil.txt` if R-57 never triggered in an observation year | 7 yr | `compliance/evidence/ir/pkjwt-sweep-stale/PKJWT-SWEEP-STALE-E-001-{incident_id}.txt` |
+
+**Artefact content:** Per-activation incident record: `system.pkjwt_expiry_sweep_stale_declared` event JSON (with `at_risk_tenant_count`), root cause classification (H1–H4), `system.pkjwt_expiry_sweep_restored` event JSON, terminal output of R-57-C1 (P1 gate count), R-57-C2 (pg_cron run history), and R-57-C3 (catalog check). If P1 activated: R-57-C4 aggregate row count and Slack notification timestamp log per CSM notification. SHA-256 hashed; uploaded to `compliance/evidence/ir/pkjwt-sweep-stale/`. Owner: security-engineer + compliance-officer. Registered: `docs/SOC2_READINESS.md §147` (v3.73.0, 2026-07-03). Source: `docs/INCIDENT_RESPONSE.md §R-57.8`.
+
+**Privacy floor:** PKJWT-SWEEP-STALE-E-001 contains only FORM-internal `incident_id` UUIDs, aggregate integer counts (`at_risk_tenant_count`, `tenants_warned_during_recovery`), root cause classification enums, and timestamps. No employee `user_id`, name, email, individual `tenant_id`, `kid`, health value, coaching content, or GDPR Art. 9 special-category data. The R-57-C4 per-tenant detail (used only at P1 for manual CSM notification) is NOT preserved in PKJWT-SWEEP-STALE-E-001 — only the aggregate row count (`tenants_warned_during_recovery`) is recorded.
 
 ---
 
@@ -5051,6 +5107,8 @@ const NrrBridgeFilingMonitorRestoredSchema = z.object({
 **SOC 2 evidence:** FLEET-MAT-STALE-E-001 and NRR-FILING-STALE-E-001 (CC4.1/A1.1, per-activation + annual zero-count, 7yr) — registered in `docs/SOC2_READINESS.md §137`. Per-activation: export of both stale/restored events for each R-53 activation. Annual zero-count: if no activations in the year, compliance-officer files an affirmative attestation confirming `R-53 activation count = 0` for the year with a supporting `pg_cron.job_run_details` health export for jobs 56 and 57.
 
 **Retention table additions:** `system.fleet_mat_chain_monitor_stale_declared` HIGH 7yr CC4.1/A1.1; `system.fleet_mat_chain_monitor_restored` LOW 3yr CC4.1; `system.nrr_bridge_filing_monitor_stale_declared` HIGH 7yr CC4.1/A1.1; `system.nrr_bridge_filing_monitor_restored` LOW 3yr CC4.1.
+
+*v2.74 (2026-07-03): §R-57 PKJWT Key Expiry Sweep Stale events — new section `### R-57 PKJWT Key Expiry Sweep Stale events` inserted between `### SSO PKJWT Key Lifecycle events` and `### Enterprise Adoption Monitoring events`. Two DEC-030 HMAC-chained stale-recovery events: (1) `system.pkjwt_expiry_sweep_stale_declared` HIGH/7yr — IC-declared job 58 stale incident anchor; PKJWT-SWEEP-STALE-CHAIN-01 anchor; payload: `incident_id` UUID, `confirmed_stale_since`, `stale_hours`, `missed_runs`, `at_risk_tenant_count` aggregate int, `trigger` enum, `initial_severity` enum; privacy floor: no `tenant_id`, `kid`, user data, or GDPR Art. 9 data. (2) `system.pkjwt_expiry_sweep_restored` LOW/3yr — IC-confirmed job 58 restoration terminal event; PKJWT-SWEEP-STALE-CHAIN-01 terminal; HTTP 422 `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` if no prior `stale_declared` for same `incident_id`; payload: `incident_id`, `restored_at`, `root_cause` H1–H4 enum, `tenants_warned_during_recovery` aggregate int. Zod v2 schemas: `PkjwtExpirySweepStaleDeclaredPayload` + `PkjwtExpirySweepRestoredPayload` (canonical source: `docs/INCIDENT_RESPONSE.md §R-57.7`). PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant table with HTTP 422 error code. SOC 2 evidence artefact PKJWT-SWEEP-STALE-E-001 (CC6.6, per-activation, 7yr; registered `docs/SOC2_READINESS.md §147`, v3.73.0, 2026-07-03). Retention table: +2 rows (`system.pkjwt_expiry_sweep_stale_declared` HIGH 7yr CC6.6; `system.pkjwt_expiry_sweep_restored` LOW 3yr CC6.6). Companion edits: `docs/OBSERVABILITY.md` v5.14.1 (§12.6 job 58 companion runbook cross-ref added); `docs/SOC2_READINESS.md` v3.73.0 (§147 PKJWT-SWEEP-STALE-E-001 registered); `docs/INCIDENT_RESPONSE.md` v3.22.1 (§R-57.11 items 1–3 closed). **Closes `docs/INCIDENT_RESPONSE.md §R-57.11` item 1 (P0 — 🟢 2026-07-03).** Document header v2.73 → v2.74. Owner: security-engineer + compliance-officer + enterprise-architect.*
 
 *v2.73 (2026-07-02): §SSO-PKJ-Lifecycle — three DEC-030 HMAC-chained SSO PKJWT Key Lifecycle events registered (SSO_SCIM_IMPLEMENTATION.md §42 · DEC-097 · SOC 2 CC6.6). New section `### SSO PKJWT Key Lifecycle events` inserted between `### SSO Fleet Health Monitoring events` and `### Enterprise Adoption Monitoring events`. Three events: (1) `sso.pkjwt_key_generated` HIGH/7yr — per-tenant OIDC `private_key_jwt` asymmetric key pair generation record; PAM-gated `POST /internal/tenant/{tenant_id}/sso/pkjwt/generate`; payload: `tenant_id` UUID, `kid` UUID, `algorithm` enum (RS256|ES256), `key_generated_at`, `key_expires_at` (+ 1 year per §42.9); private key absent from payload. (2) `sso.pkjwt_key_rotated` HIGH/7yr — annual rotation record; payload: `tenant_id` UUID, `old_kid` UUID, `new_kid` UUID, `rotation_reason` enum (scheduled|incident|customer_request), `rotated_at`. (3) `sso.pkjwt_key_expiry_warning` STANDARD/3yr — pg_cron job 58 (`pkjwt_key_expiry_sweep`, `0 9 * * *`) daily sweep; emitted per tenant where `pkjwt_key_expires_at < NOW() + INTERVAL '30 days'`; payload: `tenant_id` UUID, `kid` UUID, `key_expires_at`, `days_until_expiry` non-negative int; P3 Slack-only `#alerts-enterprise`; non-blocking. Zod v2 schemas: `SsoPkjwtKeyGeneratedPayload`, `SsoPkjwtKeyRotatedPayload`, `SsoPkjwtKeyExpiryWarningPayload`. SOC 2 evidence artefact PKJWT-E-001 (CC6.6, quarterly + per-incident, 7yr) registered in section. CC6.6 auditor narrative: confirms private key is never in transit or at IdP — only public key published via JWKS endpoint; PKJWT-E-001 demonstrates annual rotation compliance and key payload privacy invariant (no `private_key` field in any Zod schema). Privacy floor: all three events contain only FORM-internal UUIDs (`tenant_id`, `kid`) and timestamps — no employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data; private key material is absent from all payloads by Zod schema constraint. Retention table: +2 rows (`sso.pkjwt_key_generated`/`sso.pkjwt_key_rotated` 7yr CC6.6; `sso.pkjwt_key_expiry_warning` 3yr CC6.6 advisory). Companion edits: `docs/OBSERVABILITY.md` v5.14.0 (§12.6 job 58 `pkjwt_key_expiry_sweep`); `docs/SSO_SCIM_IMPLEMENTATION.md` v2.16 (§42.11 items 4 + 5 closed). Document header v2.72 → v2.73. Owner: compliance-officer + security-engineer + platform-engineer.*
 

@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.22.0
+# FORM · Incident Response Runbook v3.22.1
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -20977,13 +20977,17 @@ z.object({
 
 | # | Task | Owner | Priority | Status |
 |---|---|---|---|---|
-| 1 | Register `system.pkjwt_expiry_sweep_stale_declared` (HIGH/7yr) and `system.pkjwt_expiry_sweep_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` (or nearest SYSTEM-class event section); include Zod v2 schemas from §R-57.7 and PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant | security-engineer + platform-engineer | **P0** | [ ] |
-| 2 | Update `docs/OBSERVABILITY.md §12.6` job 58 row: in the stale-routing / cross-reference column, add `companion runbook: INCIDENT_RESPONSE R-57` | compliance-officer | **P0** | [ ] |
-| 3 | Register PKJWT-SWEEP-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` evidence artefact registry (per-activation cadence, CC6.6, 7yr, owner: security-engineer + compliance-officer) | compliance-officer | **P0** | [ ] |
+| 1 | Register `system.pkjwt_expiry_sweep_stale_declared` (HIGH/7yr) and `system.pkjwt_expiry_sweep_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` (or nearest SYSTEM-class event section); include Zod v2 schemas from §R-57.7 and PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant | security-engineer + platform-engineer | **P0** | [x] **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.74, §R-57 PKJWT Key Expiry Sweep Stale events — two DEC-030 events, Zod schemas PkjwtExpirySweepStaleDeclaredPayload + PkjwtExpirySweepRestoredPayload, PKJWT-SWEEP-STALE-CHAIN-01 invariant table, PKJWT-SWEEP-STALE-E-001 evidence artefact table).** |
+| 2 | Update `docs/OBSERVABILITY.md §12.6` job 58 row: in the stale-routing / cross-reference column, add `companion runbook: INCIDENT_RESPONSE R-57` | compliance-officer | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.14.1 — §12.6 job 58 cross-reference column updated: `; INCIDENT_RESPONSE R-57 (§R-57; v3.22.0, 2026-07-03 — companion stale recovery runbook for job 58)` inserted before `— **job 58** |`).** |
+| 3 | Register PKJWT-SWEEP-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` evidence artefact registry (per-activation cadence, CC6.6, 7yr, owner: security-engineer + compliance-officer) | compliance-officer | **P0** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.73.0, §147 — §79.4 row 114 added; §80.3 `pkjwt-sweep-stale/` subfolder added; §80.4 Vanta mirror list updated).** |
 | 4 | Implement PKJWT-SWEEP-STALE-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`: create `pkjwt-sweep-stale-chain-01.ts` with `enforcePkjwtSweepStaleChain01(supabase, incidentId)` — queries `audit_log_events` for prior `system.pkjwt_expiry_sweep_stale_declared` within a 72h window for same `incident_id`; fail-closed on DB error; returns HTTP 422 + `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` if no anchor found when `system.pkjwt_expiry_sweep_restored` is emitted; patch `index.ts` to import and invoke | platform-engineer + security-engineer | **P0** / M8 | [ ] |
 | 5 | Authoring complete — §R-57 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.22.0).** |
 
 **Privacy floor (invariant throughout R-57):** No employee `user_id`, name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data appears in any R-57 query result, DEC-030 event payload, evidence artefact, or Slack communication template. R-57-C1 and R-57-C4 aggregate counts and timestamps only. `tenant_id` fields in all event payloads are FORM-internal UUIDs — not linked to company name, employee roster, or any personal identifier in this runbook.
+
+---
+
+*v3.22.1 (2026-07-03): §R-57.11 Cross-Reference Patch — Items 1–3 Closed (AUDIT_LOG_SCHEMA v2.74 · OBSERVABILITY v5.14.1 · SOC2_READINESS v3.73.0). Closes three P0 implementation checklist items from §R-57.11 (v3.22.0, 2026-07-03): item 1 — `system.pkjwt_expiry_sweep_stale_declared` (HIGH/7yr) and `system.pkjwt_expiry_sweep_restored` (LOW/3yr) registered in `docs/AUDIT_LOG_SCHEMA.md` v2.74 (§R-57 PKJWT Key Expiry Sweep Stale events section — two DEC-030 events, Zod v2 schemas `PkjwtExpirySweepStaleDeclaredPayload` + `PkjwtExpirySweepRestoredPayload`, PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant table [HTTP 422 `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` on unanchored restore for same `incident_id`], PKJWT-SWEEP-STALE-E-001 evidence artefact table); item 2 — `docs/OBSERVABILITY.md §12.6` job 58 row cross-reference column updated in v5.14.1 to add `; INCIDENT_RESPONSE R-57 (§R-57; v3.22.0, 2026-07-03 — companion stale recovery runbook for job 58)` before `— **job 58** |`; item 3 — PKJWT-SWEEP-STALE-E-001 registered in `docs/SOC2_READINESS.md §79.4` master evidence table (row 114) in v3.73.0 (§147 — §80.3 `pkjwt-sweep-stale/` R2 subfolder added; §80.4 Vanta mirror list updated; §147.1–§147.4 cross-reference patch section). Document header v3.22.0 → v3.22.1. Owner: security-engineer + compliance-officer.*
 
 ---
 

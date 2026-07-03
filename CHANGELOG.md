@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [11.58.0] — 2026-07-03
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.73 → v2.74. §R-57 PKJWT Key Expiry Sweep Stale events section added: registers `system.pkjwt_expiry_sweep_stale_declared` (HIGH/7yr, CC6.6, IC PAM-elevated) and `system.pkjwt_expiry_sweep_restored` (LOW/3yr, CC6.6) as DEC-030 HMAC-chained events with Zod v2 schemas (`PkjwtExpirySweepStaleDeclaredPayload`, `PkjwtExpirySweepRestoredPayload`). PKJWT-SWEEP-STALE-CHAIN-01 ordering invariant table added (HTTP 422 `PKJWT_SWEEP_STALE_CHAIN_01_VIOLATION` on unanchored restore for same `incident_id`). PKJWT-SWEEP-STALE-E-001 evidence artefact table added (CC6.6, per-activation, 7yr). Retention table rows added for both events. Closes INCIDENT_RESPONSE.md §R-57.11 item 1 (P0).
+- `docs/OBSERVABILITY.md` — v5.14.0 → v5.14.1. §12.6 job 58 (`pkjwt_key_expiry_sweep`) cross-reference column updated: `; INCIDENT_RESPONSE R-57 (§R-57; v3.22.0, 2026-07-03 — companion stale recovery runbook for job 58)` inserted before `— **job 58** |`. Closes INCIDENT_RESPONSE.md §R-57.11 item 2 (P0).
+- `docs/SOC2_READINESS.md` — v3.72.0 → v3.73.0. §147 added: PKJWT-SWEEP-STALE-E-001 registered in §79.4 master evidence table (row 114, CC6.6, per-activation, 7yr, owner: security-engineer + compliance-officer, path: `compliance/evidence/ir/pkjwt-sweep-stale/PKJWT-SWEEP-STALE-E-001-{incident_id}.txt`). §80.3 `pkjwt-sweep-stale/` R2 subfolder added. §80.4 Vanta mirror list updated with PKJWT-SWEEP-STALE-E-001. Closes INCIDENT_RESPONSE.md §R-57.11 item 3 (P0).
+- `docs/INCIDENT_RESPONSE.md` — v3.22.0 → v3.22.1. §R-57.11 items 1, 2, 3 marked `[x] Done` with references to respective doc versions and dates. Version note v3.22.1 added.
+- `VERSION` — 11.57.0 → 11.58.0.
+
 ## [11.57.0] — 2026-07-03
 
 ### Added
