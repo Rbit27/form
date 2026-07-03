@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [11.57.0] — 2026-07-03
+
+### Added
+- `content/post-53-rest-intervals-what-determines.md` — Editorial series post 53. «Скільки відпочивати між підходами — і від чого це реально залежить». Фізіологія паузи: ресинтез PCr (Harris et al. 1976: двофазний — 50% за 30 с, повне відновлення 3–8 хв), кліренс H+ і неорганічного фосфату, нейром'язовий компонент. Спростування «60-секундного правила»: Schoenfeld et al. (2016) RCT — 3 хвилини паузи → значно більший приріст сили І гіпертрофії порівняно з 1 хвилиною при рівному тижневому об'ємі. Чотири реальні детермінанти тривалості паузи: % від 1RM (Willardson & Burkett 2006), нейром'язова вимогливість вправи (Schoenfeld 2010), RPE підходу, ціль (технічна якість vs. повторення). Тест готовності. RPE-моніторинг між підходами (Helms et al. 2016, Zourdos et al. 2016). Таблиця орієнтирів. clinical-safety: NOT_REQUIRED. sports-scientist review pending. Blog card prepended at top of feed.
+
+### Changed
+- `blog.html` — post-53 card prepended at top of feed.
+- `README.md` — post-53 updated proposed → draft (v11.57.0); editorial count 11–44 → 11–53; series «Мезоцикл без тренера» 3081–3090 added as proposed; version reference updated.
+- `STATUS.md` — content engine row 51–99 updated: post-53 added v11.57.0.
+- `VERSION` — 11.56.0 → 11.57.0.
+
 ## [11.56.0] — 2026-07-03
 
 ### Added
