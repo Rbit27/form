@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.68.0] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` R-43 — C1 Erasure SLA Monitor Stale recovery runbook (§R-43.1–§R-43.11; P1 base / P0 / P0 escalated, compliance-officer + devops-lead). Covers `c1-erasure-sla-monitor` pg_cron job 11 (§12.6): schedule `0 8 * * *`, 26h freshness window. Stale consequence: GDPR Art. 17 day-33 SLA warning detection blind spot — open erasure requests can silently age from day 33 through the day-35 contractual SLA boundary without triggering PagerDuty P1 `form-compliance` or emitting AL-C1-01 alert. Severity tiers: P1 (no requests at risk), P0 (R-43-C2 ≥ 1: day 33–35 danger window), P0 escalated + R-09 (R-43-C3 ≥ 1: day 35+ Art. 17 breach). Four root-cause hypotheses: H1 (job deleted/disabled — R-05 co-activation if unauthorized), H2 (SQL exception / DDL change on `dsar_requests`), H3 (`form_system` SELECT revoked on `dsar_requests`), H4 (Supabase platform outage — R-03 co-activation). Four scope queries: R-43-C1 (last 5 job 11 runs), R-43-C2 (day 33–35 aggregate count — P0 gate), R-43-C3 (day 35+ aggregate count — P0 escalated + R-09 gate), R-43-C4 (peer daily compliance job health — H4 discriminator). DEC-030 HMAC-chained event pair: `system.c1_erasure_monitor_stale_declared` HIGH/7yr → `system.c1_erasure_monitor_restored` STANDARD/3yr; C1-ERASURE-STALE-CHAIN-01 invariant (HTTP 422 on inversion → R-05). Privacy floor: no `dsar_request_id`, no `user_id`, no email, no name, no GDPR Art. 9 data in any DEC-030 event — aggregate counts only. Quarterly evidence artefact ERASURE-MON-E-001 (P5.1/C1.2/CC4.1/CC7.2, 7yr, `compliance/evidence/erasure/erasure-mon-e-001-YYYY-QN.csv`). SOC 2 criteria: P5.1, C1.2, CC4.1, CC7.2.
+
+### Changed
+- `docs/OBSERVABILITY.md` — §12.6 job 11 `c1-erasure-sla-monitor` cross-reference updated: `; INCIDENT_RESPONSE R-43 (job 11 stale recovery runbook — §R-43.5)` added to stale-consequence column. Document header v5.14.3 → v5.14.4.
+- `docs/INCIDENT_RESPONSE.md` — document header v3.24.0 → v3.25.0.
+- `STATUS.md` — current version updated to v11.68.0.
+- `VERSION` — 11.67.0 → 11.68.0.
+
+---
+
 ## [11.67.0] — 2026-07-03
 
 ### Added

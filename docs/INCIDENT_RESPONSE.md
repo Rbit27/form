@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.24.0
+# FORM · Incident Response Runbook v3.25.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -16167,6 +16167,283 @@ Quarterly export of all `cron.job_run_details` for job 42: run count, failure co
 **v1.0 · 2026-06-25 · Owner: security-engineer + compliance-officer**
 **Review: after every activation, minimum annual.**
 **Next scheduled review: June 2027 or after first activation — whichever comes first.**
+
+---
+
+## R-43 C1 Erasure SLA Monitor Stale — `c1-erasure-sla-monitor` (job 11) — P5.1 / GDPR Art. 17 day-33 warning detection gap
+
+> Scope: Covers the failure mode where `c1-erasure-sla-monitor` (pg_cron job 11, `0 8 * * *`,
+> 26h freshness window) exceeds its freshness threshold, creating a blind spot in
+> AL-C1-01 detection. During a stale window, open erasure requests in `dsar_requests`
+> (type = `erasure`, status ≠ `fulfilled`/`rejected`) may silently age from day 33 through
+> the day-35 contractual SLA boundary without triggering PagerDuty P1 `form-compliance` or
+> emitting the AL-C1-01 Slack `#security-alerts` HIGH alert. This runbook is activated by
+> `pg-cron-health-monitor` (§12.7) emitting `system.cron_job_stale` for
+> `job_name = 'c1-erasure-sla-monitor'` and is the compliance-officer's structured response
+> to restoring GDPR Art. 17 day-33 SLA warning coverage.
+
+### R-43.1 Trigger Matrix
+
+| Source | Signal | Threshold | Severity |
+|---|---|---|---|
+| `pg-cron-health-monitor` (§12.7) | `system.cron_job_stale` with `job_name = 'c1-erasure-sla-monitor'` | No successful run in `cron.job_run_details` within prior 26 h | P1 base; P0 if R-43-C2 ≥ 1; P0 escalated (→ R-09) if R-43-C3 ≥ 1 |
+| Manual discovery | compliance-officer or devops-lead observes missing daily `c1_erasure_sla_check` log entries | > 26 h gap since last confirmed `cron.job_run_details` success for job 11 | P1 → assess R-43-C2/C3 for P0 escalation |
+
+### R-43.2 Severity Classification
+
+| Condition | Severity |
+|---|---|
+| Job stale, R-43-C2 = 0 and R-43-C3 = 0 (no requests in day 33–35 danger window or past day 35 during stale window) | P1 — GDPR Art. 17 day-33 monitoring gap; no erasure request at risk during stale window |
+| Job stale, R-43-C2 ≥ 1 (≥ 1 open erasure request is in the day 33–35 danger window) | P0 — at-risk erasure requests confirmed; immediate compensating check required; escalate to compliance-officer + devops-lead |
+| Job stale, R-43-C3 ≥ 1 (≥ 1 open erasure request past day 35 — GDPR Art. 17 SLA breach) | P0 escalated — Art. 17 SLA breach confirmed; activate R-09 (Data Subject Rights Breach); page compliance-officer + legal + founder immediately |
+
+### R-43.3 Immediate Actions (T+0 through T+30)
+
+| Time | Action | Owner |
+|---|---|---|
+| T+0 | Acknowledge PagerDuty P1 `form-compliance` alert. Note `confirmed_stale_since` timestamp (last successful `cron.job_run_details` entry for `c1-erasure-sla-monitor`). | compliance-officer |
+| T+0 | Run R-43-C3 (day-35+ breach gate). If count ≥ 1: immediately escalate to P0 escalated; page legal + founder; activate R-09 (Data Subject Rights Breach); begin compensating manual DSAR triage in parallel with job recovery. | compliance-officer |
+| T+0 | Run R-43-C2 (day 33–35 danger window gate). If count ≥ 1 and R-43-C3 = 0: escalate to P0; page devops-lead; begin compensating manual review of affected requests. | compliance-officer |
+| T+5 | Run R-43-C1 (last 5 run records for job 11). Inspect `status` and `return_message` fields. | compliance-officer |
+| T+5 | Run R-43-C4 (peer job health — H2/H4 shared failure discriminator). If ≥ 2 peer daily compliance jobs stale: suspect H4 (Supabase outage) — co-activate R-03 and pause individual job diagnostics. | compliance-officer + devops-lead |
+| T+10 | If no platform outage: inspect `return_message` in R-43-C1 for SQL exceptions → H3; check `SELECT jobid FROM cron.job WHERE jobname = 'c1-erasure-sla-monitor'` for H1 (job deleted/disabled). | compliance-officer |
+| T+15 | If H3 suspected (SQL exception in job): connect to Supabase SQL editor; run `SELECT status FROM dsar_requests LIMIT 1` as `form_system` to confirm schema access. If permission denied: H3 confirmed (`form_system` SELECT revoked on `dsar_requests`). | compliance-officer + devops-lead |
+| T+20 | Execute recovery procedure per §R-43.5. | compliance-officer + devops-lead |
+| T+30 | Emit `system.c1_erasure_monitor_stale_declared` DEC-030 HIGH/7yr (§R-43.7). Verify recovery: confirm `c1-erasure-sla-monitor` run appears in `cron.job_run_details` with `status = 'succeeded'` within 26 h of fix. | compliance-officer |
+
+### R-43.4 Root Cause Hypotheses
+
+| ID | Hypothesis | Discriminator |
+|---|---|---|
+| H1 | pg_cron job deleted or disabled — `c1-erasure-sla-monitor` row absent from `cron.job` or `active = false` | `SELECT jobid FROM cron.job WHERE jobname = 'c1-erasure-sla-monitor'` returns no row, or `active = false` |
+| H2 | SQL exception in `c1-erasure-sla-monitor` body — DDL change on `dsar_requests` (column rename, table drop, type change on `submitted_at`, `status`, or `type` columns) causes the job query to throw; pg_cron marks `status = 'failed'` | R-43-C1 `return_message` contains SQL error text (e.g. `column "submitted_at" does not exist` or `relation "dsar_requests" does not exist`); `status = 'failed'` for all recent runs |
+| H3 | `form_system` permission revoked from `dsar_requests` — job query fails on `SELECT` | R-43-C1 `return_message` contains permission-denied error; confirmed by direct `form_system` `SELECT status FROM dsar_requests LIMIT 1` attempt returning error |
+| H4 | Supabase platform outage — pg_cron scheduler itself is suspended; all jobs stale simultaneously | R-43-C4: ≥ 2 peer daily compliance jobs also stale (e.g. `invite_expiry_sweep`, `api_key_chain_monitor`); Supabase status page confirms incident; co-activate R-03 |
+
+### R-43.5 Recovery Procedure
+
+**Step 1 — H1: Job deleted or disabled**
+
+```sql
+-- Re-register c1-erasure-sla-monitor
+SELECT cron.schedule(
+  'c1-erasure-sla-monitor',
+  '0 8 * * *',
+  $$
+    SELECT form_system.run_c1_erasure_sla_monitor();
+  $$
+);
+-- Or re-enable if disabled:
+UPDATE cron.job SET active = true WHERE jobname = 'c1-erasure-sla-monitor';
+```
+
+If unauthorized deletion confirmed (no authorized maintenance record): co-activate R-05 (HMAC chain break / unauthorized system change); review all `system.cron_config_changed` DEC-030 events from prior 72h; rotate `form_system` pg_cron credentials if unauthorized access suspected.
+
+**Step 2 — H2: SQL exception (schema change)**
+
+Identify the breaking DDL change from `audit_log_events` or Supabase migration logs. Options:
+- (a) Revert the breaking DDL change (preferred if migration was erroneous).
+- (b) Update `c1-erasure-sla-monitor` function body to use the new column/field name and redeploy via Supabase migration.
+
+Verify `form_api` and `tenant_manager` are NOT granted SELECT on `dsar_requests` (invariant: only `form_system` and `service_role` have SELECT; `form_api` is REVOKED — privacy floor: DSAR records contain GDPR Art. 9 subject identity data).
+
+**Step 3 — H3: `form_system` permission revoked**
+
+```sql
+-- Restore form_system SELECT on dsar_requests
+GRANT SELECT ON dsar_requests TO form_system;
+-- Confirm form_api is still REVOKED (privacy floor invariant)
+REVOKE SELECT ON dsar_requests FROM form_api;
+```
+
+**Step 4 — H4: Platform outage**
+
+Monitor Supabase status page. Co-activate R-03 (Infrastructure Outage). No action on `c1-erasure-sla-monitor` specifically until platform recovers; pg_cron will auto-resume on platform restoration.
+
+**Step 5 — Post-recovery: verify and close**
+
+After fix deployed (all hypotheses):
+
+```sql
+-- Confirm job ran successfully
+SELECT run_at, status, return_message
+FROM cron.job_run_details
+WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'c1-erasure-sla-monitor')
+ORDER BY run_at DESC LIMIT 3;
+```
+
+Confirm `status = 'succeeded'` for at least one post-fix run. Then re-run R-43-C2 and R-43-C3 to confirm current danger-window and breach counts at restoration. Emit `system.c1_erasure_monitor_restored` DEC-030 STANDARD/3yr (§R-43.7). Resolve PagerDuty P1/P0. If R-09 was activated: follow R-09 closure procedure independently.
+
+### R-43.6 Recovery Scope Queries
+
+**R-43-C1 — Stale window (last 5 job 11 runs)**
+
+```sql
+SELECT run_at, status, return_message
+FROM cron.job_run_details
+WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'c1-erasure-sla-monitor')
+ORDER BY run_at DESC
+LIMIT 5;
+```
+
+`status = 'failed'` with SQL error → H2 or H3. No rows returned → H1 or H4.
+
+**R-43-C2 — P0 gate (open erasure requests in day 33–35 danger window)**
+
+```sql
+SELECT COUNT(*) AS danger_window_requests
+FROM dsar_requests
+WHERE type = 'erasure'
+  AND status NOT IN ('fulfilled', 'rejected')
+  AND submitted_at < NOW() - INTERVAL '33 days'
+  AND submitted_at >= NOW() - INTERVAL '35 days';
+```
+
+`danger_window_requests ≥ 1` → P0 escalation required; at least one erasure request is in the 2-day window before contractual SLA breach. Privacy floor: result is an aggregate count only — no `dsar_request_id`, no `user_id`, no PII.
+
+**R-43-C3 — P0 escalated gate (open erasure requests past day 35 — GDPR Art. 17 breach)**
+
+```sql
+SELECT COUNT(*) AS breach_requests
+FROM dsar_requests
+WHERE type = 'erasure'
+  AND status NOT IN ('fulfilled', 'rejected')
+  AND submitted_at < NOW() - INTERVAL '35 days';
+```
+
+`breach_requests ≥ 1` → P0 escalated; GDPR Art. 17 SLA breach confirmed; activate R-09 (Data Subject Rights Breach) immediately. Privacy floor: aggregate count only — no `dsar_request_id`, no `user_id`, no PII.
+
+**R-43-C4 — Peer job health (H4 discriminator)**
+
+```sql
+SELECT jobname, MAX(run_at) AS last_run,
+       COUNT(*) FILTER (WHERE status = 'failed') AS recent_failures
+FROM cron.job_run_details jrd
+JOIN cron.job j USING (jobid)
+WHERE j.jobname IN (
+  'invite_expiry_sweep',
+  'invite_email_expiry_cleanup',
+  'api_key_chain_monitor',
+  'victor_safety_baseline_refresh',
+  'mid_contract_termination_risk_check'
+)
+GROUP BY jobname
+ORDER BY last_run ASC;
+```
+
+≥ 2 peer daily compliance jobs with `last_run < NOW() - INTERVAL '30 hours'` → H4 (Supabase outage); co-activate R-03.
+
+### R-43.7 DEC-030 Event Chain
+
+All events are HMAC-chained per DEC-030 (see `docs/AUDIT_LOG_SCHEMA.md`).
+
+**`system.c1_erasure_monitor_stale_declared`** — severity HIGH / retention 7yr
+
+Emitted at T+30 (or earlier if root cause is clear) to anchor the stale window in the tamper-evident audit record.
+
+```typescript
+// Zod schema — system.c1_erasure_monitor_stale_declared
+const C1ErasureMonitorStaleDeclaredSchema = z.object({
+  incident_id: z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),              // ISO 8601 — last successful job_run_details run_at
+  stale_minutes: z.number().positive(),                      // NOW() - confirmed_stale_since in minutes
+  missed_runs: z.number().int().nonnegative(),               // floor(stale_minutes / 1440) — missed daily runs
+  trigger: z.enum(['pagerduty_alert', 'manual_discovery', 'co_active_r03']),
+  initial_severity: z.enum(['P1', 'P0', 'P0_ESCALATED']),
+  danger_window_requests_at_declared: z.number().int().nonnegative(), // R-43-C2 count at declaration — no PII
+  breach_requests_at_declared: z.number().int().nonnegative(),        // R-43-C3 count at declaration — no PII
+});
+// Privacy floor: no dsar_request_id, no user_id, no email, no name, no GDPR Art. 9 data.
+// Aggregate counts only.
+```
+
+**`system.c1_erasure_monitor_restored`** — severity STANDARD / retention 3yr
+
+Emitted after confirmed successful recovery run (Step 5). Closes the C1-ERASURE-STALE-CHAIN-01 pair.
+
+```typescript
+// Zod schema — system.c1_erasure_monitor_restored
+const C1ErasureMonitorRestoredSchema = z.object({
+  incident_id: z.string().uuid(),                             // must match stale_declared incident_id
+  restored_at: z.string().datetime(),                         // ISO 8601 — first successful post-fix run_at
+  root_cause: z.enum(['H1', 'H2', 'H3', 'H4']),
+  fix_deployed_at: z.string().datetime(),
+  stale_window_hours: z.number().positive(),                  // restored_at - confirmed_stale_since in hours
+  danger_window_requests_at_declared: z.number().int().nonnegative(), // from stale_declared event
+  breach_requests_at_declared: z.number().int().nonnegative(),        // from stale_declared event
+  art17_sla_breached: z.boolean(),                            // breach_requests_at_declared > 0
+});
+// Privacy floor: no dsar_request_id, no user_id, no email, no name, no GDPR Art. 9 data.
+```
+
+**C1-ERASURE-STALE-CHAIN-01 ordering invariant:**
+
+`system.c1_erasure_monitor_restored` MUST follow `system.c1_erasure_monitor_stale_declared` for the same `incident_id`. If the chain emitter receives a `restored` event with no matching `declared` in the HMAC chain: return HTTP 422 `C1_ERASURE_STALE_CHAIN_01_VIOLATION` → activate R-05 (HMAC chain break).
+
+### R-43.8 Evidence Preservation
+
+| Artefact | Content | SOC 2 | Retention | Path |
+|---|---|---|---|---|
+| R-43-C1 output | `cron.job_run_details` for job 11 covering stale window — `status`, `run_at`, `return_message` for all rows from `confirmed_stale_since` to `restored_at` | CC7.2 | 3yr | `compliance/evidence/erasure/erasure-sla-monitor-stale/r43-<incident_id>/stale-window-job-runs.csv` |
+| R-43-C2 output at declaration | `danger_window_requests` count at T+0 (aggregate only — no PII) | P5.1 / C1.2 | 7yr | `compliance/evidence/erasure/erasure-sla-monitor-stale/r43-<incident_id>/danger-window-at-declared.txt` |
+| R-43-C3 output at declaration | `breach_requests` count at T+0 (aggregate only — no PII) | P5.1 / C1.2 | 7yr | `compliance/evidence/erasure/erasure-sla-monitor-stale/r43-<incident_id>/breach-gate-at-declared.txt` |
+| R-43-C2 + R-43-C3 at restoration | Danger-window and breach counts post-recovery (must both be 0 absent active R-09; if > 0, R-09 outcome document accompanies) | P5.1 / C1.2 / CC4.1 | 7yr | `compliance/evidence/erasure/erasure-sla-monitor-stale/r43-<incident_id>/scope-queries-at-restored.txt` |
+| `stale_declared` DEC-030 event | `system.c1_erasure_monitor_stale_declared` HIGH/7yr — HMAC chain entry anchoring stale window | CC7.2 / P5.1 | 7yr | `audit_log_events` (chain-verifiable per HMAC-VERIFY-ALGO-001) |
+| `stale_restored` DEC-030 event | `system.c1_erasure_monitor_restored` STANDARD/3yr — HMAC chain closure | CC7.2 | 3yr | `audit_log_events` (chain-verifiable per HMAC-VERIFY-ALGO-001) |
+
+**ERASURE-MON-E-001 — Quarterly pg_cron job 11 health report (P5.1/C1.2/CC4.1/CC7.2, 7yr)**
+
+Quarterly export of all `cron.job_run_details` for job 11: run count, failure count, stale-window activations (count and max-stale-hours), `danger_window_requests_at_declared` and `breach_requests_at_declared` for any R-43 activations, `art17_sla_breached` for any `restored` events. Zero-activation quarters filed as affirmative attestation that GDPR Art. 17 day-33 monitoring was uninterrupted. Path: `compliance/evidence/erasure/erasure-mon-e-001-YYYY-QN.csv`. Cross-ref: SOC2_READINESS §79.4 (pending R-43.11 item 4 registration). `form_api` REVOKED from evidence path.
+
+### R-43.9 SOC 2 Criteria Mapping
+
+| Criterion | Coverage |
+|---|---|
+| **P5.1** | `c1-erasure-sla-monitor` (job 11) enforces the GDPR Art. 17 day-33 SLA warning. A stale window creates a blind spot where an open erasure request can silently cross the day-35 contractual boundary without triggering PagerDuty P1 `form-compliance` or emitting the AL-C1-01 alert. R-43 defines the IC's structured response to detect and close that blind spot. `danger_window_requests_at_declared = 0` AND `breach_requests_at_declared = 0` in the `stale_declared` event is the auditor-inspectable attestation that no GDPR Art. 17 SLA risk materialised during the stale window. |
+| **C1.2** | FORM's contractual commitment to process erasure requests within 35 days (Art. 17 SLA) is operationalised via `c1-erasure-sla-monitor`. A stale window creates a C1.2 gap: the monitoring control is not operating. R-43 provides the IC with a structured assessment (`breach_requests_at_declared` in `stale_declared`) to immediately determine whether any contractual SLA breach occurred during the gap. |
+| **CC4.1** | R-43 is part of FORM's control monitoring framework. The fact that `pg-cron-health-monitor` (§12.7) detects `c1-erasure-sla-monitor` staleness and triggers a structured IC response demonstrates that FORM monitors its own compliance controls and has defined procedures for responding when those controls are impaired. |
+| **CC7.2** | `pg-cron-health-monitor` detects the `c1-erasure-sla-monitor` gap and emits `system.cron_job_stale`. R-43 runbook activates. DEC-030 HMAC chain (`stale_declared` → `stale_restored`) provides the tamper-evident detection-to-restoration timeline independently verifiable per `compliance/docs/hmac-chain-verification-algorithm.md` (HMAC-VERIFY-ALGO-001). |
+
+> **Auditor narrative (P5.1 + C1.2 + CC4.1 + CC7.2):** FORM's `c1-erasure-sla-monitor` (job 11, daily 08:00 UTC, 26h freshness window) queries `dsar_requests` for open erasure requests (type = `erasure`, status ≠ `fulfilled`/`rejected`) with `submitted_at < now() - INTERVAL '33 days'`, giving a 2-day warning before the day-35 contractual Art. 17 SLA. The `pg-cron-health-monitor` (§12.7) detects any job 11 gap exceeding 26 h and pages compliance-officer via PagerDuty P1 `form-compliance`. R-43 provides the IC with a structured response including an immediate P0 gate assessment: R-43-C2 (day 33–35 danger window — P0 if ≥ 1) and R-43-C3 (day 35+ breach — P0 escalated + R-09 if ≥ 1). The DEC-030 HMAC-chained event pair (`system.c1_erasure_monitor_stale_declared` HIGH/7yr → `system.c1_erasure_monitor_restored` STANDARD/3yr) anchors any stale window in the tamper-evident audit record, independently verifiable per HMAC-VERIFY-ALGO-001. `danger_window_requests_at_declared = 0` AND `breach_requests_at_declared = 0` in the `stale_declared` event is the auditor-inspectable attestation that no Art. 17 SLA risk materialised during the stale window. Privacy floor enforced throughout: no `dsar_request_id`, no `user_id`, no email, no name, no GDPR Art. 9 data in any DEC-030 event payload or evidence artefact — aggregate counts only.
+
+---
+
+### R-43.10 Post-Incident Controls
+
+| Control | Action | Owner | SLA |
+|---|---|---|---|
+| **H1 — Unauthorized deletion** | If H1 confirmed with no authorized maintenance record: co-activate R-05 (unauthorized system change); review all `system.cron_config_changed` DEC-030 events from prior 72h; rotate `form_system` pg_cron credentials if unauthorized access suspected | compliance-officer + security-engineer | Immediately on H1 confirmation |
+| **Art. 17 SLA breach** | If `breach_requests_at_declared ≥ 1` in `system.c1_erasure_monitor_stale_declared`: R-09 is already active; follow R-09 closure procedure for all Art. 17 breach cases; document per-request disposition in DPA incident report before resolving PagerDuty P0 escalated | compliance-officer + legal | Before PagerDuty P0 resolution |
+| **§12.6 cross-reference** | Update `docs/OBSERVABILITY.md §12.6` job 11 `c1-erasure-sla-monitor` registry entry to include `INCIDENT_RESPONSE R-43 (job 11 stale recovery runbook — §R-43.5)` in the stale-consequence cross-ref column | devops-lead | **Done — OBSERVABILITY.md §12.6 v5.14.4 patch, 2026-07-03** |
+| **SOC2_READINESS §79.4 registration** | Register ERASURE-MON-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table: quarterly pg_cron job 11 health report (run count, failure count, stale-window activations, `danger_window_requests_at_declared` and `breach_requests_at_declared` for any R-43 activations); zero-activation quarters filed as affirmative attestation; P5.1/C1.2/CC4.1/CC7.2; 7yr retention; `form_api` REVOKED from evidence path | compliance-officer | R-43.11 item 4 (P1 obligation) |
+
+---
+
+### R-43.11 Implementation Checklist
+
+#### P0 — Before job 11 is deployed to production (M6)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.c1_erasure_monitor_stale_declared` (HIGH/7yr) and `system.c1_erasure_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §DSAR & Erasure events`. Add C1-ERASURE-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-43.7. | compliance-officer + security-engineer | **P0** | M6 | [ ] |
+| 2 | Deploy R-43 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'c1-erasure-sla-monitor'` to PagerDuty service `form-compliance` P1, dedup key `c1-erasure-sla-monitor-stale`, routing to compliance-officer. Integration test: disable job 11 in staging for > 26 h; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-compliance` with correct dedup key. | devops-lead | **P0** | M6 | [ ] |
+
+#### P1 — Before first SOC 2 Type II audit period begins (M7–M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | Update `docs/OBSERVABILITY.md §12.6` job 11 `c1-erasure-sla-monitor` registry entry: add `INCIDENT_RESPONSE R-43 (job 11 stale recovery runbook — §R-43.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M7 | [x] *(completed in OBSERVABILITY.md §12.6 v5.14.4 patch, 2026-07-03)* |
+| 4 | Register ERASURE-MON-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table: quarterly pg_cron job 11 health report (run count, failure count, stale-window activations, `danger_window_requests_at_declared` and `breach_requests_at_declared` for any R-43 activations); zero-activation quarters filed as affirmative attestation; `form_api` REVOKED from evidence path; SOC 2 P5.1/C1.2/CC4.1/CC7.2; retention 7yr; path: `compliance/evidence/erasure/erasure-mon-e-001-YYYY-QN.csv`. | compliance-officer | **P1** | M11 | [ ] |
+
+---
+
+*v1.0 (2026-07-03): R-43 C1 Erasure SLA Monitor Stale — forty-third runbook. Closes the documentation gap for `c1-erasure-sla-monitor` (job 11, `0 8 * * *`, 26h freshness window) identified in `docs/OBSERVABILITY.md §12.6` — job 11 was registered in the canonical §12.6 registry with P5.1 GDPR Art. 17 day-33 SLA warning coverage but had no corresponding INCIDENT_RESPONSE runbook and no INCIDENT_RESPONSE cross-reference in its §12.6 stale-consequence column, unlike all peer daily compliance pg_cron jobs which carry explicit stale runbook cross-references. Critical characteristic: job 11 staleness creates a GDPR Art. 17 SLA risk — if any open erasure request was in the day 33–35 window during the stale period, or crossed day 35 undetected, the contractual and regulatory erasure obligation may have been missed without any PagerDuty P1 `form-compliance` alert firing; R-43-C3 provides the P0-escalated gate that immediately classifies this condition at IC activation and triggers R-09 if `breach_requests_at_declared ≥ 1`. Privacy floor enforced throughout: no `dsar_request_id`, no `user_id`, no email, no name, no GDPR Art. 9 data in any system DEC-030 event payload — aggregate counts only. Severity: P1 base; P0 if R-43-C2 (day 33–35 danger window) ≥ 1; P0 escalated + R-09 if R-43-C3 (day 35+ breach) ≥ 1. Trigger: `system.cron_job_stale` with `job_name = 'c1-erasure-sla-monitor'` from `pg-cron-health-monitor` (§12.7) → PagerDuty P1 `form-compliance` → compliance-officer; dedup `c1-erasure-sla-monitor-stale`. Four root cause hypotheses: H1 (job deleted/disabled — R-05 co-activation if unauthorized); H2 (SQL exception in job body — DDL change on `dsar_requests`); H3 (`form_system` SELECT permission revoked on `dsar_requests`); H4 (Supabase platform outage — R-03 co-activation). Four scope queries: R-43-C1 (last 5 job 11 run records — stale window + `return_message`); R-43-C2 (day 33–35 danger-window aggregate count — P0 gate); R-43-C3 (day 35+ breach aggregate count — P0 escalated gate + R-09 activation); R-43-C4 (peer daily compliance job health — H4 discriminator: ≥ 2 peer jobs stale). Five-step recovery procedure: Step 1 (H1 — re-register via `cron.schedule()` or re-enable; R-05 co-activation if unauthorized); Step 2 (H2 — identify breaking DDL change, revert or update job body; confirm `form_api` REVOKED invariant on `dsar_requests`); Step 3 (H3 — restore `form_system` SELECT on `dsar_requests`; confirm `form_api` REVOKED); Step 4 (H4 — co-activate R-03, await platform recovery); Step 5 (post-recovery: confirm `status = 'succeeded'` in `job_run_details`; re-run R-43-C2/C3; emit `system.c1_erasure_monitor_restored` STANDARD/3yr; resolve PagerDuty; follow R-09 closure if activated). Two DEC-030 HMAC-chained events: `system.c1_erasure_monitor_stale_declared` HIGH/7yr (Zod: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `trigger` enum['pagerduty_alert','manual_discovery','co_active_r03'], `initial_severity` enum['P1','P0','P0_ESCALATED'], `danger_window_requests_at_declared` nonneg int, `breach_requests_at_declared` nonneg int — no PII); `system.c1_erasure_monitor_restored` STANDARD/3yr (Zod: `incident_id` UUID, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `stale_window_hours` positive, `danger_window_requests_at_declared` nonneg int, `breach_requests_at_declared` nonneg int, `art17_sla_breached` bool); C1-ERASURE-STALE-CHAIN-01: `restored` must follow `declared` for same `incident_id`; HTTP 422 `C1_ERASURE_STALE_CHAIN_01_VIOLATION` on breach → R-05 activated. Evidence: stale-window `cron.job_run_details` export (CC7.2, 3yr); R-43-C2 at declaration (P5.1/C1.2, 7yr); R-43-C3 at declaration (P5.1/C1.2, 7yr); R-43-C2+C3 at restoration (P5.1/C1.2/CC4.1, 7yr); DEC-030 events in `audit_log_events` (chain-verifiable per HMAC-VERIFY-ALGO-001); ERASURE-MON-E-001 quarterly job 11 health report (P5.1/C1.2/CC4.1/CC7.2, 7yr — pending §79.4 registration per R-43.11 item 4). SOC 2 criteria: P5.1 (GDPR Art. 17 SLA monitoring; `danger_window_requests_at_declared = 0` AND `breach_requests_at_declared = 0` is auditor-inspectable attestation); C1.2 (contractual 35-day erasure commitment operationalised via job 11; stale window creates C1.2 gap; `breach_requests_at_declared` in `stale_declared` immediately classifies any contractual breach); CC4.1 (structured monitoring of own compliance controls — `pg-cron-health-monitor` detects job 11 gap and triggers IC response); CC7.2 (`pg-cron-health-monitor` detection + DEC-030 HMAC chain `stale_declared` → `stale_restored` = tamper-evident detection-to-restoration timeline independently verifiable per HMAC-VERIFY-ALGO-001). Post-incident controls: H1 unauthorized deletion → R-05 + `form_system` credential rotation; `breach_requests_at_declared ≥ 1` → R-09 (Data Subject Rights Breach) must complete closure before PagerDuty P0 resolution; §12.6 cross-ref [x] Done v5.14.4 patch 2026-07-03; ERASURE-MON-E-001 §79.4 registration (P1 — R-43.11 item 4). Four-item implementation checklist: 2× P0/M6 (AUDIT_LOG_SCHEMA registration; PagerDuty routing + integration test); 2× P1/M7–M11 (§12.6 cross-ref [x] Done v5.14.4 patch 2026-07-03; ERASURE-MON-E-001 §79.4 registration). Cross-references: `docs/OBSERVABILITY.md §12.6` (job 11 `c1-erasure-sla-monitor` registry entry — stale-consequence cross-ref updated with INCIDENT_RESPONSE R-43 per v5.14.4 patch [x] Done 2026-07-03); `docs/AUDIT_LOG_SCHEMA.md §DSAR & Erasure events` (companion DEC-030 events to be registered — R-43.11 item 1, P0/M6); `docs/SOC2_READINESS.md §79.4` (ERASURE-MON-E-001 quarterly job 11 health report — pending R-43.11 item 4 registration); R-03 (Infrastructure Outage — H4 co-activation path); R-05 (HMAC chain break — H1 unauthorized deletion co-activation and C1-ERASURE-STALE-CHAIN-01 violation escalation); R-09 (Data Subject Rights Breach — P0 escalated co-activation if `breach_requests_at_declared ≥ 1`). Owner: compliance-officer + devops-lead.*
+
+---
+
+**v1.0 · 2026-07-03 · Owner: compliance-officer + devops-lead**
+**Review: after every activation, minimum annual.**
+**Next scheduled review: July 2027 or after first activation — whichever comes first.**
 
 ---
 
