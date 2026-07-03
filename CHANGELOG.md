@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [11.84.0] — 2026-07-03
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — R-62 Victor Safety Baseline Refresh Stale runbook (§R-62.1–§R-62.12): companion stale recovery runbook for `victor_safety_baseline_refresh` (job 14, daily 01:00 UTC, P1 `form-devops`). CC7.2/A1.2. Covers false-negative risk from stale VICTOR-002/003/004 threshold denominators (FORM-VICTOR-001 P0 unaffected — threshold-independent). Five root causes H1–H5; H5 (`kv_write_failure`) unique: pg_cron shows succeeded but KV write failed silently. VBASE-REFRESH-STALE-CHAIN-01 DEC-030 ordering invariant (HTTP 422 `VBASE_REFRESH_STALE_CHAIN_01_VIOLATION`). VBASE-STALE-E-001 per-activation SOC 2 evidence artefact (CC7.2/A1.2, 7yr WORM). `clinical_safety_review_required` flag gates victor-safety-lead attestation when safety activity occurred during stale window. Header v3.27.0 → v3.28.0.
+- `docs/AUDIT_LOG_SCHEMA.md` — `system.victor_baseline_refresh_stale_declared` (HIGH/7yr) and `system.victor_baseline_refresh_restored` (LOW/3yr) registered with Zod v2 schemas, VBASE-REFRESH-STALE-CHAIN-01 ordering invariant, CC7.2/A1.2 auditor narratives. v2.76 → v2.77.
+- `docs/SOC2_READINESS.md` — §150 VBASE-STALE-E-001 registration (CC7.2/A1.2, §79.4 row, §80.3 `victor-safety/` subfolder update, §80.4 Vanta mirror entry). v3.75.0 → v3.76.0.
+- `docs/OBSERVABILITY.md` — §12.6 job 14 cross-reference updated (INCIDENT_RESPONSE R-62 companion runbook). Header v5.14.6 → v5.14.7.
+- `VERSION` — 11.83.1 → 11.84.0.
+
+---
+
 ## [11.83.1] — 2026-07-03
 
 ### Changed

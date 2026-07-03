@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.76
+# FORM · Audit Log Schema v2.77
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -1418,6 +1418,8 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `system.invite_expiry_sweep_restored` | 3 years | SOC 2 CC6.3/P5.1/P5.2 advisory — R-60 IC-confirmed jobs 10 + 12 restoration terminal event; INVITE-SWEEP-STALE-CHAIN-01 terminal; 3yr sufficient as recovery record (primary CC6.3/P5.1/P5.2 evidence carried by 7yr `system.invite_expiry_sweep_stale_declared`); registered v2.75 |
 | `system.apikey_chain_monitor_stale_declared` | 7 years | SOC 2 CC6.4/CC7.2 — R-61 IC-declared job 13 (`api_key_chain_monitor`) stale incident anchor; APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant (HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION` on inversion); P0 upgrade if `rotation_gap_count_at_declared > 0` (active CC6.4 credential exposure — APIKEY-SLO-03 breach) or `bypass_check_count_at_declared > 0` (potential DEC-030 bypass); APIKEY-CHAIN-STALE-E-001 per-activation evidence source; registered v2.76 |
 | `system.apikey_chain_monitor_restored` | 3 years | SOC 2 CC6.4/CC7.2 advisory — R-61 IC-confirmed job 13 restoration terminal event; APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 terminal; 3yr sufficient (primary CC6.4/CC7.2 evidence carried by 7yr `system.apikey_chain_monitor_stale_declared`); registered v2.76 |
+| `system.victor_baseline_refresh_stale_declared` | 7 years | SOC 2 CC7.2/A1.2 — R-62 IC-declared job 14 (`victor_safety_baseline_refresh`) stale incident anchor; VBASE-REFRESH-STALE-CHAIN-01 ordering invariant (HTTP 422 `VBASE_REFRESH_STALE_CHAIN_01_VIOLATION` on inversion); VBASE-STALE-E-001 per-activation evidence source; registered v2.77 |
+| `system.victor_baseline_refresh_restored` | 3 years | SOC 2 CC7.2/A1.2 advisory — R-62 IC-confirmed job 14 restoration terminal event; VBASE-REFRESH-STALE-CHAIN-01 terminal; 3yr sufficient (primary CC7.2/A1.2 evidence carried by 7yr `system.victor_baseline_refresh_stale_declared`); registered v2.77 |
 | `mobile.replay_config_updated` | 3 years | STANDARD — enterprise replay feature-flag state record; REPLAY-CHAIN-01 ordering invariant anchor; REPLAY-E-001 evidence artefact (SOC 2 CC6.7); `docs/OBSERVABILITY.md §46.6` (DEC-063) |
 | `mobile.replay_tier_violation` | 7 years | HIGH-severity zero-fire Tier S gate-bypass detection; SOC 2 CC7.2 (anomaly monitoring) + P1.1 (privacy notice conformance); any emission triggers P1 PagerDuty `form-compliance` + `form-devops` and §46.7 inadvertent capture escalation; REPLAY-E-003 evidence artefact; `docs/OBSERVABILITY.md §46.6` (DEC-063) |
 | `pam.*` | 7 years | SOC 2 CC6.1/CC6.2/CC6.3 JIT privilege access evidence; break-glass record |
@@ -5535,6 +5537,87 @@ CC7.2 requires FORM to monitor system components for anomalies that indicate pot
 
 **v2.76 · 2026-07-03 · owner: compliance-officer + security-engineer**
 *v2.76 (2026-07-03): +2 events — `system.apikey_chain_monitor_stale_declared` (HIGH/7yr) and `system.apikey_chain_monitor_restored` (LOW/3yr) — in new section `### API Key Chain Monitor Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-61 · CC6.4/CC7.2)`. Closes `docs/INCIDENT_RESPONSE.md R-61.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant, and CC6.4/CC7.2 auditor narratives). APIKEY-CHAIN-MONITOR-STALE-CHAIN-01: `system.apikey_chain_monitor_restored` blocked (HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05. Seven-field Zod v2 `ApiKeyChainMonitorStaleDeclaredPayloadSchema`: `incident_id` (UUID), `job_id` (literal 13), `stale_declared_at` (datetime), `last_succeeded_at` (datetime|null — null on H1/deleted), `hours_stale` (int≥0), `rotation_gap_count_at_declared` (int≥−1, −1 = not yet run), `bypass_check_count_at_declared` (int≥−1). Seven-field Zod v2 `ApiKeyChainMonitorRestoredPayloadSchema`: `incident_id` (UUID), `job_id` (literal 13), `restored_at` (datetime), `rotation_gap_count_closed` (int≥0, must be 0 at filing), `bypass_check_count_closed` (int≥0, must be 0 at filing), `root_cause` (enum deleted/disabled/infra/function_broken), `compensating_sql_executed` (bool). Privacy floor (both schemas): no `key_id`, `tenant_id`, `key_preview`, raw key material, `client_ip`, or GDPR Art. 9 data — aggregate INT counts only. Retention table: +2 rows (`system.apikey_chain_monitor_stale_declared` 7yr CC6.4/CC7.2; `system.apikey_chain_monitor_restored` 3yr CC6.4/CC7.2 advisory). Owner: compliance-officer + security-engineer.*
+
+---
+
+### Victor Baseline Refresh Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-62 · CC7.2/A1.2)
+
+> Defined in `docs/INCIDENT_RESPONSE.md` R-62 (v3.28.0, 2026-07-03). Two DEC-030 HMAC-chained events for job 14 (`victor_safety_baseline_refresh`, daily 01:00 UTC, 26h freshness) staleness. VBASE-REFRESH-STALE-CHAIN-01 ordering invariant: `system.victor_baseline_refresh_restored` blocked (HTTP 422 `VBASE_REFRESH_STALE_CHAIN_01_VIOLATION`) without prior `system.victor_baseline_refresh_stale_declared` for same `incident_id`. Clinical-safety significance: FORM-VICTOR-002/003/004 alert thresholds derive from baselines computed by job 14; a stale job means thresholds may not reflect the true 30-day rolling rate, creating false-negative risk where a genuine dangerous-advice spike goes undetected by VICTOR-002/003. FORM-VICTOR-001 (P0, threshold-independent) is unaffected. H5 root cause (`kv_write_failure`) is unique to R-62: pg_cron shows `succeeded` but KV write failed silently — R-62-C2 (Wrangler KV probe) required in addition to R-62-C1. Privacy floor (both events): aggregate INT counts and trigger-category strings only — no `user_id`, `session_id`, coaching content, body composition, or GDPR Art. 9 special-category data. Registered v2.77 (2026-07-03).
+
+#### `system.victor_baseline_refresh_stale_declared` — HIGH / 7 years
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `incident_id` | UUID | ✓ | Correlates stale_declared → restored; keyed in VBASE-STALE-E-001 |
+| `job_id` | INT | ✓ | `14` (constant for `victor_safety_baseline_refresh`) |
+| `stale_declared_at` | timestamptz | ✓ | UTC, ISO 8601 — IC acknowledgement timestamp |
+| `confirmed_stale_since` | timestamptz \| null | ✓ | From R-62-C1 pg_cron run history; null if job deleted (H1) or run history purged |
+| `stale_hours` | INT | ✓ | `stale_declared_at − confirmed_stale_since` in whole hours; 0 if `confirmed_stale_since` null |
+| `missing_categories` | string[] | ✓ | R-62-C2 KV probe — trigger categories with no fresh baseline key; empty array if all keys present |
+| `safety_incident_count_at_declared` | INT | ✓ | R-62-C3 aggregate `COUNT(*)` from `ai.safety_incident_opened` scoped to stale window; −1 if R-62-C3 not yet run at declaration time |
+
+**Zod v2 schema:**
+
+```typescript
+const VictorBaselineRefreshStaleDeclaredSchema = z.object({
+  incident_id:                       z.string().uuid(),
+  job_id:                            z.literal(14),
+  stale_declared_at:                 z.string().datetime(),
+  confirmed_stale_since:             z.string().datetime().nullable(),
+  stale_hours:                       z.number().int().nonnegative(),
+  missing_categories:                z.array(z.string()),
+  safety_incident_count_at_declared: z.number().int().min(-1),
+});
+```
+
+#### `system.victor_baseline_refresh_restored` — LOW / 3 years
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `incident_id` | UUID | ✓ | Must match `stale_declared` `incident_id` — VBASE-REFRESH-STALE-CHAIN-01 assertion |
+| `job_id` | INT | ✓ | `14` (constant) |
+| `restored_at` | timestamptz | ✓ | UTC, ISO 8601 — IC closure timestamp |
+| `root_cause` | ENUM | ✓ | `deleted` \| `disabled` \| `infra` \| `function_broken` \| `kv_write_failure` (H1–H5; H5 unique to job 14 — pg_cron succeeded but KV write failed silently) |
+| `compensating_computation_executed` | BOOL | ✓ | `true` if IC ran R-62 §Step 5 manual KV backfill via PAM-elevated Wrangler write |
+| `categories_restored` | string[] | ✓ | Trigger categories with fresh KV baseline keys confirmed post-restoration |
+| `clinical_safety_review_required` | BOOL | ✓ | `true` if `safety_incident_count_at_declared > 0` — flags mandatory victor-safety-lead review before P1 closure |
+
+**Zod v2 schema:**
+
+```typescript
+const VictorBaselineRefreshRestoredSchema = z.object({
+  incident_id:                       z.string().uuid(),
+  job_id:                            z.literal(14),
+  restored_at:                       z.string().datetime(),
+  root_cause:                        z.enum(['deleted', 'disabled', 'infra', 'function_broken', 'kv_write_failure']),
+  compensating_computation_executed: z.boolean(),
+  categories_restored:               z.array(z.string()),
+  clinical_safety_review_required:   z.boolean(),
+});
+```
+
+#### VBASE-REFRESH-STALE-CHAIN-01 Ordering Invariant
+
+| Invariant ID | Rule | Enforcement | Co-activates |
+|---|---|---|---|
+| VBASE-REFRESH-STALE-CHAIN-01 | `system.victor_baseline_refresh_restored` must not be emitted unless a `system.victor_baseline_refresh_stale_declared` with matching `incident_id` exists in the DEC-030 HMAC chain | HTTP 422 `VBASE_REFRESH_STALE_CHAIN_01_VIOLATION` returned by `emit-audit-event` Worker on invariant violation | R-05 (HMAC chain break runbook) |
+
+Structural peers: APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 (R-61 / v2.76); INVITE-SWEEP-STALE-CHAIN-01 (R-60 / v2.75); PKJWT-SWEEP-STALE-CHAIN-01 (R-57 / v2.74).
+
+#### CC7.2 Auditor Narrative
+
+CC7.2 requires FORM to monitor system components for anomalies that indicate potential system failure or impairment. Job 14 (`victor_safety_baseline_refresh`, daily 01:00 UTC) computes per-trigger-category 30-day rolling safety flag rates and writes them to `system.victor_safety_baselines` KV namespace. These baselines are the denominators for FORM-VICTOR-002 (P1, 3× baseline), FORM-VICTOR-003 (P2, 5× baseline), and FORM-VICTOR-004 (P3, 10× baseline) PagerDuty alert thresholds. `system.victor_baseline_refresh_stale_declared` is the tamper-evident IC incident anchor when this monitoring calibration control lapses; `missing_categories` is the auditor-inspectable KV-level attestation of which trigger categories lack a current baseline. A stale baseline during a period of elevated safety flags risks inflating the 30-day rolling rate used as the threshold denominator, causing subsequent VICTOR-002/003/004 thresholds to be too permissive — a false-negative risk that CC7.2 requires be surfaced and documented. `safety_incident_count_at_declared` (aggregate INT) provides IC-attested activity level during the stale window without exposing individual session or user identifiers. Retention 7yr for `stale_declared` (CC7.2 monitoring calibration gap record — multi-cycle SOC 2 coverage); 3yr for `restored` (recovery confirmation — primary evidence carried by 7yr anchor).
+
+#### A1.2 Auditor Narrative
+
+A1.2 requires FORM to maintain availability of system components — including the control systems that protect availability. The Victor safety threshold system (FORM-VICTOR-001 through -004) is a control-system component: it guards the availability of safe, clinically appropriate AI coaching by detecting anomalous safety flag rates. Job 14's KV baseline store is the threshold calibration substrate. When job 14 is stale, FORM-VICTOR-002/003/004 thresholds become uncalibrated — either stale-high (masking a real spike) or stale-low (generating false-positive noise that degrades IC-response bandwidth). `system.victor_baseline_refresh_stale_declared` documents the availability impairment of this calibration control; `compensating_computation_executed` in `restored` attests that calibration was restored. `clinical_safety_review_required = true` signals the IC must obtain victor-safety-lead attestation before closure when elevated safety activity occurred during the stale window. Note: FORM-VICTOR-001 (P0, any VT-03/04/05/06 trigger — threshold-independent) is unaffected by baseline staleness; A1.2 coverage here applies specifically to the VICTOR-002/003/004 proportional alert tiers.
+
+**Emitters:** Both events emitted by IC (devops-lead, PAM-elevated) via `POST /audit/emit-event` (DEC-030 HMAC-chained). `stale_declared` at R-62 T+0 after PagerDuty AL-VBASE-STALE-01 P1 fires; populate `missing_categories` (R-62-C2 Wrangler KV probe) and `safety_incident_count_at_declared` (R-62-C3) after scope queries complete (amendment acceptable before closure). `restored` at R-62 Step 6 after job 14 confirmed healthy and R-62-C2 returns no missing categories. No automated emission path — both events require IC PAM elevation.
+
+---
+
+**v2.77 · 2026-07-03 · owner: compliance-officer + security-engineer**
+*v2.77 (2026-07-03): +2 events — `system.victor_baseline_refresh_stale_declared` (HIGH/7yr) and `system.victor_baseline_refresh_restored` (LOW/3yr) — in new section `### Victor Baseline Refresh Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-62 · CC7.2/A1.2)`. Closes `docs/INCIDENT_RESPONSE.md R-62.12` item 1 (P0 — register both events with Zod v2 schemas, payload tables, VBASE-REFRESH-STALE-CHAIN-01 ordering invariant, and CC7.2/A1.2 auditor narratives). VBASE-REFRESH-STALE-CHAIN-01: `system.victor_baseline_refresh_restored` blocked (HTTP 422 `VBASE_REFRESH_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id`; co-activates R-05. Seven-field Zod v2 `VictorBaselineRefreshStaleDeclaredSchema`: `incident_id` (UUID), `job_id` (literal 14), `stale_declared_at` (datetime), `confirmed_stale_since` (datetime|null — null on H1/deleted or purged run history), `stale_hours` (int≥0), `missing_categories` (string[] — R-62-C2 KV probe result; empty = all categories have fresh baseline), `safety_incident_count_at_declared` (int≥−1, −1 = not yet run). Seven-field Zod v2 `VictorBaselineRefreshRestoredSchema`: `incident_id` (UUID), `job_id` (literal 14), `restored_at` (datetime), `root_cause` (enum deleted/disabled/infra/function_broken/kv_write_failure — 5 values, H1–H5; H5 `kv_write_failure` unique to job 14: pg_cron shows `succeeded` but KV write to `system.victor_safety_baselines` failed silently — discriminated by R-62-C2 Wrangler probe, not R-62-C1 pg_cron history), `compensating_computation_executed` (bool — true if §Step 5 manual KV backfill executed via PAM-elevated Wrangler write), `categories_restored` (string[]), `clinical_safety_review_required` (bool — true if `safety_incident_count_at_declared > 0`; victor-safety-lead review attestation required before P1 closure). Privacy floor (both schemas): no `user_id`, `session_id`, coaching session content, body composition metrics, GDPR Art. 9 data; no Victor safety flag text or session identifiers; aggregate INT counts and trigger-category strings only; `form_api` REVOKED. Retention table: +2 rows (`system.victor_baseline_refresh_stale_declared` 7yr CC7.2/A1.2; `system.victor_baseline_refresh_restored` 3yr CC7.2/A1.2 advisory). Clinical safety note: FORM-VICTOR-001 (P0, threshold-independent — any VT-03/04/05/06) unaffected by baseline staleness; staleness risk is specific to VICTOR-002/003/004 proportional tiers. Owner: compliance-officer + security-engineer.*
 
 ---
 

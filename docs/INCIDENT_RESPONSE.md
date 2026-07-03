@@ -22622,6 +22622,401 @@ Owner: @security-engineer
 
 ---
 
+## R-62 · Victor Safety Baseline Refresh Stale — `victor_safety_baseline_refresh` (job 14) — CC7.2 / A1.2 clinical-safety threshold integrity
+
+**Trigger:** `AL-VBASE-STALE-01` — `system.cron_job_stale` for `victor_safety_baseline_refresh` (job 14) → PagerDuty P1 `form-devops` → devops-lead; dedup `victor-baseline-stale`; freshness window: 26 h.
+
+**SOC 2:** CC7.2 (system monitoring for anomalies), A1.2 (environmental control availability — clinical-safety threshold evaluation).
+
+**Owners:** devops-lead (primary), clinical-safety (secondary — consulted when stale window > 48 h or safety incidents fired during stale period), compliance-officer (SOC 2 evidence).
+
+---
+
+### §R-62.1 Trigger Matrix
+
+| Alert ID | Source | Job | Freshness | PagerDuty route | Dedup key |
+|---|---|---|---|---|---|
+| AL-VBASE-STALE-01 | `system.cron_job_stale` | `victor_safety_baseline_refresh` (job 14) | 26 h | P1 `form-devops` → devops-lead | `victor-baseline-stale` |
+
+Job 14 runs daily at 01:00 UTC (`0 1 * * *`). It queries `VICTOR_SAFETY_TELEMETRY` Cloudflare Analytics Engine for the trailing 30 days, computes per-`trigger_category` flag rates, and writes results to the `system.victor_safety_baselines` Workers KV namespace (`vsafety:baseline:{trigger_category}:{date}`). These baseline values are the denominators used by FORM-VICTOR-002, FORM-VICTOR-003, and FORM-VICTOR-004 threshold evaluation:
+
+- **FORM-VICTOR-002** fires when `victor_safety_flag_rate_per_1k_turns` for VT-01/02 exceeds **3× 30-day rolling baseline** in any 30-minute window.
+- **FORM-VICTOR-003** fires when the same rate for VT-07/08 exceeds **5× 30-day rolling baseline** in any 1-hour window.
+- **FORM-VICTOR-004** fires when the rate for VT-09/10 exceeds **10× 30-day baseline** in any 2-hour window.
+
+When job 14 is stale, all three alert rules evaluate against the last successfully written baseline. A stale baseline creates two distinct risks:
+
+1. **False-positive risk** (lower severity): if the stale baseline is lower than current normal activity, thresholds are artificially tight → FORM-VICTOR-002/003 generates noise alerts.
+2. **False-negative risk** (higher severity): if the stale baseline was computed during an elevated-flag period (e.g., during a prior safety incident), the multiplied threshold is artificially high → a genuine VT-01/02 spike may not exceed `3× inflated baseline`, masking a true clinical safety signal. Note: FORM-VICTOR-001 (P0, threshold-independent) is **not** affected by baseline staleness — it fires on any single VT-03/04/05/06 event regardless.
+
+---
+
+### §R-62.2 Severity
+
+| Condition | Severity | Co-active runbooks |
+|---|---|---|
+| Default (job stale, baseline age < 48 h) | **P1** | — |
+| Stale window > 48 h | **P1** + mandatory clinical-safety consult | R-23 (consult only — clinical-safety decides whether to escalate) |
+| R-62-C3 shows FORM-VICTOR-002/003/004 fired during stale window | **P1** + mandatory clinical-safety threshold-validity review | R-23 (for review of whether fired alerts reflected true signal or stale-baseline artifact) |
+| All daily jobs stale (R-62-C4 Part A shows ≥ 3 peer jobs stale) | **P1** + co-active | R-03 (Supabase infra failure) |
+
+Clinical-safety holds VETO authority on whether any FORM-VICTOR-002/003/004 alert that fired during the stale window should be re-evaluated as potentially false-negative-masked. devops-lead escalates to clinical-safety owner on first awareness of stale window > 48 h.
+
+---
+
+### §R-62.3 Immediate Action Timeline
+
+| Time | Action |
+|---|---|
+| **T+0** | Acknowledge PagerDuty. Emit `system.victor_baseline_refresh_stale_declared` (DEC-030 HMAC-chained; see §R-62.8). Set `safety_incident_count_at_declared = -1` as placeholder until R-62-C3 completes. |
+| **T+5** | Run **R-62-C1** (pg_cron run history — staleness confirmation). Identify `last_succeeded_at` to compute stale duration. |
+| **T+10** | Run **R-62-C2** (KV baseline state — which `trigger_category` keys are stale or absent). |
+| **T+15** | Run **R-62-C3** (safety incident count during stale window). If `stale_duration_hours > 48` OR any FORM-VICTOR-002/003/004 alert fired: page clinical-safety owner on `#alerts-safety` (§R-62.7 Template B). |
+| **T+20** | Run **R-62-C4** (peer job health + job catalog). Identify root cause hypothesis H1–H5 (§R-62.5). |
+| **T+25** | If H4 or H5: trigger manual compensating baseline computation (§R-62.6 Step 3). |
+| **T+30** | Post Slack update (§R-62.7 Template A). Begin restoration by H1–H5 (§R-62.6 Step 4). |
+
+---
+
+### §R-62.4 Scope Queries
+
+#### R-62-C1 · pg_cron run history (staleness confirmation)
+
+```sql
+-- PAM-elevated read-only (form_readonly)
+SELECT
+  j.jobname,
+  j.schedule,
+  j.active,
+  r.runid,
+  r.start_time,
+  r.end_time,
+  r.status,
+  r.return_message,
+  EXTRACT(EPOCH FROM (now() - r.start_time)) / 3600 AS hours_since_this_run
+FROM cron.job j
+LEFT JOIN cron.job_run_details r ON r.jobid = j.jobid
+WHERE j.jobname = 'victor_safety_baseline_refresh'
+ORDER BY r.start_time DESC NULLS LAST
+LIMIT 10;
+```
+
+Expected: at least one `succeeded` row within the past 26 h. Absence of a succeeded row within 26 h → stale confirmed. Note `last_succeeded_at` from the most recent `succeeded` row — this is `confirmed_stale_since` in the DEC-030 stale_declared event payload.
+
+#### R-62-C2 · KV baseline state check (Cloudflare Workers KV — Wrangler CLI)
+
+Run via Wrangler CLI with `form-devops` credentials (PAM-elevated if required for KV access):
+
+```bash
+# List all baseline keys in the system.victor_safety_baselines namespace
+wrangler kv:key list \
+  --namespace-id=<VICTOR_SAFETY_BASELINES_KV_NAMESPACE_ID> \
+  --prefix="vsafety:baseline:" | jq '.[] | .name'
+
+# Spot-check yesterday's baseline for VT-01 (highest clinical sensitivity)
+YESTERDAY=$(date -u -d "yesterday" +%Y-%m-%d)
+wrangler kv:key get "vsafety:baseline:VT-01:${YESTERDAY}" \
+  --namespace-id=<VICTOR_SAFETY_BASELINES_KV_NAMESPACE_ID>
+```
+
+Expected output: keys for all 10 trigger categories (VT-01 through VT-10) with date stamps within the prior 26 h. Missing keys or keys older than 26 h confirm the job did not write successfully. Note which `trigger_category` keys are stale or absent — this informs the H4/H5 root cause discrimination and the compensating computation scope.
+
+**Privacy note:** KV baseline values are aggregate flag rates per `trigger_category` — no `user_id`, `session_id`, `coaching_turns.content`, or GDPR Art. 9 data is stored in the KV namespace.
+
+#### R-62-C3 · Safety incident activity during stale window (clinical-safety exposure gate)
+
+```sql
+-- PAM-elevated read-only (form_readonly)
+-- Aggregate counts only — no session_id coaching content, or user health data
+SELECT
+  metadata->>'severity_class'    AS severity_class,
+  COUNT(*)                       AS incident_count,
+  MIN(created_at)                AS first_opened,
+  MAX(created_at)                AS last_opened
+FROM audit_log_events
+WHERE event_type = 'ai.safety_incident_opened'
+  AND created_at >= $last_succeeded_at  -- from R-62-C1 most recent succeeded row
+GROUP BY metadata->>'severity_class'
+ORDER BY severity_class;
+```
+
+**Interpretation:**
+- Zero rows → no safety incidents opened during the stale window; no clinical-safety false-negative risk from FORM-VICTOR-002/003/004.
+- P0 rows → FORM-VICTOR-001 fired (threshold-independent; not affected by baseline staleness) — these are true signals; note for R-23 cross-reference in VBASE-STALE-E-001.
+- P1/P2 rows → FORM-VICTOR-002/003/004 fired during the stale window; clinical-safety must review whether the stale baseline could have masked additional true signals or generated false positives. Escalate to clinical-safety owner immediately (§R-62.7 Template B).
+
+**Privacy invariant:** `audit_log_events.metadata` for `ai.safety_incident_opened` carries `incident_id` (UUID), `severity_class`, `trigger_category`, `affected_session_count` (integer), `model_version`, and `prompt_version` only — no `user_id`, `session_id` content, or GDPR Art. 9 health data. This query groups by `severity_class` and COUNT only — no individual incident identifiers surface.
+
+#### R-62-C4 · Peer job health discriminator + job catalog
+
+**Part A — peer daily job health (all-jobs-stale discriminator):**
+
+```sql
+-- PAM-elevated read-only (form_readonly)
+SELECT
+  j.jobname,
+  j.active,
+  MAX(r.start_time)                                                    AS last_run,
+  EXTRACT(EPOCH FROM (now() - MAX(r.start_time))) / 3600               AS hours_since_last_run
+FROM cron.job j
+LEFT JOIN cron.job_run_details r ON r.jobid = j.jobid
+WHERE j.jobname IN (
+  'api_key_chain_monitor',
+  'c1_erasure_sla_monitor',
+  'invite_expiry_sweep',
+  'workout_data_purge'
+)
+GROUP BY j.jobname, j.active
+ORDER BY last_run ASC NULLS FIRST;
+```
+
+If ≥ 3 peer jobs show `hours_since_last_run > 26` → co-active **R-03** (Supabase infrastructure failure). Single-job staleness → H1, H2, H4, or H5 most likely.
+
+**Part B — job catalog check:**
+
+```sql
+SELECT jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'victor_safety_baseline_refresh';
+```
+
+Expected: `jobname = 'victor_safety_baseline_refresh'`, `schedule = '0 1 * * *'`, `active = true`.
+
+---
+
+### §R-62.5 Root Cause Hypotheses
+
+| ID | Hypothesis | Discriminator |
+|---|---|---|
+| H1 | Job 14 deleted from `cron.job` | R-62-C1 returns zero rows; R-62-C4 Part B returns zero rows |
+| H2 | Job 14 disabled (`active = false`) | R-62-C4 Part B shows `active = false`; R-62-C1 shows last succeeded row older than 26 h |
+| H3 | Supabase infrastructure failure (pg_cron daemon not running or Postgres unreachable) | R-62-C4 Part A shows ≥ 3 peer jobs also stale; co-active R-03 |
+| H4 | `victor_safety_baseline_refresh()` function broken — Cloudflare Analytics Engine API unavailable or `VICTOR_SAFETY_TELEMETRY` schema change broke the query | R-62-C1 shows a recent `failed` status row with error in `return_message`; R-62-C4 Part A shows peer jobs healthy |
+| H5 | KV namespace write failure — `system.victor_safety_baselines` Workers KV namespace unavailable or permission error at write step | R-62-C1 shows recent `succeeded` status (job ran) but R-62-C2 shows stale/absent keys (write failed silently or threw after pg_cron exit) |
+
+H4 and H5 are distinguished by R-62-C1 run status:
+- H4: pg_cron shows `failed` → the AE query or KV write threw before the job returned success.
+- H5: pg_cron shows `succeeded` → the function completed but the KV write silently failed or was rolled back after pg_cron recorded success (rare, but possible if `pg_net` async write was used and Workers KV was transiently unavailable at write time).
+
+---
+
+### §R-62.6 Recovery Steps
+
+**Step 1 — Emit stale-declared DEC-030 event** (T+0; do not skip even if recovering quickly):
+
+Emit `system.victor_baseline_refresh_stale_declared` via `POST /audit/emit-event` Worker with:
+- `incident_id`: new UUID (correlates to VBASE-STALE-E-001 artefact and terminal `restored` event)
+- `confirmed_stale_since`: `last_succeeded_at` from R-62-C1 (null if H1 — job never ran)
+- `stale_hours`: computed from `now() - confirmed_stale_since`
+- `missing_categories`: array of `trigger_category` values with stale or absent KV keys from R-62-C2 (empty array if R-62-C2 not yet run — update payload when available)
+- `safety_incident_count_at_declared`: result of R-62-C3 total incident count across all severity classes (or `-1` if R-62-C3 not yet run)
+
+**Step 2 — Assess clinical safety exposure** (T+15 if stale window > 48 h or R-62-C3 > 0):
+
+Page clinical-safety owner on `#alerts-safety` (§R-62.7 Template B). Provide: stale duration, R-62-C3 incident count by severity class, R-62-C2 missing category list. Clinical-safety owner decides whether to:
+1. Accept the stale window as low-risk (FORM-VICTOR-001 was active throughout; FORM-VICTOR-002/003 had no confirmed false-negative evidence).
+2. Declare a formal clinical-safety review (activate R-23 §R-23.2 P1 path) if evidence suggests FORM-VICTOR-002/003 may have failed to fire during the stale window.
+
+Document clinical-safety owner's decision in the VBASE-STALE-E-001 artefact IC narrative.
+
+**Step 3 — Manual compensating baseline computation** (if H4 or H5, and stale window > 24 h):
+
+Run via PAM-elevated `form_system` role Supabase Edge Function invocation or direct SQL. This re-computes the 30-day rolling baseline and writes it to KV:
+
+```sql
+-- Manual baseline computation for all 10 trigger categories
+-- Uses form_system role (has SELECT on VICTOR_SAFETY_TELEMETRY view if exposed in Postgres)
+-- If VICTOR_SAFETY_TELEMETRY is AE-only, use the Cloudflare Workers KV write API directly
+
+-- If available via Postgres-side telemetry aggregate view (form_system only):
+SELECT
+  trigger_category,
+  COUNT(*) * 1000.0 / NULLIF(SUM(COUNT(*)) OVER (), 0)   AS flags_per_1k_turns,
+  COUNT(*)                                                 AS total_flags,
+  now()::date                                              AS computed_for_date
+FROM victor_safety_telemetry_daily_agg  -- form_system-only aggregate (no content)
+WHERE telemetry_date >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY trigger_category
+ORDER BY trigger_category;
+```
+
+Write each result to `system.victor_safety_baselines` KV: `vsafety:baseline:{trigger_category}:{date}`. This is a compensating control that restores FORM-VICTOR-002/003/004 correct threshold evaluation until job 14 is operational again. Document in VBASE-STALE-E-001 as `compensating_computation_executed = true`.
+
+**Step 4 — Restore job 14:**
+
+| Root cause | Restoration action |
+|---|---|
+| H1 (deleted) | `SELECT cron.schedule('victor_safety_baseline_refresh', '0 1 * * *', 'SELECT victor_safety_baseline_refresh()');` |
+| H2 (disabled) | `UPDATE cron.job SET active = true WHERE jobname = 'victor_safety_baseline_refresh';` |
+| H3 (Supabase infra) | Await Supabase infrastructure recovery; verify via R-62-C4 Part A all peer jobs restored; co-active R-03 takes lead. |
+| H4 (function broken) | Patch `victor_safety_baseline_refresh()`: fix the broken AE query or VICTOR_SAFETY_TELEMETRY schema change; deploy via migration; verify no breaking change to `VICTOR_SAFETY_TELEMETRY` or `system.victor_safety_baselines` KV schema. |
+| H5 (KV write failure) | Investigate Workers KV namespace health; rotate namespace binding if permission issue; re-deploy `victor_safety_baseline_refresh()` with KV write error surfacing to pg_cron return message. |
+
+**Step 5 — Confirm restoration:**
+
+```sql
+SELECT cron.run_job(jobid)
+FROM cron.job
+WHERE jobname = 'victor_safety_baseline_refresh';
+
+-- Wait 60 s (AE query takes longer than a simple SQL job), then verify:
+SELECT start_time, end_time, status, return_message
+FROM cron.job_run_details r
+JOIN cron.job j ON j.jobid = r.jobid
+WHERE j.jobname = 'victor_safety_baseline_refresh'
+ORDER BY start_time DESC
+LIMIT 3;
+```
+
+Expected: `status = 'succeeded'` in the most recent row. Immediately verify via R-62-C2: all 10 VT-01…VT-10 KV keys should have fresh timestamps (within 5 min of forced run). If R-62-C2 still shows stale keys after a `succeeded` run → H5 (KV write failure) — escalate to platform-engineer.
+
+**Step 6 — File VBASE-STALE-E-001:**
+
+Emit `system.victor_baseline_refresh_restored` DEC-030 event (VBASE-REFRESH-STALE-CHAIN-01 terminal) with `incident_id` (must match `stale_declared`), `restored_at`, `root_cause` (H1–H5 enum), `compensating_computation_executed` (bool), `categories_restored` (array of VT-XX values confirmed in KV), `clinical_safety_review_required` (bool from R-62-C3 assessment). File VBASE-STALE-E-001 under `compliance/evidence/victor-safety/vbase-stale-e-001-<YYYY-MM-DD>/` (7yr WORM; dual devops-lead + compliance-officer sign-off; Vanta mirror upload within 48 h of `restored` emission).
+
+---
+
+### §R-62.7 Slack Communication Templates
+
+**Template A — P1 Stale Detected (`#alerts-devops`):**
+
+```
+🟡 [P1] victor_safety_baseline_refresh (job 14) STALE
+Stale since: {confirmed_stale_since} UTC ({stale_hours}h ago)
+Missing KV categories: {missing_categories or 'running R-62-C2'}
+Safety incidents during window: {safety_incident_count_at_declared or 'running R-62-C3'}
+Incident ID: {incident_id}
+IC: @devops-lead | Runbook: INCIDENT_RESPONSE §R-62
+Dedup: victor-baseline-stale | Next update: T+30
+```
+
+**Template B — Clinical Safety Consult Required (`#alerts-safety`):**
+
+```
+🔶 [CLINICAL-SAFETY CONSULT REQUIRED] Victor baseline stale > 48h or safety incidents during window
+Stale duration: {stale_hours}h | Incident ID: {incident_id}
+Safety incidents opened during stale window by severity:
+  P0: {p0_count} (FORM-VICTOR-001 — threshold-independent, not affected by baseline)
+  P1: {p1_count} (FORM-VICTOR-002 — VT-01/02; POSSIBLE false-negative risk if baseline inflated)
+  P2: {p2_count} (FORM-VICTOR-003 — VT-07/08)
+  P3: {p3_count} (FORM-VICTOR-004 — VT-09/10)
+Missing baseline categories: {missing_categories}
+Action required: @clinical-safety review whether stale baseline may have masked VT-01/02 signals
+IC: @devops-lead | Runbook: §R-62.2 + §R-62.6 Step 2
+```
+
+**Template C — Post-Resolution (`#alerts-devops` + `#alerts-safety` if Template B was sent):**
+
+```
+✅ [RESOLVED] victor_safety_baseline_refresh (job 14) restored
+Root cause: {H1|H2|H3|H4|H5 — description}
+Stale window: {stale_hours}h ({confirmed_stale_since} → {restored_at} UTC)
+Compensating baseline computation: {Yes/No}
+Clinical safety review outcome: {outcome or 'N/A — not required'}
+VBASE-STALE-E-001 filed: {R2 path}
+```
+
+---
+
+### §R-62.8 DEC-030 Audit Chain
+
+**Events registered in `docs/AUDIT_LOG_SCHEMA.md §Victor-Baseline-Refresh-Stale events` (v2.77, 2026-07-03):**
+
+**`system.victor_baseline_refresh_stale_declared` — HIGH / 7 years:**
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Correlates stale_declared → restored; keyed in VBASE-STALE-E-001 |
+| `job_id` | INT | 14 (constant) |
+| `stale_declared_at` | timestamptz | UTC, ISO 8601 |
+| `confirmed_stale_since` | timestamptz \| null | From R-62-C1 last succeeded row; null if H1 (job deleted, no run history) |
+| `stale_hours` | INT | Derived: `stale_declared_at − confirmed_stale_since`; 0 if null |
+| `missing_categories` | TEXT[] | `trigger_category` values with stale/absent KV keys from R-62-C2; empty array if R-62-C2 not yet run |
+| `safety_incident_count_at_declared` | INT | Total `ai.safety_incident_opened` count from R-62-C3; −1 if not yet run |
+
+**`system.victor_baseline_refresh_restored` — LOW / 3 years:**
+
+| Field | Type | Notes |
+|---|---|---|
+| `incident_id` | UUID | Must match `stale_declared` `incident_id` |
+| `job_id` | INT | 14 (constant) |
+| `restored_at` | timestamptz | UTC, ISO 8601 |
+| `root_cause` | ENUM | `deleted` \| `disabled` \| `infra` \| `function_broken` \| `kv_write_failure` |
+| `compensating_computation_executed` | BOOL | `true` if §R-62.6 Step 3 manual baseline computation was performed |
+| `categories_restored` | TEXT[] | VT-XX values confirmed in KV after restoration (should be all 10) |
+| `clinical_safety_review_required` | BOOL | `true` if stale window > 48h or R-62-C3 returned P1/P2/P3 incidents |
+
+**Privacy floor (both events):** No `user_id`, `session_id`, coaching content, body composition metric, baseline numeric values, or GDPR Art. 9 special-category data appears in either event payload. `missing_categories` carries only `trigger_category` enum codes (VT-01…VT-10) — no individual safety classification events, no coaching content.
+
+**VBASE-REFRESH-STALE-CHAIN-01 Ordering Invariant:**
+
+| Invariant ID | Rule | Enforcement |
+|---|---|---|
+| VBASE-REFRESH-STALE-CHAIN-01 | `system.victor_baseline_refresh_restored` must not be emitted unless a `system.victor_baseline_refresh_stale_declared` with matching `incident_id` exists in the DEC-030 HMAC chain | HTTP 422 `VBASE_REFRESH_STALE_CHAIN_01_VIOLATION` returned by `emit-audit-event` Worker on inversion; co-activates R-05 |
+
+---
+
+### §R-62.9 VBASE-STALE-E-001 Evidence Artefact
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | VBASE-STALE-E-001 |
+| **SOC 2 criteria** | CC7.2, A1.2 |
+| **Frequency** | Per-activation (one artefact per R-62 incident) |
+| **Retention** | 7 years WORM |
+| **Storage path** | `compliance/evidence/victor-safety/vbase-stale-e-001-<YYYY-MM-DD>/` |
+| **Owners** | devops-lead (primary) + compliance-officer (sign-off) + clinical-safety (sign-off if `clinical_safety_review_required = true`) |
+| **Vanta mirror** | Upload within 48 h of `system.victor_baseline_refresh_restored` emission |
+| **Contents** | `system.victor_baseline_refresh_stale_declared` event JSON; R-62-C1 output (pg_cron run history — last 10 rows); R-62-C2 output (KV key list — keys and timestamps only, no baseline rate values); R-62-C3 output (aggregate safety incident counts by severity class — no individual incident IDs); compensating baseline computation log if §R-62.6 Step 3 executed; R-62-C4 Part A peer health output; job restoration confirmation query result; clinical-safety owner decision record (if `clinical_safety_review_required = true`); `system.victor_baseline_refresh_restored` event JSON; dual devops-lead + compliance-officer sign-off |
+| **Registered** | SOC2_READINESS.md §150 (v3.76.0, 2026-07-03) |
+
+---
+
+### §R-62.10 Post-Incident Controls
+
+| # | Control | Owner | Trigger |
+|---|---|---|---|
+| 1 | Post-mortem: document stale window, root cause H-classification, whether FORM-VICTOR-002/003/004 thresholds were materially compromised during the window, and clinical-safety owner decision | devops-lead + clinical-safety | Post every P1 activation where stale_hours > 48 or clinical_safety_review_required = true |
+| 2 | H4 guard: if `victor_safety_baseline_refresh()` broke due to a schema change in `VICTOR_SAFETY_TELEMETRY`, add a CI integration test that asserts the AE query returns ≥ 1 row per `trigger_category` in staging | devops-lead + platform-engineer | Post first H4 occurrence |
+| 3 | H5 guard: add explicit KV write error handling in `victor_safety_baseline_refresh()` that surfaces a `return_message` error string to pg_cron `job_run_details` — the current H5 discriminator requires R-62-C2 because a KV write failure may not prevent `status = 'succeeded'` in pg_cron | platform-engineer | Post first H5 occurrence |
+| 4 | H1/H2 CI guard: add lint rule (consistent with R-58 §R-58.7 item 2) blocking `DROP FUNCTION victor_safety_baseline_refresh` and `UPDATE cron.job SET active = false WHERE jobname = 'victor_safety_baseline_refresh'` without required approvals | devops-lead | After first H1 or H2 occurrence |
+| 5 | Quarterly proactive run history sweep: verify job 14 has ≥ 85 successful runs in the trailing 90 days; < 85 triggers investigation | devops-lead | Quarterly |
+
+---
+
+### §R-62.11 Cross-References
+
+| Reference | Relationship |
+|---|---|
+| `docs/OBSERVABILITY.md §12.6` (job 14 row) | pg_cron canonical registry — AL-VBASE-STALE-01 alert source; cross-reference updated v5.14.7 (this pass) |
+| `docs/OBSERVABILITY.md §32.4` | FORM-VICTOR-002/003/004 alert thresholds + `victor_safety_baseline_refresh` computation SQL — canonical definition of the baselines this job produces |
+| `docs/AUDIT_LOG_SCHEMA.md §Victor-Baseline-Refresh-Stale events` | `system.victor_baseline_refresh_stale_declared` HIGH/7yr + `system.victor_baseline_refresh_restored` LOW/3yr with VBASE-REFRESH-STALE-CHAIN-01 invariant; registered v2.77 (this pass) |
+| `docs/INCIDENT_RESPONSE.md R-03` | Supabase infrastructure failure runbook — co-activate when R-62-C4 Part A shows all-jobs-stale discriminator |
+| `docs/INCIDENT_RESPONSE.md R-05` | HMAC chain break runbook — co-activate if VBASE-REFRESH-STALE-CHAIN-01 emits 422 |
+| `docs/INCIDENT_RESPONSE.md R-23` | Victor AI safety incident runbook — consulted when stale window > 48h or P1/P2/P3 safety incidents opened during stale window |
+| `docs/SOC2_READINESS.md §150` | VBASE-STALE-E-001 companion SOC 2 section (CC7.2/A1.2; v3.76.0, 2026-07-03) |
+| `docs/SOC2_READINESS.md §79.4` | VBASE-STALE-E-001 master evidence table registration (CC7.2/A1.2; per-activation; 7yr; v3.76.0, this pass) |
+
+---
+
+### §R-62.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.victor_baseline_refresh_stale_declared` (HIGH/7yr) and `system.victor_baseline_refresh_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, VBASE-REFRESH-STALE-CHAIN-01 ordering invariant, and CC7.2/A1.2 auditor narratives | compliance-officer + platform-engineer | **P0** | [x] **Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.77).** |
+| 2 | Implement VBASE-REFRESH-STALE-CHAIN-01 enforcement in `supabase/functions/emit-audit-event/index.ts`: HTTP 422 `VBASE_REFRESH_STALE_CHAIN_01_VIOLATION` on `system.victor_baseline_refresh_restored` emitted without matching `system.victor_baseline_refresh_stale_declared` for same `incident_id` | platform-engineer | **P0** | [ ] |
+| 3 | Register VBASE-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/A1.2; per-activation; 7yr; `compliance/evidence/victor-safety/vbase-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.76.0, §150).** |
+| 4 | Update `docs/OBSERVABILITY.md §12.6` job 14 row cross-reference column: add `; INCIDENT_RESPONSE R-62 (§R-62; v1.0, 2026-07-03 — companion stale recovery runbook for job 14)` | devops-lead | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.14.7).** |
+| 5 | Authoring complete — §R-62 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.28.0).** |
+
+**Privacy floor (invariant throughout R-62):** No `user_id`, `session_id`, coaching session content, body composition metric, individual safety telemetry record, baseline numeric rate values, or GDPR Art. 9 special-category data appears in any R-62 scope query result, communication template payload, DEC-030 event payload, or VBASE-STALE-E-001 evidence artefact. R-62-C1 surfaces only pg_cron run metadata (timestamps, run counts, status). R-62-C2 surfaces only KV key names and timestamps — no baseline rate values are included in the evidence artefact. R-62-C3 surfaces only aggregate `COUNT(*)` grouped by `severity_class` — no individual `incident_id` UUIDs, `session_id` values, or coaching content; `ai.safety_incident_opened` payload fields `trigger_category` and `affected_session_count` are not surfaced. R-62-C4 surfaces only pg_cron job metadata and run timestamps. The compensating computation in §R-62.6 Step 3 uses `form_system` role and accesses `victor_safety_telemetry_daily_agg` (aggregate view only — no per-session rows); computed baseline rates are written to Workers KV and are not included in any DEC-030 event payload or evidence artefact.
+
+---
+
+*v3.28.0 (2026-07-03): R-62 — Victor Safety Baseline Refresh Stale (`victor_safety_baseline_refresh`, job 14) — CC7.2 / A1.2 clinical-safety threshold integrity companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 14 was the highest-priority remaining daily pg_cron job without a companion stale recovery runbook after R-61 (job 13), R-60 (jobs 10 + 12), R-59 (job 30), R-58 (job 36), and R-57 (job 58) closed gaps for their respective jobs. §R-62.1 trigger matrix: AL-VBASE-STALE-01 `system.cron_job_stale` for job 14 → P1 `form-devops` → devops-lead; dedup `victor-baseline-stale`; 26h freshness window. §R-62.2 severity: P1 default; mandatory clinical-safety consult if stale > 48h or R-62-C3 shows P1/P2/P3 safety incidents during stale window (FORM-VICTOR-002/003/004 threshold-validity risk — FORM-VICTOR-001 is threshold-independent and unaffected); co-active R-03 on all-jobs-stale discriminator. §R-62.3 five-step immediate action timeline (T+0 to T+30): emit stale_declared at T+0; R-62-C1 pg_cron history at T+5; R-62-C2 KV state at T+10; R-62-C3 safety incident gate + clinical-safety escalation at T+15; R-62-C4 peer health + root cause at T+20; compensating computation at T+25 if H4/H5. §R-62.4 four scope queries: R-62-C1 (pg_cron run history for job 14 — `last_succeeded_at`); R-62-C2 (Wrangler KV key list — missing/stale categories); R-62-C3 (aggregate `ai.safety_incident_opened` counts by severity class — no individual incident IDs or coaching content); R-62-C4 Part A (peer job health: api_key_chain_monitor, c1_erasure_sla_monitor, invite_expiry_sweep, workout_data_purge) + Part B (job catalog check). §R-62.5 five root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infra), H4 (`victor_safety_baseline_refresh()` function broken — AE query or schema change), H5 (KV write failure — pg_cron shows succeeded but KV keys remain stale). §R-62.6 six-step recovery: (1) emit stale_declared; (2) clinical-safety exposure assessment if stale > 48h or R-62-C3 > 0; (3) manual compensating baseline computation if H4/H5; (4) restore job 14 by H1–H5; (5) confirm via `cron.run_job()` + R-62-C2 KV verification; (6) emit stale_restored + file VBASE-STALE-E-001. §R-62.7 three Slack templates (#alerts-devops + #alerts-safety): P1 stale detected; clinical-safety consult required; post-resolution. §R-62.8 DEC-030 chain: `system.victor_baseline_refresh_stale_declared` HIGH/7yr + `system.victor_baseline_refresh_restored` LOW/3yr; VBASE-REFRESH-STALE-CHAIN-01 ordering invariant (HTTP 422 `VBASE_REFRESH_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: KV key names and timestamps only — no baseline rate values, no user_id, no session_id, no coaching content, no GDPR Art. 9 data in any payload. §R-62.9 VBASE-STALE-E-001 per-activation evidence artefact (CC7.2/A1.2; per-activation; 7yr WORM; `compliance/evidence/victor-safety/vbase-stale-e-001-<YYYY-MM-DD>/`; clinical-safety sign-off required if `clinical_safety_review_required = true`; Vanta mirror within 48h). §R-62.10 five post-incident controls: post-mortem if stale > 48h or clinical review required; H4 AE query CI guard; H5 KV write error surfacing; H1/H2 CI lint guard; quarterly 90-day run-history sweep. §R-62.11 eight cross-references: OBSERVABILITY §12.6 (job 14, v5.14.7); OBSERVABILITY §32.4 (FORM-VICTOR-002/003/004 + baseline computation SQL); AUDIT_LOG_SCHEMA §Victor-Baseline-Refresh-Stale events (v2.77); INCIDENT_RESPONSE R-03 + R-05 + R-23; SOC2_READINESS §150 + §79.4 (v3.76.0). §R-62.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.77 chain events + invariant; SOC2_READINESS.md v3.76.0 §150 VBASE-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.14.7 §12.6 job 14 cross-ref; authoring complete); item 2 pending (platform-engineer — VBASE-REFRESH-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker). Document header v3.27.0 → v3.28.0. Owner: devops-lead + compliance-officer + clinical-safety.*
+
+---
+
 *v3.27.0 (2026-07-03): R-61 — API Key Chain Monitor Stale (`api_key_chain_monitor`, job 13) — CC6.4 / CC7.2 companion stale recovery runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks: job 13 was the only remaining daily P1-alert pg_cron job routing to `form-security` without a companion stale recovery runbook after R-57 (job 58), R-58 (job 36), R-59 (job 30), R-60 (jobs 10 + 12), and R-43 (job 11) closed the gaps for their respective jobs. §R-61.1 trigger matrix: AL-APIKEY-CHAIN-STALE-01 `system.cron_job_stale` for job 13 → P1 `form-security` → security-engineer; dedup `apikey-chain-stale`; 26h freshness window. §R-61.2 severity: P1 default; P0 upgrade if R-61-C2 `open_rotation_gap_count > 0` (active credential exposure — APIKEY-SLO-03 breach) or R-61-C3 `unmatched_live_key_count > 0` (potential DEC-030 bypass); co-active R-01 (security incident) on P0; co-active R-03 (Supabase infra) on all-jobs-stale discriminator; co-active R-05 on HMAC chain break during stale window. §R-61.3 six-step immediate action timeline (T+0 to T+30): acknowledge + emit stale_declared at T+0; R-61-C2 P0 gate at T+5; R-61-C3 P0 gate at T+10; P0 escalation + compensating SQL at T+15; R-61-C1 staleness confirmation at T+20; R-61-C4 peer health + root cause at T+30. §R-61.4 four scope queries: R-61-C1 (pg_cron run history for job 13); R-61-C2 (manual APIKEY-CHAIN-02 — aggregate `open_rotation_gap_count`, `min_gap_hours`, `max_gap_hours`; `old_key_id` as join predicate only); R-61-C3 (manual APIKEY-CHAIN-01 — aggregate `unmatched_live_key_count`; `key_id` as join predicate only); R-61-C4 Part A (peer job health: invite_expiry_sweep, c1_erasure_sla_monitor, victor_safety_baseline_refresh, workout_data_purge) + Part B (job catalog check). §R-61.5 four root-cause hypotheses: H1 (deleted), H2 (disabled), H3 (Supabase infrastructure), H4 (`api_key_chain_monitor()` function broken — DDL change to `tenant_api_keys` or `audit_log`). §R-61.6 five-step recovery: (1) emit `system.apikey_chain_monitor_stale_declared` at T+0 with `incident_id`, placeholders `−1` for counts before scope queries; (2) P0 compensating SQL — `UPDATE tenant_api_keys SET revoked_at = now()` for open rotation-gap old keys (`key_id` as join predicate only — never selected or logged; dual sign-off required); emit `api_key.revoked` batch events; (3) restore job 13 by H1–H4; (4) confirm via `cron.run_job()` + re-run R-61-C2/C3 (both must be 0); (5) file APIKEY-CHAIN-STALE-E-001 + emit `system.apikey_chain_monitor_restored`. §R-61.7 three Slack templates (#alerts-security): stale detected (P1); P0 upgrade; post-resolution. §R-61.8 DEC-030 chain: `system.apikey_chain_monitor_stale_declared` HIGH/7yr + `system.apikey_chain_monitor_restored` LOW/3yr; APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 ordering invariant (HTTP 422 `APIKEY_CHAIN_MONITOR_STALE_CHAIN_01_VIOLATION` on inversion; co-activates R-05); privacy floor: aggregate INT counts only — no `key_id`, `tenant_id`, `key_preview`, raw key material, `client_ip`, or GDPR Art. 9 data in any payload field. §R-61.9 APIKEY-CHAIN-STALE-E-001 per-activation evidence artefact (CC6.4/CC7.2; per-activation; 7yr WORM; `compliance/evidence/api-key/apikey-chain-stale-e-001-<YYYY-MM-DD>/`; Vanta mirror upload within 48 h). §R-61.10 five post-incident controls: APIKEY-SLO-03 breach assessment + CC6.4 SOC 2 finding (post P0); H1/H2 CI guard (post first H1/H2); APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker (pending platform-engineer); quarterly 90-day run-history sweep (< 85 runs triggers investigation); 24h post-restoration R-61-C3 re-run. §R-61.11 nine cross-references: OBSERVABILITY §12.6 (job 13, v5.14.6); AUDIT_LOG_SCHEMA §31.6 (check definitions) + §API-Key-Chain-Monitor-Stale events section (v2.76); INCIDENT_RESPONSE R-01 + R-03 + R-05; SOC2_READINESS §79.4 (v3.75.0) + §80.3; ENTERPRISE_SLA §17.2 (APIKEY-SLO-03). §R-61.12 five-item implementation checklist: items 1, 3, 4, 5 [x] Done this pass (AUDIT_LOG_SCHEMA.md v2.76 chain events + invariant; SOC2_READINESS.md v3.75.0 §149 APIKEY-CHAIN-STALE-E-001 §79.4 registration; OBSERVABILITY.md v5.14.6 §12.6 job 13 cross-ref; authoring complete); item 2 pending (platform-engineer — APIKEY-CHAIN-MONITOR-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker). Document header v3.26.1 → v3.27.0. Owner: security-engineer + compliance-officer.*
 
 ---
