@@ -6,7 +6,9 @@
 
 ## Current version
 
-**v11.91.0** — 2026-07-03 · content · post-3085 + post-65 · «Прогресія навантаження всередині мезоциклу: три моделі для різних рівнів тренованості» (series «Мезоцикл без тренера» 3081–3090, 5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · «Специфічність проти різноманітності: скільки варіацій реально потрібно програмі» (editorial series 61–70, 5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards prepended for post-3085 + post-65 · next: post-3086 («Deload як частина блоку, а не виняток») + post-66 («Ієрархія тренувальних рішень: від принципів до конкретних вправ»)
+**v11.92.0** — 2026-07-03 · content · post-66 · «Як оцінити якість сесії: не за вагою, не за болем, а за ключовими сигналами» (editorial series 61–70, 6/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-66 · README: series 61–70 updated 5/10 → 6/10 · next: post-3086 («Deload як частина блоку, а не виняток») + post-67 («Індивідуальні відмінності в реакції на тренування»)
+
+**v11.91.0** — 2026-07-03 · content · post-3085 + post-65 · «Прогресія навантаження всередині мезоциклу: три моделі для різних рівнів тренованості» (series «Мезоцикл без тренера» 3081–3090, 5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · «Специфічність проти різноманітності: скільки варіацій реально потрібно програмі» (editorial series 61–70, 5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html cards prepended for post-3085 + post-65 · next: post-3086 («Deload як частина блоку, а не виняток») + post-66 («Як оцінити якість сесії: не за вагою, не за болем, а за ключовими сигналами»)
 
 **v11.90.0** — 2026-07-03 · enterprise · INCIDENT_RESPONSE R-64 PAM Break-Glass Review Alert Stale (`pam_bg_review_alert`, job 21, CC6.6) companion stale recovery runbook · SOC2_READINESS §152 PAM-BG-STALE-E-001 (§79.4, count 118 → 119; 7yr WORM) · OBSERVABILITY §12.6 job 21 cross-ref R-64 added
 
