@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.53.0] — 2026-07-03
+
+### Added
+- `content/post-3065-volume-load-vs-effective-sets.md` — Series «Силові метрики» (3061–3070) post 5/10. «Volume load і effective sets: дві мови про обсяг і де кожна корисна». Тоннаж (вага × reps × sets) — зовнішнє навантаження: об'єктивне, порівнюване (Impellizzeri et al. 2004); надійний для довгострокових трендів і порівняння мезоциклів (Borresen & Lambert 2009); не передбачає гіпертрофічного стимулу, ігнорує відносну інтенсивність. Effective sets — підходи ≤3–4 RIR (RPE ≥7–8); кращий предиктор гіпертрофії (Krieger 2010; Schoenfeld et al. 2017: доза-відповідь ≥10 ефективних підходів/група/тиждень); суб'єктивні, залежать від RPE-калібрування (Eston 2012: початківці недооцінюють зусилля). MEV/MAV/MRV framework (Israetel & Hoffman 2017) оперує в логіці effective sets. Операційна карта: тоннаж — для прогресивної метрики і порівняння блоків; effective sets — для тижневого гіпертрофічного планування. Жодна метрика не фіксує якість виконання (Schoenfeld 2010: повний ROM vs частковий — різний стимул). Правило вибору: силовий блок → тоннаж; гіпертрофічний блок → effective sets; змішаний → обидва. Джерела: Borresen & Lambert 2009, Eston 2012, Figueiredo et al. 2017, Impellizzeri et al. 2004, Israetel & Hoffman 2017, Krieger 2010, Ralston et al. 2017, Schoenfeld 2010, Schoenfeld et al. 2017. clinical-safety: NOT_REQUIRED.
+- `blog.html` — картка post-3065 prepended at top of feed.
+
+### Changed
+- `README.md` — series «Силові метрики» 3061–3070 counter 4/10 → 5/10; post-3065 updated proposed → draft; v11.53.0.
+- `STATUS.md` — v11.53.0 current version added; next updated to post-3066.
+- `VERSION` — 11.52.0 → 11.53.0.
+
+---
+
 ## [11.52.0] — 2026-07-03
 
 ### Added
