@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.22.1
+# FORM · Incident Response Runbook v3.23.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -20984,6 +20984,292 @@ z.object({
 | 5 | Authoring complete — §R-57 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.22.0).** |
 
 **Privacy floor (invariant throughout R-57):** No employee `user_id`, name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data appears in any R-57 query result, DEC-030 event payload, evidence artefact, or Slack communication template. R-57-C1 and R-57-C4 aggregate counts and timestamps only. `tenant_id` fields in all event payloads are FORM-internal UUIDs — not linked to company name, employee roster, or any personal identifier in this runbook.
+
+---
+
+## R-58 · DSAR SLO Miss Counter Reset Stale — `dsar_slo_miss_counter_reset` (job 36) — CC7.2 alert escalation degradation
+
+**Classification:** P1 · Compliance · compliance-officer primary
+**Trigger:** `system.cron_job_stale` for `dsar_slo_miss_counter_reset`; dedup `dsar-slo-counter-stale`
+**Version:** v1.0 · 2026-07-03
+**Owner:** compliance-officer + devops-lead
+**Review:** After every activation; minimum annual. Next: July 2027 or first activation.
+
+> **Core impact: alert-severity routing degradation, not a DSAR data breach.** The `dsar_slo_miss_counter_reset` job resets `enterprise_sla_counters.dsar_slo_misses_this_quarter` to zero at the start of each calendar quarter (Jan 1 / Apr 1 / Jul 1 / Oct 1 at 00:00 UTC; DATA_MODEL §35.4, DEC-052). If this reset does not fire, a residual count from the prior quarter carries over — causing any *first* DSAR SLO breach in the new quarter to be routed as a **P2 Slack alert** instead of **P1 PagerDuty** (AL-DSAR-05 routing logic: counter = 1 → P1; counter > 1 → P2 Slack). No DSAR SLO obligation is altered, no employee personal data is exposed, and no DEC-030 audit events are affected — but the first-miss accountability escalation path silently degrades for the entire new quarter.
+
+---
+
+### R-58.1 Trigger Conditions
+
+This runbook activates when `pg-cron-health-monitor` (OBSERVABILITY §12.7) emits `system.cron_job_stale` HIGH/7yr for `dsar_slo_miss_counter_reset` and routes AL-COUNTER-STALE-01 via PagerDuty:
+
+| Alert ID | Trigger | PagerDuty routing | Dedup key |
+|---|---|---|---|
+| **AL-COUNTER-STALE-01** | No `pg_cron.job_run_details` succeeded entry for `dsar_slo_miss_counter_reset` within the 35-day freshness window — fires only when a full calendar quarter elapses without a successful reset | P1 `form-compliance` → compliance-officer | `dsar-slo-counter-stale` |
+
+**When the alert fires:** A 35-day freshness window ensures the alert fires only when at least one complete quarterly run has been missed (the window spans 5 additional days beyond the quarterly cadence to absorb scheduling jitter). Compliance-officer and devops-lead are the primary responders; no IC declaration or PAM elevation is required for the counter reset itself.
+
+**Affected quarter:** The stale alert implies that one of the four annual reset dates (Jan 1, Apr 1, Jul 1, Oct 1 at 00:00 UTC) did not execute. The affected quarter is the current calendar quarter, during which all DSAR SLO breach alerts may have routed at reduced severity.
+
+---
+
+### R-58.2 Severity Classification
+
+| Severity | Condition |
+|---|---|
+| **P1** | Alert fires — reset missed for a full quarter; routing degradation active from quarter start |
+| **P1 → P0 escalation** | R-58-C2 finds rows with `alert_routed_as = 'P2'` — at least one DSAR SLO breach was silently downgraded; ENTERPRISE_SLA §19.5 SLA credit assessment required |
+| **P1 co-active R-03** | R-58-C3 shows all other quarterly/daily pg_cron jobs also stale at similar timestamps → Supabase infrastructure event probable; activate R-03 in parallel |
+
+**Severity rationale:** No GDPR Art. 17 data processing obligation is altered and no DSAR records are at risk. The impact is AL-DSAR-05 routing degradation: the first DSAR SLO miss in the new quarter may have been logged as a Slack P2 instead of a PagerDuty P1, delaying the CSM escalation loop mandated by ENTERPRISE_SLA §19.5. The P0 escalation path is reserved for confirmed downgraded incidents — those require manual P1 re-escalation per tenant and an SLA credit assessment.
+
+---
+
+### R-58.3 Immediate Actions (T+0 to T+30 min)
+
+**Step 1 — Acknowledge PagerDuty and identify the missed quarter boundary:**
+
+Acknowledge AL-COUNTER-STALE-01. Note the current date and compute which reset date was missed (e.g., if the alert fires on 2026-07-15, the missed reset was Jul 1 at 00:00 UTC — the Q3 reset).
+
+**Step 2 — Run scope queries R-58-C1 through R-58-C4:**
+
+**R-58-C1 — Current counter values and staleness confirmation:**
+```sql
+SELECT
+  esc.tenant_id,
+  esc.dsar_slo_misses_this_quarter                                AS counter_value,
+  MAX(jrd.start_time)                                            AS last_reset_at,
+  NOW() - MAX(jrd.start_time)                                    AS stale_window,
+  EXTRACT(EPOCH FROM (NOW() - MAX(jrd.start_time))) / 86400      AS stale_days
+FROM enterprise_sla_counters esc
+LEFT JOIN cron.job_run_details jrd
+  ON jrd.jobname = 'dsar_slo_miss_counter_reset'
+  AND jrd.status = 'succeeded'
+GROUP BY esc.tenant_id, esc.dsar_slo_misses_this_quarter
+ORDER BY esc.dsar_slo_misses_this_quarter DESC, stale_days DESC NULLS FIRST;
+-- stale_days > 35: confirms trigger valid (freshness window breached)
+-- counter_value > 0: active stale count — reset required regardless of stale_days
+-- counter_value = 0: counter already at 0 (possible if a DSAR SLO miss occurred in Q4 and
+--   this is the first quarter with zero misses; alert still valid — job missed its run)
+-- NULL last_reset_at: job has never successfully run (new deployment or H1 deletion)
+-- Privacy: tenant_id is a FORM-internal UUID; no employee name, email, or GDPR Art. 9 data
+```
+
+**R-58-C2 — DSAR SLO breach audit: current quarter downgraded alerts:**
+```sql
+SELECT
+  ale.tenant_id,
+  ale.created_at                                                  AS breach_detected_at,
+  ale.payload->>'dsar_id'                                        AS dsar_id,
+  ale.payload->>'alert_routed_as'                                AS alert_routed_as,
+  ale.payload->>'slo_miss_count_at_time'                         AS counter_at_detection
+FROM audit_log_events ale
+WHERE ale.event_type = 'enterprise.dsar_slo_breached'
+  AND ale.created_at >= DATE_TRUNC('quarter', NOW())
+ORDER BY ale.created_at;
+-- Rows with alert_routed_as = 'P2': breach silently downgraded — manual P1 escalation required
+-- Rows with alert_routed_as = 'P1': routing was correct (counter was 1 at detection — prior Q)
+-- No rows: no DSAR SLO breaches in current quarter; routing degradation had no observed impact
+-- Privacy: tenant_id and dsar_id are FORM-internal UUIDs; no DSAR content, employee names,
+--   or GDPR Art. 9 data; do NOT log dsar_request content or employee PII in incident notes
+```
+
+**R-58-C3 — pg_cron run history and peer job health:**
+```sql
+SELECT
+  jobname,
+  MAX(start_time)                                                AS last_run,
+  NOW() - MAX(start_time)                                        AS gap,
+  COUNT(*) FILTER (WHERE start_time >= NOW() - INTERVAL '90 days') AS runs_last_90_days
+FROM cron.job_run_details
+WHERE jobname IN (
+  'dsar_slo_miss_counter_reset',
+  'renewal_notice_check',
+  'backup_age_monitor',
+  'quarterly_perf_regression_check',
+  'litigation_hold_compliance_monitor'
+)
+GROUP BY jobname
+ORDER BY gap DESC NULLS FIRST;
+-- dsar_slo_miss_counter_reset gap >> all peer gaps → H1/H2/H4 (job-specific issue)
+-- All jobs show similar large gaps → H3 (Supabase maintenance / infrastructure event)
+-- runs_last_90_days = 0 for dsar job only → H1 (deleted) or H2 (disabled since last quarter)
+```
+
+**R-58-C4 — Job registration confirmation:**
+```sql
+SELECT
+  jobid,
+  jobname,
+  schedule,
+  active,
+  username
+FROM cron.job
+WHERE jobname = 'dsar_slo_miss_counter_reset';
+-- No rows → H1 (job deleted)
+-- active = false → H2 (job disabled)
+-- schedule ≠ '0 0 1 1,4,7,10 *' → schedule tampered (H3/H4 — devops-lead investigate)
+-- active = true, schedule correct, no recent runs → H4 (function broken or pg_cron failure)
+```
+
+---
+
+### R-58.4 Root Cause Hypotheses
+
+| Hypothesis | Indicator | Resolution |
+|---|---|---|
+| **H1 — Job deleted** | R-58-C4 returns no rows | Recreate job (§R-58.5 Step 3, Option A) |
+| **H2 — Job disabled** | R-58-C4 shows `active = false` | Re-enable: `UPDATE cron.job SET active = true WHERE jobname = 'dsar_slo_miss_counter_reset'` (devops-lead, `supabase_admin` role) |
+| **H3 — Supabase maintenance / infrastructure event** | R-58-C3 shows all peer jobs stale at similar timestamps; check Supabase status page | Wait for infrastructure resolution; co-activate R-03 if unresolved; manual counter reset immediately (§R-58.5 Step 1) |
+| **H4 — Function broken or pg_cron scheduling error** | R-58-C4 shows job active + schedule correct but no recent run history in `cron.job_run_details` | Check pg_cron logs for SQL errors; test `UPDATE enterprise_sla_counters SET ...` manually as `form_system` to confirm DDL grants; patch if broken |
+
+---
+
+### R-58.5 Recovery Procedure
+
+**Step 1 — Immediate compensating control: manual counter reset (all hypotheses):**
+
+Do not wait for root cause analysis. Reset the counter immediately as `form_system` role:
+
+```sql
+-- Execute as form_system role (standard operational — no PAM elevation required)
+-- Cross-ref: DATA_MODEL §35.5 (canonical reset SQL)
+UPDATE enterprise_sla_counters
+SET
+  dsar_slo_misses_this_quarter = 0,
+  updated_at                   = NOW()
+WHERE dsar_slo_misses_this_quarter > 0;
+
+-- Verify: zero rows remaining
+SELECT COUNT(*)
+FROM enterprise_sla_counters
+WHERE dsar_slo_misses_this_quarter > 0;
+-- Expected: 0
+```
+
+**Step 2 — Audit and re-escalate any downgraded DSAR SLO breach alerts (R-58-C2):**
+
+If R-58-C2 returned rows with `alert_routed_as = 'P2'`:
+- Each row represents a DSAR SLO breach silently downgraded from P1 to P2 during the stale window
+- compliance-officer manually opens a PagerDuty P1 incident per affected `tenant_id` and routes to the responsible CSM
+- Assess whether ENTERPRISE_SLA §19.5 SLA credits are owed for each affected tenant
+- Note: do NOT include employee `user_id`, DSAR content, or GDPR Art. 9 data in any incident note or Slack message — reference `dsar_id` UUID only
+
+**Step 3 — Restore pg_cron job by root cause:**
+
+*Option A (H1 — recreate):*
+```sql
+SELECT cron.schedule(
+  'dsar_slo_miss_counter_reset',
+  '0 0 1 1,4,7,10 *',
+  $$UPDATE enterprise_sla_counters
+    SET dsar_slo_misses_this_quarter = 0, updated_at = NOW()
+    WHERE dsar_slo_misses_this_quarter > 0$$
+);
+-- Confirm: SELECT jobname, schedule, active FROM cron.job WHERE jobname = 'dsar_slo_miss_counter_reset';
+```
+
+*Option B (H2 — re-enable):*
+```sql
+UPDATE cron.job SET active = true WHERE jobname = 'dsar_slo_miss_counter_reset';
+```
+
+*Option C (H3 — infrastructure):*
+Await Supabase infrastructure resolution per R-03 protocol. Counter reset already applied in Step 1 as compensating control.
+
+*Option D (H4 — function/schedule):*
+Investigate pg_cron logs; patch the `UPDATE` statement if the SQL has an error; confirm via a test run as `form_system`.
+
+**Step 4 — Confirm restoration:**
+
+Trigger a test run (devops-lead, via Supabase Dashboard or direct SQL):
+```sql
+-- Force immediate execution via pg_cron
+SELECT cron.run_job(
+  (SELECT jobid FROM cron.job WHERE jobname = 'dsar_slo_miss_counter_reset')
+);
+
+-- Confirm job_run_details shows succeeded
+SELECT jobname, start_time, end_time, status, return_message
+FROM cron.job_run_details
+WHERE jobname = 'dsar_slo_miss_counter_reset'
+ORDER BY start_time DESC
+LIMIT 3;
+-- Expected: most recent row shows status = 'succeeded'
+```
+
+**Step 5 — Final verification:**
+```sql
+SELECT COUNT(*) FROM enterprise_sla_counters WHERE dsar_slo_misses_this_quarter > 0;
+-- Expected: 0 (counter clean for all tenants entering the new quarter)
+```
+
+---
+
+### R-58.6 Communication Templates
+
+**Slack `#compliance-alerts` — Stale counter detected:**
+```
+⚠️  AL-COUNTER-STALE-01 · DSAR SLO miss counter reset stale · job 36
+Last successful reset: [last_reset_at] UTC · stale [stale_days] days
+Impact: first DSAR SLO breach in Q[X] routes as P2 (Slack) instead of P1 (PagerDuty)
+Responders: @compliance-officer + @devops-lead · R-58 runbook active
+Manual counter reset initiated immediately as compensating control
+```
+
+**Slack `#compliance-alerts` — Downgraded breach found (if R-58-C2 positive):**
+```
+🔴  P1 re-escalation required · [N] DSAR SLO breach(es) silently downgraded this quarter
+Affected tenant(s): [tenant_id list — UUIDs only; do NOT include employee data or DSAR content]
+Root cause: dsar_slo_miss_counter_reset stale since [date] UTC · job 36
+Action: @compliance-officer opening PagerDuty P1 per affected tenant; ENTERPRISE_SLA §19.5 SLA credit assessment in progress
+```
+
+**Slack `#compliance-alerts` — Post-resolution:**
+```
+✅  R-58 resolved · job 36 dsar_slo_miss_counter_reset restored
+Counter reset at [timestamp] UTC · 0 tenants with residual count
+Root cause: [H1 job deleted / H2 disabled / H3 Supabase maintenance / H4 function error] · [one-sentence summary]
+Downgraded breaches re-escalated: [N] / SLA credit assessment: [pending / not required]
+Post-mortem: [Linear ticket URL]
+```
+
+---
+
+### R-58.7 Post-Incident Controls
+
+1. **Post-mortem required** for any confirmed downgraded DSAR SLO breach (R-58-C2 positive).
+2. **H1/H2 guard**: Add a CI lint rule that detects pg_cron job deletions in migration files without a corresponding recreation statement in the same migration.
+3. **Proactive quarterly verification**: devops-lead to confirm `cron.job_run_details` shows a `dsar_slo_miss_counter_reset` succeeded row within 48h after each quarter boundary (Jan 1, Apr 1, Jul 1, Oct 1) as part of the quarterly SOC 2 evidence collection sweep.
+4. **OBSERVABILITY §12.6 cross-reference**: Confirm job 36 row now references R-58 (§R-58.9 item 1).
+
+---
+
+### R-58.8 Cross-References
+
+| Source | Reference |
+|---|---|
+| `docs/OBSERVABILITY.md §12.6` | Job 36 canonical pg_cron registry entry (schedule, freshness window, AL-COUNTER-STALE-01 alert routing) |
+| `docs/OBSERVABILITY.md §37.12` | AL-DSAR-05 canonical definition — P1/P2 routing logic that depends on `dsar_slo_misses_this_quarter` counter |
+| `docs/DATA_MODEL.md §35.4` / DEC-052 | Canonical counter definition and AL-DSAR-05 routing decision rationale |
+| `docs/DATA_MODEL.md §35.5` | `enterprise_sla_counters` schema and canonical reset SQL |
+| `docs/ENTERPRISE_SLA.md §19.5` | Employer DSAR 24h SLA commitment (P5.1/CC7.2) and SLA credit mechanism |
+| `docs/INCIDENT_RESPONSE.md R-14` | Per-user Art. 17 DSAR escalation path (co-reference if DSAR records at risk) |
+
+---
+
+### R-58.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Update `docs/OBSERVABILITY.md §12.6` job 36 cross-reference column: add `; INCIDENT_RESPONSE R-58 (§R-58; v1.0, 2026-07-03 — companion stale recovery runbook for job 36)` before `— **job 36**` | compliance-officer | **P0** | [x] **Done — 2026-07-03 (OBSERVABILITY.md v5.14.2).** |
+| 2 | Authoring complete — §R-58 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (INCIDENT_RESPONSE.md v3.23.0).** |
+
+**Privacy floor (invariant throughout R-58):** No employee `user_id`, name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data appears in any R-58 query result, scope query output, or communication template. R-58-C1 surfaces only `tenant_id` (FORM-internal UUID) and `dsar_slo_misses_this_quarter` (integer — not employee-identifiable). R-58-C2 surfaces only `tenant_id` + `dsar_id` (FORM-internal UUIDs) + routing metadata — no DSAR request content, employee name, data category, or Art. 9 health value. Slack templates reference `tenant_id` UUIDs only; do NOT include any DSAR subject details in incident communications.
+
+---
+
+*v3.23.0 (2026-07-03): R-58 — DSAR SLO Miss Counter Reset Stale (`dsar_slo_miss_counter_reset`, job 36) — CC7.2 alert escalation degradation companion runbook. Closes the documentation gap identified by cross-referencing the §12.6 pg_cron canonical registry against existing companion runbooks (R-31 through R-57): job 36 was the only quarterly pg_cron job without a companion stale recovery runbook despite carrying a P1 PagerDuty alert (`form-compliance`). §R-58 trigger matrix: AL-COUNTER-STALE-01 `system.cron_job_stale` HIGH for job 36 → P1 `form-compliance` → compliance-officer; dedup `dsar-slo-counter-stale`; 35-day freshness window. §R-58.1 trigger conditions: single alert AL-COUNTER-STALE-01 (P1, `form-compliance`); quarterly cadence (Jan 1 / Apr 1 / Jul 1 / Oct 1); stale = prior-quarter `dsar_slo_misses_this_quarter` residue carries into new quarter, causing AL-DSAR-05 first-miss routing to degrade from P1 PagerDuty to P2 Slack. §R-58.2 severity: P1 default; P1 → P0 on confirmed downgraded DSAR SLO breach (R-58-C2 positive); P1 co-active R-03 on all-jobs-stale discriminator. §R-58.3 four scope queries: R-58-C1 (current counter values + staleness per tenant); R-58-C2 (DSAR SLO breach audit — current quarter downgraded alerts); R-58-C3 (pg_cron run history + peer job health discriminator); R-58-C4 (job registration confirmation). §R-58.4 four root-cause hypotheses: H1 (deleted); H2 (disabled); H3 (Supabase maintenance / infrastructure); H4 (function broken or scheduling error). §R-58.5 five-step recovery: (1) immediate manual counter reset as compensating control (no PAM elevation — `form_system` role; canonical SQL from DATA_MODEL §35.5); (2) audit and re-escalate any downgraded P2 alerts via R-58-C2; (3) restore job by H1/H2/H3/H4 option; (4) confirm restoration via `cron.run_job()` + `job_run_details` succeeded row; (5) final `COUNT(*)` verification of zero residual counts. §R-58.6 three Slack communication templates (stale detected, downgraded breach found, post-resolution). §R-58.7 four post-incident controls (post-mortem for R-58-C2 positive; H1/H2 CI lint guard; proactive quarterly verification by devops-lead; §12.6 cross-reference check). §R-58.8 six cross-references (OBSERVABILITY §12.6 + §37.12; DATA_MODEL §35.4/§35.5/DEC-052; ENTERPRISE_SLA §19.5; INCIDENT_RESPONSE R-14). §R-58.9 two-item implementation checklist (both [x] Done this pass — OBSERVABILITY §12.6 cross-ref update + authoring complete). Privacy floor: no employee `user_id`, name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data in any query, template, or communication — `tenant_id` + `dsar_id` are FORM-internal UUIDs only. Document header v3.22.1 → v3.23.0. Owner: compliance-officer + devops-lead.*
 
 ---
 

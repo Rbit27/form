@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [11.65.0] — 2026-07-03
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` R-58 — DSAR SLO Miss Counter Reset Stale recovery runbook (§R-58.1–§R-58.9; P1, compliance-officer + enterprise-architect). Covers `dsar_slo_miss_counter_reset` pg_cron job 36 (§12.6): schedule `0 0 1 1,4,7,10 *`, 35-day freshness window. Stale consequence: cross-quarter counter accumulation causes AL-DSAR-05 to route Q2+ first-miss DSAR SLO breach events as P2 Slack instead of P1 PagerDuty (CC7.2 alert-escalation degradation, GDPR Art. 17 / ENTERPRISE_SLA §19.5). Runbook includes scope queries (R-58-C1 counter staleness + R-58-C2 DSAR breach audit), two recovery tracks (H1: job absent/crashed → recreate; H2: job present but stale → diagnose), manual counter reset SQL, post-recovery validation, SOC 2 evidence artefact checklist (P5.1/CC7.2), communication template, and cross-references to DATA_MODEL §35.4/DEC-052, AL-DSAR-05, §70 DSAR SLO monitoring.
+
+### Changed
+- `docs/OBSERVABILITY.md` — §12.6 job 36 cross-reference updated: `; INCIDENT_RESPONSE R-58 (§R-58; v1.0, 2026-07-03 — companion stale recovery runbook for job 36)` added to `dsar_slo_miss_counter_reset` registry entry. Document header v5.14.1 → v5.14.2 (R-58.9 item 1 closed).
+- `docs/INCIDENT_RESPONSE.md` — document header v3.22.1 → v3.23.0.
+- `STATUS.md` — current version updated to v11.65.0.
+- `VERSION` — 11.64.0 → 11.65.0.
+
+---
+
 ## [11.64.0] — 2026-07-03
 
 ### Added
