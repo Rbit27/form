@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [11.49.0] — 2026-07-03
+
+### Added
+- `content/post-3061-strength-metrics-hierarchy.md` — Series «Силові метрики» (3061–3070) post 1/10. «Ієрархія метрик у силовому тренуванні: що вимірювати, коли і чому». Рамка трьох рівнів вимірювань: рівень 1 — первинні метрики прогресу (e1RM тренд, робоча вага при фіксованому RPE, ефективні сети; горизонт — мезоцикл; Stone et al. 2007: performance metrics integrate all adaptations); рівень 2 — операційні метрики сесії (RPE на сет, Zourdos et al. 2016; session RPE × обсяг = training load, Foster et al. 2001; ефективні сети, Israetel et al. 2019); рівень 3 — контекстуальні метрики відновлення (суб'єктивний сон, Halson 2014; HRV тренд, Perkins et al. 2021; Meeusen et al. 2013: wellness measures = early warning signs). Ієрархія відповідає ієрархії рішень: рівень 1 → стратегічні (чи працює програма), рівень 2 → операційні (як регулювати навантаження), рівень 3 → тактичні (чому варіативність). Мінімальна система трекінгу. Краткий огляд тем серії 3062–3070. Helms et al. (2016); Kraemer і Ratamess (2004). clinical-safety: NOT_REQUIRED.
+- `blog.html` — картка post-3061 prepended at top of feed.
+
+### Changed
+- `README.md` — series «Силові метрики» 3061–3070 row 3061 updated proposed → draft · v11.49.0; series header updated proposed → active.
+- `STATUS.md` — v11.49.0 current entry added; next: post-3062 («e1RM як операційний орієнтир: де він надійний, де брехливий»).
+- `VERSION` — 11.48.0 → 11.49.0.
+
 ## [11.48.0] — 2026-07-03
 
 ### Added

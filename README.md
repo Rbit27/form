@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–44 drafted · 35 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 proposed · series «Технічна самодіагностика» 3071–3080 proposed · block 896–900 active · block 901–910 proposed · v11.48.0
+### Editorial series: 11–44 drafted · 35 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 active (1/10) · series «Технічна самодіагностика» 3071–3080 proposed · block 896–900 active · block 901–910 proposed · v11.49.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3429,13 +3429,13 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3059 | Як складати тренувальний журнал, який справді допомагає: мінімум даних для максимальних рішень | **draft · v11.47.0 → post-3059-training-journal-minimum-data.md** |
 | 3060 | Синтез 3051–3060: операційний протокол програмних рішень для self-coached атлета | **draft · v11.48.0 → post-3060-programming-decisions-synthesis.md** |
 
-### Editorial series: 3061–3070 — Силові метрики: як читати числа і будувати ієрархію орієнтирів (proposed · v11.37.0)
+### Editorial series: 3061–3070 — Силові метрики: як читати числа і будувати ієрархію орієнтирів (active · v11.49.0)
 
 Блок про те, як self-coached атлет вибудовує систему вимірювань — яким числам довіряти, яким ні, і як будувати ієрархію метрик без ілюзії точності. Фокус: практика читання власних тренувальних даних без external validation. Тон: editorial-brutalist, 13-min read.
 
 | Post | Topic | Status |
 |---|---|---|
-| 3061 | Ієрархія метрик у силовому тренуванні: що вимірювати, коли і чому | proposed |
+| 3061 | Ієрархія метрик у силовому тренуванні: що вимірювати, коли і чому | **draft · v11.49.0 → post-3061-strength-metrics-hierarchy.md** |
 | 3062 | e1RM як операційний орієнтир: де він надійний, де брехливий | proposed |
 | 3063 | RPE vs % від 1RM: не «що краще» — а що коли і для кого | proposed |
 | 3064 | Що тренувальний журнал вимірює точно, а що він систематично спотворює | proposed |
