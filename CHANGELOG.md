@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [11.62.0] — 2026-07-03
+
+### Added
+- `content/post-55-what-finishing-with-reserve-actually-means.md` — editorial series post-55. «Що означає "закінчити тренування з резервом" — і чому більшість це неправильно розуміє». RIR як вимірювана змінна зі своєю методологією (Zourdos et al. 2016 — RIR-based RPE scale; Helms et al. 2016 — inter/intra-rater reliability). Систематичне завищення RIR: більшість ліфтерів переоцінюють резерв на 3–5 повторень (Hackett et al. 2012; Sampson & Groeller 2016). Ефективне вікно для гіпертрофії: 0–3 RIR при рівному об'ємі; 4+ RIR показує атенюацію (Refalo et al. 2023); механічна напруга — первинний гіпертрофічний тригер (Schoenfeld 2010). Протокол калібрування: сети до відмови як вимірювальний інструмент, тест двох повторень, deload як скидання RPE-базелайну (Meeusen et al. 2013). Три рівні резерву: сет-рівень (RIR 0–1 для інтенсивних, 1–3 для об'ємних, 3–5 для допоміжних), сесія (70–85% капаситі), блок. Два операційних питання після кожного підходу. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+
+### Changed
+- `blog.html` — post-55 card prepended at top of feed.
+- `README.md` — post-55 updated proposed → draft · v11.62.0.
+- `VERSION` — 11.61.0 → 11.62.0.
+
+---
+
 ## [11.61.0] — 2026-07-03
 
 ### Added
