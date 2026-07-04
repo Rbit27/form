@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.89.1
+# FORM · SOC 2 Type II Readiness v3.90.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -820,6 +820,7 @@ The table below is the single authoritative schedule for recurring compliance ac
 | **Every month** | Evidence collection checkpoint — pull access list, open CVEs, audit log anomaly review, incident summary | Monthly | compliance-officer | Monthly compliance memo filed to `compliance/YYYY-MM/evidence-memo.md` in private repo | CC4.1 (monitoring of controls) |
 | **Every month** | Sub-processor list currency check — confirm no new processors added without 30-day customer notice | Monthly | compliance-officer | Updated `form.coach/legal/sub-processors` publish date + git commit timestamp | CC9.1, GDPR Art. 28(3) |
 | **Every month** | HMAC chain integrity verification — confirm weekly cron ran and no chain breaks | Monthly | security-engineer | `audit_log_chain_verification` report; alert-free confirmation in `#security-alerts` | CC4.1, CC7.3 |
+| **Every month** | Monthly BCL-E-001 chain export — automated export of all `backchannel_logout.*` DEC-030 HMAC-chained events for BCL-enabled tenants via `compliance/scripts/export-bcl-events.sh`; sign JSON Lines output; confirm zero orphan `backchannel_logout.received` events without `revoked` or `failed` closure; upload to R2 WORM within 48h; add MASTER-INDEX row. Filing: 5th of each month, starting T+30 days post M8 go-live. Nil-export attestation JSON required each month if BCL not yet in production or zero BCL-enabled tenants active. Privacy floor: `sub_hash` (SHA-256 hex) + `tenant_id` UUID + `bcl_request_id` UUID + enums only — no raw `sub`, `user_id`, email, or GDPR Art. 9 data | Monthly (5th of month); first filing M8 + 30d; nil attestation until M8 go-live | compliance-officer + devops-lead | `compliance/evidence/oidc-bcl/bcl-e-001-30day-export.jsonl` | CC6.1, CC6.3 (§163) — added §165 (2026-07-04) |
 | **Q1 (Jan)** | Annual Disaster Recovery drill — simulate complete Supabase primary failure; validate RTO ≤4h, RPO ≤1h using PITR restore runbook | Annual | devops-lead + security-engineer | DR drill report: test date, RTO achieved, RPO achieved, gaps identified, sign-off by compliance-officer | A1.2 (DR test performed annually) — closes 🔴 gap |
 | **Q1 (Jan)** | Annual penetration test — commission external firm; scope: API endpoints, auth flows, RLS bypass attempts, Cloudflare Workers | Annual | security-engineer (procurement); external firm (execution) | Pentest report with finding counts by severity + remediation plan; executive summary for enterprise customers | CC7.1 (vulnerability identification), CC9.2 |
 | **Q1 (Jan)** | Annual policy review — AUP, IRP, BCP, data classification, vendor management, offboarding checklist, media disposal policy | Annual | compliance-officer | Policy review log: each policy, reviewer, date reviewed, version bumped (or "no change" noted), signed by owner | CC1.2, CC2.2, C1.1 |
@@ -844,10 +845,12 @@ The table below is the single authoritative schedule for recurring compliance ac
 | **Q4 (Oct)** | Q4 control effectiveness review | Quarterly | compliance-officer + security-engineer | Same as Q2 artifact | CC4.2 |
 | **Q4 (Oct)** | Annual GEO-E-001 collection — export all `geo.contract_currency_set` DEC-030 HMAC-chain records for the SOC 2 observation year; confirm `billing_currency = 'USD'` for all rows; assert GEO-CHAIN-01 predecessor coverage (every `enterprise.tenant_created` event in the period has a matching `geo.contract_currency_set` for the same `tenant_id` preceding it in the chain; `geo_chain_predecessor_present = TRUE` for all rows); export five-column CSV (`tenant_id`, `contract_currency`, `geo_chain_predecessor_present`, `event_id`, `changed_at`); upload to `compliance/evidence/geo/GEO-E-001_<YYYY>.csv` (7yr WORM) and Vanta within 48h; add MASTER-INDEX row. Zero-enterprise-tenant-onboarding years: file nil attestation at `GEO-E-001_<YYYY>-nil.json` within 48h of year-end | Annual (Q4 of each SOC 2 observation year; complete before year-end) | compliance-officer | `compliance/evidence/geo/GEO-E-001_<YYYY>.csv` | CC1.3, CC3.1 (§144) — added §146 (2026-07-03) |
 | **Quarterly (Jan 5 / Apr 5 / Jul 5 / Oct 5)** | Quarterly PKJWT-E-001 collection — export all `sso.pkjwt_key_generated` and `sso.pkjwt_key_rotated` DEC-030 HMAC-chain events for PKJWT-enabled tenants (`oidc_client_auth_method = 'private_key_jwt'`) in the observation quarter; assert: (1) every active PKJWT tenant has a key-generation or rotation record within the preceding 12 months (annual rotation policy per SSO_SCIM_IMPLEMENTATION §42.9); (2) no `private_key` field present in any chain event payload (Zod v2 schema constraint); export six-column CSV (`tenant_id`, `kid`, `event_type`, `algorithm`, `key_generated_at`/`rotated_at`, `rotation_reason`, `key_expires_at`); upload to `compliance/evidence/sso/PKJWT-E-001_<YYYY-QN>.csv` (7yr WORM) and Vanta within 48h; add MASTER-INDEX row. Zero-PKJWT-tenant quarters: nil attestation at `PKJWT-E-001_<YYYY-QN>-nil.json`. Per-incident supplement: on each `sso.pkjwt_key_rotated` event with `rotation_reason: 'incident'` or `rotation_reason: 'customer_request'` — file `PKJWT-E-001_<YYYY-QN>_sup-<YYYYMMDD>.csv` within 48h regardless of calendar date | Quarterly (Q1 Jan 5 / Q2 Apr 5 / Q3 Jul 5 / Q4 Oct 5); per-incident supplement on demand | compliance-officer | `compliance/evidence/sso/PKJWT-E-001_<YYYY-QN>.csv` | CC6.6 (§145) — added §146 (2026-07-03) |
+| **Quarterly (Jan 31 / Apr 30 / Jul 31 / Oct 31)** | Quarterly BCL-OBS-E-001 observability health report — compile six-component report per OBSERVABILITY §70.8: (1) BCL request count by tenant (last 90d); (2) `backchannel_logout.failed` count by reason enum; (3) REVOCATION_QUEUE exhaustion count (AL-BCL-02 activations); (4) BCL-CHAIN-01 retrospective SQL result (must return zero rows, or each non-zero row requires an IC reference); (5) AL-BCL-01/02/03/04 quarterly activation log with IC references; (6) BCL-SLO-01 (HTTP 200 ≥ 99.0%, rolling 30d) and BCL-SLO-02 (P95 < 2,000 ms, rolling 7d) compliance summary. Filing: within 30 days of quarter close. Zero-event quarters require affirmative nil attestation per component — not silence. Nil-report attestation JSON required each quarter until M8 production deploy | Quarterly (within 30 days of quarter close); first Q3 2026 (contingent on M8 deploy); nil report until M8 | compliance-officer + devops-lead | `compliance/evidence/oidc-bcl/bcl-obs-e-001-{YYYY}-Q{N}.json` | CC6.1, CC6.3, CC7.2, CC7.3 (§164) — added §165 (2026-07-04) |
 | **Q4 (Nov)** | Annual training completion audit — verify 100% of employees and contractors completed security awareness training; identify and remediate any gaps before year-end | Annual | compliance-officer | Completion register cross-referenced against current headcount; gap note if anyone incomplete + remediation date | CC1.4, CC2.2 |
 | **Q4 (Dec)** | Annual sub-processor list publication refresh — update `form.coach/legal/sub-processors` to reflect any additions, removals, or changes; send 30-day advance notice for any new processors taking effect in Q1 | Annual | compliance-officer | Published page with "last updated" date; 30-day notice emails sent to enterprise tenants (or confirmation that no changes occurred) | CC9.1, GDPR Art. 28(3) |
 | **Q4 (Dec)** | Year-end compliance programme review — assess overall SOC 2 readiness score; update this document; plan gap remediation for following year; confirm audit firm engagement for upcoming year | Annual | compliance-officer + security-engineer | Updated SOC2_READINESS.md version; gap delta from prior year; budget line items confirmed for next year compliance activities | CC1.1, overall programme |
 | **Event-triggered** | Per-change FIDO2-E-001 supplement — on each break-glass engineer roster change (addition or removal) or hardware key replacement event: re-collect updated Cloudflare Access enrollment screenshots (for affected engineers) and updated sanitized `break-glass-policy.tf` diff; file `FIDO2-E-001_<YYYY-MM>_change-<YYYYMMDD>.zip`; SHA-256 hash; upload to `compliance/evidence/pam/` (7yr WORM) and Vanta within 48h; add MASTER-INDEX row. Treat any `destructive` tier activation with fewer than 2 FIDO2-enrolled engineers as a P0 PAM incident (§24.3). Also fires on PAM offboarding (parallel to `pam-db-proxy` key rotation in offboarding checklist) | Per-change (each roster change or hardware key replacement) | compliance-officer + security-engineer | `compliance/evidence/pam/FIDO2-E-001_<YYYY-MM>_change-<YYYYMMDD>.zip` | CC6.7 (§142) — added §146 (2026-07-03) |
+| **Event-triggered (M7 + 30d) + Annual (Q4 Dec 31)** | SAML SLO evidence collection — *initial* (T+30 days post M7 go-live): export all `slo.sp_initiated` / `slo.completed` / `slo.failed` / `slo.fallback_local_only` DEC-030 HMAC-chain records for SLO-E-001 (SP-initiated path); and all `slo.idp_initiated` DEC-030 HMAC-chain records for SLO-E-002 (IdP-initiated path); confirm zero orphan `slo.sp_initiated` events without terminal `slo.completed` or `slo.failed` + `slo.fallback_local_only` closure; upload to `compliance/evidence/saml-slo/` (7yr WORM) and Vanta within 48h. *Annual thereafter* (Q4 Dec 31): nil-export attestation JSON if zero SAML SLO events in the preceding 12 months; full export if events exist. Privacy floor: `slo_request_id` UUID + `tenant_id` UUID + `idp_name_id` SAML pseudonym + `session_id` nullable UUID + timestamps/enums; `user_id` only in `slo.fallback_local_only` (FORM-internal UUID, not employee identity) — no raw employee email or GDPR Art. 9 data | Initial: T+30 days post M7 go-live; annual nil-export Q4 Dec 31 thereafter | compliance-officer | SLO-E-001: `compliance/evidence/saml-slo/slo-e-001-sp-chain-export.json`; SLO-E-002: `compliance/evidence/saml-slo/slo-e-002-idp-initiated-export.json` | CC6.1, CC6.3 (§162) — added §165 (2026-07-04) |
 | **Q1 (following year)** | Annual cycle repeats — DR drill, pentest, policy review, NDA audit, privacy review, vendor review, security training | Annual | compliance-officer | Continuous evidence chain spanning the observation period | All CC, A, PI, C, P criteria |
 
 ---
@@ -35727,6 +35730,104 @@ Upload path: `compliance/evidence/oidc-bcl/bcl-obs-e-001-{YYYY}-Q{N}.json` → V
 | `docs/OBSERVABILITY.md §70.11` pending obligation closure | 🟢 **Done — 2026-07-04 (OBSERVABILITY v5.16.3)** |
 | `docs/SSO_SCIM_IMPLEMENTATION.md §46.9` (BCL-OBS-E-001 §164 cross-reference added) | 🟢 **Done — 2026-07-04 (SSO_SCIM v2.27)** |
 | `docs/INCIDENT_RESPONSE.md R-74` (BCL-CHAIN-01 violation runbook — AL-BCL-03 IC reference target for §164.3 CC7.3 narrative) | 🟢 Pre-existing — R-74 filed v3.39.0 2026-07-04 |
+
+---
+
+*v3.90.0 (2026-07-04): §165 Cross-Reference Patch — §15 Compliance Calendar: SLO-E-001 / SLO-E-002 / BCL-E-001 / BCL-OBS-E-001 (CC6.1/CC6.3/CC7.2/CC7.3). Closes three deferred §15.1 calendar-addition items across §162 (2026-07-04), §163 (2026-07-04), and §164 (2026-07-04) — each registered artefacts in §79.4 and §80.4 but none added a corresponding §15.1 recurring collection row. Three rows added inline to §15.1 Master Compliance Calendar: (1) BCL-E-001 monthly (5th of each month after M8 + 30d go-live; automated `compliance/scripts/export-bcl-events.sh` signed JSON Lines; nil-export attestation until M8 in production; `compliance/evidence/oidc-bcl/bcl-e-001-30day-export.jsonl`; CC6.1/CC6.3); (2) BCL-OBS-E-001 quarterly within 30 days of quarter close (Jan 31 / Apr 30 / Jul 31 / Oct 31; six-component observability health report per OBSERVABILITY §70.8 — BCL request counts, failure counts, REVOCATION_QUEUE exhaustion, BCL-CHAIN-01 retrospective SQL, AL-BCL-01/02/03/04 activation log, BCL-SLO-01/02 compliance summary; nil-report attestation until M8; `compliance/evidence/oidc-bcl/bcl-obs-e-001-{YYYY}-Q{N}.json`; CC6.1/CC6.3/CC7.2/CC7.3); (3) SLO-E-001 + SLO-E-002 SAML SLO chain exports — initial T+30 days post M7 go-live (SP-initiated chain SLO-E-001; IdP-initiated chain SLO-E-002; zero-orphan assertion for `slo.sp_initiated`); annual Q4 Dec 31 nil-export attestation thereafter; `compliance/evidence/saml-slo/slo-e-001-sp-chain-export.json` + `slo-e-002-idp-initiated-export.json`; CC6.1/CC6.3. §165.1 background (three deferred obligations and their source sections). §165.2 §15.1 calendar additions — three sub-sections with per-artefact field table, cadence rationale, auditor-facing note. §165.3 three cross-reference obligations closed (all 🟢 Done this patch). §165.4 three-item implementation checklist (all [x] Done this pass). Privacy floor: BCL artefacts contain `sub_hash` SHA-256 + UUID fields only; SLO artefacts contain `idp_name_id` SAML pseudonym + UUIDs + timestamps/enums — no employee `user_id`, name, email, session token, coaching content, body composition metric, or GDPR Art. 9 special-category data in any calendar collection activity. Document header v3.89.1 → v3.90.0. Owner: compliance-officer.*
+
+---
+
+## §165 · Cross-Reference Patch — §15 Compliance Calendar: SLO-E-001 / SLO-E-002 / BCL-E-001 / BCL-OBS-E-001 (CC6.1/CC6.3/CC7.2/CC7.3)
+
+> **Date:** 2026-07-04. **Trigger:** Three cross-reference items deferred across §162 (v3.88.0, 2026-07-04), §163 (v3.89.0, 2026-07-04), and §164 (v3.89.1, 2026-07-04) — each registered new SOC 2 evidence artefacts in §79.4 and §80.4 Vanta, but none added their recurring collection cadences to the §15.1 Master Compliance Calendar. **Owner:** compliance-officer.
+
+### §165.1 Background
+
+Three evidence registration sections authored on 2026-07-04 each carried a deferred §15.1 calendar obligation:
+
+- **§162** (v3.88.0) registered **SLO-E-001** (CC6.1/CC6.3 — SAML SP-initiated SLO 30-day chain export) and **SLO-E-002** (CC6.1/CC6.3 — SAML IdP-initiated SLO export) with an initial T+30 days post M7 go-live trigger and an annual nil-export path. §162.7 included no "add to §15.1 calendar" task.
+- **§163** (v3.89.0) registered **BCL-E-001** (CC6.1/CC6.3 — OIDC BCL 30-day chain export) as a monthly recurring artefact starting T+30 days post M8 go-live. §163.7 item 6 captured the first-filing trigger but no §15.1 calendar row.
+- **§164** (v3.89.1) registered **BCL-OBS-E-001** (CC6.1/CC6.3/CC7.2/CC7.3 — quarterly BCL observability health report) with a quarterly cadence within 30 days of quarter close. §164.5 included no "add to §15.1 calendar" task.
+
+The deferred-calendar pattern mirrors §142/§144/§145 (2026-07-02) which were resolved by §146 (v3.72.0, 2026-07-03). This patch is the §165 equivalent for the M7–M8 SSO evidence batch.
+
+### §165.2 §15.1 Calendar Additions (Inline)
+
+Three rows were added inline to §15.1. The full prose descriptions appear in the §15.1 table; the field tables below provide auditor-navigable detail per artefact.
+
+#### §165.2.1 BCL-E-001 Monthly (CC6.1 / CC6.3)
+
+| Field | Value |
+|---|---|
+| **Schedule** | 5th of each month; first collection in the calendar month after M8 go-live + 30 days |
+| **Activity** | Run `compliance/scripts/export-bcl-events.sh`; sign JSON Lines output (SHA-256 hash + HMAC chain verification result per record); upload to `compliance/evidence/oidc-bcl/bcl-e-001-30day-export.jsonl` (R2 WORM); add MASTER-INDEX row |
+| **Orphan check** | Assert zero `backchannel_logout.received` events without a terminal `backchannel_logout.revoked` or `backchannel_logout.failed` closure in the 30-day window |
+| **Nil-export attestation** | Required each month if BCL not yet in production (M8 pending) or zero BCL-enabled tenants active; file `bcl-e-001-nil_<YYYY-MM>.json` with `status: "bcl_not_in_production"` or `status: "zero_bcl_tenants"` |
+| **Privacy floor** | `sub_hash` (SHA-256 hex of OIDC `sub` — raw `sub` never stored) + `tenant_id` UUID + `bcl_request_id` UUID + `revocation_method` enum + `sessions_revoked_count` INT + `iss` (IdP issuer URL) + timestamps; no employee name, email, health value, or GDPR Art. 9 data |
+| **Owner** | compliance-officer + devops-lead |
+| **R2 path** | `compliance/evidence/oidc-bcl/bcl-e-001-30day-export.jsonl` |
+| **Vanta cadence** | Monthly (aligned to export run); nil-export artefacts uploaded identically |
+| **TSC** | CC6.1, CC6.3 |
+| **Source** | §163 (v3.89.0, 2026-07-04) |
+
+**Auditor-facing note:** BCL-E-001 monthly export is the primary CC6.1 evidence for OIDC federated session revocation continuity. Each monthly artefact proves (a) every `backchannel_logout.received` event has a terminal `revoked` or `failed` closure — no orphan events; (b) BCL-CHAIN-01 HMAC ordering was maintained throughout the month (chain verification result per record). Missing monthly artefacts (gap months) must be explained in the following month's compliance memo (§15.1 monthly evidence checkpoint). Nil-export artefacts are affirmative attestation — not a silent omission. First actual (non-nil) filing is expected in the calendar month after the §46.8 M8 production deploy + 30 days.
+
+#### §165.2.2 BCL-OBS-E-001 Quarterly (CC6.1 / CC6.3 / CC7.2 / CC7.3)
+
+| Field | Value |
+|---|---|
+| **Schedule** | Within 30 days of quarter close: Q1 (Jan–Mar) → Jan 31; Q2 (Apr–Jun) → Apr 30; Q3 (Jul–Sep) → Jul 31; Q4 (Oct–Dec) → Oct 31 |
+| **Activity** | Compile six-component observability health report per OBSERVABILITY §70.8 spec |
+| **Component 1** | Total BCL request count by tenant (`backchannel_logout.received` events, last 90 days) |
+| **Component 2** | `backchannel_logout.failed` count by `reason` enum; zero-count = affirmative attestation |
+| **Component 3** | REVOCATION_QUEUE exhaustion count (AL-BCL-02 activations); zero = affirmative attestation |
+| **Component 4** | BCL-CHAIN-01 retrospective SQL result (AL-BCL-03 SQL from OBSERVABILITY §70.4 against `audit_log_events`); must return zero rows or each non-zero row requires an IC reference |
+| **Component 5** | AL-BCL-01/02/03/04 quarterly activation log: date, severity, resolution timestamp, IC reference; zero-activation = affirmative attestation per alert |
+| **Component 6** | BCL-SLO-01 (HTTP 200 rate ≥ 99.0%, rolling 30d) and BCL-SLO-02 (P95 < 2,000 ms, rolling 7d) compliance summary: % compliance, longest breach window if any, associated IC reference |
+| **Nil-report attestation** | Required each quarter if BCL not yet in production (M8 pending); file `bcl-obs-e-001-{YYYY}-Q{N}-nil.json` with all six components set to `null` + `status: "bcl_not_in_production"` |
+| **Zero-event attestation** | Per-component zero-event JSON if BCL in production but no events occurred — not silence |
+| **Privacy floor** | Aggregate counts only; `tenant_id` as FORM-internal UUID (in per-tenant request count); `oidc_sub_hash` not surfaced; no employee `user_id`, name, email, coaching content, or GDPR Art. 9 data |
+| **Owner** | compliance-officer + devops-lead |
+| **R2 path** | `compliance/evidence/oidc-bcl/bcl-obs-e-001-{YYYY}-Q{N}.json` |
+| **Vanta cadence** | Quarterly (within 30 days of quarter close) |
+| **TSC** | CC6.1, CC6.3, CC7.2, CC7.3 |
+| **Source** | §164 (v3.89.1, 2026-07-04); OBSERVABILITY §70.8 (full spec + SQL) |
+
+**Auditor-facing note:** BCL-OBS-E-001 evidences the *monitoring controls*, not just the outcomes evidenced by BCL-E-001. CC7.2 and CC7.3 require quarterly proof that AL-BCL-01 through AL-BCL-04 ran and that any anomaly generated a documented incident response. A P0 AL-BCL-03 activation (BCL-CHAIN-01 integrity violation) requires an IC reference in component (5) pointing to a `docs/INCIDENT_RESPONSE.md R-74` post-mortem — the BC-OBS-E-001 log is the auditor's navigation path from anomaly detection to documented resolution. First actual (non-nil) filing is Q3 2026, contingent on the §46.8 M8 production deploy.
+
+#### §165.2.3 SLO-E-001 + SLO-E-002 Initial + Annual (CC6.1 / CC6.3)
+
+| Field | Value |
+|---|---|
+| **Initial trigger** | T+30 days post M7 go-live — one-time collection per §162 + §45.8 item 6 |
+| **Annual cadence** | Q4 Dec 31 — nil-export attestation thereafter if zero SAML SLO events in the preceding 12 months; full export if events exist |
+| **SLO-E-001 activity** | Export all `slo.sp_initiated` / `slo.completed` / `slo.failed` / `slo.fallback_local_only` DEC-030 HMAC-chain records for the 30-day post go-live window; assert zero orphan `slo.sp_initiated` events without a terminal `slo.completed` or `slo.failed` + `slo.fallback_local_only` closure; SHA-256 hash; upload to R2 WORM + Vanta within 48h |
+| **SLO-E-002 activity** | Export all `slo.idp_initiated` DEC-030 HMAC-chain records; assert `sessions_revoked_count > 0` for each record (IdP-initiated SLO must terminate all sessions for the `idp_name_id`); SHA-256 hash; upload to R2 WORM + Vanta within 48h |
+| **Annual nil-export** | File `slo-e-001-nil_<YYYY>.json` + `slo-e-002-nil_<YYYY>.json` at `compliance/evidence/saml-slo/` within 48h of Dec 31 if zero SAML SLO events occurred in the year |
+| **Privacy floor** | `slo_request_id` UUID + `tenant_id` UUID + `idp_name_id` (SAML federation-layer pseudonym, non-PII per SAML 2.0 Core §8.3) + `session_id` nullable UUID + timestamps/enums; nullable `user_id` only in `slo.fallback_local_only` (FORM-internal UUID — not employee email or identity attribute); no raw employee email or GDPR Art. 9 data |
+| **Owner** | compliance-officer |
+| **R2 paths** | SLO-E-001: `compliance/evidence/saml-slo/slo-e-001-sp-chain-export.json`; SLO-E-002: `compliance/evidence/saml-slo/slo-e-002-idp-initiated-export.json` |
+| **Vanta cadence** | 30-day post go-live (initial); annual nil-export thereafter (within 48h of Dec 31) |
+| **TSC** | CC6.1, CC6.3 |
+| **Source** | §162 (v3.88.0, 2026-07-04); SSO_SCIM_IMPLEMENTATION §45 |
+
+**Auditor-facing note:** SLO-E-001 and SLO-E-002 together with BCL-E-001 provide CC6.1 and CC6.3 coverage for *both* federated SSO protocols (SAML 2.0 and OIDC). If zero SAML SLO events occurred in the 12-month observation period, the nil attestation files are not a control gap — they are affirmative statements that all enterprise sessions that *could* have triggered SAML SLO were handled correctly (and there were zero such events). An auditor querying `audit_log_events` directly should be guided to `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events` (v2.88) for the five-event schema and SAML-SLO-CHAIN-01 ordering invariant.
+
+### §165.3 Cross-Reference Obligations Closed
+
+| Obligation | Source section | Status |
+|---|---|---|
+| Add SLO-E-001 + SLO-E-002 initial + annual nil-export cadence to §15.1 compliance calendar | §162 (v3.88.0, 2026-07-04) — deferred at authoring | 🟢 **Done — 2026-07-04 (§165.2.3, this patch)** |
+| Add BCL-E-001 monthly collection cadence to §15.1 compliance calendar | §163 (v3.89.0, 2026-07-04) — deferred at authoring | 🟢 **Done — 2026-07-04 (§165.2.1, this patch)** |
+| Add BCL-OBS-E-001 quarterly collection cadence to §15.1 compliance calendar | §164 (v3.89.1, 2026-07-04) — deferred at authoring | 🟢 **Done — 2026-07-04 (§165.2.2, this patch)** |
+
+### §165.4 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Add BCL-E-001 monthly row to §15.1 Master Compliance Calendar | compliance-officer | **P2** | [x] **Done — 2026-07-04 (§165.2.1 inline, this patch)** |
+| 2 | Add BCL-OBS-E-001 quarterly row to §15.1 Master Compliance Calendar | compliance-officer | **P2** | [x] **Done — 2026-07-04 (§165.2.2 inline, this patch)** |
+| 3 | Add SLO-E-001 + SLO-E-002 initial + annual row to §15.1 Master Compliance Calendar | compliance-officer | **P2** | [x] **Done — 2026-07-04 (§165.2.3 inline, this patch)** |
 
 ---
 

@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [12.52.1] — 2026-07-04
+
+### Changed
+- `docs/SOC2_READINESS.md` v3.89.1 → v3.90.0 — §165 Cross-Reference Patch — §15 Compliance Calendar: SLO-E-001 / SLO-E-002 / BCL-E-001 / BCL-OBS-E-001. Closes three deferred §15.1 calendar-addition items: §162 (SLO-E-001 + SLO-E-002 SAML SLO chain exports — initial T+30 days post M7 go-live + annual Q4 Dec 31 nil-export attestation; CC6.1/CC6.3), §163 (BCL-E-001 monthly OIDC BCL 30-day chain export — 5th of each month after M8 + 30d; nil attestation until M8 in production; CC6.1/CC6.3), §164 (BCL-OBS-E-001 quarterly BCL observability health report — within 30 days of quarter close Jan 31 / Apr 30 / Jul 31 / Oct 31; six-component report per OBSERVABILITY §70.8; nil-report until M8; CC6.1/CC6.3/CC7.2/CC7.3). Three rows added inline to §15.1 Master Compliance Calendar. §165.1 background. §165.2 per-artefact field tables + auditor-facing notes (§165.2.1 BCL-E-001 / §165.2.2 BCL-OBS-E-001 / §165.2.3 SLO-E-001 + SLO-E-002). §165.3 three cross-reference obligations 🟢 Closed. §165.4 three-item implementation checklist all [x] Done. Mirrors §146 (v3.72.0, 2026-07-03) pattern for the M7–M8 SSO evidence batch. Privacy floor: BCL artefacts — `sub_hash` SHA-256 + UUID fields only; SLO artefacts — `idp_name_id` SAML pseudonym + UUIDs + timestamps/enums; no employee PII or GDPR Art. 9 data. Owner: compliance-officer.
+- `VERSION` — 12.52.0 → 12.52.1.
+
+---
+
 ## [12.52.0] — 2026-07-04
 
 ### Added
