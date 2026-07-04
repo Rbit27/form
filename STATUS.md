@@ -6,6 +6,7 @@
 
 ## Current version
 
+**v12.78.0** — 2026-07-04 · content · post-3133 · «Мікросесії і подрібнений об'єм: коли це виправдано, коли — ні» · series «Тренувальний менеджмент часу» 3126–3135 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3133 · «Тренувальний менеджмент часу» in progress 7/10 → 8/10 · next: post-3134 («Тренувальна рутина vs. тренувальна гнучкість: де баланс»)
 **v12.77.0** — 2026-07-04 · content · post-12 · «Техніка або інтенсивність: чому форма — це не безпека, а продуктивність» · editorial post-12 · clinical-safety PASS · sports-scientist review pending · blog.html card prepended for post-12 · next: post-3133 («Мікросесії і подрібнений об'єм: коли це виправдано, коли — ні»)
 **v12.76.0** — 2026-07-04 · enterprise · DATA_MODEL §53 SAML SLO Migration 0100 · five columns canonical (slo_url, slo_binding, backchannel_logout_enabled, idp_name_id, idp_session_id) · SSO_SCIM §45.9 cross-ref patched · header v1.43 → v1.45 · owner: enterprise-architect
 **v12.75.0** — 2026-07-04 · content · post-11 · «Деловантажний тиждень: чому це стратегія, а не слабкість» · editorial post-11 (deload weeks) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-11 · next: post-12 («Техніка понад інтенсивністю: чому форма будує тренованість»)

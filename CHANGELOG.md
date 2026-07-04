@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [12.78.0] — 2026-07-04
+
+### Added
+- `content/post-3133-microsessions-split-volume.md` — Series «Тренувальний менеджмент часу» 3126–3135 post 8/10. «Мікросесії і подрібнений об'єм: коли це виправдано, коли — ні». Häkkinen & Pakarinen (1993): двократні тренування і гормональна відповідь; Brigatto (2019): 8 vs. 16 підходів при рівному тижневому об'ємі — без різниці; McLester (2000): частота vs. об'єм; Schoenfeld (2016): обсяг — первинний. Два типи мікросесій; коли виправдані (concurrent training ≥6h, MED maintenance, distributed skill practice); коли ні (< 2 підходи, < 48h між гіпертрофічними стимулами, початківці, max effort). Операційна таблиця рішення. clinical-safety NOT_REQUIRED.
+- `blog.html` — post-3133 card prepended at top of feed.
+
+### Changed
+- `STATUS.md` — v12.77.0 → v12.78.0; series «Тренувальний менеджмент часу» 7/10 → 8/10; next: post-3134 («Тренувальна рутина vs. тренувальна гнучкість: де баланс»).
+
+---
+
 ## [12.77.0] — 2026-07-04
 
 ### Added
