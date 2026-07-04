@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v12.41.0** — 2026-07-04 · content · post-3124 · «Коли час від self-coached перейти до роботи з тренером: сигнали, критерії, типи підтримки» (series «Самодіагностика без тренера» 3116–3125, 9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3124 · «Самодіагностика без тренера» 8/10 → 9/10 · next: post-3125 (series «Самодіагностика без тренера» 10/10 — synthesis «Операційна система self-coached intermediate атлета: синтез серії 3116–3125»)
+
 **v12.40.0** — 2026-07-04 · content · post-3123 · «Зовнішній погляд без тренера: відео, партнер, дані — що замінює, що не замінює» (series «Самодіагностика без тренера» 3116–3125, 8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3123 · «Самодіагностика без тренера» 7/10 → 8/10 · next: post-3124 (series «Самодіагностика без тренера» 9/10 — «Коли час від self-coached перейти до роботи з тренером: сигнали, критерії, типи підтримки»)
 
 **v12.39.0** — 2026-07-04 · content · post-3122 · «Де межа між перетренованістю і нормальною накопиченою втомою: операційні критерії» (series «Самодіагностика без тренера» 3116–3125, 7/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3122 · «Самодіагностика без тренера» 6/10 → 7/10 · next: post-3123 (series «Самодіагностика без тренера» 8/10 — «Зовнішній погляд без тренера: відео, партнер, дані — що замінює, що не замінює»)
