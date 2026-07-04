@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [12.40.1] — 2026-07-04
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md §R-73` — R-73 BCL REVOCATION_QUEUE Exhausted (CC6.3/CC7.3 — Enterprise SSO Session Revocation Failure, P1). Background: REVOCATION_QUEUE three-retry exhaustion (5s/10s/20s, 35s total) leaves employee FORM session active after IdP logout — confirmed CC6.3 control gap. Twelve-step T+0..T+60 response; three scope queries (C1 `backchannel_logout.failed` identification, C2 active session detection with privacy floor, C3 post-resolution zero-row verification); five root causes (H1 connection pool, H2 Supabase outage/R-03, H3 CF Queue stuck, H4 transient write, H5 sub_hash mismatch); resolution playbook with PAM-elevated `POST /tenant/{slug}/revoke-all-sessions` (two-person auth §19.4, `enterprise.admin_sessions_bulk_revoked` HIGH/7yr DEC-030); BCL-REV-E-001 per-activation evidence artefact (CC6.3/CC7.3, 7yr WORM); CSM notification SLA §4.3 (15 min / 24h written summary); co-activation matrix (P0 escalation at 30 min unrevoked, R-03, R-74, DLQ fleet); five implementation checklist items. Closes §70.11 obligation "File companion IR runbook for AL-BCL-02 in docs/INCIDENT_RESPONSE.md."
+- `docs/INCIDENT_RESPONSE.md §R-74` — R-74 BCL-CHAIN-01 Integrity Violation (CC7.2/CC7.3/CC8.1 — BCL Pipeline Audit Chain Break, P0 no auto-resolve no cooldown). Background: BCL-CHAIN-01 invariant (`received` anchor in `BCL_ANCHOR_KV` 60s TTL; `checkBclAnchor()` HTTP 422 if absent; `failed` exempt); live HTTP 422 (chain INSERT blocked — clean) vs. retrospective SQL orphan (chain INSERT completed despite missing anchor — more severe, requires R-05). Three trigger conditions; three-scope P0 severity table (contained/full/fleet); four scope queries (C1 audit log extraction, C2 canonical retrospective SQL from §70.4, C3 CF KV API TTL check, C4 PAM-elevated session state); five root causes (H1 TTL expiry in retry window, H2 `writeBclAnchor()` silent failure, H3 IdP duplicate replay, H4 code bug, H5 malicious manipulation); five resolution paths; mandatory R-05 co-activation on retrospective violation; BCL-CHN-E-001 per-activation evidence artefact (CC7.2/CC7.3/CC8.1, 7yr WORM, compliance-officer sign-off required for closure); four communication templates including T-74-C compliance-officer sign-off request; co-activation matrix (R-05 MANDATORY retrospective, R-73 session active, P0-fleet, R-05 full H5); six implementation checklist items including tabletop exercise before M8 deploy. Closes §70.11 obligation "File companion IR runbook for AL-BCL-03 in docs/INCIDENT_RESPONSE.md."
+- `docs/INCIDENT_RESPONSE.md` — header v3.38.0 → v3.39.0.
+- `docs/OBSERVABILITY.md §70.9 item 12` — status `[ ]` → `[x] Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.39.0, R-73 + R-74)`; `R-xx` placeholders replaced with `R-73` and `R-74`.
+- `docs/OBSERVABILITY.md §70.11` — two rows 🟡 Pending → 🟢 Done (AL-BCL-02 companion → R-73; AL-BCL-03 companion → R-74).
+- `docs/OBSERVABILITY.md §70.7` — CC7.3 row updated: "§70.11 pending" placeholder replaced with direct R-73 + R-74 references.
+- `docs/OBSERVABILITY.md` — header v5.16.0 → v5.16.1; v5.16.1 patch note appended.
+- `VERSION` — 12.40.0 → 12.40.1.
+
+---
+
 ## [12.40.0] — 2026-07-04
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.38.0
+# FORM · Incident Response Runbook v3.39.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -26133,3 +26133,597 @@ Implementation status: [ ] Pending — platform-engineer (§R-72.12 item 2).
 ---
 
 *v1.0 (2026-07-04): R-72 `audit-event-flush` Stale (A1.2/CC7.2 — Audit Event Pipeline Offline) — seventy-second runbook and companion stale recovery runbook for `audit-event-flush` (the P0-default DEC-030 audit event pipeline flush job). `audit-event-flush` (pg_cron `*/30 * * * *`; 2h freshness window; every 30 min UTC; 2 cycles per hour) was registered in OBSERVABILITY.md §12.6 as one of three P0 sentinel jobs (alongside `audit-chain-daily-check` and `row-count-monitor`); no stale recovery runbook was authored at that time — closing the longest-standing P0 runbook gap in the §12.6 registry. A1.2/CC7.2 control significance: `audit-event-flush` is the pipeline that commits DEC-030 HMAC-chained events from the Cloudflare KV buffer to `audit_log_events` in Postgres; a stale job means all events emitted since the last flush are not yet in the HMAC chain — FORM's primary audit trail is temporarily incomplete; unlike R-68 (chain verification sentinel offline — chain exists but is unverified) and R-71 (data-integrity anomaly sentinel offline — chain exists and is verified but anomaly detection is paused), R-72 represents the audit pipeline itself being offline: no events emitted during the stale window are in `audit_log_events`. P0 default (equal priority with R-68 and R-71): event loss requires simultaneous KV flush failure AND Supabase write failure within the same window (KV TTL >> 2h freshness window), but the CC7.2 chain integrity gap exists for the full stale duration regardless of loss risk — auditors cannot verify the chain is complete for the stale window until `audit-event-flush` restores. Three scope queries: R-72-C1 (pg_cron job history + `active` flag — H1/H2/H4 discriminator); R-72-C2 (Cloudflare KV buffer depth via CF API — event loss risk gate; `total_pending` count + `oldest_expiration` timestamp; P0-escalate if `expiration < NOW() + 7200s`); R-72-C3 (peer job health — H3 discriminator; ≥3 stale jobs → R-03 co-activation). Four root causes with four H4 sub-causes: H1 (deleted — zero `cron.job` row); H2 (disabled — `active = false`); H3 (Supabase pg_cron degradation → R-03 co-active); H4 (Edge Function broken — H4a deployment failure, H4b KV namespace binding broken, H4c pg_net degradation, H4d Postgres write failure). Two DEC-030 HMAC-chained events (AUDIT_LOG_SCHEMA.md v2.87, 2026-07-04): `system.audit_event_flush_stale_declared` HIGH/7yr (AEF-FLUSH-STALE-CHAIN-01 anchor; IC PAM-elevated at T+0; A1.2/CC7.2; six-field Zod v2 `AuditEventFlushStaleDeclaredSchema`); `system.audit_event_flush_restored` LOW/3yr (terminal; IC PAM-elevated post-recovery; `kv_events_flushed` captures recovery count; `manual_flush_required` flags P0-escalate path; six-field Zod v2 `AuditEventFlushRestoredSchema`). AEF-FLUSH-STALE-CHAIN-01: HTTP 422 `AEF_FLUSH_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit; co-activates R-05; implementation pending platform-engineer (§R-72.11 item 2). Two communication templates: T-72-A (detection; `#incidents-critical`); T-72-B (resolution); T-72-C (escalation; stale >2h or KV TTL risk or H4b/H4d; restricted to CEO + CTO + IC). One evidence artefact: AEF-FLUSH-STALE-E-001 (per-activation; A1.2/CC7.2; 7yr; `compliance/evidence/audit-event-flush/aef-flush-stale-e-001-<YYYY-MM-DD>/`; NEW R2 subfolder — §R-72.11 item 3 pending devops-lead; T+60 min filing deadline). Six implementation checklist items: AUDIT_LOG_SCHEMA.md event registration (P0/Done v2.87), AEF-FLUSH-STALE-CHAIN-01 Worker enforcement (P1/pending platform-engineer), R2 subfolder provision (P1/pending devops-lead), SOC2_READINESS.md §79.4 artefact registration (P1/Done §161 v3.87.0), OBSERVABILITY.md §12.6 cross-ref update (P0/Done v5.15.7), authoring complete (P0/Done). Privacy floor: no user_id, tenant_id, coaching content, health data, or GDPR Art. 9 data in any scope query output, KV buffer count, DEC-030 payload, template, or evidence artefact; `kv_buffer_events_at_risk` and `kv_events_flushed` are aggregate integer counts with no event content; AEF-FLUSH-STALE-E-001 restricted to platform-engineer + compliance-officer. Cross-references: OBSERVABILITY.md §12.6 `audit-event-flush` row (v5.15.7); AUDIT_LOG_SCHEMA.md §Audit Event Flush Stale events (v2.87); SOC2_READINESS.md §161 (v3.87.0); R-68 (audit-chain-daily-check stale — CC7.2 chain verification companion); R-71 (row-count-monitor stale — CC7.1/A1.2 data-integrity companion); R-05; R-03. Owner: platform-engineer + compliance-officer.*
+
+---
+
+## R-73 · BCL REVOCATION_QUEUE Exhausted — Session Revocation Failure — CC6.3 / CC7.3 (Enterprise SSO)
+
+> **Alert source:** AL-BCL-02 (`docs/OBSERVABILITY.md §70.4`)
+> **Severity:** P1 (default). No auto-resolve.
+> **Owner:** security-engineer + compliance-officer (IC). CSM notified per §R-73.10.
+> **SOC 2:** CC6.3 (access revocation timeliness), CC7.3 (response to identified anomalies).
+> **Privacy floor:** Scope queries and DEC-030 event payloads contain no individual `user_id`, employee name, email address, coaching content, body composition metric, or GDPR Art. 9 special-category data. `tenant_id` is FORM-internal UUID. `oidc_sub_hash` in `backchannel_logout.failed` payloads is SHA-256 of the OIDC `sub` claim — not the raw value.
+> **References:** `docs/OBSERVABILITY.md §70.4 AL-BCL-02`, `docs/SSO_SCIM_IMPLEMENTATION.md §46` (BCL Worker spec), `docs/DATA_MODEL.md §46.2` (`enterprise_sessions` DDL), `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`.
+
+---
+
+### Background
+
+The FORM OIDC Back-Channel Logout (BCL) Worker (`oidc-backchannel-logout.ts`) processes IdP-side logout tokens. When the synchronous call to `revokeOidcSessions()` fails (e.g., Supabase write timeout, connection pool exhaustion), the Worker asynchronously enqueues the revocation request to **REVOCATION_QUEUE** (Cloudflare Queue). The queue consumer retries the `revokeOidcSessions()` call up to three times with exponential backoff (5s → 10s → 20s; total worst-case elapsed time 35s). If all three retries exhaust, the session revocation is abandoned: the affected `enterprise_sessions` row is NOT updated, the employee's FORM session remains active, and a `backchannel_logout.failed` DEC-030 event is emitted with `reason: queue_exhausted`.
+
+**SOC 2 significance (CC6.3):** FORM's access revocation SLO requires that sessions terminate within the REVOCATION_QUEUE retry window (≤ 35s from BCL receipt). Any REVOCATION_QUEUE exhaustion represents a confirmed CC6.3 gap — FORM received a valid logout instruction from the IdP but failed to act on it within the SLO window. The incident must be resolved (sessions manually revoked, root cause corrected) and documented before closing.
+
+---
+
+### R-73.1 Trigger Conditions
+
+| Trigger | Source | Threshold |
+|---|---|---|
+| **AL-BCL-02 primary** | `bcl_queue_exhausted_total` WAE counter | > 0 in any 5-min window |
+| **Manual activation** | IC observation of `backchannel_logout.failed` events with `reason: queue_exhausted` in audit log | Any count |
+| **Concurrent activation** | R-03 (Supabase outage) co-activates R-73 if BCL REVOCATION_QUEUE is backed up due to Supabase writes failing | See R-73.11 co-activation matrix |
+
+AL-BCL-02 dedup key: `bcl-revocation-queue-exhausted-{tenant_id}` (24h cooldown per affected tenant). If multiple tenants are affected simultaneously, each receives a separate AL-BCL-02 fire.
+
+---
+
+### R-73.2 Severity Classification
+
+| Condition | Severity |
+|---|---|
+| 1–4 sessions unrevoked, single tenant, Supabase restored < 10 min | **P1** (default) |
+| ≥ 5 sessions unrevoked OR multiple tenants simultaneously affected | **P1** escalate to P0-watch: notify founder + CSM lead |
+| Sessions still unrevoked > 30 min post-detection | **P0 escalate**: co-activate standard P0 protocol (§5) |
+| Supabase completely unreachable (R-03 active) | **P0** per R-03; R-73 rides alongside |
+
+Default P1: IC declaration within 15 min, resolution target within 2 hours.
+
+---
+
+### R-73.3 Immediate Actions (T+0 to T+60 min)
+
+| Time | Action | Owner |
+|---|---|---|
+| T+0 | Acknowledge PagerDuty AL-BCL-02 alert; confirm `bcl_queue_exhausted_total` counter source and affected `tenant_id` | security-engineer (IC) |
+| T+5 | Run R-73-C1 (identify failed `bcl_request_id` values and affected tenant) | IC |
+| T+10 | Run R-73-C2 (find sessions not yet revoked for affected tenant) | IC |
+| T+15 | If R-73-C2 returns rows: request PAM elevation (`pam_request_id` required for all subsequent privileged actions) | IC |
+| T+20 | Notify CSM of affected tenant (T-73-B template). Do NOT include user count or `oidc_sub_hash` in CSM message — use seat count approximation only. | IC + CSM |
+| T+25 | Perform manual session revocation (R-73.6 resolution playbook) | IC (PAM-elevated) |
+| T+30 | Run R-73-C3 (verify all sessions revoked) | IC |
+| T+40 | If R-73-C3 still returns rows: escalate severity, re-run manual revocation, confirm Supabase connectivity | IC |
+| T+60 | Diagnose root cause (R-73.5), file BCL-REV-E-001 evidence artefact, begin post-incident review scheduling | IC + compliance-officer |
+
+---
+
+### R-73.4 Scope Queries
+
+All queries run as `form_audit` role (read-only). For manual revocation actions (R-73.6), IC must be PAM-elevated.
+
+#### R-73-C1 — Identify exhausted `bcl_request_id` values
+
+```sql
+-- Returns backchannel_logout.failed events from the past 24h with reason = queue_exhausted.
+-- Run as form_audit role. Zero rows = no exhaustion events.
+SELECT
+  payload->>'bcl_request_id'        AS bcl_request_id,
+  payload->>'tenant_id'             AS tenant_id,
+  payload->>'reason'                AS failure_reason,
+  payload->>'sessions_revoked_count' AS sessions_revoked_count,
+  created_at                        AS failed_at
+FROM audit_log_events
+WHERE event_type = 'backchannel_logout.failed'
+  AND created_at > NOW() - INTERVAL '24 hours'
+ORDER BY created_at DESC;
+-- Privacy floor: oidc_sub_hash not returned — use bcl_request_id for correlation only.
+```
+
+#### R-73-C2 — Find sessions still active for affected tenant
+
+```sql
+-- For each tenant_id from R-73-C1, find sessions that should have been revoked.
+-- Substitute $tenant_id and $failed_at from R-73-C1 results.
+SELECT
+  session_id,
+  created_at,
+  last_active_at,
+  'still_active_after_bcl_failure' AS status
+FROM enterprise_sessions
+WHERE tenant_id  = $tenant_id
+  AND revoked_at IS NULL
+  AND deleted_at IS NULL
+  AND created_at < $failed_at
+ORDER BY last_active_at DESC;
+-- Privacy floor: user_id not returned — session_id is FORM-internal UUID.
+-- Do NOT expose this query output outside IC + compliance-officer.
+```
+
+#### R-73-C3 — Verify all sessions revoked (post-resolution)
+
+```sql
+-- Run after manual revocation to confirm no active sessions remain.
+-- R-73 closure requires: still_active_sessions = 0
+SELECT COUNT(*) AS still_active_sessions
+FROM enterprise_sessions
+WHERE tenant_id  = $tenant_id
+  AND revoked_at IS NULL
+  AND deleted_at IS NULL;
+```
+
+---
+
+### R-73.5 Root Cause Tree
+
+| Root cause | Code | Discriminator |
+|---|---|---|
+| Supabase connection pool exhaustion — all `revokeOidcSessions()` calls fail under load | **H1** | Check Supabase dashboard → Connection Pooling → Active connections at failure timestamp; check pg_cron concurrent jobs |
+| Supabase planned maintenance or unplanned outage — R-03 co-active | **H2** | Check Supabase status page at failure timestamp; confirm R-03 also fired |
+| Cloudflare Queue consumer stuck or dead — `REVOCATION_QUEUE` not draining | **H3** | CF dashboard → Queues → `REVOCATION_QUEUE` message lag; check BCL Worker consumer log for crash/restart |
+| Transient Supabase write error during retry window | **H4** | Single retry succeeded before exhaustion (rare — exhaustion = all 3 failed); cross-reference Supabase P99 latency spike |
+| `revokeOidcSessions()` bug — correct session not targeted (`oidc_sub_hash` mismatch) | **H5** | Compare `oidc_sub_hash` in `backchannel_logout.failed` event with `enterprise_sessions.oidc_sub_hash`; check index `idx_enterprise_sessions_oidc_sub_hash` |
+
+---
+
+### R-73.6 Resolution Playbook
+
+**Step 1 — Manual session revocation (PAM-elevated, two-person auth per `docs/SSO_SCIM_IMPLEMENTATION.md §19.4`)**
+
+```bash
+POST https://admin-internal.form.coach/api/v1/tenant/{slug}/revoke-all-sessions
+Authorization: Bearer {FORM_STAFF_TOKEN}
+X-PAM-Request-ID: {pam_request_id}
+Content-Type: application/json
+
+{
+  "reason": "bcl_revocation_queue_exhausted",
+  "incident_reference": "R-73-{YYYY-MM-DD}",
+  "bcl_request_ids": ["{bcl_request_id_1}", "..."]
+}
+```
+
+This endpoint sets `revoked_at = NOW()` on all active sessions for the tenant and emits `enterprise.admin_sessions_bulk_revoked` HIGH/7yr (DEC-030) with `pam_request_id`, aggregate `sessions_revoked_count`, and `incident_reference`. No individual `user_id` in the event payload.
+
+**Step 2 — Verify queue drained**
+
+CF Dashboard → Queues → `REVOCATION_QUEUE`: message count must be 0. If DLQ has messages, forward manually to standard consumer or mark as poison-message for compliance review.
+
+**Step 3 — Root cause remediation**
+
+| Root cause | Remediation |
+|---|---|
+| H1 | Increase Supabase connection pool limit; throttle BCL consumer concurrency |
+| H2 | Wait for R-03 resolution; after Supabase recovery drain any queued BCL events |
+| H3 | Redeploy BCL Worker (`wrangler deploy oidc-backchannel-logout.ts`); drain DLQ |
+| H4 | No structural change; optionally increase retry count (platform-engineer decision, requires §46 update) |
+| H5 | Investigate `idx_enterprise_sessions_oidc_sub_hash` query path; check Migration 0101 applied |
+
+---
+
+### R-73.7 DEC-030 HMAC-Chained Events
+
+| Event type | Severity / Retention | Emitter | Chain role | Privacy floor |
+|---|---|---|---|---|
+| `backchannel_logout.failed` | HIGH / 7yr | BCL REVOCATION_QUEUE consumer (automatic) | Terminal BCL chain event for this `bcl_request_id`; `failed` is **exempt** from BCL-CHAIN-01 anchor requirement (§46.11) | `oidc_sub_hash` only — no raw `sub`; no `user_id` |
+| `enterprise.admin_sessions_bulk_revoked` | HIGH / 7yr | Admin API (IC PAM-elevated) | Post-resolution evidence; not part of BCL chain; emitted by `POST /tenant/{slug}/revoke-all-sessions` | `tenant_id` UUID, `pam_request_id`, `bcl_request_ids[]`, `sessions_revoked_count`; no individual `user_id` |
+
+**Ordering note:** A `backchannel_logout.failed` event with no prior `backchannel_logout.received` for the same `bcl_request_id` is itself a BCL-CHAIN-01 violation and co-activates R-74.
+
+---
+
+### R-73.8 Evidence Artefact
+
+**BCL-REV-E-001** — per-activation evidence package, filed within T+60 min.
+
+| Field | Value |
+|---|---|
+| Artefact ID | BCL-REV-E-001 |
+| SOC 2 controls | CC6.3, CC7.3 |
+| Trigger | Per R-73 activation |
+| Retention | 7yr WORM |
+| R2 access | `r2:form-api` REVOKED — IC PAM-elevated only |
+| R2 path | `compliance/evidence/oidc-bcl/bcl-rev-e-001-<YYYY-MM-DD>/` |
+| Filing deadline | T+60 min |
+
+**Files:** `incident-timeline.md`, `r73-c1-output.txt`, `r73-c2-output.txt` (session count only — no session UUIDs), `r73-c3-output.txt` (must show `still_active_sessions = 0`), `manual-revocation-log.md`, `root-cause-analysis.md`, `csm-notification-log.md`.
+
+**Privacy floor:** All files contain operational metadata only. `r73-c2-output.txt` contains session row count — not session UUIDs, not `user_id`. `oidc_sub_hash` in `r73-c1-output.txt` must be redacted before sharing with auditors unless specifically required for chain correlation.
+
+---
+
+### R-73.9 Communication Templates
+
+**T-73-A — Internal declaration (`#incidents-critical`)**
+
+```
+🔴 P1 DECLARED — BCL Session Revocation Failure
+IC: @{security-engineer}
+Trigger: AL-BCL-02 — REVOCATION_QUEUE exhausted ({N} events / 5 min)
+Affected tenant: tenant_id {UUID} (CSM-only — no company name in this channel)
+Action: Scoping sessions; manual revocation in progress
+Runbook: docs/INCIDENT_RESPONSE.md R-73
+```
+
+**T-73-B — CSM notification (Slack `#form-{slug}-shared` or direct DM)**
+
+```
+Hi {CSM name} — flagging a technical event for your awareness.
+
+Between {start_time} and {end_time} UTC, logout signals from your IdP may not
+have immediately terminated sessions in FORM due to a queue processing issue.
+We have manually revoked all affected sessions. No user data was exposed.
+
+Action required from you: None. Sessions have been revoked.
+Follow-up: Written incident summary within 24 hours.
+
+This notification satisfies FORM SLA §4.3 incident disclosure obligation.
+```
+
+**T-73-C — Resolution (`#incidents-critical`)**
+
+```
+✅ P1 RESOLVED — BCL Session Revocation Failure
+Resolution time: {duration}
+Sessions manually revoked: {aggregate count}
+Root cause: {H1/H2/H3/H4/H5 — one sentence}
+Evidence: BCL-REV-E-001 filed at compliance/evidence/oidc-bcl/bcl-rev-e-001-{date}/
+Open items: {Linear URL or "None"}
+PIR: {required if > 5 sessions affected / yes / no}
+```
+
+---
+
+### R-73.10 CSM Notification SLA
+
+Under `docs/ENTERPRISE_SLA.md §4.3`, CSM must be notified within **15 minutes** of a confirmed P1 affecting their tenant. Notification must not include individual user counts, session UUIDs, or `oidc_sub_hash` values. A written summary (BCL-REV-E-001 `incident-timeline.md`) must be delivered to CSM within **24 hours** of resolution. Failure to notify within 15 min is itself an SLA breach, recordable in `docs/ENTERPRISE_SLA.md §9` credit log.
+
+---
+
+### R-73.11 Co-Activation Matrix
+
+| Condition | Co-activation | Notes |
+|---|---|---|
+| Sessions still unrevoked > 30 min | Escalate to P0 per §5 | Do not wait for T+60 |
+| Supabase completely unreachable (H2) | **R-03** | R-03 IC leads infra recovery; R-73 IC monitors BCL scope |
+| `backchannel_logout.failed` with no prior `received` in chain | **R-74** (BCL-CHAIN-01 violation) | Both active simultaneously; R-74 IC (compliance-officer) takes chain custody |
+| REVOCATION_QUEUE DLQ accumulates > 50 messages across tenants | Fleet escalation — notify all affected CSMs; escalate to P0 | Indicates systemic queue failure |
+
+---
+
+### R-73.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `enterprise.admin_sessions_bulk_revoked` HIGH/7yr in `docs/AUDIT_LOG_SCHEMA.md §Enterprise-Events` — Zod v2 schema: `tenant_id`, `pam_request_id`, `bcl_request_ids[]`, `sessions_revoked_count`, `incident_reference` | compliance-officer | **P1** | [ ] Pending — M8 |
+| 2 | Provision `compliance/evidence/oidc-bcl/` R2 subfolder (parent of `bcl-rev-e-001-*/`); WORM + `r2:form-api` REVOKED policy | devops-lead | **P1** | [ ] Pending — M8 |
+| 3 | Register BCL-REV-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.3/CC7.3; per-activation; 7yr) | compliance-officer | **P1** | [ ] Pending — M8 |
+| 4 | Implement `POST /internal/tenant/{slug}/revoke-all-sessions` Admin API endpoint (PAM, two-person auth, DEC-030 `enterprise.admin_sessions_bulk_revoked` emission) | platform-engineer + security-engineer | **P1** | [ ] Pending — M8 |
+| 5 | Authoring complete — R-73 closes §70.11 obligation "File companion IR runbook for AL-BCL-02 in docs/INCIDENT_RESPONSE.md" | compliance-officer + devops-lead | **P0** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.39.0).** |
+
+**Privacy floor (invariant throughout R-73):** All scope query outputs, DEC-030 event payloads, templates, and BCL-REV-E-001 artefact files contain operational metadata only. No `user_id`, employee name, email, coaching content, health data, or GDPR Art. 9 special-category data. `oidc_sub_hash` is SHA-256 only. Session counts are aggregate integers. Cross-references: `docs/OBSERVABILITY.md §70.4 AL-BCL-02`, `docs/OBSERVABILITY.md §70.8 BCL-OBS-E-001`, `docs/SSO_SCIM_IMPLEMENTATION.md §46`, `docs/DATA_MODEL.md §46.2`, `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`, `docs/ENTERPRISE_SLA.md §4.3`. Owner: security-engineer + compliance-officer.
+
+
+---
+
+## R-74 · BCL-CHAIN-01 Integrity Violation — Audit Chain Break (BCL Pipeline) — CC7.2 / CC7.3 / CC8.1 (P0)
+
+> **Alert source:** AL-BCL-03 (`docs/OBSERVABILITY.md §70.4`)
+> **Severity:** P0 — no auto-resolve. No cooldown. Every violation is its own P0.
+> **Owner:** security-engineer + compliance-officer (joint IC). Founder notified.
+> **SOC 2:** CC7.2 (HMAC chain integrity — DEC-030 primary control), CC7.3 (P0 response), CC8.1 (change management — migration DDL chain coverage).
+> **Privacy floor:** All scope queries, DEC-030 event payloads, templates, and BCL-CHN-E-001 artefact files contain no `user_id`, employee name, email address, coaching content, health metric, or GDPR Art. 9 special-category data. `tenant_id` is FORM-internal UUID. `oidc_sub_hash` is SHA-256 only.
+> **References:** `docs/OBSERVABILITY.md §70.4 AL-BCL-03`, `docs/SSO_SCIM_IMPLEMENTATION.md §46.11` (BCL-CHAIN-01 invariant spec), `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`, `docs/INCIDENT_RESPONSE.md R-05` (mandatory co-activation on retrospective violation).
+
+---
+
+### Background
+
+**BCL-CHAIN-01** is an HMAC-chain ordering invariant enforced by the `emit-audit-event` Cloudflare Worker. When `backchannel_logout.received` is written to the chain, the Worker stores a short-lived anchor in `BCL_ANCHOR_KV` (60s TTL) keyed by `bcl_request_id`. Before `backchannel_logout.revoked` is written, `checkBclAnchor()` verifies the anchor exists. If absent, the Worker returns HTTP 422 `BCL_CHAIN_01_VIOLATION` and blocks the chain INSERT.
+
+A BCL-CHAIN-01 violation indicates:
+1. **Live (HTTP 422):** A `revoked` event was attempted without a valid `received` anchor — the chain INSERT was blocked; the database is clean.
+2. **Retrospective (SQL > 0 rows):** A `revoked` event exists in the chain without a preceding `received` — the enforcement was bypassed; this is the more severe scenario.
+
+Both are P0. This runbook is architecturally equivalent to R-05 (HMAC Chain Break) scoped to the BCL pipeline. The violation must be treated as a potential audit integrity incident until the root cause is confirmed non-malicious.
+
+**This runbook does NOT cover:** AL-BCL-01 (failure rate), AL-BCL-02 (REVOCATION_QUEUE exhaustion — R-73), or AL-BCL-04 (latency).
+
+---
+
+### R-74.1 Trigger Conditions
+
+| Trigger | Source | Threshold |
+|---|---|---|
+| **AL-BCL-03 primary (live)** | `emit-audit-event` returns HTTP 422 `BCL_CHAIN_01_VIOLATION` | Any single occurrence |
+| **AL-BCL-03 retrospective** | Hourly BCL-CHAIN-01 integrity check SQL (§70.4 AL-BCL-03 SQL) returns > 0 rows | Any single row |
+| **Manual activation** | IC observes `backchannel_logout.revoked` in audit log with no matching `received` for same `bcl_request_id` | Any single occurrence |
+
+Dedup key: `bcl-chain-01-violation-{bcl_request_id}` — per unique `bcl_request_id`. No auto-dedup across `bcl_request_id` values. No cooldown.
+
+---
+
+### R-74.2 Severity Classification
+
+BCL-CHAIN-01 violations are always **P0**. The distinction below affects scope and co-activation, not base severity.
+
+| Condition | Scope |
+|---|---|
+| Live HTTP 422 only; root cause identified as H1/H2/H3; no orphan `revoked` in chain | **P0 contained** — resolve per §R-74.6; R-05 advisory |
+| Retrospective SQL returns rows (`revoked` in chain without `received`) | **P0 full** — mandatory R-05 co-activation; legal chain audit |
+| Multiple `bcl_request_id` values across tenants | **P0 fleet** — founder notification immediately; halt BCL processing fleet-wide |
+
+---
+
+### R-74.3 Immediate Actions (T+0 to T+60 min)
+
+| Time | Action | Owner |
+|---|---|---|
+| T+0 | Acknowledge PagerDuty AL-BCL-03 (P0); page security-engineer + compliance-officer simultaneously | On-call |
+| T+5 | Run R-74-C1 (extract `bcl_request_id` from violation event) | security-engineer (IC) |
+| T+10 | Run R-74-C2 (retrospective SQL — is `revoked` in chain?) | IC |
+| T+10 | If R-74-C2 returns rows: **co-activate R-05**; notify founder (T-74-B) | IC + compliance-officer |
+| T+15 | If retrospective violation: disable `backchannel_logout_enabled` for affected tenant (PAM-elevated emergency SQL) to halt further BCL chain writes | IC (PAM-elevated) |
+| T+15 | Run R-74-C3 (check `BCL_ANCHOR_KV` TTL for violating `bcl_request_id`) | IC |
+| T+20 | Preserve raw DEC-030 chain segment to R2 WORM (`compliance/evidence/oidc-bcl/chain-violations/bcl-chn-e-001-{bcl_request_id}-{YYYY-MM-DD}/`) | compliance-officer (PAM-elevated) |
+| T+25 | Run R-74-C4 (determine session state — may need R-73 co-activation) | IC (PAM-elevated) |
+| T+30 | Classify root cause (R-74.5) | IC |
+| T+60 | Begin BCL-CHN-E-001 artefact; compliance-officer sign-off required before R-74 closure | compliance-officer |
+
+**Critical protocol:** An HTTP 422 violation means the `revoked` INSERT was blocked — the session may still be active. Run R-74-C4 immediately. If session is still active, co-activate R-73.
+
+---
+
+### R-74.4 Scope Queries
+
+#### R-74-C1 — Extract violation from audit log
+
+```sql
+-- Identify security.bcl_chain_01_violation events from the past 24h.
+-- Run as form_audit role.
+-- Note: this event requires §70.9 item 11 (AUDIT_LOG_SCHEMA registration) + §74.12 item 2
+-- (hourly check job) to be implemented. Until then use R-74-C2 directly.
+SELECT
+  payload->>'bcl_request_id'  AS bcl_request_id,
+  payload->>'tenant_id'       AS tenant_id,
+  payload->>'violation_type'  AS violation_type,
+  created_at                  AS violation_at
+FROM audit_log_events
+WHERE event_type = 'security.bcl_chain_01_violation'
+  AND created_at > NOW() - INTERVAL '24 hours'
+ORDER BY created_at DESC;
+```
+
+#### R-74-C2 — Retrospective BCL-CHAIN-01 SQL (canonical — from §70.4 AL-BCL-03)
+
+```sql
+-- Returns orphan 'backchannel_logout.revoked' events without a prior 'received' anchor.
+-- Run as form_audit role. Zero rows = chain intact. Any rows = P0 confirmed.
+SELECT
+  e_revoked.payload->>'bcl_request_id'   AS bcl_request_id,
+  e_revoked.payload->>'tenant_id'        AS tenant_id,
+  e_revoked.created_at                   AS revoked_at,
+  'BCL_CHAIN_01_VIOLATION'               AS violation_type
+FROM audit_log_events e_revoked
+WHERE e_revoked.event_type = 'backchannel_logout.revoked'
+  AND e_revoked.created_at > NOW() - INTERVAL '24 hours'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events e_received
+    WHERE e_received.event_type = 'backchannel_logout.received'
+      AND e_received.payload->>'bcl_request_id'
+                              = e_revoked.payload->>'bcl_request_id'
+      AND e_received.created_at BETWEEN
+            e_revoked.created_at - INTERVAL '60 seconds'
+        AND e_revoked.created_at
+  );
+-- Privacy floor: no user_id, name, email, health value.
+-- tenant_id and bcl_request_id are FORM-internal UUIDs only.
+```
+
+#### R-74-C3 — Check BCL_ANCHOR_KV TTL (Cloudflare API, PAM-elevated)
+
+```bash
+curl -s -H "Authorization: Bearer $CF_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/storage/kv/namespaces/$BCL_ANCHOR_KV_ID/metadata/bcl_anchor:{bcl_request_id}"
+# 200 + {"expiration": <unix>} = anchor exists (not expired)
+# 404 / null expiration = anchor missing (TTL expired or never written)
+```
+
+#### R-74-C4 — Session state check (PAM-elevated)
+
+```sql
+-- Determine if the session targeted by the violating bcl_request_id was revoked.
+-- PAM elevation required. Substitute $bcl_request_id from R-74-C1.
+SELECT
+  session_id,
+  revoked_at,
+  CASE WHEN revoked_at IS NULL
+    THEN 'SESSION_STILL_ACTIVE — co-activate R-73'
+    ELSE 'SESSION_REVOKED'
+  END AS status
+FROM enterprise_sessions
+WHERE oidc_sub_hash = (
+  SELECT payload->>'sub_hash'
+  FROM audit_log_events
+  WHERE event_type = 'backchannel_logout.revoked'
+    AND payload->>'bcl_request_id' = $bcl_request_id
+  LIMIT 1
+);
+-- Privacy floor: session_id is FORM-internal UUID. No user_id returned.
+```
+
+---
+
+### R-74.5 Root Cause Tree
+
+| Root cause | Code | Discriminator |
+|---|---|---|
+| `BCL_ANCHOR_KV` TTL (60s) expired before REVOCATION_QUEUE completed retries — total retry time exceeded anchor lifetime | **H1** | R-74-C3 returns null/404; `backchannel_logout.failed` NOT yet emitted (queue still in-flight when anchor expired) |
+| `writeBclAnchor()` silent failure — `system.bcl_anchor_kv_write_failed` advisory emitted; no anchor stored; subsequent `revoked` blocked by 422 | **H2** | R-74-C3 null/404; `system.bcl_anchor_kv_write_failed` event near violation timestamp |
+| IdP duplicate logout POST after FORM's 60s TTL — original chain was valid but second attempt had no anchor | **H3** | R-74-C2 shows `revoked` without matching `received` in 60s window; two `received` events for same `bcl_request_id` absent (second was never emitted) |
+| Code bug — `revoked` emitted before `received` due to race condition or incorrect async ordering in BCL Worker | **H4** | R-74-C2 shows orphan `revoked` with no `received` at all; check BCL Worker deploy timestamp vs. violation timestamp; cross-reference BCL-I-001/BCL-I-002 (§46.12) |
+| Suspected malicious chain manipulation — attacker writes `revoked` directly to `audit_log_events` bypassing `emit-audit-event` | **H5** | R-74-C2 confirms orphan `revoked`; check `audit_log_events.hmac_hash` chain segment; cross-reference with R-05 forensic queries |
+
+---
+
+### R-74.6 Resolution Playbook
+
+**H1 — Anchor TTL too short for queue retry window**
+1. Confirm via R-74-C3 that anchor expired; confirm `backchannel_logout.failed` NOT yet emitted.
+2. Manual session revocation per R-73.6 (session was not revoked since `revoked` was blocked by 422).
+3. Increase `BCL_ANCHOR_KV_TTL_MS` env var from 60s to 120s — platform-engineer decision; requires `docs/SSO_SCIM_IMPLEMENTATION.md §46.11` update.
+4. File BCL-CHN-E-001 with root cause H1.
+
+**H2 — `writeBclAnchor()` silent failure**
+1. Confirm `system.bcl_anchor_kv_write_failed` event near violation timestamp.
+2. If CF KV service was degraded: treat as transient; no structural change. File BCL-CHN-E-001 H2.
+3. If CF KV healthy during failure: investigate `emit-audit-event` Worker error logs; may require code fix (platform-engineer).
+
+**H3 — IdP duplicate replay after TTL**
+1. Confirm second `received` for same `bcl_request_id` is absent (BCL Worker dedup blocked it).
+2. No session revocation gap — original chain was valid. File BCL-CHN-E-001 H3.
+3. If IdP retry interval < 60s: consider reducing IdP retry interval or increasing anchor TTL.
+
+**H4 — Code bug**
+1. Halt BCL processing for affected tenant immediately.
+2. Co-activate R-05 for chain integrity review.
+3. File emergency Linear P0; deployment requires security-engineer + platform-engineer sign-off.
+4. Resume BCL only after fix deployed and BCL-I-001 integration test passes (§46.12).
+
+**H5 — Malicious manipulation**
+1. **Do not close without security-engineer, compliance-officer, and founder review.**
+2. Co-activate R-05 full forensic mode immediately.
+3. Preserve all chain segments to R2 WORM before any further writes.
+4. Halt BCL fleet-wide.
+5. GDPR Art. 33 72-hour supervisory authority notification assessment — compliance-officer decision.
+
+**Closure requirement (all root causes):** Compliance-officer sign-off via `security.bcl_chain_01_violation_closed` DEC-030 event. BCL-CHN-E-001 must be filed. R-74-C2 must return 0 rows at time of closure.
+
+---
+
+### R-74.7 DEC-030 HMAC-Chained Events
+
+| Event type | Severity / Retention | Emitter | Chain role | Privacy floor |
+|---|---|---|---|---|
+| `security.bcl_chain_01_violation` | CRITICAL / 7yr | Hourly BCL-CHAIN-01 check job (§70.9 item 4 — pg_cron job 59 or CF Worker Cron, pending OQ-BCL-OBS-01) | Violation declaration; anchors incident response chain for this `bcl_request_id` | `tenant_id` UUID + `bcl_request_id` UUID; no `user_id`, no `oidc_sub_hash` |
+| `security.bcl_chain_01_violation_closed` | HIGH / 7yr | IC PAM-elevated (compliance-officer sign-off required) | Terminal event; emitted only after BCL-CHN-E-001 filed and compliance-officer approves | `pam_request_id`, `root_cause_code` (H1–H5), `incident_reference`, `artefact_path`; no PII |
+
+**Self-referential note:** `security.bcl_chain_01_violation` is itself a DEC-030 chain event. If `emit-audit-event` is the source of the H4/H5 bug and cannot emit this event, the hourly check job must retry via direct Supabase INSERT under `compliance_reviewer` PAM elevation, with an explanatory note in BCL-CHN-E-001.
+
+---
+
+### R-74.8 BCL-CHAIN-01 Invariant (Reference)
+
+From `docs/SSO_SCIM_IMPLEMENTATION.md §46.11`:
+
+> **For any `bcl_request_id`: `backchannel_logout.revoked` MUST NOT be emitted until `backchannel_logout.received` has been successfully written to the HMAC chain AND its anchor has been written to `BCL_ANCHOR_KV` (60s TTL, `emit-audit-event` Worker only).**
+>
+> Enforcement: `checkBclAnchor()` → HTTP 422 `BCL_CHAIN_01_VIOLATION` if anchor absent. KV read exception → HTTP 503 safe-fail. `backchannel_logout.failed` events are EXEMPT from this check.
+
+An HTTP 422 means the INSERT was BLOCKED — database is clean; this is the benign scenario. A retrospective SQL violation means the INSERT completed despite missing anchor — enforcement was bypassed; this is the more severe scenario requiring R-05 co-activation.
+
+---
+
+### R-74.9 Evidence Artefact
+
+**BCL-CHN-E-001** — per-activation evidence package. Compliance-officer sign-off required before R-74 closure.
+
+| Field | Value |
+|---|---|
+| Artefact ID | BCL-CHN-E-001 |
+| SOC 2 controls | CC7.2, CC7.3, CC8.1 |
+| Trigger | Per R-74 activation |
+| Retention | 7yr WORM |
+| R2 access | `r2:form-api` REVOKED — compliance-officer sign-off required for upload |
+| R2 path | `compliance/evidence/oidc-bcl/chain-violations/bcl-chn-e-001-{bcl_request_id}-{YYYY-MM-DD}/` |
+| Filing deadline | Before R-74 closure (same-day filing strongly preferred) |
+
+**Files:** `incident-timeline.md`, `r74-c1-output.txt`, `r74-c2-output.txt` (must show 0 rows at closure), `r74-c3-raw-output.txt` (CF KV metadata), `chain-segment.json` (raw HMAC chain entries for affected `bcl_request_id`), `root-cause-analysis.md` (compliance-officer signature required), `bcl_chain_01_violation_closed-event-id.txt`.
+
+**Privacy floor:** `chain-segment.json` may contain `oidc_sub_hash` (SHA-256 only). Redact before sharing with auditors unless specifically required for chain correlation verification. Restricted to IC + compliance-officer + outside counsel (H5 only).
+
+---
+
+### R-74.10 Communication Templates
+
+**T-74-A — P0 declaration (`#incidents-critical`)**
+
+```
+🔴🔴 P0 DECLARED — BCL-CHAIN-01 Audit Chain Violation
+IC: @{security-engineer} + @{compliance-officer}
+Alert: AL-BCL-03 — BCL-CHAIN-01 integrity violation
+bcl_request_id: {UUID} | tenant_id: {UUID}
+Type: {live HTTP 422 / retrospective SQL}
+Root cause: INVESTIGATING
+Action: Chain segment preservation in progress
+Runbook: docs/INCIDENT_RESPONSE.md R-74
+R-05 co-active: {pending R-74-C2 / yes / no}
+```
+
+**T-74-B — Founder escalation (Slack DM)**
+
+```
+🚨 P0 — BCL audit chain integrity violation.
+bcl_request_id: {UUID}. Root cause under investigation ({H1–H5}).
+Session impact: {count or "unknown — investigating"}.
+R-05 co-active: {yes/no}.
+Needed from you: {none at this time / call security-engineer now}.
+Next update: 30 min.
+```
+
+**T-74-C — Compliance-officer sign-off request**
+
+```
+Requesting compliance-officer sign-off for R-74 closure.
+
+bcl_request_id: {UUID}
+Root cause: {H1/H2/H3/H4/H5}
+R-74-C2 at closure: 0 rows (chain intact for past 24h)
+BCL-CHN-E-001: compliance/evidence/oidc-bcl/chain-violations/bcl-chn-e-001-{id}-{date}/
+Open items: {Linear URL or "None"}
+R-05: {active / not triggered / closed}
+
+Please emit security.bcl_chain_01_violation_closed (HIGH/7yr) via PAM elevation.
+```
+
+**T-74-D — Resolution (`#incidents-critical`)**
+
+```
+✅ P0 RESOLVED — BCL-CHAIN-01 Audit Chain Violation
+Compliance-officer sign-off: received
+Root cause: {H1/H2/H3/H4/H5}
+Chain integrity: CONFIRMED (R-74-C2 = 0 rows at closure)
+Evidence: BCL-CHN-E-001 filed
+R-05: {resolved / not triggered}
+PIR: Required (all P0s — within 72h)
+```
+
+---
+
+### R-74.11 Co-Activation Matrix
+
+| Condition | Co-activation | Notes |
+|---|---|---|
+| R-74-C2 returns rows (retrospective — `revoked` in chain without `received`) | **R-05** (HMAC Chain Break) — MANDATORY | R-05 IC leads forensic chain review; R-74 IC leads BCL scope |
+| R-74-C4 shows session still active (revocation blocked by 422) | **R-73** (BCL Session Revocation Failure) | Manual session revocation per R-73.6 |
+| Multiple `bcl_request_id` values across tenants | **P0-fleet** — founder notification (T-74-B); halt BCL processing fleet-wide | Do not limit scope to single tenant |
+| Root cause H5 (suspected malicious manipulation) | **R-05 full forensic** + Art. 33 GDPR 72h assessment | Engage outside security counsel if confirmed malicious |
+| R-05-C1 (HMAC chain check) shows non-BCL chain gaps | **R-05 full** regardless of BCL root cause | BCL violation may indicate broader chain integrity issue |
+
+---
+
+### R-74.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `security.bcl_chain_01_violation` CRITICAL/7yr and `security.bcl_chain_01_violation_closed` HIGH/7yr in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` — Zod v2 schemas per §R-74.7 | compliance-officer | **P1** | [ ] Pending — M8 (§70.9 item 11 companion) |
+| 2 | Implement hourly BCL-CHAIN-01 check job per §70.9 item 4 — run R-74-C2 SQL; emit `system.bcl_chain_check_passed` LOW/1yr (zero rows) or `security.bcl_chain_01_violation` CRITICAL/7yr + PagerDuty P0 (any rows); resolve OQ-BCL-OBS-01 before M8 production deploy | devops-lead + compliance-officer | **P1** | [ ] Pending — M8 (OQ-BCL-OBS-01 open) |
+| 3 | Provision `compliance/evidence/oidc-bcl/chain-violations/` R2 subfolder; WORM + `r2:form-api` REVOKED policy | devops-lead | **P1** | [ ] Pending — M8 |
+| 4 | Register BCL-CHN-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3/CC8.1; per-activation; 7yr) | compliance-officer | **P1** | [ ] Pending — M8 |
+| 5 | Conduct tabletop exercise for R-74 H4 (code bug) + H5 (malicious manipulation) — IC, security-engineer, compliance-officer, devops-lead; 60 min; before M8 BCL production deploy | security-engineer | **P1** | [ ] Pending — before M8 deploy |
+| 6 | Authoring complete — R-74 closes §70.11 obligation "File companion IR runbook for AL-BCL-03 in docs/INCIDENT_RESPONSE.md" | compliance-officer + devops-lead | **P0** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.39.0).** |
+
+**Privacy floor (invariant throughout R-74):** All scope query outputs, DEC-030 event payloads, templates, and BCL-CHN-E-001 artefact files contain no `user_id`, employee name, email, coaching content, health data, or GDPR Art. 9 special-category data. `tenant_id` and `bcl_request_id` are FORM-internal UUIDs. `oidc_sub_hash` in chain segments is SHA-256 only; redact before auditor sharing. `chain-segment.json` restricted to IC + compliance-officer + outside counsel (H5 only). Cross-references: `docs/OBSERVABILITY.md §70.4 AL-BCL-03`, `docs/OBSERVABILITY.md §70.8 BCL-OBS-E-001`, `docs/SSO_SCIM_IMPLEMENTATION.md §46.11`, `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`, `docs/SOC2_READINESS.md §163`, `docs/INCIDENT_RESPONSE.md R-05`. Owner: security-engineer + compliance-officer.
+
+---
+
+*v3.39.0 (2026-07-04): R-73 BCL REVOCATION_QUEUE Exhausted (CC6.3/CC7.3 — Enterprise SSO Session Revocation Failure) + R-74 BCL-CHAIN-01 Integrity Violation (CC7.2/CC7.3/CC8.1 — BCL Pipeline Audit Chain Break). Closes both §70.11 pending obligations from `docs/OBSERVABILITY.md §70` (BCL Observability, v5.16.0, 2026-07-04): "File companion IR runbook for AL-BCL-02" and "File companion IR runbook for AL-BCL-03." R-73 (P1): REVOCATION_QUEUE three-retry exhaustion (5s/10s/20s, 35s total) leaves enterprise employee session active after IdP logout — CC6.3 control gap; three trigger conditions; four-tier severity table; T+0..T+60 twelve-step response; three scope queries (C1: `backchannel_logout.failed` identification; C2: active session detection; C3: post-resolution verification); five root causes (H1 pool exhaustion, H2 Supabase outage/R-03, H3 CF Queue stuck, H4 transient error, H5 sub_hash mismatch); resolution playbook including PAM-elevated `POST /tenant/{slug}/revoke-all-sessions` Admin API (two-person auth, §19.4); two DEC-030 events (`backchannel_logout.failed` HIGH/7yr auto-emitted, `enterprise.admin_sessions_bulk_revoked` HIGH/7yr IC PAM-elevated); BCL-REV-E-001 per-activation evidence artefact (CC6.3/CC7.3, 7yr WORM); three communication templates including T-73-B CSM notification (§4.3 SLA, 15 min); CSM notification SLA section (§R-73.10); co-activation matrix (P0 escalation at 30 min, R-03, R-74, DLQ fleet); five implementation checklist items. R-74 (P0 — no auto-resolve, no cooldown): BCL-CHAIN-01 ordering invariant breach — live HTTP 422 (chain clean, INSERT blocked) vs. retrospective SQL (chain INSERT completed despite missing anchor, more severe); three trigger conditions; three-scope severity table (P0-contained / P0-full / P0-fleet); T+0..T+60 twelve-step timeline; four scope queries (C1: audit log extraction; C2: canonical retrospective SQL from §70.4; C3: CF KV API TTL check; C4: session state PAM-elevated); five root causes (H1 TTL expiry in retry window, H2 `writeBclAnchor()` silent failure, H3 IdP duplicate replay, H4 code bug, H5 malicious manipulation); five root-cause resolution paths; closure requirement (compliance-officer sign-off via `security.bcl_chain_01_violation_closed` DEC-030); BCL-CHAIN-01 invariant reference verbatim from §46.11; two DEC-030 events (`security.bcl_chain_01_violation` CRITICAL/7yr hourly check job, `security.bcl_chain_01_violation_closed` HIGH/7yr IC terminal); BCL-CHN-E-001 per-activation evidence artefact (CC7.2/CC7.3/CC8.1, 7yr WORM, compliance-officer sign-off required); four communication templates (T-74-A declaration, T-74-B founder, T-74-C compliance sign-off request, T-74-D resolution); co-activation matrix (R-05 MANDATORY on retrospective violation, R-73 if session active, P0-fleet, R-05 full on H5); six implementation checklist items. Privacy floor invariant: no user_id, employee name, email, coaching content, health data, or GDPR Art. 9 data in any query output, event payload, template, or artefact. Document header v3.38.0 → v3.39.0. Owner: security-engineer + compliance-officer.*
