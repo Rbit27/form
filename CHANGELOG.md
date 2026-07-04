@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [12.44.0] — 2026-07-04
+
+### Added
+- `content/post-3157-confirmation-bias-training-information.md` — Series «Тренувальне мислення» 3156–3165 post 2/10. Ефект підтвердження у виборі тренувальної інформації: три рівні дії (selective exposure, biased assimilation, selective recall). Чому тренування є ідеальним середовищем для confirmation bias: особисті ставки, повільний зворотний зв'язок, переповнений суперечливими авторитетами контент-простір. Конкретні сфери: обсяг, частота, вибір вправ, темп прогресії. Чому «читати більше» не вирішує проблему. П'ять практик зниження ефекту: steelmanning, метакогнітивний стоп, вага методології, журнал передбачень, розрізнення джерело/аргумент. Зв'язок з якорінням (post-3156). clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card for post-3157 added at top of feed.
+
+### Changed
+- `VERSION` — 12.43.1 → 12.44.0.
+
+---
+
 ## [12.43.1] — 2026-07-04
 
 ### Changed
