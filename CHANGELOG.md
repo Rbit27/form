@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.46.0] — 2026-07-04
+
+### Added
+- `content/post-3159-dunning-kruger-strength-training-competence-curve.md` — Block «Тренувальне мислення» 3156–3165 post 4/10. Ефект Даннінга-Крюгера у силовому тренуванні: де знаходиться self-coached атлет на кривій компетентності. Оригінальне дослідження Круґера та Даннінга (1999) — подвійна асиметрія між некомпетентними і компетентними. Чотири зони кривої у силовому тренінгу: початкова невизначеність → пік впевненості → долина розчарування → плато справжньої компетентності. Чому self-coaching структурно підтримує залишання в Зоні 2. Чотири прояви overconfidence у практиці: плутанина новизни відповіді з ефективністю програми, дискваліфікація базових принципів, систематична переоцінка технічної якості, надмірна впевненість в оцінці чужих помилок. Що реально рухає вздовж кривої: зовнішні точки відліку. Практичний алгоритм: нормативна перевірка, список невідомого, одна точка зовнішнього зворотного зв'язку на квартал, журнал прогнозів. Джерела: Kruger & Dunning 1999, Ehrlinger et al. 2008, Sanchez & Dunning 2018, Dunning 2011. clinical-safety: NOT_REQUIRED.
+- `blog.html` — post-3159 card prepended at top of feed.
+
+### Changed
+- `README.md §3156–3165 series table` — statuses for 3156, 3157, 3158 corrected (proposed → draft with version/file refs); 3159 reordered to Dunning-Kruger (aligns with STATUS.md v12.45.0 declaration and post-3158 «next» closing line); Planning Fallacy moved to 3160; series header updated to in progress 4/10 · v12.46.0.
+- `STATUS.md` — v12.46.0 entry added; «Тренувальне мислення» 3/10 → 4/10.
+- `VERSION` — 12.45.1 → 12.46.0.
+
+---
+
 ## [12.45.1] — 2026-07-04
 
 ### Changed

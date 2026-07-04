@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 in progress 2/10 · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.44.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 in progress 4/10 · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.46.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3591,15 +3591,15 @@ AI-тренери, відеоаналіз, носимі пристрої, зас
 
 | № | Тема | Статус |
 |---|------|--------|
-| 3156 | Якоріння в тренуванні: чому перша програма визначає всі наступні рішення | proposed |
+| 3156 | Якоріння в тренуванні: чому перша програма визначає всі наступні рішення | **draft · v12.43.0 → post-3156-anchoring-bias-first-program.md** |
 | 3157 | Ефект підтвердження у виборі тренувальної інформації: що self-coached атлет не читає | **draft · v12.44.0 → post-3157-confirmation-bias-training-information.md** |
-| 3158 | Надмірна впевненість у RPE: коли суб'єктивна шкала починає брехати систематично | proposed |
-| 3159 | Помилка планування в тренуванні: чому блоки завжди виходять довшими і важчими за задум | proposed |
-| 3160 | Як читати наукові рекомендації і не застосовувати їх неправильно — контекст, ефект-розмір, популяція | proposed |
+| 3158 | Надмірна впевненість у RPE: коли суб'єктивна шкала починає брехати систематично | **draft · v12.45.0 → post-3158-rpe-overconfidence-systematic-bias.md** |
+| 3159 | Ефект Даннінга-Крюгера у силовому тренуванні: де знаходиться self-coached атлет на кривій компетентності | **draft · v12.46.0 → post-3159-dunning-kruger-strength-training-competence-curve.md** |
+| 3160 | Помилка планування в тренуванні: чому блоки завжди виходять довшими і важчими за задум | proposed |
 | 3161 | Sunk cost у тренуванні: чому атлети продовжують програму, яка не працює | proposed |
 | 3162 | Адаптація рішень при зміні контексту: коли стара логіка більше не підходить | proposed |
 | 3163 | Як self-coached атлет оцінює якість поради — навіть без тренера | proposed |
-| 3164 | Проста евристика vs. складна модель: де кожна виграє у тренувальних рішеннях | proposed |
+| 3164 | Як читати наукові рекомендації і не застосовувати їх неправильно — контекст, ефект-розмір, популяція | proposed |
 | 3165 | Синтез 3156–3165: десять когнітивних пасток і як їх обходити без зовнішнього спостерігача | proposed |
 
 ---
