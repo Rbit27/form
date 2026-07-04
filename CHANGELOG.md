@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [12.43.1] — 2026-07-04
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.89 → v2.90. Two new sections: `### BCL Chain Integrity Monitor events` (+3 events: `security.bcl_chain_01_violation` CRITICAL/7yr, `security.bcl_chain_01_violation_closed` HIGH/7yr, `system.bcl_chain_check_passed` LOW/1yr; BCL-VIO-CHAIN-01 ordering invariant; BCL-CHN-E-001 evidence artefact spec; CC7.2/CC7.3/CC8.1 auditor narratives) and `### BCL Admin Session Bulk Revocation events` (+1 event: `enterprise.admin_sessions_bulk_revoked` HIGH/7yr; BCL-REV-E-001 evidence artefact spec; CC6.3/CC7.3 auditor narratives). Retention table +4 rows. Closes R-73.12 item 1, R-74.12 item 1, and OBSERVABILITY §70.9 item 11.
+- `docs/INCIDENT_RESPONSE.md` — v3.39.0 → v3.39.1. R-73.12 item 1 status `[ ]` → `[x] Done` (AUDIT_LOG_SCHEMA.md v2.90 `enterprise.admin_sessions_bulk_revoked` registration). R-74.12 item 1 status `[ ]` → `[x] Done` (AUDIT_LOG_SCHEMA.md v2.90 `security.bcl_chain_01_violation` + `security.bcl_chain_01_violation_closed` registration).
+- `docs/OBSERVABILITY.md` — v5.16.1 → v5.16.2. §70.9 item 11 status `[ ]` → `[x] Done`. §70.11 cross-reference row `system.bcl_chain_check_passed` + `security.bcl_chain_01_violation` 🟡 Pending → 🟢 Done.
+- `VERSION` — 12.43.0 → 12.43.1.
+
+---
+
 ## [12.43.0] — 2026-07-04
 
 ### Added
