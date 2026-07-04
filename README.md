@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 in progress 2/10 · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.54.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 in progress 9/10 · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.65.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3615,10 +3615,10 @@ AI-тренери, відеоаналіз, носимі пристрої, зас
 | 3168 | Мета-навички тренування: що залишається корисним через 10 років незалежно від протоколу | **draft · v12.55.0 → post-3168-meta-skills-training-10-years.md** |
 | 3169 | Як self-coached атлет відрізняє системну проблему від локального збою | **draft · v12.57.0 → post-3169-systemic-vs-local-problem-diagnosis.md** |
 | 3170 | Тренувальна ідентичність: чому «я атлет» — не мотиваційна фраза, а операційна настанова | **draft · v12.59.0 → post-3170-training-identity-operational-stance.md** |
-| 3171 | Помилки першого року self-coaching — і чому більшість з них не про програму | proposed |
-| 3172 | Зовнішній зворотний зв'язок без тренера: що замінює погляд іззовні | proposed |
-| 3173 | Коли self-coached атлету варто звернутись до тренера — і як це рішення виглядає без ego | proposed |
-| 3174 | Навчання у провалах: як self-coached атлет перетворює помилки на дані, а не на самокритику | proposed |
+| 3171 | Петлі зворотного зв'язку без тренера: як self-coached атлет збирає, читає і діє на сигнали прогресу | **draft · v12.61.0 → post-3171-feedback-loops-without-coach.md** |
+| 3172 | Де системне мислення про тренування зупиняється і починається ситуаційна гнучкість — і як не переплутати одне з іншим | **draft · v12.63.0 → post-3172-systematic-vs-situational-flexibility.md** |
+| 3173 | Мезоциклове планування без фіксованого змагального календаря: що визначає структуру, коли дедлайн не заданий | **draft · v12.64.0 → post-3173-mesocycle-planning-without-competition-calendar.md** |
+| 3174 | Навчання у провалах: як self-coached атлет перетворює помилки на дані, а не на самокритику | **draft · v12.65.0 → post-3174-learning-from-failures-data-not-self-criticism.md** |
 | 3175 | Синтез 3166–3175: десять орієнтирів для self-coached атлета, що вийшов за межі протоколів | proposed |
 
 ---
