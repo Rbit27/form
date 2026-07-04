@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.71.1] — 2026-07-04
+
+### Added
+- `docs/SOC2_READINESS.md §168` — BCL-CHN-E-001 + BCL-REV-E-001 Registration (CC7.2/CC7.3/CC8.1 + CC6.3/CC7.3 · INCIDENT_RESPONSE R-74 + R-73). Two per-activation OIDC BCL evidence artefacts registered in §79.4 master evidence table (count 139 → 141). BCL-CHN-E-001: per-activation R-74 (BCL-CHAIN-01 Integrity Violation, P0) evidence package; 7yr WORM; CC7.2/CC7.3/CC8.1; `compliance/evidence/oidc-bcl/chain-violations/bcl-chn-e-001-{bcl_request_id}-{YYYY-MM-DD}/`; compliance-officer co-sign required. BCL-REV-E-001: per-activation R-73 (OIDC BCL REVOCATION_QUEUE Exhaustion, P1) incident note; 7yr WORM; CC6.3/CC7.3; `compliance/evidence/oidc-bcl/bcl-rev-e-001-{YYYY-MM-DD}/`; compliance-officer review within 24h. OIDC BCL equivalent of §167 (SAML SLO).
+
+### Changed
+- `docs/SOC2_READINESS.md` — header v3.92.0 → v3.93.0.
+- `docs/INCIDENT_RESPONSE.md` — R-73.12 item 3 → [x] Done (BCL-REV-E-001 SOC2 registration complete, §168.2); R-74.12 item 4 → [x] Done (BCL-CHN-E-001 SOC2 registration complete, §168.2); R-74.12 item 2 OQ-BCL-OBS-01 status note updated from "(OQ-BCL-OBS-01 open)" to DEC-098 resolved reference (pg_cron job 59 `bcl_chain_integrity_check` adopted; OBSERVABILITY.md v5.17.0); document header v3.40.1 → v3.40.3.
+- `STATUS.md` — current version updated to v12.71.1.
+- `VERSION` — 12.71.0 → 12.71.1.
+
+---
+
 ## [12.71.0] — 2026-07-04
 
 ### Added

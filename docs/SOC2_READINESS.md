@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.92.0
+# FORM · SOC 2 Type II Readiness v3.93.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -35940,6 +35940,78 @@ SLO-REV-E-001 was defined in `docs/INCIDENT_RESPONSE.md R-75.9` (v3.40.0, 2026-0
 | 5 | Provision `compliance/evidence/saml-slo/chain-violations/` R2 subfolder (WORM + `r2:form-api` REVOKED) | devops-lead | **P1** | [ ] Pending — M7 (R-76.12 item 3) |
 
 ---
+
+## §168 · BCL-CHN-E-001 + BCL-REV-E-001 Registration (CC7.2/CC7.3/CC8.1 + CC6.3/CC7.3 · INCIDENT_RESPONSE R-74 + R-73 · OIDC BCL Chain Integrity + BCL Revocation Failure Evidence)
+
+> **Date:** 2026-07-04. **Trigger:** (1) `docs/INCIDENT_RESPONSE.md R-74.12` item 4 (P1/M8) — "Register BCL-CHN-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3/CC8.1; per-activation; 7yr)." (2) `docs/INCIDENT_RESPONSE.md R-73.12` item 3 (P1/M8) — "Register BCL-REV-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.3/CC7.3; per-activation; 7yr)." **Owner:** compliance-officer.
+
+### §168.1 Background
+
+BCL-CHN-E-001 was defined in `docs/INCIDENT_RESPONSE.md R-74.9` as the per-activation evidence package for the R-74 (BCL-CHAIN-01 Integrity Violation, P0) incident runbook. The companion event types (`security.bcl_chain_01_violation` CRITICAL/7yr, `security.bcl_chain_01_violation_closed` HIGH/7yr, and `system.bcl_chain_check_passed` LOW/1yr) are registered in `docs/AUDIT_LOG_SCHEMA.md` (v2.90, 2026-07-04), closing R-74.12 item 1. The BCL-CHAIN-01 ordering invariant — `backchannel_logout.revoked` requires a prior `backchannel_logout.received` anchor for the same `{tenant_id, bcl_request_id}`; violation yields HTTP 422 — is enforced by the `oidc-backchannel-logout.ts` Worker and monitored by pg_cron job 59 (`bcl_chain_integrity_check`, hourly; DEC-098, `docs/OBSERVABILITY.md §71`).
+
+BCL-REV-E-001 was defined in `docs/INCIDENT_RESPONSE.md R-73.8` as the per-activation incident note for the R-73 (OIDC BCL REVOCATION_QUEUE Exhaustion, P1) runbook. Both artefacts require §79.4 registration to complete their SOC 2 evidence chain. This section is the OIDC BCL equivalent of §167 (SAML SLO — SLO-CHN-E-001 + SLO-REV-E-001, registered 2026-07-04).
+
+### §168.2 §79.4 Master Evidence Table Entries (count 139 → 140 → 141)
+
+| Artefact ID | Evidence description | TSC | Collection responsibility | Retention | R2 path |
+|---|---|---|---|---|---|
+| **BCL-CHN-E-001** | Per-activation R-74 (BCL-CHAIN-01 Integrity Violation, P0) evidence package. Required files: `incident-timeline.md` (T+0..T+60 response, IC-declare-within-15-min SLA), `r74-c1-output.txt` (`security.bcl_chain_01_violation` audit log extraction), `r74-c2-output.txt` (retrospective SQL — must show 0 rows at closure), `r74-c3-raw-output.txt` (CF KV metadata for affected `bcl_request_id`), `r74-c4-session-state.txt` (session state, PAM-elevated), `chain-segment.json` (HMAC chain entries for affected `{tenant_id, bcl_request_id}` — `oidc_sub_hash` SHA-256 MUST be redacted before any auditor-facing copy is produced; H5 access restricted to IC + compliance-officer + outside counsel), `root-cause-analysis.md` (compliance-officer signature required before R-74 closure), `bcl_chain_01_violation_closed-event-id.txt`. Compliance-officer sign-off required before R-74 closure. Filed by IC at R-74 resolution; compliance-officer co-signs. | CC7.2, CC7.3, CC8.1 | IC (authoring, filing at R-74 resolution) + compliance-officer (co-sign, R2 upload confirmation) | 7yr WORM | `compliance/evidence/oidc-bcl/chain-violations/bcl-chn-e-001-{bcl_request_id}-{YYYY-MM-DD}/` |
+| **BCL-REV-E-001** | Per-activation R-73 (OIDC BCL REVOCATION_QUEUE Exhaustion, P1) incident note. Required files: `incident-timeline.md` (T+0..T+60 response, CSM notification timestamp, SLA adherence per §4.3), `r73-c1-output.txt` (REVOCATION_QUEUE depth at peak — aggregate count only; no `bcl_request_id` UUIDs), `r73-c2-output.txt` (REVOCATION_QUEUE depth at closure — count only; no UUIDs), `r73-c3-output.txt` (post-mitigation session state: `still_active_sessions = 0` required before closure), `manual-revocation-log.md` (manual revocation steps executed by IC, PAM-elevated, if applicable), `root-cause-analysis.md`, `csm-notification-log.md` (T-73-B timestamp, tenant slug, CSM acknowledgement within 15 min; no employee identifiers). Filed within T+60 min of R-73 resolution. | CC6.3, CC7.3 | IC (authoring, filing within T+60 min) + compliance-officer (review within 24h) | 7yr WORM | `compliance/evidence/oidc-bcl/bcl-rev-e-001-{YYYY-MM-DD}/` |
+
+**§79.4 evidence count update:** 139 → **141** (BCL-CHN-E-001 count 139 → 140; BCL-REV-E-001 count 140 → 141).
+
+### §168.3 SOC 2 Auditor Narratives
+
+**BCL-CHN-E-001 — CC7.2 narrative:** BCL-CHN-E-001 is the per-activation forensic record of a BCL-CHAIN-01 HMAC chain ordering violation — a `backchannel_logout.revoked` event detected in the DEC-030 chain without a prior `backchannel_logout.received` anchor for the same `{tenant_id, bcl_request_id}`. The `r74-c2-output.txt` must show zero rows at closure, providing tamper-evident proof via the DEC-030 chain that the continuous monitoring mechanism (pg_cron job 59, `bcl_chain_integrity_check`, hourly; DEC-098) successfully detected and remediated the anomaly. Combined with `security.bcl_chain_01_violation` + `security.bcl_chain_01_violation_closed` DEC-030 events (registered in AUDIT_LOG_SCHEMA.md v2.90, 2026-07-04), BCL-CHN-E-001 provides an end-to-end CC7.2 audit trail: detection → IC-declare → root cause → remediation → compliance-officer sign-off.
+
+**BCL-CHN-E-001 — CC7.3 narrative:** The `incident-timeline.md` documents R-74's T+0..T+60 response against the IC-declare-within-15-min SLA. `security.bcl_chain_01_violation_closed` with `r74_c2_zero_row_confirmed: true` proves IC did not declare resolution until zero rows confirmed. No auto-resolve permitted — each closure requires compliance-officer sign-off, providing a strong CC7.3 control gate.
+
+**BCL-CHN-E-001 — CC8.1 narrative:** The HMAC chain violation is evidence that the `oidc-backchannel-logout.ts` Worker's BCL-CHAIN-01 enforcement (HTTP 422 on ordering violation) functioned correctly: the chain rejected the out-of-order `backchannel_logout.revoked` event rather than silently writing an orphan record. BCL-CHN-E-001 thus evidences that FORM's change management process correctly deployed and enforced the BCL-CHAIN-01 invariant (cross-reference: BCL-E-003, Migration 0101 apply log, §163/§79.4 count 134 → 135).
+
+**BCL-REV-E-001 — CC6.3 narrative:** `r73-c3-output.txt` (`still_active_sessions = 0` at closure) proves the OIDC BCL REVOCATION_QUEUE exhaustion — which transiently prevented token-hint revocation of active sessions — was fully remediated before R-73 closure. FORM local session revocation (`enterprise_sessions.revoked_at` set by the `oidc-backchannel-logout.ts` Worker regardless of REVOCATION_QUEUE state) means CC6.3 access revocation is never fully blocked during R-73 — BCL-REV-E-001 covers the queue-side revocation lag window and proves it was closed.
+
+**BCL-REV-E-001 — CC7.3 narrative:** `csm-notification-log.md` proves FORM met the 15-minute CSM notification SLA per `docs/ENTERPRISE_SLA.md §4.3` (§R-73.10). `incident-timeline.md` shows the T+0..T+60 response, closing the CC7.3 audit record for OIDC BCL REVOCATION_QUEUE exhaustion incidents.
+
+### §168.4 Privacy Floor
+
+**BCL-CHN-E-001:** All files contain only FORM-internal UUIDs (`tenant_id`, `bcl_request_id`, `incident_id`), timestamps, and aggregate counts. `oidc_sub_hash` in `chain-segment.json` is a SHA-256 hash of the OIDC `sub` claim — the raw `sub` claim is never stored in the DEC-030 audit log or in any BCL-CHN-E-001 file. `chain-segment.json` MUST have `oidc_sub_hash` values redacted (replaced with `[REDACTED-SHA256]`) before any auditor-facing copy is produced. H5 classification: chain segments restricted to IC + compliance-officer + outside counsel only. No `user_id`, employee name, email, coaching content, health data, or GDPR Art. 9 special-category data.
+
+**BCL-REV-E-001:** `r73-c1-output.txt` and `r73-c2-output.txt` contain REVOCATION_QUEUE depth as aggregate count scalars only — no `bcl_request_id` UUID enumeration. `csm-notification-log.md` contains tenant slug only (not UUID, not employee identifiers). `r73-c3-output.txt` contains the `still_active_sessions` scalar and the aggregate remediation count only.
+
+### §168.5 R2 Storage Specification
+
+| Artefact | R2 subfolder | WORM policy | Provision status |
+|---|---|---|---|
+| **BCL-CHN-E-001** | `compliance/evidence/oidc-bcl/chain-violations/` (new subfolder — pending R-74.12 item 3, P1/M8, devops-lead) | 7yr WORM; `r2:form-api` REVOKED | [ ] Pending — M8 (R-74.12 item 3) |
+| **BCL-REV-E-001** | `compliance/evidence/oidc-bcl/` (same parent as BCL-E-001/002/003 — provisioned at M8 BCL go-live, §163/R2 spec) | 7yr WORM; `r2:form-api` REVOKED | [ ] Pending — M8 go-live (same provision as BCL-E-001 subfolder) |
+
+### §168.6 §80.4 Vanta Mirror Protocol Update
+
+| Artefact | Mirror action | Cadence |
+|---|---|---|
+| **BCL-CHN-E-001** | Add per-activation control evidence entry to Vanta CC7.2 + CC7.3 + CC8.1 evidence library within 48h of each R-74 filing. Annual nil attestation `"bcl_chain_violations_ytd": 0` if no R-74 activations in calendar year. | Per-activation + annual nil |
+| **BCL-REV-E-001** | Add per-activation control evidence entry to Vanta CC6.3 + CC7.3 evidence library within 48h of each R-73 filing. Annual nil attestation `"bcl_rev_e_001_count_ytd": 0` if no R-73 activations in calendar year. | Per-activation + annual nil |
+
+### §168.7 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register BCL-CHN-E-001 in §79.4 master evidence table (CC7.2/CC7.3/CC8.1; count 139 → 140) | `docs/INCIDENT_RESPONSE.md R-74.12 item 4` | 🟢 **Done — 2026-07-04 (§168.2, this section)** |
+| Register BCL-REV-E-001 in §79.4 master evidence table (CC6.3/CC7.3; count 140 → 141) | `docs/INCIDENT_RESPONSE.md R-73.12 item 3` | 🟢 **Done — 2026-07-04 (§168.2, this section)** |
+
+### §168.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register BCL-CHN-E-001 in §79.4 master evidence table (CC7.2/CC7.3/CC8.1; count 139 → 140) | compliance-officer | **P1** | [x] **Done — 2026-07-04 (§168.2, this section).** |
+| 2 | Register BCL-REV-E-001 in §79.4 master evidence table (CC6.3/CC7.3; count 140 → 141) | compliance-officer | **P1** | [x] **Done — 2026-07-04 (§168.2, this section).** |
+| 3 | Update R-74.12 item 4 status in `docs/INCIDENT_RESPONSE.md` | compliance-officer | **P1** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.3).** |
+| 4 | Update R-73.12 item 3 status in `docs/INCIDENT_RESPONSE.md` | compliance-officer | **P1** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.3).** |
+| 5 | Provision `compliance/evidence/oidc-bcl/chain-violations/` R2 subfolder (WORM + `r2:form-api` REVOKED) | devops-lead | **P1** | [ ] Pending — M8 (R-74.12 item 3) |
+
+---
+
+*v3.93.0 (2026-07-04): §168 — BCL-CHN-E-001 + BCL-REV-E-001 Registration (CC7.2/CC7.3/CC8.1 + CC6.3/CC7.3 · INCIDENT_RESPONSE R-74 + R-73). Two per-activation OIDC BCL evidence artefacts registered in §79.4 master evidence table (count 139 → 141). BCL-CHN-E-001 (CC7.2/CC7.3/CC8.1, 7yr WORM, per-activation R-74 — BCL-CHAIN-01 Integrity Violation — evidence package; `compliance/evidence/oidc-bcl/chain-violations/bcl-chn-e-001-{bcl_request_id}-{YYYY-MM-DD}/`; compliance-officer co-sign required; count 139 → 140). BCL-REV-E-001 (CC6.3/CC7.3, 7yr WORM, per-activation R-73 — OIDC BCL REVOCATION_QUEUE Exhaustion — incident note; `compliance/evidence/oidc-bcl/bcl-rev-e-001-{YYYY-MM-DD}/`; compliance-officer review within 24h; count 140 → 141). §168.2 §79.4 entries with artefact description, TSC, collection responsibility, retention, R2 path. §168.3 SOC 2 auditor narratives: BCL-CHN-E-001 CC7.2 (DEC-030 continuous detection via pg_cron job 59 DEC-098 + `r74-c2-output.txt` zero rows at closure), CC7.3 (IC-declare ≤ 15 min + compliance-officer sign-off gate), CC8.1 (BCL-CHAIN-01 HTTP 422 enforcement proves change management + invariant deployed correctly; cross-reference BCL-E-003 §163); BCL-REV-E-001 CC6.3 (FORM local session always revoked first + `r73-c3-output.txt` still_active_sessions = 0 at closure), CC7.3 (`csm-notification-log.md` proves §4.3 SLA). §168.4 privacy floor (BCL-CHN-E-001: `oidc_sub_hash` SHA-256 MUST be redacted before auditor sharing — raw `sub` never stored; H5 chain segments restricted to IC + compliance-officer + outside counsel; BCL-REV-E-001: aggregate REVOCATION_QUEUE depth scalars only, no bcl_request_id UUID enumeration). §168.5 R2 storage spec (BCL-CHN-E-001 pending R-74.12 item 3 M8; BCL-REV-E-001 same parent as BCL-E-001/002/003). §168.6 §80.4 Vanta mirror (both artefacts per-activation + annual nil attestation). §168.7 cross-reference obligations closed (R-74.12 item 4 🟢 Done count 139 → 140; R-73.12 item 3 🟢 Done count 140 → 141). §168.8 five-item checklist (items 1–4 Done this pass; item 5 pending M8 devops-lead R2 provision). This is the OIDC BCL equivalent of §167 (SAML SLO — SLO-CHN-E-001 + SLO-REV-E-001, registered 2026-07-04). Document header v3.92.0 → v3.93.0. Owner: compliance-officer.*
 
 *v3.92.0 (2026-07-04): §167 — SLO-CHN-E-001 + SLO-REV-E-001 Registration (CC7.2/CC7.3 + CC6.3/CC7.3 · INCIDENT_RESPONSE R-76 + R-75). Two per-activation SAML SLO evidence artefacts registered in §79.4 master evidence table (count 137 → 139). SLO-CHN-E-001 (CC7.2/CC7.3, 7yr WORM, per-activation R-76 — SLO-CHAIN-01 Integrity Violation — evidence package; `compliance/evidence/saml-slo/chain-violations/slo-chn-e-001-{incident_id}-{YYYY-MM-DD}/`; compliance-officer co-sign required; count 137 → 138). SLO-REV-E-001 (CC6.3/CC7.3, 7yr WORM, per-activation R-75 — SAML SLO High Failure Rate — incident note; `compliance/evidence/saml-slo/slo-rev-e-001-{YYYY-MM-DD}/`; compliance-officer review within 24h; count 138 → 139). §167.2 §79.4 entries with artefact description, TSC, collection responsibility, retention, R2 path. §167.3 SOC 2 auditor narratives: SLO-CHN-E-001 CC7.2 (continuous detection + `r76-c2-output.txt` zero rows at closure), CC7.3 (IC-declare ≤ 15 min + compliance-officer sign-off gate); SLO-REV-E-001 CC6.3 (FORM local session always revoked first + `r75-c3-output.txt` < 5% post-mitigation), CC7.3 (`csm-notification.txt` proves §4.3 SLA). §167.4 privacy floor (SLO-CHN-E-001: `idp_name_id` MUST be redacted before auditor sharing; H5 chain segments restricted; SLO-REV-E-001: aggregate failure counts only, no `slo_request_id` enumeration in CSM-facing files). §167.5 R2 storage spec (SLO-CHN-E-001 pending R-76.12 item 3; SLO-REV-E-001 same parent as SLO-E-001/002). §167.6 §80.4 Vanta mirror (both artefacts per-activation + annual nil attestation). §167.7 cross-reference obligations closed (R-76.12 item 4 🟢 Done count 137 → 138; R-75.12 item 2 🟢 Done count 138 → 139). §167.8 five-item checklist (items 1–4 Done this pass; item 5 pending M7 devops-lead R2 provision). Companion AUDIT_LOG_SCHEMA.md v2.93 (§SLO-Chain-Monitor-Events, 2026-07-04) registered `security.slo_chain_01_violation` CRITICAL/7yr, `security.slo_chain_01_violation_closed` HIGH/7yr, `system.slo_chain_check_passed` LOW/1yr, closing R-76.12 item 1. SOC2_READINESS.md header corrected v3.90.0 → v3.92.0 (v3.91.0 note pre-existing — §166 was authored v3.91.0 but header was not updated in that commit). Document header v3.91.0 → v3.92.0. Owner: compliance-officer.*
 
