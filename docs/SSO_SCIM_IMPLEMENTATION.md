@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.23
+# FORM · SSO/SCIM Implementation v2.24
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -16105,7 +16105,7 @@ BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
 | 4 | Register route `POST /auth/oidc/backchannel-logout` in API gateway router; add Cloudflare rate-limit rules | platform-engineer | **P0** | M8 | [ ] **Full spec: §46.10; closure gate: §46.10.3 RT-U-001..RT-U-006 (2026-07-04)** |
 | 5 | Implement `REVOCATION_QUEUE` Cloudflare Queue consumer per §46.4.3 | platform-engineer | **P0** | M8 | [ ] **Closure gate: §46.4.4 RQ-U-001..RQ-U-009 (2026-07-04)** |
 | 6 | Register four DEC-030 audit events (`backchannel_logout.received`, `.validated`, `.revoked`, `.failed`) with Zod v2 schemas in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` | compliance-officer | **P0** | M8 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.89, §BCL-Events, 2026-07-04.** |
-| 7 | Enforce BCL-CHAIN-01 invariant in `emit-audit-event` Worker (HTTP 422 on violation) | platform-engineer | **P0** | M8 | [ ] |
+| 7 | Enforce BCL-CHAIN-01 invariant in `emit-audit-event` Worker (HTTP 422 on violation) | platform-engineer | **P0** | M8 | [ ] **Full spec: §46.11; closure gate: §46.11.7 BCL-INV-U-001..BCL-INV-U-007 (2026-07-04)** |
 | 8 | Execute BCL-I-001 through BCL-I-008 integration test matrix; collect BCL-E-002 artefact | security-engineer | **P0** | M8 | [ ] |
 | 9 | Apply Migration 0101 to production; file BCL-E-003 in R2 `compliance/evidence/oidc-bcl/` | devops-lead | **P0** | M8 | [ ] |
 | 10 | Add BCL-E-001 through BCL-E-003 to `docs/SOC2_READINESS.md §79.4` master evidence table (count 132 → 135); map to CC6.1/CC6.3/CC8.1 | compliance-officer | **P1** | M8 | [x] **Done — SOC2_READINESS.md §163, 2026-07-04 (count 132 → 135).** |
@@ -16122,7 +16122,7 @@ BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
 
 **SOC 2 CC6.1 impact:** Mirroring §45.9 for SAML SLO — upon §46.8 P0 items deploying to production and a 30-day observation window producing BCL-E-001, the auditor finding for CC6.1 (OIDC session revocation path) moves from "compensating control documented" to "control implemented and evidenced." Together with §45 (SAML SLO), this closes the federated logout coverage for both supported SSO protocols.
 
-Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (emergency session revocation — BCL is the normal path; R-01 is the break-glass path), `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (P0 checklist item 6 — [x] Done v2.89, 2026-07-04), `docs/SOC2_READINESS.md §163` (BCL-E-001 through BCL-E-003 registered, P1 item 10 — [x] Done 2026-07-04).
+Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (emergency session revocation — BCL is the normal path; R-01 is the break-glass path), `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (P0 checklist item 6 — [x] Done v2.89, 2026-07-04), `docs/SOC2_READINESS.md §163` (BCL-E-001 through BCL-E-003 registered, P1 item 10 — [x] Done 2026-07-04), `§46.11` (BCL-CHAIN-01 `emit-audit-event` Worker enforcement spec — P0 item 7 full spec; 2026-07-04).
 
 ---
 
@@ -16238,6 +16238,201 @@ binding = "REVOCATION_QUEUE"
 **Closure requirement for item 4:** RT-U-001 through RT-U-006 all pass. `wrangler.toml` diff reviewed and approved by security-engineer. `§46.8 item 4` updated `[ ] → [x] Done`.
 
 ---
+
+## §46.11 BCL-CHAIN-01 Invariant Enforcement Spec — `emit-audit-event` Worker Layer (Item 7 Spec)
+
+**Owner:** platform-engineer · **Priority:** P0 · **Milestone:** M8 · **Refs:** §46.8 item 7, §46.5.3
+
+This section provides the complete implementation spec for enforcing BCL-CHAIN-01 in the `emit-audit-event` Worker. Item 7 was listed in §46.8 without implementation detail; §46.11 closes that gap.
+
+### §46.11.1 Design Rationale
+
+BCL-CHAIN-01 (§46.5.3) requires that `backchannel_logout.revoked` can only be written to the HMAC audit chain if a `backchannel_logout.received` event with the same `{tenant_id, bcl_request_id}` pair has already been persisted. This invariant prevents:
+
+- **Phantom revocations** — a `revoked` event in the chain with no traceable inbound request record, which would obscure session tampering in a SOC 2 CC6.1 audit.
+- **Split-brain replays** — a retry queue consumer (§46.4.3) emitting a second `revoked` event after the BCL Worker crashed between received and revoked writes.
+
+Enforcement lives in the `emit-audit-event` Worker — not the BCL Worker itself — for the same reason all other chain ordering invariants live there (SLO-CHAIN-01 §45.5.3, SCIM-CHAIN-01 §15.10, REVOKE-CHAIN-01 §27.8): the check must occur at the HMAC chain write point so a violation blocks the INSERT rather than logging a warning after the fact.
+
+---
+
+### §46.11.2 KV Namespace — BCL_ANCHOR_KV
+
+BCL-CHAIN-01 enforcement requires a dedicated Cloudflare KV namespace: **`BCL_ANCHOR_KV`**, bound to the `emit-audit-event` Worker.
+
+| Property | Value |
+|---|---|
+| Binding name | `BCL_ANCHOR_KV` |
+| Purpose | Stores 60-second anchor keys for `backchannel_logout.received` events |
+| Key convention | `bcl:anchor:{tenant_id}:{bcl_request_id}` |
+| Value | `"1"` (presence-only; the value is never read, only existence is checked) |
+| TTL | **60 seconds** (matches §46.5.3 anchor window) |
+| Owner Worker | `emit-audit-event` only |
+
+**Separation from BCL_RATE_KV:** `BCL_ANCHOR_KV` is distinct from `BCL_RATE_KV` (§46.10.2). The two namespaces have different access patterns, different owning Workers, and different TTL semantics. Sharing a namespace would require key-prefix discipline to prevent collisions and would create a cross-Worker dependency. Dedicated namespaces are cheaper to reason about and easier to audit.
+
+**TTL rationale:** 60 seconds covers the expected latency between `backchannel_logout.received` write and `backchannel_logout.revoked` write (< 2s in normal path, < 20s on third retry per §46.4.3 backoff), provides comfortable margin, and prevents unbounded KV growth from anchors whose `revoked` never arrives (failed validations, network drops).
+
+---
+
+### §46.11.3 Anchor Write Logic — on `backchannel_logout.received`
+
+After the `emit-audit-event` Worker successfully writes a `backchannel_logout.received` event to the HMAC chain (INSERT to `audit_log_events` confirmed), it writes an anchor key to `BCL_ANCHOR_KV`:
+
+```typescript
+// workers/emit-audit-event/src/chain-invariants/bcl-chain-01.ts
+
+export async function writeBclAnchor(
+  env: EmitAuditEventEnv,
+  tenantId: string,
+  bclRequestId: string,
+): Promise<void> {
+  const key = `bcl:anchor:${tenantId}:${bclRequestId}`;
+  // expirationTtl in seconds; 60s matches §46.5.3 anchor window
+  await env.BCL_ANCHOR_KV.put(key, '1', { expirationTtl: 60 });
+}
+```
+
+**Ordering guarantee:** The anchor KV write occurs **after** the `audit_log_events` INSERT is committed and HTTP 200 is returned. The chain record is the source of truth; KV is an ephemeral check-index only.
+
+**KV write failure path:** If `BCL_ANCHOR_KV.put()` throws a transient KV error, the `emit-audit-event` Worker emits an advisory event `system.bcl_anchor_kv_write_failed` (LOW severity, 1yr retention; `bcl_request_id` in payload) and returns HTTP 200. This is non-fatal: the chain record exists in `audit_log_events`; the 60-second window means a BCL-CHAIN-01 false positive is possible only if the KV write fails AND `backchannel_logout.revoked` arrives before the anchor window expires via a retry. Operators can verify chain integrity via the monthly BCL-E-001 audit export. See BCL-INV-U-006 (§46.11.7).
+
+**Idempotency:** `put()` with `expirationTtl` is idempotent — a duplicate write from a retry merely resets the TTL to 60s, which is acceptable.
+
+---
+
+### §46.11.4 Anchor Check Logic — on `backchannel_logout.revoked`
+
+Before writing `backchannel_logout.revoked` to the HMAC chain, the `emit-audit-event` Worker checks `BCL_ANCHOR_KV` for the prior `received` anchor:
+
+```typescript
+// workers/emit-audit-event/src/chain-invariants/bcl-chain-01.ts
+
+export async function checkBclAnchor(
+  env: EmitAuditEventEnv,
+  tenantId: string,
+  bclRequestId: string,
+): Promise<Response | null> {
+  const key = `bcl:anchor:${tenantId}:${bclRequestId}`;
+  let anchor: string | null;
+  try {
+    anchor = await env.BCL_ANCHOR_KV.get(key);
+  } catch (err) {
+    // Transient KV read failure — safe failure: block the write, let BCL Worker retry
+    throw err; // propagate to event router; event router catches → HTTP 503
+  }
+  if (anchor === null) {
+    return new Response(
+      JSON.stringify({
+        error: 'BCL_CHAIN_01_VIOLATION',
+        message: 'backchannel_logout.revoked received with no prior backchannel_logout.received anchor',
+        bcl_request_id: bclRequestId,
+      }),
+      { status: 422, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+  return null; // anchor present — proceed to chain write
+}
+```
+
+**Exemption — `backchannel_logout.failed`:** This event type is **not** subject to `checkBclAnchor()`. A `failed` event may precede `received` (e.g., Worker crash between JWT decode failure and audit emission). The event router skips the check when `event_type === 'backchannel_logout.failed'`. See §46.11.5.
+
+**KV read exception path:** If `BCL_ANCHOR_KV.get()` throws (transient KV error, not null), the exception propagates to the event router, which returns HTTP 503. The BCL Worker retries per §46.4.3 backoff (5/10/20s). This is the correct trade-off: a spurious HTTP 503 causes a retry; a spurious HTTP 200 would write a phantom `revoked` event. Safe over available.
+
+---
+
+### §46.11.5 Event Router Integration
+
+Additions to `workers/emit-audit-event/src/event-router.ts`:
+
+```typescript
+import { writeBclAnchor, checkBclAnchor } from './chain-invariants/bcl-chain-01';
+
+// Inside the event router switch on event_type:
+
+case 'backchannel_logout.received': {
+  await writeToChain(env, event);
+  // Anchor write is non-fatal — chain record is source of truth
+  try {
+    await writeBclAnchor(env, event.payload.tenant_id, event.payload.bcl_request_id);
+  } catch (_err) {
+    await emitAdvisory(env, 'system.bcl_anchor_kv_write_failed', {
+      bcl_request_id: event.payload.bcl_request_id,
+      tenant_id: event.payload.tenant_id,
+    });
+  }
+  return new Response('OK', { status: 200 });
+}
+
+case 'backchannel_logout.revoked': {
+  // BCL-CHAIN-01: check anchor BEFORE writing to chain
+  const violation = await checkBclAnchor(
+    env,
+    event.payload.tenant_id,
+    event.payload.bcl_request_id,
+  );
+  if (violation) return violation; // HTTP 422 BCL_CHAIN_01_VIOLATION
+  await writeToChain(env, event);
+  return new Response('OK', { status: 200 });
+}
+
+case 'backchannel_logout.failed': {
+  // BCL-CHAIN-01 exemption (§46.5.3): failed may arrive without a prior received anchor
+  await writeToChain(env, event);
+  return new Response('OK', { status: 200 });
+}
+
+case 'backchannel_logout.validated': {
+  // No BCL-CHAIN-01 check: validated is forensic metadata, not the chain terminal event
+  await writeToChain(env, event);
+  return new Response('OK', { status: 200 });
+}
+```
+
+---
+
+### §46.11.6 wrangler.toml Binding — `emit-audit-event` Worker
+
+Add to `workers/emit-audit-event/wrangler.toml`:
+
+```toml
+# BCL-CHAIN-01 anchor index — 60s TTL presence keys; emit-audit-event Worker only
+[[kv_namespaces]]
+binding = "BCL_ANCHOR_KV"
+id = "<CLOUDFLARE_KV_NAMESPACE_ID_BCL_ANCHOR>"
+preview_id = "<CLOUDFLARE_KV_NAMESPACE_ID_BCL_ANCHOR_PREVIEW>"
+```
+
+**Provisioning note:** Create the namespace before deploying the updated Worker:
+
+```sh
+wrangler kv namespace create "BCL_ANCHOR_KV"
+wrangler kv namespace create "BCL_ANCHOR_KV" --preview
+```
+
+Replace the placeholder IDs with the values from `wrangler`'s output. The `BCL_ANCHOR_KV` namespace is bound to `emit-audit-event` only — not to `oidc-backchannel-logout` or any other Worker.
+
+---
+
+### §46.11.7 Unit Test Matrix (Item 7 Closure Gate)
+
+Tests target `workers/emit-audit-event/src/chain-invariants/bcl-chain-01.ts` using Vitest with Miniflare KV stubs. These must pass in CI before item 7 of §46.8 can be marked `[x] Done`.
+
+| Test ID | Scenario | Input | Expected |
+|---|---|---|---|
+| BCL-INV-U-001 | Anchor written after `received` | `backchannel_logout.received` processed; `BCL_ANCHOR_KV.get(key)` called immediately after | Returns `"1"` (present); TTL ≤ 60s |
+| BCL-INV-U-002 | `revoked` accepted — valid anchor | `received` processed first; then `revoked` with same `{tenant_id, bcl_request_id}` | `checkBclAnchor` returns `null`; chain write proceeds; HTTP 200 |
+| BCL-INV-U-003 | `revoked` rejected — no anchor present | `revoked` processed without prior `received` | `checkBclAnchor` returns HTTP 422 `BCL_CHAIN_01_VIOLATION`; `bcl_request_id` in body; chain write blocked |
+| BCL-INV-U-004 | `revoked` rejected — anchor TTL expired | `received` processed; Miniflare KV stub overrides TTL to 0; then `revoked` | `BCL_ANCHOR_KV.get()` returns `null`; HTTP 422 `BCL_CHAIN_01_VIOLATION` |
+| BCL-INV-U-005 | `failed` exempt — no anchor required | `failed` processed without any prior `received` | Event router skips `checkBclAnchor`; chain write proceeds; HTTP 200 |
+| BCL-INV-U-006 | KV write failure — non-fatal on `received` | `BCL_ANCHOR_KV.put()` stub throws `KVError`; `received` processed | Chain write succeeds; HTTP 200 returned; advisory `system.bcl_anchor_kv_write_failed` emitted |
+| BCL-INV-U-007 | KV read exception — safe failure on `revoked` | `BCL_ANCHOR_KV.get()` stub throws `KVError` (not null); `revoked` processed | Exception propagates to event router; HTTP 503 returned; chain NOT written |
+
+**Closure requirement for item 7:** BCL-INV-U-001 through BCL-INV-U-007 all pass in CI. Security-engineer reviews `wrangler.toml` diff confirming `BCL_ANCHOR_KV` binding added. `§46.8 item 7` updated `[ ] → [x] Done`.
+
+---
+
+*v2.24 (2026-07-04): §46.11 BCL-CHAIN-01 Invariant Enforcement Spec — `emit-audit-event` Worker Layer (Item 7 Spec). Closes the implementation-detail gap for §46.8 item 7 (P0/M8). §46.11.1 Design rationale: invariant lives in `emit-audit-event` Worker (not BCL Worker) so violation blocks the HMAC chain INSERT rather than logging after the fact — same layer as SLO-CHAIN-01 §45.5.3 and SCIM-CHAIN-01 §15.10. §46.11.2 KV namespace: `BCL_ANCHOR_KV` (separate from `BCL_RATE_KV`; 60s TTL keys; `emit-audit-event` Worker only; key convention `bcl:anchor:{tenant_id}:{bcl_request_id}`). §46.11.3 Anchor write: `writeBclAnchor()` — called after successful chain INSERT for `backchannel_logout.received`; KV write failure is non-fatal (chain record is source of truth; advisory `system.bcl_anchor_kv_write_failed` LOW/1yr emitted). §46.11.4 Anchor check: `checkBclAnchor()` — called before chain INSERT for `backchannel_logout.revoked`; null anchor → HTTP 422 `BCL_CHAIN_01_VIOLATION` with `bcl_request_id`; KV read exception → HTTP 503 (safe-over-available: blocks write, BCL Worker retries per §46.4.3 backoff); `backchannel_logout.failed` exempt. §46.11.5 Event router integration: four `backchannel_logout.*` cases wired — `received` (write then anchor), `revoked` (check then write), `failed` (write, exempt), `validated` (write, no check). §46.11.6 `wrangler.toml` binding for `emit-audit-event` Worker: `BCL_ANCHOR_KV` with `id` and `preview_id` placeholders; provisioning note with `wrangler kv namespace create` commands. §46.11.7 Unit test matrix — 7 tests BCL-INV-U-001..BCL-INV-U-007 (Vitest + Miniflare KV stubs): anchor write on received, revoked accepted with valid anchor, revoked rejected without anchor, revoked rejected after TTL expiry, failed exempt, KV write failure non-fatal on received, KV read exception safe-fail on revoked. Closure requirement: BCL-INV-U-001..BCL-INV-U-007 pass in CI + security-engineer wrangler diff review → §46.8 item 7 `[ ] → [x] Done`. §46.8 item 7 status updated: "[ ] **Full spec: §46.11; closure gate: §46.11.7 BCL-INV-U-001..BCL-INV-U-007 (2026-07-04)**". §46.9 cross-references line updated to add §46.11 entry. Header v2.23 → v2.24. Privacy floor: `BCL_ANCHOR_KV` keys contain only `tenant_id` UUID and `bcl_request_id` UUID — no `user_id`, email, health value, or GDPR Art. 9 special-category data; advisory event `system.bcl_anchor_kv_write_failed` carries only `tenant_id` UUID and `bcl_request_id` UUID. Owner: platform-engineer + security-engineer. Review: enterprise-architect + compliance-officer.*
 
 *v2.23 (2026-07-04): §46 items 2/4/5 closure-gate specs added. Item 2 (P0 — OIDC callback handler): §46.3.4 unit test matrix CB-U-001 through CB-U-008 defined; evidence artefact BCL-E-CB-001 path registered; closure requirement: all 8 tests pass in CI. Item 4 (P0 — API gateway route + Cloudflare rate-limit): §46.10 added — route registration spec (`requireFormEncoded` middleware, `router.post('/auth/oidc/backchannel-logout')`), two rate-limit rules (120 req/min per IP Cloudflare WAF; 60 req/min per `iss` via KV), `wrangler.toml` stanzas for `BCL_RATE_KV` KV namespace and `oidc-bcl-retry` Queue bindings (producer + consumer), 6-item route test matrix RT-U-001..RT-U-006; closure requirement: RT-U-001..RT-U-006 pass + security-engineer wrangler diff review. Item 5 (P0 — REVOCATION_QUEUE consumer): §46.4.4 unit test matrix RQ-U-001 through RQ-U-009 defined; closure requirement: all 9 tests pass in CI. Header v2.22 → v2.23. Owner: security-engineer + platform-engineer.*
 

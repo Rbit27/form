@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [12.36.1] — 2026-07-04
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §46.11` — BCL-CHAIN-01 Invariant Enforcement Spec for `emit-audit-event` Worker (Item 7 Spec). `BCL_ANCHOR_KV` KV namespace design (separate from `BCL_RATE_KV`; 60s TTL; `emit-audit-event` Worker only); `writeBclAnchor()` TypeScript spec (called after `received` chain INSERT; non-fatal KV write failure path; advisory `system.bcl_anchor_kv_write_failed`); `checkBclAnchor()` TypeScript spec (blocks `revoked` chain INSERT on null anchor → HTTP 422 `BCL_CHAIN_01_VIOLATION`; KV read exception → HTTP 503 safe-fail; `failed` exempt); event router integration for all four `backchannel_logout.*` cases; `wrangler.toml` binding for `BCL_ANCHOR_KV` with provisioning note; 7-test unit matrix BCL-INV-U-001..BCL-INV-U-007 (Vitest + Miniflare KV stubs). §46.8 item 7 status: closure gate added. §46.9 cross-references updated. Header v2.23 → v2.24. Owners: platform-engineer + security-engineer.
+- `VERSION` — 12.36.0 → 12.36.1.
+
+---
+
 ## [12.36.0] — 2026-07-04
 
 ### Added
