@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [12.52.2] — 2026-07-04
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.17.0 → v5.18.0 — §72 SAML Single Logout (SLO) Observability. Closes the observability gap created by `docs/SSO_SCIM_IMPLEMENTATION.md §45` (v2.20, 2026-07-04 — SAML SLO Worker spec, Migration 0100, SLO-CHAIN-01 ordering invariant). §72.1: scope — SAML SLO Worker (`saml-slo.ts`), SLO_KV (TTL 15s), `revokeSessionsBySloRequest()`, five DEC-030 event types (slo.sp_initiated anchor, slo.completed + slo.fallback_local_only closure, slo.failed CHAIN-01 exempt, slo.idp_initiated independent), SLO-CHAIN-01 ordering invariant; IdP support matrix (Okta ✅, Entra ID ✅, Google Workspace ❌); privacy floor (raw idp_name_id never in payloads). §72.2: RED metrics — slo_requests_total by flow + tenant (WAE), slo.failed by reason enum, slo_chain_violation_total (emit-audit-event 422), SP round-trip P95 target < 8,000 ms. §72.3: two SLOs — SLO-SLO-01 (SP-initiated federated success rate ≥ 99.0%, rolling 30d; SSO-SLO-04 credit linkage; denominator excludes slo_not_configured tenants) and SLO-SLO-02 (round-trip P95 < 8,000 ms, rolling 7d). §72.4: three alert rules — AL-SLO-01 (failure + idp_timeout rate P1, per-tenant 30-min dedup, five-step runbook, auto-resolve; companion R-75 pending), AL-SLO-02 (SLO-CHAIN-01 violation P0; full retrospective SQL LIMIT 50 24h window form_audit role; no cooldown; no auto-resolve; companion R-76 pending), AL-SLO-03 (P95 > 9,000 ms P2; four-step latency runbook). §72.5: three §6.2 alert table rows (slo subsection after bcl). §72.6: seven-panel "SAML SLO / Federated Logout" dashboard sub-group (request volume by flow/tenant, outcome pie, slo.failed by reason, SLO-CHAIN-01 integrity tile, SP P95 gauge, federated success rate by tenant, fallback rate by reason). §72.7: SOC 2 mapping CC6.1/CC6.3/CC7.2/CC7.3. §72.8: SLO-OBS-E-001 quarterly evidence artefact (six-component report; zero-event attestation pattern; nil attestation until M7; `compliance/evidence/saml-slo/slo-obs-e-001-{YYYY}-Q{N}.json`; 7yr WORM; CC6.1/CC6.3/CC7.2/CC7.3). §72.9: twelve-item checklist — 2× P0 Done this pass (TOC entry, §6.2 additions), 10× P1/M7 pending. §72.10: OQ-SLO-OBS-01 (pg_cron vs. CF Workers Cron Trigger for SLO-CHAIN-01 retrospective check — recommendation pg_cron job 60; P1/M7). §72.11: seven cross-reference obligations — 2× Done, 5× Pending P1/M7 (SOC2_READINESS SLO-OBS-E-001 registration, §15.1 calendar, IR runbooks R-75 + R-76, SSO_SCIM §45.9 backreference). Owner: devops-lead + security-engineer + compliance-officer.
+- `VERSION` — 12.52.1 → 12.52.2.
+
+---
+
 ## [12.52.1] — 2026-07-04
 
 ### Changed

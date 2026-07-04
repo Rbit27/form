@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.17.0
+# FORM · Observability & Monitoring Taxonomy v5.18.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -71,6 +71,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §69 | Cross-Reference Patch — §12.6 Job 48 + §56.8 Stale SOC2_READINESS Registration Status Closure (SOC2_READINESS §120 / §124) |
 | §70 | OIDC Back-Channel Logout (BCL) Observability |
 | §71 | Migration M-0102 — BCL-CHAIN-01 Integrity Check pg_cron Job 59 Deployment Spec |
+| §72 | SAML Single Logout (SLO) Observability |
 
 ---
 
@@ -19657,3 +19658,265 @@ BCL-E-003 filing requirement: apply log must include: migration filename, apply 
 ---
 
 *v5.17.0 (2026-07-04): §71 Migration M-0102 — BCL-CHAIN-01 Integrity Check pg_cron Job 59 Deployment Spec. Closes the SQL-DDL gap for §70.9 item 4 (architecture resolved DEC-098; production deploy pending M8). §71.1 Purpose and scope (prerequisites: Migration 0101 live + all §46.8 P0 items 1–8 closed + GUC set; M-0102 separate from Migration 0101). §71.2 Seven design decisions table: `form_audit` role, 24h check window, `NOT EXISTS` dedup by `bcl_request_id` 24h, 50-violation safety cap BCL-INT-CAP-01, all-clear suppressed on violations, `bcl_pairs_checked` count of all 24h revoked rows, 8,000 ms pg_net timeout. §71.3 Full SQL DDL for `0102_bcl_chain_integrity_check.sql`: `fn_bcl_chain_integrity_check()` SECURITY DEFINER plpgsql function (GUC guard; `bcl_pairs_checked` COUNT; R-74-C2 canonical FOR loop with BCL-INT-CAP-01 LIMIT 50 and 24h dedup; `security.bcl_chain_01_violation` CRITICAL/7yr per orphan with fresh `incident_id` UUID; `system.bcl_chain_check_passed` LOW/1yr suppressed when violations found); GRANT EXECUTE to `form_audit`; `cron.schedule('bcl_chain_integrity_check', '0 * * * *', ...)` (job 59); four verification queries. §71.4 Rollback procedure (`cron.unschedule` + `DROP FUNCTION` + system.migration_rolled_back DEC-030 event). §71.5 Seven-item deployment checklist (4× P0 pre-apply gates, 3× P0/P1 at M8 deploy). §71.6 SOC 2 evidence (CC7.2/CC7.3/CC8.1; BCL-E-003 filing requirement). §71.7 Seven cross-reference rows. TOC §71 entry added. §70.9 item 4 status updated: "SQL DDL spec complete — 2026-07-04 (§71 `0102_bcl_chain_integrity_check.sql`)". Document header v5.16.4 → v5.17.0. Privacy floor: all payloads contain FORM-internal UUIDs only; no `user_id`, employee PII, health value, or GDPR Art. 9 special-category data. Owner: devops-lead + compliance-officer. Review: enterprise-architect + security-engineer.*
+
+---
+
+## §72 SAML Single Logout (SLO) Observability
+
+### §72.1 Scope and Context
+
+This section defines observability for FORM's **SAML 2.0 Single Logout (SLO)** pipeline — the synchronous HTTP-Redirect/HTTP-POST browser-mediated logout federation for enterprise SAML tenants. SAML SLO closes the federated identity lifecycle by propagating FORM-side logouts to the IdP (SP-initiated) and processing IdP-side logouts (IdP-initiated), complementing the async OIDC Back-Channel Logout (BCL) pipeline scoped in §70.
+
+**Components in scope:**
+
+| Component | Identifier | Purpose |
+|---|---|---|
+| SAML SLO Worker | `apps/api-gateway/src/sso/saml-slo.ts` | SP-initiated initiation + completion; IdP-initiated handler |
+| SLO state KV | `SLO_KV` namespace | Tracks in-flight SP-initiated round-trip; key `slo:{tenant_id}:{slo_request_id}` TTL 15s |
+| `revokeSessionsBySloRequest()` | Supabase RPC | Revokes `enterprise_sessions` rows for IdP-initiated SLO by `idp_name_id` (and optional `idp_session_id`) |
+| DEC-030 HMAC chain | `emit-audit-event` Worker | All five SLO event types are HMAC-chained at write time; SLO-CHAIN-01 ordering invariant enforced as HTTP 422 `SLO_CHAIN_01_VIOLATION` on inversion |
+
+**Five DEC-030 HMAC-chained events:**
+
+| Event type | Retention | Chain role | Trigger |
+|---|---|---|---|
+| `slo.sp_initiated` | STANDARD / 7yr | Anchor — SP-initiated flow | User triggers logout from FORM; local session revoked; SLO round-trip begins |
+| `slo.idp_initiated` | HIGH / 7yr | Independent | IdP pushes `LogoutRequest` to FORM's SLO endpoint |
+| `slo.completed` | STANDARD / 7yr | Closure — requires `slo.sp_initiated` anchor | Valid `LogoutResponse` received from IdP; federated SLO success |
+| `slo.failed` | HIGH / 7yr | Error (SLO-CHAIN-01 exempt) | IdP timeout, invalid signature, unexpected StatusCode, DB revocation failure |
+| `slo.fallback_local_only` | STANDARD / 7yr | Closure — requires `slo.sp_initiated` anchor | SLO unavailable (not configured or timed out); FORM session cleared; no IdP propagation |
+
+**SLO-CHAIN-01 ordering invariant:** `slo.completed` and `slo.fallback_local_only` MUST be preceded by a `slo.sp_initiated` anchor with the same `{tenant_id, slo_request_id}`. `slo.failed` is exempt (may emit without prior anchor for IdP-invalid-signature cases). HTTP 422 `SLO_CHAIN_01_VIOLATION` on any inversion at the `emit-audit-event` Worker layer.
+
+**Privacy floor:** Raw `idp_name_id` (SAML NameID) is never written to `audit_log_events` payloads; `idp_name_id_hash` (SHA-256 hex) is used for correlation in IdP-initiated flows. `slo_request_id` is a FORM-internal UUID. `session_id` is a FORM-internal UUID and appears only in SP-initiated events. No individual `user_id`, employee name, email, coaching content, body composition metric, or GDPR Art. 9 special-category data in any SLO event payload or observability output.
+
+**SOC 2 scope:** CC6.1 (logical access — federated session revocation proof via HMAC chain), CC6.3 (revocation timeliness — 10s AbortController window + SLO-SLO-01), CC7.2 (anomaly monitoring — AL-SLO-01/02/03), CC7.3 (response — P0/P1/P2 runbooks).
+
+**IdP SLO support matrix:**
+
+| IdP | SP-initiated | IdP-initiated | Notes |
+|---|---|---|---|
+| Okta | ✅ | ✅ | Full HTTP-Redirect + HTTP-POST; primary integration test target |
+| Microsoft Entra ID | ✅ | ✅ | Requires `SLO endpoint` configured in Enterprise App manifest |
+| Google Workspace | ❌ | ❌ | No SAML SLO endpoint; `slo.fallback_local_only` on every logout; `tenant_sso_configs.slo_url IS NULL` |
+
+**Implementation reference:** `docs/SSO_SCIM_IMPLEMENTATION.md §45` (v2.20, 2026-07-04 — SLO Worker spec, Migration 0100, SLO-CHAIN-01, twelve-item checklist). Evidence artefacts SLO-E-001…SLO-E-004 registered in `docs/SOC2_READINESS.md §162`; SLO-E-001 + SLO-E-002 added to §15.1 calendar in `docs/SOC2_READINESS.md §165`.
+
+---
+
+### §72.2 RED Metrics
+
+**Rate:**
+
+| Metric | Source | Description |
+|---|---|---|
+| `slo_requests_total{flow, tenant_id}` | Cloudflare WAE | SLO attempts per minute by flow (`sp_initiated` / `idp_initiated`) and tenant |
+| `slo_completed_total{tenant_id}` | Cloudflare WAE | Successful federated SLO completions (slo.completed events) |
+| `slo_fallback_total{reason, tenant_id}` | Cloudflare WAE | Fallback-to-local-only events by reason (`slo_not_configured` / `idp_timeout`) |
+
+**Errors:**
+
+| Metric | Source | Description |
+|---|---|---|
+| `slo_failed_total{reason, tenant_id}` | Cloudflare WAE + `audit_log_events` | `slo.failed` events by reason enum (`idp_timeout`, `invalid_signature`, `status_code_{value}`, `db_revocation_failed`) |
+| `slo_chain_violation_total` | `emit-audit-event` Worker (HTTP 422 counter) | SLO-CHAIN-01 ordering violations — any non-zero value is a P0 |
+
+Metric emission pattern: Cloudflare Workers Analytics Engine (WAE) for edge request/error/latency signals; Supabase `audit_log_events` queries via `form_audit` role for DEC-030 event-level aggregates — matching DEC-067 canonical SSO identity signal pattern.
+
+**Duration:**
+
+| Metric | Target | Alert threshold |
+|---|---|---|
+| `slo_round_trip_duration_ms` P95 (SP-initiated: `slo.sp_initiated` → `slo.completed` or `slo.failed`) | P95 < 8,000 ms | P95 > 9,000 ms / 15 min (AL-SLO-03) |
+
+The 10-second `AbortController` in the SLO Worker is the hard ceiling; the P95 target of 8,000 ms leaves a 2-second buffer before the abort fires. A P95 above 9,000 ms indicates the tail distribution is encroaching on the abort boundary.
+
+---
+
+### §72.3 SLOs
+
+| SLO ID | Description | Target | Alert threshold | Window | Credit linkage |
+|---|---|---|---|---|---|
+| **SLO-SLO-01 · SP-initiated federated success rate** | `slo.completed` count / (`slo.sp_initiated` count where `tenant_sso_configs.slo_url IS NOT NULL`) | ≥ 99.0% | < 95.0% / 10 min → AL-SLO-01 P1 | Rolling 30 days | SSO-SLO-04 (`docs/ENTERPRISE_SLA.md §26.3`) |
+| **SLO-SLO-02 · SP-initiated round-trip P95 latency** | `slo_round_trip_duration_ms` P95 (SP-initiated flows only) | P95 < 8,000 ms | P95 > 9,000 ms / 15 min → AL-SLO-03 P2 | Rolling 7 days | SSO-SLO-04 (latency dimension) |
+
+**SLO-SLO-01 numerator exclusion:** `slo.fallback_local_only` with `reason: slo_not_configured` is excluded from the denominator — tenants without a configured `slo_url` cannot achieve federated SLO and should not count against the success rate. Only tenants with `slo_url IS NOT NULL` contribute.
+
+**SLO-SLO-02 measurement window:** P95 is computed over all SP-initiated round-trips in the rolling 7-day window. IdP-initiated flows have no round-trip latency from FORM's perspective (FORM receives the request and responds) and are excluded.
+
+**Error budget:** SLO-SLO-01 at 99.0% → 432 minutes of error budget per 30-day period. A 50% consumption (216 minutes) triggers a P2 alert per §19 error budget management.
+
+---
+
+### §72.4 Alert Rules
+
+#### AL-SLO-01 — SLO High Failure Rate
+
+| Field | Value |
+|---|---|
+| **Trigger** | `slo_failed_total + slo_fallback_total{reason=idp_timeout}` > 5% of `slo_requests_total{flow=sp_initiated}` for a given `tenant_id` over a 10-min window; or > 20% fleet-wide over 15 min |
+| **Severity** | P1 (per-tenant 5% threshold) — SLO failures degrade federated logout assurance (CC6.3 partial gap). Fleet-wide P1 if > 20% / 15 min (IdP connectivity or FORM Worker regression). |
+| **Routing** | PagerDuty `form-security` → security-engineer (IC); Slack `#alerts-enterprise`; CSM auto-notify for affected `tenant_id` |
+| **Dedup key** | `slo-failure-rate-{tenant_id}` (30-min cooldown per tenant); `slo-failure-rate-fleet` (30-min cooldown for fleet-wide threshold) |
+| **Runbook** | (1) Query `audit_log_events WHERE event_type = 'slo.failed' AND created_at > NOW() - INTERVAL '30 minutes'` via `form_audit` role to confirm `reason` breakdown; (2) Check `tenant_sso_configs.slo_url` for affected tenant — verify IdP SLO endpoint reachability (simple HTTPS GET to SLO URL from staging); (3) Check `slo_fallback_total{reason=idp_timeout}` — if dominant, suspect IdP-side SLO endpoint outage (coordinate with enterprise contact or CSM); (4) Check for `invalid_signature` reason — may indicate IdP cert rotation not reflected in `tenant_sso_configs.idp_cert`; (5) If `db_revocation_failed` dominant, check Supabase connectivity for `revokeSessionsBySloRequest()` (co-activate R-03 if needed); (6) File SLO incident note if > 1% federated failure rate persists > 20 min for any SLO-enabled tenant. Companion runbook: `docs/INCIDENT_RESPONSE.md R-75`. |
+| **SOC 2** | CC6.3 (federated revocation timeliness gap), CC7.2 (failure rate anomaly monitoring), CC7.3 (IC notification ≤ 15 min) |
+| **Auto-resolve** | Yes — when `slo_failed_rate` drops below 2% for 10 min for the affected tenant |
+
+---
+
+#### AL-SLO-02 — SLO-CHAIN-01 Integrity Violation
+
+| Field | Value |
+|---|---|
+| **Trigger** | Any HTTP 422 `SLO_CHAIN_01_VIOLATION` response from `emit-audit-event` Worker, OR the retrospective SQL below returns > 0 rows for any `{tenant_id, slo_request_id}` pair |
+| **Severity** | P0 — HMAC chain ordering violation is a SOC 2 critical control failure (DEC-030, CC7.2). Indicates a `slo.completed` or `slo.fallback_local_only` event was emitted without a prior `slo.sp_initiated` anchor. No auto-resolve. |
+| **Routing** | PagerDuty `form-security` P0 → security-engineer + compliance-officer (simultaneous page); no cooldown; every violation is its own P0 event |
+| **Dedup key** | `slo-chain-01-violation-{slo_request_id}` (per-request UUID — no auto-dedup; each unique `slo_request_id` is a distinct violation) |
+| **Runbook** | (1) Extract `slo_request_id` UUID from violation; (2) Check SLO_KV for `slo:{tenant_id}:{slo_request_id}` TTL — if TTL 15s expired before `slo.completed` was emitted, the anchor may have been evicted prematurely (investigate Worker timing and KV write ordering in SLO initiation path); (3) If genuine ordering violation, IC-declare per `docs/INCIDENT_RESPONSE.md R-01`; (4) Preserve raw DEC-030 chain segment for SOC 2 evidence at `compliance/evidence/saml-slo/chain-violations/`; (5) Do not close without compliance-officer sign-off. Companion runbook: `docs/INCIDENT_RESPONSE.md R-76`. |
+| **Retrospective SQL** | |
+
+```sql
+-- SLO-CHAIN-01 retrospective integrity check
+-- Returns orphan 'slo.completed' or 'slo.fallback_local_only' events
+-- without a prior 'slo.sp_initiated' anchor for the same slo_request_id.
+-- Run via form_audit role (read-only). Zero rows = chain intact. Any rows = P0.
+SELECT
+  e_closure.event_type                      AS closure_event_type,
+  e_closure.payload->>'slo_request_id'      AS slo_request_id,
+  e_closure.payload->>'tenant_id'           AS tenant_id,
+  e_closure.created_at                      AS closure_at,
+  'SLO_CHAIN_01_VIOLATION'                  AS violation_type
+FROM audit_log_events e_closure
+WHERE e_closure.event_type IN ('slo.completed', 'slo.fallback_local_only')
+  AND e_closure.created_at > NOW() - INTERVAL '24 hours'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events e_anchor
+    WHERE e_anchor.event_type = 'slo.sp_initiated'
+      AND e_anchor.payload->>'slo_request_id'
+                             = e_closure.payload->>'slo_request_id'
+      AND e_anchor.created_at BETWEEN
+            e_closure.created_at - INTERVAL '60 seconds'
+        AND e_closure.created_at
+  )
+ORDER BY e_closure.created_at DESC
+LIMIT 50;
+-- Privacy floor: no user_id, name, email, health value, or GDPR Art. 9 data.
+-- tenant_id = FORM-internal UUID; slo_request_id = per-request UUID only.
+-- idp_name_id_hash not surfaced (not a field in slo.completed / slo.fallback_local_only).
+```
+
+| **SOC 2** | CC7.2 (HMAC chain as audit integrity control), CC7.3 (P0 IC-declare ≤ 15 min) |
+| **Auto-resolve** | No — manual close after compliance-officer sign-off and chain segment evidence filed |
+
+---
+
+#### AL-SLO-03 — SLO Round-Trip Latency Degraded
+
+| Field | Value |
+|---|---|
+| **Trigger** | `slo_round_trip_duration_ms` P95 > 9,000 ms sustained for 15 min (approaching 10s AbortController abort boundary) |
+| **Severity** | P2 — sustained latency near abort boundary increases `slo.fallback_local_only` rate as AbortController fires before IdP responds, degrading SLO-SLO-01 federated success rate |
+| **Routing** | PagerDuty `form-devops` → devops-lead; Slack `#alerts-enterprise` advisory for tenant CSMs |
+| **Dedup key** | `slo-round-trip-latency-p95` (30-min cooldown) |
+| **Runbook** | (1) Check SLO Worker CPU time (CF Workers dashboard — slo route); (2) Inspect `slo.failed{reason=idp_timeout}` count — if elevated, the IdP SLO endpoint is responding slowly (coordinate with enterprise contact); (3) Check `node-saml` `LogoutRequest` signing latency (CPU-bound; check if Workers CPU usage spikes during SLO); (4) Check Supabase `revokeSessionsBySloRequest()` P95 (partial index `idx_enterprise_sessions_idp_name_id` on not-null + not-revoked should be used — verify via `EXPLAIN ANALYZE`). |
+| **SOC 2** | CC7.2 (latency anomaly as SLO availability signal) |
+| **Auto-resolve** | Yes — when P95 drops below 7,000 ms for 10 min |
+
+---
+
+### §72.5 §6.2 Alert Table Additions
+
+The following three rows are added to the consolidated §6.2 alert rules table under a new `slo` subsection (insert after `bcl` subsection from §70.5):
+
+| Alert ID | Trigger | Severity | Routing | SOC 2 | Runbook |
+|---|---|---|---|---|---|
+| AL-SLO-01 | SP-initiated `slo_failed_total + slo_fallback_total{reason=idp_timeout}` > 5% / 10 min (per tenant) or > 20% / 15 min (fleet) | P1 (per-tenant); P1 (fleet-wide) | PagerDuty `form-security`; CSM notify; Slack `#alerts-enterprise` | CC6.3 / CC7.2 / CC7.3 | §72.4 AL-SLO-01 |
+| AL-SLO-02 | SLO-CHAIN-01 violation (HTTP 422 or retrospective SQL > 0 rows) | P0 — no auto-resolve | PagerDuty `form-security` P0; no cooldown | CC7.2 / CC7.3 | §72.4 AL-SLO-02 |
+| AL-SLO-03 | SP-initiated round-trip P95 > 9,000 ms / 15 min | P2 | PagerDuty `form-devops`; Slack advisory | CC7.2 | §72.4 AL-SLO-03 |
+
+---
+
+### §72.6 Dashboard Specification
+
+**Panel group: "SAML SLO / Federated Logout"** (sub-panel of the "Enterprise Identity" dashboard defined in §26.9; add after "BCL / Federated Session Revocation" sub-group from §70.6)
+
+| Panel | Type | Source | Purpose |
+|---|---|---|---|
+| SLO request volume (per tenant, by flow) | Time series | `slo_requests_total{flow, tenant_id}`, 5-min buckets (WAE) | Volume trend split SP-initiated vs IdP-initiated per tenant |
+| SLO outcome breakdown | Pie chart | `slo_requests_total` split: `completed` / `failed` by `reason` / `fallback_local_only` by `reason` | Federated vs fallback success distribution |
+| `slo.failed` events by reason | Counter + time series | `audit_log_events WHERE event_type = 'slo.failed'` via `form_audit` role | DEC-030 HMAC-chained failure signal by reason enum |
+| SLO-CHAIN-01 integrity tile | Status tile | AL-SLO-02 retrospective SQL row count — `0` = ✅ intact; any rows = 🔴 P0 | SOC 2 CC7.2 live ordering integrity check |
+| SP-initiated round-trip P95 latency | Gauge | `slo_round_trip_duration_ms` P95, rolling 30 min (WAE) | SLO-SLO-02 adherence; approaching-abort-boundary signal |
+| Federated success rate by tenant | Line chart | `slo_completed_total / slo_requests_total{slo_url_configured=true}` per tenant, rolling 30d | SLO-SLO-01 live compliance per tenant |
+| Fallback rate by reason | Bar chart | `slo_fallback_total{reason}` by tenant, 1h buckets | `slo_not_configured` (expected for unconfigured tenants) vs `idp_timeout` (operational signal) |
+
+---
+
+### §72.7 SOC 2 Evidence Mapping
+
+| Control | SAML SLO Observability Contribution | Evidence Artefact |
+|---|---|---|
+| **CC6.1** (logical access) | `slo.completed` HMAC-chained event proves federated session revocation occurred upon user-initiated logout; `slo.idp_initiated` proves FORM processes IdP-push logouts; SLO-CHAIN-01 invariant ensures ordering integrity from initiation to closure | SLO-E-001 (`docs/SOC2_READINESS.md §162`), SLO-OBS-E-001 (§72.8) |
+| **CC6.3** (access revocation timeliness) | SP-initiated SLO completes or falls back within 10s AbortController window — session is revoked locally regardless of IdP response; `slo.completed` timestamp delta (`slo.sp_initiated` → `slo.completed`) proves time-to-federated-revocation; AL-SLO-01 P1 fires when failure rate exceeds threshold | SLO-E-001 event timestamps; SLO-OBS-E-001 quarterly latency summary |
+| **CC7.2** (anomaly monitoring) | AL-SLO-01 (SP-initiated failure rate anomaly), AL-SLO-02 (SLO-CHAIN-01 HMAC ordering violation — P0, no cooldown), AL-SLO-03 (round-trip latency approaching abort boundary — P2) are three running anomaly detection rules covering the SLO pipeline | SLO-OBS-E-001 (quarterly — alert rule coverage table + activation log) |
+| **CC7.3** (response to anomalies) | AL-SLO-01: IC notification ≤ 15 min (P1, per-tenant); AL-SLO-02: IC-declare ≤ 15 min (P0, no auto-resolve — companion runbook R-76); AL-SLO-03: investigate ≤ 4h (P2) | SLO-OBS-E-001 (quarterly — incident response log); `docs/INCIDENT_RESPONSE.md R-75` (AL-SLO-01 companion runbook) + `docs/INCIDENT_RESPONSE.md R-76` (AL-SLO-02 companion runbook — pending §72.9 item 9/10) |
+
+---
+
+### §72.8 SOC 2 Evidence Artefact
+
+| Artefact ID | Description | Controls | Cadence | Retention | R2 Path |
+|---|---|---|---|---|---|
+| **SLO-OBS-E-001** | Quarterly SAML SLO observability health report. Must include six components: (1) SLO request count by tenant and flow type (SP-initiated / IdP-initiated) for the last 90 days; (2) `slo.failed` count by `reason` enum — zero-event attestation required if none; (3) `slo.fallback_local_only` count by `reason` — zero-event attestation required if none; (4) SLO-CHAIN-01 retrospective SQL result (§72.4 AL-SLO-02 SQL) — must return zero rows, or each non-zero row requires an IC incident reference; (5) AL-SLO-01/02/03 quarterly activation log with IC references — zero-event attestation required if no activations; (6) SLO-SLO-01 (SP-initiated federated success rate ≥ 99.0%, rolling 30d) and SLO-SLO-02 (P95 < 8,000 ms, rolling 7d) compliance summary for each quarter-end measurement. | CC6.1, CC6.3, CC7.2, CC7.3 | Quarterly | 7yr WORM | `compliance/evidence/saml-slo/slo-obs-e-001-{YYYY}-Q{N}.json` |
+
+**Privacy floor:** SLO-OBS-E-001 contains only aggregate counts, alert activation records, and SQL result sets. No individual employee `user_id`, name, email, session token, coaching content, body composition metric, or GDPR Art. 9 special-category data. `tenant_id` as FORM-internal UUID only. `idp_name_id_hash` is not surfaced in the report (the retrospective SQL returns only `slo_request_id` UUID and `tenant_id` UUID). Raw SAML NameID never appears.
+
+**Zero-event attestation pattern:** If no `slo.failed` events occurred in the quarter, SLO-OBS-E-001 must explicitly record `"slo_failed_count": 0` — not omit the field. Same pattern for `slo.fallback_local_only` count, AL-SLO-02 violation count, and each AL activation count. Absence of field ≠ zero for auditors.
+
+**First filing:** Q3 2026, contingent on §45.8 M7 production deploy completing before 2026-09-30. A nil attestation JSON is required for each quarterly component until M7 production deploy. Nil attestation format mirrors BCL-OBS-E-001 nil pattern.
+
+---
+
+### §72.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Add §72 TOC entry to `docs/OBSERVABILITY.md` | devops-lead | **P0** | This pass | [x] **Done — §72 TOC entry added (v5.18.0, 2026-07-04).** |
+| 2 | Register AL-SLO-01/02/03 in §6.2 master alert table (§72.5 three rows, `slo` subsection after `bcl`) | devops-lead + security-engineer | **P0** | This pass | [x] **Done — §72.5 §6.2 additions authored (v5.18.0, 2026-07-04).** |
+| 3 | Implement AL-SLO-01: `slo.failed + slo.fallback_local_only{reason=idp_timeout}` failure-rate query via Better Stack; P1 PagerDuty `form-security` + CSM auto-notify; 30-min per-tenant dedup | devops-lead + security-engineer | **P1** | M7 | [ ] |
+| 4 | Implement AL-SLO-02: SLO-CHAIN-01 retrospective SQL (§72.4) as pg_cron scheduled check; emit `system.slo_chain_check_passed` on zero rows; emit P0 PagerDuty + DEC-030 audit event on any row; no cooldown | devops-lead + compliance-officer | **P1** | M7 | [ ] — see OQ-SLO-OBS-01 (§72.10) |
+| 5 | Implement AL-SLO-03: WAE `slo_round_trip_duration_ms` P95 threshold monitor (> 9,000 ms / 15 min); P2 PagerDuty `form-devops` | devops-lead | **P1** | M7 | [ ] |
+| 6 | Build "SAML SLO / Federated Logout" panel group in Enterprise Identity dashboard (§26.9) — seven panels per §72.6 | devops-lead | **P1** | M7 | [ ] |
+| 7 | Register SLO-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.1/CC6.3/CC7.2/CC7.3, quarterly, 7yr WORM; evidence count 136 → 137) | compliance-officer | **P1** | M7 | [ ] — see §72.11 |
+| 8 | Add SLO-OBS-E-001 quarterly filing row to `docs/SOC2_READINESS.md §15.1` Master Compliance Calendar (after existing SLO-E-001/002 row added in §165) | compliance-officer | **P1** | M7 | [ ] — see §72.11 |
+| 9 | File companion IR runbook R-75 (AL-SLO-01 companion — SLO High Failure Rate, CC6.3/CC7.3, P1) in `docs/INCIDENT_RESPONSE.md` | security-engineer + compliance-officer | **P1** | M7 | [ ] — see §72.11 |
+| 10 | File companion IR runbook R-76 (AL-SLO-02 companion — SLO-CHAIN-01 Integrity Violation, CC7.2/CC7.3, P0, no auto-resolve) in `docs/INCIDENT_RESPONSE.md` | security-engineer + compliance-officer | **P1** | M7 | [ ] — see §72.11 |
+| 11 | Add §72 cross-reference to `docs/SSO_SCIM_IMPLEMENTATION.md §45.9` (new subsection parallel to §46.9 for BCL) | compliance-officer | **P1** | M7 | [ ] — see §72.11 |
+| 12 | File SLO-OBS-E-001 Q3 2026 first quarterly artefact (after §45.8 M7 production deploy + 30-day observation) | compliance-officer | **P1** | Q3 2026 | [ ] |
+
+---
+
+### §72.10 Open Questions
+
+| OQ ID | Status | Question | Owner | Target | Priority |
+|---|---|---|---|---|---|
+| OQ-SLO-OBS-01 | 🟡 Open | Should the SLO-CHAIN-01 retrospective integrity check (§72.9 item 4) run as a Supabase pg_cron job or as a Cloudflare Workers Cron Trigger? Analogous to OQ-BCL-OBS-01 (resolved DEC-098 → pg_cron job 59). Recommendation: pg_cron (DEC-067 precedent; direct `form_audit` role access to `audit_log_events` without REST round-trip; fleet consistency with jobs 1–59; Migration M-0103 pattern from M-0102). If adopted, register as pg_cron job 60 and add §12.6 row. `slo.completed` + `slo.fallback_local_only` anchor-check SQL is the implementation target (§72.4 AL-SLO-02 SQL, LIMIT 50, 24h window). Resolve before M7 production deploy. | devops-lead + compliance-officer | Before M7 | P1 |
+
+---
+
+### §72.11 Cross-Reference Obligations Created by §72
+
+| Obligation | Source | Status |
+|---|---|---|
+| §72 TOC entry added to `docs/OBSERVABILITY.md` | §72.1 | 🟢 **Done — this pass (v5.18.0, 2026-07-04).** |
+| §72.5 §6.2 `slo` subsection alert rows authored | §72.5 | 🟢 **Done — this pass (v5.18.0, 2026-07-04).** |
+| Register SLO-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (count 136 → 137) | §72.8 / §72.9 item 7 | 🟡 **Pending — P1/M7.** |
+| Add SLO-OBS-E-001 to `docs/SOC2_READINESS.md §15.1` Master Compliance Calendar | §72.8 / §72.9 item 8 | 🟡 **Pending — P1/M7.** |
+| File companion IR runbook R-75 (AL-SLO-01 — SLO High Failure Rate, P1) in `docs/INCIDENT_RESPONSE.md` | §72.9 item 9 | 🟡 **Pending — P1/M7.** |
+| File companion IR runbook R-76 (AL-SLO-02 — SLO-CHAIN-01 Integrity Violation, P0) in `docs/INCIDENT_RESPONSE.md` | §72.9 item 10 | 🟡 **Pending — P1/M7.** |
+| Add §72 backreference to `docs/SSO_SCIM_IMPLEMENTATION.md §45.9` (new cross-reference subsection, parallel to BCL §46.9) | §72.9 item 11 | 🟡 **Pending — P1/M7.** |
+
+---
+
+*v5.18.0 (2026-07-04): §72 SAML Single Logout (SLO) Observability. Closes the observability gap created by `docs/SSO_SCIM_IMPLEMENTATION.md §45` (v2.20, 2026-07-04 — SAML SLO Worker spec, Migration 0100, SLO-CHAIN-01 ordering invariant, twelve-item implementation checklist). Five DEC-030 SLO events registered in `docs/AUDIT_LOG_SCHEMA.md` (slo.sp\_initiated, slo.idp\_initiated, slo.completed, slo.failed, slo.fallback\_local\_only — registered by SSO\_SCIM §45 v2.20); SLO-E-001/002/003/004 evidence artefacts registered in `docs/SOC2_READINESS.md §162` (v3.88.0, 2026-07-04; evidence count 128 → 132); SLO-E-001 + SLO-E-002 added to §15.1 compliance calendar in `docs/SOC2_READINESS.md §165` (v3.90.0, 2026-07-04). §72.1: scopes monitoring to SAML SLO Worker (`saml-slo.ts`), SLO\_KV (TTL 15s), `revokeSessionsBySloRequest()`, and SLO-CHAIN-01 HMAC ordering invariant; five DEC-030 event types with chain roles (sp\_initiated anchor, completed + fallback\_local\_only closure, failed exempt); privacy floor (raw `idp_name_id` never in payloads — `idp_name_id_hash` SHA-256 for correlation only); SOC 2 CC6.1/CC6.3/CC7.2/CC7.3; IdP SLO support matrix (Okta ✅ SP+IdP, Entra ID ✅ SP+IdP, Google Workspace ❌ no SLO endpoint → fallback\_local\_only). §72.2: RED metrics — SLO requests by flow + tenant (WAE), `slo.failed` by reason enum (WAE + audit\_log\_events), `slo_chain_violation_total` (emit-audit-event 422 counter), SP round-trip P95 latency target < 8,000 ms. §72.3: two SLOs — SLO-SLO-01 (SP-initiated federated success rate ≥ 99.0%; alert < 95% / 10 min; rolling 30 days; SSO-SLO-04 credit linkage) and SLO-SLO-02 (round-trip P95 < 8,000 ms; alert > 9,000 ms / 15 min; rolling 7 days); SLO-SLO-01 denominator excludes `slo_not_configured` tenants. §72.4: three alert rules — AL-SLO-01 (failure + timeout rate P1, per-tenant 30-min dedup; full runbook with five diagnostic steps; auto-resolve), AL-SLO-02 (SLO-CHAIN-01 violation P0; full retrospective SQL with `form_audit` role, LIMIT 50, 24h window; no cooldown; no auto-resolve), AL-SLO-03 (P95 > 9,000 ms P2 PagerDuty `form-devops`; approaching-abort-boundary runbook). §72.5: three §6.2 alert table rows (slo subsection: AL-SLO-01/02/03; marked P0 Done this pass). §72.6: seven-panel "SAML SLO / Federated Logout" dashboard sub-group for §26.9 Enterprise Identity dashboard: request volume by flow + tenant, outcome pie, `slo.failed` by reason, SLO-CHAIN-01 integrity tile, SP round-trip P95 gauge, federated success rate by tenant, fallback rate by reason. §72.7: SOC 2 evidence mapping for CC6.1 (revocation proof via HMAC chain), CC6.3 (timeliness: 10s abort window + timestamp delta + SLO-SLO-01), CC7.2 (three alert rules as anomaly monitors), CC7.3 (P0/P1/P2 response SLAs; companion runbooks R-75 + R-76 pending §72.9 items 9/10). §72.8: SLO-OBS-E-001 quarterly evidence artefact (CC6.1/CC6.3/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/saml-slo/slo-obs-e-001-{YYYY}-Q{N}.json`); six-component report spec; zero-event attestation pattern required for all failure/alert counters; nil attestation required each quarter until M7. §72.9: twelve-item implementation checklist — 2× P0 Done this pass (TOC entry, §6.2 additions), 10× P1/M7 pending (alert rules 1–3, dashboard, SOC2\_READINESS SLO-OBS-E-001 registration, §15.1 calendar entry, IR runbooks R-75 + R-76, SSO\_SCIM §45.9 backreference, first quarterly filing); OQ-SLO-OBS-01 raised (pg\_cron vs. CF Workers Cron Trigger for SLO-CHAIN-01 retrospective check — recommendation: pg\_cron job 60; M7 resolution gate). §72.10: OQ-SLO-OBS-01 registered. §72.11: seven cross-reference obligations — 2× 🟢 Done this pass (TOC + §6.2); 5× 🟡 Pending P1/M7 (SOC2\_READINESS SLO-OBS-E-001 registration, §15.1 calendar, IR runbooks R-75 + R-76, SSO\_SCIM §45.9 backreference). Privacy floor: all §72 content is operational metadata only — no individual employee `user_id`, name, email, session token, coaching content, body composition metric, or GDPR Art. 9 special-category data; `tenant_id` is FORM-internal UUID; `idp_name_id_hash` appears only as a query parameter reference (SHA-256 hash, not raw NameID); SLO-OBS-E-001 aggregate-only with zero-event attestation. Document header v5.17.0 → v5.18.0. Owner: devops-lead + security-engineer + compliance-officer.*
