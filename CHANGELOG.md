@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [12.35.0] — 2026-07-04
+
+### Added
+- `content/post-3118-minimal-journal-three-levels.md` — Block 3116–3125 series «Самодіагностика без тренера» post 3/10. «Де і як фіксувати три рівні: мінімальний журнал для self-coached атлета». Мінімальний журнал для трьох горизонтів: рівень 1 (сесія — 3 поля, 3 хвилини: ключові вправи, RPE, одна аномалія); рівень 2 (блоковий огляд раз на 7–10 днів — тренд показників, патерн аномалій, одне рішення); рівень 3 (мезоциклова рефлексія 45 хвилин — цілі блоку, що рухалось/стояло, порівняння з попереднім мезоциклом, 1–2 рішення). Шаблони для всіх трьох рівнів. Таблиця часових горизонтів і мінімального обсягу. Типові помилки: журнал без перегляду, ретроспективне заповнення, надмірна деталізація, записи без рішень. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §46.3.4` — OIDC Callback Handler Unit Test Matrix (Item 2 Closure Gate). 8 тест-кейсів CB-U-001..CB-U-008: nominal Okta (`sid` present), Google (`sid` absent), Entra ID; adversarial empty `sub`, PII-in-`sub` attempt, oversized `sid`, missing Migration 0101 column (graceful degradation), SubtleCrypto unavailable. Evidence artefact path: `compliance/evidence/oidc-bcl/bcl-e-cb-001-unit-test.json`. Closure: all 8 pass in CI → §46.8 item 2 `[ ] → [x] Done`.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §46.4.4` — REVOCATION_QUEUE Consumer Unit Test Matrix (Item 5 Closure Gate). 9 тест-кейсів RQ-U-001..RQ-U-009: nominal sid-path, sub-path, no-match; transient DB error retry (attempt 1, attempt 3/DLQ); malformed message; unknown message type; audit emit failure after successful revocation. Closure: all 9 pass in CI → §46.8 item 5 `[ ] → [x] Done`.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §46.10` — API Gateway Route Registration & Cloudflare Rate-Limit Rules (Item 4 Full Spec). §46.10.1: route registration spec — `requireFormEncoded` middleware (HTTP 400 for non-`application/x-www-form-urlencoded`), `router.post('/auth/oidc/backchannel-logout', oidcBackchannelLogoutHandler)`. §46.10.2: two Cloudflare WAF rate-limit rules — 120 req/min per source IP (wrangler.toml WAF rule, 5-min block), 60 req/min per `iss` (KV-backed Worker-layer counter, `BCL_RATE_KV` namespace); `wrangler.toml` stanzas for KV namespace and Queue bindings (producer `REVOCATION_QUEUE` + consumer `oidc-bcl-retry` with DLQ `oidc-bcl-retry-dlq`). §46.10.3: 6-item route test matrix RT-U-001..RT-U-006. Closure: RT-U-001..RT-U-006 pass + security-engineer wrangler diff review → §46.8 item 4 `[ ] → [x] Done`.
+- `blog.html` — post-3118 card prepended at top of feed.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §46.8` — items 2/4/5 status notes updated with closure-gate cross-references (§46.3.4, §46.10, §46.4.4). Header v2.22 → v2.23.
+- `VERSION` — 12.34.0 → 12.35.0.
+
+---
+
 ## [12.34.0] — 2026-07-04
 
 ### Added

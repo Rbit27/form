@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.22
+# FORM · SSO/SCIM Implementation v2.23
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -15664,6 +15664,25 @@ For Google Workspace tenants, `idp_session_id` is always NULL. Back-channel revo
 
 ---
 
+#### §46.3.4 OIDC Callback Handler Unit Test Matrix (Item 2 Closure Gate)
+
+These tests must pass before item 2 of §46.8 can be marked `[x] Done`. Evidence artefact: `compliance/evidence/oidc-bcl/bcl-e-cb-001-unit-test.json` (CI run output).
+
+| Test ID | Scenario | Input | Expected outcome |
+|---|---|---|---|
+| CB-U-001 | Nominal — Okta, `sid` present | ID token with `sub`, `sid`, `iss` | `idp_session_id = sid`, `oidc_sub_hash = sha256hex(sub)`, `idp_name_id = NULL` |
+| CB-U-002 | Nominal — Google, `sid` absent | ID token with `sub`, `iss`, no `sid` | `idp_session_id = NULL`, `oidc_sub_hash = sha256hex(sub)`, `idp_name_id = NULL` |
+| CB-U-003 | Nominal — Entra ID, `sid` present | ID token with `sub`, `sid`, `iss` | Same as CB-U-001; `oidc_sub_hash` recomputed server-side, never sourced from token |
+| CB-U-004 | Adversarial — `sub` is empty string | ID token with `sub = ""` | Handler throws `OidcCallbackError('BCL_SUB_EMPTY')`; session INSERT aborted |
+| CB-U-005 | Adversarial — `sub` contains raw PII attempt | ID token with `sub = "email@example.com"` | `oidc_sub_hash = sha256hex("email@example.com")` — hash computed normally; no raw value stored |
+| CB-U-006 | Adversarial — `sid` is 512-char string | Oversized `sid` | `idp_session_id` clamped to 255 chars or error thrown; `oidc_sub_hash` unaffected |
+| CB-U-007 | Migration 0101 not applied | Target DB without `oidc_sub_hash` column | Handler catches column-not-found DB error; emits `oidc.callback.migration_missing` advisory; session INSERT proceeds without BCL fields (graceful degradation) |
+| CB-U-008 | `crypto.subtle` unavailable | Worker env without SubtleCrypto | Handler throws `OidcCallbackError('BCL_CRYPTO_UNAVAILABLE')`; fatal; triggers P0 alert |
+
+**Closure requirement for item 2:** CB-U-001 through CB-U-008 all pass in CI. BCL-E-CB-001 artefact filed to R2. `§46.8 item 2` updated `[ ] → [x] Done`.
+
+---
+
 ### §46.4 Worker Implementation Spec
 
 **File:** `apps/api-gateway/src/sso/oidc-backchannel-logout.ts`
@@ -15946,6 +15965,26 @@ export async function handleRevocationQueueMessage(
 
 ---
 
+#### §46.4.4 REVOCATION_QUEUE Consumer Unit Test Matrix (Item 5 Closure Gate)
+
+These tests must pass before item 5 of §46.8 can be marked `[x] Done`. They exercise the Cloudflare Queue consumer defined in §46.4.3.
+
+| Test ID | Scenario | Input | Expected outcome |
+|---|---|---|---|
+| RQ-U-001 | Nominal — valid retry message, DB succeeds on 1st attempt | `{type:'oidc_bcl_retry', tenantId, subHash, sid, attempt:1}` | `revokeOidcSessions()` called; `backchannel_logout.revoked` emitted; `message.ack()` |
+| RQ-U-002 | Nominal — sid-path revocation only (no subHash) | message with `sid` set, `subHash` null | Only sid-path UPDATE executed; audit event emitted; ack |
+| RQ-U-003 | Nominal — sub-path revocation only (no sid) | message with `sid` null, `subHash` set | Only sub-path UPDATE executed; audit event emitted; ack |
+| RQ-U-004 | Nominal — no-match (revokedCount = 0) | message where no sessions match | Returns 200 per §13.10 Q3; `backchannel_logout.revoked` emitted with `revokedCount:0`; ack |
+| RQ-U-005 | Transient DB error — attempt 1 of 3 | DB throws connection error, `attempt:1` | `message.retry({delaySeconds:5})`; `attempt` incremented; no audit event emitted |
+| RQ-U-006 | Transient DB error — attempt 3 of 3 (final) | DB throws connection error, `attempt:3` | `message.retry({delaySeconds:20})` — Cloudflare routes to DLQ after max retries; `backchannel_logout.failed` emitted with `failureReason:'max_retries_exceeded'`; P3 Slack alert |
+| RQ-U-007 | Invalid message body — malformed JSON | Cloudflare delivers unparseable payload | `message.ack()` (no retry — unrecoverable); `backchannel_logout.failed` emitted with `failureReason:'malformed_queue_message'`; P3 Slack |
+| RQ-U-008 | Unknown message type | `{type:'unknown_type'}` | `message.ack()` (discard); advisory log; no audit event |
+| RQ-U-009 | `emitAuditEvent` fails after successful revocation | DB revocation succeeds; audit Worker 503 | Session revoked (not rolled back); `backchannel_logout.failed` emitted on retry; P3 Slack; BCL-CHAIN-01 invariant respected (revoked event not emitted until audit confirmed) |
+
+**Closure requirement for item 5:** RQ-U-001 through RQ-U-009 all pass in CI. Evidence filed alongside BCL-E-001.
+
+---
+
 ### §46.5 DEC-030 Audit Event Registration
 
 Four events must be registered in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`. These extend the three events defined in §13.7 with a `backchannel_logout.failed` event and full Zod v2 schemas.
@@ -16061,10 +16100,10 @@ BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 1 | Apply Migration 0101 to staging; run CI adversarial tests MIG-0101-01 through MIG-0101-03 | devops-lead | **P0** | M8 | [ ] |
-| 2 | Update OIDC callback handler (`oidc-callback.ts`) to extract and store `idp_session_id` (from `sid`) and `oidc_sub_hash` (from `sub`) per §46.3 | platform-engineer | **P0** | M8 | [ ] |
+| 2 | Update OIDC callback handler (`oidc-callback.ts`) to extract and store `idp_session_id` (from `sid`) and `oidc_sub_hash` (from `sub`) per §46.3 | platform-engineer | **P0** | M8 | [ ] **Closure gate: §46.3.4 CB-U-001..CB-U-008 (2026-07-04)** |
 | 3 | Implement `oidc-backchannel-logout.ts` Worker per §46.4.1 — full handler including `revokeOidcSessions()` and retry queue dispatch | platform-engineer | **P0** | M8 | [ ] |
-| 4 | Register route `POST /auth/oidc/backchannel-logout` in API gateway router; add Cloudflare rate-limit rules | platform-engineer | **P0** | M8 | [ ] |
-| 5 | Implement `REVOCATION_QUEUE` Cloudflare Queue consumer per §46.4.3 | platform-engineer | **P0** | M8 | [ ] |
+| 4 | Register route `POST /auth/oidc/backchannel-logout` in API gateway router; add Cloudflare rate-limit rules | platform-engineer | **P0** | M8 | [ ] **Full spec: §46.10; closure gate: §46.10.3 RT-U-001..RT-U-006 (2026-07-04)** |
+| 5 | Implement `REVOCATION_QUEUE` Cloudflare Queue consumer per §46.4.3 | platform-engineer | **P0** | M8 | [ ] **Closure gate: §46.4.4 RQ-U-001..RQ-U-009 (2026-07-04)** |
 | 6 | Register four DEC-030 audit events (`backchannel_logout.received`, `.validated`, `.revoked`, `.failed`) with Zod v2 schemas in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` | compliance-officer | **P0** | M8 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.89, §BCL-Events, 2026-07-04.** |
 | 7 | Enforce BCL-CHAIN-01 invariant in `emit-audit-event` Worker (HTTP 422 on violation) | platform-engineer | **P0** | M8 | [ ] |
 | 8 | Execute BCL-I-001 through BCL-I-008 integration test matrix; collect BCL-E-002 artefact | security-engineer | **P0** | M8 | [ ] |
@@ -16086,6 +16125,121 @@ BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
 Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (emergency session revocation — BCL is the normal path; R-01 is the break-glass path), `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (P0 checklist item 6 — [x] Done v2.89, 2026-07-04), `docs/SOC2_READINESS.md §163` (BCL-E-001 through BCL-E-003 registered, P1 item 10 — [x] Done 2026-07-04).
 
 ---
+
+## §46.10 API Gateway Route Registration & Cloudflare Rate-Limit Rules (Item 4 Spec)
+
+**Owner:** platform-engineer · **Priority:** P0 · **Milestone:** M8 · **Refs:** §46.8 item 4
+
+This section provides the complete specification for registering the BCL route and configuring Cloudflare WAF rate-limit rules. Item 4 was listed in §46.8 without implementation detail; §46.10 closes that gap.
+
+### §46.10.1 API Gateway Route Registration
+
+**File:** `apps/api-gateway/src/router.ts` (or equivalent Hono/Express router file)
+
+The route must be registered before any authentication middleware, because the BCL endpoint is self-authenticating via the signed `logout_token` JWT (no session cookie or Bearer token required):
+
+```typescript
+// apps/api-gateway/src/router.ts
+import { oidcBackchannelLogoutHandler } from './sso/oidc-backchannel-logout';
+
+// BCL route — no auth middleware; handler is self-authenticating
+router.post(
+  '/auth/oidc/backchannel-logout',
+  oidcBackchannelLogoutHandler,
+);
+```
+
+**Content-Type constraint:** The route must only accept `application/x-www-form-urlencoded` (per OpenID Connect Back-Channel Logout 1.0 §2.5). Requests with any other `Content-Type` must be rejected with HTTP 400 before reaching the handler:
+
+```typescript
+// Middleware applied to this route only
+function requireFormEncoded(req: Request): Response | null {
+  const ct = req.headers.get('Content-Type') ?? '';
+  if (!ct.startsWith('application/x-www-form-urlencoded')) {
+    return new Response(JSON.stringify({ error: 'BCL_CONTENT_TYPE_INVALID' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return null;
+}
+```
+
+### §46.10.2 Cloudflare WAF Rate-Limit Rules
+
+Two rate-limit rules are required. They are defined in `wrangler.toml` under the `[env.production]` stanza and must be applied to the BCL Worker binding.
+
+**Rule 1 — Per-source-IP limit (brute-force / DDoS protection):**
+
+```toml
+[[env.production.rules]]
+description = "BCL per-IP rate limit"
+expression = '(http.request.uri.path eq "/auth/oidc/backchannel-logout")'
+action = "block"
+ratelimit = { characteristics = ["ip.src"], period = 60, requests_per_period = 120, mitigation_timeout = 300 }
+```
+
+- 120 requests/minute per source IP (matches §46.4 Worker spec comment)
+- 5-minute block on violation
+- Returns HTTP 429 with `Retry-After: 300` header
+
+**Rule 2 — Per-IdP `iss` limit (prevents a misconfigured or compromised IdP from flooding the endpoint):**
+
+This rule requires Cloudflare WAF Custom Rules with body field inspection (available on Business and Enterprise plans). If not available, implement at the Worker layer:
+
+```typescript
+// In oidc-backchannel-logout.ts handler, after decoding logout_token header
+const issRateKey = `bcl:iss:${encodeURIComponent(iss)}`;
+const issCount = await env.BCL_RATE_KV.get(issRateKey);
+if (Number(issCount ?? '0') >= 60) {
+  return new Response(JSON.stringify({ error: 'BCL_ISS_RATE_EXCEEDED' }), {
+    status: 429,
+    headers: { 'Retry-After': '60', 'Content-Type': 'application/json' },
+  });
+}
+await env.BCL_RATE_KV.put(issRateKey, String(Number(issCount ?? '0') + 1), { expirationTtl: 60 });
+```
+
+**KV namespace binding (wrangler.toml):**
+
+```toml
+[[env.production.kv_namespaces]]
+binding = "BCL_RATE_KV"
+id = "<production-kv-namespace-id>"
+preview_id = "<preview-kv-namespace-id>"
+```
+
+**Queue binding (wrangler.toml) — required for REVOCATION_QUEUE consumer (§46.4.3):**
+
+```toml
+[[env.production.queues.consumers]]
+queue = "oidc-bcl-retry"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "oidc-bcl-retry-dlq"
+
+[[env.production.queues.producers]]
+queue = "oidc-bcl-retry"
+binding = "REVOCATION_QUEUE"
+```
+
+### §46.10.3 Route Registration Test Matrix (Item 4 Closure Gate)
+
+| Test ID | Scenario | Input | Expected |
+|---|---|---|---|
+| RT-U-001 | Correct method and content-type | `POST /auth/oidc/backchannel-logout`, `application/x-www-form-urlencoded` | Passes to handler; HTTP 200 |
+| RT-U-002 | Wrong method — GET | `GET /auth/oidc/backchannel-logout` | HTTP 405 Method Not Allowed |
+| RT-U-003 | Wrong content-type — JSON | `POST /auth/oidc/backchannel-logout`, `application/json` | HTTP 400 `BCL_CONTENT_TYPE_INVALID` |
+| RT-U-004 | Per-IP rate limit exceeded | 121st request from same IP within 60s | HTTP 429, `Retry-After: 300` |
+| RT-U-005 | Per-iss rate limit exceeded | 61st request for same `iss` within 60s | HTTP 429, `Retry-After: 60` |
+| RT-U-006 | Internal health check bypass | Request from `127.0.0.1` / Cloudflare internal | Rate-limit rules do not apply (bypass list configured) |
+
+**Closure requirement for item 4:** RT-U-001 through RT-U-006 all pass. `wrangler.toml` diff reviewed and approved by security-engineer. `§46.8 item 4` updated `[ ] → [x] Done`.
+
+---
+
+*v2.23 (2026-07-04): §46 items 2/4/5 closure-gate specs added. Item 2 (P0 — OIDC callback handler): §46.3.4 unit test matrix CB-U-001 through CB-U-008 defined; evidence artefact BCL-E-CB-001 path registered; closure requirement: all 8 tests pass in CI. Item 4 (P0 — API gateway route + Cloudflare rate-limit): §46.10 added — route registration spec (`requireFormEncoded` middleware, `router.post('/auth/oidc/backchannel-logout')`), two rate-limit rules (120 req/min per IP Cloudflare WAF; 60 req/min per `iss` via KV), `wrangler.toml` stanzas for `BCL_RATE_KV` KV namespace and `oidc-bcl-retry` Queue bindings (producer + consumer), 6-item route test matrix RT-U-001..RT-U-006; closure requirement: RT-U-001..RT-U-006 pass + security-engineer wrangler diff review. Item 5 (P0 — REVOCATION_QUEUE consumer): §46.4.4 unit test matrix RQ-U-001 through RQ-U-009 defined; closure requirement: all 9 tests pass in CI. Header v2.22 → v2.23. Owner: security-engineer + platform-engineer.*
 
 *v2.22 (2026-07-04): §46.8 items 6 + 10 closed. Item 6 (P0/M8 — register four DEC-030 BCL events in AUDIT_LOG_SCHEMA.md §BCL-Events): [x] Done — `docs/AUDIT_LOG_SCHEMA.md` v2.89 (2026-07-04) adds `### OIDC Back-Channel Logout events` section between SLO and Enterprise Adoption Monitoring; four events (`backchannel_logout.received` STANDARD/7yr, `backchannel_logout.validated` STANDARD/7yr, `backchannel_logout.revoked` STANDARD/7yr, `backchannel_logout.failed` HIGH/7yr), full Zod v2 schemas (`BclReceivedPayload`, `BclValidatedPayload`, `BclRevokedPayload`, `BclFailedPayload`), BCL-CHAIN-01 table, three SOC 2 evidence artefact rows (BCL-E-001/002/003), CC6.1/CC6.3 auditor narratives. Item 10 (P1/M8 — register BCL-E-001..003 in SOC2_READINESS.md §79.4): [x] Done — `docs/SOC2_READINESS.md` §163 (2026-07-04) adds three artefact rows (count 132 → 135): BCL-E-001 (CC6.1/CC6.3, 7yr, monthly 30-day export), BCL-E-002 (CC6.1, 7yr, Okta + Azure AD integration test), BCL-E-003 (CC8.1, 7yr, Migration 0101 log); R2 paths registered; collection responsibility table updated; §79.4 count 132 → 135. §46.9 cross-reference table updated: `AUDIT_LOG_SCHEMA.md §BCL-Events` → Done v2.89 (2026-07-04); `SOC2_READINESS.md §79.4` → Done §163 (2026-07-04). Remaining P0 open: items 1–5, 7–9. Header v2.21 → v2.22. Owner: compliance-officer.*
 

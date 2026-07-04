@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v12.35.0** — 2026-07-04 · content + enterprise · post-3118 · «Де і як фіксувати три рівні: мінімальний журнал для self-coached атлета» (series «Самодіагностика без тренера» 3116–3125, 3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3118 · SSO_SCIM_IMPLEMENTATION v2.23: §46.3.4 CB-U-001..CB-U-008 closure-gate (item 2); §46.10 Route + Cloudflare rate-limit full spec + RT-U-001..RT-U-006 (item 4); §46.4.4 RQ-U-001..RQ-U-009 closure-gate (item 5) · §46.8 items 2/4/5 status notes updated · «Самодіагностика без тренера» 2/10 → 3/10 · next: post-3119 (series «Самодіагностика без тренера» 4/10 — «Як відрізнити справжній прогрес від шуму: статистичне мислення для self-coached атлета») + SSO_SCIM §46.8 item 3 (P0/M8 — implement `oidc-backchannel-logout.ts` Worker)
+
+**v12.34.0** — 2026-07-04 · enterprise: OBSERVABILITY §70 BCL Observability · v12.34.0
+
 **v12.33.0** — 2026-07-04 · content · post-3117 · «Три рівні самооцінки: відчуття сесії, тренд блоку, мезоцикл» (series «Самодіагностика без тренера» 3116–3125, 2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3117 · «Самодіагностика без тренера» 1/10 → 2/10 · next: post-3118 (series «Самодіагностика без тренера» 3/10 — «Де і як фіксувати три рівні: мінімальний журнал для self-coached атлета») + SSO_SCIM §46.8 items 2/4/5 (P0/M8 — Worker tests, integration tests, Migration 0101 go-live)
 
 **v12.32.0** — 2026-07-04 · content · post-3116 · «Що таке «прогрес» для intermediate атлета — і чому він більше не виглядає як лінійне зростання ваги» (series «Самодіагностика без тренера» 3116–3125, 1/10 — НОВА СЕРІЯ) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3116 · «Самодіагностика без тренера» proposed → in progress 1/10 · next: post-3117 (series «Самодіагностика без тренера» 2/10 — «Три рівні самооцінки: відчуття сесії, тренда блоку, мезоциклу») + SSO_SCIM §46.8 items 2/4/5 (P0/M8 — Worker tests, integration tests, Migration 0101 go-live)
