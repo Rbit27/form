@@ -13,6 +13,17 @@
 
 ---
 
+## 2026-07-04
+
+### DEC-098 · OQ-BCL-OBS-01 Resolution: BCL-CHAIN-01 Hourly Retrospective Integrity Check Scheduled as pg_cron Job 59 (`bcl_chain_integrity_check`)
+
+- **Decision:** Resolve OQ-BCL-OBS-01 — the BCL-CHAIN-01 hourly retrospective chain integrity check (AL-BCL-03, `docs/OBSERVABILITY.md §70.9 item 4`) is deployed as **pg_cron job 59** (`bcl_chain_integrity_check`), not as a Cloudflare Workers Cron Trigger. Job name: `bcl_chain_integrity_check`. Schedule: `0 * * * *` (hourly). Role: `form_audit` (read-only; `form_api` REVOKED from `audit_log_events`). SQL: R-74-C2 retrospective SQL from `docs/INCIDENT_RESPONSE.md R-74.6`, querying `audit_log_events` for orphaned `backchannel_logout.revoked` rows (no corresponding `backchannel_logout.received` within the 60s `BCL_ANCHOR_KV` TTL window for the same `{tenant_id, bcl_request_id}`). Freshness window: 2h (1-run tolerance). All-clear: emits `system.bcl_chain_check_passed` LOW/1yr (`bcl_pairs_checked` INT ≥ 0, `check_run_at` ISO 8601 UTC — fleet-wide once per run, not per tenant). Violation: emits `security.bcl_chain_01_violation` CRITICAL/7yr per `{tenant_id, bcl_request_id}` orphan + AL-BCL-03 P0 PagerDuty `form-security` (no cooldown). Registered in `docs/OBSERVABILITY.md §12.6` as job 59. OQ-BCL-OBS-01 closed 🟡 → 🟢. `docs/AUDIT_LOG_SCHEMA.md §BCL Chain Integrity Monitor events` TBD runtime reference patched to pg_cron job 59. Production implementation pending M8 BCL deploy via Migration M-0102.
+- **Owner:** devops-lead + compliance-officer
+- **Why:** (1) **DEC-067 precedent** — established 2026-06-30 that Supabase pg_cron direct SQL queries against `audit_log_events` are the canonical signal source for SSO chain monitoring, consistent with all 58 existing sentinel jobs. (2) **Direct database access** — R-74-C2 retrospective SQL requires `form_audit` role access to `audit_log_events`; pg_cron executes within Supabase without REST round-trip overhead; a Cloudflare Worker Cron Trigger would require a `form_audit` JWT for REST access, adding latency and a credential-management surface. (3) **Fleet consistency** — all 58 existing pg_cron sentinel jobs (jobs 1–58) follow the direct-SQL pattern using `audit_log_events`; BCL-CHAIN-01 uses the same table, same `form_audit` role, same freshness-window-and-DEC-030-all-clear pattern; a Cloudflare Worker would be the only outlier in a 59-job fleet. (4) **Operational simplicity** — pg_cron job management lives in Supabase migrations (M-0102 when implemented); no additional Wrangler CRON_TRIGGER config, no additional CF Worker deployment pipeline, no additional Worker credential management.
+- **Reverse cost:** Low — reassignment to CF Workers Cron Trigger requires removing job 59 from the pg_cron registry (drop row, migration rollback M-0102), authoring a new Cloudflare Worker with CRON_TRIGGER Wrangler config, and issuing a `form_audit` JWT for the Worker's Supabase REST queries. No tenant-visible impact; no MSA or contractual change required.
+
+---
+
 ## 2026-07-02
 
 ### DEC-097 · OIDC `private_key_jwt` Client Authentication Design Adopted for Enterprise Tenants (RFC 7523)

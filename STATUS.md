@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v12.47.1** — 2026-07-04 · enterprise · OQ-BCL-OBS-01 resolved → pg_cron job 59 `bcl_chain_integrity_check` (DEC-098) · OBSERVABILITY.md v5.16.4 (§12.6 job 59 registration, §70.10 OQ closed) · AUDIT_LOG_SCHEMA.md v2.91 (§BCL Chain Integrity Monitor events TBD patched) · DECISION_LOG.md DEC-098 · next: M8 BCL production deploy Migration M-0102
+
 **v12.47.0** — 2026-07-04 · content · post-3160 · «Помилка планування в тренуванні: чому блоки завжди виходять довшими і важчими за задум» (series «Тренувальне мислення» 3156–3165, 5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3160 · «Тренувальне мислення» in progress 4/10 → 5/10 · next: post-3161 (series «Тренувальне мислення» 6/10 — «Ефект Зейгарнік у тренуванні: чому незавершені підходи і перервані цикли займають ментальний простір більше, ніж завершені»)
 
 **v12.46.0** — 2026-07-04 · content · post-3159 · «Ефект Даннінга-Крюгера у силовому тренуванні: де знаходиться self-coached атлет на кривій компетентності» (series «Тренувальне мислення» 3156–3165, 4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3159 · «Тренувальне мислення» in progress 3/10 → 4/10 · README series table updated: 3156–3158 statuses corrected, 3159 reordered (DK replaces Planning Fallacy; PF moved to 3160) · next: post-3160 (series «Тренувальне мислення» 5/10 — «Помилка планування в тренуванні: чому блоки завжди виходять довшими і важчими за задум»)

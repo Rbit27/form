@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.47.1] — 2026-07-04
+
+### Added
+- `docs/DECISION_LOG.md` — DEC-098: OQ-BCL-OBS-01 resolved. BCL-CHAIN-01 hourly retrospective integrity check scheduled as pg_cron job 59 `bcl_chain_integrity_check` (hourly `0 * * * *`, `form_audit` role, 2h freshness). Rationale: DEC-067 precedent (pg_cron direct SQL canonical for `audit_log_events` sentinel fleet), R-74-C2 SQL requires direct `form_audit` access, fleet consistency with jobs 1–58, operational simplicity (Supabase migration M-0102). Reverse cost: low.
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.16.3 → v5.16.4 — §12.6 job 59 row added (`bcl_chain_integrity_check`); §12.6 freshness note job 59 paragraph appended; §70.9 item 4 `[ ]` → `[x]` (architecture resolved, DEC-098); §70.10 OQ-BCL-OBS-01 🟡 Open → 🟢 Resolved (DEC-098); document header updated.
+- `docs/AUDIT_LOG_SCHEMA.md` v2.90 → v2.91 — §BCL Chain Integrity Monitor events: two TBD/open-question references patched to pg_cron job 59 (DEC-098, 2026-07-04); document header updated.
+- `STATUS.md` — v12.47.1 entry added.
+- `VERSION` — 12.47.0 → 12.47.1.
+
+---
+
 ## [12.47.0] — 2026-07-04
 
 ### Added
