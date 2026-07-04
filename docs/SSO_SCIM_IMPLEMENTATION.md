@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.27
+# FORM · SSO/SCIM Implementation v2.28
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -15476,7 +15476,7 @@ All eight tests must pass before migration 0100 is applied to production. SLO-I-
 | 8 | Execute SLO-I-001 through SLO-I-008 integration test matrix (§45.7) against Okta developer sandbox; collect SLO-E-003 artefact | security-engineer | **P0** | M7 | [ ] |
 | 9 | Apply Migration 0100 to production; file SLO-E-004 evidence artefact in R2 `compliance/evidence/saml-slo/` | devops-lead | **P0** | M7 | [ ] |
 | 10 | Add `users.idp_name_id` column (§45.3.3) and update JIT provisioning handler to populate it | platform-engineer | **P1** | M7 | [ ] |
-| 11 | Add SLO-E-001 through SLO-E-004 to `docs/SOC2_READINESS.md §79.4` master evidence table (count 128 → 132); map to CC6.1/CC6.3/CC8.1 | compliance-officer | **P1** | M7 | [ ] |
+| 11 | Add SLO-E-001 through SLO-E-004 to `docs/SOC2_READINESS.md §79.4` master evidence table (count 128 → 132); map to CC6.1/CC6.3/CC8.1 | compliance-officer | **P1** | M7 | [x] **Done — SOC2_READINESS.md §162, 2026-07-04 (count 128 → 132).** |
 | 12 | Collect SLO-E-001 (SP-initiated chain export) and SLO-E-002 (IdP-initiated export) at T+30 days post go-live; file in R2 and advance G-002 to 🟢 in §9 gap registry | compliance-officer | **P1** | M8 | [ ] |
 
 **G-002 will advance from 🟡 Implementation spec complete to 🟢 Implementation complete** when items 1–9 are deployed to production and SLO-I-001 + SLO-I-004 integration tests pass against at least one production IdP (Okta).
@@ -16792,6 +16792,8 @@ BCL-E-002 (`compliance/evidence/oidc-bcl/bcl-e-002-integration-test.json`) is th
 **Closure requirement for item 8:** BCL-I-001 through BCL-I-008 all assertions pass. BCL-E-002 artefact signed and uploaded to R2. `§46.8 item 8` updated `[ ] → [x] Done`.
 
 ---
+
+*v2.28 (2026-07-04): §45.8 item 11 cross-reference patch — SLO evidence registration status corrected. §45.8 item 11 (Add SLO-E-001…SLO-E-004 to `docs/SOC2_READINESS.md §79.4` master evidence table; count 128 → 132; map to CC6.1/CC6.3/CC8.1) was showing `[ ]` despite being closed by SOC2_READINESS §162 (v3.88.0, 2026-07-04; count 128 → 132). Status updated `[ ]` → `[x] Done — SOC2_READINESS.md §162, 2026-07-04 (count 128 → 132).` No new events, schemas, or implementation specs changed. Document header v2.27 → v2.28. Owner: compliance-officer.*
 
 *v2.27 (2026-07-04): §46.9 cross-reference additions — BCL-OBS-E-001 §164 + OBSERVABILITY §70 backreference. §46.9 cross-reference line updated: `docs/SOC2_READINESS.md §164` (BCL-OBS-E-001 registered, CC6.1/CC6.3/CC7.2/CC7.3, count 135 → 136) and `docs/OBSERVABILITY.md §70` (BCL observability layer — RED metrics, SLOs, alert rules AL-BCL-01..04, BCL-OBS-E-001 artefact spec) added alongside existing §163, §46.11, §46.12 entries. Closes OBSERVABILITY §70.9 item 10 (P1/M8 — "Add §70 cross-reference to SSO_SCIM §46.9 cross-reference obligations table") and §70.11 pending obligation "Add §70 reference to SSO_SCIM_IMPLEMENTATION §46.9". Header v2.26 → v2.27. Owner: compliance-officer.*
 

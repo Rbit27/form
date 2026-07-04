@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [12.49.1] — 2026-07-04
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.91 → v2.92 — §SAML-SLO-Events collection responsibility cross-reference corrected: SLO-E-001…SLO-E-004 filing section `SOC2_READINESS.md §160` → `§162` (actual section authored v3.88.0, 2026-07-04); v2.92 version note appended.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` v2.27 → v2.28 — §45.8 item 11 status corrected `[ ]` → `[x] Done — SOC2_READINESS.md §162, 2026-07-04 (count 128 → 132)`; v2.28 version note appended.
+- `VERSION` — 12.49.0 → 12.49.1.
+
 ## [12.49.0] — 2026-07-04
 
 ### Added
