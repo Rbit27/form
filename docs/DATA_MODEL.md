@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.45
+# FORM · Multi-Tenant Data Model v1.46
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -61,6 +61,7 @@
 51. [`tenants.reporting_k_floor` — Per-Tenant k-Anonymity Floor Override — Migration 0092](#51-tenantsreporting_k_floor--per-tenant-k-anonymity-floor-override--migration-0092)
 52. [`enterprise_sessions.oidc_sub_hash` — OIDC BCL Session Index — Migration 0101](#52-enterprise_sessionsoidc_sub_hash--oidc-bcl-session-index--migration-0101)
 53. [SAML SLO + OIDC BCL Schema Columns — Migration 0100](#53-saml-slo--oidc-bcl-schema-columns--migration-0100)
+54. [`tenant_sso_configs` PKJWT Extension — Migration 0098](#54-tenant_sso_configs-pkjwt-extension--migration-0098)
 
 ---
 
@@ -19412,3 +19413,371 @@ Evidence artefacts registered in `docs/SOC2_READINESS.md §162` (SLO-E-001 throu
 *v1.45 (2026-07-04): §53 SAML SLO + OIDC BCL Schema Columns — Migration 0100. DATA_MODEL canonical registration for the Migration 0100 schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §45` (v2.20, 2026-07-04). Five columns added across two tables: `tenant_sso_configs.slo_url` (TEXT nullable — IdP SLO endpoint), `tenant_sso_configs.slo_binding` (TEXT CHECK IN ('HTTP-POST','HTTP-Redirect') — SAML binding), `tenant_sso_configs.backchannel_logout_enabled` (BOOLEAN NOT NULL DEFAULT false — OIDC BCL gate), `enterprise_sessions.idp_name_id` (TEXT nullable — SAML NameID for SLO sweep revocation), `enterprise_sessions.idp_session_id` (TEXT nullable — SAML SessionIndex / OIDC sid for targeted revocation). Two partial indices: `idx_sessions_idp_name_id (tenant_id, idp_name_id) WHERE idp_name_id IS NOT NULL AND revoked_at IS NULL` and `idx_sessions_idp_session_id (tenant_id, idp_session_id) WHERE idp_session_id IS NOT NULL AND revoked_at IS NULL`. §53.1 purpose: closes federated session termination lifecycle gap — without 0100, SLO Worker has no schema to write NameID/SessionIndex at sign-in or read them at logout. §53.2 dependency chain: 0099→0100→0101; additive only, no outside-counsel gate. §53.3 full DDL + rollback (`0100_saml_slo_schema.sql` + `rollback/0100_saml_slo_schema_rollback.sql`). §53.4 five CI adversarial tests MIG-0100-01..05 (migration apply, rollback, form_api access-denied, form_system write, partial-index EXPLAIN verify; evidence path `compliance/evidence/saml-slo/migration-0100-validation_<YYYY-MM-DD>.txt`). §53.5 column/index semantics (slo_url NULL=local-only logout; slo_binding CHECK; backchannel_logout_enabled opt-in default; idp_name_id raw-NameID immutable-at-write; idp_session_id dual-purpose SAML/OIDC; partial-index cardinality design). §53.6 RLS (inherits sessions_tenant_isolation + sessions_no_tenant_manager_access; three auditor proof queries). §53.7 privacy floor (idp_name_id = email-format PII → stored Postgres + hash-only in DEC-030 + RLS blocks employer; idp_session_id = opaque non-PII; DSAR + Art.17 cascade DELETE). §53.8 SOC 2 evidence (SLO-E-001..004 CC6.1/CC6.3/CC8.1/P4.1). §53.9 ten-item implementation checklist (8× P0/M7 staging+production+Worker+CI+evidence; 2× P1/M7 Done this pass). §53.10 cross-reference obligations (§45.9 DATA_MODEL §53 entry Done this pass; G-004 gap closure Done this pass). TOC §53 entry added. Document header v1.43 → v1.45. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §45` (canonical SLO spec); `docs/SSO_SCIM_IMPLEMENTATION.md §12.4/§12.5` (baseline table schemas); `docs/SOC2_READINESS.md §162` (SLO-E-001..004 evidence); `docs/OBSERVABILITY.md §72/§73` (SLO observability + chain integrity DDL); `docs/INCIDENT_RESPONSE.md R-74` (SLO-CHAIN-01 P0 response); `docs/DATA_MODEL.md §52` (companion Migration 0101 oidc_sub_hash). Owner: enterprise-architect + security-engineer + compliance-officer.*
 
 *v1.44 (2026-07-04): §52 `enterprise_sessions.oidc_sub_hash` — OIDC BCL Session Index — Migration 0101. DATA_MODEL canonical registration for the Migration 0101 schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §46.2` (v2.21, 2026-07-04). One nullable column added to `enterprise_sessions`: `oidc_sub_hash TEXT` (SHA-256 hex of OIDC `sub` claim; NULL for SAML sessions and pre-M8 OIDC sessions; no DEFAULT; no CHECK). Companion partial index `idx_enterprise_sessions_oidc_sub ON enterprise_sessions (tenant_id, oidc_sub_hash) WHERE oidc_sub_hash IS NOT NULL AND revoked_at IS NULL` — created CONCURRENTLY (no table lock). §52.1 purpose: single-table sub-based BCL revocation path collapsing the prior two-round-trip `users → enterprise_sessions` UPDATE into one indexed UPDATE; matches `idp_name_id_hash` privacy pattern from SAML SLO (SSO_SCIM §45); raw `sub` never in Postgres. §52.2 dependency chain: modifies `enterprise_sessions` (M3 SSO baseline schema, SSO_SCIM §12.5) independently of the 0083→0092 enterprise_contracts/tenants chain; no outside-counsel gate. §52.3 full DDL + rollback (CONCURRENTLY for both CREATE INDEX and DROP INDEX). §52.4 three CI adversarial tests MIG-0101-01/02/03 (< 30 s on 10 k rows, concurrent INSERT no deadlock, rollback restores schema — evidence path `compliance/evidence/oidc-bcl/migration-0101-validation_<YYYY-MM-DD>.txt`). §52.5 column + index semantics (nullable design rationale, SHA-256 encoding, write-at-INSERT-only invariant, revocation UPDATE pattern, OIDC vs SAML session comparison table). §52.6 RLS (inherits `sessions_tenant_isolation` policy; `form_system` write path for BCL UPDATE; `tenant_manager` no access path — privacy floor at DDL level; three auditor proof queries). §52.7 privacy floor (oidc_sub_hash as pseudonymous operational identifier; raw sub discarded in Worker memory; hash never in DSAR/admin reporting/DEC-030 payloads; GDPR Art. 17 coverage via existing CASCADE on user deletion). §52.8 SOC 2 evidence (CC6.1 — single-table revocation + RLS gate; CC6.3 — sub-millisecond indexed UPDATE + REVOCATION_QUEUE at-least-once; CC6.1 integration — BCL-I-001/BCL-I-002; CC8.1 — BCL-E-003 migration log; P4.1 — structural tenant_manager exclusion; CC6.3 auditor narrative). §52.9 eight-item implementation checklist (6× P0/M8 staging + production deploy + integration tests + evidence filing; 2× P1/M8 cross-reference updates + G-003 closure). §52.10 cross-reference obligations (SSO_SCIM §46.9 DATA_MODEL cross-reference 🟢 Done this pass; 7× pending M8). TOC §52 entry added. Document header v1.43 → v1.44. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §46` (canonical BCL implementation spec — Migration 0101 DDL, BCL Worker, BCL-CHAIN-01, BCL-E-001/002/003, G-003 gap); `docs/SSO_SCIM_IMPLEMENTATION.md §12.5` (`enterprise_sessions` baseline schema — 13-column table pre-0101); `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (v2.89, 2026-07-04 — four `backchannel_logout.*` events + BCL-CHAIN-01 + Zod v2 schemas); `docs/SOC2_READINESS.md §163` (BCL-E-001/002/003 registered CC6.1/CC6.3/CC8.1 — count 132 → 135); `docs/INCIDENT_RESPONSE.md R-73` (BCL REVOCATION_QUEUE Exhausted) + `R-74` (BCL-CHAIN-01 Integrity Violation, P0); `docs/OBSERVABILITY.md §70` (BCL observability — RED metrics, SLOs SLO-BCL-01/02, alert rules AL-BCL-01/02/03/04, BCL-OBS-E-001 quarterly evidence); `docs/DATA_MODEL.md §12.5` cross-reference note: `enterprise_sessions` baseline DDL canonical source remains SSO_SCIM §12.5; §52 documents the additive Migration 0101 extension only. Owner: enterprise-architect + security-engineer + compliance-officer.*
+
+---
+
+## 54. `tenant_sso_configs` PKJWT Extension — Migration 0098
+
+> **Canonical implementation spec:** `docs/SSO_SCIM_IMPLEMENTATION.md §42` (design, DEC-097, v2.15, 2026-07-02) + `§43` (complete DDL, Worker spec, JWKS endpoint, v2.18, 2026-07-02). This section is the DATA_MODEL canonical registration for Migration 0098, providing cross-reference, column semantics, RLS analysis, privacy floor verification, and SOC 2 evidence mapping. The full `buildClientAssertion()` Worker spec, JWKS endpoint spec, pg_cron DDL (Migration 0099), Admin Dashboard panel spec, and key rotation design live in §42–§44. **Companion DEC-030 events:** `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` (v2.73, 2026-07-02 — `sso.pkjwt_key_generated`, `sso.pkjwt_key_rotated`, `sso.pkjwt_key_expiry_warning`).
+
+### §54.1 Purpose
+
+Migration 0098 extends `tenant_sso_configs` with seven columns that enable OIDC `private_key_jwt` client authentication (RFC 7523) as an alternative to `client_secret_post`. `private_key_jwt` is required by enterprise IdPs (Okta FIPS mode, some Entra ID tenants with strict client authentication policies) that mandate asymmetric client credentials for token endpoint calls.
+
+**Why these columns rather than a separate table:**
+
+The `private_key_jwt` extension is a per-tenant configuration dimension of the existing OIDC SSO record. Storing these as columns on `tenant_sso_configs` (one row per tenant × IdP pairing) avoids a JOIN at token exchange time and preserves the tenant isolation model already established by the `sso_configs_tenant_isolation` RLS policy. The design mirrors `oidc_client_secret_encrypted` (SSO_SCIM §4.2), using the same AES-256-GCM column-level encryption mechanism.
+
+**Four design principles (§42.1):**
+
+1. **Opt-in default** — `oidc_client_auth_method TEXT NOT NULL DEFAULT 'client_secret_post'`. All existing tenants retain `client_secret_post` on migration apply; no backfill needed.
+2. **Consistency enforced at DB layer** — `chk_pkjwt_columns_set` CHECK constraint ensures that when `oidc_client_auth_method = 'private_key_jwt'`, the four required columns (`pkjwt_private_key_encrypted`, `pkjwt_algorithm`, `pkjwt_key_id`, `pkjwt_key_expires_at`) are all non-null. Belt-and-suspenders alongside application-layer validation.
+3. **Private key encrypted at rest** — `pkjwt_private_key_encrypted BYTEA` stores AES-256-GCM ciphertext; plaintext PEM is only materialised in Cloudflare Worker memory during a token exchange call. No SQL function, trigger, or audit event ever receives or logs plaintext key material.
+4. **Key rotation observable** — `pkjwt_key_expires_at TIMESTAMPTZ` is the sweep target for `pkjwt_key_expiry_sweep` pg_cron job (Job 58, daily 09:00 UTC; OBSERVABILITY §12.6), which emits `sso.pkjwt_key_expiry_warning` DEC-030 events within 30 days of expiry.
+
+---
+
+### §54.2 Migration Dependency Chain
+
+```
+Migration 0097  (DEC-097 — DECISION_LOG formal design adoption; no schema change)
+Migration 0098  tenant_sso_configs PKJWT extension          (§54 ← this section)
+Migration 0099  pkjwt_key_expiry_sweep pg_cron DDL           (SSO_SCIM §44.2)
+Migration 0100  SAML SLO + OIDC BCL schema columns           (§53)
+Migration 0101  enterprise_sessions.oidc_sub_hash             (§52)
+```
+
+Migration 0098 depends on:
+- `tenant_sso_configs` existing with the §12.4 baseline schema (SSO_SCIM §12.4 — `id`, `tenant_id`, `provider_type`, `saml_idp_metadata_url`, `oidc_client_id`, `oidc_client_secret_encrypted`, `oidc_token_endpoint_url`, `oidc_userinfo_endpoint_url`, `created_at`, `updated_at`).
+- No outside-counsel gate — additive columns on an existing table, no FK to new tables, no ASC 606 / financial implications, no GDPR Art. 9 health data in any new column.
+
+Migrations 0099–0101 depend on Migration 0098 being in place (`pkjwt_key_expiry_sweep` pg_cron in 0099 scans `oidc_client_auth_method = 'private_key_jwt'`; SLO/BCL columns 0100–0101 are logically independent but operationally ordered). Apply order: 0098 → 0099 → 0100 → 0101.
+
+**Migration file:** `supabase/migrations/0098_tenant_sso_configs_pkjwt.sql`
+
+---
+
+### §54.3 Full DDL + Rollback
+
+**Migration 0098** (`supabase/migrations/0098_tenant_sso_configs_pkjwt.sql`):
+
+```sql
+-- Migration 0098: tenant_sso_configs private_key_jwt columns
+-- Owner: platform-engineer
+-- Milestone: M5
+-- Reviewed-by: enterprise-architect, security-engineer
+-- References: docs/SSO_SCIM_IMPLEMENTATION.md §42.7.2, §43.2
+
+BEGIN;
+
+-- ── 1. New columns on tenant_sso_configs ───────────────────────────────────
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS oidc_client_auth_method TEXT
+    NOT NULL
+    DEFAULT 'client_secret_post'
+    CHECK (oidc_client_auth_method IN ('client_secret_post', 'private_key_jwt')),
+
+  -- Encrypted PKCS#8 PEM private key (AES-256-GCM, same mechanism as oidc_client_secret_encrypted §4.2)
+  -- NULL when oidc_client_auth_method = 'client_secret_post'
+  ADD COLUMN IF NOT EXISTS pkjwt_private_key_encrypted BYTEA,
+
+  -- Signing algorithm: 'RS256' (RSA-2048, default) or 'ES256' (EC P-256)
+  ADD COLUMN IF NOT EXISTS pkjwt_algorithm TEXT
+    CHECK (pkjwt_algorithm IN ('RS256', 'ES256')),
+
+  -- JWK kid — matches the kid field served at the JWKS endpoint
+  ADD COLUMN IF NOT EXISTS pkjwt_key_id TEXT,
+
+  -- Key expiry for rotation alert (§42.4.4, pg_cron job pkjwt_key_expiry_sweep)
+  ADD COLUMN IF NOT EXISTS pkjwt_key_expires_at TIMESTAMPTZ,
+
+  -- Optional aud override: some IdPs require issuer URL instead of token endpoint URL (§42.3.2)
+  -- NULL → default to oidc_token_endpoint_url
+  ADD COLUMN IF NOT EXISTS pkjwt_aud_override TEXT,
+
+  -- Optional assertion lifetime override in seconds (default 300 = 5 minutes, max 300 per §42.3.2)
+  -- NULL → default 300
+  ADD COLUMN IF NOT EXISTS pkjwt_assertion_lifetime_secs INTEGER
+    CHECK (pkjwt_assertion_lifetime_secs BETWEEN 60 AND 300);
+
+-- ── 2. Partial index: expiry sweep performance ──────────────────────────────
+-- Scanned daily by pkjwt_key_expiry_sweep (OBSERVABILITY.md §12.6, job 58).
+-- Partial index covers only the ~few percent of tenants using private_key_jwt.
+
+CREATE INDEX IF NOT EXISTS idx_tsc_pkjwt_expiry
+  ON tenant_sso_configs (pkjwt_key_expires_at)
+  WHERE oidc_client_auth_method = 'private_key_jwt';
+
+-- ── 3. Consistency constraint ───────────────────────────────────────────────
+-- When private_key_jwt is active, the four key columns must all be set.
+-- Enforced at application layer (key generation flow §42.4.2) and here as a
+-- belt-and-suspenders DB constraint.
+
+ALTER TABLE tenant_sso_configs
+  ADD CONSTRAINT chk_pkjwt_columns_set
+    CHECK (
+      oidc_client_auth_method = 'client_secret_post'
+      OR (
+        pkjwt_private_key_encrypted IS NOT NULL
+        AND pkjwt_algorithm IS NOT NULL
+        AND pkjwt_key_id IS NOT NULL
+        AND pkjwt_key_expires_at IS NOT NULL
+      )
+    );
+
+-- ── 4. RLS notes ────────────────────────────────────────────────────────────
+-- tenant_sso_configs existing RLS policy remains unchanged:
+--   form_api (row-level): SELECT/UPDATE restricted to own tenant_id via current_setting
+--   form_admin: BYPASSRLS
+--   form_system: SELECT only
+-- pkjwt_private_key_encrypted is encrypted at rest — even form_admin access
+-- returns ciphertext; plaintext only accessible to form_api decryption path (§4.2).
+-- No additional RLS column grants required; existing policy covers new columns.
+
+-- ── 5. Comments ─────────────────────────────────────────────────────────────
+
+COMMENT ON COLUMN tenant_sso_configs.oidc_client_auth_method
+  IS 'OIDC token endpoint client authentication method. client_secret_post (default) or private_key_jwt (RFC 7523). Activated per tenant on request — see SSO_SCIM_IMPLEMENTATION.md §42.';
+
+COMMENT ON COLUMN tenant_sso_configs.pkjwt_private_key_encrypted
+  IS 'AES-256-GCM encrypted PKCS#8 PEM private key for private_key_jwt client auth. NULL when oidc_client_auth_method = client_secret_post. Never logged. Never served to client. Rotate annually per §42.4.4.';
+
+COMMENT ON COLUMN tenant_sso_configs.pkjwt_key_id
+  IS 'JWK kid for the current private_key_jwt key pair. Matches the kid in the JWKS endpoint at /auth/oidc/{tenant_id}/.well-known/jwks.json.';
+
+COMMENT ON COLUMN tenant_sso_configs.pkjwt_key_expires_at
+  IS 'Expiry timestamp for the current pkjwt key pair. Scanned daily by pkjwt_key_expiry_sweep cron (OBSERVABILITY §12.6 job 58); sso.pkjwt_key_expiry_warning emitted within 30 days.';
+
+COMMIT;
+```
+
+**Rollback** (`supabase/migrations/rollback/0098_tenant_sso_configs_pkjwt_rollback.sql`):
+
+```sql
+-- Rollback 0098 — run only if migration must be reverted before any tenant
+-- has oidc_client_auth_method set to 'private_key_jwt'.
+-- DANGER: if any tenant has private_key_jwt active, rollback breaks their SSO.
+-- Confirm zero rows with: SELECT COUNT(*) FROM tenant_sso_configs
+--   WHERE oidc_client_auth_method = 'private_key_jwt';
+
+BEGIN;
+
+ALTER TABLE tenant_sso_configs
+  DROP CONSTRAINT IF EXISTS chk_pkjwt_columns_set;
+
+DROP INDEX IF EXISTS idx_tsc_pkjwt_expiry;
+
+ALTER TABLE tenant_sso_configs
+  DROP COLUMN IF EXISTS pkjwt_assertion_lifetime_secs,
+  DROP COLUMN IF EXISTS pkjwt_aud_override,
+  DROP COLUMN IF EXISTS pkjwt_key_expires_at,
+  DROP COLUMN IF EXISTS pkjwt_key_id,
+  DROP COLUMN IF EXISTS pkjwt_algorithm,
+  DROP COLUMN IF EXISTS pkjwt_private_key_encrypted,
+  DROP COLUMN IF EXISTS oidc_client_auth_method;
+
+COMMIT;
+```
+
+> **Pre-rollback gate:** The rollback script must only execute after `SELECT COUNT(*) FROM tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt'` returns 0. Wired as a `DO $$` guard in the actual rollback file (SSO_SCIM §43.2.1). **Lock note:** `ADD COLUMN IF NOT EXISTS` with `NOT NULL DEFAULT 'client_secret_post'` on `tenant_sso_configs` rewrites all existing rows at migration apply time. On a table with O(100) enterprise tenant rows at M5 this is sub-second. `CREATE INDEX IF NOT EXISTS` (non-CONCURRENT) is acceptable for a partial index covering the `private_key_jwt` subset (initially empty). CONCURRENT is not needed because this migration runs during the M5 maintenance window.
+
+---
+
+### §54.4 CI Adversarial Tests
+
+The following five tests gate every PR that touches Migration 0098 or the PKJWT Worker path. Evidence path: `compliance/evidence/sso/migration-0098-validation_<YYYY-MM-DD>.txt`.
+
+| ID | Test | Pass Criterion |
+|---|---|---|
+| **MIG-0098-01** | Migration applies cleanly on a clean DB | `supabase db reset && supabase migration up` exits 0; all seven columns present on `tenant_sso_configs`; `idx_tsc_pkjwt_expiry` exists; `chk_pkjwt_columns_set` constraint present; existing rows have `oidc_client_auth_method = 'client_secret_post'` |
+| **MIG-0098-02** | Rollback restores prior schema exactly | Rollback SQL exits 0 (after confirming zero `private_key_jwt` rows); `\d tenant_sso_configs` shows no PKJWT columns; constraint and index absent |
+| **MIG-0098-03** | `chk_pkjwt_columns_set` rejects partial PKJWT activation | `UPDATE tenant_sso_configs SET oidc_client_auth_method = 'private_key_jwt', pkjwt_algorithm = NULL WHERE id = <fixture_id>` → `ERROR: new row for relation "tenant_sso_configs" violates check constraint "chk_pkjwt_columns_set"` |
+| **MIG-0098-04** | `pkjwt_private_key_encrypted` returns ciphertext at SQL layer for all roles | `SET ROLE form_api; SELECT pkjwt_private_key_encrypted FROM tenant_sso_configs WHERE tenant_id = current_setting('app.tenant_id')::UUID LIMIT 1;` → returns BYTEA ciphertext (not plaintext PEM); decryption path is the only plaintext route (SSO_SCIM §43.3.2) |
+| **MIG-0098-05** | `idx_tsc_pkjwt_expiry` used by expiry sweep query | `EXPLAIN (ANALYZE, FORMAT JSON) SELECT id, tenant_id, pkjwt_key_expires_at FROM tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt' AND pkjwt_key_expires_at < NOW() + INTERVAL '30 days';` → `Index Scan using idx_tsc_pkjwt_expiry` present in plan |
+
+MIG-0098-04 verifies the key privacy boundary: `pkjwt_private_key_encrypted` is accessible to `form_api` (needed for decryption at token exchange time) but returns ciphertext at the SQL layer. The plaintext private key is materialised in Cloudflare Worker memory via `decryptPkjwtPrivateKey()` (SSO_SCIM §43.3.2) — it never traverses the Postgres connection in plaintext.
+
+---
+
+### §54.5 Column and Index Semantics
+
+#### `tenant_sso_configs.oidc_client_auth_method`
+
+| Property | Value |
+|---|---|
+| **Type** | `TEXT NOT NULL DEFAULT 'client_secret_post'` |
+| **CHECK** | `IN ('client_secret_post', 'private_key_jwt')` |
+| **Default semantics** | All existing tenants retain `'client_secret_post'` on migration apply — no backfill, no behavioural change for existing OIDC tenants |
+| **Activation** | Set to `'private_key_jwt'` via Admin Dashboard PKJWT panel (SSO_SCIM §44.3) after key generation completes; `chk_pkjwt_columns_set` ensures all four required columns are non-null at that point |
+| **Read path** | `buildTokenExchangeParams()` (SSO_SCIM §43.3.6) reads this column at every token exchange call; routes to `buildClientAssertion()` (PKJ path) or `decryptClientSecret()` (secret path) |
+
+#### `tenant_sso_configs.pkjwt_private_key_encrypted`
+
+| Property | Value |
+|---|---|
+| **Type** | `BYTEA`, nullable |
+| **NULL semantics** | `NULL` when `oidc_client_auth_method = 'client_secret_post'`; enforced by `chk_pkjwt_columns_set` |
+| **Encoding** | AES-256-GCM ciphertext of PKCS#8 PEM private key; IV prepended to ciphertext blob; same mechanism as `oidc_client_secret_encrypted` (SSO_SCIM §4.2) |
+| **Write path** | Admin Dashboard key generation flow (SSO_SCIM §44.3); key generated in Cloudflare Worker memory via WebCrypto; PEM encrypted before INSERT |
+| **Read path** | `decryptPkjwtPrivateKey()` (SSO_SCIM §43.3.2) in the OIDC callback Worker; plaintext PEM materialised in Worker memory only; discarded after `importPrivateKey()` |
+| **Privacy floor** | Never logged. Never in DEC-030 event payloads. Never served to any API consumer. SQL layer always returns ciphertext |
+
+#### `tenant_sso_configs.pkjwt_algorithm`
+
+| Property | Value |
+|---|---|
+| **Type** | `TEXT`, nullable |
+| **CHECK** | `IN ('RS256', 'ES256')` — enforced at DB layer; rejects any unsupported algorithm string |
+| **NULL semantics** | `NULL` when `client_secret_post`; required non-null when `private_key_jwt` (CHECK constraint) |
+| **Default** | `'RS256'` (RSA-2048) — applied by Admin Dashboard key generation; EC P-256 available on request |
+| **Usage** | Passed to `importPrivateKey()` (SSO_SCIM §43.3.3) as the WebCrypto algorithm selector; determines the `alg` header in the JWT client assertion |
+
+#### `tenant_sso_configs.pkjwt_key_id`
+
+| Property | Value |
+|---|---|
+| **Type** | `TEXT`, nullable |
+| **NULL semantics** | `NULL` when `client_secret_post`; required non-null when `private_key_jwt` |
+| **Content** | JWK `kid` value — matches the `kid` field served at the JWKS endpoint (`/auth/oidc/{tenant_id}/.well-known/jwks.json`); used as the `kid` header in every client assertion JWT |
+| **Format** | UUID v4 (`crypto.randomUUID()` at key generation time); stable for the key lifetime; changes on rotation |
+
+#### `tenant_sso_configs.pkjwt_key_expires_at`
+
+| Property | Value |
+|---|---|
+| **Type** | `TIMESTAMPTZ`, nullable |
+| **NULL semantics** | `NULL` when `client_secret_post`; required non-null when `private_key_jwt` |
+| **Role** | Rotation trigger: `pkjwt_key_expiry_sweep` (Job 58, OBSERVABILITY §12.6) scans `pkjwt_key_expires_at < NOW() + INTERVAL '30 days'` daily at 09:00 UTC; emits `sso.pkjwt_key_expiry_warning` DEC-030 event per matching tenant |
+| **Default lifetime** | 365 days from key generation; set by Admin Dashboard at `generateAndStoreKey()` call |
+| **Index** | Covered by `idx_tsc_pkjwt_expiry` (partial, `WHERE oidc_client_auth_method = 'private_key_jwt'`) for O(log n) sweep |
+
+#### `tenant_sso_configs.pkjwt_aud_override`
+
+| Property | Value |
+|---|---|
+| **Type** | `TEXT`, nullable |
+| **NULL semantics** | `NULL` → `aud` claim in client assertion defaults to `oidc_token_endpoint_url`. Non-null → `aud` claim set to this value |
+| **Use case** | Okta FIPS: `aud` must be the Okta issuer URL, not the token endpoint. Entra ID: token endpoint URL is correct; no override needed. See SSO_SCIM §42.3.2 for IdP-specific `aud` requirements |
+
+#### `tenant_sso_configs.pkjwt_assertion_lifetime_secs`
+
+| Property | Value |
+|---|---|
+| **Type** | `INTEGER`, nullable |
+| **CHECK** | `BETWEEN 60 AND 300` — minimum 1 min, maximum 5 min (RFC 7523 §4 recommendation) |
+| **NULL semantics** | `NULL` → defaults to 300 s (5 minutes) in `buildClientAssertion()`. Non-null → overrides the default |
+| **Usage** | Sets `exp = iat + pkjwt_assertion_lifetime_secs` in the client assertion JWT; short lifetimes reduce replay window; max 300 s per §42.3.2 |
+
+#### `idx_tsc_pkjwt_expiry`
+
+| Property | Value |
+|---|---|
+| **Covers** | `(pkjwt_key_expires_at)` |
+| **Partial predicate** | `WHERE oidc_client_auth_method = 'private_key_jwt'` |
+| **Size** | O(PKJWT tenants) — initially empty; small fraction of total `tenant_sso_configs` rows (opt-in model) |
+| **Query pattern** | `WHERE oidc_client_auth_method = 'private_key_jwt' AND pkjwt_key_expires_at < NOW() + INTERVAL '30 days'` — index scan on partial set; fast even as PKJWT adoption grows |
+| **Lock** | `CREATE INDEX IF NOT EXISTS` (non-CONCURRENT) — acceptable for M5 maintenance window |
+
+---
+
+### §54.6 Row-Level Security
+
+`tenant_sso_configs` RLS is defined in SSO_SCIM §12.4. The existing policies apply to all new PKJWT columns automatically — no new policies are required.
+
+**Existing policies in effect:**
+
+| Policy | Roles | Effect |
+|---|---|---|
+| `sso_configs_tenant_isolation` | `form_api`, `tenant_manager` | SELECT/UPDATE only rows WHERE `tenant_id = current_setting('app.tenant_id')::UUID` |
+| `sso_configs_system_write` | `form_system` | INSERT/UPDATE/DELETE unrestricted (SSO wizard and metadata refresh Workers) |
+| BYPASSRLS | `form_admin` | Unrestricted — cross-tenant audit; returns ciphertext for `pkjwt_private_key_encrypted` |
+
+**Critical RLS note for `pkjwt_private_key_encrypted`:** Even roles that can SELECT from `tenant_sso_configs` (within their tenant scope) always receive AES-256-GCM ciphertext at the SQL layer. No role ever receives plaintext — decryption occurs in Cloudflare Worker memory using the KMS-held key-encryption-key (SSO_SCIM §4.2). This is a cryptographic boundary, independent of RLS.
+
+**DDL auditor proof queries:**
+
+```sql
+-- 1. Confirm RLS is enabled on tenant_sso_configs:
+SELECT relrowsecurity FROM pg_class WHERE relname = 'tenant_sso_configs';
+-- Expected: t
+
+-- 2. Confirm tenant_manager cannot read pkjwt_private_key_encrypted from another tenant:
+SET app.tenant_id = 'tenant-A';
+SET ROLE tenant_manager;
+SELECT pkjwt_private_key_encrypted
+  FROM tenant_sso_configs
+ WHERE tenant_id = 'tenant-B'
+ LIMIT 1;
+-- Expected: 0 rows (RLS filter)
+
+-- 3. Confirm chk_pkjwt_columns_set is present:
+SELECT conname, pg_get_constraintdef(oid)
+  FROM pg_constraint
+ WHERE conrelid = 'tenant_sso_configs'::regclass
+   AND conname = 'chk_pkjwt_columns_set';
+-- Expected: 1 row with the full CHECK expression
+```
+
+**Privacy floor for HR (`tenant_manager`):** The `sso_configs_tenant_isolation` policy restricts `tenant_manager` to SELECT within their own tenant only. The Admin Dashboard SSO wizard exposes `oidc_client_auth_method` (active/inactive), the JWKS URL (`pkjwt_key_id`-derived), and `pkjwt_key_expires_at` for display — not `pkjwt_private_key_encrypted`. The application layer strips key columns before the API response; RLS provides the structural backstop that prevents any cross-tenant leak.
+
+---
+
+### §54.7 Privacy Floor
+
+| Data element | Classification | Rationale |
+|---|---|---|
+| `pkjwt_private_key_encrypted` | FORM-internal cryptographic material | RSA-2048 or EC P-256 private key for a tenant's OIDC client authentication. Not personal data (no employee `user_id`, name, email, health value, or GDPR Art. 9 category). AES-256-GCM encrypted at rest; plaintext never in transit beyond Cloudflare Worker ephemeral memory; never in DEC-030 audit event payloads; never in API responses. Privacy concern: exposure would allow token exchange impersonation for that tenant. Mitigated by column-level encryption + KMS boundary. |
+| `pkjwt_key_id` | FORM-internal operational identifier | JWK `kid` — public identifier, also present at the JWKS endpoint. No PII. Safe for inclusion in DEC-030 event payloads (`sso.pkjwt_key_generated`, `sso.pkjwt_key_rotated`). |
+| `pkjwt_algorithm`, `pkjwt_aud_override`, `pkjwt_assertion_lifetime_secs`, `pkjwt_key_expires_at` | FORM-internal configuration | No PII. Shown in Admin Dashboard for tenant configuration; included in `sso.pkjwt_key_generated` event payload as tenant-level config metadata. |
+| `oidc_client_auth_method` | FORM-internal configuration | No PII. Safe for Admin Dashboard display and audit events. |
+| GDPR Art. 17 erasure | No separate step | `tenant_sso_configs` rows are deleted when the tenant is deprovisioned. PKJWT columns are deleted with the row. The private key ciphertext is discarded; raw plaintext was never in Postgres. |
+
+**Privacy floor invariant:** No employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data is present in any column added by Migration 0098. All three DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` contain only FORM-internal UUIDs (`tenant_id`, `kid`) and timestamps — private key material absent from all event payload types by Zod v2 schema constraint (confirmed v2.73, 2026-07-02).
+
+---
+
+### §54.8 SOC 2 Evidence
+
+| SOC 2 Criterion | Control mechanism | Evidence |
+|---|---|---|
+| **CC6.6** — Key management | `pkjwt_private_key_encrypted BYTEA` stores only AES-256-GCM ciphertext; plaintext private key generated and used in Cloudflare Worker memory only; never in Postgres, never in transit, never stored at IdP; `pkjwt_key_expires_at` enforces annual rotation cycle; `chk_pkjwt_columns_set` prevents partial activation; `idx_tsc_pkjwt_expiry` enables proactive rotation alerting | **PKJWT-E-001** — quarterly CSV export of `sso.pkjwt_key_generated` + `sso.pkjwt_key_rotated` DEC-030 events; confirms rotation policy compliance; R2 `compliance/evidence/sso/PKJWT-E-001_<YYYY-QN>.csv`; 7yr WORM; registered `docs/SOC2_READINESS.md §145` (v3.71.0, 2026-07-02) |
+| **CC6.6** — Asymmetric posture | Public key served at JWKS endpoint (`/auth/oidc/{tenant_id}/.well-known/jwks.json`); IdP validates client assertions against JWKS public key; private key never sent to IdP, never in IdP logs | PKJWT-E-001 (§ above) + JWKS endpoint availability check from OBSERVABILITY monitoring dashboard |
+| **CC8.1** — Change management | Migration 0098 applied via Supabase CLI with CI gate (MIG-0098-01 through MIG-0098-05); PR review by enterprise-architect + security-engineer; migration log filed to R2 WORM | **PKJWT-E-002** — Migration 0098 production apply log: `supabase migration up` output from staging + production deploys; R2 `compliance/evidence/sso/migration-0098-apply-log_<YYYY-MM-DD>.txt`; CC8.1; 7yr WORM |
+| **P4.1** — Use limitation | `pkjwt_private_key_encrypted` used only for OIDC token exchange; never in reporting, DSAR exports, or tenant-facing responses; application layer strips key columns before response | Structural: ciphertext only at SQL layer; MIG-0098-04 adversarial test verifies at every CI run |
+
+**SOC 2 auditor narrative — CC6.6:**
+FORM's `private_key_jwt` implementation uses per-tenant RSA-2048 (or EC P-256) key pairs generated in Cloudflare Worker memory at activation time. The private key is immediately encrypted with AES-256-GCM using a KMS-held key-encryption-key before storage in `tenant_sso_configs.pkjwt_private_key_encrypted`. The plaintext private key is never persisted to Postgres, never logged, and never transmitted beyond Worker ephemeral memory. At each OIDC token exchange, the Worker decrypts the key in memory, signs a short-lived JWT assertion (exp ≤ 300 s), and discards the plaintext. The public key is served at the JWKS endpoint for IdP validation. Annual rotation is tracked via `pkjwt_key_expires_at` and alerted 30 days in advance by `pkjwt_key_expiry_sweep` (pg_cron Job 58). `sso.pkjwt_key_generated` and `sso.pkjwt_key_rotated` DEC-030 events (HMAC-chained per DEC-030) provide an auditor-verifiable record of key lifecycle events. PKJWT-E-001 (quarterly export) enables SOC 2 fieldwork to verify CC6.6 compliance across the observation period.
+
+---
+
+### §54.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration 0098 to staging; run MIG-0098-01 through MIG-0098-05 (§54.4); file `compliance/evidence/sso/migration-0098-validation_<YYYY-MM-DD>.txt` | platform-engineer + devops-lead | **P0** | M5 | [ ] Pending |
+| 2 | Deploy `buildClientAssertion()` + `buildTokenExchangeParams()` (SSO_SCIM §43.3) to staging OIDC Worker; confirm RS256 and ES256 assertion shape; verify `client_secret` coexistence guard fires when PKJ active | platform-engineer | **P0** | M5 | [ ] Pending |
+| 3 | Deploy JWKS endpoint (`GET /auth/oidc/:tenant_id/.well-known/jwks.json`) per SSO_SCIM §43.4 to staging; confirm single-key and dual-key rotation window responses; verify `Cache-Control: public, max-age=3600` | platform-engineer | **P0** | M5 | [ ] Pending |
+| 4 | Apply migration 0098 to production (gated on items 1–3); confirm `idx_tsc_pkjwt_expiry` created; confirm all existing rows have `oidc_client_auth_method = 'client_secret_post'` | devops-lead | **P0** | M5 (after items 1–3) | [ ] Pending |
+| 5 | File PKJWT-E-002 (Migration 0098 production apply log) to R2 `compliance/evidence/sso/migration-0098-apply-log_<YYYY-MM-DD>.txt`; compliance-officer co-sign | compliance-officer + devops-lead | **P0** | M5 | [ ] Pending |
+| 6 | DATA_MODEL §54 canonical registration | compliance-officer | **P1** | Documentation pass | 🟢 Done — this pass (v1.46, 2026-07-04) |
+| 7 | Update `docs/SSO_SCIM_IMPLEMENTATION.md §42.12` — DATA_MODEL §54 cross-reference row added | compliance-officer | **P1** | Documentation pass | 🟢 Done — this pass (SSO_SCIM v2.33, 2026-07-04) |
+| 8 | G-012 full closure: once items 1–5 complete, update §9 G-012 row from 🟡 Design complete → 🟢 Implementation complete | compliance-officer + security-engineer | **P1** | M5 (after items 1–5) | [ ] Pending |
+
+---
+
+### §54.10 Cross-Reference Obligations
+
+| Document | Section | Description | Status |
+|---|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §42 | Canonical PKJWT design — RFC 7523 client auth, key management, DEC-097, CC6.6 design narrative | Cross-reference source |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §43 | Migration 0098 complete DDL + rollback + `buildClientAssertion()` Worker spec + JWKS endpoint spec + unit test matrix — §54.3 DDL mirrors §43.2 verbatim | DDL source |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §42.12 | Cross-reference obligations table — DATA_MODEL §54 row added | 🟢 Done this pass (SSO_SCIM v2.33, 2026-07-04) |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §44.2 | Migration 0099 — `pkjwt_key_expiry_sweep` pg_cron DDL (companion; must follow 0098 in apply order) | 🟢 Done — SSO_SCIM v2.19, 2026-07-02 |
+| `docs/AUDIT_LOG_SCHEMA.md` | §SSO-PKJ-Lifecycle | Three DEC-030 events: `sso.pkjwt_key_generated/rotated/expiry_warning` with Zod v2 schemas and retention labels | 🟢 Done — AUDIT_LOG_SCHEMA.md v2.73, 2026-07-02 |
+| `docs/OBSERVABILITY.md` | §12.6 | `pkjwt_key_expiry_sweep` pg_cron job 58 registration (daily 09:00 UTC, 26h freshness, P3 Slack-only `#alerts-enterprise`) | 🟢 Done — OBSERVABILITY.md v5.14.0, 2026-07-02 |
+| `docs/SOC2_READINESS.md` | §145 | PKJWT-E-001 evidence artefact (CC6.6, quarterly CSV export of `sso.pkjwt_key_generated/rotated`, 7yr WORM) | 🟢 Done — SOC2_READINESS.md v3.71.0, 2026-07-02 |
+
+---
+
+*v1.46 (2026-07-04): §54 `tenant_sso_configs` PKJWT Extension — Migration 0098. DATA_MODEL canonical registration for the Migration 0098 schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §42` (design, DEC-097, v2.15, 2026-07-02) + `§43` (complete DDL + Worker spec, v2.18, 2026-07-02). Seven new columns added to `tenant_sso_configs`: `oidc_client_auth_method TEXT NOT NULL DEFAULT 'client_secret_post' CHECK IN ('client_secret_post','private_key_jwt')` (auth method selector; opt-in default; routes `buildTokenExchangeParams()` to PKJ or secret path), `pkjwt_private_key_encrypted BYTEA` (AES-256-GCM ciphertext of PKCS#8 PEM private key — same mechanism as `oidc_client_secret_encrypted` §4.2; SQL layer always ciphertext; plaintext in Worker memory only), `pkjwt_algorithm TEXT CHECK IN ('RS256','ES256')` (signing algorithm; `'RS256'` default; CHECK rejects unsupported strings), `pkjwt_key_id TEXT` (JWK kid matching JWKS endpoint; UUID v4; stable per key lifetime), `pkjwt_key_expires_at TIMESTAMPTZ` (annual rotation trigger for pg_cron job 58; partial index target), `pkjwt_aud_override TEXT` (IdP-specific `aud` override; Okta FIPS requires issuer URL; NULL = token endpoint URL), `pkjwt_assertion_lifetime_secs INTEGER CHECK BETWEEN 60 AND 300` (assertion JWT `exp` override; NULL = 300 s default). One partial index `idx_tsc_pkjwt_expiry ON tenant_sso_configs (pkjwt_key_expires_at) WHERE oidc_client_auth_method = 'private_key_jwt'` for O(log n) daily expiry sweep. One CHECK constraint `chk_pkjwt_columns_set` enforcing that when `private_key_jwt` is active, all four required columns are non-null. §54.1 purpose: closes the DATA_MODEL registration gap for PKJWT — SSO_SCIM §42/§43 had complete design + DDL spec but no companion DATA_MODEL section (unlike BCL→§52 and SLO→§53); establishes the canonical cross-reference, RLS analysis, privacy floor, and SOC 2 mapping. §54.2 migration dependency chain: DEC-097 (no schema change) → 0098 (this) → 0099 (pg_cron §44.2) → 0100 (SLO/BCL §53) → 0101 (oidc_sub_hash §52); additive only, no outside-counsel gate, M5 maintenance window. §54.3 full DDL + rollback (mirrors SSO_SCIM §43.2 verbatim; rollback pre-gate: zero `private_key_jwt` rows required; lock note: sub-second on O(100) tenant rows). §54.4 five CI adversarial tests MIG-0098-01..05 (migration apply, rollback, CHECK constraint rejection, ciphertext-only at SQL layer, idx_tsc_pkjwt_expiry plan verify; evidence path `compliance/evidence/sso/migration-0098-validation_<YYYY-MM-DD>.txt`). §54.5 column/index semantics (oidc_client_auth_method opt-in default; pkjwt_private_key_encrypted encrypted-at-rest ciphertext-only-at-SQL; pkjwt_algorithm RS256/ES256 CHECK; pkjwt_key_id UUID4 stable-per-key-lifetime; pkjwt_key_expires_at 365-day rotation anchor; pkjwt_aud_override Okta-FIPS null=token-endpoint-url; pkjwt_assertion_lifetime_secs 60–300 null=300; idx_tsc_pkjwt_expiry partial O(log n) sweep). §54.6 RLS (inherits `sso_configs_tenant_isolation` + `sso_configs_system_write` + BYPASSRLS; cryptographic boundary: ciphertext at SQL layer for all roles; three auditor proof queries; tenant_manager strips key material in application layer). §54.7 privacy floor (pkjwt_private_key_encrypted = cryptographic material, no PII, AES-256-GCM encrypted, never in DEC-030 payloads, never in transit; all other columns configuration only, no PII; Zod v2 constraint prohibits key material in event payloads; GDPR Art. 17 via tenant row deletion). §54.8 SOC 2 evidence (CC6.6 key management — PKJWT-E-001 quarterly, 7yr; CC6.6 asymmetric — public at JWKS, private never at IdP; CC8.1 — PKJWT-E-002 migration apply log; P4.1 — ciphertext-only structural). §54.9 eight-item implementation checklist (5× P0/M5 staging+production+Worker+JWKS+evidence; 2× P1/Done this pass; 1× P1/M5 G-012 full closure). §54.10 cross-reference obligations (SSO_SCIM §42.12 DATA_MODEL §54 row 🟢 Done this pass; AUDIT_LOG_SCHEMA §SSO-PKJ-Lifecycle 🟢 Done v2.73; OBSERVABILITY §12.6 job 58 🟢 Done v5.14.0; SOC2_READINESS §145 PKJWT-E-001 🟢 Done v3.71.0). TOC §54 entry added. Document header v1.45 → v1.46. Owner: enterprise-architect + security-engineer + compliance-officer.*

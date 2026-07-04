@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [12.81.1] — 2026-07-04
+
+### Added
+- `docs/DATA_MODEL.md §54` — `tenant_sso_configs` PKJWT Extension — Migration 0098. DATA_MODEL canonical registration for the seven `private_key_jwt` columns (`oidc_client_auth_method`, `pkjwt_private_key_encrypted`, `pkjwt_algorithm`, `pkjwt_key_id`, `pkjwt_key_expires_at`, `pkjwt_aud_override`, `pkjwt_assertion_lifetime_secs`), partial index `idx_tsc_pkjwt_expiry`, and CHECK constraint `chk_pkjwt_columns_set`. Full DDL + rollback (mirrors SSO_SCIM §43.2), five CI adversarial tests (MIG-0098-01..05), RLS analysis, privacy floor (no PII; AES-256-GCM ciphertext-only at SQL layer; private key in Cloudflare Worker memory only), SOC 2 CC6.6/CC8.1/P4.1 mapping (PKJWT-E-001 quarterly + PKJWT-E-002 migration log), eight-item implementation checklist (5× P0/M5 pending deployment; 2× P1/Done this pass; 1× P1/M5 G-012 closure), and cross-reference obligations table. Closes DATA_MODEL registration gap for G-012 (PKJWT) — pattern established by BCL→§52 and SLO→§53 now complete for Migration 0098.
+
+### Changed
+- `docs/DATA_MODEL.md` — v1.45 → v1.46; TOC §54 entry added.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — v2.32 → v2.33; §42.12 cross-reference table new row: `docs/DATA_MODEL.md §54` → 🟢 Done (2026-07-04); v2.33 version note added.
+
 ## [12.81.0] — 2026-07-04
 
 ### Added
