@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.25
+# FORM · SSO/SCIM Implementation v2.26
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -16131,7 +16131,7 @@ BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
 | 5 | Implement `REVOCATION_QUEUE` Cloudflare Queue consumer per §46.4.3 | platform-engineer | **P0** | M8 | [ ] **Closure gate: §46.4.4 RQ-U-001..RQ-U-009 (2026-07-04)** |
 | 6 | Register four DEC-030 audit events (`backchannel_logout.received`, `.validated`, `.revoked`, `.failed`) with Zod v2 schemas in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` | compliance-officer | **P0** | M8 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.89, §BCL-Events, 2026-07-04.** |
 | 7 | Enforce BCL-CHAIN-01 invariant in `emit-audit-event` Worker (HTTP 422 on violation) | platform-engineer | **P0** | M8 | [ ] **Full spec: §46.11; closure gate: §46.11.7 BCL-INV-U-001..BCL-INV-U-007 (2026-07-04)** |
-| 8 | Execute BCL-I-001 through BCL-I-008 integration test matrix; collect BCL-E-002 artefact | security-engineer | **P0** | M8 | [ ] |
+| 8 | Execute BCL-I-001 through BCL-I-008 integration test matrix; collect BCL-E-002 artefact | security-engineer | **P0** | M8 | [ ] **Full spec: §46.12; closure gate: §46.12.6 BCL-I-001..BCL-I-008 (2026-07-04)** |
 | 9 | Apply Migration 0101 to production; file BCL-E-003 in R2 `compliance/evidence/oidc-bcl/` | devops-lead | **P0** | M8 | [ ] |
 | 10 | Add BCL-E-001 through BCL-E-003 to `docs/SOC2_READINESS.md §79.4` master evidence table (count 132 → 135); map to CC6.1/CC6.3/CC8.1 | compliance-officer | **P1** | M8 | [x] **Done — SOC2_READINESS.md §163, 2026-07-04 (count 132 → 135).** |
 
@@ -16147,7 +16147,7 @@ BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
 
 **SOC 2 CC6.1 impact:** Mirroring §45.9 for SAML SLO — upon §46.8 P0 items deploying to production and a 30-day observation window producing BCL-E-001, the auditor finding for CC6.1 (OIDC session revocation path) moves from "compensating control documented" to "control implemented and evidenced." Together with §45 (SAML SLO), this closes the federated logout coverage for both supported SSO protocols.
 
-Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (emergency session revocation — BCL is the normal path; R-01 is the break-glass path), `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (P0 checklist item 6 — [x] Done v2.89, 2026-07-04), `docs/SOC2_READINESS.md §163` (BCL-E-001 through BCL-E-003 registered, P1 item 10 — [x] Done 2026-07-04), `§46.11` (BCL-CHAIN-01 `emit-audit-event` Worker enforcement spec — P0 item 7 full spec; 2026-07-04).
+Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (emergency session revocation — BCL is the normal path; R-01 is the break-glass path), `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (P0 checklist item 6 — [x] Done v2.89, 2026-07-04), `docs/SOC2_READINESS.md §163` (BCL-E-001 through BCL-E-003 registered, P1 item 10 — [x] Done 2026-07-04), `§46.11` (BCL-CHAIN-01 `emit-audit-event` Worker enforcement spec — P0 item 7 full spec; 2026-07-04), `§46.12` (BCL integration test execution spec — P0 item 8 full spec, BCL-E-002 packaging procedure; 2026-07-04).
 
 ---
 
@@ -16456,6 +16456,344 @@ Tests target `workers/emit-audit-event/src/chain-invariants/bcl-chain-01.ts` usi
 **Closure requirement for item 7:** BCL-INV-U-001 through BCL-INV-U-007 all pass in CI. Security-engineer reviews `wrangler.toml` diff confirming `BCL_ANCHOR_KV` binding added. `§46.8 item 7` updated `[ ] → [x] Done`.
 
 ---
+
+## §46.12 BCL Integration Test Execution Spec (Item 8 Full Spec)
+
+**Owner:** security-engineer · **Priority:** P0 · **Milestone:** M8 · **Refs:** §46.8 item 8, §46.7, §46.6 (BCL-E-002)
+
+This section provides the full execution procedure for the BCL-I-001 through BCL-I-008 integration test matrix defined in §46.7. Item 8 was listed in §46.8 without execution detail; §46.12 closes that gap. BCL-I-001 and BCL-I-003 results are packaged as SOC 2 evidence artefact BCL-E-002 (§46.6).
+
+---
+
+### §46.12.1 Prerequisites
+
+All of the following §46.8 P0 items must be complete before executing the integration test matrix:
+
+| Prerequisite | §46.8 item | Verification |
+|---|---|---|
+| Migration 0101 applied to staging (`oidc_sub_hash` column present in `enterprise_sessions`) | Item 1 | `SELECT column_name FROM information_schema.columns WHERE table_name = 'enterprise_sessions' AND column_name = 'oidc_sub_hash';` returns one row |
+| OIDC callback handler updated — CB-U-001..CB-U-008 pass in CI | Item 2 | CI green on `oidc-callback.test.ts` |
+| `oidc-backchannel-logout.ts` Worker deployed to staging — BH-U-001..BH-U-012 pass in CI | Item 3 | CI green on `oidc-backchannel-logout.test.ts`; `POST /auth/oidc/backchannel-logout` returns HTTP 400 for a malformed body |
+| API gateway route registered; Cloudflare rate-limit rules active — RT-U-001..RT-U-006 pass | Item 4 | `curl -X GET https://api-staging.form.coach/auth/oidc/backchannel-logout` returns HTTP 405 |
+| REVOCATION_QUEUE consumer deployed — RQ-U-001..RQ-U-009 pass in CI | Item 5 | CI green on `revocation-queue.test.ts` |
+| BCL-CHAIN-01 invariant enforced in `emit-audit-event` Worker — BCL-INV-U-001..BCL-INV-U-007 pass in CI | Item 7 | CI green on `bcl-chain-01.test.ts`; `BCL_ANCHOR_KV` binding present in wrangler.toml |
+
+**Target environment:** staging (`api-staging.form.coach`). BCL-I-001 and BCL-I-003 must also pass against a production IdP sandbox (Okta or Entra ID developer tenant) before §46.8 item 8 can be marked done.
+
+---
+
+### §46.12.2 Environment Setup — Okta Developer Sandbox (BCL-I-001)
+
+Required for BCL-I-001 (Okta `sid`-path happy path).
+
+**Okta app configuration:**
+
+| Setting | Value |
+|---|---|
+| Application type | Web, OIDC |
+| Grant types | Authorization Code |
+| Back-Channel Logout URI | `https://api-staging.form.coach/auth/oidc/backchannel-logout` |
+| `backchannel_logout_session_required` | `true` (ensures `sid` is included in every logout token) |
+| `backchannel_logout_revocation_required` | `false` (FORM controls revocation — IdP must not block on this) |
+
+**FORM tenant configuration** (staging Admin Dashboard or direct DB):
+
+```sql
+UPDATE tenant_sso_configs
+SET
+  oidc_issuer         = 'https://dev-<your-okta-org>.okta.com',
+  oidc_client_id      = '<okta-client-id>',
+  oidc_client_secret  = '<okta-client-secret>',
+  backchannel_logout_enabled = true
+WHERE tenant_id = '<test-tenant-uuid>';
+```
+
+**Test user:** Create one Okta user in the test org. Log them in to FORM via OIDC (`POST /auth/oidc/callback`) so `enterprise_sessions` has a row with non-null `idp_session_id` (from `sid`). Record the session UUID.
+
+---
+
+### §46.12.3 Environment Setup — Entra ID Developer Tenant (BCL-I-003)
+
+Required for BCL-I-003 (Azure AD `sid`-path happy path).
+
+**Azure AD app registration:**
+
+| Setting | Value |
+|---|---|
+| Redirect URI | `https://api-staging.form.coach/auth/oidc/callback` |
+| Back-Channel Logout URI | `https://api-staging.form.coach/auth/oidc/backchannel-logout` |
+| `backchannel_logout_session_required` claim | Enabled under **Token Configuration → Optional Claims → ID token → sid** |
+
+**Verify `sid` is emitted:** Decode the ID token from an Entra ID login and confirm `sid` is present. If absent, re-check **Token configuration → Optional claims** — `sid` is an optional claim that must be explicitly enabled on Entra ID.
+
+**FORM tenant configuration** — same pattern as §46.12.2 with Entra ID issuer (`https://login.microsoftonline.com/<tenant-id>/v2.0`).
+
+---
+
+### §46.12.4 Synthetic IdP Test Harness (BCL-I-002, BCL-I-004..BCL-I-007)
+
+BCL-I-002, BCL-I-004, BCL-I-005, BCL-I-006, and BCL-I-007 use synthetic (crafted) logout tokens issued by a local test RSA key rather than a live IdP. This avoids requiring a second IdP setup for adversarial cases.
+
+**Setup — per-test signing key:**
+
+```typescript
+// test/helpers/synthetic-bcl.ts
+import { SignJWT, importJWK, exportJWK, generateKeyPair } from 'jose';
+
+export async function makeSyntheticBcl(opts: {
+  sub?: string;
+  sid?: string;
+  includeNonce?: boolean;
+  tamperSignature?: boolean;
+  iss?: string;
+  omitEventsclaim?: boolean;
+}): Promise<{ token: string; jwksUri: string }> {
+  const { privateKey, publicKey } = await generateKeyPair('RS256');
+  const iss = opts.iss ?? 'https://synthetic.idp.test';
+  const token = await new SignJWT({
+    iss,
+    sub:    opts.sub ?? 'test-sub-' + crypto.randomUUID(),
+    aud:    'form-test-client',
+    iat:    Math.floor(Date.now() / 1000),
+    jti:    crypto.randomUUID(),
+    events: opts.omitEventsclaim ? undefined : {
+      'http://schemas.openid.net/event/backchannel-logout': {}
+    },
+    ...(opts.sid        ? { sid: opts.sid }         : {}),
+    ...(opts.includeNonce ? { nonce: 'must-fail' }  : {}),
+  })
+    .setProtectedHeader({ alg: 'RS256' })
+    .sign(privateKey);
+
+  const rawToken = opts.tamperSignature
+    ? token.slice(0, -10) + 'AAAAAAAAAA'
+    : token;
+
+  // Expose synthetic JWKS at a local endpoint so the BCL Worker can verify
+  const jwk = await exportJWK(publicKey);
+  return { token: rawToken, jwksUri: `data:application/json,${JSON.stringify({ keys: [jwk] })}` };
+}
+```
+
+**Staging override for JWKS TTL:** The BCL Worker caches JWKS for 5 minutes (§46.4.1). For synthetic tests, configure the test tenant to point `oidc_issuer` at a local mock server that serves the synthetic JWKS inline (no TTL problem). Alternatively, use a staging-only env var `BCL_JWKS_TTL_MS=0` to disable caching.
+
+---
+
+### §46.12.5 Direct `emit-audit-event` Test Harness (BCL-I-008)
+
+BCL-I-008 tests BCL-CHAIN-01 enforcement in the `emit-audit-event` Worker by calling it directly without a prior `backchannel_logout.received` anchor in `BCL_ANCHOR_KV`.
+
+```bash
+# Call emit-audit-event Worker directly (bypasses BCL Worker entirely)
+curl -X POST https://audit-staging.form.coach/emit \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $EMIT_WORKER_INTERNAL_TOKEN" \
+  -d '{
+    "event_type": "backchannel_logout.revoked",
+    "tenant_id":  "<test-tenant-uuid>",
+    "bcl_request_id": "00000000-0000-0000-0000-000000000099",
+    "sessions_revoked_count": 1,
+    "revocation_method": "sid"
+  }'
+```
+
+Expected: HTTP 422, body `{ "error": "BCL_CHAIN_01_VIOLATION", "bcl_request_id": "00000000-0000-0000-0000-000000000099" }`. No row written to the HMAC audit chain for this `bcl_request_id`.
+
+---
+
+### §46.12.6 Test Execution Procedure and Assertion Checklist
+
+Execute tests in this order. BCL-I-001 through BCL-I-003 use live IdP sandboxes; BCL-I-004 through BCL-I-008 use the synthetic harness.
+
+#### BCL-I-001 — Happy path, Okta, `sid` present
+
+**Setup:** §46.12.2 complete. Test user logged in; `enterprise_sessions` row exists with `idp_session_id = <okta-sid>`.
+
+**Execution:** In Okta Admin Console, sign the test user out of the FORM app (`/api/v1/users/<uid>/sessions` DELETE, or trigger a Back-Channel Logout from the FORM app's "Sign-on Policy").
+
+**Assertions:**
+
+| # | Assertion | Pass condition |
+|---|---|---|
+| 1 | HTTP response | BCL endpoint returns HTTP 200 within 2 s |
+| 2 | Session revoked | `SELECT revoked_at FROM enterprise_sessions WHERE idp_session_id = '<okta-sid>';` returns non-null `revoked_at` |
+| 3 | Audit event sequence | HMAC chain contains `backchannel_logout.received` → `backchannel_logout.validated` → `backchannel_logout.revoked` in order for `bcl_request_id` |
+| 4 | `revocation_method` | `backchannel_logout.revoked` payload `revocation_method = "sid"` |
+| 5 | `sessions_revoked_count` | `backchannel_logout.revoked` payload `sessions_revoked_count = 1` |
+| 6 | Privacy floor | No raw `sub` or email in any audit event payload for this `bcl_request_id` |
+| 7 | BCL-CHAIN-01 anchor | `BCL_ANCHOR_KV` key `bcl:anchor:<tenant_id>:<bcl_request_id>` present (or TTL expired — confirm presence via `received` audit event timestamp within 60 s of `revoked` event) |
+
+**Evidence:** Capture full CI/cURL run output as JSON. This is part of BCL-E-002.
+
+---
+
+#### BCL-I-002 — Happy path, synthetic IdP, `sub` only (no `sid`)
+
+**Setup:** Create synthetic token via §46.12.4 with `sub = "test-sub-001"`, no `sid`. Ensure at least two active sessions in `enterprise_sessions` with `oidc_sub_hash = sha256("test-sub-001")`.
+
+**Assertions:**
+
+| # | Assertion | Pass condition |
+|---|---|---|
+| 1 | HTTP 200 | Within 2 s |
+| 2 | All sub sessions revoked | All rows matching `oidc_sub_hash = sha256("test-sub-001")` have non-null `revoked_at` |
+| 3 | `revocation_method` | `"sub"` |
+| 4 | `sessions_revoked_count` | Equals the count of sessions that were active before the call |
+| 5 | Privacy floor | `backchannel_logout.revoked` payload contains `oidc_sub_hash` (SHA-256 hex), not raw `sub` |
+
+---
+
+#### BCL-I-003 — Happy path, Entra ID, `sid` present
+
+**Setup:** §46.12.3 complete. Same execution flow as BCL-I-001 but triggered via Entra ID revocation.
+
+**Assertions:** Identical to BCL-I-001 assertions 1–7. Additionally verify:
+
+| # | Assertion | Pass condition |
+|---|---|---|
+| 8 | Entra ID `sid` format | `idp_session_id` in `enterprise_sessions` matches the `sid` claim format from Entra ID (GUID string, not opaque) |
+| 9 | JWKS resolution | `backchannel_logout.received` payload records `iss = "https://login.microsoftonline.com/<tenant-id>/v2.0"` |
+
+**Evidence:** Capture full output. Combine with BCL-I-001 output as BCL-E-002 (§46.12.7).
+
+---
+
+#### BCL-I-004 — `nonce` present in logout_token
+
+**Setup:** Synthetic token with `includeNonce: true`.
+
+**Assertions:**
+
+| # | Assertion | Pass condition |
+|---|---|---|
+| 1 | HTTP 400 | Response `{ "error": "BCL_NONCE_PRESENT" }` |
+| 2 | `backchannel_logout.failed` emitted | `reason: "nonce_present"` in audit payload |
+| 3 | No sessions revoked | `enterprise_sessions` unchanged |
+| 4 | No `backchannel_logout.revoked` | Chain contains only `received` and `failed` for this `bcl_request_id` |
+
+---
+
+#### BCL-I-005 — Invalid JWT signature (tampered token)
+
+**Setup:** Synthetic token with `tamperSignature: true` (last 10 chars replaced).
+
+**Assertions:**
+
+| # | Assertion | Pass condition |
+|---|---|---|
+| 1 | HTTP 400 | Response `{ "error": "BCL_JWT_VERIFICATION_FAILED" }` |
+| 2 | `backchannel_logout.failed` emitted | `reason: "jwt_verification_failed"` |
+| 3 | No sessions revoked | `enterprise_sessions` unchanged |
+| 4 | No raw sub in failed event | Tampered token's `sub` claim (if decodable) never appears in audit payload |
+
+---
+
+#### BCL-I-006 — Unknown `iss`
+
+**Setup:** Synthetic token with `iss: "https://unknown.evil.example"` (no matching `tenant_sso_configs.oidc_issuer`).
+
+**Assertions:**
+
+| # | Assertion | Pass condition |
+|---|---|---|
+| 1 | HTTP 400 | Response `{ "error": "BCL_UNKNOWN_ISSUER" }` |
+| 2 | `backchannel_logout.received` emitted with `tenant_id: null` | Forensic event written before tenant resolution; no PII |
+| 3 | No `backchannel_logout.validated` or `revoked` | Chain terminates at `received` for this `bcl_request_id` |
+| 4 | No sessions revoked | `enterprise_sessions` unchanged |
+
+---
+
+#### BCL-I-007 — `sid` no-match (no active sessions for that `idp_session_id`)
+
+**Setup:** Synthetic token with a valid `iss` (configured tenant) and `sid = "nonexistent-session-id"` that does not match any row in `enterprise_sessions.idp_session_id`.
+
+**Assertions:**
+
+| # | Assertion | Pass condition |
+|---|---|---|
+| 1 | HTTP 200 | Per §13.10 Q3 — no-match is not an error |
+| 2 | `backchannel_logout.revoked` emitted | `sessions_revoked_count: 0`, `revocation_method: "sid"` |
+| 3 | Audit chain complete | `received` → `validated` → `revoked` all present |
+| 4 | No sessions modified | `enterprise_sessions` unchanged |
+
+---
+
+#### BCL-I-008 — BCL-CHAIN-01 enforcement (direct `emit-audit-event` call)
+
+**Setup:** §46.12.5. Use a `bcl_request_id` that has no prior `backchannel_logout.received` in either the HMAC chain or `BCL_ANCHOR_KV`.
+
+**Assertions:**
+
+| # | Assertion | Pass condition |
+|---|---|---|
+| 1 | HTTP 422 | Response `{ "error": "BCL_CHAIN_01_VIOLATION", "bcl_request_id": "…" }` |
+| 2 | No chain write | No row in HMAC audit chain for `backchannel_logout.revoked` with this `bcl_request_id` |
+| 3 | `backchannel_logout.failed` NOT emitted | Invariant violation is a system error, not a `failed` event |
+
+---
+
+### §46.12.7 Evidence Collection — BCL-E-002 Packaging
+
+BCL-E-002 (`compliance/evidence/oidc-bcl/bcl-e-002-integration-test.json`) is the SOC 2 CC6.1 evidence artefact for OIDC BCL integration tests.
+
+**Required inputs:**
+
+| Source | Field in artefact |
+|---|---|
+| BCL-I-001 cURL/CI output (HTTP status, response body, timing) | `bcl_i_001` |
+| BCL-I-001 audit chain query result (JSON rows) | `bcl_i_001_audit_chain` |
+| BCL-I-003 cURL/CI output | `bcl_i_003` |
+| BCL-I-003 audit chain query result | `bcl_i_003_audit_chain` |
+| CI run URL or build ID | `ci_run` |
+| Tester identity (security-engineer GitHub handle or email hash) | `tester` |
+| Timestamp (ISO 8601 UTC) | `executed_at` |
+
+**Artefact schema:**
+
+```json
+{
+  "artefact_id":            "BCL-E-002",
+  "soc2_criteria":          ["CC6.1"],
+  "executed_at":            "<ISO-8601-UTC>",
+  "ci_run":                 "<CI-run-URL-or-build-id>",
+  "tester":                 "<github-handle-or-sha256-email>",
+  "staging_api_base":       "https://api-staging.form.coach",
+  "bcl_i_001": {
+    "idp":                  "okta",
+    "http_status":          200,
+    "latency_ms":           "<measured>",
+    "sessions_revoked_count": 1,
+    "revocation_method":    "sid",
+    "audit_chain_events":   ["backchannel_logout.received", "backchannel_logout.validated", "backchannel_logout.revoked"]
+  },
+  "bcl_i_003": {
+    "idp":                  "entra_id",
+    "http_status":          200,
+    "latency_ms":           "<measured>",
+    "sessions_revoked_count": 1,
+    "revocation_method":    "sid",
+    "audit_chain_events":   ["backchannel_logout.received", "backchannel_logout.validated", "backchannel_logout.revoked"]
+  },
+  "all_tests_passed":       true,
+  "privacy_floor_verified": true
+}
+```
+
+**Filing procedure:**
+1. Populate all fields above.
+2. Sign the JSON payload using the FORM compliance signing key (same process as SLO-E-003 — see `compliance/scripts/sign-evidence.sh`).
+3. Upload to Cloudflare R2: `compliance/evidence/oidc-bcl/bcl-e-002-integration-test.json` (WORM bucket — write-once, read-many; 7-year retention).
+4. Notify compliance-officer with the R2 object URL for confirmation.
+
+**Privacy floor verification:** Before filing, confirm the artefact contains no raw OIDC `sub` values, no `idp_name_id` strings, no email addresses, and no session cookie values. The `tester` field must be a GitHub handle or SHA-256 hash of the tester's email — never plaintext email.
+
+---
+
+**Closure requirement for item 8:** BCL-I-001 through BCL-I-008 all assertions pass. BCL-E-002 artefact signed and uploaded to R2. `§46.8 item 8` updated `[ ] → [x] Done`.
+
+---
+
+*v2.26 (2026-07-04): §46.12 BCL Integration Test Execution Spec (Item 8 Full Spec). Closes the execution-detail gap for §46.8 item 8 (P0/M8). §46.12.1 Prerequisites: all §46.8 items 1–7 must be complete before executing the integration matrix; six verification checks listed. §46.12.2 Okta developer sandbox setup: app configuration (`backchannel_logout_session_required: true`, BCL URI), FORM tenant SQL, test user login procedure. §46.12.3 Entra ID developer tenant setup: app registration settings, `sid` optional claim enablement, FORM tenant SQL. §46.12.4 Synthetic IdP test harness: TypeScript `makeSyntheticBcl()` helper (RSA-256 signing, optional `nonce`/tamper/missing-events flags), staging JWKS cache bypass via `BCL_JWKS_TTL_MS=0`. §46.12.5 Direct `emit-audit-event` harness for BCL-CHAIN-01 test (BCL-I-008): cURL command against audit Worker internal endpoint, expected HTTP 422 `BCL_CHAIN_01_VIOLATION` body. §46.12.6 Per-test assertion checklists: BCL-I-001 (7 assertions — Okta `sid` path, session revoked, audit chain order, `revocation_method: sid`, `sessions_revoked_count: 1`, privacy floor, BCL-CHAIN-01 anchor), BCL-I-002 (5 assertions — sub-path, all matching sessions revoked, `sub_hash` not raw `sub`), BCL-I-003 (9 assertions — Entra ID + Okta assertions + `sid` format + JWKS `iss`), BCL-I-004 (4 — `nonce` rejection, `failed` event, no revocation), BCL-I-005 (4 — tampered signature, `failed` event, no raw sub), BCL-I-006 (4 — unknown iss, `received` with `tenant_id: null`, no revocation), BCL-I-007 (4 — no-match HTTP 200, `sessions_revoked_count: 0`), BCL-I-008 (3 — HTTP 422, no chain write, no `failed` event). §46.12.7 BCL-E-002 packaging: JSON artefact schema (BCL-I-001 + BCL-I-003 output, `privacy_floor_verified` field), signing procedure via `compliance/scripts/sign-evidence.sh`, R2 upload to `compliance/evidence/oidc-bcl/bcl-e-002-integration-test.json`, compliance-officer notification. Closure requirement: BCL-I-001..BCL-I-008 all pass + BCL-E-002 filed → §46.8 item 8 `[ ] → [x] Done`. §46.8 item 8 status updated: "[ ] **Full spec: §46.12; closure gate: §46.12.6 BCL-I-001..BCL-I-008 (2026-07-04)**". §46.9 cross-reference line updated to add §46.12 entry. Header v2.25 → v2.26. Privacy floor: BCL-E-002 artefact must not contain raw OIDC `sub`, `idp_name_id`, email, or session cookie values; `tester` field uses GitHub handle or SHA-256 hash of email. Owner: security-engineer. Review: compliance-officer + enterprise-architect.*
 
 *v2.24 (2026-07-04): §46.11 BCL-CHAIN-01 Invariant Enforcement Spec — `emit-audit-event` Worker Layer (Item 7 Spec). Closes the implementation-detail gap for §46.8 item 7 (P0/M8). §46.11.1 Design rationale: invariant lives in `emit-audit-event` Worker (not BCL Worker) so violation blocks the HMAC chain INSERT rather than logging after the fact — same layer as SLO-CHAIN-01 §45.5.3 and SCIM-CHAIN-01 §15.10. §46.11.2 KV namespace: `BCL_ANCHOR_KV` (separate from `BCL_RATE_KV`; 60s TTL keys; `emit-audit-event` Worker only; key convention `bcl:anchor:{tenant_id}:{bcl_request_id}`). §46.11.3 Anchor write: `writeBclAnchor()` — called after successful chain INSERT for `backchannel_logout.received`; KV write failure is non-fatal (chain record is source of truth; advisory `system.bcl_anchor_kv_write_failed` LOW/1yr emitted). §46.11.4 Anchor check: `checkBclAnchor()` — called before chain INSERT for `backchannel_logout.revoked`; null anchor → HTTP 422 `BCL_CHAIN_01_VIOLATION` with `bcl_request_id`; KV read exception → HTTP 503 (safe-over-available: blocks write, BCL Worker retries per §46.4.3 backoff); `backchannel_logout.failed` exempt. §46.11.5 Event router integration: four `backchannel_logout.*` cases wired — `received` (write then anchor), `revoked` (check then write), `failed` (write, exempt), `validated` (write, no check). §46.11.6 `wrangler.toml` binding for `emit-audit-event` Worker: `BCL_ANCHOR_KV` with `id` and `preview_id` placeholders; provisioning note with `wrangler kv namespace create` commands. §46.11.7 Unit test matrix — 7 tests BCL-INV-U-001..BCL-INV-U-007 (Vitest + Miniflare KV stubs): anchor write on received, revoked accepted with valid anchor, revoked rejected without anchor, revoked rejected after TTL expiry, failed exempt, KV write failure non-fatal on received, KV read exception safe-fail on revoked. Closure requirement: BCL-INV-U-001..BCL-INV-U-007 pass in CI + security-engineer wrangler diff review → §46.8 item 7 `[ ] → [x] Done`. §46.8 item 7 status updated: "[ ] **Full spec: §46.11; closure gate: §46.11.7 BCL-INV-U-001..BCL-INV-U-007 (2026-07-04)**". §46.9 cross-references line updated to add §46.11 entry. Header v2.23 → v2.24. Privacy floor: `BCL_ANCHOR_KV` keys contain only `tenant_id` UUID and `bcl_request_id` UUID — no `user_id`, email, health value, or GDPR Art. 9 special-category data; advisory event `system.bcl_anchor_kv_write_failed` carries only `tenant_id` UUID and `bcl_request_id` UUID. Owner: platform-engineer + security-engineer. Review: enterprise-architect + compliance-officer.*
 

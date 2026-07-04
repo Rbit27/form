@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [12.38.1] — 2026-07-04
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §46.12` — BCL Integration Test Execution Spec (Item 8 Full Spec). §46.12.1 Prerequisites (all §46.8 items 1–7 must be complete; six verification checks). §46.12.2 Okta developer sandbox setup (app config with `backchannel_logout_session_required: true`, FORM tenant SQL, test user login procedure). §46.12.3 Entra ID developer tenant setup (app registration, `sid` optional claim enablement). §46.12.4 Synthetic IdP test harness (`makeSyntheticBcl()` TypeScript helper — RSA-256 signing, `includeNonce`/`tamperSignature`/`omitEventsclaim` flags, `BCL_JWKS_TTL_MS=0` staging override). §46.12.5 Direct `emit-audit-event` harness for BCL-I-008 (cURL command, expected HTTP 422 `BCL_CHAIN_01_VIOLATION`). §46.12.6 Per-test assertion checklists: BCL-I-001 (7 assertions — Okta `sid` path, session revoked, audit chain order, `revocation_method: sid`, `sessions_revoked_count: 1`, privacy floor, BCL-CHAIN-01 anchor); BCL-I-002 (5 — sub-path, all sessions revoked, `oidc_sub_hash` not raw `sub`); BCL-I-003 (9 — Entra ID, `sid` format, JWKS `iss`); BCL-I-004 (4 — nonce rejection); BCL-I-005 (4 — tampered signature); BCL-I-006 (4 — unknown iss, `received` with `tenant_id: null`); BCL-I-007 (4 — no-match HTTP 200, `sessions_revoked_count: 0`); BCL-I-008 (3 — HTTP 422, no chain write, no `failed` event). §46.12.7 BCL-E-002 packaging: JSON artefact schema, `compliance/scripts/sign-evidence.sh` signing, R2 upload to `compliance/evidence/oidc-bcl/bcl-e-002-integration-test.json` (WORM/7yr), compliance-officer notification. Closure requirement: all BCL-I-001..BCL-I-008 assertions pass + BCL-E-002 filed → §46.8 item 8 `[ ] → [x] Done`. §46.8 item 8 status updated with §46.12 closure gate reference. §46.9 cross-reference line updated to add §46.12 entry. Header v2.25 → v2.26. Owner: security-engineer. Review: compliance-officer + enterprise-architect.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — header v2.25 → v2.26.
+- `VERSION` — 12.38.0 → 12.38.1.
+
+---
+
 ## [12.38.0] — 2026-07-04
 
 ### Added
