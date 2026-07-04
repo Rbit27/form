@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v12.51.0** — 2026-07-04 · content · post-3164 · «Як читати наукові рекомендації і не застосовувати їх неправильно — контекст, ефект-розмір, популяція» (series «Тренувальне мислення» 3156–3165, 9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3164 · «Тренувальне мислення» in progress 8/10 → 9/10 · README: series «Тренувальна автономія» 3166–3175 proposed · next: post-3165 (series «Тренувальне мислення» 10/10 — синтез серії)
+
 **v12.50.0** — 2026-07-04 · content · post-3163 · «Як self-coached атлет оцінює якість поради — навіть без тренера» (series «Тренувальне мислення» 3156–3165, 8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3163 · «Тренувальне мислення» in progress 7/10 → 8/10 · next: post-3164 (series «Тренувальне мислення» 9/10 — когнітивне перевантаження від надлишку «гарних порад»)
 
 **v12.49.0** — 2026-07-04 · content · post-3162 · «Адаптація рішень при зміні контексту: коли стара логіка більше не підходить» (series «Тренувальне мислення» 3156–3165, 7/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3162 · «Тренувальне мислення» in progress 6/10 → 7/10 · next: post-3163 (series «Тренувальне мислення» 8/10 — «Як self-coached атлет оцінює якість поради — навіть без тренера»)
