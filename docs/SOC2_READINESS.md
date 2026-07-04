@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.84.0
+# FORM · SOC 2 Type II Readiness v3.85.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -5724,7 +5724,7 @@ FORM implements a five-category granular consent model. Each category is indepen
 |---|---|---|---|---|
 | **PRV-19** | Health data used exclusively for AI coaching delivery — not sold, not licensed, not shared with enterprise customer HR for individual-level reporting | Privacy floor enforcement: 7 non-negotiable rules from `docs/ENTERPRISE.md`; `data.read_individual` access attempt by HR-scoped token triggers DEC-030 alert | ✅ Done | `docs/ENTERPRISE.md` privacy floor; DEC-030 `data.read_individual` alert spec |
 | **PRV-20** | No-go customer policy enforced — insurance risk-scoring, government backdoors, wellness-as-punishment deals declined at sales stage | No-go list maintained in `docs/ENTERPRISE.md §When we say no`; compliance-officer veto power on any deal with risk-scoring or surveillance characteristics | ✅ Done | `docs/ENTERPRISE.md` no-go list |
-| **PRV-21** | Enterprise aggregate reports respect k-anonymity floor N < 5 — any cohort with fewer than 5 members is suppressed in all HR-visible dashboards | k-anonymity enforced at the analytics query layer before results returned to tenant admin dashboard | 🟡 Partial — policy defined; enforcement not yet unit-tested | `docs/DATA_MODEL.md` §13.6; k-anonymity floor spec |
+| **PRV-21** | Enterprise aggregate reports respect k-anonymity floor N < 5 — any cohort with fewer than 5 members is suppressed in all HR-visible dashboards | k-anonymity enforced at the analytics query layer before results returned to tenant admin dashboard; DDL-layer backstop: `chk_reporting_k_floor_tier CHECK (reporting_k_floor IN (5, 10, 15))` on `tenants` (migration 0092) makes values < 5 structurally impossible at Postgres layer | ✅ Done (DDL portion — migration 0092 · `docs/DATA_MODEL.md §51` v1.43, 2026-07-03); 🟡 Partial — unit-test enforcement pending (§51.9 item 8, P1/M8) | `docs/DATA_MODEL.md §51` (migration 0092 — `chk_reporting_k_floor_tier` DDL CHECK + `form_api` REVOKE); KANON-E-001 (§159 — P4.1/CC2.2 per-change evidence artefact) |
 | **PRV-22** | Analytics events stripped of all Article 9 fields before transmission to PostHog | PostHog event schema blocklist (PRV-15); middleware strips forbidden fields before event dispatch | 🟡 Partial — schema defined; lint rule CI enforcement pending (see PRV-15) | PRE-35-E-007 |
 
 #### 35.6.2 P4.2 — Retention Limitation
@@ -35337,3 +35337,74 @@ PAM-SYNC-STALE-E-001 added to §80.4 Vanta mirror protocol. Mirror deadline: wit
 ---
 
 *v3.84.0 (2026-07-03): §158 — PAM-SYNC-STALE-E-001 Registration (CC6.2/CC6.6 · INCIDENT_RESPONSE R-70). PAM-SYNC-STALE-E-001 registered in §79.4 master evidence table (count 124 → 125). Evidence class: per-activation. Retention: 7yr WORM. TSC: CC6.2/CC6.6. R2 path: `compliance/evidence/pam/pam-sync-stale-e-001-<YYYY-MM-DD>/` (NEW subfolder — no pre-existing parent). Two-envelope artefact structure: public cover sheet (Vanta-mirrored) + restricted inner envelope (security-engineer + IC only). Closes INCIDENT_RESPONSE.md §R-70.12 items 4 and cross-references OBSERVABILITY.md v5.15.5 (§12.6 job 20 cross-ref update) and AUDIT_LOG_SCHEMA.md v2.84 (DEC-030 event registration). Owner: compliance-officer + security-engineer.*
+
+## §159 · KANON-E-001 Registration (P4.1/CC2.2 · DATA_MODEL §51 · Migration 0092 · PRV-21 DDL Closure)
+
+> **Date:** 2026-07-03. **Trigger:** `docs/DATA_MODEL.md §51.9` item 4 (P0) — "Register KANON-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (P4.1/CC2.2; per-change + annual nil attestation; 7yr; `compliance/evidence/k-anonymity/`) + PRV-21 DDL status update." **Owner:** compliance-officer + enterprise-architect.
+
+### §159.1 Background
+
+Migration 0092 (`tenants.reporting_k_floor`) formalizes the per-tenant k-anonymity floor override column sketched informally in DATA_MODEL §17.4.4. The `chk_reporting_k_floor_tier CHECK (reporting_k_floor IN (5, 10, 15))` DDL constraint makes values below 5 structurally impossible at the Postgres layer — closing the DDL portion of PRV-21 ("policy defined; enforcement not yet unit-tested"). Every change to `reporting_k_floor` emits `tenant.k_floor_updated` HIGH/7yr (DEC-030 HMAC-chained); KANON-CHAIN-01 blocks clinical-tier escalations and floor reductions without a `compliance_officer_cosign_ref`. KANON-E-001 is the per-change + annual SOC 2 evidence artefact that captures: (1) the DEC-030 HMAC chain export of all `tenant.k_floor_updated` events in the observation period; (2) DDL snapshot confirming `chk_reporting_k_floor_tier` is present; (3) zero-row assertion `SELECT COUNT(*) FROM tenants WHERE reporting_k_floor < 5` → 0 (DDL-guaranteed but auditor gets explicit assertion); (4) nil attestation for zero-change years. TSC: P4.1 (use limitation — k-anonymity is the primary technical control limiting use of admin aggregate data), CC2.2 (communication — floor changes are formally recorded in HMAC chain as evidence of governance communication).
+
+### §159.2 §79.4 Registration
+
+KANON-E-001 registered in §79.4 master evidence table (count 125 → 126). Evidence class: per-change (one artefact entry per `tenant.k_floor_updated` event) + annual nil attestation (one per observation period; filed even in zero-change years). Retention: 7yr WORM. TSC: P4.1/CC2.2. R2 path: `compliance/evidence/k-anonymity/kanon-e-001_{YYYY}.jsonl` (annual); `compliance/evidence/k-anonymity/kanon-e-001_{YYYY}-nil.json` (nil attestation for zero-change years). Owner: compliance-officer + enterprise-architect. Content: (1) export of all `tenant.k_floor_updated` DEC-030 HMAC-chain events (`tenant_id` slug, `previous_k_floor`, `new_k_floor`, `approved_by_user_id`, `compliance_officer_cosign_ref` nullable, `changed_at`); (2) DDL snapshot of `chk_reporting_k_floor_tier` constraint on `tenants` (`SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'tenants'::regclass AND conname = 'chk_reporting_k_floor_tier'`); (3) zero-row assertion (`SELECT COUNT(*) FROM tenants WHERE reporting_k_floor < 5` → 0); (4) nil attestation for years with zero floor changes.
+
+**Evidence SQL for zero-floor assertion and annual collection:**
+```sql
+-- KANON-E-001 zero-row assertion (structural impossibility confirmation):
+SELECT COUNT(*) AS below_minimum_count FROM tenants WHERE reporting_k_floor < 5;
+-- Expected: 0 (chk_reporting_k_floor_tier DDL CHECK guarantees this)
+
+-- KANON-E-001 annual per-change event export (compliance_reviewer role):
+SELECT
+  tenant_id,
+  previous_k_floor,
+  new_k_floor,
+  approved_by_user_id,
+  compliance_officer_cosign_ref,
+  changed_at
+FROM audit_log_view
+WHERE event = 'tenant.k_floor_updated'
+  AND changed_at >= date_trunc('year', now())
+  AND changed_at < date_trunc('year', now()) + INTERVAL '1 year'
+ORDER BY changed_at ASC;
+-- Privacy floor: no employee user_id, name, email, health data in result set;
+-- tenant_id is org slug (FORM-internal); approved_by_user_id is FORM EA UUID.
+```
+
+### §159.3 §80.3 R2 Storage Update
+
+`compliance/evidence/k-anonymity/` is a **new** top-level subfolder under `compliance/evidence/` — no pre-existing parent. Platform-engineer must provision `compliance/evidence/k-anonymity/` in R2 (write-once policy, versioning enabled) prior to first KANON-E-001 filing. Annual JSONL path: `compliance/evidence/k-anonymity/kanon-e-001_{YYYY}.jsonl`. Nil attestation path: `compliance/evidence/k-anonymity/kanon-e-001_{YYYY}-nil.json`. Migration validation evidence path: `compliance/evidence/k-anonymity/migration-0092-validation_<YYYY-MM-DD>.txt`. `r2:form-api` REVOKED (§80.3 invariant — no automated R2 write path for compliance evidence; compliance-officer upload only; no PAM elevation required for non-security evidence unless containing `admin_user_id` fields — which KANON-E-001 does not). Privacy floor: KANON-E-001 JSONL contains only `tenant_id` (org slug), `previous_k_floor` / `new_k_floor` (integer thresholds), `approved_by_user_id` (FORM internal UUID — not enterprise employee identifier), `compliance_officer_cosign_ref` (ticket reference string or null), `changed_at` (ISO 8601); no individual employee `user_id`, name, email, health value, coaching content, body composition, or GDPR Art. 9 special-category data.
+
+### §159.4 §80.4 Vanta Mirror Update
+
+KANON-E-001 added to §80.4 Vanta mirror protocol. Mirror deadline: within 48h of annual artefact filing. Evidence class: annual + per-change (nil attestation in zero-change years). TSC: P4.1/CC2.2. Privacy floor: tenant_id org slug + integer threshold values + FORM-internal UUIDs only — no employee PII, health data, or GDPR Art. 9 data in any mirrored artefact. Zero-change year nil attestation: a short JSON attestation confirming zero `tenant.k_floor_updated` events in the observation period and that `chk_reporting_k_floor_tier` constraint was present throughout — mirrored to Vanta within 48h of annual collection date.
+
+### §159.5 PRV-21 Status Update
+
+PRV-21 status updated from "🟡 Partial — policy defined; enforcement not yet unit-tested" to "✅ Done (DDL portion — migration 0092 · `docs/DATA_MODEL.md §51` v1.43, 2026-07-03); 🟡 Partial — unit-test enforcement pending (§51.9 item 8, P1/M8)" in the §35.6.1 P4.1 control table. The DDL-layer closure (`chk_reporting_k_floor_tier` CHECK) is a concrete technical control that an auditor can verify via `pg_constraint`. Full PRV-21 closure (unit-test enforcement) pending qa-lead delivery of the `assert_k_anonymity()` unit test in DATA_MODEL §51.9 item 8 (P1/M8).
+
+### §159.6 Cross-Reference Obligations Closed
+
+| Cross-reference | Status |
+|---|---|
+| DATA_MODEL.md §51.9 item 3 (P0 — register `tenant.k_floor_updated` in AUDIT_LOG_SCHEMA.md) | [x] Done — 2026-07-03 (AUDIT_LOG_SCHEMA.md v2.85) |
+| DATA_MODEL.md §51.9 item 4 (P0 — register KANON-E-001 in §79.4 + PRV-21 DDL status update) | [x] Done — 2026-07-03 (§159.2, this section) |
+| DATA_MODEL.md §17.4.4 annotation (formal migration 0092 reference) | [x] Done — 2026-07-03 (DATA_MODEL.md v1.43) |
+
+### §159.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register KANON-E-001 in §79.4 master evidence table (P4.1/CC2.2, per-change + annual, 7yr) | compliance-officer + enterprise-architect | **P0** | [x] **Done — 2026-07-03 (§159.2, this section).** |
+| 2 | Provision `compliance/evidence/k-anonymity/` R2 subfolder (new — no parent; write-once policy + versioning enabled) | platform-engineer | **P1** | [ ] **Pending — platform-engineer.** |
+| 3 | Add KANON-E-001 to §80.4 Vanta mirror protocol (annual + nil attestation within 48h) | compliance-officer + enterprise-architect | **P1** | [x] **Done — 2026-07-03 (§159.4, this section).** |
+| 4 | PRV-21 status update in §35.6.1 P4.1 table (DDL portion ✅ Done) | compliance-officer | **P0** | [x] **Done — 2026-07-03 (§159.5, this section).** |
+| 5 | Migration 0092 staging apply + ten validation checks; evidence file to `compliance/evidence/k-anonymity/migration-0092-validation_<YYYY-MM-DD>.txt` | platform-engineer | **P0** | [ ] **Pending — staging deploy.** |
+| 6 | KANON-E-001 first annual collection (nil attestation expected at GA — `reporting_k_floor != 5` → 0 tenants) | compliance-officer | **P2** | [ ] **Pending — est. M13.** |
+| 7 | Authoring complete — §159 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-03 (SOC2_READINESS.md v3.85.0).** |
+
+---
+
+*v3.85.0 (2026-07-03): §159 — KANON-E-001 Registration (P4.1/CC2.2 · DATA_MODEL §51 · Migration 0092 · PRV-21 DDL Closure). KANON-E-001 registered in §79.4 master evidence table (count 125 → 126). Evidence class: per-change + annual nil attestation. Retention: 7yr WORM. TSC: P4.1/CC2.2. R2 path: `compliance/evidence/k-anonymity/` (NEW subfolder — no pre-existing parent; annual JSONL + nil attestation JSON). PRV-21 status updated: "🟡 Partial — policy defined; enforcement not yet unit-tested" → "✅ Done (DDL portion — migration 0092; `chk_reporting_k_floor_tier` CHECK on `tenants`) + 🟡 unit-test closure pending (DATA_MODEL §51.9 item 8, P1/M8)". Closes DATA_MODEL §51.9 items 3 and 4 (P0). Cross-references AUDIT_LOG_SCHEMA.md v2.85 (`tenant.k_floor_updated` HIGH/7yr + KANON-CHAIN-01) and DATA_MODEL.md v1.43 (§51 migration 0092 canonical spec + §17.4.4 annotation). Owner: compliance-officer + enterprise-architect.*

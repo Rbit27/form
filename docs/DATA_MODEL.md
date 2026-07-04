@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.42
+# FORM · Multi-Tenant Data Model v1.43
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -58,6 +58,7 @@
 48. [`enterprise_contracts.graduated_from_pilot_id` — Pilot-to-Paid Cohort FK — Migration 0089](#48-enterprise_contractsgraduated_from_pilot_id--pilot-to-paid-cohort-fk--migration-0089)
 49. [`tenants.data_region` — EU Data Residency Column — Migration 0090](#49-tenantsdata_region--eu-data-residency-column--migration-0090)
 50. [`tenants` OTA Change Window Columns — Migration 0091](#50-tenants-ota-change-window-columns--migration-0091)
+51. [`tenants.reporting_k_floor` — Per-Tenant k-Anonymity Floor Override — Migration 0092](#51-tenantsreporting_k_floor--per-tenant-k-anonymity-floor-override--migration-0092)
 
 ---
 
@@ -4018,6 +4019,8 @@ Responses where all rows are suppressed return `{ data: [], suppressed_cohorts: 
 All Metabase admin reporting panels include `WHERE {{active_users}} >= 5`. This is defence-in-depth only; primary enforcement is at DB and API layers. The filter prevents accidental exposure if a panel is cloned and the query modified internally.
 
 #### 17.4.4 Per-Tenant k-Floor Override
+
+> **Formal registration:** `docs/DATA_MODEL.md §51` (v1.43, 2026-07-03 — migration 0092). The DDL sketch below is formalised by §51 with full RLS, privacy floor, SOC 2 evidence mapping, KANON-CHAIN-01 chain invariant, and PRV-21 DDL closure.
 
 Enterprise customers in sensitive industries (healthcare, mental health services) may require a higher k-floor. The `tenants.reporting_k_floor` column raises the floor without a schema change:
 
@@ -18667,3 +18670,180 @@ SOC 2 evidence artefact: **OTA-WINDOW-E-001** (CC3.2/A1.1, annual + per-activati
 *v1.32 (2026-06-25): §46.8 items 3 + 4 cross-reference closure — OBSERVABILITY §54 authored (v5.2.0, 2026-06-25) + SOC2_READINESS §112 registered LITH-E-001 + LITH-OBS-E-001 (v3.37.0, 2026-06-25). §46.9 cross-reference status updated: OBSERVABILITY §54 🟡 → 🟢 Done (OBSERVABILITY.md §54 v5.2.0, 2026-06-25); SOC2_READINESS §79.4 LITH-E-001 + LITH-OBS-E-001 🟡 → 🟢 Done (SOC2_READINESS.md §112 v3.37.0, 2026-06-25; §79.4 count 67 → 69; `litigation-hold/` R2 subfolder created; §80.4 Vanta 2 new entries). §46.8 checklist items 3 and 4 marked 🟢 in §46.9 cross-reference table. Remaining open: §46.8 item 1 (migration 0087 apply + staging checks, P0/M5), §46.8 item 2 (Admin Console PAM workflow, P0/M5), §46.8 item 5 (end-to-end staging test, P2/M7). Document header v1.31 → v1.32. No schema, model, or index changes. Owner: compliance-officer + enterprise-architect.*
 
 *v1.31 (2026-06-25): §46 `litigation_hold_records` Schema — Migration 0087. Closes the schema gap created by DEC-080 (2026-06-23, OQ-WIN-04 resolution): DEC-080 registered `enterprise.litigation_hold_declared` (HIGH/7yr) and `enterprise.litigation_hold_released` (HIGH/7yr) in `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn` and established MSA §11.6 (Litigation Hold and Legal Claim Retention), but no Postgres table was specified to track the lifecycle state of active and released holds — leaving three operational gaps: (1) no automated 6-month review monitoring (MSA §11.6.3 `target_review_date` obligation); (2) no automated 36-month maximum enforcement signal (MSA §11.6.4 cap); (3) no post-release deletion deadline tracking (MSA §11.6.6 10-business-day obligation). §46 closes all three gaps via the new `litigation_hold_records` table as the DDL-layer foundation for `docs/OBSERVABILITY.md §54` (pg_cron job 45, pending obligation — §46.8 item 3). §46.1 purpose + four design principles: (1) one row per hold per activation date (UNIQUE constraint); (2) health data exclusion is a DDL invariant (`lhr_held_data_categories_valid` CHECK enforcing `held_data_categories <@ ARRAY['billing_records','contract_records','audit_log_entries','sla_performance_data']::TEXT[]` — structural impossibility of including Art. 9 health data, implements DEC-036 zero-grace-period at schema layer); (3) max duration split between DDL (retrospective `lhr_release_date_within_max_duration` CHECK) and monitoring (prospective job 45 AL-LITH-02); (4) form_api REVOKED, all tenant roles excluded, compliance_officer SELECT+UPDATE only, form_system SELECT (pg_cron). §46.2 migration dependency chain: 0083 → 0084 → 0085 → 0086 → 0087; tenant(id) FK ON DELETE RESTRICT; no hard FK to enterprise_contracts (active-tenant holds must be possible). §46.3.1 full DDL: two ENUMs (`litigation_hold_status_enum`: declared/released/deletion_completed; `hold_reason_category_enum`: billing_dispute/legal_claim/regulatory_direction/anticipated_litigation; `hold_release_reason_enum`: 5 values); CREATE TABLE with 18 columns; six CHECK constraints (`lhr_held_data_categories_valid` health exclusion, `lhr_review_date_after_activation`, `lhr_max_expiry_equals_36_months`, `lhr_release_date_within_max_duration`, `lhr_release_fields_complete`, `lhr_deletion_completed_requires_release`); five indexes (UNIQUE on tenant_id+activation_date; partial on status; covering on target_review_date/tenant_id WHERE declared; covering on max_expiry_date/tenant_id WHERE declared; covering on deletion_target_date/tenant_id WHERE released); five RLS policies (form_admin ALL; compliance_officer SELECT + UPDATE; form_system SELECT; REVOKE form_api); COMMENT on table. §46.3.2 nine-item staging validation checklist (columns present; health exclusion CHECK; valid categories accepted; max expiry CHECK; release fields coherence; UNIQUE constraint; form_api REVOKE; tenant_manager no-policy; form_system SELECT). §46.4 full column semantics table: 18 columns with type, nullability, default, semantics; enum value meanings for `litigation_hold_status_enum` + §12.3 deletion timeline impact. §46.5 RLS: seven-role policy table; note that this is the first enterprise table with NO tenant-role read access (litigation holds are FORM-internal instruments); five DDL auditor proof queries (form_api REVOKE; tenant_manager no-policy; RLS enabled; compliance_officer cannot INSERT; form_system can SELECT). §46.6 health data exclusion invariant: why DDL not application logic (three reasons — application bypass risk; GDPR Art. 9 severity; Zod + DDL must be consistent); how Art. 9 data continues on standard §12.2/§12.3 lifecycle regardless of hold status. §46.7 SOC 2 evidence: CC5.3 (multiple-level structural controls — `pg_constraint` verifiable); C1.2 (disposal — `deletion_completed_date` computable duration); CC4.1 (monitoring — three dedicated indexes for job 45 sweeps); LITH-E-001 new evidence artefact (annual, 7yr, compliance/evidence/litigation-hold/, C1.2/CC5.3/CC4.1; content: hold count by reason/category, per-hold disposal duration, review overdue count, max-duration approach count, job 45 run stats; privacy: tenant_id UUID only). §46.8 implementation checklist: 2× P0/M5 (migration 0087 apply + nine staging checks; Admin Console PAM-gated Litigation Hold / Release Hold / Certify Deletion workflows + DEC-030 emission); 2× P1/M6 (OBSERVABILITY §54 authorship; SOC2_READINESS §79.4 LITH-E-001 registration + R2 subfolder + Vanta); 1× P2/M7 (end-to-end staging test: review-overdue AL-LITH-01, deletion-deadline-breach AL-LITH-03). §46.9 four cross-reference obligations created: OBSERVABILITY §54 🟡 pending (§46.8 item 3, P1/M6 — DDL prerequisite met by this section); SOC2_READINESS §79.4 LITH-E-001 🟡 pending (§46.8 item 4); Admin Console Litigation Hold workflow 🟡 pending (§46.8 item 2); migration-0087 staging output 🟡 pending (§46.8 item 1). TOC updated (§46 added). Document header v1.30 → v1.31. Cross-references: `docs/DECISION_LOG.md §DEC-080` (OQ-WIN-04 resolution, 2026-06-23 — authoritative decision record); `docs/COST_MODEL.md §43.11 OQ-WIN-04` (origin open question, now 🟢 Resolved via DEC-080); `docs/MSA_TEMPLATE.md §11.6` (authoritative litigation hold legal procedure: activation requirements, scope limitations, 5-business-day notice, 36-month cap, 6-month review, 10-business-day post-release deletion, deletion certificate); `docs/AUDIT_LOG_SCHEMA.md §Enterprise Post-Churn` (`enterprise.litigation_hold_declared` HIGH/7yr + `enterprise.litigation_hold_released` HIGH/7yr — payload schemas that feed this table's columns); `docs/DATA_MODEL.md §12` (GDPR Art. 17 deletion timeline — §12.3 is suspended for held data categories by an active hold); `docs/DATA_MODEL.md §44` (migration 0085 — `enterprise_churn_events`, lifecycle table intersecting with hold activation on churned tenants); `docs/OBSERVABILITY.md §54` (companion monitoring section — pg_cron job 45, SLOs, alert rules; pending §46.8 item 3); DEC-036 (GDPR Art. 9 zero-grace-period invariant — health data exclusion basis). Owner: compliance-officer + enterprise-architect + security-engineer.*
+
+---
+
+## 51. `tenants.reporting_k_floor` — Per-Tenant k-Anonymity Floor Override — Migration 0092
+
+> **Defined in:** `docs/DATA_MODEL.md §17.4.4` (informal sketch — this section is the formal migration registration). Closes `docs/SOC2_READINESS.md PRV-21` (documentation portion — "policy defined; enforcement not yet unit-tested" → DDL-enforced minimum; see §51.8). Companion DEC-030 events: `docs/AUDIT_LOG_SCHEMA.md §Tenant k-Anonymity Floor events` (v2.85, 2026-07-03).
+
+### §51.1 Purpose
+
+Migration 0092 formalizes the `reporting_k_floor` column that §17.4.4 described informally with an inline DDL sketch. The column allows enterprise customers in sensitive industries (healthcare, mental health services) to raise the k-anonymity floor for admin reporting above the system default of 5, without requiring a schema change.
+
+When `reporting_k_floor = 5` (default for all tenants), the system minimum per QBR-K-ANON-01 Tier 1 applies (COST_MODEL §51). When raised to 10 or 15 (enterprise-architect approval required; DEC-030 chain `tenant.k_floor_updated` HIGH/7yr), the `assert_k_anonymity()` function (§17.4.2) and Cloudflare Worker middleware (§17.4.1) suppress cohorts smaller than the tenant-specific floor.
+
+**Four design principles:**
+1. **Additive-only migration** — `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS reporting_k_floor INTEGER NOT NULL DEFAULT 5 CONSTRAINT chk_reporting_k_floor_tier CHECK (...)` — no table rewrite; existing rows backfilled to 5 (the current implicit floor) automatically.
+2. **DDL CHECK enforcement** — `chk_reporting_k_floor_tier CHECK (reporting_k_floor IN (5, 10, 15))` makes any value outside the three approved tiers structurally impossible at the Postgres layer, regardless of application logic. Values below 5 are impossible at the DB layer — closes PRV-21 "policy defined; enforcement not yet unit-tested".
+3. **`form_api` REVOKED** — `REVOKE UPDATE (reporting_k_floor) ON tenants FROM form_api` — k-floor is a compliance parameter requiring enterprise-architect approval; no tenant admin can self-modify the floor, and no automated API path can lower it.
+4. **DEC-030 chain governance** — every change emits `tenant.k_floor_updated` HIGH/7yr (KANON-CHAIN-01 ordering invariant). KANON-E-001 is the per-change + annual SOC 2 evidence artefact (P4.1/CC2.2).
+
+### §51.2 Migration Dependency Chain
+
+`0083 → 0084 → 0085 → 0086 → 0087 → 0088 → 0089 → 0090 → 0091 → 0092`
+
+Migration 0092 modifies the `tenants` table only — no structural FK dependency on 0083–0091. No outside-counsel production gate (DDL-only additive column; no ASC 606 / financial reporting implications). Prerequisite: migration 0091 (`tenants.ota_change_window_enabled` / `ota_slo_variant`) must be applied first.
+
+### §51.3 Full DDL
+
+```sql
+-- Migration 0092: Per-Tenant k-Anonymity Floor Override
+-- Formalizes the reporting_k_floor column sketched in DATA_MODEL §17.4.4.
+-- chk_reporting_k_floor_tier CHECK ensures values outside {5, 10, 15} (and below 5) are
+-- structurally impossible at the Postgres layer — PRV-21 DDL closure.
+-- DEC-030 governance: tenant.k_floor_updated HIGH/7yr on every change (KANON-CHAIN-01).
+-- form_api REVOKED from UPDATE reporting_k_floor (KANON-FLOOR-01 invariant).
+
+ALTER TABLE tenants
+  ADD COLUMN IF NOT EXISTS reporting_k_floor INTEGER NOT NULL DEFAULT 5
+    CONSTRAINT chk_reporting_k_floor_tier CHECK (reporting_k_floor IN (5, 10, 15));
+
+COMMENT ON COLUMN tenants.reporting_k_floor IS
+  'Per-tenant k-anonymity floor for admin reporting aggregate metrics (DATA_MODEL §17.4). '
+  'Default 5 = system minimum (QBR-K-ANON-01 Tier 1, COST_MODEL §51). '
+  'Raise to 10 (Tier 2, health-adjacent) or 15 (clinical/high-sensitivity) '
+  'for tenants in healthcare, mental health, or similarly regulated industries. '
+  'Values outside {5, 10, 15} rejected at DB layer by chk_reporting_k_floor_tier CHECK. '
+  'Change requires enterprise-architect approval via Admin Console; emits '
+  'tenant.k_floor_updated HIGH/7yr (DEC-030 HMAC-chained). '
+  'KANON-CHAIN-01 ordering invariant enforced at emit-audit-event Worker. '
+  'Evidence artefact: KANON-E-001 (P4.1/CC2.2 — per-change + annual nil attestation, 7yr). '
+  'form_api REVOKED from UPDATE (KANON-FLOOR-01). Write path: form_system only via '
+  'PATCH /internal/tenant/{slug}/k-floor (enterprise-architect Cloudflare Access). '
+  'PRV-21 DDL closure: structurally impossible to set reporting_k_floor < 5 '
+  '(chk_reporting_k_floor_tier). Source: DATA_MODEL §51 (migration 0092, 2026-07-03).';
+
+COMMENT ON CONSTRAINT chk_reporting_k_floor_tier ON tenants IS
+  'KANON-FLOOR-01: restricts reporting_k_floor to approved tiers {5, 10, 15}. '
+  'Prevents values below 5 (system minimum — PRV-21 DDL closure) and non-tier values. '
+  'DEC-030 KANON-CHAIN-01 provides application-layer governance atop this DDL floor. '
+  'Source: DATA_MODEL §51 (migration 0092, 2026-07-03).';
+
+-- KANON-FLOOR-01: form_api cannot UPDATE reporting_k_floor.
+REVOKE UPDATE (reporting_k_floor) ON tenants FROM form_api;
+```
+
+### §51.4 Staging Validation Checklist
+
+Evidence path: `compliance/evidence/k-anonymity/migration-0092-validation_<YYYY-MM-DD>.txt`
+
+1. [ ] Column `reporting_k_floor` present with type `INTEGER`, NOT NULL, DEFAULT 5.
+2. [ ] Constraint `chk_reporting_k_floor_tier` registered (`SELECT conname FROM pg_constraint WHERE conrelid = 'tenants'::regclass AND conname = 'chk_reporting_k_floor_tier'`).
+3. [ ] CHECK rejects value 4 (below minimum): `SET ROLE form_system; UPDATE tenants SET reporting_k_floor = 4 WHERE slug = 'test-tenant'` → expected `ERROR: new row … violates check constraint "chk_reporting_k_floor_tier"`.
+4. [ ] CHECK rejects value 7 (non-tier): same command with 7 → same error.
+5. [ ] CHECK rejects value 20 (above maximum): same command with 20 → same error.
+6. [ ] CHECK accepts 5, 10, 15 (all three valid tiers): three `UPDATE … ROLLBACK` cycles, each succeeds.
+7. [ ] Existing `tenants` rows backfilled: `SELECT COUNT(*) FROM tenants WHERE reporting_k_floor IS NULL` → 0.
+8. [ ] Existing `tenants` rows default to 5: `SELECT COUNT(*) FROM tenants WHERE reporting_k_floor != 5` → 0 (no prior floor changes).
+9. [ ] `form_api` CANNOT `UPDATE reporting_k_floor`: `SET ROLE form_api; UPDATE tenants SET reporting_k_floor = 10 WHERE slug = 'test-tenant'` → expected `ERROR: permission denied`.
+10. [ ] `form_system` CAN `UPDATE reporting_k_floor`: `SET ROLE form_system; UPDATE tenants SET reporting_k_floor = 10 WHERE slug = 'test-tenant'; ROLLBACK` → succeeds.
+
+### §51.5 Column Semantics
+
+| Column | Type | Nullable | Default | Semantics |
+|---|---|---|---|---|
+| `reporting_k_floor` | `INTEGER` | NOT NULL | `5` | Per-tenant k-anonymity floor for admin reporting; valid values: 5 (system default / QBR-K-ANON-01 Tier 1), 10 (health-adjacent / Tier 2), 15 (clinical/high-sensitivity); `assert_k_anonymity()` (§17.4.2) and Worker middleware read this value; DDL CHECK enforces valid-tier invariant |
+
+**Tier mapping:**
+
+| `reporting_k_floor` | QBR-K-ANON-01 Tier | Applicable industries | Enterprise-architect approval required |
+|---|---|---|---|
+| 5 | Tier 1 — Engagement metrics | All (system default; no action required) | No |
+| 10 | Tier 2 — Health-adjacent | Healthcare, mental health services, regulated wellness | Yes — `tenant.k_floor_updated` HIGH/7yr |
+| 15 | Clinical / High-Sensitivity | Clinical platforms, HIPAA-adjacent (NA), NHS-adjacent (UK) | Yes — `tenant.k_floor_updated` HIGH/7yr + `compliance_officer_cosign_ref` required (KANON-CHAIN-01) |
+
+### §51.6 RLS
+
+`form_api` is REVOKED from `UPDATE` on `reporting_k_floor`. The existing `tenants` RLS SELECT policies from §16 cover this column — all roles with SELECT on `tenants` read the new column.
+
+| Role | Access |
+|---|---|
+| `form_api` | SELECT only (via tenant-scoped RLS; needed for `assert_k_anonymity()` function calls and Worker middleware) |
+| `form_system` | ALL (sole write path via `PATCH /internal/tenant/{slug}/k-floor`, enterprise-architect Cloudflare Access) |
+| `form_admin` | SELECT across all tenants |
+| `compliance_reviewer` | SELECT (KANON-E-001 evidence query reads `reporting_k_floor` at collection time) |
+| `tenant_owner` / `tenant_admin` | SELECT own row (contractual transparency — tenant may see their own floor setting) |
+| `tenant_manager` | SELECT own row (GDPR Art. 30 ROPA awareness — aggregate reporting parameters) |
+
+**DDL auditor proof queries:**
+```sql
+-- 1. Confirm form_api cannot UPDATE reporting_k_floor:
+SET ROLE form_api;
+UPDATE tenants SET reporting_k_floor = 10 WHERE slug = 'test-tenant';
+-- Expected: ERROR: permission denied for relation tenants
+
+-- 2. Confirm chk_reporting_k_floor_tier rejects below-minimum:
+SET ROLE form_system;
+UPDATE tenants SET reporting_k_floor = 4 WHERE slug = 'test-tenant';
+-- Expected: ERROR: new row for relation "tenants" violates check constraint "chk_reporting_k_floor_tier"
+
+-- 3. Confirm chk_reporting_k_floor_tier rejects non-tier value:
+SET ROLE form_system;
+UPDATE tenants SET reporting_k_floor = 7 WHERE slug = 'test-tenant';
+-- Expected: same error
+
+-- 4. Confirm compliance_reviewer can SELECT:
+SET ROLE compliance_reviewer;
+SELECT slug, reporting_k_floor FROM tenants LIMIT 5;
+```
+
+### §51.7 Privacy Floor
+
+| Column | GDPR classification | PHI / Art. 9 risk | Notes |
+|---|---|---|---|
+| `reporting_k_floor` | Technical configuration integer — not GDPR Art. 4 personal data | None | No individual identified; value is a threshold integer (5, 10, or 15), not a data-subject attribute |
+
+`tenant_manager` (HR/People-ops) SELECT access: `reporting_k_floor` is contractual compliance metadata, not health data. The k-floor is the mechanism that *protects* individual data from HR view — making the floor value visible to HR does not create a privacy risk. `REVOKE UPDATE (reporting_k_floor) ON tenants FROM form_api` prevents any automated path from silently lowering the floor. A `form_api` token compromised at the application layer cannot reduce k-anonymity protection below the DDL-layer minimum of 5.
+
+### §51.8 SOC 2 Evidence
+
+| Control | Evidence mechanism |
+|---|---|
+| **P4.1 — Use limitation** | `reporting_k_floor` is the schema-level enforcement of the k-anonymity use-limitation control. `chk_reporting_k_floor_tier CHECK (reporting_k_floor IN (5, 10, 15))` ensures cohort-size thresholds cannot be set below 5 at the DB layer, making PRV-21 measurably enforced rather than policy-only. Auditor-inspectable: `pg_constraint` row for `chk_reporting_k_floor_tier` on `tenants`. |
+| **CC2.2 — External communication** | `tenant.k_floor_updated` HIGH/7yr DEC-030 HMAC chain creates a tamper-evident record of every k-floor change; KANON-CHAIN-01 invariant prevents recording a floor-15 change without a `compliance_officer_cosign_ref`. |
+| **CC3.2 — Risk assessment** | Enterprise-architect approval recorded in `approved_by_user_id` field of `tenant.k_floor_updated`; `compliance_officer_cosign_ref` required for floor-15 (clinical tier). Floor elevations are high-significance configuration events that constitute a formal risk assessment decision. |
+| **PRV-21 — DDL closure** | PRV-21 was "🟡 Partial — policy defined; enforcement not yet unit-tested". Migration 0092 closes the DDL portion: `chk_reporting_k_floor_tier` makes values < 5 structurally impossible. Unit-test closure (fully closing PRV-21) pending §51.9 item 8 (P1/M8). |
+
+SOC 2 evidence artefact: **KANON-E-001** (P4.1/CC2.2, per-change + annual nil attestation, 7yr, `compliance/evidence/k-anonymity/`) — registered in `docs/SOC2_READINESS.md §159` (v3.85.0, 2026-07-03). Content: (1) export of all `tenant.k_floor_updated` DEC-030 events in the observation period with `previous_k_floor`, `new_k_floor`, `approved_by_user_id` fields; (2) zero-change years filed as affirmative nil attestation; (3) DDL snapshot confirming `chk_reporting_k_floor_tier` constraint is present; (4) zero-row assertion (`SELECT COUNT(*) FROM tenants WHERE reporting_k_floor < 5` → 0 — DDL CHECK makes this structurally impossible but auditor gets explicit assertion).
+
+### §51.9 Implementation Checklist
+
+- [ ] **P0** — Migration 0092 staging apply + ten validation checks; evidence file to `compliance/evidence/k-anonymity/migration-0092-validation_<YYYY-MM-DD>.txt`
+- [ ] **P0** — Production deploy before M12 enterprise GA
+- [x] **P0** — `docs/AUDIT_LOG_SCHEMA.md §Tenant k-Anonymity Floor events` — `tenant.k_floor_updated` HIGH/7yr + `KFloorUpdatedSchema` Zod v2 + KANON-CHAIN-01 invariant — **Done: AUDIT_LOG_SCHEMA.md v2.85, 2026-07-03**
+- [x] **P0** — `docs/SOC2_READINESS.md §79.4` KANON-E-001 registration (§159, count 125 → 126) + PRV-21 DDL status update — **Done: SOC2_READINESS.md v3.85.0, 2026-07-03**
+- [ ] **P1/M8** — `assert_k_anonymity(p_value, p_cohort_size, p_tenant_slug TEXT)` function update: reads `reporting_k_floor` from `tenants` (replaces hardcoded `DEFAULT 5`); staging validation that a floor-10 tenant sees 10-threshold suppression
+- [ ] **P1/M8** — Worker middleware update to JOIN `tenants` for per-tenant `reporting_k_floor` on every admin reporting response
+- [ ] **P1/M12** — `PATCH /internal/tenant/{slug}/k-floor` Worker endpoint + KANON-CHAIN-01 integration test + enterprise-architect Cloudflare Access gate
+- [ ] **P1/M8** — Unit test: `assert_k_anonymity()` returns NULL for `cohort_size < tenant.reporting_k_floor` (closes PRV-21 "enforcement not yet unit-tested" fully)
+- [ ] **P2/M13** — KANON-E-001 first annual collection (nil attestation expected at GA: `SELECT COUNT(*) FROM tenants WHERE reporting_k_floor != 5` → 0)
+
+### §51.10 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md §Tenant k-Anonymity Floor events` — `tenant.k_floor_updated` HIGH/7yr + `KFloorUpdatedSchema` Zod v2 + KANON-CHAIN-01 | §51.9 item 3 (P0) | 🟢 **Done — AUDIT_LOG_SCHEMA.md v2.85, 2026-07-03** |
+| `docs/SOC2_READINESS.md §79.4` KANON-E-001 registration (§159, count 125 → 126; P4.1/CC2.2; per-change + annual nil attestation; 7yr; `compliance/evidence/k-anonymity/`) | §51.9 item 4 (P0) | 🟢 **Done — SOC2_READINESS.md v3.85.0, 2026-07-03** |
+| `docs/SOC2_READINESS.md PRV-21` status update 🟡 Partial → ✅ Done (DDL portion; unit-test closure pending §51.9 item 8, P1/M8) | §51.8 PRV-21 closure | 🟢 **Done — SOC2_READINESS.md v3.85.0, 2026-07-03** |
+| `docs/DATA_MODEL.md §17.4.4` — annotation added: "formalized by migration 0092 · DATA_MODEL §51" | §51.1 (documentation) | 🟢 **Done — this pass (v1.43, 2026-07-03)** |
+| Migration 0092 staging apply + ten validation checks + evidence file | §51.9 items 1–2 (P0) | 🟡 **Pending — staging deploy** |
+| `assert_k_anonymity()` function update (tenant-slug parameter; reads `reporting_k_floor` from DB) | §51.9 item 5 (P1/M8) | 🟡 **Pending — platform-engineer + data-engineer** |
+| Worker middleware update (per-tenant `reporting_k_floor` JOIN on admin reporting responses) | §51.9 item 6 (P1/M8) | 🟡 **Pending — platform-engineer** |
+| `PATCH /internal/tenant/{slug}/k-floor` Worker endpoint + KANON-CHAIN-01 integration test | §51.9 item 7 (P1/M12) | 🟡 **Pending — platform-engineer** |
+| PRV-21 unit-test closure (fully closed once §51.9 item 8 done, P1/M8) | §51.9 item 8 (P1/M8) | 🟡 **Pending — qa-lead** |
+| KANON-E-001 first annual collection run | §51.9 item 9 (P2/M13) | 🟡 **Pending — est. M13** |
+
+---
+
+*v1.43 (2026-07-03): §51 `tenants.reporting_k_floor` — Per-Tenant k-Anonymity Floor Override — Migration 0092. Formalizes the informal DDL sketch from §17.4.4 as a full migration registration with DDL, RLS, privacy floor, SOC 2 evidence mapping, and implementation checklist. One column added to `tenants`: `reporting_k_floor INTEGER NOT NULL DEFAULT 5 CONSTRAINT chk_reporting_k_floor_tier CHECK (reporting_k_floor IN (5, 10, 15))`. `chk_reporting_k_floor_tier` makes values < 5 (and non-tier values) structurally impossible at the Postgres layer — closes PRV-21 DDL portion ("policy defined; enforcement not yet unit-tested" → DDL-enforced minimum). `form_api` REVOKED from UPDATE via selective column-level REVOKE (KANON-FLOOR-01). Migration dependency chain: 0083→…→0091→0092. Ten-item staging validation checklist (evidence path: `compliance/evidence/k-anonymity/migration-0092-validation_<YYYY-MM-DD>.txt`). §51.5 tier mapping: 5 (Tier 1 default / all tenants / no approval), 10 (Tier 2 health-adjacent / enterprise-architect approval), 15 (clinical/high-sensitivity / enterprise-architect + `compliance_officer_cosign_ref` / KANON-CHAIN-01). §51.6 RLS: `form_api` SELECT only (assert_k_anonymity() + Worker middleware); `form_system` ALL (sole write path); `form_admin`/`compliance_reviewer` SELECT; `tenant_owner`/`tenant_admin`/`tenant_manager` SELECT own row. §51.7 privacy floor: `reporting_k_floor` is a technical configuration integer — not GDPR Art. 4 personal data; no PHI/Art. 9 risk; `REVOKE UPDATE … FROM form_api` prevents automated k-floor reduction below DDL minimum of 5. §51.8 SOC 2: P4.1 (`chk_reporting_k_floor_tier` DDL-layer enforcement — PRV-21 DDL closure); CC2.2 (`tenant.k_floor_updated` HIGH/7yr HMAC chain tamper-evident trail); CC3.2 (enterprise-architect approval + `approved_by_user_id` + compliance-officer cosign for floor-15). KANON-E-001 evidence artefact (P4.1/CC2.2, per-change + annual nil attestation, 7yr, `compliance/evidence/k-anonymity/`) registered in `docs/SOC2_READINESS.md §159` (v3.85.0, 2026-07-03). §51.9 nine-item implementation checklist (2× P0 done; 5× P1 pending M8/M12; 2× further pending). §51.10 ten cross-reference obligations (4× done; 6× pending). §17.4.4 in-line annotation added referencing migration 0092 formal registration. PRV-21 DDL portion closed in SOC2_READINESS v3.85.0 (unit-test closure pending §51.9 item 8, P1/M8). TOC §51 entry added. Document header v1.42 → v1.43. Owner: enterprise-architect + compliance-officer.*

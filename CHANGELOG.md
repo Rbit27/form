@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.13.0] — 2026-07-03
+
+### Added
+- `docs/DATA_MODEL.md §51` — `tenants.reporting_k_floor` — Per-Tenant k-Anonymity Floor Override — Migration 0092. Formalizes the informal DDL sketch from §17.4.4 as a full migration registration. One column: `reporting_k_floor INTEGER NOT NULL DEFAULT 5 CONSTRAINT chk_reporting_k_floor_tier CHECK (reporting_k_floor IN (5, 10, 15))`. `chk_reporting_k_floor_tier` makes values < 5 structurally impossible at the Postgres layer — closes PRV-21 DDL portion. `form_api` REVOKED from UPDATE (KANON-FLOOR-01). Tier mapping: 5 (Tier 1 default / all tenants), 10 (Tier 2 health-adjacent / enterprise-architect approval), 15 (clinical/high-sensitivity / enterprise-architect + compliance-officer cosign). KANON-E-001 evidence artefact (P4.1/CC2.2, per-change + annual nil attestation, 7yr, `compliance/evidence/k-anonymity/`). Header v1.42 → v1.43.
+- `docs/AUDIT_LOG_SCHEMA.md §Tenant k-Anonymity Floor events` — `tenant.k_floor_updated` HIGH/7yr DEC-030 HMAC-chained event. `KFloorUpdatedSchema` Zod v2 (eight fields: `event`, `tenant_id` slug, `previous_k_floor` enum 5|10|15, `new_k_floor` enum 5|10|15, `change_reason` ≤ 200 chars, `approved_by_user_id` FORM EA UUID, `compliance_officer_cosign_ref` nullable, `changed_at`). KANON-CHAIN-01 two HTTP 422 invariants: `KANON_CHAIN_01_CLINICAL_COSIGN_REQUIRED` (floor-15 without cosign ref); `KANON_CHAIN_01_FLOOR_REDUCTION_COSIGN_REQUIRED` (floor reduction without cosign ref). Header v2.84 → v2.85.
+- `docs/SOC2_READINESS.md §159` — KANON-E-001 registered in §79.4 master evidence table (count 125 → 126; P4.1/CC2.2; per-change + annual nil attestation; 7yr WORM; R2 path `compliance/evidence/k-anonymity/`; NEW R2 subfolder — no pre-existing parent). §80.4 Vanta mirror protocol updated.
+
+### Changed
+- `docs/DATA_MODEL.md §17.4.4` — annotation added: "Formal registration: `docs/DATA_MODEL.md §51` (v1.43, 2026-07-03 — migration 0092)."
+- `docs/SOC2_READINESS.md §35.6.1 PRV-21` — status updated: 🟡 Partial ("policy defined; enforcement not yet unit-tested") → ✅ Done (DDL portion — `chk_reporting_k_floor_tier` CHECK on `tenants`, migration 0092) + 🟡 unit-test closure pending (DATA_MODEL §51.9 item 8, P1/M8). Header v3.84.0 → v3.85.0.
+- `VERSION` — 12.12.0 → 12.13.0.
+
 ## [12.11.0] — 2026-07-03
 
 ## [12.12.0] — 2026-07-03
