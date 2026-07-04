@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 in progress 5/10 · series «Тренування в реальних умовах» 3106–3115 in progress 6/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 in progress 9/10 · series «Самодіагностика без тренера» 3116–3125 proposed · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.17.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 in progress 6/10 · series «Тренування в реальних умовах» 3106–3115 in progress 7/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 proposed · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.21.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -76,7 +76,7 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 77 | Тренування і сон: що спортивна наука знає про двонапрямковий зв'язок | **draft · v12.11.0 → post-77-training-and-sleep-bidirectional-relationship.md · Редакційна серія 71–80 7/10** |
 | 78 | Варіабельність тренувального відгуку: чому одна і та сама програма дає різні результати | proposed |
 | 79 | Як зрозуміти, що тренування не досягає цілі — без зовнішнього тренера | proposed |
-| 80 | Деload без відчуття марнування часу: перепрограмування очікувань | proposed |
+| 80 | Деload без відчуття марнування часу: перепрограмування очікувань | **draft · v12.21.0 → post-80-deload-without-guilt.md · Редакційна серія 71–80 10/10 — СЕРІЯ ЗАВЕРШЕНА** |
 | 81 | Що робити з «злими днями»: алгоритм для сесій із поганим відчуттям | proposed |
 | 82 | Тривалість тренування: скільки часу потрібно і скільки — достатньо | proposed |
 | 83 | Вибір вправи як рішення, а не як традиція | proposed |
