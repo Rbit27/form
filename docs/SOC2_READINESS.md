@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.90.0
+# FORM · SOC 2 Type II Readiness v3.92.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -35872,6 +35872,76 @@ This section resolves both: registers SLO-OBS-E-001 in §79.4 (evidence count 13
 | 4 | Provision `compliance/evidence/saml-slo/slo-obs-e-001/` R2 subfolder; WORM policy | devops-lead | **P1** | [ ] Pending — before M7 go-live + 30d observation |
 
 ---
+
+## §167 · SLO-CHN-E-001 + SLO-REV-E-001 Registration (CC7.2/CC7.3 + CC6.3/CC7.3 · INCIDENT_RESPONSE R-76 + R-75 · SAML SLO Chain Integrity + SLO Revocation Failure Evidence)
+
+> **Date:** 2026-07-04. **Trigger:** (1) `docs/INCIDENT_RESPONSE.md R-76.12` item 4 (P1/M7) — "Register SLO-CHN-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3; per-activation; 7yr)." (2) `docs/INCIDENT_RESPONSE.md R-75.12` item 2 (P1/M7) — "Register SLO-REV-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.3/CC7.3; per-activation; 7yr)." **Owner:** compliance-officer.
+
+### §167.1 Background
+
+SLO-CHN-E-001 was defined in `docs/INCIDENT_RESPONSE.md R-76.9` (v3.40.0, 2026-07-04) as the per-activation evidence package for the R-76 (SLO-CHAIN-01 Integrity Violation, P0) incident runbook. The companion event types (`security.slo_chain_01_violation` CRITICAL/7yr, `security.slo_chain_01_violation_closed` HIGH/7yr, and `system.slo_chain_check_passed` LOW/1yr) are registered in `docs/AUDIT_LOG_SCHEMA.md §SLO-Chain-Monitor-Events` (v2.93, 2026-07-04), closing R-76.12 item 1.
+
+SLO-REV-E-001 was defined in `docs/INCIDENT_RESPONSE.md R-75.9` (v3.40.0, 2026-07-04) as the per-activation incident note for the R-75 (SAML SLO High Failure Rate, P1) runbook. Both artefacts require §79.4 registration to complete their SOC 2 evidence chain.
+
+### §167.2 §79.4 Master Evidence Table Entries (count 137 → 138 → 139)
+
+| Artefact ID | Evidence description | TSC | Collection responsibility | Retention | R2 path |
+|---|---|---|---|---|---|
+| **SLO-CHN-E-001** | Per-activation R-76 (SLO-CHAIN-01 Integrity Violation, P0) evidence package. Required files: `incident-timeline.md` (T+0..T+60 response), `r76-c1-output.txt` (`security.slo_chain_01_violation` audit log extraction), `r76-c2-output.txt` (retrospective SQL — must show 0 rows at closure), `r76-c3-raw-output.txt` (CF KV SLO_KV TTL metadata), `r76-c4-pam-session-state.txt` (session state, PAM-elevated), `chain-segment.json` (HMAC chain entries for affected `slo_request_id` — `idp_name_id` MUST be redacted before auditor sharing; H5 access restricted to IC + compliance-officer + outside security counsel), `root-cause-analysis.md` (compliance-officer signature required), `slo_chain_01_violation_closed-event-id.txt`. Compliance-officer sign-off required before R-76 closure. Filed by IC at R-76 resolution; compliance-officer co-signs. | CC7.2, CC7.3 | IC (authoring, filing at R-76 resolution) + compliance-officer (co-sign, R2 upload confirmation) | 7yr WORM | `compliance/evidence/saml-slo/chain-violations/slo-chn-e-001-{incident_id}-{YYYY-MM-DD}/` |
+| **SLO-REV-E-001** | Per-activation R-75 (SAML SLO High Failure Rate, P1) incident note. Required files: `incident-timeline.md` (T+0..T+60 response, CSM notification timestamp, SLA adherence per §4.3), `r75-c1-output.txt` (`slo.failed` events by `reason` enum — aggregate counts only; no `slo_request_id` enumeration), `r75-c2-output.txt` (IdP SLO endpoint reachability check — URL and HTTP response code only), `r75-c3-output.txt` (post-mitigation failure rate — must be < 5% / 10 min), `csm-notification.txt` (T-75-B timestamp, tenant slug, CSM acknowledgement within 15 min; no employee identifiers). Filed within T+60 min of R-75 resolution. | CC6.3, CC7.3 | IC (authoring, filing within T+60 min) + compliance-officer (review within 24h) | 7yr WORM | `compliance/evidence/saml-slo/slo-rev-e-001-{YYYY-MM-DD}/` |
+
+**§79.4 evidence count update:** 137 → **139** (SLO-CHN-E-001 count 137 → 138; SLO-REV-E-001 count 138 → 139).
+
+### §167.3 SOC 2 Auditor Narratives
+
+**SLO-CHN-E-001 — CC7.2 narrative:** SLO-CHN-E-001 is the per-activation forensic record of a SLO-CHAIN-01 HMAC chain ordering violation — an `slo.completed` or `slo.fallback_local_only` event detected in the chain without a prior `slo.sp_initiated` or `slo.idp_initiated` anchor for the same `{tenant_id, slo_request_id}`. The `r76-c2-output.txt` must show zero rows at closure, providing tamper-evident proof via the DEC-030 chain that the continuous monitoring mechanism (AL-SLO-02, pg_cron job 60) successfully detected and remediated the anomaly. Combined with `security.slo_chain_01_violation` + `security.slo_chain_01_violation_closed` DEC-030 events (registered in AUDIT_LOG_SCHEMA.md §SLO-Chain-Monitor-Events, v2.93, 2026-07-04), SLO-CHN-E-001 provides an end-to-end CC7.2 audit trail: detection → IC-declare → root cause → remediation → compliance-officer sign-off.
+
+**SLO-CHN-E-001 — CC7.3 narrative:** The `incident-timeline.md` documents R-76's T+0..T+60 response against the IC-declare-within-15-min SLA. `security.slo_chain_01_violation_closed` with `r76_c2_zero_row_confirmed: true` proves IC did not declare resolution until zero rows confirmed. No auto-resolve permitted — each closure requires compliance-officer sign-off, providing a strong CC7.3 control gate.
+
+**SLO-REV-E-001 — CC6.3 narrative:** `r75-c3-output.txt` (post-mitigation failure rate < 5%) proves the federated session revocation degradation was remediated within the R-75 response SLA. FORM local session revocation (`enterprise_sessions.revoked_at` set regardless of SLO round-trip outcome) means CC6.3 access revocation is never fully blocked during R-75 — SLO-REV-E-001 covers the federated-IdP-side revocation lag window and proves it was closed.
+
+**SLO-REV-E-001 — CC7.3 narrative:** `csm-notification.txt` proves FORM met the 15-minute CSM notification SLA per `docs/ENTERPRISE_SLA.md §4.3` (§R-75.10). `incident-timeline.md` shows the T+0..T+60 response, closing the CC7.3 audit record for SAML SLO high-failure-rate incidents.
+
+### §167.4 Privacy Floor
+
+**SLO-CHN-E-001:** All files contain only FORM-internal UUIDs (`tenant_id`, `slo_request_id`, `incident_id`), timestamps, and aggregate counts. `idp_name_id` in `chain-segment.json` is a SAML federation-layer pseudonym — MUST be redacted before any auditor-facing copy is produced. H5 chain segments restricted to IC + compliance-officer + outside security counsel only. No `user_id`, employee name, email, coaching content, health data, or GDPR Art. 9 special-category data.
+
+**SLO-REV-E-001:** `r75-c1-output.txt` contains aggregate failure counts by `reason` enum only — no individual `slo_request_id` enumeration. `csm-notification.txt` contains tenant slug only (not UUID, not employee identifiers). `r75-c2-output.txt` contains IdP SLO endpoint URL and HTTP response code only.
+
+### §167.5 R2 Storage Specification
+
+| Artefact | R2 subfolder | WORM policy | Provision status |
+|---|---|---|---|
+| **SLO-CHN-E-001** | `compliance/evidence/saml-slo/chain-violations/` (new subfolder — pending R-76.12 item 3, P1/M7, devops-lead) | 7yr WORM; `r2:form-api` REVOKED | [ ] Pending — M7 (R-76.12 item 3) |
+| **SLO-REV-E-001** | `compliance/evidence/saml-slo/` (same parent as SLO-E-001/002/003/004 — provisioned at M7 go-live) | 7yr WORM; `r2:form-api` REVOKED | [ ] Pending — M7 go-live (same provision as SLO-E-001 subfolder) |
+
+### §167.6 §80.4 Vanta Mirror Protocol Update
+
+| Artefact | Mirror action | Cadence |
+|---|---|---|
+| **SLO-CHN-E-001** | Add per-activation control evidence entry to Vanta CC7.2 + CC7.3 evidence library within 48h of each R-76 filing. Annual nil attestation `"slo_chain_violations_ytd": 0` if no R-76 activations in calendar year. | Per-activation + annual nil |
+| **SLO-REV-E-001** | Add per-activation control evidence entry to Vanta CC6.3 + CC7.3 evidence library within 48h of each R-75 filing. Annual nil attestation `"slo_rev_e_001_count_ytd": 0` if no R-75 activations in calendar year. | Per-activation + annual nil |
+
+### §167.7 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register SLO-CHN-E-001 in §79.4 master evidence table (CC7.2/CC7.3; count 137 → 138) | `docs/INCIDENT_RESPONSE.md R-76.12 item 4` | 🟢 **Done — 2026-07-04 (§167.2, this section)** |
+| Register SLO-REV-E-001 in §79.4 master evidence table (CC6.3/CC7.3; count 138 → 139) | `docs/INCIDENT_RESPONSE.md R-75.12 item 2` | 🟢 **Done — 2026-07-04 (§167.2, this section)** |
+
+### §167.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register SLO-CHN-E-001 in §79.4 master evidence table (CC7.2/CC7.3; count 137 → 138) | compliance-officer | **P1** | [x] **Done — 2026-07-04 (§167.2, this section).** |
+| 2 | Register SLO-REV-E-001 in §79.4 master evidence table (CC6.3/CC7.3; count 138 → 139) | compliance-officer | **P1** | [x] **Done — 2026-07-04 (§167.2, this section).** |
+| 3 | Update R-76.12 item 4 status in `docs/INCIDENT_RESPONSE.md` | compliance-officer | **P1** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.1).** |
+| 4 | Update R-75.12 item 2 status in `docs/INCIDENT_RESPONSE.md` | compliance-officer | **P1** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.1).** |
+| 5 | Provision `compliance/evidence/saml-slo/chain-violations/` R2 subfolder (WORM + `r2:form-api` REVOKED) | devops-lead | **P1** | [ ] Pending — M7 (R-76.12 item 3) |
+
+---
+
+*v3.92.0 (2026-07-04): §167 — SLO-CHN-E-001 + SLO-REV-E-001 Registration (CC7.2/CC7.3 + CC6.3/CC7.3 · INCIDENT_RESPONSE R-76 + R-75). Two per-activation SAML SLO evidence artefacts registered in §79.4 master evidence table (count 137 → 139). SLO-CHN-E-001 (CC7.2/CC7.3, 7yr WORM, per-activation R-76 — SLO-CHAIN-01 Integrity Violation — evidence package; `compliance/evidence/saml-slo/chain-violations/slo-chn-e-001-{incident_id}-{YYYY-MM-DD}/`; compliance-officer co-sign required; count 137 → 138). SLO-REV-E-001 (CC6.3/CC7.3, 7yr WORM, per-activation R-75 — SAML SLO High Failure Rate — incident note; `compliance/evidence/saml-slo/slo-rev-e-001-{YYYY-MM-DD}/`; compliance-officer review within 24h; count 138 → 139). §167.2 §79.4 entries with artefact description, TSC, collection responsibility, retention, R2 path. §167.3 SOC 2 auditor narratives: SLO-CHN-E-001 CC7.2 (continuous detection + `r76-c2-output.txt` zero rows at closure), CC7.3 (IC-declare ≤ 15 min + compliance-officer sign-off gate); SLO-REV-E-001 CC6.3 (FORM local session always revoked first + `r75-c3-output.txt` < 5% post-mitigation), CC7.3 (`csm-notification.txt` proves §4.3 SLA). §167.4 privacy floor (SLO-CHN-E-001: `idp_name_id` MUST be redacted before auditor sharing; H5 chain segments restricted; SLO-REV-E-001: aggregate failure counts only, no `slo_request_id` enumeration in CSM-facing files). §167.5 R2 storage spec (SLO-CHN-E-001 pending R-76.12 item 3; SLO-REV-E-001 same parent as SLO-E-001/002). §167.6 §80.4 Vanta mirror (both artefacts per-activation + annual nil attestation). §167.7 cross-reference obligations closed (R-76.12 item 4 🟢 Done count 137 → 138; R-75.12 item 2 🟢 Done count 138 → 139). §167.8 five-item checklist (items 1–4 Done this pass; item 5 pending M7 devops-lead R2 provision). Companion AUDIT_LOG_SCHEMA.md v2.93 (§SLO-Chain-Monitor-Events, 2026-07-04) registered `security.slo_chain_01_violation` CRITICAL/7yr, `security.slo_chain_01_violation_closed` HIGH/7yr, `system.slo_chain_check_passed` LOW/1yr, closing R-76.12 item 1. SOC2_READINESS.md header corrected v3.90.0 → v3.92.0 (v3.91.0 note pre-existing — §166 was authored v3.91.0 but header was not updated in that commit). Document header v3.91.0 → v3.92.0. Owner: compliance-officer.*
 
 *v3.91.0 (2026-07-04): §166 — SLO-OBS-E-001 Registration + §15.1 Calendar Patch (CC6.1/CC6.3/CC7.2/CC7.3 · OBSERVABILITY §72.8 · SAML SLO Observability). Closes `docs/OBSERVABILITY.md §72.9` items 7 and 8 and `§72.11` obligations 3 and 4. §79.4 evidence count 136 → 137: SLO-OBS-E-001 registered (quarterly SAML SLO observability health report; six-component spec from OBSERVABILITY §72.8; CC6.1/CC6.3/CC7.2/CC7.3; 7yr WORM; `compliance/evidence/saml-slo/slo-obs-e-001-{YYYY}-Q{N}.json`; nil attestation until M7; compliance-officer + devops-lead collection responsibility). §15.1 calendar addition: SLO-OBS-E-001 quarterly row (Jan 31 / Apr 30 / Jul 31 / Oct 31; R2 path; sign-evidence.sh; §80.4 Vanta mirror). §166.4 cross-reference obligations table: both items 7 and 8 marked 🟢 Done. §166.5 four-item checklist: items 1–3 Done this pass, item 4 pending M7. Privacy floor: SLO-OBS-E-001 is aggregate-only; no user_id, employee name, email, coaching content, health data, or GDPR Art. 9 special-category data; idp_name_id_hash SHA-256 only. Cross-references: OBSERVABILITY.md §72.8 (SLO-OBS-E-001 spec), OBSERVABILITY.md §72.9 (items 7 + 8 closed), SSO_SCIM_IMPLEMENTATION.md §45.9 (cross-reference table updated), INCIDENT_RESPONSE.md R-75 + R-76 (companion runbooks — filed this same batch). Document header v3.90.0 → v3.91.0. Owner: compliance-officer.*
 

@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [12.60.0] — 2026-07-04
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §SLO-Chain-Monitor-Events` (v2.93) — Three SLO chain integrity monitor events registered: `security.slo_chain_01_violation` CRITICAL/7yr (SOC 2 CC7.2/CC7.3 — pg_cron job 60 retrospective SQL finds orphaned `slo.completed`/`slo.fallback_local_only` without prior anchor; P0 PagerDuty AL-SLO-02; SLO-VIO-CHAIN-01 anchor; SLO-CHN-E-001 evidence source), `security.slo_chain_01_violation_closed` HIGH/7yr (R-76 IC terminal event; compliance-officer sign-off + PAM elevation; `r76_c2_zero_row_confirmed: true` literal gate; SLO-CHN-E-001 precondition), `system.slo_chain_check_passed` LOW/1yr (pg_cron job 60 all-clear; fleet-level zero-orphan attestation; privacy floor — no per-tenant disclosure; SLO-OBS-E-001 quarterly source). Full Zod v2 schemas for all three events. SLO-VIO-CHAIN-01 ordering invariant table (parallel to BCL-VIO-CHAIN-01). SLO-CHN-E-001 artefact spec (CC7.2/CC7.3, 7yr WORM). CC7.2 and CC7.3 auditor narratives. Three retention table rows added. Closes INCIDENT_RESPONSE R-76.12 item 1.
+- `docs/SOC2_READINESS.md §167` (v3.92.0) — SLO-CHN-E-001 (CC7.2/CC7.3, per-activation, 7yr WORM, `compliance/evidence/saml-slo/chain-violations/slo-chn-e-001-{incident_id}-{YYYY-MM-DD}/`) and SLO-REV-E-001 (CC6.3/CC7.3, annual + per-activation, 7yr WORM, `compliance/evidence/saml-slo/slo-rev-e-001-{YYYY-MM-DD}/`) registered in §79.4 master evidence table (count 137 → 139). SOC 2 auditor narratives for CC7.2, CC7.3 (SLO-CHN-E-001) and CC6.3, CC7.3 (SLO-REV-E-001). Privacy floor: `idp_name_id` must be redacted before auditor sharing. R2 storage spec. §80.4 Vanta mirror protocol update. Closes INCIDENT_RESPONSE R-76.12 item 4 and R-75.12 item 2.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v3.40.0 → v3.40.1 — R-76.12 items 1 and 4 marked Done; R-76.7 Registration status updated from PENDING to confirmed. R-75.12 item 2 marked Done. v3.40.1 version note added to document footer.
+- `docs/AUDIT_LOG_SCHEMA.md` v2.92 → v2.93 — header version bump; v2.93 version note added.
+- `docs/SOC2_READINESS.md` v3.90.0 → v3.92.0 — header corrected from v3.90.0 (header lag) to v3.92.0; v3.92.0 version note added.
+- `VERSION` — 12.59.0 → 12.60.0.
+
+---
+
 ## [12.59.0] — 2026-07-04
 
 ### Added
