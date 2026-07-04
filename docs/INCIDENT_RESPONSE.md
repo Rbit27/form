@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.37.0
+# FORM · Incident Response Runbook v3.38.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -25794,3 +25794,342 @@ Needs: CEO + CTO awareness. R-10 Incident Commander: <name>
 ---
 
 *v1.0 (2026-07-04): R-71 `row-count-monitor` Stale (CC7.1/A1.2 — Data-Integrity Anomaly Sentinel) — seventy-first runbook and companion stale recovery runbook for `row-count-monitor` (the P0-default data-integrity anomaly sentinel). Job `row-count-monitor` (`*/15 * * * *`; 1h freshness window; every 15 min UTC; 4 cycles per hour) was registered in OBSERVABILITY.md §12.6 as a P0 sentinel for CC7.1/A1.2 (data-integrity anomaly detection against `monitoring_baselines` 1-hour rolling averages for 7 critical tables); no stale recovery runbook was authored at that time. CC7.1/A1.2 control significance: `row-count-monitor` compares current table row counts against 1-hour rolling baseline averages stored in `monitoring_baselines`; a >20% deviation triggers PagerDuty P0 and is a primary signal of data loss, deletion attack, or data corruption — making this sentinel the first-line automated early-warning system for data-integrity incidents. P0 default: unlike R-69 (P1, wearable freshness measurement gap) and R-70 (P2, PAM KV-Postgres sync detection gap), a stale `row-count-monitor` means FORM's primary automated data-integrity check is completely offline — the risk is undetected mass data deletion or corruption, not a detection-latency gap; R-71-C2 (manual deviation check) is the compensating control for the stale window. Three scope queries: R-71-C1 (pg_cron history + `active` flag — H1/H2 discriminator); R-71-C2 (manual deviation scan vs. `monitoring_baselines` — compensating control; `manual_deviation_found` and `max_deviation_pct` scalars for DEC-030 payloads); R-71-C3 (peer job health — H3 discriminator; ≥3 stale jobs → R-03 co-activation). Four root causes with one 4-way sub-classification: H1 (deleted — zero `cron.job` row); H2 (disabled — `active = false`); H3 (Supabase pg_cron degradation → R-03 co-active); H4 (Edge Function broken — 4 sub-causes: H4a deployment failure, H4b `monitoring_baselines` DDL drift, H4c pg_net degradation, H4d execution timeout). Two DEC-030 HMAC-chained events (AUDIT_LOG_SCHEMA.md v2.86, 2026-07-04): `system.row_count_monitor_stale_declared` HIGH/7yr (ROWCOUNT-MON-STALE-CHAIN-01 anchor; IC PAM-elevated at T+5; CC7.1/A1.2; six-field Zod v2 `RowCountMonitorStaleDeclaredSchema`); `system.row_count_monitor_restored` LOW/3yr (terminal; IC PAM-elevated post-recovery; `manual_deviation_found` and `max_deviation_pct` capture R-71-C2 result; six-field Zod v2 `RowCountMonitorRestoredSchema`). ROWCOUNT-MON-STALE-CHAIN-01: HTTP 422 `ROWCOUNT_MON_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit; implementation pending platform-engineer (§R-71.12 item 2). Three communication templates: T-71-A (detection; `#incidents-enterprise`); T-71-B (resolution); T-71-C (escalation; stale >4h or deviation >20%; restricted to CEO + CTO + IC). One evidence artefact: ROWCOUNT-MON-STALE-E-001 (per-activation; CC7.1/A1.2; 7yr; `compliance/evidence/row-count-monitor/rowcount-mon-stale-e-001-<YYYY-MM-DD>/`; NEW R2 subfolder — §R-71.12 item 3 pending devops-lead). Six implementation checklist items: AUDIT_LOG_SCHEMA.md event registration (P0/Done v2.86), ROWCOUNT-MON-STALE-CHAIN-01 Worker enforcement (P1/pending platform-engineer), R2 subfolder provision (P1/pending devops-lead), SOC2_READINESS.md §79.4 artefact registration (P1/Done §160 v3.86.0), OBSERVABILITY.md §12.6 cross-ref update (P0/Done v5.15.6), authoring complete (P0/Done). Privacy floor: no user_id, tenant_id, coaching content, health data, or GDPR Art. 9 data in any scope query, DEC-030 payload, template, or evidence artefact; `monitoring_baselines.row_count_avg` is aggregate-only (total table counts — not per-user/per-tenant); ROWCOUNT-MON-STALE-E-001 restricted to devops-lead + compliance-officer. Cross-references: OBSERVABILITY.md §12.6 `row-count-monitor` row; SOC2_READINESS.md §25.4.3 (`pg-cron-health-monitor` Edge Function spec); AUDIT_LOG_SCHEMA.md §Row Count Monitor Stale events (v2.86); R-10; R-05; R-03. Owner: devops-lead + compliance-officer.*
+
+---
+
+## R-72 · `audit-event-flush` Stale — A1.2 / CC7.2 — Audit Event Pipeline Offline
+
+> **Applies when:** `audit-event-flush` pg_cron job exceeds the 2-hour freshness window without a successful run.
+> **Trigger source:** `pg-cron-health-monitor` Edge Function (§12.6) emits `system.cron_job_stale` with `job_name = 'audit-event-flush'`; routes to PagerDuty P0 `form-platform` → platform-engineer with dedup key `audit-event-flush-stale`.
+> **Context:** `audit-event-flush` (pg_cron `*/30 * * * *`, 2h freshness window) is the Supabase Edge Function that reads pending DEC-030 HMAC-chained events from the Cloudflare KV buffer namespace and commits them to `audit_log_events` in Postgres, computing and appending HMAC links. When stale, all events emitted since the last successful flush are buffered in KV but are not yet in `audit_log_events` — the HMAC chain in Postgres is incomplete for the stale window. Event loss requires simultaneous flush failure AND Supabase-side write failure within the same window (KV TTL is substantially longer than 2h), but the chain integrity gap is a P0 concern regardless. Unlike R-68 (chain verification sentinel offline) and R-71 (data-integrity anomaly sentinel offline), R-72 represents the DEC-030 pipeline itself being offline: events emitted during the stale window are not in `audit_log_events` and cannot be audited or verified until flush restores.
+> **SLO risk:** High — 4 missed flush cycles (2h) means DEC-030 events emitted in that window have not been committed to the HMAC chain. If a Supabase write failure coincides with the flush outage and the KV TTL is reached, those events are permanently lost. Even without loss, the chain is incomplete during the stale window, meaning CC7.2 audit evidence is temporarily unverifiable.
+
+### R-72.1 Trigger Conditions
+
+| Trigger | Source | Condition | Default Severity | Routing |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (`audit-event-flush`)** | `pg-cron-health-monitor` Edge Function (§12.6) | No successful `audit-event-flush` run in `pg_cron.job_run_details` within the prior 2 h | **P0** (PagerDuty `form-platform` → platform-engineer; Slack `#incidents-critical`; dedup key `audit-event-flush-stale`) | PagerDuty P0 → platform-engineer; non-auto-resolve (IC must manually close after flush confirmed) |
+
+**P0-escalate criterion:** Upon R-72 activation, platform-engineer runs R-72-C2 immediately. If the query returns `kv_events_at_risk > 0` — i.e., any buffered events have a KV `expiration` timestamp less than `NOW() + 2h` — severity escalates to **P0-escalate**. Notify security-engineer and compliance-officer; proceed immediately to Step 3c (manual KV flush) before root-cause investigation.
+
+### R-72.2 Severity Classification
+
+| Severity | Condition | Response SLA | IC Actions |
+|---|---|---|---|
+| **P0** (default) | Stale; R-72-C2 finds no events approaching KV TTL expiry | 30 min investigation window; pipeline offline — diagnose root cause and restore; no immediate event loss risk | Emit `stale_declared`; restore job; verify flush; emit `restored`; file AEF-FLUSH-STALE-E-001 |
+| **P0-escalate** | Stale AND R-72-C2 finds any buffered events with `expiration < NOW() + 2h` | 15 min; immediately trigger manual KV flush to Postgres before diagnosing root cause | Manual flush execution via PAM-elevated admin endpoint; then restore job; emit chain; file evidence |
+
+### R-72.3 Immediate Actions (T+0 to T+60 min)
+
+| Step | Elapsed | Action | Owner | Notes |
+|---|---|---|---|---|
+| **T+0** | 0 | Emit `system.audit_event_flush_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker. This is the AEF-FLUSH-STALE-CHAIN-01 anchor — do this FIRST before any queries. | platform-engineer | Required at ALL severity levels. IC must hold a PAM-elevated session. `form_api` REVOKED from this path. |
+| **T+5** | 5 min | Run **R-72-C1** (pg_cron job history + `active` flag — H1/H2 discriminator). | platform-engineer | Determines if job is deleted (H1), disabled (H2), or running but failing (H4). |
+| **T+10** | 10 min | Run **R-72-C2** (Cloudflare KV buffer depth — event loss risk gate). | platform-engineer | If `kv_events_at_risk > 0` → escalate to P0-escalate immediately (Step 3c). |
+| **T+15** | 15 min | Run **R-72-C3** (peer job health — H3 discriminator). If ≥3 peer P0/critical jobs stale → co-activate R-03. | platform-engineer | Identifies Supabase pg_cron infra degradation. |
+| **T+20** | 20 min | **If P0-escalate**: trigger manual KV flush via PAM-gated `POST /internal/audit-event-flush/manual-trigger` (Cloudflare Access: `form-platform` role). | platform-engineer | Manual flush endpoint reads KV buffer and commits all pending events to `audit_log_events`. PAM session required. |
+| **T+25** | 25 min | Restore pg_cron job per H1–H4 root cause (see §R-72.5). | platform-engineer | Restoration steps depend on root cause. |
+| **T+35** | 35 min | Confirm next successful 30-min flush cycle via R-72-C1 (`status = 'succeeded'`). Run R-72-C2 to verify KV buffer fully drained (`pending_events_count = 0`). | platform-engineer | Do not close incident until KV buffer is confirmed empty. |
+| **T+45** | 45 min | Emit `system.audit_event_flush_restored` (LOW/3yr) via `emit-audit-event` Worker (PAM-elevated). | platform-engineer | AEF-FLUSH-STALE-CHAIN-01 terminal event. |
+| **T+60** | 60 min | File AEF-FLUSH-STALE-E-001 evidence artefact to R2 WORM storage (filing deadline T+60). | platform-engineer + compliance-officer | See §R-72.9 for artefact spec. |
+
+### R-72.4 Scope Queries
+
+**R-72-C1 — pg_cron job history + `active` flag (H1/H2/H4 discriminator)**
+
+```sql
+-- H1/H2 discriminator: does the job exist and is it active?
+SELECT jobid, jobname, schedule, active, command
+FROM cron.job
+WHERE jobname = 'audit-event-flush';
+
+-- H4 discriminator: last 10 run results
+SELECT
+  jrd.jobid,
+  j.jobname,
+  j.active,
+  jrd.start_time,
+  jrd.end_time,
+  EXTRACT(EPOCH FROM (jrd.end_time - jrd.start_time)) AS duration_s,
+  jrd.status,
+  jrd.return_message
+FROM cron.job_run_details jrd
+JOIN cron.job j ON j.jobid = jrd.jobid
+WHERE j.jobname = 'audit-event-flush'
+ORDER BY jrd.start_time DESC
+LIMIT 10;
+```
+
+Interpretation:
+- Zero rows from `cron.job`: **H1** (job deleted) — re-register.
+- `active = false`: **H2** (job disabled) — re-enable.
+- `active = true`, recent `status = 'failed'`, `return_message` contains error: **H4** — read `return_message` for sub-cause.
+- All rows stale (no recent start_time): **H3** (pg_cron infra) — confirm via R-72-C3.
+
+**R-72-C2 — Cloudflare KV buffer depth check (event loss risk gate)**
+
+KV is not queryable via SQL. Check via the Cloudflare Workers admin API (requires `CF_API_TOKEN` with `Workers KV Storage:Read` permission and `ACCOUNT_ID`):
+
+```bash
+# List keys in the AUDIT_EVENTS_KV namespace with the pending-flush prefix.
+# Replace ${ACCOUNT_ID} and ${AUDIT_EVENTS_KV_NAMESPACE_ID} with production values.
+# Result: count of buffered events pending flush. 'expiration' is KV TTL unix timestamp.
+curl -s -X GET \
+  "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces/${AUDIT_EVENTS_KV_NAMESPACE_ID}/keys?prefix=pending%3A&limit=1000" \
+  -H "Authorization: Bearer ${CF_API_TOKEN}" | jq '{
+    total_pending: (.result | length),
+    oldest_expiration: (.result | min_by(.expiration) | .expiration),
+    newest_expiration: (.result | max_by(.expiration) | .expiration)
+  }'
+```
+
+Interpretation:
+- `total_pending = 0`: KV buffer is empty — stale job has not yet accumulated unflushed events (H1/H2 detected and restored quickly). No immediate event loss risk.
+- `total_pending > 0` AND `oldest_expiration > (now_unix + 7200)`: events present but KV TTL safely beyond 2h. No immediate loss risk; P0 (default) maintained.
+- `total_pending > 0` AND `oldest_expiration < (now_unix + 7200)`: **P0-escalate** — at least one buffered event is within 2h of KV TTL expiry. Trigger manual flush immediately (Step 3c).
+
+**R-72-C3 — Peer job health (H3 discriminator)**
+
+```sql
+-- Check peer P0 and critical pipeline jobs for co-stale condition.
+-- If ≥3 peer jobs are also stale → H3 (Supabase pg_cron infra) → co-activate R-03.
+SELECT
+  j.jobname,
+  j.schedule,
+  j.active,
+  MAX(jrd.start_time)  AS last_run_attempt,
+  MAX(CASE WHEN jrd.status = 'succeeded' THEN jrd.end_time END) AS last_successful_run,
+  ROUND(EXTRACT(EPOCH FROM (NOW() -
+    MAX(CASE WHEN jrd.status = 'succeeded' THEN jrd.end_time END))
+  ) / 3600.0, 2) AS hours_since_last_success
+FROM cron.job j
+LEFT JOIN cron.job_run_details jrd ON j.jobid = jrd.jobid
+WHERE j.jobname IN (
+  'audit-event-flush',          -- P0 (this incident)
+  'audit-chain-daily-check',    -- P0 (R-68)
+  'row-count-monitor',          -- P0 (R-71)
+  'mfa-enforcement-log-cleanup',
+  'audit_log_retention_purge',
+  'victor_safety_chain_monitor' -- P1 (R-63)
+)
+GROUP BY j.jobname, j.schedule, j.active
+ORDER BY hours_since_last_success DESC NULLS LAST;
+```
+
+If ≥3 peer jobs are stale beyond their freshness windows, **co-activate R-03** (Supabase pg_cron infra degradation). Do NOT attempt to re-register or re-enable `audit-event-flush` until infra is restored.
+
+### R-72.5 Root Cause Tree
+
+| Hypothesis | Description | Discriminator | Resolution |
+|---|---|---|---|
+| **H1** | pg_cron job `audit-event-flush` deleted from `cron.job` catalog | R-72-C1: zero rows from `cron.job WHERE jobname = 'audit-event-flush'` | Re-register the job |
+| **H2** | Job disabled (`active = false`), e.g. flagged during a migration rollback or manual admin action | R-72-C1: `active = false` in `cron.job` | `UPDATE cron.job SET active = true WHERE jobname = 'audit-event-flush'` |
+| **H3** | Supabase pg_cron infrastructure degradation — multiple jobs stale | R-72-C3: ≥3 peer jobs stale beyond their freshness windows; Supabase status page (status.supabase.com) shows degraded pg_cron | Co-activate R-03; wait for infra restoration; do not recreate or re-enable the job during outage |
+| **H4** | Edge Function `audit-event-flush` broken — registered and active, but execution fails | R-72-C1: `active = true` in `cron.job`; `status = 'failed'` in recent `cron.job_run_details`; `return_message` contains error detail | Diagnose sub-cause (H4a–H4d) from `return_message` |
+
+**H1 — Job deleted:**
+
+1. R-72-C2 immediately (P0-escalate gate).
+2. Re-register: `SELECT cron.schedule('audit-event-flush', '*/30 * * * *', $$SELECT net.http_post(url := current_setting('app.supabase_functions_endpoint') || '/audit-event-flush', headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.service_role_key')), body := '{}'::jsonb) AS request_id$$);`
+3. Confirm `cron.job` shows `active = true`.
+4. Trigger immediate manual flush: `POST /internal/audit-event-flush/manual-trigger` (PAM-elevated).
+5. Verify R-72-C2 shows `total_pending = 0`.
+6. File Linear issue — investigate who/what deleted the job (potential unauthorized change; co-activate R-10 if combined with suspicious `audit_log_events` gaps).
+7. Emit DEC-030 events (§R-72.7). Root cause: `h1_deleted`.
+
+**H2 — Job disabled:**
+
+1. R-72-C2 immediately (P0-escalate gate).
+2. `UPDATE cron.job SET active = true WHERE jobname = 'audit-event-flush';`
+3. Confirm `active = true` post-update.
+4. Trigger immediate manual flush: `POST /internal/audit-event-flush/manual-trigger` (PAM-elevated).
+5. Verify R-72-C2 shows `total_pending = 0`.
+6. File Linear issue — investigate who disabled the job and whether this represents an unauthorized change.
+7. Emit DEC-030 events (§R-72.7). Root cause: `h2_disabled`.
+
+**H3 — Supabase pg_cron infra degradation:**
+
+1. Run R-72-C2 immediately and every 30 min during outage to monitor KV buffer depth.
+2. Co-activate R-03 (Supabase infrastructure outage).
+3. Do NOT attempt to re-register or re-enable the job — infra restoration is required first.
+4. After Supabase restoration: confirm `audit-event-flush` resumes automatically; verify with R-72-C1 (`status = 'succeeded'`).
+5. Trigger manual flush post-recovery: `POST /internal/audit-event-flush/manual-trigger` (PAM-elevated); verify R-72-C2 shows `total_pending = 0`.
+6. Emit DEC-030 events (§R-72.7). Root cause: `h3_infra`.
+
+**H4 — Edge Function / Worker broken:**
+
+Inspect `return_message` from R-72-C1 to identify sub-cause:
+
+| Sub-cause | `return_message` Pattern | Resolution |
+|---|---|---|
+| **H4a — Deployment failure** | `Error: Script not found` / HTTP 404 from `net.http_post` / function not deployed | Supabase Dashboard → Edge Functions → `audit-event-flush` → Redeploy from git HEAD |
+| **H4b — KV namespace binding broken** | `Error: KV namespace binding not found` / `bindings` error | Cloudflare Workers Settings → Bindings → verify `AUDIT_EVENTS_KV` binding exists; re-add if absent and redeploy; engage platform-engineer |
+| **H4c — pg_net degradation** | pg_net timeout / `net._http_response` shows failures | `SELECT * FROM net._http_response ORDER BY id DESC LIMIT 20;` — if degraded, follow pg_net recovery; open Supabase support ticket |
+| **H4d — Postgres write failure** | Worker successfully reads KV but cannot write to `audit_log_events` | Check Supabase PgBouncer health; verify `audit_log_events` RLS policy has not been altered; check `form_system` role permissions on `audit_log_events` |
+
+For all H4 sub-causes:
+1. R-72-C2 immediately (P0-escalate gate — trigger manual flush if events at KV TTL risk).
+2. Fix underlying sub-cause.
+3. Verify next scheduled 30-min cycle succeeds via R-72-C1.
+4. Run R-72-C2 to confirm `total_pending = 0` after recovery.
+5. Emit DEC-030 events (§R-72.7). Root cause: `h4_edge_function_broken`.
+
+### R-72.6 Communication Templates
+
+**T-72-A — Detection notification (post at T+0 in `#incidents-critical`)**
+
+```
+🔴 [P0] audit-event-flush STALE — DEC-030 audit event pipeline offline
+Time: <ISO 8601>
+IC: <name>
+Detected: pg-cron-health-monitor → PagerDuty P0
+Status: Triaging. Last confirmed flush: <timestamp from R-72-C1>. Stale ~<N> h (~<M> missed 30-min cycles).
+KV buffer: <scanning / total_pending=<N> events — P0-escalate: YES/NO>
+Root cause: <investigating / H1 deleted / H2 disabled / H3 infra (R-03 co-active) / H4 broken sub-cause>
+Next update: T+15
+```
+
+**T-72-B — Resolution notification (post in `#incidents-critical`)**
+
+```
+✅ [P0 → Resolved] audit-event-flush STALE — pipeline restored
+Root cause: <H1/H2/H3/H4 sub-cause>
+Duration: <N> h stale (~<M> missed flush cycles)
+KV events flushed during recovery: <N> (manual flush triggered: YES/NO)
+DEC-030: stale_declared + restored events emitted (AEF-FLUSH-STALE-CHAIN-01 satisfied)
+Evidence: AEF-FLUSH-STALE-E-001 filed to R2 at T+<N> min
+Follow-up: <Linear issue URL or "none required">
+```
+
+**T-72-C — Escalation template (stale > 2h, KV events at TTL risk, or H4b/H4d confirmed; restricted to CEO + CTO + IC)**
+
+```
+🚨 [MAJOR INCIDENT] audit-event-flush STALE — DEC-030 audit event pipeline offline >2h / events at KV TTL risk
+Time: <ISO 8601>
+IC: <name>
+Stale duration: <N> h (~<M> missed flush cycles)
+KV buffer: total_pending=<N> events; oldest_expiration in <T> h (P0-escalate: YES/NO)
+Root cause: <H4b KV binding broken / H4d Postgres write failure / H3 infra> — manual flush <triggered/blocked>
+Actions taken: <list>
+Needs: CEO + CTO awareness. Potential DEC-030 audit trail gap for the stale window.
+```
+
+### R-72.7 DEC-030 HMAC-Chained Events
+
+Both events are emitted via `emit-audit-event` Worker. IC must hold a PAM-elevated session for both emissions. `form_api` REVOKED from the emission path (consistent with all companion stale runbooks R-60 through R-71).
+
+**Event 1: `system.audit_event_flush_stale_declared` — HIGH · 7-year retention · HMAC chain anchor**
+
+Emit at T+0 after staleness is confirmed. This is the AEF-FLUSH-STALE-CHAIN-01 anchor — `system.audit_event_flush_restored` is blocked without a prior `stale_declared` event for the same `incident_id`.
+
+| Field | Type | Constraints | Description |
+|---|---|---|---|
+| `incident_id` | UUID | required | Fresh UUID generated by IC at T+0 for this activation |
+| `confirmed_stale_since` | ISO 8601 datetime | required | Timestamp of last confirmed successful run from R-72-C1 |
+| `stale_hours` | integer | ≥ 0 | Hours elapsed since last confirmed successful run at emission time |
+| `missed_flush_cycles` | integer | ≥ 0 | Estimated missed 30-min cycles: `stale_hours × 2` |
+| `kv_buffer_events_at_risk` | integer | ≥ −1 | Count of buffered events from R-72-C2; −1 if KV scan not yet run at emission time |
+| `p0_escalated` | boolean | required | `true` if R-72-C2 found events with `expiration < NOW() + 7200s` (2h KV TTL risk) |
+
+Zod v2 schema (`AuditEventFlushStaleDeclaredSchema`):
+```typescript
+const AuditEventFlushStaleDeclaredSchema = z.object({
+  incident_id:               z.string().uuid(),
+  confirmed_stale_since:     z.string().datetime(),
+  stale_hours:               z.number().int().min(0),
+  missed_flush_cycles:       z.number().int().min(0),
+  kv_buffer_events_at_risk:  z.number().int().min(-1),
+  p0_escalated:              z.boolean(),
+});
+```
+
+**Event 2: `system.audit_event_flush_restored` — LOW · 3-year retention · HMAC chain terminal**
+
+Emit after `audit-event-flush` successfully completes at least one full flush cycle post-recovery AND R-72-C2 confirms `total_pending = 0`. Blocked by AEF-FLUSH-STALE-CHAIN-01 without prior `stale_declared` for the same `incident_id`.
+
+| Field | Type | Constraints | Description |
+|---|---|---|---|
+| `incident_id` | UUID | required | Must match the `incident_id` from the `stale_declared` event |
+| `restored_at` | ISO 8601 datetime | required | Timestamp of first successful flush run post-recovery |
+| `root_cause` | enum | 4 values | `h1_deleted` / `h2_disabled` / `h3_infra` / `h4_edge_function_broken` |
+| `stale_hours_total` | integer | ≥ 0 | Total hours stale: from `confirmed_stale_since` to `restored_at` |
+| `kv_events_flushed` | integer | ≥ 0 | Events recovered from KV buffer and committed to `audit_log_events`; 0 if KV was already empty |
+| `manual_flush_required` | boolean | required | `true` if IC triggered a manual flush (P0-escalate path or H4 sub-case) |
+
+Zod v2 schema (`AuditEventFlushRestoredSchema`):
+```typescript
+const AuditEventFlushRestoredSchema = z.object({
+  incident_id:           z.string().uuid(),
+  restored_at:           z.string().datetime(),
+  root_cause:            z.enum(['h1_deleted', 'h2_disabled', 'h3_infra', 'h4_edge_function_broken']),
+  stale_hours_total:     z.number().int().min(0),
+  kv_events_flushed:     z.number().int().min(0),
+  manual_flush_required: z.boolean(),
+});
+```
+
+### R-72.8 AEF-FLUSH-STALE-CHAIN-01 Ordering Invariant
+
+`system.audit_event_flush_restored` MUST be preceded by `system.audit_event_flush_stale_declared` with a matching `incident_id`. The `emit-audit-event` Worker enforces this at write time: if a `restored` event arrives without a prior `stale_declared` for the same `incident_id`, the Worker returns:
+
+```
+HTTP 422 AEF_FLUSH_STALE_CHAIN_01_VIOLATION
+```
+
+A 422 response on the `restored` emit co-activates R-05 (HMAC Chain Break) — an unanchored `restored` emit represents potential audit log manipulation or workflow error. The IC must not retry the `restored` emit without first understanding why the `stale_declared` anchor is absent from the chain and confirming with compliance-officer.
+
+Implementation status: [ ] Pending — platform-engineer (§R-72.12 item 2).
+
+### R-72.9 Evidence Artefact
+
+**AEF-FLUSH-STALE-E-001** — per-activation evidence package filed to R2 WORM storage within T+60 min of incident activation.
+
+| Field | Value |
+|---|---|
+| Artefact ID | AEF-FLUSH-STALE-E-001 |
+| SOC 2 controls | A1.2 / CC7.2 |
+| Trigger | Per activation of R-72 (every `audit-event-flush` stale incident) |
+| Retention | 7 years WORM |
+| R2 access | `r2:form-api` REVOKED — IC PAM-elevated manual upload only |
+| R2 path | `compliance/evidence/audit-event-flush/aef-flush-stale-e-001-<YYYY-MM-DD>/` (**NEW subfolder** — no pre-existing parent) |
+| Filing deadline | T+60 min from incident activation |
+| SOC2_READINESS.md ref | §161 (v3.87.0, 2026-07-04) |
+
+**Artefact file contents:**
+
+| File | Description |
+|---|---|
+| `incident-timeline.md` | Start time, detection method, IC identifier (UUID pseudonym), resolution time, root cause (H1–H4), total stale hours, missed flush cycles |
+| `r72-c1-output.txt` | R-72-C1 pg_cron history query result — restricted to platform-engineer + compliance-officer |
+| `r72-c2-output.txt` | R-72-C2 Cloudflare KV buffer depth: `total_pending` at T+0 and `total_pending` at T+35 (post-recovery); `kv_buffer_events_at_risk` count and `p0_escalated` flag |
+| `dec-030-event-ids.txt` | Chain event UUIDs for `stale_declared` and `restored` events |
+| `root-cause-analysis.md` | Root cause classification (H1–H4 sub-cause if H4), resolution steps taken, follow-up Linear issue URL (if applicable) |
+
+**Privacy floor (artefact-level):** All AEF-FLUSH-STALE-E-001 files contain operational infrastructure metadata only — no `user_id`, `tenant_id`, individual workout, coaching content, health metric, body composition value, or GDPR Art. 9 special-category data. `r72-c2-output.txt` contains only aggregate KV key counts and TTL timestamps — not the content of buffered events (event payloads remain encrypted in KV and are only readable by the `audit-event-flush` Worker with its service binding). Artefact access: platform-engineer + compliance-officer only; not shared with auditors without explicit compliance-officer review and redaction pass.
+
+### R-72.10 Co-Activation Matrix
+
+| Trigger condition | Co-activation | Notes |
+|---|---|---|
+| R-72-C2 finds events with `expiration < NOW() + 7200s` (2h KV TTL risk) | P0-escalate: trigger manual flush immediately | Do not wait for root cause classification before flushing |
+| AEF-FLUSH-STALE-CHAIN-01 HTTP 422 on `restored` emit | **R-05** (HMAC Chain Break) | Do not retry `restored` emit without R-05 IC guidance |
+| H3: Supabase pg_cron infra degradation (≥3 peer jobs stale) | **R-03** (Service Outage — Supabase infra) | R-03 IC leads infra recovery; R-72 IC monitors KV buffer depth |
+| Stale > 2h, R-72-C2 inaccessible (Cloudflare API unreachable), root cause unidentified | CEO/CTO escalation via T-72-C | Internal escalation only; no separate runbook |
+| R-72-C1 shows `audit_log_events` sequence gap during stale window post-recovery | **R-68** (audit-chain-daily-check — trigger manual chain integrity gate R-68-C2) | Verify chain integrity covers the stale window before closing R-72 |
+
+### R-72.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.audit_event_flush_stale_declared` (HIGH/7yr) and `system.audit_event_flush_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, AEF-FLUSH-STALE-CHAIN-01 ordering invariant, and A1.2/CC7.2 auditor narrative | compliance-officer + security-engineer | **P0** | [x] **Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.87).** |
+| 2 | Implement AEF-FLUSH-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker (HTTP 422 `AEF_FLUSH_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit; co-activates R-05) | platform-engineer | **P1** | [ ] Pending — platform-engineer |
+| 3 | Provision `compliance/evidence/audit-event-flush/` R2 subfolder (new folder — not pre-existing); configure WORM + `r2:form-api` REVOKED policy consistent with §80.3 invariant | devops-lead + compliance-officer | **P1** | [ ] Pending — devops-lead |
+| 4 | Register AEF-FLUSH-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (A1.2/CC7.2; per-activation; 7yr; `compliance/evidence/audit-event-flush/aef-flush-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer | **P1** | [x] **Done — 2026-07-04 (SOC2_READINESS.md v3.87.0, §161).** |
+| 5 | Update `docs/OBSERVABILITY.md §12.6` `audit-event-flush` row with R-72 cross-reference | devops-lead | **P0** | [x] **Done — 2026-07-04 (OBSERVABILITY.md v5.15.7).** |
+| 6 | Authoring complete — §R-72 documentation obligation fulfilled | platform-engineer + compliance-officer | **P0** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.38.0).** |
+
+**Privacy floor (invariant throughout R-72):** All R-72 scope query outputs, DEC-030 event payloads, communication templates, and AEF-FLUSH-STALE-E-001 artefact files contain operational infrastructure metadata only — no `user_id`, `tenant_id`, employee name, email, workout, coaching content, body composition value, or GDPR Art. 9 special-category data. `r72-c2-output.txt` contains only aggregate KV key counts and TTL timestamps — the content of buffered events (event payloads) is not surfaced in any query, template, or evidence file. `kv_buffer_events_at_risk` and `kv_events_flushed` in DEC-030 payloads are aggregate integer counts with no individual event content. `system.audit_event_flush_restored.kv_events_flushed` captures the count of events committed during recovery — not their content, type, or originating `user_id`/`tenant_id`. AEF-FLUSH-STALE-E-001 artefact access: platform-engineer + compliance-officer only; not shared with auditors without explicit compliance-officer review. Cross-references: OBSERVABILITY.md §12.6 `audit-event-flush` row (v5.15.7); AUDIT_LOG_SCHEMA.md §Audit Event Flush Stale events (v2.87); SOC2_READINESS.md §161 (v3.87.0); R-68 (audit-chain-daily-check stale — chain integrity companion); R-71 (row-count-monitor stale — data-integrity companion P0); R-05; R-03. Owner: platform-engineer + compliance-officer.
+
+---
+
+*v1.0 (2026-07-04): R-72 `audit-event-flush` Stale (A1.2/CC7.2 — Audit Event Pipeline Offline) — seventy-second runbook and companion stale recovery runbook for `audit-event-flush` (the P0-default DEC-030 audit event pipeline flush job). `audit-event-flush` (pg_cron `*/30 * * * *`; 2h freshness window; every 30 min UTC; 2 cycles per hour) was registered in OBSERVABILITY.md §12.6 as one of three P0 sentinel jobs (alongside `audit-chain-daily-check` and `row-count-monitor`); no stale recovery runbook was authored at that time — closing the longest-standing P0 runbook gap in the §12.6 registry. A1.2/CC7.2 control significance: `audit-event-flush` is the pipeline that commits DEC-030 HMAC-chained events from the Cloudflare KV buffer to `audit_log_events` in Postgres; a stale job means all events emitted since the last flush are not yet in the HMAC chain — FORM's primary audit trail is temporarily incomplete; unlike R-68 (chain verification sentinel offline — chain exists but is unverified) and R-71 (data-integrity anomaly sentinel offline — chain exists and is verified but anomaly detection is paused), R-72 represents the audit pipeline itself being offline: no events emitted during the stale window are in `audit_log_events`. P0 default (equal priority with R-68 and R-71): event loss requires simultaneous KV flush failure AND Supabase write failure within the same window (KV TTL >> 2h freshness window), but the CC7.2 chain integrity gap exists for the full stale duration regardless of loss risk — auditors cannot verify the chain is complete for the stale window until `audit-event-flush` restores. Three scope queries: R-72-C1 (pg_cron job history + `active` flag — H1/H2/H4 discriminator); R-72-C2 (Cloudflare KV buffer depth via CF API — event loss risk gate; `total_pending` count + `oldest_expiration` timestamp; P0-escalate if `expiration < NOW() + 7200s`); R-72-C3 (peer job health — H3 discriminator; ≥3 stale jobs → R-03 co-activation). Four root causes with four H4 sub-causes: H1 (deleted — zero `cron.job` row); H2 (disabled — `active = false`); H3 (Supabase pg_cron degradation → R-03 co-active); H4 (Edge Function broken — H4a deployment failure, H4b KV namespace binding broken, H4c pg_net degradation, H4d Postgres write failure). Two DEC-030 HMAC-chained events (AUDIT_LOG_SCHEMA.md v2.87, 2026-07-04): `system.audit_event_flush_stale_declared` HIGH/7yr (AEF-FLUSH-STALE-CHAIN-01 anchor; IC PAM-elevated at T+0; A1.2/CC7.2; six-field Zod v2 `AuditEventFlushStaleDeclaredSchema`); `system.audit_event_flush_restored` LOW/3yr (terminal; IC PAM-elevated post-recovery; `kv_events_flushed` captures recovery count; `manual_flush_required` flags P0-escalate path; six-field Zod v2 `AuditEventFlushRestoredSchema`). AEF-FLUSH-STALE-CHAIN-01: HTTP 422 `AEF_FLUSH_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit; co-activates R-05; implementation pending platform-engineer (§R-72.11 item 2). Two communication templates: T-72-A (detection; `#incidents-critical`); T-72-B (resolution); T-72-C (escalation; stale >2h or KV TTL risk or H4b/H4d; restricted to CEO + CTO + IC). One evidence artefact: AEF-FLUSH-STALE-E-001 (per-activation; A1.2/CC7.2; 7yr; `compliance/evidence/audit-event-flush/aef-flush-stale-e-001-<YYYY-MM-DD>/`; NEW R2 subfolder — §R-72.11 item 3 pending devops-lead; T+60 min filing deadline). Six implementation checklist items: AUDIT_LOG_SCHEMA.md event registration (P0/Done v2.87), AEF-FLUSH-STALE-CHAIN-01 Worker enforcement (P1/pending platform-engineer), R2 subfolder provision (P1/pending devops-lead), SOC2_READINESS.md §79.4 artefact registration (P1/Done §161 v3.87.0), OBSERVABILITY.md §12.6 cross-ref update (P0/Done v5.15.7), authoring complete (P0/Done). Privacy floor: no user_id, tenant_id, coaching content, health data, or GDPR Art. 9 data in any scope query output, KV buffer count, DEC-030 payload, template, or evidence artefact; `kv_buffer_events_at_risk` and `kv_events_flushed` are aggregate integer counts with no event content; AEF-FLUSH-STALE-E-001 restricted to platform-engineer + compliance-officer. Cross-references: OBSERVABILITY.md §12.6 `audit-event-flush` row (v5.15.7); AUDIT_LOG_SCHEMA.md §Audit Event Flush Stale events (v2.87); SOC2_READINESS.md §161 (v3.87.0); R-68 (audit-chain-daily-check stale — CC7.2 chain verification companion); R-71 (row-count-monitor stale — CC7.1/A1.2 data-integrity companion); R-05; R-03. Owner: platform-engineer + compliance-officer.*

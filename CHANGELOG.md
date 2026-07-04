@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [12.18.0] — 2026-07-04
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md R-72` — `audit-event-flush` Stale companion runbook (A1.2/CC7.2, P0 default). Job `*/30 * * * *`, 2h freshness window. 11 subsections (R-72.1–R-72.11): identity table, detection timeline (T+0 through T+60), severity classification matrix (P0 / P0-escalate if stale > 4h), 3 scope queries (R-72-C1 pg_cron history SQL, R-72-C2 Cloudflare KV API `prefix=pending:` count, R-72-C3 peer job health SQL), H1–H4 root cause tree (H4 with 4 sub-causes: H4a deleted, H4b disabled, H4c infra, H4d edge function broken), per-root-cause recovery playbook, DEC-030 HMAC-chained events with payload tables and Zod v2 schemas, AEF-FLUSH-STALE-CHAIN-01 ordering invariant, AEF-FLUSH-STALE-E-001 evidence artefact spec (5-file per-activation package, T+60 min filing deadline, NEW R2 subfolder), co-activation matrix (R-05, R-03, R-68), 6-item implementation checklist. Header v3.37.0 → v3.38.0.
+- `docs/AUDIT_LOG_SCHEMA.md §Audit Event Flush Stale events` — `system.audit_event_flush_stale_declared` (HIGH/7yr) and `system.audit_event_flush_restored` (LOW/3yr) DEC-030 HMAC-chained events registered. `AuditEventFlushStaleDeclaredSchema` Zod v2 (6 fields: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_hours` int≥0, `missed_flush_cycles` int≥0, `kv_buffer_events_at_risk` int≥−1, `p0_escalated` bool). `AuditEventFlushRestoredSchema` Zod v2 (6 fields: `incident_id` UUID, `restored_at` datetime, `root_cause` 4-value enum h1_deleted/h2_disabled/h3_infra/h4_edge_function_broken, `stale_hours_total` int≥0, `kv_events_flushed` int≥0, `manual_flush_required` bool). AEF-FLUSH-STALE-CHAIN-01 ordering invariant documented (HTTP 422 `AEF_FLUSH_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit; R-05 co-activation; implementation pending platform-engineer). A1.2/CC7.2 auditor narrative. Header v2.86 → v2.87.
+- `docs/SOC2_READINESS.md §161` — AEF-FLUSH-STALE-E-001 registered in §79.4 master evidence table (count 127 → 128; A1.2/CC7.2; per-activation trigger; 7yr WORM; R2 path `compliance/evidence/audit-event-flush/`; NEW subfolder — no pre-existing parent; T+60 min filing deadline). §80.4 Vanta mirror protocol updated (per-activation + annual nil attestation within 48h). Header v3.86.0 → v3.87.0.
+- `docs/OBSERVABILITY.md §12.6` — `audit-event-flush` row cross-reference column updated: `; INCIDENT_RESPONSE R-72 (§R-72; v1.0, 2026-07-04 — companion stale recovery runbook for audit-event-flush)` appended. Header v5.15.6 → v5.15.7.
+- `VERSION` — 12.17.0 → 12.18.0.
+
 ## [12.17.0] — 2026-07-04
 
 ### Added

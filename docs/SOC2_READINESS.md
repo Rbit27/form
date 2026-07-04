@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.86.0
+# FORM · SOC 2 Type II Readiness v3.87.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -35472,3 +35472,68 @@ CC7.1 requires monitoring of system components to detect anomalies. `row-count-m
 ---
 
 *v3.86.0 (2026-07-04): §160 — ROWCOUNT-MON-STALE-E-001 Registration (CC7.1/A1.2 · INCIDENT_RESPONSE R-71 · `row-count-monitor` Stale Recovery Evidence). ROWCOUNT-MON-STALE-E-001 registered in §79.4 master evidence table (count 126 → 127). Evidence class: per-activation (per R-71 incident). Retention: 7yr WORM. TSC: CC7.1/A1.2. R2 path: `compliance/evidence/row-count-monitor/` (NEW subfolder — no pre-existing parent; per-activation folder per YYYY-MM-DD + annual nil attestation). Artefact contents: five files per activation (incident-timeline.md, r71-c1-output.txt, r71-c2-output.txt, dec-030-event-ids.txt, root-cause-analysis.md). §80.4 Vanta mirror protocol updated: ROWCOUNT-MON-STALE-E-001 added (per-activation mirror + annual nil attestation within 48h). Closes INCIDENT_RESPONSE.md R-71.12 item 4 (P1 — register ROWCOUNT-MON-STALE-E-001 in §79.4). R2 subfolder provision pending (devops-lead — §160.6 item 2). Cross-references: INCIDENT_RESPONSE.md R-71 (full runbook — P0 default, CC7.1/A1.2); AUDIT_LOG_SCHEMA.md v2.86 (`system.row_count_monitor_stale_declared` HIGH/7yr + `system.row_count_monitor_restored` LOW/3yr + ROWCOUNT-MON-STALE-CHAIN-01); OBSERVABILITY.md §12.6 `row-count-monitor` row (v5.15.6). Privacy floor: all five artefact files contain operational infrastructure metadata only; `r71-c2-output.txt` contains aggregate deviation_pct scalars from `monitoring_baselines.row_count_avg` (total table counts — not per-user/per-tenant); no user_id, tenant_id, coaching content, health data, or GDPR Art. 9 data; access restricted to devops-lead + compliance-officer. Owner: compliance-officer + security-engineer.*
+
+---
+
+## §161 AEF-FLUSH-STALE-E-001 Registration (A1.2/CC7.2 · INCIDENT_RESPONSE R-72 · `audit-event-flush` Stale Recovery Evidence)
+
+### §161.1 Registration Summary
+
+AEF-FLUSH-STALE-E-001 is the per-activation evidence artefact for INCIDENT_RESPONSE.md R-72 (`audit-event-flush` Stale — A1.2/CC7.2 DEC-030 HMAC chain population sentinel). `audit-event-flush` (pg_cron `*/30 * * * *`, 2h freshness window) is the scheduled job responsible for draining the Cloudflare KV buffer (`AUDIT_EVENTS_KV`) into the Postgres HMAC chain (`audit_log_events`). When `audit-event-flush` goes stale, DEC-030 audit events accumulate in the KV buffer without being committed to the tamper-evident chain — creating a HMAC chain population gap with potential for irreversible event loss if pending key TTL expires before recovery. R-72 is a P0-default incident: the compensating control is R-72-C2 (Cloudflare KV API `prefix=pending:` count scan), whose result (`kv_buffer_events_at_risk`) is captured in the DEC-030 `stale_declared` event and this artefact.
+
+### §161.2 §79.4 Master Evidence Table Entry (evidence count 127 → 128)
+
+| # | Artefact ID | TSC | Trigger | Retention | R2 path | Status |
+|---|---|---|---|---|---|---|
+| 128 | AEF-FLUSH-STALE-E-001 | A1.2 / CC7.2 | Per-activation (R-72 incident) | 7yr WORM | `compliance/evidence/audit-event-flush/aef-flush-stale-e-001-<YYYY-MM-DD>/` | 🟡 **Pending — R2 subfolder provision (§161.6 item 2 / R-72.11 item 3)** |
+
+### §161.3 R2 Path Specification
+
+| Field | Value |
+|---|---|
+| R2 bucket | `r2:form-compliance` (WORM-enabled) |
+| R2 API access | `r2:form-api` REVOKED — IC PAM-elevated manual upload only (consistent with §80.3 invariant) |
+| R2 path pattern | `compliance/evidence/audit-event-flush/aef-flush-stale-e-001-<YYYY-MM-DD>/` |
+| Parent folder | `compliance/evidence/audit-event-flush/` — **NEW subfolder** (no pre-existing parent) |
+| Subfolder provision status | 🟡 Pending — devops-lead (§161.6 item 2) |
+| Object versioning | Enabled (WORM — no DELETE, no overwrite) |
+| Filing deadline | T+60 min from R-72 incident declaration (matches P0 resolution SLA) |
+
+**Artefact file list (per-activation):**
+
+| File | Description |
+|---|---|
+| `incident-timeline.md` | Activation timestamp, IC identifier (UUID pseudonym), resolution time, root cause (H1–H4), total stale hours, KV buffer events at risk, KV events flushed |
+| `r72-c1-output.txt` | R-72-C1 pg_cron history query result — last 10 `audit-event-flush` run records; restricted to devops-lead + compliance-officer |
+| `r72-c2-output.txt` | R-72-C2 Cloudflare KV API scan: `total_pending` count, `oldest_expiration`, `newest_expiration` at scan time |
+| `dec-030-event-ids.txt` | HMAC chain event UUIDs: `system.audit_event_flush_stale_declared` and `system.audit_event_flush_restored` |
+| `root-cause-analysis.md` | Root cause classification (H1–H4 with sub-causes H4a–H4d), resolution steps, manual flush record if applicable, follow-up Linear issue URL |
+
+**Privacy floor:** All artefact files contain operational infrastructure metadata only — no `user_id`, `tenant_id`, individual workout, coaching content, health metric, body composition value, or GDPR Art. 9 special-category data. `r72-c2-output.txt` contains only aggregate KV key-count scalars (total pending count, expiration timestamps of oldest/newest key — not the key contents or the DEC-030 event payloads they reference). Artefact access: devops-lead + compliance-officer only; not shared with auditors without explicit compliance-officer review.
+
+### §161.4 §80.4 Vanta Mirror Protocol Update
+
+AEF-FLUSH-STALE-E-001 is added to the §80.4 Vanta evidence mirror registry.
+
+| Evidence ID | Vanta control | Mirror frequency | Nil-activation attestation |
+|---|---|---|---|
+| AEF-FLUSH-STALE-E-001 | A1.2 / CC7.2 — monitoring system operations | Per-activation (on each R-72 incident) | Annual affirmative attestation if zero activations in the year |
+
+**Nil-activation attestation:** If `audit-event-flush` has no stale incidents during a 12-month period, compliance-officer files a nil-activation attestation JSON to `compliance/evidence/audit-event-flush/aef-flush-stale-e-001-nil-<YYYY>/nil-attestation.json` confirming zero R-72 activations and confirming the job was continuously active and healthy per OBSERVABILITY.md §12.6 pg_cron health registry.
+
+### §161.5 A1.2 / CC7.2 Auditor Narrative
+
+A1.2 requires that the entity monitors system capacity and performance against commitments and communicates relevant information. `audit-event-flush` (pg_cron `*/30 * * * *`, 2h freshness window, 2 cycles per hour) drains the Cloudflare KV buffer (`AUDIT_EVENTS_KV`) into the Postgres HMAC chain (`audit_log_events`) — the tamper-evident record that underpins FORM's entire SOC 2 audit evidence chain. SOC 2 A1.2 evidence: per-activation AEF-FLUSH-STALE-E-001 artefacts demonstrate that every chain population gap was detected via `pg-cron-health-monitor` within 1h of the 2h freshness breach, triaged within P0 timelines (T+5 DEC-030 emission, T+60 min evidence filing), and compensated by R-72-C2 manual KV scan — no DEC-030 event was permanently lost without detection. CC7.2 requires monitoring of system components to detect anomalous activity. Stale `audit-event-flush` is an anomalous deviation from FORM's standard 30-min flush cadence; pg-cron-health-monitor detects and alerts within 1h, IC confirms via R-72-C1 pg_cron history, and R-72-C2 quantifies the chain population risk. The DEC-030 HMAC chain (AEF-FLUSH-STALE-CHAIN-01: `stale_declared` → `restored`) provides tamper-evident sequencing that auditors can verify against the `audit_log_events` table — confirming both the gap and its resolution are permanently recorded. AEF-FLUSH-STALE-E-001 at 7yr WORM retention demonstrates sustained monitoring capability over the audit period and covers the full SOC 2 Type II observation window.
+
+### §161.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register AEF-FLUSH-STALE-E-001 in §79.4 master evidence table (A1.2/CC7.2; per-activation; 7yr; `compliance/evidence/audit-event-flush/`) | compliance-officer + security-engineer | **P0** | [x] **Done — 2026-07-04 (§161.2, this section).** |
+| 2 | Provision `compliance/evidence/audit-event-flush/` R2 subfolder (NEW folder — no pre-existing parent); configure WORM object versioning + `r2:form-api` REVOKED policy consistent with §80.3 invariant | devops-lead + compliance-officer | **P1** | [ ] **Pending — devops-lead.** |
+| 3 | Add AEF-FLUSH-STALE-E-001 to §80.4 Vanta mirror protocol (per-activation + annual nil attestation within 48h) | compliance-officer | **P1** | [x] **Done — 2026-07-04 (§161.4, this section).** |
+| 4 | Authoring complete — §161 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-04 (SOC2_READINESS.md v3.87.0).** |
+
+---
+
+*v3.87.0 (2026-07-04): §161 — AEF-FLUSH-STALE-E-001 Registration (A1.2/CC7.2 · INCIDENT_RESPONSE R-72 · `audit-event-flush` Stale Recovery Evidence). AEF-FLUSH-STALE-E-001 registered in §79.4 master evidence table (count 127 → 128). Evidence class: per-activation (per R-72 incident). Retention: 7yr WORM. TSC: A1.2/CC7.2. R2 path: `compliance/evidence/audit-event-flush/` (NEW subfolder — no pre-existing parent; per-activation folder per YYYY-MM-DD + annual nil attestation). Artefact contents: five files per activation (incident-timeline.md, r72-c1-output.txt, r72-c2-output.txt, dec-030-event-ids.txt, root-cause-analysis.md). Filing deadline: T+60 min (matches P0 resolution SLA). §80.4 Vanta mirror protocol updated: AEF-FLUSH-STALE-E-001 added (per-activation mirror + annual nil attestation within 48h). Closes INCIDENT_RESPONSE.md R-72.11 item 4 (P1 — register AEF-FLUSH-STALE-E-001 in §79.4). R2 subfolder provision pending (devops-lead — §161.6 item 2). Cross-references: INCIDENT_RESPONSE.md R-72 (full runbook — P0 default, A1.2/CC7.2); AUDIT_LOG_SCHEMA.md v2.87 (`system.audit_event_flush_stale_declared` HIGH/7yr + `system.audit_event_flush_restored` LOW/3yr + AEF-FLUSH-STALE-CHAIN-01); OBSERVABILITY.md §12.6 `audit-event-flush` row (v5.15.7 — R-72 cross-reference added). Privacy floor: all five artefact files contain operational infrastructure metadata only; `r72-c2-output.txt` contains aggregate KV key-count scalars (total_pending count, oldest/newest expiration timestamps — not event payload contents); no user_id, tenant_id, coaching content, health data, or GDPR Art. 9 data; access restricted to devops-lead + compliance-officer. Owner: compliance-officer + security-engineer.*
