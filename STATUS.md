@@ -6,6 +6,7 @@
 
 ## Current version
 
+**v12.64.0** — 2026-07-04 · content · post-3173 · «Мезоциклове планування без фіксованого змагального календаря: що визначає структуру, коли дедлайн не заданий» · series «Тренувальна автономія» 3166–3175 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3173 · «Тренувальна автономія» in progress 7/10 → 8/10 · next: post-3174 («Навчання у провалах: як self-coached атлет перетворює помилки на дані, а не на самокритику»)
 **v12.63.0** — 2026-07-04 · content · post-3172 · «Де системне мислення про тренування зупиняється і починається ситуаційна гнучкість — і як не переплутати одне з іншим» · series «Тренувальна автономія» 3166–3175 (7/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3172 · «Тренувальна автономія» in progress 6/10 → 7/10 · next: post-3173 (8/10 — мезоциклове планування без фіксованого змагального календаря)
 
 **v12.62.0** — 2026-07-04 · enterprise · OBSERVABILITY §12.6 job 60 + §73 SQL DDL + §72.9 patch · IR R-76.12 item 2 patch · OQ-SLO-OBS-01 → DEC-099 closes architecture gate · job 60 `slo_chain_integrity_check` `59 * * * *` registered · Migration M-0103 spec complete · §72.9 item 4 [x] Architecture resolved · §72.9 item 11 [x] Done
