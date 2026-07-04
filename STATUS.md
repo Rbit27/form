@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v12.43.0** — 2026-07-04 · content · post-3156 · «Якоріння в тренуванні: чому перша програма визначає всі наступні рішення» (series «Тренувальне мислення» 3156–3165, 1/10 — НОВА СЕРІЯ) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3156 · «Тренувальне мислення» proposed → in progress 1/10 · next: post-3157 (series «Тренувальне мислення» 2/10 — «Ефект підтвердження у виборі тренувальної інформації: що self-coached атлет не читає»)
+
 **v12.42.0** — 2026-07-04 · content · post-3125 · «Самодіагностика без тренера: операційна система для intermediate атлета — синтез серії 3116–3125» (series «Самодіагностика без тренера» 3116–3125, 10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3125 · «Самодіагностика без тренера» 9/10 → 10/10 (SERIES COMPLETE) · next: series «Тренувальне мислення» 3156–3165 (1/10 — нова серія)
 
 **v12.41.0** — 2026-07-04 · content · post-3124 · «Коли час від self-coached перейти до роботи з тренером: сигнали, критерії, типи підтримки» (series «Самодіагностика без тренера» 3116–3125, 9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3124 · «Самодіагностика без тренера» 8/10 → 9/10 · next: post-3125 (series «Самодіагностика без тренера» 10/10 — synthesis «Операційна система self-coached intermediate атлета: синтез серії 3116–3125»)
