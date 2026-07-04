@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.72.0] — 2026-07-04
+
+### Added
+- `content/post-3130-planning-training-around-unpredictable-deadlines.md` — series «Тренувальний менеджмент часу» 3126–3135 (5/10). «Як планувати тренування навколо непередбачуваних дедлайнів». Buffer-модель vs. opportunistic-модель при стохастичному розкладі. Принцип pre-loading при відомих горизонтах (>36h): тренування до дедлайну. Мінімальний модуль для 30-хвилинних вікон: 2–3 компаунди при 75–82% 1RM. Braun et al. (2007): інтенсивність > обсяг при обмеженому часі. Відмова від компенсаційної логіки (Gabbett 2016). Алгоритм рішення при появі нового дедлайну. clinical-safety: NOT_REQUIRED · sports-scientist review pending.
+- `blog.html` — post-3130 card prepended at top of feed.
+
+### Changed
+- `STATUS.md` — «Тренувальний менеджмент часу» in progress 4/10 → 5/10; next: post-3131 («Відновлення при стисненому розкладі: де можна скоротити і де не можна»); current version updated to v12.72.0.
+- `VERSION` — 12.71.1 → 12.72.0.
+
+---
+
 ## [12.71.1] — 2026-07-04
 
 ### Added
