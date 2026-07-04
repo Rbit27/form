@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [12.58.0] — 2026-07-04
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-75` — SAML SLO High Failure Rate runbook (AL-SLO-01 companion, P1, auto-resolve). CC6.3/CC7.3. Five root causes H1–H5 (IdP outage, cert rotation, db_revocation_failed/R-03, Worker regression, URL misconfiguration). T+0..T+30 response timeline. Four scope queries (R-75-C1..C4). SLO-INC-E-001 per-activation evidence artefact. CSM notification SLA (§R-75.10). Three communication templates. Closes OBSERVABILITY §72.9 item 9.
+- `docs/INCIDENT_RESPONSE.md §R-76` — SLO-CHAIN-01 Integrity Violation runbook (AL-SLO-02 companion, P0, no auto-resolve). CC7.2/CC7.3. Four root causes H1–H4 (SLO_KV TTL expiry, Worker timing, code bug, malicious manipulation). T+0..T+60 response timeline. Four scope queries including canonical retrospective SQL (R-76-C2) and SLO_KV TTL check (R-76-C3). SLO-CHAIN-01 ordering invariant reference. Four-part closure requirement (SQL zero rows + SLO-CHN-E-001 filed + DEC-030 event + compliance-officer sign-off). SLO-CHN-E-001 per-activation evidence artefact. Four communication templates. Closes OBSERVABILITY §72.9 item 10.
+- `docs/SOC2_READINESS.md §166` — SLO-OBS-E-001 registration in §79.4 (evidence count 136 → 137) + §15.1 compliance calendar quarterly row. Closes OBSERVABILITY §72.9 items 7 + 8.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §45.9` — cross-reference obligations subsection (parallel to §46.9). Tracks six §72 commitments — all 🟢 Done this batch. Closes OBSERVABILITY §72.9 item 11.
+- `docs/DECISION_LOG.md DEC-099` — OQ-SLO-OBS-01 resolved: SLO-CHAIN-01 retrospective check as pg_cron job 60 (`slo_chain_integrity_check`, `59 * * * *`, Migration M-0103).
+
+### Changed
+- `docs/OBSERVABILITY.md §72.9` — items 7, 8, 9, 10, 11 marked Done. `§72.10` OQ-SLO-OBS-01 resolved (DEC-099). `§72.11` five pending rows → 🟢 Done. `§72.7` CC7.3 row updated with confirmed R-75/R-76 references. Document v5.18.0 → v5.18.1.
+
+---
+
 ## [12.56.0] — 2026-07-04
 
 ### Added

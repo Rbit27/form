@@ -15491,7 +15491,24 @@ All eight tests must pass before migration 0100 is applied to production. SLO-I-
 
 **SOC 2 CC6.1 impact:** §13.9 notes that full closure requires implementation, integration tests, and audit events. §45 satisfies the implementation specification requirement. Upon §45.8 P0 items deploying to production and 30-day observation, the auditor finding moves from "compensating control documented" (§13 design) to "control implemented and evidenced" (SLO-E-001/002/003). This is a meaningful SOC 2 observation-window advance ahead of the Type II audit period.
 
-Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (tenant nuke — SLO complements but does not replace emergency session revocation), `docs/AUDIT_LOG_SCHEMA.md §SLO-Events` (P0 checklist item 6), `docs/SOC2_READINESS.md §79.4` (SLO-E-001 through SLO-E-004 to add, P1 item 11).
+Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (tenant nuke — SLO complements but does not replace emergency session revocation), `docs/AUDIT_LOG_SCHEMA.md §SLO-Events` (P0 checklist item 6), `docs/SOC2_READINESS.md §79.4` (SLO-E-001 through SLO-E-004 registered in §162 v3.88.0; SLO-OBS-E-001 pending §72.9 item 7).
+
+### §45.9 Cross-Reference Obligations
+
+Parallel to §46.9 (BCL cross-reference obligations). Tracks the status of §72 (SAML SLO Observability) cross-reference commitments.
+
+| Cross-reference obligation | Source | Status |
+|---|---|---|
+| `docs/INCIDENT_RESPONSE.md R-75` (AL-SLO-01 companion — SLO High Failure Rate, P1) | `docs/OBSERVABILITY.md §72.9 item 9` | 🟢 **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.0, §R-75).** |
+| `docs/INCIDENT_RESPONSE.md R-76` (AL-SLO-02 companion — SLO-CHAIN-01 Integrity Violation, P0) | `docs/OBSERVABILITY.md §72.9 item 10` | 🟢 **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.0, §R-76).** |
+| `docs/OBSERVABILITY.md §72` backreference (this §45.9 subsection) | `docs/OBSERVABILITY.md §72.9 item 11` | 🟢 **Done — 2026-07-04 (this §45.9, v2.30).** |
+| `docs/SOC2_READINESS.md §79.4` — SLO-OBS-E-001 registration (count 136 → 137) | `docs/OBSERVABILITY.md §72.9 item 7` | 🟢 **Done — 2026-07-04 (SOC2_READINESS.md §166, evidence count 136 → 137).** |
+| `docs/SOC2_READINESS.md §15.1` — SLO-OBS-E-001 quarterly filing row | `docs/OBSERVABILITY.md §72.9 item 8` | 🟢 **Done — 2026-07-04 (SOC2_READINESS.md §166.2 calendar patch).** |
+| OQ-SLO-OBS-01 resolved — pg_cron job 60 for SLO-CHAIN-01 retrospective check | `docs/OBSERVABILITY.md §72.10` | 🟢 **Resolved — DEC-099 (2026-07-04). Migration M-0103 registers pg_cron job 60 `slo_chain_integrity_check`.** |
+
+---
+
+*v2.30 (2026-07-04): §45.9 cross-reference obligations subsection added. Parallel to §46.9 (BCL cross-reference obligations). Tracks six §72 (SAML SLO Observability) commitments: IR runbooks R-75 + R-76 (items 9/10 — 🟢 Done INCIDENT_RESPONSE v3.40.0), §72 backreference (item 11 — 🟢 Done this section), SOC2_READINESS SLO-OBS-E-001 registration (item 7 — 🟢 Done §166), SOC2_READINESS §15.1 calendar (item 8 — 🟢 Done §166.2), OQ-SLO-OBS-01 resolution (DEC-099 — pg_cron job 60). Cross-reference obligations line in §45.9 gap status update updated (SOC2_READINESS §79.4 registration note updated to reflect §162 completion). Header v2.29 → v2.30. Owner: compliance-officer.*
 
 ---
 
