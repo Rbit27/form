@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.69.0] — 2026-07-04
+
+### Added
+- `content/post-3127-flexible-vs-fixed-schedule.md` — series «Тренувальний менеджмент часу» 3126–3135, post 2/10. «Гнучкий vs. жорсткий розклад тренувань: який стійкіший при нестабільному тижні». Three scheduling architectures (fully fixed, anchor+buffer, weekly quota); failure modes of each; research: Gardner 2012 habit automaticity, Lally 2010 context consistency, Sniehotta 2005 if-then planning; fallback-protocol and decision time-horizon as structural parameters. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3127 card prepended at top of feed.
+
+### Changed
+- `README.md` — series «Тренувальний менеджмент часу» in progress 1/10 → 2/10; roadmap version marker v12.68.0 → v12.69.0; added proposed series «Тренувальний мінімалізм» 3176–3185 and «Читання власних даних» 3186–3195.
+- `STATUS.md` — v12.69.0 current version entry added.
+- `VERSION` — 12.68.0 → 12.69.0.
+
+---
+
 ## [12.68.0] — 2026-07-04
 
 ### Added
