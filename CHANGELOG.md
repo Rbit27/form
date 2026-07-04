@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.27.0] — 2026-07-04
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md v2.88` — Registered five SAML SLO DEC-030 HMAC-chained audit events: `slo.sp_initiated` (7yr/HIGH — SP-initiated LogoutRequest dispatch), `slo.idp_initiated` (7yr/HIGH — IdP-initiated LogoutRequest received), `slo.completed` (7yr/HIGH — SLO completed with IdP response status enum), `slo.failed` (7yr/HIGH — SLO failure with fallback_applied flag), `slo.fallback_local_only` (3yr/STANDARD — local-only session revocation when SLO not configured or IdP unreachable). Full Zod v2 schemas. SLO-CHAIN-01 ordering invariant documented (completion event requires prior initiation anchor; HTTP 422 `SLO_CHAIN_01_VIOLATION`; `slo.failed` exempt). Two retention table rows added. CC6.1/CC6.3 auditor narratives. SOC 2 evidence artefacts table SLO-E-001..SLO-E-004. Closes SSO_SCIM_IMPLEMENTATION §45.8 item 6 (P0/M7).
+- `docs/SOC2_READINESS.md v3.88.0` — §162 · SLO-E-001…SLO-E-004 Registration (CC6.1/CC6.3/CC8.1). §79.4 master evidence table count 128 → 132. Row 129: SLO-E-001 (CC6.1/CC6.3 — SP-initiated chain export, `compliance/evidence/saml-slo/slo-e-001-sp-chain-export.json`). Row 130: SLO-E-002 (CC6.1/CC6.3 — IdP-initiated export, `compliance/evidence/saml-slo/slo-e-002-idp-initiated-export.json`). Row 131: SLO-E-003 (CC6.1 — Integration test results, `compliance/evidence/saml-slo/slo-e-003-okta-integration-test.json`). Row 132: SLO-E-004 (CC8.1 — Migration 0100 log, `compliance/evidence/saml-slo/slo-e-004-migration-0100-log.json`). R2 storage paths specified. §80.4 Vanta mirror update. CC6.1/CC6.3/CC8.1 auditor narratives. Implementation checklist. Closes SSO_SCIM_IMPLEMENTATION §45.8 item 11 (P1/M7).
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §45.8 checklist item 6 marked `[x] Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.88, §SAML-SLO-Events)`.
+- `VERSION` — 12.26.1 → 12.27.0.
+
+---
+
 ## [12.26.1] — 2026-07-04
 
 ### Changed

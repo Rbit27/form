@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.87.0
+# FORM · SOC 2 Type II Readiness v3.88.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -35535,5 +35535,77 @@ A1.2 requires that the entity monitors system capacity and performance against c
 | 4 | Authoring complete — §161 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-04 (SOC2_READINESS.md v3.87.0).** |
 
 ---
+
+## §162 · SLO-E-001…SLO-E-004 Registration (CC6.1/CC6.3/CC8.1 · SSO_SCIM_IMPLEMENTATION §45 · SAML SLO Evidence Artefacts)
+
+> **Date:** 2026-07-04. **Trigger:** `docs/SSO_SCIM_IMPLEMENTATION.md §45.8` item 11 (P1/M7) — "Add SLO-E-001 through SLO-E-004 to `docs/SOC2_READINESS.md §79.4` master evidence table (count 128 → 132); map to CC6.1/CC6.3/CC8.1." **Owner:** compliance-officer + security-engineer + platform-engineer.
+
+### §162.1 Background
+
+SAML Single Logout (SLO) is the federated protocol mechanism that allows FORM (as SP) to propagate a user's logout to the IdP — and vice versa. Without SLO, a FORM local logout does not terminate the user's authentication session at Okta/Entra AD, enabling silent re-authentication without re-entering IdP credentials. `docs/SSO_SCIM_IMPLEMENTATION.md §45` provides the full implementation specification: SP-initiated and IdP-initiated SLO Worker (`saml-slo.ts`), Migration 0100 DDL (`slo_url` + `slo_binding` columns on `tenant_sso_configs`), SAML callback update for `idp_name_id` + `idp_session_id` population, SLO-CHAIN-01 invariant, and a 12-item P0 implementation checklist. Five DEC-030 HMAC-chained events (`slo.sp_initiated`, `slo.idp_initiated`, `slo.completed`, `slo.failed`, `slo.fallback_local_only`) were registered in `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events` (v2.88, 2026-07-04 — item 6 of §45.8 checklist). This section registers the four companion SOC 2 evidence artefacts (SLO-E-001 through SLO-E-004) that close item 11.
+
+### §162.2 §79.4 Master Evidence Table Entries (evidence count 128 → 132)
+
+| # | Artefact ID | TSC | Description | Trigger | Retention | R2 path | Status |
+|---|---|---|---|---|---|---|---|
+| 129 | SLO-E-001 | CC6.1, CC6.3 | SAML SLO SP-initiated chain export: 30-day DEC-030 HMAC chain export of `slo.sp_initiated` + `slo.completed` pairs (and `slo.failed` + `slo.fallback_local_only` for each failed attempt) after M7 go-live. Confirms that every SP-initiated SLO has a terminal event in the immutable chain — no orphan `slo.sp_initiated` without a `completed` or `failed` + `fallback_local_only` closure. | 30-day audit export at T+30 days post M7 go-live; annual nil-export thereafter if zero SP-initiated SLO events in the period | 7yr WORM | `compliance/evidence/saml-slo/slo-e-001-sp-chain-export.json` | 🟡 **Pending — M7 go-live (§45.8 P0 checklist)** |
+| 130 | SLO-E-002 | CC6.1, CC6.3 | SAML SLO IdP-initiated event export: 30-day DEC-030 chain export of `slo.idp_initiated` events (if any fired in the period). `sessions_revoked_count` in each event proves all sessions for the `idp_name_id` were revoked — not just the initiating session. Nil export if no IdP-initiated SLO events fired in the period. | 30-day audit export at T+30 days post M7 go-live | 7yr WORM | `compliance/evidence/saml-slo/slo-e-002-idp-initiated-export.json` | 🟡 **Pending — M7 go-live (§45.8 P0 checklist)** |
+| 131 | SLO-E-003 | CC6.1 | SAML SLO integration test matrix results: full output of SLO-I-001 through SLO-I-008 test executions against Okta developer sandbox (§45.7). Confirms that SP-initiated, IdP-initiated, timeout, fallback, invalid-signature, transient NameID, and SLO-CHAIN-01 scenarios all behave as specified before production deploy. SLO-I-001, SLO-I-004, and SLO-I-003 results are the primary CC6.1 functional evidence; SLO-I-006 (invalid signature rejection) and SLO-I-008 (chain invariant HTTP 422) are the secondary security evidence. | At §45.8 P0 checklist completion — before migration 0100 is applied to production | 7yr WORM | `compliance/evidence/saml-slo/slo-e-003-okta-integration-test.json` | 🟡 **Pending — §45.8 item 8 (P0/M7)** |
+| 132 | SLO-E-004 | CC8.1 | Migration 0100 apply log: Supabase migration log export confirming migration 0100 (`slo_url VARCHAR(1024) NULLABLE`, `slo_binding` enum column) was applied to production; includes: apply timestamp, reviewer (devops-lead) sign-off UUID, `ci.migration_applied` DEC-030 chain event UUID for cross-reference, and adversarial CI test MIG-0100-01…MIG-0100-05 pass/fail summary (§45.2.3). Demonstrates that the SLO schema change followed FORM's documented change management process (CC8.1). | At migration 0100 production apply (§45.8 item 9, P0/M7) | 7yr WORM | `compliance/evidence/saml-slo/slo-e-004-migration-0100-log.json` | 🟡 **Pending — §45.8 item 9 (P0/M7)** |
+
+### §162.3 R2 Storage Specification
+
+| Field | Value |
+|---|---|
+| R2 bucket | `r2:form-compliance` (WORM-enabled, EU region) |
+| R2 API access | `r2:form-api` REVOKED — compliance-officer / devops-lead PAM-elevated manual upload only |
+| Parent folder | `compliance/evidence/saml-slo/` — **NEW subfolder** (no pre-existing parent) |
+| Object versioning | Enabled (WORM — no DELETE, no overwrite) |
+| Filing deadlines | SLO-E-001/002: T+30 days post M7 go-live · SLO-E-003: pre-production deploy · SLO-E-004: at migration 0100 apply |
+
+**Privacy floor (all four artefacts):** Event payloads in SLO-E-001/002 contain FORM-internal UUIDs (`tenant_id`, `slo_request_id`, `session_id` nullable), `idp_name_id` (SAML `NameID` — a federation-layer pseudonym; not a GDPR Art. 9 identifier; contains no health, coaching, or biometric data), timestamps, and enums. `user_id` is present only in `slo.fallback_local_only` events (nullable). SLO-E-003 contains test harness output and Okta sandbox metadata only. SLO-E-004 contains migration SQL metadata and a devops-lead UUID only. No employee name, email, body composition, health metric, or GDPR Art. 9 special-category data in any SLO evidence artefact.
+
+### §162.4 §80.4 Vanta Mirror Update
+
+SLO-E-001 through SLO-E-004 added to §80.4 Vanta mirror registry.
+
+| Evidence ID | Vanta control | Mirror frequency |
+|---|---|---|
+| SLO-E-001 | CC6.1/CC6.3 — federated session termination | 30-day post go-live; annual nil-export thereafter |
+| SLO-E-002 | CC6.1/CC6.3 — IdP-initiated SLO | 30-day post go-live; annual nil-export thereafter |
+| SLO-E-003 | CC6.1 — functional pre-production testing | Once (at §45.8 P0 completion) |
+| SLO-E-004 | CC8.1 — SLO schema change management | Once (at migration 0100 production apply) |
+
+### §162.5 SOC 2 Auditor Narratives
+
+**CC6.1 (Logical and Physical Access Controls — access restriction):** SAML SLO ensures that an enterprise user's IdP session is terminated alongside the FORM session on logout. Without SLO, re-authentication at the IdP would succeed without re-entering credentials, violating the "access is revoked promptly upon termination of the authorized period" requirement. SLO-E-001 30-day chain export provides affirmative evidence that the SP-initiated SLO control was exercised in production. SLO-E-003 integration test results (SLO-I-001: SP-initiated success; SLO-I-004: IdP-initiated success; SLO-I-002/03/05/06/07: edge case and failure handling) prove the control was validated end-to-end against a production-equivalent IdP before go-live.
+
+**CC6.3 (Logical and Physical Access Controls — access removal):** Session revocation is the core CC6.3 control for enterprise SSO tenants. `slo.idp_initiated.sessions_revoked_count` in SLO-E-002 provides field-level evidence that all active sessions for a given `idp_name_id` were revoked — not just the session that initiated the logout. SLO-CHAIN-01 invariant (enforced at the `emit-audit-event` Worker layer, HTTP 422 `SLO_CHAIN_01_VIOLATION`) ensures that no terminal event (`slo.completed` or `slo.fallback_local_only`) can appear in the HMAC chain without a prior initiation anchor — auditors can verify chain completeness with a single SQL join on `slo_request_id`. The three `slo.fallback_local_only` trigger paths (`slo_not_configured`, `idp_timeout`, `no_name_id`) are bounded and documented: they represent configurations or conditions where SLO is not possible, not control failures.
+
+**CC8.1 (Change Management):** SLO-E-004 migration 0100 log confirms that the two `tenant_sso_configs` schema changes (`slo_url`, `slo_binding`) followed FORM's documented change management process: migration SQL authored, reviewed, tested with adversarial CI (MIG-0100-01…MIG-0100-05 covering null-safety, constraint violations, index correctness, rollback, and RLS continuity), staging apply, and production apply with devops-lead sign-off — exactly as required by FORM's migration policy (`docs/DEPLOYMENT.md §Change Management`).
+
+### §162.6 Cross-Reference Obligations Closed
+
+| Cross-reference | Status |
+|---|---|
+| SSO_SCIM_IMPLEMENTATION.md §45.8 item 6 (P0 — register five SLO DEC-030 events in AUDIT_LOG_SCHEMA.md) | [x] **Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.88)** |
+| SSO_SCIM_IMPLEMENTATION.md §45.8 item 11 (P1 — add SLO-E-001…SLO-E-004 to §79.4, count 128 → 132) | [x] **Done — 2026-07-04 (§162.2, this section)** |
+| AUDIT_LOG_SCHEMA.md §SAML-SLO-Events SLO-E-001…004 registration note | [x] **Done — 2026-07-04 (v2.88)** |
+
+### §162.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register SLO-E-001…SLO-E-004 in §79.4 master evidence table (CC6.1/CC6.3/CC8.1; count 128 → 132) | compliance-officer + security-engineer | **P1** | [x] **Done — 2026-07-04 (§162.2, this section).** |
+| 2 | Provision `compliance/evidence/saml-slo/` R2 subfolder (NEW — no pre-existing parent; WORM + versioning) | devops-lead | **P1** | [ ] **Pending — devops-lead; before M7 go-live.** |
+| 3 | Add SLO-E-001…SLO-E-004 to §80.4 Vanta mirror protocol | compliance-officer | **P1** | [x] **Done — 2026-07-04 (§162.4, this section).** |
+| 4 | Collect SLO-E-003 (integration test results) before migration 0100 production apply (§45.8 item 8) | security-engineer | **P0** | [ ] **Pending — §45.8 P0 checklist.** |
+| 5 | Collect SLO-E-004 (migration 0100 log) at production apply (§45.8 item 9) | devops-lead | **P0** | [ ] **Pending — §45.8 P0 checklist.** |
+| 6 | Collect SLO-E-001 + SLO-E-002 at T+30 days post M7 go-live | compliance-officer | **P1** | [ ] **Pending — est. M8.** |
+| 7 | Authoring complete — §162 documentation obligation fulfilled | compliance-officer | **P1** | [x] **Done — 2026-07-04 (SOC2_READINESS.md v3.88.0).** |
+
+---
+
+*v3.88.0 (2026-07-04): §162 — SLO-E-001…SLO-E-004 Registration (CC6.1/CC6.3/CC8.1 · SSO_SCIM_IMPLEMENTATION §45 · SAML SLO). Four SAML SLO evidence artefacts registered in §79.4 master evidence table (count 128 → 132): SLO-E-001 (CC6.1/CC6.3 — SP-initiated SLO chain export, 7yr WORM, `compliance/evidence/saml-slo/slo-e-001-sp-chain-export.json`); SLO-E-002 (CC6.1/CC6.3 — IdP-initiated SLO export, 7yr WORM, `compliance/evidence/saml-slo/slo-e-002-idp-initiated-export.json`); SLO-E-003 (CC6.1 — integration test matrix SLO-I-001…SLO-I-008 results artefact from Okta developer sandbox, 7yr WORM, `compliance/evidence/saml-slo/slo-e-003-okta-integration-test.json`); SLO-E-004 (CC8.1 — Migration 0100 apply log + reviewer sign-off, 7yr WORM, `compliance/evidence/saml-slo/slo-e-004-migration-0100-log.json`). Closes SSO_SCIM_IMPLEMENTATION.md §45.8 item 11 (P1/M7 — add SLO-E-001…SLO-E-004 to §79.4). CC6.1 auditor narrative: SLO-E-001 SP-chain export demonstrates federated session termination was exercised at the IdP layer (not just FORM-local) for all SP-initiated logouts in the first 30 days post M7 go-live. CC6.3 auditor narrative: `sessions_revoked_count` in `slo.idp_initiated` (SLO-E-002) proves all active sessions for a given `idp_name_id` were revoked — not just the initiating session. CC8.1 auditor narrative: SLO-E-004 migration 0100 apply log confirms the `slo_url` + `slo_binding` schema changes followed FORM's change management process (migration SQL review, staging apply, adversarial CI tests MIG-0100-01…MIG-0100-05, production apply with devops-lead sign-off). Privacy floor: SLO-E-001/002 artefacts contain only FORM-internal UUIDs (`tenant_id`, `slo_request_id`, `session_id` nullable), `idp_name_id` (SAML federation-layer pseudonym — not a GDPR Art. 9 identifier, no health data), and timestamps/enums; no employee `user_id` (except `slo.fallback_local_only` which has nullable `user_id`); SLO-E-003/004 contain test harness output and migration SQL metadata only. Cross-references: AUDIT_LOG_SCHEMA.md v2.88 (§SAML-SLO-Events — five `slo.*` DEC-030 events registered); SSO_SCIM_IMPLEMENTATION.md §45 (full SLO spec; §45.8 item 6 🟢 Done v2.88; §45.8 item 11 🟢 Done this section). Owner: compliance-officer + security-engineer + platform-engineer.*
 
 *v3.87.0 (2026-07-04): §161 — AEF-FLUSH-STALE-E-001 Registration (A1.2/CC7.2 · INCIDENT_RESPONSE R-72 · `audit-event-flush` Stale Recovery Evidence). AEF-FLUSH-STALE-E-001 registered in §79.4 master evidence table (count 127 → 128). Evidence class: per-activation (per R-72 incident). Retention: 7yr WORM. TSC: A1.2/CC7.2. R2 path: `compliance/evidence/audit-event-flush/` (NEW subfolder — no pre-existing parent; per-activation folder per YYYY-MM-DD + annual nil attestation). Artefact contents: five files per activation (incident-timeline.md, r72-c1-output.txt, r72-c2-output.txt, dec-030-event-ids.txt, root-cause-analysis.md). Filing deadline: T+60 min (matches P0 resolution SLA). §80.4 Vanta mirror protocol updated: AEF-FLUSH-STALE-E-001 added (per-activation mirror + annual nil attestation within 48h). Closes INCIDENT_RESPONSE.md R-72.11 item 4 (P1 — register AEF-FLUSH-STALE-E-001 in §79.4). R2 subfolder provision pending (devops-lead — §161.6 item 2). Cross-references: INCIDENT_RESPONSE.md R-72 (full runbook — P0 default, A1.2/CC7.2); AUDIT_LOG_SCHEMA.md v2.87 (`system.audit_event_flush_stale_declared` HIGH/7yr + `system.audit_event_flush_restored` LOW/3yr + AEF-FLUSH-STALE-CHAIN-01); OBSERVABILITY.md §12.6 `audit-event-flush` row (v5.15.7 — R-72 cross-reference added). Privacy floor: all five artefact files contain operational infrastructure metadata only; `r72-c2-output.txt` contains aggregate KV key-count scalars (total_pending count, oldest/newest expiration timestamps — not event payload contents); no user_id, tenant_id, coaching content, health data, or GDPR Art. 9 data; access restricted to devops-lead + compliance-officer. Owner: compliance-officer + security-engineer.*

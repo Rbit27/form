@@ -15467,7 +15467,7 @@ All eight tests must pass before migration 0100 is applied to production. SLO-I-
 | 3 | Implement `saml-slo.ts` Worker — IdP-initiated handler (§45.4.3), SP-initiated initiation (§45.4.4), SLO callback handler (§45.4.5), timeout + fallback (§45.4.6) | platform-engineer | **P0** | M7 | [ ] |
 | 4 | Provision `SLO_KV` Cloudflare KV namespace; add binding in `wrangler.toml` per §45.4.2 | devops-lead | **P0** | M7 | [ ] |
 | 5 | Register SLO routes in API gateway router: `POST /auth/saml/slo`, `GET /auth/saml/slo`, `GET /auth/saml/slo/callback` | platform-engineer | **P0** | M7 | [ ] |
-| 6 | Register five DEC-030 events (`slo.sp_initiated`, `slo.idp_initiated`, `slo.completed`, `slo.failed`, `slo.fallback_local_only`) in `docs/AUDIT_LOG_SCHEMA.md §SLO-Events` with Zod schemas from §45.5.2 | compliance-officer | **P0** | M7 | [ ] |
+| 6 | Register five DEC-030 events (`slo.sp_initiated`, `slo.idp_initiated`, `slo.completed`, `slo.failed`, `slo.fallback_local_only`) in `docs/AUDIT_LOG_SCHEMA.md §SLO-Events` with Zod schemas from §45.5.2 | compliance-officer | **P0** | M7 | [x] **Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.88, §SAML-SLO-Events)** |
 | 7 | Enforce SLO-CHAIN-01 invariant in `emit-audit-event` Worker (HTTP 422 on violation) | platform-engineer | **P0** | M7 | [ ] |
 | 8 | Execute SLO-I-001 through SLO-I-008 integration test matrix (§45.7) against Okta developer sandbox; collect SLO-E-003 artefact | security-engineer | **P0** | M7 | [ ] |
 | 9 | Apply Migration 0100 to production; file SLO-E-004 evidence artefact in R2 `compliance/evidence/saml-slo/` | devops-lead | **P0** | M7 | [ ] |
