@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [12.45.0] — 2026-07-04
+
+### Added
+- `content/post-3158-rpe-overconfidence-systematic-bias.md` — Series «Тренувальне мислення» 3156–3165 post 3/10. Надмірна впевненість у RPE: три фази хибної впевненості, конфаундери (накопичена втома, новизна вправи, тепло, очікування, соціальний контекст), різниця між шумом і систематичним зміщенням. Зв'язок з якорінням (3156) і confirmation bias (3157). Операційні принципи зниження overconfidence. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card for post-3158 prepended to feed.
+
+### Changed
+- `VERSION` — 12.44.0 → 12.45.0.
+
 ## [12.44.0] — 2026-07-04
 
 ### Added

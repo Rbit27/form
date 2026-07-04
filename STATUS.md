@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v12.45.0** — 2026-07-04 · content · post-3158 · «Надмірна впевненість у RPE: коли суб'єктивна шкала починає брехати систематично» (series «Тренувальне мислення» 3156–3165, 3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3158 · «Тренувальне мислення» in progress 2/10 → 3/10 · next: post-3159 (series «Тренувальне мислення» 4/10 — «Ефект Даннінга-Крюгера у силовому тренуванні: де знаходиться self-coached атлет на кривій компетентності»)
+
 **v12.44.0** — 2026-07-04 · content · post-3157 · «Ефект підтвердження у виборі тренувальної інформації: що self-coached атлет не читає» (series «Тренувальне мислення» 3156–3165, 2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3157 · «Тренувальне мислення» in progress 1/10 → 2/10 · next: post-3158 (series «Тренувальне мислення» 3/10 — «Надмірна впевненість у RPE: коли суб'єктивна шкала починає брехати систематично»)
 
 **v12.43.0** — 2026-07-04 · content · post-3156 · «Якоріння в тренуванні: чому перша програма визначає всі наступні рішення» (series «Тренувальне мислення» 3156–3165, 1/10 — НОВА СЕРІЯ) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3156 · «Тренувальне мислення» proposed → in progress 1/10 · next: post-3157 (series «Тренувальне мислення» 2/10 — «Ефект підтвердження у виборі тренувальної інформації: що self-coached атлет не читає»)
