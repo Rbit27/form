@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [12.30.0] — 2026-07-04
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md §46` — OIDC Back-Channel Logout Implementation Spec — Worker, Migration 0101, and OIDC Callback Update (M8). Advances G-003 from 🟡 Design complete (§13) to 🟡 Implementation spec complete. Covers: (1) Migration 0101 DDL — `enterprise_sessions.oidc_sub_hash` (SHA-256 hex of OIDC `sub`, nullable TEXT, partial index on `(tenant_id, oidc_sub_hash) WHERE oidc_sub_hash IS NOT NULL AND revoked_at IS NULL`); rollback script; three CI adversarial tests MIG-0101-01 through MIG-0101-03. (2) OIDC callback handler update — `extractOidcBclAttributes()` computes `oidc_sub_hash` via `crypto.subtle.digest` and extracts `idp_session_id` from `sid` claim; raw `sub` never stored in `enterprise_sessions`; `idp_name_id` left NULL for OIDC sessions (SAML-only). IdP `sid` support matrix: Okta ✅ always, Entra ID ✅ with `backchannel_logout_session_required`, Google ❌ sub-only. (3) Worker `apps/api-gateway/src/sso/oidc-backchannel-logout.ts` — 6-step handler (parse form body → decode JWT header for `iss` → emit `backchannel_logout.received` before tenant resolution → resolve tenant from `iss` → verify signature via `jose` `jwtVerify()` with 5-min JWKS TTL and ±5-min clock tolerance → spec checks: `nonce` absent, `events` claim present, `sub`/`sid` present → emit `backchannel_logout.validated` → `revokeOidcSessions()` → emit `backchannel_logout.revoked`); transient DB errors return HTTP 200 and enqueue `REVOCATION_QUEUE` (3 retries: 5/10/20s backoff); `sessions_revoked_count: 0` is valid (no-match per §13.10 Q3). `revokeOidcSessions()`: sid-path uses `idp_session_id = sid`; sub-path uses `oidc_sub_hash = subHash`. Retry queue consumer (`oidc_bcl_retry` message type). (4) Four DEC-030 HMAC-chained events: `backchannel_logout.received` (STANDARD/7yr), `backchannel_logout.validated` (STANDARD/7yr), `backchannel_logout.revoked` (STANDARD/7yr), `backchannel_logout.failed` (HIGH/7yr — P3 Slack `#alerts-enterprise`); Zod v2 schemas for all four. (5) BCL-CHAIN-01 ordering invariant — `backchannel_logout.revoked` requires prior `backchannel_logout.received` anchor with same `bcl_request_id`; HTTP 422 `BCL_CHAIN_01_VIOLATION` on violation; `backchannel_logout.failed` exempt. (6) Three SOC 2 evidence artefacts: BCL-E-001 (30-day event export CC6.1/CC6.3), BCL-E-002 (Okta + Azure AD integration test results CC6.1), BCL-E-003 (Migration 0101 log CC8.1). (7) Eight integration tests BCL-I-001 through BCL-I-008 (Okta sid-path, sub-only path, Azure AD, nonce-present rejection, invalid signature, unknown iss, no-match, BCL-CHAIN-01 enforcement). (8) 10-item implementation checklist: 9× P0/M8, 1× P1/M8. Privacy floor: raw `sub` never in `enterprise_sessions` or audit payloads; SHA-256 hash only. §9 gap registry G-003 updated inline: 🟡 Design complete → 🟡 Implementation spec complete.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — header v2.20 → v2.21; §9 gap registry G-003 updated inline (🟡 Design complete → 🟡 Implementation spec complete, see §46); TOC entries §43–§46 added.
+- `VERSION` — 12.29.0 → 12.30.0.
+
+---
+
 ## [12.29.0] — 2026-07-04
 
 ### Added

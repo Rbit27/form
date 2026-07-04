@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.20
+# FORM · SSO/SCIM Implementation v2.21
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -48,6 +48,10 @@
 40. [OQ-SSO-34.1 Resolution — BDG Guard Window vs. AL-SCIM-MASS-01 Detection Window: Separate Windows Retained (DEC-093)](#40-oq-sso-341-resolution--bdg-guard-window-vs-al-scim-mass-01-detection-window-separate-windows-retained-dec-093)
 41. [OQ-SSO-24.3 & OQ-SSO-24.4 Resolution — PAM Role Naming Distinction & FIDO2 Hardware Key Procurement (DEC-094)](#41-oq-sso-243--oq-sso-244-resolution--pam-role-naming-distinction--fido2-hardware-key-procurement-dec-094)
 42. [OIDC `private_key_jwt` Client Authentication — RFC 7523 Design & Key Management (DEC-097, Closes G-012)](#42-oidc-private_key_jwt-client-authentication--rfc-7523-design--key-management-closes-g-012)
+43. [Migration 0098 Implementation — `tenant_sso_configs` PKJWT Extension + Worker Spec (M5)](#43-migration-0098-implementation--tenant_sso_configs-pkjwt-extension--worker-spec-m5)
+44. [pg_cron DDL, Admin Dashboard PKJWT Panel, and OIDC Onboarding Guide Update (M6)](#44-pg_cron-ddl-admin-dashboard-pkjwt-panel-and-oidc-onboarding-guide-update-m6)
+45. [SAML SLO Implementation Spec — Worker, Migration 0100, and Callback Update (M7)](#45-saml-slo-implementation-spec--worker-migration-0100-and-callback-update-m7)
+46. [OIDC Back-Channel Logout — Implementation Spec, Migration 0101, and OIDC Callback Update (M8)](#46-oidc-back-channel-logout--implementation-spec-migration-0101-and-oidc-callback-update-m8)
 
 ---
 
@@ -1167,7 +1171,7 @@ The following items are not yet built or require a decision before implementatio
 |---|---|---|---|---|
 | G-001 | **SCIM endpoint not yet implemented.** ~~Schema is defined; endpoint code, token authentication, and attribute mapping are not written.~~ **🟡 Design complete — see §27.** Full Cloudflare Worker architecture, token authentication pipeline, User/Group CRUD handlers, idempotency contract, RFC 7644 error format, and six DEC-030 lifecycle events fully specified. Implementation pending per §27.14 checklist (P0 M4/M5). | ~~Critical — blocks any SCIM provisioning~~ **🟡 Design complete; implementation pending §27.14 P0 checklist** | enterprise-architect + platform-engineer | ~~Estimate: 6–8 weeks engineering~~ **Design complete in §27 (v1.9); implementation per §27.14 checklist. SOC 2 CC6.3: advance to 🟢 Closed once §27.14 P0 tasks deploy to production and G-013 DPA block is cleared.** |
 | G-002 | **SAML SLO not yet implemented.** ~~SP-initiated and IdP-initiated SLO are designed but not coded. Logout currently only invalidates FORM session, does not propagate to IdP.~~ **🟡 Design complete — see §13. 🟡 Implementation spec complete — see §45.** Full Worker spec (IdP-initiated handler, SP-initiated initiation + completion), Migration 0100 DDL (5 schema changes), SAML callback update, KV state tracking, SLO-CHAIN-01 ordering invariant, and 12-item implementation checklist specified. | ~~High — required for SOC 2 CC6 (logical access revocation)~~ **🟡 Implementation spec complete; pending §45.8 P0 checklist deployment. SOC 2 CC6.1: advance to 🟢 once §45.8 P0 tasks deploy and integration tests pass against Okta.** | security-engineer + platform-engineer | ~~Estimate: 2–3 weeks~~ **Implementation spec complete in §45 (v2.20, 2026-07-04). Blocked on: §45.8 P0 checklist (Migration 0100, Worker deploy, Okta integration test).** |
-| G-003 | **OIDC back-channel logout not implemented.** The endpoint exists in design but not in code. | High | platform-engineer | Estimate: 1 week (simpler than SLO) |
+| G-003 | **OIDC back-channel logout not implemented.** ~~The endpoint exists in design but not in code.~~ **🟡 Design complete — see §13. 🟡 Implementation spec complete — see §46.** Full Worker spec (`oidc-backchannel-logout.ts`), Migration 0101 DDL (`oidc_sub_hash` column), OIDC callback update, BCL-CHAIN-01 ordering invariant, and 10-item implementation checklist specified. | ~~High~~ **🟡 Implementation spec complete; pending §46.8 P0 checklist deployment. SOC 2 CC6.1: advance to 🟢 once §46.8 P0 tasks deploy and BCL-I-001 + BCL-I-003 integration tests pass against Okta or Entra ID.** | security-engineer + platform-engineer | ~~Estimate: 1 week~~ **Implementation spec complete in §46 (v2.21, 2026-07-04). Blocked on: §46.8 P0 checklist (Migration 0101, Worker deploy, Okta/Azure AD integration test).** |
 | G-004 | **Certificate rotation automation.** The rotation runbook in 8.1 is manual. The 60-day expiry alert cron and the dual-cert metadata endpoint do not exist yet. | Medium — operational risk | devops-lead | Estimate: 1–2 weeks |
 | G-005 | **Google Directory API integration for group sync.** ~~Currently Google Workspace OIDC lacks group membership in ID token. The service account approach is designed but not implemented.~~ **🟡 Design complete — see §21.** Service account credential management, per-tenant KV token storage (`google_svc_token_{client_email}` TTL 55 min), `getGroupsForUser()` Admin SDK call, group-to-role resolution, and `scim.group_synced` DEC-030 audit event chain fully specified in §21. Implementation pending per §21.14 checklist (P0 M4/M5). | ~~Medium — Google Workspace tenants cannot use group-based role mapping without this~~ **🟡 Design complete; implementation blocked on §21.14 P0 checklist tasks** | platform-engineer | ~~Estimate: 2 weeks~~ **Design complete in §21 (v1.7); implementation per §21.14 checklist. SOC 2 CC6: advance to 🟢 Closed once §21.14 P0 tasks deploy to production.** |
 | G-006 | **`tenant_sso_configs.ip_allowlist` enforcement.** Schema column exists; the Cloudflare Worker that enforces IP allowlist on SSO callbacks is not written. | ~~Medium — promised in enterprise contracts~~ **UI design resolved — see §16.10; Worker implementation pending** | platform-engineer | Estimate: 1 week for Worker once §16.10 spec is approved |
@@ -15492,3 +15496,595 @@ Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (tenant nuke — SLO comple
 ---
 
 *v2.20 additions (2026-07-04): §45 — SAML SLO Implementation Spec — Worker, Migration 0100, and Callback Update. Advances G-002 from §13 design-complete to implementation-spec-complete. Resolves all three §13.8 blockers: (1) `node-saml` v4.x SLO support verified — `generateLogoutRequest()`, `generateLogoutResponse()`, `validatePostRequest()`, `validateRedirectSignature()`, `validatePostResponse()` API confirmed; `samlify` rejected; custom XML signing prohibited. (2) Migration 0100 DDL — five new columns: `tenant_sso_configs.slo_url` (nullable TEXT), `tenant_sso_configs.slo_binding` (CHECK HTTP-POST/HTTP-Redirect), `tenant_sso_configs.backchannel_logout_enabled` (BOOLEAN DEFAULT false), `enterprise_sessions.idp_name_id` (TEXT + partial index on not-null + not-revoked), `enterprise_sessions.idp_session_id` (TEXT + partial index); rollback script; five CI adversarial tests MIG-0100-01 through MIG-0100-05. (3) SAML callback handler update — `extractSloAttributes()` extracts NameID + SessionIndex from `node-saml` profile; `enterprise_sessions` INSERT updated; `users.idp_name_id` column spec for JIT provisioning (P1). Worker spec: `apps/api-gateway/src/sso/saml-slo.ts` — IdP-initiated SLO handler (validate LogoutRequest signature via node-saml, revoke matching sessions by `idp_name_id` + optional `idp_session_id`, return signed `LogoutResponse` with `StatusCode: Success` or `Responder`); SP-initiated initiation handler (`initiateSPSlo()` — HTTP-POST preferred, HTTP-Redirect fallback, `SLO_KV` state `slo:{tenant_id}:{slo_request_id}` TTL 15s, `slo.sp_initiated` event); SP-initiated completion handler (`handleSloCallback()` — validate `LogoutResponse`, emit `slo.completed` or `slo.failed` + `slo.fallback_local_only`); 10-second `AbortController` timeout in logout handler (session revoked unconditionally before timeout; SLO is best-effort). Privacy floor: raw `idp_name_id` excluded from all audit payloads; `idp_name_id_hash` SHA-256 used for correlation. Five DEC-030 events: `slo.sp_initiated` (STANDARD/7yr), `slo.idp_initiated` (HIGH/7yr — P3 alert), `slo.completed` (STANDARD/7yr), `slo.failed` (HIGH/7yr — P3 alert), `slo.fallback_local_only` (STANDARD/7yr). Zod v2 schemas for all five events. SLO-CHAIN-01 ordering invariant (HTTP 422 `SLO_CHAIN_01_VIOLATION` — `slo.completed` / `slo.fallback_local_only` requires prior anchor event for same `slo_request_id`; `slo.failed` exempt). Four SOC 2 evidence artefacts: SLO-E-001 (SP chain 30-day export, CC6.1/CC6.3), SLO-E-002 (IdP-initiated 30-day export, CC6.1/CC6.3), SLO-E-003 (Okta integration test results, CC6.1), SLO-E-004 (Migration 0100 log, CC8.1). Eight integration tests SLO-I-001 through SLO-I-008 (SP-initiated happy path, timeout, null SLO URL, IdP-initiated with/without SessionIndex, invalid signature, transient NameID, chain invariant enforcement). 12-item implementation checklist: 9× P0/M7 (Migration 0100 staging + production, callback update, Worker implementation, KV namespace, route registration, AUDIT_LOG_SCHEMA registration, SLO-CHAIN-01 enforcement, integration tests), 3× P1/M7–M8 (users.idp_name_id, SOC2_READINESS §79.4 update, 30-day evidence collection). G-002: 🟡 Design complete → 🟡 Implementation spec complete; 🟢 Closed pending §45.8 P0 deployment + Okta integration test. §9 gap registry updated inline. Header v2.19 → v2.20. Owner: security-engineer + platform-engineer. Review: enterprise-architect + compliance-officer.*
+
+---
+
+## §46 OIDC Back-Channel Logout — Implementation Spec, Migration 0101, and OIDC Callback Update (M8)
+
+**Owner:** security-engineer + platform-engineer
+**Review:** enterprise-architect + compliance-officer
+**Closes:** G-003 design phase → 🟡 Implementation spec complete
+
+---
+
+### §46.1 Purpose and Scope
+
+OIDC back-channel logout design is complete at §13.3 (OpenID Connect Back-Channel Logout 1.0). This section provides the full implementation spec — the OIDC counterpart to §45 (SAML SLO). It resolves all open blockers from §13.8 that apply to the OIDC path and advances G-003 from 🟡 Design complete to 🟡 Implementation spec complete.
+
+**What §46 specifies:**
+
+1. **Migration 0101** — adds `enterprise_sessions.oidc_sub_hash` (SHA-256 of OIDC `sub`) for single-table sub-based revocation without PII storage
+2. **OIDC callback handler update** — populates `idp_session_id` from `sid` claim and `oidc_sub_hash` at login time
+3. **Worker** — `apps/api-gateway/src/sso/oidc-backchannel-logout.ts` (single `POST /auth/oidc/backchannel-logout` handler)
+4. **DEC-030 audit events** — four events: `backchannel_logout.received`, `backchannel_logout.validated`, `backchannel_logout.revoked`, `backchannel_logout.failed`
+5. **BCL-CHAIN-01 ordering invariant** — `backchannel_logout.revoked` requires a prior `backchannel_logout.received` anchor
+6. **SOC 2 evidence artefacts** — BCL-E-001 through BCL-E-003
+7. **Integration tests** — BCL-I-001 through BCL-I-006
+8. **10-item implementation checklist**
+
+**Why OIDC back-channel is simpler than SAML SLO (§45):**
+
+| Dimension | SAML SLO (§45) | OIDC Back-Channel (§46) |
+|---|---|---|
+| Browser involvement | Yes — HTTP-Redirect/POST round-trip | No — direct IdP → FORM POST |
+| Request/response correlation | Required — `slo_request_id` in KV TTL 15s | Not required — stateless per-request |
+| Protocol library dependency | `node-saml` v4.x (SLO-specific API) | `jose` (already in use for OIDC tokens) |
+| State machine | 5-state (initiated → sent → awaiting → completed/failed) | 3-state (received → validated → revoked/failed) |
+| New KV namespace | `SLO_KV` | None required |
+| Migration complexity | 5 new columns (Migration 0100) | 1 new column (Migration 0101) |
+
+Both protocols ultimately call the same `enterprise_sessions` UPDATE. §46.4.2 reuses the same `revocation_reason = 'federated_logout'` pattern.
+
+---
+
+### §46.2 Migration 0101 — `oidc_sub_hash` Column
+
+#### §46.2.1 Rationale
+
+The §13.3.3 revocation SQL uses an indirect lookup for sub-based revocation:
+
+```sql
+user_id = (SELECT id FROM users WHERE tenant_id = $tenant_id AND idp_subject = $sub)
+```
+
+This is correct but requires two round-trips (users lookup → sessions UPDATE). It also requires the Worker to pass the raw `sub` claim through the revocation call, increasing the PII surface.
+
+Adding `oidc_sub_hash` (SHA-256 of `sub`) to `enterprise_sessions` enables a single-table UPDATE with an indexed hash column, matching the privacy pattern of `idp_name_id_hash` in SAML SLO. The raw `sub` is never stored in `enterprise_sessions`; the canonical identity record remains `users.idp_subject`.
+
+#### §46.2.2 Migration File
+
+**Path:** `supabase/migrations/0101_oidc_sub_hash.sql`
+
+```sql
+-- Migration 0101: OIDC back-channel logout — oidc_sub_hash
+-- Adds SHA-256 hash of OIDC sub to enterprise_sessions for single-table sub-based revocation.
+-- Owner: platform-engineer · SOC 2: CC6.1 (logical access revocation)
+
+BEGIN;
+
+ALTER TABLE enterprise_sessions
+  ADD COLUMN oidc_sub_hash TEXT;
+
+-- Partial index: only active OIDC sessions (non-null hash, not yet revoked)
+-- Lookup pattern: WHERE tenant_id = ? AND oidc_sub_hash = ? AND revoked_at IS NULL
+CREATE INDEX CONCURRENTLY idx_enterprise_sessions_oidc_sub
+  ON enterprise_sessions (tenant_id, oidc_sub_hash)
+  WHERE oidc_sub_hash IS NOT NULL AND revoked_at IS NULL;
+
+COMMENT ON COLUMN enterprise_sessions.oidc_sub_hash IS
+  'SHA-256 hex of OIDC sub claim. NULL for SAML sessions and for OIDC sessions '
+  'created before Migration 0101. Used for sub-based back-channel logout revocation '
+  'without storing raw sub PII. See docs/SSO_SCIM_IMPLEMENTATION.md §46.';
+
+COMMIT;
+```
+
+#### §46.2.3 Rollback
+
+```sql
+BEGIN;
+DROP INDEX CONCURRENTLY IF EXISTS idx_enterprise_sessions_oidc_sub;
+ALTER TABLE enterprise_sessions DROP COLUMN IF EXISTS oidc_sub_hash;
+COMMIT;
+```
+
+#### §46.2.4 CI Adversarial Tests
+
+| Test ID | Scenario | Pass criteria |
+|---|---|---|
+| MIG-0101-01 | Apply migration to a table with 10,000 existing rows | Completes in < 30 s; all rows have `oidc_sub_hash = NULL`; zero FK violations |
+| MIG-0101-02 | Concurrent INSERT to `enterprise_sessions` during `CREATE INDEX CONCURRENTLY` | INSERT succeeds; index created without deadlock or blocking |
+| MIG-0101-03 | Rollback: drop column and index | Table shape restored to pre-migration state; dependent views unaffected |
+
+---
+
+### §46.3 OIDC Callback Handler Update — `idp_session_id` and `oidc_sub_hash` Population
+
+**File:** `apps/api-gateway/src/sso/oidc-callback.ts`
+
+When a user authenticates via OIDC, the callback handler validates the ID token and INSERTs an `enterprise_sessions` row. This update adds extraction and storage of two back-channel logout fields.
+
+#### §46.3.1 Claim Extraction
+
+```typescript
+interface OidcBclAttributes {
+  idpSessionId: string | null; // from ID token `sid` claim (OPTIONAL per OIDC spec)
+  oidcSubHash:  string;        // SHA-256 hex of `sub` claim (ALWAYS present in OIDC)
+}
+
+async function extractOidcBclAttributes(
+  idTokenPayload: JWTPayload
+): Promise<OidcBclAttributes> {
+  const sub = idTokenPayload.sub;
+  if (typeof sub !== 'string' || !sub) {
+    // sub is REQUIRED in all OIDC ID tokens (RFC 7519 §4.1.2)
+    throw new Error('OIDC_ID_TOKEN_MISSING_SUB');
+  }
+
+  const subBytes   = new TextEncoder().encode(sub);
+  const hashBuf    = await crypto.subtle.digest('SHA-256', subBytes);
+  const oidcSubHash = Array.from(new Uint8Array(hashBuf))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  const idpSessionId = typeof idTokenPayload.sid === 'string'
+    ? idTokenPayload.sid
+    : null;
+
+  return { idpSessionId, oidcSubHash };
+}
+```
+
+**Privacy note:** The raw `sub` is used only within this function to compute the hash. It is not written to any `enterprise_sessions` column. The raw `sub` is already stored in `users.idp_subject` (populated at JIT provisioning) and is subject to the full GDPR data lifecycle per §14.5.2.
+
+#### §46.3.2 Session INSERT Update
+
+```typescript
+const bclAttrs = await extractOidcBclAttributes(idTokenPayload);
+
+await supabase.from('enterprise_sessions').insert({
+  // ... existing fields unchanged ...
+  idp_session_id: bclAttrs.idpSessionId,  // OIDC sid — null if IdP omitted it
+  oidc_sub_hash:  bclAttrs.oidcSubHash,   // SHA-256 of sub — always set for OIDC
+  // Note: idp_name_id is LEFT NULL for OIDC sessions (SAML-only column)
+});
+```
+
+#### §46.3.3 IdP `sid` Support Matrix
+
+| IdP | Includes `sid` in ID token | Required IdP config |
+|---|---|---|
+| Okta | ✅ Always | No config needed — Okta always includes `sid` |
+| Entra ID (Azure AD) | ✅ Yes, when back-channel logout is configured | Set `backchannel_logout_session_required: true` in Azure AD app registration |
+| Google Workspace | ❌ No | Google OIDC does not include `sid`; sub-based revocation is used |
+| Ping Identity | ✅ Yes | Standard OIDC `sid` claim |
+| OneLogin | ✅ Yes | Standard OIDC `sid` claim |
+
+For Google Workspace tenants, `idp_session_id` is always NULL. Back-channel revocation always uses the sub-based path (all active sessions for `oidc_sub_hash` revoked per §13.10 Q4). This is documented in the IdP onboarding guide and must be disclosed to Google Workspace customers: logging out on one device revokes all FORM sessions for that user.
+
+---
+
+### §46.4 Worker Implementation Spec
+
+**File:** `apps/api-gateway/src/sso/oidc-backchannel-logout.ts`
+**Route:** `POST /auth/oidc/backchannel-logout`
+**Auth:** None required — the signed `logout_token` JWT is self-authenticating per OpenID Connect Back-Channel Logout 1.0 §2.4.
+**Rate limit:** 120 requests/minute per source IP (Cloudflare WAF rule); 60 requests/minute per `iss` value (prevents a single misconfigured IdP from flooding the endpoint).
+
+#### §46.4.1 Request Handler
+
+```typescript
+export async function handleOidcBackchannelLogout(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const bclRequestId = crypto.randomUUID();
+
+  // ── Step 1: Parse logout_token from form body ──────────────────────────────
+  let logoutToken: string;
+  try {
+    const body  = await request.formData();
+    const token = body.get('logout_token');
+    if (!token || typeof token !== 'string') {
+      return new Response('missing logout_token', { status: 400 });
+    }
+    logoutToken = token;
+  } catch {
+    return new Response('invalid request body — expected application/x-www-form-urlencoded', { status: 400 });
+  }
+
+  // ── Step 2: Decode header (without verification) to extract iss ───────────
+  let unverifiedIss: string;
+  try {
+    const { payload } = decodeJwt(logoutToken); // jose: header decode only
+    if (!payload.iss || typeof payload.iss !== 'string') {
+      return new Response('missing iss claim', { status: 400 });
+    }
+    unverifiedIss = payload.iss;
+  } catch {
+    return new Response('malformed JWT', { status: 400 });
+  }
+
+  // Emit received event immediately — before tenant resolution —
+  // so forensics exist even if the iss is unknown or validation fails.
+  await emitAuditEvent({
+    event_type: 'backchannel_logout.received',
+    tenant_id:  null, // not yet resolved; auditor join via bcl_request_id
+    data: {
+      bcl_request_id: bclRequestId,
+      iss:            unverifiedIss,
+      received_at:    new Date().toISOString(),
+    },
+  });
+
+  // ── Step 3: Resolve tenant from iss ────────────────────────────────────────
+  const tenantConfig = await env.DB
+    .prepare(`
+      SELECT tenant_id, oidc_issuer, oidc_client_id, oidc_jwks_uri,
+             backchannel_logout_enabled
+      FROM tenant_sso_configs
+      WHERE oidc_issuer = ?1 AND protocol = 'oidc'
+      LIMIT 1
+    `)
+    .bind(unverifiedIss)
+    .first<TenantSsoConfig>();
+
+  if (!tenantConfig) {
+    // Unknown iss: no tenant found. Return 400 — do not leak tenant existence.
+    return new Response('unknown issuer', { status: 400 });
+  }
+
+  if (!tenantConfig.backchannel_logout_enabled) {
+    return new Response('backchannel logout not enabled for this tenant', { status: 501 });
+  }
+
+  // ── Step 4: Verify JWT signature and standard claims ──────────────────────
+  let payload: JWTPayload;
+  try {
+    const jwks = createRemoteJWKSet(new URL(tenantConfig.oidc_jwks_uri), {
+      cacheMaxAge: 5 * 60 * 1000, // 5-minute TTL per §13.3.2
+    });
+
+    const { payload: verified } = await jwtVerify(logoutToken, jwks, {
+      issuer:         tenantConfig.oidc_issuer,
+      audience:       tenantConfig.oidc_client_id,
+      clockTolerance: 300, // ±5 minutes per §13.3.2 `iat` check
+    });
+    payload = verified;
+  } catch (err) {
+    await emitAuditEvent({
+      event_type: 'backchannel_logout.failed',
+      tenant_id:  tenantConfig.tenant_id,
+      data: { bcl_request_id: bclRequestId, reason: 'jwt_verification_failed', error: String(err) },
+    });
+    return new Response('invalid logout_token signature or claims', { status: 400 });
+  }
+
+  // ── Step 5: Spec-required additional checks ────────────────────────────────
+  // (a) nonce MUST NOT be present — distinguishes logout_token from ID token
+  if (payload.nonce !== undefined) {
+    await emitAuditEvent({
+      event_type: 'backchannel_logout.failed',
+      tenant_id:  tenantConfig.tenant_id,
+      data: { bcl_request_id: bclRequestId, reason: 'nonce_present' },
+    });
+    return new Response('logout_token must not contain nonce', { status: 400 });
+  }
+
+  // (b) events claim must contain the backchannel-logout event URI
+  const eventsMap = payload['events'] as Record<string, unknown> | undefined;
+  if (!eventsMap?.['http://schemas.openid.net/event/backchannel-logout']) {
+    await emitAuditEvent({
+      event_type: 'backchannel_logout.failed',
+      tenant_id:  tenantConfig.tenant_id,
+      data: { bcl_request_id: bclRequestId, reason: 'missing_events_claim' },
+    });
+    return new Response('missing backchannel-logout event claim', { status: 400 });
+  }
+
+  // (c) sub or sid must be present
+  const sub = typeof payload.sub === 'string' ? payload.sub : null;
+  const sid = typeof payload.sid === 'string' ? payload.sid : null;
+
+  if (!sub && !sid) {
+    await emitAuditEvent({
+      event_type: 'backchannel_logout.failed',
+      tenant_id:  tenantConfig.tenant_id,
+      data: { bcl_request_id: bclRequestId, reason: 'neither_sub_nor_sid' },
+    });
+    return new Response('logout_token must contain sub or sid', { status: 400 });
+  }
+
+  // Privacy: never store raw sub in audit events — hash only
+  const subHash = sub ? await sha256hex(sub) : null;
+
+  await emitAuditEvent({
+    event_type: 'backchannel_logout.validated',
+    tenant_id:  tenantConfig.tenant_id,
+    data: {
+      bcl_request_id:    bclRequestId,
+      iss:               tenantConfig.oidc_issuer,
+      sub_hash:          subHash,
+      sid:               sid,
+      revocation_method: sid ? 'sid' : 'sub',
+    },
+  });
+
+  // ── Step 6: Revoke sessions ────────────────────────────────────────────────
+  let revokedCount: number;
+  try {
+    revokedCount = await revokeOidcSessions({
+      env, tenantId: tenantConfig.tenant_id, subHash, sid,
+    });
+  } catch (err) {
+    // Transient DB error. Accept the token (return 200) and enqueue for retry.
+    // Rationale: returning 503 may trigger IdP retry storms; at-least-once
+    // delivery is preferable over double-revocation risk.
+    await env.REVOCATION_QUEUE.send({
+      type:            'oidc_bcl_retry',
+      tenant_id:       tenantConfig.tenant_id,
+      sub_hash:        subHash,
+      sid,
+      bcl_request_id:  bclRequestId,
+      attempt:         1,
+    });
+    await emitAuditEvent({
+      event_type: 'backchannel_logout.failed',
+      tenant_id:  tenantConfig.tenant_id,
+      data: {
+        bcl_request_id: bclRequestId,
+        reason:         'db_error_deferred_to_queue',
+        error:          String(err),
+      },
+    });
+    return new Response('OK', { status: 200 });
+  }
+
+  await emitAuditEvent({
+    event_type: 'backchannel_logout.revoked',
+    tenant_id:  tenantConfig.tenant_id,
+    data: {
+      bcl_request_id:        bclRequestId,
+      sessions_revoked_count: revokedCount,
+      revocation_method:     sid ? 'sid' : 'sub',
+      sub_hash:              subHash,
+      async:                 false,
+    },
+  });
+
+  return new Response('OK', { status: 200 });
+}
+```
+
+#### §46.4.2 `revokeOidcSessions()` Helper
+
+```typescript
+async function revokeOidcSessions(opts: {
+  env:       Env;
+  tenantId:  string;
+  subHash:   string | null;
+  sid:       string | null;
+}): Promise<number> {
+  const { env, tenantId, subHash, sid } = opts;
+
+  const { results } = sid
+    ? await env.DB
+        .prepare(`
+          UPDATE enterprise_sessions
+          SET revoked_at = now(), revocation_reason = 'federated_logout'
+          WHERE tenant_id = ?1
+            AND idp_session_id = ?2
+            AND revoked_at IS NULL
+          RETURNING session_id
+        `)
+        .bind(tenantId, sid)
+        .all<{ session_id: string }>()
+    : await env.DB
+        .prepare(`
+          UPDATE enterprise_sessions
+          SET revoked_at = now(), revocation_reason = 'federated_logout'
+          WHERE tenant_id = ?1
+            AND oidc_sub_hash = ?2
+            AND revoked_at IS NULL
+          RETURNING session_id
+        `)
+        .bind(tenantId, subHash)
+        .all<{ session_id: string }>();
+
+  // revokedCount = 0 is valid — IdP may send logout for a session FORM has no record of.
+  // Return 200 regardless (§13.10 Q3).
+  return results.length;
+}
+```
+
+#### §46.4.3 Retry Queue Consumer (`REVOCATION_QUEUE`)
+
+Cloudflare Queue consumer (`apps/api-gateway/src/queues/revocation.ts`):
+
+```typescript
+export async function handleRevocationQueueMessage(
+  message: Message<RevocationTask>,
+  env: Env
+): Promise<void> {
+  const task = message.body;
+
+  if (task.type !== 'oidc_bcl_retry') return;
+  if (task.attempt > 3) {
+    await emitAuditEvent({
+      event_type: 'backchannel_logout.failed',
+      tenant_id:  task.tenant_id,
+      data: {
+        bcl_request_id: task.bcl_request_id,
+        reason:         'max_retries_exceeded',
+      },
+    });
+    // P2 alert — does not page on-call unless exceeds threshold
+    await env.PAGERDUTY.trigger({ severity: 'warning', summary: `BCL retry exhausted for tenant ${task.tenant_id}` });
+    message.ack();
+    return;
+  }
+
+  try {
+    await revokeOidcSessions({ env, tenantId: task.tenant_id, subHash: task.sub_hash, sid: task.sid });
+    await emitAuditEvent({
+      event_type: 'backchannel_logout.revoked',
+      tenant_id:  task.tenant_id,
+      data: {
+        bcl_request_id: task.bcl_request_id,
+        sessions_revoked_count: -1, // unknown at retry time
+        revocation_method: task.sid ? 'sid' : 'sub',
+        async: true,
+      },
+    });
+    message.ack();
+  } catch {
+    message.retry({ delaySeconds: Math.pow(2, task.attempt) * 5 }); // 5s, 10s, 20s
+    message.body.attempt++;
+  }
+}
+```
+
+---
+
+### §46.5 DEC-030 Audit Event Registration
+
+Four events must be registered in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`. These extend the three events defined in §13.7 with a `backchannel_logout.failed` event and full Zod v2 schemas.
+
+#### §46.5.1 Event Table
+
+| Event type | Severity | Retention | Description | Alert |
+|---|---|---|---|---|
+| `backchannel_logout.received` | STANDARD | 7yr WORM | `logout_token` received at endpoint; not yet validated | None |
+| `backchannel_logout.validated` | STANDARD | 7yr WORM | `logout_token` passed all checks; revocation initiated | None |
+| `backchannel_logout.revoked` | STANDARD | 7yr WORM | Sessions revoked (`count = 0` is valid) | None |
+| `backchannel_logout.failed` | HIGH | 7yr WORM | Validation failed or DB error; includes `reason` enum | P3 Slack `#alerts-enterprise` |
+
+**BCL-CHAIN-01 invariant:** `backchannel_logout.revoked` MUST be preceded by a `backchannel_logout.received` event with the same `bcl_request_id` within the same tenant. The `emit-audit-event` Worker enforces this: if `backchannel_logout.revoked` arrives without an anchor, it returns HTTP 422 `BCL_CHAIN_01_VIOLATION`. `backchannel_logout.failed` is exempt from this invariant (it may arrive without a prior received event when validation fails at the JWT decode step before the received event can be emitted — edge case: Worker crash between emit and validation).
+
+#### §46.5.2 Zod v2 Schemas
+
+```typescript
+// AUDIT_LOG_SCHEMA.md §BCL-Events — Zod v2 schemas
+
+import { z } from 'zod/v2';
+
+// ── backchannel_logout.received ───────────────────────────────────────────────
+export const BclReceivedData = z.object({
+  bcl_request_id: z.string().uuid(),
+  iss:            z.string().url(),
+  received_at:    z.string().datetime(),
+});
+
+// ── backchannel_logout.validated ──────────────────────────────────────────────
+export const BclValidatedData = z.object({
+  bcl_request_id:    z.string().uuid(),
+  iss:               z.string().url(),
+  sub_hash:          z.string().length(64).nullable(),  // SHA-256 hex; null if only sid present
+  sid:               z.string().nullable(),
+  revocation_method: z.enum(['sid', 'sub']),
+});
+
+// ── backchannel_logout.revoked ────────────────────────────────────────────────
+export const BclRevokedData = z.object({
+  bcl_request_id:        z.string().uuid(),
+  sessions_revoked_count: z.number().int().min(0),
+  revocation_method:     z.enum(['sid', 'sub']),
+  sub_hash:              z.string().length(64).nullable(),
+  async:                 z.boolean(),
+});
+
+// ── backchannel_logout.failed ─────────────────────────────────────────────────
+export const BclFailedData = z.object({
+  bcl_request_id: z.string().uuid(),
+  reason: z.enum([
+    'jwt_verification_failed',
+    'missing_events_claim',
+    'nonce_present',
+    'neither_sub_nor_sid',
+    'db_error_deferred_to_queue',
+    'max_retries_exceeded',
+  ]),
+  error: z.string().optional(), // raw error message — excluded from PagerDuty payload
+});
+```
+
+#### §46.5.3 BCL-CHAIN-01 Ordering Invariant Detail
+
+```
+BCL-CHAIN-01: backchannel_logout.revoked must have a prior anchor
+
+Checked at: emit-audit-event Worker, before writing backchannel_logout.revoked
+Anchor event: backchannel_logout.received with same bcl_request_id + tenant_id
+Anchor window: 60 seconds (TTL in audit KV index)
+Failure response: HTTP 422 { code: "BCL_CHAIN_01_VIOLATION", bcl_request_id }
+Exemption: backchannel_logout.failed is NOT subject to BCL-CHAIN-01
+
+Rationale: Ensures every successful revocation is traceable to an inbound request
+event, preventing phantom revocation records that could obscure session tampering.
+```
+
+---
+
+### §46.6 SOC 2 Evidence Artefacts
+
+| ID | Description | SOC 2 criteria | Collection method | Retention | R2 path |
+|---|---|---|---|---|---|
+| BCL-E-001 | 30-day `backchannel_logout.*` audit export — all tenants with BCL enabled | CC6.1, CC6.3 | Automated monthly export via `compliance/scripts/export-bcl-events.sh`; signed JSON Lines | 7yr WORM | `compliance/evidence/oidc-bcl/bcl-e-001-30day-export.jsonl` |
+| BCL-E-002 | Integration test results — Okta + Azure AD BCL against developer sandboxes | CC6.1 | CI run artefact from §46.8 BCL-I-001 and BCL-I-003; compliance-officer files after BCL-I pass | 7yr WORM | `compliance/evidence/oidc-bcl/bcl-e-002-integration-test.json` |
+| BCL-E-003 | Migration 0101 applied — Supabase migration log export | CC8.1 (change management) | Migration apply timestamp + reviewer sign-off | 7yr WORM | `compliance/evidence/oidc-bcl/bcl-e-003-migration-0101-log.json` |
+
+**Collection responsibility:** compliance-officer files BCL-E-001 at T+30 days post M8 go-live. Platform-engineer files BCL-E-002 at P0 checklist completion. devops-lead files BCL-E-003 at migration apply.
+
+BCL-E-001 through BCL-E-003 must be added to `docs/SOC2_READINESS.md §79.4` master evidence table (count 132 → 135) in a follow-on commit. This is §46.9 item 9 (P1).
+
+---
+
+### §46.7 Integration Test Matrix
+
+| Test ID | Scenario | IdP | Expected outcome |
+|---|---|---|---|
+| BCL-I-001 | Happy path — `sid` present; single session revoked | Okta developer sandbox | `backchannel_logout.received` → `backchannel_logout.validated` → `backchannel_logout.revoked` (`sessions_revoked_count: 1`, `revocation_method: sid`); HTTP 200 returned within 2s |
+| BCL-I-002 | Happy path — `sub` only; all user sessions revoked | Synthetic IdP (mock) | `revocation_method: sub`; `sessions_revoked_count` = all active sessions for sub; HTTP 200 |
+| BCL-I-003 | Happy path — Azure AD, `sid` present | Entra ID developer tenant | Same as BCL-I-001; validates `backchannel_logout_session_required` config on Azure |
+| BCL-I-004 | `nonce` present in logout_token | Synthetic | `backchannel_logout.failed` (`reason: nonce_present`); HTTP 400 |
+| BCL-I-005 | Invalid JWT signature (tampered token) | Synthetic | `backchannel_logout.failed` (`reason: jwt_verification_failed`); HTTP 400; no sessions revoked |
+| BCL-I-006 | `logout_token` with unknown `iss` | Synthetic | HTTP 400 (`unknown issuer`); `backchannel_logout.received` emitted with `tenant_id: null` |
+| BCL-I-007 | `sid` does not match any `enterprise_sessions.idp_session_id` (no-match path) | Synthetic | `backchannel_logout.revoked` with `sessions_revoked_count: 0`; HTTP 200 (per §13.10 Q3) |
+| BCL-I-008 | BCL-CHAIN-01: `backchannel_logout.revoked` emitted without prior anchor | Test harness (direct `emit-audit-event` call) | HTTP 422 `BCL_CHAIN_01_VIOLATION`; revoked event not written |
+
+BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
+
+---
+
+### §46.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply Migration 0101 to staging; run CI adversarial tests MIG-0101-01 through MIG-0101-03 | devops-lead | **P0** | M8 | [ ] |
+| 2 | Update OIDC callback handler (`oidc-callback.ts`) to extract and store `idp_session_id` (from `sid`) and `oidc_sub_hash` (from `sub`) per §46.3 | platform-engineer | **P0** | M8 | [ ] |
+| 3 | Implement `oidc-backchannel-logout.ts` Worker per §46.4.1 — full handler including `revokeOidcSessions()` and retry queue dispatch | platform-engineer | **P0** | M8 | [ ] |
+| 4 | Register route `POST /auth/oidc/backchannel-logout` in API gateway router; add Cloudflare rate-limit rules | platform-engineer | **P0** | M8 | [ ] |
+| 5 | Implement `REVOCATION_QUEUE` Cloudflare Queue consumer per §46.4.3 | platform-engineer | **P0** | M8 | [ ] |
+| 6 | Register four DEC-030 audit events (`backchannel_logout.received`, `.validated`, `.revoked`, `.failed`) with Zod v2 schemas in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` | compliance-officer | **P0** | M8 | [ ] |
+| 7 | Enforce BCL-CHAIN-01 invariant in `emit-audit-event` Worker (HTTP 422 on violation) | platform-engineer | **P0** | M8 | [ ] |
+| 8 | Execute BCL-I-001 through BCL-I-008 integration test matrix; collect BCL-E-002 artefact | security-engineer | **P0** | M8 | [ ] |
+| 9 | Apply Migration 0101 to production; file BCL-E-003 in R2 `compliance/evidence/oidc-bcl/` | devops-lead | **P0** | M8 | [ ] |
+| 10 | Add BCL-E-001 through BCL-E-003 to `docs/SOC2_READINESS.md §79.4` master evidence table (count 132 → 135); map to CC6.1/CC6.3/CC8.1 | compliance-officer | **P1** | M8 | [ ] |
+
+**G-003 will advance from 🟡 Implementation spec complete to 🟢 Implementation complete** when items 1–9 are deployed to production and BCL-I-001 + BCL-I-003 integration tests pass against at least one production IdP (Okta or Entra ID).
+
+---
+
+### §46.9 Gap Status Update
+
+| Gap | Previous status | Updated status | Notes |
+|---|---|---|---|
+| G-003 — OIDC back-channel logout | 🟡 Design complete, implementation pending (§13) | 🟡 Implementation spec complete, deployment pending | Worker spec complete (§46.4). Migration 0101 DDL ready (§46.2). OIDC callback update specified (§46.3). BCL-CHAIN-01 invariant defined (§46.5.3). 10-item implementation checklist in §46.8. Advance to 🟢 on P0 checklist completion + Okta or Azure AD integration test. |
+
+**SOC 2 CC6.1 impact:** Mirroring §45.9 for SAML SLO — upon §46.8 P0 items deploying to production and a 30-day observation window producing BCL-E-001, the auditor finding for CC6.1 (OIDC session revocation path) moves from "compensating control documented" to "control implemented and evidenced." Together with §45 (SAML SLO), this closes the federated logout coverage for both supported SSO protocols.
+
+Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (emergency session revocation — BCL is the normal path; R-01 is the break-glass path), `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (P0 checklist item 6), `docs/SOC2_READINESS.md §79.4` (BCL-E-001 through BCL-E-003 to add, P1 item 10).
+
+---
+
+*v2.21 additions (2026-07-04): §46 — OIDC Back-Channel Logout Implementation Spec — Worker, Migration 0101, and OIDC Callback Update. Advances G-003 from §13 design-complete to implementation-spec-complete. Key decisions: (1) Migration 0101 adds `oidc_sub_hash` (SHA-256 hex of OIDC `sub`) to `enterprise_sessions` — single-table UPDATE for sub-based revocation; partial index on `(tenant_id, oidc_sub_hash) WHERE oidc_sub_hash IS NOT NULL AND revoked_at IS NULL`; rollback via DROP COLUMN; three CI adversarial tests MIG-0101-01 through MIG-0101-03. (2) OIDC callback handler update — `extractOidcBclAttributes()` computes `oidc_sub_hash` via `crypto.subtle.digest('SHA-256', ...)` and extracts `idp_session_id` from `sid` claim; raw `sub` never written to `enterprise_sessions`; `idp_name_id` left NULL for OIDC sessions (SAML-only). (3) Worker `oidc-backchannel-logout.ts` — 6-step handler: parse form body → decode JWT header for iss → emit `backchannel_logout.received` (before tenant resolution, for forensics) → resolve tenant from iss → verify JWT signature via `jose` `jwtVerify()` (same library as §12 access token) with 5-minute JWKS TTL → spec checks (nonce absent, `events` claim present, sub/sid present) → emit `backchannel_logout.validated` → call `revokeOidcSessions()` (sid-path: `idp_session_id = sid`; sub-path: `oidc_sub_hash = subHash`) → emit `backchannel_logout.revoked`; transient DB errors return HTTP 200 and enqueue `REVOCATION_QUEUE` (3 retries with 5/10/20s backoff); no-match (revokedCount = 0) returns HTTP 200 per §13.10 Q3; retry queue consumer handles `oidc_bcl_retry` message type. (4) Four DEC-030 HMAC-chained events: `backchannel_logout.received` (STANDARD/7yr), `backchannel_logout.validated` (STANDARD/7yr), `backchannel_logout.revoked` (STANDARD/7yr), `backchannel_logout.failed` (HIGH/7yr — P3 Slack); Zod v2 schemas. (5) BCL-CHAIN-01 ordering invariant (`backchannel_logout.revoked` requires prior `backchannel_logout.received` anchor; HTTP 422 `BCL_CHAIN_01_VIOLATION` on violation; `backchannel_logout.failed` exempt). (6) Three SOC 2 evidence artefacts: BCL-E-001 (30-day event export, CC6.1/CC6.3), BCL-E-002 (Okta + Azure AD integration test results, CC6.1), BCL-E-003 (Migration 0101 log, CC8.1). (7) Eight integration tests BCL-I-001 through BCL-I-008 (Okta sid-path, sub-only path, Azure AD, nonce-present rejection, invalid signature, unknown iss, no-match path, BCL-CHAIN-01 enforcement). (8) 10-item implementation checklist: 9× P0/M8, 1× P1/M8. (9) §46.3.3 IdP `sid` support matrix — Okta ✅ always, Entra ID ✅ with config, Google ❌ sub-only. G-003: 🟡 Design complete → 🟡 Implementation spec complete; 🟢 Closed pending §46.8 P0 deployment + Okta/Entra integration test. §9 gap registry updated inline below. Header v2.20 → v2.21. Privacy floor: raw `sub` never in `enterprise_sessions`; raw `sub` never in audit event payloads; `sub_hash` SHA-256 used throughout; `sid` is non-PII per OIDC spec (opaque session identifier). Owner: security-engineer + platform-engineer. Review: enterprise-architect + compliance-officer.*
