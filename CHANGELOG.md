@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.52.0] — 2026-07-04
+
+### Added
+- `content/post-3165-cognitive-traps-synthesis-training-thinking.md` — Editorial series post 3165. «Синтез 3156–3165: десять когнітивних пасток і як їх обходити без зовнішнього спостерігача». Серія «Тренувальне мислення» 3156–3165 (10/10 — SERIES COMPLETE). Каталог десяти когнітивних пасток: якоріння, підтвердження, надмірна впевненість у RPE, Даннінг-Крюгер, помилка планування, sunk cost, контекстна ригідність, некритична оцінка поради, дослівне прочитання досліджень, відсутність зовнішнього спостерігача. Три метамеханізми: захист поточної моделі, помилкова калібрація, підміна оцінки якості. Три кластери, де пастки з'являються разом (застрягла програма, інформаційна ехо-камера, нереалістичне планування). Операційна система без тренера: чотири принципи + функціональні замінники зовнішнього спостерігача. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3165 card prepended at top of feed (series badge: «Тренувальне мислення 10/10 — SERIES COMPLETE»).
+
+### Changed
+- `README.md` — series «Тренувальне мислення» 3156–3165 status: in progress 9/10 → COMPLETE 10/10; post-3165 table row updated from proposed → draft with v12.52.0 filename; series «Тренувальна автономія» 3166–3175 status: proposed → in progress 0/10; version badge v12.51.0 → v12.52.0.
+- `STATUS.md` — current version updated to v12.52.0; next task: post-3166.
+- `VERSION` — 12.51.1 → 12.52.0.
+
+---
+
 ## [12.51.1] — 2026-07-04
 
 ### Changed

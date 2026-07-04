@@ -6,7 +6,9 @@
 
 ## Current version
 
-**v12.51.0** — 2026-07-04 · content · post-3164 · «Як читати наукові рекомендації і не застосовувати їх неправильно — контекст, ефект-розмір, популяція» (series «Тренувальне мислення» 3156–3165, 9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3164 · «Тренувальне мислення» in progress 8/10 → 9/10 · README: series «Тренувальна автономія» 3166–3175 proposed · next: post-3165 (series «Тренувальне мислення» 10/10 — синтез серії)
+**v12.52.0** — 2026-07-04 · content · post-3165 · «Синтез 3156–3165: десять когнітивних пасток і як їх обходити без зовнішнього спостерігача» · series «Тренувальне мислення» 3156–3165 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-3165 · README: «Тренувальне мислення» COMPLETE 10/10, «Тренувальна автономія» 3166–3175 in progress 0/10 · next: post-3166 («Чому self-coached атлет потребує системи рішень, а не набору правил»)
+
+**v12.51.1** — 2026-07-04 · enterprise · SSO_SCIM §46.13 + §46.14 Migration 0101 deploy specs · v12.51.1
 
 **v12.50.0** — 2026-07-04 · content · post-3163 · «Як self-coached атлет оцінює якість поради — навіть без тренера» (series «Тренувальне мислення» 3156–3165, 8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3163 · «Тренувальне мислення» in progress 7/10 → 8/10 · next: post-3164 (series «Тренувальне мислення» 9/10 — когнітивне перевантаження від надлишку «гарних порад»)
 
