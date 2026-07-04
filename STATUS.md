@@ -6,6 +6,7 @@
 
 ## Current version
 
+**v12.79.0** — 2026-07-04 · content · post-3134 · «Тренувальна рутина vs. тренувальна гнучкість: де баланс» · series «Тренувальний менеджмент часу» 3126–3135 (9/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3134 · «Тренувальний менеджмент часу» in progress 8/10 → 9/10 · next: post-3135 (synthesis — SERIES FINALE 10/10)
 **v12.78.0** — 2026-07-04 · content · post-3133 · «Мікросесії і подрібнений об'єм: коли це виправдано, коли — ні» · series «Тренувальний менеджмент часу» 3126–3135 (8/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3133 · «Тренувальний менеджмент часу» in progress 7/10 → 8/10 · next: post-3134 («Тренувальна рутина vs. тренувальна гнучкість: де баланс»)
 **v12.77.0** — 2026-07-04 · content · post-12 · «Техніка або інтенсивність: чому форма — це не безпека, а продуктивність» · editorial post-12 · clinical-safety PASS · sports-scientist review pending · blog.html card prepended for post-12 · next: post-3133 («Мікросесії і подрібнений об'єм: коли це виправдано, коли — ні»)
 **v12.76.0** — 2026-07-04 · enterprise · DATA_MODEL §53 SAML SLO Migration 0100 · five columns canonical (slo_url, slo_binding, backchannel_logout_enabled, idp_name_id, idp_session_id) · SSO_SCIM §45.9 cross-ref patched · header v1.43 → v1.45 · owner: enterprise-architect

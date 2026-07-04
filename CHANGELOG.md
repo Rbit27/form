@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [12.79.0] — 2026-07-04
+
+### Added
+- `content/post-3134-training-routine-vs-flexibility.md` — Series «Тренувальний менеджмент часу» 3126–3135 post 9/10. «Тренувальна рутина vs. тренувальна гнучкість: де баланс». Baumeister (1998) ego depletion і когнітивна ефективність; Wood (2002) автоматизація звичок; Gould & Maynard (2009) адаптивне подолання vs. ригідність; Cotterill (2010) передсесійний ритуал; Flett & Hewitt (2002) адаптивний vs. дезадаптивний перфекціонізм. Операційна модель «жорсткий хребет, гнучка периферія»: фіксовані елементи (якірний рух, прогресійна логіка, MWS, логування) vs. гнучкі (день, час, тривалість, допоміжний об'єм). clinical-safety NOT_REQUIRED.
+- `blog.html` — post-3134 card prepended at top of feed.
+
+### Changed
+- `STATUS.md` — v12.78.0 → v12.79.0; series «Тренувальний менеджмент часу» 8/10 → 9/10; next: post-3135 (synthesis, SERIES FINALE).
+
+---
+
 ## [12.78.0] — 2026-07-04
 
 ### Added
