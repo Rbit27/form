@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.68.0] — 2026-07-04
+
+### Added
+- `content/post-3126-time-as-training-resource.md` — Block 3126–3135 series «Тренувальний менеджмент часу» post 1/10. «Чому «нестача часу» — операційна проблема, а не проблема мотивації». Three types of time constraints (insufficient windows, unpredictable schedule, unprioritzed slots); research base: Schoenfeld 2016 frequency meta-analysis, Krieger 2010, McLester 2003, Ralston 2017 on compressed protocols; three-level time audit (weekly resource, window duration, week structure); operational reframe and common traps. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3126 card prepended at top of feed.
+
+### Changed
+- `README.md` — series «Тренувальний менеджмент часу» 3126–3135 proposed → in progress 1/10; series «Тренувальна автономія» 3166–3175 in progress 9/10 → COMPLETE 10/10; roadmap version marker updated v12.65.0 → v12.68.0.
+- `STATUS.md` — v12.67.0 entry added (enterprise QBR runbook); v12.68.0 current version entry added.
+- `VERSION` — 12.67.0 → 12.68.0.
+
+---
+
 ## [12.67.0] — 2026-07-04
 
 ### Added

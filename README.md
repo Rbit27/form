@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 in progress 9/10 · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.65.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 in progress 1/10 · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 COMPLETE 10/10 · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.68.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3534,13 +3534,13 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3124 | Квартальний аудит і коли звертатися до тренера: критерії рішення для self-coached атлета | proposed |
 | 3125 | Синтез 3116–3125: система самодіагностики — п'ять компетенцій self-coached атлета | proposed |
 
-### Editorial series: 3126–3135 — Тренувальний менеджмент часу: як self-coached атлет будує тренування навколо реального графіку (proposed · v12.17.0)
+### Editorial series: 3126–3135 — Тренувальний менеджмент часу: як self-coached атлет будує тренування навколо реального графіку (in progress 1/10 · v12.68.0)
 
 Серія про операційну реальність тренування: не «як тренуватися правильно», а «як тренуватися регулярно при непередбачуваному графіку». Різниця між ідеальним і стійким. Тон: editorial-brutalist. 13-min read.
 
 | № | Тема | Статус |
 |---|------|--------|
-| 3126 | Чому «нестача часу» — операційна проблема, а не проблема мотивації | proposed |
+| 3126 | Чому «нестача часу» — операційна проблема, а не проблема мотивації | **draft · v12.68.0 → post-3126-time-as-training-resource.md** |
 | 3127 | Гнучкий vs. жорсткий розклад тренувань: який стійкіший у реальних умовах | proposed |
 | 3128 | Мінімальна тижнева одиниця: скільки тренувань зберігають адаптації | proposed |
 | 3129 | Тренування вранці vs. ввечері: що каже хронобіологія і що важливіше | proposed |
