@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.80.0] — 2026-07-04
+
+### Added
+- `content/post-3135-time-management-series-synthesis.md` — Series «Тренувальний менеджмент часу» 3126–3135 post 10/10 — SERIES COMPLETE. «Синтез 3126–3135: операційна система тренування для зайнятого self-coached атлета». Десять принципів серії; операційна схема тижневого циклу (ЯДРО / ПЕРИФЕРІЯ / МЕТРИКИ / MED-алгоритм / STREAK LOGIC DEC-013); «жорсткий хребет, гнучка периферія»; rolling best; 2 якірні сесії при ≥75% 1RM як MWS. clinical-safety NOT_REQUIRED.
+- `blog.html` — post-3135 card prepended at top of feed.
+
+### Changed
+- `README.md` — series «Тренувальний менеджмент часу» 3126–3135 in progress 7/10 → COMPLETE 10/10; posts 3133/3134/3135 status updated proposed → draft; version note v12.74.0 → v12.80.0.
+- `STATUS.md` — v12.79.0 → v12.80.0; series COMPLETE 10/10; next: series «Self-coached атлет: перший рік» 3136–3145 (proposed → in progress).
+
+---
+
 ## [12.79.0] — 2026-07-04
 
 ### Added
