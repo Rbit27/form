@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [12.51.1] — 2026-07-04
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §46.13 Migration 0101 Staging Deployment & CI Adversarial Test Procedure (Item 1 Spec): prerequisites, Supabase CLI + psql apply procedure, three-check post-apply verification, rollback trigger, and full CI adversarial test specs MIG-0101-01 (large-table performance < 30 s on 10,000 rows), MIG-0101-02 (concurrent INSERT during `CREATE INDEX CONCURRENTLY` no deadlock), MIG-0101-03 (rollback restores column + index; table SELECT still succeeds); Vitest + `@databases/pg` test code for all three; `compliance/migrations/log.md` staging entry JSON schema. §46.14 Migration 0101 Production Deployment & BCL-E-003 Evidence Filing (Item 9 Spec): blocking prerequisite table (items 1–5, 7, 8 must be done), zero-downtime apply procedure, three-step psql post-apply verification, P1 rollback procedure + `#incidents` alert routing, BCL-E-003 artefact JSON schema with privacy floor (GitHub handles only in `applied_by`/`filed_by`), R2 filing via `compliance/scripts/sign-evidence.sh`, G-003 🟡 → 🟢 closure criteria table (four conditions). §46.8 items 1 and 9 status updated to reference §46.13 and §46.14 respectively. §46.9 cross-references updated. Document header v2.28 → v2.29. Owner: devops-lead + compliance-officer.
+- `VERSION` — 12.51.0 → 12.51.1.
+
+---
+
 ## [12.51.0] — 2026-07-04
 
 ### Added

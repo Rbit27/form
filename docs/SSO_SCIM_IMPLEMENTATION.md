@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.28
+# FORM · SSO/SCIM Implementation v2.29
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -16124,7 +16124,7 @@ BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Apply Migration 0101 to staging; run CI adversarial tests MIG-0101-01 through MIG-0101-03 | devops-lead | **P0** | M8 | [ ] |
+| 1 | Apply Migration 0101 to staging; run CI adversarial tests MIG-0101-01 through MIG-0101-03 | devops-lead | **P0** | M8 | [ ] **Full spec: §46.13; closure gate: §46.13.3 MIG-0101-01..MIG-0101-03 (2026-07-04)** |
 | 2 | Update OIDC callback handler (`oidc-callback.ts`) to extract and store `idp_session_id` (from `sid`) and `oidc_sub_hash` (from `sub`) per §46.3 | platform-engineer | **P0** | M8 | [ ] **Closure gate: §46.3.4 CB-U-001..CB-U-008 (2026-07-04)** |
 | 3 | Implement `oidc-backchannel-logout.ts` Worker per §46.4.1 — full handler including `revokeOidcSessions()` and retry queue dispatch | platform-engineer | **P0** | M8 | [ ] **Closure gate: §46.4.5 BH-U-001..BH-U-012 (2026-07-04)** |
 | 4 | Register route `POST /auth/oidc/backchannel-logout` in API gateway router; add Cloudflare rate-limit rules | platform-engineer | **P0** | M8 | [ ] **Full spec: §46.10; closure gate: §46.10.3 RT-U-001..RT-U-006 (2026-07-04)** |
@@ -16132,7 +16132,7 @@ BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
 | 6 | Register four DEC-030 audit events (`backchannel_logout.received`, `.validated`, `.revoked`, `.failed`) with Zod v2 schemas in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` | compliance-officer | **P0** | M8 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.89, §BCL-Events, 2026-07-04.** |
 | 7 | Enforce BCL-CHAIN-01 invariant in `emit-audit-event` Worker (HTTP 422 on violation) | platform-engineer | **P0** | M8 | [ ] **Full spec: §46.11; closure gate: §46.11.7 BCL-INV-U-001..BCL-INV-U-007 (2026-07-04)** |
 | 8 | Execute BCL-I-001 through BCL-I-008 integration test matrix; collect BCL-E-002 artefact | security-engineer | **P0** | M8 | [ ] **Full spec: §46.12; closure gate: §46.12.6 BCL-I-001..BCL-I-008 (2026-07-04)** |
-| 9 | Apply Migration 0101 to production; file BCL-E-003 in R2 `compliance/evidence/oidc-bcl/` | devops-lead | **P0** | M8 | [ ] |
+| 9 | Apply Migration 0101 to production; file BCL-E-003 in R2 `compliance/evidence/oidc-bcl/` | devops-lead | **P0** | M8 | [ ] **Full spec: §46.14; closure gate: §46.14.4 BCL-E-003 filing (2026-07-04)** |
 | 10 | Add BCL-E-001 through BCL-E-003 to `docs/SOC2_READINESS.md §79.4` master evidence table (count 132 → 135); map to CC6.1/CC6.3/CC8.1 | compliance-officer | **P1** | M8 | [x] **Done — SOC2_READINESS.md §163, 2026-07-04 (count 132 → 135).** |
 
 **G-003 will advance from 🟡 Implementation spec complete to 🟢 Implementation complete** when items 1–9 are deployed to production and BCL-I-001 + BCL-I-003 integration tests pass against at least one production IdP (Okta or Entra ID).
@@ -16147,7 +16147,7 @@ BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
 
 **SOC 2 CC6.1 impact:** Mirroring §45.9 for SAML SLO — upon §46.8 P0 items deploying to production and a 30-day observation window producing BCL-E-001, the auditor finding for CC6.1 (OIDC session revocation path) moves from "compensating control documented" to "control implemented and evidenced." Together with §45 (SAML SLO), this closes the federated logout coverage for both supported SSO protocols.
 
-Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (emergency session revocation — BCL is the normal path; R-01 is the break-glass path), `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (P0 checklist item 6 — [x] Done v2.89, 2026-07-04), `docs/SOC2_READINESS.md §163` (BCL-E-001 through BCL-E-003 registered, P1 item 10 — [x] Done 2026-07-04), `docs/SOC2_READINESS.md §164` (BCL-OBS-E-001 quarterly observability health report registered, CC6.1/CC6.3/CC7.2/CC7.3, evidence count 135 → 136 — [x] Done 2026-07-04), `docs/OBSERVABILITY.md §70` (BCL observability layer — RED metrics, SLOs BCL-SLO-01/02, alert rules AL-BCL-01..04, BCL-OBS-E-001 artefact spec), `§46.11` (BCL-CHAIN-01 `emit-audit-event` Worker enforcement spec — P0 item 7 full spec; 2026-07-04), `§46.12` (BCL integration test execution spec — P0 item 8 full spec, BCL-E-002 packaging procedure; 2026-07-04).
+Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (emergency session revocation — BCL is the normal path; R-01 is the break-glass path), `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (P0 checklist item 6 — [x] Done v2.89, 2026-07-04), `docs/SOC2_READINESS.md §163` (BCL-E-001 through BCL-E-003 registered, P1 item 10 — [x] Done 2026-07-04), `docs/SOC2_READINESS.md §164` (BCL-OBS-E-001 quarterly observability health report registered, CC6.1/CC6.3/CC7.2/CC7.3, evidence count 135 → 136 — [x] Done 2026-07-04), `docs/OBSERVABILITY.md §70` (BCL observability layer — RED metrics, SLOs BCL-SLO-01/02, alert rules AL-BCL-01..04, BCL-OBS-E-001 artefact spec), `§46.11` (BCL-CHAIN-01 `emit-audit-event` Worker enforcement spec — P0 item 7 full spec; 2026-07-04), `§46.12` (BCL integration test execution spec — P0 item 8 full spec, BCL-E-002 packaging procedure; 2026-07-04), `§46.13` (Migration 0101 staging deployment procedure + MIG-0101-01..03 CI adversarial test specs — P0 item 1 full spec; 2026-07-04), `§46.14` (Migration 0101 production deployment + BCL-E-003 evidence filing procedure + G-003 closure criteria — P0 item 9 full spec; 2026-07-04).
 
 ---
 
@@ -16792,6 +16792,359 @@ BCL-E-002 (`compliance/evidence/oidc-bcl/bcl-e-002-integration-test.json`) is th
 **Closure requirement for item 8:** BCL-I-001 through BCL-I-008 all assertions pass. BCL-E-002 artefact signed and uploaded to R2. `§46.8 item 8` updated `[ ] → [x] Done`.
 
 ---
+
+## §46.13 Migration 0101 Staging Deployment & CI Adversarial Test Procedure (Item 1 Spec)
+
+**Owner:** devops-lead · **Priority:** P0 · **Milestone:** M8 · **Refs:** §46.8 item 1, §46.2
+
+This section specifies the procedure for applying Migration 0101 to staging and running CI adversarial tests MIG-0101-01 through MIG-0101-03. Item 1 was listed in §46.8 without a detailed deployment gate; §46.13 closes that gap. Item 9 (production deploy — §46.14) requires item 1 to be complete first.
+
+### §46.13.1 Prerequisites
+
+Before applying Migration 0101 to staging:
+
+1. `§46.2` DDL committed and reviewed by enterprise-architect via GitHub PR approval.
+2. `compliance/migrations/log.md` entry drafted for Migration 0101 staging apply (fields: `migration_id`, `applied_by`, `applied_at_utc`, `environment: staging`, `reviewer`, `sha256_of_sql_file`).
+3. Staging Supabase project accessible; `enterprise_sessions` table confirmed absent of `oidc_sub_hash` column via `\d enterprise_sessions`.
+4. No active CI runs touching `enterprise_sessions` on staging (avoid concurrent migration conflicts — check `pg_stat_activity`).
+
+### §46.13.2 Migration Apply Procedure (Staging)
+
+Apply Migration 0101 via Supabase CLI or direct psql.
+
+**Option A — Supabase CLI:**
+```bash
+# Dry-run first to review planned changes
+supabase db push --db-url "$SUPABASE_STAGING_DB_URL" --include-all --dry-run
+
+# Apply
+supabase db push --db-url "$SUPABASE_STAGING_DB_URL" --include-all
+```
+
+**Option B — Direct psql:**
+```bash
+psql "$SUPABASE_STAGING_DB_URL" \
+  -f migrations/0101_enterprise_sessions_oidc_sub_hash.sql
+```
+
+**Post-apply verification (run immediately after):**
+```sql
+-- 1. Confirm column exists and is nullable
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'enterprise_sessions'
+  AND column_name = 'oidc_sub_hash';
+-- Expected: 1 row — text, YES
+
+-- 2. Confirm partial index exists
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE tablename = 'enterprise_sessions'
+  AND indexname = 'idx_es_oidc_sub_hash_active';
+-- Expected: 1 row
+
+-- 3. Confirm all existing rows have oidc_sub_hash = NULL
+SELECT COUNT(*) FROM enterprise_sessions WHERE oidc_sub_hash IS NOT NULL;
+-- Expected: 0
+```
+
+If any check fails, initiate rollback immediately per §46.2 rollback script and alert enterprise-architect before proceeding.
+
+### §46.13.3 CI Adversarial Tests MIG-0101-01 through MIG-0101-03
+
+These three tests run in CI using a Postgres 15 Docker container (or Supabase local dev). Each test applies Migration 0101 to a fresh schema isolation. The test runner is Vitest + `@databases/pg`.
+
+---
+
+**MIG-0101-01 — Large-table forward migration performance**
+
+*Scenario:* Apply Migration 0101 to `enterprise_sessions` containing 10,000 pre-existing rows. Verifies the `ALTER TABLE ... ADD COLUMN NULL` + `CREATE INDEX CONCURRENTLY` completes within the 30-second SLA and all existing rows have `oidc_sub_hash = NULL`.
+
+```typescript
+// tests/migrations/mig-0101-01-large-table.test.ts
+import { sql } from '@databases/pg'
+import { db, applyMigration } from '../helpers/db'
+
+test('MIG-0101-01: forward migration completes in < 30s on 10,000 rows', async () => {
+  await db.query(sql`
+    INSERT INTO enterprise_sessions (id, tenant_id, user_id, created_at, expires_at)
+    SELECT gen_random_uuid(), gen_random_uuid(), gen_random_uuid(),
+           NOW(), NOW() + INTERVAL '1 hour'
+    FROM generate_series(1, 10000)
+  `)
+
+  const t0 = performance.now()
+  await applyMigration('0101')
+  const elapsed = performance.now() - t0
+
+  expect(elapsed).toBeLessThan(30_000)
+
+  const { rowCount } = await db.query(sql`
+    SELECT 1 FROM enterprise_sessions WHERE oidc_sub_hash IS NOT NULL
+  `)
+  expect(rowCount).toBe(0)
+
+  const [col] = await db.query(sql`
+    SELECT is_nullable FROM information_schema.columns
+    WHERE table_name = 'enterprise_sessions' AND column_name = 'oidc_sub_hash'
+  `)
+  expect(col.is_nullable).toBe('YES')
+}, 35_000)
+```
+
+**Assertions:** Migration < 30 s · all existing rows `oidc_sub_hash = NULL` · column nullable.
+
+---
+
+**MIG-0101-02 — Concurrent INSERT during CREATE INDEX CONCURRENTLY**
+
+*Scenario:* A concurrent `INSERT INTO enterprise_sessions` fires 50 ms into the migration while `CREATE INDEX CONCURRENTLY` is building. Neither operation should deadlock or produce a 5xx error.
+
+```typescript
+// tests/migrations/mig-0101-02-concurrent-insert.test.ts
+import { sql } from '@databases/pg'
+import { db, applyMigration } from '../helpers/db'
+
+test('MIG-0101-02: concurrent INSERT succeeds during CREATE INDEX CONCURRENTLY', async () => {
+  await db.query(sql`
+    INSERT INTO enterprise_sessions (id, tenant_id, user_id, created_at, expires_at)
+    SELECT gen_random_uuid(), gen_random_uuid(), gen_random_uuid(),
+           NOW(), NOW() + INTERVAL '1 hour'
+    FROM generate_series(1, 100)
+  `)
+
+  const [migResult, insertResult] = await Promise.allSettled([
+    applyMigration('0101'),
+    new Promise(resolve => setTimeout(resolve, 50)).then(() =>
+      db.query(sql`
+        INSERT INTO enterprise_sessions (id, tenant_id, user_id, created_at, expires_at)
+        VALUES (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(),
+                NOW(), NOW() + INTERVAL '1 hour')
+        RETURNING id
+      `)
+    )
+  ])
+
+  expect(migResult.status).toBe('fulfilled')
+  expect(insertResult.status).toBe('fulfilled')
+
+  const [idx] = await db.query(sql`
+    SELECT indexname FROM pg_indexes
+    WHERE tablename = 'enterprise_sessions'
+      AND indexname = 'idx_es_oidc_sub_hash_active'
+  `)
+  expect(idx).toBeDefined()
+}, 45_000)
+```
+
+**Assertions:** Migration resolves without error · INSERT resolves without deadlock or `40P01` · index `idx_es_oidc_sub_hash_active` present after migration.
+
+---
+
+**MIG-0101-03 — Rollback restores table to pre-migration shape**
+
+*Scenario:* Apply Migration 0101 then execute the §46.2 rollback script. Verify `oidc_sub_hash` column and `idx_es_oidc_sub_hash_active` index are fully removed and the table shape is restored.
+
+```typescript
+// tests/migrations/mig-0101-03-rollback.test.ts
+import { sql } from '@databases/pg'
+import { db, applyMigration, rollbackMigration } from '../helpers/db'
+
+test('MIG-0101-03: rollback restores table to pre-migration shape', async () => {
+  await applyMigration('0101')
+
+  const [before] = await db.query(sql`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'enterprise_sessions' AND column_name = 'oidc_sub_hash'
+  `)
+  expect(before).toBeDefined()
+
+  await rollbackMigration('0101')
+
+  const afterCol = await db.query(sql`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'enterprise_sessions' AND column_name = 'oidc_sub_hash'
+  `)
+  expect(afterCol.length).toBe(0)
+
+  const afterIdx = await db.query(sql`
+    SELECT indexname FROM pg_indexes
+    WHERE tablename = 'enterprise_sessions'
+      AND indexname = 'idx_es_oidc_sub_hash_active'
+  `)
+  expect(afterIdx.length).toBe(0)
+
+  // Table itself remains queryable
+  await expect(db.query(sql`SELECT id FROM enterprise_sessions LIMIT 1`))
+    .resolves.not.toThrow()
+}, 20_000)
+```
+
+**Assertions:** `oidc_sub_hash` absent · `idx_es_oidc_sub_hash_active` absent · no FK violations · `enterprise_sessions` SELECT succeeds.
+
+### §46.13.4 Staging Deployment Gate & Migration Log Entry
+
+MIG-0101-01, MIG-0101-02, and MIG-0101-03 must all pass in CI before the staging apply is considered gated. The CI run URL is captured in `compliance/migrations/log.md`.
+
+**`compliance/migrations/log.md` entry format (staging):**
+```json
+{
+  "migration_id": "0101",
+  "migration_name": "enterprise_sessions_oidc_sub_hash",
+  "environment": "staging",
+  "applied_at_utc": "<ISO-8601 timestamp>",
+  "applied_by": "<GitHub handle — devops-lead>",
+  "reviewer": "<GitHub handle — enterprise-architect>",
+  "sha256_of_sql_file": "<SHA-256 hex>",
+  "ci_run_url": "<GitHub Actions run URL where MIG-0101-01..03 passed>",
+  "post_apply_verification": {
+    "column_oidc_sub_hash_present": true,
+    "index_idx_es_oidc_sub_hash_active_present": true,
+    "non_null_rows_after_migration": 0
+  },
+  "rollback_available": true,
+  "notes": "Staging gate complete. Production deployment pending §46.8 items 2–8."
+}
+```
+
+**Privacy floor:** `applied_by` and `reviewer` must be GitHub handles — never email addresses. No raw OIDC `sub` values, no session IDs, no user data in the log entry.
+
+**Closure requirement for item 1:** MIG-0101-01 through MIG-0101-03 all pass in CI. Staging migration applied and post-apply checks pass. `compliance/migrations/log.md` staging entry filed. `§46.8 item 1` updated `[ ] → [x] Done`.
+
+---
+
+## §46.14 Migration 0101 Production Deployment & BCL-E-003 Evidence Filing (Item 9 Spec)
+
+**Owner:** devops-lead · **Priority:** P0 · **Milestone:** M8 · **Refs:** §46.8 item 9, §46.2, §46.13, `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`, `docs/SOC2_READINESS.md §163`
+
+This section specifies the procedure for applying Migration 0101 to production and filing SOC 2 evidence artefact BCL-E-003. Item 9 was listed in §46.8 without detail; §46.14 closes that gap. **This is the final gate before G-003 can advance to 🟢 Implementation complete.**
+
+### §46.14.1 Prerequisites — Production Deploy Blocking Gate
+
+All of the following §46.8 items must be `[x] Done` before production deployment:
+
+| Item | Task | Blocking? |
+|---|---|---|
+| 1 | Migration 0101 staging deploy + MIG-0101-01..03 | **Yes — §46.13 closure gate** |
+| 2 | OIDC callback handler update | **Yes** |
+| 3 | BCL Worker implementation | **Yes** |
+| 4 | API gateway route + rate-limit | **Yes** |
+| 5 | REVOCATION_QUEUE consumer | **Yes** |
+| 7 | BCL-CHAIN-01 invariant enforcement | **Yes** |
+| 8 | BCL-I-001..BCL-I-008 integration tests pass + BCL-E-002 filed | **Yes** |
+
+Additionally: compliance-officer must confirm DPA template updated per §28.6 item 6 before enabling OIDC BCL for any production enterprise tenant.
+
+### §46.14.2 Zero-Downtime Production Apply Procedure
+
+Migration 0101 is additive-only (one nullable column + one partial index via `CREATE INDEX CONCURRENTLY`). No maintenance window is required. The `ALTER TABLE ... ADD COLUMN ... DEFAULT NULL` holds `ACCESS EXCLUSIVE` only for microseconds on Postgres 14+.
+
+```bash
+# Step 1: Confirm no long-running queries that could delay the lock
+psql "$SUPABASE_PRODUCTION_DB_URL" -c "
+  SELECT pid, query_start, state, left(query, 80) AS query_preview
+  FROM pg_stat_activity
+  WHERE state != 'idle'
+    AND query_start < NOW() - INTERVAL '30 seconds'
+  ORDER BY query_start;"
+
+# Step 2: Confirm column absent on production (sanity check before apply)
+psql "$SUPABASE_PRODUCTION_DB_URL" -c "
+  SELECT column_name FROM information_schema.columns
+  WHERE table_name = 'enterprise_sessions'
+    AND column_name = 'oidc_sub_hash';"
+# Expected: 0 rows
+
+# Step 3: Apply
+psql "$SUPABASE_PRODUCTION_DB_URL" \
+  -f migrations/0101_enterprise_sessions_oidc_sub_hash.sql
+
+# Step 4: Post-apply verification
+psql "$SUPABASE_PRODUCTION_DB_URL" -c "
+  SELECT column_name, is_nullable FROM information_schema.columns
+  WHERE table_name = 'enterprise_sessions' AND column_name = 'oidc_sub_hash';"
+# Expected: 1 row — is_nullable = YES
+
+psql "$SUPABASE_PRODUCTION_DB_URL" -c "
+  SELECT indexname FROM pg_indexes
+  WHERE tablename = 'enterprise_sessions'
+    AND indexname = 'idx_es_oidc_sub_hash_active';"
+# Expected: 1 row
+
+psql "$SUPABASE_PRODUCTION_DB_URL" -c "
+  SELECT COUNT(*) FROM enterprise_sessions WHERE oidc_sub_hash IS NOT NULL;"
+# Expected: 0 (existing rows NULL; new rows populated by OIDC callback handler post-deploy)
+```
+
+**Rollback if any post-apply check fails:**
+```bash
+psql "$SUPABASE_PRODUCTION_DB_URL" -c "
+  DROP INDEX CONCURRENTLY IF EXISTS idx_es_oidc_sub_hash_active;
+  ALTER TABLE enterprise_sessions DROP COLUMN IF EXISTS oidc_sub_hash;"
+```
+
+Alert security-engineer and enterprise-architect immediately via Slack `#incidents` with P1 severity if rollback is triggered.
+
+### §46.14.3 BCL-E-003 Evidence Artefact — Migration 0101 Production Log
+
+BCL-E-003 is the SOC 2 CC8.1 change-management evidence for Migration 0101. It must be filed to R2 within 24 hours of the production apply.
+
+**Artefact schema:**
+```json
+{
+  "artefact_id": "BCL-E-003",
+  "soc2_criteria": ["CC8.1"],
+  "migration_id": "0101",
+  "migration_name": "enterprise_sessions_oidc_sub_hash",
+  "description": "Adds oidc_sub_hash (SHA-256 of OIDC sub claim) column + partial index to enterprise_sessions for OIDC back-channel logout sub-based revocation without PII storage. Enables G-003 completion.",
+  "environment": "production",
+  "applied_at_utc": "<ISO-8601 timestamp from psql output or Supabase migration log>",
+  "applied_by": "<GitHub handle — devops-lead>",
+  "reviewer_sign_off": "<GitHub handle — enterprise-architect>",
+  "sign_off_method": "GitHub PR approval on migration PR",
+  "sha256_of_sql_file": "<SHA-256 hex of migrations/0101_enterprise_sessions_oidc_sub_hash.sql>",
+  "staging_ci_run_url": "<GitHub Actions run URL where MIG-0101-01..03 passed>",
+  "post_apply_verification": {
+    "column_oidc_sub_hash_present": true,
+    "index_idx_es_oidc_sub_hash_active_present": true,
+    "non_null_rows_after_migration": 0
+  },
+  "rollback_executed": false,
+  "privacy_notes": "Column stores SHA-256 of OIDC sub only — no raw sub, no email, no session cookie. Nullable; populated only for OIDC enterprise sessions created after this migration. Compliant with DEC-030 privacy floor.",
+  "retention": "7yr WORM",
+  "r2_path": "compliance/evidence/oidc-bcl/bcl-e-003-migration-0101-log.json",
+  "filed_by": "<GitHub handle — compliance-officer>",
+  "filed_at_utc": "<ISO-8601 timestamp>"
+}
+```
+
+**Filing procedure:**
+1. Populate all fields from the production apply output (timestamps, SHA-256 of SQL file, CI run URL).
+2. Sign the JSON payload: `compliance/scripts/sign-evidence.sh bcl-e-003-migration-0101-log.json` (same key and process as BCL-E-002 — see §46.12.7).
+3. Upload to R2: `compliance/evidence/oidc-bcl/bcl-e-003-migration-0101-log.json` (WORM bucket — 7-year retention).
+4. Add production row to `compliance/migrations/log.md` (same format as §46.13.4 but `"environment": "production"`).
+5. Notify compliance-officer with the R2 object URL for written confirmation before updating §46.8 item 9 status.
+
+**Privacy floor verification before filing:** `applied_by` and `filed_by` are GitHub handles, not email addresses. `post_apply_verification.non_null_rows_after_migration` is 0. No `user_id`, session cookie, or OIDC `sub` values appear in any field.
+
+### §46.14.4 G-003 Closure Criteria
+
+Upon completing item 9, G-003 advances from 🟡 Implementation spec complete to 🟢 Implementation complete:
+
+| Condition | Required for 🟢 | Verified by |
+|---|---|---|
+| §46.8 items 1–5 and 7 deployed to production | Yes | devops-lead written confirmation |
+| BCL-I-001 or BCL-I-003 pass against production Okta or Entra ID tenant | Yes | security-engineer sign-off |
+| BCL-E-003 filed to R2 WORM bucket | Yes | compliance-officer confirmation |
+| 30-day BCL-E-001 observation window started | No — starts automatically after production BCL traffic | `docs/OBSERVABILITY.md §70` BCL-OBS-E-001 spec |
+
+Once all four conditions are met: update `§46.9` G-003 row from `🟡 Implementation spec complete, deployment pending` → `🟢 Implementation complete`. Update `§9 gap registry` G-003 entry from 🟡 → 🟢 with the closure date.
+
+**Closure requirement for item 9:** Migration 0101 applied to production. Post-apply verification checks pass. BCL-E-003 artefact signed and uploaded to R2. `compliance/migrations/log.md` production entry filed. Compliance-officer written confirmation received. `§46.8 item 9` updated `[ ] → [x] Done`.
+
+---
+
+*v2.29 (2026-07-04): §46.13 + §46.14 — Migration 0101 staging and production deployment specs (Items 1 and 9 full specs). Closes the last two implementation-detail gaps in the §46.8 BCL checklist that lacked dedicated spec sections. §46.13: Migration 0101 staging deployment procedure — prerequisites, Supabase CLI + psql apply commands, three-check post-apply verification, rollback trigger, and full CI adversarial test specs (MIG-0101-01 large-table performance < 30 s on 10,000 rows; MIG-0101-02 concurrent INSERT during `CREATE INDEX CONCURRENTLY` no deadlock; MIG-0101-03 rollback restores column + index removal and table SELECT still succeeds); Vitest + `@databases/pg` test code for all three; `compliance/migrations/log.md` staging entry JSON schema. §46.14: Migration 0101 production deployment gate — blocking prerequisite table (items 1–5, 7, 8 must be done), zero-downtime apply procedure (no maintenance window needed: `ALTER TABLE ... ADD COLUMN NULL` holds lock microseconds on Postgres 14+), three-step psql post-apply verification, P1 rollback procedure + alert routing to `#incidents`, BCL-E-003 artefact JSON schema with `applied_by`/`filed_by` GitHub-handle-only privacy floor, R2 filing procedure via `compliance/scripts/sign-evidence.sh`, G-003 🟡 → 🟢 closure criteria table (four conditions: items 1–5+7 production deploy, BCL-I-001 or BCL-I-003 against live IdP, BCL-E-003 filed, 30-day observation window started). §46.8 checklist updated: item 1 status `[ ]` → `[ ] Full spec: §46.13; closure gate: §46.13.3 MIG-0101-01..MIG-0101-03 (2026-07-04)`; item 9 status `[ ]` → `[ ] Full spec: §46.14; closure gate: §46.14.4 BCL-E-003 filing (2026-07-04)`. §46.9 cross-references updated: §46.13 and §46.14 entries added. Header v2.28 → v2.29. Privacy floor: `compliance/migrations/log.md` and BCL-E-003 artefact must contain only GitHub handles in `applied_by`/`reviewer`/`filed_by` fields — never email addresses; `post_apply_verification.non_null_rows_after_migration` must be 0; no raw OIDC `sub`, session cookie, or `user_id` in any artefact field. Owner: devops-lead (§46.13 staging, §46.14 production apply) + compliance-officer (BCL-E-003 filing, G-003 closure). Review: enterprise-architect + security-engineer.*
 
 *v2.28 (2026-07-04): §45.8 item 11 cross-reference patch — SLO evidence registration status corrected. §45.8 item 11 (Add SLO-E-001…SLO-E-004 to `docs/SOC2_READINESS.md §79.4` master evidence table; count 128 → 132; map to CC6.1/CC6.3/CC8.1) was showing `[ ]` despite being closed by SOC2_READINESS §162 (v3.88.0, 2026-07-04; count 128 → 132). Status updated `[ ]` → `[x] Done — SOC2_READINESS.md §162, 2026-07-04 (count 128 → 132).` No new events, schemas, or implementation specs changed. Document header v2.27 → v2.28. Owner: compliance-officer.*
 
