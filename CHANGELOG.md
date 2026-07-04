@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.62.0] — 2026-07-04
+
+### Added
+- `docs/OBSERVABILITY.md §12.6` — pg_cron job 60 `slo_chain_integrity_check` registered (OQ-SLO-OBS-01 resolved → DEC-099, 2026-07-04). Schedule `59 * * * *` (avoids contention with BCL job 59 at `0 * * * *`); 2h freshness window; `form_audit` role; SLO-CHAIN-01 retrospective SQL (LIMIT 50 / 24h window); violation path: `security.slo_chain_01_violation` CRITICAL/7yr + AL-SLO-02 P0 PagerDuty (no cooldown); all-clear path: `system.slo_chain_check_passed` LOW/1yr; SLO-INT-CAP-01 safety cap; SLO-ALL-CLR-SUPPRESS-01; privacy floor: no `idp_name_id`, no `user_id`, no GDPR Art. 9 data; implementation pending M7 Migration M-0103. Freshness note extended with job 60 paragraph.
+- `docs/OBSERVABILITY.md §73` — SLO-CHAIN-01 SQL DDL spec `0103_slo_chain_integrity_check.sql`: `fn_slo_chain_integrity_check()` SECURITY DEFINER; SLO-INT-CAP-01 50-violation cap; 24h / LIMIT 50 query window; `slo_pairs_checked` all-clear attestation; all-clear suppressed on violations; R2 verification queries; five-item implementation checklist (items 2–5 pending M7). Parallel to §71 BCL pattern. Closes §72.9 item 4 architecture gate.
+
+### Changed
+- `docs/OBSERVABILITY.md §72.9` (v5.18.2) — item 4 updated `[ ]` → `[x] Architecture resolved (DEC-099; pg_cron job 60 adopted; §12.6 registered; §73 SQL DDL spec complete; production pending M7)`; item 11 fixed `[ ] — see §72.11` → `[x] Done — 2026-07-04 (SSO_SCIM §45.9 v2.30; row was inadvertently merged with item 10 in prior pass — separated and corrected)`. Version note v5.18.2 appended.
+- `docs/INCIDENT_RESPONSE.md` (v3.40.2) — R-76.12 item 2 status note patched: "(OQ-SLO-OBS-01 open)" → resolved reference with DEC-099 and M-0103 details. Version note v3.40.2 appended.
+- `VERSION` — 12.61.0 → 12.62.0.
+
+---
+
 ## [12.61.0] — 2026-07-04
 
 ### Added

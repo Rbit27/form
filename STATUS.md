@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v12.62.0** — 2026-07-04 · enterprise · OBSERVABILITY §12.6 job 60 + §73 SQL DDL + §72.9 patch · IR R-76.12 item 2 patch · OQ-SLO-OBS-01 → DEC-099 closes architecture gate · job 60 `slo_chain_integrity_check` `59 * * * *` registered · Migration M-0103 spec complete · §72.9 item 4 [x] Architecture resolved · §72.9 item 11 [x] Done
+
 **v12.61.0** — 2026-07-04 · content · post-3171 · «Петлі зворотного зв'язку без тренера: як self-coached атлет збирає, читає і діє на сигнали прогресу» · series «Тренувальна автономія» 3166–3175 (6/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3171 · «Тренувальна автономія» in progress 5/10 → 6/10 · next: post-3172 (7/10 — де системне мислення зупиняється і починається ситуаційна гнучкість)
 
 **v12.55.0** — 2026-07-04 · content · post-3168 · «Мета-навички тренування: що залишається корисним через 10 років незалежно від протоколу» · series «Тренувальна автономія» 3166–3175 (3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3168 · «Тренувальна автономія» in progress 2/10 → 3/10 · next: post-3169 («Як self-coached атлет будує тренувальний процес без зовнішньої структури»)
