@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [12.71.0] — 2026-07-04
+
+### Added
+- `content/post-3129-morning-vs-evening-training-chronobiology.md` — series «Тренувальний менеджмент часу» 3126–3135 (4/10). «Тренування вранці vs. ввечері: що каже хронобіологія і що реально важливіше». Вечірній пік продуктивності: +7–8% анаеробна потужність (Chtourou & Souissi 2012), +6–10% сила (Atkinson & Reilly 1996), хронотип-ефект до 26% (Facer-Childs & Brandstaetter 2015). Гіпертрофія — без різниці (Schoenfeld et al. 2022). Адаптація до часу тренування: 40–60% зменшення відмінностей за 4–6 тижнів. Буфер 3h вечір→сон усуває негативний ефект на сон. Практичний висновок: стабільність > оптимальний час. clinical-safety: NOT_REQUIRED · sports-scientist review pending.
+- `blog.html` — post-3129 card prepended at top of feed.
+- `README.md` — Editorial series 3176–3185 «Тренувальний мінімалізм: менше і ефективніше» table (10 proposed topics). Editorial series 3186–3195 «Читання власних даних: від журналу до рішень» table (10 proposed topics).
+
+### Changed
+- `README.md` — series «Тренувальний менеджмент часу» 3126–3135 status: in progress 3/10 → 4/10. Header v12.70.0 → v12.71.0.
+- `STATUS.md` — current version updated to v12.71.0.
+- `VERSION` — 12.70.0 → 12.71.0.
+
+---
+
 ## [12.70.0] — 2026-07-04
 
 ### Added
