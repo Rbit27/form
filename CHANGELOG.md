@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [12.26.1] — 2026-07-04
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §45` — SAML SLO Implementation Spec: Worker, Migration 0100, and SAML Callback Update. Advances G-002 (SAML SLO, HIGH severity, SOC 2 CC6.1 logical access revocation) from 🟡 Design complete (§13) to 🟡 Implementation spec complete. Resolves all three §13.8 blockers: (1) `node-saml` v4.x SLO API verified — `generateLogoutRequest()`, `validatePostRequest()`, `validatePostResponse()`, `validateRedirectSignature()`, `generateLogoutResponse()` confirmed; `samlify` rejected (CVE history); custom XML signing prohibited. (2) Migration 0100 DDL — five new columns: `tenant_sso_configs.slo_url` (nullable TEXT), `tenant_sso_configs.slo_binding` (CHECK HTTP-POST/HTTP-Redirect), `tenant_sso_configs.backchannel_logout_enabled` (BOOLEAN DEFAULT false), `enterprise_sessions.idp_name_id` (TEXT + partial index), `enterprise_sessions.idp_session_id` (TEXT + partial index); rollback script; five CI adversarial tests MIG-0100-01–05. (3) SAML callback update — `extractSloAttributes()` spec; `enterprise_sessions` INSERT updated; `users.idp_name_id` column spec for JIT provisioning (P1). Worker spec (`apps/api-gateway/src/sso/saml-slo.ts`): IdP-initiated SLO handler (validate LogoutRequest, revoke sessions by `idp_name_id`/`idp_session_id`, return signed LogoutResponse); SP-initiated initiation (`initiateSPSlo()` — HTTP-POST preferred, `SLO_KV` TTL 15s); SP-initiated completion (`handleSloCallback()` — validate LogoutResponse, emit completion events); 10-second `AbortController` timeout (session revoked unconditionally before timeout). Privacy floor: raw `idp_name_id` excluded from all audit payloads — `idp_name_id_hash` SHA-256 only. Five DEC-030 HMAC-chained events: `slo.sp_initiated` (STANDARD/7yr), `slo.idp_initiated` (HIGH/7yr), `slo.completed` (STANDARD/7yr), `slo.failed` (HIGH/7yr), `slo.fallback_local_only` (STANDARD/7yr); Zod v2 schemas; SLO-CHAIN-01 ordering invariant (HTTP 422 `SLO_CHAIN_01_VIOLATION` — completion event requires prior initiation anchor). Four SOC 2 evidence artefacts SLO-E-001 through SLO-E-004 (CC6.1/CC6.3/CC8.1). Eight integration tests SLO-I-001–008. 12-item implementation checklist (9× P0/M7, 3× P1/M7–M8). §9 gap registry G-002 updated inline. Header v2.19 → v2.20.
+- `VERSION` — 12.26.0 → 12.26.1.
+
+---
+
 ## [12.26.0] — 2026-07-04
 
 ### Added

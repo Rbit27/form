@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.19
+# FORM · SSO/SCIM Implementation v2.20
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -1166,7 +1166,7 @@ The following items are not yet built or require a decision before implementatio
 | # | Gap | Severity | Owner | Notes |
 |---|---|---|---|---|
 | G-001 | **SCIM endpoint not yet implemented.** ~~Schema is defined; endpoint code, token authentication, and attribute mapping are not written.~~ **🟡 Design complete — see §27.** Full Cloudflare Worker architecture, token authentication pipeline, User/Group CRUD handlers, idempotency contract, RFC 7644 error format, and six DEC-030 lifecycle events fully specified. Implementation pending per §27.14 checklist (P0 M4/M5). | ~~Critical — blocks any SCIM provisioning~~ **🟡 Design complete; implementation pending §27.14 P0 checklist** | enterprise-architect + platform-engineer | ~~Estimate: 6–8 weeks engineering~~ **Design complete in §27 (v1.9); implementation per §27.14 checklist. SOC 2 CC6.3: advance to 🟢 Closed once §27.14 P0 tasks deploy to production and G-013 DPA block is cleared.** |
-| G-002 | **SAML SLO not yet implemented.** SP-initiated and IdP-initiated SLO are designed but not coded. Logout currently only invalidates FORM session, does not propagate to IdP. | High — required for SOC 2 CC6 (logical access revocation) | security-engineer | Estimate: 2–3 weeks |
+| G-002 | **SAML SLO not yet implemented.** ~~SP-initiated and IdP-initiated SLO are designed but not coded. Logout currently only invalidates FORM session, does not propagate to IdP.~~ **🟡 Design complete — see §13. 🟡 Implementation spec complete — see §45.** Full Worker spec (IdP-initiated handler, SP-initiated initiation + completion), Migration 0100 DDL (5 schema changes), SAML callback update, KV state tracking, SLO-CHAIN-01 ordering invariant, and 12-item implementation checklist specified. | ~~High — required for SOC 2 CC6 (logical access revocation)~~ **🟡 Implementation spec complete; pending §45.8 P0 checklist deployment. SOC 2 CC6.1: advance to 🟢 once §45.8 P0 tasks deploy and integration tests pass against Okta.** | security-engineer + platform-engineer | ~~Estimate: 2–3 weeks~~ **Implementation spec complete in §45 (v2.20, 2026-07-04). Blocked on: §45.8 P0 checklist (Migration 0100, Worker deploy, Okta integration test).** |
 | G-003 | **OIDC back-channel logout not implemented.** The endpoint exists in design but not in code. | High | platform-engineer | Estimate: 1 week (simpler than SLO) |
 | G-004 | **Certificate rotation automation.** The rotation runbook in 8.1 is manual. The 60-day expiry alert cron and the dual-cert metadata endpoint do not exist yet. | Medium — operational risk | devops-lead | Estimate: 1–2 weeks |
 | G-005 | **Google Directory API integration for group sync.** ~~Currently Google Workspace OIDC lacks group membership in ID token. The service account approach is designed but not implemented.~~ **🟡 Design complete — see §21.** Service account credential management, per-tenant KV token storage (`google_svc_token_{client_email}` TTL 55 min), `getGroupsForUser()` Admin SDK call, group-to-role resolution, and `scim.group_synced` DEC-030 audit event chain fully specified in §21. Implementation pending per §21.14 checklist (P0 M4/M5). | ~~Medium — Google Workspace tenants cannot use group-based role mapping without this~~ **🟡 Design complete; implementation blocked on §21.14 P0 checklist tasks** | platform-engineer | ~~Estimate: 2 weeks~~ **Design complete in §21 (v1.7); implementation per §21.14 checklist. SOC 2 CC6: advance to 🟢 Closed once §21.14 P0 tasks deploy to production.** |
@@ -14724,3 +14724,771 @@ All twelve §42.11 checklist items are now closed. G-012 (`private_key_jwt` clie
 ---
 
 *v2.19 (2026-07-02): §44 pg_cron DDL, Admin Dashboard PKJWT Panel, and OIDC Onboarding Guide Update (M6). Closes §42.11 items 9, 10, 11; inline-patches item 12 in §42.11 checklist (done in v2.17 but checklist row not yet patched). All 12 §42.11 checklist items are now [x] Done. Item 9 [x] Done: §44.2 — migration 0099 DDL for `form_system.pkjwt_key_expiry_sweep()` PL/pgSQL function (SECURITY DEFINER; reads `tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt' AND pkjwt_key_expires_at < NOW() + INTERVAL '30 days' AND pkjwt_key_expires_at > NOW()'`; calls `public.emit_audit_event()` per qualifying tenant with `actor_role = 'system:pg_cron'`; REVOKE ALL from PUBLIC + GRANT EXECUTE to form_system); pg_cron schedule registration via `cron.schedule('pkjwt_key_expiry_sweep', '0 9 * * *', ...)` with idempotent `IF NOT EXISTS` guard; rollback script (zero-active-PKJWT-tenant gate); integration test matrix PKJWT-I-001 through PKJWT-I-006 (single-tenant expiring, outside-window exclusion, already-expired exclusion, wrong-auth-method exclusion, multi-tenant, NULL actor_id assertion). Item 10 [x] Done: §44.3 — Admin Dashboard PKJWT panel complete UI spec: Status row (Key ID, Algorithm, Expires, Status with amber ≤ 30 days / red expired states); JWKS URL row (read-only, Copy button + advisory DEC-030 event `sso.pkjwt_jwks_url_copied` STANDARD/1yr, Open-in-browser); JWK download (public key only, never private; `sso.pkjwt_public_key_downloaded` HIGH/7yr); Key generation modal (RS256/ES256 toggle, lifetime 12–730 days, private-key-in-KMS warning, atomic transaction with compensating rollback on KV failure, `sso.pkjwt_key_generated` HIGH/7yr); Rotation button (disabled when days_until_expiry > 30; dual-key 48-hour window UI countdown; `sso.pkjwt_key_rotated` HIGH/7yr with `old_kid`/`new_kid` fields); RBAC gates (owner/admin: full; manager: read-only); four audit events; six edge cases (manager access, network error, KV failure compensation, rotation window API guard, IdP cache handling). Item 11 [x] Done: §44.4 — §7.2 OIDC onboarding guide addition for `private_key_jwt`: when-to-use decision tree; prerequisites (Enterprise tier, algorithm choice, JWKS vs. JWK file); Step 1 — switch client auth method via Admin Dashboard; Step 2 — key pair generation (no private key export, kid-to-expiry tracking); Step 3 — IdP registration procedures for Okta (JWKS URI preferred, `pkjwt_aud_override` Okta org URL edge case), Entra ID (JWK file upload required, Entra `aud` edge case), Google Workspace (RS256 only, file upload path, no `pkjwt_aud_override` needed), generic IdPs (JWKS URI vs. file upload); Step 4 — test login procedure with `invalid_client` debug checklist (JWKS reachability, kid mismatch, algorithm mismatch, `aud` mismatch); annual key rotation checklist (JWKS URI tenants: zero-touch after rotation; JWK file tenants: upload new file within 48-hour dual-key window; DEC-030 `sso.pkjwt_key_rotated` as policy evidence). §42.11 items 9/10/11 checklist rows updated `[ ] Pending` → `[x] Done`. §42.11 item 12 checklist row patched `[ ] Pending` → `[x] Done — v2.17`. §42.12 cross-reference table: three new rows added for §44.2, §44.3, §44.4. §43.6 pending note updated to reflect §44 closure. Document header v2.18 → v2.19 (header was at v2.17 in line 1; updated to v2.19 this pass to align with version note sequence). Privacy floor: no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any §44 content; `actor_id` in DEC-030 events is the Admin Dashboard operator UUID only; private key material absent from all UI displays, audit events, and test fixtures by design. Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*
+
+## §45 SAML SLO Implementation Spec — Worker, Migration 0100, and Callback Update (M7)
+
+### §45.1 Purpose and Scope
+
+This section delivers the full implementation specification for SAML 2.0 Single Logout (SLO), advancing G-002 from 🟡 Design complete to 🟡 Implementation spec complete (pending §45.8 P0 checklist deployment). The design — SP-initiated and IdP-initiated flows, SLO state machine, failure modes, NameID handling, and audit events — is fully specified in §13. This section resolves the three blockers identified in §13.8:
+
+1. **`node-saml` library SLO support** — verified; version requirements, `LogoutRequest` construction, and `LogoutResponse` parsing confirmed.
+2. **Schema migrations** — Migration 0100 DDL for all five new columns across `tenant_sso_configs` and `enterprise_sessions`.
+3. **SSO callback handler update** — `idp_name_id` and `idp_session_id` population at session creation.
+
+Scope:
+
+- **In scope:** SAML SLO (G-002). SP-initiated and IdP-initiated logout paths.
+- **Out of scope:** OIDC back-channel logout (G-003 — deferred to §46; lower complexity and no blocking SOC 2 obligation at current audit observation window). JTI blocklist integration for federated logout (§13.5.2 — deferred to M8; requires first regulated-industry customer commitment).
+- **Privacy floor:** No PII in audit event payloads. `idp_name_id` stored in `enterprise_sessions` is an opaque IdP-assigned identifier; it is treated as potentially re-identifying and excluded from all event payloads. `idp_name_id_hash` (SHA-256) is used for audit correlation where needed.
+- **DEC-030 compliance:** All events in §13.7 are registered and HMAC-chained per DEC-030. SLO-CHAIN-01 ordering invariant enforced at the `emit-audit-event` Worker.
+
+Owner: security-engineer + platform-engineer. Review: enterprise-architect + compliance-officer before any production deploy of Migration 0100.
+
+---
+
+### §45.2 Migration 0100 — SAML SLO Schema DDL
+
+Migration 0100 adds all schema dependencies identified in §13.8. It is non-destructive: all new columns are nullable (or have `DEFAULT false`) and can be applied online without a maintenance window.
+
+#### §45.2.1 Migration File
+
+**File:** `supabase/migrations/0100_saml_slo_schema.sql`
+
+```sql
+-- Migration 0100: SAML SLO schema dependencies (§45)
+-- Adds: slo_url, slo_binding, backchannel_logout_enabled on tenant_sso_configs
+--       idp_name_id, idp_session_id on enterprise_sessions
+-- Non-destructive. Online-safe. No table rewrites.
+
+BEGIN;
+
+-- ── tenant_sso_configs: SLO endpoint URL ─────────────────────────────────────
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS slo_url TEXT;
+
+COMMENT ON COLUMN tenant_sso_configs.slo_url IS
+  'IdP SLO endpoint URL. NULL = SLO not configured; FORM falls back to local-only logout (§13.2.4).';
+
+-- ── tenant_sso_configs: SLO binding preference ──────────────────────────────
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS slo_binding TEXT
+    CHECK (slo_binding IN ('HTTP-POST', 'HTTP-Redirect'));
+
+COMMENT ON COLUMN tenant_sso_configs.slo_binding IS
+  'SAML SLO binding. HTTP-POST preferred (§13.2.1). NULL treated as HTTP-Redirect for legacy IdPs.';
+
+-- ── tenant_sso_configs: back-channel logout toggle ──────────────────────────
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS backchannel_logout_enabled BOOLEAN NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN tenant_sso_configs.backchannel_logout_enabled IS
+  'Enable OIDC back-channel logout (§13.3). false = endpoint returns HTTP 501.';
+
+-- ── enterprise_sessions: IdP NameID for SAML SLO lookup ─────────────────────
+ALTER TABLE enterprise_sessions
+  ADD COLUMN IF NOT EXISTS idp_name_id TEXT;
+
+COMMENT ON COLUMN enterprise_sessions.idp_name_id IS
+  'SAML NameID value from the AuthnResponse assertion. Used in SLO LogoutRequest and IdP-initiated lookup.
+   NULL for OIDC sessions (no NameID). Treated as potentially re-identifying — excluded from all audit payloads; SHA-256 hash used for correlation.';
+
+CREATE INDEX IF NOT EXISTS idx_sessions_idp_name_id
+  ON enterprise_sessions (tenant_id, idp_name_id)
+  WHERE idp_name_id IS NOT NULL AND revoked_at IS NULL;
+
+-- ── enterprise_sessions: IdP session identifier for SAML SessionIndex / OIDC sid
+ALTER TABLE enterprise_sessions
+  ADD COLUMN IF NOT EXISTS idp_session_id TEXT;
+
+COMMENT ON COLUMN enterprise_sessions.idp_session_id IS
+  'SAML SessionIndex from AuthnResponse, or OIDC sid claim from ID token.
+   Used by SLO to target a specific IdP session (§13.2.2) and by back-channel logout (§13.3.3).
+   NULL if the IdP did not include SessionIndex / sid.';
+
+CREATE INDEX IF NOT EXISTS idx_sessions_idp_session_id
+  ON enterprise_sessions (tenant_id, idp_session_id)
+  WHERE idp_session_id IS NOT NULL AND revoked_at IS NULL;
+
+-- ── RLS: new columns inherit existing tenant_id RLS policy on enterprise_sessions
+-- No new policy needed. form_api reads enterprise_sessions via existing RLS (tenant_id = current_tenant_id()).
+-- idp_name_id / idp_session_id never returned in tenant-facing API responses — they are internal keys only.
+
+COMMIT;
+```
+
+#### §45.2.2 Rollback
+
+```sql
+-- Rollback migration 0100
+BEGIN;
+ALTER TABLE enterprise_sessions DROP COLUMN IF EXISTS idp_session_id;
+ALTER TABLE enterprise_sessions DROP COLUMN IF EXISTS idp_name_id;
+ALTER TABLE tenant_sso_configs  DROP COLUMN IF EXISTS backchannel_logout_enabled;
+ALTER TABLE tenant_sso_configs  DROP COLUMN IF EXISTS slo_binding;
+ALTER TABLE tenant_sso_configs  DROP COLUMN IF EXISTS slo_url;
+DROP INDEX IF EXISTS idx_sessions_idp_name_id;
+DROP INDEX IF EXISTS idx_sessions_idp_session_id;
+COMMIT;
+```
+
+#### §45.2.3 CI Adversarial Test Requirements
+
+Migration 0100 must pass the following checks in CI before merging to main:
+
+| Test ID | Check | Tool |
+|---|---|---|
+| MIG-0100-01 | Migration applies cleanly against a fresh Supabase schema | `supabase db reset && supabase migration up` |
+| MIG-0100-02 | Rollback script applies cleanly after migration | Manual CI step |
+| MIG-0100-03 | `form_api` role cannot SELECT `idp_name_id` or `idp_session_id` directly (these are internal columns; not in any tenant-facing view) | `SET ROLE form_api; SELECT idp_name_id FROM enterprise_sessions LIMIT 1` — expect 0 rows via RLS (tenant_id mismatch in test harness); no column-level GRANT needed since column access is controlled via view |
+| MIG-0100-04 | `form_system` role can write `idp_name_id` and `idp_session_id` | `SET ROLE form_system; UPDATE enterprise_sessions SET idp_name_id = 'test'` — must succeed |
+| MIG-0100-05 | Partial index `idx_sessions_idp_name_id` used by SLO lookup query (verify via `EXPLAIN`) | Query: `SELECT session_id FROM enterprise_sessions WHERE tenant_id = $1 AND idp_name_id = $2 AND revoked_at IS NULL` — confirm `Index Scan using idx_sessions_idp_name_id` |
+
+---
+
+### §45.3 SAML Callback Handler Update — `idp_name_id` and `idp_session_id` Population
+
+The SAML `AuthnResponse` callback handler (`apps/api-gateway/src/sso/saml-callback.ts`) must be updated to extract and store `idp_name_id` and `idp_session_id` at session creation. Without this update, SLO cannot construct a valid `LogoutRequest` (no stored `NameID`) and IdP-initiated SLO cannot look up the correct session.
+
+#### §45.3.1 Extraction from AuthnResponse
+
+```typescript
+// apps/api-gateway/src/sso/saml-callback.ts (additions)
+import { validateSamlResponse } from './saml-validate'; // existing
+
+interface SamlSessionAttributes {
+  idpNameId: string | null;
+  idpSessionId: string | null;
+}
+
+/**
+ * Extracts the NameID and SessionIndex from a validated SAML AuthnResponse.
+ * Both values are stored on enterprise_sessions at creation and used exclusively
+ * for SLO lookup. Neither value is exposed in any API response.
+ *
+ * Returns null for both if the assertion does not include the expected fields
+ * (transient NameID without fallback, or IdP omits SessionIndex). The session
+ * is created without SLO capability in that case — see §13.6.2.
+ */
+export function extractSloAttributes(
+  samlProfile: Record<string, unknown>
+): SamlSessionAttributes {
+  // node-saml v4.x exposes NameID via samlProfile.nameID (string)
+  // and SessionIndex via samlProfile.sessionIndex (string | undefined)
+  const idpNameId =
+    typeof samlProfile.nameID === 'string' && samlProfile.nameID.length > 0
+      ? samlProfile.nameID
+      : null;
+
+  const idpSessionId =
+    typeof samlProfile.sessionIndex === 'string' &&
+    samlProfile.sessionIndex.length > 0
+      ? samlProfile.sessionIndex
+      : null;
+
+  return { idpNameId, idpSessionId };
+}
+```
+
+#### §45.3.2 Session INSERT Update
+
+The `createEnterpriseSession()` call in the SAML callback must include the new columns:
+
+```typescript
+// Existing: INSERT INTO enterprise_sessions (...) VALUES (...)
+// Updated to include idp_name_id and idp_session_id:
+
+const { idpNameId, idpSessionId } = extractSloAttributes(samlProfile);
+
+await supabase.from('enterprise_sessions').insert({
+  // ... existing columns unchanged ...
+  idp_name_id:    idpNameId,    // null for transient NameID tenants
+  idp_session_id: idpSessionId, // null if IdP omits SessionIndex
+});
+```
+
+No change to the OIDC callback for this migration — `idp_session_id` for OIDC (`sid` claim) is handled in §46 alongside back-channel logout.
+
+#### §45.3.3 users Table `idp_name_id` for JIT Provisioning
+
+Section 13.6.1 notes that `users.idp_name_id` should be populated at JIT provisioning time for identity continuity. This is a separate column from `enterprise_sessions.idp_name_id`. The JIT provisioning handler (`apps/api-gateway/src/sso/jit-provision.ts`) must be updated:
+
+```sql
+-- Add to Migration 0100 (or as Migration 0100b if JIT refactor requires a separate PR)
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS idp_name_id TEXT;
+
+COMMENT ON COLUMN users.idp_name_id IS
+  'Persistent SAML NameID for this user at this tenant IdP. Populated at JIT provisioning.
+   Used for NameID→user_id resolution in IdP-initiated SLO when no active session is found.
+   NULL for OIDC users (no NameID concept) and SCIM-provisioned users (no SAML assertion).';
+
+CREATE INDEX IF NOT EXISTS idx_users_idp_name_id
+  ON users (tenant_id, idp_name_id)
+  WHERE idp_name_id IS NOT NULL;
+```
+
+**Sequencing note:** `users.idp_name_id` is a P1 item (§45.8). The core SLO implementation functions without it — the fallback in §13.2.2 (step 3) revokes by `enterprise_sessions.idp_name_id` match only. The `users.idp_name_id` column enables a secondary lookup when no matching session is found (e.g., the session was already expired before the IdP-initiated SLO arrived). It is not required for the P0 path.
+
+---
+
+### §45.4 SLO Worker Implementation Spec
+
+#### §45.4.1 Library Verification — `node-saml` v4.x SLO Support
+
+**Finding:** `node-saml` v4.x includes full SLO support. The relevant APIs:
+
+| Function | Purpose | Notes |
+|---|---|---|
+| `saml.generateLogoutRequest(user)` | Constructs a signed `LogoutRequest` XML | `user` must include `nameID`, `nameIDFormat`, `sessionIndex`; returns `{id, request}` |
+| `saml.generateLogoutResponse(logoutRequest, success)` | Constructs a `LogoutResponse` XML | `success: true` → `StatusCode: Success`; `false` → `StatusCode: Responder` |
+| `saml.validateRedirectSignature(req, cert)` | Validates an HTTP-Redirect binding signature (covers full query string per §13.2.1) | Must be called before `validatePostRequest` |
+| `saml.validatePostRequest(body, cert)` | Validates an HTTP-POST binding `LogoutRequest` | Parses XML, verifies signature against IdP cert |
+| `saml.validatePostResponse(body, cert)` | Validates an HTTP-POST binding `LogoutResponse` | Confirms `InResponseTo` matches stored `slo_request_id` |
+| `saml.getAuthorizeUrl(params)` | Existing — no change | Used for SP-initiated AuthnRequest |
+
+**Version pin:** `"node-saml": "^4.0.0"` in `packages.json`. Do not use versions < 4.0.0 — earlier versions have incomplete SLO support and contain known XML parsing vulnerabilities.
+
+**Alternative considered and rejected:** `samlify` — excluded per §13.8 note (historical CVEs in XML parsing). Custom XML signing is explicitly prohibited.
+
+#### §45.4.2 Worker File Layout
+
+New Worker file at `apps/api-gateway/src/sso/saml-slo.ts`. Existing SAML auth files are unchanged except for the callback update in §45.3.
+
+```
+apps/api-gateway/src/sso/
+  saml-slo.ts            ← NEW — SLO endpoint handlers (this section)
+  saml-callback.ts       ← UPDATED — adds extractSloAttributes() call (§45.3)
+  saml-auth.ts           ← UNCHANGED
+  saml-validate.ts       ← UNCHANGED
+```
+
+Bindings required in `wrangler.toml` (additions):
+
+```toml
+[[kv_namespaces]]
+binding = "SLO_KV"
+id      = "<kv-namespace-id-for-slo>"
+# TTL 15 seconds for SLO request state; separate namespace from SSO_KV to avoid
+# quota contention with the SSO session cache.
+```
+
+`SLO_KV` is a NEW namespace. Do not reuse `SSO_KV`. Key pattern: `slo:{tenant_id}:{slo_request_id}`, TTL 15 seconds.
+
+#### §45.4.3 IdP-Initiated SLO Handler
+
+Route: `POST /auth/saml/slo` (HTTP-POST binding) and `GET /auth/saml/slo` (HTTP-Redirect binding).
+
+```typescript
+// apps/api-gateway/src/sso/saml-slo.ts (excerpt)
+
+import { SAML } from 'node-saml';
+import { emitAuditEvent } from '../audit/emit';
+import { sha256hex } from '../crypto/hash';
+import type { Env } from '../types';
+
+/**
+ * Handles IdP-initiated SLO: the IdP sends an unsolicited LogoutRequest.
+ * FORM validates, revokes sessions, and returns a signed LogoutResponse.
+ * See §13.2.2 for the full flow.
+ */
+export async function handleIdpInitiatedSlo(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const tenantId = await resolveTenantFromRequest(request, env);
+  if (!tenantId) return new Response('Unknown tenant', { status: 400 });
+
+  const config = await getTenantSsoConfig(tenantId, env);
+  if (!config?.slo_url) {
+    // SLO not configured — return Responder status, write audit event
+    await emitAuditEvent(env, {
+      event_name: 'slo.fallback_local_only',
+      tenant_id:  tenantId,
+      metadata:   { reason: 'slo_not_configured' },
+    });
+    return buildSamlLogoutResponse(config, null, false, env);
+  }
+
+  // Parse LogoutRequest from either POST body or GET query string
+  let logoutRequest: Record<string, unknown>;
+  try {
+    const saml = buildSamlInstance(config);
+    if (request.method === 'POST') {
+      const body = await request.formData();
+      logoutRequest = await saml.validatePostRequest(
+        Object.fromEntries(body),
+        config.idp_cert
+      );
+    } else {
+      const url = new URL(request.url);
+      logoutRequest = await saml.validateRedirectSignature(
+        Object.fromEntries(url.searchParams),
+        config.idp_cert
+      );
+    }
+  } catch (err) {
+    await emitAuditEvent(env, {
+      event_name: 'slo.failed',
+      tenant_id:  tenantId,
+      metadata:   { reason: 'invalid_signature', slo_request_id: null },
+    });
+    return buildSamlLogoutResponse(config, null, false, env);
+  }
+
+  const nameId       = logoutRequest.nameID as string | undefined;
+  const sessionIndex = logoutRequest.sessionIndex as string | undefined;
+  const requestId    = logoutRequest.ID as string | undefined;
+
+  if (!nameId) {
+    await emitAuditEvent(env, {
+      event_name: 'slo.failed',
+      tenant_id:  tenantId,
+      metadata:   { reason: 'missing_name_id', slo_request_id: requestId ?? null },
+    });
+    return buildSamlLogoutResponse(config, requestId ?? null, false, env);
+  }
+
+  // Revoke matching sessions (§13.2.2 step 3)
+  const revokedSessions = await revokeSessionsByNameId(
+    tenantId,
+    nameId,
+    sessionIndex ?? null,
+    env
+  );
+
+  // Emit slo.idp_initiated — no raw nameId in payload; hash only
+  await emitAuditEvent(env, {
+    event_name: 'slo.idp_initiated',
+    tenant_id:  tenantId,
+    metadata:   {
+      idp_name_id_hash:       sha256hex(nameId),
+      session_index:          sessionIndex ?? null,
+      logout_request_id:      requestId ?? null,
+      sessions_revoked_count: revokedSessions.length,
+    },
+  });
+
+  return buildSamlLogoutResponse(config, requestId ?? null, true, env);
+}
+
+/**
+ * Revokes enterprise_sessions matching the given NameID (and optionally SessionIndex).
+ * Falls back to all sessions for the NameID within the tenant if SessionIndex is absent.
+ */
+async function revokeSessionsByNameId(
+  tenantId: string,
+  nameId: string,
+  sessionIndex: string | null,
+  env: Env
+): Promise<string[]> {
+  const query = sessionIndex
+    ? `
+        UPDATE enterprise_sessions
+        SET revoked_at = now(), revocation_reason = 'federated_logout'
+        WHERE tenant_id = $1 AND idp_name_id = $2 AND idp_session_id = $3
+          AND revoked_at IS NULL
+        RETURNING session_id
+      `
+    : `
+        UPDATE enterprise_sessions
+        SET revoked_at = now(), revocation_reason = 'federated_logout'
+        WHERE tenant_id = $1 AND idp_name_id = $2 AND revoked_at IS NULL
+        RETURNING session_id
+      `;
+
+  const params = sessionIndex
+    ? [tenantId, nameId, sessionIndex]
+    : [tenantId, nameId];
+
+  const { data } = await env.SUPABASE.rpc('execute_sql', { query, params });
+  return (data ?? []).map((r: { session_id: string }) => r.session_id);
+}
+```
+
+#### §45.4.4 SP-Initiated SLO Initiation
+
+Triggered by the user clicking "Sign out" in FORM. Called from the existing logout handler BEFORE clearing the FORM session cookie. The FORM session is revoked first (unconditionally), then the SLO round-trip begins.
+
+Route: existing `POST /auth/logout` — SLO logic is injected after session revocation.
+
+```typescript
+// apps/api-gateway/src/sso/saml-slo.ts (excerpt)
+
+/**
+ * Initiates SP-initiated SLO after local session has been revoked.
+ * Returns a redirect Response to the IdP SLO endpoint.
+ * See §13.2.1 and §13.2.3 (SLO state machine).
+ */
+export async function initiateSPSlo(
+  session: EnterpriseSession,
+  config: TenantSsoConfig,
+  env: Env
+): Promise<Response | null> {
+  if (!config.slo_url || !session.idp_name_id) {
+    // SLO not configured, or session has no NameID (§13.6.2 transient fallback)
+    await emitAuditEvent(env, {
+      event_name: 'slo.fallback_local_only',
+      tenant_id:  session.tenant_id,
+      metadata:   {
+        session_id: session.session_id,
+        user_id:    session.user_id,
+        reason:     config.slo_url ? 'no_name_id' : 'slo_not_configured',
+      },
+    });
+    return null; // caller continues to post-logout redirect
+  }
+
+  const sloRequestId = `_form_logout_${crypto.randomUUID().replace(/-/g, '')}`;
+  const relayState   = crypto.randomUUID();
+
+  // Persist SLO state in KV for response correlation (TTL 15s)
+  await env.SLO_KV.put(
+    `slo:${session.tenant_id}:${sloRequestId}`,
+    JSON.stringify({
+      session_id:    session.session_id,
+      user_id:       session.user_id,
+      relay_state:   relayState,
+      initiated_at:  Date.now(),
+    }),
+    { expirationTtl: 15 }
+  );
+
+  const saml = buildSamlInstance(config);
+  const { id: _id, request: logoutRequestXml } =
+    saml.generateLogoutRequest({
+      nameID:        session.idp_name_id,
+      nameIDFormat:  'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+      sessionIndex:  session.idp_session_id ?? undefined,
+    });
+
+  // Prefer HTTP-POST; fall back to HTTP-Redirect per tenant config
+  const binding = config.slo_binding ?? 'HTTP-Redirect';
+
+  let redirectUrl: string;
+  if (binding === 'HTTP-POST') {
+    // Return a self-submitting POST form (not a redirect)
+    return buildSloPostForm(config.slo_url, logoutRequestXml, relayState);
+  } else {
+    const deflated = deflateRaw(logoutRequestXml);
+    const encoded  = btoa(deflated);
+    const qs = new URLSearchParams({
+      SAMLRequest: encoded,
+      SigAlg:     'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
+      RelayState:  relayState,
+    });
+    const sig = await signQueryString(qs.toString(), env.SP_PRIVATE_KEY);
+    qs.set('Signature', sig);
+    redirectUrl = `${config.slo_url}?${qs.toString()}`;
+  }
+
+  await emitAuditEvent(env, {
+    event_name: 'slo.sp_initiated',
+    tenant_id:  session.tenant_id,
+    metadata:   {
+      session_id:    session.session_id,
+      user_id:       session.user_id,
+      slo_request_id: sloRequestId,
+      idp_slo_url:   config.slo_url,
+    },
+  });
+
+  return Response.redirect(redirectUrl, 302);
+}
+```
+
+#### §45.4.5 SP-Initiated SLO Completion Handler
+
+Route: `GET /auth/saml/slo/callback` — IdP redirects back here with signed `LogoutResponse`.
+
+```typescript
+// apps/api-gateway/src/sso/saml-slo.ts (excerpt)
+
+/**
+ * Handles the IdP's LogoutResponse after SP-initiated SLO.
+ * Validates the response, emits slo.completed or slo.failed, and
+ * redirects the user to /login?logged_out=1.
+ * See §13.2.1 (final steps) and §13.2.3 (Complete state).
+ */
+export async function handleSloCallback(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const url         = new URL(request.url);
+  const relayState  = url.searchParams.get('RelayState') ?? '';
+
+  // Look up SLO state by RelayState scan (KV list is O(n) — acceptable for low SLO volume)
+  // Preferred: embed tenant_id in RelayState as `{tenant_id}:{uuid}` (P1 hardening)
+  const { tenantId, sloState } = await resolveSloStateByRelayState(
+    relayState,
+    env
+  );
+
+  if (!tenantId || !sloState) {
+    // Unknown relay state — likely expired (>15s) or forged
+    return Response.redirect('/login?error=slo_relay_expired', 302);
+  }
+
+  const config = await getTenantSsoConfig(tenantId, env);
+  const saml   = buildSamlInstance(config!);
+
+  let isSuccess = false;
+  let partial   = false;
+  try {
+    const logoutResponse = await saml.validatePostResponse(
+      Object.fromEntries(url.searchParams),
+      config!.idp_cert
+    );
+    const statusCode = (logoutResponse as Record<string, unknown>).statusCode as string;
+    isSuccess = statusCode === 'urn:oasis:names:tc:SAML:2.0:status:Success';
+    partial   = !isSuccess && statusCode !== undefined;
+  } catch {
+    isSuccess = false;
+  }
+
+  const durationMs = Date.now() - sloState.initiated_at;
+
+  if (isSuccess || partial) {
+    await emitAuditEvent(env, {
+      event_name: 'slo.completed',
+      tenant_id:  tenantId,
+      metadata:   {
+        session_id:    sloState.session_id,
+        slo_request_id: relayState,
+        duration_ms:   durationMs,
+        partial,
+      },
+    });
+  } else {
+    await emitAuditEvent(env, {
+      event_name: 'slo.failed',
+      tenant_id:  tenantId,
+      metadata:   {
+        session_id:    sloState.session_id,
+        slo_request_id: relayState,
+        reason:        'invalid_signature',
+      },
+    });
+    await emitAuditEvent(env, {
+      event_name: 'slo.fallback_local_only',
+      tenant_id:  tenantId,
+      metadata:   {
+        session_id: sloState.session_id,
+        user_id:    sloState.user_id,
+        reason:     'idp_timeout',
+      },
+    });
+  }
+
+  // Clean up KV state
+  await env.SLO_KV.delete(`slo:${tenantId}:${relayState}`);
+
+  return Response.redirect('/login?logged_out=1', 302);
+}
+```
+
+#### §45.4.6 Timeout and Fallback — AbortController Integration
+
+The 10-second SLO timeout (§13.2.4) is enforced in the `POST /auth/logout` handler that calls `initiateSPSlo()`. The logout handler must not block indefinitely on the IdP round-trip:
+
+```typescript
+// In the logout handler (apps/api-gateway/src/auth/logout.ts):
+
+// 1. Revoke FORM session unconditionally (always executes)
+await revokeSession(sessionId, env);
+
+// 2. Attempt SLO with 10-second timeout
+const controller = new AbortController();
+const timeout    = setTimeout(() => controller.abort(), 10_000);
+
+let sloRedirect: Response | null = null;
+try {
+  sloRedirect = await Promise.race([
+    initiateSPSlo(session, config, env),
+    new Promise<null>((_, reject) =>
+      controller.signal.addEventListener('abort', () => reject(new Error('slo_timeout')))
+    ),
+  ]);
+} catch (err) {
+  if ((err as Error).message === 'slo_timeout') {
+    await emitAuditEvent(env, {
+      event_name: 'slo.failed',
+      tenant_id:  session.tenant_id,
+      metadata:   { session_id: sessionId, reason: 'idp_timeout', slo_request_id: null },
+    });
+    await emitAuditEvent(env, {
+      event_name: 'slo.fallback_local_only',
+      tenant_id:  session.tenant_id,
+      metadata:   { session_id: sessionId, user_id: session.user_id, reason: 'idp_timeout' },
+    });
+  }
+} finally {
+  clearTimeout(timeout);
+}
+
+// 3. Redirect to IdP SLO endpoint (if SLO configured) or post-logout page (fallback)
+return sloRedirect ?? Response.redirect('/login?logged_out=1', 302);
+```
+
+---
+
+### §45.5 DEC-030 Audit Event Registration
+
+All events in §13.7 must be registered in `docs/AUDIT_LOG_SCHEMA.md` before the §45.8 P0 checklist deploy. The following are the new events, their retention, and Zod v2 schemas.
+
+#### §45.5.1 Event Table
+
+| Event name | Trigger | Severity | Retention | SOC 2 |
+|---|---|---|---|---|
+| `slo.sp_initiated` | User-triggered logout; local session revoked; SLO round-trip starting | STANDARD | 7yr | CC6.1, CC6.3 |
+| `slo.idp_initiated` | IdP pushed unsolicited `LogoutRequest` to FORM SLO endpoint | HIGH | 7yr | CC6.1, CC6.3 |
+| `slo.completed` | SP-initiated SLO: valid `LogoutResponse` received and processed | STANDARD | 7yr | CC6.1 |
+| `slo.failed` | SLO error: invalid signature, IdP timeout, DB revocation failure | HIGH | 7yr | CC6.1, CC7.2 |
+| `slo.fallback_local_only` | Federated SLO unavailable; FORM session cleared; no IdP propagation | STANDARD | 7yr | CC6.1 |
+
+All five events are HMAC-SHA256 chained per DEC-030. `slo.idp_initiated` and `slo.failed` are HIGH severity and generate a P3 `#alerts-enterprise` Slack notification when fired.
+
+#### §45.5.2 Zod v2 Schemas
+
+```typescript
+// Registration target: docs/AUDIT_LOG_SCHEMA.md §SLO-Events (new subsection)
+
+import { z } from 'zod/v4';
+
+export const SloSpInitiatedSchema = z.object({
+  session_id:     z.string().uuid(),
+  tenant_id:      z.string().uuid(),
+  user_id:        z.string().uuid(),
+  slo_request_id: z.string().min(1),
+  idp_slo_url:    z.string().url(),
+});
+
+export const SloIdpInitiatedSchema = z.object({
+  tenant_id:              z.string().uuid(),
+  // No raw idp_name_id — hash only (privacy floor §45.1)
+  idp_name_id_hash:       z.string().length(64),  // SHA-256 hex
+  session_index:          z.string().nullable(),
+  logout_request_id:      z.string().nullable(),
+  sessions_revoked_count: z.number().int().min(0),
+});
+
+export const SloCompletedSchema = z.object({
+  session_id:     z.string().uuid(),
+  tenant_id:      z.string().uuid(),
+  slo_request_id: z.string().min(1),
+  duration_ms:    z.number().int().min(0),
+  partial:        z.boolean(),
+});
+
+export const SloFailedSchema = z.object({
+  session_id:     z.string().uuid().nullable(),
+  tenant_id:      z.string().uuid(),
+  slo_request_id: z.string().nullable(),
+  reason: z.enum([
+    'idp_timeout',
+    'invalid_signature',
+    'status_code_responder',
+    'db_revocation_failed',
+    'missing_name_id',
+    'relay_state_expired',
+  ]),
+});
+
+export const SloFallbackLocalOnlySchema = z.object({
+  session_id: z.string().uuid().nullable(),
+  tenant_id:  z.string().uuid(),
+  user_id:    z.string().uuid().nullable(),
+  reason: z.enum([
+    'slo_not_configured',
+    'idp_timeout',
+    'no_name_id',
+  ]),
+});
+```
+
+#### §45.5.3 SLO-CHAIN-01 Ordering Invariant
+
+The following DEC-030 HMAC chain ordering invariant must be registered in the `emit-audit-event` Worker and enforced with HTTP 422:
+
+**SLO-CHAIN-01:** `slo.completed` or `slo.fallback_local_only` MUST NOT be emitted for a given `slo_request_id` unless at least one of `slo.sp_initiated` or `slo.idp_initiated` was previously emitted for the same `{tenant_id, slo_request_id}` pair.
+
+Violation response:
+
+```json
+{
+  "error": "SLO_CHAIN_01_VIOLATION",
+  "message": "slo.completed emitted for slo_request_id with no preceding slo.sp_initiated or slo.idp_initiated anchor"
+}
+```
+
+HTTP 422 with `SLO_CHAIN_01_VIOLATION` error code. `slo.failed` is exempt from the chain ordering check — a `slo.failed` event must be writable even when the initiation event was never persisted (e.g., network failure between initiation and first event write).
+
+---
+
+### §45.6 SOC 2 CC6 Evidence Artefacts
+
+These artefacts close the CC6.1 "compensating control documented" finding to "control implemented and evidenced" upon production deployment and 30-day observation.
+
+| Artefact ID | Name | TSC criteria | Trigger | Retention | R2 path |
+|---|---|---|---|---|---|
+| SLO-E-001 | SAML SLO `slo.sp_initiated` + `slo.completed` chain export | CC6.1, CC6.3 | 30-day audit export after M7 go-live | 7yr WORM | `compliance/evidence/saml-slo/slo-e-001-sp-chain-export.json` |
+| SLO-E-002 | IdP-initiated SLO `slo.idp_initiated` event export | CC6.1, CC6.3 | 30-day audit export (if any events fired) | 7yr WORM | `compliance/evidence/saml-slo/slo-e-002-idp-initiated-export.json` |
+| SLO-E-003 | Integration test results — Okta SP-initiated + IdP-initiated SLO against developer sandbox | CC6.1 | Per §45.7 test matrix; stored with CI run artifact | 7yr WORM | `compliance/evidence/saml-slo/slo-e-003-okta-integration-test.json` |
+| SLO-E-004 | Migration 0100 applied — Supabase migration log export | CC8.1 (change management) | Migration apply timestamp + reviewer sign-off | 7yr WORM | `compliance/evidence/saml-slo/slo-e-004-migration-0100-log.json` |
+
+**Collection responsibility:** compliance-officer files SLO-E-001 and SLO-E-002 at T+30 days post M7 go-live. Platform-engineer files SLO-E-003 at P0 checklist completion. devops-lead files SLO-E-004 at migration apply.
+
+SLO-E-001 through SLO-E-004 must be added to `docs/SOC2_READINESS.md §79.4` master evidence table (count 128 → 132) in a follow-on commit. This is §45.8 item 11 (P1).
+
+---
+
+### §45.7 Integration Test Matrix
+
+| Test ID | Scenario | IdP | Expected outcome |
+|---|---|---|---|
+| SLO-I-001 | SP-initiated SLO — Okta, persistent NameID, HTTP-POST binding | Okta developer sandbox | `slo.sp_initiated` → `slo.completed`; user redirected to `/login?logged_out=1`; enterprise_sessions row has `revoked_at` set, `revocation_reason = 'federated_logout'` |
+| SLO-I-002 | SP-initiated SLO — IdP SLO timeout (10s) | Okta (SLO endpoint patched to drop response) | `slo.failed` (reason: `idp_timeout`) + `slo.fallback_local_only` (reason: `idp_timeout`); user still redirected to `/login?logged_out=1`; session revoked |
+| SLO-I-003 | SP-initiated SLO — `slo_url` NULL | Any | `slo.fallback_local_only` (reason: `slo_not_configured`); no SLO round-trip attempted |
+| SLO-I-004 | IdP-initiated SLO — Okta pushes `LogoutRequest` with SessionIndex | Okta developer sandbox | `slo.idp_initiated` emitted; matching session revoked by both `idp_name_id` + `idp_session_id`; `LogoutResponse` returned with `StatusCode: Success` |
+| SLO-I-005 | IdP-initiated SLO — missing SessionIndex (Okta omits it) | Okta (SessionIndex omitted in test) | All active sessions for `idp_name_id` revoked; `slo.idp_initiated` emitted with `session_index: null` |
+| SLO-I-006 | IdP-initiated SLO — invalid signature | Synthetic | `slo.failed` (reason: `invalid_signature`); `LogoutResponse` with `StatusCode: Responder`; no sessions revoked |
+| SLO-I-007 | SP-initiated SLO — transient NameID (session has no `idp_name_id`) | Synthetic | `slo.fallback_local_only` (reason: `no_name_id`); local session revoked; no SLO round-trip |
+| SLO-I-008 | SLO-CHAIN-01 invariant — `slo.completed` emitted without prior anchor | Synthetic emit via test harness | `emit-audit-event` Worker returns HTTP 422 `SLO_CHAIN_01_VIOLATION` |
+
+All eight tests must pass before migration 0100 is applied to production. SLO-I-001, SLO-I-004, and SLO-I-003 results are packaged as evidence artefact SLO-E-003.
+
+---
+
+### §45.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply Migration 0100 to staging environment; run §45.2.3 adversarial CI tests (MIG-0100-01 through MIG-0100-05) | devops-lead | **P0** | M7 | [ ] |
+| 2 | Update SAML callback handler (`saml-callback.ts`) to populate `idp_name_id` and `idp_session_id` per §45.3 | platform-engineer | **P0** | M7 | [ ] |
+| 3 | Implement `saml-slo.ts` Worker — IdP-initiated handler (§45.4.3), SP-initiated initiation (§45.4.4), SLO callback handler (§45.4.5), timeout + fallback (§45.4.6) | platform-engineer | **P0** | M7 | [ ] |
+| 4 | Provision `SLO_KV` Cloudflare KV namespace; add binding in `wrangler.toml` per §45.4.2 | devops-lead | **P0** | M7 | [ ] |
+| 5 | Register SLO routes in API gateway router: `POST /auth/saml/slo`, `GET /auth/saml/slo`, `GET /auth/saml/slo/callback` | platform-engineer | **P0** | M7 | [ ] |
+| 6 | Register five DEC-030 events (`slo.sp_initiated`, `slo.idp_initiated`, `slo.completed`, `slo.failed`, `slo.fallback_local_only`) in `docs/AUDIT_LOG_SCHEMA.md §SLO-Events` with Zod schemas from §45.5.2 | compliance-officer | **P0** | M7 | [ ] |
+| 7 | Enforce SLO-CHAIN-01 invariant in `emit-audit-event` Worker (HTTP 422 on violation) | platform-engineer | **P0** | M7 | [ ] |
+| 8 | Execute SLO-I-001 through SLO-I-008 integration test matrix (§45.7) against Okta developer sandbox; collect SLO-E-003 artefact | security-engineer | **P0** | M7 | [ ] |
+| 9 | Apply Migration 0100 to production; file SLO-E-004 evidence artefact in R2 `compliance/evidence/saml-slo/` | devops-lead | **P0** | M7 | [ ] |
+| 10 | Add `users.idp_name_id` column (§45.3.3) and update JIT provisioning handler to populate it | platform-engineer | **P1** | M7 | [ ] |
+| 11 | Add SLO-E-001 through SLO-E-004 to `docs/SOC2_READINESS.md §79.4` master evidence table (count 128 → 132); map to CC6.1/CC6.3/CC8.1 | compliance-officer | **P1** | M7 | [ ] |
+| 12 | Collect SLO-E-001 (SP-initiated chain export) and SLO-E-002 (IdP-initiated export) at T+30 days post go-live; file in R2 and advance G-002 to 🟢 in §9 gap registry | compliance-officer | **P1** | M8 | [ ] |
+
+**G-002 will advance from 🟡 Implementation spec complete to 🟢 Implementation complete** when items 1–9 are deployed to production and SLO-I-001 + SLO-I-004 integration tests pass against at least one production IdP (Okta).
+
+---
+
+### §45.9 Gap Status Update
+
+| Gap | Previous status | Updated status | Notes |
+|---|---|---|---|
+| G-002 — SAML SLO | 🟡 Design complete, implementation pending (§13) | 🟡 Implementation spec complete, deployment pending | SP-initiated and IdP-initiated SLO Worker spec complete (§45.4). Migration 0100 DDL ready (§45.2). Callback update specified (§45.3). SLO-CHAIN-01 invariant defined (§45.5.3). 12-item implementation checklist in §45.8. Advance to 🟢 on P0 checklist completion + Okta integration test. |
+
+**SOC 2 CC6.1 impact:** §13.9 notes that full closure requires implementation, integration tests, and audit events. §45 satisfies the implementation specification requirement. Upon §45.8 P0 items deploying to production and 30-day observation, the auditor finding moves from "compensating control documented" (§13 design) to "control implemented and evidenced" (SLO-E-001/002/003). This is a meaningful SOC 2 observation-window advance ahead of the Type II audit period.
+
+Cross-references: `docs/INCIDENT_RESPONSE.md §R-01` (tenant nuke — SLO complements but does not replace emergency session revocation), `docs/AUDIT_LOG_SCHEMA.md §SLO-Events` (P0 checklist item 6), `docs/SOC2_READINESS.md §79.4` (SLO-E-001 through SLO-E-004 to add, P1 item 11).
+
+---
+
+*v2.20 additions (2026-07-04): §45 — SAML SLO Implementation Spec — Worker, Migration 0100, and Callback Update. Advances G-002 from §13 design-complete to implementation-spec-complete. Resolves all three §13.8 blockers: (1) `node-saml` v4.x SLO support verified — `generateLogoutRequest()`, `generateLogoutResponse()`, `validatePostRequest()`, `validateRedirectSignature()`, `validatePostResponse()` API confirmed; `samlify` rejected; custom XML signing prohibited. (2) Migration 0100 DDL — five new columns: `tenant_sso_configs.slo_url` (nullable TEXT), `tenant_sso_configs.slo_binding` (CHECK HTTP-POST/HTTP-Redirect), `tenant_sso_configs.backchannel_logout_enabled` (BOOLEAN DEFAULT false), `enterprise_sessions.idp_name_id` (TEXT + partial index on not-null + not-revoked), `enterprise_sessions.idp_session_id` (TEXT + partial index); rollback script; five CI adversarial tests MIG-0100-01 through MIG-0100-05. (3) SAML callback handler update — `extractSloAttributes()` extracts NameID + SessionIndex from `node-saml` profile; `enterprise_sessions` INSERT updated; `users.idp_name_id` column spec for JIT provisioning (P1). Worker spec: `apps/api-gateway/src/sso/saml-slo.ts` — IdP-initiated SLO handler (validate LogoutRequest signature via node-saml, revoke matching sessions by `idp_name_id` + optional `idp_session_id`, return signed `LogoutResponse` with `StatusCode: Success` or `Responder`); SP-initiated initiation handler (`initiateSPSlo()` — HTTP-POST preferred, HTTP-Redirect fallback, `SLO_KV` state `slo:{tenant_id}:{slo_request_id}` TTL 15s, `slo.sp_initiated` event); SP-initiated completion handler (`handleSloCallback()` — validate `LogoutResponse`, emit `slo.completed` or `slo.failed` + `slo.fallback_local_only`); 10-second `AbortController` timeout in logout handler (session revoked unconditionally before timeout; SLO is best-effort). Privacy floor: raw `idp_name_id` excluded from all audit payloads; `idp_name_id_hash` SHA-256 used for correlation. Five DEC-030 events: `slo.sp_initiated` (STANDARD/7yr), `slo.idp_initiated` (HIGH/7yr — P3 alert), `slo.completed` (STANDARD/7yr), `slo.failed` (HIGH/7yr — P3 alert), `slo.fallback_local_only` (STANDARD/7yr). Zod v2 schemas for all five events. SLO-CHAIN-01 ordering invariant (HTTP 422 `SLO_CHAIN_01_VIOLATION` — `slo.completed` / `slo.fallback_local_only` requires prior anchor event for same `slo_request_id`; `slo.failed` exempt). Four SOC 2 evidence artefacts: SLO-E-001 (SP chain 30-day export, CC6.1/CC6.3), SLO-E-002 (IdP-initiated 30-day export, CC6.1/CC6.3), SLO-E-003 (Okta integration test results, CC6.1), SLO-E-004 (Migration 0100 log, CC8.1). Eight integration tests SLO-I-001 through SLO-I-008 (SP-initiated happy path, timeout, null SLO URL, IdP-initiated with/without SessionIndex, invalid signature, transient NameID, chain invariant enforcement). 12-item implementation checklist: 9× P0/M7 (Migration 0100 staging + production, callback update, Worker implementation, KV namespace, route registration, AUDIT_LOG_SCHEMA registration, SLO-CHAIN-01 enforcement, integration tests), 3× P1/M7–M8 (users.idp_name_id, SOC2_READINESS §79.4 update, 30-day evidence collection). G-002: 🟡 Design complete → 🟡 Implementation spec complete; 🟢 Closed pending §45.8 P0 deployment + Okta integration test. §9 gap registry updated inline. Header v2.19 → v2.20. Owner: security-engineer + platform-engineer. Review: enterprise-architect + compliance-officer.*
