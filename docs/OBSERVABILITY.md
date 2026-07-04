@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.16.4
+# FORM · Observability & Monitoring Taxonomy v5.17.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -70,6 +70,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §68 | Cross-Reference Patch — §59.7 / §59.8 / §60.7 / §60.8 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.57 + SOC2_READINESS.md v3.52.0) |
 | §69 | Cross-Reference Patch — §12.6 Job 48 + §56.8 Stale SOC2_READINESS Registration Status Closure (SOC2_READINESS §120 / §124) |
 | §70 | OIDC Back-Channel Logout (BCL) Observability |
+| §71 | Migration M-0102 — BCL-CHAIN-01 Integrity Check pg_cron Job 59 Deployment Spec |
 
 ---
 
@@ -19341,7 +19342,7 @@ The following four rows are added to the consolidated §6.2 alert rules table un
 | 1 | Add §70 TOC entry to `docs/OBSERVABILITY.md` | devops-lead | **P0** | This pass | [x] **Done — §70 TOC entry added (v5.16.0, 2026-07-04).** |
 | 2 | Implement AL-BCL-01 alert: `audit_log_events WHERE event_type = 'backchannel_logout.failed'` 5-min and 10-min window queries via Better Stack + PagerDuty webhook for P1 escalation | devops-lead + platform-engineer | **P1** | M8 | [ ] |
 | 3 | Implement AL-BCL-02 alert: REVOCATION_QUEUE exhaustion counter via WAE; P1 PagerDuty `form-security`; CSM auto-notify | devops-lead + platform-engineer | **P1** | M8 | [ ] |
-| 4 | Implement AL-BCL-03: run retrospective BCL-CHAIN-01 SQL (§70.4) as hourly scheduled check; emit `system.bcl_chain_check_passed` LOW/1yr on zero rows; emit `security.bcl_chain_01_violation` CRITICAL/7yr + PagerDuty P0 on any row | devops-lead + compliance-officer | **P1** | M8 | [x] **Architecture resolved — 2026-07-04 (DEC-098; OQ-BCL-OBS-01 closed): scheduled as pg_cron job 59 `bcl_chain_integrity_check` (hourly `0 * * * *`, `form_audit` role, 2h freshness); §12.6 registry entry added this pass. Production implementation (Migration M-0102) pending M8 BCL production deploy.** |
+| 4 | Implement AL-BCL-03: run retrospective BCL-CHAIN-01 SQL (§70.4) as hourly scheduled check; emit `system.bcl_chain_check_passed` LOW/1yr on zero rows; emit `security.bcl_chain_01_violation` CRITICAL/7yr + PagerDuty P0 on any row | devops-lead + compliance-officer | **P1** | M8 | [x] **Architecture resolved — 2026-07-04 (DEC-098; OQ-BCL-OBS-01 closed): scheduled as pg_cron job 59 `bcl_chain_integrity_check` (hourly `0 * * * *`, `form_audit` role, 2h freshness); §12.6 registry entry added. SQL DDL spec complete — 2026-07-04 (§71 `0102_bcl_chain_integrity_check.sql`; `fn_bcl_chain_integrity_check()` SECURITY DEFINER; 50-violation safety cap BCL-INT-CAP-01; dedup by `bcl_request_id` 24h window; `bcl_pairs_checked` all-clear attestation; all-clear suppressed on violations). Production deploy pending M8 BCL production deploy.** |
 | 5 | Implement AL-BCL-04: WAE `bcl_request_duration_ms` P95 threshold monitor (> 3,000 ms / 15 min); PagerDuty `form-devops` P2 | devops-lead | **P1** | M8 | [ ] |
 | 6 | Build "BCL / Federated Session Revocation" panel group in Enterprise Identity dashboard (§26.9) — eight panels per §70.6 | devops-lead | **P1** | M8 | [ ] |
 | 7 | Register BCL-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.1/CC6.3/CC7.2/CC7.3, quarterly, 7yr) | compliance-officer | **P1** | M8 | [x] **Done — 2026-07-04 (`docs/SOC2_READINESS.md §164`, evidence count 135 → 136).** |
@@ -19383,3 +19384,276 @@ The following four rows are added to the consolidated §6.2 alert rules table un
 *v5.16.2 (2026-07-04): §70.9 item 11 + §70.11 cross-reference closure — AUDIT_LOG_SCHEMA.md v2.90 event registrations. §70.9 item 11 status updated `[ ]` → `[x] Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.90)`. §70.11 row "Register `system.bcl_chain_check_passed` + `security.bcl_chain_01_violation`" updated 🟡 Pending → 🟢 Done: both events registered in new `§BCL Chain Integrity Monitor events` section; `security.bcl_chain_01_violation_closed` HIGH/7yr and BCL-VIO-CHAIN-01 ordering invariant registered simultaneously; BCL-CHN-E-001 per-activation evidence artefact spec included (CC7.2/CC7.3/CC8.1, 7yr); `enterprise.admin_sessions_bulk_revoked` HIGH/7yr and BCL-REV-E-001 artefact registered in companion `§BCL Admin Session Bulk Revocation events` section per R-73.12 item 1. Remaining §70.11 obligations: SOC2_READINESS BCL-OBS-E-001 registration (§70.9 item 7 — P1/M8), SSO_SCIM §46.9 backreference (§70.9 item 10 — P1/M8). Document header v5.16.1 → v5.16.2. Owner: compliance-officer.*
 
 *v5.16.1 (2026-07-04): §70.7 CC7.3 cross-reference patch + §70.9 item 12 + §70.11 two-row closure — IR companion runbooks R-73 and R-74 filed. §70.9 item 12 status updated `[ ]` → `[x] Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.39.0, R-73 + R-74)`. §70.11 two pending rows updated 🟡 → 🟢 Done: "File companion IR runbook for AL-BCL-02" (R-73 — BCL REVOCATION_QUEUE Exhausted, CC6.3/CC7.3, P1) and "File companion IR runbook for AL-BCL-03" (R-74 — BCL-CHAIN-01 Integrity Violation, CC7.2/CC7.3/CC8.1, P0). §70.7 CC7.3 row updated to reference R-73 + R-74 directly (replacing "§70.11 pending" placeholder). Remaining §70.11 obligations: SOC2_READINESS BCL-OBS-E-001 registration (item 7), SSO_SCIM §46.9 backreference (item 10), AUDIT_LOG_SCHEMA two new events (item 11) — all P1/M8. Document header v5.16.0 → v5.16.1. Owner: devops-lead + compliance-officer.*
+
+---
+
+## §71 Migration M-0102 — BCL-CHAIN-01 Integrity Check pg_cron Job 59 Deployment Spec
+
+### §71.1 Purpose and Scope
+
+This section provides the complete SQL DDL for **Supabase migration `0102_bcl_chain_integrity_check.sql`**, which deploys pg_cron job 59 (`bcl_chain_integrity_check`) to production. Job 59 implements the hourly BCL-CHAIN-01 retrospective integrity sentinel specified in §12.6 (registry row) and §70.9 item 4 (implementation checklist).
+
+**Context:** Architecture was resolved via DEC-098 (2026-07-04) — pg_cron job 59 adopted over Cloudflare Workers Cron Trigger (OQ-BCL-OBS-01 closed). The SQL spec here is the last documentation gate before production deploy, which is gated on all §46.8 M8 P0 items (items 1–5, 7–9) completing first. Migration M-0102 is a **separate migration from Migration 0101** — 0101 adds `oidc_sub_hash` column to `enterprise_sessions`; M-0102 registers the hourly integrity check function.
+
+**Prerequisites for production deploy:**
+- Migration 0101 applied to production (§46.8 item 9) — `backchannel_logout.revoked` events must be flowing before the retrospective check has data to scan.
+- All §46.8 P0 items 1–8 closed (BCL Worker live, REVOCATION_QUEUE live, BCL-CHAIN-01 Worker enforcement live, integration tests BCL-I-001..BCL-I-008 passed).
+- `app.emit_audit_event_worker_url` GUC configured in production Supabase database (same GUC used by all existing 58 pg_cron bridge jobs).
+
+**SOC 2:** CC7.2 (continuous retrospective anomaly monitoring of BCL-CHAIN-01); CC7.3 (P0 PagerDuty paging on violation via AL-BCL-03); CC8.1 (change control — this migration log is BCL-E-003 per AUDIT_LOG_SCHEMA.md §BCL-Events). Owner: devops-lead + compliance-officer.
+
+---
+
+### §71.2 Design Decisions
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Runtime role | `form_audit` | DEC-067 precedent — `form_audit` is the canonical read-only `audit_log_events` role for all retrospective pg_cron sentinels (jobs 1–58). |
+| Check window | 24 hours (`NOW() - INTERVAL '24 hours'`) | Matches R-74-C2 canonical SQL (INCIDENT_RESPONSE.md §R-74.6). Belt-and-suspenders: primary enforcement is Worker-layer real-time HTTP 422; this detects retroactive anomalies (post-write deletion, H4/H5 bugs). |
+| Dedup mechanism | `NOT EXISTS` on `security.bcl_chain_01_violation` with same `bcl_request_id` in last 24h | Prevents re-paging same orphan every hour while it remains unresolved. Each unique `bcl_request_id` is paged once per 24h window; IC closes via R-74 runbook. |
+| Safety cap | 50 per run (BCL-INT-CAP-01) | > 50 simultaneous orphans indicates H4/H5 (systemic bug or malicious manipulation) — IC co-activates R-05; cap prevents pg_net overload. BCL volume is enterprise-only and inherently bounded. |
+| All-clear suppression | Suppressed when violations emitted | Follows AMEND-MONITOR-CHAIN-01 pattern (job 48) — prevents mixed-signal attestation in BCL-OBS-E-001 quarterly artefact. |
+| `bcl_pairs_checked` scope | COUNT of all `backchannel_logout.revoked` in 24h window | Represents total pairs examined, regardless of violations. `bcl_pairs_checked = 0` is explicit zero-BCL-activity attestation per §70.8 spec. |
+| pg_net timeout | 8,000 ms | Matches higher-stakes integrity jobs (vs. 5,000 ms for SIEM bridge). Failure on `pg_net.http_post` is non-fatal per design — violation remains detectable on next hourly run. |
+
+---
+
+### §71.3 SQL DDL — `0102_bcl_chain_integrity_check.sql`
+
+```sql
+-- Migration: 0102_bcl_chain_integrity_check.sql
+-- Deploys pg_cron job 59: hourly BCL-CHAIN-01 retrospective integrity sentinel.
+--
+-- Prerequisites:
+--   - Migration 0101 applied (backchannel_logout.* events flowing to audit_log_events).
+--   - All §46.8 P0 items 1-8 closed (BCL Worker live, BCL-CHAIN-01 enforcement live).
+--   - GUC app.emit_audit_event_worker_url set in production database.
+--   - pg_cron and pg_net extensions enabled (both present in existing jobs 1-58).
+--
+-- Run: supabase db push --db-url $SUPABASE_DB_URL (devops-lead, PAM elevation required)
+-- Evidence: save apply log as BCL-E-003 in R2 compliance/evidence/oidc-bcl/
+-- Owner: devops-lead + compliance-officer | DEC-098, OQ-BCL-OBS-01 (resolved)
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- Function: fn_bcl_chain_integrity_check
+-- Role:     form_audit (SECURITY DEFINER escalates for pg_net.http_post only)
+-- Purpose:  Run R-74-C2 retrospective SQL; emit DEC-030 events via emit-audit-event Worker.
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION fn_bcl_chain_integrity_check()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_violation         RECORD;
+  v_worker_url        TEXT    := current_setting('app.emit_audit_event_worker_url', true);
+  v_bcl_pairs_checked INT;
+  v_violation_count   INT     := 0;
+BEGIN
+  -- Guard: fail loudly if Worker URL is not configured.
+  IF v_worker_url IS NULL OR v_worker_url = '' THEN
+    RAISE EXCEPTION
+      'fn_bcl_chain_integrity_check: app.emit_audit_event_worker_url GUC is not set — '
+      'BCL-CHAIN-01 integrity monitoring disabled. Set via: ALTER DATABASE form '
+      'SET app.emit_audit_event_worker_url = ''https://...'';';
+  END IF;
+
+  -- Count total BCL pairs examined (all backchannel_logout.revoked in 24h window).
+  -- bcl_pairs_checked = 0 is valid: explicit zero-BCL-activity attestation per §70.8.
+  SELECT COUNT(*)::int
+    INTO v_bcl_pairs_checked
+    FROM audit_log_events
+   WHERE event_type = 'backchannel_logout.revoked'
+     AND created_at > NOW() - INTERVAL '24 hours';
+
+  -- BCL-CHAIN-01 integrity sweep: R-74-C2 canonical SQL (INCIDENT_RESPONSE §R-74.6).
+  -- Returns orphaned backchannel_logout.revoked rows (no prior received anchor in 60s window).
+  -- Dedup: skip bcl_request_id already paged via security.bcl_chain_01_violation in last 24h.
+  -- Safety cap: BCL-INT-CAP-01 — at most 50 pg_net calls per hourly run.
+  FOR v_violation IN
+    SELECT
+      e_revoked.payload->>'bcl_request_id'   AS bcl_request_id,
+      e_revoked.payload->>'tenant_id'        AS tenant_id,
+      e_revoked.created_at                   AS revoked_at
+    FROM audit_log_events e_revoked
+    WHERE e_revoked.event_type = 'backchannel_logout.revoked'
+      AND e_revoked.created_at > NOW() - INTERVAL '24 hours'
+      -- R-74-C2: no matching received anchor within 60s prior to revoked.
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log_events e_received
+        WHERE e_received.event_type = 'backchannel_logout.received'
+          AND e_received.payload->>'bcl_request_id'
+                              = e_revoked.payload->>'bcl_request_id'
+          AND e_received.created_at BETWEEN
+                e_revoked.created_at - INTERVAL '60 seconds'
+            AND e_revoked.created_at
+      )
+      -- Dedup: do not re-emit for same bcl_request_id already paged in last 24h.
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log_events dedup
+        WHERE dedup.event_type = 'security.bcl_chain_01_violation'
+          AND dedup.payload->>'bcl_request_id' = e_revoked.payload->>'bcl_request_id'
+          AND dedup.created_at > NOW() - INTERVAL '24 hours'
+      )
+    ORDER BY e_revoked.created_at DESC
+    LIMIT 50  -- BCL-INT-CAP-01: cap at 50; >50 simultaneous orphans = H4/H5, co-activate R-05
+  LOOP
+    v_violation_count := v_violation_count + 1;
+
+    -- Emit security.bcl_chain_01_violation CRITICAL/7yr per orphaned {tenant_id, bcl_request_id}.
+    -- AL-BCL-03: no cooldown — every distinct violation is a P0 PagerDuty page.
+    -- incident_id: fresh UUID per detection; IC uses this to anchor BCL-CHN-E-001 artefact.
+    PERFORM pg_net.http_post(
+      url     := v_worker_url || '/internal/emit-audit-event',
+      body    := json_build_object(
+        'event_type',      'security.bcl_chain_01_violation',
+        'severity',        'CRITICAL',
+        'retention_years', 7,
+        'payload', json_build_object(
+          'bcl_request_id',   v_violation.bcl_request_id,
+          'tenant_id',        v_violation.tenant_id,
+          'incident_id',      gen_random_uuid()::text,
+          'violation_type',   'BCL_CHAIN_01_VIOLATION',
+          'detected_at',      to_char(NOW() AT TIME ZONE 'UTC',
+                                      'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+          'revoked_event_at', to_char(v_violation.revoked_at AT TIME ZONE 'UTC',
+                                      'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+          'detection_source', 'pg_cron_job_59_retrospective'
+        )
+      )::text,
+      headers              := '{"Content-Type": "application/json"}'::jsonb,
+      timeout_milliseconds := 8000
+    );
+  END LOOP;
+
+  -- All-clear: emit system.bcl_chain_check_passed LOW/1yr when zero violations found.
+  -- Suppressed when violations emitted (mixed-signal prevention — BCL-OBS-E-001 quarterly
+  -- attestation must show unambiguous all-clear or violation, never both in same run).
+  -- bcl_pairs_checked = 0 is valid and is emitted as zero-BCL-activity attestation.
+  IF v_violation_count = 0 THEN
+    PERFORM pg_net.http_post(
+      url     := v_worker_url || '/internal/emit-audit-event',
+      body    := json_build_object(
+        'event_type',      'system.bcl_chain_check_passed',
+        'severity',        'LOW',
+        'retention_years', 1,
+        'payload', json_build_object(
+          'bcl_pairs_checked', v_bcl_pairs_checked,
+          'check_run_at',      to_char(NOW() AT TIME ZONE 'UTC',
+                                       'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+          'detection_source',  'pg_cron_job_59_retrospective'
+        )
+      )::text,
+      headers              := '{"Content-Type": "application/json"}'::jsonb,
+      timeout_milliseconds := 8000
+    );
+  END IF;
+END;
+$$;
+
+-- Grant EXECUTE to form_audit role (pg_cron runs job 59 as form_audit).
+-- SECURITY DEFINER escalates to owner for pg_net.http_post (form_audit has no direct
+-- pg_net access); form_audit SELECT on audit_log_events is the read-path privilege.
+GRANT EXECUTE ON FUNCTION fn_bcl_chain_integrity_check() TO form_audit;
+
+-- Register as pg_cron job 59 (hourly, at top of hour, UTC — matches §12.6 schedule).
+SELECT cron.schedule(
+  'bcl_chain_integrity_check',
+  '0 * * * *',
+  'SELECT fn_bcl_chain_integrity_check()'
+);
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- Verification queries (run after apply, before BCL-E-003 filing):
+-- ────────────────────────────────────────────────────────────────────────────
+-- 1. Confirm function exists:
+--    SELECT proname, prosecdef FROM pg_proc WHERE proname = 'fn_bcl_chain_integrity_check';
+--    Expected: proname = fn_bcl_chain_integrity_check, prosecdef = true (SECURITY DEFINER)
+--
+-- 2. Confirm pg_cron job 59 registered:
+--    SELECT jobid, jobname, schedule, active FROM cron.job
+--     WHERE jobname = 'bcl_chain_integrity_check';
+--    Expected: jobid = 59, schedule = '0 * * * *', active = true
+--
+-- 3. Confirm form_audit GRANT:
+--    SELECT grantee, privilege_type FROM information_schema.routine_privileges
+--     WHERE routine_name = 'fn_bcl_chain_integrity_check';
+--    Expected: grantee = form_audit, privilege_type = EXECUTE
+--
+-- 4. Manual dry-run (staging only, no violations expected):
+--    SET ROLE form_audit; SELECT fn_bcl_chain_integrity_check(); RESET ROLE;
+--    Expected: function completes; system.bcl_chain_check_passed event emitted
+--    to emit-audit-event Worker; bcl_pairs_checked = 0 if no BCL activity.
+```
+
+**Privacy invariant:** No `user_id`, employee name, email, session token, coaching content, health value, or GDPR Art. 9 special-category data appears in any event payload, function argument, or verification query output. `tenant_id` is a FORM-internal UUID. `bcl_request_id` is a FORM-internal UUID. `incident_id` is a freshly generated UUID per violation detection — not derived from any PII source.
+
+---
+
+### §71.4 Rollback Procedure
+
+If M-0102 must be rolled back (e.g., GUC misconfiguration causing RAISE EXCEPTION on first run):
+
+```sql
+-- Rollback: 0102_rollback_bcl_chain_integrity_check.sql
+-- Run only if post-apply verification fails. Requires devops-lead + compliance-officer.
+
+SELECT cron.unschedule('bcl_chain_integrity_check');
+-- Verify: SELECT jobid FROM cron.job WHERE jobname = 'bcl_chain_integrity_check';
+-- Expected: 0 rows.
+
+DROP FUNCTION IF EXISTS fn_bcl_chain_integrity_check();
+-- Verify: SELECT proname FROM pg_proc WHERE proname = 'fn_bcl_chain_integrity_check';
+-- Expected: 0 rows.
+
+-- File rollback event in audit log (DEC-030 system event — IC manual, PAM elevation):
+-- event_type: system.migration_rolled_back
+-- payload: { migration: '0102_bcl_chain_integrity_check', reason: '<root cause>', rolled_back_at: '<ISO 8601>' }
+```
+
+---
+
+### §71.5 Deployment Checklist
+
+| # | Task | Owner | Priority | Gate |
+|---|---|---|---|---|
+| 1 | Confirm all §46.8 P0 items 1–8 closed before M-0102 apply — BCL Worker must be live | devops-lead | **P0** | Before M-0102 |
+| 2 | Confirm `app.emit_audit_event_worker_url` GUC set in production Supabase (`SHOW app.emit_audit_event_worker_url;`) | devops-lead | **P0** | Before M-0102 |
+| 3 | Apply `0102_bcl_chain_integrity_check.sql` to production; run four verification queries (§71.3) | devops-lead | **P0** | M8 production deploy |
+| 4 | Execute staging dry-run (`SET ROLE form_audit; SELECT fn_bcl_chain_integrity_check(); RESET ROLE;`); confirm `system.bcl_chain_check_passed` event received by emit-audit-event Worker | devops-lead | **P0** | Before production apply |
+| 5 | File BCL-E-003 in R2 `compliance/evidence/oidc-bcl/` — migration apply log + verification query output | devops-lead | **P0** | At M8 deploy |
+| 6 | Update §46.8 item 9 (`[ ]` → `[x] Done`) in `docs/SSO_SCIM_IMPLEMENTATION.md` to confirm Migration 0101 + M-0102 both applied | devops-lead | **P0** | At M8 deploy |
+| 7 | Notify compliance-officer: BCL-E-003 filed; BCL-OBS-E-001 Q3 2026 first quarterly filing window open (§70.8) | devops-lead | **P1** | At M8 deploy |
+
+---
+
+### §71.6 SOC 2 Evidence
+
+| Control | Evidence contribution |
+|---|---|
+| CC7.2 | `fn_bcl_chain_integrity_check()` is the continuous retrospective monitor for BCL-CHAIN-01 (hourly, automated). |
+| CC7.3 | AL-BCL-03 (no cooldown) routes `security.bcl_chain_01_violation` to PagerDuty P0 `form-security`. |
+| CC8.1 | Migration M-0102 apply log is **BCL-E-003** per `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`; filed to R2 `compliance/evidence/oidc-bcl/bcl-e-003-migration-0102-log.md`. |
+
+BCL-E-003 filing requirement: apply log must include: migration filename, apply timestamp (UTC), Supabase project ID, devops-lead GitHub handle, four verification query outputs. Must be signed via `compliance/scripts/sign-evidence.sh` before R2 upload. Compliance-officer notification required at upload.
+
+---
+
+### §71.7 Cross-References
+
+| Document | Location | Relationship |
+|---|---|---|
+| `docs/OBSERVABILITY.md §12.6` | Job 59 registry row | §71 provides the SQL DDL that implements the registered job. |
+| `docs/OBSERVABILITY.md §70.9` | Item 4 status | Updated to "SQL DDL spec complete — §71" this pass. |
+| `docs/OBSERVABILITY.md §70.4` | AL-BCL-03 alert rule | Alert fires when `security.bcl_chain_01_violation` emitted by job 59. |
+| `docs/OBSERVABILITY.md §70.8` | BCL-OBS-E-001 quarterly artefact | All-clear `system.bcl_chain_check_passed` events (from job 59) are the continuous attestation log input. |
+| `docs/INCIDENT_RESPONSE.md R-74` | BCL-CHAIN-01 violation runbook | R-74-C2 SQL is the canonical source query reproduced in `fn_bcl_chain_integrity_check()`. |
+| `docs/AUDIT_LOG_SCHEMA.md §BCL Chain Integrity Monitor events` | Event schemas | `security.bcl_chain_01_violation` (v2.90) and `system.bcl_chain_check_passed` (v2.90) Zod schemas. |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §46.8` | BCL implementation checklist | Item 9 (Migration 0101 production apply) and companion M-0102 are co-gated at M8. |
+| `docs/SOC2_READINESS.md §163` | BCL-E-003 evidence row | BCL-E-003 is the migration M-0102 apply log (CC8.1, 7yr). |
+
+---
+
+*v5.17.0 (2026-07-04): §71 Migration M-0102 — BCL-CHAIN-01 Integrity Check pg_cron Job 59 Deployment Spec. Closes the SQL-DDL gap for §70.9 item 4 (architecture resolved DEC-098; production deploy pending M8). §71.1 Purpose and scope (prerequisites: Migration 0101 live + all §46.8 P0 items 1–8 closed + GUC set; M-0102 separate from Migration 0101). §71.2 Seven design decisions table: `form_audit` role, 24h check window, `NOT EXISTS` dedup by `bcl_request_id` 24h, 50-violation safety cap BCL-INT-CAP-01, all-clear suppressed on violations, `bcl_pairs_checked` count of all 24h revoked rows, 8,000 ms pg_net timeout. §71.3 Full SQL DDL for `0102_bcl_chain_integrity_check.sql`: `fn_bcl_chain_integrity_check()` SECURITY DEFINER plpgsql function (GUC guard; `bcl_pairs_checked` COUNT; R-74-C2 canonical FOR loop with BCL-INT-CAP-01 LIMIT 50 and 24h dedup; `security.bcl_chain_01_violation` CRITICAL/7yr per orphan with fresh `incident_id` UUID; `system.bcl_chain_check_passed` LOW/1yr suppressed when violations found); GRANT EXECUTE to `form_audit`; `cron.schedule('bcl_chain_integrity_check', '0 * * * *', ...)` (job 59); four verification queries. §71.4 Rollback procedure (`cron.unschedule` + `DROP FUNCTION` + system.migration_rolled_back DEC-030 event). §71.5 Seven-item deployment checklist (4× P0 pre-apply gates, 3× P0/P1 at M8 deploy). §71.6 SOC 2 evidence (CC7.2/CC7.3/CC8.1; BCL-E-003 filing requirement). §71.7 Seven cross-reference rows. TOC §71 entry added. §70.9 item 4 status updated: "SQL DDL spec complete — 2026-07-04 (§71 `0102_bcl_chain_integrity_check.sql`)". Document header v5.16.4 → v5.17.0. Privacy floor: all payloads contain FORM-internal UUIDs only; no `user_id`, employee PII, health value, or GDPR Art. 9 special-category data. Owner: devops-lead + compliance-officer. Review: enterprise-architect + security-engineer.*

@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [12.48.0] — 2026-07-04
+
+### Added
+- `content/post-3161-zeigarnik-effect-training.md` — Series «Тренувальне мислення» 3156–3165, 6/10. «Ефект Зейгарнік у тренуванні: чому незавершені підходи і перервані цикли займають ментальний простір більше, ніж завершені». Bluma Zeigarnik (1927) і Курт Левін (напруга цілі / goal tension). Три прояви у тренуванні: незавершений підхід, перерваний блок, пропущена сесія без явного рішення. Коли ефект допомагає: RIR buffer, зупинка на підйомі, відкрита петля між сесіями. Де працює проти: синдром «повинен завершити», румінація, паралельні незакриті блоки. Операційна відповідь: протокол запису як механізм закриття, мікро-фіналізація підходів, явне «закриття» блоку при плановій зупинці. clinical-safety: NOT_REQUIRED.
+- `docs/OBSERVABILITY.md §71` — Migration M-0102 SQL Spec: BCL-CHAIN-01 Integrity Check pg_cron Job 59 Deployment Spec. Full DDL for `0102_bcl_chain_integrity_check.sql`: `fn_bcl_chain_integrity_check()` SECURITY DEFINER (GUC guard; `bcl_pairs_checked` COUNT; R-74-C2 FOR loop with BCL-INT-CAP-01 LIMIT 50 + 24h dedup; `security.bcl_chain_01_violation` CRITICAL/7yr with fresh `incident_id` UUID; `system.bcl_chain_check_passed` LOW/1yr suppressed on violations); GRANT to `form_audit`; `cron.schedule` job 59 `0 * * * *`; four verification queries; rollback procedure; seven-item deployment checklist; SOC 2 evidence (CC7.2/CC7.3/CC8.1 — BCL-E-003); seven cross-reference rows. TOC §71 added. §70.9 item 4 updated: SQL DDL spec complete.
+- `blog.html` — post-3161 card prepended.
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.16.4 → v5.17.0 — §71 added; TOC §71 entry; §70.9 item 4 status extended with "SQL DDL spec complete — §71"; document header updated.
+- `VERSION` — 12.47.1 → 12.48.0.
+
 ## [12.47.1] — 2026-07-04
 
 ### Added
