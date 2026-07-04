@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.93.0
+# FORM · SOC 2 Type II Readiness v3.94.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -36010,6 +36010,77 @@ BCL-REV-E-001 was defined in `docs/INCIDENT_RESPONSE.md R-73.8` as the per-activ
 | 5 | Provision `compliance/evidence/oidc-bcl/chain-violations/` R2 subfolder (WORM + `r2:form-api` REVOKED) | devops-lead | **P1** | [ ] Pending — M8 (R-74.12 item 3) |
 
 ---
+
+---
+
+## §169 AUDIT_LOG_SCHEMA v2.94 Registration Patch — `security.bcl_int_cap_reached` + `security.slo_int_cap_reached` (CC7.2 · BCL-INT-CAP-01 / SLO-INT-CAP-01 · OBSERVABILITY §74)
+
+> **Owner:** compliance-officer + security-engineer  
+> **Date:** 2026-07-04  
+> **AUDIT_LOG_SCHEMA version:** v2.94 (2026-07-04)  
+> **SOC 2 criterion:** CC7.2 (Anomaly and Incident Detection)  
+> **Evidence count:** 141 (unchanged — cap events are individual DEC-030 signals, not standalone evidence packages)
+
+### §169.1 Gap Identification
+
+`docs/OBSERVABILITY.md §74` (BCL-INT-CAP-01 Parity Patch, 2026-07-04) identified two registration gaps in AUDIT_LOG_SCHEMA.md v2.93:
+
+1. **BCL-INT-CAP-01 unregistered:** `fn_bcl_chain_integrity_check()` v1 (§71 SQL DDL) used `LIMIT 50` on the orphan cursor query, making the `v_violation_count > 50` guard unreachable. PostgreSQL enforces `LIMIT` before the PL/pgSQL loop body — `v_violation_count` is bounded at 50 and never reaches 51. The v2 function (`0104_bcl_chain_check_cap_patch.sql`; §74.3 corrected DDL) uses `LIMIT 51`: the 51st row confirms > 50 orphans exist, then emits `security.bcl_int_cap_reached` and exits. The event type was unregistered in AUDIT_LOG_SCHEMA prior to v2.94.
+
+2. **SLO-INT-CAP-01 backfill:** `fn_slo_chain_integrity_check()` (§73 SQL DDL) correctly used `LIMIT 51` but emitted `security.slo_int_cap_reached` without registering it in AUDIT_LOG_SCHEMA. v2.94 backfills this registration alongside the BCL-INT-CAP-01 fix.
+
+### §169.2 New DEC-030 Event Registrations (AUDIT_LOG_SCHEMA v2.94)
+
+Both events registered as CRITICAL severity, 7-year retention, SOC 2 CC7.2. Neither event requires a standalone §79.4 evidence artefact row — they are individual DEC-030 HMAC-chained signals that surface in the existing BCL-OBS-E-001 and SLO-OBS-E-001 quarterly observability reports (§80.4 Vanta mirror: operational signals, not evidence packages).
+
+| Event type | Severity | Retention | Emitter | Invariant |
+|---|---|---|---|---|
+| `security.bcl_int_cap_reached` | CRITICAL | 7 yr | `fn_bcl_chain_integrity_check()` v2 — pg_cron job 59 (`0 * * * *`; `form_audit` role; migration `0104_bcl_chain_check_cap_patch.sql`) | BCL-INT-CAP-01: first 50 `security.bcl_chain_01_violation` events emitted; `system.bcl_chain_check_passed` suppressed (BCL-ALL-CLR-SUPPRESS-01); co-activate R-05 |
+| `security.slo_int_cap_reached` | CRITICAL | 7 yr | `fn_slo_chain_integrity_check()` — pg_cron job 60 (`59 * * * *`; `form_audit` role; migration `0103_slo_chain_integrity_check.sql`) | SLO-INT-CAP-01: first 50 `security.slo_chain_01_violation` events emitted; `system.slo_chain_check_passed` suppressed (SLO-ALL-CLR-SUPPRESS-01); co-activate R-05 |
+
+**Privacy floor (both events):** `tenant_id = NULL` — fleet-level aggregate; no per-tenant enumeration; no `bcl_request_id`, `slo_request_id`, `oidc_sub_hash`, `idp_name_id`, `user_id`, or GDPR Art. 9 special-category data.
+
+**Shared Zod v2 schema:** `ChainIntCapReachedPayload` (canonical: `docs/OBSERVABILITY.md §74.2.3`). Event-specific schemas: `BclIntCapReachedPayload` (`detection_source: z.literal('pg_cron_job_59_retrospective')`) and `SloIntCapReachedPayload` (`detection_source: z.literal('pg_cron_job_60_retrospective')`).
+
+### §169.3 SOC 2 CC7.2 Auditor Narrative
+
+Both `security.bcl_int_cap_reached` and `security.slo_int_cap_reached` are CC7.2 anomaly detection signals. Under normal operation, the BCL-INT-CAP-01 and SLO-INT-CAP-01 caps are never reached — the hourly integrity check jobs emit either zero violations (clean run → `system.*_chain_check_passed` all-clear) or bounded violations (≤ 50 → individual `security.*_chain_01_violation` events). A cap-reached event indicates > 50 simultaneous orphaned chain entries in the 24-hour window, which the R-74.5 / R-76.5 root cause taxonomy classifies as H4 (systemic code bug) or H5 (malicious manipulation) — conditions requiring co-activation of R-05 (Critical Security Incident).
+
+The BCL-ALL-CLR-SUPPRESS-01 and SLO-ALL-CLR-SUPPRESS-01 invariants ensure that `system.bcl_chain_check_passed` / `system.slo_chain_check_passed` are not emitted in the same job run as a cap event — preventing mixed-signal attestation that would incorrectly record both a cap-reached condition and a clean-run all-clear.
+
+For auditor purposes: these two CRITICAL/7yr events strengthen the CC7.2 continuous-monitoring record. Their presence in quarterly BCL-OBS-E-001 / SLO-OBS-E-001 reports (§80.4 Vanta mirror) provides ongoing attestation that FORM's integrity check jobs operate with a defined safety cap and emit verifiable HMAC-chained signals when the cap is reached.
+
+### §169.4 §80.4 Vanta Mirror Protocol Update
+
+| Signal | Mirror action |
+|---|---|
+| `security.bcl_int_cap_reached` | Surfaces in BCL-OBS-E-001 quarterly report (§168.6). No standalone Vanta evidence entry required — operational DEC-030 signal, not a standalone artefact. If emitted ≥ 1× in a quarter, BCL-OBS-E-001 `cap_events_count` > 0 automatically flags R-05 co-activation in the quarterly narrative. |
+| `security.slo_int_cap_reached` | Surfaces in SLO-OBS-E-001 quarterly report (§166.4 / OBSERVABILITY §72.8). Same protocol as above for SLO. |
+
+### §169.5 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register `security.bcl_int_cap_reached` in AUDIT_LOG_SCHEMA §BCL-Chain-Monitor-Events | `docs/OBSERVABILITY.md §74.6 item 1` | 🟢 **Done — 2026-07-04 (AUDIT_LOG_SCHEMA v2.94, §BCL-Chain-Monitor-Events — "Four DEC-030" header, table row, Zod v2 schema, retention table)** |
+| Register `security.slo_int_cap_reached` in AUDIT_LOG_SCHEMA §SLO-Chain-Monitor-Events | `docs/OBSERVABILITY.md §74.6 item 2` | 🟢 **Done — 2026-07-04 (AUDIT_LOG_SCHEMA v2.94, §SLO-Chain-Monitor-Events — "Four DEC-030" header, table row, Zod v2 schema, retention table)** |
+| Cross-reference SOC2_READINESS §169 in OBSERVABILITY §74.7 | `docs/OBSERVABILITY.md §74.7 obligation 1` | 🟢 **Done — this section** |
+| Deploy migration `0104_bcl_chain_check_cap_patch.sql` (fn v2 with LIMIT 51) | `docs/OBSERVABILITY.md §74.6 item 3` | [ ] Pending — M8 gate (requires M-0102 applied) |
+| Deploy migration `0103_slo_chain_integrity_check.sql` (fn_slo already correct — LIMIT 51) | `docs/OBSERVABILITY.md §74.6 item 4` | [ ] Pending — M7 gate (requires M-0103 applied; SLO fn SQL already correct) |
+| Confirm R-05 co-activation clause in R-74 + R-76 runbooks | `docs/OBSERVABILITY.md §74.6 items 5–6` | [ ] Pending — INCIDENT_RESPONSE.md update pass |
+
+### §169.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `security.bcl_int_cap_reached` in AUDIT_LOG_SCHEMA §BCL-Chain-Monitor-Events | compliance-officer | **P0** | [x] **Done — 2026-07-04 (AUDIT_LOG_SCHEMA v2.94).** |
+| 2 | Register `security.slo_int_cap_reached` in AUDIT_LOG_SCHEMA §SLO-Chain-Monitor-Events | compliance-officer | **P0** | [x] **Done — 2026-07-04 (AUDIT_LOG_SCHEMA v2.94).** |
+| 3 | Add §169 cross-reference to SOC2_READINESS.md | compliance-officer | **P0** | [x] **Done — 2026-07-04 (this section).** |
+| 4 | Deploy `0104_bcl_chain_check_cap_patch.sql` (BCL fn v2 LIMIT 51 fix) | platform-engineer + devops-lead | **P1** | [ ] Pending — M8 |
+| 5 | Confirm R-05 co-activation documented in INCIDENT_RESPONSE.md R-74 + R-76 runbooks | compliance-officer | **P1** | [ ] Pending next INCIDENT_RESPONSE pass |
+
+---
+
+*v3.94.0 (2026-07-04): §169 — AUDIT_LOG_SCHEMA v2.94 Registration Patch (`security.bcl_int_cap_reached` + `security.slo_int_cap_reached` · CC7.2 · BCL-INT-CAP-01 / SLO-INT-CAP-01 · OBSERVABILITY §74). Two new CRITICAL/7yr CC7.2 DEC-030 events registered: (1) `security.bcl_int_cap_reached` — emitted by `fn_bcl_chain_integrity_check()` v2 (migration `0104_bcl_chain_check_cap_patch.sql`; §74.3 corrected DDL using `LIMIT 51` sentinel; BCL-INT-CAP-01 invariant; `system.bcl_chain_check_passed` suppressed by BCL-ALL-CLR-SUPPRESS-01); (2) `security.slo_int_cap_reached` — emitted by `fn_slo_chain_integrity_check()` (§73 SQL DDL; SLO-INT-CAP-01 invariant; backfill registration); both events fleet-level aggregate (privacy floor: `tenant_id = NULL`); shared `ChainIntCapReachedPayload` Zod v2 base schema (OBSERVABILITY §74.2.3). Evidence count 141 unchanged — cap events surface in existing BCL-OBS-E-001 / SLO-OBS-E-001 quarterly observability reports; no new §79.4 artefact rows required. §169.3 CC7.2 auditor narrative (cap-reached = H4/H5 systemic signal; BCL-ALL-CLR-SUPPRESS-01 / SLO-ALL-CLR-SUPPRESS-01 prevent mixed-signal attestation). §169.4 Vanta mirror protocol (BCL-OBS-E-001 + SLO-OBS-E-001 `cap_events_count` field; no standalone Vanta entry). §169.5 cross-reference obligations (items 1–3 Done this pass; items 4–5 pending M7/M8). §169.6 five-item checklist (items 1–3 Done this pass; items 4–5 pending M7/M8). Document header v3.93.0 → v3.94.0. Owner: compliance-officer + security-engineer.*
 
 *v3.93.0 (2026-07-04): §168 — BCL-CHN-E-001 + BCL-REV-E-001 Registration (CC7.2/CC7.3/CC8.1 + CC6.3/CC7.3 · INCIDENT_RESPONSE R-74 + R-73). Two per-activation OIDC BCL evidence artefacts registered in §79.4 master evidence table (count 139 → 141). BCL-CHN-E-001 (CC7.2/CC7.3/CC8.1, 7yr WORM, per-activation R-74 — BCL-CHAIN-01 Integrity Violation — evidence package; `compliance/evidence/oidc-bcl/chain-violations/bcl-chn-e-001-{bcl_request_id}-{YYYY-MM-DD}/`; compliance-officer co-sign required; count 139 → 140). BCL-REV-E-001 (CC6.3/CC7.3, 7yr WORM, per-activation R-73 — OIDC BCL REVOCATION_QUEUE Exhaustion — incident note; `compliance/evidence/oidc-bcl/bcl-rev-e-001-{YYYY-MM-DD}/`; compliance-officer review within 24h; count 140 → 141). §168.2 §79.4 entries with artefact description, TSC, collection responsibility, retention, R2 path. §168.3 SOC 2 auditor narratives: BCL-CHN-E-001 CC7.2 (DEC-030 continuous detection via pg_cron job 59 DEC-098 + `r74-c2-output.txt` zero rows at closure), CC7.3 (IC-declare ≤ 15 min + compliance-officer sign-off gate), CC8.1 (BCL-CHAIN-01 HTTP 422 enforcement proves change management + invariant deployed correctly; cross-reference BCL-E-003 §163); BCL-REV-E-001 CC6.3 (FORM local session always revoked first + `r73-c3-output.txt` still_active_sessions = 0 at closure), CC7.3 (`csm-notification-log.md` proves §4.3 SLA). §168.4 privacy floor (BCL-CHN-E-001: `oidc_sub_hash` SHA-256 MUST be redacted before auditor sharing — raw `sub` never stored; H5 chain segments restricted to IC + compliance-officer + outside counsel; BCL-REV-E-001: aggregate REVOCATION_QUEUE depth scalars only, no bcl_request_id UUID enumeration). §168.5 R2 storage spec (BCL-CHN-E-001 pending R-74.12 item 3 M8; BCL-REV-E-001 same parent as BCL-E-001/002/003). §168.6 §80.4 Vanta mirror (both artefacts per-activation + annual nil attestation). §168.7 cross-reference obligations closed (R-74.12 item 4 🟢 Done count 139 → 140; R-73.12 item 3 🟢 Done count 140 → 141). §168.8 five-item checklist (items 1–4 Done this pass; item 5 pending M8 devops-lead R2 provision). This is the OIDC BCL equivalent of §167 (SAML SLO — SLO-CHN-E-001 + SLO-REV-E-001, registered 2026-07-04). Document header v3.92.0 → v3.93.0. Owner: compliance-officer.*
 

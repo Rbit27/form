@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.18.1
+# FORM · Observability & Monitoring Taxonomy v5.19.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -72,6 +72,8 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §70 | OIDC Back-Channel Logout (BCL) Observability |
 | §71 | Migration M-0102 — BCL-CHAIN-01 Integrity Check pg_cron Job 59 Deployment Spec |
 | §72 | SAML Single Logout (SLO) Observability |
+| §73 | SLO-CHAIN-01 Integrity Check — Migration SQL DDL (`0103_slo_chain_integrity_check.sql`) |
+| §74 | BCL-INT-CAP-01 Parity Patch — Cap-Reached Event Registration (AUDIT_LOG_SCHEMA.md v2.94) |
 
 ---
 
@@ -20138,5 +20140,380 @@ SELECT cron.schedule(
 | Tabletop SLO-INT-CAP-01 test | §73.4 item 5 | 🟡 Pending — M7 (qa-lead + security-engineer) |
 
 ---
+
+## §74 BCL-INT-CAP-01 Parity Patch — Cap-Reached Event Registration (AUDIT_LOG_SCHEMA.md v2.94)
+
+> **Date:** 2026-07-04. **Owner:** compliance-officer + devops-lead. **SOC 2:** CC7.2 (continuous anomaly monitoring — BCL-INT-CAP-01 / SLO-INT-CAP-01 fleet-level integrity signals). **Context:** Closes two documentation gaps created by §71 and §73.
+
+### §74.1 Background and Gap Identification
+
+§73 (v5.18.2, 2026-07-04) introduced `security.slo_int_cap_reached` CRITICAL/7yr as a DEC-030 event emitted by pg_cron job 60 when its R-76-C2 sweep finds > 50 orphaned SLO closure events in a single 24-hour window (SLO-INT-CAP-01). §71 (v5.17.0, 2026-07-04) defined the BCL parallel — BCL-INT-CAP-01 — in its design decisions table (§71.2: "50 per run; > 50 indicates H4/H5"). Two gaps resulted:
+
+**Gap 1 — §73 SLO-INT-CAP-01 event unregistered:** `security.slo_int_cap_reached` is emitted by the §73 SQL DDL but was never added to `docs/AUDIT_LOG_SCHEMA.md §SLO-Chain-Monitor-Events`. The section header states "three DEC-030 HMAC-chained events" but §73 introduces a fourth. The event has no Zod v2 schema, no retention table entry, and no SOC 2 auditor narrative.
+
+**Gap 2 — §71 BCL-INT-CAP-01 cap-reached event missing:** The §71 SQL uses `LIMIT 50` in the FOR loop cursor query. Because PostgreSQL enforces the LIMIT before loop body execution, `v_violation_count` is bounded at 50 — the check `IF v_violation_count = 0` for the all-clear path is reachable, but there is no path where >50 can be detected. The BCL parallel to `security.slo_int_cap_reached` does not exist in either `fn_bcl_chain_integrity_check()` or `docs/AUDIT_LOG_SCHEMA.md §BCL-Chain-Monitor-Events`.
+
+This section registers both events in AUDIT_LOG_SCHEMA.md v2.94, provides the corrected `fn_bcl_chain_integrity_check()` v2 SQL DDL using `LIMIT 51` (the correct cap-detection mechanism), and updates BCL-OBS-E-001 and SLO-OBS-E-001 quarterly artefact scope.
+
+---
+
+### §74.2 AUDIT_LOG_SCHEMA.md v2.94 — Two New CC7.2 Events
+
+| Event | Severity | Retention | TSC | Section | Type |
+|---|---|---|---|---|---|
+| `security.slo_int_cap_reached` | CRITICAL | 7 yr | CC7.2 | §SLO-Chain-Monitor-Events | §73 backfill |
+| `security.bcl_int_cap_reached` | CRITICAL | 7 yr | CC7.2 | §BCL-Chain-Monitor-Events | BCL parity gap |
+
+#### §74.2.1 `security.slo_int_cap_reached` — SLO-INT-CAP-01
+
+**Emitter:** pg_cron job 60 (`slo_chain_integrity_check`, `59 * * * *`, `form_audit` role) when the R-76-C2 sweep processes its 51st orphaned `slo.completed` / `slo.fallback_local_only` row (LIMIT 51 in §73 SQL; EXIT on `v_cap_total > 50`).
+
+**Semantics:** > 50 simultaneous SLO orphans in a 24-hour window is beyond the expected operating range for individual KV TTL races (H1–H3). This volume implies systemic degradation — H4 (code bug) or H5 (malicious manipulation) — and warrants R-05 co-activation review. The first 50 `security.slo_chain_01_violation` events are still emitted before this cap event; IC must open an R-76 incident for each of those 50 as well as an R-05 for the systemic signal.
+
+**Privacy floor:** `tenant_id = NULL` (fleet-level signal — no per-tenant data enumeration). `total_orphans_found` is an integer count — does not enumerate `{tenant_id, slo_request_id}` pairs. No `idp_name_id`, `user_id`, employee name, email, coaching content, or GDPR Art. 9 special-category data.
+
+**Chain ordering:** No SLO-VIO-CHAIN-01 or SLO-INT-CAP-01 anchor requirement — this event is a fleet-level aggregate, not a per-request event.
+
+**Retention table:** `security.slo_int_cap_reached` CRITICAL 7yr CC7.2.
+
+#### §74.2.2 `security.bcl_int_cap_reached` — BCL-INT-CAP-01
+
+**Emitter:** pg_cron job 59 (`bcl_chain_integrity_check`, `0 * * * *`, `form_audit` role) — corrected v2 function (`fn_bcl_chain_integrity_check()` v2; §74.3 SQL DDL) when the R-74-C2 sweep processes its 51st orphaned `backchannel_logout.revoked` row (LIMIT 51 + EXIT on `v_cap_total > 50`). **Not emitted by §71 v1** (LIMIT 50 prevents detection).
+
+**Semantics:** BCL-INT-CAP-01 parallel to SLO-INT-CAP-01. > 50 simultaneous BCL orphans implies H4/H5 systemic failure — co-activate R-05. IC must open R-74 incidents for each of the 50 emitted `security.bcl_chain_01_violation` events. `system.bcl_chain_check_passed` is suppressed (BCL-ALL-CLR-SUPPRESS-01).
+
+**Privacy floor:** Identical to `security.slo_int_cap_reached` — `tenant_id = NULL`, aggregate counts only, no `bcl_request_id` enumeration, no `oidc_sub_hash`.
+
+**Retention table:** `security.bcl_int_cap_reached` CRITICAL 7yr CC7.2.
+
+#### §74.2.3 Shared Zod v2 Schema
+
+```typescript
+// AUDIT_LOG_SCHEMA.md §SLO-Chain-Monitor-Events + §BCL-Chain-Monitor-Events — cap event
+// Registered v2.94 (2026-07-04). Canonical source: docs/OBSERVABILITY.md §74.2
+
+import { z } from 'zod/v2';
+
+// ── security.slo_int_cap_reached (SLO-INT-CAP-01) ────────────────────────────
+// ── security.bcl_int_cap_reached (BCL-INT-CAP-01) ────────────────────────────
+// Both events share the same payload shape — discriminated by event_type in the
+// DEC-030 envelope (not within the payload itself).
+export const ChainIntCapReachedPayload = z.object({
+  cap_limit:           z.literal(50),
+  orphan_count_capped: z.literal(true),
+  total_orphans_found: z.number().int().min(51), // must be > cap_limit to fire
+  detection_source:    z.enum([
+    'pg_cron_job_59_retrospective',  // BCL job 59 — fn_bcl_chain_integrity_check() v2
+    'pg_cron_job_60_retrospective',  // SLO job 60 — fn_slo_chain_integrity_check()
+  ]),
+  detected_at:         z.string().datetime(),
+});
+```
+
+#### §74.2.4 SOC 2 Auditor Narrative — CC7.2
+
+`security.slo_int_cap_reached` and `security.bcl_int_cap_reached` extend the continuous anomaly monitoring record for SLO-CHAIN-01 and BCL-CHAIN-01 respectively to cover fleet-wide systemic failure scenarios. Where individual `security.slo_chain_01_violation` / `security.bcl_chain_01_violation` events prove per-request integrity is monitored, cap-reached events prove that FORM has a defined and observable threshold for escalating from per-incident (R-74/R-76) to systemic (R-05) response. The absence of cap-reached events in a BCL-OBS-E-001 or SLO-OBS-E-001 quarterly period is explicit attestation that no systemic chain failure above the per-request cap occurred during that period.
+
+---
+
+### §74.3 Corrected `fn_bcl_chain_integrity_check()` v2 — Migration `0104_bcl_chain_check_cap_patch.sql`
+
+The §71 SQL uses `LIMIT 50` in the cursor query. Since PostgreSQL enforces the LIMIT before the PL/pgSQL loop body runs, `v_violation_count` cannot exceed 50 — the guard `IF v_violation_count = 0 THEN` (all-clear branch) is reachable, but `v_violation_count > 50` is unreachable. BCL-INT-CAP-01 cap detection requires fetching one extra row to confirm > 50 orphans exist.
+
+**Correction:** `LIMIT 51` + `EXIT WHEN v_cap_total > 50`. The loop processes rows 1–50 normally (emitting violations), and exits on the 51st row without emitting a violation for it — the 51st row's existence is the cap signal. `security.bcl_int_cap_reached` is then emitted with `total_orphans_found` equal to the count returned before EXIT.
+
+**Migration type:** `CREATE OR REPLACE FUNCTION` — no schema DDL change (no new tables, columns, or indexes). Applied via migration `0104_bcl_chain_check_cap_patch.sql`. **Gate:** M-0102 already applied (pg_cron job 59 registered) + all §46.8 P0 items 1–8 closed.
+
+```sql
+-- Migration: 0104_bcl_chain_check_cap_patch.sql
+-- Replaces fn_bcl_chain_integrity_check() with v2 — adds BCL-INT-CAP-01 cap-reached
+-- detection using LIMIT 51 (correct; vs. §71 LIMIT 50 which cannot fire the cap event).
+-- No pg_cron job change — job 59 ('bcl_chain_integrity_check') is retained unchanged.
+-- Gate: M-0102 applied (job 59 registered) + all §46.8 P0 items 1-8 closed.
+-- Owner: devops-lead + compliance-officer | DEC-098, OBSERVABILITY §74
+
+-- Secure REVOKE before GRANT (follows §73 pattern; §71 omitted this step).
+REVOKE ALL ON FUNCTION fn_bcl_chain_integrity_check() FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION fn_bcl_chain_integrity_check()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_catalog   -- §73 parity: prevents search-path injection
+AS $$
+DECLARE
+  v_violation    RECORD;
+  v_worker_url   TEXT        := current_setting('app.emit_audit_event_worker_url', true);
+  v_emitted      INT         := 0;
+  v_cap_total    INT         := 0;
+  v_cap_hit      BOOL        := false;
+  v_bcl_checked  INT;
+  v_now          TIMESTAMPTZ := clock_timestamp();  -- consistent across all pg_net calls
+BEGIN
+  IF v_worker_url IS NULL OR v_worker_url = '' THEN
+    RAISE EXCEPTION
+      'fn_bcl_chain_integrity_check: app.emit_audit_event_worker_url GUC not set — '
+      'BCL-CHAIN-01 integrity monitoring disabled.';
+  END IF;
+
+  -- Count total BCL pairs examined (bcl_pairs_checked = 0 is valid; explicit
+  -- zero-BCL-activity attestation in BCL-OBS-E-001 quarterly report per §70.8).
+  SELECT COUNT(*)::int
+    INTO v_bcl_checked
+    FROM audit_log_events
+   WHERE event_type = 'backchannel_logout.revoked'
+     AND created_at > v_now - INTERVAL '24 hours';
+
+  -- R-74-C2: orphaned backchannel_logout.revoked rows (no prior received anchor ≤ 60s).
+  -- LIMIT 51: fetch one extra row to detect when orphan count > 50 (BCL-INT-CAP-01).
+  -- Dedup: skip bcl_request_id already paged via security.bcl_chain_01_violation in 24h.
+  FOR v_violation IN
+    SELECT
+      e_r.payload->>'bcl_request_id'  AS bcl_request_id,
+      e_r.payload->>'tenant_id'       AS tenant_id,
+      e_r.created_at                  AS revoked_at
+    FROM audit_log_events e_r
+    WHERE e_r.event_type = 'backchannel_logout.revoked'
+      AND e_r.created_at > v_now - INTERVAL '24 hours'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log_events e_recv
+        WHERE e_recv.event_type = 'backchannel_logout.received'
+          AND e_recv.payload->>'bcl_request_id' = e_r.payload->>'bcl_request_id'
+          AND e_recv.created_at BETWEEN
+                e_r.created_at - INTERVAL '60 seconds' AND e_r.created_at
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log_events dedup
+        WHERE dedup.event_type = 'security.bcl_chain_01_violation'
+          AND dedup.payload->>'bcl_request_id' = e_r.payload->>'bcl_request_id'
+          AND dedup.created_at > v_now - INTERVAL '24 hours'
+      )
+    ORDER BY e_r.created_at DESC
+    LIMIT 51  -- BCL-INT-CAP-01: LIMIT 51 (not 50) enables cap detection on 51st row
+  LOOP
+    v_cap_total := v_cap_total + 1;
+
+    -- BCL-INT-CAP-01: 51st row confirms > 50 orphans. Stop emitting violations.
+    IF v_cap_total > 50 THEN
+      v_cap_hit := true;
+      EXIT;
+    END IF;
+
+    -- Emit security.bcl_chain_01_violation CRITICAL/7yr per orphaned {tenant_id, bcl_request_id}.
+    -- AL-BCL-03: no cooldown — every distinct violation is a P0 PagerDuty page.
+    PERFORM pg_net.http_post(
+      url     := v_worker_url || '/internal/emit-audit-event',
+      headers := jsonb_build_object('Content-Type', 'application/json'),
+      body    := jsonb_build_object(
+        'event_type',       'security.bcl_chain_01_violation',
+        'severity',         'CRITICAL',
+        'retention_years',  7,
+        'tenant_id',        v_violation.tenant_id,
+        'payload',          jsonb_build_object(
+          'bcl_request_id',   v_violation.bcl_request_id,
+          'tenant_id',        v_violation.tenant_id,
+          'incident_id',      gen_random_uuid()::text,
+          'violation_type',   'BCL_CHAIN_01_VIOLATION',
+          'detected_at',      v_now,
+          'revoked_event_at', v_violation.revoked_at,
+          'detection_source', 'pg_cron_job_59_retrospective'
+        )
+      )::text,
+      timeout_milliseconds := 8000
+    );
+    v_emitted := v_emitted + 1;
+  END LOOP;
+
+  -- BCL-INT-CAP-01: emit fleet-level cap-reached marker when > 50 orphans found.
+  -- > 50 simultaneous orphans = H4/H5 (systemic bug or malicious) — co-activate R-05.
+  -- BCL-ALL-CLR-SUPPRESS-01: all-clear suppressed when cap is hit.
+  IF v_cap_hit THEN
+    PERFORM pg_net.http_post(
+      url     := v_worker_url || '/internal/emit-audit-event',
+      headers := jsonb_build_object('Content-Type', 'application/json'),
+      body    := jsonb_build_object(
+        'event_type',       'security.bcl_int_cap_reached',
+        'severity',         'CRITICAL',
+        'retention_years',  7,
+        'tenant_id',        NULL,
+        'payload',          jsonb_build_object(
+          'cap_limit',            50,
+          'orphan_count_capped',  true,
+          'total_orphans_found',  v_cap_total,
+          'detection_source',     'pg_cron_job_59_retrospective',
+          'detected_at',          v_now
+        )
+      )::text,
+      timeout_milliseconds := 8000
+    );
+    RETURN;  -- BCL-ALL-CLR-SUPPRESS-01: no all-clear when violations or cap emitted.
+  END IF;
+
+  -- BCL-ALL-CLR-SUPPRESS-01: suppress all-clear if any per-request violations emitted.
+  IF v_emitted > 0 THEN
+    RETURN;
+  END IF;
+
+  -- All-clear: emit system.bcl_chain_check_passed LOW/1yr.
+  -- bcl_pairs_checked = 0 is valid: explicit zero-BCL-activity attestation per §70.8.
+  PERFORM pg_net.http_post(
+    url     := v_worker_url || '/internal/emit-audit-event',
+    headers := jsonb_build_object('Content-Type', 'application/json'),
+    body    := jsonb_build_object(
+      'event_type',       'system.bcl_chain_check_passed',
+      'severity',         'LOW',
+      'retention_years',  1,
+      'tenant_id',        NULL,
+      'payload',          jsonb_build_object(
+        'bcl_pairs_checked', v_bcl_checked,
+        'check_run_at',      v_now,
+        'detection_source',  'pg_cron_job_59_retrospective'
+      )
+    )::text,
+    timeout_milliseconds := 8000
+  );
+END;
+$$;
+
+-- GRANT EXECUTE to form_audit only (REVOKE PUBLIC already applied above).
+GRANT EXECUTE ON FUNCTION fn_bcl_chain_integrity_check() TO form_audit;
+
+-- pg_cron job 59 is unchanged — function name 'fn_bcl_chain_integrity_check' is retained.
+-- No cron.schedule() call needed: job 59 already references this function name.
+
+-- Verification queries (run after apply — staging before production):
+--   SELECT proname, prosecdef FROM pg_proc WHERE proname = 'fn_bcl_chain_integrity_check';
+--   -- Expected: prosecdef = true (SECURITY DEFINER).
+--   SELECT grantee, privilege_type FROM information_schema.role_routine_grants
+--    WHERE routine_name = 'fn_bcl_chain_integrity_check';
+--   -- Expected: form_audit | EXECUTE only; PUBLIC row absent.
+--   SET ROLE form_audit; SELECT fn_bcl_chain_integrity_check(); RESET ROLE;
+--   -- Expected (no BCL activity): system.bcl_chain_check_passed emitted; bcl_pairs_checked = 0.
+```
+
+**Changes from §71 v1:**
+
+| Change | Rationale |
+|---|---|
+| `LIMIT 51` (was `LIMIT 50`) | Enables BCL-INT-CAP-01 detection: 51st row confirms > 50 orphans exist; `LIMIT 50` made `v_cap_total > 50` unreachable |
+| `v_cap_hit` + `v_cap_total` variables | Tracks cap state across loop; `EXIT` on 51st row; emits `security.bcl_int_cap_reached` below the loop |
+| `security.bcl_int_cap_reached` CRITICAL/7yr | BCL-INT-CAP-01 cap-reached event; registered AUDIT_LOG_SCHEMA.md v2.94 (§74.2) |
+| BCL-ALL-CLR-SUPPRESS-01 dual suppression | Prevents mixed-signal: cap-hit path → `RETURN` immediately; `v_emitted > 0` guard for per-violation path; matches SLO-ALL-CLR-SUPPRESS-01 in §73 |
+| `SET search_path = public, pg_catalog` | SECURITY DEFINER best practice — prevents search-path injection; matches §73 pattern; §71 omitted |
+| `REVOKE ALL ... FROM PUBLIC` before GRANT | Explicit deny-before-grant; matches §73 pattern; §71 omitted |
+| `v_now TIMESTAMPTZ := clock_timestamp()` | Single consistent timestamp across all pg_net calls in the run; replaces inline `NOW()` calls in §71 (which could differ across loop iterations under load) |
+| `detection_source` in all-clear payload | Parity with violation events; BCL-OBS-E-001 quarterly report can distinguish pg_cron job 59 from any future detection source |
+
+---
+
+### §74.4 BCL-INT-CAP-01 Tabletop Test Spec (BCL-CAP-TAB-01)
+
+Parallel to §73.4 item 5 (SLO-INT-CAP-01 tabletop test). **Gate:** Staging environment with M-0102 (job 59 registered) + M-0104 (v2 function applied) deployed.
+
+**BCL-CAP-TAB-01 test procedure:**
+
+1. Insert 51 synthetic `backchannel_logout.revoked` rows into `audit_log_events` on staging — no corresponding `backchannel_logout.received` anchors within the 60-second window, all within the last 24 hours, across ≥ 2 test tenant UUIDs:
+
+```sql
+-- Synthetic orphan insertion (staging only — never production):
+INSERT INTO audit_log_events (
+  id, event_type, severity, tenant_id, payload, hmac_signature, prev_chain_hash, created_at
+)
+SELECT
+  gen_random_uuid(),
+  'backchannel_logout.revoked',
+  'STANDARD',
+  (CASE WHEN n % 2 = 0 THEN 'aaaaaaaa-0000-0000-0000-000000000001'
+                        ELSE 'aaaaaaaa-0000-0000-0000-000000000002' END)::uuid,
+  jsonb_build_object(
+    'bcl_request_id', gen_random_uuid()::text,
+    'tenant_id',      (CASE WHEN n % 2 = 0 THEN 'aaaaaaaa-0000-0000-0000-000000000001'
+                                            ELSE 'aaaaaaaa-0000-0000-0000-000000000002' END),
+    'sessions_revoked_count', 1,
+    'revocation_method', 'sub',
+    'sub_hash', repeat('a', 64),
+    'async', false
+  ),
+  'synthetic-test-hmac',  -- non-verifiable; staging test only
+  'synthetic-prev-hash',
+  NOW() - (n * INTERVAL '1 second')
+FROM generate_series(1, 51) AS n;
+```
+
+2. Trigger the check function manually:
+
+```sql
+SET ROLE form_audit;
+SELECT fn_bcl_chain_integrity_check();
+RESET ROLE;
+```
+
+3. **Expected outcomes (all three must hold):**
+
+| Check | Expected | Failure action |
+|---|---|---|
+| `security.bcl_chain_01_violation` count | Exactly 50 rows in `audit_log_events` with `event_type = 'security.bcl_chain_01_violation'` and `created_at > NOW() - INTERVAL '1 minute'` | BCL-INT-CAP-01 EXIT not triggering; verify LIMIT 51 in function DDL |
+| `security.bcl_int_cap_reached` event | Exactly 1 row; `payload->>'total_orphans_found' = '51'`; `payload->>'orphan_count_capped' = 'true'`; `tenant_id IS NULL` | Cap-reached emission path not reached; verify v_cap_total > 50 branch |
+| `system.bcl_chain_check_passed` absent | 0 rows with `event_type = 'system.bcl_chain_check_passed'` in last 1 minute | BCL-ALL-CLR-SUPPRESS-01 not enforced |
+
+4. **Cleanup:** DELETE inserted orphan rows from `audit_log_events` on staging after test.
+
+**Owner:** qa-lead + security-engineer. **Priority:** P1. **Gate:** Before M8 BCL production deploy.
+
+---
+
+### §74.5 BCL-OBS-E-001 + SLO-OBS-E-001 Quarterly Report Scope Update
+
+The BCL-OBS-E-001 quarterly evidence artefact spec (§70.8) and SLO-OBS-E-001 spec (§72.8) each document two event types for the quarterly report. Both are updated to include the cap-reached event as a third type:
+
+**BCL-OBS-E-001 (§70.8) — updated event coverage:**
+
+| Event type | Quarterly report section | Zero-event attestation |
+|---|---|---|
+| `system.bcl_chain_check_passed` | `all_clear_events` | Required: `count: 0` if no BCL activity in quarter |
+| `security.bcl_chain_01_violation` | `violation_events` | Required: empty array if no violations |
+| `security.bcl_int_cap_reached` *(new — §74)* | `cap_reached_events` | Required: empty array + note "BCL-INT-CAP-01 threshold not breached in period"; if non-empty: note R-05 co-activation status for each event |
+
+**SLO-OBS-E-001 (§72.8) — updated event coverage:**
+
+| Event type | Quarterly report section | Zero-event attestation |
+|---|---|---|
+| `system.slo_chain_check_passed` | `all_clear_events` | Required: `count: 0` if no SLO activity |
+| `security.slo_chain_01_violation` | `violation_events` | Required: empty array if no violations |
+| `security.slo_int_cap_reached` *(new — §74)* | `cap_reached_events` | Required: empty array + note "SLO-INT-CAP-01 threshold not breached in period"; if non-empty: note R-05 co-activation status |
+
+**Auditor narrative (CC7.2):** The presence of cap-reached events in a quarterly report proves FORM detected and escalated systemic chain failures beyond per-request thresholds. The absence of cap-reached events is explicit attestation that no > 50-orphan event occurred in the period — complementing the per-request `violation_events` count which may be zero independently.
+
+---
+
+### §74.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `security.slo_int_cap_reached` CRITICAL/7yr in `docs/AUDIT_LOG_SCHEMA.md §SLO-Chain-Monitor-Events` (§73 backfill; §74.2 spec + Zod v2 schema) | compliance-officer | **P1** | [x] **Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.94, this pass).** |
+| 2 | Register `security.bcl_int_cap_reached` CRITICAL/7yr in `docs/AUDIT_LOG_SCHEMA.md §BCL-Chain-Monitor-Events` (BCL parity gap; §74.2 spec + Zod v2 schema) | compliance-officer | **P1** | [x] **Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.94, this pass).** |
+| 3 | Apply corrected `fn_bcl_chain_integrity_check()` v2 (migration `0104_bcl_chain_check_cap_patch.sql`; §74.3 SQL DDL) to staging; gate: M-0102 applied + all §46.8 P0 items 1–8 closed | devops-lead | **P1** | [ ] Pending — M8 |
+| 4 | Run BCL-CAP-TAB-01 tabletop test (§74.4) on staging after M-0104 applied; confirm 50 violations + 1 cap-reached + 0 all-clear | qa-lead + security-engineer | **P1** | [ ] Pending — M8 |
+| 5 | Apply `0104_bcl_chain_check_cap_patch.sql` to production (gate: BCL-CAP-TAB-01 passed + all §46.8 P0 items deployed + M-0102 applied) | devops-lead | **P1** | [ ] Pending — M8 |
+| 6 | Update BCL-OBS-E-001 Q3 2026 first filing (§70.8) and SLO-OBS-E-001 Q3 2026 first filing (§72.8) to include `cap_reached_events` section (zero-event attestation if no cap events in period) | compliance-officer | **P1** | [ ] Pending — M8 (BCL) / M7 (SLO) first filing windows |
+
+---
+
+### §74.7 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register `security.slo_int_cap_reached` in AUDIT_LOG_SCHEMA.md | §73.2 SLO-INT-CAP-01 (event emitted by §73 SQL without prior registration) | 🟢 **Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.94, §74.2 this pass).** |
+| Register `security.bcl_int_cap_reached` in AUDIT_LOG_SCHEMA.md | §71.2 BCL-INT-CAP-01 design (no event existed; §71 SQL missing cap logic) | 🟢 **Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.94, §74.2 this pass).** |
+| Apply corrected `fn_bcl_chain_integrity_check()` v2 (M-0104) to staging | §74.3 | 🟡 Pending — M8 (devops-lead) |
+| BCL-CAP-TAB-01 tabletop test on staging | §74.4 | 🟡 Pending — M8 (qa-lead + security-engineer) |
+| BCL-OBS-E-001 Q3 first filing — add `cap_reached_events` section | §74.5 + §70.8 | 🟡 Pending — M8 first filing (compliance-officer) |
+| SLO-OBS-E-001 Q3 first filing — add `cap_reached_events` section | §74.5 + §72.8 | 🟡 Pending — M7 first filing (compliance-officer) |
+
+---
+
+*v5.19.0 (2026-07-04): §74 BCL-INT-CAP-01 Parity Patch — Cap-Reached Event Registration (AUDIT\_LOG\_SCHEMA.md v2.94 · CC7.2 · BCL-INT-CAP-01 / SLO-INT-CAP-01). Closes two documentation gaps created by §71 and §73. Gap 1: `security.slo_int_cap_reached` CRITICAL/7yr emitted by §73 SQL DDL (`0103_slo_chain_integrity_check.sql`) was not registered in `docs/AUDIT_LOG_SCHEMA.md §SLO-Chain-Monitor-Events`; §SLO-Chain-Monitor-Events header described "three" events but §73 introduced a fourth (SLO-INT-CAP-01: > 50 orphaned SLO closure events in 24h window). Gap 2: §71 BCL-INT-CAP-01 design decision ("50 per run; > 50 indicates H4/H5") had no corresponding `security.bcl_int_cap_reached` event — §71 SQL `LIMIT 50` makes cap-reached detection impossible (`v_violation_count` capped at 50 by the query limit, so `> 50` never triggers). §74.2 registers both events in AUDIT\_LOG\_SCHEMA.md v2.94: `security.slo_int_cap_reached` (SLO-INT-CAP-01 backfill) and `security.bcl_int_cap_reached` (BCL-INT-CAP-01 parity gap) — both CRITICAL/7yr, CC7.2, fleet-level aggregate payload (no tenant\_id, no slo/bcl\_request\_id, no user PII), shared `ChainIntCapReachedPayload` Zod v2 schema (`cap_limit: z.literal(50)`, `orphan_count_capped: z.literal(true)`, `total_orphans_found: z.number().int().min(51)`, `detection_source` enum, `detected_at`). §74.3 corrected `fn_bcl_chain_integrity_check()` v2 SQL DDL (migration `0104_bcl_chain_check_cap_patch.sql`): uses `LIMIT 51` (vs. §71 `LIMIT 50`) with EXIT on `v_cap_total > 50` (51st row confirms > 50 orphans) → emits first 50 `security.bcl_chain_01_violation` events then `security.bcl_int_cap_reached`; BCL-ALL-CLR-SUPPRESS-01 dual suppression (cap-hit RETURN + `v_emitted > 0` RETURN); adds `SET search_path = public, pg_catalog`, `REVOKE ALL FROM PUBLIC` before `GRANT EXECUTE TO form_audit`, `v_now TIMESTAMPTZ := clock_timestamp()` for consistent timestamps, `detection_source` field in all-clear payload; `CREATE OR REPLACE FUNCTION` patch — no pg_cron schedule change; gated on M8 + all §46.8 P0 items + M-0102 applied. §74.4 BCL-CAP-TAB-01 tabletop test spec (parallel to §73.4 item 5 SLO-INT-CAP-01): insert 51 synthetic `backchannel_logout.revoked` orphan rows on staging → manual `fn_bcl_chain_integrity_check()` run → confirm 50 `security.bcl_chain_01_violation` + 1 `security.bcl_int_cap_reached` (`total_orphans_found = 51`) + no `system.bcl_chain_check_passed`. §74.5 BCL-OBS-E-001 + SLO-OBS-E-001 quarterly report scope update: add `security.bcl_int_cap_reached` and `security.slo_int_cap_reached` as a third event type in each quarterly artefact (alongside existing all-clear + per-violation events); zero-event attestation required when no cap events in period; R-05 co-activation note required when cap events present. §74.6 six-item implementation checklist: items 1–2 Done this pass (AUDIT\_LOG\_SCHEMA.md v2.94 registrations); items 3–6 Pending M7/M8. §74.7 six cross-reference obligations: two 🟢 Done this pass; four 🟡 Pending M7/M8. Also adds §73 TOC entry (missing from §73 initial pass — §73.5 cross-reference marked Done but TOC row was not inserted). Privacy floor (both cap events): `tenant_id = NULL` (fleet-level signal — no per-tenant data); `total_orphans_found` is an integer count — no `{tenant_id, slo_request_id}` or `{tenant_id, bcl_request_id}` enumeration; no `user_id`, email, health data, or GDPR Art. 9 special-category data. Document header v5.18.1 → v5.19.0. Owner: devops-lead + compliance-officer. Review: security-engineer + enterprise-architect.*
 
 *v5.18.0 (2026-07-04): §72 SAML Single Logout (SLO) Observability. Closes the observability gap created by `docs/SSO_SCIM_IMPLEMENTATION.md §45` (v2.20, 2026-07-04 — SAML SLO Worker spec, Migration 0100, SLO-CHAIN-01 ordering invariant, twelve-item implementation checklist). Five DEC-030 SLO events registered in `docs/AUDIT_LOG_SCHEMA.md` (slo.sp\_initiated, slo.idp\_initiated, slo.completed, slo.failed, slo.fallback\_local\_only — registered by SSO\_SCIM §45 v2.20); SLO-E-001/002/003/004 evidence artefacts registered in `docs/SOC2_READINESS.md §162` (v3.88.0, 2026-07-04; evidence count 128 → 132); SLO-E-001 + SLO-E-002 added to §15.1 compliance calendar in `docs/SOC2_READINESS.md §165` (v3.90.0, 2026-07-04). §72.1: scopes monitoring to SAML SLO Worker (`saml-slo.ts`), SLO\_KV (TTL 15s), `revokeSessionsBySloRequest()`, and SLO-CHAIN-01 HMAC ordering invariant; five DEC-030 event types with chain roles (sp\_initiated anchor, completed + fallback\_local\_only closure, failed exempt); privacy floor (raw `idp_name_id` never in payloads — `idp_name_id_hash` SHA-256 for correlation only); SOC 2 CC6.1/CC6.3/CC7.2/CC7.3; IdP SLO support matrix (Okta ✅ SP+IdP, Entra ID ✅ SP+IdP, Google Workspace ❌ no SLO endpoint → fallback\_local\_only). §72.2: RED metrics — SLO requests by flow + tenant (WAE), `slo.failed` by reason enum (WAE + audit\_log\_events), `slo_chain_violation_total` (emit-audit-event 422 counter), SP round-trip P95 latency target < 8,000 ms. §72.3: two SLOs — SLO-SLO-01 (SP-initiated federated success rate ≥ 99.0%; alert < 95% / 10 min; rolling 30 days; SSO-SLO-04 credit linkage) and SLO-SLO-02 (round-trip P95 < 8,000 ms; alert > 9,000 ms / 15 min; rolling 7 days); SLO-SLO-01 denominator excludes `slo_not_configured` tenants. §72.4: three alert rules — AL-SLO-01 (failure + timeout rate P1, per-tenant 30-min dedup; full runbook with five diagnostic steps; auto-resolve), AL-SLO-02 (SLO-CHAIN-01 violation P0; full retrospective SQL with `form_audit` role, LIMIT 50, 24h window; no cooldown; no auto-resolve), AL-SLO-03 (P95 > 9,000 ms P2 PagerDuty `form-devops`; approaching-abort-boundary runbook). §72.5: three §6.2 alert table rows (slo subsection: AL-SLO-01/02/03; marked P0 Done this pass). §72.6: seven-panel "SAML SLO / Federated Logout" dashboard sub-group for §26.9 Enterprise Identity dashboard: request volume by flow + tenant, outcome pie, `slo.failed` by reason, SLO-CHAIN-01 integrity tile, SP round-trip P95 gauge, federated success rate by tenant, fallback rate by reason. §72.7: SOC 2 evidence mapping for CC6.1 (revocation proof via HMAC chain), CC6.3 (timeliness: 10s abort window + timestamp delta + SLO-SLO-01), CC7.2 (three alert rules as anomaly monitors), CC7.3 (P0/P1/P2 response SLAs; companion runbooks R-75 + R-76 pending §72.9 items 9/10). §72.8: SLO-OBS-E-001 quarterly evidence artefact (CC6.1/CC6.3/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/saml-slo/slo-obs-e-001-{YYYY}-Q{N}.json`); six-component report spec; zero-event attestation pattern required for all failure/alert counters; nil attestation required each quarter until M7. §72.9: twelve-item implementation checklist — 2× P0 Done this pass (TOC entry, §6.2 additions), 10× P1/M7 pending (alert rules 1–3, dashboard, SOC2\_READINESS SLO-OBS-E-001 registration, §15.1 calendar entry, IR runbooks R-75 + R-76, SSO\_SCIM §45.9 backreference, first quarterly filing); OQ-SLO-OBS-01 raised (pg\_cron vs. CF Workers Cron Trigger for SLO-CHAIN-01 retrospective check — recommendation: pg\_cron job 60; M7 resolution gate). §72.10: OQ-SLO-OBS-01 registered. §72.11: seven cross-reference obligations — 2× 🟢 Done this pass (TOC + §6.2); 5× 🟡 Pending P1/M7 (SOC2\_READINESS SLO-OBS-E-001 registration, §15.1 calendar, IR runbooks R-75 + R-76, SSO\_SCIM §45.9 backreference). Privacy floor: all §72 content is operational metadata only — no individual employee `user_id`, name, email, session token, coaching content, body composition metric, or GDPR Art. 9 special-category data; `tenant_id` is FORM-internal UUID; `idp_name_id_hash` appears only as a query parameter reference (SHA-256 hash, not raw NameID); SLO-OBS-E-001 aggregate-only with zero-event attestation. Document header v5.17.0 → v5.18.0. Owner: devops-lead + security-engineer + compliance-officer.*

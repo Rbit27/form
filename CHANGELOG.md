@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.73.1] — 2026-07-04
+
+### Added
+- `docs/OBSERVABILITY.md §74` — BCL-INT-CAP-01 Parity Patch (v5.19.0). Registers `security.bcl_int_cap_reached` CRITICAL/7yr CC7.2 alongside companion `security.slo_int_cap_reached`. Corrects §71 `LIMIT 50` bug (PG enforces LIMIT before PL/pgSQL loop body — `v_violation_count > 50` was unreachable). Corrected `fn_bcl_chain_integrity_check()` v2 DDL uses `LIMIT 51` sentinel (migration `0104_bcl_chain_check_cap_patch.sql`). BCL-ALL-CLR-SUPPRESS-01 / SLO-ALL-CLR-SUPPRESS-01 documented. Shared `ChainIntCapReachedPayload` Zod v2 schema. §74.4 BCL-CAP-TAB-01 tabletop test spec. BCL-OBS-E-001 + SLO-OBS-E-001 quarterly report scope updated.
+- `docs/AUDIT_LOG_SCHEMA.md §BCL-Chain-Monitor-Events` — v2.94: "Four DEC-030" header; `security.bcl_int_cap_reached` CRITICAL/7yr table row; `BclIntCapReachedPayload` Zod v2 schema; master retention table +2 rows (`security.bcl_int_cap_reached` + `security.slo_int_cap_reached` CRITICAL 7yr CC7.2 v2.94); `system.bcl_chain_check_passed` + `system.slo_chain_check_passed` retention notes updated with BCL-ALL-CLR-SUPPRESS-01 / SLO-ALL-CLR-SUPPRESS-01 references.
+- `docs/SOC2_READINESS.md §169` — v3.94.0: AUDIT_LOG_SCHEMA v2.94 Registration Patch cross-reference. CC7.2 auditor narrative for both cap events. §80.4 Vanta mirror protocol (surfaces in BCL-OBS-E-001 / SLO-OBS-E-001; no new §79.4 artefact rows). Evidence count 141 unchanged.
+
+### Changed
+- `VERSION` — 12.73.0 → 12.73.1.
+
+---
+
 ## [12.73.0] — 2026-07-04
 
 ### Added
