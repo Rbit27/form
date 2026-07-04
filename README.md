@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 in progress 1/10 · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.53.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 in progress 2/10 · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.54.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3611,7 +3611,7 @@ AI-тренери, відеоаналіз, носимі пристрої, зас
 | № | Тема | Статус |
 |---|------|--------|
 | 3166 | Чому self-coached атлет потребує системи рішень, а не набору правил | **draft · v12.53.0 → post-3166-decision-system-vs-rules-self-coached.md** |
-| 3167 | Ієрархія принципів: що стоїть вище — дослідження, досвід чи відчуття тіла | proposed |
+| 3167 | Ієрархія принципів: що стоїть вище — дослідження, досвід чи відчуття тіла | **draft · v12.54.0 → post-3167-hierarchy-of-principles-research-experience-body.md** |
 | 3168 | Мета-навички тренування: що залишається корисним через 10 років незалежно від протоколу | proposed |
 | 3169 | Як self-coached атлет відрізняє системну проблему від локального збою | proposed |
 | 3170 | Тренувальна ідентичність: чому «я атлет» — не мотиваційна фраза, а операційна настанова | proposed |

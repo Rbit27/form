@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v12.54.0** — 2026-07-04 · content · post-3167 · «Ієрархія принципів: що стоїть вище — дослідження, досвід чи відчуття тіла» · series «Тренувальна автономія» 3166–3175 (2/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3167 · «Тренувальна автономія» in progress 1/10 → 2/10 · next: post-3168 («Мета-навички тренування: що залишається корисним через 10 років незалежно від протоколу»)
+
 **v12.53.0** — 2026-07-04 · content · post-3166 · «Чому self-coached атлет потребує системи рішень, а не набору правил» · series «Тренувальна автономія» 3166–3175 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3166 · «Тренувальна автономія» proposed → in progress 1/10 · next: post-3167 («Ієрархія принципів: що стоїть вище — дослідження, досвід чи відчуття тіла»)
 
 **v12.52.0** — 2026-07-04 · content · post-3165 · «Синтез 3156–3165: десять когнітивних пасток і як їх обходити без зовнішнього спостерігача» · series «Тренувальне мислення» 3156–3165 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-3165 · README: «Тренувальне мислення» COMPLETE 10/10, «Тренувальна автономія» 3166–3175 in progress 0/10 · next: post-3166 («Чому self-coached атлет потребує системи рішень, а не набору правил»)
