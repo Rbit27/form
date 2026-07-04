@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [12.69.1] — 2026-07-04
+
+### Changed
+- `docs/DATA_MODEL.md` — §52 `enterprise_sessions.oidc_sub_hash` — OIDC BCL Session Index — Migration 0101. DATA_MODEL canonical registration for the Migration 0101 schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §46` (v2.21, 2026-07-04). Closes cross-reference gap: §46.9 entry added to SSO_SCIM (v2.31).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §46.9 cross-reference obligations updated: `docs/DATA_MODEL.md §52` entry added (v2.31, 2026-07-04).
+- `VERSION` — 12.69.0 → 12.69.1.
+
+---
+
 ## [12.69.0] — 2026-07-04
 
 ### Added

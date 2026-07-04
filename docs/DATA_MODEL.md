@@ -59,6 +59,7 @@
 49. [`tenants.data_region` — EU Data Residency Column — Migration 0090](#49-tenantsdata_region--eu-data-residency-column--migration-0090)
 50. [`tenants` OTA Change Window Columns — Migration 0091](#50-tenants-ota-change-window-columns--migration-0091)
 51. [`tenants.reporting_k_floor` — Per-Tenant k-Anonymity Floor Override — Migration 0092](#51-tenantsreporting_k_floor--per-tenant-k-anonymity-floor-override--migration-0092)
+52. [`enterprise_sessions.oidc_sub_hash` — OIDC BCL Session Index — Migration 0101](#52-enterprise_sessionsoidc_sub_hash--oidc-bcl-session-index--migration-0101)
 
 ---
 
@@ -18847,3 +18848,219 @@ SOC 2 evidence artefact: **KANON-E-001** (P4.1/CC2.2, per-change + annual nil at
 ---
 
 *v1.43 (2026-07-03): §51 `tenants.reporting_k_floor` — Per-Tenant k-Anonymity Floor Override — Migration 0092. Formalizes the informal DDL sketch from §17.4.4 as a full migration registration with DDL, RLS, privacy floor, SOC 2 evidence mapping, and implementation checklist. One column added to `tenants`: `reporting_k_floor INTEGER NOT NULL DEFAULT 5 CONSTRAINT chk_reporting_k_floor_tier CHECK (reporting_k_floor IN (5, 10, 15))`. `chk_reporting_k_floor_tier` makes values < 5 (and non-tier values) structurally impossible at the Postgres layer — closes PRV-21 DDL portion ("policy defined; enforcement not yet unit-tested" → DDL-enforced minimum). `form_api` REVOKED from UPDATE via selective column-level REVOKE (KANON-FLOOR-01). Migration dependency chain: 0083→…→0091→0092. Ten-item staging validation checklist (evidence path: `compliance/evidence/k-anonymity/migration-0092-validation_<YYYY-MM-DD>.txt`). §51.5 tier mapping: 5 (Tier 1 default / all tenants / no approval), 10 (Tier 2 health-adjacent / enterprise-architect approval), 15 (clinical/high-sensitivity / enterprise-architect + `compliance_officer_cosign_ref` / KANON-CHAIN-01). §51.6 RLS: `form_api` SELECT only (assert_k_anonymity() + Worker middleware); `form_system` ALL (sole write path); `form_admin`/`compliance_reviewer` SELECT; `tenant_owner`/`tenant_admin`/`tenant_manager` SELECT own row. §51.7 privacy floor: `reporting_k_floor` is a technical configuration integer — not GDPR Art. 4 personal data; no PHI/Art. 9 risk; `REVOKE UPDATE … FROM form_api` prevents automated k-floor reduction below DDL minimum of 5. §51.8 SOC 2: P4.1 (`chk_reporting_k_floor_tier` DDL-layer enforcement — PRV-21 DDL closure); CC2.2 (`tenant.k_floor_updated` HIGH/7yr HMAC chain tamper-evident trail); CC3.2 (enterprise-architect approval + `approved_by_user_id` + compliance-officer cosign for floor-15). KANON-E-001 evidence artefact (P4.1/CC2.2, per-change + annual nil attestation, 7yr, `compliance/evidence/k-anonymity/`) registered in `docs/SOC2_READINESS.md §159` (v3.85.0, 2026-07-03). §51.9 nine-item implementation checklist (2× P0 done; 5× P1 pending M8/M12; 2× further pending). §51.10 ten cross-reference obligations (4× done; 6× pending). §17.4.4 in-line annotation added referencing migration 0092 formal registration. PRV-21 DDL portion closed in SOC2_READINESS v3.85.0 (unit-test closure pending §51.9 item 8, P1/M8). TOC §51 entry added. Document header v1.42 → v1.43. Owner: enterprise-architect + compliance-officer.*
+
+---
+
+## 52. `enterprise_sessions.oidc_sub_hash` — OIDC BCL Session Index — Migration 0101
+
+> **Canonical implementation spec:** `docs/SSO_SCIM_IMPLEMENTATION.md §46` (v2.21, 2026-07-04). This section is the DATA_MODEL registration for Migration 0101, providing the canonical cross-reference, column semantics, RLS analysis, privacy floor verification, and SOC 2 evidence mapping. The full Worker spec (`oidc-backchannel-logout.ts`), CI adversarial test matrix (MIG-0101-01/02/03), OIDC callback handler update, and BCL-CHAIN-01 ordering invariant live in §46. **Companion audit events:** `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (v2.89, 2026-07-04 — `backchannel_logout.received/validated/revoked/failed`).
+
+### §52.1 Purpose
+
+Migration 0101 adds a single nullable column — `oidc_sub_hash TEXT` — to `enterprise_sessions`. The column stores the SHA-256 hex digest of the OIDC `sub` claim set at login time by the OIDC callback handler (`apps/api-gateway/src/sso/oidc-callback.ts §46.3`). It enables *single-table* sub-based session revocation during an OIDC Back-Channel Logout (BCL) event without touching the `users` table or storing the raw OIDC `sub` anywhere in Postgres.
+
+**Why a new column rather than the existing two-table path:**
+
+The prior sub-based revocation pattern (SSO_SCIM §13.3.3) required two round-trips:
+1. `SELECT id FROM users WHERE tenant_id = $t AND idp_subject = $sub` — passes raw `sub` through the Worker
+2. `UPDATE enterprise_sessions SET revoked_at = now() WHERE user_id = $uid AND tenant_id = $t AND revoked_at IS NULL`
+
+`oidc_sub_hash` collapses this to a single indexed UPDATE — `WHERE tenant_id = $t AND oidc_sub_hash = $hash AND revoked_at IS NULL` — and removes the raw `sub` from the Worker-to-DB call path entirely. The pattern mirrors `idp_name_id_hash` in SAML SLO (SSO_SCIM §45).
+
+**Four design principles:**
+
+1. **Additive-only** — `ALTER TABLE enterprise_sessions ADD COLUMN oidc_sub_hash TEXT` with no NOT NULL, no DEFAULT, no backfill. Existing SAML sessions and pre-0101 OIDC sessions remain unaffected (`oidc_sub_hash = NULL`). `CREATE INDEX CONCURRENTLY` avoids table lock.
+2. **Nullable by design** — SAML sessions never have an OIDC `sub`; pre-0101 OIDC sessions lack the hash; both cases produce `NULL`. The partial index `WHERE oidc_sub_hash IS NOT NULL AND revoked_at IS NULL` excludes both groups from index maintenance overhead.
+3. **Raw `sub` never in Postgres** — the OIDC callback handler computes `SHA-256(sub)` via `crypto.subtle.digest` before the INSERT; the raw claim is discarded in the Cloudflare Worker memory. This is the same PII boundary as `refresh_token_hash` (already on `enterprise_sessions`).
+4. **Revocation path sealed by BCL-CHAIN-01** — every BCL event pair (`backchannel_logout.received` → `backchannel_logout.revoked`) is HMAC-chained via DEC-030; the chain invariant is enforced at the `emit-audit-event` Worker layer (HTTP 422 `BCL_CHAIN_01_VIOLATION` on ordering violation — see SSO_SCIM §46.5.3 and IR R-74).
+
+### §52.2 Migration Dependency Chain
+
+Migration 0101 modifies `enterprise_sessions` only. `enterprise_sessions` was created as part of the M3 SSO baseline (SSO_SCIM §12.5) — outside the `0083→0092` enterprise_contracts/tenants migration sequence. Migration 0101 has **no structural FK dependency** on migrations 0083–0092 and can be applied independently of the `tenants` column migration chain.
+
+**Prerequisite:** `enterprise_sessions` table must exist with the §12.5 schema (session_id, user_id, tenant_id, refresh_token_hash, family_id, generation, device_fingerprint, ip_last, created_at, last_used_at, expires_at, revoked_at, revoked_reason — 13 columns). `CREATE INDEX CONCURRENTLY` requires no advisory lock and does not block reads or writes.
+
+**Migration file:** `supabase/migrations/0101_oidc_sub_hash.sql`
+
+**Outside-counsel gate:** Not required — additive nullable column, no CHECK constraint, no ASC 606 / financial reporting implications, no GDPR Art. 9 data.
+
+### §52.3 Full DDL
+
+```sql
+-- Migration 0101: OIDC back-channel logout — oidc_sub_hash
+-- Adds SHA-256 hash of OIDC sub to enterprise_sessions for single-table sub-based revocation.
+-- Owner: platform-engineer · SOC 2: CC6.1/CC6.3 (logical access revocation)
+-- Privacy floor: raw OIDC sub never stored; SHA-256 hex only; matches idp_name_id_hash pattern.
+-- Companion: docs/SSO_SCIM_IMPLEMENTATION.md §46 (BCL Worker, BCL-CHAIN-01, BCL-E-001/002/003).
+
+BEGIN;
+
+ALTER TABLE enterprise_sessions
+  ADD COLUMN oidc_sub_hash TEXT;
+
+-- Partial index: active OIDC sessions only (non-null hash, not revoked).
+-- Lookup: WHERE tenant_id = $tenant_id AND oidc_sub_hash = $hash AND revoked_at IS NULL
+-- CREATE INDEX CONCURRENTLY runs without table lock — safe on live production table.
+CREATE INDEX CONCURRENTLY idx_enterprise_sessions_oidc_sub
+  ON enterprise_sessions (tenant_id, oidc_sub_hash)
+  WHERE oidc_sub_hash IS NOT NULL AND revoked_at IS NULL;
+
+COMMENT ON COLUMN enterprise_sessions.oidc_sub_hash IS
+  'SHA-256 hex of OIDC sub claim. NULL for SAML sessions and for OIDC sessions '
+  'created before Migration 0101. Populated by OIDC callback handler at INSERT. '
+  'Used for sub-based back-channel logout revocation without storing raw sub PII. '
+  'See docs/SSO_SCIM_IMPLEMENTATION.md §46 (BCL Worker) and '
+  'docs/DATA_MODEL.md §52 (this section). BCL-CHAIN-01: revoked event requires '
+  'prior received anchor — enforced at emit-audit-event Worker (HTTP 422 on violation).';
+
+COMMIT;
+```
+
+**Rollback:**
+
+```sql
+BEGIN;
+DROP INDEX CONCURRENTLY IF EXISTS idx_enterprise_sessions_oidc_sub;
+ALTER TABLE enterprise_sessions DROP COLUMN IF EXISTS oidc_sub_hash;
+COMMIT;
+```
+
+Rollback is safe: the column is nullable with no dependents. Dropping `CREATE INDEX CONCURRENTLY`-created indexes also uses `CONCURRENTLY` to avoid lock escalation.
+
+### §52.4 CI Adversarial Tests
+
+From `docs/SSO_SCIM_IMPLEMENTATION.md §46.2.4` — these three tests gate §52.9 item 1 (`[x] Done` status requires all three passing):
+
+| Test ID | Scenario | Pass criteria |
+|---|---|---|
+| **MIG-0101-01** | Apply migration to a table with 10,000 existing rows | Completes in < 30 s; all existing rows have `oidc_sub_hash = NULL`; zero FK violations; column is nullable |
+| **MIG-0101-02** | Concurrent INSERT to `enterprise_sessions` during `CREATE INDEX CONCURRENTLY` | INSERT succeeds without deadlock or blocking; index created; new row visible through index if `oidc_sub_hash IS NOT NULL` |
+| **MIG-0101-03** | Rollback: drop column and index | Table shape restored to 13-column pre-migration schema; no dependent views or functions broken |
+
+Evidence artefact: `compliance/evidence/oidc-bcl/migration-0101-validation_<YYYY-MM-DD>.txt` (output of all three tests + post-apply `\d enterprise_sessions` snapshot).
+
+### §52.5 Column and Index Semantics
+
+#### §52.5.1 Column
+
+| Property | Value |
+|---|---|
+| **Column name** | `oidc_sub_hash` |
+| **Type** | `TEXT` |
+| **Nullable** | YES — `NULL` for SAML sessions; `NULL` for OIDC sessions created before M8 (Migration 0101) |
+| **Default** | None — populated by OIDC callback handler at INSERT only |
+| **Encoding** | SHA-256 hex (64 lowercase hex chars); computed via `crypto.subtle.digest('SHA-256', new TextEncoder().encode(sub))` in Cloudflare Worker |
+| **Write path** | OIDC callback handler (`apps/api-gateway/src/sso/oidc-callback.ts`) — INSERT only; no UPDATE after session creation |
+| **Revocation path** | BCL Worker (`oidc-backchannel-logout.ts §46.4.1`): `UPDATE enterprise_sessions SET revoked_at = now(), revoked_reason = 'admin_revoked' WHERE tenant_id = $t AND oidc_sub_hash = $hash AND revoked_at IS NULL` |
+
+#### §52.5.2 Index
+
+| Property | Value |
+|---|---|
+| **Index name** | `idx_enterprise_sessions_oidc_sub` |
+| **Type** | B-tree, UNIQUE: NO (one user can have multiple active sessions) |
+| **Columns** | `(tenant_id, oidc_sub_hash)` |
+| **Partial predicate** | `WHERE oidc_sub_hash IS NOT NULL AND revoked_at IS NULL` |
+| **Coverage** | Active OIDC sessions only — excludes SAML sessions and revoked rows. Reduces index size to < 5% of total table rows at typical enterprise fleet ratios (SAML dominant at M8) |
+| **Lock mode** | `CREATE INDEX CONCURRENTLY` — no table lock; safe on live table |
+| **Query pattern** | `WHERE tenant_id = $t AND oidc_sub_hash = $hash AND revoked_at IS NULL` — index covers exact lookup; no full-scan fallback |
+
+#### §52.5.3 OIDC vs SAML Session Comparison
+
+| Dimension | SAML sessions | OIDC sessions (post-M8) |
+|---|---|---|
+| `oidc_sub_hash` | NULL — SAML has no OIDC `sub` | SHA-256 hex of `sub` claim |
+| `idp_session_id` | `NameID`-based (SSO_SCIM §12) | `sid` claim if IdP provides it (Okta ✅, Entra ID ✅ with config, Google ❌) |
+| BCL revocation path | SAML SLO (SSO_SCIM §45) — not BCL | BCL Worker `oidc-backchannel-logout.ts` (SSO_SCIM §46.4.1) |
+| Sub-based revocation | N/A | `oidc_sub_hash` partial index (this section) |
+| Sid-based revocation | N/A | `idp_session_id` column (pre-existing, nullable) |
+
+### §52.6 Row-Level Security
+
+`enterprise_sessions` RLS is defined in SSO_SCIM §12.5. The existing policy `sessions_tenant_isolation` applies to the whole table including `oidc_sub_hash`:
+
+```sql
+CREATE POLICY sessions_tenant_isolation ON enterprise_sessions
+    USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+```
+
+**Column-level access analysis for `oidc_sub_hash`:**
+
+| Role | Access | Notes |
+|---|---|---|
+| `form_api` | SELECT (via tenant-scoped RLS) | Token refresh handler reads session row; `oidc_sub_hash` value is irrelevant to token validation — not used in hot path |
+| `form_system` | ALL | BCL Worker uses `form_system` credentials for the revocation UPDATE; INSERT at login also uses `form_system` path |
+| `form_admin` | SELECT | Unrestricted (internal ops only; `oidc_sub_hash` is a hash — no PII exposure) |
+| `compliance_reviewer` | SELECT | Forensic access for SOC 2 evidence queries |
+| `tenant_owner` / `tenant_admin` | None — `enterprise_sessions` has no tenant-admin SELECT path | HR cannot see individual session rows. Tenant admin session list is served through a separate Admin Dashboard API that projects only `session_id`, `created_at`, `last_used_at`, `device_fingerprint` (display-only hash) — never `oidc_sub_hash` |
+| `tenant_manager` | None | Same as above; enforces the privacy floor: HR never sees individual session data |
+
+**DDL auditor proof queries:**
+
+```sql
+-- 1. Confirm RLS is enabled on enterprise_sessions:
+SELECT relrowsecurity FROM pg_class WHERE relname = 'enterprise_sessions';
+-- Expected: t
+
+-- 2. Confirm tenant_manager has no SELECT policy on enterprise_sessions:
+SELECT policyname FROM pg_policies
+WHERE tablename = 'enterprise_sessions' AND roles @> ARRAY['tenant_manager'];
+-- Expected: 0 rows
+
+-- 3. Confirm form_system can UPDATE oidc_sub_hash (BCL revocation path):
+SELECT has_column_privilege('form_system', 'enterprise_sessions', 'oidc_sub_hash', 'UPDATE');
+-- Expected: t
+```
+
+### §52.7 Privacy Floor
+
+| Data element | Classification | Rationale |
+|---|---|---|
+| `oidc_sub_hash` | FORM-internal operational identifier | SHA-256 hex of OIDC `sub`. The `sub` claim is an opaque provider-assigned identifier — not a name, email, or direct identifier in the GDPR Art. 4(1) sense. However, it is a pseudonym that identifies a specific user within one IdP context; it is therefore treated as pseudonymous personal data at FORM. SHA-256 is one-way (non-reversible without a rainbow table specific to the IdP's sub format). The hash is never surfaced in admin reporting, DSAR exports, or DEC-030 audit payloads — only used internally for BCL revocation. |
+| Raw OIDC `sub` | Never in Postgres | `extractOidcBclAttributes()` computes `SHA-256(sub)` in the Cloudflare Worker before the INSERT. The raw string is discarded in ephemeral Worker memory. No SQL function, trigger, or migration step ever receives the raw `sub`. |
+| `oidc_sub_hash` in BCL event payloads | Present as `sub_hash` (optional field) | `backchannel_logout.validated` and `backchannel_logout.revoked` DEC-030 events include `sub_hash` (nullable — null if only `sid` present). The audit chain records which hash triggered the revocation without reconstructing the identity. Auditor access via `compliance_reviewer` SELECT restricted to FORM internal use; never in the DSAR Art. 20 export path. |
+| HR privacy floor | Enforced at DDL + API layer | `tenant_manager` has no RLS policy on `enterprise_sessions`. The Admin Dashboard session list endpoint projects only display-safe fields. `oidc_sub_hash` never appears in any response accessible to enterprise HR admins — structural, not relying on application-layer filtering alone. |
+| GDPR Art. 17 erasure | `oidc_sub_hash` = NULL on user deletion | The existing `enterprise_sessions` row-deletion cascade (`ON DELETE CASCADE` on `user_id → auth.users`) hard-deletes all session rows when a user is erased. `oidc_sub_hash` is removed with the row. No separate erasure step required. |
+
+### §52.8 SOC 2 Evidence
+
+| SOC 2 Criterion | Control mechanism | Evidence |
+|---|---|---|
+| **CC6.1** — Logical access controls | `oidc_sub_hash` enables single-table BCL revocation; when BCL fires, `revoked_at IS NOT NULL` immediately gates any `form_api` token refresh attempt; `sessions_tenant_isolation` RLS enforces tenant boundary | BCL-E-001 (monthly 30-day export of `backchannel_logout.*` DEC-030 events, CC6.1/CC6.3, 7yr WORM — registered `docs/SOC2_READINESS.md §163`) |
+| **CC6.3** — Access revocation timely | BCL Worker (SSO_SCIM §46.4.1) calls `revokeOidcSessions()` synchronously; `oidc_sub_hash` partial index makes the UPDATE sub-millisecond at enterprise fleet scale; REVOCATION_QUEUE provides at-least-once delivery if DB is transiently unavailable (≤ 3 retries, 5/10/20s backoff) | BCL-E-001 (revocation latency: `backchannel_logout.received` → `backchannel_logout.revoked` timestamp delta; P99 target < 500 ms synchronous path) |
+| **CC6.1 (integration test)** | BCL-I-001 (Okta `sid`-path) and BCL-I-002 (sub-only path) verify that `oidc_sub_hash` lookup revokes the correct session and that `sessions_revoked_count ≥ 1` is emitted | BCL-E-002 (Okta + Entra ID integration test results, CC6.1, 7yr WORM — registered `docs/SOC2_READINESS.md §163`) |
+| **CC8.1** — Change management | Migration 0101 applied via Supabase CLI with CI + compliance-officer sign-off; migration log filed to R2 WORM | BCL-E-003 (Migration 0101 production apply log, CC8.1, 7yr WORM — registered `docs/SOC2_READINESS.md §163`) |
+| **P4.1** — Use limitation | `oidc_sub_hash` is used only for BCL revocation; never in admin reporting, DSAR exports, or any tenant-facing endpoint; `tenant_manager` has no access path | Structural: no `tenant_manager` RLS policy on `enterprise_sessions` (DDL auditor proof query §52.6) |
+
+**SOC 2 auditor narrative — CC6.3:**
+When an OIDC IdP (Okta, Entra ID) terminates a user session via BCL, FORM's `oidc-backchannel-logout.ts` Worker receives the logout token, extracts `SHA-256(sub)`, and executes `UPDATE enterprise_sessions SET revoked_at = now() WHERE tenant_id = ? AND oidc_sub_hash = ? AND revoked_at IS NULL`. The partial index `idx_enterprise_sessions_oidc_sub` makes this UPDATE a point-lookup with no full-table scan. The subsequent `form_api` access token refresh for that session fails immediately (`revoked_at IS NOT NULL` check) even before the JWT TTL expires. `backchannel_logout.revoked` DEC-030 event (STANDARD/7yr) carries `sessions_revoked_count` and `revocation_method: 'sub'`, providing an auditor-verifiable record of each revocation event. BCL-E-001 (monthly 30-day export) allows SOC 2 fieldwork to verify CC6.3 compliance across the observation period.
+
+### §52.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration 0101 to staging; run MIG-0101-01/02/03 (§52.4); file `compliance/evidence/oidc-bcl/migration-0101-validation_<YYYY-MM-DD>.txt` | platform-engineer + devops-lead | **P0** | M8 | [ ] Pending |
+| 2 | Deploy OIDC callback handler update (`§46.3`) to staging: confirm `oidc_sub_hash` is populated on OIDC login; verify SAML login leaves `oidc_sub_hash = NULL` | platform-engineer | **P0** | M8 | [ ] Pending |
+| 3 | Deploy BCL Worker (`oidc-backchannel-logout.ts §46.4`) to staging; run BCL-I-001 (Okta sid-path) and BCL-I-002 (sub-only path) against staging OIDC tenant; confirm `sessions_revoked_count ≥ 1` | security-engineer + platform-engineer | **P0** | M8 | [ ] Pending |
+| 4 | Deploy migration 0101 to production (gated on items 1–3); confirm `CREATE INDEX CONCURRENTLY` completes; run `SELECT COUNT(*) FROM enterprise_sessions WHERE oidc_sub_hash IS NOT NULL` → 0 (no legacy sessions have hash yet) | devops-lead | **P0** | M8 (after items 1–3) | [ ] Pending |
+| 5 | File BCL-E-002 (Okta + Entra ID integration test results) to R2 `compliance/evidence/oidc-bcl/bcl-e-002-integration-test.json`; compliance-officer co-sign | security-engineer + compliance-officer | **P0** | M8 | [ ] Pending |
+| 6 | File BCL-E-003 (migration 0101 production apply log) to R2 `compliance/evidence/oidc-bcl/bcl-e-003-migration-0101-log.json` per `docs/SSO_SCIM_IMPLEMENTATION.md §46.14.3`; compliance-officer co-sign | compliance-officer + platform-engineer | **P0** | M8 | [ ] Pending |
+| 7 | Update `docs/SSO_SCIM_IMPLEMENTATION.md §46.8` items 1 and 9 from `[ ]` → `[x] Done` on production deploy confirmation | compliance-officer | **P1** | M8 | [ ] Pending |
+| 8 | G-003 closure: once items 1–6 complete, update `docs/SSO_SCIM_IMPLEMENTATION.md §9 gap registry` G-003 row from 🟡 Implementation spec complete → 🟢 Implementation complete | compliance-officer + security-engineer | **P1** | M8 | [ ] Pending |
+
+### §52.10 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md §46.9` — DATA_MODEL §52 cross-reference entry added | §52.9 item 7 | 🟢 **Done — 2026-07-04 (SSO_SCIM v2.30, §46.9 row added this pass)** |
+| Migration 0101 staging apply + MIG-0101-01/02/03 | §52.9 item 1 (P0/M8) | 🟡 Pending — M8 |
+| OIDC callback handler staging deploy + hash population verification | §52.9 item 2 (P0/M8) | 🟡 Pending — M8 |
+| BCL Worker staging deploy + BCL-I-001/BCL-I-002 | §52.9 item 3 (P0/M8) | 🟡 Pending — M8 |
+| Migration 0101 production apply | §52.9 item 4 (P0/M8) | 🟡 Pending — M8 (after items 1–3) |
+| BCL-E-002 filing to R2 | §52.9 item 5 (P0/M8) | 🟡 Pending — M8 |
+| BCL-E-003 filing to R2 | §52.9 item 6 (P0/M8) | 🟡 Pending — M8 |
+| G-003 closure | §52.9 item 8 (P1/M8) | 🟡 Pending — M8 |
+
+---
+
+*v1.44 (2026-07-04): §52 `enterprise_sessions.oidc_sub_hash` — OIDC BCL Session Index — Migration 0101. DATA_MODEL canonical registration for the Migration 0101 schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §46.2` (v2.21, 2026-07-04). One nullable column added to `enterprise_sessions`: `oidc_sub_hash TEXT` (SHA-256 hex of OIDC `sub` claim; NULL for SAML sessions and pre-M8 OIDC sessions; no DEFAULT; no CHECK). Companion partial index `idx_enterprise_sessions_oidc_sub ON enterprise_sessions (tenant_id, oidc_sub_hash) WHERE oidc_sub_hash IS NOT NULL AND revoked_at IS NULL` — created CONCURRENTLY (no table lock). §52.1 purpose: single-table sub-based BCL revocation path collapsing the prior two-round-trip `users → enterprise_sessions` UPDATE into one indexed UPDATE; matches `idp_name_id_hash` privacy pattern from SAML SLO (SSO_SCIM §45); raw `sub` never in Postgres. §52.2 dependency chain: modifies `enterprise_sessions` (M3 SSO baseline schema, SSO_SCIM §12.5) independently of the 0083→0092 enterprise_contracts/tenants chain; no outside-counsel gate. §52.3 full DDL + rollback (CONCURRENTLY for both CREATE INDEX and DROP INDEX). §52.4 three CI adversarial tests MIG-0101-01/02/03 (< 30 s on 10 k rows, concurrent INSERT no deadlock, rollback restores schema — evidence path `compliance/evidence/oidc-bcl/migration-0101-validation_<YYYY-MM-DD>.txt`). §52.5 column + index semantics (nullable design rationale, SHA-256 encoding, write-at-INSERT-only invariant, revocation UPDATE pattern, OIDC vs SAML session comparison table). §52.6 RLS (inherits `sessions_tenant_isolation` policy; `form_system` write path for BCL UPDATE; `tenant_manager` no access path — privacy floor at DDL level; three auditor proof queries). §52.7 privacy floor (oidc_sub_hash as pseudonymous operational identifier; raw sub discarded in Worker memory; hash never in DSAR/admin reporting/DEC-030 payloads; GDPR Art. 17 coverage via existing CASCADE on user deletion). §52.8 SOC 2 evidence (CC6.1 — single-table revocation + RLS gate; CC6.3 — sub-millisecond indexed UPDATE + REVOCATION_QUEUE at-least-once; CC6.1 integration — BCL-I-001/BCL-I-002; CC8.1 — BCL-E-003 migration log; P4.1 — structural tenant_manager exclusion; CC6.3 auditor narrative). §52.9 eight-item implementation checklist (6× P0/M8 staging + production deploy + integration tests + evidence filing; 2× P1/M8 cross-reference updates + G-003 closure). §52.10 cross-reference obligations (SSO_SCIM §46.9 DATA_MODEL cross-reference 🟢 Done this pass; 7× pending M8). TOC §52 entry added. Document header v1.43 → v1.44. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §46` (canonical BCL implementation spec — Migration 0101 DDL, BCL Worker, BCL-CHAIN-01, BCL-E-001/002/003, G-003 gap); `docs/SSO_SCIM_IMPLEMENTATION.md §12.5` (`enterprise_sessions` baseline schema — 13-column table pre-0101); `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (v2.89, 2026-07-04 — four `backchannel_logout.*` events + BCL-CHAIN-01 + Zod v2 schemas); `docs/SOC2_READINESS.md §163` (BCL-E-001/002/003 registered CC6.1/CC6.3/CC8.1 — count 132 → 135); `docs/INCIDENT_RESPONSE.md R-73` (BCL REVOCATION_QUEUE Exhausted) + `R-74` (BCL-CHAIN-01 Integrity Violation, P0); `docs/OBSERVABILITY.md §70` (BCL observability — RED metrics, SLOs SLO-BCL-01/02, alert rules AL-BCL-01/02/03/04, BCL-OBS-E-001 quarterly evidence); `docs/DATA_MODEL.md §12.5` cross-reference note: `enterprise_sessions` baseline DDL canonical source remains SSO_SCIM §12.5; §52 documents the additive Migration 0101 extension only. Owner: enterprise-architect + security-engineer + compliance-officer.*
