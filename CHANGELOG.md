@@ -9,6 +9,16 @@
 ### Changed
 - `docs/OBSERVABILITY.md` v5.18.0 → v5.18.1 — §72.9 items 9 and 10 marked Done; §72.11 R-75 and R-76 obligations marked 🟢 Done; three obligations remain pending M7.
 - `VERSION` — 12.55.0 → 12.56.0.
+---
+
+## [12.57.0] — 2026-07-04
+
+### Added
+- `content/post-3169-systemic-vs-local-problem-diagnosis.md` — Block 3166–3175 series «Тренувальна автономія» post 4/10. «Як self-coached атлет відрізняє системну проблему від локального збою»: одна сесія — шум, 3-4+ тижні — сигнал; трьохкрокова діагностика (кількість точок, наявність зовнішнього пояснення, масштаб відхилення); порядок перевірки (сон → загальне навантаження → обсяг → техніка → програма); часові орієнтири для intermediate атлета; асиметрія помилок (більшість overreact); роль журналу. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3169 card added at top of feed.
+
+### Changed
+- `README.md` — posts 3168 and 3169 marked as draft with version references.
 
 ---
 
