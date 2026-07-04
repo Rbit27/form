@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 in progress 3/10 · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.35.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 in progress 4/10 · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.36.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3515,7 +3515,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3114 | Мотивація і дисципліна як неправильна рамка: що реально підтримує практику довгостроково | **draft · post-3114-athlete-after-40-recovery-myths.md** |
 | 3115 | Синтез 3106–3115: адаптивна стійкість self-coached атлета | **draft · v12.26.0 → post-3115-adaptive-resilience-self-coached-system-synthesis.md · SERIES COMPLETE · clinical-safety NOT_REQUIRED** |
 
-### Editorial series: 3116–3125 — Самодіагностика без тренера: як атлет читає власний прогрес (in progress 1/10 · v12.32.0)
+### Editorial series: 3116–3125 — Самодіагностика без тренера: як атлет читає власний прогрес (in progress 4/10 · v12.36.0)
 
 
 
@@ -3524,9 +3524,9 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | № | Тема | Статус |
 |---|------|--------|
 | 3116 | Що таке «прогрес» для intermediate атлета — і чому він більше не виглядає як лінійне зростання ваги | **draft · v12.32.0 → post-3116-progress-intermediate-athlete-nonlinear.md · clinical-safety NOT_REQUIRED** |
-| 3117 | Три рівні самооцінки: відчуття сесії, тренда блоку, мезоциклу | proposed |
-| 3118 | Коли журнал тренувань стає дзеркалом, а не просто записником | proposed |
-| 3119 | Розрізнення плато: реальна адаптаційна стеля, накопичена втома, помилка вимірювання | proposed |
+| 3117 | Три рівні самооцінки: відчуття сесії, тренда блоку, мезоциклу | **draft · v12.33.0 → post-3117-three-levels-self-assessment.md · clinical-safety NOT_REQUIRED** |
+| 3118 | Де і як фіксувати три рівні: мінімальний журнал для self-coached атлета | **draft · v12.35.0 → post-3118-minimal-journal-three-levels.md · clinical-safety NOT_REQUIRED** |
+| 3119 | Розрізнення плато: реальна адаптаційна стеля, накопичена втома, помилка вимірювання | **draft · v12.36.0 → post-3119-plateau-diagnosis-three-causes.md · clinical-safety NOT_REQUIRED** |
 | 3120 | Технічна деградація як прихований прогрес-стоппер: як читати рух, а не лише цифри | proposed |
 | 3121 | Суб'єктивні маркери відновлення: які сигнали надійні, які — ні | proposed |
 | 3122 | Зовнішній погляд без тренера: відео, партнер, дані — що замінює, що не замінює | proposed |
@@ -3584,6 +3584,23 @@ AI-тренери, відеоаналіз, носимі пристрої, зас
 | 3153 | Онлайн-програми і шаблони: як оцінити якість без тренера-ментора | proposed |
 | 3154 | Спільноти і форуми як інструмент: сигнал vs. шум | proposed |
 | 3155 | Синтез 3146–3155: мінімальний ефективний технологічний стек для self-coached атлета | proposed |
+
+### Editorial series: 3156–3165 — Тренувальне мислення: як self-coached атлет приймає рішення без тренера (proposed · v12.36.0)
+
+Серія про когнітивну сторону self-coached тренування: не «що робити», а «як думати про те, що робити». Помилки рішень, евристики, якоріння, надмірна впевненість, ефект підтвердження у виборі програми. Тон: editorial-brutalist. 13-min read.
+
+| № | Тема | Статус |
+|---|------|--------|
+| 3156 | Якоріння в тренуванні: чому перша програма визначає всі наступні рішення | proposed |
+| 3157 | Ефект підтвердження у виборі тренувальної інформації: що self-coached атлет не читає | proposed |
+| 3158 | Надмірна впевненість у RPE: коли суб'єктивна шкала починає брехати систематично | proposed |
+| 3159 | Помилка планування в тренуванні: чому блоки завжди виходять довшими і важчими за задум | proposed |
+| 3160 | Як читати наукові рекомендації і не застосовувати їх неправильно — контекст, ефект-розмір, популяція | proposed |
+| 3161 | Sunk cost у тренуванні: чому атлети продовжують програму, яка не працює | proposed |
+| 3162 | Адаптація рішень при зміні контексту: коли стара логіка більше не підходить | proposed |
+| 3163 | Як self-coached атлет оцінює якість поради — навіть без тренера | proposed |
+| 3164 | Проста евристика vs. складна модель: де кожна виграє у тренувальних рішеннях | proposed |
+| 3165 | Синтез 3156–3165: десять когнітивних пасток і як їх обходити без зовнішнього спостерігача | proposed |
 
 ---
 

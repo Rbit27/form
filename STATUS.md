@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v12.36.0** — 2026-07-04 · content · post-3119 · «Розрізнення плато: реальна адаптаційна стеля, накопичена втома, помилка вимірювання» (series «Самодіагностика без тренера» 3116–3125, 4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3119 · README: «Самодіагностика без тренера» 3/10 → 4/10; series «Тренувальне мислення» 3156–3165 proposed (10 нових тем) · content-engine: posts 11–15 ✓ all exist → post-3119 written + roadmap extended (series 3156–3165) · next: post-3120 (series «Самодіагностика без тренера» 5/10 — «Технічна деградація як прихований прогрес-стоппер: як читати рух, а не лише цифри») + SSO_SCIM §46.8 item 3 (P0/M8 — implement `oidc-backchannel-logout.ts` Worker)
+
 **v12.35.0** — 2026-07-04 · content + enterprise · post-3118 · «Де і як фіксувати три рівні: мінімальний журнал для self-coached атлета» (series «Самодіагностика без тренера» 3116–3125, 3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3118 · SSO_SCIM_IMPLEMENTATION v2.23: §46.3.4 CB-U-001..CB-U-008 closure-gate (item 2); §46.10 Route + Cloudflare rate-limit full spec + RT-U-001..RT-U-006 (item 4); §46.4.4 RQ-U-001..RQ-U-009 closure-gate (item 5) · §46.8 items 2/4/5 status notes updated · «Самодіагностика без тренера» 2/10 → 3/10 · next: post-3119 (series «Самодіагностика без тренера» 4/10 — «Як відрізнити справжній прогрес від шуму: статистичне мислення для self-coached атлета») + SSO_SCIM §46.8 item 3 (P0/M8 — implement `oidc-backchannel-logout.ts` Worker)
 
 **v12.34.0** — 2026-07-04 · enterprise: OBSERVABILITY §70 BCL Observability · v12.34.0
