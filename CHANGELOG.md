@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [12.37.0] — 2026-07-04
+
+### Added
+- `content/post-3120-technical-degradation-hidden-progress-stopper.md` — Series «Самодіагностика без тренера» 3116–3125, post 5/10. «Технічна деградація як прихований прогрес-стоппер: як читати рух, а не лише цифри». Три механізми технічної деградації: (1) вимушена компенсація — цільова структура не справляється, нервова система перерозподіляє навантаження на допоміжні групи (квадрицепс → розгиначі спини); (2) накопичена втома в специфічних структурах — нейром'язова готовність 95% / сполучна тканина 70%, автоматична зміна патерну без болю; (3) закріплення помилкового патерну — автоматизація компенсаторної механіки після 50+ повторень. П'ять сигналів без відео: асиметрична втома після підходу, зміна точки «зависання», RPE-до-техніки дисонанс, зникнення відчуття м'яза, раптова легкість після мікрокорекції (van der Berg et al. 2012 — атлети недооцінюють кінематичні відхилення без зовнішнього відео). Порівняльний відео-протокол: раз на 2–3 тижні, фіксований ракурс, порівняння з початком блоку. Технічна де-лоад-тиждень: 50–65% ваги (не стандартний деловантаження — відновлює від компенсаторного патерну, не від втоми). clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3120 card prepended at top of feed.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §46.4.5` — Worker Request Handler Unit Test Matrix (Item 3 Closure Gate). 12 test cases BH-U-001..BH-U-012 covering all code paths of `handleOidcBackchannelLogout()`: nominal Okta/Google/no-match paths; adversarial cases (missing token, malformed JWT, unknown iss, BCL disabled, bad signature, nonce present, missing events claim, missing sub/sid); transient DB error → queue dispatch path. Privacy floor assertion: raw `sub` must not appear in any audit event payload. Evidence artefact: `compliance/evidence/oidc-bcl/bcl-e-bh-001-unit-test.json`. §46.8 item 3 status: closure gate reference added.
+
+### Changed
+- `README.md` — серія «Самодіагностика без тренера» 4/10 → 5/10; post-3120 status updated proposed → draft; series header v12.36.0 → v12.37.0.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §46.8 item 3` — status note updated to reference §46.4.5 closure gate (BH-U-001..BH-U-012).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — header v2.24 → v2.25.
+- `VERSION` — 12.36.1 → 12.37.0.
+
+---
+
 ## [12.36.1] — 2026-07-04
 
 ### Changed

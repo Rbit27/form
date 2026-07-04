@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.24
+# FORM · SSO/SCIM Implementation v2.25
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -15985,6 +15985,31 @@ These tests must pass before item 5 of §46.8 can be marked `[x] Done`. They exe
 
 ---
 
+#### §46.4.5 Worker Request Handler Unit Test Matrix (Item 3 Closure Gate)
+
+These tests must pass before item 3 of §46.8 can be marked `[x] Done`. They exercise `handleOidcBackchannelLogout()` defined in §46.4.1. Evidence artefact: `compliance/evidence/oidc-bcl/bcl-e-bh-001-unit-test.json` (CI run output).
+
+| Test ID | Scenario | Input | Expected outcome |
+|---|---|---|---|
+| BH-U-001 | Nominal — Okta, `sid` present, single session revoked | Valid signed logout_token; `sub`, `sid`, correct `iss`, `events` claim, no `nonce`; tenant has BCL enabled; DB revokes 1 session | `backchannel_logout.received` emitted (tenant_id null); `backchannel_logout.validated` emitted (sub_hash set, sid set, revocation_method `'sid'`); `backchannel_logout.revoked` emitted (count 1, async false); HTTP 200 |
+| BH-U-002 | Nominal — Google Workspace, `sid` absent, sub-path revocation | Valid logout_token; `sub` only (no `sid`); BCL enabled; DB revokes 2 sessions | `backchannel_logout.validated` emitted with `revocation_method: 'sub'`, `sid: null`; `backchannel_logout.revoked` emitted with count 2; HTTP 200 |
+| BH-U-003 | Nominal — no sessions match (`revokedCount = 0`) | Valid logout_token; tenant has BCL enabled; no sessions matching sub_hash or sid in DB | `backchannel_logout.revoked` emitted with `sessions_revoked_count: 0`; HTTP 200 (per §13.10 Q3 — zero-revocation is valid) |
+| BH-U-004 | Adversarial — missing `logout_token` field | POST body with no `logout_token` key | HTTP 400 `missing logout_token`; no audit events emitted |
+| BH-U-005 | Adversarial — malformed JWT (not parseable) | `logout_token` value is `"not.a.jwt"` | HTTP 400 `malformed JWT`; `backchannel_logout.received` NOT emitted (parse fails before iss extraction) |
+| BH-U-006 | Adversarial — unknown `iss` (no matching tenant) | Valid JWT structure; `iss` not present in `tenant_sso_configs` | `backchannel_logout.received` emitted (tenant_id null, iss logged); HTTP 400 `unknown issuer`; no additional events |
+| BH-U-007 | Adversarial — BCL disabled for tenant | Valid JWT; `iss` resolves to tenant; `backchannel_logout_enabled = false` | HTTP 501 `backchannel logout not enabled for this tenant`; no audit events beyond received |
+| BH-U-008 | Adversarial — JWT signature invalid (tampered) | Logout_token with modified payload; real `iss` resolves to tenant; JWKS verification fails | `backchannel_logout.failed` emitted with `reason: 'jwt_verification_failed'`; HTTP 400; `backchannel_logout.received` already persisted (emitted before verify step) |
+| BH-U-009 | Adversarial — `nonce` claim present in logout_token | Valid signed token containing `nonce: "abc"` in payload | `backchannel_logout.failed` emitted with `reason: 'nonce_present'`; HTTP 400 `logout_token must not contain nonce` |
+| BH-U-010 | Adversarial — `events` claim absent | Valid signed token; payload has no `events` key | `backchannel_logout.failed` emitted with `reason: 'missing_events_claim'`; HTTP 400 |
+| BH-U-011 | Adversarial — neither `sub` nor `sid` present | Valid signed token; payload has neither `sub` nor `sid` | `backchannel_logout.failed` emitted with `reason: 'neither_sub_nor_sid'`; HTTP 400 |
+| BH-U-012 | Transient DB error during `revokeOidcSessions()` | All validation passes; DB throws connection error at UPDATE step | `REVOCATION_QUEUE.send()` called with `{type:'oidc_bcl_retry', attempt:1}`; `backchannel_logout.failed` emitted with `reason: 'db_error_deferred_to_queue'`; HTTP 200 (at-least-once delivery — no 503 to avoid IdP retry storm) |
+
+**Closure requirement for item 3:** BH-U-001 through BH-U-012 all pass in CI. `compliance/evidence/oidc-bcl/bcl-e-bh-001-unit-test.json` artefact filed to R2. `§46.8 item 3` updated `[ ] → [x] Done`.
+
+**Privacy floor:** BH-U-005 and BH-U-008 must verify that no raw `sub` value appears in any audit event payload — only `sub_hash` (SHA-256 hex). Test runner must assert `event.data.sub === undefined` on all emitted events.
+
+---
+
 ### §46.5 DEC-030 Audit Event Registration
 
 Four events must be registered in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`. These extend the three events defined in §13.7 with a `backchannel_logout.failed` event and full Zod v2 schemas.
@@ -16101,7 +16126,7 @@ BCL-I-001, BCL-I-003 results are packaged as evidence artefact BCL-E-002.
 |---|---|---|---|---|---|
 | 1 | Apply Migration 0101 to staging; run CI adversarial tests MIG-0101-01 through MIG-0101-03 | devops-lead | **P0** | M8 | [ ] |
 | 2 | Update OIDC callback handler (`oidc-callback.ts`) to extract and store `idp_session_id` (from `sid`) and `oidc_sub_hash` (from `sub`) per §46.3 | platform-engineer | **P0** | M8 | [ ] **Closure gate: §46.3.4 CB-U-001..CB-U-008 (2026-07-04)** |
-| 3 | Implement `oidc-backchannel-logout.ts` Worker per §46.4.1 — full handler including `revokeOidcSessions()` and retry queue dispatch | platform-engineer | **P0** | M8 | [ ] |
+| 3 | Implement `oidc-backchannel-logout.ts` Worker per §46.4.1 — full handler including `revokeOidcSessions()` and retry queue dispatch | platform-engineer | **P0** | M8 | [ ] **Closure gate: §46.4.5 BH-U-001..BH-U-012 (2026-07-04)** |
 | 4 | Register route `POST /auth/oidc/backchannel-logout` in API gateway router; add Cloudflare rate-limit rules | platform-engineer | **P0** | M8 | [ ] **Full spec: §46.10; closure gate: §46.10.3 RT-U-001..RT-U-006 (2026-07-04)** |
 | 5 | Implement `REVOCATION_QUEUE` Cloudflare Queue consumer per §46.4.3 | platform-engineer | **P0** | M8 | [ ] **Closure gate: §46.4.4 RQ-U-001..RQ-U-009 (2026-07-04)** |
 | 6 | Register four DEC-030 audit events (`backchannel_logout.received`, `.validated`, `.revoked`, `.failed`) with Zod v2 schemas in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` | compliance-officer | **P0** | M8 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.89, §BCL-Events, 2026-07-04.** |
