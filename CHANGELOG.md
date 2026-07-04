@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.70.0] — 2026-07-04
+
+### Added
+- `content/post-3128-minimum-weekly-training-unit.md` — series «Тренувальний менеджмент часу» 3126–3135 (3/10). «Мінімальна тижнева одиниця: скільки тренувань зберігають адаптації». Підтримка vs. набір як асиметричні процеси; Bickel et al. 2011 (1/3 обсягу зберігає силу 32 тижні), Graves et al. 1988/1992 (1 сесія/тиждень = збереження при збереженій інтенсивності; інтенсивність > частота), Ralston et al. 2017 + Colquhoun et al. 2018 (обсяг — провідний фактор). Практичний мінімум: 1–2 сесії/тиждень з ≥80% 1RM. Часовий горизонт підтримки без суттєвої регресії. clinical-safety: NOT_REQUIRED · sports-scientist review pending.
+- `blog.html` — post-3128 card prepended at top of feed.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §32.8 stale-status closure (v2.31): items 2, 5, 9 patched `[ ]` → `[x] Done`. Item 2: `AUDIT_LOG_SCHEMA.md §SSO` `sso.ip_blocked` `auth_path` field — done v2.14 (2026-06-16). Item 5: `scim.ip_enforcement_misconfigured` AUDIT_LOG_SCHEMA registration — done v2.14. Item 9: §23.9 + §25.13 OQ row updates to 🟢 Resolved — done v2.4 initial pass. Header v2.30 → v2.31.
+- `STATUS.md` — current version updated to v12.70.0.
+- `VERSION` — 12.69.1 → 12.70.0.
+
+---
+
 ## [12.69.1] — 2026-07-04
 
 ### Changed
