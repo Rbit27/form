@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.75.0] — 2026-07-04
+
+### Added
+- `content/post-11-deload-weeks-strategic-undertraining.md` — Editorial post 11. «Деловантажний тиждень: чому це стратегія, а не слабкість». Модель втоми і фітнесу (Banister 1975); Meeusen et al. (2013) ECSS overtraining consensus; Fry & Kraemer (1997) overreaching markers; Zatsiorsky & Kraemer (2006) periodization; Kraemer & Ratamess (2004) intensity preservation; ритміка планового vs. авторегульованого деловантаження; структура деловантажного тижня: -40–60% обсяг, збереження інтенсивності; нейром'язова vs. периферична втома. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card для post-11 prepended.
+
+### Changed
+- `STATUS.md` — v12.75.0; post-11 added to content engine table.
+- `VERSION` — 12.74.0 → 12.75.0.
+
+---
+
 ## [12.74.0] — 2026-07-04
 
 ### Added
