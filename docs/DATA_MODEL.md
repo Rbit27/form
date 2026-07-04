@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.43
+# FORM · Multi-Tenant Data Model v1.45
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -60,6 +60,7 @@
 50. [`tenants` OTA Change Window Columns — Migration 0091](#50-tenants-ota-change-window-columns--migration-0091)
 51. [`tenants.reporting_k_floor` — Per-Tenant k-Anonymity Floor Override — Migration 0092](#51-tenantsreporting_k_floor--per-tenant-k-anonymity-floor-override--migration-0092)
 52. [`enterprise_sessions.oidc_sub_hash` — OIDC BCL Session Index — Migration 0101](#52-enterprise_sessionsoidc_sub_hash--oidc-bcl-session-index--migration-0101)
+53. [SAML SLO + OIDC BCL Schema Columns — Migration 0100](#53-saml-slo--oidc-bcl-schema-columns--migration-0100)
 
 ---
 
@@ -19062,5 +19063,352 @@ When an OIDC IdP (Okta, Entra ID) terminates a user session via BCL, FORM's `oid
 | G-003 closure | §52.9 item 8 (P1/M8) | 🟡 Pending — M8 |
 
 ---
+
+---
+
+## 53. SAML SLO + OIDC BCL Schema Columns — Migration 0100
+
+> **Cross-reference**: Canonical SLO implementation spec lives in `docs/SSO_SCIM_IMPLEMENTATION.md §45` (v2.20, 2026-07-04). This section is the DATA_MODEL canonical registration for the five columns Migration 0100 adds across `tenant_sso_configs` and `enterprise_sessions`. Read §45 first for the full Worker spec, AuthnRequest/LogoutRequest flows, and SAML SLO certificate chain. §52 covers the companion Migration 0101 OIDC BCL extension.
+
+---
+
+### 53.1 Purpose
+
+Migration 0100 enables federated session termination at the Postgres schema layer. Without it, FORM's SAML SLO Worker (`saml-slo.ts`, Cloudflare Workers) can receive a valid SAML `<LogoutRequest>`, validate the signature, parse the `NameID` and `SessionIndex` — and then have nowhere to persist the lookup keys needed to revoke the correct `enterprise_sessions` rows.
+
+The five columns land in two tables:
+
+| Table | Column | Role |
+|---|---|---|
+| `tenant_sso_configs` | `slo_url` | IdP SLO endpoint URL — where FORM sends `<LogoutRequest>` |
+| `tenant_sso_configs` | `slo_binding` | HTTP-POST or HTTP-Redirect |
+| `tenant_sso_configs` | `backchannel_logout_enabled` | Gate for OIDC BCL endpoint (§13.3) |
+| `enterprise_sessions` | `idp_name_id` | SAML NameID for SLO session-matching |
+| `enterprise_sessions` | `idp_session_id` | SAML SessionIndex / OIDC `sid` claim |
+
+Together they close the lifecycle loop: provisioning (Migration 0083→0092 chain) → SSO sign-on (SSO_SCIM §12.5 baseline) → **federated logout** (Migration 0100 this section) → BCL sub-hash (Migration 0101, §52).
+
+The `slo_url` + `slo_binding` pairing is read at SLO Worker startup to build the IdP-bound `<LogoutRequest>` endpoint. `idp_name_id` and `idp_session_id` are written at AuthnResponse assertion parse time and consumed at SLO-received time to identify the exact session row(s) to revoke. The `backchannel_logout_enabled` flag guards the OIDC BCL endpoint — `false` returns HTTP 501, preventing unauthenticated invocation on tenants that have not opted in.
+
+---
+
+### 53.2 Migration Dependency Chain
+
+```
+Migration 0083  enterprise_contracts JSONB schema           (§44)
+Migration 0089  enterprise_contracts.graduated_from_pilot_id (§48)
+Migration 0090  tenants.data_region                         (§49)
+Migration 0091  tenants OTA change window columns            (§50)
+Migration 0092  tenants.reporting_k_floor                   (§51)
+Migration 0099  tenant_sso_configs SAML cert rotation       (SSO_SCIM §44)
+Migration 0100  SAML SLO + OIDC BCL schema columns          (§53 ← this section)
+Migration 0101  enterprise_sessions.oidc_sub_hash            (§52)
+```
+
+Migration 0100 depends on:
+- `tenant_sso_configs` existing (SSO_SCIM §12.4 baseline, created before Migration 0083).
+- `enterprise_sessions` existing (SSO_SCIM §12.5 baseline, 13-column table).
+- No outside-counsel gate — all five columns are additive `ADD COLUMN IF NOT EXISTS` with no FK constraints to new tables.
+
+Migration 0101 (§52) must run **after** 0100 because `oidc_sub_hash` references the BCL behaviour gated by `backchannel_logout_enabled` added here.
+
+---
+
+### 53.3 Full DDL + Rollback
+
+**Migration 0100** (`supabase/migrations/0100_saml_slo_schema.sql`):
+
+```sql
+-- Migration 0100: SAML SLO + OIDC BCL schema dependencies
+-- Spec: docs/SSO_SCIM_IMPLEMENTATION.md §45 (v2.20, 2026-07-04)
+-- Owner: enterprise-architect + security-engineer
+-- Evidence: SLO-E-004 (docs/SOC2_READINESS.md §162)
+BEGIN;
+
+-- ── tenant_sso_configs: SLO endpoint ──────────────────────────────────────
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS slo_url TEXT;
+COMMENT ON COLUMN tenant_sso_configs.slo_url IS
+  'IdP SLO endpoint URL. NULL = SLO not configured; FORM falls back to '
+  'local-only logout (SSO_SCIM §13.2.4). Populated by tenant admin during '
+  'SSO wizard step 4. Updated on IdP metadata refresh (SSO_SCIM §44.3).';
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS slo_binding TEXT
+  CHECK (slo_binding IN (''HTTP-POST'', ''HTTP-Redirect''));
+COMMENT ON COLUMN tenant_sso_configs.slo_binding IS
+  'SAML SLO binding. HTTP-POST preferred (SSO_SCIM §13.2.1). '
+  'NULL treated as HTTP-Redirect for legacy IdPs. '
+  'CHECK constraint rejects any other value at DB layer.';
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS backchannel_logout_enabled BOOLEAN NOT NULL DEFAULT false;
+COMMENT ON COLUMN tenant_sso_configs.backchannel_logout_enabled IS
+  'Enable OIDC back-channel logout endpoint (SSO_SCIM §13.3). '
+  'false = BCL endpoint returns HTTP 501. '
+  'Cannot be true unless tenant is on OIDC (validated in application layer).';
+
+-- ── enterprise_sessions: SLO/BCL lookup keys ─────────────────────────────
+ALTER TABLE enterprise_sessions
+  ADD COLUMN IF NOT EXISTS idp_name_id TEXT;
+COMMENT ON COLUMN enterprise_sessions.idp_name_id IS
+  'SAML NameID value from the AuthnResponse assertion '
+  '(e.g. email or persistent format). Used by SAML SLO Worker to identify '
+  'the session row(s) to revoke on <LogoutRequest> receipt. '
+  'NULL for OIDC sessions and pre-M7 SAML sessions. '
+  'Raw value stored — correlation hash idp_name_id_hash computed in '
+  'Worker memory only; never persisted (privacy floor, §53.7).';
+
+CREATE INDEX IF NOT EXISTS idx_sessions_idp_name_id
+  ON enterprise_sessions (tenant_id, idp_name_id)
+  WHERE idp_name_id IS NOT NULL AND revoked_at IS NULL;
+COMMENT ON INDEX idx_sessions_idp_name_id IS
+  'Partial index for SLO NameID lookup (SSO_SCIM §45.5). '
+  'WHERE clause limits scope to active SAML sessions with a NameID set. '
+  'Expected cardinality: O(10) active sessions per tenant per NameID.';
+
+ALTER TABLE enterprise_sessions
+  ADD COLUMN IF NOT EXISTS idp_session_id TEXT;
+COMMENT ON COLUMN enterprise_sessions.idp_session_id IS
+  'SAML SessionIndex from AuthnResponse, or OIDC sid claim from ID token. '
+  'Used by SAML SLO Worker for targeted single-session revocation when '
+  'SessionIndex is present in the <LogoutRequest>. '
+  'Used by OIDC BCL Worker (SSO_SCIM §46) to match the sid claim in the '
+  'logout token. NULL for sessions predating M7/M8 and for IdPs that do '
+  'not emit SessionIndex. OIDC sid is opaque per spec — not PII (§53.7).';
+
+CREATE INDEX IF NOT EXISTS idx_sessions_idp_session_id
+  ON enterprise_sessions (tenant_id, idp_session_id)
+  WHERE idp_session_id IS NOT NULL AND revoked_at IS NULL;
+COMMENT ON INDEX idx_sessions_idp_session_id IS
+  'Partial index for SLO SessionIndex / BCL sid lookup (SSO_SCIM §45.5, §46.3). '
+  'Supports single-session targeted revocation in O(1) indexed UPDATE. '
+  'WHERE clause excludes NULL and already-revoked rows.';
+
+COMMIT;
+```
+
+**Rollback** (`supabase/migrations/rollback/0100_saml_slo_schema_rollback.sql`):
+
+```sql
+BEGIN;
+DROP INDEX IF EXISTS idx_sessions_idp_session_id;
+DROP INDEX IF EXISTS idx_sessions_idp_name_id;
+ALTER TABLE enterprise_sessions DROP COLUMN IF EXISTS idp_session_id;
+ALTER TABLE enterprise_sessions DROP COLUMN IF EXISTS idp_name_id;
+ALTER TABLE tenant_sso_configs  DROP COLUMN IF EXISTS backchannel_logout_enabled;
+ALTER TABLE tenant_sso_configs  DROP COLUMN IF EXISTS slo_binding;
+ALTER TABLE tenant_sso_configs  DROP COLUMN IF EXISTS slo_url;
+COMMIT;
+```
+
+> **Lock note**: `ADD COLUMN IF NOT EXISTS` without a volatile DEFAULT acquires an `ACCESS EXCLUSIVE` lock briefly. On a live production table with O(10 k) `enterprise_sessions` rows this is sub-second. `CREATE INDEX IF NOT EXISTS` (non-CONCURRENT) is acceptable for a partial index on a bounded active set; CONCURRENT is not needed here because this migration runs during the M7 maintenance window. The `idx_sessions_idp_name_id` and `idx_sessions_idp_session_id` indices exclude `revoked_at IS NOT NULL` rows — keeping index size constant as historical sessions accumulate.
+
+---
+
+### 53.4 CI Adversarial Tests
+
+The following five tests gate every PR that touches Migration 0100 or the SLO Worker. Evidence path: `compliance/evidence/saml-slo/migration-0100-validation_<YYYY-MM-DD>.txt`.
+
+| ID | Test | Pass Criterion |
+|---|---|---|
+| **MIG-0100-01** | Migration applies cleanly on a clean DB | `supabase db reset && supabase migration up` exits 0; all five columns present; both indices exist |
+| **MIG-0100-02** | Rollback restores prior schema exactly | Rollback SQL exits 0; `\d tenant_sso_configs` and `\d enterprise_sessions` show no SLO/BCL columns; both indices absent |
+| **MIG-0100-03** | `form_api` cannot SELECT `idp_name_id` or `idp_session_id` | `SET ROLE form_api; SELECT idp_name_id FROM enterprise_sessions LIMIT 1;` → `ERROR: permission denied` |
+| **MIG-0100-04** | `form_system` can write `idp_name_id` and `idp_session_id` | `SET ROLE form_system; UPDATE enterprise_sessions SET idp_name_id = 'test@example.com', idp_session_id = 'sid-abc' WHERE id = <fixture_id>;` → 1 row updated |
+| **MIG-0100-05** | Partial index `idx_sessions_idp_name_id` used by SLO lookup | `EXPLAIN (ANALYZE, FORMAT JSON) SELECT id FROM enterprise_sessions WHERE tenant_id = $1 AND idp_name_id = $2 AND revoked_at IS NULL;` → `Index Scan using idx_sessions_idp_name_id` present in plan |
+
+MIG-0100-03 is the **NOBYPASSRLS parity check** for the new columns: it verifies that the RLS policy does not inadvertently expose `idp_name_id` or `idp_session_id` through the `form_api` path that serves employer-facing dashboards (privacy floor invariant, §53.7).
+
+---
+
+### 53.5 Column and Index Semantics
+
+#### `tenant_sso_configs.slo_url`
+
+- **Type**: `TEXT`, nullable.
+- **NULL semantics**: IdP has not configured SLO. The SLO Worker checks `slo_url IS NOT NULL` before dispatching a `<LogoutRequest>`. When NULL the Worker emits `slo.local_only_logout` event and revokes the local session without contacting the IdP (SSO_SCIM §13.2.4).
+- **Write path**: Tenant admin via the SSO wizard (step 4 — "Configure logout"). Also updated on IdP metadata re-import (SSO_SCIM §44.3 — SAML metadata refresh Worker).
+- **Validation**: URL format validated in application layer before write; DB column intentionally permissive (TEXT, no regex CHECK) to accommodate non-standard IdP URL patterns.
+
+#### `tenant_sso_configs.slo_binding`
+
+- **Type**: `TEXT`, nullable. CHECK constraint: `slo_binding IN ('HTTP-POST', 'HTTP-Redirect')`.
+- **NULL semantics**: Treated as `HTTP-Redirect` in the SLO Worker for legacy IdP compatibility. NULL is not an error condition.
+- **Preference**: HTTP-POST is preferred (body not visible in server logs); HTTP-Redirect acceptable for IdPs that do not support POST binding. Tenant admin selects during SSO wizard.
+- **CHECK enforcement**: Any value other than the two allowed strings triggers a Postgres error at `INSERT`/`UPDATE` — the application layer cannot silently persist an unsupported binding.
+
+#### `tenant_sso_configs.backchannel_logout_enabled`
+
+- **Type**: `BOOLEAN NOT NULL DEFAULT false`.
+- **NOT NULL + DEFAULT false**: Ensures no ambiguous NULL state. All existing rows receive `false` on migration apply — correct default (opt-in model).
+- **Gate role**: OIDC BCL endpoint (`oidc-backchannel-logout.ts` Worker) reads this flag at request time. `false` → HTTP 501 Not Implemented (tells the IdP this tenant has not enabled BCL). `true` → proceeds to logout token validation.
+- **Invariant**: This flag must only be `true` on tenants using OIDC provider type. The application layer enforces this at configuration time; no DB-level FK constraint to provider type (to avoid coupling migration 0100 to the sso_provider enum).
+
+#### `enterprise_sessions.idp_name_id`
+
+- **Type**: `TEXT`, nullable.
+- **NULL semantics**: Session predates M7 deploy, or session is OIDC (not SAML).
+- **Write path**: Written by the SAML SSO Worker at `AuthnResponse` assertion parse time. Never updated after initial write (immutable within a session lifetime).
+- **Read path**: Read by the SAML SLO Worker when processing an incoming `<LogoutRequest>`. The Worker extracts the `NameID` from the request and issues: `UPDATE enterprise_sessions SET revoked_at = now(), revoked_reason = 'saml_slo' WHERE tenant_id = $1 AND idp_name_id = $2 AND revoked_at IS NULL`.
+- **Privacy note**: Raw NameID is stored here (required for revocation matching). The Worker computes `idp_name_id_hash = SHA-256(idp_name_id)` in memory only for audit log correlation; the hash is never persisted in Postgres (§53.7).
+
+#### `enterprise_sessions.idp_session_id`
+
+- **Type**: `TEXT`, nullable.
+- **NULL semantics**: Session predates M7/M8 deploy, or IdP does not emit `SessionIndex` (SAML) / `sid` claim (OIDC).
+- **Dual purpose**:
+  - **SAML SLO**: Written from `AuthnResponse/@SessionIndex`. Read by SLO Worker for single-session targeted revocation (preferred over NameID-sweep when `SessionIndex` is present in `<LogoutRequest>`).
+  - **OIDC BCL**: Written from OIDC ID token `sid` claim at sign-in. Read by BCL Worker for `sid`-targeted revocation (SSO_SCIM §46.3).
+- **OIDC `sid` privacy**: The OIDC `sid` claim is defined as an opaque identifier per OpenID Connect Front-Channel Logout 1.0 spec §3. It is not PII. No hash derivation needed (unlike `oidc_sub_hash` in §52).
+
+#### Indices
+
+| Index | Covers | Partial condition | Use case |
+|---|---|---|---|
+| `idx_sessions_idp_name_id` | `(tenant_id, idp_name_id)` | `idp_name_id IS NOT NULL AND revoked_at IS NULL` | SLO NameID-sweep revocation |
+| `idx_sessions_idp_session_id` | `(tenant_id, idp_session_id)` | `idp_session_id IS NOT NULL AND revoked_at IS NULL` | SLO SessionIndex / BCL sid targeted revocation |
+
+Both indices are partial: they exclude NULL columns and already-revoked rows. This keeps index size O(active sessions) regardless of historical session accumulation — critical for a table that could have millions of revoked rows over a multi-year deployment.
+
+---
+
+### 53.6 Row-Level Security
+
+The five new columns inherit the existing RLS policies on their respective tables. No new policies are needed; the adversarial tests (§53.4 MIG-0100-03/04) verify the inheritance is correct.
+
+**`tenant_sso_configs` policies in effect:**
+
+| Policy | Roles | Effect |
+|---|---|---|
+| `sso_configs_tenant_isolation` | `form_api`, `tenant_manager` | SELECT only rows WHERE `tenant_id = current_setting('app.tenant_id')` |
+| `sso_configs_system_write` | `form_system` | INSERT/UPDATE/DELETE unrestricted (used by SSO wizard and metadata refresh Workers) |
+
+`form_admin` bypasses RLS on `tenant_sso_configs` for cross-tenant audit queries. The new `slo_url`, `slo_binding`, `backchannel_logout_enabled` columns are automatically included.
+
+**`enterprise_sessions` policies in effect:**
+
+| Policy | Roles | Effect |
+|---|---|---|
+| `sessions_tenant_isolation` | `form_api` | SELECT only rows WHERE `tenant_id = current_setting('app.tenant_id')` |
+| `sessions_system_write` | `form_system` | INSERT/UPDATE (write path for SLO/BCL revocation) |
+| `sessions_no_tenant_manager_access` | `tenant_manager` | No rows returned — HR cannot see individual session data |
+
+**Auditor proof queries** (run as `form_api` with `app.tenant_id = 'tenant-A'`):
+
+```sql
+-- Q1: form_api cannot read idp_name_id from another tenant's sessions
+SET app.tenant_id = 'tenant-A';
+SET ROLE form_api;
+SELECT idp_name_id
+  FROM enterprise_sessions
+ WHERE tenant_id = 'tenant-B'
+ LIMIT 1;
+-- Expected: 0 rows (RLS filter)
+
+-- Q2: tenant_manager cannot read any session columns
+SET ROLE tenant_manager;
+SELECT COUNT(*) FROM enterprise_sessions;
+-- Expected: 0 rows (no_tenant_manager_access policy)
+
+-- Q3: form_system can write idp_name_id for SLO revocation path
+SET ROLE form_system;
+UPDATE enterprise_sessions
+   SET idp_name_id = 'user@corp.example'
+ WHERE id = '<fixture-session-id>'
+   AND tenant_id = 'tenant-A';
+-- Expected: 1 row updated
+```
+
+---
+
+### 53.7 Privacy Floor
+
+Migration 0100 introduces two session columns that carry IdP-sourced identifiers. The privacy analysis for each:
+
+**`idp_name_id`** — Raw SAML NameID:
+- NameID format is IdP-controlled and commonly an email address or persistent opaque identifier.
+- When email-format: treated as personal data under GDPR Art. 4(1).
+- **Stored in Postgres** because targeted SLO revocation requires matching the exact NameID value from the incoming `<LogoutRequest>`.
+- **Not in DEC-030 audit payloads**: The HMAC chain audit log (DEC-030) uses `idp_name_id_hash = SHA-256(idp_name_id)` for correlation. The raw value is discarded in Worker memory after the hash is computed. This hash is never stored in Postgres — it exists only in the DEC-030 event payload.
+- **Not in employer dashboard**: `tenant_manager` role has no access to `enterprise_sessions` (RLS policy `sessions_no_tenant_manager_access`). HR sees only aggregate usage statistics, never individual session identifiers.
+- **DSAR / Art. 17 coverage**: `enterprise_sessions` rows are included in the DSAR export pipeline (SSO_SCIM §63) and in the Art. 17 cascade DELETE on user record deletion. The `idp_name_id` column is exported to the data subject (their own NameID) but excluded from employer-visible DSAR responses.
+
+**`idp_session_id`** — SAML SessionIndex / OIDC `sid`:
+- SAML `SessionIndex` is an opaque IdP-generated identifier with no standard PII content.
+- OIDC `sid` is defined as opaque per spec (OpenID Connect Front-Channel Logout 1.0 §3).
+- **Not personal data** under GDPR by design — no hash derivation required (contrast with `oidc_sub_hash` in §52).
+- **Stored in Postgres** for both SLO targeted revocation and BCL sid-matching.
+- Same employer-visibility and DSAR rules as `idp_name_id` apply (RLS blocks `tenant_manager`; DSAR pipeline exports to data subject only).
+
+**`backchannel_logout_enabled`**:
+- Boolean flag — no personal data content. No privacy treatment required.
+
+**Privacy floor invariant summary:**
+
+| Identifier | PII? | Stored in Postgres | In DEC-030 payloads | Employer-visible | GDPR Art. 17 |
+|---|---|---|---|---|---|
+| `idp_name_id` (raw) | Yes (email format) | ✅ Yes | ❌ No (hash only) | ❌ No (RLS) | ✅ Cascade DELETE |
+| `idp_name_id_hash` | Pseudonymous | ❌ No | ✅ Yes | ❌ No | N/A (not stored) |
+| `idp_session_id` | No (opaque) | ✅ Yes | ❌ No | ❌ No (RLS) | ✅ Cascade DELETE |
+
+---
+
+### 53.8 SOC 2 Evidence
+
+Evidence artefacts registered in `docs/SOC2_READINESS.md §162` (SLO-E-001 through SLO-E-004):
+
+| Evidence ID | Trust Service Criteria | Description | Status |
+|---|---|---|---|
+| **SLO-E-001** | CC6.1 | SAML SLO Worker revocation test — automated test suite confirming `enterprise_sessions` revoked on valid `<LogoutRequest>` | 🟡 Pending M7 staging deploy |
+| **SLO-E-002** | CC6.3 | SLO targeted revocation by `SessionIndex` — test confirming `idx_sessions_idp_session_id` used; confirms O(1) UPDATE path | 🟡 Pending M7 staging deploy |
+| **SLO-E-003** | CC8.1 | SLO-CHAIN-01 integrity check cron job log — `pg_cron` Job 60 evidence from staging | 🟡 Pending M7 staging deploy |
+| **SLO-E-004** | CC8.1 | Migration 0100 apply log — `supabase migration up` output from staging + production deploys | 🟡 Pending M7 staging deploy |
+
+**CC6.1 mapping**: The `slo_url` + `slo_binding` columns enable federated session revocation — when an IdP sends a `<LogoutRequest>`, FORM can identify and revoke all active `enterprise_sessions` rows for that NameID. This meets the CC6.1 "logical access removal" requirement for federated identity providers.
+
+**CC6.3 mapping**: The `idp_session_id` column enables targeted single-session revocation. The partial index `idx_sessions_idp_session_id` ensures the UPDATE runs in sub-millisecond time even at scale (CC6.3 — restricting access to authorized users).
+
+**P4.1 mapping**: `tenant_manager` (HR) cannot query `idp_name_id` or `idp_session_id` by RLS design. This demonstrates structural enforcement of the privacy floor (P4.1 — privacy notice and personal information use restriction).
+
+**CC8.1 mapping**: SLO-E-004 (migration apply log) provides the change management evidence that the schema was deployed via the approved migration pipeline with peer review (PR gate) and automated CI (MIG-0100-01 through MIG-0100-05).
+
+---
+
+### 53.9 Implementation Checklist
+
+| # | Item | Priority | Milestone | Status |
+|---|---|---|---|---|
+| 1 | Deploy Migration 0100 to staging | P0 | M7 | 🟡 Pending |
+| 2 | SAML SLO Worker (`saml-slo.ts`) reads `slo_url` + `slo_binding` from `tenant_sso_configs` | P0 | M7 | 🟡 Pending |
+| 3 | SAML SSO Worker writes `idp_name_id` + `idp_session_id` at AuthnResponse parse | P0 | M7 | 🟡 Pending |
+| 4 | SLO Worker revocation UPDATE uses `idx_sessions_idp_name_id` and `idx_sessions_idp_session_id` | P0 | M7 | 🟡 Pending |
+| 5 | CI adversarial tests MIG-0100-01 through MIG-0100-05 passing | P0 | M7 | 🟡 Pending |
+| 6 | SOC 2 evidence SLO-E-004 filed (migration apply log) | P0 | M7 | 🟡 Pending |
+| 7 | SOC 2 evidence SLO-E-001/002/003 filed from staging run | P0 | M7 | 🟡 Pending |
+| 8 | Deploy Migration 0100 to production | P0 | M7 | 🟡 Pending |
+| 9 | Update SSO_SCIM §45.9 cross-reference: `docs/DATA_MODEL.md §53` → Done | P1 | M7 | 🟢 Done (this pass) |
+| 10 | G-004 gap closure: DATA_MODEL registration for Migration 0100 | P1 | M7 | 🟢 Done (this pass) |
+
+---
+
+### 53.10 Cross-Reference Obligations
+
+| Document | Section | Description | Status |
+|---|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §45 | Canonical SAML SLO implementation spec — Migration 0100 DDL, SLO Worker, SAML SLO flows | Cross-reference source |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §45.9 | SLO cross-reference obligations table — entry for `DATA_MODEL §53` | 🟢 Done this pass |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §12.4 | `tenant_sso_configs` baseline schema (pre-0100) | Reference only |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §12.5 | `enterprise_sessions` baseline schema (13-column table, pre-0100) | Reference only |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §46 | OIDC BCL spec — `idp_session_id` dual-use with BCL sid matching | Reference only |
+| `docs/SOC2_READINESS.md` | §162 | SLO-E-001..SLO-E-004 evidence artefacts registered | 🟢 Done (v3.95.0) |
+| `docs/OBSERVABILITY.md` | §72 | SAML SLO observability — SLO-SLO-01/02, AL-SLO-01..03, SLO-OBS-E-001 | 🟢 Done (v5.19.0) |
+| `docs/OBSERVABILITY.md` | §73 | SLO-CHAIN-01 SQL DDL spec (`0103_slo_chain_integrity_check.sql`) | 🟢 Done (v5.19.0) |
+| `docs/INCIDENT_RESPONSE.md` | R-74 | SLO-CHAIN-01 Integrity Violation (P0) — co-activation with R-05 | 🟢 Done (v3.40.4) |
+| `docs/DATA_MODEL.md` | §52 | Migration 0101 companion (`oidc_sub_hash`) — BCL session index | 🟢 Done (v1.44) |
+
+---
+
+*v1.45 (2026-07-04): §53 SAML SLO + OIDC BCL Schema Columns — Migration 0100. DATA_MODEL canonical registration for the Migration 0100 schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §45` (v2.20, 2026-07-04). Five columns added across two tables: `tenant_sso_configs.slo_url` (TEXT nullable — IdP SLO endpoint), `tenant_sso_configs.slo_binding` (TEXT CHECK IN ('HTTP-POST','HTTP-Redirect') — SAML binding), `tenant_sso_configs.backchannel_logout_enabled` (BOOLEAN NOT NULL DEFAULT false — OIDC BCL gate), `enterprise_sessions.idp_name_id` (TEXT nullable — SAML NameID for SLO sweep revocation), `enterprise_sessions.idp_session_id` (TEXT nullable — SAML SessionIndex / OIDC sid for targeted revocation). Two partial indices: `idx_sessions_idp_name_id (tenant_id, idp_name_id) WHERE idp_name_id IS NOT NULL AND revoked_at IS NULL` and `idx_sessions_idp_session_id (tenant_id, idp_session_id) WHERE idp_session_id IS NOT NULL AND revoked_at IS NULL`. §53.1 purpose: closes federated session termination lifecycle gap — without 0100, SLO Worker has no schema to write NameID/SessionIndex at sign-in or read them at logout. §53.2 dependency chain: 0099→0100→0101; additive only, no outside-counsel gate. §53.3 full DDL + rollback (`0100_saml_slo_schema.sql` + `rollback/0100_saml_slo_schema_rollback.sql`). §53.4 five CI adversarial tests MIG-0100-01..05 (migration apply, rollback, form_api access-denied, form_system write, partial-index EXPLAIN verify; evidence path `compliance/evidence/saml-slo/migration-0100-validation_<YYYY-MM-DD>.txt`). §53.5 column/index semantics (slo_url NULL=local-only logout; slo_binding CHECK; backchannel_logout_enabled opt-in default; idp_name_id raw-NameID immutable-at-write; idp_session_id dual-purpose SAML/OIDC; partial-index cardinality design). §53.6 RLS (inherits sessions_tenant_isolation + sessions_no_tenant_manager_access; three auditor proof queries). §53.7 privacy floor (idp_name_id = email-format PII → stored Postgres + hash-only in DEC-030 + RLS blocks employer; idp_session_id = opaque non-PII; DSAR + Art.17 cascade DELETE). §53.8 SOC 2 evidence (SLO-E-001..004 CC6.1/CC6.3/CC8.1/P4.1). §53.9 ten-item implementation checklist (8× P0/M7 staging+production+Worker+CI+evidence; 2× P1/M7 Done this pass). §53.10 cross-reference obligations (§45.9 DATA_MODEL §53 entry Done this pass; G-004 gap closure Done this pass). TOC §53 entry added. Document header v1.43 → v1.45. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §45` (canonical SLO spec); `docs/SSO_SCIM_IMPLEMENTATION.md §12.4/§12.5` (baseline table schemas); `docs/SOC2_READINESS.md §162` (SLO-E-001..004 evidence); `docs/OBSERVABILITY.md §72/§73` (SLO observability + chain integrity DDL); `docs/INCIDENT_RESPONSE.md R-74` (SLO-CHAIN-01 P0 response); `docs/DATA_MODEL.md §52` (companion Migration 0101 oidc_sub_hash). Owner: enterprise-architect + security-engineer + compliance-officer.*
 
 *v1.44 (2026-07-04): §52 `enterprise_sessions.oidc_sub_hash` — OIDC BCL Session Index — Migration 0101. DATA_MODEL canonical registration for the Migration 0101 schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §46.2` (v2.21, 2026-07-04). One nullable column added to `enterprise_sessions`: `oidc_sub_hash TEXT` (SHA-256 hex of OIDC `sub` claim; NULL for SAML sessions and pre-M8 OIDC sessions; no DEFAULT; no CHECK). Companion partial index `idx_enterprise_sessions_oidc_sub ON enterprise_sessions (tenant_id, oidc_sub_hash) WHERE oidc_sub_hash IS NOT NULL AND revoked_at IS NULL` — created CONCURRENTLY (no table lock). §52.1 purpose: single-table sub-based BCL revocation path collapsing the prior two-round-trip `users → enterprise_sessions` UPDATE into one indexed UPDATE; matches `idp_name_id_hash` privacy pattern from SAML SLO (SSO_SCIM §45); raw `sub` never in Postgres. §52.2 dependency chain: modifies `enterprise_sessions` (M3 SSO baseline schema, SSO_SCIM §12.5) independently of the 0083→0092 enterprise_contracts/tenants chain; no outside-counsel gate. §52.3 full DDL + rollback (CONCURRENTLY for both CREATE INDEX and DROP INDEX). §52.4 three CI adversarial tests MIG-0101-01/02/03 (< 30 s on 10 k rows, concurrent INSERT no deadlock, rollback restores schema — evidence path `compliance/evidence/oidc-bcl/migration-0101-validation_<YYYY-MM-DD>.txt`). §52.5 column + index semantics (nullable design rationale, SHA-256 encoding, write-at-INSERT-only invariant, revocation UPDATE pattern, OIDC vs SAML session comparison table). §52.6 RLS (inherits `sessions_tenant_isolation` policy; `form_system` write path for BCL UPDATE; `tenant_manager` no access path — privacy floor at DDL level; three auditor proof queries). §52.7 privacy floor (oidc_sub_hash as pseudonymous operational identifier; raw sub discarded in Worker memory; hash never in DSAR/admin reporting/DEC-030 payloads; GDPR Art. 17 coverage via existing CASCADE on user deletion). §52.8 SOC 2 evidence (CC6.1 — single-table revocation + RLS gate; CC6.3 — sub-millisecond indexed UPDATE + REVOCATION_QUEUE at-least-once; CC6.1 integration — BCL-I-001/BCL-I-002; CC8.1 — BCL-E-003 migration log; P4.1 — structural tenant_manager exclusion; CC6.3 auditor narrative). §52.9 eight-item implementation checklist (6× P0/M8 staging + production deploy + integration tests + evidence filing; 2× P1/M8 cross-reference updates + G-003 closure). §52.10 cross-reference obligations (SSO_SCIM §46.9 DATA_MODEL cross-reference 🟢 Done this pass; 7× pending M8). TOC §52 entry added. Document header v1.43 → v1.44. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §46` (canonical BCL implementation spec — Migration 0101 DDL, BCL Worker, BCL-CHAIN-01, BCL-E-001/002/003, G-003 gap); `docs/SSO_SCIM_IMPLEMENTATION.md §12.5` (`enterprise_sessions` baseline schema — 13-column table pre-0101); `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (v2.89, 2026-07-04 — four `backchannel_logout.*` events + BCL-CHAIN-01 + Zod v2 schemas); `docs/SOC2_READINESS.md §163` (BCL-E-001/002/003 registered CC6.1/CC6.3/CC8.1 — count 132 → 135); `docs/INCIDENT_RESPONSE.md R-73` (BCL REVOCATION_QUEUE Exhausted) + `R-74` (BCL-CHAIN-01 Integrity Violation, P0); `docs/OBSERVABILITY.md §70` (BCL observability — RED metrics, SLOs SLO-BCL-01/02, alert rules AL-BCL-01/02/03/04, BCL-OBS-E-001 quarterly evidence); `docs/DATA_MODEL.md §12.5` cross-reference note: `enterprise_sessions` baseline DDL canonical source remains SSO_SCIM §12.5; §52 documents the additive Migration 0101 extension only. Owner: enterprise-architect + security-engineer + compliance-officer.*

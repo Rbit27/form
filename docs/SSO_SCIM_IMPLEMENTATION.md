@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.31
+# FORM · SSO/SCIM Implementation v2.32
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -15507,6 +15507,11 @@ Parallel to §46.9 (BCL cross-reference obligations). Tracks the status of §72 
 | `docs/SOC2_READINESS.md §79.4` — SLO-OBS-E-001 registration (count 136 → 137) | `docs/OBSERVABILITY.md §72.9 item 7` | 🟢 **Done — 2026-07-04 (SOC2_READINESS.md §166, evidence count 136 → 137).** |
 | `docs/SOC2_READINESS.md §15.1` — SLO-OBS-E-001 quarterly filing row | `docs/OBSERVABILITY.md §72.9 item 8` | 🟢 **Done — 2026-07-04 (SOC2_READINESS.md §166.2 calendar patch).** |
 | OQ-SLO-OBS-01 resolved — pg_cron job 60 for SLO-CHAIN-01 retrospective check | `docs/OBSERVABILITY.md §72.10` | 🟢 **Resolved — DEC-099 (2026-07-04). Migration M-0103 registers pg_cron job 60 `slo_chain_integrity_check`.** |
+| `docs/DATA_MODEL.md §53` — SAML SLO + OIDC BCL Schema Columns (Migration 0100) | G-004 gap — DATA_MODEL registration missing for Migration 0100 | 🟢 **Done — 2026-07-04 (DATA_MODEL.md v1.45, §53).** |
+
+---
+
+*v2.32 (2026-07-04): §45.9 cross-reference obligations table — added `docs/DATA_MODEL.md §53` row (G-004 gap closure: DATA_MODEL canonical registration for Migration 0100 schema extension was missing; §53 added in DATA_MODEL v1.45). Header v2.31 → v2.32. Owner: enterprise-architect.*
 
 ---
 

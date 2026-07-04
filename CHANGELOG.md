@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.76.0] — 2026-07-04
+
+### Added
+- `docs/DATA_MODEL.md §53` — SAML SLO + OIDC BCL Schema Columns (Migration 0100). DATA_MODEL canonical registration for the five columns added by Migration 0100: `tenant_sso_configs.slo_url`, `tenant_sso_configs.slo_binding`, `tenant_sso_configs.backchannel_logout_enabled`, `enterprise_sessions.idp_name_id`, `enterprise_sessions.idp_session_id`. Closes G-004 gap (Migration 0100 had no DATA_MODEL section, unlike Migration 0101 which has §52). §53.1 purpose (federated logout lifecycle closure); §53.2 migration dependency chain (0099→0100→0101); §53.3 full DDL + rollback; §53.4 five CI adversarial tests MIG-0100-01..05; §53.5 column/index semantics; §53.6 RLS (auditor proof queries); §53.7 privacy floor (idp_name_id PII handling, GDPR Art.17, DEC-030 hash-only); §53.8 SOC 2 evidence (SLO-E-001..004, CC6.1/CC6.3/CC8.1/P4.1); §53.9 ten-item checklist; §53.10 cross-reference obligations.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §45.9` — cross-reference obligations table patched: `docs/DATA_MODEL.md §53` row added (🟢 Done).
+
+### Changed
+- `docs/DATA_MODEL.md` — header v1.43 → v1.45; TOC §53 entry added; version note v1.45 appended.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — header v2.31 → v2.32; §45.9 table updated.
+- `VERSION` — 12.75.0 → 12.76.0.
+
+---
+
 ## [12.75.0] — 2026-07-04
 
 ### Added
