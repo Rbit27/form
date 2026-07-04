@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [12.74.0] — 2026-07-04
+
+### Added
+- `content/post-3132-progression-unstable-weekly-volume.md` — Editorial series post 3132. «Прогресія при нестабільному тижневому обсязі: як зберегти вектор розвитку». Серія «Тренувальний менеджмент часу» 3126–3135 (7/10). Вектор розвитку як rolling best на горизонті 4–8 тижнів (Häkkinen 1988: 7–8% втрата сили за 2–3 тижні без тренувань; Ralston 2017: 1 підхід/тиждень підтримує силу; McLester 2000; Schoenfeld, Ogborn & Krieger 2016 — нелінійна дозозалежна крива). При скороченому обсязі: зберігати інтенсивність ≥ 80% 1RM, скорочувати кількість сетів (Braun 2007: одна важка сесія > трьох легких). Якірні підйоми і якірні сесії. Деловантажний протокол повернення після перерви (тиждень 1 — 60–70%/70–75%; тиждень 2 — 80–90%/80–85%; тиждень 3 — 100%). Що ламає вектор: компенсаційна перевантаженість (Gabbett 2016: acute:chronic > 1.5), зниження інтенсивності при стисненні, відсутність 4-тижневих якірних тестів, надто часте оновлення програми. Місячна сума сесій як метрика (надійніша за тижневу при нестабільному розкладі). clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card для post-3132 prepended.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.40.4: R-74.11 + R-76.11 Co-Activation Matrix patch. Новий рядок у R-74.11: `security.bcl_int_cap_reached` (BCL-INT-CAP-01) → R-05 MANDATORY (H4/H5 per R-74.5; AUDIT_LOG_SCHEMA v2.94; SOC2 §169.3). Новий рядок у R-76.11: `security.slo_int_cap_reached` (SLO-INT-CAP-01) → R-05 MANDATORY (H4/H5 per R-76.5; AUDIT_LOG_SCHEMA v2.94; SOC2 §169.3). Closes SOC2_READINESS §169.6 item 5 (P1).
+- `docs/SOC2_READINESS.md` — v3.95.0: §169.5 cross-reference obligation 5 → 🟢 Done; §169.6 item 5 → [x] Done (INCIDENT_RESPONSE.md v3.40.4 R-74.11 + R-76.11 patch). Document header v3.94.0 → v3.95.0.
+- `README.md` — series «Тренувальний менеджмент часу» 3126–3135 in progress 6/10 → 7/10; posts 3127/3130/3131/3132 status updated.
+- `STATUS.md` — v12.74.0; post-3132 added; series 6/10 → 7/10; next: post-3133.
+- `VERSION` — 12.73.1 → 12.74.0.
+
+---
+
 ## [12.73.1] — 2026-07-04
 
 ### Added

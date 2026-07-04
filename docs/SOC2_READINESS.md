@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.94.0
+# FORM · SOC 2 Type II Readiness v3.95.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -36066,7 +36066,7 @@ For auditor purposes: these two CRITICAL/7yr events strengthen the CC7.2 continu
 | Cross-reference SOC2_READINESS §169 in OBSERVABILITY §74.7 | `docs/OBSERVABILITY.md §74.7 obligation 1` | 🟢 **Done — this section** |
 | Deploy migration `0104_bcl_chain_check_cap_patch.sql` (fn v2 with LIMIT 51) | `docs/OBSERVABILITY.md §74.6 item 3` | [ ] Pending — M8 gate (requires M-0102 applied) |
 | Deploy migration `0103_slo_chain_integrity_check.sql` (fn_slo already correct — LIMIT 51) | `docs/OBSERVABILITY.md §74.6 item 4` | [ ] Pending — M7 gate (requires M-0103 applied; SLO fn SQL already correct) |
-| Confirm R-05 co-activation clause in R-74 + R-76 runbooks | `docs/OBSERVABILITY.md §74.6 items 5–6` | [ ] Pending — INCIDENT_RESPONSE.md update pass |
+| Confirm R-05 co-activation clause in R-74 + R-76 runbooks | `docs/OBSERVABILITY.md §74.6 items 5–6` | 🟢 **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.4; §169.6 item 5 closed)** |
 
 ### §169.6 Implementation Checklist
 
@@ -36076,9 +36076,11 @@ For auditor purposes: these two CRITICAL/7yr events strengthen the CC7.2 continu
 | 2 | Register `security.slo_int_cap_reached` in AUDIT_LOG_SCHEMA §SLO-Chain-Monitor-Events | compliance-officer | **P0** | [x] **Done — 2026-07-04 (AUDIT_LOG_SCHEMA v2.94).** |
 | 3 | Add §169 cross-reference to SOC2_READINESS.md | compliance-officer | **P0** | [x] **Done — 2026-07-04 (this section).** |
 | 4 | Deploy `0104_bcl_chain_check_cap_patch.sql` (BCL fn v2 LIMIT 51 fix) | platform-engineer + devops-lead | **P1** | [ ] Pending — M8 |
-| 5 | Confirm R-05 co-activation documented in INCIDENT_RESPONSE.md R-74 + R-76 runbooks | compliance-officer | **P1** | [ ] Pending next INCIDENT_RESPONSE pass |
+| 5 | Confirm R-05 co-activation documented in INCIDENT_RESPONSE.md R-74 + R-76 runbooks | compliance-officer | **P1** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.4: R-74.11 + R-76.11 co-activation matrices patched — `security.bcl_int_cap_reached` BCL-INT-CAP-01 → R-05 MANDATORY row added to R-74.11; `security.slo_int_cap_reached` SLO-INT-CAP-01 → R-05 MANDATORY row added to R-76.11).** |
 
 ---
+
+*v3.95.0 (2026-07-04): §169.5 + §169.6 Closure Patch — R-05 Co-Activation Confirmed in INCIDENT_RESPONSE.md R-74 + R-76. §169.5 cross-reference obligation "Confirm R-05 co-activation clause in R-74 + R-76 runbooks": 🟢 Done (INCIDENT_RESPONSE.md v3.40.4 — R-74.11 co-activation matrix patched with `security.bcl_int_cap_reached` BCL-INT-CAP-01 → R-05 MANDATORY row; R-76.11 co-activation matrix patched with `security.slo_int_cap_reached` SLO-INT-CAP-01 → R-05 MANDATORY row). §169.6 item 5: [x] Done (INCIDENT_RESPONSE.md v3.40.4). Both new matrix rows document H4/H5 classification per R-74.5 / R-76.5 root-cause taxonomy; reference AUDIT_LOG_SCHEMA v2.94 §BCL-Chain-Monitor-Events / §SLO-Chain-Monitor-Events; and SOC2 §169.3 auditor narrative. §169.5 obligations: all 5 items now Done (items 1–3 Done in v3.94.0; item 4 pending M7/M8 migration deploy — unchanged; item 5 Done this pass). §169.6 checklist: items 1–3 and 5 Done; item 4 pending M8 (migration deploy). Document header v3.94.0 → v3.95.0. Owner: compliance-officer + security-engineer.*
 
 *v3.94.0 (2026-07-04): §169 — AUDIT_LOG_SCHEMA v2.94 Registration Patch (`security.bcl_int_cap_reached` + `security.slo_int_cap_reached` · CC7.2 · BCL-INT-CAP-01 / SLO-INT-CAP-01 · OBSERVABILITY §74). Two new CRITICAL/7yr CC7.2 DEC-030 events registered: (1) `security.bcl_int_cap_reached` — emitted by `fn_bcl_chain_integrity_check()` v2 (migration `0104_bcl_chain_check_cap_patch.sql`; §74.3 corrected DDL using `LIMIT 51` sentinel; BCL-INT-CAP-01 invariant; `system.bcl_chain_check_passed` suppressed by BCL-ALL-CLR-SUPPRESS-01); (2) `security.slo_int_cap_reached` — emitted by `fn_slo_chain_integrity_check()` (§73 SQL DDL; SLO-INT-CAP-01 invariant; backfill registration); both events fleet-level aggregate (privacy floor: `tenant_id = NULL`); shared `ChainIntCapReachedPayload` Zod v2 base schema (OBSERVABILITY §74.2.3). Evidence count 141 unchanged — cap events surface in existing BCL-OBS-E-001 / SLO-OBS-E-001 quarterly observability reports; no new §79.4 artefact rows required. §169.3 CC7.2 auditor narrative (cap-reached = H4/H5 systemic signal; BCL-ALL-CLR-SUPPRESS-01 / SLO-ALL-CLR-SUPPRESS-01 prevent mixed-signal attestation). §169.4 Vanta mirror protocol (BCL-OBS-E-001 + SLO-OBS-E-001 `cap_events_count` field; no standalone Vanta entry). §169.5 cross-reference obligations (items 1–3 Done this pass; items 4–5 pending M7/M8). §169.6 five-item checklist (items 1–3 Done this pass; items 4–5 pending M7/M8). Document header v3.93.0 → v3.94.0. Owner: compliance-officer + security-engineer.*
 

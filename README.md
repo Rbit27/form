@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 in progress 4/10 · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 COMPLETE 10/10 · series «Тренувальний мінімалізм: менше і ефективніше» 3176–3185 proposed · series «Читання власних даних: від журналу до рішень» 3186–3195 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.71.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 in progress 7/10 · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 COMPLETE 10/10 · series «Тренувальний мінімалізм: менше і ефективніше» 3176–3185 proposed · series «Читання власних даних: від журналу до рішень» 3186–3195 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.74.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3534,20 +3534,20 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3124 | Квартальний аудит і коли звертатися до тренера: критерії рішення для self-coached атлета | proposed |
 | 3125 | Синтез 3116–3125: система самодіагностики — п'ять компетенцій self-coached атлета | proposed |
 
-### Editorial series: 3126–3135 — Тренувальний менеджмент часу: як self-coached атлет будує тренування навколо реального графіку (in progress 4/10 · v12.71.0)
+### Editorial series: 3126–3135 — Тренувальний менеджмент часу: як self-coached атлет будує тренування навколо реального графіку (in progress 7/10 · v12.74.0)
 
 Серія про операційну реальність тренування: не «як тренуватися правильно», а «як тренуватися регулярно при непередбачуваному графіку». Різниця між ідеальним і стійким. Тон: editorial-brutalist. 13-min read.
 
 | № | Тема | Статус |
 |---|------|--------|
 | 3126 | Чому «нестача часу» — операційна проблема, а не проблема мотивації | **draft · v12.68.0 → post-3126-time-as-training-resource.md** |
-| 3127 | Гнучкий vs. жорсткий розклад тренувань: який стійкіший у реальних умовах | proposed |
-| 3128 | Мінімальна тижнева одиниця: скільки тренувань зберігають адаптації | done |
+| 3127 | Гнучкий vs. жорсткий розклад тренувань: який стійкіший у реальних умовах | **draft · v12.69.0 → post-3127-flexible-vs-rigid-schedule.md** |
+| 3128 | Мінімальна тижнева одиниця: скільки тренувань зберігають адаптації | **draft · v12.70.0 → post-3128-minimum-weekly-training-unit.md** |
 | 3129 | Тренування вранці vs. ввечері: що каже хронобіологія і що важливіше | **draft · v12.71.0 → post-3129-morning-vs-evening-training-chronobiology.md** |
-| 3130 | Як планувати тренування навколо непередбачуваних дедлайнів | proposed |
-| 3131 | Серійні пропуски: як повернутись після 2–3 тижнів без тренувань | proposed |
-| 3132 | Мікросесії і подрібнений об'єм: коли це виправдано, коли — ні | proposed |
-| 3133 | Сезонні коливання інтенсивності: планові деловантаження vs. вимушені паузи | proposed |
+| 3130 | Як планувати тренування навколо непередбачуваних дедлайнів | **draft · v12.72.0 → post-3130-planning-training-around-unpredictable-deadlines.md** |
+| 3131 | Відновлення при стисненому розкладі: де можна скоротити і де не можна | **draft · v12.73.0 → post-3131-recovery-in-tight-schedule.md** |
+| 3132 | Прогресія при нестабільному тижневому обсязі: як зберегти вектор розвитку | **draft · v12.74.0 → post-3132-progression-unstable-weekly-volume.md** |
+| 3133 | Мікросесії і подрібнений об'єм: коли це виправдано, коли — ні | proposed |
 | 3134 | Тренувальна рутина vs. тренувальна гнучкість: де баланс | proposed |
 | 3135 | Синтез 3126–3135: операційна система тренування для зайнятого self-coached атлета | proposed |
 

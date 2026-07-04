@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.40.3
+# FORM · Incident Response Runbook v3.40.4
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -26704,6 +26704,7 @@ PIR: Required (all P0s — within 72h)
 | Condition | Co-activation | Notes |
 |---|---|---|
 | R-74-C2 returns rows (retrospective — `revoked` in chain without `received`) | **R-05** (HMAC Chain Break) — MANDATORY | R-05 IC leads forensic chain review; R-74 IC leads BCL scope |
+| `security.bcl_int_cap_reached` emitted (BCL-INT-CAP-01: pg_cron job 59 detected ≥ 50 orphaned BCL chain entries in 24h window) | **R-05** (Critical Security Incident) — MANDATORY | BCL-INT-CAP-01 classifies as H4 (systemic code bug) or H5 (malicious manipulation) per R-74.5 taxonomy — both require R-05 co-activation; event registered AUDIT_LOG_SCHEMA v2.94 §BCL-Chain-Monitor-Events; SOC2 §169.3 |
 | R-74-C4 shows session still active (revocation blocked by 422) | **R-73** (BCL Session Revocation Failure) | Manual session revocation per R-73.6 |
 | Multiple `bcl_request_id` values across tenants | **P0-fleet** — founder notification (T-74-B); halt BCL processing fleet-wide | Do not limit scope to single tenant |
 | Root cause H5 (suspected malicious manipulation) | **R-05 full forensic** + Art. 33 GDPR 72h assessment | Engage outside security counsel if confirmed malicious |
@@ -27328,6 +27329,7 @@ PIR: Required (all P0s — within 72h)
 | Condition | Co-activation | Notes |
 |---|---|---|
 | R-76-C2 returns rows (retrospective — closure in chain without prior anchor) | **R-05** (HMAC Chain Break) — MANDATORY | R-05 IC leads forensic chain review; R-76 IC leads SLO scope |
+| `security.slo_int_cap_reached` emitted (SLO-INT-CAP-01: pg_cron job 60 detected ≥ 50 orphaned SLO chain entries in 24h window) | **R-05** (Critical Security Incident) — MANDATORY | SLO-INT-CAP-01 classifies as H4 (systemic code bug) or H5 (malicious manipulation) per R-76.5 taxonomy — both require R-05 co-activation; event registered AUDIT_LOG_SCHEMA v2.94 §SLO-Chain-Monitor-Events; SOC2 §169.3 |
 | R-75 is concurrently active (SLO high failure rate) | **R-75** (SLO High Failure Rate) | Shared root cause likely (H4 code bug or H2 KV failure); unified IC |
 | Multiple `slo_request_id` values across tenants | **P0-fleet** — founder notification (T-76-B); halt SLO fleet-wide | Do not limit scope to single tenant |
 | Root cause H5 (suspected malicious manipulation) | **R-05 full forensic** + Art. 33 GDPR 72h assessment | Engage outside security counsel if confirmed malicious |
@@ -27347,6 +27349,8 @@ PIR: Required (all P0s — within 72h)
 | 6 | Authoring complete — R-76 closes §72.11 obligation "File companion IR runbook R-76 (AL-SLO-02 — SLO-CHAIN-01 Integrity Violation, P0) in `docs/INCIDENT_RESPONSE.md`" | compliance-officer | **P0** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.0).** |
 
 **Privacy floor (invariant throughout R-76):** All scope query outputs, DEC-030 event payloads, templates, and SLO-CHN-E-001 artefact files contain no `user_id`, employee name, email, coaching content, health data, or GDPR Art. 9 special-category data. `tenant_id` and `slo_request_id` are FORM-internal UUIDs. `chain-segment.json` restricted to IC + compliance-officer + outside counsel (H5 only). Cross-references: `docs/OBSERVABILITY.md §72.4 AL-SLO-02`, `docs/OBSERVABILITY.md §72.8 SLO-OBS-E-001`, `docs/SSO_SCIM_IMPLEMENTATION.md §45.5.3`, `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events`, `docs/SOC2_READINESS.md §72.9 items 7–8 pending`. Owner: security-engineer + compliance-officer.
+
+*v3.40.4 (2026-07-04): §R-74.11 + §R-76.11 Co-Activation Matrix patch — BCL-INT-CAP-01 / SLO-INT-CAP-01 → R-05 MANDATORY. Added two new rows to co-activation matrices: (1) R-74.11 — `security.bcl_int_cap_reached` (BCL-INT-CAP-01: pg_cron job 59, ≥ 50 orphaned BCL chain entries in 24h window) → R-05 MANDATORY; classifies as H4/H5 per R-74.5 taxonomy; event registered AUDIT_LOG_SCHEMA v2.94 §BCL-Chain-Monitor-Events; SOC2 §169.3. (2) R-76.11 — `security.slo_int_cap_reached` (SLO-INT-CAP-01: pg_cron job 60, ≥ 50 orphaned SLO chain entries in 24h window) → R-05 MANDATORY; classifies as H4/H5 per R-76.5 taxonomy; event registered AUDIT_LOG_SCHEMA v2.94 §SLO-Chain-Monitor-Events; SOC2 §169.3. Closes SOC2_READINESS.md §169.6 item 5 (P1 — "Confirm R-05 co-activation documented in INCIDENT_RESPONSE.md R-74 + R-76 runbooks"). Document header v3.40.3 → v3.40.4. Owner: compliance-officer + security-engineer.*
 
 *v3.40.3 (2026-07-04): §R-73.12 item 3 + §R-74.12 items 2 and 4 closure patch. Item 3 (R-73.12): BCL-REV-E-001 registered in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.3/CC7.3; count 140 → 141; §168.2, SOC2_READINESS.md v3.93.0) → [x] Done. Item 4 (R-74.12): BCL-CHN-E-001 registered in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3/CC8.1; count 139 → 140; §168.2, SOC2_READINESS.md v3.93.0) → [x] Done. Item 2 (R-74.12): OQ-BCL-OBS-01 resolved → DEC-098 (pg_cron job 59 `bcl_chain_integrity_check` adopted; OBSERVABILITY.md v5.17.0; §71 SQL DDL spec `0102_bcl_chain_integrity_check.sql` via Migration M-0102); status note updated from "(OQ-BCL-OBS-01 open)" to resolved reference; production implementation remains pending M8 BCL deploy. Also corrected document header v3.40.1 → v3.40.3 (v3.40.2 patch was applied to footer only in prior session; header was not updated at that time). Document header v3.40.1 → v3.40.3. Owner: compliance-officer.*
 *v3.40.2 (2026-07-04): §R-76.12 item 2 status note patched — "(OQ-SLO-OBS-01 open)" → resolved reference. OQ-SLO-OBS-01 was resolved → DEC-099 (pg_cron job 60 `slo_chain_integrity_check` adopted) in OBSERVABILITY.md v5.18.1; §12.6 registry entry added and §73 SQL DDL spec authored in OBSERVABILITY.md v5.18.2 (2026-07-04). Item 2 implementation remains pending M7 (Migration M-0103 production deploy). Document header v3.40.1 → v3.40.2. Owner: compliance-officer + devops-lead.*
