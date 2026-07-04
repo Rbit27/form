@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [12.34.0] — 2026-07-04
+
+### Added
+- `docs/OBSERVABILITY.md §70` — OIDC Back-Channel Logout (BCL) Observability (v5.16.0). Closes the monitoring gap created by `docs/SSO_SCIM_IMPLEMENTATION.md §46` (BCL Worker spec, Migration 0101, BCL-CHAIN-01 ordering invariant). §70.1 scopes monitoring to BCL Worker (`oidc-backchannel-logout.ts`), `REVOCATION_QUEUE`, `revokeOidcSessions()`, and BCL-CHAIN-01 HMAC chain; four DEC-030 event types registered in AUDIT_LOG_SCHEMA v2.89 (§BCL-Events); privacy floor (SHA-256 `oidc_sub_hash` only, raw `sub` never stored or emitted); SOC 2 CC6.1/CC6.3/CC7.2/CC7.3/CC8.1; IdP `sid` support matrix (Okta ✅, Entra ID ✅, Google ❌). §70.2 RED metrics for BCL Worker, REVOCATION_QUEUE, and session revocations. §70.3 two SLOs — BCL-SLO-01 (HTTP 200 rate ≥ 99.0%) and BCL-SLO-02 (P95 < 2,000 ms). §70.4 four alert rules — AL-BCL-01 (failure rate P2→P1 Slack `#alerts-enterprise` / PagerDuty `form-security`; SQL specified), AL-BCL-02 (REVOCATION_QUEUE exhaustion P1; no auto-resolve), AL-BCL-03 (BCL-CHAIN-01 violation P0; retrospective SQL with `form_audit` role; no cooldown; no auto-resolve), AL-BCL-04 (P95 latency P2). §70.5 four §6.2 alert table rows (bcl subsection). §70.6 eight-panel "BCL / Federated Session Revocation" dashboard sub-group (for §26.9). §70.7 SOC 2 mapping (CC6.1/CC6.3/CC7.2/CC7.3/CC8.1). §70.8 BCL-OBS-E-001 quarterly evidence artefact (7yr WORM; zero-event attestation required). §70.9 twelve-item implementation checklist (2× P0 Done this pass; 10× P1/M8 pending). §70.10 OQ-BCL-OBS-01 (pg_cron job 59 vs. Workers Cron Trigger for BCL-CHAIN-01 hourly check). §70.11 six cross-reference obligations (TOC entry 🟢 Done; five 🟡 Pending P1/M8). TOC entry §70 added.
+
+### Changed
+- `docs/OBSERVABILITY.md` — header v5.15.7 → v5.16.0; TOC row §70 added.
+- `VERSION` — 12.33.0 → 12.34.0.
+
+---
+
 ## [12.33.0] — 2026-07-04
 
 ### Added

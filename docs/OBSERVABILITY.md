@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.15.7
+# FORM · Observability & Monitoring Taxonomy v5.16.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -69,6 +69,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §67 | Cross-Reference Patch — §66.9 Items 2 + 6 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.67 + ENTERPRISE_SLA.md v1.3) |
 | §68 | Cross-Reference Patch — §59.7 / §59.8 / §60.7 / §60.8 Stale-Status Closure (AUDIT_LOG_SCHEMA.md v2.57 + SOC2_READINESS.md v3.52.0) |
 | §69 | Cross-Reference Patch — §12.6 Job 48 + §56.8 Stale SOC2_READINESS Registration Status Closure (SOC2_READINESS §120 / §124) |
+| §70 | OIDC Back-Channel Logout (BCL) Observability |
 
 ---
 
@@ -19117,3 +19118,259 @@ The §56.10 item 5 obligation was fulfilled in SOC2_READINESS §120 (v3.45.0, 20
 *v5.14.9 (2026-07-03): §12.6 pg_cron canonical registry — job 21 (`pam_bg_review_alert`) cross-reference column update. Closes INCIDENT_RESPONSE.md §R-64.12 item 4 (P0): companion stale recovery runbook R-64 (PAM Break-Glass Review Alert Stale, CC6.6) authored this pass; job 21 row updated with `; INCIDENT_RESPONSE R-64 (§R-64; v1.0, 2026-07-03 — companion stale recovery runbook for job 21)` in the cross-reference column. Document header v5.14.8 → v5.14.9. Owner: devops-lead.*
 
 *v5.15.6 (2026-07-04): §12.6 pg_cron canonical registry — `row-count-monitor` (unnumbered original job) cross-reference column update. Closes INCIDENT_RESPONSE.md §R-71.12 item 5 (P0): companion stale recovery runbook R-71 (Row Count Monitor Stale, CC7.1/A1.2, P0 default) authored this pass; `row-count-monitor` row updated with `; INCIDENT_RESPONSE R-71 (§R-71; v1.0, 2026-07-04 — companion stale recovery runbook for row-count-monitor)` in the cross-reference column. R-71 is the second P0-default companion stale runbook authored (R-68 was the first for `audit-chain-daily-check`); `row-count-monitor` is the only remaining P0 job among the original unnumbered §12.6 entries without a companion stale runbook after this update. Document header v5.15.5 → v5.15.6. Owner: devops-lead.*
+
+---
+
+## §70 OIDC Back-Channel Logout (BCL) Observability
+
+### §70.1 Purpose and Scope
+
+This section defines observability for FORM's OIDC Back-Channel Logout (BCL) endpoint and session revocation pipeline. BCL is the protocol by which an IdP (Okta, Entra ID) signals FORM to invalidate enterprise user sessions on IdP-side logout — without requiring the user's browser.
+
+**Source references:** `docs/SSO_SCIM_IMPLEMENTATION.md §46` (BCL Worker spec, Migration 0101, BCL-CHAIN-01 invariant, Zod v2 event schemas). DEC-030 events registered: `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (v2.89, 2026-07-04). SOC 2 evidence registered: `docs/SOC2_READINESS.md §163` (v3.89.0, 2026-07-04; BCL-E-001/002/003, evidence count 132 → 135).
+
+**BCL components monitored:**
+
+| Component | Description |
+|---|---|
+| `POST /auth/oidc/backchannel-logout` Worker | `oidc-backchannel-logout.ts` — 6-step BCL handler (receive → validate → revoke → emit events) |
+| `REVOCATION_QUEUE` Cloudflare Queue | Async retry consumer for transient DB failures; 3 retries at 5/10/20s backoff |
+| `revokeOidcSessions()` | Session UPDATE on `enterprise_sessions`; sid-path (`idp_session_id = sid`) or sub-path (`oidc_sub_hash = SHA-256(sub)`) |
+| BCL-CHAIN-01 HMAC chain | Ordering invariant enforced inline by `emit-audit-event` Worker; HTTP 422 `BCL_CHAIN_01_VIOLATION` on violation |
+
+**Four DEC-030 events (all HMAC-chained, `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`):**
+
+| Event | Severity | Retention | Trigger | Chain role |
+|---|---|---|---|---|
+| `backchannel_logout.received` | STANDARD | 7yr | HTTP request received; before tenant resolution | Anchor for BCL-CHAIN-01 |
+| `backchannel_logout.validated` | STANDARD | 7yr | JWT signature + spec checks passed | Intermediate |
+| `backchannel_logout.revoked` | STANDARD | 7yr | `revokeOidcSessions()` completed | Requires prior `.received` anchor (BCL-CHAIN-01) |
+| `backchannel_logout.failed` | HIGH | 7yr | Any validation failure (nonce_present, jwt_verification_failed, unknown_iss) | Exempt from BCL-CHAIN-01 ordering |
+
+**Privacy floor:** `oidc_sub_hash` in revocation queries is SHA-256(sub) — raw `sub` value is never stored in `enterprise_sessions` or emitted in any DEC-030 event payload (SSO_SCIM §46.2.1). `tenant_id` propagated as FORM-internal UUID only. No individual employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any BCL event payload or alert signal.
+
+**SOC 2 mapping:** CC6.1 (logical access — session revocation on IdP-side logout), CC6.3 (access revocation timeliness — DEC-030 timestamp delta proves time-to-revoke), CC7.2 (anomaly monitoring — four alert rules), CC7.3 (response SLA — P0/P1 escalation), CC8.1 (change management — Migration 0101 via BCL-E-003).
+
+**IdP `sid` support matrix (from SSO_SCIM §46.3.3):**
+
+| IdP | sid claim | Revocation path |
+|---|---|---|
+| Okta | ✅ Always present | sid-path: `idp_session_id = sid` lookup |
+| Entra ID | ✅ With `backchannel_logout_session_required` | sid-path |
+| Google Workspace | ❌ sub-only (no `sid`) | sub-path: `oidc_sub_hash = SHA-256(sub)` |
+
+**G-003 status:** 🟡 Implementation spec complete (`docs/SSO_SCIM_IMPLEMENTATION.md §46`, v2.21, 2026-07-04). G-003 advances to 🟢 when §46.8 P0 checklist items 1–9 deploy to production and BCL-I-001 + BCL-I-003 integration tests pass. This section provides observability infrastructure that activates on that deploy.
+
+---
+
+### §70.2 RED Metrics
+
+| Service | Rate (R) | Errors (E) | Duration (D) |
+|---|---|---|---|
+| **BCL Worker** | `bcl_requests_total` req/min per tenant | `bcl_requests_total{outcome="failed"}` / total | `bcl_request_duration_ms` P95; target < 2,000 ms |
+| **REVOCATION_QUEUE** | `bcl_queue_enqueued_total` msgs/min | `bcl_queue_exhausted_total` (3-retry limit reached) per 10 min | `bcl_queue_processing_duration_ms` P95 |
+| **Session revocations** | `bcl_sessions_revoked_total` per BCL request | `bcl_revocation_path{path="no_match"}` rate > 20% in 30 min | `bcl_revocation_duration_ms` P95 (DB UPDATE) |
+
+**Metric emission approach:** BCL Worker runs on Cloudflare Workers platform. Metrics are emitted via Cloudflare Workers Analytics Engine (WAE) counter data points, consistent with `cf_worker_requests_total` in §0. DEC-030 event data (four event types) is available via `audit_log_events` Supabase queries using the `form_audit` read-only role — matching the DEC-067 decision (§48) for SSO identity alert signals. No separate metric pipeline is introduced; the BCL DEC-030 event stream is the primary monitoring signal for failure detection.
+
+**No-match rate note:** `sessions_revoked_count: 0` is a valid BCL outcome per SSO_SCIM §46.4.1 §13.10 Q3 — the IdP may send a BCL for a session that has already expired in FORM (e.g., via token TTL or prior manual revocation). A no-match rate > 20% sustained 30 min is worth investigating for `sid` misconfiguration (wrong `idp_session_id` lookup column), not for security risk.
+
+---
+
+### §70.3 SLOs
+
+| SLO ID | Indicator | Target | Alert threshold | Window | Owner |
+|---|---|---|---|---|---|
+| **BCL-SLO-01** | BCL Worker HTTP 200 response rate — fraction of BCL requests that receive HTTP 200 (includes `sessions_revoked_count: 0` no-match and transient-DB-error-then-queue paths per SSO_SCIM §46.4.3) | ≥ 99.0% | < 95% in any 10-min window | Rolling 30 days | devops-lead |
+| **BCL-SLO-02** | BCL Worker P95 latency — time from HTTP request receipt to HTTP 200 response (excludes REVOCATION_QUEUE async leg) | < 2,000 ms | P95 > 3,000 ms for 15 min | Rolling 7 days | devops-lead |
+
+**BCL-SLO-01 note:** 400-series responses for invalid logout_token (nonce present, bad JWT signature, unknown iss per OIDC BCL spec) are by-design validation rejections — they do not count against BCL-SLO-01. AL-BCL-01 monitors the `backchannel_logout.failed` event rate separately as a security signal.
+
+**Enterprise SLA credit linkage:** BCL-SLO-01 and BCL-SLO-02 do not generate enterprise SLA credits independently (the §23 SLA credit framework covers user-facing SSO login availability). If a BCL-SLO-01 breach means sessions were not revoked on IdP-initiated logout, the applicable SLA pathway is SSO-SLO-04 (session revocation timeliness, §26.3 — P99 < 200 ms for KV session revocation). The REVOCATION_QUEUE retry window (max 35s total: 5 + 10 + 20s) is the outer bound on async revocation latency.
+
+---
+
+### §70.4 Alert Rules
+
+#### AL-BCL-01 — BCL Failure Rate Anomaly
+
+| Field | Value |
+|---|---|
+| **Trigger** | `backchannel_logout.failed` event rate > 5% of `.received` events in any 10-min rolling window (fleet-wide), OR any single tenant with > 2 `backchannel_logout.failed` events in 5 min |
+| **Severity** | P2 (Slack `#alerts-enterprise`); escalates to P1 (PagerDuty `form-security`) if rate > 20% sustained 15 min |
+| **Routing** | Slack `#alerts-enterprise` → security-engineer on-call; P1 escalation → PagerDuty `form-security` |
+| **Dedup key** | `bcl-failure-rate-fleet` (fleet-level, 10-min cooldown); `bcl-failure-tenant-{tenant_id}` (per-tenant, 30-min cooldown) |
+| **Runbook** | Check `backchannel_logout.failed` event `reason` field: `nonce_present` → IdP is sending non-spec logout token; `jwt_verification_failed` → JWKS fetch failure or IdP key rotation without FORM JWKS cache refresh (TTL 5 min per §46.4.1); `unknown_iss` → new OIDC tenant not yet configured in `tenant_sso_configs`. Escalate to security-engineer for `jwt_verification_failed` > 2 events / 5 min from any single IdP (possible JWT forgery probe). |
+| **Alert SQL** | `SELECT payload->>'reason', COUNT(*) FROM audit_log_events WHERE event_type = 'backchannel_logout.failed' AND created_at > NOW() - INTERVAL '10 minutes' GROUP BY 1` (form_audit role) |
+| **SOC 2** | CC7.2 (anomaly monitoring — BCL failure pattern), CC7.3 (response SLA for BCL security anomalies) |
+| **Auto-resolve** | Yes — when rate drops below 2% for 10 min |
+| **Privacy floor** | Alert payload: `tenant_id` (FORM UUID), `failure_count` (integer), `dominant_reason` (enum). No employee `user_id`, name, email, session content, or GDPR Art. 9 data. |
+
+---
+
+#### AL-BCL-02 — REVOCATION_QUEUE Retry Exhaustion
+
+| Field | Value |
+|---|---|
+| **Trigger** | `bcl_queue_exhausted_total` > 0 in any 5-min window (any BCL session revocation reached 3-retry limit and was dropped from queue) |
+| **Severity** | P1 — session revocation failure means a user session persists in FORM after IdP-side logout (CC6.3 control gap) |
+| **Routing** | PagerDuty `form-security` → security-engineer; auto-notify CSM for affected `tenant_id` via Slack `#alerts-enterprise` |
+| **Dedup key** | `bcl-revocation-queue-exhausted-{tenant_id}` (24h cooldown — one P1 per affected tenant per day; severity does not downgrade on repeat within 24h) |
+| **Runbook** | (1) Query `audit_log_events WHERE event_type = 'backchannel_logout.revoked' AND payload->>'sessions_revoked_count' = '0'` to identify affected `bcl_request_id` values; (2) Cross-reference with `enterprise_sessions WHERE revoked_at IS NULL AND tenant_id = $affected_tenant` to find persisting sessions; (3) Manual revocation via `POST /internal/tenant/{slug}/revoke-all-sessions` (form-staff Cloudflare Access only — two-person auth per `docs/SSO_SCIM_IMPLEMENTATION.md §19.4`); (4) Investigate Supabase connectivity (check Supabase status page + Cloudflare Workers connectivity); (5) File SOC 2 CC6.3 incident note if > 5 sessions remain unrevoked > 10 min after first REVOCATION_QUEUE enqueue. |
+| **SOC 2** | CC6.3 (access revocation timeliness — exhaustion = revocation gap), CC7.3 (P1 response within 15 min) |
+| **Auto-resolve** | No — manual close after IC review and session verification |
+
+---
+
+#### AL-BCL-03 — BCL-CHAIN-01 Integrity Violation
+
+| Field | Value |
+|---|---|
+| **Trigger** | Any HTTP 422 `BCL_CHAIN_01_VIOLATION` response from `emit-audit-event` Worker, OR the retrospective SQL below returns > 0 rows |
+| **Severity** | P0 — HMAC chain integrity violation is a SOC 2 critical control failure (DEC-030, CC7.2). No auto-resolve. |
+| **Routing** | PagerDuty `form-security` P0 → security-engineer + compliance-officer (simultaneous page); no cooldown; every violation is its own P0 |
+| **Dedup key** | `bcl-chain-01-violation-{bcl_request_id}` (per-request, no auto-dedup — each unique `bcl_request_id` is a distinct violation) |
+| **Runbook** | (1) Extract `bcl_request_id` UUID from violation; (2) Check KV store TTL for `bcl_anchor:{bcl_request_id}` key — if TTL expired prematurely (< 60s), KV misconfiguration (escalate to platform-engineer); (3) If genuine ordering violation (revoked emitted before received), IC-declare per `docs/INCIDENT_RESPONSE.md R-01`; (4) Preserve raw DEC-030 chain segment at `compliance/evidence/oidc-bcl/chain-violations/` for SOC 2 evidence; (5) Do not close without compliance-officer sign-off. |
+| **Retrospective SQL** | |
+
+```sql
+-- BCL-CHAIN-01 retrospective integrity check
+-- Returns orphan 'backchannel_logout.revoked' events without a prior anchor
+-- Run via form_audit role (read-only). Zero rows = chain intact. Any rows = P0.
+SELECT
+  e_revoked.payload->>'bcl_request_id'   AS bcl_request_id,
+  e_revoked.payload->>'tenant_id'        AS tenant_id,
+  e_revoked.created_at                   AS revoked_at,
+  'BCL_CHAIN_01_VIOLATION'               AS violation_type
+FROM audit_log_events e_revoked
+WHERE e_revoked.event_type = 'backchannel_logout.revoked'
+  AND e_revoked.created_at > NOW() - INTERVAL '24 hours'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events e_received
+    WHERE e_received.event_type   = 'backchannel_logout.received'
+      AND e_received.payload->>'bcl_request_id'
+                                  = e_revoked.payload->>'bcl_request_id'
+      AND e_received.created_at BETWEEN
+            e_revoked.created_at - INTERVAL '60 seconds'
+        AND e_revoked.created_at
+  );
+-- Privacy floor: no user_id, name, email, health value, or GDPR Art. 9 data.
+-- tenant_id = FORM-internal UUID; bcl_request_id = per-request UUID only.
+```
+
+| **SOC 2** | CC7.2 (HMAC chain as audit integrity control), CC7.3 (P0 IC-declare within 15 min) |
+
+---
+
+#### AL-BCL-04 — BCL Worker Latency
+
+| Field | Value |
+|---|---|
+| **Trigger** | `bcl_request_duration_ms` P95 > 3,000 ms sustained for 15 min |
+| **Severity** | P2 — exceeds BCL-SLO-02; OIDC BCL spec requires IdP HTTP response within a reasonable timeout (typically < 5s); sustained latency may cause IdP to suspend BCL delivery to FORM |
+| **Routing** | PagerDuty `form-devops` → devops-lead; Slack `#alerts-enterprise` advisory |
+| **Dedup key** | `bcl-worker-latency-p95` (30-min cooldown) |
+| **Runbook** | (1) Check BCL Worker CPU time (CF Workers dashboard — bcl route); (2) Check Supabase P95 query latency for `enterprise_sessions` UPDATE (Supabase dashboard → Query Performance); (3) Check JWKS endpoint KV cache hit rate — a KV miss triggers an outbound JWKS fetch (adds 200–800ms), consider increasing KV TTL from 5-min default (§46.4.1); (4) If `revokeOidcSessions()` sub-path (SHA-256 lookup) is slow, verify partial index `idx_enterprise_sessions_oidc_sub_hash` is used via `EXPLAIN ANALYZE` (DATA_MODEL §46.2.1). |
+| **SOC 2** | CC7.2 (latency anomaly as availability signal) |
+| **Auto-resolve** | Yes — when P95 drops below 2,000 ms for 10 min |
+
+---
+
+### §70.5 §6.2 Alert Table Additions
+
+The following four rows are added to the consolidated §6.2 alert rules table under a new `bcl` subsection (insert after `session_revocation` subsection from §26.6):
+
+| Alert ID | Trigger | Severity | Routing | SOC 2 | Runbook |
+|---|---|---|---|---|---|
+| AL-BCL-01 | `backchannel_logout.failed` rate > 5% / 10 min (fleet) or > 2 events / 5 min (tenant) | P2 → P1 if > 20% / 15 min | Slack `#alerts-enterprise`; P1 → PagerDuty `form-security` | CC7.2 / CC7.3 | §70.4 AL-BCL-01 |
+| AL-BCL-02 | REVOCATION_QUEUE exhausted retries > 0 / 5 min | P1 | PagerDuty `form-security`; CSM notify | CC6.3 / CC7.3 | §70.4 AL-BCL-02 |
+| AL-BCL-03 | BCL-CHAIN-01 violation (HTTP 422 or retrospective SQL > 0 rows) | P0 — no auto-resolve | PagerDuty `form-security` P0; no cooldown | CC7.2 / CC7.3 | §70.4 AL-BCL-03 |
+| AL-BCL-04 | BCL Worker P95 > 3,000 ms / 15 min | P2 | PagerDuty `form-devops`; Slack advisory | CC7.2 | §70.4 AL-BCL-04 |
+
+---
+
+### §70.6 Dashboard Specification
+
+**Panel group: "BCL / Federated Session Revocation"** (sub-panel of the "Enterprise Identity" dashboard defined in §26.9)
+
+| Panel | Type | Source | Purpose |
+|---|---|---|---|
+| BCL request volume (per tenant) | Time series | `bcl_requests_total` by `tenant_id`, 5-min buckets (WAE) | Volume trend; spike = IdP-side mass logout or misconfigured IdP |
+| BCL outcome breakdown | Pie chart | `bcl_requests_total{outcome}` split: HTTP 200 / failed by `reason` | Failure mode distribution |
+| `backchannel_logout.failed` events | Counter + time series | `audit_log_events WHERE event_type = 'backchannel_logout.failed'` (Supabase, `form_audit` role) | DEC-030 HMAC-chained evidence signal; raw HIGH/7yr event count |
+| REVOCATION_QUEUE exhausted retries | Counter | `bcl_queue_exhausted_total` (WAE) | Session revocation failure indicator; zero = healthy (CC6.3) |
+| BCL-CHAIN-01 integrity | Status tile | AL-BCL-03 retrospective SQL result count — `0` = ✅ intact; any rows = 🔴 P0 violation | SOC 2 CC7.2 live integrity tile |
+| BCL Worker P95 latency | Gauge | `bcl_request_duration_ms` P95, rolling 30 min (WAE) | BCL-SLO-02 adherence |
+| Sessions revoked daily | Bar chart | SUM(`bcl_sessions_revoked_total`) per tenant per day (WAE) | Operational audit trail |
+| No-match rate | Line chart | `bcl_revocation_path{path="no_match"}` / total per tenant, 1h buckets | sid misconfiguration early warning |
+
+---
+
+### §70.7 SOC 2 Evidence Mapping
+
+| Control | BCL Observability Contribution | Evidence Artefact |
+|---|---|---|
+| **CC6.1** (logical access) | BCL endpoint provides automated federated session revocation; `backchannel_logout.revoked` HMAC-chained event proves revocation occurred per IdP signal; AL-BCL-02 ensures REVOCATION_QUEUE exhaustion surfaces before sessions persist longer than the retry window | BCL-E-001 (`docs/SOC2_READINESS.md §163`), BCL-OBS-E-001 (§70.8) |
+| **CC6.3** (access revocation timeliness) | DEC-030 `backchannel_logout.received` → `.revoked` timestamp delta proves time-to-revoke; REVOCATION_QUEUE retry window ≤ 35s total (5 + 10 + 20s) bounds worst-case async revocation latency; AL-BCL-02 P1 fires on any exhaustion | BCL-E-001 chain timestamps; BCL-OBS-E-001 quarterly timestamp delta report |
+| **CC7.2** (anomaly monitoring) | AL-BCL-01 (failure rate anomaly), AL-BCL-02 (session revocation failure), AL-BCL-03 (HMAC chain integrity violation — P0), AL-BCL-04 (latency anomaly) are four running anomaly detection rules covering the BCL pipeline | BCL-OBS-E-001 (quarterly — alert rule coverage table + activation log) |
+| **CC7.3** (response to anomalies) | AL-BCL-01: Slack P2 ≤ 5 min, P1 escalation ≤ 15 min; AL-BCL-02: IC notification ≤ 15 min (P1); AL-BCL-03: IC-declare ≤ 15 min (P0, no auto-resolve); AL-BCL-04: P2 investigate ≤ 4h | BCL-OBS-E-001 (quarterly — incident response log); INCIDENT_RESPONSE companion runbooks (§70.11 pending) |
+| **CC8.1** (change management) | Migration 0101 DDL (`oidc_sub_hash` column on `enterprise_sessions`) is tracked via BCL-E-003 artefact (`docs/SOC2_READINESS.md §163`) — filed in R2 `compliance/evidence/oidc-bcl/` after production apply (§46.8 item 9) | BCL-E-003 (`docs/SOC2_READINESS.md §163`) |
+
+---
+
+### §70.8 SOC 2 Evidence Artefact
+
+| Artefact ID | Description | Controls | Cadence | Retention | R2 Path |
+|---|---|---|---|---|---|
+| **BCL-OBS-E-001** | Quarterly BCL observability health report. Must include: (1) total BCL requests per tenant; (2) `backchannel_logout.failed` count by `reason` enum (zero-event attestation if none); (3) REVOCATION_QUEUE exhaustion count (zero-event attestation if none); (4) BCL-CHAIN-01 retrospective SQL result (§70.4 AL-BCL-03 SQL) — must return zero rows or IC reference if violated; (5) AL-BCL-01/02/03/04 activation log for the quarter (zero-event attestation if no activations); (6) BCL-SLO-01 and BCL-SLO-02 compliance summary (% compliance, longest breach if any). | CC6.1, CC6.3, CC7.2, CC7.3 | Quarterly | 7yr WORM | `compliance/evidence/oidc-bcl/bcl-obs-e-001-{YYYY}-Q{N}.json` |
+
+**Privacy floor:** BCL-OBS-E-001 contains only aggregate counts, alert activation records, and SQL result sets. No individual employee `user_id`, name, email, session token, coaching content, body composition metric, or GDPR Art. 9 special-category data. `tenant_id` as FORM-internal UUID only. `oidc_sub_hash` not surfaced in the report (query returns `bcl_request_id` and `tenant_id` only — see §70.4 AL-BCL-03 SQL).
+
+**Zero-event attestation pattern:** If no `backchannel_logout.failed` events occurred in the quarter, BCL-OBS-E-001 must explicitly record `"bcl_failed_count": 0` — not omit the field. Same pattern applies to AL-BCL-02 exhaustion count and AL-BCL-03 violation count. Absence of field ≠ zero for auditors.
+
+**First filing:** Q3 2026, contingent on §46.8 M8 production deploy completing before 2026-09-30.
+
+---
+
+### §70.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Add §70 TOC entry to `docs/OBSERVABILITY.md` | devops-lead | **P0** | This pass | [x] **Done — §70 TOC entry added (v5.16.0, 2026-07-04).** |
+| 2 | Implement AL-BCL-01 alert: `audit_log_events WHERE event_type = 'backchannel_logout.failed'` 5-min and 10-min window queries via Better Stack + PagerDuty webhook for P1 escalation | devops-lead + platform-engineer | **P1** | M8 | [ ] |
+| 3 | Implement AL-BCL-02 alert: REVOCATION_QUEUE exhaustion counter via WAE; P1 PagerDuty `form-security`; CSM auto-notify | devops-lead + platform-engineer | **P1** | M8 | [ ] |
+| 4 | Implement AL-BCL-03: run retrospective BCL-CHAIN-01 SQL (§70.4) as hourly scheduled check; emit `system.bcl_chain_check_passed` LOW/1yr on zero rows; emit `security.bcl_chain_01_violation` CRITICAL/7yr + PagerDuty P0 on any row | devops-lead + compliance-officer | **P1** | M8 | [ ] |
+| 5 | Implement AL-BCL-04: WAE `bcl_request_duration_ms` P95 threshold monitor (> 3,000 ms / 15 min); PagerDuty `form-devops` P2 | devops-lead | **P1** | M8 | [ ] |
+| 6 | Build "BCL / Federated Session Revocation" panel group in Enterprise Identity dashboard (§26.9) — eight panels per §70.6 | devops-lead | **P1** | M8 | [ ] |
+| 7 | Register BCL-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.1/CC6.3/CC7.2/CC7.3, quarterly, 7yr) | compliance-officer | **P1** | M8 | [ ] |
+| 8 | File BCL-OBS-E-001 Q3 2026 first quarterly artefact (after §46.8 M8 production deploy) | compliance-officer | **P1** | Q3 2026 | [ ] |
+| 9 | Add §6.2 `bcl` subsection inline in §6.2 alert rules table — four rows per §70.5 | devops-lead | **P0** | This pass | [x] **Done — §70.5 §6.2 additions authored (v5.16.0, 2026-07-04).** |
+| 10 | Add §70 cross-reference to `docs/SSO_SCIM_IMPLEMENTATION.md §46.9` cross-reference obligations table | compliance-officer | **P1** | M8 | [ ] |
+| 11 | Register `system.bcl_chain_check_passed` LOW/1yr and `security.bcl_chain_01_violation` CRITICAL/7yr in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (§70.9 item 4 companion — new events emitted by hourly BCL-CHAIN-01 check job) | compliance-officer | **P1** | M8 | [ ] |
+| 12 | File companion IR runbooks for AL-BCL-02 (session revocation failure — R-xx) and AL-BCL-03 (chain violation — R-xx) in `docs/INCIDENT_RESPONSE.md` | compliance-officer + devops-lead | **P1** | M8 | [ ] |
+
+---
+
+### §70.10 OQ Gap Tracker
+
+| OQ | Status | Question | Owner | Target | Priority |
+|---|---|---|---|---|---|
+| OQ-BCL-OBS-01 | 🟡 **Open** | Should the BCL-CHAIN-01 retrospective integrity check (§70.9 item 4) run as a Supabase pg_cron job (direct SQL access to `audit_log_events`) or as a Cloudflare Workers Cron Trigger (Supabase query via REST + `form_audit` JWT)? pg_cron has lower latency for SQL queries and is consistent with the pg_cron sentinel pattern used by jobs 50–58. Cloudflare Workers Cron is consistent with the BCL Worker's own deployment boundary. Decision needed before M8 BCL production deploy — the choice affects whether `system.bcl_chain_check_passed` is emitted from Supabase (pg_cron) or from a Worker. If pg_cron: assign as job 59 in §12.6 registry; if Cloudflare Cron Trigger: document in §70.4 AL-BCL-03 as a Worker-side scheduler. | devops-lead + platform-engineer | Before M8 BCL production deploy | P1 |
+
+---
+
+### §70.11 Cross-Reference Obligations Created by §70
+
+| Obligation | Source | Status |
+|---|---|---|
+| §70 TOC entry added to `docs/OBSERVABILITY.md` | §70.1 | 🟢 **Done — this pass (v5.16.0, 2026-07-04).** |
+| Register BCL-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table | §70.8 / §70.9 item 7 | 🟡 Pending — P1/M8 (compliance-officer) |
+| Add §70 reference to `docs/SSO_SCIM_IMPLEMENTATION.md §46.9` cross-reference obligations | §70.9 item 10 | 🟡 Pending — P1/M8 (compliance-officer) |
+| Register `system.bcl_chain_check_passed` LOW/1yr + `security.bcl_chain_01_violation` CRITICAL/7yr in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` | §70.9 item 11 | 🟡 Pending — P1/M8 (compliance-officer) |
+| File companion IR runbook for AL-BCL-02 (session revocation failure) in `docs/INCIDENT_RESPONSE.md` | §70.9 item 12 | 🟡 Pending — P1/M8 (compliance-officer + devops-lead) |
+| File companion IR runbook for AL-BCL-03 (BCL-CHAIN-01 violation) in `docs/INCIDENT_RESPONSE.md` | §70.9 item 12 | 🟡 Pending — P1/M8 (compliance-officer + devops-lead) |
+
+---
+
+*v5.16.0 (2026-07-04): §70 OIDC Back-Channel Logout (BCL) Observability. Closes the observability gap created by `docs/SSO_SCIM_IMPLEMENTATION.md §46` (v2.21, 2026-07-04 — BCL Worker spec, Migration 0101, BCL-CHAIN-01 ordering invariant, ten-item implementation checklist). Four DEC-030 BCL events registered in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (v2.89, 2026-07-04); BCL-E-001/002/003 evidence artefacts registered in `docs/SOC2_READINESS.md §163` (v3.89.0, 2026-07-04; evidence count 132 → 135). §70.1: scopes monitoring to BCL Worker (`oidc-backchannel-logout.ts`), `REVOCATION_QUEUE`, `revokeOidcSessions()`, and BCL-CHAIN-01 HMAC chain; four DEC-030 event types with their chain roles; privacy floor (SHA-256 `oidc_sub_hash` only, raw `sub` never in events or DB); SOC 2 CC6.1/CC6.3/CC7.2/CC7.3/CC8.1; IdP `sid` support matrix (Okta ✅, Entra ID ✅ with `backchannel_logout_session_required`, Google ❌ sub-only). §70.2: RED metrics — BCL Worker (req/min, `backchannel_logout.failed` rate, P95 duration), REVOCATION_QUEUE (enqueued/exhausted), session revocation (revoked total, no-match rate); metric emission via Cloudflare WAE + Supabase `audit_log_events` queries (matching DEC-067 pattern for SSO identity signals). §70.3: two SLOs — BCL-SLO-01 (HTTP 200 rate ≥ 99.0%; alert < 95% / 10 min; rolling 30 days) and BCL-SLO-02 (P95 < 2,000 ms; alert P95 > 3,000 ms / 15 min; rolling 7 days); enterprise SLA credit linkage via SSO-SLO-04 (§26.3). §70.4: four alert rules — AL-BCL-01 (failure rate P2→P1, Slack `#alerts-enterprise` + PagerDuty `form-security` escalation; SQL specified; per-tenant dedup 30-min cooldown), AL-BCL-02 (REVOCATION_QUEUE exhaustion P1 PagerDuty `form-security`; CSM auto-notify; no auto-resolve), AL-BCL-03 (BCL-CHAIN-01 violation P0; full retrospective SQL with `form_audit` role specified; no cooldown; no auto-resolve), AL-BCL-04 (P95 latency P2 PagerDuty `form-devops`; JWKS KV miss runbook). §70.5: four §6.2 alert table rows added (bcl subsection: AL-BCL-01 through AL-BCL-04). §70.6: eight-panel "BCL / Federated Session Revocation" dashboard sub-group for §26.9 Enterprise Identity dashboard: request volume per tenant, outcome pie, `backchannel_logout.failed` events, REVOCATION_QUEUE exhaustion, BCL-CHAIN-01 integrity tile, P95 latency gauge, daily sessions revoked bar, no-match rate line. §70.7: SOC 2 evidence mapping for CC6.1 (revocation proof via HMAC chain), CC6.3 (timeliness: ≤ 35s retry window + timestamp delta), CC7.2 (four alert rules as anomaly monitors), CC7.3 (P0/P1/P2 response SLAs), CC8.1 (Migration 0101 via BCL-E-003). §70.8: BCL-OBS-E-001 quarterly evidence artefact (CC6.1/CC6.3/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/oidc-bcl/bcl-obs-e-001-{YYYY}-Q{N}.json`); zero-event attestation pattern required for all four alert counters; first filing Q3 2026 contingent on M8 production deploy. §70.9: twelve-item implementation checklist — 2× P0 Done this pass (TOC entry, §6.2 additions), 10× P1/M8 pending (alert rules 1–4, dashboard, SOC2_READINESS registration, first quarterly filing, SSO_SCIM backreference, AUDIT_LOG_SCHEMA event registration, IR runbooks); OQ-BCL-OBS-01 raised (pg_cron job 59 vs. Cloudflare Workers Cron Trigger for BCL-CHAIN-01 hourly check — P1/before-M8-production). §70.10: OQ-BCL-OBS-01 registered. §70.11: six cross-reference obligations — §70 TOC entry 🟢 Done; five 🟡 Pending P1/M8 (SOC2_READINESS BCL-OBS-E-001, SSO_SCIM §46.9 backreference, AUDIT_LOG_SCHEMA two new events, two IR runbooks). Privacy floor: all §70 content is operational metadata only — no individual employee `user_id`, name, email, session token, coaching content, body composition metric, or GDPR Art. 9 special-category data; `tenant_id` is FORM-internal UUID; `oidc_sub_hash` appears only as a query parameter reference (SHA-256 hash, not raw `sub`); BCL-OBS-E-001 aggregate-only with zero-event attestation. Document header v5.15.7 → v5.16.0. Owner: devops-lead + security-engineer + compliance-officer.*
