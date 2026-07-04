@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.16.0] — 2026-07-04
+
+### Added
+- `content/post-79-adaptation-plateau-slowing-progress.md` — Editorial series post 79 (71–80, 9/10). «Адаптація і стеля: коли прогрес сповільнюється з правильних причин». Адаптаційна крива і принцип спадної граничної корисності (Sale 1988; Folland & Williams 2007); три сценарії стелі: функціональне перевантаження, природне сповільнення між рівнями, вичерпання методу; діагностика «правильного» сповільнення від проблеми (часовий горизонт, RIR, якість виконання); алгоритм для self-coached атлета; Schoenfeld et al. 2017 гіпертрофічна відповідь у тренованих. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-3100-plateau-vs-accumulated-fatigue.md` — Series «Прогресія без тренера» 3096–3105 (5/10). «Як відрізнити плато від накопиченої втоми». Нагромаджена втома vs. справжнє плато: Meeusen et al. (2013) консенсус ECSS/ACSM FO/NFOR/OTS; три діагностичних питання; деловантаження як діагностичний тест; Halson & Jeukendrup (2004) критерій FO vs. NFOR; контекстні маркери (сон, стрес); матриця рішень; чому рання зміна програми є системною помилкою. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `content/post-3110-extreme-time-deficit-20-30-min-session.md` — Series «Тренування в реальних умовах» 3106–3115 (5/10). «Тренування при екстремальному дефіциті часу: 20–30-хвилинна сесія як достатній мінімум». МЕД у силовому тренуванні: Krieger (2010) 1–3 підходи; Androulakis-Korakakis et al. (2020) 1–2 підходи підтримують силу; Ralston et al. (2017) різниця між «мало» і «нічого»; два сценарії дефіциту; ієрархія пріоритетів вправ; структура 20-хвилинної сесії; частота як важіль; Seaborne et al. (2018) м'язова пам'ять. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — картки для post-3110, post-3100, post-79 prepended у верх feed.
+
+### Changed
+- `STATUS.md` — editorial 71–80 8/10 → 9/10; «Прогресія без тренера» 4/10 → 5/10; «Тренування в реальних умовах» 4/10 → 5/10; v12.16.0.
+- `VERSION` — 12.15.0 → 12.16.0.
+
 ## [12.15.0] — 2026-07-04
 
 ### Added
