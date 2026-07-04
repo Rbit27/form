@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v12.47.0** — 2026-07-04 · content · post-3160 · «Помилка планування в тренуванні: чому блоки завжди виходять довшими і важчими за задум» (series «Тренувальне мислення» 3156–3165, 5/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3160 · «Тренувальне мислення» in progress 4/10 → 5/10 · next: post-3161 (series «Тренувальне мислення» 6/10 — «Ефект Зейгарнік у тренуванні: чому незавершені підходи і перервані цикли займають ментальний простір більше, ніж завершені»)
+
 **v12.46.0** — 2026-07-04 · content · post-3159 · «Ефект Даннінга-Крюгера у силовому тренуванні: де знаходиться self-coached атлет на кривій компетентності» (series «Тренувальне мислення» 3156–3165, 4/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3159 · «Тренувальне мислення» in progress 3/10 → 4/10 · README series table updated: 3156–3158 statuses corrected, 3159 reordered (DK replaces Planning Fallacy; PF moved to 3160) · next: post-3160 (series «Тренувальне мислення» 5/10 — «Помилка планування в тренуванні: чому блоки завжди виходять довшими і важчими за задум»)
 
 **v12.45.0** — 2026-07-04 · content · post-3158 · «Надмірна впевненість у RPE: коли суб'єктивна шкала починає брехати систематично» (series «Тренувальне мислення» 3156–3165, 3/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3158 · «Тренувальне мислення» in progress 2/10 → 3/10 · next: post-3159 (series «Тренувальне мислення» 4/10 — «Ефект Даннінга-Крюгера у силовому тренуванні: де знаходиться self-coached атлет на кривій компетентності»)
