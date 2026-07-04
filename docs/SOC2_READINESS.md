@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.88.0
+# FORM · SOC 2 Type II Readiness v3.89.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -35544,7 +35544,9 @@ A1.2 requires that the entity monitors system capacity and performance against c
 
 SAML Single Logout (SLO) is the federated protocol mechanism that allows FORM (as SP) to propagate a user's logout to the IdP — and vice versa. Without SLO, a FORM local logout does not terminate the user's authentication session at Okta/Entra AD, enabling silent re-authentication without re-entering IdP credentials. `docs/SSO_SCIM_IMPLEMENTATION.md §45` provides the full implementation specification: SP-initiated and IdP-initiated SLO Worker (`saml-slo.ts`), Migration 0100 DDL (`slo_url` + `slo_binding` columns on `tenant_sso_configs`), SAML callback update for `idp_name_id` + `idp_session_id` population, SLO-CHAIN-01 invariant, and a 12-item P0 implementation checklist. Five DEC-030 HMAC-chained events (`slo.sp_initiated`, `slo.idp_initiated`, `slo.completed`, `slo.failed`, `slo.fallback_local_only`) were registered in `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events` (v2.88, 2026-07-04 — item 6 of §45.8 checklist). This section registers the four companion SOC 2 evidence artefacts (SLO-E-001 through SLO-E-004) that close item 11.
 
-### §162.2 §79.4 Master Evidence Table Entries (evidence count 128 → 132)
+### §162.2 §79.4 Master Evidence Table Entries (evidence count 128 → 135)
+
+> **Updated 2026-07-04:** rows 133–135 (BCL-E-001…BCL-E-003) added in §163 (this section updated to reflect cumulative count 128 → 135).
 
 | # | Artefact ID | TSC | Description | Trigger | Retention | R2 path | Status |
 |---|---|---|---|---|---|---|---|
@@ -35605,6 +35607,74 @@ SLO-E-001 through SLO-E-004 added to §80.4 Vanta mirror registry.
 | 7 | Authoring complete — §162 documentation obligation fulfilled | compliance-officer | **P1** | [x] **Done — 2026-07-04 (SOC2_READINESS.md v3.88.0).** |
 
 ---
+
+---
+
+## §163 · BCL-E-001…BCL-E-003 Registration (CC6.1/CC6.3/CC8.1 · SSO_SCIM_IMPLEMENTATION §46 · OIDC Back-Channel Logout Evidence Artefacts)
+
+> **Date:** 2026-07-04. **Trigger:** `docs/SSO_SCIM_IMPLEMENTATION.md §46.8` item 10 (P1/M8) — "Add BCL-E-001 through BCL-E-003 to `docs/SOC2_READINESS.md §79.4` master evidence table (count 132 → 135); map to CC6.1/CC6.3/CC8.1." **Owner:** compliance-officer + security-engineer + platform-engineer.
+
+OIDC back-channel logout (BCL) is the RFC 9470 mechanism by which an IdP (Okta, Azure AD/Entra ID) pushes a `logout_token` directly to FORM's back-channel endpoint (`POST /auth/oidc/backchannel-logout`) to revoke one or all sessions for a user — without requiring the user's browser as an intermediary. `docs/SSO_SCIM_IMPLEMENTATION.md §46` provides the full implementation specification: `oidc-backchannel-logout.ts` Worker, Migration 0101 DDL (`oidc_sub_hash` column on `enterprise_sessions`), OIDC callback update, BCL-CHAIN-01 invariant, and a 10-item P0/M8 implementation checklist. Four DEC-030 HMAC-chained events (`backchannel_logout.received`, `backchannel_logout.validated`, `backchannel_logout.revoked`, `backchannel_logout.failed`) were registered in `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` (v2.89, 2026-07-04 — §46.8 item 6). This section registers the three companion SOC 2 evidence artefacts (BCL-E-001 through BCL-E-003) per §46.8 item 10.
+
+### §163.2 §79.4 Master Evidence Table Entries (evidence count 132 → 135)
+
+| # | Artefact ID | TSC | Description | Trigger | Retention | R2 path | Status |
+|---|---|---|---|---|---|---|---|
+| 133 | BCL-E-001 | CC6.1, CC6.3 | OIDC BCL 30-day event chain export: automated monthly export of all `backchannel_logout.*` DEC-030 HMAC-chained events across all tenants with `backchannel_logout_enabled = true`, via `compliance/scripts/export-bcl-events.sh`; signed JSON Lines. Each record includes `bcl_request_id`, `tenant_id`, event chain sequence (`received` → `validated` → `revoked` or `failed`), `sessions_revoked_count`, `revocation_method`, and HMAC chain verification result. Confirms that every inbound `logout_token` is traceable to a terminal event (revoked or failed) — no orphan received events without closure. | Automated monthly export beginning 30 days after M8 go-live; nil-export attestation if zero BCL events in the period | 7yr WORM | `compliance/evidence/oidc-bcl/bcl-e-001-30day-export.jsonl` | 🟡 **Pending — M8 go-live (§46.8 P0 checklist)** |
+| 134 | BCL-E-002 | CC6.1 | OIDC BCL integration test results: full output of BCL-I-001 through BCL-I-008 test executions against Okta developer sandbox (BCL-I-001: sid-path happy path) and Entra ID developer tenant (BCL-I-003: Azure AD sid-path). Confirms that sid-path revocation, sub-path revocation, invalid JWT rejection, nonce-present rejection, unknown-iss rejection, no-match (zero-revoke), and BCL-CHAIN-01 enforcement all behave as specified (§46.7). BCL-I-001 + BCL-I-003 results are the primary CC6.1 functional evidence (cross-protocol federated logout coverage alongside SLO-E-003 for SAML). BCL-I-005 (invalid signature rejection) and BCL-I-008 (BCL-CHAIN-01 HTTP 422) are the secondary security evidence. | At §46.8 P0 checklist completion — before migration 0101 is applied to production | 7yr WORM | `compliance/evidence/oidc-bcl/bcl-e-002-integration-test.json` | 🟡 **Pending — §46.8 item 8 (P0/M8)** |
+| 135 | BCL-E-003 | CC8.1 | Migration 0101 apply log: Supabase migration log export confirming migration 0101 (`oidc_sub_hash TEXT GENERATED ... STORED` / `oidc_sub_hash` SHA-256 hex column on `enterprise_sessions`) was applied to production; includes: apply timestamp, reviewer (devops-lead) sign-off UUID, `ci.migration_applied` DEC-030 chain event UUID for cross-reference, and adversarial CI test MIG-0101-01…MIG-0101-03 pass/fail summary (§46.2). Demonstrates that the BCL schema change followed FORM's documented change management process (CC8.1). | At migration 0101 production apply (§46.8 item 9, P0/M8) | 7yr WORM | `compliance/evidence/oidc-bcl/bcl-e-003-migration-0101-log.json` | 🟡 **Pending — §46.8 item 9 (P0/M8)** |
+
+### §163.3 R2 Storage Specification
+
+| Field | Value |
+|---|---|
+| R2 bucket | `r2:form-compliance` (WORM-enabled, EU region) |
+| R2 API access | `r2:form-api` REVOKED — compliance-officer / devops-lead PAM-elevated manual upload only |
+| Subfolder | `compliance/evidence/oidc-bcl/` (NEW — to be provisioned by devops-lead at M8 deploy) |
+| Filing deadlines | BCL-E-001: T+30 days post M8 go-live · BCL-E-002: pre-production deploy · BCL-E-003: at migration 0101 apply |
+
+**Privacy floor (all three artefacts):** BCL-E-001 event payloads contain FORM-internal UUIDs (`tenant_id`, `bcl_request_id`), `sub_hash` (SHA-256 hex digest of OIDC `sub` — raw `sub` never stored), `sid` (opaque IdP session ID — non-PII per OIDC Core §2), `iss` (IdP issuer URL — not a user identity attribute), counts, and enums. No employee name, email, body composition, health metric, or GDPR Art. 9 special-category data in any BCL evidence artefact. BCL-E-002 contains test harness output and developer sandbox metadata only. BCL-E-003 contains migration SQL metadata and a devops-lead UUID only.
+
+### §163.4 §80.4 Vanta Mirror Protocol Update
+
+BCL-E-001 through BCL-E-003 added to §80.4 Vanta mirror registry.
+
+| Artefact | SOC 2 Criteria | Mirror cadence |
+|---|---|---|
+| BCL-E-001 | CC6.1, CC6.3 — OIDC federated session revocation | Monthly (aligned to export run) |
+| BCL-E-002 | CC6.1 — BCL integration test functional evidence | Once (at M8 P0 checklist completion) + re-file on major IdP config change |
+| BCL-E-003 | CC8.1 — BCL schema change management | Once (at migration 0101 production apply) |
+
+### §163.5 CC6.1 / CC6.3 / CC8.1 Auditor Narratives
+
+**CC6.1 (Logical Access Restrictions):** BCL-E-001 30-day chain export demonstrates that FORM's OIDC back-channel logout Worker processed IdP-initiated session revocation events and revoked matching `enterprise_sessions` rows for all tenants with BCL enabled. Without BCL, a user whose IdP-side session is revoked (e.g., admin revocation in Okta, device wipe via Entra ID) would retain a valid FORM session token until natural expiry. `backchannel_logout.received` → `.validated` → `.revoked` HMAC triples in BCL-E-001 prove the termination control was exercised. BCL-E-002 integration tests (BCL-I-001 Okta sid-path, BCL-I-003 Azure AD sid-path) prove the Worker handles both production IdPs correctly before production deploy.
+
+**CC6.3 (Session Revocation):** `revocation_method` in `.validated` and `.revoked` events distinguishes `sid`-path (single-session precision revocation via `idp_session_id` lookup) from `sub`-path (all-sessions-for-sub revocation via `oidc_sub_hash` lookup) — both satisfy CC6.3 session lifecycle completeness. BCL-CHAIN-01 ordering invariant prevents phantom `.revoked` events that could obscure incomplete revocation. Together with SAML SLO (§45 / SLO-E-001…SLO-E-004), BCL closes federated session revocation for both supported SSO protocols (SAML 2.0 and OIDC).
+
+**CC8.1 (Change Management):** BCL-E-003 migration 0101 log confirms that the `enterprise_sessions.oidc_sub_hash` column addition followed FORM's documented change management process: migration SQL authored, reviewed, tested with adversarial CI (MIG-0101-01…MIG-0101-03 covering sub_hash correctness, partial-index performance, and rollback safety), staging apply, and production apply with devops-lead sign-off.
+
+### §163.6 Cross-Reference Obligations Closed
+
+| Cross-reference obligation | Status |
+|---|---|
+| SSO_SCIM_IMPLEMENTATION.md §46.8 item 10 (P1 — add BCL-E-001…BCL-E-003 to §79.4, count 132 → 135) | [x] **Done — 2026-07-04 (§163.2, this section)** |
+| AUDIT_LOG_SCHEMA.md §BCL-Events (v2.89) — BCL-E-001 referenced as 30-day evidence source | [x] **Registered — AUDIT_LOG_SCHEMA v2.89, 2026-07-04** |
+
+### §163.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register BCL-E-001…BCL-E-003 in §79.4 master evidence table (CC6.1/CC6.3/CC8.1; count 132 → 135) | compliance-officer + security-engineer | **P1** | [x] **Done — 2026-07-04 (§163.2, this section).** |
+| 2 | Provision `compliance/evidence/oidc-bcl/` subfolder in `r2:form-compliance` | devops-lead | **P0** | [ ] **Pending — §46.8 M8 deploy.** |
+| 3 | Add BCL-E-001…BCL-E-003 to §80.4 Vanta mirror protocol | compliance-officer | **P1** | [x] **Done — 2026-07-04 (§163.4, this section).** |
+| 4 | Collect BCL-E-002 (integration test results) at §46.8 P0 checklist completion | platform-engineer + security-engineer | **P0** | [ ] **Pending — §46.8 item 8 (P0/M8).** |
+| 5 | Collect BCL-E-003 (migration 0101 log) at production apply | devops-lead | **P0** | [ ] **Pending — §46.8 item 9 (P0/M8).** |
+| 6 | File BCL-E-001 (first 30-day export) at T+30 days post M8 go-live | compliance-officer | **P1** | [ ] **Pending — M8 go-live + 30 days.** |
+| 7 | Authoring complete — §163 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-04 (SOC2_READINESS.md v3.89.0).** |
+
+---
+
+*v3.89.0 (2026-07-04): §163 — BCL-E-001…BCL-E-003 Registration (CC6.1/CC6.3/CC8.1 · SSO_SCIM_IMPLEMENTATION §46 · OIDC Back-Channel Logout). Three OIDC BCL evidence artefacts registered in §79.4 master evidence table (count 132 → 135): BCL-E-001 (CC6.1/CC6.3 — 30-day BCL event chain export, 7yr WORM, `compliance/evidence/oidc-bcl/bcl-e-001-30day-export.jsonl`); BCL-E-002 (CC6.1 — Okta + Azure AD BCL integration test results BCL-I-001 + BCL-I-003, 7yr WORM, `compliance/evidence/oidc-bcl/bcl-e-002-integration-test.json`); BCL-E-003 (CC8.1 — Migration 0101 apply log + devops-lead sign-off, 7yr WORM, `compliance/evidence/oidc-bcl/bcl-e-003-migration-0101-log.json`). Closes SSO_SCIM_IMPLEMENTATION.md §46.8 item 10 (P1/M8 — add BCL-E-001…BCL-E-003 to §79.4). §162.2 section header updated (128 → 132 → 128 → 135 cumulative note). CC6.1 auditor narrative: BCL-E-001 30-day export + BCL-E-002 integration test results together prove OIDC federated session revocation was exercised correctly; complements SLO-E-001…SLO-E-003 for SAML. Together BCL + SAML SLO cover both federated protocols (OIDC and SAML 2.0) for CC6.1 logical access termination. CC6.3 narrative: `revocation_method` (sid|sub) + `sessions_revoked_count` in `.revoked` events prove both single-session and all-sessions-for-sub revocation paths; BCL-CHAIN-01 prevents orphan revocation records. CC8.1 narrative: BCL-E-003 migration 0101 log confirms `oidc_sub_hash` schema change followed FORM change management (adversarial CI MIG-0101-01…03, staging apply, production apply with devops-lead sign-off). Privacy floor (all three artefacts): `sub_hash` is SHA-256 hex — raw `sub` never in evidence; `sid` is non-PII OIDC session reference; `iss` is IdP issuer URL; no employee name, email, health data, or GDPR Art. 9 data. Cross-references: AUDIT_LOG_SCHEMA.md v2.89 (§BCL-Events — four BCL events registered; §46.8 item 6 🟢 Done v2.89); SSO_SCIM_IMPLEMENTATION.md §46 (full BCL spec; §46.8 item 10 🟢 Done this section; §46.9 gap G-003 🟡 Implementation spec complete). Document header v3.88.0 → v3.89.0. Owner: compliance-officer + security-engineer + platform-engineer.*
 
 *v3.88.0 (2026-07-04): §162 — SLO-E-001…SLO-E-004 Registration (CC6.1/CC6.3/CC8.1 · SSO_SCIM_IMPLEMENTATION §45 · SAML SLO). Four SAML SLO evidence artefacts registered in §79.4 master evidence table (count 128 → 132): SLO-E-001 (CC6.1/CC6.3 — SP-initiated SLO chain export, 7yr WORM, `compliance/evidence/saml-slo/slo-e-001-sp-chain-export.json`); SLO-E-002 (CC6.1/CC6.3 — IdP-initiated SLO export, 7yr WORM, `compliance/evidence/saml-slo/slo-e-002-idp-initiated-export.json`); SLO-E-003 (CC6.1 — integration test matrix SLO-I-001…SLO-I-008 results artefact from Okta developer sandbox, 7yr WORM, `compliance/evidence/saml-slo/slo-e-003-okta-integration-test.json`); SLO-E-004 (CC8.1 — Migration 0100 apply log + reviewer sign-off, 7yr WORM, `compliance/evidence/saml-slo/slo-e-004-migration-0100-log.json`). Closes SSO_SCIM_IMPLEMENTATION.md §45.8 item 11 (P1/M7 — add SLO-E-001…SLO-E-004 to §79.4). CC6.1 auditor narrative: SLO-E-001 SP-chain export demonstrates federated session termination was exercised at the IdP layer (not just FORM-local) for all SP-initiated logouts in the first 30 days post M7 go-live. CC6.3 auditor narrative: `sessions_revoked_count` in `slo.idp_initiated` (SLO-E-002) proves all active sessions for a given `idp_name_id` were revoked — not just the initiating session. CC8.1 auditor narrative: SLO-E-004 migration 0100 apply log confirms the `slo_url` + `slo_binding` schema changes followed FORM's change management process (migration SQL review, staging apply, adversarial CI tests MIG-0100-01…MIG-0100-05, production apply with devops-lead sign-off). Privacy floor: SLO-E-001/002 artefacts contain only FORM-internal UUIDs (`tenant_id`, `slo_request_id`, `session_id` nullable), `idp_name_id` (SAML federation-layer pseudonym — not a GDPR Art. 9 identifier, no health data), and timestamps/enums; no employee `user_id` (except `slo.fallback_local_only` which has nullable `user_id`); SLO-E-003/004 contain test harness output and migration SQL metadata only. Cross-references: AUDIT_LOG_SCHEMA.md v2.88 (§SAML-SLO-Events — five `slo.*` DEC-030 events registered); SSO_SCIM_IMPLEMENTATION.md §45 (full SLO spec; §45.8 item 6 🟢 Done v2.88; §45.8 item 11 🟢 Done this section). Owner: compliance-officer + security-engineer + platform-engineer.*
 

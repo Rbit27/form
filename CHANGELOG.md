@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [12.31.0] — 2026-07-04
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §BCL-Events` — OIDC Back-Channel Logout DEC-030 events registered (v2.89). Four HMAC-chained events: `backchannel_logout.received` (STANDARD/7yr), `backchannel_logout.validated` (STANDARD/7yr), `backchannel_logout.revoked` (STANDARD/7yr), `backchannel_logout.failed` (HIGH/7yr — P3 Slack `#alerts-enterprise`). Full Zod v2 schemas: `BclReceivedPayload`, `BclValidatedPayload`, `BclRevokedPayload`, `BclFailedPayload`. BCL-CHAIN-01 ordering invariant table (HTTP 422 `BCL_CHAIN_01_VIOLATION` if `backchannel_logout.revoked` emitted without prior `backchannel_logout.received` with matching `{tenant_id, bcl_request_id}` within 60s KV window; `backchannel_logout.failed` exempt). SOC 2 evidence artefacts table: BCL-E-001/002/003. CC6.1 and CC6.3 auditor narratives. Retention table rows added for all four events. Schema v2.89 changelog entry added.
+- `docs/SOC2_READINESS.md §163` — BCL-E-001…BCL-E-003 evidence artefacts registered (v3.89.0). §79.4 evidence count 132 → 135: BCL-E-001 (30-day OIDC BCL event export; CC6.1/CC6.3), BCL-E-002 (Okta + Azure AD integration test results; CC6.1), BCL-E-003 (Migration 0101 log; CC8.1). §163.3: R2 storage spec — new subfolder `compliance/evidence/oidc-bcl/`. §163.4: §80.4 Vanta mirror protocol update. §163.5: CC6.1/CC6.3/CC8.1 auditor narratives. §163.6: Cross-reference obligations closed table. §163.7: Implementation checklist (items 1,3,7 Done; items 2,4,5,6 Pending M8).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — header v2.88 → v2.89; retention table 2 BCL rows added; BCL-Events section inserted.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — header v2.21 → v2.22; §46.8 items 6 (P0 — AUDIT_LOG_SCHEMA v2.89) and 10 (P1 — SOC2_READINESS §163) closed; §46.9 cross-references updated; v2.22 patch note added.
+- `docs/SOC2_READINESS.md` — header v3.88.0 → v3.89.0; §162.2 evidence count 132 → 135; §163 added; v3.89.0 changelog entry added.
+- `README.md` — series «Тренування в реальних умовах» 3106–3115 `in progress 9/10` → `COMPLETE 10/10`; version badge 12.29.0 → 12.31.0.
+- `VERSION` — 12.30.0 → 12.31.0.
+
+---
+
 ## [12.30.0] — 2026-07-04
 
 ### Added

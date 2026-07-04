@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 in progress 9/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 proposed · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.29.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 proposed · series «Тренувальний менеджмент часу» 3126–3135 proposed · series «Self-coached атлет: перший рік» 3136–3145 proposed · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.31.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3498,22 +3498,22 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3104 | Програмування мікропрогресій для intermediate і advanced атлета | proposed |
 | 3105 | Синтез 3096–3105: операційна система прогресії для self-coached атлета | proposed |
 
-### Series «Тренування в реальних умовах» 3106–3115 · in progress 1/10 · v12.10.0
+### Series «Тренування в реальних умовах» 3106–3115 · COMPLETE 10/10 · v12.31.0
 
 Серія про те, як self-coached атлет адаптує практику до обставин реального життя — без скасування тренувань і без ілюзії «ідеальних умов». Фокус: операційні рішення в умовах дефіциту сну, середовищного стресу, відновлення після хвороби і непостійного розкладу. Тон: editorial-brutalist, 13-min read.
 
 | Post | Topic | Status |
 |---|---|---|
 | 3106 | Тренування після безсонної ночі: що реально змінюється і що можна зберегти | **draft · v12.10.0 → post-3106-training-after-sleepless-night.md** |
-| 3107 | Хвороба і тренування: де межа між «можна» і «не варто» — і хто її визначає | **draft · v12.11.0 → post-3107-illness-and-training-boundary.md · «Тренування в реальних умовах» 2/10 · clinical-safety CONDITIONAL PASS** |
-| 3108 | Тренування у відрядженні або подорожі: мінімальний протокол без залу | proposed |
-| 3109 | Коли немає часу на повну сесію: скорочений формат без втрати стимулу | proposed |
-| 3110 | Тренування під час стресового тижня: де знизити навантаження, де не треба | proposed |
-| 3111 | Повернення після перерви від двох тижнів до двох місяців: послідовність першого блоку | proposed |
-| 3112 | Відновлення після травми: що зберегти, що відновити і в якому порядку | proposed |
-| 3113 | Тренування при зміні розкладу (нічні зміни, дитина, сезонні зміни): як перебудувати структуру | proposed |
-| 3114 | Мотивація і дисципліна як неправильна рамка: що реально підтримує практику довгостроково | proposed |
-| 3115 | Синтез 3106–3115: протокол адаптації тренувань до обставин реального життя | proposed |
+| 3107 | Хвороба і тренування: де межа між «можна» і «не варто» — і хто її визначає | **draft · v12.11.0 → post-3107-illness-and-training-boundary.md · clinical-safety CONDITIONAL PASS** |
+| 3108 | Тренування у відрядженні або подорожі: мінімальний протокол без залу | **draft · post-3108-travel-training-minimal-protocol.md** |
+| 3109 | Коли немає часу на повну сесію: скорочений формат без втрати стимулу | **draft · post-3109-chronic-sleep-deprivation-training.md** |
+| 3110 | Тренування під час стресового тижня: де знизити навантаження, де не треба | **draft · post-3110-extreme-time-deficit-20-30-min-session.md** |
+| 3111 | Повернення після перерви від двох тижнів до двох місяців: послідовність першого блоку | **draft · post-3111-emotional-exhaustion-training-decision.md** |
+| 3112 | Відновлення після травми: що зберегти, що відновити і в якому порядку | **draft · post-3112-return-after-long-break.md** |
+| 3113 | Тренування при зміні розкладу (нічні зміни, дитина, сезонні зміни): як перебудувати структуру | **draft · post-3113-training-with-young-child-newborn-phase.md** |
+| 3114 | Мотивація і дисципліна як неправильна рамка: що реально підтримує практику довгостроково | **draft · post-3114-athlete-after-40-recovery-myths.md** |
+| 3115 | Синтез 3106–3115: адаптивна стійкість self-coached атлета | **draft · v12.26.0 → post-3115-adaptive-resilience-self-coached-system-synthesis.md · SERIES COMPLETE · clinical-safety NOT_REQUIRED** |
 
 ### Editorial series: 3116–3125 — Самодіагностика без тренера: як атлет читає власний прогрес (proposed · v12.7.0)
 
