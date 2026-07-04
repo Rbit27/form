@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v12.53.0** — 2026-07-04 · content · post-3166 · «Чому self-coached атлет потребує системи рішень, а не набору правил» · series «Тренувальна автономія» 3166–3175 (1/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3166 · «Тренувальна автономія» proposed → in progress 1/10 · next: post-3167 («Ієрархія принципів: що стоїть вище — дослідження, досвід чи відчуття тіла»)
+
 **v12.52.0** — 2026-07-04 · content · post-3165 · «Синтез 3156–3165: десять когнітивних пасток і як їх обходити без зовнішнього спостерігача» · series «Тренувальне мислення» 3156–3165 (10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card added for post-3165 · README: «Тренувальне мислення» COMPLETE 10/10, «Тренувальна автономія» 3166–3175 in progress 0/10 · next: post-3166 («Чому self-coached атлет потребує системи рішень, а не набору правил»)
 
 **v12.51.1** — 2026-07-04 · enterprise · SSO_SCIM §46.13 + §46.14 Migration 0101 deploy specs · v12.51.1
