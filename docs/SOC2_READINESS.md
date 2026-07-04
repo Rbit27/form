@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.89.0
+# FORM · SOC 2 Type II Readiness v3.89.1
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -35671,6 +35671,62 @@ BCL-E-001 through BCL-E-003 added to §80.4 Vanta mirror registry.
 | 5 | Collect BCL-E-003 (migration 0101 log) at production apply | devops-lead | **P0** | [ ] **Pending — §46.8 item 9 (P0/M8).** |
 | 6 | File BCL-E-001 (first 30-day export) at T+30 days post M8 go-live | compliance-officer | **P1** | [ ] **Pending — M8 go-live + 30 days.** |
 | 7 | Authoring complete — §163 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-04 (SOC2_READINESS.md v3.89.0).** |
+
+---
+
+*v3.89.1 (2026-07-04): §164 — BCL-OBS-E-001 Registration (CC6.1/CC6.3/CC7.2/CC7.3 · OBSERVABILITY §70.8 · BCL Observability Quarterly Report). BCL-OBS-E-001 registered in §79.4 master evidence table (count 135 → 136). Closes OBSERVABILITY §70.9 item 7 (P1/M8) and §70.11 pending obligation "Register BCL-OBS-E-001 in §79.4". Privacy floor: BCL-OBS-E-001 contains only aggregate counts, alert activation records, and SQL result sets — no individual employee `user_id`, name, email, session token, coaching content, body composition metric, or GDPR Art. 9 special-category data; `tenant_id` as FORM-internal UUID only; `oidc_sub_hash` not surfaced. Document header v3.89.0 → v3.89.1. Owner: compliance-officer.*
+
+---
+
+## §164 · BCL-OBS-E-001 Registration (CC6.1/CC6.3/CC7.2/CC7.3 · OBSERVABILITY §70.8 · BCL Observability Quarterly Evidence Artefact)
+
+> **Date:** 2026-07-04. **Trigger:** `docs/OBSERVABILITY.md §70.9` item 7 (P1/M8) — "Register BCL-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.1/CC6.3/CC7.2/CC7.3, quarterly, 7yr)." **Owner:** compliance-officer.
+
+BCL-OBS-E-001 is the quarterly BCL observability health report defined in `docs/OBSERVABILITY.md §70.8`. It is the monitoring-infrastructure companion to BCL-E-001 (monthly 30-day event chain export, §163). While BCL-E-001 evidences the *outcome* of BCL-mediated session revocations, BCL-OBS-E-001 evidences the *monitoring controls* (alert activation log, SLO compliance summary, BCL-CHAIN-01 retrospective SQL result) that ensure the BCL Worker and REVOCATION_QUEUE are continuously operational. An auditor cannot rely on BCL-E-001 alone to demonstrate CC7.2 anomaly monitoring — BCL-OBS-E-001 closes that gap by providing quarterly proof that AL-BCL-01 through AL-BCL-04 ran as specified and that SLO breach windows, if any, are documented with IC references.
+
+### §164.2 §79.4 Master Evidence Table Entry (evidence count 135 → 136)
+
+| # | Evidence ID | SOC 2 Criteria | Description | Class | Cadence | Retention | Owner | R2 Path |
+|---|---|---|---|---|---|---|---|---|
+| 136 | BCL-OBS-E-001 | CC6.1, CC6.3, CC7.2, CC7.3 | Quarterly BCL observability health report. Must contain: (1) total BCL requests per tenant (`backchannel_logout.received` count, last 90 days); (2) `backchannel_logout.failed` count by `reason` enum — zero-count quarters filed as affirmative attestation; (3) REVOCATION_QUEUE exhaustion count (AL-BCL-02 activations) — zero-count quarters filed as affirmative attestation; (4) BCL-CHAIN-01 retrospective SQL result (§70.4 AL-BCL-03 SQL against `audit_log_events` — must return zero rows or include IC reference for each non-zero row); (5) AL-BCL-01/02/03/04 quarterly activation log (date, severity, resolution timestamp, IC reference — zero-event quarters filed as affirmative attestation); (6) BCL-SLO-01 (HTTP 200 rate ≥ 99.0%, rolling 30 days) and BCL-SLO-02 (P95 < 2,000 ms, rolling 7 days) compliance summary (% compliance, longest breach window if any, associated IC reference). **Privacy floor:** BCL-OBS-E-001 contains only aggregate counts, alert activation records, and SQL result sets. No individual employee `user_id`, name, email, session token, coaching content, body composition metric, or GDPR Art. 9 special-category data. `tenant_id` as FORM-internal UUID only (in (1) per-tenant request count only). `oidc_sub_hash` not surfaced in this report (AL-BCL-03 SQL returns `bcl_request_id` and `tenant_id` only — see §70.4). Source: `docs/OBSERVABILITY.md §70.8` (full spec). | Manual-periodic (aggregate query + alert log export) | Quarterly — first filing Q3 2026 contingent on §46.8 M8 production deploy; nil-report attestation if BCL not yet in production | 7yr WORM | compliance-officer + devops-lead | `compliance/evidence/oidc-bcl/bcl-obs-e-001-{YYYY}-Q{N}.json` |
+
+### §164.3 SOC 2 Auditor Narratives
+
+**CC6.1 (Logical Access Restrictions):** BCL-OBS-E-001 section (4) BCL-CHAIN-01 retrospective SQL result combined with BCL-E-001 (30-day event chain export, §163) demonstrates that OIDC back-channel logout events were processed without integrity violations: BCL-CHAIN-01 requires `backchannel_logout.received` to appear in the HMAC chain before any `backchannel_logout.revoked` event for the same `bcl_request_id`. A zero-row BCL-CHAIN-01 retrospective result proves no revocation event was orphaned (i.e., no session was marked revoked without a prior intake record), strengthening the CC6.1 termination control evidence.
+
+**CC6.3 (Access Restrictions for Third Parties):** BCL-OBS-E-001 section (2) `backchannel_logout.failed` by `reason` enum and section (3) REVOCATION_QUEUE exhaustion count directly evidence whether FORM's federated session revocation control (the mechanism satisfying MSA §5.4 "sessions revoked within 60 seconds of IdP logout signal") operated without significant failure rate. A zero-count or low-failure-rate quarter confirms the CC6.3 timeliness commitment was upheld; any AL-BCL-02 activation (REVOCATION_QUEUE exhaustion) is documented with an IC reference proving FORM detected and responded to the control failure.
+
+**CC7.2 (System Monitoring):** BCL-OBS-E-001 section (5) AL-BCL-01/02/03/04 quarterly activation log is the primary CC7.2 evidence for BCL observability — it demonstrates that FORM's four BCL alert rules ran and that any anomaly (failure rate spike, REVOCATION_QUEUE exhaustion, BCL-CHAIN-01 violation, P95 latency regression) generated a documented IC response. Zero-activation quarters filed as affirmative attestation that BCL operated within SLO throughout the period. AL-BCL-03 (BCL-CHAIN-01 P0; no auto-resolve) is the highest-severity monitor: its zero-activation attestation confirms audit chain integrity was never breached.
+
+**CC7.3 (Incident Response):** BCL-OBS-E-001 section (5) activation log cross-references IC references for any AL-BCL-01/02/03/04 triggers, providing auditor-navigable links from anomaly detection to documented incident response. Any P0 IC reference in an AL-BCL-03 entry must correspond to a post-mortem in `docs/INCIDENT_RESPONSE.md R-74` (BCL-CHAIN-01 Integrity Violation runbook). This closes the CC7.3 loop from anomaly detection → IC activation → documented resolution.
+
+### §164.4 Vanta Mirror Protocol
+
+BCL-OBS-E-001 added to §80.4 Vanta mirror protocol:
+
+| Evidence ID | SOC 2 domain | Collection cadence |
+|---|---|---|
+| BCL-OBS-E-001 | CC6.1, CC6.3, CC7.2, CC7.3 — BCL observability health | Quarterly (within 30 days of quarter close) |
+
+Upload path: `compliance/evidence/oidc-bcl/bcl-obs-e-001-{YYYY}-Q{N}.json` → Vanta evidence library, tag `bcl-observability`. First upload: Q3 2026 (contingent on M8 production deploy; nil attestation if BCL not yet in production).
+
+### §164.5 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register BCL-OBS-E-001 in §79.4 master evidence table (CC6.1/CC6.3/CC7.2/CC7.3; count 135 → 136) | compliance-officer | **P1** | [x] **Done — 2026-07-04 (§164.2, this section).** |
+| 2 | Add BCL-OBS-E-001 to §80.4 Vanta mirror protocol | compliance-officer | **P1** | [x] **Done — 2026-07-04 (§164.4, this section).** |
+| 3 | File BCL-OBS-E-001 Q3 2026 first quarterly artefact (after §46.8 M8 production deploy) | compliance-officer + devops-lead | **P1** | [ ] **Pending — §46.8 P0 checklist + M8 production deploy.** |
+
+### §164.6 Cross-References
+
+| Cross-reference | Status |
+|---|---|
+| `docs/OBSERVABILITY.md §70.8` (BCL-OBS-E-001 full spec — query logic, privacy floor, zero-event attestation pattern) | 🟢 Source definition |
+| `docs/OBSERVABILITY.md §70.9` item 7 (P1/M8 — "Register BCL-OBS-E-001 in §79.4") | 🟢 **Done — 2026-07-04 (§164.2, this section)** |
+| `docs/OBSERVABILITY.md §70.11` pending obligation closure | 🟢 **Done — 2026-07-04 (OBSERVABILITY v5.16.3)** |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §46.9` (BCL-OBS-E-001 §164 cross-reference added) | 🟢 **Done — 2026-07-04 (SSO_SCIM v2.27)** |
+| `docs/INCIDENT_RESPONSE.md R-74` (BCL-CHAIN-01 violation runbook — AL-BCL-03 IC reference target for §164.3 CC7.3 narrative) | 🟢 Pre-existing — R-74 filed v3.39.0 2026-07-04 |
 
 ---
 

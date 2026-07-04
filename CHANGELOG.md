@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [12.45.1] — 2026-07-04
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.89.0 → v3.89.1. §164 BCL-OBS-E-001 Registration: quarterly BCL observability health report registered in §79.4 master evidence table (evidence count 135 → 136, CC6.1/CC6.3/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/oidc-bcl/bcl-obs-e-001-{YYYY}-Q{N}.json`). SOC 2 auditor narratives (CC6.1/CC6.3/CC7.2/CC7.3) documented. §80.4 Vanta mirror protocol updated. Closes OBSERVABILITY §70.9 item 7 (P1/M8) and §70.11 pending obligation.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — v2.26 → v2.27. §46.9 cross-reference line extended: `docs/SOC2_READINESS.md §164` (BCL-OBS-E-001 registered) and `docs/OBSERVABILITY.md §70` (BCL observability layer — RED metrics, SLOs, alert rules AL-BCL-01..04, BCL-OBS-E-001 spec) added. Closes OBSERVABILITY §70.9 item 10 (P1/M8) and §70.11 pending obligation.
+- `docs/OBSERVABILITY.md` — v5.16.2 → v5.16.3. §70.9 items 7 + 10 marked `[x] Done`. §70.11 two pending rows updated 🟡 → 🟢. All six §70.11 cross-reference obligations now closed.
+- `VERSION` — 12.45.0 → 12.45.1.
+
+---
+
 ## [12.45.0] — 2026-07-04
 
 ### Added
