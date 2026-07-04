@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.56.0] — 2026-07-04
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` v3.40.0 — R-75 (AL-SLO-01 companion, P1 auto-resolve): SAML SLO High Failure Rate runbook. Triggered when `slo_failed_total + slo_fallback_total{reason=idp_timeout}` exceeds 5%/10 min per-tenant or 20%/15 min fleet. Five root causes (IdP unreachable, IdP slow, cert rotation, db_revocation_failed, saml-slo.ts bug); three scope queries (R-75-C1/C2/C3); SLO-REV-E-001 evidence artefact; comm templates T-75-A/B/C; CSM SLA (10 min notify / 30 min update); co-activation with R-76, compliance-officer, CSM-enterprise.
+- `docs/INCIDENT_RESPONSE.md` v3.40.0 — R-76 (AL-SLO-02 companion, P0 no auto-resolve no cooldown): SLO-CHAIN-01 Integrity Violation runbook. Triggered by HTTP 422 `SLO_CHAIN_01_VIOLATION` from `emit-audit-event` Worker or retrospective SQL returning > 0 rows. Five root causes (SLO_KV TTL 15 s expiry — recommended 30 s, KV write failure, duplicate replay, code bug, malicious); four scope queries (R-76-C1/C2/C3/C4); SLO-CHN-E-001 evidence artefact (7yr WORM `compliance/evidence/saml-slo/chain-violations/`); comm templates T-76-A/B/C/D (P0 declaration, founder brief, compliance sign-off, resolution); six implementation checklist items including registration of `security.slo_chain_01_violation` + `security.slo_chain_01_violation_closed` in AUDIT_LOG_SCHEMA.md (pending). Cross-references: OBSERVABILITY.md §72.4 AL-SLO-02, SSO_SCIM_IMPLEMENTATION.md §45.5.3 SLO-CHAIN-01, SOC2_READINESS.md §§162/163/165.
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.18.0 → v5.18.1 — §72.9 items 9 and 10 marked Done; §72.11 R-75 and R-76 obligations marked 🟢 Done; three obligations remain pending M7.
+- `VERSION` — 12.55.0 → 12.56.0.
+
+---
+
 ## [12.55.0] — 2026-07-04
 
 ### Added

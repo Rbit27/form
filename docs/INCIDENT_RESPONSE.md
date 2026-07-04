@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.39.1
+# FORM · Incident Response Runbook v3.40.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -26723,6 +26723,632 @@ PIR: Required (all P0s — within 72h)
 | 6 | Authoring complete — R-74 closes §70.11 obligation "File companion IR runbook for AL-BCL-03 in docs/INCIDENT_RESPONSE.md" | compliance-officer + devops-lead | **P0** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.39.0).** |
 
 **Privacy floor (invariant throughout R-74):** All scope query outputs, DEC-030 event payloads, templates, and BCL-CHN-E-001 artefact files contain no `user_id`, employee name, email, coaching content, health data, or GDPR Art. 9 special-category data. `tenant_id` and `bcl_request_id` are FORM-internal UUIDs. `oidc_sub_hash` in chain segments is SHA-256 only; redact before auditor sharing. `chain-segment.json` restricted to IC + compliance-officer + outside counsel (H5 only). Cross-references: `docs/OBSERVABILITY.md §70.4 AL-BCL-03`, `docs/OBSERVABILITY.md §70.8 BCL-OBS-E-001`, `docs/SSO_SCIM_IMPLEMENTATION.md §46.11`, `docs/AUDIT_LOG_SCHEMA.md §BCL-Events`, `docs/SOC2_READINESS.md §163`, `docs/INCIDENT_RESPONSE.md R-05`. Owner: security-engineer + compliance-officer.
+
+---
+
+## R-75 · SAML SLO High Failure Rate — Federated Session Revocation Degraded — CC6.3 / CC7.3 (P1)
+
+> **Alert source:** AL-SLO-01 (`docs/OBSERVABILITY.md §72.4`)
+> **Severity:** P1 (default). Auto-resolves when SP-initiated SLO failure rate falls below 5% per-tenant for 10 min or 20% fleet for 15 min.
+> **Owner:** security-engineer + compliance-officer (IC). CSM notified per §R-75.10.
+> **SOC 2:** CC6.3 (federated session revocation timeliness), CC7.3 (response to identified anomalies).
+> **Privacy floor:** Scope queries and DEC-030 event payloads contain no individual `user_id`, employee name, email address, coaching content, body composition metric, or GDPR Art. 9 special-category data. `tenant_id` is FORM-internal UUID. `slo_request_id` is FORM-internal UUID.
+> **References:** `docs/OBSERVABILITY.md §72.4 AL-SLO-01`, `docs/SSO_SCIM_IMPLEMENTATION.md §45` (SAML SLO Worker spec), `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events`.
+
+---
+
+### Background
+
+The FORM SAML SLO Worker (`saml-slo.ts`) handles both SP-initiated logout (FORM → IdP) and IdP-initiated logout (IdP → FORM). On the SP-initiated path, FORM revokes the local `enterprise_sessions` row immediately and unconditionally — before dispatching the `LogoutRequest` to the IdP. If the IdP SLO round-trip fails (timeout, invalid signature, malformed response, or DB write failure), the local session is already revoked, but the identity federation assertion at the IdP may persist. The user cannot log back into FORM (local session cleared), but the IdP session registry may still show the user as active until the session reaches its natural expiry.
+
+**SOC 2 significance (CC6.3):** FORM's access revocation SLO requires that identity federation termination is confirmed within the SP-initiated round-trip (target < 8,000 ms; abort boundary 10,000 ms). A sustained SLO failure rate above 5% means FORM cannot confirm federated session revocation for the affected tenant's employees — IdP authentication sessions may outlive FORM local session termination. The incident must be investigated and the root cause corrected, even though no FORM access persists after local revocation.
+
+**Important distinction from R-73 (BCL):** In BCL revocation failure (R-73), the FORM session remains ACTIVE — the employee retains FORM access. In SLO failure (R-75), the FORM session IS revoked — FORM access is terminated. The outstanding risk in R-75 is IdP-side persistence, which may allow re-authentication at the IdP without re-prompting MFA (depending on IdP session duration policy).
+
+This runbook does NOT cover SLO-CHAIN-01 integrity violations (R-76) or round-trip latency approaching the abort boundary (AL-SLO-03, P2 advisory).
+
+---
+
+### R-75.1 Trigger Conditions
+
+| Trigger | Source | Threshold |
+|---|---|---|
+| **AL-SLO-01 primary (per-tenant)** | `slo_failed_total{reason=idp_timeout} + slo_fallback_total{reason=idp_timeout}` as a fraction of `slo_requests_total` for the tenant | > 5% / 10 min window |
+| **AL-SLO-01 fleet-wide** | Same ratio aggregated across all SLO-enabled tenants | > 20% / 15 min window |
+| **Manual activation** | IC observation of elevated `slo.failed` events (any `reason`) in audit log | Any sustained elevation above 1% for > 20 min for an SLO-enabled tenant |
+
+AL-SLO-01 dedup key: `slo-failure-rate-{tenant_id}` (30-min cooldown per tenant). Fleet-wide key: `slo-failure-rate-fleet` (15-min cooldown). Denominator excludes tenants where `slo_url IS NULL` — `slo_not_configured` fallbacks are expected and do not contribute to the failure rate.
+
+---
+
+### R-75.2 Severity Classification
+
+| Condition | Severity |
+|---|---|
+| Failure rate 5–20% for single tenant, `idp_timeout` dominant, IdP SLO endpoint reachable | **P1** (default) — investigate within 1h |
+| Failure rate > 20% for single tenant OR multiple tenants simultaneously affected | **P1 escalate** — notify CSM lead + security-engineer lead; check IdP status |
+| Fleet-wide failure rate > 20% / 15 min | **P1 fleet** — page all on-call; check CF edge health; confirm SLO Worker deployment |
+| `slo.failed{reason=invalid_signature}` > 0 events (any rate) | **P1 + security review** — potential IdP certificate rotation or replay attempt; security-engineer priority |
+| P1 unresolved > 2h | **P0 escalate** — co-activate §5 P0 protocol; compliance-officer assesses GDPR Art. 33 notification |
+
+---
+
+### R-75.3 Immediate Actions (T+0 to T+60 min)
+
+| Time | Action | Owner |
+|---|---|---|
+| T+0 | Acknowledge PagerDuty AL-SLO-01; confirm `slo_failed_total` source, affected `tenant_id`, and failure `reason` breakdown | security-engineer (IC) |
+| T+5 | Run R-75-C1 (identify `slo.failed` events by reason for affected tenant in last 30 min) | IC |
+| T+10 | Run R-75-C2 (verify `tenant_sso_configs.slo_url` is configured and confirm reachability) | IC |
+| T+15 | Notify CSM for affected tenant (T-75-B template) — aggregate failure percentage and time window only; no `slo_request_id` or session count | IC + CSM |
+| T+20 | Classify root cause per R-75.5 using R-75-C1 and R-75-C2 results | IC |
+| T+30 | Begin resolution per R-75.6 for identified root cause | IC |
+| T+45 | Run R-75-C3 (confirm failure rate trending down; check whether AL-SLO-01 auto-resolve condition met) | IC |
+| T+60 | File SLO-REV-E-001 incident note; schedule root cause analysis if failure rate persists | IC + compliance-officer |
+
+---
+
+### R-75.4 Scope Queries
+
+All queries run as `form_audit` role (read-only).
+
+#### R-75-C1 — Identify `slo.failed` events by reason for affected tenant
+
+```sql
+-- Returns slo.failed events from the past 30 minutes, grouped by reason.
+-- Run as form_audit role. Zero rows = no failures in window.
+SELECT
+  payload->>'reason'        AS failure_reason,
+  COUNT(*)                  AS event_count,
+  MIN(created_at)           AS first_at,
+  MAX(created_at)           AS last_at
+FROM audit_log_events
+WHERE event_type = 'slo.failed'
+  AND payload->>'tenant_id' = $tenant_id
+  AND created_at > NOW() - INTERVAL '30 minutes'
+GROUP BY payload->>'reason'
+ORDER BY event_count DESC;
+-- Privacy floor: slo_request_id not returned — aggregate counts by reason only.
+-- user_id is not present in slo.failed payloads.
+```
+
+#### R-75-C2 — Verify IdP SLO endpoint configuration and reachability
+
+```sql
+-- Returns SLO URL and IdP certificate info for the affected tenant.
+-- Run as form_audit role. slo_url NULL = slo_not_configured (AL-SLO-01 should not fire).
+SELECT
+  tenant_id,
+  slo_url,
+  LEFT(idp_cert, 40) AS idp_cert_fingerprint,
+  updated_at         AS config_last_updated
+FROM tenant_sso_configs
+WHERE tenant_id = $tenant_id;
+-- If slo_url IS NULL: tenant is slo_not_configured.
+-- AL-SLO-01 denominator excludes these tenants — escalate to devops-lead
+-- to investigate a potential false-positive alert trigger.
+```
+
+#### R-75-C3 — Confirm current failure rate is recovering (post-mitigation)
+
+```sql
+-- Estimates failure rate in the last 10 minutes for the affected tenant.
+-- Run as form_audit role. Used to confirm AL-SLO-01 auto-resolve condition.
+SELECT
+  (SELECT COUNT(*) FROM audit_log_events
+   WHERE event_type = 'slo.failed'
+     AND payload->>'tenant_id' = $tenant_id
+     AND created_at > NOW() - INTERVAL '10 minutes') AS failed_10m,
+  (SELECT COUNT(*) FROM audit_log_events
+   WHERE event_type = 'slo.fallback_local_only'
+     AND payload->>'reason' = 'idp_timeout'
+     AND payload->>'tenant_id' = $tenant_id
+     AND created_at > NOW() - INTERVAL '10 minutes') AS fallback_idp_timeout_10m,
+  (SELECT COUNT(*) FROM audit_log_events
+   WHERE event_type = 'slo.sp_initiated'
+     AND payload->>'tenant_id' = $tenant_id
+     AND created_at > NOW() - INTERVAL '10 minutes') AS initiated_10m;
+-- If (failed_10m + fallback_idp_timeout_10m) / initiated_10m < 0.05, alert should auto-resolve.
+```
+
+---
+
+### R-75.5 Root Cause Tree
+
+| Root cause | Code | Discriminator |
+|---|---|---|
+| IdP SLO endpoint unreachable from CF edge (DNS failure, network partition, IdP firewall rule change) | **H1** | `slo.failed{reason=idp_timeout}` dominant; HTTPS GET to `tenant_sso_configs.slo_url` from external check fails or times out |
+| IdP SLO endpoint slow — responding > 10s AbortController limit; endpoint reachable but degraded (IdP maintenance, rate-limiting, high load) | **H2** | `slo.failed{reason=idp_timeout}` and `slo.fallback_local_only{reason=idp_timeout}` dominant; HTTPS GET to SLO URL returns 200 but with high latency; AL-SLO-03 (P2) may co-fire |
+| IdP certificate rotation — `idp_cert` in `tenant_sso_configs` is stale; `LogoutResponse` signature verification fails | **H3** | `slo.failed{reason=invalid_signature}` dominant; compare IdP metadata certificate with `tenant_sso_configs.idp_cert`; check if IdP rolled cert without notifying enterprise admin |
+| Supabase `revokeSessionsBySloRequest()` failure — local session revocation write fails | **H4** | `slo.failed{reason=db_revocation_failed}` dominant; check Supabase connectivity; co-activate R-03 if Supabase completely unreachable |
+| Bug in `saml-slo.ts` — incorrect `RelayState` / `slo_request_id` correlation, race in state machine, malformed `LogoutRequest` generation | **H5** | `slo.failed{reason=unknown}` or `slo.failed{reason=malformed_response}` sudden onset post-deploy; correlate failure timestamp with `saml-slo` Worker deploy; check CF Workers error rate |
+
+---
+
+### R-75.6 Resolution Playbook
+
+**H1 — IdP SLO endpoint unreachable**
+1. Confirm IdP SLO URL is unreachable via external health check (outside CF edge). Check IdP status page.
+2. Local FORM sessions are revoked — no FORM access persists. Notify CSM (T-75-B): federated logout confirmation is unavailable until IdP recovers.
+3. Monitor `slo_failed_total` recovery. AL-SLO-01 auto-resolves when failure rate drops below 5% / 10 min after IdP recovery.
+4. File SLO-REV-E-001 with root cause H1; no code change required.
+
+**H2 — IdP SLO endpoint slow**
+1. Confirm via `slo_round_trip_duration_ms` WAE metric: P95 approaching 8,000 ms. AL-SLO-03 (P2 latency alert) may co-fire.
+2. Local sessions are revoked. Notify CSM (T-75-B): federated logout confirmation is delayed due to IdP response latency.
+3. No code change; optionally coordinate with enterprise IT contact to investigate IdP SLO endpoint performance.
+4. File SLO-REV-E-001 with root cause H2.
+
+**H3 — IdP certificate rotation**
+1. Compare IdP metadata certificate with `tenant_sso_configs.idp_cert` for affected tenant.
+2. Request fresh IdP metadata XML from enterprise IT contact. Update `tenant_sso_configs.idp_cert` via PAM-elevated Admin API (`PATCH /api/v1/tenant/{slug}/sso-config`).
+3. Confirm `slo.failed{reason=invalid_signature}` events cease. Notify CSM (T-75-B).
+4. File SLO-REV-E-001 with root cause H3. Raise Linear task to add IdP certificate expiry alerting.
+
+**H4 — Supabase revokeSessionsBySloRequest() failure**
+1. Check Supabase connectivity and `enterprise_sessions` table write health.
+2. If Supabase completely unreachable: co-activate R-03. Local session revocation is blocked — active access control failure until Supabase recovers.
+3. After Supabase recovery, confirm `slo.failed{reason=db_revocation_failed}` ceases.
+4. File SLO-REV-E-001 with root cause H4.
+
+**H5 — Bug in saml-slo.ts**
+1. Correlate failure onset with `saml-slo` Worker deploy timestamp. If correlated: roll back deployment immediately.
+2. File emergency Linear P0; fix requires security-engineer + platform-engineer review.
+3. Resume normal SLO after fix deployed and SLO-I-001 integration test passes against Okta sandbox (§45.7).
+4. If `slo.failed` events have no prior `slo.sp_initiated` anchor in chain: co-activate R-76 (SLO-CHAIN-01 violation).
+
+---
+
+### R-75.7 DEC-030 HMAC-Chained Events
+
+| Event type | Severity / Retention | Emitter | Chain role | Privacy floor |
+|---|---|---|---|---|
+| `slo.failed` | HIGH / 7yr | `saml-slo.ts` Worker (automatic on each SLO failure path) | SLO-CHAIN-01 exempt — may emit without a prior anchor | `tenant_id` UUID + `slo_request_id` UUID + `reason` enum + `fallback_applied` bool; no `user_id` |
+| `slo.fallback_local_only` | STANDARD / 3yr | `saml-slo.ts` Worker (automatic on all fallback paths) | SLO-CHAIN-01 terminal (alongside `slo.completed`) | `tenant_id` UUID + `session_id` UUID (nullable) + `user_id` UUID (nullable) + `reason` enum |
+
+**Note on SLO chain and R-75:** A sustained `slo.failed` rate where events have no prior `slo.sp_initiated` anchor (H5 — premature failure before initiation write) represents a SLO-CHAIN-01 violation. Run R-76-C2 (retrospective SQL) immediately if H5 is suspected and co-activate R-76.
+
+---
+
+### R-75.8 Evidence Artefact
+
+**SLO-REV-E-001** — per-activation incident note, filed within T+60 min.
+
+| Field | Value |
+|---|---|
+| Artefact ID | SLO-REV-E-001 |
+| SOC 2 controls | CC6.3, CC7.3 |
+| Trigger | Per R-75 activation |
+| Retention | 7yr WORM |
+| R2 access | `r2:form-api` REVOKED — IC PAM-elevated only |
+| R2 path | `compliance/evidence/saml-slo/slo-rev-e-001-<YYYY-MM-DD>/` |
+| Filing deadline | T+60 min |
+
+**Files:** `incident-timeline.md`, `r75-c1-output.txt` (reason breakdown — aggregate counts only, no `slo_request_id`), `r75-c2-output.txt` (SLO URL config metadata), `r75-c3-output.txt` (post-mitigation failure rate counts), `root-cause-analysis.md`, `csm-notification-log.md`.
+
+**Privacy floor:** `r75-c1-output.txt` contains aggregate counts by failure reason only — no `slo_request_id`, no session UUIDs, no `user_id`. `r75-c2-output.txt` contains IdP configuration metadata — no employee data. All files restricted to IC + compliance-officer.
+
+---
+
+### R-75.9 Communication Templates
+
+**T-75-A — Internal declaration (`#incidents-critical`)**
+
+```
+🟡 P1 DECLARED — SAML SLO High Failure Rate
+IC: @{security-engineer}
+Trigger: AL-SLO-01 — SLO failure rate > 5% / 10 min
+Affected tenant: tenant_id {UUID} (CSM-only — no company name in this channel)
+Dominant failure reason: {idp_timeout / invalid_signature / db_revocation_failed / other}
+Note: Local FORM sessions ARE REVOKED — no FORM access persists for affected employees
+Action: Root cause investigation in progress
+Runbook: docs/INCIDENT_RESPONSE.md R-75
+```
+
+**T-75-B — CSM notification (Slack `#form-{slug}-shared` or direct DM)**
+
+```
+Hi {CSM name} — flagging a technical event for your awareness.
+
+Between {start_time} and {end_time} UTC, FORM experienced elevated failure rate
+on federated logout confirmation to your identity provider ({IdP name}).
+
+FORM sessions for employees who logged out during this window have been
+revoked in FORM — employees cannot access FORM using the affected sessions.
+The identity provider session may not have received the federated logout
+signal during this window; employees may be able to re-authenticate
+using the IdP session depending on your IdP's session duration policy.
+
+We are investigating the root cause. No user data was exposed.
+
+Action required from you: None at this time. We will provide an update
+within 2 hours, or sooner when the root cause is identified and resolved.
+
+This notification satisfies FORM SLA §4.3 incident disclosure obligation.
+```
+
+**T-75-C — Resolution (`#incidents-critical`)**
+
+```
+✅ P1 RESOLVED — SAML SLO High Failure Rate
+Resolution time: {duration}
+Root cause: {H1/H2/H3/H4/H5 — one sentence}
+SLO-SLO-01 current rate: {rate% — target ≥ 99%}
+Evidence: SLO-REV-E-001 filed at compliance/evidence/saml-slo/slo-rev-e-001-{date}/
+Open items: {Linear URL or "None"}
+PIR: {required if > 20 min sustained federated failure / yes / no}
+```
+
+---
+
+### R-75.10 CSM Notification SLA
+
+Under `docs/ENTERPRISE_SLA.md §4.3`, CSM must be notified within **15 minutes** of a confirmed P1 affecting their tenant. Notification must not include `slo_request_id` values, session counts, or individual employee identifiers — use aggregate failure rate percentage and the time window only. A written summary (SLO-REV-E-001 `incident-timeline.md`) must be delivered to CSM within **24 hours** of resolution. Failure to notify within 15 min is itself an SLA breach, recordable in `docs/ENTERPRISE_SLA.md §9` credit log.
+
+---
+
+### R-75.11 Co-Activation Matrix
+
+| Condition | Co-activation | Notes |
+|---|---|---|
+| `slo.failed` events with no prior `slo.sp_initiated` anchor (H5 — premature failure before initiation write) | **R-76** (SLO-CHAIN-01 Integrity Violation) | Run R-76-C2 retrospective SQL immediately |
+| `slo_round_trip_duration_ms` P95 > 9,000 ms concurrently | **AL-SLO-03** escalates alongside R-75 (H2 — slow IdP) | Unified root cause; single IC |
+| Supabase `revokeSessionsBySloRequest()` failures dominant (H4) | **R-03** (Supabase availability) | R-03 IC leads infra recovery; R-75 IC monitors SLO scope |
+| P1 unresolved > 2h | **P0 escalate** — co-activate §5 P0 protocol | Compliance-officer assesses GDPR Art. 33 notification |
+
+---
+
+### R-75.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Provision `compliance/evidence/saml-slo/` R2 subfolder (parent of `slo-rev-e-001-*/`); WORM + `r2:form-api` REVOKED policy | devops-lead | **P1** | [ ] Pending — M7 |
+| 2 | Register SLO-REV-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.3/CC7.3; per-activation; 7yr) | compliance-officer | **P1** | [ ] Pending — M7 |
+| 3 | Implement AL-SLO-01 alert rule in Better Stack (§72.9 item 3): `slo_failed_total + slo_fallback_total{reason=idp_timeout}` failure-rate query; P1 PagerDuty `form-security` + CSM auto-notify; 30-min per-tenant dedup | devops-lead + security-engineer | **P1** | [ ] Pending — M7 |
+| 4 | Authoring complete — R-75 closes §72.11 obligation "File companion IR runbook R-75 (AL-SLO-01 — SLO High Failure Rate, P1) in `docs/INCIDENT_RESPONSE.md`" | compliance-officer | **P0** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.0).** |
+
+**Privacy floor (invariant throughout R-75):** All scope query outputs, DEC-030 event payloads, templates, and SLO-REV-E-001 artefact files contain operational metadata only. No `user_id`, employee name, email, coaching content, health data, or GDPR Art. 9 special-category data. `tenant_id` and `slo_request_id` are FORM-internal UUIDs. Failure reason breakdown is aggregate — no per-request identifiers. Cross-references: `docs/OBSERVABILITY.md §72.4 AL-SLO-01`, `docs/OBSERVABILITY.md §72.8 SLO-OBS-E-001`, `docs/SSO_SCIM_IMPLEMENTATION.md §45`, `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events`, `docs/ENTERPRISE_SLA.md §4.3`. Owner: security-engineer + compliance-officer.
+
+---
+
+## R-76 · SLO-CHAIN-01 Integrity Violation — Audit Chain Break (SAML SLO Pipeline) — CC7.2 / CC7.3 (P0)
+
+> **Alert source:** AL-SLO-02 (`docs/OBSERVABILITY.md §72.4`)
+> **Severity:** P0 — no auto-resolve. No cooldown. Every violation is its own P0.
+> **Owner:** security-engineer + compliance-officer (joint IC). Founder notified.
+> **SOC 2:** CC7.2 (HMAC chain integrity — DEC-030 primary control), CC7.3 (P0 response).
+> **Privacy floor:** All scope queries, DEC-030 event payloads, templates, and SLO-CHN-E-001 artefact files contain no `user_id`, employee name, email address, coaching content, health metric, or GDPR Art. 9 special-category data. `tenant_id` is FORM-internal UUID. `slo_request_id` is FORM-internal UUID.
+> **References:** `docs/OBSERVABILITY.md §72.4 AL-SLO-02`, `docs/SSO_SCIM_IMPLEMENTATION.md §45.5.3` (SLO-CHAIN-01 invariant spec), `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events`, `docs/INCIDENT_RESPONSE.md R-05` (mandatory co-activation on retrospective violation).
+
+---
+
+### Background
+
+**SLO-CHAIN-01** is an HMAC-chain ordering invariant enforced by the `emit-audit-event` Cloudflare Worker. When `slo.sp_initiated` or `slo.idp_initiated` is written to the chain, the Worker stores a short-lived anchor in `SLO_KV` (15s TTL) keyed by `slo:{tenant_id}:{slo_request_id}`. Before `slo.completed` or `slo.fallback_local_only` is written, the Worker verifies the anchor exists. If absent, the Worker returns HTTP 422 `SLO_CHAIN_01_VIOLATION` and blocks the chain INSERT.
+
+A SLO-CHAIN-01 violation indicates one of two scenarios:
+1. **Live (HTTP 422):** A `slo.completed` or `slo.fallback_local_only` was attempted without a valid anchor — the chain INSERT was blocked; the database is clean.
+2. **Retrospective (SQL > 0 rows):** A `slo.completed` or `slo.fallback_local_only` exists in the chain without a preceding anchor — the enforcement was bypassed; this is the more severe scenario.
+
+Both are P0. This runbook is architecturally equivalent to R-74 (BCL-CHAIN-01 Integrity Violation) scoped to the SAML SLO pipeline. A violation must be treated as a potential audit integrity incident until the root cause is confirmed non-malicious.
+
+**SLO-CHAIN-01 exemption:** `slo.failed` is EXEMPT from the chain ordering check — it must be writable even when no prior initiation event exists (e.g., network failure before initiation write). A `slo.failed` without a prior anchor is NOT a SLO-CHAIN-01 violation and does NOT activate R-76.
+
+**Note on SLO_KV TTL:** SLO_KV anchors expire after **15 seconds** (vs BCL_ANCHOR_KV 60s). The SP-initiated round-trip target is < 8,000 ms and aborts at 10,000 ms (AbortController). This means H1 (anchor TTL expired before closure event) is structurally more likely than in the BCL pipeline. The minimum recommended SLO_KV TTL is 3× the AbortController boundary (30s) to prevent false H1 scenarios.
+
+**This runbook does NOT cover:** AL-SLO-01 (high failure rate — R-75) or AL-SLO-03 (latency — P2 advisory, no companion runbook required).
+
+---
+
+### R-76.1 Trigger Conditions
+
+| Trigger | Source | Threshold |
+|---|---|---|
+| **AL-SLO-02 primary (live)** | `emit-audit-event` Worker returns HTTP 422 `SLO_CHAIN_01_VIOLATION` for `slo.completed` or `slo.fallback_local_only` | Any single occurrence |
+| **AL-SLO-02 retrospective** | SLO-CHAIN-01 retrospective integrity check SQL (§72.4 AL-SLO-02 — pg_cron job 60, pending OQ-SLO-OBS-01 resolution + §72.9 item 4) returns > 0 rows | Any single row |
+| **Manual activation** | IC observes `slo.completed` or `slo.fallback_local_only` in audit log with no matching `slo.sp_initiated` or `slo.idp_initiated` for the same `{tenant_id, slo_request_id}` | Any single occurrence |
+
+Dedup key: `slo-chain-01-violation-{slo_request_id}` — per unique `slo_request_id`. No auto-dedup across `slo_request_id` values. No cooldown.
+
+---
+
+### R-76.2 Severity Classification
+
+SLO-CHAIN-01 violations are always **P0**. The distinction below affects scope and co-activation, not base severity.
+
+| Condition | Scope |
+|---|---|
+| Live HTTP 422 only; root cause identified as H1/H2/H3; no orphan closure event in chain | **P0 contained** — resolve per §R-76.6; R-05 advisory |
+| Retrospective SQL returns rows (`slo.completed` or `slo.fallback_local_only` without prior anchor) | **P0 full** — mandatory R-05 co-activation; legal chain audit |
+| Multiple `slo_request_id` values across tenants | **P0 fleet** — founder notification immediately; halt SLO processing fleet-wide |
+
+---
+
+### R-76.3 Immediate Actions (T+0 to T+60 min)
+
+| Time | Action | Owner |
+|---|---|---|
+| T+0 | Acknowledge PagerDuty AL-SLO-02 (P0); page security-engineer + compliance-officer simultaneously | On-call |
+| T+5 | Run R-76-C1 (extract `slo_request_id` and `tenant_id` from violation signal) | security-engineer (IC) |
+| T+10 | Run R-76-C2 (retrospective SQL — is `slo.completed` or `slo.fallback_local_only` in chain without prior anchor?) | IC |
+| T+10 | If R-76-C2 returns rows: **co-activate R-05**; notify founder (T-76-B) | IC + compliance-officer |
+| T+15 | If retrospective violation: disable SP-initiated SLO for affected tenant (PAM-elevated: `PATCH /api/v1/tenant/{slug}/sso-config` setting `slo_enabled=false`) to halt further SLO chain writes | IC (PAM-elevated) |
+| T+15 | Run R-76-C3 (check SLO_KV TTL for the violating `slo_request_id`) | IC |
+| T+20 | Preserve raw DEC-030 chain segment to R2 WORM (`compliance/evidence/saml-slo/chain-violations/slo-chn-e-001-{slo_request_id}-{YYYY-MM-DD}/`) | compliance-officer (PAM-elevated) |
+| T+25 | Run R-76-C4 (determine session state for the violating `slo_request_id`) | IC (PAM-elevated) |
+| T+30 | Classify root cause (R-76.5) | IC |
+| T+60 | Begin SLO-CHN-E-001 artefact; compliance-officer sign-off required before R-76 closure | compliance-officer |
+
+**Critical protocol:** An HTTP 422 violation means the closure INSERT was blocked — the session may still need revocation confirmation. Run R-76-C4 to check session state; if session is unexpectedly still active, co-activate R-75.
+
+---
+
+### R-76.4 Scope Queries
+
+#### R-76-C1 — Extract violation signal from audit log
+
+```sql
+-- Identify security.slo_chain_01_violation events from the past 24h.
+-- Run as form_audit role.
+-- NOTE: security.slo_chain_01_violation event type is PENDING registration
+-- in AUDIT_LOG_SCHEMA.md (§R-76.12 item 1) and PENDING pg_cron job 60
+-- implementation (§72.9 item 4 / OQ-SLO-OBS-01). Until implemented,
+-- use R-76-C2 directly to identify the violation.
+SELECT
+  payload->>'slo_request_id' AS slo_request_id,
+  payload->>'tenant_id'      AS tenant_id,
+  payload->>'violation_type' AS violation_type,
+  created_at                 AS violation_at
+FROM audit_log_events
+WHERE event_type = 'security.slo_chain_01_violation'
+  AND created_at > NOW() - INTERVAL '24 hours'
+ORDER BY created_at DESC;
+```
+
+#### R-76-C2 — Retrospective SLO-CHAIN-01 SQL (canonical — from §72.4 AL-SLO-02)
+
+```sql
+-- Returns orphan 'slo.completed' or 'slo.fallback_local_only' events
+-- without a prior 'slo.sp_initiated' or 'slo.idp_initiated' anchor
+-- for the same {tenant_id, slo_request_id}.
+-- Run as form_audit role. Zero rows = chain intact. Any rows = P0 confirmed.
+SELECT
+  e_closure.event_type                        AS closure_event_type,
+  e_closure.payload->>'slo_request_id'        AS slo_request_id,
+  e_closure.payload->>'tenant_id'             AS tenant_id,
+  e_closure.created_at                        AS closure_at,
+  'SLO_CHAIN_01_VIOLATION'                    AS violation_type
+FROM audit_log_events e_closure
+WHERE e_closure.event_type IN ('slo.completed', 'slo.fallback_local_only')
+  AND e_closure.created_at > NOW() - INTERVAL '24 hours'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events e_anchor
+    WHERE e_anchor.event_type IN ('slo.sp_initiated', 'slo.idp_initiated')
+      AND e_anchor.payload->>'slo_request_id'
+                              = e_closure.payload->>'slo_request_id'
+      AND e_anchor.payload->>'tenant_id'
+                              = e_closure.payload->>'tenant_id'
+      AND e_anchor.created_at < e_closure.created_at
+  )
+LIMIT 50;
+-- Privacy floor: no user_id, name, email, health data.
+-- tenant_id and slo_request_id are FORM-internal UUIDs only.
+-- idp_name_id not present in slo.completed or slo.fallback_local_only payloads.
+```
+
+#### R-76-C3 — Check SLO_KV anchor TTL (Cloudflare API, PAM-elevated)
+
+```bash
+curl -s -H "Authorization: Bearer $CF_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/storage/kv/namespaces/$SLO_KV_NAMESPACE_ID/metadata/slo:{tenant_id}:{slo_request_id}"
+# 200 + {"expiration": <unix>} = anchor exists (not expired)
+# 404 / null expiration = anchor missing (TTL expired or never written)
+# SLO_KV TTL is 15 seconds — 404 expected after normal SLO round-trip > 15s (H1 candidate)
+```
+
+#### R-76-C4 — Session state for the violating slo_request_id (PAM-elevated)
+
+```sql
+-- Determine if the session targeted by the violating slo_request_id was revoked.
+-- PAM elevation required. Substitute $slo_request_id from R-76-C1/C2.
+SELECT
+  es.session_id,
+  es.revoked_at,
+  CASE WHEN es.revoked_at IS NULL
+    THEN 'SESSION_STILL_ACTIVE — investigate'
+    ELSE 'SESSION_REVOKED'
+  END AS status
+FROM enterprise_sessions es
+WHERE es.session_id = (
+  SELECT payload->>'session_id'
+  FROM audit_log_events
+  WHERE event_type IN ('slo.completed', 'slo.fallback_local_only')
+    AND payload->>'slo_request_id' = $slo_request_id
+  LIMIT 1
+);
+-- If session_id is null in the closure payload (IdP-initiated multi-session),
+-- query by tenant_id and revocation window. session_id is FORM-internal UUID — no user_id returned.
+```
+
+---
+
+### R-76.5 Root Cause Tree
+
+| Root cause | Code | Discriminator |
+|---|---|---|
+| `SLO_KV` anchor TTL (15s) expired before `saml-slo.ts` emitted the closure event — Worker processing (Supabase write to `enterprise_sessions`, IdP round-trip) took longer than 15s | **H1** | R-76-C3 returns null/404; closure event timestamp > 15s after initiation event; no KV write failure event |
+| `SLO_KV.put()` silent failure — anchor never stored; subsequent closure event blocked by 422 | **H2** | R-76-C3 null/404; `SLO_KV` namespace health degraded at violation timestamp; system KV write failure advisory near violation |
+| Duplicate or replay SLO response — IdP sends a second `LogoutResponse` after SLO_KV anchor TTL expired; original chain was valid; second closure is orphan | **H3** | R-76-C2 shows a second closure event at timestamp > 15s after a valid first `slo.sp_initiated` + `slo.completed` pair; first closure preceded by anchor; second is orphan |
+| Code bug in `saml-slo.ts` — closure event emitted before initiation anchor is written due to race condition in async Worker flow | **H4** | R-76-C2 shows orphan closure event at timestamp < 1s after expected initiation; correlate with `saml-slo` Worker deploy timestamp; cross-reference SLO-I-008 integration test result |
+| Suspected malicious chain manipulation — closure event written directly to `audit_log_events` bypassing `emit-audit-event` Worker | **H5** | R-76-C2 confirms orphan closure; no corresponding `saml-slo` Worker log entry for the `slo_request_id`; check `audit_log_events.hmac_hash` chain segment; cross-reference R-05 forensic queries |
+
+---
+
+### R-76.6 Resolution Playbook
+
+**H1 — SLO_KV anchor TTL expired before closure**
+1. Confirm via R-76-C3 that anchor expired (404); confirm closure timestamp > 15s after initiation.
+2. Local FORM session was already revoked before the 422 — FORM revokes locally before dispatching to IdP. Check R-76-C4; if session unexpectedly active, investigate separately.
+3. Increase `SLO_KV_TTL_MS` from 15s to 30s — platform-engineer decision; requires §45 update. This provides 3× margin over the 10s AbortController boundary.
+4. File SLO-CHN-E-001 with root cause H1.
+
+**H2 — SLO_KV.put() silent failure**
+1. Confirm CF KV service health at violation timestamp.
+2. If CF KV degraded: treat as transient; no structural change. File SLO-CHN-E-001 H2.
+3. If CF KV healthy: investigate `saml-slo.ts` KV write path (`SLO_KV.put()` in SP-initiated initiation handler); check `SLO_KV` binding in `wrangler.toml`; may require platform-engineer code fix.
+
+**H3 — Duplicate/replay after TTL**
+1. Confirm original `slo.sp_initiated` + `slo.completed` pair is intact and valid.
+2. No session revocation gap — original chain is clean; second closure event is spurious (IdP retry).
+3. File SLO-CHN-E-001 H3. Consider idempotency handling for duplicate `LogoutResponse` at the callback handler.
+
+**H4 — Code bug in saml-slo.ts**
+1. Halt SP-initiated SLO for affected tenant (PAM-elevated `slo_enabled=false` for tenant).
+2. Co-activate R-05 for chain integrity review.
+3. File emergency Linear P0; deployment requires security-engineer + platform-engineer sign-off.
+4. Resume SLO only after fix deployed and SLO-I-008 integration test passes (§45.7).
+
+**H5 — Malicious manipulation**
+1. **Do not close without security-engineer, compliance-officer, and founder review.**
+2. Co-activate R-05 full forensic mode immediately.
+3. Preserve all chain segments to R2 WORM before any further writes.
+4. Halt SLO processing fleet-wide.
+5. GDPR Art. 33 72-hour supervisory authority notification assessment — compliance-officer decision.
+
+**Closure requirement (all root causes):** Compliance-officer sign-off via `security.slo_chain_01_violation_closed` DEC-030 event (pending registration — §R-76.12 item 1; record manually in SLO-CHN-E-001 until registered). R-76-C2 must return 0 rows at time of closure.
+
+---
+
+### R-76.7 DEC-030 HMAC-Chained Events
+
+| Event type | Severity / Retention | Emitter | Chain role | Privacy floor |
+|---|---|---|---|---|
+| `security.slo_chain_01_violation` | CRITICAL / 7yr | pg_cron job 60 (SLO-CHAIN-01 retrospective check — pending OQ-SLO-OBS-01 resolution + §72.9 item 4) | Violation declaration; anchors incident response chain for this `slo_request_id` | `tenant_id` UUID + `slo_request_id` UUID; no `user_id`, no `idp_name_id` |
+| `security.slo_chain_01_violation_closed` | HIGH / 7yr | IC PAM-elevated (compliance-officer sign-off required) | Terminal event; emitted only after SLO-CHN-E-001 filed and compliance-officer approves | `pam_request_id`, `root_cause_code` (H1–H5), `incident_reference`, `artefact_path`; no PII |
+
+**Registration status:** Both event types are PENDING registration in `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events` — see §R-76.12 item 1. Until registered, compliance-officer must manually record the violation and closure in SLO-CHN-E-001.
+
+---
+
+### R-76.8 SLO-CHAIN-01 Invariant (Reference)
+
+From `docs/SSO_SCIM_IMPLEMENTATION.md §45.5.3`:
+
+> **SLO-CHAIN-01:** `slo.completed` or `slo.fallback_local_only` MUST NOT be emitted for a given `slo_request_id` unless at least one of `slo.sp_initiated` or `slo.idp_initiated` was previously emitted for the same `{tenant_id, slo_request_id}` pair.
+>
+> `slo.failed` is EXEMPT — must be writable even when the initiation event was never persisted (e.g., network failure before initiation write). Enforcement: `emit-audit-event` Worker returns HTTP 422 `SLO_CHAIN_01_VIOLATION` on ordering violation.
+
+An HTTP 422 means the closure INSERT was BLOCKED — database is clean; this is the less severe scenario. A retrospective SQL violation means the closure INSERT completed despite a missing anchor — enforcement was bypassed; this is the more severe scenario requiring R-05 co-activation.
+
+**Note on SLO_KV TTL (15s) vs BCL_ANCHOR_KV TTL (60s):** The shorter TTL reflects SLO's tighter timing constraints. However, 15s provides only 5s of margin above the 10s AbortController boundary, creating structural H1 risk in high-latency scenarios. The recommended TTL (30s) provides 3× margin. Any SLO_KV TTL change requires updating §45.4.2 in `docs/SSO_SCIM_IMPLEMENTATION.md` and re-running SLO-I-008.
+
+---
+
+### R-76.9 Evidence Artefact
+
+**SLO-CHN-E-001** — per-activation evidence package. Compliance-officer sign-off required before R-76 closure.
+
+| Field | Value |
+|---|---|
+| Artefact ID | SLO-CHN-E-001 |
+| SOC 2 controls | CC7.2, CC7.3 |
+| Trigger | Per R-76 activation |
+| Retention | 7yr WORM |
+| R2 access | `r2:form-api` REVOKED — compliance-officer sign-off required for upload |
+| R2 path | `compliance/evidence/saml-slo/chain-violations/slo-chn-e-001-{slo_request_id}-{YYYY-MM-DD}/` |
+| Filing deadline | Before R-76 closure (same-day filing strongly preferred) |
+
+**Files:** `incident-timeline.md`, `r76-c1-output.txt`, `r76-c2-output.txt` (must show 0 rows at closure), `r76-c3-raw-output.txt` (CF KV metadata response), `chain-segment.json` (raw HMAC chain entries for affected `slo_request_id`), `root-cause-analysis.md` (compliance-officer signature required), `slo_chain_01_violation_closed-event-id.txt` (pending §R-76.12 item 1 — manual attestation note until event registered).
+
+**Privacy floor:** `chain-segment.json` contains `tenant_id` and `slo_request_id` UUIDs — no `user_id`, no `idp_name_id`, no employee data. `idp_name_id` is not present in `slo.completed` or `slo.fallback_local_only` payloads. Restricted to IC + compliance-officer + outside counsel (H5 only).
+
+---
+
+### R-76.10 Communication Templates
+
+**T-76-A — P0 declaration (`#incidents-critical`)**
+
+```
+🔴🔴 P0 DECLARED — SLO-CHAIN-01 Audit Chain Violation
+IC: @{security-engineer} + @{compliance-officer}
+Alert: AL-SLO-02 — SLO-CHAIN-01 ordering integrity violation
+slo_request_id: {UUID} | tenant_id: {UUID}
+Type: {live HTTP 422 / retrospective SQL}
+Root cause: INVESTIGATING
+Action: Chain segment preservation in progress
+Runbook: docs/INCIDENT_RESPONSE.md R-76
+R-05 co-active: {pending R-76-C2 / yes / no}
+```
+
+**T-76-B — Founder escalation (Slack DM)**
+
+```
+🚨 P0 — SLO-CHAIN-01 audit chain integrity violation.
+slo_request_id: {UUID}. Root cause under investigation ({H1–H5}).
+Session impact: local FORM session revoked; IdP session state uncertain.
+R-05 co-active: {yes/no}.
+Needed from you: {none at this time / call security-engineer now}.
+Next update: 30 min.
+```
+
+**T-76-C — Compliance-officer sign-off request**
+
+```
+Requesting compliance-officer sign-off for R-76 closure.
+
+slo_request_id: {UUID}
+Root cause: {H1/H2/H3/H4/H5}
+R-76-C2 at closure: 0 rows (chain intact for past 24h)
+SLO-CHN-E-001: compliance/evidence/saml-slo/chain-violations/slo-chn-e-001-{id}-{date}/
+Open items: {Linear URL or "None"}
+R-05: {active / not triggered / closed}
+
+Please emit security.slo_chain_01_violation_closed (HIGH/7yr) via PAM elevation.
+(Pending AUDIT_LOG_SCHEMA registration — §R-76.12 item 1. Record manually in
+SLO-CHN-E-001 artefact if event not yet implemented.)
+```
+
+**T-76-D — Resolution (`#incidents-critical`)**
+
+```
+✅ P0 RESOLVED — SLO-CHAIN-01 Audit Chain Violation
+Compliance-officer sign-off: received
+Root cause: {H1/H2/H3/H4/H5}
+Chain integrity: CONFIRMED (R-76-C2 = 0 rows at closure)
+Evidence: SLO-CHN-E-001 filed
+R-05: {resolved / not triggered}
+PIR: Required (all P0s — within 72h)
+```
+
+---
+
+### R-76.11 Co-Activation Matrix
+
+| Condition | Co-activation | Notes |
+|---|---|---|
+| R-76-C2 returns rows (retrospective — closure in chain without prior anchor) | **R-05** (HMAC Chain Break) — MANDATORY | R-05 IC leads forensic chain review; R-76 IC leads SLO scope |
+| R-75 is concurrently active (SLO high failure rate) | **R-75** (SLO High Failure Rate) | Shared root cause likely (H4 code bug or H2 KV failure); unified IC |
+| Multiple `slo_request_id` values across tenants | **P0-fleet** — founder notification (T-76-B); halt SLO fleet-wide | Do not limit scope to single tenant |
+| Root cause H5 (suspected malicious manipulation) | **R-05 full forensic** + Art. 33 GDPR 72h assessment | Engage outside security counsel if confirmed malicious |
+| R-05-C1 (HMAC chain check) shows non-SLO chain gaps | **R-05 full** regardless of SLO root cause | SLO violation may indicate broader chain integrity issue |
+
+---
+
+### R-76.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `security.slo_chain_01_violation` CRITICAL/7yr and `security.slo_chain_01_violation_closed` HIGH/7yr in `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events` — Zod v2 schemas parallel to `security.bcl_chain_01_violation` / `security.bcl_chain_01_violation_closed` in §BCL-Events | compliance-officer | **P1** | [ ] Pending — M7 |
+| 2 | Implement SLO-CHAIN-01 retrospective check as pg_cron job 60 per OQ-SLO-OBS-01 recommendation (§72.9 item 4); run R-76-C2 SQL; emit `system.slo_chain_check_passed` LOW/1yr (zero rows) or `security.slo_chain_01_violation` CRITICAL/7yr + PagerDuty P0 AL-SLO-02 (any rows); no cooldown | devops-lead + compliance-officer | **P1** | [ ] Pending — M7 (OQ-SLO-OBS-01 open) |
+| 3 | Provision `compliance/evidence/saml-slo/chain-violations/` R2 subfolder; WORM + `r2:form-api` REVOKED policy | devops-lead | **P1** | [ ] Pending — M7 |
+| 4 | Register SLO-CHN-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3; per-activation; 7yr) | compliance-officer | **P1** | [ ] Pending — M7 |
+| 5 | Conduct tabletop exercise for R-76 H4 (code bug) + H5 (malicious manipulation) — IC, security-engineer, compliance-officer, devops-lead; 60 min; before M7 SLO production deploy | security-engineer | **P1** | [ ] Pending — before M7 deploy |
+| 6 | Authoring complete — R-76 closes §72.11 obligation "File companion IR runbook R-76 (AL-SLO-02 — SLO-CHAIN-01 Integrity Violation, P0) in `docs/INCIDENT_RESPONSE.md`" | compliance-officer | **P0** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.0).** |
+
+**Privacy floor (invariant throughout R-76):** All scope query outputs, DEC-030 event payloads, templates, and SLO-CHN-E-001 artefact files contain no `user_id`, employee name, email, coaching content, health data, or GDPR Art. 9 special-category data. `tenant_id` and `slo_request_id` are FORM-internal UUIDs. `chain-segment.json` restricted to IC + compliance-officer + outside counsel (H5 only). Cross-references: `docs/OBSERVABILITY.md §72.4 AL-SLO-02`, `docs/OBSERVABILITY.md §72.8 SLO-OBS-E-001`, `docs/SSO_SCIM_IMPLEMENTATION.md §45.5.3`, `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events`, `docs/SOC2_READINESS.md §72.9 items 7–8 pending`. Owner: security-engineer + compliance-officer.
+
+*v3.40.0 (2026-07-04): R-75 SAML SLO High Failure Rate (CC6.3/CC7.3 — AL-SLO-01 companion, P1 auto-resolve) + R-76 SLO-CHAIN-01 Integrity Violation (CC7.2/CC7.3 — AL-SLO-02 companion, P0 no auto-resolve no cooldown). Closes two §72.11 obligations from `docs/OBSERVABILITY.md §72` (v5.18.0, 2026-07-04): "File companion IR runbook R-75 (AL-SLO-01 — SLO High Failure Rate, P1)" and "File companion IR runbook R-76 (AL-SLO-02 — SLO-CHAIN-01 Integrity Violation, P0)." R-75 (P1, auto-resolve when failure rate < 5% / 10 min): SP-initiated SAML SLO federated session revocation degraded — IdP SLO round-trip failures spike above threshold while local FORM session is always revoked first; five root causes (H1 IdP unreachable, H2 IdP slow, H3 cert mismatch → invalid_signature, H4 Supabase db_revocation_failed → R-03 co-active, H5 saml-slo.ts bug); three scope queries (C1 slo.failed by reason aggregate, C2 slo_url reachability check, C3 post-mitigation rate); resolution playbook for each H1–H5; two DEC-030 SLO-CHAIN-01-exempt events (slo.failed HIGH/7yr, slo.fallback_local_only STANDARD/3yr); SLO-REV-E-001 per-activation evidence artefact (CC6.3/CC7.3, 7yr WORM, T+60 deadline); three communication templates (T-75-A declaration, T-75-B CSM notification with §4.3 SLA, T-75-C resolution); CSM notification SLA §R-75.10 (15 min, 24h written summary); co-activation matrix (R-76 on H5 chain violation, AL-SLO-03 on H2, R-03 on H4, P0 on > 2h); four implementation checklist items (SLO-REV-E-001 R2 provision, SOC2 registration, AL-SLO-01 Better Stack implementation, authoring done). R-76 (P0 — no auto-resolve, no cooldown): SLO-CHAIN-01 ordering invariant breach at emit-audit-event Worker — `slo.completed` or `slo.fallback_local_only` without prior `slo.sp_initiated`/`slo.idp_initiated` anchor in SLO_KV (15s TTL vs BCL_ANCHOR_KV 60s); two violation modes (live HTTP 422 chain clean, retrospective SQL chain INSERT completed without anchor — more severe); SLO_KV 15s TTL creates structural H1 risk — recommended 30s (3× AbortController boundary); five root causes (H1 TTL expiry, H2 KV write failure, H3 IdP duplicate replay, H4 code bug, H5 malicious); four scope queries (C1 violation event audit log, C2 canonical retrospective SQL LIMIT 50 24h, C3 CF KV API TTL check, C4 session state PAM-elevated); closure requirement: compliance-officer sign-off + R-76-C2 = 0 rows; two DEC-030 events pending registration (security.slo_chain_01_violation CRITICAL/7yr pg_cron job 60, security.slo_chain_01_violation_closed HIGH/7yr IC PAM-elevated); SLO-CHN-E-001 per-activation artefact (CC7.2/CC7.3, 7yr WORM, compliance-officer sign-off required); four communication templates (T-76-A P0 declaration, T-76-B founder escalation, T-76-C compliance sign-off request, T-76-D resolution); co-activation matrix (R-05 MANDATORY on retrospective SQL rows, R-75 on concurrent high failure rate, P0-fleet on multiple tenants, R-05 full on H5 malicious, R-05 full on non-SLO chain gaps); six implementation checklist items (AUDIT_LOG_SCHEMA registration, pg_cron job 60, R2 provision, SOC2 registration, tabletop exercise, authoring done). §72.9 items 9/10 marked Done. §72.11 R-75/R-76 obligations marked Done. OBSERVABILITY.md v5.18.0 → v5.18.1. Document header v3.39.1 → v3.40.0. Owner: security-engineer + compliance-officer.*
 
 ---
 
