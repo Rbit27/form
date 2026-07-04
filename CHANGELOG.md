@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [12.67.0] — 2026-07-04
+
+### Added
+- `docs/runbooks/RB-ENT-QBR-01.md` — Enterprise Quarterly Business Review operational runbook. Consolidates QBR preparation, call execution, DEC-030 filing (`enterprise.qbr_completed`), and SOC 2 evidence artefact collection (ADO-E-002) into a single operator-facing document. Covers: pre-QBR checklist (T−5 business days), Admin Dashboard data pull with Tier 1 k ≥ 5 permissible metrics, prohibited metrics table (GDPR Art. 9 / privacy floor), 60-minute agenda, FEHS band response matrix (Green 75–100 / Yellow 50–74 / Red 25–49 / Critical 0–24), QBR-PRIV-01 attestation procedure, FEHS-CHAIN-01 invariant (DEC-089 / §52), ADO-E-002 quarterly SOC 2 export with coverage-gap SQL, renewal transition protocol (< 180d), expansion discussion eligibility, and five-item implementation checklist. SOC 2: CC2.2, CC4.1, CC9.2. Privacy floor: seven non-negotiable ENTERPRISE.md constraints enforced at Admin Dashboard RLS, `privacy_floor_verified` chain invariant, and CSM training layers. Owner: customer-success + compliance-officer + enterprise-architect.
+
+### Changed
+- `VERSION` — 12.66.0 → 12.67.0.
+
+---
+
 ## [12.66.0] — 2026-07-04
 
 ### Added
