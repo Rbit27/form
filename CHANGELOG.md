@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.81.0] — 2026-07-04
+
+### Added
+- `content/post-3136-first-year-without-coach.md` — Series «Self-coached атлет: перший рік» 3136–3145 post 1/10. «Чому перший рік без тренера — найскладніший і найважливіший». Fitts & Posner (1967) когнітивна стадія навчання; Kraemer & Ratamess (2004) нейронна адаптація і маскування помилок новачковими приростами; Baumeister et al. (1998) ego depletion від мета-рішень; Meeusen et al. (2013) мінімальна тривалість мезоциклу; Fröhlich et al. (2010) технічні помилки першого року і плато. Три компоненти якісного першого року: технічна база, журналування, перша модель власного відгуку. clinical-safety NOT_REQUIRED.
+- `blog.html` — post-3136 card prepended at top of feed.
+
+### Changed
+- `README.md` — series «Self-coached атлет: перший рік» 3136–3145 proposed → in progress 1/10; post-3136 → draft; posts 3141/3142 ⚠️ clinical-safety required flagged; new proposed series 3196–3205 «Силові стандарти» + 3206–3215 «Тренувальна послідовність» added to roadmap; version note v12.80.0 → v12.81.0.
+- `STATUS.md` — v12.80.0 → v12.81.0; series «Self-coached атлет: перший рік» proposed → in progress 1/10; next: post-3137.
+
+---
+
 ## [12.80.0] — 2026-07-04
 
 ### Added
