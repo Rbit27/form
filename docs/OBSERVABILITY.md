@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.15.5
+# FORM · Observability & Monitoring Taxonomy v5.15.6
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -1248,7 +1248,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `dsar-sla-day29-alert` | `0 7 * * *` | 26 h | P5.1 GDPR Art. 15 — DSAR day-29 P0 alert clock | PagerDuty P1 → compliance-officer |
 | `dsar-export-expiry-cleanup` | `0 3 * * *` | 26 h | P4.1 retention — R2 export object purge (7-day window) | PagerDuty P1 → compliance-officer |
 | `audit-chain-daily-check` | `0 6 * * *` | 26 h | DEC-030 HMAC chain integrity verification; INCIDENT_RESPONSE R-68 (§R-68; v1.0, 2026-07-03 — companion stale recovery runbook for audit-chain-daily-check) | PagerDuty **P0** → security-engineer + devops-lead |
-| `row-count-monitor` | `*/15 * * * *` | 1 h | CC7.1 / A1.2 — data-integrity anomaly sentinel | PagerDuty **P0** → devops-lead |
+| `row-count-monitor` | `*/15 * * * *` | 1 h | CC7.1 / A1.2 — data-integrity anomaly sentinel; INCIDENT_RESPONSE R-71 (§R-71; v1.0, 2026-07-04 — companion stale recovery runbook for row-count-monitor) | PagerDuty **P0** → devops-lead |
 | `mfa-enforcement-log-cleanup` | `0 2 * * *` | 26 h | CC6.1 MFA enforcement log retention | PagerDuty P1 → devops-lead |
 | `workout-export` | `0 1 * * *` | 26 h | A1.2 — user-facing export pipeline; stale = visible feature failure | PagerDuty P1 → devops-lead |
 | `audit-event-flush` | `*/30 * * * *` | 2 h | A1.2 / DEC-030 — audit event KV buffer flush; stale = potential event loss | PagerDuty **P0** → platform-engineer |
@@ -19115,3 +19115,5 @@ The §56.10 item 5 obligation was fulfilled in SOC2_READINESS §120 (v3.45.0, 20
 *v5.15.0 (2026-07-03): §12.6 pg_cron canonical registry — job 22 (`siem_bridge_cr02_impossible_travel`) cross-reference column update. Closes INCIDENT_RESPONSE.md §R-65.12 item 4 (P0): companion stale recovery runbook R-65 (SIEM Bridge CR-02 Impossible Travel Monitor Stale, CC7.2) authored this pass; job 22 row updated with `; INCIDENT_RESPONSE R-65 (§R-65; v1.0, 2026-07-03 — companion stale recovery runbook for job 22)` in the cross-reference column. Document header v5.14.9 → v5.15.0. Owner: devops-lead.*
 
 *v5.14.9 (2026-07-03): §12.6 pg_cron canonical registry — job 21 (`pam_bg_review_alert`) cross-reference column update. Closes INCIDENT_RESPONSE.md §R-64.12 item 4 (P0): companion stale recovery runbook R-64 (PAM Break-Glass Review Alert Stale, CC6.6) authored this pass; job 21 row updated with `; INCIDENT_RESPONSE R-64 (§R-64; v1.0, 2026-07-03 — companion stale recovery runbook for job 21)` in the cross-reference column. Document header v5.14.8 → v5.14.9. Owner: devops-lead.*
+
+*v5.15.6 (2026-07-04): §12.6 pg_cron canonical registry — `row-count-monitor` (unnumbered original job) cross-reference column update. Closes INCIDENT_RESPONSE.md §R-71.12 item 5 (P0): companion stale recovery runbook R-71 (Row Count Monitor Stale, CC7.1/A1.2, P0 default) authored this pass; `row-count-monitor` row updated with `; INCIDENT_RESPONSE R-71 (§R-71; v1.0, 2026-07-04 — companion stale recovery runbook for row-count-monitor)` in the cross-reference column. R-71 is the second P0-default companion stale runbook authored (R-68 was the first for `audit-chain-daily-check`); `row-count-monitor` is the only remaining P0 job among the original unnumbered §12.6 entries without a companion stale runbook after this update. Document header v5.15.5 → v5.15.6. Owner: devops-lead.*

@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.85.0
+# FORM · SOC 2 Type II Readiness v3.86.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -35408,3 +35408,67 @@ PRV-21 status updated from "🟡 Partial — policy defined; enforcement not yet
 ---
 
 *v3.85.0 (2026-07-03): §159 — KANON-E-001 Registration (P4.1/CC2.2 · DATA_MODEL §51 · Migration 0092 · PRV-21 DDL Closure). KANON-E-001 registered in §79.4 master evidence table (count 125 → 126). Evidence class: per-change + annual nil attestation. Retention: 7yr WORM. TSC: P4.1/CC2.2. R2 path: `compliance/evidence/k-anonymity/` (NEW subfolder — no pre-existing parent; annual JSONL + nil attestation JSON). PRV-21 status updated: "🟡 Partial — policy defined; enforcement not yet unit-tested" → "✅ Done (DDL portion — migration 0092; `chk_reporting_k_floor_tier` CHECK on `tenants`) + 🟡 unit-test closure pending (DATA_MODEL §51.9 item 8, P1/M8)". Closes DATA_MODEL §51.9 items 3 and 4 (P0). Cross-references AUDIT_LOG_SCHEMA.md v2.85 (`tenant.k_floor_updated` HIGH/7yr + KANON-CHAIN-01) and DATA_MODEL.md v1.43 (§51 migration 0092 canonical spec + §17.4.4 annotation). Owner: compliance-officer + enterprise-architect.*
+
+---
+
+## §160 ROWCOUNT-MON-STALE-E-001 Registration (CC7.1/A1.2 · INCIDENT_RESPONSE R-71 · `row-count-monitor` Stale Recovery Evidence)
+
+### §160.1 Registration Summary
+
+ROWCOUNT-MON-STALE-E-001 is the per-activation evidence artefact for INCIDENT_RESPONSE.md R-71 (`row-count-monitor` Stale — CC7.1/A1.2 data-integrity anomaly sentinel). `row-count-monitor` (pg_cron `*/15 * * * *`, 1h freshness window) is FORM's automated sentinel comparing current row counts for 7 critical Postgres tables against 1-hour rolling baseline averages in `monitoring_baselines`; a >20% deviation triggers PagerDuty P0. R-71 is a P0-default incident: a stale `row-count-monitor` means FORM's primary automated data-integrity check is offline — the compensating control is R-71-C2 (manual deviation scan), whose results (`manual_deviation_found`, `max_deviation_pct` scalars) are captured in DEC-030 chain events and this artefact.
+
+### §160.2 §79.4 Master Evidence Table Entry (evidence count 126 → 127)
+
+| # | Artefact ID | TSC | Trigger | Retention | R2 path | Status |
+|---|---|---|---|---|---|---|
+| 127 | ROWCOUNT-MON-STALE-E-001 | CC7.1 / A1.2 | Per-activation (R-71 incident) | 7yr WORM | `compliance/evidence/row-count-monitor/rowcount-mon-stale-e-001-<YYYY-MM-DD>/` | 🟡 **Pending — R2 subfolder provision (§160.6 item 2 / R-71.12 item 3)** |
+
+### §160.3 R2 Path Specification
+
+| Field | Value |
+|---|---|
+| R2 bucket | `r2:form-compliance` (WORM-enabled) |
+| R2 API access | `r2:form-api` REVOKED — IC PAM-elevated manual upload only (consistent with §80.3 invariant) |
+| R2 path pattern | `compliance/evidence/row-count-monitor/rowcount-mon-stale-e-001-<YYYY-MM-DD>/` |
+| Parent folder | `compliance/evidence/row-count-monitor/` — **NEW subfolder** (no pre-existing parent) |
+| Subfolder provision status | 🟡 Pending — devops-lead (§160.6 item 2) |
+| Object versioning | Enabled (WORM — no DELETE, no overwrite) |
+
+**Artefact file list (per-activation):**
+
+| File | Description |
+|---|---|
+| `incident-timeline.md` | Activation timestamp, IC identifier (UUID pseudonym), resolution time, root cause (H1–H4), total stale hours, deviation summary |
+| `r71-c1-output.txt` | R-71-C1 pg_cron history query result — restricted to devops-lead + compliance-officer |
+| `r71-c2-output.txt` | R-71-C2 manual deviation scan: all 7 `monitoring_baselines` table deviation_pct values; `manual_deviation_found` and `max_deviation_pct` scalars |
+| `dec-030-event-ids.txt` | HMAC chain event UUIDs: `system.row_count_monitor_stale_declared` and `system.row_count_monitor_restored` |
+| `root-cause-analysis.md` | Root cause classification (H1–H4 with sub-causes for H4), resolution steps, follow-up Linear issue URL |
+
+**Privacy floor:** All artefact files contain operational infrastructure metadata only — no `user_id`, `tenant_id`, individual workout, coaching content, health metric, body composition value, or GDPR Art. 9 special-category data. `r71-c2-output.txt` contains only aggregate `deviation_pct` scalars from `monitoring_baselines.row_count_avg` (total table counts — not per-user or per-tenant). Artefact access: devops-lead + compliance-officer only; not shared with auditors without explicit compliance-officer review.
+
+### §160.4 §80.4 Vanta Mirror Protocol Update
+
+ROWCOUNT-MON-STALE-E-001 is added to the §80.4 Vanta evidence mirror registry.
+
+| Evidence ID | Vanta control | Mirror frequency | Nil-activation attestation |
+|---|---|---|---|
+| ROWCOUNT-MON-STALE-E-001 | CC7.1 / A1.2 — monitoring system operations | Per-activation (on each R-71 incident) | Annual affirmative attestation if zero activations in the year |
+
+**Nil-activation attestation:** If `row-count-monitor` has no stale incidents during a 12-month period, compliance-officer files a nil-activation attestation JSON to `compliance/evidence/row-count-monitor/rowcount-mon-stale-e-001-nil-<YYYY>/nil-attestation.json` confirming zero R-71 activations and confirming the job was continuously active and healthy per OBSERVABILITY.md §12.6 pg_cron health registry.
+
+### §160.5 CC7.1 / A1.2 Auditor Narrative
+
+CC7.1 requires monitoring of system components to detect anomalies. `row-count-monitor` (pg_cron `*/15 * * * *`, 1h freshness window, 4 cycles per hour) is the primary automated sentinel for data-integrity anomaly detection: it queries all 7 critical Postgres tables registered in `monitoring_baselines` and compares current row counts against 1-hour rolling baselines; a deviation >20% fires PagerDuty P0. SOC 2 CC7.1 evidence: per-activation ROWCOUNT-MON-STALE-E-001 artefacts demonstrate that every monitoring gap was detected via `pg-cron-health-monitor`, triaged within 1h (T+5 DEC-030 emission, T+60 P0 resolution target), and compensated by R-71-C2 manual scan — no data-integrity anomaly was undetected. A1.2 requires that the entity monitors system capacity and performance; stale `row-count-monitor` directly impacts ability to detect availability-threatening mass data deletion or corruption. ROWCOUNT-MON-STALE-E-001 at 7yr WORM retention demonstrates sustained monitoring capability over the audit period. The DEC-030 HMAC chain (ROWCOUNT-MON-STALE-CHAIN-01: `stale_declared` → `restored`) provides tamper-evident sequencing that auditors can verify against the `audit_log_events` table.
+
+### §160.6 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register ROWCOUNT-MON-STALE-E-001 in §79.4 master evidence table (CC7.1/A1.2; per-activation; 7yr; `compliance/evidence/row-count-monitor/`) | compliance-officer + security-engineer | **P0** | [x] **Done — 2026-07-04 (§160.2, this section).** |
+| 2 | Provision `compliance/evidence/row-count-monitor/` R2 subfolder (NEW folder — no pre-existing parent); configure WORM object versioning + `r2:form-api` REVOKED policy consistent with §80.3 invariant | devops-lead + compliance-officer | **P1** | [ ] **Pending — devops-lead.** |
+| 3 | Add ROWCOUNT-MON-STALE-E-001 to §80.4 Vanta mirror protocol (per-activation + annual nil attestation within 48h) | compliance-officer | **P1** | [x] **Done — 2026-07-04 (§160.4, this section).** |
+| 4 | Authoring complete — §160 documentation obligation fulfilled | compliance-officer | **P0** | [x] **Done — 2026-07-04 (SOC2_READINESS.md v3.86.0).** |
+
+---
+
+*v3.86.0 (2026-07-04): §160 — ROWCOUNT-MON-STALE-E-001 Registration (CC7.1/A1.2 · INCIDENT_RESPONSE R-71 · `row-count-monitor` Stale Recovery Evidence). ROWCOUNT-MON-STALE-E-001 registered in §79.4 master evidence table (count 126 → 127). Evidence class: per-activation (per R-71 incident). Retention: 7yr WORM. TSC: CC7.1/A1.2. R2 path: `compliance/evidence/row-count-monitor/` (NEW subfolder — no pre-existing parent; per-activation folder per YYYY-MM-DD + annual nil attestation). Artefact contents: five files per activation (incident-timeline.md, r71-c1-output.txt, r71-c2-output.txt, dec-030-event-ids.txt, root-cause-analysis.md). §80.4 Vanta mirror protocol updated: ROWCOUNT-MON-STALE-E-001 added (per-activation mirror + annual nil attestation within 48h). Closes INCIDENT_RESPONSE.md R-71.12 item 4 (P1 — register ROWCOUNT-MON-STALE-E-001 in §79.4). R2 subfolder provision pending (devops-lead — §160.6 item 2). Cross-references: INCIDENT_RESPONSE.md R-71 (full runbook — P0 default, CC7.1/A1.2); AUDIT_LOG_SCHEMA.md v2.86 (`system.row_count_monitor_stale_declared` HIGH/7yr + `system.row_count_monitor_restored` LOW/3yr + ROWCOUNT-MON-STALE-CHAIN-01); OBSERVABILITY.md §12.6 `row-count-monitor` row (v5.15.6). Privacy floor: all five artefact files contain operational infrastructure metadata only; `r71-c2-output.txt` contains aggregate deviation_pct scalars from `monitoring_baselines.row_count_avg` (total table counts — not per-user/per-tenant); no user_id, tenant_id, coaching content, health data, or GDPR Art. 9 data; access restricted to devops-lead + compliance-officer. Owner: compliance-officer + security-engineer.*

@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [12.16.1] — 2026-07-04
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md R-71` — `row-count-monitor` Stale companion runbook (CC7.1/A1.2, P0 default). Job `*/15 * * * *`, 1h freshness window. 12 subsections (R-71.1–R-71.12): identity table, detection timeline (T+0 through T+60), severity classification matrix, 3 scope queries (R-71-C1 pg_cron history + active flag H1/H2 discriminator, R-71-C2 manual deviation check against `monitoring_baselines` compensating control, R-71-C3 peer job health H3 discriminator), H1–H4 root cause tree (H4 with 4 sub-causes: deployment failure, `monitoring_baselines` DDL drift, pg_net degradation, execution timeout), per-root-cause resolution playbook, DEC-030 HMAC-chained events with payload tables and Zod v2 schemas, ROWCOUNT-MON-STALE-CHAIN-01 ordering invariant, ROWCOUNT-MON-STALE-E-001 evidence artefact spec (5-file per-activation package, T+25 min filing deadline, NEW R2 subfolder), 3 communication templates (T-71-A/B/C; T-71-C restricted to CEO+CTO+IC), co-activation matrix (R-10/>20% deviation, R-05/chain invariant violated, R-03/H3 infra), 6-item implementation checklist. Header v3.36.0 → v3.37.0.
+- `docs/AUDIT_LOG_SCHEMA.md §Row Count Monitor Stale events` — `system.row_count_monitor_stale_declared` (HIGH/7yr) and `system.row_count_monitor_restored` (LOW/3yr) DEC-030 HMAC-chained events registered. `RowCountMonitorStaleDeclaredSchema` Zod v2 (6 fields: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_hours` int≥0, `missed_runs_estimate` int≥0, `manual_deviation_found` bool, `max_deviation_pct` float≥−1). `RowCountMonitorRestoredSchema` Zod v2 (6 fields: `incident_id` UUID, `restored_at` datetime, `root_cause` 4-value enum h1_deleted/h2_disabled/h3_infra/h4_edge_function_broken, `stale_hours_total` int≥0, `manual_deviation_found` bool, `max_deviation_pct` float≥0). ROWCOUNT-MON-STALE-CHAIN-01 ordering invariant documented (HTTP 422 `ROWCOUNT_MON_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit; R-05 co-activation; implementation pending platform-engineer). CC7.1/A1.2 auditor narrative. Header v2.85 → v2.86.
+- `docs/SOC2_READINESS.md §160` — ROWCOUNT-MON-STALE-E-001 registered in §79.4 master evidence table (count 126 → 127; CC7.1/A1.2; per-activation trigger; 7yr WORM; R2 path `compliance/evidence/row-count-monitor/`; NEW subfolder — no pre-existing parent). §80.4 Vanta mirror protocol updated (per-activation + annual nil attestation within 48h). Header v3.85.0 → v3.86.0.
+- `docs/OBSERVABILITY.md §12.6` — `row-count-monitor` row cross-reference column updated: `; INCIDENT_RESPONSE R-71 (§R-71; v1.0, 2026-07-04 — companion stale recovery runbook for row-count-monitor)` appended. Header v5.15.5 → v5.15.6.
+- `VERSION` — 12.16.0 → 12.16.1.
+
 ## [12.16.0] — 2026-07-04
 
 ### Added

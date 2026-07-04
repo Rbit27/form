@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.36.0
+# FORM · Incident Response Runbook v3.37.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -25413,3 +25413,384 @@ Do not post pam_session_id or admin_user_id in public Slack channels.
 ---
 
 *v1.0 (2026-07-03): R-70 PAM Postgres Sync Stale (`pam_postgres_sync` · job 20) — seventieth runbook and first companion stale recovery runbook in the security namespace (all prior companion stale runbooks R-28 through R-69 were in the `system.*` or wearable namespace). Job 20 `pam_postgres_sync` (`*/30 * * * *`; 35h freshness window; every 30 min UTC) was registered in OBSERVABILITY.md §12.6 (v2.5, 2026-06-10) as part of the PAM observability authoring pass (DATA_MODEL §29.10 items 7–8); no stale recovery runbook was authored at that time. The CC6.2/CC6.6 control significance: `pam_postgres_sync` verifies every `pam.elevation_approved` DEC-030 event has a matching `admin_jit_escalations` row — it is the KV-to-Postgres PAM audit sync integrity sentinel. Stale window = potential undetected gap between KV PAM state and Postgres audit record for any elevation events occurring during the stale period. P2 default (lower than R-68 P0 and R-69 P1): a stale `pam_postgres_sync` creates a detection latency gap, not a confirmed chain break (PAM events are human-initiated and infrequent; 35h window tolerates scheduling failures while maintaining audit integrity); the R-70-C1 compensating SQL immediately bridges the gap for the stale window. Key escalation path: P2 → P0 if R-70-C1 finds any `pam.elevation_approved` without `admin_jit_escalations` match AND `is_break_glass = true` — this is a CC6.6 break-glass audit completeness breach requiring co-activation of R-20. Two DEC-030 HMAC-chained events (AUDIT_LOG_SCHEMA.md v2.84, 2026-07-03): `security.pam_postgres_sync_stale_declared` HIGH/7yr (PAM-SYNC-STALE-CHAIN-01 anchor; IC PAM-elevated at T+5; CC6.2/CC6.6); `security.pam_postgres_sync_restored` LOW/3yr (terminal; IC PAM-elevated post-recovery; `manual_gap_count` and `gap_remediated` capture R-70-C1 result). Three scope queries: R-70-C1 (PAM elevation gap check — security-sensitive, restricted distribution; `manual_gap_count`); R-70-C2 (pg_cron job health — H1/H2 discriminator); R-70-C3 (peer job health — H3 discriminator). Four root causes: H1 (deleted — `cron.job` no row); H2 (disabled — `active = false`); H3 (Supabase pg_cron degradation → R-02 co-active); H4 (pg_net degraded). Three communication templates (T-70-A detection; T-70-B resolution; T-70-C escalation — restricted distribution when break-glass gap confirmed). One evidence artefact: PAM-SYNC-STALE-E-001 (per-activation; CC6.2/CC6.6; 7yr; `compliance/evidence/pam/pam-sync-stale-e-001-<YYYY-MM-DD>/`; new R2 subfolder — §R-70.12 item 3 pending devops-lead). Six implementation checklist items: AUDIT_LOG_SCHEMA.md event registration (P0/Done), PAM-SYNC-STALE-CHAIN-01 Worker enforcement (P1/pending platform-engineer), R2 pam/ subfolder provision (P1/pending devops-lead), SOC2_READINESS.md §79.4 artefact registration (P1/Done §158), §12.6 OBSERVABILITY cross-ref update (P0/Done v5.15.5), authoring complete (P0/Done). Privacy floor: R-70-C1 output restricted to security-engineer + IC; `manual_gap_count` and `gap_remediated` are aggregate scalars in DEC-030 events; PAM-SYNC-STALE-E-001 uses two-envelope structure (outer public cover sheet + restricted inner row list); no enterprise tenant employee user_id, health data, or GDPR Art. 9 data. Cross-references: OBSERVABILITY.md §12.6 job 20; DATA_MODEL.md §29; SSO_SCIM_IMPLEMENTATION.md §24; AUDIT_LOG_SCHEMA.md §PAM events; R-05; R-20; R-02. Owner: security-engineer + compliance-officer + platform-engineer.*
+
+---
+
+## R-71: `row-count-monitor` Stale (CC7.1 / A1.2 — Data-Integrity Anomaly Sentinel)
+
+### R-71.1 Runbook Identity
+
+| Field | Value |
+|---|---|
+| Runbook ID | R-71 |
+| Job name | `row-count-monitor` |
+| Job type | Supabase Edge Function invoked by pg_cron |
+| Schedule | `*/15 * * * *` (every 15 min UTC) |
+| Freshness window | **1 h** (four 15-min slots) |
+| SOC 2 controls | CC7.1, A1.2 |
+| Default severity | **P0** |
+| PagerDuty routing | `form-devops` P0 → devops-lead; dedup key `row-count-monitor-stale` |
+| DEC-030 events | `system.row_count_monitor_stale_declared` (HIGH/7yr) · `system.row_count_monitor_restored` (LOW/3yr) |
+| Chain invariant | ROWCOUNT-MON-STALE-CHAIN-01 |
+| Evidence artefact | ROWCOUNT-MON-STALE-E-001 |
+| Companion runbooks | R-10 (if deviation >20%) · R-05 (if chain invariant violated) · R-03 (if H3 Supabase infra) |
+| Owner | devops-lead (primary) · compliance-officer (DEC-030 events + evidence) |
+| OBSERVABILITY.md ref | §12.6 `row-count-monitor` row |
+
+### R-71.2 Detection and Initial Triage
+
+**Automated detection path:** `pg-cron-health-monitor` Edge Function (schedule `0 * * * *`, hourly) queries `cron.job_run_details` for all registered jobs and compares `last_run_at` against each job's freshness window. When `row-count-monitor` last successful completion timestamp exceeds 1 h (four missed 15-min cycles), `pg-cron-health-monitor` emits `system.cron_job_stale` HIGH DEC-030 event (registered in AUDIT_LOG_SCHEMA.md v0.7) with `job_name = 'row-count-monitor'` and fires PagerDuty P0 to `form-devops` → devops-lead.
+
+**Dedup key:** `row-count-monitor-stale` — PagerDuty suppresses additional alerts for the same stale window until resolved.
+
+**IC designation:** devops-lead is the default Incident Commander. compliance-officer is notified at T+10 for DEC-030 event emission coordination. IC must hold a PAM-elevated session before emitting DEC-030 events via `emit-audit-event` Worker.
+
+| Time | Action |
+|---|---|
+| T+0 | PagerDuty P0 fires |
+| T+5 min | IC confirms staleness via R-71-C1. PAM-elevated session opened. `system.row_count_monitor_stale_declared` HIGH emitted |
+| T+10 min | Notify compliance-officer. Run R-71-C2 (manual row count deviation check) |
+| T+15 min | Classify root cause (H1/H2/H3/H4) via R-71-C3. Initiate co-activations if warranted |
+| T+60 min | Resolution target (P0). Emit `system.row_count_monitor_restored` LOW post-recovery |
+
+### R-71.3 Severity Classification
+
+| Condition | Severity | Action |
+|---|---|---|
+| Stale detected, root cause not yet identified | **P0** (default) | Begin triage immediately |
+| H1 (deleted) or H2 (disabled): sentinel definitively offline | **P0** | Restore immediately (R-71.6 H1/H2 path) |
+| H3: Supabase pg_cron infra degradation (≥3 peer jobs stale within 4 h) | **P0 → P1** (if confirmed infra) | Co-activate R-03; no direct job action until infra restored |
+| H4: Edge Function broken, R-71-C2 shows ≤5% deviation on all tables | **P0** | Redeploy Edge Function |
+| H4: Edge Function broken, R-71-C2 shows >20% deviation in ≥1 table | **P0 — upgrade to Major Incident** | Co-activate R-10 immediately |
+| Stale >4 h (>16 missed 15-min cycles) with no root cause identified | **P0 — escalate to CEO/CTO** | T-71-C escalation template |
+
+### R-71.4 Scope Queries
+
+**R-71-C1 — pg_cron history (job existence and last runs)**
+
+Run first to confirm staleness and classify H1/H2. Restricted to devops-lead + compliance-officer.
+
+```sql
+SELECT
+  j.jobid,
+  j.jobname,
+  j.schedule,
+  j.active,
+  j.command,
+  d.runid,
+  d.start_time,
+  d.end_time,
+  d.status,
+  d.return_message
+FROM cron.job j
+LEFT JOIN cron.job_run_details d
+  ON d.jobname = j.jobname
+  AND d.start_time > NOW() - INTERVAL '3 hours'
+WHERE j.jobname = 'row-count-monitor'
+ORDER BY d.start_time DESC NULLS LAST
+LIMIT 20;
+```
+
+Interpretation:
+- Zero rows from `cron.job`: **H1** (job deleted) — proceed to R-71.6 H1 path.
+- `active = false`: **H2** (job disabled) — proceed to R-71.6 H2 path.
+- `active = true` but no recent `job_run_details` rows: **H3 or H4** — continue to R-71-C3.
+- Recent rows with `status = 'failed'` or non-empty `return_message`: **H4** (Edge Function error) — check `return_message` for sub-cause.
+
+**R-71-C2 — Manual row count deviation check (compensating control while stale)**
+
+Run to determine whether a data-integrity anomaly occurred during the stale window. Results inform `manual_deviation_found` and `max_deviation_pct` fields for DEC-030 events and severity escalation decision. Restricted to devops-lead + compliance-officer.
+
+```sql
+SELECT
+  mb.table_name,
+  mb.row_count_avg                                                   AS baseline_avg,
+  (SELECT reltuples::BIGINT
+   FROM   pg_class
+   WHERE  relname = mb.table_name)                                   AS current_estimate,
+  ROUND(
+    (
+      (SELECT reltuples FROM pg_class WHERE relname = mb.table_name)
+      - mb.row_count_avg
+    ) / NULLIF(mb.row_count_avg, 0) * 100
+  , 2)                                                               AS deviation_pct
+FROM monitoring_baselines mb
+ORDER BY ABS(
+  ROUND(
+    (
+      (SELECT reltuples FROM pg_class WHERE relname = mb.table_name)
+      - mb.row_count_avg
+    ) / NULLIF(mb.row_count_avg, 0) * 100
+  , 2)
+) DESC;
+```
+
+Interpretation:
+- Any `deviation_pct` > 20%: **co-activate R-10** (Data Loss/Deletion Attack) immediately; `manual_deviation_found = true`.
+- `deviation_pct` between 5–20%: flag to devops-lead and compliance-officer; investigate before resolving; `manual_deviation_found = true`.
+- `deviation_pct` ≤ 5% for all tables: no anomaly during stale window; `manual_deviation_found = false`; `max_deviation_pct` = largest absolute deviation found.
+- `monitoring_baselines` table missing or empty: **H4b** (table schema issue) — see R-71.6 H4 path.
+
+**R-71-C3 — Peer job health (H3 discriminator)**
+
+Run after R-71-C1 if H3 infra is suspected (active = true, no recent runs).
+
+```sql
+SELECT
+  jobname,
+  MAX(start_time)                                                    AS last_run,
+  NOW() - MAX(start_time)                                            AS since_last_run,
+  COUNT(*)                                                           AS run_count_4h,
+  SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)             AS success_count_4h
+FROM cron.job_run_details
+WHERE start_time > NOW() - INTERVAL '4 hours'
+GROUP BY jobname
+ORDER BY since_last_run DESC;
+```
+
+Interpretation:
+- ≥3 jobs show `since_last_run` > their expected cadence: **H3** (Supabase pg_cron degradation) — co-activate R-03.
+- Only `row-count-monitor` stale: **H4** (Edge Function-specific failure) — check `return_message` from R-71-C1 for sub-cause.
+
+### R-71.5 Root Cause Tree
+
+```
+row-count-monitor STALE
+├── H1: Job deleted from pg_cron
+│     Confirm: R-71-C1 returns zero rows from cron.job
+│     Action: Recreate job (R-71.6 H1)
+│
+├── H2: Job disabled (active = false)
+│     Confirm: R-71-C1 shows active = false
+│     Action: Re-enable job (R-71.6 H2)
+│
+├── H3: Supabase pg_cron infrastructure degradation
+│     Confirm: R-71-C3 shows ≥3 peer jobs also stale within 4 h
+│     Action: Co-activate R-03; no job-level action until infra restored
+│
+└── H4: Edge Function broken (job active=true, only row-count-monitor failing)
+      ├── H4a: Edge Function deployment failure / cold-start crash
+      │     Confirm: return_message contains stack trace or 5xx error
+      │     Action: Redeploy Edge Function via Supabase Dashboard
+      │
+      ├── H4b: monitoring_baselines table missing or schema mismatch
+      │     Confirm: return_message references "monitoring_baselines" or column not found
+      │     Action: Verify table exists; apply migration if DDL drifted
+      │
+      ├── H4c: pg_net degradation (Edge Function cannot send results via pg_net)
+      │     Confirm: return_message references pg_net or HTTP call failure
+      │     Action: Check pg_net extension health; escalate to Supabase support
+      │
+      └── H4d: Execution timeout (query exceeds Edge Function time limit)
+            Confirm: return_message contains "timeout" or execution time > 10s
+            Action: Optimise SQL in Edge Function; consider splitting per-table
+```
+
+### R-71.6 Resolution Playbook
+
+**H1 — Job deleted:**
+
+1. Confirm R-71-C1 returns no row in `cron.job` for `jobname = 'row-count-monitor'`.
+2. Recreate job from OBSERVABILITY.md §12.6 canonical definition:
+   ```sql
+   SELECT cron.schedule(
+     'row-count-monitor',
+     '*/15 * * * *',
+     $$SELECT net.http_post(
+       url     := current_setting('app.supabase_functions_endpoint') || '/row-count-monitor',
+       headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.service_role_key')),
+       body    := '{}'::jsonb
+     ) AS request_id$$
+   );
+   ```
+3. Confirm `active = true` in `cron.job` after creation.
+4. Wait for next 15-min cycle to confirm successful execution via R-71-C1.
+5. File Linear issue to investigate who/what deleted the job (potential unauthorized change — R-10 signal if combined with >5% deviation from R-71-C2).
+6. Emit DEC-030 events (R-71.7). Root cause: `h1_deleted`.
+
+**H2 — Job disabled:**
+
+1. Confirm `active = false` in R-71-C1.
+2. Re-enable: `UPDATE cron.job SET active = true WHERE jobname = 'row-count-monitor';`
+3. Confirm `active = true` post-update.
+4. Wait for next 15-min cycle to confirm successful execution via R-71-C1.
+5. File Linear issue to determine who/what disabled the job and whether this represents an unauthorized change.
+6. Emit DEC-030 events (R-71.7). Root cause: `h2_disabled`.
+
+**H3 — Supabase pg_cron infra degradation:**
+
+1. Confirm via R-71-C3 (≥3 peer jobs stale) and Supabase status page (status.supabase.com).
+2. Co-activate R-03 (Service Outage — Supabase pg_cron infra degradation).
+3. Do NOT attempt to recreate or re-enable the job — infra restoration is required first.
+4. Run R-71-C2 manually every 30 min to monitor for anomaly onset during infra downtime.
+5. Post T-71-A detection notification to `#incidents-enterprise` with `H3 infra (R-03 co-active)` note.
+6. After Supabase restoration: confirm `row-count-monitor` resumes automatically; verify with R-71-C1.
+7. Emit DEC-030 events (R-71.7). Root cause: `h3_infra`.
+
+**H4 — Edge Function broken:**
+
+1. Check `return_message` in R-71-C1 for error specifics.
+2. **H4a (deployment failure):** Supabase Dashboard → Edge Functions → `row-count-monitor` → Redeploy. Verify function version matches git HEAD.
+3. **H4b (monitoring_baselines schema):** `SELECT * FROM monitoring_baselines LIMIT 5;` — confirm table exists with expected columns (`table_name TEXT`, `row_count_avg NUMERIC`, `updated_at TIMESTAMPTZ`). If missing, apply migration or restore from backup.
+4. **H4c (pg_net degradation):** `SELECT * FROM net._http_response ORDER BY id DESC LIMIT 10;` — look for failures. If pg_net is degraded, open Supabase support ticket.
+5. **H4d (timeout):** Optimise the SQL scanning all 7 monitored tables; consider running per-table and reducing result set size. Engage platform-engineer if query plan changes are needed.
+6. After fix: confirm next 15-min cycle succeeds via R-71-C1.
+7. Emit DEC-030 events (R-71.7). Root cause: `h4_edge_function_broken`.
+
+### R-71.7 DEC-030 HMAC-Chained Events
+
+Both events are emitted via `emit-audit-event` Worker. IC must hold a PAM-elevated session for both emissions. `form_api` REVOKED from the emission path (consistent with all companion stale runbooks R-60 through R-70).
+
+**Event 1: `system.row_count_monitor_stale_declared` — HIGH · 7-year retention · HMAC chain anchor**
+
+Emit at T+5 after staleness is confirmed. This is the ROWCOUNT-MON-STALE-CHAIN-01 anchor — `system.row_count_monitor_restored` is blocked without a prior `stale_declared` event for the same `incident_id`.
+
+| Field | Type | Constraints | Description |
+|---|---|---|---|
+| `incident_id` | UUID | required | Fresh UUID generated by IC at T+5 for this activation |
+| `confirmed_stale_since` | ISO 8601 datetime | required | Timestamp of last confirmed successful run from R-71-C1 |
+| `stale_hours` | integer | ≥ 0 | Hours elapsed since last confirmed successful run at emission time |
+| `missed_runs_estimate` | integer | ≥ 0 | Estimated missed 15-min cycles: `stale_hours × 4` |
+| `manual_deviation_found` | boolean | required | `true` if R-71-C2 found any table with `deviation_pct > 5%`; `false` if all ≤ 5% |
+| `max_deviation_pct` | float | ≥ −1 | Maximum absolute `deviation_pct` from R-71-C2; −1 if scan not yet run at emission time |
+
+Zod v2 schema (`RowCountMonitorStaleDeclaredSchema`):
+```typescript
+const RowCountMonitorStaleDeclaredSchema = z.object({
+  incident_id:            z.string().uuid(),
+  confirmed_stale_since:  z.string().datetime(),
+  stale_hours:            z.number().int().min(0),
+  missed_runs_estimate:   z.number().int().min(0),
+  manual_deviation_found: z.boolean(),
+  max_deviation_pct:      z.number().min(-1),
+});
+```
+
+**Event 2: `system.row_count_monitor_restored` — LOW · 3-year retention · HMAC chain terminal**
+
+Emit after `row-count-monitor` successfully completes at least one full run post-recovery. Blocked by ROWCOUNT-MON-STALE-CHAIN-01 without prior `stale_declared` for same `incident_id`.
+
+| Field | Type | Constraints | Description |
+|---|---|---|---|
+| `incident_id` | UUID | required | Must match the `incident_id` from the `stale_declared` event |
+| `restored_at` | ISO 8601 datetime | required | Timestamp of first successful run post-recovery |
+| `root_cause` | enum | 4 values | `h1_deleted` / `h2_disabled` / `h3_infra` / `h4_edge_function_broken` |
+| `stale_hours_total` | integer | ≥ 0 | Total hours stale: from `confirmed_stale_since` to `restored_at` |
+| `manual_deviation_found` | boolean | required | `true` if R-71-C2 found any table with `deviation_pct > 5%` during stale window |
+| `max_deviation_pct` | float | ≥ 0 | Maximum absolute `deviation_pct` from final R-71-C2 scan; 0 if no deviation found |
+
+Zod v2 schema (`RowCountMonitorRestoredSchema`):
+```typescript
+const RowCountMonitorRestoredSchema = z.object({
+  incident_id:            z.string().uuid(),
+  restored_at:            z.string().datetime(),
+  root_cause:             z.enum(['h1_deleted', 'h2_disabled', 'h3_infra', 'h4_edge_function_broken']),
+  stale_hours_total:      z.number().int().min(0),
+  manual_deviation_found: z.boolean(),
+  max_deviation_pct:      z.number().min(0),
+});
+```
+
+### R-71.8 ROWCOUNT-MON-STALE-CHAIN-01 Ordering Invariant
+
+`system.row_count_monitor_restored` MUST be preceded by `system.row_count_monitor_stale_declared` with a matching `incident_id`. The `emit-audit-event` Worker enforces this at write time: if a `restored` event arrives without a prior `stale_declared` for the same `incident_id`, the Worker returns:
+
+```
+HTTP 422 ROWCOUNT_MON_STALE_CHAIN_01_VIOLATION
+```
+
+A 422 response on the `restored` emit co-activates R-05 (HMAC Chain Break) — an unanchored `restored` emit represents potential audit log manipulation or workflow error. The IC must not retry the `restored` emit without first understanding why the `stale_declared` anchor is absent from the chain and confirming with compliance-officer.
+
+Implementation status: [ ] Pending — platform-engineer (§R-71.12 item 2).
+
+### R-71.9 Evidence Artefact
+
+**ROWCOUNT-MON-STALE-E-001** — per-activation evidence package filed to R2 WORM storage within T+25 min of incident activation.
+
+| Field | Value |
+|---|---|
+| Artefact ID | ROWCOUNT-MON-STALE-E-001 |
+| SOC 2 controls | CC7.1 / A1.2 |
+| Trigger | Per activation of R-71 (every `row-count-monitor` stale incident) |
+| Retention | 7 years WORM |
+| R2 access | `r2:form-api` REVOKED — IC PAM-elevated manual upload only |
+| R2 path | `compliance/evidence/row-count-monitor/rowcount-mon-stale-e-001-<YYYY-MM-DD>/` (**NEW subfolder** — no pre-existing parent) |
+| Filing deadline | T+25 min from incident activation |
+| SOC2_READINESS.md ref | §160 (v3.86.0, 2026-07-04) |
+
+**Artefact file contents:**
+
+| File | Description |
+|---|---|
+| `incident-timeline.md` | Start time, detection method, IC identifier (UUID pseudonym), resolution time, root cause (H1–H4), total stale hours |
+| `r71-c1-output.txt` | R-71-C1 pg_cron history query result — restricted to devops-lead + compliance-officer |
+| `r71-c2-output.txt` | R-71-C2 deviation check result: all table deviations with `deviation_pct`; `manual_deviation_found` and `max_deviation_pct` scalar values |
+| `dec-030-event-ids.txt` | Chain event UUIDs for `stale_declared` and `restored` events |
+| `root-cause-analysis.md` | Root cause classification (H1–H4), resolution steps taken, follow-up Linear issue URL (if applicable) |
+
+**Privacy floor (artefact-level):** All ROWCOUNT-MON-STALE-E-001 files contain operational infrastructure metadata only — no `user_id`, `tenant_id`, individual workout, coaching content, health metric, body composition value, or GDPR Art. 9 special-category data. `r71-c2-output.txt` contains only aggregate `deviation_pct` scalars computed from `monitoring_baselines.row_count_avg` (1-hour rolling average of total table row counts — not per-user, per-tenant, or per-session aggregates). Artefact access: devops-lead + compliance-officer only; not shared with auditors without explicit compliance-officer review and redaction pass.
+
+### R-71.10 Communication Templates
+
+**T-71-A — Detection notification (post at T+5 in `#incidents-enterprise`)**
+
+```
+🔴 [P0] row-count-monitor STALE — data-integrity sentinel offline
+Time: <ISO 8601>
+IC: <name>
+Detected: pg-cron-health-monitor → PagerDuty P0
+Status: Triaging. Last confirmed run: <timestamp from R-71-C1>. Stale ~<N> h.
+R-71-C2 deviation scan: <running / deviation_pct=X% on table Y / no anomaly>
+Root cause: <investigating / H1 deleted / H2 disabled / H3 infra (R-03 co-active) / H4 Edge Function>
+Next update: T+15
+```
+
+**T-71-B — Resolution notification (post in `#incidents-enterprise`)**
+
+```
+✅ [P0 → Resolved] row-count-monitor STALE — sentinel restored
+Root cause: <H1/H2/H3/H4>
+Duration: <N> h stale
+Deviation found during stale window: <YES — R-10 co-active / NO — no anomaly>
+DEC-030: stale_declared + restored events emitted (ROWCOUNT-MON-STALE-CHAIN-01 satisfied)
+Evidence: ROWCOUNT-MON-STALE-E-001 filed to R2 at T+<N> min
+Follow-up: <Linear issue URL or "none required">
+```
+
+**T-71-C — Escalation template (stale >4 h or deviation >20%; restricted to CEO + CTO + IC)**
+
+```
+🚨 [MAJOR INCIDENT] row-count-monitor STALE >4h / deviation >20% detected
+Time: <ISO 8601>
+IC: <name>
+Stale duration: <N> h (<M> missed 15-min cycles)
+Deviation: <table_name> deviation_pct=<X>% (threshold >20% — R-10 co-active)
+Actions taken: <list>
+Needs: CEO + CTO awareness. R-10 Incident Commander: <name>
+```
+
+### R-71.11 Co-Activation Matrix
+
+| Trigger condition | Co-activation | Notes |
+|---|---|---|
+| R-71-C2 finds any table with `deviation_pct > 20%` | **R-10** (Data Loss / Deletion Attack) | Activate immediately; do not wait for root cause classification |
+| ROWCOUNT-MON-STALE-CHAIN-01 HTTP 422 on `restored` emit | **R-05** (HMAC Chain Break) | Do not retry `restored` emit without R-05 IC guidance |
+| H3: Supabase pg_cron infra degradation (≥3 peer jobs stale) | **R-03** (Service Outage — Supabase infra) | R-03 IC leads infra recovery; R-71 IC monitors job recovery |
+| Stale >4 h and no root cause identified | CEO/CTO escalation via T-71-C | Internal escalation; no separate runbook |
+
+### R-71.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.row_count_monitor_stale_declared` (HIGH/7yr) and `system.row_count_monitor_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` with Zod v2 schemas, payload tables, ROWCOUNT-MON-STALE-CHAIN-01 ordering invariant, and CC7.1/A1.2 auditor narrative | compliance-officer + security-engineer | **P0** | [x] **Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.86).** |
+| 2 | Implement ROWCOUNT-MON-STALE-CHAIN-01 enforcement in `emit-audit-event` Worker (HTTP 422 `ROWCOUNT_MON_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit) | platform-engineer | **P1** | [ ] Pending — platform-engineer |
+| 3 | Provision `compliance/evidence/row-count-monitor/` R2 subfolder (new folder — not pre-existing); configure WORM + `r2:form-api` REVOKED policy consistent with §80.3 invariant | devops-lead + compliance-officer | **P1** | [ ] Pending — devops-lead |
+| 4 | Register ROWCOUNT-MON-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.1/A1.2; per-activation; 7yr; `compliance/evidence/row-count-monitor/rowcount-mon-stale-e-001-<YYYY-MM-DD>/`) | compliance-officer + security-engineer | **P1** | [x] **Done — 2026-07-04 (SOC2_READINESS.md v3.86.0, §160).** |
+| 5 | Update `docs/OBSERVABILITY.md §12.6` `row-count-monitor` row cross-reference column: add `; INCIDENT_RESPONSE R-71 (§R-71; v1.0, 2026-07-04 — companion stale recovery runbook for row-count-monitor)` | devops-lead | **P0** | [x] **Done — 2026-07-04 (OBSERVABILITY.md v5.15.6).** |
+| 6 | Authoring complete — §R-71 documentation obligation fulfilled | compliance-officer + security-engineer | **P0** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.37.0).** |
+
+**Privacy floor (invariant throughout R-71):** `r71-c1-output.txt` and `r71-c2-output.txt` in ROWCOUNT-MON-STALE-E-001 are operational database metadata only — no `user_id`, `tenant_id`, employee name, email, workout, coaching content, body composition value, or GDPR Art. 9 special-category data is present in any scope query output, DEC-030 event payload, communication template, or evidence artefact for R-71. `manual_deviation_found` and `max_deviation_pct` in DEC-030 event payloads are aggregate scalars — they capture the severity of row count deviation without identifying which users or tenants contributed data. No enterprise tenant employee data is reachable through `monitoring_baselines.row_count_avg` (1-hour rolling averages of aggregate table counts — not per-user, per-tenant, or per-workout aggregates). ROWCOUNT-MON-STALE-E-001 artefact access: devops-lead + compliance-officer only; not shared with auditors without explicit compliance-officer review.
+
+---
+
+*v1.0 (2026-07-04): R-71 `row-count-monitor` Stale (CC7.1/A1.2 — Data-Integrity Anomaly Sentinel) — seventy-first runbook and companion stale recovery runbook for `row-count-monitor` (the P0-default data-integrity anomaly sentinel). Job `row-count-monitor` (`*/15 * * * *`; 1h freshness window; every 15 min UTC; 4 cycles per hour) was registered in OBSERVABILITY.md §12.6 as a P0 sentinel for CC7.1/A1.2 (data-integrity anomaly detection against `monitoring_baselines` 1-hour rolling averages for 7 critical tables); no stale recovery runbook was authored at that time. CC7.1/A1.2 control significance: `row-count-monitor` compares current table row counts against 1-hour rolling baseline averages stored in `monitoring_baselines`; a >20% deviation triggers PagerDuty P0 and is a primary signal of data loss, deletion attack, or data corruption — making this sentinel the first-line automated early-warning system for data-integrity incidents. P0 default: unlike R-69 (P1, wearable freshness measurement gap) and R-70 (P2, PAM KV-Postgres sync detection gap), a stale `row-count-monitor` means FORM's primary automated data-integrity check is completely offline — the risk is undetected mass data deletion or corruption, not a detection-latency gap; R-71-C2 (manual deviation check) is the compensating control for the stale window. Three scope queries: R-71-C1 (pg_cron history + `active` flag — H1/H2 discriminator); R-71-C2 (manual deviation scan vs. `monitoring_baselines` — compensating control; `manual_deviation_found` and `max_deviation_pct` scalars for DEC-030 payloads); R-71-C3 (peer job health — H3 discriminator; ≥3 stale jobs → R-03 co-activation). Four root causes with one 4-way sub-classification: H1 (deleted — zero `cron.job` row); H2 (disabled — `active = false`); H3 (Supabase pg_cron degradation → R-03 co-active); H4 (Edge Function broken — 4 sub-causes: H4a deployment failure, H4b `monitoring_baselines` DDL drift, H4c pg_net degradation, H4d execution timeout). Two DEC-030 HMAC-chained events (AUDIT_LOG_SCHEMA.md v2.86, 2026-07-04): `system.row_count_monitor_stale_declared` HIGH/7yr (ROWCOUNT-MON-STALE-CHAIN-01 anchor; IC PAM-elevated at T+5; CC7.1/A1.2; six-field Zod v2 `RowCountMonitorStaleDeclaredSchema`); `system.row_count_monitor_restored` LOW/3yr (terminal; IC PAM-elevated post-recovery; `manual_deviation_found` and `max_deviation_pct` capture R-71-C2 result; six-field Zod v2 `RowCountMonitorRestoredSchema`). ROWCOUNT-MON-STALE-CHAIN-01: HTTP 422 `ROWCOUNT_MON_STALE_CHAIN_01_VIOLATION` on unanchored `restored` emit; implementation pending platform-engineer (§R-71.12 item 2). Three communication templates: T-71-A (detection; `#incidents-enterprise`); T-71-B (resolution); T-71-C (escalation; stale >4h or deviation >20%; restricted to CEO + CTO + IC). One evidence artefact: ROWCOUNT-MON-STALE-E-001 (per-activation; CC7.1/A1.2; 7yr; `compliance/evidence/row-count-monitor/rowcount-mon-stale-e-001-<YYYY-MM-DD>/`; NEW R2 subfolder — §R-71.12 item 3 pending devops-lead). Six implementation checklist items: AUDIT_LOG_SCHEMA.md event registration (P0/Done v2.86), ROWCOUNT-MON-STALE-CHAIN-01 Worker enforcement (P1/pending platform-engineer), R2 subfolder provision (P1/pending devops-lead), SOC2_READINESS.md §79.4 artefact registration (P1/Done §160 v3.86.0), OBSERVABILITY.md §12.6 cross-ref update (P0/Done v5.15.6), authoring complete (P0/Done). Privacy floor: no user_id, tenant_id, coaching content, health data, or GDPR Art. 9 data in any scope query, DEC-030 payload, template, or evidence artefact; `monitoring_baselines.row_count_avg` is aggregate-only (total table counts — not per-user/per-tenant); ROWCOUNT-MON-STALE-E-001 restricted to devops-lead + compliance-officer. Cross-references: OBSERVABILITY.md §12.6 `row-count-monitor` row; SOC2_READINESS.md §25.4.3 (`pg-cron-health-monitor` Edge Function spec); AUDIT_LOG_SCHEMA.md §Row Count Monitor Stale events (v2.86); R-10; R-05; R-03. Owner: devops-lead + compliance-officer.*
