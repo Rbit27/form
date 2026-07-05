@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 COMPLETE 10/10 · series «Self-coached атлет: перший рік» 3136–3145 in progress 8/10 · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 COMPLETE 10/10 · series «Тренувальний мінімалізм: менше і ефективніше» 3176–3185 proposed · series «Читання власних даних: від журналу до рішень» 3186–3195 proposed · series «Силові стандарти» 3196–3205 proposed · series «Тренувальна послідовність» 3206–3215 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.88.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 COMPLETE 10/10 · series «Self-coached атлет: перший рік» 3136–3145 in progress 9/10 · series «Інструменти self-coached атлета 2026» 3146–3155 proposed · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 COMPLETE 10/10 · series «Тренувальний мінімалізм: менше і ефективніше» 3176–3185 proposed · series «Читання власних даних: від журналу до рішень» 3186–3195 proposed · series «Силові стандарти» 3196–3205 proposed · series «Тренувальна послідовність» 3206–3215 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.89.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3551,7 +3551,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3134 | Тренувальна рутина vs. тренувальна гнучкість: де баланс | **draft · v12.79.0 → post-3134-training-routine-vs-flexibility.md** |
 | 3135 | Синтез 3126–3135: операційна система тренування для зайнятого self-coached атлета | **draft · v12.80.0 → post-3135-time-management-series-synthesis.md** |
 
-### Editorial series: 3136–3145 — Self-coached атлет: перший рік (in progress 7/10 · v12.88.0)
+### Editorial series: 3136–3145 — Self-coached атлет: перший рік (in progress 9/10 · v12.89.0)
 
 Серія для атлетів, які починають тренуватися без тренера і будують свій перший самостійний рік. Від «чому план з інтернету не працює» до «як побудувати власну систему». Тон: editorial-brutalist, без сентиментальності. 13-min read.
 
@@ -3563,9 +3563,9 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3139 | Як самостійно оцінювати техніку у перший рік: відео як діагностичний інструмент | **draft · v12.84.0 → post-3139-technique-self-assessment-video-first-year.md** |
 | 3140 | Прогресивне перевантаження у перший рік: механіка, а не мотивація | **draft · v12.85.0 → post-3140-progressive-overload-first-year-mechanics.md** |
 | 3141 | Відновлення у перший рік: що відбувається між тренуваннями і де ховається перше плато | **draft · v12.86.0 → post-3141-recovery-management-first-plateau-first-year.md** |
-| 3142 | Перші травми і болі: як відрізнити адаптаційний дискомфорт від сигналу стоп | ⚠️ clinical-safety review required before writing (pain/injury topic) |
-| 3143 | Соціальний контекст першого року: зал, партнер, онлайн-спільноти | proposed |
-| 3144 | Як оцінити перший рік: критерії успіху, якщо цифри не є єдиною мірою | proposed |
+| 3142 | Коли програма не відповідає тижню: прийняття рішень у реальному часі | **draft · v12.87.0 → post-3142-when-program-doesnt-match-the-week-first-year.md** |
+| 3143 | Планування мезоциклу самостійно: перший досвід | **draft · v12.88.0 → post-3143-mesocycle-planning-first-experience-first-year.md** |
+| 3144 | Як оцінювати прогрес без тренера: що вимірювати і коли змінювати план | **draft · v12.89.0 → post-3144-progress-assessment-without-coach-first-year.md** |
 | 3145 | Синтез 3136–3145: що self-coached атлет знає після першого року | proposed |
 
 ### Editorial series: 3146–3155 — Інструменти self-coached атлета 2026: що дійсно допомагає (proposed · v12.17.0)
