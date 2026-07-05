@@ -3321,6 +3321,51 @@ export const PkjwtExpirySweepRestoredPayload = z.object({
 
 ---
 
+### R-81 PKJWT JWKS Missing Recovery events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-81 · CC6.6)
+
+> IC closure event for PKJWT JWKS endpoint missing incidents (AL-PKJWT-01, P1 zero-tolerance). Registered per `docs/INCIDENT_RESPONSE.md §R-81.11` item 1 (AUDIT_LOG_SCHEMA.md v3.1, 2026-07-05). **Trigger:** Any `sso.pkjwt_jwks_missing` HIGH/7yr event (registered in `§SSO PKJWT Key Lifecycle events` above). **IC closure event:** `sso.pkjwt_jwks_restored` LOW/3yr emitted by security-engineer (IC, PAM-elevated) at R-81 Step 6 after JWKS endpoint returns HTTP 200 with non-empty `keys` array. **PKJWT-JWKS-CHAIN-01 invariant:** `emit-audit-event` Worker verifies a prior `sso.pkjwt_jwks_missing` event for the same `tenant_id` within the preceding 24h before accepting `sso.pkjwt_jwks_restored`; HTTP 422 `PKJWT_JWKS_CHAIN_01_VIOLATION` on violation → R-05. Enforcement pending `docs/INCIDENT_RESPONSE.md §R-81.11` item 5 (P0/M6). **Privacy floor:** `tenant_id` (FORM-internal UUID) and operational enums/timestamps only. No employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data. `incident_id` is a FORM-internal IC ticket UUID — not linked to any personal identifier. Cross-ref: `docs/INCIDENT_RESPONSE.md §R-81` (canonical runbook — §R-81.5 recovery procedure, R-81-C1…R-81-C4 scope queries, H1–H4 root causes, PKJWT-JWKS-E-001 evidence artefact §R-81.8); `docs/OBSERVABILITY.md §75.4` (AL-PKJWT-01 — canonical alert definition triggering R-81; Runbook field updated v5.21.0 to add `INCIDENT_RESPONSE.md R-81`); `docs/SOC2_READINESS.md §177` (PKJWT-JWKS-E-001 registered v4.3.0, 2026-07-05; evidence count 151 → 152); DEC-030; SOC 2 CC6.6.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `sso.pkjwt_jwks_restored` | LOW | 3 yr | IC (security-engineer, PAM-elevated) at R-81 Step 6 after JWKS endpoint returns HTTP 200 with non-empty `keys` array; PKJWT-JWKS-CHAIN-01 terminal event; confirms FORM KV inconsistency resolved and IdP token exchange capable of resuming; 3yr retention sufficient as operational incident-closure record (primary CC6.6 evidence carried by 7yr `sso.pkjwt_jwks_missing` trigger event and PKJWT-JWKS-E-001 7yr artefact) | `incident_id` (UUID — R-81 IC ticket correlation; PKJWT-JWKS-CHAIN-01 key), `tenant_id` (UUID — affected tenant; FORM-internal), `root_cause` (enum: `H1_key_never_published` \| `H2_kv_slot_deleted` \| `H3_partial_rotation` \| `H4_key_expired`), `stale_window_minutes` (positive number — interval from first `sso.pkjwt_jwks_missing` event to JWKS 200 confirmed), `resolution_confirmed_at` (ISO 8601 — timestamp of confirmed JWKS HTTP 200 with non-empty `keys` array), `emergency_rotation_opened` (bool — `true` when H4 root cause triggered emergency rotation via R-79; `false` otherwise) |
+
+```typescript
+import { z } from 'zod/v4';
+
+// sso.pkjwt_jwks_restored — PKJWT JWKS endpoint KV inconsistency resolved (LOW · 3yr · CC6.6)
+// Canonical source: docs/INCIDENT_RESPONSE.md §R-81.7 (R-81 IC closure event)
+// Emitter: security-engineer (IC, PAM-elevated) at R-81 Step 6.
+// PKJWT-JWKS-CHAIN-01: prior sso.pkjwt_jwks_missing for same tenant_id within 24h required.
+// Privacy floor: tenant_id is FORM-internal UUID only; incident_id is IC ticket UUID only;
+//   no employee user_id, name, email, health value, or GDPR Art. 9 data.
+export const SsoPkjwtJwksRestoredPayload = z.object({
+  incident_id:               z.string().uuid(),
+  tenant_id:                 z.string().uuid(),
+  root_cause:                z.enum(['H1_key_never_published', 'H2_kv_slot_deleted', 'H3_partial_rotation', 'H4_key_expired']),
+  stale_window_minutes:      z.number().positive(),
+  resolution_confirmed_at:   z.string().datetime(),
+  emergency_rotation_opened: z.boolean(), // true only for H4 → R-79 co-activation
+});
+```
+
+**PKJWT-JWKS-CHAIN-01 ordering invariant**
+
+| Invariant ID | Rule | HTTP 422 error code | Enforcement |
+|---|---|---|---|
+| PKJWT-JWKS-CHAIN-01 | `sso.pkjwt_jwks_restored` requires a prior `sso.pkjwt_jwks_missing` event for the same `tenant_id` within the preceding 24h within any HMAC audit chain window; an `sso.pkjwt_jwks_restored` emit with no matching prior `sso.pkjwt_jwks_missing` for the same `tenant_id` within 24h is rejected | `PKJWT_JWKS_CHAIN_01_VIOLATION` | Pending `emit-audit-event` Worker deployment per `docs/INCIDENT_RESPONSE.md §R-81.11` item 5 (P0/M6) → R-05 on violation |
+
+**SOC 2 evidence artefact:**
+
+| Artefact ID | Criterion | Collection trigger | Retention | Storage path |
+|---|---|---|---|---|
+| **PKJWT-JWKS-E-001** | CC6.6 (JWKS availability control gap — asymmetric key access control boundary), CC7.3 (P1 response within 15 min) | Per-activation (each R-81 invocation); nil attestation in PKJWT-OBS-E-001 quarterly artefact (§75.8) if R-81 not triggered in the quarter | 7 yr | `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json` |
+
+**Artefact content:** Per-activation incident record: `sso.pkjwt_jwks_missing` DEC-030 event JSON (trigger event); R-81-C1 DB state output (`oidc_client_auth_method`, `pkjwt_key_id`, `pkjwt_key_expires_at` — no BYTEA); R-81-C2 recent `sso.pkjwt_jwks_missing` event query output; R-81-C3 key lifecycle events for `tenant_id`; R-81-C4 JWKS 200 confirmation response body (public JWK fields only — `kty`, `kid`, `use`, `alg`, `n`/`e` or `crv`/`x`/`y`; no private key fields); root cause classification (H1–H4); CSM notification record; `sso.pkjwt_jwks_restored` DEC-030 event JSON. SHA-256 hashed via `compliance/scripts/sign-evidence.sh`; uploaded to `compliance/evidence/pkjwt-obs/`. Owner: security-engineer + compliance-officer. Registered: `docs/SOC2_READINESS.md §177` (v4.3.0, 2026-07-05).
+
+**Privacy floor:** PKJWT-JWKS-E-001 contains only FORM-internal `incident_id` UUIDs, `tenant_id` UUIDs, `kid` UUIDs (public-key references — no private key material), operational enums, root cause classifications, and timestamps. R-81-C1 query explicitly excludes `pkjwt_private_key_encrypted` and all other BYTEA columns. R-81-C4 JWKS response contains only public JWK fields — no `d`, `p`, `q`, `dp`, `dq`, `qi` private key fields. No employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data.
+
+---
+
 ### SAML SLO (Single Logout) events (DEC-030 HMAC-chained · SSO §45 · DEC-030 · SOC 2 CC6.1/CC6.3)
 
 > Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §45` (v2.4, 2026-07-04 — §45.8 item 6, P0/M7). Five DEC-030 HMAC-chained events covering the full SAML Single Logout lifecycle: SP-initiated SLO, IdP-initiated SLO, successful completion, failure (timeout/invalid signature), and local-only fallback. **Privacy floor (all five events):** `tenant_id` and `slo_request_id` (FORM-internal UUIDs) are the primary identifiers. `session_id` is present in `slo.sp_initiated` and `slo.completed` (nullable) and `slo.fallback_local_only` (nullable). `user_id` is present only in `slo.fallback_local_only` (nullable — present only when a local session can be resolved). `idp_name_id` is a federation-layer pseudonym (opaque to FORM); it is not a GDPR Art. 9 identifier and contains no health, coaching, or biometric data. No `user_id` in `slo.sp_initiated`, `slo.idp_initiated`, `slo.completed`, or `slo.failed` — these events operate at the session layer before user resolution. **SLO-CHAIN-01 ordering invariant:** `slo.completed` or `slo.fallback_local_only` MUST NOT be emitted for a given `slo_request_id` unless at least one of `slo.sp_initiated` or `slo.idp_initiated` was previously emitted for the same `{tenant_id, slo_request_id}` pair. `slo.failed` is exempt from the chain ordering check — a `slo.failed` event must be writable even when the initiation event was never persisted (e.g., network failure between initiation and first event write). Enforcement: `emit-audit-event` Worker returns HTTP 422 `SLO_CHAIN_01_VIOLATION` on ordering violation. Cross-ref: `docs/SSO_SCIM_IMPLEMENTATION.md §45` (canonical design — §45.4 Worker spec; §45.5 DEC-030 events; §45.5.3 SLO-CHAIN-01; §45.7 integration test matrix SLO-I-001…SLO-I-008; §45.8 checklist); `docs/SSO_SCIM_IMPLEMENTATION.md §45.8 item 6` (P0/M7 — closed by this registration); SOC 2 CC6.1 (logical access — federated logout as access termination control); CC6.3 (session revocation — SLO completes the session lifecycle); CC8.1 (change management — migration 0100). Owner: compliance-officer + security-engineer + platform-engineer.

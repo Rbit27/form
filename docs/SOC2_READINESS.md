@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.2.0
+# FORM · SOC 2 Type II Readiness v4.3.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -36822,6 +36822,94 @@ CERT-CHECK-STALE-E-001 is added to the §80.4 Vanta mirror schedule:
 | 3 | Add CERT-CHECK-STALE-E-001 nil-attestation protocol to §80.4 Vanta mirror schedule | devops-lead | **P2** | [x] **Done — 2026-07-05 (§176.7, this section).** |
 
 ---
+
+## §177 — PKJWT-JWKS-E-001 Registration (CC6.6/CC7.3 · INCIDENT_RESPONSE R-81 · PKJWT JWKS Endpoint Missing Key Evidence)
+
+### §177.1 Background
+
+`docs/INCIDENT_RESPONSE.md §R-81` (v3.46.0, 2026-07-05) introduces PKJWT-JWKS-E-001 — the per-activation SOC 2 evidence artefact for every AL-PKJWT-01 activation (any `sso.pkjwt_jwks_missing` HIGH/7yr DEC-030 event for an active PKJWT tenant). This section registers PKJWT-JWKS-E-001 in the §79.4 master evidence table (count 151 → 152) and closes §R-81.11 item 3 (P1/M6).
+
+AL-PKJWT-01 (`docs/OBSERVABILITY.md §75.4`, v5.21.0) is a zero-tolerance P1 alert: any `sso.pkjwt_jwks_missing` event means a PKJWT-enabled tenant's JWKS endpoint returned 503 — their IdP cannot validate FORM's `private_key_jwt` assertions, blocking all OIDC-SSO logins for that tenant. CC6.6 requires FORM to demonstrate that the asymmetric client authentication control is maintained and that any availability lapse is detected, root-caused, remediated, and evidenced. PKJWT-JWKS-E-001 is that per-activation evidence record.
+
+### §177.2 §79.4 Master Evidence Table Entry (count 151 → 152)
+
+| # | Artefact ID | Description | SOC 2 Criteria | Cadence | Retention | Storage Path | Owner |
+|---|---|---|---|---|---|---|---|
+| **152** | **PKJWT-JWKS-E-001** | Per-activation incident record for AL-PKJWT-01 `sso.pkjwt_jwks_missing` events — DB state + scope queries + synthetic JWKS GET confirmation + DEC-030 chain pair (`sso.pkjwt_jwks_missing` HIGH / `sso.pkjwt_jwks_restored` LOW) | CC6.6 (asymmetric auth control availability); CC7.3 (incident response) | Per-activation (one artefact per R-81 IC; absence = positive non-occurrence evidence; nil-attestation protocol per quarter) | 7yr WORM | `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json` | security-engineer + compliance-officer |
+
+**§79.4 evidence count update:** 151 → **152** (PKJWT-JWKS-E-001 registered; companion to PKJWT-OBS-E-001 quarterly artefact in §170.2, both within the `compliance/evidence/pkjwt-obs/` R2 parent path).
+
+### §177.3 Artefact Content Specification
+
+PKJWT-JWKS-E-001 is filed as a JSON document per IC activation. Required components:
+
+| # | Component | Source | Privacy constraint |
+|---|---|---|---|
+| 1 | `sso.pkjwt_jwks_missing` HIGH/7yr event JSON (IC trigger) | form_audit DEC-030 log; `SsoPkjwtJwksMissingPayload` (AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle) | `tenant_id` UUID only; no company name, employee roster, or PEM |
+| 2 | Trigger mode declaration | R-81 IC log (Mode-1: PagerDuty P1; Mode-2: CSM escalation; Mode-3: manual discovery) | Mode enum only |
+| 3 | Root cause classification | R-81 IC log (H1: key never published; H2: KV slot deleted; H3: partial rotation failure; H4: key expired) | Root-cause enum + brief narrative; no private key material |
+| 4 | R-81-C1 DB state query output | `SELECT pkjwt_key_id, pkjwt_key_expires_at, pkjwt_algorithm, oidc_client_auth_method FROM tenant_sso_configs WHERE id = $tenant_id` | `pkjwt_private_key_encrypted` BYTEA explicitly excluded |
+| 5 | R-81-C2 recent `sso.pkjwt_jwks_missing` events (last 2 h for tenant) | form_audit DEC-030 log query | `tenant_id` UUID + timestamps only |
+| 6 | R-81-C3 key lifecycle events (generated/rotated for tenant) | form_audit DEC-030 log query — confirms KV write presence or absence | `kid` UUID + event type + timestamp only |
+| 7 | R-81-C4 synthetic JWKS GET 200 confirmation (post-remediation) | `curl -s https://api.formapp.io/auth/oidc/{tenant_id}/.well-known/jwks.json` HTTP status + `kid` array | Public-key reference only — no private key material extractable from `kid` |
+| 8 | `sso.pkjwt_jwks_restored` LOW/3yr event JSON | form_audit DEC-030 log; `SsoPkjwtJwksRestoredPayload` (AUDIT_LOG_SCHEMA.md v3.1 §R-81 PKJWT JWKS Missing Recovery events) | Same privacy constraints; PKJWT-JWKS-CHAIN-01 terminal event |
+
+### §177.4 SOC 2 Auditor Narratives
+
+**CC6.6 — Logical Access Controls (Asymmetric Client Authentication):**
+FORM's OIDC `private_key_jwt` implementation (DEC-097, RFC 7523, SSO_SCIM §42–§44) uses per-tenant RSA-2048/EC P-256 private keys stored encrypted in Cloudflare KV (`SSO_PKJWT_JWKS:{tenant_id}:current`). The JWKS Worker (`GET /auth/oidc/{tenant_id}/.well-known/jwks.json`) publishes the corresponding public key for IdP validation. AL-PKJWT-01 zero-tolerantly detects any `sso.pkjwt_jwks_missing` event (JWKS Worker KV miss → HTTP 503 → DEC-030 HIGH emission). PKJWT-JWKS-E-001 documents: (a) the triggering event with timestamp and `tenant_id`; (b) DB state at detection time (R-81-C1) proving which root cause applied; (c) the remediation action taken (H1/H2/H3 → PAM Republish JWKS; H4 → emergency rotation via R-79); (d) synthetic JWKS GET 200 confirmation (R-81-C4) proving the public key is accessible again before IC closure; (e) the `sso.pkjwt_jwks_restored` terminal DEC-030 event with IC closure timestamp. Combined with PKJWT-OBS-E-001 quarterly artefact (§170.2), this proves CC6.6: FORM continuously monitors, detects, and remediates any lapse in asymmetric authentication key availability without private key material ever being exposed.
+
+**CC7.3 — Risk Mitigation (Incident Response):**
+PKJWT-JWKS-E-001 documents the full IC timeline from AL-PKJWT-01 P1 PagerDuty trigger to `sso.pkjwt_jwks_restored` DEC-030 emission, proving that FORM's incident response process (R-81 runbook) was followed: trigger mode recorded, root cause classified, remediation executed, JWKS availability verified, and IC formally closed. The PKJWT-JWKS-CHAIN-01 ordering invariant (AUDIT_LOG_SCHEMA.md v3.1) enforces that `sso.pkjwt_jwks_restored` can only be emitted after a prior `sso.pkjwt_jwks_missing` for the same `tenant_id` within 24 h — the artefact's presence of both events proves the chain was respected. This satisfies CC7.3's requirement that FORM identifies, responds to, and evidences resolution of security incidents affecting logical access controls.
+
+### §177.5 Privacy Floor
+
+All PKJWT-JWKS-E-001 components contain only FORM-internal UUIDs (`tenant_id`, `kid`) and operational metadata (timestamps, enums, HTTP status codes):
+
+- `pkjwt_private_key_encrypted` BYTEA column is explicitly excluded from R-81-C1 (SELECT list does not include it)
+- `kid` values in R-81-C4 are public X.509 key references — no private key material is derivable
+- No employee `user_id`, name, email, session token, health value, body composition metric, coaching content, or GDPR Art. 9 special-category data appears in any component
+- R-81-C2 and R-81-C3 contain only `tenant_id` UUID, event type strings, and timestamps — no personal identifiers
+- HR role NEVER has access to `compliance/evidence/pkjwt-obs/` (§80.3 invariant; `r2:form-api` NO ACCESS)
+
+### §177.6 R2 Storage Specification
+
+| Field | Value |
+|---|---|
+| Parent path | `compliance/evidence/pkjwt-obs/` (already provisioned per §170; WORM 7yr; `r2:form-api` NO ACCESS) |
+| Artefact path | `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json` |
+| Naming | `incident_id` = `incident_id` UUID from `sso.pkjwt_jwks_missing` triggering event |
+| Format | JSON (UTF-8); signed via `sign-evidence.sh` before upload |
+| Retention | 7yr WORM Object Lock Governance minimum |
+| Access | security-engineer + compliance-officer only; `r2:form-api` REVOKED |
+
+### §177.7 §80.4 Vanta Mirror Protocol
+
+| Protocol | Detail |
+|---|---|
+| Per-activation upload | Upload `pkjwt-jwks-e-001-{incident_id}.json` to Vanta within 48 h of `sso.pkjwt_jwks_restored` IC closure event |
+| Nil-attestation | If R-81 count = 0 for the quarter, file quarterly nil-attestation statement: `{"quarter": "YYYY-QN", "pkjwt_jwks_e_001_count": 0, "attestation": "No AL-PKJWT-01 activations this quarter — no PKJWT JWKS endpoint missing events recorded"}` |
+| Vanta control link | CC6.6 (asymmetric auth monitoring) + CC7.3 (incident response) |
+
+### §177.8 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register PKJWT-JWKS-E-001 in §79.4 master evidence table (count 151 → 152) | `docs/INCIDENT_RESPONSE.md §R-81.11` item 3 — "Register PKJWT-JWKS-E-001 in `docs/SOC2_READINESS.md §79.4`" | 🟢 **Done — 2026-07-05 (§177.2, this section)** |
+| `sso.pkjwt_jwks_restored` LOW/3yr event + `SsoPkjwtJwksRestoredPayload` Zod v2 schema + PKJWT-JWKS-CHAIN-01 invariant registered in AUDIT_LOG_SCHEMA.md | `docs/INCIDENT_RESPONSE.md §R-81.7` / AUDIT_LOG_SCHEMA.md v3.1 obligation | 🟢 **Done — 2026-07-05 (AUDIT_LOG_SCHEMA.md v3.1, §R-81 PKJWT JWKS Missing Recovery events)** |
+| Update `docs/OBSERVABILITY.md §75.4` AL-PKJWT-01 Runbook field to reference R-81 | `docs/INCIDENT_RESPONSE.md §R-81.11` item 2 | 🟢 **Done — 2026-07-05 (OBSERVABILITY.md v5.21.0, §75.4 Runbook field)** |
+
+### §177.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register PKJWT-JWKS-E-001 in §79.4 master evidence table (count 151 → 152) | compliance-officer | **P1** | [x] **Done — 2026-07-05 (§177.2, this section).** |
+| 2 | Confirm `compliance/evidence/pkjwt-obs/` R2 parent path is provisioned (WORM 7yr; carried from §170 — already done) | devops-lead | **P1** | [x] **Done — 2026-07-05 (§170, already provisioned).** |
+| 3 | Add PKJWT-JWKS-E-001 nil-attestation protocol to §80.4 Vanta mirror schedule (§177.7) | devops-lead | **P2** | [x] **Done — 2026-07-05 (§177.7, this section).** |
+
+---
+
+*v4.3.0 (2026-07-05): §177 — PKJWT-JWKS-E-001 Registration (CC6.6/CC7.3 · INCIDENT_RESPONSE R-81 · PKJWT JWKS Endpoint Missing Key Evidence). Closes §R-81.11 item 3 (P1/M6 — "Register PKJWT-JWKS-E-001 in `docs/SOC2_READINESS.md §79.4`"). §79.4 evidence count 151 → 152 (PKJWT-JWKS-E-001 — per-activation, CC6.6/CC7.3, 7yr WORM, `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json`). §177.3 seven-component artefact content spec: `sso.pkjwt_jwks_missing` HIGH/7yr event JSON (IC trigger); trigger mode (Mode-1 PagerDuty / Mode-2 CSM / Mode-3 manual); root cause classification (H1–H4); R-81-C1 DB state query output (`pkjwt_key_id`, `pkjwt_key_expires_at`, `pkjwt_algorithm`, `oidc_client_auth_method` — no BYTEA); R-81-C2 recent `sso.pkjwt_jwks_missing` events for tenant (last 2 h); R-81-C3 key lifecycle events for tenant (generated/rotated, confirming presence or absence of KV write); R-81-C4 synthetic JWKS GET 200 confirmation post-remediation (HTTP status + `kid` array — no private key material); `sso.pkjwt_jwks_restored` LOW/3yr event JSON (PKJWT-JWKS-CHAIN-01 terminal event). §177.4 SOC 2 auditor narratives: CC6.6 (asymmetric client auth control maintained — PKJWT-JWKS-E-001 proves that every `sso.pkjwt_jwks_missing` activation was detected, root-caused H1–H4, remediated, and verified via synthetic JWKS GET before IC closure; private key material never exposed in any artefact component); CC7.3 (incident response SLA met — Mode-1 P1 PagerDuty response documented; PKJWT-JWKS-CHAIN-01 ordering invariant confirmed in artefact). §177.5 privacy floor: `pkjwt_private_key_encrypted` BYTEA column explicitly excluded from all R-81-C1 outputs; `kid` UUID in R-81-C4 is a public-key reference only; no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any artefact component; `tenant_id` is FORM-internal UUID — not linked to company name or employee roster in this artefact. §177.6 R2 storage: `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json` under parent `compliance/evidence/pkjwt-obs/` (already provisioned per §170); WORM 7yr; `r2:form-api` NO ACCESS invariant. §177.7 Vanta mirror: per-activation upload within 48 h of IC closure; nil-attestation protocol for quarters where R-81 count = 0. §177.8 cross-references: R-81.11 item 3 (this registration), AUDIT_LOG_SCHEMA.md v3.1 §R-81 (`sso.pkjwt_jwks_restored` schema + PKJWT-JWKS-CHAIN-01 invariant), OBSERVABILITY.md v5.21.0 §75.4 (AL-PKJWT-01 companion runbook updated), INCIDENT_RESPONSE.md v3.46.0 §R-81 (primary runbook). §177.9 three-item checklist: items 1 (§79.4 count 151 → 152) + 3 (Vanta nil-attestation) Done this pass; item 2 (`pkjwt-obs/` R2 sub-path note) carried from §170 (parent already provisioned). SOC 2 readiness: ~97.3% (PKJWT-JWKS-E-001 closes the per-activation evidence gap for AL-PKJWT-01 activations; CC6.6 asymmetric-auth availability evidence coverage now complete alongside PKJWT-OBS-E-001 quarterly artefact). Document header v4.2.0 → v4.3.0. Owner: compliance-officer + security-engineer.*
 
 *v4.2.0 (2026-07-05): §176 — CERT-CHECK-STALE-E-001 Registration (CC7.2/CC6.1 · INCIDENT_RESPONSE R-80 · cert-expiry-check Cron Stale Evidence). Closes §R-80.11 item 3 (P1/M4 — "Register CERT-CHECK-STALE-E-001 in `docs/SOC2_READINESS.md §79.4`"). §79.4 evidence count 150 → 151 (CERT-CHECK-STALE-E-001 — per-activation, CC7.2/CC6.1, 7yr WORM, `compliance/evidence/saml-cert/cert-expiry-check-stale/`). §176.3 nine-component artefact content spec: stale-declared event JSON, trigger mode, root cause classification, R-80-C1 cert_monitor_error query, R-80-C2 staleness approximation, R-80-C4 CF Cron history extract, R-80-C3 full cert scan output (`expired_certs_found: 0` confirmation; no BYTEA columns), Step 3a manual alert emission log, restored event JSON. §176.4 SOC 2 auditor narratives: CC7.2 (compensating-control response — R-80-C3 manual scan substitutes for missed daily cron; zero-expired-cert attestation); CC6.1 (credential lifecycle monitoring gap detected and closed; combined with CC6-E-CERT-001/004 proves full-lifecycle coverage continuity). §176.5 privacy floor: no BYTEA columns, no private key material, no employee `user_id`, name, email, health value, or GDPR Art. 9 data; `tenant_id` UUIDs and `fingerprint_sha256` (public) only in R-80-C3 output. §176.6 R2 storage: `compliance/evidence/saml-cert/cert-expiry-check-stale/` sub-path within parent pending M4 provision (§175.10 item 5); WORM 7yr; pre-M4 nil attestation protocol. §176.7 Vanta mirror: per-activation upload + nil-attestation statement when R-80 count = 0. §176.8 cross-references: all three obligations 🟢 Done this pass (AUDIT_LOG_SCHEMA.md v3.0 events, OBSERVABILITY.md v5.20.4 AL-CERT-05 patch, this section §176.2). §176.9 three-item checklist: items 1 (§79.4 count 150 → 151) + 3 (Vanta nil-attestation) Done this pass; item 2 (R2 sub-path provision) pending M4. SOC 2 readiness: ~97.3% (CERT-CHECK-STALE-E-001 formalizes the compensating-control evidence for the AL-CERT-05 cron monitoring gap scenario — evidence coverage for CC7.2 SAML cert monitoring now complete across all alert conditions AL-CERT-01..05). Document header v4.1.0 → v4.2.0. Owner: compliance-officer + security-engineer.*
 

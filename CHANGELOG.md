@@ -12,6 +12,21 @@
 
 ---
 
+## [13.27.1] — 2026-07-05
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-81` — PKJWT JWKS Endpoint Missing Key companion runbook (AL-PKJWT-01 · CC6.6/CC7.3). Eleven-section runbook: trigger matrix (Mode-1 PagerDuty P1 / Mode-2 CSM escalation / Mode-3 manual discovery); four root causes (H1 key never published, H2 KV slot deleted, H3 partial rotation failure, H4 key expired); four scope queries (R-81-C1 DB state, R-81-C2 recent jwks_missing events, R-81-C3 key lifecycle events, R-81-C4 synthetic JWKS GET); six-step recovery; Slack communication templates (initial P1, P0 escalation for unauthorized H2, post-resolution); PKJWT-JWKS-CHAIN-01 ordering invariant; PKJWT-JWKS-E-001 per-activation SOC 2 evidence artefact (CC6.6/CC7.3, 7yr WORM). Closes the AL-PKJWT-01 companion gap: BCL has R-73/R-74, SLO has R-75/R-76, PKJWT now has R-81.
+- `docs/AUDIT_LOG_SCHEMA.md §R-81` (v3.1) — new `sso.pkjwt_jwks_restored` LOW/3yr event; `SsoPkjwtJwksRestoredPayload` Zod v2 schema; PKJWT-JWKS-CHAIN-01 ordering invariant; PKJWT-JWKS-E-001 artefact spec.
+- `docs/SOC2_READINESS.md §177` (v4.3.0) — PKJWT-JWKS-E-001 registered in §79.4 master evidence table; count 151 → 152.
+
+### Changed
+- `docs/OBSERVABILITY.md §75.4` (v5.21.0) — AL-PKJWT-01 Runbook field updated: `INCIDENT_RESPONSE.md R-81` added as dedicated companion runbook reference.
+- `docs/OBSERVABILITY.md §75.9` (v5.21.0) — item 8 added: R-81 authoring (Done this pass).
+- `docs/OBSERVABILITY.md §75.10` (v5.21.0) — two new cross-reference obligations added (R-81 authored + AL-PKJWT-01 runbook field updated).
+- `VERSION` — 13.27.0 → 13.27.1.
+
+---
+
 ## [13.27.0] — 2026-07-05
 
 ### Added

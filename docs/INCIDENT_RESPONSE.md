@@ -28832,3 +28832,266 @@ Implementation status: [ ] Pending — platform-engineer (§R-80.11 item 4, P0/M
 *v3.45.0 (2026-07-05): R-80 `cert-expiry-check` Cloudflare Workers Cron Stale (CC7.2/CC6.1 — AL-CERT-05 companion runbook). Closes the AL-CERT-05 companion runbook gap in `docs/OBSERVABILITY.md §26.5` (v5.20.3, 2026-07-05): AL-CERT-05 listed only "SSO §20.6; ENGINEERING_RUNBOOK.md" — no dedicated INCIDENT_RESPONSE companion runbook existed for the `cert-expiry-check` CF Workers Cron failure/stale scenario. All analogous monitoring controls had companion runbooks (R-35 for `white_label_cert_check`; R-77 for `bcl_chain_integrity_check` pg_cron job 59; R-78 for `slo_chain_integrity_check` pg_cron job 60; R-79 for PKJWT incident rotation); the `cert-expiry-check` CF Workers Cron Trigger was the remaining gap. R-80: eleven-section runbook. Trigger: AL-CERT-05 via mode-1 (`sso.cert_monitor_error` HIGH DEC-030 event, P1 PagerDuty HIGH + `#security-alerts`) or mode-2 (> 26 h execution gap). Five root causes: H1 Cron Trigger disabled (dashboard toggle or missing `wrangler.toml` entry); H2 bad Worker deployment (startup crash, pre-handler exit); H3 Supabase connection failure (PGCONN_URL unreachable, rotated secret); H4 cert data decryption/parsing error (malformed BYTEA per tenant row); H5 CF platform incident (Workers/Cron Triggers infra degraded). Four scope queries: R-80-C1 (last `sso.cert_monitor_error` events, form_audit, trigger-mode determination); R-80-C2 (last cert-lifecycle event, staleness bound approximation); R-80-C3 (manual cert expiry scan against `tenant_sso_configs` — full UNION ALL query across sp + idp cert classes, all active SAML tenants; substitutes for all missed daily cron executions; P0 escalation to R-04 if `alert_tier = 'expired'`); R-80-C4 (Cloudflare Cron Trigger health — external, via CF dashboard / Wrangler Tail / R2 daily summary). Step 3a: manual `sso.cert_expiry_alert` emission for any missed tier-advance events (closes CSM/PagerDuty notification gap; `detected_by: 'r80_manual_scan'` distinguishes from automated cron emissions). Two DEC-030 events: `system.cert_expiry_check_stale_declared` (HIGH/7yr) + `system.cert_expiry_check_restored` (LOW/3yr); CERT-CHECK-STALE-CHAIN-01 ordering invariant (declared must precede restored per `incident_id`; HTTP 422 `CERT_CHECK_STALE_CHAIN_01_VIOLATION`; pending M4 implementation in `emit-audit-event` Worker). CERT-CHECK-STALE-E-001 per-activation SOC 2 evidence artefact (CC7.2/CC6.1, 7yr WORM, `compliance/evidence/saml-cert/cert-expiry-check-stale/CERT-CHECK-STALE-E-001-{incident_id}.txt`). Seven implementation checklist items: items 1 (AUDIT_LOG_SCHEMA.md v3.0 §CERT-Expiry-Check-Stale-Events — new section with two events, two Zod v2 schemas, CERT-CHECK-STALE-CHAIN-01 invariant, CERT-CHECK-STALE-E-001 artefact spec) + 2 (OBSERVABILITY.md v5.20.4 — §26.5 AL-CERT-05 runbook field patched: "SSO §20.6; ENGINEERING_RUNBOOK.md" → "SSO §20.6; ENGINEERING_RUNBOOK.md; INCIDENT_RESPONSE.md R-80") + 3 (SOC2_READINESS.md v4.2.0 — §176 added, count 150 → 151) + 7 (authoring done) marked Done this pass; items 4–6 pending M4. Document header v3.44.0 → v3.45.0. Owner: security-engineer + compliance-officer + enterprise-architect.*
 
 *v3.39.0 (2026-07-04): R-73 BCL REVOCATION_QUEUE Exhausted (CC6.3/CC7.3 — Enterprise SSO Session Revocation Failure) + R-74 BCL-CHAIN-01 Integrity Violation (CC7.2/CC7.3/CC8.1 — BCL Pipeline Audit Chain Break). Closes both §70.11 pending obligations from `docs/OBSERVABILITY.md §70` (BCL Observability, v5.16.0, 2026-07-04): "File companion IR runbook for AL-BCL-02" and "File companion IR runbook for AL-BCL-03." R-73 (P1): REVOCATION_QUEUE three-retry exhaustion (5s/10s/20s, 35s total) leaves enterprise employee session active after IdP logout — CC6.3 control gap; three trigger conditions; four-tier severity table; T+0..T+60 twelve-step response; three scope queries (C1: `backchannel_logout.failed` identification; C2: active session detection; C3: post-resolution verification); five root causes (H1 pool exhaustion, H2 Supabase outage/R-03, H3 CF Queue stuck, H4 transient error, H5 sub_hash mismatch); resolution playbook including PAM-elevated `POST /tenant/{slug}/revoke-all-sessions` Admin API (two-person auth, §19.4); two DEC-030 events (`backchannel_logout.failed` HIGH/7yr auto-emitted, `enterprise.admin_sessions_bulk_revoked` HIGH/7yr IC PAM-elevated); BCL-REV-E-001 per-activation evidence artefact (CC6.3/CC7.3, 7yr WORM); three communication templates including T-73-B CSM notification (§4.3 SLA, 15 min); CSM notification SLA section (§R-73.10); co-activation matrix (P0 escalation at 30 min, R-03, R-74, DLQ fleet); five implementation checklist items. R-74 (P0 — no auto-resolve, no cooldown): BCL-CHAIN-01 ordering invariant breach — live HTTP 422 (chain clean, INSERT blocked) vs. retrospective SQL (chain INSERT completed despite missing anchor, more severe); three trigger conditions; three-scope severity table (P0-contained / P0-full / P0-fleet); T+0..T+60 twelve-step timeline; four scope queries (C1: audit log extraction; C2: canonical retrospective SQL from §70.4; C3: CF KV API TTL check; C4: session state PAM-elevated); five root causes (H1 TTL expiry in retry window, H2 `writeBclAnchor()` silent failure, H3 IdP duplicate replay, H4 code bug, H5 malicious manipulation); five root-cause resolution paths; closure requirement (compliance-officer sign-off via `security.bcl_chain_01_violation_closed` DEC-030); BCL-CHAIN-01 invariant reference verbatim from §46.11; two DEC-030 events (`security.bcl_chain_01_violation` CRITICAL/7yr hourly check job, `security.bcl_chain_01_violation_closed` HIGH/7yr IC terminal); BCL-CHN-E-001 per-activation evidence artefact (CC7.2/CC7.3/CC8.1, 7yr WORM, compliance-officer sign-off required); four communication templates (T-74-A declaration, T-74-B founder, T-74-C compliance sign-off request, T-74-D resolution); co-activation matrix (R-05 MANDATORY on retrospective violation, R-73 if session active, P0-fleet, R-05 full on H5); six implementation checklist items. Privacy floor invariant: no user_id, employee name, email, coaching content, health data, or GDPR Art. 9 data in any query output, event payload, template, or artefact. Document header v3.38.0 → v3.39.0. Owner: security-engineer + compliance-officer.*
+
+---
+
+## R-81 · PKJWT JWKS Endpoint Missing Key
+
+### §R-81.1 Purpose and Trigger Classification
+
+**Runbook ID:** R-81
+**Incident Commander:** security-engineer (primary); compliance-officer (evidence, DEC-030 chain)
+**Alert source:** AL-PKJWT-01 (`docs/OBSERVABILITY.md §75.4`, v5.21.0)
+**Severity on open:** P1 (escalates to P0 if root cause H2 confirmed unauthorized — see §R-81.5 H2)
+**Auto-resolve:** No — IC must close manually after R-81-C4 synthetic JWKS GET 200 confirmed
+
+**Purpose:** This runbook governs the response to any `sso.pkjwt_jwks_missing` HIGH/7yr DEC-030 event — the signal that the PKJWT JWKS Worker (`GET /auth/oidc/{tenant_id}/.well-known/jwks.json`) could not find the tenant's public key in Cloudflare KV and returned HTTP 503. A 503 means the affected tenant's IdP cannot validate FORM's `private_key_jwt` client assertions — all OIDC-SSO logins for that tenant are blocked. AL-PKJWT-01 is zero-tolerance: no dedup suppression skips notification; 1-hour per-tenant dedup prevents duplicate PagerDuty pages only.
+
+**Pattern context:** BCL observability (§70) has companion runbooks R-73 (REVOCATION_QUEUE exhausted) and R-74 (BCL-CHAIN-01 violation); SAML SLO observability (§72) has R-75 and R-76. R-81 closes the equivalent gap for PKJWT observability (§75).
+
+### §R-81.2 Trigger Matrix
+
+| Mode | Trigger condition | Initial page | IC owns |
+|---|---|---|---|
+| **Mode-1** | `sso.pkjwt_jwks_missing` HIGH/7yr DEC-030 event received by event router → AL-PKJWT-01 fires → PagerDuty `form-security` P1 | PagerDuty HIGH alert + `#alerts-enterprise` Slack | From PagerDuty ack |
+| **Mode-2** | CSM reports enterprise customer OIDC login failures (no PagerDuty page, possibly JWKS 503 not yet DEC-030-emitted due to Worker timing) | CSM → security-engineer DM | From CSM report |
+| **Mode-3** | Manual discovery (monitoring review, customer support ticket, proactive audit) | None (manual) | From discovery point |
+
+All three modes converge on the same scope queries (§R-81.3) and recovery procedure (§R-81.5). Mode-1 is the expected path; Mode-2/3 indicate a secondary detection gap and should trigger a §R-81.9 post-incident control review.
+
+### §R-81.3 Scope Queries
+
+Run all four queries before attempting remediation. Do not skip R-81-C1 — the root cause hypothesis (H1–H4) determines the recovery path.
+
+**R-81-C1 — DB state (no BYTEA)**
+
+```sql
+-- form_audit role; pkjwt_private_key_encrypted explicitly excluded
+SELECT
+  id                        AS tenant_id,
+  pkjwt_key_id,
+  pkjwt_key_expires_at,
+  pkjwt_algorithm,
+  oidc_client_auth_method,
+  oidc_issuer,
+  updated_at
+FROM tenant_sso_configs
+WHERE id = $tenant_id
+  AND oidc_client_auth_method = 'private_key_jwt';
+```
+
+Interpret: if `pkjwt_key_id` IS NULL → H1 (key never published). If `pkjwt_key_expires_at < NOW()` → H4 (key expired). Otherwise → H2 (KV slot deleted) or H3 (partial rotation) — distinguish via R-81-C3.
+
+**R-81-C2 — Recent `sso.pkjwt_jwks_missing` events for tenant (last 2 h)**
+
+```sql
+-- form_audit role; establishes incident window and repeat-occurrence count
+SELECT
+  event_id,
+  event_type,
+  severity,
+  tenant_id,
+  payload->>'pkjwt_key_id'      AS pkjwt_key_id,
+  payload->>'worker_kv_slot'    AS kv_slot,
+  created_at
+FROM audit_log
+WHERE tenant_id   = $tenant_id
+  AND event_type  = 'sso.pkjwt_jwks_missing'
+  AND created_at >= NOW() - INTERVAL '2 hours'
+ORDER BY created_at DESC;
+```
+
+**R-81-C3 — Key lifecycle events for tenant (generated / rotated, last 48 h)**
+
+```sql
+-- form_audit role; confirms whether a key was ever written to KV for this tenant
+SELECT
+  event_id,
+  event_type,
+  payload->>'pkjwt_key_id'       AS pkjwt_key_id,
+  payload->>'rotation_reason'    AS rotation_reason,
+  payload->>'previous_key_id'    AS previous_key_id,
+  created_at
+FROM audit_log
+WHERE tenant_id  = $tenant_id
+  AND event_type IN ('sso.pkjwt_key_generated', 'sso.pkjwt_key_rotated')
+  AND created_at >= NOW() - INTERVAL '48 hours'
+ORDER BY created_at DESC;
+```
+
+H1 indicator: no rows. H3 indicator: `sso.pkjwt_key_rotated` row exists within last rotation window but `pkjwt_jwks_missing` event followed shortly after (KV write failed mid-rotation). H2 indicator: `sso.pkjwt_key_generated` or `sso.pkjwt_key_rotated` row exists and gap between last KV-write event and `pkjwt_jwks_missing` is large (deliberate deletion).
+
+**R-81-C4 — Synthetic JWKS GET (post-remediation verification only)**
+
+Run this query AFTER completing Steps 1–4 of the recovery procedure (§R-81.5) to confirm the endpoint is serving the public key:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" \
+  https://api.formapp.io/auth/oidc/$TENANT_ID/.well-known/jwks.json
+# Expected: 200
+# If still 503: KV write did not propagate — re-check Step 3 and retry
+
+# To inspect the kid array (no private key material in JWKS output):
+curl -s https://api.formapp.io/auth/oidc/$TENANT_ID/.well-known/jwks.json \
+  | jq '[.keys[] | {kid, kty, alg, use}]'
+```
+
+Expected: HTTP 200 + JSON `{"keys": [{"kid": "<uuid>", "kty": "RSA"|"EC", ...}]}`. If 503 persists after remediation, repeat Step 3 (§R-81.5) before IC closure.
+
+### §R-81.4 Root Cause Hypotheses
+
+| Hypothesis | Description | R-81-C1 signal | R-81-C3 signal | Recovery path |
+|---|---|---|---|---|
+| **H1 — Key never published** | Admin Dashboard PKJWT generate flow completed the DB write but the KV write step failed silently; `pkjwt_key_id` is set in DB but KV slot is empty | `pkjwt_key_id` present; `pkjwt_key_expires_at` future | Zero lifecycle events or only an old `generated` event with no subsequent `rotated` | PAM Republish JWKS action (Step 3a) |
+| **H2 — KV slot deleted** | Cloudflare KV slot `SSO_PKJWT_JWKS:{tenant_id}:current` was deleted — accidental CF dashboard flush, deploy script side-effect, or unauthorized delete | `pkjwt_key_id` present; `pkjwt_key_expires_at` future | `generated` or `rotated` event present; large time gap to `pkjwt_jwks_missing` | PAM Republish JWKS action (Step 3a); if unauthorized delete confirmed → co-activate R-05 P0 |
+| **H3 — Partial rotation failure** | `pkjwt_key_expiry_sweep` (job 58) or manual rotation updated DB (`pkjwt_key_id`, `pkjwt_key_expires_at`) but the KV write failed mid-rotation; new key ID in DB but old (or no) JWKS in KV | `pkjwt_key_id` present; `pkjwt_key_expires_at` recently updated | `pkjwt_key_rotated` event close in time to `pkjwt_jwks_missing` | PAM Republish JWKS action (Step 3a) for new key ID |
+| **H4 — Key expired** | `pkjwt_key_expires_at < NOW()` — job 58 did not rotate before expiry OR advance warning (AL-PKJWT-02 `sso.pkjwt_key_expiry_warning`) was missed | `pkjwt_key_expires_at < NOW()` | Recent or no rotation event — key age exceeded configured TTL | Emergency key rotation (Step 3b); co-activate R-79 (PKJWT Incident Key Rotation) |
+
+### §R-81.5 Recovery Procedure
+
+| Step | Action | Detail |
+|---|---|---|
+| **1** | Acknowledge AL-PKJWT-01 PagerDuty page; open IC in `#alerts-enterprise`; post T-81-A initial Slack message (§R-81.6) | Ack within 5 min of page (P1 SLA) |
+| **2** | Run R-81-C1 through R-81-C3 scope queries; classify root cause H1–H4 | Do not begin remediation until root cause confirmed; if ambiguous between H2 and H3, treat as H2 until R-81-C3 rules it out |
+| **3a** | **H1 / H2 / H3 — Republish JWKS via Admin Dashboard PAM action** | Navigate to Admin Dashboard → Enterprise SSO → PKJWT panel (§44.3) → Republish JWKS (PAM-gated, two-person auth); this re-reads `pkjwt_private_key_encrypted` from DB, derives the public key, and writes the JWKS JSON to `SSO_PKJWT_JWKS:{tenant_id}:current` in KV. Log the Admin Dashboard action timestamp for PKJWT-JWKS-E-001. If H2 and deletion was unauthorized, additionally co-activate R-05 (Unauthorized Privileged Access). |
+| **3b** | **H4 — Emergency key rotation via R-79** | Co-activate `docs/INCIDENT_RESPONSE.md R-79` (PKJWT Incident Key Rotation); follow R-79 procedure to generate a new RSA-2048/EC P-256 key pair, publish JWKS, and update `tenant_sso_configs`; R-79 handles IdP JWKS cache TTL communication (Okta ~1 h, Entra ID ~24 h, Google Workspace ~1 h) |
+| **4** | Run R-81-C4 synthetic JWKS GET; confirm HTTP 200 + correct `kid` in response | If 503 persists: re-run Step 3a/3b; check CF KV replication (KV propagates within ~60 s globally); if 503 persists > 5 min post-KV-write, escalate to devops-lead for CF KV incident investigation |
+| **5** | Notify affected tenant CSM; post T-81-C post-resolution Slack message (§R-81.6); confirm with customer that OIDC-SSO logins are successful | Keep SSO unblocked for ≤ SLA window; SLA credit per §4.3 if breach |
+| **6** | Emit `sso.pkjwt_jwks_restored` LOW/3yr (PKJWT-JWKS-CHAIN-01 terminal event — see §R-81.7); file PKJWT-JWKS-E-001 (CC6.6/CC7.3, 7yr WORM — see §R-81.8); close IC | PKJWT-JWKS-CHAIN-01 invariant enforced: `sso.pkjwt_jwks_restored` will be rejected (HTTP 422 `PKJWT_JWKS_CHAIN_01_VIOLATION`) if no prior `sso.pkjwt_jwks_missing` for same `tenant_id` within 24 h — do not emit out of sequence |
+
+### §R-81.6 Communication Templates
+
+**T-81-A — Initial P1 declaration (post to `#alerts-enterprise` within 5 min of page)**
+
+```
+🔴 P1 INCIDENT — PKJWT JWKS Endpoint Missing Key
+Tenant: {tenant_id}
+Alert: AL-PKJWT-01 — sso.pkjwt_jwks_missing HIGH event
+Impact: OIDC-SSO logins blocked for this tenant (IdP cannot validate private_key_jwt assertions)
+IC: @{security-engineer}
+Status: Running scope queries R-81-C1..C3 to classify root cause (H1–H4)
+Next update: 15 min
+```
+
+**T-81-B — P0 escalation (H2 unauthorized KV deletion confirmed)**
+
+```
+🚨 ESCALATING TO P0 — Unauthorized KV Deletion Detected
+Tenant: {tenant_id}
+Evidence: sso.pkjwt_jwks_missing event; R-81-C3 confirms key present in DB; no authorized delete action in audit log
+Action: Co-activating R-05 (Unauthorized Privileged Access); notifying compliance-officer and founders
+IC: @{security-engineer} + @{compliance-officer}
+```
+
+**T-81-C — Post-resolution (post to `#alerts-enterprise` on IC closure)**
+
+```
+✅ RESOLVED — PKJWT JWKS Endpoint Restored
+Tenant: {tenant_id}
+Root cause: {H1|H2|H3|H4} — {brief description}
+Remediation: {PAM Republish JWKS | R-79 Emergency Rotation}
+R-81-C4 verified: JWKS GET 200 confirmed at {timestamp}
+DEC-030: sso.pkjwt_jwks_restored LOW/3yr emitted; IC closed
+Evidence: PKJWT-JWKS-E-001 filed (CC6.6/CC7.3, 7yr WORM)
+Duration: {open_time} → {close_time} ({total_minutes} min)
+```
+
+### §R-81.7 DEC-030 Chain Specification
+
+Two DEC-030 events govern this runbook. The second event (`sso.pkjwt_jwks_restored`) is new — registered in `docs/AUDIT_LOG_SCHEMA.md v3.1 §R-81 PKJWT JWKS Missing Recovery events`.
+
+| Event | Type | Severity | Retention | Emitted by | When |
+|---|---|---|---|---|---|
+| `sso.pkjwt_jwks_missing` | AUTO | HIGH | 7yr | JWKS Worker 503 guard (§43.4) | Immediately on KV miss → 503 response |
+| `sso.pkjwt_jwks_restored` | IC PAM-elevated | LOW | 3yr | security-engineer IC (PAM-gated) | Step 6 of recovery, after R-81-C4 200 confirmed |
+
+**`SsoPkjwtJwksRestoredPayload` Zod v2 schema (canonical source: AUDIT_LOG_SCHEMA.md v3.1):**
+
+```typescript
+export const SsoPkjwtJwksRestoredPayload = z.object({
+  incident_id:               z.string().uuid(),
+  tenant_id:                 z.string().uuid(),
+  root_cause:                z.enum(['H1_key_never_published', 'H2_kv_slot_deleted', 'H3_partial_rotation', 'H4_key_expired']),
+  stale_window_minutes:      z.number().positive(),
+  resolution_confirmed_at:   z.string().datetime(),
+  emergency_rotation_opened: z.boolean(),
+});
+```
+
+**PKJWT-JWKS-CHAIN-01 Ordering Invariant:**
+
+| Invariant ID | Rule | Enforcement | Violation response |
+|---|---|---|---|
+| PKJWT-JWKS-CHAIN-01 | `sso.pkjwt_jwks_restored` REQUIRES a prior `sso.pkjwt_jwks_missing` for the same `tenant_id` within 24 h | `supabase/functions/emit-audit-event/` (pending M6 implementation) | HTTP 422 `PKJWT_JWKS_CHAIN_01_VIOLATION` → co-activate R-05 (unauthorized event manipulation) |
+
+### §R-81.8 SOC 2 Evidence
+
+**PKJWT-JWKS-E-001** is filed per R-81 activation as a JSON artefact (canonical registration: `docs/SOC2_READINESS.md §177`, v4.3.0).
+
+| Field | Value |
+|---|---|
+| Artefact ID | PKJWT-JWKS-E-001 |
+| SOC 2 criteria | CC6.6 (asymmetric auth control availability); CC7.3 (incident response) |
+| Cadence | Per-activation (one artefact per R-81 IC) |
+| Retention | 7yr WORM Object Lock Governance |
+| Path | `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json` |
+| Owner | security-engineer + compliance-officer |
+
+**Artefact content (all 8 components — see §177.3 for full spec):**
+
+1. `sso.pkjwt_jwks_missing` HIGH/7yr event JSON (IC trigger)
+2. Trigger mode (Mode-1 / Mode-2 / Mode-3)
+3. Root cause classification (H1–H4)
+4. R-81-C1 DB state output (no `pkjwt_private_key_encrypted` BYTEA)
+5. R-81-C2 recent `sso.pkjwt_jwks_missing` events for tenant
+6. R-81-C3 key lifecycle events for tenant
+7. R-81-C4 synthetic JWKS GET 200 confirmation (HTTP status + `kid` array)
+8. `sso.pkjwt_jwks_restored` LOW/3yr event JSON (PKJWT-JWKS-CHAIN-01 terminal event)
+
+File to `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json`, sign via `sign-evidence.sh`, upload to Vanta within 48 h of IC closure.
+
+### §R-81.9 Post-Incident Controls
+
+| # | Control | Owner | Trigger condition |
+|---|---|---|---|
+| 1 | Root cause post-mortem within 48 h of restoration | devops-lead + security-engineer | Every R-81 activation |
+| 2 | If H1 (key never published): audit the Admin Dashboard PKJWT generate flow for the silent KV write failure; add a synchronous KV write confirmation step to the generate flow with explicit error surface (do not silently succeed if KV write fails) | platform-engineer | H1 only |
+| 3 | If H2 (KV slot deleted — authorized): identify which deploy script, CF dashboard action, or maintenance procedure caused the deletion; add KV slot existence check to pre-deploy checklist; if the deletion was deliberate but routine (e.g., tenant offboarding), confirm that proper offboarding runbook was followed | devops-lead | H2 authorized only |
+| 4 | If H2 (KV slot deleted — unauthorized): co-activate R-05 (Unauthorized Privileged Access / Insider Threat); freeze CF API tokens with KV write access pending investigation; notify compliance-officer and founders immediately; P0 severity throughout investigation | security-engineer + compliance-officer | H2 unauthorized only |
+| 5 | If H3 (partial rotation): add atomic KV write + DB update transaction to PKJWT rotation flow; if partial failure is detected (DB updated, KV write failed), emit `sso.pkjwt_key_rotated` with `rotation_status: 'partial'` and trigger AL-PKJWT-01 proactively rather than waiting for the JWKS Worker to surface the 503 | platform-engineer | H3 only |
+| 6 | If H4 (key expired): review why job 58 (`pkjwt_key_expiry_sweep`, `0 9 * * *`) did not rotate before expiry OR why AL-PKJWT-02 `sso.pkjwt_key_expiry_warning` was not acted upon; add co-activation of R-57 (pg_cron stale runbook) to verify job 58 ran as scheduled; if warning was missed, review PagerDuty routing for `form-security` | devops-lead + security-engineer | H4 only |
+
+### §R-81.10 Cross-References
+
+| Reference | Location | Relationship |
+|---|---|---|
+| AL-PKJWT-01 alert spec | `docs/OBSERVABILITY.md §75.4` (v5.21.0, 2026-07-05) | Canonical alert definition triggering R-81; §75.4 Runbook field updated this pass to reference `INCIDENT_RESPONSE.md R-81` |
+| `sso.pkjwt_jwks_missing` event schema | `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` (v2.95, 2026-07-05) | Canonical DEC-030 schema for the Mode-1 trigger event; `SsoPkjwtJwksMissingPayload` |
+| `sso.pkjwt_jwks_restored` event schema | `docs/AUDIT_LOG_SCHEMA.md §R-81 PKJWT JWKS Missing Recovery events` (v3.1, 2026-07-05) | New LOW/3yr terminal event; `SsoPkjwtJwksRestoredPayload` Zod v2 schema; PKJWT-JWKS-CHAIN-01 invariant |
+| PKJWT-JWKS-E-001 registration | `docs/SOC2_READINESS.md §177` (v4.3.0, 2026-07-05) | §79.4 master evidence table registration; count 151 → 152 |
+| PKJWT JWKS Worker design | `docs/SSO_SCIM_IMPLEMENTATION.md §43.4` | CF Worker spec; KV slot `SSO_PKJWT_JWKS:{tenant_id}:current`; 503 guard that emits `sso.pkjwt_jwks_missing` |
+| PKJWT Admin Dashboard panel | `docs/SSO_SCIM_IMPLEMENTATION.md §44.3` | PAM-gated Republish JWKS action (Step 3a recovery path) |
+| PKJWT incident rotation | `docs/INCIDENT_RESPONSE.md §R-79` | H4 co-activation: emergency key rotation procedure |
+| Unauthorized privileged access | `docs/INCIDENT_RESPONSE.md §R-05` | H2 unauthorized co-activation (KV slot deliberately deleted without authorization) |
+| PKJWT stale sweep runbook | `docs/INCIDENT_RESPONSE.md §R-57` | H4 companion: verify job 58 ran as scheduled |
+| PKJWT Key Lifecycle Observability | `docs/OBSERVABILITY.md §75.1–§75.10` | Full PKJWT observability section; RED metrics, SLOs (PKJWT-SLO-01/02), alert rules, dashboard, evidence |
+| pg_cron job 58 | `docs/OBSERVABILITY.md §12.6` | `pkjwt_key_expiry_sweep`, `0 9 * * *` — H4 failure point if job did not rotate before expiry |
+| DEC-030 HMAC chain protocol | `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) | HMAC-chained audit log pattern governing all events emitted in this runbook |
+
+### §R-81.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `sso.pkjwt_jwks_restored` LOW/3yr and `SsoPkjwtJwksRestoredPayload` Zod v2 schema in `docs/AUDIT_LOG_SCHEMA.md` (new section `§R-81 PKJWT JWKS Missing Recovery events`); include PKJWT-JWKS-CHAIN-01 ordering invariant and PKJWT-JWKS-E-001 artefact spec | security-engineer + compliance-officer | **P0** | [x] **Done — 2026-07-05 (AUDIT_LOG_SCHEMA.md v3.1, §R-81 PKJWT JWKS Missing Recovery events).** |
+| 2 | Update `docs/OBSERVABILITY.md §75.4` AL-PKJWT-01 Runbook field: add `INCIDENT_RESPONSE.md R-81` as dedicated companion runbook reference | compliance-officer | **P0** | [x] **Done — 2026-07-05 (OBSERVABILITY.md v5.21.0, §75.4 Runbook field updated; §75.9 item 8 + §75.10 two obligations added).** |
+| 3 | Register PKJWT-JWKS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§177, per-activation cadence, CC6.6/CC7.3, 7yr, count 151 → 152) | compliance-officer | **P1** | [x] **Done — 2026-07-05 (SOC2_READINESS.md v4.3.0, §177; count 151 → 152).** |
+| 4 | Implement PKJWT-JWKS-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`: `sso.pkjwt_jwks_restored` must have prior `sso.pkjwt_jwks_missing` for same `tenant_id` within 24 h; HTTP 422 + `PKJWT_JWKS_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending — M6 |
+| 5 | Implement H3 fix: atomic KV write + DB update in PKJWT rotation flow with explicit `rotation_status: 'partial'` error surface | platform-engineer | **P1** / M6 | [ ] Pending — M6 |
+| 6 | Add KV slot existence check to pre-deploy checklist (H2 post-incident control) | devops-lead | **P2** | [ ] Pending |
+| 7 | Authoring complete — R-81 closes the AL-PKJWT-01 companion runbook gap: AL-PKJWT-01 in `docs/OBSERVABILITY.md §75.4` had only an inline six-step runbook; BCL (R-73/R-74) and SAML SLO (R-75/R-76) each had dedicated companion runbooks; this runbook closes the equivalent gap for PKJWT JWKS endpoint missing-key incidents | compliance-officer | **P0** | [x] **Done — 2026-07-05 (INCIDENT_RESPONSE.md v3.46.0).** |
+
+**Privacy floor (invariant throughout R-81):** No employee `user_id`, name, email, health value, body composition, coaching session content, private key material, or GDPR Art. 9 special-category data appears in any R-81 scope query result, DEC-030 event payload, evidence artefact, or Slack communication template. R-81-C1 explicitly excludes `pkjwt_private_key_encrypted` BYTEA from the SELECT list. R-81-C4 retrieves only the public JWKS JSON — `kid`, `kty`, `alg`, `use` fields are public-key references; no private key material is derivable. `tenant_id` in all R-81 outputs is a FORM-internal UUID — not linked to company name, employee roster, or any personal identifier in this runbook. HR role NEVER has access to `compliance/evidence/pkjwt-obs/`. Owner: security-engineer + compliance-officer + enterprise-architect.
+
+---
+
+*v3.46.0 (2026-07-05): R-81 PKJWT JWKS Endpoint Missing Key (CC6.6/CC7.3 — AL-PKJWT-01 companion runbook). Closes the AL-PKJWT-01 companion runbook gap in `docs/OBSERVABILITY.md §75.4` (v5.21.0, 2026-07-05): §75.4 had only a six-step inline runbook for the `sso.pkjwt_jwks_missing` P1 scenario; BCL observability (§70) has R-73 (REVOCATION_QUEUE exhausted) and R-74 (BCL-CHAIN-01 violation); SAML SLO observability (§72) has R-75 and R-76; PKJWT observability (§75) was the remaining gap. R-81: eleven-section companion runbook. Trigger: AL-PKJWT-01 (any `sso.pkjwt_jwks_missing` HIGH/7yr DEC-030 event — JWKS Worker KV miss → HTTP 503 → IdP cannot validate `private_key_jwt` assertions → OIDC-SSO logins blocked for affected tenant; zero-tolerance P1; 1h per-tenant dedup). Three trigger modes: Mode-1 (PagerDuty P1 via AL-PKJWT-01); Mode-2 (CSM escalation); Mode-3 (manual discovery). Four root causes: H1 key never published (Admin Dashboard generate flow incomplete KV write); H2 KV slot deleted (`SSO_PKJWT_JWKS:{tenant_id}:current` — accidental CF dashboard flush, deploy script, or unauthorized delete — unauthorized H2 escalates to P0 + R-05 co-activation); H3 partial rotation failure (DB updated by job 58 or manual rotation but KV write failed mid-rotation); H4 key expired (`pkjwt_key_expires_at < NOW()` — job 58 missed rotation or AL-PKJWT-02 warning missed → emergency rotation via R-79 co-activation). Four scope queries: R-81-C1 (`SELECT pkjwt_key_id, pkjwt_key_expires_at, pkjwt_algorithm, oidc_client_auth_method FROM tenant_sso_configs WHERE id = $tenant_id` — `pkjwt_private_key_encrypted` BYTEA explicitly excluded; root-cause determination); R-81-C2 (recent `sso.pkjwt_jwks_missing` events last 2 h for tenant — incident window + repeat-occurrence count); R-81-C3 (key lifecycle events `sso.pkjwt_key_generated`/`sso.pkjwt_key_rotated` last 48 h — confirms KV write presence or absence; H2 vs H3 disambiguation); R-81-C4 (synthetic `curl` JWKS GET post-remediation — HTTP 200 + `kid` array confirmation; must succeed before IC closure). Six-step recovery: Step 1 (ack PagerDuty, open IC, post T-81-A); Step 2 (run R-81-C1..C3, classify H1–H4); Step 3a (H1/H2/H3 — PAM Republish JWKS via Admin Dashboard §44.3, two-person auth, re-reads DB private key, writes KV); Step 3b (H4 — co-activate R-79 emergency rotation; IdP JWKS cache TTL communication: Okta ~1h, Entra ID ~24h, Google Workspace ~1h); Step 4 (R-81-C4 JWKS GET 200 confirm); Step 5 (notify CSM, T-81-C post-resolution); Step 6 (emit `sso.pkjwt_jwks_restored` LOW/3yr PKJWT-JWKS-CHAIN-01 terminal event; file PKJWT-JWKS-E-001; close IC). Three Slack templates: T-81-A (initial P1 declaration ≤5 min); T-81-B (P0 escalation for unauthorized H2); T-81-C (post-resolution). PKJWT-JWKS-CHAIN-01 ordering invariant: `sso.pkjwt_jwks_restored` requires prior `sso.pkjwt_jwks_missing` for same `tenant_id` within 24 h; HTTP 422 `PKJWT_JWKS_CHAIN_01_VIOLATION` on violation → R-05 (pending M6 `emit-audit-event` Worker implementation). `SsoPkjwtJwksRestoredPayload` Zod v2 schema: `incident_id` UUID, `tenant_id` UUID, `root_cause` enum (H1–H4), `stale_window_minutes` positive number, `resolution_confirmed_at` datetime, `emergency_rotation_opened` boolean. PKJWT-JWKS-E-001 per-activation SOC 2 evidence artefact (CC6.6/CC7.3, 7yr WORM, `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json`): eight components including both DEC-030 events, R-81-C1..C4 outputs, trigger mode, and root cause classification; `pkjwt_private_key_encrypted` BYTEA never included. Six post-incident controls: H1 — synchronous KV write confirmation in generate flow; H2 authorized — KV slot existence check in pre-deploy checklist; H2 unauthorized — R-05 P0 + CF API token freeze; H3 — atomic KV + DB rotation transaction; H4 — job 58 schedule audit + R-57 co-activation; universal — 48h post-mortem. Seven implementation checklist items: items 1 (AUDIT_LOG_SCHEMA.md v3.1 §R-81 — `sso.pkjwt_jwks_restored` LOW/3yr + `SsoPkjwtJwksRestoredPayload` schema + PKJWT-JWKS-CHAIN-01 invariant + PKJWT-JWKS-E-001 artefact spec registered) + 2 (OBSERVABILITY.md v5.21.0 — §75.4 AL-PKJWT-01 Runbook field + §75.9 item 8 + §75.10 two new obligations) + 3 (SOC2_READINESS.md v4.3.0 — §177 added, count 151 → 152) + 7 (authoring done) marked Done this pass; items 4–6 pending M6. Privacy floor invariant throughout: no employee `user_id`, PII, health data, private key material, or GDPR Art. 9 data in any query, event, template, or artefact. Document header v3.45.0 → v3.46.0. Owner: security-engineer + compliance-officer + enterprise-architect.*
