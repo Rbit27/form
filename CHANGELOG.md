@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.96.0] — 2026-07-05
+
+### Added
+- `content/post-3151-training-apps-what-to-track-what-to-ignore.md` — Block «Інструменти self-coached атлета 2026» 3146–3155 post 6/10. «Тренувальні застосунки: що відстежувати, що ігнорувати і коли вийти з підписки». Таксономія: первинна тріада (вага × rep × RPE), часові маркери, суб'єктивні поля до сесії. Що ігнорувати: gamification rings/streaks (Cowan et al. 2021 — no long-term effect), синтетичні скори готовності, автоматичні AI-рекомендації. Три типи застосунків: журнал прогресії / плановик програм / аналіз тренду. Ознаки що пора іти: не перечитуєш дані, anxiety від метрик, відсутній export. Мінімальний критерій: ≤3 хв введення, 6-міс тренд, відкритий export. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3151 card prepended at top of feed.
+
+### Changed
+- `README.md` — series «Інструменти self-coached атлета 2026» in progress 5/10 → 6/10; post-3151 proposed → done · v12.96.0.
+- `VERSION` — 12.95.1 → 12.96.0.
+
+---
+
 ## [12.95.1] — 2026-07-05
 
 ### Added
