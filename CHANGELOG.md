@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.19.0] — 2026-07-05
+
+### Added
+- `content/post-3251-when-rpe-lies-situations-where-subjective-effort-scale-is-uncalibrated.md` — Block «Тренування без зовнішнього зворотного зв'язку» 3246–3255 post 6/10. Коли RPE бреше: шість ситуацій, де суб'єктивна шкала не відповідає реальному стимулу (нові рухи, накопичена втома, гострий стрес, недосипання, специфічність м'язових груп, незнайоме середовище). Три правила роботи з некаліброваною RPE. Коли відкласти шкалу повністю. Посилання: Bartholomew et al. 2008, Leproult & Van Cauter 2011, Halperin et al. 2015, Helms et al. 2016. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3251 card added at top of feed.
+
+### Changed
+- `VERSION` — 13.18.1 → 13.19.0.
+
+---
+
 ## [13.18.1] — 2026-07-05
 
 ### Changed
