@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [13.35.1] — 2026-07-05
+
+### Changed
+- `docs/OBSERVABILITY.md §76.10` — SSO_SCIM backreference obligation closed: row updated from 🟡 Pending to 🟢 Done (SSO_SCIM_IMPLEMENTATION.md v2.38 was authored as a companion edit in v5.22.1 but the §76.10 table was not updated). §76.10 footer note patched to reflect all four cross-reference obligations Done. v5.22.0 footer note updated: "two pending" → "all four 🟢 Done". Document v5.22.1 → v5.22.2.
+- `VERSION` — 13.35.0 → 13.35.1.
+
 ## [13.35.0] — 2026-07-05
 
 ### Added
