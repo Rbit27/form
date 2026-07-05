@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.95.0] — 2026-07-05
+
+### Added
+- `content/post-3150-ai-coach-vs-personal-trainer-honest-tradeoff.md` — Editorial series «Інструменти self-coached атлета 2026» 3146–3155, post 5/10. «AI-коуч vs. персональний тренер: чесний trade-off для self-coached атлета». Порівняння за критеріями: доступність, ціна, технічний зворотний зв'язок, адаптація в реальному часі, клінічний контекст, соціальна мотивація. AI-коуч: доступність 24/7, $10–30/міс, зниження соціального тиску (Chen et al., 2020), масштаб паттернів. PT: тактильний feedback, адаптація без введення даних, Irwin et al. (2012) — соціальна синхронізація підвищує больовий поріг і витривалість. Де обидва погані: фізіологічна персоналізація, мотивація без внутрішньої мети (Deci & Ryan, 2000). Карта рішень: початківець → PT, досвідчений self-coached → AI; гібрид вимагає аналітичної зрілості. clinical-safety NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `blog.html` — post-3150 card added at top of feed (series 5/10).
+
+### Changed
+- `README.md` — series «Інструменти self-coached атлета 2026» 3146–3155: 4/10 → 5/10; post-3150 proposed → done with filename; current version v12.95.0.
+- `VERSION` — 12.94.0 → 12.95.0.
+
+---
+
 ## [12.94.0] — 2026-07-05
 
 ### Added
