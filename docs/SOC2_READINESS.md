@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.97.0
+# FORM · SOC 2 Type II Readiness v3.98.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -36238,5 +36238,73 @@ This section is the stale-monitoring evidence companion to §168 (BCL-CHN-E-001 
 | 7 | Add BCL-CHECK-STALE-E-001 and SLO-CHECK-STALE-E-001 to §80.4 Vanta mirror protocol | compliance-officer | **P1** | [x] **Done — 2026-07-05 (§171.6, this section).** |
 
 ---
+
+---
+
+## §172 — PKJWT-ROT-E-001 Registration (CC6.6/CC7.2/CC7.3 · INCIDENT_RESPONSE §R-79 · PKJWT Incident Rotation IC Evidence)
+
+> **Date:** 2026-07-05. **Trigger:** `docs/INCIDENT_RESPONSE.md §R-79.11` item 2 (P1/M6) — "Register PKJWT-ROT-E-001 in `docs/SOC2_READINESS.md §79.4` evidence artefact registry (per-activation cadence, CC6.6/CC7.2/CC7.3, 7yr, owner: security-engineer + compliance-officer)." **Owner:** compliance-officer.
+
+### §172.1 Background
+
+`docs/INCIDENT_RESPONSE.md §R-79` (v3.43.0, 2026-07-05 — R-79 PKJWT Incident Key Rotation) introduced PKJWT-ROT-E-001 as the per-activation SOC 2 evidence artefact for every R-79 activation. R-79 is the companion investigation runbook for AL-PKJWT-02 (`sso.pkjwt_key_rotated` events where `rotation_reason: 'incident'`). Because an incident rotation may indicate unauthorized key replacement (H3), FORM must demonstrate that every such event was detected, investigated by an authorized IC, and formally resolved with root cause classification. PKJWT-ROT-E-001 provides that demonstration.
+
+`docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` v2.97 (2026-07-05) simultaneously registered `sso.pkjwt_incident_rotation_ic_declared` and `sso.pkjwt_incident_rotation_ic_closed` as the DEC-030 HMAC-chained events that anchor the PKJWT-ROT-IC-CHAIN-01 ordering invariant — the events whose IDs appear in PKJWT-ROT-E-001. This §172 closes the companion §R-79.11 item 2 obligation.
+
+### §172.2 §79.4 Master Evidence Table Entry (count 144 → 145)
+
+| # | Artefact ID | TSC | Description | Cadence | Retention | Owner | R2 path |
+|---|---|---|---|---|---|---|---|
+| 145 | **PKJWT-ROT-E-001** | CC6.6, CC7.2, CC7.3 | Per-activation R-79 IC record. Required contents: (1) `sso.pkjwt_incident_rotation_ic_declared` event JSON — PKJWT-ROT-IC-CHAIN-01 anchor event with `incident_id`, `rotation_event_id`, `old_kid`, `new_kid`, `trigger`, `initial_severity`, `declared_at`; (2) root cause classification (H1–H4 per R-79.4); (3) R-79-C1 rotation event detail output (the triggering `sso.pkjwt_key_rotated` event — `rotation_reason: 'incident'`, `old_kid`, `new_kid`, `rotated_at`); (4) R-79-C2 PAM access log extract for the rotation endpoint ±10 min (authorized `principal_id` + `pam_request_id`; or ZERO-ROW declaration triggering R-05 co-activation); (5) R-79-C3 JWKS KV state check output confirming new `kid` present and old `kid` absent from `SSO_PKJWT_JWKS:{tenant_id}:current` (or active P1 note if unhealthy); (6) `sso.pkjwt_incident_rotation_ic_closed` event JSON — PKJWT-ROT-IC-CHAIN-01 terminal event with `root_cause`, `authorized_by`, `jwks_state_healthy: true`, `sessions_revoked`, `closed_at`; (7) sessions revocation record (H2 only — Admin API call log with `sessions_revoked_count` from `enterprise.admin_sessions_bulk_revoked` event). SHA-256 hashed; uploaded to `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY-MM-DD}-{tenant_id_first_8}/`. **Nil attestation:** If R-79 is never triggered in a calendar year, compliance-officer files `PKJWT-ROT-E-001-{YYYY}-nil.txt` (signed zero-activation attestation) — absence of per-activation files without a nil attestation is insufficient for auditor consumption. | Per-activation (each R-79 invocation); annual nil attestation if zero R-79 activations in the year | 7yr WORM | security-engineer + compliance-officer | `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY-MM-DD}-{tenant_id_first_8}/PKJWT-ROT-E-001.json` |
+
+**§79.4 evidence count update:** 144 → **145** (PKJWT-ROT-E-001 registered).
+
+### §172.3 SOC 2 Auditor Narratives
+
+**CC6.6 — Unexpected PKJWT key replacement anomaly detection and investigation:** PKJWT-ROT-E-001 demonstrates that FORM detected every `sso.pkjwt_key_rotated` event with `rotation_reason: 'incident'` (via AL-PKJWT-02 P2 alert), opened a formal IC investigation anchored in the DEC-030 HMAC chain (`sso.pkjwt_incident_rotation_ic_declared`), determined whether the rotation was authorized (R-79-C2 PAM access log) or unauthorized (H3 — mandatory R-05 escalation), validated JWKS KV consistency post-rotation (R-79-C3), and formally closed the IC (`sso.pkjwt_incident_rotation_ic_closed`). The existence of PKJWT-ROT-E-001 for any R-79 activation proves FORM's CC6.6 anomaly-response process is operational. Absence of a per-activation artefact for a given period (combined with a signed nil attestation) proves no incident rotations occurred — itself a positive CC6.6 attestation.
+
+**CC7.2 — Rotation velocity anomaly monitoring:** AL-PKJWT-02 (P2 Slack `#alerts-enterprise`; escalated to P1 PagerDuty `form-security` if AL-PKJWT-01 co-occurs) is the detection event for unexpected PKJWT rotation velocity. PKJWT-ROT-E-001 shows the alert fired, was investigated, and was resolved within the §4.3 SLA. R-79-C4 (90-day rotation timeline query) provides the velocity context used to determine whether the rotation is anomalous (single rotation in > 1 year = normal; multiple rotations in < 30 days = high-anomaly threshold). The PKJWT-ROT-IC-CHAIN-01 DEC-030 chain (`sso.pkjwt_incident_rotation_ic_declared` → `sso.pkjwt_incident_rotation_ic_closed`) provides an unforgeable HMAC record of the full detection-to-resolution timeline.
+
+**CC7.3 — Incident response and remediation:** PKJWT-ROT-E-001 provides the per-activation audit trail linking AL-PKJWT-02 alert detection → R-79 IC activation → root cause classification (H1–H4) → remediation action (H2: session revocation; H3: R-05/R-20 escalation; H4: code fix deployment) → JWKS health verification → IC closure. The four root cause enums (H1 undocumented, H2 break-glass, H3 unauthorized, H4 code bug) map directly to differentiated remediation paths, demonstrating that FORM's incident response is structured and repeatable, not ad hoc. Any H2 activation with `sessions_revoked > 0` additionally generates a GDPR Art. 33 assessment note in the IC record.
+
+### §172.4 Privacy Floor
+
+PKJWT-ROT-E-001 contains only FORM-internal UUIDs (`incident_id`, `tenant_id`, `rotation_event_id`, `old_kid`, `new_kid`, `pam_request_id`, `authorized_by` as `principal_id`), timestamps, integer counts (`sessions_revoked`, `sessions_revoked_count`), root cause enums, and JWKS public-key material (`kid` UUIDs only). No individual employee `user_id`, name, email, session token, private key material, coaching session content, health value, body composition metric, or GDPR Art. 9 special-category data appears in any PKJWT-ROT-E-001 artefact. The R-79-C2 PAM log extract records only `principal_id` (FORM-internal UUID) and `pam_request_id` — not the employee name associated with that principal. `old_kid` and `new_kid` are public-key identifiers only — the `pkjwt_private_key_encrypted` value is never read, logged, or referenced. Access: security-engineer + compliance-officer only; `r2:form-api` REVOKED.
+
+### §172.5 R2 Storage Specification
+
+| Field | Value |
+|---|---|
+| **R2 path pattern** | `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY-MM-DD}-{tenant_id_first_8}/PKJWT-ROT-E-001.json` |
+| **R2 parent subfolder** | `compliance/evidence/pkjwt-obs/` — pre-existing (created for PKJWT-OBS-E-001 in §170, 2026-07-05; verify with devops-lead before first filing) |
+| **WORM policy** | 7yr; `r2:form-api` REVOKED |
+| **Nil attestation path** | `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY}-nil.txt` — filed annually if R-79 never triggered |
+| **Collection deadline** | Within R-79 resolution window — `sso.pkjwt_incident_rotation_ic_closed` must be emitted first; artefact filed within 60 min of IC closure for H1/H2/H4; forensics timeline governs H3 |
+
+### §172.6 §80.4 Vanta Mirror Protocol Update
+
+| Artefact | Mirror action | Cadence |
+|---|---|---|
+| **PKJWT-ROT-E-001** | Add per-activation IC record to Vanta CC6.6/CC7.2/CC7.3 evidence library within 48 h of each R-79 IC closure. Annual nil attestation `"pkjwt_rot_e_001_count_ytd": 0` if R-79 not triggered during calendar year. Tag: `pkjwt-incident-rotation`. | Per-activation + annual nil |
+
+### §172.7 Cross-Reference Obligations Closed
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register PKJWT-ROT-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.6/CC7.2/CC7.3; per-activation, 7yr; count 144 → 145) | `docs/INCIDENT_RESPONSE.md §R-79.11` item 2 (P1/M6) | 🟢 **Done — 2026-07-05 (§172.2, this section)** |
+
+### §172.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register PKJWT-ROT-E-001 in §79.4 master evidence table (CC6.6/CC7.2/CC7.3; count 144 → 145) | compliance-officer | **P1** | [x] **Done — 2026-07-05 (§172.2, this section).** |
+| 2 | Verify `compliance/evidence/pkjwt-obs/` R2 subfolder exists (created for PKJWT-OBS-E-001 §170; devops-lead confirm) | devops-lead | **P1** | [ ] Pending — M6 (verify with devops-lead before first R-79 activation) |
+| 3 | Add PKJWT-ROT-E-001 to §80.4 Vanta mirror protocol | compliance-officer | **P1** | [x] **Done — 2026-07-05 (§172.6, this section).** |
+| 4 | Update `docs/INCIDENT_RESPONSE.md §R-79.11` item 2 to [x] Done | compliance-officer | **P1** | [x] **Done — 2026-07-05 (INCIDENT_RESPONSE.md v3.44.0).** |
+| 5 | Add annual nil attestation process to §15.1 compliance calendar | compliance-officer | **P2** | [ ] Pending — M6 |
+
+---
+
+*v3.98.0 (2026-07-05): §172 — PKJWT-ROT-E-001 Registration (CC6.6/CC7.2/CC7.3 · INCIDENT_RESPONSE §R-79 · PKJWT Incident Rotation IC Evidence). §79.4 evidence count 144 → 145: PKJWT-ROT-E-001 registered (per-activation R-79 IC record; seven-component spec — `sso.pkjwt_incident_rotation_ic_declared` event JSON + root cause classification H1–H4 + R-79-C1 rotation detail + R-79-C2 PAM access log extract + R-79-C3 JWKS KV state check + `sso.pkjwt_incident_rotation_ic_closed` event JSON + H2-only sessions revocation record; SHA-256 hashed; CC6.6/CC7.2/CC7.3; 7yr WORM; `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY-MM-DD}-{tenant_id_first_8}/PKJWT-ROT-E-001.json`; security-engineer + compliance-officer collection responsibility). Closes `docs/INCIDENT_RESPONSE.md §R-79.11` item 2 (P1/M6). §172.1 background: companion obligation to AUDIT_LOG_SCHEMA.md v2.97 §SSO-PKJ-Lifecycle (`sso.pkjwt_incident_rotation_ic_declared` + `sso.pkjwt_incident_rotation_ic_closed` registered simultaneously as §R-79.11 item 1). §172.3 SOC 2 auditor narratives: CC6.6 (detection + investigation + JWKS health verification + IC closure); CC7.2 (AL-PKJWT-02 velocity alert + PKJWT-ROT-IC-CHAIN-01 HMAC record of detection-to-resolution timeline); CC7.3 (four-root-cause H1–H4 structured response + GDPR Art. 33 assessment note for H2 with sessions_revoked > 0). §172.4 privacy floor: FORM-internal UUIDs only; `authorized_by` is `principal_id` UUID (not employee name); no private key material, employee PII, health data, or GDPR Art. 9 special-category data. §172.5 R2 storage: `compliance/evidence/pkjwt-obs/` parent (pre-existing from §170); nil attestation path `pkjwt-rot-e-001-{YYYY}-nil.txt`. §172.6 Vanta mirror: per-activation + annual nil (tag: `pkjwt-incident-rotation`). §172.7 cross-reference closed (§R-79.11 item 2 🟢 Done). §172.8 five-item checklist: items 1 + 3 + 4 Done this pass; items 2 + 5 pending M6. SOC 2 readiness: ~97% → ~97.1% (per-activation evidence gate for PKJWT incident rotation now fully specified). Document header v3.97.0 → v3.98.0. Companion edits: `docs/AUDIT_LOG_SCHEMA.md` v2.97 (§SSO-PKJ-Lifecycle — `sso.pkjwt_incident_rotation_ic_declared` + `sso.pkjwt_incident_rotation_ic_closed` registered; §R-79.11 item 1 closes simultaneously); `docs/INCIDENT_RESPONSE.md` v3.44.0 (§R-79.11 items 1 + 2 both marked [x] Done). Owner: compliance-officer + security-engineer + enterprise-architect.*
 
 *v3.97.0 (2026-07-05): §171 — BCL-CHECK-STALE-E-001 + SLO-CHECK-STALE-E-001 Registration (CC7.2 · INCIDENT_RESPONSE R-77 + R-78 · BCL/SLO Chain Integrity Check Stale Evidence). §79.4 evidence count 142 → 144: BCL-CHECK-STALE-E-001 (CC7.2, per-activation, 7yr WORM, `compliance/evidence/bcl/chain-integrity-check-stale/BCL-CHECK-STALE-E-001-{incident_id}.txt`; IC + compliance-officer collection; count 142 → 143) and SLO-CHECK-STALE-E-001 (CC7.2, per-activation, 7yr WORM, `compliance/evidence/saml-slo/chain-integrity-check-stale/SLO-CHECK-STALE-E-001-{incident_id}.txt`; count 143 → 144) both registered. Closes R-77.11 item 3 (P0/M8) and R-78.11 item 3 (P0/M7). §171.1 background: BCL-CHECK-STALE-E-001 is the compensating-control record for a BCL-CHAIN-01 retrospective scan blind spot (job 59 stale ≥ 2h); SLO-CHECK-STALE-E-001 is the parallel record for job 60 (SLO-CHAIN-01, M7 prerequisite). Critical SOC 2 framing: these artefacts evidence *monitoring gaps* — stale scanner + clean manual compensating-control run — distinct from §168 (BCL-CHN-E-001) and §167 (SLO-CHN-E-001) which evidence *detected chain violations*; together all four artefact types provide complete CC7.2 coverage. §171.2 §79.4 table entries with full artefact descriptions, per-activation nil attestation protocol, and R-74/R-76 subordination clause. §171.3 SOC 2 auditor narratives: CC7.2 for each artefact + shared auditor note distinguishing monitoring-gap evidence (§171) from violation evidence (§167/§168). §171.4 privacy floor: aggregate integer counts and FORM-internal UUIDs only; no employee `user_id`, name, `tenant_id` enumeration, `bcl_request_id`, `slo_request_id`, `oidc_sub_hash`, `idp_name_id_hash`, health data, or GDPR Art. 9 special-category data. §171.5 R2 storage: two new subfolders (`compliance/evidence/bcl/chain-integrity-check-stale/` + `compliance/evidence/saml-slo/chain-integrity-check-stale/`); both pending devops-lead provision at M8/M7 (R-77.11 item 5 + R-78.11 item 5). §171.6 §80.4 Vanta mirror: per-activation + annual nil attestation for each artefact. §171.7 cross-reference obligations closed (R-77.11 item 3 + R-78.11 item 3 both 🟢 Done). §171.8 seven-item checklist: items 1–4 + 7 Done this pass; items 5–6 pending devops-lead M8/M7. INCIDENT_RESPONSE.md updated to v3.42.0. Document header v3.96.0 → v3.97.0. Owner: compliance-officer + security-engineer.*

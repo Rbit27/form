@@ -6,6 +6,7 @@
 
 ## Current version
 
+**v12.98.0** — 2026-07-05 · enterprise · AUDIT_LOG_SCHEMA v2.97 §SSO-PKJ-Lifecycle +2 PKJWT IC events · SOC2_READINESS v3.98.0 §172 PKJWT-ROT-E-001 (count 144→145) · INCIDENT_RESPONSE v3.44.0 §R-79.11 items 1+2 [x] Done
 **v12.97.0** — 2026-07-05 · content · post-3152 · «Форуми, спільноти і соціальні мережі: де знайти корисну інформацію і де не загубитися» · series «Інструменти self-coached атлета 2026» 3146–3155 in progress 7/10 · clinical-safety NOT_REQUIRED (тема: оцінка онлайн-ресурсів і спільнот для тренувальної освіти; без їжі/образу тіла/болю/клінічної діагностики) · sports-scientist review pending · blog.html card prepended for post-3152 · README: post-3152 proposed → done; series 6/10 → 7/10 · next: post-3153 («Система зворотного зв'язку: як перетворити зафіксовані дані на рішення»)
 **v12.96.0** — 2026-07-05 · content · post-3151 · «Тренувальні застосунки: що відстежувати, що ігнорувати і коли вийти з підписки» · series «Інструменти self-coached атлета 2026» 3146–3155 in progress 6/10 · clinical-safety NOT_REQUIRED (тема: вибір та використання тренувальних застосунків як інструментів фіксації та аналізу; без їжі/образу тіла/болю/клінічної діагностики) · sports-scientist review pending · blog.html card prepended for post-3151 · README: post-3151 proposed → done; series 5/10 → 6/10 · next: post-3152 («Форуми, спільноти і соціальні мережі: де знайти корисну інформацію і де не загубитися»)
 **v12.95.1** — 2026-07-05 · enterprise · INCIDENT_RESPONSE R-79 PKJWT Incident Rotation · v12.95.1

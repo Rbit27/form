@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.98.0] — 2026-07-05
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` v2.97 — `sso.pkjwt_incident_rotation_ic_declared` (HIGH/7yr) and `sso.pkjwt_incident_rotation_ic_closed` (HIGH/7yr) registered as fifth and sixth PKJWT Key Lifecycle events. Closes `docs/INCIDENT_RESPONSE.md §R-79.11` item 1 (P0/M6). Section header updated "Four" → "Six DEC-030 HMAC-chained events". Zod v2 schemas `SsoPkjwtIncidentRotationIcDeclaredPayload` + `SsoPkjwtIncidentRotationIcClosedPayload` added (canonical source: §R-79.7). PKJWT-ROT-IC-CHAIN-01 ordering invariant table added (HTTP 422 `PKJWT_ROT_IC_CHAIN_01_VIOLATION`; enforcement pending §R-79.11 item 4, P0/M6). PKJWT-ROT-E-001 added to §SSO-PKJ-Lifecycle evidence artefacts table. Privacy floor updated: corrected "all three events" → "all six events" with IC payload field specifics. Cross-references to §R-79 and OBSERVABILITY §75.4 added.
+- `docs/SOC2_READINESS.md §172` v3.98.0 — PKJWT-ROT-E-001 Registration (CC6.6/CC7.2/CC7.3 · INCIDENT_RESPONSE §R-79 · PKJWT Incident Rotation IC Evidence). §79.4 evidence count 144 → 145. Seven-component artefact spec: `sso.pkjwt_incident_rotation_ic_declared` event JSON + root cause H1–H4 + R-79-C1/C2/C3 scope query outputs + `sso.pkjwt_incident_rotation_ic_closed` event JSON + H2 sessions revocation record. CC6.6 auditor narrative (detection + investigation + JWKS health verification + IC closure); CC7.2 (AL-PKJWT-02 velocity alert + PKJWT-ROT-IC-CHAIN-01 HMAC chain record); CC7.3 (H1–H4 structured response + GDPR Art. 33 assessment for H2). Privacy floor: FORM-internal UUIDs only; no employee PII or GDPR Art. 9 data. R2 path: `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY-MM-DD}-{tenant_id_first_8}/`. Annual nil attestation protocol. Closes §R-79.11 item 2 (P1/M6).
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v3.43.0 → v3.44.0 — §R-79.11 item 1 + item 2 marked [x] Done (2026-07-05, AUDIT_LOG_SCHEMA.md v2.97 + SOC2_READINESS.md v3.98.0 §172). Items 3 + 4 (R2 subfolder verification + PKJWT-ROT-IC-CHAIN-01 Worker enforcement) remain pending M6.
+- `STATUS.md` — v12.97.0 → v12.98.0.
+- `VERSION` — 12.97.0 → 12.98.0.
+
+---
+
 ## [12.97.0] — 2026-07-05
 
 ### Added
