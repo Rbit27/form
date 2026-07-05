@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v13.36.1** — 2026-07-05 · enterprise · AUDIT_LOG_SCHEMA §R-82 `session.revocation_kv_sync_restored` LOW/3yr terminal event + `SessionRevocationKvSyncRestoredPayload` Zod v2 schema + REVOKE-KV-CHAIN-01 invariant · closes INCIDENT_RESPONSE §R-82.11 item 1 (P0/M5) · AUDIT_LOG_SCHEMA v3.0 → v3.1
+
+---
+
 **v13.36.0** — 2026-07-05 · content · post-3265 · «Від шаблону до власної системи: повна операційна карта (синтез серії)» · series «Програмування під себе: від шаблону до власної системи» 3256–3265 COMPLETE 10/10 · clinical-safety NOT_REQUIRED (тема: методологічний синтез self-coached програмування, операційна карта чотирьох рівнів, дерево ключових рішень; без їжі/образу тіла/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3265 · next series: «Читання власних даних: від журналу до рішень» 3266–3275
 
 ---

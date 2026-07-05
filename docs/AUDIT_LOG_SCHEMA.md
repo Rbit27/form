@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v3.0
+# FORM · Audit Log Schema v3.1
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -506,6 +506,41 @@ Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-revie
 **HMAC chain requirement:** `session.bulk_revocation_started` must be committed to the chain before `handleBulkScimRevocation()` writes the first KV key. `session.tenant_nuke_started` must be committed before `nukeTenantSessions()` writes the `revoke:tenant:{tenant_id}:all` KV key. These ordering constraints are mandatory for DEC-030 tamper evidence — a chain entry inserted retroactively for an action that already occurred is a chain violation.
 
 **`support.unauthorized_nuke_attempt` (HIGH, 7yr):** Emitted when a tenant nuke API call is received with a single authoriser or with two identical user IDs. Payload: `{tenant_id, attempted_by_user_id, reason_provided, rejection_code: 'single_authoriser' | 'duplicate_authoriser'}`. This event is in the `support.*` namespace because it records a violation of an internal safety control, not a customer-visible action.
+
+---
+
+### §R-82 Session Revocation KV Sync Restored events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-82 · SOC 2 CC7.3)
+
+> Defined in `docs/INCIDENT_RESPONSE.md R-82` (v3.47.0, 2026-07-05). One terminal event covering Session Revocation KV sync restoration at IC closure. Emitted manually by the on-call engineer (devops-lead or security-engineer) as Step 6 of the R-82 recovery procedure, after R-82-C4 zero-error confirmation (≥ 15 minutes of zero `session.revocation_kv_sync_error` events). **REVOKE-KV-CHAIN-01 ordering invariant:** `session.revocation_kv_sync_restored` requires a prior `session.revocation_kv_sync_error` event with the same `incident_id` committed to the chain within the preceding 24 h; the `emit-audit-event` Worker returns HTTP 422 `REVOKE_KV_CHAIN_01_VIOLATION` if no such anchor exists — escalate immediately to R-05 (implementation: pending M5, `docs/INCIDENT_RESPONSE.md §R-82.11` item 2). The anchor check is on `incident_id` only; `tenant_id` may be null for fleet-wide Cloudflare KV platform incidents (root cause H3). **Privacy floor:** payload contains only aggregate counts, root cause enum, and operational metadata — no `user_id`, employee name, email, health value, coaching content, or GDPR Art. 9 special-category data. **Emitter:** `form_system` via devops-lead or security-engineer CLI invocation (`compliance/scripts/emit-restoration-event.sh`); IC closure is a human decision — there is no automated emitter. **Cross-ref:** `docs/INCIDENT_RESPONSE.md R-82` (§R-82.7 DEC-030 chain spec; §R-82.8 REVOKE-SYNC-E-001 SOC 2 evidence artefact); `docs/OBSERVABILITY.md §76.4` (AL-REVOKE-01 trigger alert + companion runbook); `docs/SOC2_READINESS.md §180` (REVOKE-SYNC-E-001 registered, count 156 → 157). **Closes `docs/INCIDENT_RESPONSE.md §R-82.11` item 1 (P0/M5).**
+
+| Event type | Severity | Retention | Trigger | Payload fields |
+|---|---|---|---|---|
+| `session.revocation_kv_sync_restored` | LOW | 3 yr | On-call engineer emits at R-82 IC closure (Step 6), following R-82-C4 zero-error confirmation (≥ 15 min) | `incident_id` (UUID), `tenant_id` (UUID nullable — null for fleet-wide H3 incidents), `root_cause` (enum: `H1`–`H5`), `degraded_window_minutes` (positive int), `supabase_fallback_activated` (bool), `failed_revocation_row_count` (nonneg int — `kv_sync_status='failed'` rows during degraded window), `resolution_confirmed_at` (ISO 8601 datetime), `r05_co_activated` (bool — `true` for H5 unauthorized-access incidents), `kv_write_error_count_during_incident` (nonneg int) |
+
+**REVOKE-KV-CHAIN-01 ordering invariant:** `session.revocation_kv_sync_restored` MUST NOT be emitted for a given `incident_id` unless a `session.revocation_kv_sync_error` event with the same `incident_id` was committed to the HMAC chain within the preceding 24 h. The `emit-audit-event` Worker enforces this at INSERT time — HTTP 422 `REVOKE_KV_CHAIN_01_VIOLATION` on violation; escalate immediately to R-05 (HMAC Chain Break). `tenant_id` may differ between anchor and terminal events (null for fleet-wide incidents); the chain anchor check is on `incident_id` only. **Implementation:** pending M5 (`emit-audit-event` Worker update — `docs/INCIDENT_RESPONSE.md §R-82.11` item 2). Until M5 deployment, the invariant is verified manually: the IC log in `#incidents` Slack MUST reference the `session.revocation_kv_sync_error` trigger event before `session.revocation_kv_sync_restored` is emitted.
+
+**`SessionRevocationKvSyncRestoredPayload` Zod v2 schema:**
+
+```typescript
+import { z } from 'zod';
+
+export const SessionRevocationKvSyncRestoredPayload = z.object({
+  incident_id:                          z.string().uuid(),
+  tenant_id:                            z.string().uuid().nullable(), // null = fleet-wide (H3)
+  root_cause:                           z.enum(['H1', 'H2', 'H3', 'H4', 'H5']),
+  degraded_window_minutes:              z.number().positive(),
+  supabase_fallback_activated:          z.boolean(),
+  failed_revocation_row_count:          z.number().nonnegative(), // kv_sync_status='failed' rows
+  resolution_confirmed_at:              z.string().datetime(),
+  r05_co_activated:                     z.boolean(),
+  kv_write_error_count_during_incident: z.number().nonnegative(),
+});
+```
+
+**Privacy floor:** `incident_id` is a FORM-internal UUID assigned at IC open — not linked to any user identity. `tenant_id` is a FORM-internal UUID or null — not linked to company name or employee roster in this event payload. `root_cause` H1–H5 enum contains no PII. `failed_revocation_row_count` is an aggregate count only — no `session_id`, `user_id`, or per-session identifying value. `kv_write_error_count_during_incident` is a count of KV write failures — no key values, no session identifiers. No employee name, email, health value, coaching session content, private key material, or GDPR Art. 9 special-category data in any field. **`r2:form-api` NO ACCESS** to REVOKE-SYNC-E-001 artefacts at `compliance/evidence/session-revocation/`.
+
+**SOC 2 auditor narrative for CC7.3 — Response to identified anomalies:**
+`session.revocation_kv_sync_restored` is the REVOKE-KV-CHAIN-01 terminal event for the AL-REVOKE-01 incident lifecycle. Its presence in the HMAC audit chain — immutably paired with the `session.revocation_kv_sync_error` anchor — proves that every KV sync degradation episode was formally closed: root cause classified (H1–H5), remediation applied, and KV-edge enforcement verified restored (R-82-C4 zero-error confirm ≥ 15 min). `r05_co_activated: true` on H5 incidents documents escalation to the unauthorized-access runbook (R-05 CC6.6/CC7.4). Combined with REVOKE-SYNC-E-001 (`docs/SOC2_READINESS.md §180`), auditors receive per-activation evidence of the complete IC response cycle — trigger, classification, remediation, and formal closure.
 
 ---
 
@@ -1475,6 +1510,7 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `pam.*` | 7 years | SOC 2 CC6.1/CC6.2/CC6.3 JIT privilege access evidence; break-glass record |
 | `sso.google_directory_*` | 7 years | SOC 2 CC6.3/CC9.2 Google Workspace Directory sync evidence |
 | `session.bulk_revocation_*` / `session.tenant_nuke_*` / `session.revocation_kv_sync_error` | 7 years | SOC 2 CC6.3 timely logical access removal evidence |
+| `session.revocation_kv_sync_restored` | 3 years | SOC 2 CC7.3 IC closure terminal event; REVOKE-KV-CHAIN-01 (R-82); REVOKE-SYNC-E-001 per-activation artefact anchor; `docs/INCIDENT_RESPONSE.md §R-82` |
 | `scim.session_revocation_kv_fallback` | 7 years | SOC 2 CC6.3 (dual-path revocation under KV failure), CC7.2 (KV health monitoring — AL-REVOKE-01 trigger) |
 | `security.rls_bypass_attempt` / `security.definer_function_cross_tenant` | 7 years | Tenant isolation breach evidence; SOC 2 CC6.6/PI1.5 |
 | `asset.*` (device disposal) | 7 years | SOC 2 C1.2 confidential media disposal + CC6.5 access termination evidence |
@@ -7232,6 +7268,9 @@ export const CertExpiryCheckRestoredPayload = z.object({
 
 **v1.0 · 2026-06-10 · owner: compliance-officer + security-engineer**
 *v1.0 (2026-06-10): +5 `ai.*` Victor AI safety events — `ai.safety_incident_opened` (CRITICAL/HIGH, 7yr), `ai.safety_incident_contained` (HIGH, 7yr), `ai.victor_disabled` (HIGH, 7yr), `ai.victor_reenabled` (HIGH, 7yr), `ai.safety_incident_resolved` (STANDARD, 3yr). All HMAC-chained per DEC-030. VSAFETY-CHAIN-01/02/03 ordering invariants enforced by `emit-audit-event` Worker write-guard (HTTP 422 on violation → PagerDuty P0). Privacy floor: no user_id, coaching content, or health values in any payload — incident_id (UUID) and affected_session_count (aggregate integer) only. Retention table updated with 2 new rows. Closes OBSERVABILITY.md §32.10 checklist item 7 (P0 M4) and INCIDENT_RESPONSE.md R-23 checklist item 2 (P0 M4). Cross-ref: OBSERVABILITY.md §32.5 (FORM-VICTOR-001 through -004 alert rules), §2.1 (VICTOR-SLO-01 through -04), §32.7 (VSAFETY-CHAIN monitors); INCIDENT_RESPONSE.md R-23 §R-23.3 (T+3min auto-disable path); SOC 2 CC7.2/CC7.4; GDPR Art. 9.*
+
+**v3.1 · 2026-07-05 · owner: security-engineer + compliance-officer**
+*v3.1 (2026-07-05): +1 `session.revocation_kv_sync_restored` LOW/3yr terminal event — new section `§R-82 Session Revocation KV Sync Restored events` inserted after `### Session revocation events (DEC-030 HMAC-chained · SSO §22)`. Event: emitted by on-call engineer (devops-lead or security-engineer) at Step 6 of R-82 IC closure, after R-82-C4 zero-error confirmation (≥ 15 min). REVOKE-KV-CHAIN-01 ordering invariant: `session.revocation_kv_sync_restored` requires prior `session.revocation_kv_sync_error` for same `incident_id` within 24 h; `emit-audit-event` Worker returns HTTP 422 `REVOKE_KV_CHAIN_01_VIOLATION` on violation — escalate to R-05 (invariant enforcement pending M5, `§R-82.11` item 2; manual verification interim procedure documented). `SessionRevocationKvSyncRestoredPayload` Zod v2 schema: `incident_id` UUID, `tenant_id` UUID-nullable (null for fleet-wide H3), `root_cause` enum H1–H5, `degraded_window_minutes` positive, `supabase_fallback_activated` boolean, `failed_revocation_row_count` nonneg-int (kv_sync_status='failed' rows), `resolution_confirmed_at` datetime, `r05_co_activated` boolean, `kv_write_error_count_during_incident` nonneg-int. SOC 2 CC7.3 auditor narrative: REVOKE-KV-CHAIN-01 terminal event paired with `session.revocation_kv_sync_error` anchor proves every AL-REVOKE-01 episode formally closed (root cause classified, remediation applied, KV-edge enforcement restored). Retention table: +1 row (`session.revocation_kv_sync_restored` — 3yr, CC7.3, REVOKE-SYNC-E-001 anchor). Privacy floor: `incident_id` FORM-internal UUID only; `tenant_id` FORM-internal UUID or null; all other fields are aggregate counts and enums — no `user_id`, employee PII, health value, coaching content, or GDPR Art. 9 data. Closes `docs/INCIDENT_RESPONSE.md §R-82.11` item 1 (P0/M5 — security-engineer + compliance-officer). Cross-ref: `docs/INCIDENT_RESPONSE.md R-82` (§R-82.7 DEC-030 chain spec; §R-82.8 REVOKE-SYNC-E-001); `docs/OBSERVABILITY.md §76.4` (AL-REVOKE-01); `docs/SOC2_READINESS.md §180` (REVOKE-SYNC-E-001, count 156 → 157). Header v3.0 → v3.1. Owner: security-engineer + compliance-officer.*
 
 **v0.9 · 2026-06-10 · owner: compliance-officer + security-engineer**
 *v0.9 (2026-06-10): +4 `enterprise.*` pricing governance events — `enterprise.pricing_exception_approved` (HIGH, 7yr), `enterprise.consumer_price_updated` (HIGH, 7yr), `enterprise.list_price_updated` (HIGH, 7yr), `enterprise.price_floor_override_requested` (CRITICAL, 7yr). All HMAC-chained per DEC-030. Ordering rule: `enterprise.pricing_exception_approved` must precede quote dispatch; `enterprise.price_floor_override_requested` records even denied attempts. `enterprise.pricing_exception_approved` links to `enterprise.contract_signed` (§23.7) via `pricing_exception_event_id`. Privacy invariant: no PII, company names, or health values in any payload. Retention table updated with 1 new row for `enterprise.*` events (SOC 2 CC1.4/CC5.2). Emitter: founder (manual) for exception-approved / price-updated / list-price-updated; pricing calculator server-side API (automated) for floor-override-requested. Closes COST_MODEL.md §31.9 checklist item 1 (P0, M4 — register four pricing event types in AUDIT_LOG_SCHEMA.md; Zod schema validation and `emit-audit-event` Worker deployment are implementation items for platform-engineer + data-engineer per §31.9 item 1 DoD). Cross-ref: COST_MODEL.md §31.8 (event definitions), §31.6 (discount authority matrix), §31.5 (price floors); ENTERPRISE.md §Pricing; MSA_TEMPLATE.md (price escalation clause — §31.7.2); DECISION_LOG.md.*

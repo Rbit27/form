@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.36.1] — 2026-07-05
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §R-82` — New section «Session Revocation KV Sync Restored events» (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-82 · SOC 2 CC7.3). One terminal event `session.revocation_kv_sync_restored` (LOW/3yr): emitted by on-call engineer at R-82 IC closure (Step 6), following R-82-C4 zero-error confirmation ≥ 15 min. `SessionRevocationKvSyncRestoredPayload` Zod v2 schema: `incident_id` UUID, `tenant_id` UUID-nullable (null=fleet-wide H3), `root_cause` enum H1–H5, `degraded_window_minutes` positive, `supabase_fallback_activated` bool, `failed_revocation_row_count` nonneg-int, `resolution_confirmed_at` datetime, `r05_co_activated` bool, `kv_write_error_count_during_incident` nonneg-int. REVOKE-KV-CHAIN-01 ordering invariant: `session.revocation_kv_sync_restored` requires prior `session.revocation_kv_sync_error` for same `incident_id` within 24 h; HTTP 422 `REVOKE_KV_CHAIN_01_VIOLATION` on violation → R-05 (enforcement pending M5). Retention table +1 row (3yr CC7.3). Header v3.0 → v3.1. Closes `docs/INCIDENT_RESPONSE.md §R-82.11` item 1 (P0/M5 — security-engineer + compliance-officer).
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md §R-82.11` — item 1 status `[ ] Pending — M5` → `[x] Done — 2026-07-05 (AUDIT_LOG_SCHEMA.md v3.1, §R-82 section)`.
+- `VERSION` — 13.36.0 → 13.36.1.
+
+---
+
 ## [13.36.0] — 2026-07-05
 
 ### Added
