@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [12.87.0] — 2026-07-05
+
+### Added
+- `content/post-3142-when-program-doesnt-match-the-week-first-year.md` — Series «Self-coached атлет: перший рік» 3136–3145 post 7/10. «Коли програма не відповідає тижню: прийняття рішень у реальному часі». Zourdos et al. (2016): autoregulation через RPE дає кращий довгостроковий прогрес, ніж суворе дотримання відсотків. Kiely (2012): стабільна адаптація залежить від підтримки тренувального вектора. Ієрархія тренувальних змінних (частота і основні рухи → якість виконання → обсяг і допоміжна робота). Три сценарії: скорочений тиждень (компресія без деградації якості), збій на початку тижн�� (реструктурування без доганяння), провальний тиждень (прийняти і рухатись без штрафу). П'ять питань у момент вибору. Межа між адаптивним управлінням і самосаботажем. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `docs/SOC2_READINESS.md §170` — PKJWT-OBS-E-001 Registration + §15.1 Calendar Patch (CC6.6/CC7.2/CC7.3). Closes `docs/OBSERVABILITY.md §75.9` item 5 (P1/M6) and `§75.10` obligation 3. §79.4 evidence count 141 → 142: PKJWT-OBS-E-001 registered (quarterly PKJWT key lifecycle observability health report; six-component spec from OBSERVABILITY §75.8; CC6.6/CC7.2/CC7.3; 7yr WORM; `compliance/evidence/pkjwt-obs/pkjwt-obs-e-001-{YYYY}-Q{N}.json`; nil attestation until M5/M6 PKJWT production deploy). §15.1 calendar addition: PKJWT-OBS-E-001 quarterly row (Jan 31 / Apr 30 / Jul 31 / Oct 31). §80.4 Vanta mirror: PKJWT-OBS-E-001 added (tag `pkjwt-observability`). Owner: compliance-officer + devops-lead.
+- `blog.html` — post-3142 card prepended.
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.20.0 → v5.20.1; §75.9 item 5 `[ ] Pending — M6` → `[x] Done — 2026-07-05 (SOC2_READINESS §170.2; evidence count 141 → 142)`; §75.10 obligation 3 `🟡 Pending → 🟢 Done`.
+- `docs/SOC2_READINESS.md` — v3.95.0 → v3.96.0; §170 appended; evidence count 141 → 142.
+- `README.md` — series 3136–3145 in progress 6/10 → 7/10.
+- `STATUS.md` — v12.86.0 → v12.87.0.
+- `VERSION` — 12.86.1 → 12.87.0.
+
 ## [12.86.1] — 2026-07-05
 
 ### Added
