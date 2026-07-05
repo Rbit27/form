@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.27.0] — 2026-07-05
+
+### Added
+- `content/post-3258-first-template-adaptation-principles-how-to-change-without-breaking.md` — Series «Програмування під себе: від шаблону до власної системи» 3256–3265, post 3/10. «Принципи першої адаптації шаблону: як змінювати, не зламавши». Five principles: one-variable-one-block (never more than one independent change per iteration); minimum effective dose (–1–2 sets, not –30%); adapt the periphery not the core (exercise selection, volume distribution, session placement — yes; progressive overload principle, specificity, structural balance — no); document the hypothesis before the change (5 min before the block eliminates retrospective distortions); evaluate the hypothesis not general feeling. Priority queue for multiple patterns: recovery → progress blockers → optimization. Boundary between template adaptation and writing a new programme: ~30–40% divergence. clinical-safety NOT_REQUIRED (training programming methodology; no food/body image/pain/psychiatry). sports-scientist review pending.
+- `blog.html` — post-3258 card prepended at top of feed.
+
+### Changed
+- `VERSION` — 13.26.0 → 13.27.0.
+
+---
+
 ## [13.26.0] — 2026-07-05
 
 ### Added
