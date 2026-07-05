@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v13.37.0** — 2026-07-05 · content · post-3266 · «Чому прогрес у 2–5-річній перспективі виглядає не так, як ти очікуєш» · series «Довгострокове прогресування: 2–5-річний горизонт» 3266–3275 new 1/10 · clinical-safety NOT_REQUIRED (тема: довгострокова прогресія, тренувальний вік, фазова архітектура, macrocycle-мислення; без їжі/образу тіла/болю/психіатрії) · sports-scientist review pending · blog.html card prepended for post-3266 · README: series 3256–3265 → COMPLETE 10/10; series 3266–3275 proposed → in progress 1/10; series 3266–3275 detail table added · next: post-3267 («Macrocycle операційно: як думати про річний цикл і чому більшість до цього не доходять» — 2/10)
+
 **v13.36.1** — 2026-07-05 · enterprise · AUDIT_LOG_SCHEMA §R-82 `session.revocation_kv_sync_restored` LOW/3yr terminal event + `SessionRevocationKvSyncRestoredPayload` Zod v2 schema + REVOKE-KV-CHAIN-01 invariant · closes INCIDENT_RESPONSE §R-82.11 item 1 (P0/M5) · AUDIT_LOG_SCHEMA v3.0 → v3.1
 
 ---

@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.37.0] — 2026-07-05
+
+### Added
+- `content/post-3266-long-term-progress-looks-different-than-you-expect.md` — New editorial post, series «Довгострокове прогресування: 2–5-річний горизонт» 1/10. Topic: why long-term progress (years 2–5) looks structurally different from the first year; non-linear phase architecture, training age concept, strength expression vs. potential, accumulation/intensification phases, real annual gain benchmarks for intermediate/advanced athletes. Editorial-brutalist tone. clinical-safety NOT_REQUIRED. 13-min read.
+- `blog.html` — Card prepended for post-3266.
+- `README.md` — Series 3266–3275 detail table added; header updated: 3256–3265 → COMPLETE 10/10, 3266–3275 → in progress 1/10; v13.37.0.
+- `STATUS.md` — v13.37.0 entry added.
+
+### Changed
+- `VERSION` — 13.36.1 → 13.37.0.
+
 ## [13.36.1] — 2026-07-05
 
 ### Added
