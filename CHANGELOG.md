@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [12.93.1] — 2026-07-05
+
+### Changed
+- `docs/SOC2_READINESS.md` v3.96.0 → v3.97.0 — §171 added: BCL-CHECK-STALE-E-001 (CC7.2, per-activation, 7yr WORM) and SLO-CHECK-STALE-E-001 (CC7.2, per-activation, 7yr WORM) registered in §79.4 master evidence table (count 142 → 144). Closes R-77.11 item 3 (P0/M8) and R-78.11 item 3 (P0/M7). §80.4 Vanta mirror protocol updated for both artefacts. These are compensating-control evidence artefacts for pg_cron job 59/60 stale events — distinct from §168 (BCL-CHN-E-001) and §167 (SLO-CHN-E-001) which cover detected chain violations. R2 subfolder provision pending devops-lead at M8/M7.
+- `docs/INCIDENT_RESPONSE.md` v3.41.0 → v3.42.0 — R-77.11 item 3 + R-78.11 item 3 marked Done (2026-07-05, SOC2_READINESS.md v3.97.0 §171).
+- `VERSION` — 12.93.0 → 12.93.1.
+
 ## [12.93.0] — 2026-07-05
 
 ### Added
