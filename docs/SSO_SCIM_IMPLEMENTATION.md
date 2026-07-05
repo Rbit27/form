@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.35
+# FORM · SSO/SCIM Implementation v2.36
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -6355,6 +6355,8 @@ FORM ops do not surface SP certificate expiry warnings to the tenant admin — S
 | CC6-E-CERT-002 | `audit_log` export: all `sso.cert_rotated` events for the observation period | Same query with `event_type = 'sso.cert_rotated'` |
 | CC6-E-CERT-003 | `tenant_sso_configs` certificate column snapshot (expiry timestamps + fingerprints only — no PEM) | `SELECT tenant_id, saml_sp_cert_expires_at, saml_sp_cert_fingerprint, saml_idp_cert_expires_at, saml_idp_cert_fingerprint, cert_rotation_state FROM tenant_sso_configs WHERE is_active = true` — run at start and end of observation period |
 | CC6-E-CERT-004 | Cron execution log: Cloudflare Workers Tail log or R2-archived daily summary confirming `cert-expiry-check` ran on schedule | Cloudflare dashboard → Workers & Pages → cert-expiry-check → Logs |
+
+**§79.4 registration:** CC6-E-CERT-001..004 registered in `docs/SOC2_READINESS.md §175` (v4.1.0, 2026-07-05; count 146 → 150; CC6.1/CC7.2/CC8.1; 7yr WORM; `compliance/evidence/saml-cert/`; collection queries, auditor narratives, and privacy floor documented). Owner: compliance-officer + devops-lead + security-engineer.
 
 ---
 

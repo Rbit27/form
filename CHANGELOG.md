@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [13.21.0] — 2026-07-05
+
+### Changed
+- `docs/SOC2_READINESS.md` v4.0.0 → v4.1.0 — §175: CC6-E-CERT-001…CC6-E-CERT-004 registered in §79.4 master evidence table (count 146 → 150; CC6.1/CC7.2/CC8.1). Four SAML certificate lifecycle evidence artefacts: `sso.cert_expiry_alert` export (CC6-E-CERT-001), `sso.cert_rotated` export (CC6-E-CERT-002), `tenant_sso_configs` cert column snapshot — no PEM (CC6-E-CERT-003), `cert-expiry-check` cron execution log (CC6-E-CERT-004). Collection queries, auditor narratives (CC6.1/CC7.2/CC8.1), privacy floor, R2 storage spec (`compliance/evidence/saml-cert/`), §80.4 Vanta mirror, §15.1 calendar row, cross-reference obligations. Closes AUDIT_LOG_SCHEMA.md v2.99 §79.4 registration obligation.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` v2.35 → v2.36 — §20.9: §79.4 registration cross-reference added (SOC2_READINESS §175, v4.1.0, 2026-07-05; count 146 → 150).
+- `VERSION` — 13.20.0 → 13.21.0.
+
+---
+
 ## [13.19.0] — 2026-07-05
 
 ### Added

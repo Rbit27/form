@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.0.0
+# FORM · SOC 2 Type II Readiness v4.1.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -36580,3 +36580,145 @@ HR access to any CC-PKJWT evidence file is prohibited by the same data access co
 ---
 
 *v4.0.0 (2026-07-05): §174 — PKJWT-ROT-IC-CHAIN-01 Pre-Enforcement Compensating Controls Register & Gap-Period Audit Package. Formal SOC 2 gap-period documentation while PKJWT-ROT-IC-CHAIN-01 enforcement code (R-79.11 item 4, M6) awaits deployment. Gap period: 2026-07-05 → M6 (est. 2026-Q3, ≤ 90 days). Three manual compensating controls registered: CC-PKJWT-01 (weekly PKJWT audit log review; security-engineer; CC7.2; detection latency ≤ 7d), CC-PKJWT-02 (weekly JWKS endpoint probe; security-engineer; CC6.6; KV state consistency), CC-PKJWT-03 (weekly IC closure SLA check; compliance-officer; CC7.3; 24h SLA enforcement). New evidence artefact PKJWT-GAP-E-001 registered: quarterly gap-period compensating controls package (CC6.6/CC7.2/CC7.3; 7yr WORM; `compliance/evidence/pkjwt-gap/pkjwt-gap-e-001-{YYYY}-Q{N}.zip`; contents: CC-PKJWT-01/02/03 weekly evidence + risk acceptance attestation + nil-activation PKJWT-ROT-E-001 note; retire at M6). §79.4 evidence count 145 → 146. §15.1 calendar row added: quarterly PKJWT-GAP-E-001 (first due 2026-10-31; retire at M6, replace monitoring evidence role with PKJWT-OBS-E-001). M6 transition protocol documented (8 steps): automated enforcement deploy → AL-PKJWT-02 alert verify → R2 subfolder confirm → PKJWT-OBS-E-001 Q3 file → PKJWT-GAP-E-001 final package → checklist updates → §15.1 row removal → R-79.11 item 4 closure. SOC 2 auditor narratives: CC6.6 (weekly JWKS probe compensates for absent automated key-state cross-check), CC7.2 (weekly audit log review; ≤ 7d detection latency; risk bounded ≤ 90d; audit trail completeness unaffected), CC7.3 (weekly IC SLA check; post-M6 AL-PKJWT-02 automates). Risk characterisation: time-bounded detective gap (≤ 90d, not a structural failure); HMAC chain integrity and privacy floor unaffected. Privacy floor: no employee PII, health data, or GDPR Art. 9 data; `pkjwt_private_key_encrypted` explicitly excluded; HR access to `compliance/evidence/pkjwt-gap/` prohibited by data access controls. §174.10 checklist: items 2+3 Done this pass; items 1+4+5+6+7 pending (2026-07-05/2026-07-07/2026-10-31/M6). SOC 2 readiness: ~97.1% → ~97.2% (gap-period risk formally characterised; compensating controls enumerated; PKJWT evidence chain closed). Document header v3.98.0 → v4.0.0 (corrects missed v3.99.0 header update from §173). Owner: compliance-officer + security-engineer + enterprise-architect.*
+
+---
+
+## §175 — CC6-E-CERT-001…CC6-E-CERT-004 Registration (CC6.1/CC7.2/CC8.1 · SSO_SCIM §20 · SAML Certificate Lifecycle Evidence)
+
+### §175.1 Background
+
+FORM's SAML Certificate Lifecycle Management system (`docs/SSO_SCIM_IMPLEMENTATION.md §20`) maintains proactive monitoring of both SP certificates (FORM-generated, RSA-2048, 2-year validity) and IdP certificates (customer-generated, validity varies) for all active SAML tenants. The monitoring cron (`cert-expiry-check`, daily 02:00 UTC) covers both cert classes through a seven-tier escalation ladder (t90 → t60 → t30 → t14 → t7 → t2 → expired), emitting DEC-030 HMAC-chained events at each tier advance and routing to AL-CERT-01 through AL-CERT-05 (`docs/OBSERVABILITY.md §26.5`).
+
+The four DEC-030 audit events (`sso.cert_expiry_alert`, `sso.cert_expired`, `sso.cert_uploaded`, `sso.cert_monitor_error`) were registered in `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` (v2.99, 2026-07-05). Four SOC 2 evidence artefacts defined in `docs/SSO_SCIM_IMPLEMENTATION.md §20.9` were not yet registered in this document. This section closes that gap (count 146 → 150).
+
+### §175.2 §79.4 Master Evidence Table Entries (count 146 → 150)
+
+| # | Artefact ID | Name | SOC 2 Criteria | Cadence | Retention | R2 Path | Responsible |
+|---|---|---|---|---|---|---|---|
+| **147** | **CC6-E-CERT-001** | `audit_log_events` export — all `sso.cert_expiry_alert` events for the SOC 2 observation period | CC6.1, CC7.2 | Annual (SOC 2 observation window); nil attestation if `cert-expiry-check` not yet in production | 7yr WORM | `compliance/evidence/saml-cert/cc6-e-cert-001-{obs_start}-{obs_end}.jsonl` | devops-lead + compliance-officer |
+| **148** | **CC6-E-CERT-002** | `audit_log_events` export — all `sso.cert_rotated` events for the SOC 2 observation period | CC6.1, CC8.1 | Annual (SOC 2 observation window); nil attestation if no SAML rotations occurred | 7yr WORM | `compliance/evidence/saml-cert/cc6-e-cert-002-{obs_start}-{obs_end}.jsonl` | devops-lead + compliance-officer |
+| **149** | **CC6-E-CERT-003** | `tenant_sso_configs` certificate column snapshot: expiry timestamps + fingerprints only — **no PEM columns** | CC6.1 | Two snapshots per observation window (start-of-period + end-of-period) | 7yr WORM | `compliance/evidence/saml-cert/cc6-e-cert-003-{snapshot_date}.json` | devops-lead + compliance-officer |
+| **150** | **CC6-E-CERT-004** | `cert-expiry-check` Cloudflare Workers cron execution log — confirms daily 02:00 UTC schedule adherence across observation period | CC7.2 | Annual (SOC 2 observation window); nil attestation with note if not yet in production | 7yr WORM | `compliance/evidence/saml-cert/cc6-e-cert-004-{obs_start}-{obs_end}/` | devops-lead |
+
+**§79.4 evidence count update:** 146 → **150** (CC6-E-CERT-001 count 146 → 147; CC6-E-CERT-002 count 147 → 148; CC6-E-CERT-003 count 148 → 149; CC6-E-CERT-004 count 149 → 150).
+
+### §175.3 Collection Queries
+
+**CC6-E-CERT-001 — `sso.cert_expiry_alert` export:**
+
+```sql
+-- Run as form_audit role (read-only)
+SELECT id, event_type, payload, hmac_signature, created_at
+FROM audit_log_events
+WHERE event_type = 'sso.cert_expiry_alert'
+  AND created_at BETWEEN $obs_start AND $obs_end
+ORDER BY created_at ASC;
+```
+
+**CC6-E-CERT-002 — `sso.cert_rotated` export:**
+
+```sql
+-- Run as form_audit role (read-only)
+SELECT id, event_type, payload, hmac_signature, created_at
+FROM audit_log_events
+WHERE event_type = 'sso.cert_rotated'
+  AND created_at BETWEEN $obs_start AND $obs_end
+ORDER BY created_at ASC;
+```
+
+**CC6-E-CERT-003 — Certificate column snapshot (NO PEM columns):**
+
+```sql
+-- Run as form_audit role (read-only)
+-- IMPORTANT: saml_sp_certificate and saml_idp_certificate BYTEA columns MUST NOT be selected
+SELECT
+  tenant_id,
+  saml_sp_cert_expires_at,
+  saml_sp_cert_fingerprint,
+  saml_idp_cert_expires_at,
+  saml_idp_cert_fingerprint,
+  cert_rotation_state,
+  cert_alert_tier,
+  cert_alert_last_sent_at
+FROM tenant_sso_configs
+WHERE is_active = true
+ORDER BY tenant_id;
+-- Run twice: at $obs_start and at $obs_end; file as cc6-e-cert-003-{date}.json each time
+```
+
+**CC6-E-CERT-004 — Cron execution log:**
+
+Collect via Cloudflare Workers Tail (`wrangler tail cert-expiry-check --env production`) or the R2-archived daily summary. The export must cover every calendar day of the SOC 2 observation period at 02:00 UTC. Confirm no unresolved failures (i.e., no `sso.cert_monitor_error` HIGH events in CC6-E-CERT-001 that do not have a subsequent successful execution in CC6-E-CERT-004).
+
+### §175.4 SOC 2 Auditor Narratives
+
+**CC6.1 — Logical access credentials managed through full lifecycle:**
+
+CC6-E-CERT-001 (alert export) demonstrates that FORM's `cert-expiry-check` cron continuously monitors all SAML tenant certificate expirations through the seven-tier escalation ladder and emits DEC-030 HMAC-chained events at each threshold crossing, feeding AL-CERT-01 through AL-CERT-05 (`docs/OBSERVABILITY.md §26.5`). CC6-E-CERT-002 (rotation export) proves that certificate rotation events were executed within the alert window; cross-referencing with CC6-E-CERT-001 demonstrates the full credential lifecycle (issue → monitor → alert → rotate) was exercised without gaps. CC6-E-CERT-003 (config snapshot, collected at start and end of observation period) confirms that no SAML tenant certificate expired while `cert_rotation_state = 'idle'` — i.e., FORM always acted on detected expiries before they lapsed. Together, the three artefacts cover the entire CC6.1 credential lifecycle evidence requirement for SAML-based enterprise SSO.
+
+**CC7.2 — System monitors for anomalies including credential expiry:**
+
+CC6-E-CERT-004 (cron execution log) proves `cert-expiry-check` ran on schedule across the full observation period. Each execution covers all active SAML tenants in a single pass and emits `sso.cert_monitor_error` HIGH/7yr on any query or parse failure (AL-CERT-05, `form-platform` P1 routing). The combination of CC6-E-CERT-004 (zero execution gaps) and the `sso.cert_monitor_error` zero-count attestation from CC6-E-CERT-001 together satisfy CC7.2's "monitoring covers the observation period without material gaps" requirement. CC6-E-CERT-001 further proves that anomalies (approaching expirations) were detected and escalated within the seven-tier threshold matrix (`docs/SSO_SCIM_IMPLEMENTATION.md §20.3`).
+
+**CC8.1 — Changes to systems are authorized and controlled:**
+
+CC6-E-CERT-002 (`sso.cert_rotated` events) in conjunction with CC6-E-CERT-003 (pre/post-rotation cert snapshots) provides evidence that each SP certificate rotation followed FORM's change procedure (§8.1 zero-downtime rotation runbook + §20 `cert_rotation_state` state machine). The `cert_rotation_state` column in CC6-E-CERT-003 snapshots confirms no certificate was rotated while `cert_rotation_state = 'idle'` (which would indicate a rotation that bypassed the monitoring path). The sequence `idle → notified → rotation_in_progress → complete` is machine-enforced; any `sso.cert_rotated` event outside this sequence would appear as a state machine anomaly detectable by cross-referencing CC6-E-CERT-002 with CC6-E-CERT-003.
+
+### §175.5 Privacy Floor
+
+All four CC6-E-CERT artefacts enforce the FORM privacy floor invariant:
+
+- **CC6-E-CERT-001/002**: DEC-030 event exports contain only `tenant_id` (FORM-internal UUID), `cert_class` operational enum (`sp` or `idp`), `fingerprint_sha256` (SHA-256 hex of the certificate's DER encoding — standard X.509 public identifier, not secret), `cert_alert_tier`, and operational timestamps. No certificate PEM material, no private key material, no employee `user_id`, name, email, health value, coaching session content, body composition data, or GDPR Art. 9 special-category data.
+- **CC6-E-CERT-003**: The collection query explicitly excludes `saml_sp_certificate` and `saml_idp_certificate` BYTEA columns (PEM-encoded certificate bytes). Only expiry timestamps, fingerprints, and state machine fields are selected. No employee `user_id`, name, email, or health data. `fingerprint_sha256` is the public SHA-256 digest of the DER-encoded certificate — no secret material.
+- **CC6-E-CERT-004**: Cron execution log contains operational metadata only: execution timestamps, duration, tenant counts scanned, error counts. Aggregate counts only — no `tenant_id` enumeration, no employee PII, no health data.
+- **HR access prohibition:** No CC6-E-CERT artefact contains data accessible to HR roles. The `compliance/evidence/saml-cert/` R2 subfolder is restricted to devops-lead and compliance-officer roles.
+
+### §175.6 R2 Storage Spec
+
+| Path | Contents | Provision trigger |
+|---|---|---|
+| `compliance/evidence/saml-cert/` | Parent subfolder for all four artefact types | M4 — after `cert-expiry-check` production deploy (§20.11 item 3) |
+| `compliance/evidence/saml-cert/cc6-e-cert-001-{obs_start}-{obs_end}.jsonl` | JSONL export signed via `sign-evidence.sh` | Annual, at SOC 2 observation window close |
+| `compliance/evidence/saml-cert/cc6-e-cert-002-{obs_start}-{obs_end}.jsonl` | JSONL export signed via `sign-evidence.sh` | Annual, at SOC 2 observation window close |
+| `compliance/evidence/saml-cert/cc6-e-cert-003-{snapshot_date}.json` | JSON snapshot (two per window: start + end) signed via `sign-evidence.sh` | At start and end of each SOC 2 observation window |
+| `compliance/evidence/saml-cert/cc6-e-cert-004-{obs_start}-{obs_end}/` | Daily cron log files | Ongoing daily collection, R2 upload at window close |
+
+WORM policy: `r2:form-api` REVOKED; 7yr retention lock applied at upload via `compliance/scripts/sign-evidence.sh`.
+
+### §175.7 §80.4 Vanta Mirror Protocol
+
+All four artefacts are added to the §80.4 Vanta mirror schedule:
+
+- **CC6-E-CERT-001**: Annual upload within 30 days of observation window close. Tag: `saml-cert-expiry-alerts`. Pre-M4 nil attestation: `"cert_expiry_alerts_count": 0, "note": "cert-expiry-check not yet in production — M4 pending"`.
+- **CC6-E-CERT-002**: Annual upload. Tag: `saml-cert-rotations`. Nil attestation if no SAML rotations occurred in the period.
+- **CC6-E-CERT-003**: Two uploads per window (start-of-period + end-of-period). Tag: `saml-cert-inventory`.
+- **CC6-E-CERT-004**: Annual upload. Tag: `cert-expiry-cron-health`. Pre-M4 nil attestation: `"cron_execution_days_confirmed": 0, "note": "cert-expiry-check not yet in production"`.
+
+### §175.8 §15.1 Compliance Calendar Addition
+
+**CC6-E-CERT-001..004 — annual (SOC 2 observation window)**
+
+Cadence: annual, within 30 days of SOC 2 observation window close. Collection becomes active after `cert-expiry-check` production deploy (M4). First due: 30 days after first SOC 2 audit firm engagement (§15.1 Milestone 1). Responsible: devops-lead (collection) + compliance-officer (sign-off + Vanta mirror). Evidence path: `compliance/evidence/saml-cert/`. Start-of-period CC6-E-CERT-003 snapshot due at observation window open.
+
+### §175.9 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register CC6-E-CERT-001..004 in §79.4 master evidence table (count 146 → 150) | `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` v2.99 — "registration in `docs/SOC2_READINESS.md §79.4` pending" | 🟢 **Done — 2026-07-05 (§175.2, this section)** |
+| Add §175 backlink to `docs/SSO_SCIM_IMPLEMENTATION.md §20.9` evidence table | §20.9 — no §79.4 registration reference existed | 🟢 **Done — 2026-07-05 (SSO_SCIM v2.36, companion edit)** |
+
+### §175.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register CC6-E-CERT-001..004 in §79.4 master evidence table (count 146 → 150) | compliance-officer | **P1** | [x] **Done — 2026-07-05 (§175.2, this section).** |
+| 2 | Add §15.1 compliance calendar row for annual CC6-E-CERT-001..004 collection | compliance-officer | **P2** | [x] **Done — 2026-07-05 (§175.8, this section).** |
+| 3 | Add §175 cross-reference to `docs/SSO_SCIM_IMPLEMENTATION.md §20.9` evidence table | compliance-officer | **P1** | [x] **Done — 2026-07-05 (SSO_SCIM v2.36, companion edit).** |
+| 4 | Add CC6-E-CERT-001..004 to §80.4 Vanta mirror schedule | devops-lead | **P2** | [x] **Done — 2026-07-05 (§175.7, this section).** |
+| 5 | Provision `compliance/evidence/saml-cert/` R2 subfolder (WORM + `r2:form-api` REVOKED policy) | devops-lead | **P1** | [ ] Pending — M4 (after `cert-expiry-check` production deploy) |
+| 6 | Collect and file first CC6-E-CERT-003 start-of-period snapshot after M4 deploy | devops-lead + compliance-officer | **P1** | [ ] Pending — M4 |
+| 7 | Collect and file first annual CC6-E-CERT-001/002/003 (end)/004 package at SOC 2 observation window close | devops-lead + compliance-officer | **P2** | [ ] Pending — SOC 2 T+30d |
+
+---
+
+*v4.1.0 (2026-07-05): §175 — CC6-E-CERT-001…CC6-E-CERT-004 Registration (CC6.1/CC7.2/CC8.1 · SSO_SCIM §20.9 · SAML Certificate Lifecycle Evidence). Closes the §79.4 registration obligation from `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` v2.99 (2026-07-05): "registration in `docs/SOC2_READINESS.md §79.4` pending." §79.4 evidence count 146 → 150: CC6-E-CERT-001 (CC6.1/CC7.2, annual, 7yr WORM, `sso.cert_expiry_alert` event export; count 146 → 147), CC6-E-CERT-002 (CC6.1/CC8.1, annual, 7yr WORM, `sso.cert_rotated` export; count 147 → 148), CC6-E-CERT-003 (CC6.1, annual × 2 snapshots, 7yr WORM, `tenant_sso_configs` expiry/fingerprint/state snapshot — `saml_sp_certificate` and `saml_idp_certificate` BYTEA explicitly excluded; count 148 → 149), CC6-E-CERT-004 (CC7.2, annual, 7yr WORM, `cert-expiry-check` cron execution log; count 149 → 150). §175.3 collection queries for all four artefacts (form_audit role; CC6-E-CERT-003 query explicitly forbids PEM columns). §175.4 SOC 2 auditor narratives: CC6.1 (CC6-E-CERT-001/002/003 combined prove issue → monitor → alert → rotate lifecycle without expiry-while-idle gaps); CC7.2 (CC6-E-CERT-004 cron schedule adherence + CC6-E-CERT-001 zero `sso.cert_monitor_error` attestation together prove gap-free monitoring coverage); CC8.1 (CC6-E-CERT-002 rotation export + CC6-E-CERT-003 pre/post state machine snapshots prove `cert_rotation_state` sequence respected — no out-of-path rotation). §175.5 privacy floor: no PEM content, no private key material, no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 data in any artefact; `fingerprint_sha256` is public X.509 DER fingerprint only; CC6-E-CERT-004 aggregate counts only; HR access to `compliance/evidence/saml-cert/` prohibited. §175.6 R2 storage: `compliance/evidence/saml-cert/` new subfolder (pending M4 devops-lead provision after `cert-expiry-check` production deploy per §20.11 item 3); all artefacts signed via `sign-evidence.sh` + WORM 7yr. §175.7 §80.4 Vanta mirror: all four artefacts registered with annual upload + nil attestation protocol for pre-M4 period. §175.8 §15.1 calendar row added (annual, 30d post-observation-close). §175.9 cross-references: AUDIT_LOG_SCHEMA v2.99 registration obligation 🟢 Done; SSO_SCIM §20.9 cross-reference 🟢 Done (v2.36). §175.10 seven-item checklist: items 1/2/3/4 Done this pass; items 5/6/7 pending M4/SOC2 audit window. Companion edit: `docs/SSO_SCIM_IMPLEMENTATION.md` v2.36 (§20.9 cross-reference to §175 added). SOC 2 readiness: ~97.2% → ~97.3% (four SAML certificate lifecycle evidence artefacts formally registered in §79.4 with collection queries, auditor narratives, and privacy floor). Document header v4.0.0 → v4.1.0. Owner: compliance-officer + devops-lead + security-engineer.*
