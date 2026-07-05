@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [13.23.0] — 2026-07-05
+
+### Added
+- `content/post-3254-self-assessment-as-skill-from-i-dont-know-to-i-have-hypothesis.md` — Series «Тренування без зовнішнього зворотного зв'язку» 3246–3255, 9/10. Побудова self-assessment як операційної навички для self-coached атлета: п'ять рівнів відповіді (від «я не знаю нічого» до «я побачу результат A після дії B за C тижнів»); три категорії сигналів для спостереження (RPE-дрейф, технічна якість, суб'єктивний стан); інтерпретація та уникнення confirmation bias; формулювання гіпотези зі специфічністю і часовим горизонтом; мінімальний viable assessment (три рядки після сесії + 10 хв огляду на тиждень); три типові пастки (надмірна складність, confirmation bias, вимога визначеності). clinical-safety: NOT_REQUIRED.
+- `blog.html` — картка post-3254 prepended at top of feed.
+- `README.md` — новий proposed series 3326–3335 «Тренувальна рефлексія: від сесії до блоку» додано до roadmap; summary line оновлено.
+
+### Changed
+- `STATUS.md` — серія 3246–3255 progress updated: 8/10 → 9/10; next: post-3255 (synthesis / series finale).
+- `VERSION` — 13.22.0 → 13.23.0.
+
+---
+
 ## [13.22.0] — 2026-07-05
 
 ### Added
