@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.40.4
+# FORM · Incident Response Runbook v3.41.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -27349,6 +27349,685 @@ PIR: Required (all P0s — within 72h)
 | 6 | Authoring complete — R-76 closes §72.11 obligation "File companion IR runbook R-76 (AL-SLO-02 — SLO-CHAIN-01 Integrity Violation, P0) in `docs/INCIDENT_RESPONSE.md`" | compliance-officer | **P0** | [x] **Done — 2026-07-04 (INCIDENT_RESPONSE.md v3.40.0).** |
 
 **Privacy floor (invariant throughout R-76):** All scope query outputs, DEC-030 event payloads, templates, and SLO-CHN-E-001 artefact files contain no `user_id`, employee name, email, coaching content, health data, or GDPR Art. 9 special-category data. `tenant_id` and `slo_request_id` are FORM-internal UUIDs. `chain-segment.json` restricted to IC + compliance-officer + outside counsel (H5 only). Cross-references: `docs/OBSERVABILITY.md §72.4 AL-SLO-02`, `docs/OBSERVABILITY.md §72.8 SLO-OBS-E-001`, `docs/SSO_SCIM_IMPLEMENTATION.md §45.5.3`, `docs/AUDIT_LOG_SCHEMA.md §SAML-SLO-Events`, `docs/SOC2_READINESS.md §72.9 items 7–8 pending`. Owner: security-engineer + compliance-officer.
+
+## R-77 · BCL Chain Integrity Check Stale — `bcl_chain_integrity_check` (job 59) — CC7.2 monitoring gap
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `bcl_chain_integrity_check` pg_cron job 59 exceeds the 2-hour freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` Edge Function (§12.6) emits `system.cron_job_stale` with `job_name = 'bcl_chain_integrity_check'`; routes to PagerDuty P1 `form-security` → security-engineer + devops-lead; dedup key `bcl-chain-integrity-check-stale` per §12.6 registry
+> **Primary owners:** security-engineer · devops-lead · compliance-officer
+> **SOC 2 criteria:** CC7.2 — monitoring control gap; BCL-CHAIN-01 retrospective integrity scan suspended during stale window
+> **SLO risk:** Job 59 (`0 * * * *`) executes `fn_bcl_chain_integrity_check()` (Migration M-0102; `form_audit` role, read-only) — the hourly retrospective SQL scan for orphaned `backchannel_logout.revoked` rows in `audit_log_events` (BCL-CHAIN-01 ordering invariant: every `revoked` event must have a matching `received` anchor within the 60-second `BCL_ANCHOR_KV` TTL). A stale job 59 means the retrospective scan is suspended — retroactive anomalies (post-write event deletion, H4/H5 code bugs) go undetected until the next successful run.
+> **Critical distinction:** The primary BCL-CHAIN-01 enforcement is at the `emit-audit-event` Worker layer in real time (HTTP 422 `BCL_CHAIN_01_VIOLATION` on live invariant violation — no new persisted orphan at write time while Worker is active). A stale job 59 does NOT indicate a live chain violation; it indicates that the belt-and-suspenders retrospective scan is temporarily blind. BCL-OBS-E-001 quarterly attestation density (all-clear cadence) is reduced pro-rata for the stale window.
+> **Prerequisites:** Job 59 is active only after M8 BCL production deploy (Migration M-0102). This runbook is written for operational readiness; before M8, no stale alert fires for job 59.
+
+---
+
+### R-77.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | Routing |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 59)** | `pg-cron-health-monitor` Edge Function (§12.6) | No successful `bcl_chain_integrity_check` run in `pg_cron.job_run_details` within the prior 2 h | **P1** (PagerDuty `form-security` → security-engineer + devops-lead; dedup key `bcl-chain-integrity-check-stale`) | PagerDuty P1 `form-security` → security-engineer + devops-lead; Slack `#security-alerts` HIGH |
+| **Manual discovery** | security-engineer or compliance-officer observes stale job during routine §12.6 review or BCL-OBS-E-001 quarterly evidence collection | Post-evidence-collection or routine check | **P1 — treat as triggered** | Slack `#security-alerts` |
+
+> **No automatic escalation to P0:** A stale job 59 alone is not a P0 incident. P0 escalation applies only if R-77-C4 (manual run of `fn_bcl_chain_integrity_check()`) finds violations during the stale window. In that case, immediately activate R-74 (BCL-CHAIN-01 Integrity Violation) as primary incident; R-77 becomes subordinate.
+
+---
+
+### R-77.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P1** | Stale; R-77-C4 manual run finds zero violations | 2 h investigation; CC7.2 monitoring gap only; no chain break; BCL-OBS-E-001 attestation density reduced pro-rata | Diagnose root cause; restore job 59; run R-77-C4 to confirm clean; emit DEC-030 stale + restored chain |
+| **P0 (via R-74)** | Stale AND R-77-C4 manual run finds orphaned `backchannel_logout.revoked` rows | Immediately activate R-74; R-77 closes as subordinate | Co-activate R-74 (BCL-CHAIN-01 Integrity Violation P0); R-77 IC transfers primary IC role to R-74 IC |
+
+---
+
+### R-77.3 Immediate Actions (T+0 to T+60 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `system.bcl_chain_integrity_check_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker | security-engineer | Required at ALL severity levels. Do this FIRST before any DB queries. BCL-CHECK-STALE-CHAIN-01 anchor event. |
+| **T+5** | Run R-77-C1 (audit log freshness check) | security-engineer | Confirm last `system.bcl_chain_check_passed` emission time; calculate exact stale window in hours. |
+| **T+10** | Run R-77-C2 (pg_cron run history for job 59) | security-engineer | Confirm stale start time, missed-run count, `return_message` for root cause classification (H1–H5). |
+| **T+15** | Run R-77-C3 (catalog registration check) | security-engineer | Confirm job 59 exists in `cron.job` with `active = true` and schedule `0 * * * *`. |
+| **T+20** | Run R-77-C4 (manual execution of `fn_bcl_chain_integrity_check()`) | security-engineer | PAM-elevated `form_audit` role. Substitutes for all missed job 59 runs during the stale window. If violations found → immediately activate R-74. |
+| **T+30–T+60** | Fix underlying cause and restore job 59 per root cause diagnosis | devops-lead + security-engineer | See §R-77.5 Steps 4–5. Emit `system.bcl_chain_integrity_check_restored` on confirmed first successful automated run. |
+
+---
+
+### R-77.4 Root Cause Hypotheses and Scope Queries
+
+#### R-77-C1 — Audit log freshness check
+
+```sql
+-- Role: form_audit (read-only on audit_log_events)
+-- Confirms last emission of system.bcl_chain_check_passed and stale window size
+SELECT
+  MAX(created_at)                                          AS last_all_clear_at,
+  NOW() - MAX(created_at)                                  AS stale_duration,
+  EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600.0  AS stale_hours
+FROM audit_log_events
+WHERE event_type = 'system.bcl_chain_check_passed';
+-- NULL last_all_clear_at: job 59 has never run (pre-M8, or job deleted with no prior run)
+-- stale_hours > 2: confirms freshness window exceeded; use for stale_hours field in DEC-030 payload
+```
+
+> **Privacy floor:** Returns only timestamps and derived intervals. No `tenant_id`, `bcl_request_id`, employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data.
+
+#### R-77-C2 — pg_cron run history for job 59
+
+```sql
+-- Role: form_audit
+-- Returns last 10 runs of bcl_chain_integrity_check (succeeded and failed)
+SELECT
+  jobid,
+  jobname,
+  runid,
+  job_pid,
+  database,
+  username,
+  command,
+  status,
+  return_message,
+  start_time,
+  end_time
+FROM pg_cron.job_run_details
+WHERE jobname = 'bcl_chain_integrity_check'
+ORDER BY start_time DESC
+LIMIT 10;
+-- Confirm: (1) time of last successful run (stale window start),
+--          (2) missed-run count (hourly 0 * * * * cadence),
+--          (3) return_message for root cause classification (H1–H5)
+```
+
+#### R-77-C3 — Catalog registration check
+
+```sql
+-- Role: form_audit
+-- Confirms job 59 is still registered in cron.job catalog with correct schedule
+-- Zero rows = job deleted (H1); active = false = job disabled (H2)
+SELECT
+  jobid,
+  schedule,
+  jobname,
+  nodename,
+  active
+FROM cron.job
+WHERE jobname = 'bcl_chain_integrity_check';
+-- Expected: 1 row, schedule = '0 * * * *', active = true
+```
+
+#### R-77-C4 — Manual execution (substitute for missed job 59 runs)
+
+```sql
+-- Role: form_audit (PAM-elevated — read-only on audit_log_events)
+-- Must be run for every R-77 activation regardless of severity
+-- fn_bcl_chain_integrity_check() queries the 24-hour window;
+--   a single manual run covers all missed hourly windows within the stale period
+--   (up to 24 h retrospective coverage per OBSERVABILITY.md §71.2 DDL spec)
+SELECT fn_bcl_chain_integrity_check();
+-- Outcome A (P1 confirmed clean):
+--   emits system.bcl_chain_check_passed (bcl_pairs_checked INT, check_run_at)
+--   → preserve terminal output for BCL-CHECK-STALE-E-001 artefact
+-- Outcome B (P0 escalation required):
+--   emits security.bcl_chain_01_violation per orphaned {tenant_id, bcl_request_id}
+--   → immediately activate R-74 (BCL-CHAIN-01 Integrity Violation P0)
+--   → R-77 becomes subordinate to R-74
+```
+
+> **Privacy floor:** `fn_bcl_chain_integrity_check()` emits `security.bcl_chain_01_violation` (per orphaned `{tenant_id, bcl_request_id}` pair — FORM-internal UUIDs only) or `system.bcl_chain_check_passed` (aggregate `bcl_pairs_checked` INT + `check_run_at` only). No raw OIDC `sub`, employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data in either outcome.
+
+#### Root cause hypotheses
+
+| Hypothesis | Description | Primary signal | Recovery path |
+|---|---|---|---|
+| **H1 — Job deleted / deregistered** | `bcl_chain_integrity_check` removed from `cron.job` catalog (e.g. faulty migration rollback, manual deletion) | R-77-C3 returns zero rows | Re-register job 59 per Migration M-0102 DDL: `SELECT cron.schedule('bcl_chain_integrity_check', '0 * * * *', 'SELECT fn_bcl_chain_integrity_check();')` |
+| **H2 — Job disabled (`active = false`)** | Job 59 is registered but `active = false` | R-77-C3 returns 1 row with `active = false` | `UPDATE cron.job SET active = true WHERE jobname = 'bcl_chain_integrity_check'`; investigate why disabled |
+| **H3 — Supabase pg_cron infrastructure maintenance** | `pg_cron` scheduler suspended during Supabase maintenance window; all pg_cron jobs missing runs simultaneously | R-77-C2 shows no `return_message` entries after stale start time; Supabase status page maintenance log; peer jobs also stale | Monitor Supabase status page; job 59 self-recovers on next `0 * * * *` run after maintenance closure; no re-registration required |
+| **H4 — `fn_bcl_chain_integrity_check()` exception** | PL/pgSQL function raised unhandled exception (e.g. Migration M-0102 not yet applied to this Supabase project; `audit_log_events` schema changed since migration; query timeout on large table) | R-77-C3 shows job registered and active; R-77-C2 shows `status = 'failed'` with `return_message` containing PL/pgSQL exception trace | Inspect `return_message`; if M-0102 not applied → apply migration; if M-0104 applied → ensure v2 function (`0104_bcl_chain_check_cap_patch.sql`); if timeout → add `SET statement_timeout`; redeploy function; trigger R-77-C4 to verify |
+| **H5 — `form_audit` role grant revoked on `audit_log_events`** | `REVOKE SELECT ON audit_log_events FROM form_audit` executed (targeted role grant change, distinct from general schema change) | R-77-C2 shows `status = 'failed'` with `return_message` containing `permission denied for table audit_log_events`; other `form_audit`-dependent jobs may also be affected | `GRANT SELECT ON audit_log_events TO form_audit`; investigate source of revocation; if unrecognised or suspicious: co-activate R-20 (Insider Threat / Privileged Access Abuse) |
+
+---
+
+### R-77.5 Recovery Procedure
+
+#### Step 1 — Emit stale-declared event (T+0, all severities)
+
+Emit `system.bcl_chain_integrity_check_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker before any DB queries. BCL-CHECK-STALE-CHAIN-01 anchor event. Supply `stale_hours` from R-77-C1 if already known; use estimated value if emitting before query (amend the incident record, not the audit event — the initial emission anchors the chain).
+
+#### Step 2 — Run R-77-C1, R-77-C2, and R-77-C3 (root cause classification)
+
+Classify root cause as H1–H5 per §R-77.4 table. Record `missed_run_count` from R-77-C2 (`return_message`-absent runs at hourly `0 * * * *` cadence during the stale window).
+
+#### Step 3 — Run R-77-C4 (mandatory manual execution, all severities)
+
+Run `fn_bcl_chain_integrity_check()` under PAM-elevated `form_audit` role. This run substitutes for all missed job 59 executions during the stale window (24-hour retrospective window covers any stale period up to 24 h).
+
+- **Outcome A (zero violations):** P1 confirmed; preserve terminal output for BCL-CHECK-STALE-E-001 artefact; proceed to Step 4.
+- **Outcome B (violations found):** Immediately activate R-74 (BCL-CHAIN-01 Integrity Violation P0). R-77 IC transfers primary IC role to R-74 IC. Continue Step 4 to restore job 59 in parallel with R-74 response.
+
+#### Step 4 — Diagnose root cause and restore job 59
+
+| Root cause | Restoration action | Validation |
+|---|---|---|
+| **H1 — Job deleted** | Re-register: `SELECT cron.schedule('bcl_chain_integrity_check', '0 * * * *', 'SELECT fn_bcl_chain_integrity_check();')` | R-77-C3 returns 1 row with `active = true`; next `0 * * * *` run shows `status = 'succeeded'` in `pg_cron.job_run_details` |
+| **H2 — Job disabled** | `UPDATE cron.job SET active = true WHERE jobname = 'bcl_chain_integrity_check'` | R-77-C3 returns `active = true` |
+| **H3 — Supabase maintenance** | Await platform recovery; no action required | Next `0 * * * *` run after maintenance closure shows `status = 'succeeded'` |
+| **H4 — Function broken** | Fix migration gap / schema mismatch; redeploy `fn_bcl_chain_integrity_check()` per `0102_bcl_chain_integrity_check.sql` (or `0104_bcl_chain_check_cap_patch.sql` v2 if M-0104 applied to this project); trigger R-77-C4 after fix | `pg_cron.job_run_details` shows `status = 'succeeded'` for next hourly run |
+| **H5 — Role grant revoked** | `GRANT SELECT ON audit_log_events TO form_audit`; investigate revocation source | R-77-C4 returns clean output; `\dp audit_log_events` confirms `form_audit` grant restored |
+
+#### Step 5 — Trigger immediate run and confirm restoration
+
+```sql
+-- Role: form_system (or PAM-elevated devops-lead session)
+-- Triggers immediate execution (does not wait for next 0 * * * * scheduled run)
+SELECT cron.run_job(jobid)
+FROM cron.job
+WHERE jobname = 'bcl_chain_integrity_check';
+```
+
+Confirm `pg_cron.job_run_details` shows `status = 'succeeded'` for `bcl_chain_integrity_check` post-fix. Verify `system.bcl_chain_check_passed` event is emitted in `audit_log_events`. Emit `system.bcl_chain_integrity_check_restored` (LOW/3yr) — see §R-77.7.
+
+---
+
+### R-77.6 Communication Templates
+
+#### Slack `#security-alerts` — Stale declaration (P1, all activations)
+
+```
+[P1 · BCL Chain Integrity Check Stale] job 59 (`bcl_chain_integrity_check`) exceeded 2 h freshness window.
+Incident: {incident_id}
+Declared: {timestamp UTC}
+Stale since: {confirmed_stale_since UTC}
+Missed runs (est.): {missed_runs}
+Last all-clear: {last_bcl_chain_check_passed_at UTC} (R-77-C1)
+IC: security-engineer
+Status: Root cause investigation underway (R-77-C2, R-77-C3). Manual R-77-C4 run in progress.
+Note: Primary BCL-CHAIN-01 enforcement (Worker HTTP 422) remains active — no live chain violation implied.
+Next update: T+20 min (R-77-C4 result) or on severity escalation to R-74.
+Dedup: bcl-chain-integrity-check-stale
+```
+
+#### P0 escalation (if R-77-C4 finds violations → R-74 activated)
+
+```
+[P0 ESCALATION → R-74] BCL-CHAIN-01 violation detected during R-77-C4 manual run.
+Incident: {incident_id}
+R-77-C4 output: {violation summary — tenant_id, bcl_request_id, orphan count}
+IC: security-engineer (R-74 primary IC)
+Action: R-74 (BCL-CHAIN-01 Integrity Violation P0) activated immediately.
+        compliance-officer sign-off required before security.bcl_chain_01_violation_closed.
+R-77 stale recovery continues in parallel.
+CC: compliance-officer · devops-lead · @security-oncall
+```
+
+#### Post-resolution template (P1 clean)
+
+```
+[RESOLVED · BCL Chain Integrity Check Stale] job 59 (`bcl_chain_integrity_check`) restored.
+Incident: {incident_id}
+Restored at: {restored_at UTC}
+Root cause: {root_cause — H1/H2/H3/H4/H5}
+R-77-C4 result: CLEAN (0 violations found during stale window)
+DEC-030: system.bcl_chain_integrity_check_restored emitted.
+BCL-OBS-E-001 stale window logged in BCL-CHECK-STALE-E-001 artefact.
+IC: security-engineer
+```
+
+---
+
+### R-77.7 DEC-030 Chain Specification
+
+Two DEC-030 HMAC-chained events are required for every R-77 activation. Both events are emitted via `emit-audit-event` Worker. IC must hold a PAM-elevated session.
+
+#### Event 1 — `system.bcl_chain_integrity_check_stale_declared` (HIGH · 7yr retention)
+
+**When:** T+0 of every R-77 activation, before any DB scope queries. BCL-CHECK-STALE-CHAIN-01 anchor event.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:           z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),
+  stale_hours:           z.number().positive(),
+  missed_runs:           z.number().int().nonneg(),
+  trigger:               z.enum(['pagerduty_alert', 'slack_alert', 'manual_discovery']),
+  initial_severity:      z.literal('P1'),
+})
+```
+
+> **Privacy invariant:** No `tenant_id`, `bcl_request_id`, `oidc_sub_hash`, employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data. `missed_runs` is an integer derived from `pg_cron.job_run_details`. Operational incident metadata only.
+
+#### Event 2 — `system.bcl_chain_integrity_check_restored` (LOW · 3yr retention)
+
+**When:** After Step 5 confirms first successful automated run post-restoration. Closes BCL-CHECK-STALE-CHAIN-01 DEC-030 chain for this incident.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:          z.string().uuid(),
+  restored_at:          z.string().datetime(),
+  root_cause:           z.enum(['H1_job_deleted', 'H2_job_disabled', 'H3_maintenance', 'H4_function_broken', 'H5_role_grant_revoked']),
+  c4_violations_found:  z.literal(0),  // must be 0; if > 0, R-74 is the primary incident
+  stale_window_hours:   z.number().positive(),
+})
+```
+
+> **Privacy invariant:** No `tenant_id`, `bcl_request_id`, or employee-identifying data. `c4_violations_found: 0` confirms the manual scan found no chain violations during the stale window.
+
+#### BCL-CHECK-STALE-CHAIN-01 ordering invariant
+
+`system.bcl_chain_integrity_check_stale_declared` **must** precede `system.bcl_chain_integrity_check_restored` for the same `incident_id` within any HMAC audit chain window. The `emit-audit-event` Worker enforces this constraint: a `system.bcl_chain_integrity_check_restored` emit for an `incident_id` with no prior `system.bcl_chain_integrity_check_stale_declared` in the chain returns HTTP 422 with error code `BCL_CHECK_STALE_CHAIN_01_VIOLATION`.
+
+Implementation status: [ ] Pending — platform-engineer (§R-77.11 item 4).
+
+---
+
+### R-77.8 SOC 2 Evidence
+
+#### Evidence artefact: BCL-CHECK-STALE-E-001
+
+| Field | Value |
+|---|---|
+| **ID** | BCL-CHECK-STALE-E-001 |
+| **Description** | Per-activation incident record: `system.bcl_chain_integrity_check_stale_declared` event JSON, root cause classification (H1–H5), R-77-C1 stale duration output, R-77-C2 pg_cron run history (last 10 runs), R-77-C3 catalog check output, R-77-C4 `fn_bcl_chain_integrity_check()` manual run output confirming `c4_violations_found = 0`, `system.bcl_chain_integrity_check_restored` event JSON. SHA-256 hashed; uploaded to `compliance/evidence/bcl/chain-integrity-check-stale/`. |
+| **SOC 2 criterion** | CC7.2 — monitoring control gap; BCL-CHAIN-01 retrospective integrity scan suspended during stale window |
+| **Cadence** | Per activation (no artefact if R-77 is never triggered; absence is positive non-occurrence evidence) |
+| **Owner** | security-engineer + compliance-officer |
+| **File path** | `compliance/evidence/bcl/chain-integrity-check-stale/BCL-CHECK-STALE-E-001-{incident_id}.txt` |
+| **Retention** | 7yr (HIGH, per DEC-030; aligns with `system.bcl_chain_integrity_check_stale_declared` retention tier) |
+
+**Auditor narrative (CC7.2):** BCL-CHECK-STALE-E-001 demonstrates that FORM detected the monitoring control degradation (job 59 stale), immediately ran the retrospective integrity check manually (R-77-C4 `fn_bcl_chain_integrity_check()`), confirmed zero violations during the stale window, and restored automated monitoring. The existence of this artefact for a given quarter proves FORM's compensating-control response is operational; its absence is positive non-occurrence evidence that R-77 was never triggered.
+
+**Privacy floor:** BCL-CHECK-STALE-E-001 contains only FORM-internal `incident_id` UUIDs, aggregate integer counts, root cause classification enums, timestamps, and pg_cron metadata. No employee `user_id`, name, email, `tenant_id` (individual), `bcl_request_id`, raw OIDC `sub`, health value, coaching content, or GDPR Art. 9 special-category data.
+
+---
+
+### R-77.9 Post-Incident Controls
+
+| # | Control | Owner | Trigger condition |
+|---|---|---|---|
+| 1 | Root cause post-mortem within 48 h of restoration | devops-lead + security-engineer | Every R-77 activation |
+| 2 | If H1 (job deleted): audit `cron.job` mutation history to identify the migration or manual SQL that deleted job 59; add migration test asserting `bcl_chain_integrity_check` present and `active = true` after every schema migration | devops-lead | H1 only |
+| 3 | If H2 (job disabled): audit which operator disabled job 59 and under what authority; add `cron.job SET active = false` guard to deployment runbooks | devops-lead + enterprise-architect | H2 only |
+| 4 | If H4 (function broken): add schema-change test in CI verifying `fn_bcl_chain_integrity_check()` compiles and runs successfully against a snapshot of `audit_log_events` schema | platform-engineer | H4 only |
+| 5 | If H5 (role grant revoked): audit `REVOKE` grant history; if revocation is unrecognised or suspicious: co-activate R-20 (Insider Threat / Privileged Access Abuse) immediately | security-engineer | H5 only |
+| 6 | Review BCL-OBS-E-001 quarterly filing — if stale window overlaps with Q3/Q4/Q1/Q2 evidence collection period, note the stale window in the quarterly artefact with R-77-C1 stale duration and R-77-C4 clean result as compensating-control attestation | compliance-officer | If stale period overlaps with BCL-OBS-E-001 quarterly filing window |
+
+---
+
+### R-77.10 Cross-References
+
+| Reference | Location | Relationship |
+|---|---|---|
+| Job 59 registry | `docs/OBSERVABILITY.md §12.6` (v5.19.1, 2026-07-05) | Canonical registration of `bcl_chain_integrity_check` — schedule `0 * * * *`, freshness 2h, CC7.2, stale = BCL-CHAIN-01 retrospective monitoring blind spot; cross-reference updated to R-77 this pass |
+| BCL chain integrity SQL DDL | `docs/OBSERVABILITY.md §71` (v5.17.0, 2026-07-04) | `fn_bcl_chain_integrity_check()` canonical SQL spec; Migration M-0102 (`0102_bcl_chain_integrity_check.sql`); BCL-INT-CAP-01 cap logic via M-0104 (`fn_bcl_chain_integrity_check()` v2) |
+| BCL-CHAIN-01 Integrity Violation | `docs/INCIDENT_RESPONSE.md §R-74` (v3.39.0, 2026-07-04) | Primary chain violation runbook; activated as P0 primary incident when R-77-C4 returns non-zero violations during stale window |
+| BCL Observability | `docs/OBSERVABILITY.md §70` (v5.16.0, 2026-07-04) | BCL-OBS-E-001 quarterly evidence artefact (§70.8); all-clear attestation cadence impacted by job 59 stale window |
+| BCL implementation spec | `docs/SSO_SCIM_IMPLEMENTATION.md §46` (v2.31, 2026-07-04) | M8 BCL production deploy gate; §46.8 P0 prerequisite items; BCL-CHAIN-01 ordering invariant |
+| BCL Chain Monitor events | `docs/AUDIT_LOG_SCHEMA.md §BCL-Chain-Monitor-Events` (v2.90, 2026-07-04) | `security.bcl_chain_01_violation` CRITICAL/7yr, `system.bcl_chain_check_passed` LOW/1yr registered; stale events (`system.bcl_chain_integrity_check_stale_declared`, `system.bcl_chain_integrity_check_restored`) pending §R-77.11 item 1 |
+| DEC-030 HMAC chain protocol | `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) | HMAC-chained audit log pattern governing all events emitted in this runbook |
+
+---
+
+### R-77.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.bcl_chain_integrity_check_stale_declared` (HIGH/7yr) and `system.bcl_chain_integrity_check_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md §BCL-Chain-Monitor-Events`; include Zod v2 schemas from §R-77.7 and BCL-CHECK-STALE-CHAIN-01 ordering invariant | security-engineer + platform-engineer | **P0** | [ ] Pending — M8 |
+| 2 | Update `docs/OBSERVABILITY.md §12.6` job 59 row: add `companion runbook: INCIDENT_RESPONSE R-77` cross-reference in the stale-routing column | compliance-officer | **P0** | [x] **Done — 2026-07-05 (OBSERVABILITY.md v5.19.1 — §12.6 job 59 cross-reference updated: `; INCIDENT_RESPONSE R-77 (§R-77; v3.41.0, 2026-07-05 — companion stale recovery runbook for job 59)` inserted before `— **job 59**`).** |
+| 3 | Register BCL-CHECK-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` evidence artefact registry (per-activation cadence, CC7.2, 7yr, owner: security-engineer + compliance-officer) | compliance-officer | **P0** | [ ] Pending — M8 |
+| 4 | Implement BCL-CHECK-STALE-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`: create `bcl-check-stale-chain-01.ts` enforcing `system.bcl_chain_integrity_check_stale_declared` must precede `system.bcl_chain_integrity_check_restored` for same `incident_id` within 72 h; HTTP 422 + `BCL_CHECK_STALE_CHAIN_01_VIOLATION` on inversion | platform-engineer + security-engineer | **P0** / M8 | [ ] |
+| 5 | Provision `compliance/evidence/bcl/chain-integrity-check-stale/` R2 subfolder; WORM + `r2:form-api` REVOKED policy | devops-lead | **P0** | [ ] Pending — M8 |
+| 6 | Conduct R-77 tabletop exercise (H1 job-deleted and H4 function-broken scenarios) with security-engineer + devops-lead + compliance-officer before M8 BCL production deploy | security-engineer | **P1** | [ ] Pending — before M8 deploy |
+| 7 | Authoring complete — R-77 closes §12.6 gap: `bcl_chain_integrity_check` (job 59) was the only hourly BCL/SLO chain integrity cron job without a companion stale recovery runbook cross-reference in the §12.6 registry (R-70/R-71/R-72/R-57 each have companion runbooks; jobs 59/60 added 2026-07-04 without companion stale runbooks) | compliance-officer | **P0** | [x] **Done — 2026-07-05 (INCIDENT_RESPONSE.md v3.41.0).** |
+
+**Privacy floor (invariant throughout R-77):** No employee `user_id`, name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data appears in any R-77 query result, DEC-030 event payload, evidence artefact, or Slack communication template. R-77-C1 through R-77-C4 return only timestamps, integer counts, and operational metadata. `tenant_id` in R-77-C4 violation output (if any) is a FORM-internal UUID — not linked to company name, employee roster, or any personal identifier in this runbook. Owner: security-engineer + compliance-officer.
+
+---
+
+## R-78 · SLO Chain Integrity Check Stale — `slo_chain_integrity_check` (job 60) — CC7.2 monitoring gap
+
+> **Runbook type:** Operational failure — pg_cron stale
+> **Applies when:** `slo_chain_integrity_check` pg_cron job 60 exceeds the 2-hour freshness window without a successful run
+> **Trigger source:** `pg-cron-health-monitor` Edge Function (§12.6) emits `system.cron_job_stale` with `job_name = 'slo_chain_integrity_check'`; routes to PagerDuty P1 `form-security` → security-engineer + devops-lead; dedup key `slo-chain-integrity-check-stale` per §12.6 registry
+> **Primary owners:** security-engineer · devops-lead · compliance-officer
+> **SOC 2 criteria:** CC7.2 — monitoring control gap; SLO-CHAIN-01 retrospective integrity scan suspended during stale window
+> **SLO risk:** Job 60 (`59 * * * *`) executes `fn_slo_chain_integrity_check()` (Migration M-0103; `form_audit` role, read-only) — the hourly retrospective SQL scan for orphaned SAML SLO closure events (`slo.completed` or `slo.fallback_local_only`) in `audit_log_events` without a matching `slo.sp_initiated` or `slo.idp_initiated` anchor within the 15-second `SLO_KV` TTL window (SLO-CHAIN-01 ordering invariant). A stale job 60 means the retrospective scan is suspended — retroactive anomalies (post-write event deletion, H4/H5 code bugs) go undetected until the next successful run. The `59 * * * *` offset avoids concurrent execution with job 59 (`0 * * * *`) on the shared `audit_log_events` `form_audit` reader.
+> **Critical distinction:** The primary SLO-CHAIN-01 enforcement is at the `emit-audit-event` Worker layer in real time (HTTP 422 `SLO-CHAIN-01_VIOLATION` on live invariant violation — no new persisted orphan at write time while Worker is active). A stale job 60 does NOT indicate a live chain violation; it indicates that the belt-and-suspenders retrospective scan is temporarily blind. SLO-OBS-E-001 quarterly attestation density (all-clear cadence) is reduced pro-rata for the stale window.
+> **Prerequisites:** Job 60 is active only after M7 SAML SLO production deploy (Migration M-0103). This runbook is written for operational readiness; before M7, no stale alert fires for job 60.
+
+---
+
+### R-78.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | Routing |
+|---|---|---|---|---|
+| **`system.cron_job_stale` (job 60)** | `pg-cron-health-monitor` Edge Function (§12.6) | No successful `slo_chain_integrity_check` run in `pg_cron.job_run_details` within the prior 2 h | **P1** (PagerDuty `form-security` → security-engineer + devops-lead; dedup key `slo-chain-integrity-check-stale`) | PagerDuty P1 `form-security` → security-engineer + devops-lead; Slack `#security-alerts` HIGH |
+| **Manual discovery** | security-engineer or compliance-officer observes stale job during routine §12.6 review or SLO-OBS-E-001 quarterly evidence collection | Post-evidence-collection or routine check | **P1 — treat as triggered** | Slack `#security-alerts` |
+
+> **No automatic escalation to P0:** A stale job 60 alone is not a P0 incident. P0 escalation applies only if R-78-C4 (manual run of `fn_slo_chain_integrity_check()`) finds violations during the stale window. In that case, immediately activate R-76 (SLO-CHAIN-01 Integrity Violation) as primary incident; R-78 becomes subordinate.
+
+---
+
+### R-78.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P1** | Stale; R-78-C4 manual run finds zero violations | 2 h investigation; CC7.2 monitoring gap only; no chain break; SLO-OBS-E-001 attestation density reduced pro-rata | Diagnose root cause; restore job 60; run R-78-C4 to confirm clean; emit DEC-030 stale + restored chain |
+| **P0 (via R-76)** | Stale AND R-78-C4 manual run finds orphaned SLO closure events | Immediately activate R-76; R-78 closes as subordinate | Co-activate R-76 (SLO-CHAIN-01 Integrity Violation P0); R-78 IC transfers primary IC role to R-76 IC |
+
+---
+
+### R-78.3 Immediate Actions (T+0 to T+60 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `system.slo_chain_integrity_check_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker | security-engineer | Required at ALL severity levels. Do this FIRST before any DB queries. SLO-CHECK-STALE-CHAIN-01 anchor event. |
+| **T+5** | Run R-78-C1 (audit log freshness check) | security-engineer | Confirm last `system.slo_chain_check_passed` emission time; calculate exact stale window in hours. |
+| **T+10** | Run R-78-C2 (pg_cron run history for job 60) | security-engineer | Confirm stale start time, missed-run count, `return_message` for root cause classification (H1–H5). |
+| **T+15** | Run R-78-C3 (catalog registration check) | security-engineer | Confirm job 60 exists in `cron.job` with `active = true` and schedule `59 * * * *`. |
+| **T+20** | Run R-78-C4 (manual execution of `fn_slo_chain_integrity_check()`) | security-engineer | PAM-elevated `form_audit` role. Substitutes for all missed job 60 runs during the stale window. If violations found → immediately activate R-76. |
+| **T+30–T+60** | Fix underlying cause and restore job 60 per root cause diagnosis | devops-lead + security-engineer | See §R-78.5 Steps 4–5. Emit `system.slo_chain_integrity_check_restored` on confirmed first successful automated run. |
+
+---
+
+### R-78.4 Root Cause Hypotheses and Scope Queries
+
+#### R-78-C1 — Audit log freshness check
+
+```sql
+-- Role: form_audit (read-only on audit_log_events)
+-- Confirms last emission of system.slo_chain_check_passed and stale window size
+SELECT
+  MAX(created_at)                                          AS last_all_clear_at,
+  NOW() - MAX(created_at)                                  AS stale_duration,
+  EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600.0  AS stale_hours
+FROM audit_log_events
+WHERE event_type = 'system.slo_chain_check_passed';
+-- NULL last_all_clear_at: job 60 has never run (pre-M7, or job deleted with no prior run)
+-- stale_hours > 2: confirms freshness window exceeded; use for stale_hours field in DEC-030 payload
+```
+
+> **Privacy floor:** Returns only timestamps and derived intervals. No `tenant_id`, `slo_request_id`, employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data.
+
+#### R-78-C2 — pg_cron run history for job 60
+
+```sql
+-- Role: form_audit
+-- Returns last 10 runs of slo_chain_integrity_check (succeeded and failed)
+SELECT
+  jobid,
+  jobname,
+  runid,
+  job_pid,
+  database,
+  username,
+  command,
+  status,
+  return_message,
+  start_time,
+  end_time
+FROM pg_cron.job_run_details
+WHERE jobname = 'slo_chain_integrity_check'
+ORDER BY start_time DESC
+LIMIT 10;
+-- Confirm: (1) time of last successful run (stale window start),
+--          (2) missed-run count (hourly 59 * * * * cadence),
+--          (3) return_message for root cause classification (H1–H5)
+```
+
+#### R-78-C3 — Catalog registration check
+
+```sql
+-- Role: form_audit
+-- Confirms job 60 is still registered in cron.job catalog with correct schedule
+-- Zero rows = job deleted (H1); active = false = job disabled (H2)
+SELECT
+  jobid,
+  schedule,
+  jobname,
+  nodename,
+  active
+FROM cron.job
+WHERE jobname = 'slo_chain_integrity_check';
+-- Expected: 1 row, schedule = '59 * * * *', active = true
+```
+
+#### R-78-C4 — Manual execution (substitute for missed job 60 runs)
+
+```sql
+-- Role: form_audit (PAM-elevated — read-only on audit_log_events)
+-- Must be run for every R-78 activation regardless of severity
+-- fn_slo_chain_integrity_check() queries the 24-hour window;
+--   a single manual run covers all missed hourly windows within the stale period
+--   (up to 24 h retrospective coverage per OBSERVABILITY.md §73.2 DDL spec)
+SELECT fn_slo_chain_integrity_check();
+-- Outcome A (P1 confirmed clean):
+--   emits system.slo_chain_check_passed (slo_pairs_checked INT, check_run_at)
+--   → preserve terminal output for SLO-CHECK-STALE-E-001 artefact
+-- Outcome B (P0 escalation required):
+--   emits security.slo_chain_01_violation per orphaned {tenant_id, slo_request_id}
+--   → immediately activate R-76 (SLO-CHAIN-01 Integrity Violation P0)
+--   → R-78 becomes subordinate to R-76
+```
+
+> **Privacy floor:** `fn_slo_chain_integrity_check()` emits `security.slo_chain_01_violation` (per orphaned `{tenant_id, slo_request_id}` pair — FORM-internal UUIDs only) or `system.slo_chain_check_passed` (aggregate `slo_pairs_checked` INT + `check_run_at` only). No raw SAML `NameID`, `idp_name_id_hash`, employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data in either outcome.
+
+#### Root cause hypotheses
+
+| Hypothesis | Description | Primary signal | Recovery path |
+|---|---|---|---|
+| **H1 — Job deleted / deregistered** | `slo_chain_integrity_check` removed from `cron.job` catalog (e.g. faulty migration rollback, manual deletion) | R-78-C3 returns zero rows | Re-register job 60 per Migration M-0103 DDL: `SELECT cron.schedule('slo_chain_integrity_check', '59 * * * *', 'SELECT fn_slo_chain_integrity_check();')` |
+| **H2 — Job disabled (`active = false`)** | Job 60 is registered but `active = false` | R-78-C3 returns 1 row with `active = false` | `UPDATE cron.job SET active = true WHERE jobname = 'slo_chain_integrity_check'`; investigate why disabled |
+| **H3 — Supabase pg_cron infrastructure maintenance** | `pg_cron` scheduler suspended during Supabase maintenance window; all pg_cron jobs missing runs simultaneously | R-78-C2 shows no `return_message` entries after stale start time; Supabase status page maintenance log; peer jobs also stale | Monitor Supabase status page; job 60 self-recovers on next `59 * * * *` run after maintenance closure; no re-registration required |
+| **H4 — `fn_slo_chain_integrity_check()` exception** | PL/pgSQL function raised unhandled exception (e.g. Migration M-0103 not yet applied to this Supabase project; `audit_log_events` schema changed since migration; query timeout on large table) | R-78-C3 shows job registered and active; R-78-C2 shows `status = 'failed'` with `return_message` containing PL/pgSQL exception trace | Inspect `return_message`; if M-0103 not applied → apply migration; if schema mismatch → fix DDL; redeploy `fn_slo_chain_integrity_check()` from `0103_slo_chain_integrity_check.sql`; trigger R-78-C4 to verify |
+| **H5 — `form_audit` role grant revoked on `audit_log_events`** | `REVOKE SELECT ON audit_log_events FROM form_audit` executed (targeted role grant change, distinct from general schema change) | R-78-C2 shows `status = 'failed'` with `return_message` containing `permission denied for table audit_log_events`; peer job 59 may also be affected | `GRANT SELECT ON audit_log_events TO form_audit`; investigate source of revocation; if unrecognised or suspicious: co-activate R-20 (Insider Threat / Privileged Access Abuse); also assess job 59 (R-77) impact since both share `form_audit` read path |
+
+---
+
+### R-78.5 Recovery Procedure
+
+#### Step 1 — Emit stale-declared event (T+0, all severities)
+
+Emit `system.slo_chain_integrity_check_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker before any DB queries. SLO-CHECK-STALE-CHAIN-01 anchor event. Supply `stale_hours` from R-78-C1 if already known; use estimated value if emitting before query.
+
+#### Step 2 — Run R-78-C1, R-78-C2, and R-78-C3 (root cause classification)
+
+Classify root cause as H1–H5 per §R-78.4 table. Record `missed_run_count` from R-78-C2 at the hourly `59 * * * *` cadence during the stale window.
+
+#### Step 3 — Run R-78-C4 (mandatory manual execution, all severities)
+
+Run `fn_slo_chain_integrity_check()` under PAM-elevated `form_audit` role. This run substitutes for all missed job 60 executions during the stale window (24-hour retrospective window per `0103_slo_chain_integrity_check.sql` DDL spec).
+
+- **Outcome A (zero violations):** P1 confirmed; preserve terminal output for SLO-CHECK-STALE-E-001 artefact; proceed to Step 4.
+- **Outcome B (violations found):** Immediately activate R-76 (SLO-CHAIN-01 Integrity Violation P0). R-78 IC transfers primary IC role to R-76 IC. Continue Step 4 to restore job 60 in parallel with R-76 response.
+
+#### Step 4 — Diagnose root cause and restore job 60
+
+| Root cause | Restoration action | Validation |
+|---|---|---|
+| **H1 — Job deleted** | Re-register: `SELECT cron.schedule('slo_chain_integrity_check', '59 * * * *', 'SELECT fn_slo_chain_integrity_check();')` | R-78-C3 returns 1 row with `active = true`; next `59 * * * *` run shows `status = 'succeeded'` in `pg_cron.job_run_details` |
+| **H2 — Job disabled** | `UPDATE cron.job SET active = true WHERE jobname = 'slo_chain_integrity_check'` | R-78-C3 returns `active = true` |
+| **H3 — Supabase maintenance** | Await platform recovery; no action required | Next `59 * * * *` run after maintenance closure shows `status = 'succeeded'` |
+| **H4 — Function broken** | Fix migration gap / schema mismatch; redeploy `fn_slo_chain_integrity_check()` per `0103_slo_chain_integrity_check.sql`; trigger R-78-C4 after fix | `pg_cron.job_run_details` shows `status = 'succeeded'` for next hourly run |
+| **H5 — Role grant revoked** | `GRANT SELECT ON audit_log_events TO form_audit`; investigate revocation source; assess peer job 59 impact | R-78-C4 returns clean output; `\dp audit_log_events` confirms `form_audit` grant restored; run R-77-C4 for job 59 as well |
+
+#### Step 5 — Trigger immediate run and confirm restoration
+
+```sql
+-- Role: form_system (or PAM-elevated devops-lead session)
+-- Triggers immediate execution (does not wait for next 59 * * * * scheduled run)
+SELECT cron.run_job(jobid)
+FROM cron.job
+WHERE jobname = 'slo_chain_integrity_check';
+```
+
+Confirm `pg_cron.job_run_details` shows `status = 'succeeded'` for `slo_chain_integrity_check` post-fix. Verify `system.slo_chain_check_passed` event is emitted in `audit_log_events`. Emit `system.slo_chain_integrity_check_restored` (LOW/3yr) — see §R-78.7.
+
+---
+
+### R-78.6 Communication Templates
+
+#### Slack `#security-alerts` — Stale declaration (P1, all activations)
+
+```
+[P1 · SLO Chain Integrity Check Stale] job 60 (`slo_chain_integrity_check`) exceeded 2 h freshness window.
+Incident: {incident_id}
+Declared: {timestamp UTC}
+Stale since: {confirmed_stale_since UTC}
+Missed runs (est.): {missed_runs}
+Last all-clear: {last_slo_chain_check_passed_at UTC} (R-78-C1)
+IC: security-engineer
+Status: Root cause investigation underway (R-78-C2, R-78-C3). Manual R-78-C4 run in progress.
+Note: Primary SLO-CHAIN-01 enforcement (Worker HTTP 422) remains active — no live chain violation implied.
+Next update: T+20 min (R-78-C4 result) or on severity escalation to R-76.
+Dedup: slo-chain-integrity-check-stale
+```
+
+#### P0 escalation (if R-78-C4 finds violations → R-76 activated)
+
+```
+[P0 ESCALATION → R-76] SLO-CHAIN-01 violation detected during R-78-C4 manual run.
+Incident: {incident_id}
+R-78-C4 output: {violation summary — tenant_id, slo_request_id, orphan count}
+IC: security-engineer (R-76 primary IC)
+Action: R-76 (SLO-CHAIN-01 Integrity Violation P0) activated immediately.
+        compliance-officer sign-off required before security.slo_chain_01_violation_closed.
+R-78 stale recovery continues in parallel.
+CC: compliance-officer · devops-lead · @security-oncall
+```
+
+#### Post-resolution template (P1 clean)
+
+```
+[RESOLVED · SLO Chain Integrity Check Stale] job 60 (`slo_chain_integrity_check`) restored.
+Incident: {incident_id}
+Restored at: {restored_at UTC}
+Root cause: {root_cause — H1/H2/H3/H4/H5}
+R-78-C4 result: CLEAN (0 violations found during stale window)
+DEC-030: system.slo_chain_integrity_check_restored emitted.
+SLO-OBS-E-001 stale window logged in SLO-CHECK-STALE-E-001 artefact.
+IC: security-engineer
+```
+
+---
+
+### R-78.7 DEC-030 Chain Specification
+
+Two DEC-030 HMAC-chained events are required for every R-78 activation. Both events are emitted via `emit-audit-event` Worker. IC must hold a PAM-elevated session.
+
+#### Event 1 — `system.slo_chain_integrity_check_stale_declared` (HIGH · 7yr retention)
+
+**When:** T+0 of every R-78 activation, before any DB scope queries. SLO-CHECK-STALE-CHAIN-01 anchor event.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:           z.string().uuid(),
+  confirmed_stale_since: z.string().datetime(),
+  stale_hours:           z.number().positive(),
+  missed_runs:           z.number().int().nonneg(),
+  trigger:               z.enum(['pagerduty_alert', 'slack_alert', 'manual_discovery']),
+  initial_severity:      z.literal('P1'),
+})
+```
+
+> **Privacy invariant:** No `tenant_id`, `slo_request_id`, `idp_name_id_hash`, employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data. `missed_runs` is an integer derived from `pg_cron.job_run_details`. Operational incident metadata only.
+
+#### Event 2 — `system.slo_chain_integrity_check_restored` (LOW · 3yr retention)
+
+**When:** After Step 5 confirms first successful automated run post-restoration. Closes SLO-CHECK-STALE-CHAIN-01 DEC-030 chain for this incident.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:          z.string().uuid(),
+  restored_at:          z.string().datetime(),
+  root_cause:           z.enum(['H1_job_deleted', 'H2_job_disabled', 'H3_maintenance', 'H4_function_broken', 'H5_role_grant_revoked']),
+  c4_violations_found:  z.literal(0),  // must be 0; if > 0, R-76 is the primary incident
+  stale_window_hours:   z.number().positive(),
+})
+```
+
+> **Privacy invariant:** No `tenant_id`, `slo_request_id`, or employee-identifying data. `c4_violations_found: 0` confirms the manual scan found no chain violations during the stale window.
+
+#### SLO-CHECK-STALE-CHAIN-01 ordering invariant
+
+`system.slo_chain_integrity_check_stale_declared` **must** precede `system.slo_chain_integrity_check_restored` for the same `incident_id` within any HMAC audit chain window. The `emit-audit-event` Worker enforces this constraint: a `system.slo_chain_integrity_check_restored` emit for an `incident_id` with no prior `system.slo_chain_integrity_check_stale_declared` in the chain returns HTTP 422 with error code `SLO_CHECK_STALE_CHAIN_01_VIOLATION`.
+
+Implementation status: [ ] Pending — platform-engineer (§R-78.11 item 4).
+
+---
+
+### R-78.8 SOC 2 Evidence
+
+#### Evidence artefact: SLO-CHECK-STALE-E-001
+
+| Field | Value |
+|---|---|
+| **ID** | SLO-CHECK-STALE-E-001 |
+| **Description** | Per-activation incident record: `system.slo_chain_integrity_check_stale_declared` event JSON, root cause classification (H1–H5), R-78-C1 stale duration output, R-78-C2 pg_cron run history (last 10 runs), R-78-C3 catalog check output, R-78-C4 `fn_slo_chain_integrity_check()` manual run output confirming `c4_violations_found = 0`, `system.slo_chain_integrity_check_restored` event JSON. SHA-256 hashed; uploaded to `compliance/evidence/saml-slo/chain-integrity-check-stale/`. |
+| **SOC 2 criterion** | CC7.2 — monitoring control gap; SLO-CHAIN-01 retrospective integrity scan suspended during stale window |
+| **Cadence** | Per activation (no artefact if R-78 is never triggered; absence is positive non-occurrence evidence) |
+| **Owner** | security-engineer + compliance-officer |
+| **File path** | `compliance/evidence/saml-slo/chain-integrity-check-stale/SLO-CHECK-STALE-E-001-{incident_id}.txt` |
+| **Retention** | 7yr (HIGH, per DEC-030; aligns with `system.slo_chain_integrity_check_stale_declared` retention tier) |
+
+**Auditor narrative (CC7.2):** SLO-CHECK-STALE-E-001 demonstrates that FORM detected the monitoring control degradation (job 60 stale), immediately ran the retrospective integrity check manually (R-78-C4 `fn_slo_chain_integrity_check()`), confirmed zero violations during the stale window, and restored automated monitoring. The existence of this artefact for a given quarter proves FORM's compensating-control response is operational; its absence is positive non-occurrence evidence that R-78 was never triggered.
+
+**Privacy floor:** SLO-CHECK-STALE-E-001 contains only FORM-internal `incident_id` UUIDs, aggregate integer counts, root cause classification enums, timestamps, and pg_cron metadata. No employee `user_id`, name, email, `tenant_id` (individual), `slo_request_id`, raw SAML `NameID`, `idp_name_id_hash`, health value, coaching content, or GDPR Art. 9 special-category data.
+
+---
+
+### R-78.9 Post-Incident Controls
+
+| # | Control | Owner | Trigger condition |
+|---|---|---|---|
+| 1 | Root cause post-mortem within 48 h of restoration | devops-lead + security-engineer | Every R-78 activation |
+| 2 | If H1 (job deleted): audit `cron.job` mutation history to identify which migration or manual SQL deleted job 60; add migration test asserting `slo_chain_integrity_check` present and `active = true` after every schema migration | devops-lead | H1 only |
+| 3 | If H2 (job disabled): audit which operator disabled job 60 and under what authority; add `cron.job SET active = false` guard to deployment runbooks | devops-lead + enterprise-architect | H2 only |
+| 4 | If H4 (function broken): add schema-change test in CI verifying `fn_slo_chain_integrity_check()` compiles and runs successfully against a snapshot of `audit_log_events` schema | platform-engineer | H4 only |
+| 5 | If H5 (role grant revoked): audit `REVOKE` grant history; if revocation is unrecognised or suspicious: co-activate R-20 (Insider Threat / Privileged Access Abuse) immediately; also check job 59 impact (both share `form_audit` read path on `audit_log_events`) | security-engineer | H5 only |
+| 6 | Review SLO-OBS-E-001 quarterly filing — if stale window overlaps with Q3/Q4/Q1/Q2 evidence collection period, note the stale window in the quarterly artefact with R-78-C1 stale duration and R-78-C4 clean result as compensating-control attestation | compliance-officer | If stale period overlaps with SLO-OBS-E-001 quarterly filing window |
+
+---
+
+### R-78.10 Cross-References
+
+| Reference | Location | Relationship |
+|---|---|---|
+| Job 60 registry | `docs/OBSERVABILITY.md §12.6` (v5.19.1, 2026-07-05) | Canonical registration of `slo_chain_integrity_check` — schedule `59 * * * *`, freshness 2h, CC7.2, stale = SLO-CHAIN-01 retrospective monitoring blind spot; cross-reference updated to R-78 this pass |
+| SLO chain integrity SQL DDL | `docs/OBSERVABILITY.md §73` (v5.18.2, 2026-07-04) | `fn_slo_chain_integrity_check()` canonical SQL spec; Migration M-0103 (`0103_slo_chain_integrity_check.sql`); SLO-INT-CAP-01 cap logic in §73.2 |
+| SLO-CHAIN-01 Integrity Violation | `docs/INCIDENT_RESPONSE.md §R-76` (v3.40.0, 2026-07-04) | Primary chain violation runbook; activated as P0 primary incident when R-78-C4 returns non-zero violations during stale window |
+| SLO Observability | `docs/OBSERVABILITY.md §72` (v5.18.0, 2026-07-04) | SLO-OBS-E-001 quarterly evidence artefact (§72.8); all-clear attestation cadence impacted by job 60 stale window |
+| SAML SLO implementation spec | `docs/SSO_SCIM_IMPLEMENTATION.md §45` (v2.20, 2026-07-04) | M7 SAML SLO production deploy gate; Migration 0100; SLO-CHAIN-01 ordering invariant |
+| SLO Chain Monitor events | `docs/AUDIT_LOG_SCHEMA.md §SLO-Chain-Monitor-Events` (v2.93, 2026-07-04) | `security.slo_chain_01_violation` CRITICAL/7yr, `system.slo_chain_check_passed` LOW/1yr registered; stale events (`system.slo_chain_integrity_check_stale_declared`, `system.slo_chain_integrity_check_restored`) pending §R-78.11 item 1 |
+| DEC-030 HMAC chain protocol | `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) | HMAC-chained audit log pattern governing all events emitted in this runbook |
+| R-77 (BCL peer) | `docs/INCIDENT_RESPONSE.md §R-77` (v3.41.0, 2026-07-05) | Peer stale runbook for job 59 (`bcl_chain_integrity_check`); same root cause taxonomy (H1–H5); H5 (role grant revoked) may co-affect both jobs simultaneously |
+
+---
+
+### R-78.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.slo_chain_integrity_check_stale_declared` (HIGH/7yr) and `system.slo_chain_integrity_check_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md §SLO-Chain-Monitor-Events`; include Zod v2 schemas from §R-78.7 and SLO-CHECK-STALE-CHAIN-01 ordering invariant | security-engineer + platform-engineer | **P0** | [ ] Pending — M7 |
+| 2 | Update `docs/OBSERVABILITY.md §12.6` job 60 row: add `companion runbook: INCIDENT_RESPONSE R-78` cross-reference in the stale-routing column | compliance-officer | **P0** | [x] **Done — 2026-07-05 (OBSERVABILITY.md v5.19.1 — §12.6 job 60 cross-reference updated: `; INCIDENT_RESPONSE R-78 (§R-78; v3.41.0, 2026-07-05 — companion stale recovery runbook for job 60)` inserted before `— **job 60**`).** |
+| 3 | Register SLO-CHECK-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` evidence artefact registry (per-activation cadence, CC7.2, 7yr, owner: security-engineer + compliance-officer) | compliance-officer | **P0** | [ ] Pending — M7 |
+| 4 | Implement SLO-CHECK-STALE-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`: create `slo-check-stale-chain-01.ts` enforcing `system.slo_chain_integrity_check_stale_declared` must precede `system.slo_chain_integrity_check_restored` for same `incident_id` within 72 h; HTTP 422 + `SLO_CHECK_STALE_CHAIN_01_VIOLATION` on inversion | platform-engineer + security-engineer | **P0** / M7 | [ ] |
+| 5 | Provision `compliance/evidence/saml-slo/chain-integrity-check-stale/` R2 subfolder; WORM + `r2:form-api` REVOKED policy | devops-lead | **P0** | [ ] Pending — M7 |
+| 6 | Conduct R-78 tabletop exercise (H1 job-deleted and H4 function-broken scenarios) with security-engineer + devops-lead + compliance-officer before M7 SAML SLO production deploy | security-engineer | **P1** | [ ] Pending — before M7 deploy |
+| 7 | Authoring complete — R-78 closes §12.6 gap: `slo_chain_integrity_check` (job 60) was the only hourly SLO chain integrity cron job without a companion stale recovery runbook cross-reference in the §12.6 registry (peer job 59 companion R-77 authored this same pass) | compliance-officer | **P0** | [x] **Done — 2026-07-05 (INCIDENT_RESPONSE.md v3.41.0).** |
+
+**Privacy floor (invariant throughout R-78):** No employee `user_id`, name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data appears in any R-78 query result, DEC-030 event payload, evidence artefact, or Slack communication template. R-78-C1 through R-78-C4 return only timestamps, integer counts, and operational metadata. `tenant_id` in R-78-C4 violation output (if any) is a FORM-internal UUID — not linked to company name, employee roster, or any personal identifier in this runbook. Owner: security-engineer + compliance-officer.
+
+---
+
+*v3.41.0 (2026-07-05): R-77 `bcl_chain_integrity_check` Stale (CC7.2 — job 59 companion stale recovery runbook, P1) + R-78 `slo_chain_integrity_check` Stale (CC7.2 — job 60 companion stale recovery runbook, P1). Closes §12.6 documentation gap: jobs 59 (`bcl_chain_integrity_check`, `0 * * * *`, 2h freshness) and 60 (`slo_chain_integrity_check`, `59 * * * *`, 2h freshness) were the only pg_cron jobs in the §12.6 canonical registry without a companion stale recovery runbook cross-reference — all other jobs with INCIDENT_RESPONSE runbooks list them explicitly in the §12.6 stale-routing column (R-70 for job 20, R-71 for row-count-monitor, R-72 for audit-event-flush, R-57 for job 58); jobs 59/60 were added 2026-07-04 (OBSERVABILITY.md v5.17.0/v5.18.2) as part of M8/M7 BCL/SLO chain integrity work but their companion stale runbooks were not filed at that time. R-77 (job 59 — BCL, P1): seven-section runbook; BCL-CHECK-STALE-CHAIN-01 ordering invariant (stale-declared → restored); two DEC-030 events (`system.bcl_chain_integrity_check_stale_declared` HIGH/7yr, `system.bcl_chain_integrity_check_restored` LOW/3yr) pending AUDIT_LOG_SCHEMA.md registration (§R-77.11 item 1, P0/M8); BCL-CHECK-STALE-E-001 evidence artefact (CC7.2, per-activation, 7yr, `compliance/evidence/bcl/chain-integrity-check-stale/`); R-77-C4 (`fn_bcl_chain_integrity_check()` PAM-elevated manual run) substitutes for all missed job 59 hourly executions; P0 escalation to R-74 if C4 finds violations; five root causes (H1 deleted, H2 disabled, H3 maintenance, H4 function-broken, H5 role-grant-revoked); critical distinction: primary BCL-CHAIN-01 enforcement at `emit-audit-event` Worker layer remains active during stale window; §R-77.10 OBSERVABILITY §12.6 cross-reference patched (v5.19.1); seven implementation checklist items (items 2 + 7 Done this pass; items 1 + 3–6 Pending M8). R-78 (job 60 — SLO, P1): parallel structure to R-77 adapted for SLO; SLO-CHECK-STALE-CHAIN-01 ordering invariant; two DEC-030 events (`system.slo_chain_integrity_check_stale_declared` HIGH/7yr, `system.slo_chain_integrity_check_restored` LOW/3yr) pending AUDIT_LOG_SCHEMA.md registration (§R-78.11 item 1, P0/M7); SLO-CHECK-STALE-E-001 evidence artefact (CC7.2, per-activation, 7yr, `compliance/evidence/saml-slo/chain-integrity-check-stale/`); R-78-C4 (`fn_slo_chain_integrity_check()` PAM-elevated manual run); P0 escalation to R-76 if C4 finds violations; H5 additionally cross-references job 59 impact (shared `form_audit` role on `audit_log_events`); §R-78.10 OBSERVABILITY §12.6 cross-reference patched (v5.19.1); seven implementation checklist items (items 2 + 7 Done this pass; items 1 + 3–6 Pending M7). Document header v3.40.4 → v3.41.0. Owner: security-engineer + compliance-officer.*
+
+---
 
 *v3.40.4 (2026-07-04): §R-74.11 + §R-76.11 Co-Activation Matrix patch — BCL-INT-CAP-01 / SLO-INT-CAP-01 → R-05 MANDATORY. Added two new rows to co-activation matrices: (1) R-74.11 — `security.bcl_int_cap_reached` (BCL-INT-CAP-01: pg_cron job 59, ≥ 50 orphaned BCL chain entries in 24h window) → R-05 MANDATORY; classifies as H4/H5 per R-74.5 taxonomy; event registered AUDIT_LOG_SCHEMA v2.94 §BCL-Chain-Monitor-Events; SOC2 §169.3. (2) R-76.11 — `security.slo_int_cap_reached` (SLO-INT-CAP-01: pg_cron job 60, ≥ 50 orphaned SLO chain entries in 24h window) → R-05 MANDATORY; classifies as H4/H5 per R-76.5 taxonomy; event registered AUDIT_LOG_SCHEMA v2.94 §SLO-Chain-Monitor-Events; SOC2 §169.3. Closes SOC2_READINESS.md §169.6 item 5 (P1 — "Confirm R-05 co-activation documented in INCIDENT_RESPONSE.md R-74 + R-76 runbooks"). Document header v3.40.3 → v3.40.4. Owner: compliance-officer + security-engineer.*
 

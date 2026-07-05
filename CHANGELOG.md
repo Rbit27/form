@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.83.1] — 2026-07-05
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-77` — BCL Chain Integrity Check Stale runbook (pg_cron job 59). P1 default severity; 2 h freshness window; primary BCL-CHAIN-01 enforcement at Worker layer (HTTP 422) remains active during stale — retrospective scan gap only. Trigger matrix: `system.cron_job_stale` job 59 → PagerDuty P1 `form-security`, dedup `bcl-chain-integrity-check-stale`. Scope queries R-77-C1..C4 (last all-clear, run history, catalog, manual fn_bcl_chain_integrity_check() invocation as PAM-elevated form_audit). Five root-cause hypotheses H1–H5 (job deleted, disabled, Supabase maintenance, function exception, form_audit role grant revoked). DEC-030 events: `system.bcl_chain_integrity_check_stale_declared` HIGH/7yr + `system.bcl_chain_integrity_check_restored` LOW/3yr. BCL-CHECK-STALE-CHAIN-01 ordering invariant: stale_declared MUST precede restored (HTTP 422 `BCL_CHECK_STALE_CHAIN_01_VIOLATION` on inversion). SOC 2 CC7.2 evidence artefact BCL-CHECK-STALE-E-001. Implementation pending M8 BCL production deploy.
+- `docs/INCIDENT_RESPONSE.md §R-78` — SLO Chain Integrity Check Stale runbook (pg_cron job 60). Parallel structure to R-77; schedule `59 * * * *` avoids form_audit read contention with job 59. SLO-CHECK-STALE-CHAIN-01 ordering invariant; HTTP 422 `SLO_CHECK_STALE_CHAIN_01_VIOLATION`. SOC 2 CC7.2 evidence artefact SLO-CHECK-STALE-E-001. H5 root cause cross-references peer job 59 (shared form_audit role). P0 escalation → R-76. Implementation pending M7 SAML SLO production deploy.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.40.4 → v3.41.0; R-77 and R-78 appended.
+- `docs/OBSERVABILITY.md` — v5.19.0 → v5.19.1; §12.6 pg_cron registry job 59 and job 60 rows updated with companion stale runbook cross-references (R-77, R-78).
+- `VERSION` — 12.83.0 → 12.83.1.
+
+---
+
 ## [12.83.0] — 2026-07-05
 
 ### Added
