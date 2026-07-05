@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [13.29.1] — 2026-07-05
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` (v2.36 → v2.37) — §9 G-009 gap registry row updated from 🔴 Open to 🟡 Authored; references §22 (High-Scale Session Revocation Architecture, Cloudflare KV two-tier cache); status column describes closure path (🟢 once `SESSION_REVOCATION_KV` deployed + CC6-E-REV-002 collected). §22.15 item 9 (P1/M4) closed: `[x] Done — 2026-07-05`.
+- `docs/SOC2_READINESS.md` (v4.3.0 → v4.4.0) — §178 added: CC6-E-REV-001 (audit_log export of 5 session revocation event types, CC6.3, 7yr WORM, count 153), CC6-E-REV-002 (`session_blocklist.kv_sync_status` distribution snapshot ≥ 99 % synced attestation, CC6.3/CC7.3, count 154), CC6-E-REV-003 (PagerDuty AL-REVOKE-01 incident log, CC7.2/CC7.3, count 155) registered in §79.4 master evidence table; count 152 → 155. Closes SSO_SCIM §22.15 item 9.
+- `VERSION` — 13.29.0 → 13.29.1.
+
+---
+
 ## [13.28.0] — 2026-07-05
 
 ### Added

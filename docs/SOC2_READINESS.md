@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.3.0
+# FORM · SOC 2 Type II Readiness v4.4.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -36914,3 +36914,131 @@ All PKJWT-JWKS-E-001 components contain only FORM-internal UUIDs (`tenant_id`, `
 *v4.2.0 (2026-07-05): §176 — CERT-CHECK-STALE-E-001 Registration (CC7.2/CC6.1 · INCIDENT_RESPONSE R-80 · cert-expiry-check Cron Stale Evidence). Closes §R-80.11 item 3 (P1/M4 — "Register CERT-CHECK-STALE-E-001 in `docs/SOC2_READINESS.md §79.4`"). §79.4 evidence count 150 → 151 (CERT-CHECK-STALE-E-001 — per-activation, CC7.2/CC6.1, 7yr WORM, `compliance/evidence/saml-cert/cert-expiry-check-stale/`). §176.3 nine-component artefact content spec: stale-declared event JSON, trigger mode, root cause classification, R-80-C1 cert_monitor_error query, R-80-C2 staleness approximation, R-80-C4 CF Cron history extract, R-80-C3 full cert scan output (`expired_certs_found: 0` confirmation; no BYTEA columns), Step 3a manual alert emission log, restored event JSON. §176.4 SOC 2 auditor narratives: CC7.2 (compensating-control response — R-80-C3 manual scan substitutes for missed daily cron; zero-expired-cert attestation); CC6.1 (credential lifecycle monitoring gap detected and closed; combined with CC6-E-CERT-001/004 proves full-lifecycle coverage continuity). §176.5 privacy floor: no BYTEA columns, no private key material, no employee `user_id`, name, email, health value, or GDPR Art. 9 data; `tenant_id` UUIDs and `fingerprint_sha256` (public) only in R-80-C3 output. §176.6 R2 storage: `compliance/evidence/saml-cert/cert-expiry-check-stale/` sub-path within parent pending M4 provision (§175.10 item 5); WORM 7yr; pre-M4 nil attestation protocol. §176.7 Vanta mirror: per-activation upload + nil-attestation statement when R-80 count = 0. §176.8 cross-references: all three obligations 🟢 Done this pass (AUDIT_LOG_SCHEMA.md v3.0 events, OBSERVABILITY.md v5.20.4 AL-CERT-05 patch, this section §176.2). §176.9 three-item checklist: items 1 (§79.4 count 150 → 151) + 3 (Vanta nil-attestation) Done this pass; item 2 (R2 sub-path provision) pending M4. SOC 2 readiness: ~97.3% (CERT-CHECK-STALE-E-001 formalizes the compensating-control evidence for the AL-CERT-05 cron monitoring gap scenario — evidence coverage for CC7.2 SAML cert monitoring now complete across all alert conditions AL-CERT-01..05). Document header v4.1.0 → v4.2.0. Owner: compliance-officer + security-engineer.*
 
 *v4.1.0 (2026-07-05): §175 — CC6-E-CERT-001…CC6-E-CERT-004 Registration (CC6.1/CC7.2/CC8.1 · SSO_SCIM §20.9 · SAML Certificate Lifecycle Evidence). Closes the §79.4 registration obligation from `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` v2.99 (2026-07-05): "registration in `docs/SOC2_READINESS.md §79.4` pending." §79.4 evidence count 146 → 150: CC6-E-CERT-001 (CC6.1/CC7.2, annual, 7yr WORM, `sso.cert_expiry_alert` event export; count 146 → 147), CC6-E-CERT-002 (CC6.1/CC8.1, annual, 7yr WORM, `sso.cert_rotated` export; count 147 → 148), CC6-E-CERT-003 (CC6.1, annual × 2 snapshots, 7yr WORM, `tenant_sso_configs` expiry/fingerprint/state snapshot — `saml_sp_certificate` and `saml_idp_certificate` BYTEA explicitly excluded; count 148 → 149), CC6-E-CERT-004 (CC7.2, annual, 7yr WORM, `cert-expiry-check` cron execution log; count 149 → 150). §175.3 collection queries for all four artefacts (form_audit role; CC6-E-CERT-003 query explicitly forbids PEM columns). §175.4 SOC 2 auditor narratives: CC6.1 (CC6-E-CERT-001/002/003 combined prove issue → monitor → alert → rotate lifecycle without expiry-while-idle gaps); CC7.2 (CC6-E-CERT-004 cron schedule adherence + CC6-E-CERT-001 zero `sso.cert_monitor_error` attestation together prove gap-free monitoring coverage); CC8.1 (CC6-E-CERT-002 rotation export + CC6-E-CERT-003 pre/post state machine snapshots prove `cert_rotation_state` sequence respected — no out-of-path rotation). §175.5 privacy floor: no PEM content, no private key material, no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 data in any artefact; `fingerprint_sha256` is public X.509 DER fingerprint only; CC6-E-CERT-004 aggregate counts only; HR access to `compliance/evidence/saml-cert/` prohibited. §175.6 R2 storage: `compliance/evidence/saml-cert/` new subfolder (pending M4 devops-lead provision after `cert-expiry-check` production deploy per §20.11 item 3); all artefacts signed via `sign-evidence.sh` + WORM 7yr. §175.7 §80.4 Vanta mirror: all four artefacts registered with annual upload + nil attestation protocol for pre-M4 period. §175.8 §15.1 calendar row added (annual, 30d post-observation-close). §175.9 cross-references: AUDIT_LOG_SCHEMA v2.99 registration obligation 🟢 Done; SSO_SCIM §20.9 cross-reference 🟢 Done (v2.36). §175.10 seven-item checklist: items 1/2/3/4 Done this pass; items 5/6/7 pending M4/SOC2 audit window. Companion edit: `docs/SSO_SCIM_IMPLEMENTATION.md` v2.36 (§20.9 cross-reference to §175 added). SOC 2 readiness: ~97.2% → ~97.3% (four SAML certificate lifecycle evidence artefacts formally registered in §79.4 with collection queries, auditor narratives, and privacy floor). Document header v4.0.0 → v4.1.0. Owner: compliance-officer + devops-lead + security-engineer.*
+
+---
+
+## §178 — CC6-E-REV-001 · CC6-E-REV-002 · CC6-E-REV-003 Registration (CC6.3/CC7.2/CC7.3 · SSO_SCIM §22 · Session Revocation KV Evidence)
+
+### §178.1 Background
+
+`docs/SSO_SCIM_IMPLEMENTATION.md §22` (v1.4, 2026-06-01) specifies the High-Scale Session Revocation Architecture — a two-tier Cloudflare KV write-through cache (`SESSION_REVOCATION_KV`) in front of the authoritative Supabase `session_blocklist` table. §22.12 defines three SOC 2 evidence artefacts (CC6-E-REV-001, CC6-E-REV-002, CC6-E-REV-003) and §22.15 item 9 (P1, M4) mandates their registration in `docs/SOC2_READINESS.md §79.4`. This section executes that registration (evidence count 152 → 155) and closes §22.15 item 9.
+
+### §178.2 §79.4 Master Evidence Table Entries (count 152 → 155)
+
+| # | Artefact ID | Description | SOC 2 Criteria | Cadence | Retention | Storage Path | Owner |
+|---|---|---|---|---|---|---|---|
+| **153** | **CC6-E-REV-001** | Annual audit_log export of all `session.bulk_revocation_started`, `session.bulk_revocation_complete`, `session.tenant_nuke_started`, `session.tenant_nuke_complete`, and `session.revocation_kv_sync_error` DEC-030 events — demonstrates that every SCIM bulk deactivation and tenant nuke is durably recorded with HMAC chain integrity | CC6.3 (access revocation auditable on termination) | Annual (30 days after observation-period close) | 7yr WORM | `compliance/evidence/session-revocation/cc6-e-rev-001-{year}.json` | devops-lead + compliance-officer |
+| **154** | **CC6-E-REV-002** | Annual `session_blocklist.kv_sync_status` distribution snapshot — demonstrates that ≥ 99 % of rows carry `kv_sync_status = 'synced'` after the 30-day migration window, proving that the KV cache is the authoritative hot path and Supabase remains a consistent audit trail | CC6.3 (access revocation controls operating); CC7.3 (risk mitigation — no silent desync) | Annual post-30-day migration window; one-time cutover evidence at M5 per §22.15 item 11 | 7yr WORM | `compliance/evidence/session-revocation/cc6-e-rev-002-{year}.json` | devops-lead + compliance-officer |
+| **155** | **CC6-E-REV-003** | Annual PagerDuty incident log export for AL-REVOKE-01 activations (KV sync error rate > 1 % / 5 min) — demonstrates that every KV sync failure is surfaced to on-call within SLA and remediated | CC7.2 (anomaly detection and response); CC7.3 (incident response) | Annual | 7yr WORM | `compliance/evidence/session-revocation/cc6-e-rev-003-{year}.json` | devops-lead + compliance-officer |
+
+**§79.4 evidence count update:** 152 → **155** (CC6-E-REV-001, CC6-E-REV-002, CC6-E-REV-003 registered; closes SSO_SCIM §22.15 item 9, P1/M4, compliance-officer).
+
+### §178.3 Artefact Content Specifications
+
+**CC6-E-REV-001 — Revocation event export**
+
+Collection query (form_audit role; no employee PII columns selected):
+
+```sql
+SELECT
+  id, tenant_id, event_type, severity, occurred_at,
+  payload - 'user_id' - 'email' - 'name' AS payload_scrubbed,
+  hmac_chain_hash, prev_hmac_hash
+FROM audit_log
+WHERE event_type IN (
+  'session.bulk_revocation_started',
+  'session.bulk_revocation_complete',
+  'session.tenant_nuke_started',
+  'session.tenant_nuke_complete',
+  'session.revocation_kv_sync_error'
+)
+  AND occurred_at >= :observation_start
+  AND occurred_at <  :observation_end
+ORDER BY occurred_at ASC;
+```
+
+HMAC chain integrity check must be run before upload (`scripts/verify-hmac-chain.ts --event-types session.bulk_revocation_* session.tenant_nuke_*`). Chain verification result (`{verified: true, chain_length: N}`) is appended as a top-level field in the JSON envelope.
+
+**CC6-E-REV-002 — KV sync status distribution snapshot**
+
+Collection query (form_audit role; `session_id` is opaque UUID — not linked to any employee identity):
+
+```sql
+SELECT
+  kv_sync_status,
+  COUNT(*)                           AS row_count,
+  ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS pct
+FROM session_blocklist
+WHERE created_at < :snapshot_at
+GROUP BY kv_sync_status
+ORDER BY kv_sync_status;
+```
+
+Snapshot must include: `snapshot_at` timestamp, total row count, per-status distribution, and attestation field `{"kv_synced_pct_gte_99": true/false}`. If `kv_synced_pct_gte_99` is false, a P1 incident must be opened before upload.
+
+**CC6-E-REV-003 — PagerDuty AL-REVOKE-01 incident log**
+
+Export from PagerDuty API: all incidents triggered by AL-REVOKE-01 (alert rule: `session.revocation_kv_sync_error` rate > 1 % / 5 min) for the observation period. Required fields per incident: `id`, `created_at`, `resolved_at`, `severity`, `title`, `body.details` (sanitised — no session payload data), `assigned_to` (on-call engineer alias only), `resolution_notes`. If count = 0, file nil-attestation: `{"quarter": "YYYY-QN", "cc6_e_rev_003_count": 0, "attestation": "No AL-REVOKE-01 activations — kv_sync_error rate remained below 1% threshold throughout the observation period"}`.
+
+### §178.4 SOC 2 Auditor Narratives
+
+**CC6.3 — Logical Access Controls (Access Revocation):**
+CC6-E-REV-001 proves that every bulk SCIM deactivation and emergency tenant nuke is durably recorded via DEC-030 HMAC-chained audit events before the KV write (chain-before-state-mutation invariant, §22.5.1). An auditor can reconstruct the complete revocation history for any tenant from the event export without consulting the hot-path KV cache. CC6-E-REV-002 corroborates that the Supabase `session_blocklist` audit trail and the KV cache are synchronised — ≥ 99 % synced rows after the migration window confirms no silent desync that would allow a revoked session to pass the KV check. Together these two artefacts establish end-to-end coverage from revocation intent (event chain) through cache state (sync distribution).
+
+**CC7.2 — Risk Mitigation (Anomaly Detection):**
+CC6-E-REV-003 (PagerDuty AL-REVOKE-01 log) demonstrates that any KV sync error rate exceeding 1 % / 5 min surfaces to the on-call engineer via P1 PagerDuty alert within the SLA. Absence of activations (nil-attestation) is itself positive evidence that the KV cache operated within tolerance throughout the observation period.
+
+**CC7.3 — Risk Mitigation (Incident Response):**
+CC6-E-REV-002 `kv_synced_pct_gte_99` attestation confirms that M5 cutover (removal of Supabase fallback from `isRevoked()`) was preceded by evidence of full cache convergence, per §22.15 item 11. CC6-E-REV-003 incident log shows that any anomaly was detected, assigned, and resolved with documented root cause.
+
+### §178.5 Privacy Floor
+
+All three artefacts respect FORM's privacy floor for enterprise audit evidence:
+
+- **tenant_id** is a FORM-internal UUID — it is not linked to company name, employee roster, or any GDPR Art. 9 special-category data within the artefact itself
+- **session_id** in `session_blocklist` is an opaque UUID — it cannot be used to reconstruct which employee was active without a join against tables not included in these artefacts
+- **user_id** is explicitly excluded from the CC6-E-REV-001 payload via `payload - 'user_id' - 'email' - 'name'` scrubbing in the collection query
+- No employee name, email address, health value, coaching content, biometric data, or any GDPR Art. 9 special-category data appears in any component of these three artefacts
+- HR access to `compliance/evidence/session-revocation/` is prohibited; access is restricted to compliance-officer and devops-lead
+
+### §178.6 R2 Storage
+
+| Artefact | R2 Path | Retention |
+|---|---|---|
+| CC6-E-REV-001 | `compliance/evidence/session-revocation/cc6-e-rev-001-{year}.json` | WORM 7yr |
+| CC6-E-REV-002 | `compliance/evidence/session-revocation/cc6-e-rev-002-{year}.json` | WORM 7yr |
+| CC6-E-REV-003 | `compliance/evidence/session-revocation/cc6-e-rev-003-{year}.json` | WORM 7yr |
+
+Parent path `compliance/evidence/session-revocation/` requires provisioning by devops-lead at M4 (when `SESSION_REVOCATION_KV` is deployed and `session_blocklist` migration applied). Pre-M4 nil-attestation protocol: if the observation period begins before M4, file a nil-attestation for CC6-E-REV-001 and CC6-E-REV-003 (`{"attestation": "SESSION_REVOCATION_KV not yet deployed — no bulk revocation events expected; Supabase direct path active"}`).
+
+All artefacts must be signed with `scripts/sign-evidence.sh` before R2 upload. `r2:form-api` has NO ACCESS to `compliance/evidence/` (enforced at bucket policy level).
+
+### §178.7 Vanta Mirror
+
+| Artefact | Upload Protocol | Nil-Attestation |
+|---|---|---|
+| CC6-E-REV-001 | Annual upload within 30 days of observation-period close | If count = 0, attest `{"cc6_e_rev_001_count": 0, "note": "No bulk revocations or tenant nukes during observation period"}` |
+| CC6-E-REV-002 | One-time upload at M5 cutover; annual thereafter | N/A — snapshot always collectable |
+| CC6-E-REV-003 | Annual upload within 30 days of observation-period close | If AL-REVOKE-01 count = 0, file nil-attestation per §178.3 |
+
+### §178.8 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register CC6-E-REV-001/002/003 in §79.4 master evidence table (count 152 → 155) | `docs/SSO_SCIM_IMPLEMENTATION.md §22.15` item 9 — P1/M4, compliance-officer | 🟢 **Done — 2026-07-05 (§178.2, this section)** |
+| Update G-009 entry in §9 gap table to reference §22 (🔴 → 🟡) | `docs/SSO_SCIM_IMPLEMENTATION.md §22.15` item 9 — P1/M4, compliance-officer | 🟢 **Done — 2026-07-05 (SSO_SCIM_IMPLEMENTATION.md v2.37, §9 G-009 row)** |
+| AL-REVOKE-01 and AL-REVOKE-02 registered in OBSERVABILITY.md §26.6 | `docs/SSO_SCIM_IMPLEMENTATION.md §22.15` item 8 — P0/M4 | 🟢 **Done — 2026-07-05 (OBSERVABILITY.md v5.21.0 §26.6)** |
+| All 5 session revocation DEC-030 events registered in AUDIT_LOG_SCHEMA.md | `docs/SSO_SCIM_IMPLEMENTATION.md §22.15` item 7 — P0/M4 | 🟢 **Done — AUDIT_LOG_SCHEMA.md v0.4 (2026-06-05)** |
+
+### §178.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register CC6-E-REV-001/002/003 in §79.4 master evidence table (count 152 → 155) | compliance-officer | **P1** | [x] **Done — 2026-07-05 (§178.2, this section).** |
+| 2 | Provision R2 path `compliance/evidence/session-revocation/` (WORM 7yr; `r2:form-api` NO ACCESS) | devops-lead | **P1** | Pending M4 (when `SESSION_REVOCATION_KV` deployed) |
+| 3 | Add CC6-E-REV-001/002/003 to §80.4 Vanta mirror schedule (annual; nil-attestation protocols per §178.7) | devops-lead | **P2** | Pending M4 |
+| 4 | Collect first CC6-E-REV-002 snapshot within 30 days of `session_blocklist` migration apply; attest `kv_synced_pct_gte_99` | devops-lead + compliance-officer | **P1** | Pending M5 (§22.15 item 11) |
+
+---
+
+*v4.4.0 (2026-07-05): §178 — CC6-E-REV-001 · CC6-E-REV-002 · CC6-E-REV-003 Registration (CC6.3/CC7.2/CC7.3 · SSO_SCIM §22 · Session Revocation KV Evidence). Closes SSO_SCIM §22.15 item 9 (P1/M4, compliance-officer — "Register CC6-E-REV-001/002/003 in `docs/SOC2_READINESS.md §79.4`"). §79.4 evidence count 152 → 155: CC6-E-REV-001 (153 — annual audit_log export of 5 session revocation event types, CC6.3, 7yr WORM, `compliance/evidence/session-revocation/`), CC6-E-REV-002 (154 — `session_blocklist.kv_sync_status` distribution snapshot, CC6.3/CC7.3, annual post-migration-window, 7yr WORM), CC6-E-REV-003 (155 — PagerDuty AL-REVOKE-01 incident log, CC7.2/CC7.3, annual, 7yr WORM). §178.3 collection queries for CC6-E-REV-001 (form_audit role; `payload - 'user_id' - 'email' - 'name'` scrubbing; HMAC chain verification required before upload) and CC6-E-REV-002 (`kv_sync_status` distribution with `kv_synced_pct_gte_99` attestation field); CC6-E-REV-003 PagerDuty export spec. §178.4 SOC 2 auditor narratives: CC6.3 (REV-001 HMAC chain + REV-002 sync distribution prove end-to-end revocation coverage), CC7.2 (REV-003 AL-REVOKE-01 log proves anomaly detection operating within SLA), CC7.3 (REV-002 cutover attestation + REV-003 incident resolution prove risk mitigation continuity). §178.5 privacy floor: `user_id` explicitly excluded via payload scrubbing; `session_id` is opaque UUID; no employee name, email, health value, coaching content, or GDPR Art. 9 data in any artefact component; HR access to `compliance/evidence/session-revocation/` prohibited. §178.6 R2: three paths under `compliance/evidence/session-revocation/` (pending M4 provision); WORM 7yr; `r2:form-api` NO ACCESS. §178.7 Vanta mirror: annual upload + nil-attestation protocols. §178.8 cross-references: all four obligations 🟢 Done (this pass: §79.4 count 152 → 155, SSO_SCIM §9 G-009 🔴 → 🟡; prior passes: OBSERVABILITY §26.6 AL-REVOKE-01/02, AUDIT_LOG_SCHEMA v0.4 session revocation events). §178.9 four-item checklist: item 1 (§79.4 registration) Done this pass; items 2/3/4 pending M4/M5. Companion edit: `docs/SSO_SCIM_IMPLEMENTATION.md` v2.37 (§9 G-009 updated to 🟡 Authored; §22.15 item 9 closed). Document header v4.3.0 → v4.4.0. Owner: compliance-officer + security-engineer.*
