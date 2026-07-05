@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 COMPLETE 10/10 · series «Self-coached атлет: перший рік» 3136–3145 COMPLETE 10/10 · series «Інструменти self-coached атлета 2026» 3146–3155 in progress 6/10 · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 COMPLETE 10/10 · series «Тренувальний мінімалізм: менше і ефективніше» 3176–3185 proposed · series «Читання власних даних: від журналу до рішень» 3186–3195 proposed · series «Силові стандарти» 3196–3205 proposed · series «Тренувальна послідовність» 3206–3215 proposed · series «Відновлення: деталі та механізми» 3216–3225 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.95.0
+### Editorial series: 11–60 drafted · series 51–60 COMPLETE 10/10 · 37 canonical · series «Автономне тренування» 2866–2875 COMPLETE 10/10 · series «Мінімальна ефективна доза» 2876–2885 COMPLETE 10/10 · series «Тренувальна стійкість» 2916–2925 COMPLETE 10/10 · series «Що я знаю про своє тренування» 2926–2935 COMPLETE 10/10 · series «Програмування без коуча» 3051–3060 COMPLETE 10/10 · series «Силові метрики» 3061–3070 COMPLETE 10/10 · series «Технічна самодіагностика» 3071–3080 COMPLETE 10/10 · series «Мезоцикл без тренера» 3081–3090 COMPLETE 10/10 · series «Прогресія без тренера» 3096–3105 COMPLETE 10/10 · series «Тренування в реальних умовах» 3106–3115 COMPLETE 10/10 · editorial 61–70 COMPLETE 10/10 · editorial 71–80 COMPLETE 10/10 · series «Самодіагностика без тренера» 3116–3125 COMPLETE 10/10 · series «Тренувальний менеджмент часу» 3126–3135 COMPLETE 10/10 · series «Self-coached атлет: перший рік» 3136–3145 COMPLETE 10/10 · series «Інструменти self-coached атлета 2026» 3146–3155 in progress 7/10 · series «Тренувальне мислення» 3156–3165 COMPLETE 10/10 · series «Тренувальна автономія» 3166–3175 COMPLETE 10/10 · series «Тренувальний мінімалізм: менше і ефективніше» 3176–3185 proposed · series «Читання власних даних: від журналу до рішень» 3186–3195 proposed · series «Силові стандарти» 3196–3205 proposed · series «Тренувальна послідовність» 3206–3215 proposed · series «Відновлення: деталі та механізми» 3216–3225 proposed · block 896–900 COMPLETE · block 901–910 COMPLETE · block 911–929 active · v12.97.0
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -3568,7 +3568,7 @@ Founder-voice editorial. Тон: editorial-brutalist. Фокус: операці
 | 3144 | Як оцінювати прогрес без тренера: що вимірювати і коли змінювати план | **draft · v12.89.0 → post-3144-progress-assessment-without-coach-first-year.md** |
 | 3145 | Синтез 3136–3145: що self-coached атлет знає після першого року | **draft · v12.90.0 → post-3145-first-year-synthesis-self-coached-athlete.md** |
 
-### Editorial series: 3146–3155 — Інструменти self-coached атлета 2026: що дійсно допомагає (in progress · v12.95.0)
+### Editorial series: 3146–3155 — Інструменти self-coached атлета 2026: що дійсно допомагає (in progress 7/10 · v12.97.0)
 
 AI-тренери, відеоаналіз, носимі пристрої, застосунки для прогресування — що з цього має доказову основу, що є маркетингом, і де межа між корисним інструментом і залежністю від інструменту. Тон: editorial-brutalist. 13-min read.
 
@@ -3580,9 +3580,9 @@ AI-тренери, відеоаналіз, носимі пристрої, зас
 | 3149 | Носимі пристрої у силовому тренуванні: що вони насправді вимірюють і що з цим робити | done · v12.94.0 → post-3149-wearables-strength-training-what-they-measure.md |
 | 3150 | AI-коуч vs. персональний тренер: чесний trade-off для self-coached атлета | done · v12.95.0 → post-3150-ai-coach-vs-personal-trainer-honest-tradeoff.md |
 | 3151 | Тренувальні застосунки: що відстежувати, що ігнорувати і коли вийти з підписки | done · v12.96.0 → post-3151-training-apps-what-to-track-what-to-ignore.md |
-| 3152 | HRV-моніторинг у практиці: коли корисно, коли — надмірно | proposed |
-| 3153 | Онлайн-програми і шаблони: як оцінити якість без тренера-ментора | proposed |
-| 3154 | Спільноти і форуми як інструмент: сигнал vs. шум | proposed |
+| 3152 | Форуми, спільноти і соціальні мережі: де знайти корисну інформацію і де не загубитися | done · v12.97.0 → post-3152-forums-communities-social-media-signal-vs-noise.md |
+| 3153 | Система зворотного зв'язку: як перетворити зафіксовані дані на рішення | proposed |
+| 3154 | HRV-моніторинг у практиці: коли корисно, коли — надмірно | proposed |
 | 3155 | Синтез 3146–3155: мінімальний ефективний технологічний стек для self-coached атлета | proposed |
 
 ### Editorial series: 3156–3165 — Тренувальне мислення: як self-coached атлет приймає рішення без тренера (proposed · v12.36.0)

@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.97.0] — 2026-07-05
+
+### Added
+- `content/post-3152-forums-communities-social-media-signal-vs-noise.md` — Block «Інструменти self-coached атлета 2026» 3146–3155 post 7/10. «Форуми, спільноти і соціальні мережі: де знайти корисну інформацію і де не загубитися». Карта джерел за якістю: первинна наукова література (PubMed) → evidence-based synthesis → структуровані форуми → YouTube → соцмережі (структурно несумісні з нюансованою інформацією). Алгоритми соцмереж оптимізують engagement, не точність (Cinelli et al. 2021 Nature Human Behaviour). Критерії оцінки джерела: рівні доказів, умовність рекомендацій, шкіра у грі, зміна позиції при нових даних. Пастка інформаційного споживання як дії (Hennecke & Conner 2017). Мінімальна конфігурація: один synthesis-ресурс, один форум, zero соцмереж як основного джерела. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3152 card prepended at top of feed.
+
+### Changed
+- `README.md` — series «Інструменти self-coached атлета 2026» in progress 6/10 → 7/10; post-3152 proposed → done · v12.97.0; 3153/3154 slots adjusted.
+- `STATUS.md` — v12.96.0 → v12.97.0 current version.
+- `VERSION` — 12.96.0 → 12.97.0.
+
+---
+
 ## [12.96.0] — 2026-07-05
 
 ### Added
