@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [12.94.0] — 2026-07-05
+
+### Added
+- `content/post-3149-wearables-strength-training-what-they-measure.md` — Editorial series «Інструменти self-coached атлета 2026» 3146–3155, post 4/10. «Носимі пристрої у силовому тренуванні: що вони насправді вимірюють і що з цим робити». Фотоплетизмографія (PPG) як основа всіх носимих; чому більшість алгоритмів валідовані для кардіо, не для силового тренування. ЧСС у спокої і HRV у тренді — найнадійніші метрики для силового атлета; точність ЧСС під час силового — до 16–22 уд/хв похибки (Pasadyn et al., 2019 NPJ Digital Medicine); калорійні розрахунки носимих для силового — 20–93% помилки (Dooley et al., 2017 JMIR mHealth). Порівняння PPG-пристроїв (Apple/Garmin/Fitbit), HRV-спеціалізованих (Whoop/Oura), нагрудних ременів (Polar H10). Протокол для силового атлета: базова лінія 2–4 тижні, відстеження відхилень від норми. Суб'єктивна оцінка завжди перевіряє об'єктивні дані. clinical-safety NOT_REQUIRED. sports-scientist review pending. Blog card added.
+- `blog.html` — post-3149 card added at top of feed (series 4/10).
+
+### Changed
+- `README.md` — series «Інструменти self-coached атлета 2026» 3146–3155: 3/10 → 4/10; posts 3147–3149 marked done with filenames; current version v12.94.0.
+- `VERSION` — 12.93.1 → 12.94.0.
+
+---
+
 ## [12.93.1] — 2026-07-05
 
 ### Changed
