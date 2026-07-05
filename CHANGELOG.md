@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [13.12.1] — 2026-07-05
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.98: cross-reference patch closing stale SOC2_READINESS §79.4 registration status for BCL-CHECK-STALE-E-001 (R-77.11 item 3) and SLO-CHECK-STALE-E-001 (R-78.11 item 3). Both registrations were completed 2026-07-05 in `docs/SOC2_READINESS.md §171.2` (v3.97.0) but the inline artefact-content status fields in AUDIT_LOG_SCHEMA.md §R-77 and §R-78 stale sections still read "Pending". Status updated to "[x] Done — 2026-07-05 (SOC2_READINESS.md §171.2, v3.97.0; count 142 → 143 / 143 → 144)". No schema, DDL, event table, Zod, or retention table changes.
+- `VERSION` — 13.12.0 → 13.12.1.
+
 ## [13.11.0] — 2026-07-05
 
 ### Added
