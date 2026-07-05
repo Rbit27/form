@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [13.37.1] — 2026-07-05
+
+### Changed
+- `docs/OBSERVABILITY.md §44.6` — Items 5 and 6 stale `[ ]` closed. Item 5 (`§27.7 + §6.2` AL-SIEM-06 dual-phase patch): `[x] Done — OBSERVABILITY.md v4.2 (2026-06-15)`. Item 6 (`SOC2_READINESS.md §76.11` OQ-ANOM-01/02 resolution + §76.9 CC4.1 gap tracker): `[x] Done — SOC2_READINESS.md v3.9.0 (2026-06-15)`. Both tasks were completed in June 2026; checklist cells were not updated in those passes. Document header v5.22.2 → v5.22.3. Owner: compliance-officer.
+- `VERSION` — 13.37.0 → 13.37.1.
+
 ## [13.37.0] — 2026-07-05
 
 ### Added
