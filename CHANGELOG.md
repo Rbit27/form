@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [13.8.1] — 2026-07-05
+
+### Changed
+- `docs/SOC2_READINESS.md` — §173: §15.1 compliance calendar additions. Inserted four missing evidence rows: (1) PKJWT-OBS-E-001 quarterly nil-until-deploy (CC6.6/CC7.2/CC7.3; closes OBSERVABILITY §75.10 omission); (2) PKJWT-ROT-E-001 per-activation + Q4 annual nil (CC6.6/CC7.2/CC7.3; closes §172.8 item 5 P2 obligation); (3) BCL-CHECK-STALE-E-001 per-activation + Q4 annual nil (CC7.2; closes §R-77 companion omission); (4) SLO-CHECK-STALE-E-001 per-activation + Q4 annual nil (CC7.2; closes §R-78 companion omission). §172.8 item 5 updated from `[ ] Pending — M6` to `[x] Done`. Document header v3.98.0 → v3.99.0.
+- `VERSION` — 13.8.0 → 13.8.1.
+
+---
+
 ## [13.8.0] — 2026-07-05
 
 ### Added
