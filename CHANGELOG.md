@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.24.0] — 2026-07-05
+
+### Added
+- `content/post-3255-self-coached-feedback-framework-synthesis.md` — Block series «Тренування без зовнішнього зворотного зв'язку: self-coached рамки замість тренера» 3246–3255, post 10/10 — series finale/synthesis. «Self-coached без тренера: повна рамка зворотного зв'язку». Six-layer feedback architecture integrating all series tools: Layer 1 daily capture (journal, 3 lines/session); Layer 2 technique observation (video, session/weekly); Layer 3 technical check-in (monthly/per-block); Layer 4 signal reading and calibration (RPE, asymmetry); Layer 5 interpretation and planning (weekly + block review, hypothesis formation); Layer 6 external input (spot coaching, on-demand). Weekly operational rhythm: 15–20 min outside sessions. Synthesis of posts 3246–3254. clinical-safety NOT_REQUIRED (training methodology; no food/body image/pain/psychiatry). sports-scientist review pending. Series 3246–3255 complete.
+- `blog.html` — post-3255 card prepended at top of feed.
+
+### Changed
+- `VERSION` — 13.23.1 → 13.24.0.
+
+---
+
 ## [13.23.1] — 2026-07-05
 
 ### Added
