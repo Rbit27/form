@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.36.0] — 2026-07-05
+
+### Added
+- `content/post-3265-self-coached-programming-full-operational-map-synthesis.md` — Series «Програмування під себе: від шаблону до власної системи» 3256–3265 post 10/10 SERIES COMPLETE. Synthesis: операційна карта чотирьох рівнів (Рівень 0 Шаблон 0–12 міс → Рівень 1 Спостереження 12–24 міс → Рівень 2 Адаптація 18–36 міс → Рівень 3 Система 36+ міс); дерево ключових рішень (журнал → паттерни → пояснення змін → operating manual → регулярна ревізія); три ключові переходи (0→1 звичка фіксувати; 1→2 ізоляція змінної; 2→3 чесність з межами); зведена таблиця операційної карти; посилання на наступну серію 3266–3275 «Читання власних даних». clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3265 card prepended at top of feed.
+
+### Changed
+- `STATUS.md` — Series 3256–3265 COMPLETE; next: series 3266–3275 «Читання власних даних: від журналу до рішень».
+- `VERSION` — 13.35.1 → 13.36.0.
+
+---
+
 ## [13.35.1] — 2026-07-05
 
 ### Changed
