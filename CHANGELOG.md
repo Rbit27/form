@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [13.6.1] — 2026-07-05
+
+### Changed
+- `admin-dashboard.html` — Added OIDC private_key_jwt client authentication panel to the SSO · SCIM screen (§42–§44 SSO_SCIM_IMPLEMENTATION · DEC-097 · RFC 7523). Panel includes: key status grid (Key ID, Algorithm, Expires with amber-≤30d warning, dual-key window state); JWKS endpoint URL with copy + open-in-browser; 48 h dual-key rotation modal (RS256/ES256 algorithm selector, Entra ID JWK-file warning); public key download modal (JWK format, `sso.pkjwt_public_key_downloaded` HIGH/7yr DEC-030 audit note). CC6.6 security rationale displayed inline. RBAC: owner/admin full access; manager view only.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — Header corrected v2.33 → v2.34 (v2.34 content — §42.12 OBSERVABILITY §75 cross-reference row — was authored 2026-07-05 but header bump was missed; patched this pass).
+- `VERSION` — 13.6.0 → 13.6.1.
+
+---
+
 ## [13.6.0] — 2026-07-05
 
 ### Added

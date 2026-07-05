@@ -1393,7 +1393,7 @@
       </div>
 
       <!-- MFA policy -->
-      <div class="stat-card">
+      <div class="stat-card mb-6">
         <div class="label mb-4">MFA Policy</div>
         <div class="grid grid-cols-2 gap-6">
           <div>
@@ -1414,6 +1414,117 @@
               <option>FORM application level</option>
               <option>Both</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- OIDC private_key_jwt Client Authentication (§42–§44 SSO_SCIM_IMPLEMENTATION · DEC-097 · RFC 7523) -->
+      <div class="stat-card" id="pkjwt-panel">
+        <div class="flex items-start justify-between mb-6">
+          <div>
+            <div class="label">OIDC Client Authentication</div>
+            <div class="text-paper font-medium mt-1">Private Key JWT · RFC 7523 / RFC 7521</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span style="background:rgba(163,157,142,0.15);color:#A39D8E;border:1px solid rgba(163,157,142,0.3);font-size:9px;letter-spacing:0.12em;font-family:'JetBrains Mono',monospace;text-transform:uppercase;padding:3px 8px;border-radius:9999px;">opt-in</span>
+            <span class="badge badge-warn" id="pkjwt-status-badge">expiring soon</span>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-3 p-4 rounded-xl mb-6" style="background:rgba(221,255,45,0.04);border:1px solid rgba(221,255,45,0.15);">
+          <span class="text-acid font-mono" style="font-size:16px;line-height:1.2;">⚿</span>
+          <div>
+            <div class="text-paper text-sm font-medium">FORM's private key never reaches your IdP credential store</div>
+            <div class="text-mute text-xs mt-1 leading-relaxed">Instead of a shared secret, FORM signs JWT client assertions with a per-tenant private key. Your IdP verifies the signature via the JWKS endpoint. A breach of the IdP credential store cannot expose FORM's authentication credentials. <span class="text-dim">SOC 2 CC6.6 · RFC 7521 §5 / RFC 7523 §3</span></div>
+          </div>
+        </div>
+
+        <!-- Key status grid -->
+        <div class="grid grid-cols-4 gap-4 mb-6">
+          <div class="bg-deep border border-line rounded-xl p-4">
+            <div class="label mb-2">Key ID</div>
+            <div class="data text-paper text-sm" style="word-break:break-all;">pkjwt_7f4a…c2e1</div>
+            <div class="text-mute text-xs mt-1">RS256 · current slot</div>
+          </div>
+          <div class="bg-deep border border-line rounded-xl p-4">
+            <div class="label mb-2">Algorithm</div>
+            <div class="data text-paper text-sm">RS256</div>
+            <div class="text-mute text-xs mt-1">RSA-2048 · PKCS#8</div>
+          </div>
+          <div class="bg-deep border border-line rounded-xl p-4" style="border-color:rgba(251,191,36,0.3);">
+            <div class="label mb-2" style="color:#FBBF24;">Expires</div>
+            <div class="data text-sm" style="color:#FBBF24;">2026-07-23</div>
+            <div class="text-xs mt-1" style="color:#FBBF24;opacity:0.7;">18 days remaining</div>
+          </div>
+          <div class="bg-deep border border-line rounded-xl p-4">
+            <div class="label mb-2">Dual-key window</div>
+            <div class="data text-dim text-sm">inactive</div>
+            <div class="text-mute text-xs mt-1">Active during rotation</div>
+          </div>
+        </div>
+
+        <!-- JWKS endpoint -->
+        <div class="mb-6">
+          <div class="label mb-2">JWKS endpoint <span class="text-mute">(provide to IdP)</span></div>
+          <div class="flex items-center gap-2">
+            <div class="input-field flex-1 text-dim" style="cursor:default;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">https://form.coach/auth/oidc/t_acme/.well-known/jwks.json</div>
+            <button class="copy-btn" onclick="this.textContent='copied';setTimeout(()=>this.textContent='copy',1500)">copy</button>
+            <button class="btn-ghost" style="padding:6px 14px;font-size:10px;white-space:nowrap;" onclick="alert('Opens JWKS in new tab — logs sso.pkjwt_jwks_url_copied audit event')">open ↗</button>
+          </div>
+          <div class="text-mute text-xs mt-2">Serves <span class="data">current</span> key always; serves <span class="data">next</span> key during the 48 h rotation window. <span class="text-dim">Cache-Control: public, max-age=3600</span>. Use JWKS URI (not JWK file) for Okta and most OIDC IdPs — file upload required only for Entra ID.</div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Action row -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-mute text-xs">Emits HMAC-chained DEC-030 events — all key lifecycle actions (generate · rotate · download) are audited with 7-year retention.</span>
+          </div>
+          <div class="flex gap-3">
+            <button class="btn-ghost" onclick="document.getElementById('pkjwtDownloadModal').style.display='flex'">Download public key</button>
+            <button class="btn-primary" onclick="document.getElementById('pkjwtRotateModal').style.display='flex'">Rotate key pair</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PKJWT Rotate modal -->
+      <div id="pkjwtRotateModal" style="display:none;position:fixed;inset:0;background:rgba(11,10,7,0.85);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);" onclick="if(event.target===this)this.style.display='none'">
+        <div style="background:#13110C;border:1px solid #1F1D16;border-radius:20px;padding:40px;max-width:480px;width:100%;margin:0 1rem;">
+          <div class="label mb-2">Key rotation</div>
+          <h3 class="font-serif text-2xl text-paper mb-4" style="font-weight:300;letter-spacing:-0.02em;">48 h dual-key window</h3>
+          <p class="text-mute text-sm mb-4 leading-relaxed">A new key pair will be generated. Both current and new keys will be served via JWKS for 48 hours — your IdP can rotate without any downtime. After 48 hours, the old key is removed.</p>
+          <div class="flex items-start gap-3 p-3 rounded-xl mb-6" style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);">
+            <span style="color:#FBBF24;font-size:14px;margin-top:1px;">⚠</span>
+            <div class="text-xs leading-relaxed" style="color:#FBBF24;">If your IdP requires JWK file upload (Entra ID): upload the new public key to the IdP app registration during the 48 h window before the old key expires. See the OIDC onboarding guide §7.2 for IdP-specific steps.</div>
+          </div>
+          <div class="mb-6">
+            <div class="label mb-2">New algorithm</div>
+            <select class="input-field">
+              <option selected>RS256 (RSA-2048) — recommended</option>
+              <option>ES256 (EC P-256)</option>
+            </select>
+          </div>
+          <div class="flex gap-3">
+            <button class="btn-primary" style="flex:1;" onclick="document.getElementById('pkjwtRotateModal').style.display='none';document.getElementById('pkjwt-status-badge').textContent='rotating';document.getElementById('pkjwt-status-badge').className='badge badge-onboarding'">Confirm rotation</button>
+            <button class="btn-ghost" onclick="document.getElementById('pkjwtRotateModal').style.display='none'">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PKJWT Download public key modal -->
+      <div id="pkjwtDownloadModal" style="display:none;position:fixed;inset:0;background:rgba(11,10,7,0.85);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);" onclick="if(event.target===this)this.style.display='none'">
+        <div style="background:#13110C;border:1px solid #1F1D16;border-radius:20px;padding:40px;max-width:480px;width:100%;margin:0 1rem;">
+          <div class="label mb-2">Public key · JWK format</div>
+          <h3 class="font-serif text-2xl text-paper mb-2" style="font-weight:300;letter-spacing:-0.02em;">Download public key</h3>
+          <p class="text-mute text-sm mb-4 leading-relaxed">The <strong class="text-paper">public</strong> key is safe to share with your IdP. The private key never leaves FORM's KV layer — it is not accessible via this dashboard or any API.</p>
+          <div style="background:#0B0A07;border:1px solid #1F1D16;border-radius:8px;padding:14px;margin-bottom:20px;overflow-x:auto;">
+            <pre class="data text-dim" style="font-size:11px;margin:0;white-space:pre-wrap;word-break:break-all;">{"kty":"RSA","use":"sig","alg":"RS256","kid":"pkjwt_7f4ac2e1","n":"sGpk...","e":"AQAB"}</pre>
+          </div>
+          <div class="text-mute text-xs mb-6">Downloading emits <span class="data text-dim">sso.pkjwt_public_key_downloaded</span> HIGH-severity audit event (7yr retention · DEC-030 chain).</div>
+          <div class="flex gap-3">
+            <button class="btn-primary" style="flex:1;" onclick="document.getElementById('pkjwtDownloadModal').style.display='none'">Download · jwk-public-t_acme.json</button>
+            <button class="btn-ghost" onclick="document.getElementById('pkjwtDownloadModal').style.display='none'">Cancel</button>
           </div>
         </div>
       </div>
