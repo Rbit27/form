@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.5.0
+# FORM · SOC 2 Type II Readiness v4.6.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -37088,3 +37088,79 @@ The artefact does **not** contain: `tenant_id`, `user_id`, `session_id`, `jti`, 
 *v4.5.0 (2026-07-05): §179 — REVOKE-OBS-E-001 Registration (CC6.3/CC7.2/CC7.3 · OBSERVABILITY §76 · Session Revocation KV Quarterly Evidence). Closes the observability artefact gap for SSO_SCIM §22 session revocation KV layer. §79.4 evidence count 155 → 156: REVOKE-OBS-E-001 (156 — quarterly Session Revocation KV health report, CC6.3/CC7.2/CC7.3, quarterly, 7yr WORM, `compliance/evidence/session-revocation/revoke-obs-e-001-{YYYY}-Q{N}.json`). §179.2: five-component artefact spec (revocation count by type, kv_sync_error count, bulk P95 duration_ms, AL-REVOKE-01/02 activation log, REVOKE-SLO-01 compliance summary); per-incident supplement path; pre-M4 nil-attestation protocol. §179.3 SOC 2 narratives: CC6.3 (REVOKE-OBS-E-001 SLO section + CC6-E-REV-001 HMAC chain prove timely revocation), CC7.2 (REVOKE-OBS-E-001 zero-event attestation + alert activation log prove continuous anomaly detection), CC7.3 (REVOKE-OBS-E-001 per-incident supplement documents response to each AL-REVOKE-01/02 activation). §179.4 privacy floor (aggregate counts only; no tenant_id/user_id/session_id in artefact JSON; form_audit role; r2:form-api NO ACCESS; HR NO ACCESS). §179.5 cross-references: §79.4 count 155 → 156 (this pass), OBSERVABILITY §76 authored (this pass). Document header v4.4.0 → v4.5.0. Owner: compliance-officer + security-engineer.*
 
 *v4.4.0 (2026-07-05): §178 — CC6-E-REV-001 · CC6-E-REV-002 · CC6-E-REV-003 Registration (CC6.3/CC7.2/CC7.3 · SSO_SCIM §22 · Session Revocation KV Evidence). Closes SSO_SCIM §22.15 item 9 (P1/M4, compliance-officer — "Register CC6-E-REV-001/002/003 in `docs/SOC2_READINESS.md §79.4`"). §79.4 evidence count 152 → 155: CC6-E-REV-001 (153 — annual audit_log export of 5 session revocation event types, CC6.3, 7yr WORM, `compliance/evidence/session-revocation/`), CC6-E-REV-002 (154 — `session_blocklist.kv_sync_status` distribution snapshot, CC6.3/CC7.3, annual post-migration-window, 7yr WORM), CC6-E-REV-003 (155 — PagerDuty AL-REVOKE-01 incident log, CC7.2/CC7.3, annual, 7yr WORM). §178.3 collection queries for CC6-E-REV-001 (form_audit role; `payload - 'user_id' - 'email' - 'name'` scrubbing; HMAC chain verification required before upload) and CC6-E-REV-002 (`kv_sync_status` distribution with `kv_synced_pct_gte_99` attestation field); CC6-E-REV-003 PagerDuty export spec. §178.4 SOC 2 auditor narratives: CC6.3 (REV-001 HMAC chain + REV-002 sync distribution prove end-to-end revocation coverage), CC7.2 (REV-003 AL-REVOKE-01 log proves anomaly detection operating within SLA), CC7.3 (REV-002 cutover attestation + REV-003 incident resolution prove risk mitigation continuity). §178.5 privacy floor: `user_id` explicitly excluded via payload scrubbing; `session_id` is opaque UUID; no employee name, email, health value, coaching content, or GDPR Art. 9 data in any artefact component; HR access to `compliance/evidence/session-revocation/` prohibited. §178.6 R2: three paths under `compliance/evidence/session-revocation/` (pending M4 provision); WORM 7yr; `r2:form-api` NO ACCESS. §178.7 Vanta mirror: annual upload + nil-attestation protocols. §178.8 cross-references: all four obligations 🟢 Done (this pass: §79.4 count 152 → 155, SSO_SCIM §9 G-009 🔴 → 🟡; prior passes: OBSERVABILITY §26.6 AL-REVOKE-01/02, AUDIT_LOG_SCHEMA v0.4 session revocation events). §178.9 four-item checklist: item 1 (§79.4 registration) Done this pass; items 2/3/4 pending M4/M5. Companion edit: `docs/SSO_SCIM_IMPLEMENTATION.md` v2.37 (§9 G-009 updated to 🟡 Authored; §22.15 item 9 closed). Document header v4.3.0 → v4.4.0. Owner: compliance-officer + security-engineer.*
+
+---
+
+## §180 — REVOKE-SYNC-E-001 Registration (CC6.3/CC7.2/CC7.3 · INCIDENT_RESPONSE R-82 · Session Revocation KV Sync Error Per-Activation Evidence)
+
+### §180.1 Context
+
+`docs/INCIDENT_RESPONSE.md §R-82` (v3.47.0, 2026-07-05) establishes the dedicated companion IR runbook for AL-REVOKE-01 (`docs/OBSERVABILITY.md §76.4`). AL-REVOKE-01 fires when the `session.revocation_kv_sync_error` HIGH/7yr DEC-030 event rate exceeds 1% of total revocation events over a 5-minute window — indicating that the `SESSION_REVOCATION_KV` Cloudflare KV layer is failing to write revocation entries and the Worker has fallen back to the Supabase `session_blocklist` path. REVOKE-SYNC-E-001 is the per-activation SOC 2 evidence artefact for each R-82 IC.
+
+**§79.4 evidence count update: 156 → 157.**
+
+Pattern context: BCL (§163 BCL-E-001..003, §164 BCL-OBS-E-001), SAML SLO (§166 SLO-E-001..004, SLO-OBS-E-001), PKJWT (§175 PKJWT-E-001, §177 PKJWT-JWKS-E-001, PKJWT-OBS-E-001), and Session Revocation KV (§178 CC6-E-REV-001..003, §179 REVOKE-OBS-E-001) have evidence artefacts registered. REVOKE-SYNC-E-001 completes the per-activation incident evidence gap for the Session Revocation KV layer.
+
+### §180.2 §79.4 Master Evidence Table Entry
+
+| # | Artefact ID | Description | Criterion | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|---|
+| 157 | **REVOKE-SYNC-E-001** | Per-activation Session Revocation KV sync error incident report: R-82-C1..C4 outputs, root cause (H1–H5), degraded window duration, `session_blocklist` kv_sync_status distribution during fallback, `session.revocation_kv_sync_error` trigger event JSON, `session.revocation_kv_sync_restored` terminal event JSON, R-05 co-activation status. | CC6.3 / CC7.2 / CC7.3 | Per AL-REVOKE-01 IC activation | 7 yr WORM | `compliance/evidence/session-revocation/revoke-sync-e-001-{incident_id}.json` |
+
+### §180.3 SOC 2 Auditor Narratives
+
+**CC6.3 — Logical access removal on a timely basis:**
+REVOKE-SYNC-E-001 §kv_sync_status-distribution (R-82-C3 output) proves that during the KV sync error degraded window, every revocation was written to the authoritative Supabase `session_blocklist` audit trail — `kv_sync_status = 'failed'` rows confirm the Supabase write succeeded even while the KV write failed. The fallback path (`docs/SSO_SCIM_IMPLEMENTATION.md §22.7`) continued enforcing access removal at Supabase-query latency. REVOKE-SYNC-E-001 §R-82-C4-output confirms KV-edge enforcement was restored within the 30-minute P1 SLA. Combined with the quarterly REVOKE-OBS-E-001 (§179), auditors receive both periodic operational health attestations and per-incident degradation records proving revocations were never silently dropped.
+
+**CC7.2 — Anomaly monitoring:**
+REVOKE-SYNC-E-001 §kv-error-rate (R-82-C2 output) documents the `session.revocation_kv_sync_error` rate that triggered AL-REVOKE-01 — sourced from the immutable DEC-030 HMAC-chained audit log, which cannot be altered retroactively. The artefact confirms the automated monitoring threshold (1% error rate / 5-min window) was operational and correctly identified the anomaly within the detection SLA.
+
+**CC7.3 — Response to identified anomalies:**
+REVOKE-SYNC-E-001 §root-cause-classification, §degraded-window, and the R-82-C4 zero-error confirmation document the full incident response cycle: detection, root cause determination (H1–H5 per §R-82.4), remediation applied, and recovery verified. For H5 (unauthorized access) incidents, `r05_co_activated: true` in the terminal event payload documents that the unauthorized-access runbook (R-05) was co-activated — satisfying CC7.3's requirement that identified security anomalies trigger appropriate escalation.
+
+### §180.4 Privacy Floor
+
+REVOKE-SYNC-E-001 artefact JSON contains only:
+- Aggregate counts (error_count, failed_revocation_row_count, kv_write_error_count_during_incident)
+- Operational metadata (error_code strings, kv_key_prefix type label, degraded_window_minutes, root_cause enum)
+- DEC-030 event JSONs with FORM-internal UUIDs (incident_id, tenant_id-nullable) only
+
+The artefact does **not** contain: `user_id`, `session_id`, `jti`, employee name, email, health value, coaching session content, or GDPR Art. 9 special-category data. R-82-C1 `kv_key_prefix` is a key TYPE label (`revoke:session`, `revoke:user`, `revoke:tenant`, `revoke:jti`) — not the key VALUE containing a session_id or user_id. R-82-C3 is a `kv_sync_status GROUP BY count(*)` only — no individual session rows. `r2:form-api` NO ACCESS to `compliance/evidence/session-revocation/`. HR role NO ACCESS.
+
+### §180.5 R2 Path and Provisioning
+
+| Path component | Value |
+|---|---|
+| R2 bucket | `form-compliance` (WORM; 7-year object lock) |
+| Path prefix | `compliance/evidence/session-revocation/` |
+| Per-incident object | `revoke-sync-e-001-{incident_id}.json` |
+| Signing | `compliance/scripts/sign-evidence.sh` (same key as CC6-E-REV-001 §178.3) |
+| Access control | `r2:form-api` NO ACCESS (enforced at bucket policy level); compliance-officer READ/WRITE only |
+
+R2 path provisioning status: shared with CC6-E-REV-001..003 and REVOKE-OBS-E-001 under `compliance/evidence/session-revocation/` prefix — path already provisioned as part of §178/§179. REVOKE-SYNC-E-001 uses per-incident object naming, not the REVOKE-OBS-E-001 quarterly naming convention; both objects coexist under the same prefix.
+
+### §180.6 Vanta Mirror
+
+| Artefact | Upload Protocol | Nil-Attestation |
+|---|---|---|
+| REVOKE-SYNC-E-001 | Per-IC upload within 48 h of IC closure | If no AL-REVOKE-01 activations in the quarter, attest `{"revoke_sync_e_001_count": 0, "note": "No AL-REVOKE-01 activations during observation period"}` as part of the REVOKE-OBS-E-001 quarterly filing (§179.7) |
+
+### §180.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register REVOKE-SYNC-E-001 in §79.4 master evidence table (count 156 → 157) | compliance-officer | **P0** | [x] **Done — 2026-07-05 (§180.2, this section)** |
+| 2 | Provision `compliance/scripts/sign-evidence.sh` to accept REVOKE-SYNC-E-001 artefact path (shared signing key with CC6-E-REV-001 — no new key required) | devops-lead | **P1** | Shared with §178 provisioning — pending M4 |
+| 3 | Add REVOKE-SYNC-E-001 to §80.4 Vanta mirror schedule (per-IC; nil-attestation protocol per §180.6) | devops-lead | **P2** | Pending M4 |
+
+### §180.8 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register REVOKE-SYNC-E-001 in §79.4 master evidence table (count 156 → 157) | `docs/INCIDENT_RESPONSE.md §R-82.11` item 4 | 🟢 **Done — 2026-07-05 (§180.2, this section)** |
+| `docs/INCIDENT_RESPONSE.md §R-82` authored (R-82 companion runbook for AL-REVOKE-01 — 11 sections, REVOKE-SYNC-E-001 artefact spec, REVOKE-KV-CHAIN-01 invariant) | `docs/OBSERVABILITY.md §76.9` item 4 / §76.10 | 🟢 **Done — 2026-07-05 (INCIDENT_RESPONSE.md v3.47.0, §R-82)** |
+| `session.revocation_kv_sync_restored` LOW/3yr terminal event + `SessionRevocationKvSyncRestoredPayload` schema + REVOKE-KV-CHAIN-01 invariant in `docs/AUDIT_LOG_SCHEMA.md` | `docs/INCIDENT_RESPONSE.md §R-82.11` item 1 | 🟡 **Pending M5** |
+
+---
+
+*v4.6.0 (2026-07-05): §180 — REVOKE-SYNC-E-001 Registration (CC6.3/CC7.2/CC7.3 · INCIDENT_RESPONSE R-82 · Session Revocation KV Sync Error Per-Activation Evidence). Closes `docs/OBSERVABILITY.md §76.9` item 4 + §76.10 cross-reference obligation (AL-REVOKE-01 companion IR runbook, Pending M5). §79.4 evidence count 156 → 157: REVOKE-SYNC-E-001 (157 — per-activation KV sync error incident report, CC6.3/CC7.2/CC7.3, per-IC cadence, 7yr WORM, `compliance/evidence/session-revocation/revoke-sync-e-001-{incident_id}.json`). §180.2: eight-component artefact spec (R-82-C1..C4 outputs, root cause H1–H5, degraded window duration, `session_blocklist` kv_sync_status distribution, trigger + terminal DEC-030 event JSONs, R-05 co-activation status). §180.3 SOC 2 auditor narratives: CC6.3 (R-82-C3 kv_sync_status distribution proves Supabase fallback protected all revocations during degraded window; R-82-C4 confirms KV-edge enforcement restored within SLA), CC7.2 (R-82-C2 error rate at trigger documents AL-REVOKE-01 automated detection from immutable DEC-030 chain), CC7.3 (root cause + degraded window + R-82-C4 document full IC response cycle; H5 r05_co_activated field documents escalation). §180.4 privacy floor (aggregate counts only; kv_key_prefix is key TYPE label not value; R-82-C3 is GROUP BY count only; no user_id/session_id/jti/employee name/health data in any component; r2:form-api NO ACCESS; HR NO ACCESS). §180.5 R2: path `compliance/evidence/session-revocation/revoke-sync-e-001-{incident_id}.json` (shared prefix with CC6-E-REV-001..003 and REVOKE-OBS-E-001; WORM 7yr; `r2:form-api` NO ACCESS). §180.6 Vanta mirror: per-IC upload within 48 h of IC closure; nil-attestation via REVOKE-OBS-E-001 quarterly filing if no activations. §180.7 three-item checklist: item 1 Done this pass; items 2/3 pending M4. §180.8 cross-references: §79.4 count update (🟢 this pass), R-82 authoring (🟢 INCIDENT_RESPONSE v3.47.0 this pass), AUDIT_LOG_SCHEMA terminal event (🟡 Pending M5). Companion edits: `docs/INCIDENT_RESPONSE.md` v3.47.0 (§R-82 — eleven-section AL-REVOKE-01 companion runbook; REVOKE-SYNC-E-001 artefact spec; REVOKE-KV-CHAIN-01 invariant; seven-item checklist; three communication templates; five root causes H1–H5; four scope queries R-82-C1..C4); `docs/OBSERVABILITY.md` v5.22.1 (§76.4 companion runbook field updated, §76.9 item 4 Done, §76.10 Done); `docs/SSO_SCIM_IMPLEMENTATION.md` v2.38 (§22.15 item 12 — OBSERVABILITY §76 backreference). Document header v4.5.0 → v4.6.0. Owner: compliance-officer + security-engineer + devops-lead.*

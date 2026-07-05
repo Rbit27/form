@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.45.0
+# FORM · Incident Response Runbook v3.47.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -29095,3 +29095,368 @@ File to `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json`, sig
 ---
 
 *v3.46.0 (2026-07-05): R-81 PKJWT JWKS Endpoint Missing Key (CC6.6/CC7.3 — AL-PKJWT-01 companion runbook). Closes the AL-PKJWT-01 companion runbook gap in `docs/OBSERVABILITY.md §75.4` (v5.21.0, 2026-07-05): §75.4 had only a six-step inline runbook for the `sso.pkjwt_jwks_missing` P1 scenario; BCL observability (§70) has R-73 (REVOCATION_QUEUE exhausted) and R-74 (BCL-CHAIN-01 violation); SAML SLO observability (§72) has R-75 and R-76; PKJWT observability (§75) was the remaining gap. R-81: eleven-section companion runbook. Trigger: AL-PKJWT-01 (any `sso.pkjwt_jwks_missing` HIGH/7yr DEC-030 event — JWKS Worker KV miss → HTTP 503 → IdP cannot validate `private_key_jwt` assertions → OIDC-SSO logins blocked for affected tenant; zero-tolerance P1; 1h per-tenant dedup). Three trigger modes: Mode-1 (PagerDuty P1 via AL-PKJWT-01); Mode-2 (CSM escalation); Mode-3 (manual discovery). Four root causes: H1 key never published (Admin Dashboard generate flow incomplete KV write); H2 KV slot deleted (`SSO_PKJWT_JWKS:{tenant_id}:current` — accidental CF dashboard flush, deploy script, or unauthorized delete — unauthorized H2 escalates to P0 + R-05 co-activation); H3 partial rotation failure (DB updated by job 58 or manual rotation but KV write failed mid-rotation); H4 key expired (`pkjwt_key_expires_at < NOW()` — job 58 missed rotation or AL-PKJWT-02 warning missed → emergency rotation via R-79 co-activation). Four scope queries: R-81-C1 (`SELECT pkjwt_key_id, pkjwt_key_expires_at, pkjwt_algorithm, oidc_client_auth_method FROM tenant_sso_configs WHERE id = $tenant_id` — `pkjwt_private_key_encrypted` BYTEA explicitly excluded; root-cause determination); R-81-C2 (recent `sso.pkjwt_jwks_missing` events last 2 h for tenant — incident window + repeat-occurrence count); R-81-C3 (key lifecycle events `sso.pkjwt_key_generated`/`sso.pkjwt_key_rotated` last 48 h — confirms KV write presence or absence; H2 vs H3 disambiguation); R-81-C4 (synthetic `curl` JWKS GET post-remediation — HTTP 200 + `kid` array confirmation; must succeed before IC closure). Six-step recovery: Step 1 (ack PagerDuty, open IC, post T-81-A); Step 2 (run R-81-C1..C3, classify H1–H4); Step 3a (H1/H2/H3 — PAM Republish JWKS via Admin Dashboard §44.3, two-person auth, re-reads DB private key, writes KV); Step 3b (H4 — co-activate R-79 emergency rotation; IdP JWKS cache TTL communication: Okta ~1h, Entra ID ~24h, Google Workspace ~1h); Step 4 (R-81-C4 JWKS GET 200 confirm); Step 5 (notify CSM, T-81-C post-resolution); Step 6 (emit `sso.pkjwt_jwks_restored` LOW/3yr PKJWT-JWKS-CHAIN-01 terminal event; file PKJWT-JWKS-E-001; close IC). Three Slack templates: T-81-A (initial P1 declaration ≤5 min); T-81-B (P0 escalation for unauthorized H2); T-81-C (post-resolution). PKJWT-JWKS-CHAIN-01 ordering invariant: `sso.pkjwt_jwks_restored` requires prior `sso.pkjwt_jwks_missing` for same `tenant_id` within 24 h; HTTP 422 `PKJWT_JWKS_CHAIN_01_VIOLATION` on violation → R-05 (pending M6 `emit-audit-event` Worker implementation). `SsoPkjwtJwksRestoredPayload` Zod v2 schema: `incident_id` UUID, `tenant_id` UUID, `root_cause` enum (H1–H4), `stale_window_minutes` positive number, `resolution_confirmed_at` datetime, `emergency_rotation_opened` boolean. PKJWT-JWKS-E-001 per-activation SOC 2 evidence artefact (CC6.6/CC7.3, 7yr WORM, `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json`): eight components including both DEC-030 events, R-81-C1..C4 outputs, trigger mode, and root cause classification; `pkjwt_private_key_encrypted` BYTEA never included. Six post-incident controls: H1 — synchronous KV write confirmation in generate flow; H2 authorized — KV slot existence check in pre-deploy checklist; H2 unauthorized — R-05 P0 + CF API token freeze; H3 — atomic KV + DB rotation transaction; H4 — job 58 schedule audit + R-57 co-activation; universal — 48h post-mortem. Seven implementation checklist items: items 1 (AUDIT_LOG_SCHEMA.md v3.1 §R-81 — `sso.pkjwt_jwks_restored` LOW/3yr + `SsoPkjwtJwksRestoredPayload` schema + PKJWT-JWKS-CHAIN-01 invariant + PKJWT-JWKS-E-001 artefact spec registered) + 2 (OBSERVABILITY.md v5.21.0 — §75.4 AL-PKJWT-01 Runbook field + §75.9 item 8 + §75.10 two new obligations) + 3 (SOC2_READINESS.md v4.3.0 — §177 added, count 151 → 152) + 7 (authoring done) marked Done this pass; items 4–6 pending M6. Privacy floor invariant throughout: no employee `user_id`, PII, health data, private key material, or GDPR Art. 9 data in any query, event, template, or artefact. Document header v3.45.0 → v3.46.0. Owner: security-engineer + compliance-officer + enterprise-architect.*
+
+---
+
+## R-82 · Session Revocation KV Sync Error (AL-REVOKE-01 companion)
+
+### §R-82.1 Purpose and Trigger Classification
+
+**Runbook ID:** R-82
+**Incident Commander:** security-engineer (primary); devops-lead (KV infrastructure); compliance-officer (evidence, DEC-030 chain)
+**Alert source:** AL-REVOKE-01 (`docs/OBSERVABILITY.md §76.4`, v5.22.0)
+**Severity on open:** P1 (escalates to P0 if root cause H5 confirmed unauthorized — see §R-82.5 H5)
+**Auto-resolve:** No — IC must close manually after R-82-C4 post-recovery health check confirms zero new errors for ≥ 15 minutes
+
+**Purpose:** This runbook governs the response to an AL-REVOKE-01 alert — fired when the `session.revocation_kv_sync_error` HIGH/7yr DEC-030 event rate exceeds 1% of total revocation events over a 5-minute window. A `session.revocation_kv_sync_error` event means the Session Revocation KV layer (`SESSION_REVOCATION_KV` Cloudflare KV namespace — `docs/SSO_SCIM_IMPLEMENTATION.md §22`) failed to write a revocation entry; the Worker fell back to the Supabase `session_blocklist` path. Under fallback mode, KV-edge enforcement is inactive — revocations are still persisted to the Supabase audit trail but the Cloudflare edge `isRevoked()` hot-path (`docs/SSO_SCIM_IMPLEMENTATION.md §22.4`) is not enforcing them at the CDN layer until the next JWT TTL expiry (up to 15 minutes). This is a degraded-mode P1, not a security bypass: `session_blocklist` Supabase reads are still performed as fallback, and no session that was revoked before the incident is silently re-admitted.
+
+**Pattern context:** BCL observability (§70) has companion runbooks R-73 (REVOCATION_QUEUE exhausted) and R-74 (BCL-CHAIN-01 violation); SAML SLO observability (§72) has R-75 and R-76; PKJWT observability (§75) has R-81. R-82 closes the equivalent gap for Session Revocation KV observability (§76).
+
+**Security floor during degraded mode:** The `session_blocklist` Supabase fallback means revocations ARE being honoured — just at database latency rather than KV edge latency. FORM is not silently admitting revoked sessions; it is operating at a degraded performance posture. The 30-second revocation SLA (REVOKE-SLO-01) is breached during fallback mode, but the contractual security guarantee (access is eventually revoked) is preserved.
+
+### §R-82.2 Trigger Matrix
+
+| Mode | Trigger condition | Initial page | IC owns |
+|---|---|---|---|
+| **Mode-1** | `session.revocation_kv_sync_error` rate > 1% over 5 min → AL-REVOKE-01 fires → PagerDuty `form-security` P1 | PagerDuty HIGH + `#alerts-enterprise` Slack | From PagerDuty ack |
+| **Mode-2** | Enterprise customer reports session still active after SCIM deprovisioning (KV fallback means Supabase fallback is protecting the session but at higher latency, possibly missing the SLA window) | CSM → security-engineer DM | From CSM report |
+| **Mode-3** | Manual discovery (dashboard "KV sync error rate" panel spike, Wrangler Tail review, proactive WAE audit) | None (manual) | From discovery point |
+
+All three modes converge on the same scope queries (§R-82.3) and recovery procedure (§R-82.5). Mode-1 is the expected path; Mode-2/3 indicate a secondary detection gap and should trigger a §R-82.9 post-incident control review.
+
+### §R-82.3 Scope Queries
+
+Run all four queries before attempting remediation. **Do not skip R-82-C1** — the error pattern (single tenant vs. fleet-wide, specific key prefix vs. all types) determines the root cause hypothesis and recovery path.
+
+**R-82-C1 — Recent KV sync error events (form_audit role; no user_id)**
+
+```sql
+-- form_audit role; aggregate signal + error characterisation; no PII
+SELECT
+  id,
+  event_type,
+  created_at,
+  (payload->>'error_code')      AS error_code,
+  (payload->>'error_message')   AS error_message,
+  (payload->>'kv_key_prefix')   AS kv_key_prefix,
+  (payload->>'fallback_activated') AS fallback_activated
+FROM audit_log_events
+WHERE event_type = 'session.revocation_kv_sync_error'
+  AND created_at >= NOW() - INTERVAL '2 hours'
+ORDER BY created_at DESC
+LIMIT 50;
+```
+
+Interpretation: all errors showing `error_code = '429'` → quota exhaustion (H2). All errors showing `error_code = 'binding_error'` or `error_message LIKE '%SESSION_REVOCATION_KV%undefined%'` → binding missing (H1). All errors showing `error_code = '503'` or `error_code = '500'` with Cloudflare status page event → platform incident (H3). Errors scattered across `kv_key_prefix` values (revoke:session, revoke:user, revoke:tenant) with no clear pattern → Worker code regression (H4). Any errors showing `error_code = '401'` or `error_message LIKE '%unauthorized%'` → investigate H5 immediately.
+
+**R-82-C2 — KV sync error rate over 30-minute window (form_audit role)**
+
+```sql
+-- form_audit role; rate calculation for severity assessment
+WITH revocation_events AS (
+  SELECT
+    COUNT(*) FILTER (WHERE event_type = 'session.revocation_kv_sync_error') AS error_count,
+    COUNT(*) AS total_count
+  FROM audit_log_events
+  WHERE event_type IN (
+    'session.revoked_by_user',
+    'session.revoked_by_scim',
+    'session.revoked_by_nuke',
+    'session.bulk_revocation_complete',
+    'session.revocation_kv_sync_error'
+  )
+  AND created_at >= NOW() - INTERVAL '30 minutes'
+)
+SELECT
+  error_count,
+  total_count,
+  CASE WHEN total_count > 0
+    THEN ROUND((error_count::numeric / total_count) * 100, 2)
+    ELSE 0
+  END AS error_rate_pct,
+  CASE
+    WHEN error_count = total_count THEN 'Fleet-wide KV failure (H1/H3/H4 likely)'
+    WHEN error_count::numeric / NULLIF(total_count, 0) > 0.5 THEN 'Majority failure (H2 quota or H4 regression likely)'
+    WHEN error_count::numeric / NULLIF(total_count, 0) > 0.01 THEN 'Threshold breach (H2 quota approaching or sporadic H4)'
+    ELSE 'Below threshold (transient or already recovering)'
+  END AS severity_hint
+FROM revocation_events;
+```
+
+**R-82-C3 — Supabase fallback status (session_blocklist kv_sync_status distribution)**
+
+```sql
+-- form_audit role; confirms fallback is active and audit trail is intact; no user_id
+SELECT
+  kv_sync_status,
+  COUNT(*)             AS row_count,
+  MIN(blocked_at)      AS earliest,
+  MAX(blocked_at)      AS latest
+FROM session_blocklist
+WHERE blocked_at >= NOW() - INTERVAL '2 hours'
+GROUP BY kv_sync_status
+ORDER BY kv_sync_status;
+```
+
+Expected during incident: `kv_sync_status = 'failed'` rows increasing (fallback active, Supabase audit trail intact). `kv_sync_status = 'synced'` rows should be absent or decreasing after error onset. `kv_sync_status = 'pending'` rows are normal (backfill not yet applied). If `kv_sync_status = 'failed'` count is zero but R-82-C1 shows errors, investigate whether the `session_blocklist` write is also failing (escalate to P0 — R-03 co-activation).
+
+**R-82-C4 — Post-recovery KV health (run after remediation, before IC closure)**
+
+```sql
+-- form_audit role; confirms zero new KV sync errors for ≥ 15 minutes post-remediation
+SELECT COUNT(*) AS new_errors_post_remediation
+FROM audit_log_events
+WHERE event_type = 'session.revocation_kv_sync_error'
+  AND created_at >= $remediation_timestamp;
+-- Expected: 0 for 15-minute window; IC may close if 0 for ≥ 15 min
+```
+
+Additionally, confirm via Wrangler Tail or WAE dashboard that the `session.revocation_kv_sync_error` count is zero and `kv_sync_status = 'synced'` rows are appearing in `session_blocklist` for new revocations. R-82-C4 must pass before filing REVOKE-SYNC-E-001 (§R-82.8).
+
+### §R-82.4 Root Cause Hypotheses
+
+| ID | Root cause | Distinguishing signal | Recovery path |
+|---|---|---|---|
+| **H1** | `SESSION_REVOCATION_KV` namespace binding missing from `wrangler.toml` or bound to wrong namespace ID | `error_code = 'binding_error'`; 100% error rate (fleet-wide); `typeof env.SESSION_REVOCATION_KV === 'undefined'` in Wrangler Tail | Fix `wrangler.toml` binding; redeploy |
+| **H2** | Cloudflare KV quota exhaustion (write ops, read ops, or storage) | `error_code = '429'`; gradual onset correlated with revocation volume spike; CF dashboard KV Metrics shows quota near ceiling | Request CF quota increase (Enterprise support ticket); or temporarily reduce revocation batch size (`BATCH_SIZE` in §22.6) |
+| **H3** | Cloudflare KV platform incident (namespace degraded, regional outage, Workers runtime issue) | `error_code = '503'` or `'500'`; confirmed CF status page event; no `wrangler.toml` changes; errors across all tenants simultaneously | Fallback mode active — no FORM action required; monitor CF status page; communicate to CSM; close IC when CF resolves |
+| **H4** | Worker code regression in KV write path | Errors began immediately after a new deployment; `error_code` variable (not a CF HTTP status); R-82-C1 shows consistent `error_message` pattern; other CF KV operations healthy | Roll back deployment; investigate code change; fix + redeploy |
+| **H5** | Unauthorized KV namespace access or deletion | `error_code = '401'` or `error_message` contains `'unauthorized'`; CF audit log shows unexpected API token access to `SESSION_REVOCATION_KV` namespace; possible deliberate namespace wipe | **Escalate to P0 immediately; co-activate R-05; freeze CF API tokens with KV write access** |
+
+### §R-82.5 Recovery Procedure
+
+**T+0 min — Step 1: Acknowledge, declare, activate Supabase fallback**
+
+1. Acknowledge PagerDuty alert. Open an IC in `#incidents` Slack channel. Post T-82-A template (§R-82.6).
+2. Confirm `session_blocklist` Supabase fallback is active (R-82-C3 shows `kv_sync_status = 'failed'` rows). If the fallback is NOT active and R-82-C1 shows errors, investigate whether the Supabase write path is also failing — escalate to P0 and co-activate R-03 (Supabase outage) immediately.
+3. Notify CSM if any enterprise tenants are active: "Session revocation KV layer is in degraded mode. Revocations are being processed via Supabase fallback with ≤ 15 s additional latency. No sessions are being silently admitted. We are investigating."
+
+**T+0–5 min — Step 2: Run R-82-C1 through R-82-C3, classify H1–H5**
+
+Run all three scope queries. Determine root cause from the distinguishing signals in §R-82.4. Do not proceed to remediation until root cause is classified — the wrong fix can make H2 (quota) worse or delay the response to H5 (unauthorized).
+
+**T+5–20 min — Step 3: Root-cause remediation**
+
+*Step 3a — H1 (binding missing):*
+1. Check `wrangler.toml` for `SESSION_REVOCATION_KV` binding. Confirm namespace ID matches the production namespace in CF dashboard.
+2. If binding is missing or pointing to wrong namespace ID, fix `wrangler.toml` and redeploy `form-api-gateway` Worker.
+3. Deployment must be reviewed by a second engineer (security-engineer or enterprise-architect) before applying — two-person rule for production KV binding changes.
+
+*Step 3b — H2 (quota exhaustion):*
+1. File a CF Enterprise support ticket for quota increase on `SESSION_REVOCATION_KV` namespace (write ops/day, storage bytes).
+2. As immediate mitigation: reduce `BATCH_SIZE` constant in `apps/api-gateway/src/sso/session-revocation-kv.ts` from 50 to 25 and redeploy. This halves write throughput temporarily, reducing quota burn rate.
+3. If quota increase cannot be obtained within 30 minutes: consider temporarily disabling the JTI opt-in KV path (`revoke:jti:{jti}` keys, §22.4) to reduce KV write volume. JTI blocklist is a defence-in-depth layer; session/user/tenant revocations remain active.
+
+*Step 3c — H3 (CF platform incident):*
+1. Confirm on `cloudflarestatus.com` that a KV incident is active.
+2. No FORM-side action required — fallback mode is the correct response. Do NOT attempt to redeploy; this will not fix a CF platform outage.
+3. Post T-82-B template (§R-82.6) to CSM channel with expected resolution timeline from CF status page.
+4. Monitor CF status page every 15 minutes. IC closes when CF resolves AND R-82-C4 passes.
+
+*Step 3d — H4 (code regression):*
+1. Identify the deployment that introduced the regression (compare error onset timestamp to deployment log).
+2. Roll back `form-api-gateway` to the previous stable version.
+3. Confirm rollback via Wrangler Tail — KV write success should resume within 60 seconds.
+4. File a P1 bug report; fix the regression in a separate PR with security-engineer review before re-deploying.
+
+*Step 3e — H5 (unauthorized access — escalate to P0):*
+1. **Immediately escalate to P0.** Post founder notification per R-05 escalation protocol.
+2. **Freeze all CF API tokens** with write access to `SESSION_REVOCATION_KV` namespace via CF dashboard (revoke tokens; re-issue after investigation).
+3. Co-activate R-05 (Unauthorized Privileged Access / Insider Threat).
+4. Do not attempt to restore the KV namespace until R-05 IC is active and a forensic review of the CF audit log is complete.
+5. Notify compliance-officer and legal immediately — potential data-access incident under GDPR Art. 33.
+
+**T+20–30 min — Step 4: Run R-82-C4, confirm recovery**
+
+After remediation, run R-82-C4 every 5 minutes until the query returns `new_errors_post_remediation = 0` for a 15-minute window. Also verify in the Cloudflare WAE dashboard that `session.revocation_kv_sync_error` count has returned to 0 and `kv_sync_status = 'synced'` rows are appearing in `session_blocklist`.
+
+**T+30 min — Step 5: CSM communication and IC closure (not H5)**
+
+1. Post T-82-C template (§R-82.6) to CSM channel with root cause summary.
+2. IC may be closed once: R-82-C4 passes (zero errors for ≥ 15 min) + compliance-officer confirms REVOKE-SYNC-E-001 is filed.
+
+**T+30 min — Step 6: DEC-030 terminal event and evidence filing**
+
+1. Emit `session.revocation_kv_sync_restored` LOW/3yr DEC-030 event with REVOKE-KV-CHAIN-01 terminal payload (§R-82.7).
+2. File REVOKE-SYNC-E-001 evidence artefact (§R-82.8).
+3. Close IC. Update §76.9 item 3 quarterly REVOKE-OBS-E-001 per-incident supplement path with this incident's PagerDuty incident ID.
+
+### §R-82.6 Communication Templates
+
+**T-82-A — Initial P1 declaration (post within 5 min of PagerDuty ack)**
+
+```
+[INCIDENT P1] Session Revocation KV Sync Error — AL-REVOKE-01
+
+Status: Investigating. Session revocation KV layer is in degraded mode.
+Impact: Revocations are being processed via Supabase fallback (session_blocklist). 
+  No sessions are being silently admitted — revocations are protected by the Supabase path.
+  KV-edge revocation enforcement is inactive, causing ≤ 15s additional latency.
+SLA: 30-minute investigation SLA. CSM notified of degraded mode.
+IC: [GitHub handle — security-engineer]
+```
+
+**T-82-B — CSM notification (degraded mode, non-H5)**
+
+```
+[FORM Status] Session Revocation — Degraded Mode
+
+Your account's session revocation system is currently operating in a fallback mode. 
+Revocations you trigger (SCIM deprovisioning, admin actions) are being processed and 
+recorded. Access removal is still enforced — sessions are being checked against our 
+Supabase audit trail on each request. We are investigating the Cloudflare KV layer 
+and expect to restore full performance within 30 minutes.
+
+No action is required on your part. We will notify you when the incident is resolved.
+```
+
+*Note: Do NOT send T-82-B for H5 (unauthorized access). H5 requires R-05 founder escalation and legal notification — follow R-05 templates, not T-82-B.*
+
+**T-82-C — Post-resolution (after R-82-C4 passes)**
+
+```
+[RESOLVED] Session Revocation KV Sync — Restored
+
+Root cause: [H1/H2/H3/H4 — one-line description]
+Duration of degraded mode: [start timestamp] to [end timestamp] ([N] minutes)
+Sessions revoked during degraded window: [kv_sync_status='failed' count from R-82-C3]
+  All revocations were processed via Supabase fallback — no sessions silently re-admitted.
+KV-edge enforcement: Restored. REVOKE-SLO-01 compliance resuming.
+Post-incident: [post-mortem scheduled / no further action required]
+```
+
+### §R-82.7 DEC-030 Chain Specification
+
+**Existing event (trigger — already registered in `docs/AUDIT_LOG_SCHEMA.md §session-Revocation-KV`):**
+
+| Field | Value |
+|---|---|
+| `event_type` | `session.revocation_kv_sync_error` |
+| Classification | HIGH |
+| Retention | 7 yr |
+| Description | KV write failure during session revocation; fallback to `session_blocklist` Supabase path activated |
+| SOC 2 | CC7.2 (anomaly monitoring — triggers AL-REVOKE-01) |
+
+**New terminal event for R-82 IC closure:**
+
+| Field | Value |
+|---|---|
+| `event_type` | `session.revocation_kv_sync_restored` |
+| Classification | LOW |
+| Retention | 3 yr |
+| Description | Session Revocation KV sync restored; KV-edge enforcement re-activated; REVOKE-KV-CHAIN-01 terminal event |
+| SOC 2 | CC7.3 (response to anomaly — IC closure documentation) |
+
+**`SessionRevocationKvSyncRestoredPayload` Zod v2 schema:**
+
+```typescript
+import { z } from 'zod';
+
+export const SessionRevocationKvSyncRestoredPayload = z.object({
+  incident_id:                         z.string().uuid(),
+  tenant_id:                           z.string().uuid().nullable(), // null = fleet-wide
+  root_cause:                          z.enum(['H1', 'H2', 'H3', 'H4', 'H5']),
+  degraded_window_minutes:             z.number().positive(),
+  supabase_fallback_activated:         z.boolean(),
+  failed_revocation_row_count:         z.number().nonnegative(), // kv_sync_status='failed' rows
+  resolution_confirmed_at:             z.string().datetime(),
+  r05_co_activated:                    z.boolean(),
+  kv_write_error_count_during_incident: z.number().nonnegative(),
+});
+```
+
+**REVOKE-KV-CHAIN-01 ordering invariant:**
+
+`session.revocation_kv_sync_restored` requires a prior `session.revocation_kv_sync_error` event for the same `incident_id` within 24 h. If no such anchor exists, the `emit-audit-event` Worker returns HTTP 422 `REVOKE_KV_CHAIN_01_VIOLATION` and the INSERT is blocked — escalate to R-05. (`tenant_id` may be null for fleet-wide incidents; the anchor check is on `incident_id` only.) Implementation: pending M5 (`emit-audit-event` Worker update, §R-82.11 item 4).
+
+**Privacy floor:** `session.revocation_kv_sync_error` payload contains `error_code`, `error_message` (CF error — no PII), `kv_key_prefix` (e.g., `revoke:tenant`, `revoke:session` — no `tenant_id` or `user_id` in the prefix value stored in payload). `session.revocation_kv_sync_restored` payload contains only aggregate counts, the `root_cause` enum, and operational metadata. No `user_id`, employee name, email, health value, coaching content, or GDPR Art. 9 special-category data appears in either event.
+
+### §R-82.8 SOC 2 Evidence
+
+**REVOKE-SYNC-E-001 — Per-activation evidence artefact (CC6.3 / CC7.2 / CC7.3)**
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | REVOKE-SYNC-E-001 |
+| **Description** | Per-activation Session Revocation KV sync error incident report |
+| **SOC 2 criteria** | CC6.3 / CC7.2 / CC7.3 |
+| **Cadence** | Per AL-REVOKE-01 IC activation |
+| **Retention** | 7 yr WORM |
+| **R2 path** | `compliance/evidence/session-revocation/revoke-sync-e-001-{incident_id}.json` |
+| **SOC2_READINESS registration** | §180 (§79.4 count 156 → 157; this pass, 2026-07-05) |
+
+**Eight required components:**
+
+1. **R-82-C1 output** — Last 50 `session.revocation_kv_sync_error` events for the IC window (event_type, created_at, error_code, error_message, kv_key_prefix — no user_id).
+2. **R-82-C2 output** — KV sync error rate at IC trigger point (error_count, total_count, error_rate_pct, severity_hint).
+3. **R-82-C3 output** — `session_blocklist` kv_sync_status distribution during degraded window (confirms fallback was active and audit trail was intact during incident).
+4. **Root cause classification** — H1–H5 enum with one-line justification.
+5. **Degraded window** — Start timestamp (first `session.revocation_kv_sync_error` event in IC window) to end timestamp (last error before R-82-C4 confirmed clean).
+6. **`session.revocation_kv_sync_error` HIGH/7yr event JSON** — The AL-REVOKE-01 trigger event (DEC-030 chain anchor).
+7. **`session.revocation_kv_sync_restored` LOW/3yr event JSON** — REVOKE-KV-CHAIN-01 terminal event (IC closure).
+8. **R-82-C4 output** — Post-recovery verification: `new_errors_post_remediation = 0` for ≥ 15 minutes.
+
+**Privacy floor:** REVOKE-SYNC-E-001 artefact contains only aggregate counts, operational metadata, and DEC-030 event JSONs. No `user_id`, `session_id`, `tenant_id` value (only the null-or-UUID field per §R-82.7 schema), employee name, email, health value, coaching content, or GDPR Art. 9 special-category data appears in any component. R-82-C3 is a kv_sync_status GROUP BY count only — no session IDs, no user identifiers. `r2:form-api` NO ACCESS to `compliance/evidence/session-revocation/`. HR role NO ACCESS.
+
+**SOC 2 auditor narratives:**
+
+**CC6.3 — Logical access removal on a timely basis:**
+REVOKE-SYNC-E-001 §degraded-window and §R-82-C3-output prove that during the KV sync error period, revocations were still being written to the Supabase `session_blocklist` authoritative audit trail. The `session_blocklist`-only fallback path (§22.7) continued to enforce access removal — no revocations were silently dropped. REVOKE-SYNC-E-001 §R-82-C4-output confirms that KV-edge enforcement was restored within the 30-minute SLA. Combined with the quarterly REVOKE-OBS-E-001 (§76.8), this provides auditors with both periodic health attestations and per-incident degradation records.
+
+**CC7.2 — Anomaly monitoring:**
+REVOKE-SYNC-E-001 §R-82-C2-output documents the `session.revocation_kv_sync_error` rate that triggered AL-REVOKE-01 — sourced from the immutable DEC-030 audit chain. The alert rule definition (`docs/OBSERVABILITY.md §76.4`) sets a 1%/5-min threshold, and this artefact documents the rate at trigger time, confirming the automated monitoring was operational and correctly classified the anomaly.
+
+**CC7.3 — Response to identified anomalies:**
+REVOKE-SYNC-E-001 §root-cause-classification and §degraded-window document root cause determination, remediation path applied, and resolution confirmation. The R-82-C4 zero-error confirmation is the formal closure evidence. For H5 incidents, R-05 co-activation status (`r05_co_activated: true`) is documented, providing auditors with evidence that unauthorized-access scenarios are escalated to the full unauthorized-access runbook (R-05 CC6.6 / CC7.3 / CC7.4 protocol).
+
+**Filing procedure:**
+1. Populate all eight components from IC outputs (no PII fields per schema constraints above).
+2. Sign: `compliance/scripts/sign-evidence.sh revoke-sync-e-001-{incident_id}.json` (same signing key as CC6-E-REV-001 — §178.3).
+3. Upload to R2: `compliance/evidence/session-revocation/revoke-sync-e-001-{incident_id}.json` (WORM bucket — 7-year retention).
+4. Add REVOKE-SYNC-E-001 artefact path to the quarterly REVOKE-OBS-E-001 per-incident supplement for the relevant quarter (§76.8 per-incident supplement path).
+5. Notify compliance-officer with R2 object URL for written confirmation before closing IC.
+
+### §R-82.9 Post-Incident Controls
+
+| # | Control | Owner | Trigger condition |
+|---|---|---|---|
+| 1 | Root cause post-mortem within 48 h of KV restoration | devops-lead + security-engineer | Every R-82 activation |
+| 2 | If H1 (binding missing): add `SESSION_REVOCATION_KV` binding presence check to pre-deploy checklist for `form-api-gateway` Worker (verify `env.SESSION_REVOCATION_KV` is bound and namespace ID matches production before any deploy) | devops-lead | H1 only |
+| 3 | If H2 (quota exhaustion): add KV quota utilisation to weekly devops review metric; set a 70% quota utilisation alert threshold to provide advance warning before AL-REVOKE-01 fires | devops-lead | H2 only |
+| 4 | If H3 (CF platform incident): document CF incident ID and duration in REVOKE-SYNC-E-001; no FORM-side architectural change required unless H3 exceeds 2 activations in a rolling 90-day window — at that threshold, evaluate a secondary KV namespace with failover routing | devops-lead + enterprise-architect | H3 recurring only |
+| 5 | If H4 (code regression): add a KV write integration test to the `form-api-gateway` CI pipeline that performs a synthetic revocation write and read-back against a staging KV namespace on every pull request; gate merge on test pass | platform-engineer | H4 only |
+| 6 | If H5 (unauthorized access — MANDATORY): complete R-05 IC before closing R-82; freeze and audit all CF API tokens with `SESSION_REVOCATION_KV` write access; file GDPR Art. 33 assessment with compliance-officer; do not restore KV namespace until security-engineer sign-off | security-engineer + compliance-officer | H5 only |
+
+### §R-82.10 Cross-References
+
+| Reference | Location | Relationship |
+|---|---|---|
+| AL-REVOKE-01 alert spec | `docs/OBSERVABILITY.md §76.4` (v5.22.1, 2026-07-05) | Canonical alert definition triggering R-82; §76.4 "Dedicated companion IR runbook" field updated this pass to reference R-82 |
+| AL-REVOKE-02 alert spec | `docs/OBSERVABILITY.md §76.4` (v5.22.1, 2026-07-05) | Secondary alert (bulk P95 > 5,000 ms); does not trigger R-82 but may co-occur with H2/H4 scenarios |
+| `session.revocation_kv_sync_error` event schema | `docs/AUDIT_LOG_SCHEMA.md §session-Revocation-KV` | Canonical DEC-030 schema for the AL-REVOKE-01 trigger event; registered at v1.3 (2026-06-01) |
+| `session.revocation_kv_sync_restored` event schema | `docs/AUDIT_LOG_SCHEMA.md` — pending §R-82.11 item 1 | New LOW/3yr terminal event; `SessionRevocationKvSyncRestoredPayload` Zod v2 schema; REVOKE-KV-CHAIN-01 invariant |
+| REVOKE-SYNC-E-001 registration | `docs/SOC2_READINESS.md §180` (v4.6.0, 2026-07-05) | §79.4 master evidence table registration; count 156 → 157 |
+| Session Revocation KV design | `docs/SSO_SCIM_IMPLEMENTATION.md §22` | KV architecture; four key types; `isRevoked()` hot-path; `session_blocklist` write-through; AL-REVOKE-01/02 alert definitions; §22.15 item 12 backreference to OBSERVABILITY §76 added this pass |
+| Session Revocation KV observability | `docs/OBSERVABILITY.md §76` (v5.22.1, 2026-07-05) | RED metrics, SLOs (REVOKE-SLO-01/02), AL-REVOKE-01/02 inline runbooks, REVOKE-OBS-E-001 quarterly artefact, §26.9 dashboard sub-group |
+| Supabase database outage | `docs/INCIDENT_RESPONSE.md §R-03` | H5 and H3 co-activation: if `session_blocklist` Supabase fallback is also unavailable, co-activate R-03 |
+| Unauthorized privileged access | `docs/INCIDENT_RESPONSE.md §R-05` | H5 mandatory co-activation: CF API token unauthorized access or namespace deletion |
+| REVOKE-OBS-E-001 quarterly artefact | `docs/OBSERVABILITY.md §76.8` | Per-incident supplement path includes REVOKE-SYNC-E-001 artefact path reference |
+| DEC-030 HMAC chain protocol | `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) | HMAC-chained audit log pattern governing all events emitted in this runbook |
+
+### §R-82.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `session.revocation_kv_sync_restored` LOW/3yr and `SessionRevocationKvSyncRestoredPayload` Zod v2 schema in `docs/AUDIT_LOG_SCHEMA.md` (new section `§R-82 Session Revocation KV Sync Restored events`); include REVOKE-KV-CHAIN-01 ordering invariant and REVOKE-SYNC-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [ ] Pending — M5 |
+| 2 | Implement REVOKE-KV-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`: `session.revocation_kv_sync_restored` must have prior `session.revocation_kv_sync_error` for same `incident_id` within 24 h; HTTP 422 + `REVOKE_KV_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M5 | [ ] Pending — M5 |
+| 3 | Update `docs/OBSERVABILITY.md §76.4` AL-REVOKE-01 "Dedicated companion IR runbook" field: update from "Gap — pending M5 (§76.9 item 4)" to reference `INCIDENT_RESPONSE.md R-82` | compliance-officer | **P0** | [x] **Done — 2026-07-05 (OBSERVABILITY.md v5.22.1, §76.4 updated; §76.9 item 4 and §76.10 closed this pass).** |
+| 4 | Register REVOKE-SYNC-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§180, per-activation cadence, CC6.3/CC7.2/CC7.3, 7yr, count 156 → 157) | compliance-officer | **P0** | [x] **Done — 2026-07-05 (SOC2_READINESS.md v4.6.0, §180; count 156 → 157).** |
+| 5 | Add `docs/SSO_SCIM_IMPLEMENTATION.md §22.15` item 12: backreference to OBSERVABILITY §76 (Session Revocation KV observability — RED metrics, SLOs, AL-REVOKE-01/02 section, REVOKE-OBS-E-001 artefact, §26.9 dashboard sub-group) | compliance-officer | **P1** | [x] **Done — 2026-07-05 (SSO_SCIM_IMPLEMENTATION.md v2.38, §22.15 item 12).** |
+| 6 | Add KV write CI integration test for `form-api-gateway` (synthetic revocation write + read-back against staging KV namespace; gate merge on pass — H4 post-incident control) | platform-engineer | **P1** / M5 | [ ] Pending — M5 |
+| 7 | Authoring complete — R-82 closes the AL-REVOKE-01 companion runbook gap: AL-REVOKE-01 in `docs/OBSERVABILITY.md §76.4` had only a five-step inline runbook; BCL (R-73/R-74), SAML SLO (R-75/R-76), and PKJWT (R-81) each had dedicated companion runbooks; R-82 closes the equivalent gap for Session Revocation KV observability (§76) | compliance-officer | **P0** | [x] **Done — 2026-07-05 (INCIDENT_RESPONSE.md v3.47.0).** |
+
+**Privacy floor (invariant throughout R-82):** No employee `user_id`, name, email, health value, body composition, coaching session content, private key material, or GDPR Art. 9 special-category data appears in any R-82 scope query result, DEC-030 event payload, evidence artefact, or Slack communication template. R-82-C1 returns only `error_code`, `error_message` (CF operational error strings — no PII), `kv_key_prefix` (key type prefix only — `revoke:session`, `revoke:user`, `revoke:tenant`, `revoke:jti` — not a value containing `session_id` or `user_id`). R-82-C3 returns kv_sync_status aggregate counts only — no `session_id`, `user_id`, `tenant_id`, or individual session data. `tenant_id` in the `session.revocation_kv_sync_restored` terminal event is FORM-internal UUID or null — not linked to company name, employee roster, or any personal identifier in this runbook. HR role NEVER has access to `compliance/evidence/session-revocation/`. Owner: security-engineer + compliance-officer + devops-lead.
+
+---
+
+*v3.47.0 (2026-07-05): R-82 Session Revocation KV Sync Error (CC6.3/CC7.2/CC7.3 — AL-REVOKE-01 companion runbook). Closes the AL-REVOKE-01 companion runbook gap in `docs/OBSERVABILITY.md §76.4` (v5.22.1, 2026-07-05): §76.4 had only a five-step inline runbook for the `session.revocation_kv_sync_error` P1 scenario; BCL observability (§70) has R-73 (REVOCATION_QUEUE exhausted) and R-74 (BCL-CHAIN-01 violation); SAML SLO observability (§72) has R-75 and R-76; PKJWT observability (§75) has R-81; Session Revocation KV observability (§76) was the remaining gap. R-82: eleven-section companion runbook. Trigger: AL-REVOKE-01 (`session.revocation_kv_sync_error` HIGH/7yr rate > 1% / 5 min → PagerDuty `form-security` P1; escalates to P0 on H5 unauthorized). Three trigger modes: Mode-1 (PagerDuty P1 via AL-REVOKE-01); Mode-2 (CSM escalation — session not revoked post-deprovisioning); Mode-3 (manual dashboard discovery). Five root causes: H1 KV namespace binding missing (`SESSION_REVOCATION_KV` absent from `wrangler.toml` — 100% error rate, binding_error code); H2 KV quota exhaustion (429 code, correlated with revocation volume spike); H3 CF KV platform incident (503/500 codes, CF status page confirmed, no FORM action needed — fallback mode active); H4 Worker code regression (onset correlated with deployment, variable error_code pattern); H5 unauthorized access (401/unauthorized codes, CF audit log anomaly — P0 + R-05 + CF API token freeze). Four scope queries: R-82-C1 (last 50 `session.revocation_kv_sync_error` events — error_code/message/kv_key_prefix, no user_id); R-82-C2 (KV sync error rate over 30-min window — error_count/total_count/error_rate_pct/severity_hint); R-82-C3 (`session_blocklist` kv_sync_status distribution — confirms fallback active, audit trail intact, no user_id); R-82-C4 (post-recovery zero-error confirmation, ≥ 15 min window). Six-step recovery: Step 1 (ack PagerDuty, open IC, T-82-A, confirm Supabase fallback active via R-82-C3); Step 2 (R-82-C1..C3, classify H1–H5); Step 3a (H1 — fix `wrangler.toml`, two-person review, redeploy); Step 3b (H2 — CF quota increase ticket + BATCH_SIZE reduction; optional JTI path disable); Step 3c (H3 — no FORM action, T-82-B CSM comms, monitor CF status); Step 3d (H4 — identify deployment, roll back, fix, security-engineer review); Step 3e (H5 — P0 escalation, CF API token freeze, R-05 co-activation, GDPR Art. 33 assessment); Step 4 (R-82-C4 zero-error confirm ≥ 15 min); Step 5 (T-82-C post-resolution, IC closure); Step 6 (emit `session.revocation_kv_sync_restored` LOW/3yr REVOKE-KV-CHAIN-01 terminal event; file REVOKE-SYNC-E-001; close IC). Three Slack templates: T-82-A (initial P1 declaration, fallback-mode safety statement); T-82-B (CSM degraded-mode notification — not for H5); T-82-C (post-resolution with root cause + degraded window + failed_revocation_row_count). REVOKE-KV-CHAIN-01 ordering invariant: `session.revocation_kv_sync_restored` requires prior `session.revocation_kv_sync_error` for same `incident_id` within 24 h; HTTP 422 `REVOKE_KV_CHAIN_01_VIOLATION` on violation (pending M5 `emit-audit-event` Worker implementation). `SessionRevocationKvSyncRestoredPayload` Zod v2 schema: `incident_id` UUID, `tenant_id` UUID-nullable (null for fleet-wide), `root_cause` enum (H1–H5), `degraded_window_minutes` positive, `supabase_fallback_activated` boolean, `failed_revocation_row_count` nonneg-int, `resolution_confirmed_at` datetime, `r05_co_activated` boolean, `kv_write_error_count_during_incident` nonneg-int. REVOKE-SYNC-E-001 per-activation SOC 2 evidence artefact (CC6.3/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/session-revocation/revoke-sync-e-001-{incident_id}.json`): eight components including R-82-C1..C4 outputs, root cause, degraded window, trigger event JSON, terminal event JSON; no user_id/session_id/tenant_id value in any component. Three SOC 2 auditor narratives: CC6.3 (R-82-C3 kv_sync_status distribution proves Supabase fallback protected all revocations during degraded window; R-82-C4 confirms KV-edge enforcement restored within SLA); CC7.2 (R-82-C2 error rate at trigger documents AL-REVOKE-01 automated anomaly detection from immutable DEC-030 chain); CC7.3 (root cause classification + degraded window + R-82-C4 confirm document full incident response cycle; H5 R-05 co-activation field documents escalation). Six post-incident controls: H1 — `SESSION_REVOCATION_KV` binding presence check in pre-deploy checklist; H2 — 70% quota utilisation alert threshold; H3 recurring — evaluate secondary KV namespace at 2 activations / 90 days; H4 — KV write CI integration test; H5 MANDATORY — R-05 completion + GDPR Art. 33 assessment before IC closure; universal — 48h post-mortem. Seven implementation checklist items: items 3 (OBSERVABILITY.md v5.22.1 — §76.4 companion runbook field, §76.9 item 4 Done, §76.10 Done) + 4 (SOC2_READINESS.md v4.6.0 — §180 REVOKE-SYNC-E-001, count 156 → 157) + 5 (SSO_SCIM_IMPLEMENTATION.md v2.38 — §22.15 item 12) + 7 (authoring done) marked Done this pass; items 1/2/6 pending M5. Document header v3.46.0 → v3.47.0. Owner: security-engineer + compliance-officer + devops-lead.*

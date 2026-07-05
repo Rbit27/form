@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [13.33.1] — 2026-07-05
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §R-82` — companion IR runbook for AL-REVOKE-01 (Session Revocation KV Sync Error). Eleven sections: trigger matrix (Mode-1 PagerDuty / Mode-2 CSM / Mode-3 manual), five root causes (H1 binding missing, H2 quota exhaustion, H3 CF platform incident, H4 code regression, H5 unauthorized — P0 + R-05), four scope queries (R-82-C1..C4), six-step recovery, three communication templates (T-82-A/B/C), REVOKE-KV-CHAIN-01 ordering invariant, REVOKE-SYNC-E-001 per-activation SOC 2 evidence artefact (CC6.3/CC7.2/CC7.3, 7yr WORM, §79.4 count 156 → 157). Closes AL-REVOKE-01 companion runbook gap in OBSERVABILITY §76.4. Document v3.46.0 → v3.47.0.
+- `docs/SOC2_READINESS.md §180` — REVOKE-SYNC-E-001 registration; §79.4 count 156 → 157; CC6.3/CC7.2/CC7.3, per-IC cadence, 7yr WORM. Document v4.5.0 → v4.6.0.
+
+### Changed
+- `docs/OBSERVABILITY.md §76.4/§76.9/§76.10` — AL-REVOKE-01 companion IR runbook gap closed; §76.9 item 4 [x] Done; §76.10 🟢 Done. Document v5.22.0 → v5.22.1.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §22.15` — item 12 added: OBSERVABILITY §76 backreference. Closes §76.10 "Pending next SSO_SCIM pass" obligation. Document v2.37 → v2.38.
+- `VERSION` — 13.33.0 → 13.33.1.
+
+---
+
 ## [13.33.0] — 2026-07-05
 
 ### Added
