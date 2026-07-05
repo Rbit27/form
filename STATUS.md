@@ -6,6 +6,7 @@
 
 ## Current version
 
+**v13.26.0** — 2026-07-05 · content · post-3257 · «Як ідентифікувати свої адаптаційні паттерни: що спостерігати і як це структурувати» · series «Програмування під себе: від шаблону до власної системи» 3256–3265 in progress 2/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3257 · next: post-3258 (принципи першої адаптації шаблону)
 **v13.25.0** — 2026-07-05 · content · post-3256 · «Чому шаблон — це не програма: різниця між готовою схемою і власною системою» · series «Програмування під себе: від шаблону до власної системи» 3256–3265 in progress 1/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3256 · next: post-3257 (адаптаційні паттерни: що спостерігати і як структурувати)
 **v13.24.0** — 2026-07-05 · content · post-3255 · «Self-coached без тренера: повна рамка зворотного зв'язку» · series «Тренування без зовнішнього зворотного зв'язку: self-coached рамки замість тренера» 3246–3255 COMPLETE (10/10) · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3255 · next: new series proposal (see README → Open questions)
 **v13.23.1** — 2026-07-05 · enterprise · INCIDENT_RESPONSE R-80 cert-expiry-check stale runbook (AL-CERT-05 companion; CC7.2/CC6.1; P1) · AUDIT_LOG_SCHEMA v3.0 (+2 CERT-CHECK-STALE events) · SOC2_READINESS §176 CERT-CHECK-STALE-E-001 registered (count 150 → 151)

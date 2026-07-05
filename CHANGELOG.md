@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.26.0] — 2026-07-05
+
+### Added
+- `content/post-3257-identifying-adaptive-patterns-what-to-observe-and-how-to-structure-it.md` — Series «Програмування під себе: від шаблону до власної системи» 3256–3265, post 2/10. «Як ідентифікувати свої адаптаційні паттерни: що спостерігати і як це структурувати». Four observation categories: performance vs. forecast, inter-session subjective state, RPE accuracy per movement, response to specific programme parameters. Minimum logging structure: session log + daily 1–5 marker + 2-sentence weekly summary. Confirmation criterion: three independent instances in different contexts without a clear alternative explanation. False patterns: novelty effect, confirmation bias, regression to the mean, situational variability. One full block minimum for first reliable observations. clinical-safety NOT_REQUIRED (training data observation methodology; no food/body image/pain/psychiatry). sports-scientist review pending.
+- `blog.html` — post-3257 card prepended at top of feed.
+
+### Changed
+- `VERSION` — 13.25.0 → 13.26.0.
+
+---
+
 ## [13.25.0] — 2026-07-05
 
 ### Added
