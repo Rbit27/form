@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.19.1
+# FORM · Observability & Monitoring Taxonomy v5.20.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -20517,3 +20517,186 @@ The BCL-OBS-E-001 quarterly evidence artefact spec (§70.8) and SLO-OBS-E-001 sp
 *v5.19.0 (2026-07-04): §74 BCL-INT-CAP-01 Parity Patch — Cap-Reached Event Registration (AUDIT\_LOG\_SCHEMA.md v2.94 · CC7.2 · BCL-INT-CAP-01 / SLO-INT-CAP-01). Closes two documentation gaps created by §71 and §73. Gap 1: `security.slo_int_cap_reached` CRITICAL/7yr emitted by §73 SQL DDL (`0103_slo_chain_integrity_check.sql`) was not registered in `docs/AUDIT_LOG_SCHEMA.md §SLO-Chain-Monitor-Events`; §SLO-Chain-Monitor-Events header described "three" events but §73 introduced a fourth (SLO-INT-CAP-01: > 50 orphaned SLO closure events in 24h window). Gap 2: §71 BCL-INT-CAP-01 design decision ("50 per run; > 50 indicates H4/H5") had no corresponding `security.bcl_int_cap_reached` event — §71 SQL `LIMIT 50` makes cap-reached detection impossible (`v_violation_count` capped at 50 by the query limit, so `> 50` never triggers). §74.2 registers both events in AUDIT\_LOG\_SCHEMA.md v2.94: `security.slo_int_cap_reached` (SLO-INT-CAP-01 backfill) and `security.bcl_int_cap_reached` (BCL-INT-CAP-01 parity gap) — both CRITICAL/7yr, CC7.2, fleet-level aggregate payload (no tenant\_id, no slo/bcl\_request\_id, no user PII), shared `ChainIntCapReachedPayload` Zod v2 schema (`cap_limit: z.literal(50)`, `orphan_count_capped: z.literal(true)`, `total_orphans_found: z.number().int().min(51)`, `detection_source` enum, `detected_at`). §74.3 corrected `fn_bcl_chain_integrity_check()` v2 SQL DDL (migration `0104_bcl_chain_check_cap_patch.sql`): uses `LIMIT 51` (vs. §71 `LIMIT 50`) with EXIT on `v_cap_total > 50` (51st row confirms > 50 orphans) → emits first 50 `security.bcl_chain_01_violation` events then `security.bcl_int_cap_reached`; BCL-ALL-CLR-SUPPRESS-01 dual suppression (cap-hit RETURN + `v_emitted > 0` RETURN); adds `SET search_path = public, pg_catalog`, `REVOKE ALL FROM PUBLIC` before `GRANT EXECUTE TO form_audit`, `v_now TIMESTAMPTZ := clock_timestamp()` for consistent timestamps, `detection_source` field in all-clear payload; `CREATE OR REPLACE FUNCTION` patch — no pg_cron schedule change; gated on M8 + all §46.8 P0 items + M-0102 applied. §74.4 BCL-CAP-TAB-01 tabletop test spec (parallel to §73.4 item 5 SLO-INT-CAP-01): insert 51 synthetic `backchannel_logout.revoked` orphan rows on staging → manual `fn_bcl_chain_integrity_check()` run → confirm 50 `security.bcl_chain_01_violation` + 1 `security.bcl_int_cap_reached` (`total_orphans_found = 51`) + no `system.bcl_chain_check_passed`. §74.5 BCL-OBS-E-001 + SLO-OBS-E-001 quarterly report scope update: add `security.bcl_int_cap_reached` and `security.slo_int_cap_reached` as a third event type in each quarterly artefact (alongside existing all-clear + per-violation events); zero-event attestation required when no cap events in period; R-05 co-activation note required when cap events present. §74.6 six-item implementation checklist: items 1–2 Done this pass (AUDIT\_LOG\_SCHEMA.md v2.94 registrations); items 3–6 Pending M7/M8. §74.7 six cross-reference obligations: two 🟢 Done this pass; four 🟡 Pending M7/M8. Also adds §73 TOC entry (missing from §73 initial pass — §73.5 cross-reference marked Done but TOC row was not inserted). Privacy floor (both cap events): `tenant_id = NULL` (fleet-level signal — no per-tenant data); `total_orphans_found` is an integer count — no `{tenant_id, slo_request_id}` or `{tenant_id, bcl_request_id}` enumeration; no `user_id`, email, health data, or GDPR Art. 9 special-category data. Document header v5.18.1 → v5.19.0. Owner: devops-lead + compliance-officer. Review: security-engineer + enterprise-architect.*
 
 *v5.18.0 (2026-07-04): §72 SAML Single Logout (SLO) Observability. Closes the observability gap created by `docs/SSO_SCIM_IMPLEMENTATION.md §45` (v2.20, 2026-07-04 — SAML SLO Worker spec, Migration 0100, SLO-CHAIN-01 ordering invariant, twelve-item implementation checklist). Five DEC-030 SLO events registered in `docs/AUDIT_LOG_SCHEMA.md` (slo.sp\_initiated, slo.idp\_initiated, slo.completed, slo.failed, slo.fallback\_local\_only — registered by SSO\_SCIM §45 v2.20); SLO-E-001/002/003/004 evidence artefacts registered in `docs/SOC2_READINESS.md §162` (v3.88.0, 2026-07-04; evidence count 128 → 132); SLO-E-001 + SLO-E-002 added to §15.1 compliance calendar in `docs/SOC2_READINESS.md §165` (v3.90.0, 2026-07-04). §72.1: scopes monitoring to SAML SLO Worker (`saml-slo.ts`), SLO\_KV (TTL 15s), `revokeSessionsBySloRequest()`, and SLO-CHAIN-01 HMAC ordering invariant; five DEC-030 event types with chain roles (sp\_initiated anchor, completed + fallback\_local\_only closure, failed exempt); privacy floor (raw `idp_name_id` never in payloads — `idp_name_id_hash` SHA-256 for correlation only); SOC 2 CC6.1/CC6.3/CC7.2/CC7.3; IdP SLO support matrix (Okta ✅ SP+IdP, Entra ID ✅ SP+IdP, Google Workspace ❌ no SLO endpoint → fallback\_local\_only). §72.2: RED metrics — SLO requests by flow + tenant (WAE), `slo.failed` by reason enum (WAE + audit\_log\_events), `slo_chain_violation_total` (emit-audit-event 422 counter), SP round-trip P95 latency target < 8,000 ms. §72.3: two SLOs — SLO-SLO-01 (SP-initiated federated success rate ≥ 99.0%; alert < 95% / 10 min; rolling 30 days; SSO-SLO-04 credit linkage) and SLO-SLO-02 (round-trip P95 < 8,000 ms; alert > 9,000 ms / 15 min; rolling 7 days); SLO-SLO-01 denominator excludes `slo_not_configured` tenants. §72.4: three alert rules — AL-SLO-01 (failure + timeout rate P1, per-tenant 30-min dedup; full runbook with five diagnostic steps; auto-resolve), AL-SLO-02 (SLO-CHAIN-01 violation P0; full retrospective SQL with `form_audit` role, LIMIT 50, 24h window; no cooldown; no auto-resolve), AL-SLO-03 (P95 > 9,000 ms P2 PagerDuty `form-devops`; approaching-abort-boundary runbook). §72.5: three §6.2 alert table rows (slo subsection: AL-SLO-01/02/03; marked P0 Done this pass). §72.6: seven-panel "SAML SLO / Federated Logout" dashboard sub-group for §26.9 Enterprise Identity dashboard: request volume by flow + tenant, outcome pie, `slo.failed` by reason, SLO-CHAIN-01 integrity tile, SP round-trip P95 gauge, federated success rate by tenant, fallback rate by reason. §72.7: SOC 2 evidence mapping for CC6.1 (revocation proof via HMAC chain), CC6.3 (timeliness: 10s abort window + timestamp delta + SLO-SLO-01), CC7.2 (three alert rules as anomaly monitors), CC7.3 (P0/P1/P2 response SLAs; companion runbooks R-75 + R-76 pending §72.9 items 9/10). §72.8: SLO-OBS-E-001 quarterly evidence artefact (CC6.1/CC6.3/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/saml-slo/slo-obs-e-001-{YYYY}-Q{N}.json`); six-component report spec; zero-event attestation pattern required for all failure/alert counters; nil attestation required each quarter until M7. §72.9: twelve-item implementation checklist — 2× P0 Done this pass (TOC entry, §6.2 additions), 10× P1/M7 pending (alert rules 1–3, dashboard, SOC2\_READINESS SLO-OBS-E-001 registration, §15.1 calendar entry, IR runbooks R-75 + R-76, SSO\_SCIM §45.9 backreference, first quarterly filing); OQ-SLO-OBS-01 raised (pg\_cron vs. CF Workers Cron Trigger for SLO-CHAIN-01 retrospective check — recommendation: pg\_cron job 60; M7 resolution gate). §72.10: OQ-SLO-OBS-01 registered. §72.11: seven cross-reference obligations — 2× 🟢 Done this pass (TOC + §6.2); 5× 🟡 Pending P1/M7 (SOC2\_READINESS SLO-OBS-E-001 registration, §15.1 calendar, IR runbooks R-75 + R-76, SSO\_SCIM §45.9 backreference). Privacy floor: all §72 content is operational metadata only — no individual employee `user_id`, name, email, session token, coaching content, body composition metric, or GDPR Art. 9 special-category data; `tenant_id` is FORM-internal UUID; `idp_name_id_hash` appears only as a query parameter reference (SHA-256 hash, not raw NameID); SLO-OBS-E-001 aggregate-only with zero-event attestation. Document header v5.17.0 → v5.18.0. Owner: devops-lead + security-engineer + compliance-officer.*
+
+---
+
+## §75 PKJWT Key Lifecycle Observability
+
+### §75.1 Purpose and Scope
+
+This section defines observability for FORM's OIDC `private_key_jwt` client authentication (DEC-097, RFC 7523) — the per-tenant asymmetric key lifecycle from generation through annual rotation and the JWKS public-key discovery endpoint on which token exchange depends.
+
+**Source references:** `docs/SSO_SCIM_IMPLEMENTATION.md §42` (design — `buildClientAssertion()`, JWKS endpoint, key rotation), §43 (Migration 0098 DDL + Worker spec), §44 (pg_cron DDL + Admin Dashboard panel). `docs/DATA_MODEL.md §54` (Migration 0098 schema — seven PKJWT columns on `tenant_sso_configs`). `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` (three DEC-030 events registered v2.73, 2026-07-02; `sso.pkjwt_jwks_missing` HIGH/7yr added v2.95 this pass). DEC-030, DEC-097, SOC 2 CC6.6.
+
+**PKJWT components monitored:**
+
+| Component | Description |
+|---|---|
+| `GET /auth/oidc/{tenant_id}/.well-known/jwks.json` Worker | `SSO_PKJWT_JWKS` KV-backed JWKS endpoint serving `current` and `next` public key slots; `Cache-Control: public, max-age=3600`; 503 + `sso.pkjwt_jwks_missing` on empty KV (per §43.4.2 empty-JWKS guard) |
+| pg_cron job 58 (`pkjwt_key_expiry_sweep`) | Daily 09:00 UTC sweep — scans `tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt' AND pkjwt_key_expires_at < NOW() + INTERVAL '30 days'`; emits `sso.pkjwt_key_expiry_warning` per matching tenant; freshness window 26h (R-57 stale runbook) |
+| Admin Dashboard PKJWT panel (§44.3) | PAM-gated key generation modal + rotation button (enabled 30 days before expiry); `POST /internal/tenant/{tenant_id}/sso/pkjwt/generate` and `/rotate` endpoints; emits `sso.pkjwt_key_generated` / `sso.pkjwt_key_rotated` DEC-030 events |
+
+**Four DEC-030 events monitored (all HMAC-chained, `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle`):**
+
+| Event | Severity | Retention | Trigger | Monitoring role |
+|---|---|---|---|---|
+| `sso.pkjwt_key_generated` | HIGH | 7 yr | Tenant admin generates first or replacement PKJWT key pair via Admin Dashboard PAM-gated endpoint | CC6.6 key-lifecycle record; input to PKJWT-E-001 quarterly artefact |
+| `sso.pkjwt_key_rotated` | HIGH | 7 yr | Annual rotation: old key → KV `:next` slot (48h dual-key overlap); new key → `:current` | CC6.6 rotation compliance; AL-PKJWT-02 anomaly threshold |
+| `sso.pkjwt_key_expiry_warning` | STANDARD | 3 yr | pg_cron job 58 daily sweep: key expires within 30 days | PKJWT-SLO-02 coverage; R-57 stale runbook companion |
+| `sso.pkjwt_jwks_missing` | HIGH | 7 yr | JWKS Worker returns 503: `private_key_jwt` active for tenant but KV `:current` slot empty — inconsistent state (see §43.4.2) | AL-PKJWT-01 zero-tolerance P1; PKJWT-SLO-01 breach signal |
+
+**Privacy floor:** All four events contain only `tenant_id` (FORM-internal UUID) and `kid` (UUID — public-key reference only) as identifiers, plus timestamps and operational enums. No employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data in any PKJWT event payload. `pkjwt_private_key_encrypted` is never read by pg_cron job 58, never present in any event payload, and never accessible via `form_api` (REVOKED — DATA_MODEL §54 RLS analysis).
+
+**SOC 2 mapping:** CC6.6 (cryptographic key management — private key asymmetric posture, annual rotation compliance, advance warning monitoring), CC7.2 (anomaly monitoring — AL-PKJWT-01 / AL-PKJWT-02), CC7.3 (P1/P2 response SLAs).
+
+**IdP `private_key_jwt` support matrix (from SSO_SCIM §44.4):**
+
+| IdP | `private_key_jwt` support | JWKS discovery behaviour |
+|---|---|---|
+| Okta | ✅ Supported — JWKS URI registered at OIDC app level | Caches JWKS up to 1 h; re-fetches on signature failure |
+| Azure AD / Entra ID | ✅ Supported — JWKS URI in app manifest | Caches JWKS up to 24 h; manual cache flush via portal for incident recovery |
+| Google Workspace | ✅ Supported | Caches JWKS; re-fetches on 401 from token endpoint |
+
+---
+
+### §75.2 RED Metrics
+
+| Service | Rate (R) | Errors (E) | Duration (D) |
+|---|---|---|---|
+| **JWKS Worker** | `pkjwt_jwks_requests_total` req/min per active PKJWT tenant (WAE counter) | `pkjwt_jwks_503_total` — count of `sso.pkjwt_jwks_missing` events per tenant per 5-min window; target 0 | `pkjwt_jwks_duration_ms` P95; target < 100 ms (KV read only, no DB query) |
+| **Key lifecycle** | `pkjwt_key_rotated_total` fleet-wide per 24h; typical value ≤ active-PKJWT-tenant-count / 365 | AL-PKJWT-02 threshold: > 2 `sso.pkjwt_key_rotated` for any single tenant in 24h = anomaly signal | `pkjwt_key_rotation_duration_ms` P95 (KV write + DB UPDATE for new key + DEC-030 emit) |
+| **Expiry coverage** | `pkjwt_active_tenant_count` gauge (tenants with `oidc_client_auth_method = 'private_key_jwt'`; daily query by job 58) | Coverage gap: tenant in `pkjwt_active_tenant_count` with `pkjwt_key_expires_at < NOW() + INTERVAL '30 days'` AND no `sso.pkjwt_key_expiry_warning` in last 35 days | N/A — pg_cron job 58 is non-blocking; duration irrelevant |
+
+**Metric emission approach:** JWKS Worker metrics emitted via Cloudflare Workers Analytics Engine (WAE), consistent with `cf_worker_requests_total` in §0. Key lifecycle and expiry coverage signals are derived from `audit_log_events` via `form_audit` read-only role queries — matching the DEC-067 decision (§48) for SSO identity alert signals. No separate metric pipeline introduced.
+
+**Normal baseline:** `pkjwt_jwks_503_total = 0` at all times. Any non-zero value is an immediate P1 condition (AL-PKJWT-01). `sso.pkjwt_key_rotated` events are rare (once per tenant per year at annual rotation); fleet-wide weekly count should be ≤ `active_pkjwt_tenant_count / 52`.
+
+---
+
+### §75.3 SLOs
+
+| SLO ID | Indicator | Target | Alert threshold | Window | Owner |
+|---|---|---|---|---|---|
+| **PKJWT-SLO-01** | JWKS endpoint HTTP 200 rate for active PKJWT tenants — fraction of JWKS requests that return HTTP 200 with a non-empty `keys` array; HTTP 404 (tenant not configured) is excluded from denominator | ≥ 99.9% per active PKJWT tenant per rolling 7 days | Any `sso.pkjwt_jwks_missing` event (zero tolerance — immediate AL-PKJWT-01 P1; no rolling average) | Rolling 7 days | devops-lead |
+| **PKJWT-SLO-02** | 30-day advance warning coverage — fraction of active PKJWT tenants with `pkjwt_key_expires_at` within the next 30 days that have received at least one `sso.pkjwt_key_expiry_warning` event in the preceding 35 days | 100% (every expiring tenant warned before the 30-day window closes) | R-57 stale (job 58 freshness > 26h) OR coverage gap query returns > 0 rows; see §75.4 AL-PKJWT-01 runbook step 4 | Per-tenant, evaluated on each job 58 run | devops-lead |
+
+**PKJWT-SLO-01 note:** The JWKS endpoint serves IdP token exchange requests. A 503 does not immediately break existing FORM sessions (IdPs cache JWKS for up to 24 h and retry on token failure per §75.1 IdP matrix), but it breaks new-session token exchange for Entra ID (24h cache) significantly faster than Okta (1h cache). Each `sso.pkjwt_jwks_missing` event is treated as a SLO breach trigger regardless of IdP cache residency — the KV inconsistency requires immediate human intervention.
+
+**PKJWT-SLO-02 note:** The SLO target is 100% because key expiry renders token exchange permanently broken until rotation — there is no grace period once the key expires. The 35-day window accounts for pg_cron scheduling jitter and the possibility that job 58 runs slightly before the 30-day threshold and re-runs slightly after; a tenant warned on day 31 satisfies the requirement. R-57 stale automatically degrades PKJWT-SLO-02 because missed job-58 runs accumulate coverage gaps.
+
+**Enterprise SLA credit linkage:** PKJWT-SLO-01 breach (JWKS 503) affecting a tenant maps to SSO-SLO-01 (SSO login availability) for that tenant if token exchange fails during the JWKS unavailability window, triggering enterprise SLA credit calculation per §23.
+
+---
+
+### §75.4 Alert Rules
+
+#### AL-PKJWT-01 — JWKS Endpoint Missing Key
+
+| Field | Value |
+|---|---|
+| **Trigger** | Any `sso.pkjwt_jwks_missing` HIGH/7yr DEC-030 event (zero-tolerance — JWKS missing = active KV inconsistency for affected tenant; each occurrence is an independent P1) |
+| **Severity** | P1 — immediate PagerDuty `form-security`; JWKS missing means new IdP token exchanges will fail for the affected tenant within IdP cache TTL (Okta: ~1h; Entra ID: ~24h; Google: ~1h); no batch cooldown |
+| **Routing** | PagerDuty `form-security` → security-engineer on-call; auto-notify CSM for affected `tenant_id` via Slack `#alerts-enterprise` (CSM contacts tenant IT within 15 min to warn of potential SSO interruption) |
+| **Dedup key** | `pkjwt-jwks-missing-{tenant_id}` (1h cooldown — consecutive 503s for same tenant within 1h treated as single incident; each distinct `tenant_id` pages separately) |
+| **Runbook** | (1) Query `SELECT pkjwt_key_id, pkjwt_key_expires_at, pkjwt_algorithm, oidc_client_auth_method FROM tenant_sso_configs WHERE id = $tenant_id` (form_system role) — confirm `oidc_client_auth_method = 'private_key_jwt'` and `pkjwt_key_id IS NOT NULL`; (2) Check KV: `SSO_PKJWT_JWKS:{tenant_id}:current` — if missing, key was never written or was deleted from KV (DB has the key metadata but KV slot is empty); (3) If key exists in DB but not KV: trigger Admin Dashboard "Republish JWKS" PAM action (§44.3.7 recovery path) or call `POST /internal/tenant/{tenant_id}/sso/pkjwt/republish-jwks` (form_system role, SECURITY DEFINER) — re-reads encrypted private key, re-derives public JWK, writes to KV `:current`; (4) Check expiry: if `pkjwt_key_expires_at < NOW()`, the key has expired — republishing a stale public key will cause token-endpoint signature verification failures; open emergency rotation (§42.10 "incident" rotation path, `rotation_reason: 'incident'`); also check if job 58 is stale (open R-57 if `pkjwt_key_expiry_sweep` freshness > 26h); (5) Confirm JWKS 200 by synthetic GET to `GET /auth/oidc/{tenant_id}/.well-known/jwks.json` from IC's workstation; (6) Notify tenant IT via CSM that JWKS is restored; file PKJWT-OBS-E-001 supplement noting KV inconsistency event and root cause. |
+| **Alert SQL** | `SELECT payload->>'tenant_id', created_at FROM audit_log_events WHERE event_type = 'sso.pkjwt_jwks_missing' AND created_at > NOW() - INTERVAL '5 minutes' ORDER BY created_at DESC` (form_audit role) |
+| **SOC 2** | CC6.6 (cryptographic key availability — JWKS endpoint is the CC6.6 asymmetric posture boundary), CC7.3 (P1 response within 15 min) |
+| **Auto-resolve** | No — manual close after JWKS 200 confirmed with non-empty `keys` array; PKJWT-OBS-E-001 supplement filed |
+| **Privacy floor** | Alert payload: `tenant_id` (FORM-internal UUID), `incident_time` (ISO 8601). No employee `user_id`, name, email, `kid` value (KV key name suffix), or private key material. |
+
+---
+
+#### AL-PKJWT-02 — Unexpected Key Rotation Anomaly
+
+| Field | Value |
+|---|---|
+| **Trigger** | > 2 `sso.pkjwt_key_rotated` events for any single `tenant_id` within 24 hours (expected: ≤ 1 per year under normal annual rotation); OR any `sso.pkjwt_key_rotated` event with `rotation_reason: 'incident'` (unexpected rotation — may indicate compromised key or unauthorized Admin Dashboard access) |
+| **Severity** | P2 — Slack `#alerts-enterprise` + security-engineer notification; escalates to P1 PagerDuty `form-security` if combined with any `sso.pkjwt_jwks_missing` event for the same tenant within the same 24h window |
+| **Routing** | Slack `#alerts-enterprise` → security-engineer; P2 investigation within 4h; automatic P1 escalation path on co-occurrence with AL-PKJWT-01 |
+| **Dedup key** | `pkjwt-rotation-anomaly-{tenant_id}` (24h cooldown per tenant) |
+| **Runbook** | (1) Query `SELECT old_kid, new_kid, rotation_reason, rotated_at FROM audit_log_events WHERE event_type = 'sso.pkjwt_key_rotated' AND payload->>'tenant_id' = $tenant_id AND created_at > NOW() - INTERVAL '24 hours' ORDER BY created_at ASC` (form_audit role) — count and sequence of rotations; (2) Cross-reference with `pg_log` / Cloudflare Access audit for PAM access to `/internal/tenant/{tenant_id}/sso/pkjwt/rotate` endpoint within the same window — confirm authorized principal; (3) If `rotation_reason: 'incident'` and no corresponding IR ticket exists: escalate to compliance-officer to formally open incident record (R-77 rotation companion runbook); document authorized-by principal and reason; (4) If > 2 rotations with no authorized IC record: treat as potential unauthorized access — escalate to P1; trigger session invalidation for all tenant admin sessions (`POST /internal/tenant/{tenant_id}/revoke-all-sessions`, two-person auth per §19.4); audit trail review within 2h; (5) Verify current JWKS KV slot is valid and returns HTTP 200 — AL-PKJWT-01 may also fire if rotation left KV in inconsistent state. |
+| **Alert SQL** | `SELECT payload->>'old_kid', payload->>'new_kid', payload->>'rotation_reason', created_at FROM audit_log_events WHERE event_type = 'sso.pkjwt_key_rotated' AND created_at > NOW() - INTERVAL '24 hours' GROUP BY payload->>'tenant_id' HAVING COUNT(*) > 2` (form_audit role) |
+| **SOC 2** | CC6.6 (unexpected key replacement is an anomaly signal for key compromise or unauthorized access), CC7.2 (anomaly monitoring on key rotation velocity) |
+| **Auto-resolve** | No — manual close after security-engineer confirms rotation was authorized and JWKS state is healthy |
+| **Privacy floor** | Alert payload: `tenant_id` (FORM-internal UUID), `rotation_count` (integer), `dominant_reason` (enum). No employee `user_id`, name, email, or private key material. `kid` UUIDs (old/new) are FORM-internal key identifiers — public-key references only; no key material exposed. |
+
+---
+
+### §75.5 §6.2 Alert Table Registration
+
+Two new rows in the §6.2 global alert table under the `pkjwt` subsection (added this pass):
+
+| Alert ID | P-level | Channel | Cooldown | SOC 2 | Auto-resolve | Runbook |
+|---|---|---|---|---|---|---|
+| AL-PKJWT-01 | P1 | PagerDuty `form-security` | 1h per tenant | CC6.6, CC7.3 | No | §75.4 AL-PKJWT-01 |
+| AL-PKJWT-02 | P2 (→ P1 on co-occurrence with AL-PKJWT-01) | Slack `#alerts-enterprise` | 24h per tenant | CC6.6, CC7.2 | No | §75.4 AL-PKJWT-02 |
+
+---
+
+### §75.6 "PKJWT Key Management" Dashboard Sub-Group (§26.9)
+
+Add a `pkjwt` sub-group to the §26.9 Enterprise Identity dashboard (parallel to the `bcl` and `slo` sub-groups added in §70.6 and §72.6):
+
+| Panel | Type | Query source | Update cadence |
+|---|---|---|---|
+| Active PKJWT tenants | Single-stat gauge | `SELECT COUNT(*) FROM tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt'` (form_system role, read-only) | Daily (job 58 run) |
+| JWKS 200 rate per tenant (last 7 days) | Table | WAE `pkjwt_jwks_requests_total{status=200}` / `pkjwt_jwks_requests_total` per tenant; 200 rate in % | Real-time (WAE) |
+| JWKS missing events (last 30 days) | Single-stat — target 0; red if > 0 | `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'sso.pkjwt_jwks_missing' AND created_at > NOW() - INTERVAL '30 days'` (form_audit role) | Hourly refresh |
+| Key rotation events (last 90 days) | Bar chart by tenant and `rotation_reason` | `SELECT payload->>'tenant_id', payload->>'rotation_reason', DATE_TRUNC('week', created_at) FROM audit_log_events WHERE event_type = 'sso.pkjwt_key_rotated' AND created_at > NOW() - INTERVAL '90 days'` | Daily |
+| Keys expiring within 30 days | Table (tenant_id, kid, days_until_expiry) | `SELECT payload->>'tenant_id', payload->>'kid', payload->>'days_until_expiry' FROM audit_log_events WHERE event_type = 'sso.pkjwt_key_expiry_warning' AND created_at > NOW() - INTERVAL '35 days' ORDER BY (payload->>'days_until_expiry')::int ASC` | Daily (job 58 run) |
+| pg_cron job 58 last-run freshness | Single-stat (timestamp delta since last `sso.pkjwt_key_expiry_warning` or job run) | `SELECT MAX(created_at) FROM pg_cron.job_run_details WHERE jobid = 58` (form_audit via PAM read) | Hourly |
+
+**Privacy floor:** All dashboard queries use `tenant_id` (FORM-internal UUID) only. No employee `user_id`, name, email, or `pkjwt_private_key_encrypted` column in any panel query.
+
+---
+
+### §75.7 SOC 2 Evidence Mapping
+
+| Criterion | Evidence path | Artefact |
+|---|---|---|
+| **CC6.6** (cryptographic key management — asymmetric posture, annual rotation, advance warning) | `sso.pkjwt_key_generated` + `sso.pkjwt_key_rotated` HMAC-chain events prove private key never at IdP and rotation occurred within 12-month policy window; `sso.pkjwt_key_expiry_warning` events prove 30-day advance warning monitoring; `sso.pkjwt_jwks_missing` events prove availability monitoring exists with zero-tolerance AL-PKJWT-01 | PKJWT-E-001 (key lifecycle quarterly export, `docs/SOC2_READINESS.md §145`); PKJWT-OBS-E-001 (§75.8, quarterly observability summary) |
+| **CC7.2** (anomaly monitoring) | AL-PKJWT-01 (JWKS availability zero-tolerance) and AL-PKJWT-02 (rotation velocity anomaly) provide continuous automated anomaly detection for the PKJWT subsystem; both rules derive signals from immutable DEC-030 HMAC-chain `audit_log_events` records | PKJWT-OBS-E-001 §75.8 — alert activation log section |
+| **CC7.3** (response to anomalies) | AL-PKJWT-01: P1 IC response within 15 min (PagerDuty `form-security`); AL-PKJWT-02: P2 investigation within 4h (Slack `#alerts-enterprise`); P1 escalation path defined on co-occurrence | PKJWT-OBS-E-001 §75.8 — incident response log section |
+
+---
+
+### §75.8 PKJWT-OBS-E-001 Quarterly Evidence Artefact
+
+| Artefact ID | Description | Criterion | Collection | Retention | Storage path |
+|---|---|---|---|---|---|
+| **PKJWT-OBS-E-001** | Quarterly PKJWT key lifecycle observability health report. Must include: (1) `active_pkjwt_tenant_count` at end of quarter; (2) `sso.pkjwt_jwks_missing` events for the quarter — zero-event attestation (`"jwks_missing_count": 0` + note "PKJWT-SLO-01 not breached in period") if none; (3) `sso.pkjwt_key_rotated` events for the quarter by `rotation_reason` enum (zero-event attestation if none); (4) `sso.pkjwt_key_expiry_warning` count by tenant for the quarter — confirms job 58 coverage; (5) AL-PKJWT-01 and AL-PKJWT-02 activation log (zero-event attestation if no activations); (6) PKJWT-SLO-01 and PKJWT-SLO-02 compliance summary for the quarter. | CC6.6, CC7.2, CC7.3 | Quarterly | 7 yr WORM | `compliance/evidence/pkjwt-obs/pkjwt-obs-e-001-{YYYY}-Q{N}.json` |
+
+**Supplement path:** Any `sso.pkjwt_jwks_missing` event (AL-PKJWT-01 activation) or `sso.pkjwt_key_rotated` with `rotation_reason: 'incident'` (AL-PKJWT-02 P2 trigger) generates a per-incident supplemental file: `pkjwt-obs-e-001-{incident_id}-supplement.json` referencing the parent quarterly artefact. Supplement includes: DEC-030 event JSON, IC root-cause classification, resolution timestamp, and CSM notification log. Privacy floor identical to parent artefact.
+
+**Zero-event attestation pattern:** If no `sso.pkjwt_jwks_missing` events occurred in the quarter, PKJWT-OBS-E-001 must explicitly record `"jwks_missing_count": 0` — not omit the field. Same pattern applies to rotation anomaly count and AL-PKJWT-01/02 activation counts. Absence of field ≠ zero for auditors. If no PKJWT tenants are active in the quarter, record `"active_pkjwt_tenant_count": 0` and note "no PKJWT-OBS-E-001 contents required for this quarter; nil attestation."
+
+**Privacy floor:** PKJWT-OBS-E-001 contains only `tenant_id` UUIDs (FORM-internal), `kid` UUIDs (public-key references, no private material), aggregate integer counts, alert activation records, and rotation reason enums. No employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data.
+
+---
+
+### §75.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Add `sso.pkjwt_jwks_missing` HIGH/7yr as fourth event in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle`; add Zod v2 schema `SsoPkjwtJwksMissingPayload`; update section header to note four events (was three) | compliance-officer | **P0** | [x] **Done — 2026-07-05 (AUDIT_LOG_SCHEMA.md v2.95, this pass).** |
+| 2 | Add TOC entry §75 to document table of contents | devops-lead | **P0** | [x] **Done — this pass.** |
+| 3 | Add AL-PKJWT-01 and AL-PKJWT-02 rows to §6.2 global alert table (pkjwt subsection) | devops-lead | **P1** | [x] **Done — §75.5, this pass.** |
+| 4 | Add `docs/SSO_SCIM_IMPLEMENTATION.md §42.12` cross-reference row for OBSERVABILITY §75 | compliance-officer | **P1** | [x] **Done — SSO_SCIM v2.34, this pass.** |
+| 5 | Register PKJWT-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.6/CC7.2/CC7.3, quarterly, 7yr) | compliance-officer | **P1** | [ ] Pending — M6 |
+| 6 | Add "PKJWT Key Management" sub-group to §26.9 Enterprise Identity dashboard (§75.6 spec) | devops-lead | **P1** | [ ] Pending — M6 |
+| 7 | File PKJWT-OBS-E-001 Q3 2026 first quarterly artefact (after M5/M6 PKJWT production deploy) | compliance-officer | **P1** | [ ] Pending — Q3 2026 |
+
+---
+
+### §75.10 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` — add `sso.pkjwt_jwks_missing` HIGH/7yr as fourth event (unregistered gap from §43.4 JWKS Worker spec, v2.18) | §43.4.2 JWKS empty-KV guard (DEC-030 event emitted on 503; severity HIGH per emitDec030Event call; no prior AUDIT_LOG_SCHEMA registration) | 🟢 **Done — 2026-07-05 (AUDIT_LOG_SCHEMA.md v2.95, this pass).** |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §42.12` cross-reference table — add OBSERVABILITY.md §75 row | §42 PKJWT design cross-reference obligations table | 🟢 **Done — 2026-07-05 (SSO_SCIM v2.34, this pass).** |
+| Register PKJWT-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table | §75.8 / §75.9 item 5 | 🟡 Pending — M6 (compliance-officer) |
+| Add "PKJWT Key Management" sub-group to §26.9 Enterprise Identity dashboard | §75.6 / §75.9 item 6 | 🟡 Pending — M6 (devops-lead) |
+
+---
+
+*v5.20.0 (2026-07-05): §75 PKJWT Key Lifecycle Observability. Closes the observability gap for FORM's OIDC `private_key_jwt` client authentication (DEC-097, RFC 7523, `docs/SSO_SCIM_IMPLEMENTATION.md §42–§44`). BCL (§70) and SAML SLO (§72) each have dedicated observability sections; PKJWT had only a single §12.6 pg_cron job row (job 58) and R-57 stale runbook. Gap identified: no dedicated RED metrics, no SLOs, no alert rules, no PKJWT-OBS-E-001 quarterly artefact, and `sso.pkjwt_jwks_missing` HIGH/7yr (emitted by §43.4 JWKS Worker 503 guard) was never registered in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle`. §75.1: scopes monitoring to JWKS Worker endpoint (`GET /auth/oidc/{tenant_id}/.well-known/jwks.json`, KV-backed), pg_cron job 58 (`pkjwt_key_expiry_sweep`, `0 9 * * *`), and Admin Dashboard PKJWT panel (§44.3); four DEC-030 events (`sso.pkjwt_key_generated` HIGH/7yr, `sso.pkjwt_key_rotated` HIGH/7yr, `sso.pkjwt_key_expiry_warning` STANDARD/3yr, `sso.pkjwt_jwks_missing` HIGH/7yr — fourth event registered AUDIT_LOG_SCHEMA.md v2.95 this pass); IdP support matrix (Okta/Entra ID/Google — JWKS cache TTL differences); SOC 2 CC6.6/CC7.2/CC7.3; privacy floor (no employee PII, no private key material in any event payload or dashboard query). §75.2: RED metrics — JWKS Worker (req/min WAE, 503 count, P95 < 100 ms), key lifecycle (rotation rate fleet-wide, AL-PKJWT-02 anomaly threshold), expiry coverage gap detection. §75.3: two SLOs — PKJWT-SLO-01 (JWKS HTTP 200 rate ≥ 99.9% per active PKJWT tenant; zero-tolerance on `sso.pkjwt_jwks_missing`; rolling 7 days; SSO-SLO-01 SLA credit linkage) and PKJWT-SLO-02 (30-day advance warning coverage 100%; R-57 stale degrades SLO automatically; per-tenant evaluation per job 58 run). §75.4: two alert rules — AL-PKJWT-01 (any `sso.pkjwt_jwks_missing` event → P1 PagerDuty `form-security`, 1h per-tenant dedup, full 5-step runbook: DB check → KV check → republish or emergency rotation → JWKS 200 confirm → PKJWT-OBS-E-001 supplement) and AL-PKJWT-02 (> 2 `sso.pkjwt_key_rotated` per tenant / 24h OR `rotation_reason: 'incident'` → P2 Slack `#alerts-enterprise`, 24h per-tenant dedup, P1 escalation on AL-PKJWT-01 co-occurrence, 4-step runbook: audit log query → PAM access cross-reference → incident doc → JWKS state verify). §75.5: AL-PKJWT-01 and AL-PKJWT-02 registered in §6.2 alert table (pkjwt subsection). §75.6: six-panel "PKJWT Key Management" sub-group for §26.9 Enterprise Identity dashboard: active tenant count, JWKS 200 rate per tenant, JWKS missing events (target 0), key rotation events by reason, keys expiring within 30 days, job 58 freshness tile. §75.7: SOC 2 evidence mapping CC6.6 (asymmetric posture + rotation compliance + availability monitoring + advance warning), CC7.2 (AL-PKJWT-01/02 continuous anomaly detection), CC7.3 (P1/P2 response SLAs). §75.8: PKJWT-OBS-E-001 quarterly evidence artefact (CC6.6/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/pkjwt-obs/pkjwt-obs-e-001-{YYYY}-Q{N}.json`); six-component report including active tenant count, JWKS missing events (zero-event attestation), rotation events, expiry warning coverage, alert activation log, SLO compliance summary; per-incident supplement path for AL-PKJWT-01 activations and incident rotations. §75.9: seven-item implementation checklist — four items Done this pass (AUDIT_LOG_SCHEMA.md v2.95 `sso.pkjwt_jwks_missing` registration, TOC entry, §6.2 alert table additions, SSO_SCIM §42.12 cross-reference row); three Pending M6/Q3-2026 (SOC2_READINESS PKJWT-OBS-E-001 registration, §26.9 dashboard sub-group, first quarterly filing). §75.10: four cross-reference obligations — two 🟢 Done this pass (AUDIT_LOG_SCHEMA.md v2.95 event registration, SSO_SCIM §42.12 row); two 🟡 Pending M6 (SOC2_READINESS registration, §26.9 dashboard). Privacy floor: all §75 content contains only FORM-internal UUIDs (`tenant_id`, `kid`) and operational metadata — no employee `user_id`, name, email, session token, health value, coaching content, body composition metric, or GDPR Art. 9 special-category data; `pkjwt_private_key_encrypted` never read or referenced in any alert rule, dashboard query, or evidence artefact; `kid` UUIDs are public-key references only — no private key material extractable. Document header v5.19.1 → v5.20.0. Owner: devops-lead + compliance-officer + security-engineer.*

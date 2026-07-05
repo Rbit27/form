@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [12.86.1] — 2026-07-05
+
+### Added
+- `docs/OBSERVABILITY.md §75` — PKJWT Key Lifecycle Observability. Dedicated observability section for FORM's OIDC `private_key_jwt` client authentication (DEC-097, RFC 7523) — companion to §70 (BCL) and §72 (SLO). Closes the gap where BCL and SAML SLO each had dedicated RED metrics, SLOs, alert rules, and quarterly evidence artefacts, but PKJWT had only a one-row §12.6 entry and R-57 stale runbook. Also closes a registration gap: `sso.pkjwt_jwks_missing` HIGH/7yr (emitted by `docs/SSO_SCIM_IMPLEMENTATION.md §43.4.2` JWKS Worker 503 guard since v2.18) was never registered in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle`. §75 covers: four DEC-030 events monitored (key_generated, key_rotated, key_expiry_warning, jwks_missing); RED metrics (JWKS WAE, rotation velocity, expiry coverage); PKJWT-SLO-01 (JWKS ≥ 99.9%, zero-tolerance on jwks_missing) + PKJWT-SLO-02 (30-day warning coverage 100%); AL-PKJWT-01 (JWKS missing P1 PagerDuty, 5-step runbook) + AL-PKJWT-02 (rotation anomaly P2 Slack); §6.2 alert table rows; §26.9 "PKJWT Key Management" dashboard sub-group; SOC 2 CC6.6/CC7.2/CC7.3 mapping; PKJWT-OBS-E-001 quarterly evidence artefact. Owner: devops-lead + compliance-officer + security-engineer.
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.19.1 → v5.20.0; §75 appended.
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.94 → v2.95; `sso.pkjwt_jwks_missing` HIGH/7yr registered as fourth SSO-PKJ-Lifecycle event (Zod v2 schema `SsoPkjwtJwksMissingPayload`; section header updated to four events).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — v2.33 → v2.34; §42.12 cross-reference table updated with OBSERVABILITY.md §75 row (🟢 Done).
+- `VERSION` — 12.86.0 → 12.86.1.
+
+---
+
 ## [12.85.0] — 2026-07-05
 
 ### Added
