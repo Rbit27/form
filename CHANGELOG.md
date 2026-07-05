@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.28.0] — 2026-07-05
+
+### Added
+- `content/post-3259-prioritizing-competing-patterns-how-to-choose-one-when-there-are-five.md` — Series «Програмування під себе: від шаблону до власної системи» 3256–3265, post 4/10. «Пріоритизація між конкуруючими паттернами: як вибрати один, коли їх п'ять». Three-level framework: L1 recovery-threatening patterns (always first); L2 progress-blocking patterns; L3 optimisation patterns. Four intra-level criteria: breadth of impact, temporal stability, hypothesis specificity, isolation clarity. Analytic-paralysis trigger: when observation is sufficient for action. Patterns not worth acting on (unclear causality, <3-week confirmation, normal variability, L3 with unresolved L1/L2). Conflict between patterns: usually illusory — L1 resolves first regardless. Practical 5-step algorithm from pattern list to single block choice. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3259 card prepended at top of feed.
+
+### Changed
+- `VERSION` — 13.27.0 → 13.28.0.
+- `STATUS.md` — series «Програмування під себе» progress updated to 4/10; next: post-3260 (тренувальний журнал: як вести так, щоб дані реально допомагали).
+
+---
+
 ## [13.27.0] — 2026-07-05
 
 ### Added
