@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.30.0] — 2026-07-05
+
+### Added
+- `content/post-3261-reading-adaptation-results-real-effect-vs-noise.md` — Series «Програмування під себе: від шаблону до власної системи» 3256–3265, post 6/10. «Читання результатів адаптації: як відрізнити реальний ефект від шуму». Three-condition framework for concluding an adaptation worked: sustained effect (≥3 data points in second half of block), mechanism match (effect in the right metric, not an adjacent one), no strong alternative explanation. Four noise sources: regression to the mean, novelty effect, confounders, order effect. Five-step algorithm: hypothesis written before data analysis → second-half-of-block review → alternative explanations scan → mechanism match → conclusion. «Not confirmed» ≠ «did not work» — distinction between insufficient data and falsification. Three outcome scenarios: confirmed (new baseline), signal present (repeat block), failed (new hypothesis). Common errors: reading results session-by-session; confirmation bias; time horizon too short; ignoring negative results; drawing conclusions without an isolated variable. clinical-safety NOT_REQUIRED (training programming methodology; no food/body image/pain/psychiatry). sports-scientist review pending.
+- `blog.html` — post-3261 card prepended at top of feed.
+
+### Changed
+- `VERSION` — 13.29.1 → 13.30.0.
+- `STATUS.md` — series «Програмування під себе» progress updated to 6/10; next: post-3262 (self-coached operating manual: як self-coached атлет будує власний набір правил, специфічних для його тіла).
+
+---
+
 ## [13.29.1] — 2026-07-05
 
 ### Changed
