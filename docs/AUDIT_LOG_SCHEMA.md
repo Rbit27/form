@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.98
+# FORM · Audit Log Schema v2.99
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -3687,6 +3687,79 @@ export const AdminSessionsBulkRevokedPayload = z.object({
 
 ---
 
+### SAML Certificate Lifecycle events (DEC-030 HMAC-chained · SSO §20 · SOC 2 CC6.1/CC7.2/CC8.1)
+
+> Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §20` (SAML Certificate Lifecycle Management — Proactive Monitoring & Expiry Alerting). Four DEC-030 HMAC-chained events covering the proactive certificate monitoring lifecycle: daily expiry alert escalation, expired certificate detection on an active tenant, customer IdP certificate upload, and cron health self-reporting. **Cert class distinction:** events carry `cert_class: 'sp'` (FORM-generated SP signing certificate) or `cert_class: 'idp'` (customer-provided IdP signing certificate); both PEMs are encrypted at rest in `tenant_sso_configs` — only fingerprint metadata (`fingerprint_sha256`, `expires_at`) appears in events. **Alert tier escalation model:** `cert_alert_tier` advances through `ok → t90 → t60 → t30 → t14 → t7 → t2 → expired` per tenant per cert class; `sso.cert_expiry_alert` severity scales with proximity (MEDIUM at t90/t60, HIGH at t30/t14, CRITICAL at t7/t2). **Existing event note:** `sso.cert_rotated` (SP rotation completion) is already registered in the SSO authentication policy events section (§6.5); the four events below cover the monitoring, upload, and cron-health phases. **Privacy floor (all events):** no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data; `fingerprint_sha256` is the public SHA-256 hex of the certificate's DER encoding (not secret); `cert_class` is a non-PII operational enum. Cross-ref: `docs/SSO_SCIM_IMPLEMENTATION.md §20` (canonical design — §20.2 schema columns, §20.3 alert escalation matrix, §20.4 `cert-expiry-check` Worker cron, §20.7 DEC-030 events, §20.9 SOC 2 evidence artefacts); `docs/OBSERVABILITY.md §26.5` (AL-CERT-01 through AL-CERT-05 alert rules wired to `sso.cert_expiry_alert` DEC-030 output and `cert_alert_tier` state transitions); `docs/SSO_SCIM_IMPLEMENTATION.md §9 G-004` (certificate rotation automation — 🟡 Partial; closes to 🟢 when AL-CERT-01..AL-CERT-05 deployed in PagerDuty and wired to staging `cert-expiry-check` output); `docs/SSO_SCIM_IMPLEMENTATION.md §8.1` (zero-downtime SP cert rotation runbook — references the 60-day expiry alert trigger from this cron); `docs/INCIDENT_RESPONSE.md R-04` (SSO compromise runbook — triggered by AL-CERT-03/AL-CERT-04). **Closes documentation phase of `docs/SSO_SCIM_IMPLEMENTATION.md §20.11` item 4 (P0/M4 — runtime `emitAuditEvent` wiring in `cert-expiry-check.ts` is the remaining implementation obligation).** Owner: compliance-officer + security-engineer + devops-lead. Registration: AUDIT_LOG_SCHEMA.md v2.99 (2026-07-05).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `sso.cert_expiry_alert` | MEDIUM (t90/t60) · HIGH (t30/t14) · CRITICAL (t7/t2) | 7 yr | `cert-expiry-check` CF Workers Cron (daily 02:00 UTC) advances `cert_alert_tier` for a `(tenant_id, cert_class)` pair to a new threshold window; one event per tier transition per pair; de-duplicated by `cert_alert_last_sent_at` (7-day re-alert window per tier prevents alert fatigue); triggers AL-CERT-01 (t60, P3), AL-CERT-02 (t30, P2), AL-CERT-03 (t7, P1) per `docs/OBSERVABILITY.md §26.5` | `tenant_id` (UUID), `cert_class` (enum: `sp`\|`idp`), `fingerprint_sha256` (string 64-char — public SHA-256 hex of cert DER; no PEM content), `expires_at` (ISO 8601 UTC), `days_remaining` (int ≥ 0 — calendar days until `expires_at`), `alert_tier` (enum: `t90`\|`t60`\|`t30`\|`t14`\|`t7`\|`t2`) |
+| `sso.cert_expired` | CRITICAL | 7 yr | Cron finds `cert_alert_tier = 'expired'` for an active SAML tenant (`is_active = true AND sso_enabled = true`); certificate has passed its `expires_at` date without rotation completing — SSO is hard-broken for all users of that tenant; triggers AL-CERT-04 PagerDuty CRITICAL and auto-opens `docs/INCIDENT_RESPONSE.md R-04` | `tenant_id` (UUID), `cert_class` (enum: `sp`\|`idp`), `fingerprint_sha256` (string 64-char), `expires_at` (ISO 8601 UTC), `days_overdue` (int ≥ 0 — calendar days past `expires_at`) |
+| `sso.cert_uploaded` | STANDARD | 7 yr | Customer IT admin (tenant_owner role) or CSM-mediated upload of a new IdP signing certificate PEM via Admin Dashboard SSO configuration panel (§16.3 cert panel per `docs/SSO_SCIM_IMPLEMENTATION.md §20.8`); metadata parsed from PEM and written to `saml_idp_cert_expires_at` + `saml_idp_cert_fingerprint` + `saml_idp_cert_uploaded_at`; resets `cert_alert_tier` to `ok` for `cert_class: 'idp'` | `tenant_id` (UUID), `cert_class` (literal: `idp` — SP certificate upload is `sso.cert_rotated`), `new_fingerprint_sha256` (string 64-char), `new_expires_at` (ISO 8601 UTC), `uploaded_by` (UUID — `user_id` of the tenant_owner actor; or sentinel form_system UUID for CSM-mediated upload; no email or name in payload) |
+| `sso.cert_monitor_error` | HIGH | 7 yr | `cert-expiry-check` Worker cron encounters an unhandled error querying or parsing cert metadata (Supabase unavailable, malformed BYTEA, decryption failure); emitted before cron exits with non-zero status; triggers AL-CERT-05 PagerDuty HIGH (P1 — cert expiry state unknown until next successful cron run) | `error` (string max 512 — error message only; no PEM, no key material, no tenant PII in error string) |
+
+```typescript
+// AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle — Zod v2 schemas
+// Canonical design: docs/SSO_SCIM_IMPLEMENTATION.md §20.7
+
+import { z } from 'zod/v2';
+
+const CertClassEnum     = z.enum(['sp', 'idp']);
+const AlertTierEnum     = z.enum(['t90', 't60', 't30', 't14', 't7', 't2']);
+
+// ── sso.cert_expiry_alert ────────────────────────────────────────────────────
+export const SsoCertExpiryAlertPayload = z.object({
+  tenant_id:          z.string().uuid(),
+  cert_class:         CertClassEnum,
+  fingerprint_sha256: z.string().length(64),    // SHA-256 hex; no PEM content
+  expires_at:         z.string().datetime(),
+  days_remaining:     z.number().int().min(0),
+  alert_tier:         AlertTierEnum,
+});
+
+// ── sso.cert_expired ─────────────────────────────────────────────────────────
+export const SsoCertExpiredPayload = z.object({
+  tenant_id:          z.string().uuid(),
+  cert_class:         CertClassEnum,
+  fingerprint_sha256: z.string().length(64),
+  expires_at:         z.string().datetime(),
+  days_overdue:       z.number().int().min(0),
+});
+
+// ── sso.cert_uploaded ────────────────────────────────────────────────────────
+export const SsoCertUploadedPayload = z.object({
+  tenant_id:              z.string().uuid(),
+  cert_class:             z.literal('idp'),     // SP upload is sso.cert_rotated
+  new_fingerprint_sha256: z.string().length(64),
+  new_expires_at:         z.string().datetime(),
+  uploaded_by:            z.string().uuid(),    // tenant_owner or form_system sentinel
+});
+
+// ── sso.cert_monitor_error ───────────────────────────────────────────────────
+export const SsoCertMonitorErrorPayload = z.object({
+  error: z.string().max(512),                   // no PEM, no key material, no PII
+});
+```
+
+#### SAML Certificate Lifecycle SOC 2 Evidence Artefacts
+
+| ID | SOC 2 criteria | Description | Retention | Collection method |
+|---|---|---|---|---|
+| **CC6-E-CERT-001** | CC6.1, CC7.2 | `audit_log` export: all `sso.cert_expiry_alert` events for the SOC 2 observation period; demonstrates proactive monitoring before expiry for all active SAML tenants | 7 yr | `SELECT * FROM audit_log WHERE event_type = 'sso.cert_expiry_alert' AND created_at BETWEEN $obs_start AND $obs_end ORDER BY created_at` |
+| **CC6-E-CERT-002** | CC6.1, CC8.1 | `audit_log` export: all `sso.cert_rotated` events (existing event — SP rotation completion); demonstrates change-controlled certificate rotation lifecycle | 7 yr | `SELECT * FROM audit_log WHERE event_type = 'sso.cert_rotated' AND created_at BETWEEN $obs_start AND $obs_end ORDER BY created_at` |
+| **CC6-E-CERT-003** | CC6.1 | `tenant_sso_configs` certificate metadata snapshot at start and end of observation period — expiry timestamps + fingerprints only, no PEM; demonstrates all active SAML tenants had non-expired certificates at observation end | 7 yr | `SELECT tenant_id, saml_sp_cert_expires_at, saml_sp_cert_fingerprint, saml_idp_cert_expires_at, saml_idp_cert_fingerprint, cert_rotation_state FROM tenant_sso_configs WHERE is_active = true` |
+| **CC6-E-CERT-004** | CC7.2 | Cloudflare Workers Tail log or R2-archived daily summary confirming `cert-expiry-check` cron ran on schedule (daily 02:00 UTC) throughout the observation period; absence of `sso.cert_monitor_error` HIGH events confirms healthy execution | 7 yr | Cloudflare dashboard → Workers & Pages → `cert-expiry-check` → Logs; R2 path: `compliance/evidence/sso/cert-check-logs/` |
+
+**Collection responsibility:** devops-lead files CC6-E-CERT-004 at quarterly evidence collection; compliance-officer collects CC6-E-CERT-001/002/003 at SOC 2 audit fieldwork. Registration in `docs/SOC2_READINESS.md §79.4` master evidence table pending `docs/SSO_SCIM_IMPLEMENTATION.md §20.11` item 5 (P1/M4).
+
+**Auditor narrative for CC6.1:** FORM manages the full lifecycle of both the SP signing certificate (FORM-generated, 2-year validity, AES-256-GCM encrypted at rest in `tenant_sso_configs.saml_sp_certificate`) and the IdP signing certificate (customer-provided, variable validity, encrypted in `saml_idp_certificate`). The `cert-expiry-check` CF Workers Cron reads plaintext metadata columns (`saml_sp_cert_expires_at`, `saml_idp_cert_expires_at`) without decrypting the certificate PEM, and emits `sso.cert_expiry_alert` HMAC-chained events for each tenant whose certificate enters a threshold window. CC6-E-CERT-001 (chain export) and CC6-E-CERT-003 (metadata snapshot) together demonstrate that FORM identified every certificate approaching expiry before it became a control failure, satisfying CC6.1 lifecycle management.
+
+**Auditor narrative for CC7.2:** The `cert-expiry-check` cron DEC-030 output feeds directly into AL-CERT-01 through AL-CERT-05 alert rules (`docs/OBSERVABILITY.md §26.5`): escalating PagerDuty notifications at t60 (P3), t30 (P2), t7 (P1), and expiry-on-active-tenant (P0 CRITICAL). AL-CERT-05 monitors cron health independently — a 26-hour missed-run gap triggers P1 PagerDuty regardless of cert status. CC6-E-CERT-004 (cron execution log) demonstrates continuous monitoring throughout the observation period, satisfying CC7.2's requirement that the entity monitors for anomalous conditions including credentials approaching expiry.
+
+**Retention table additions:** `sso.cert_expiry_alert` MEDIUM/HIGH/CRITICAL 7yr CC6.1/CC7.2 · `sso.cert_expired` CRITICAL 7yr CC6.1/CC7.2 · `sso.cert_uploaded` STANDARD 7yr CC6.1 · `sso.cert_monitor_error` HIGH 7yr CC7.2.
+
+---
+
 ### Enterprise Adoption Monitoring events (DEC-030 HMAC-chained · COST_MODEL §40.8 · CC4.1/CC2.2/CC7.3/CC4.2/A1.1)
 
 > Defined in `docs/COST_MODEL.md §40.8` (v2.6, 2026-06-18 — §40 Enterprise Customer Adoption Economics & Seat Utilization Health Model). Five DEC-030 HMAC-chained events covering the monthly adoption snapshot lifecycle, customer milestone detection, health band degradation, QBR completion governance, and CSM follow-up advisory monitoring. **Scope:** Enterprise tier — all active Starter/Growth/Enterprise tenants. **ADO-CHAIN-01 monitoring invariant:** If `enterprise.adoption_health_downgraded` is emitted for a tenant, the `evidence-collection-cron` Worker checks for a corresponding `enterprise.qbr_completed` or CRM CSM check-in within 10 business days; if neither is present, it emits `system.csm_followup_overdue` (LOW advisory, non-blocking). **QBR-PRIV-01 chain invariant:** `enterprise.qbr_completed` carries `privacy_floor_verified: z.literal(true)` — the `emit-audit-event` Worker returns HTTP 422 if the field is absent or `false`, preventing the QBR completion event from being chained without explicit CSM attestation that no individual employee data was shared. **Privacy invariant (all five events):** no `user_id`, no individual health values, no coaching content, no employee names or email addresses — tenant-aggregate or contract-level metadata only. `enterprise_adoption_snapshots` table: `form_api` REVOKED; `compliance_reviewer` SELECT-only; `form_system` ALL. `coaching_engaged_seats < 5` suppressed at API query layer (k-anonymity floor — see `docs/COST_MODEL.md §40.7.2`). Cross-ref: `docs/COST_MODEL.md §40` (full adoption economics model — S1/S2/S3 funnel, health band matrix, QBR financial framework, `enterprise_adoption_snapshots` DDL migration 0078, four DEC-030 event Zod schemas, CSM intervention playbook); `docs/COST_MODEL.md §40.9` (ADO-E-001/002/003 SOC 2 evidence artefacts); `docs/SOC2_READINESS.md §90` (ADO-E-001 CC4.1/A1.1, ADO-E-002 CC2.2/CC4.1, ADO-E-003 CC7.3/CC4.2 registered in master evidence table v3.15.0). **Closes `docs/COST_MODEL.md §40.10` checklist item 1 (P0/M10 — register `enterprise.adoption_snapshot_filed`, `enterprise.adoption_milestone_reached`, `enterprise.adoption_health_downgraded`, `enterprise.qbr_completed`, and `system.csm_followup_overdue` in `docs/AUDIT_LOG_SCHEMA.md §Enterprise + §System` before first enterprise pilot go-live).**
@@ -6859,6 +6932,8 @@ export const SloChainIntegrityCheckRestoredPayload = z.object({
 ---
 
 **v2.98 · 2026-07-05 · owner: compliance-officer + security-engineer**
+*v2.99 (2026-07-05): §SAML-Cert-Lifecycle — Four SAML Certificate Lifecycle DEC-030 HMAC-chained events registered. Closes documentation phase of `docs/SSO_SCIM_IMPLEMENTATION.md §20.11` item 4 (P0/M4 — runtime `emitAuditEvent` wiring in `cert-expiry-check.ts` is the remaining implementation obligation). Events: `sso.cert_expiry_alert` (MEDIUM/HIGH/CRITICAL 7yr — daily `cert-expiry-check` cron tier-advance per `(tenant_id, cert_class)` pair; feeds AL-CERT-01..AL-CERT-03 per `docs/OBSERVABILITY.md §26.5`); `sso.cert_expired` (CRITICAL 7yr — cert past `expires_at` on active SAML tenant; feeds AL-CERT-04 P0 PagerDuty + R-04 auto-open); `sso.cert_uploaded` (STANDARD 7yr — customer IdP cert upload via Admin Dashboard §16.3 cert panel); `sso.cert_monitor_error` (HIGH 7yr — cron query/parse failure; feeds AL-CERT-05 P1). Four Zod v2 schemas: `SsoCertExpiryAlertPayload`, `SsoCertExpiredPayload`, `SsoCertUploadedPayload`, `SsoCertMonitorErrorPayload`. SOC 2 evidence artefacts CC6-E-CERT-001 through CC6-E-CERT-004 documented (CC6.1/CC7.2 — registration in `docs/SOC2_READINESS.md §79.4` pending §20.11 item 5 P1/M4). Privacy floor: all four events contain only `tenant_id` UUID, `cert_class` operational enum, `fingerprint_sha256` SHA-256 hex (public), operational timestamps, and — for `sso.cert_uploaded` — `uploaded_by` UUID (no email or name); no PEM content, no private key material, no employee `user_id`, name, health value, coaching content, or GDPR Art. 9 special-category data. Retention table additions: `sso.cert_expiry_alert` MEDIUM/HIGH/CRITICAL 7yr CC6.1/CC7.2 · `sso.cert_expired` CRITICAL 7yr CC6.1/CC7.2 · `sso.cert_uploaded` STANDARD 7yr CC6.1 · `sso.cert_monitor_error` HIGH 7yr CC7.2. Cross-ref: `docs/SSO_SCIM_IMPLEMENTATION.md §20` (canonical design authority — §20.7 event spec); `docs/OBSERVABILITY.md §26.5` (AL-CERT-01..AL-CERT-05 alert rules consuming these events); `docs/SSO_SCIM_IMPLEMENTATION.md §9 G-004` (certificate rotation automation — 🟡 Partial; cross-reference obligations updated in companion SSO_SCIM v2.35 patch). Document header v2.98 → v2.99. Owner: compliance-officer + security-engineer + devops-lead.*
+
 *v2.98 (2026-07-05): §R-77 BCL-CHECK-STALE-E-001 + §R-78 SLO-CHECK-STALE-E-001 cross-reference patch — SOC2_READINESS §79.4 registration status updated Pending → Done. **Closes stale inline status in two evidence-artefact descriptions authored at v2.96 (2026-07-05):** (1) BCL-CHECK-STALE-E-001 artefact content paragraph (§R-77 BCL Chain Integrity Check Stale events section): status clause "Pending `docs/SOC2_READINESS.md §79.4` registration (R-77.11 item 3, P0/M8)" → "[x] Done — 2026-07-05 (`docs/SOC2_READINESS.md §171.2`, v3.97.0; count 142 → 143; closes R-77.11 item 3)". (2) SLO-CHECK-STALE-E-001 artefact content paragraph (§R-78 SLO Chain Integrity Check Stale events section): status clause "Pending `docs/SOC2_READINESS.md §79.4` registration (R-78.11 item 3, P0/M7)" → "[x] Done — 2026-07-05 (`docs/SOC2_READINESS.md §171.2`, v3.97.0; count 143 → 144; closes R-78.11 item 3)". Root cause: both registrations were completed on 2026-07-05 in `docs/SOC2_READINESS.md §171.2` (v3.97.0, 2026-07-05) as part of `docs/INCIDENT_RESPONSE.md §R-77.11` item 3 + `§R-78.11` item 3 closure (INCIDENT_RESPONSE.md v3.42.0, 2026-07-05) — the inline body-text status fields in the AUDIT_LOG_SCHEMA.md artefact descriptions were not patched at that time. No schema changes, no DDL changes, no event table changes, no Zod schema changes, no retention table changes in this patch — status-field correction only. Privacy floor: BCL-CHECK-STALE-E-001 and SLO-CHECK-STALE-E-001 contain only FORM-internal UUIDs, aggregate integer counts, root cause enums, timestamps, and pg_cron metadata; no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data — unchanged by this patch. Document header v2.97 → v2.98. Owner: compliance-officer + security-engineer.*
 
 **v2.96 · 2026-07-05 · owner: compliance-officer + security-engineer**

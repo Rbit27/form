@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [13.18.1] — 2026-07-05
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.98 → v2.99 — §SAML-Cert-Lifecycle: four SAML certificate lifecycle DEC-030 HMAC-chained events registered (`sso.cert_expiry_alert` MEDIUM/HIGH/CRITICAL 7yr, `sso.cert_expired` CRITICAL 7yr, `sso.cert_uploaded` STANDARD 7yr, `sso.cert_monitor_error` HIGH 7yr). Four Zod v2 schemas (`SsoCertExpiryAlertPayload`, `SsoCertExpiredPayload`, `SsoCertUploadedPayload`, `SsoCertMonitorErrorPayload`). SOC 2 evidence artefacts CC6-E-CERT-001..004 documented (CC6.1/CC7.2). Closes documentation phase of `docs/SSO_SCIM_IMPLEMENTATION.md §20.11` item 4. Auditor narratives for CC6.1 and CC7.2. Privacy floor: no PEM content, no private key material, no employee PII in any payload.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` v2.34 → v2.35 — §9 G-004 stale-status closure: `Certificate rotation automation` row updated 🔴 → 🟡 Partial; references §20 (full lifecycle design), `docs/OBSERVABILITY.md §26.5` (AL-CERT-01..AL-CERT-05), §16.3/§20.8 Admin Dashboard cert panel, and `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` (v2.99). §20.11 item 4 marked `[x] Documentation done — 2026-07-05 (AUDIT_LOG_SCHEMA.md v2.99)`. G-004 closure condition documented: 🟢 on AL-CERT-01..05 PagerDuty deploy + `cert-expiry-check` Worker staging + verified test escalation.
+- `VERSION` — 13.18.0 → 13.18.1.
+
+---
+
 ## [13.18.0] — 2026-07-05
 
 ### Added
