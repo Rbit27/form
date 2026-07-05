@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [13.16.1] — 2026-07-05
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.20.2 → v5.20.3 — §26.9 Enterprise Identity Dashboard extended with "PKJWT Key Management" sub-group (six panels: active PKJWT tenants, JWKS 200 rate per tenant, JWKS missing events, key rotation events by reason, keys expiring within 30 days, pg_cron job 58 freshness). Closes §75.9 item 6 and §75.10 cross-reference obligation. PKJWT-SLO-01 / PKJWT-SLO-02 thresholds overlaid; AL-PKJWT-01 / AL-PKJWT-02 panel cross-links added. Privacy floor enforced: tenant_id + kid UUIDs only, no employee data in any query.
+- `VERSION` — 13.16.0 → 13.16.1.
+
+---
+
 ## [13.16.0] — 2026-07-05
 
 ### Added

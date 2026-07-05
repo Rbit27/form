@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.20.2
+# FORM · Observability & Monitoring Taxonomy v5.20.3
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -6384,6 +6384,19 @@ A dedicated "Enterprise Identity" Metabase dashboard (Supabase-backed panels) an
 | **Cert tier distribution** | `cert_alert_tier` value counts across all active SAML tenants | Horizontal bar chart; any `expired` bar requires immediate action |
 | **Google Directory sync health** | `sso.google_directory_sync_error` / `sso.google_directory_sync_success` ratio per tenant, 1-hour rolling | Heat map (tenants × hours); red cells trigger AL-SSO-GDIR-01/02 investigation |
 | **Active SSO tenants count** | `COUNT(tenant_sso_configs WHERE sso_enabled = true)` | Stat panel — baseline; unexpected drop is a P1 |
+
+**PKJWT Key Management sub-group** (per §75.6; positioned after core panels above; owner: devops-lead; deployed at M6):
+
+| Panel | Type | Query source | Update cadence |
+|---|---|---|---|
+| **Active PKJWT tenants** | Single-stat gauge | `SELECT COUNT(*) FROM tenant_sso_configs WHERE oidc_client_auth_method = 'private_key_jwt'` (form_system role, read-only) | Daily (job 58 run) |
+| **JWKS 200 rate per tenant (last 7 days)** | Table | WAE `pkjwt_jwks_requests_total{status=200}` / `pkjwt_jwks_requests_total` per tenant; 200 rate in %; PKJWT-SLO-01 threshold (≥ 99.9%) overlaid as red reference line | Real-time (WAE) |
+| **JWKS missing events (last 30 days)** | Single-stat — target 0; background turns red if > 0 | `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'sso.pkjwt_jwks_missing' AND created_at > NOW() - INTERVAL '30 days'` (form_audit role) | Hourly refresh |
+| **Key rotation events by tenant & reason (last 90 days)** | Bar chart, stacked by `rotation_reason` enum (`scheduled` / `incident` / `manual`) | `SELECT payload->>'tenant_id', payload->>'rotation_reason', DATE_TRUNC('week', created_at) FROM audit_log_events WHERE event_type = 'sso.pkjwt_key_rotated' AND created_at > NOW() - INTERVAL '90 days'` | Daily |
+| **Keys expiring within 30 days** | Table: tenant_id · kid · days_until_expiry; rows ordered ascending; any row with days_until_expiry ≤ 7 highlighted in ember | `SELECT payload->>'tenant_id', payload->>'kid', payload->>'days_until_expiry' FROM audit_log_events WHERE event_type = 'sso.pkjwt_key_expiry_warning' AND created_at > NOW() - INTERVAL '35 days' ORDER BY (payload->>'days_until_expiry')::int ASC` (PKJWT-SLO-02: table must be 100 % populated while any PKJWT tenant is active) | Daily (job 58 run) |
+| **pg_cron job 58 last-run freshness** | Single-stat (seconds since last successful run); red if > 25 h | `SELECT EXTRACT(EPOCH FROM (NOW() - MAX(end_time))) FROM cron.job_run_details WHERE jobid = 58 AND status = 'succeeded'` (form_audit via PAM read) | Hourly |
+
+**Privacy floor:** All six panel queries use `tenant_id` (FORM-internal UUID) and `kid` (public key-ID, no private material) only. No employee `user_id`, name, email, or `pkjwt_private_key_encrypted` column appears in any query or panel output. **Alert cross-links:** "JWKS missing events" panel links to AL-PKJWT-01 runbook (P1 PagerDuty `form-security` on any `sso.pkjwt_jwks_missing` event, 1 h per-tenant dedup); "Key rotation events" panel links to AL-PKJWT-02 runbook (P2 Slack `#alerts-enterprise` on > 2 rotations / 24 h or `rotation_reason: 'incident'`). Full alert rule spec: §75.5. SOC 2 evidence: PKJWT-OBS-E-001 (§75.8, quarterly, CC6.6 / CC7.2 / CC7.3, 7 yr WORM).
 
 ---
 
@@ -20683,7 +20696,7 @@ Add a `pkjwt` sub-group to the §26.9 Enterprise Identity dashboard (parallel to
 | 3 | Add AL-PKJWT-01 and AL-PKJWT-02 rows to §6.2 global alert table (pkjwt subsection) | devops-lead | **P1** | [x] **Done — §75.5, this pass.** |
 | 4 | Add `docs/SSO_SCIM_IMPLEMENTATION.md §42.12` cross-reference row for OBSERVABILITY §75 | compliance-officer | **P1** | [x] **Done — SSO_SCIM v2.34, this pass.** |
 | 5 | Register PKJWT-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC6.6/CC7.2/CC7.3, quarterly, 7yr) | compliance-officer | **P1** | [x] **Done — 2026-07-05 (SOC2_READINESS §170.2; evidence count 141 → 142).** |
-| 6 | Add "PKJWT Key Management" sub-group to §26.9 Enterprise Identity dashboard (§75.6 spec) | devops-lead | **P1** | [ ] Pending — M6 |
+| 6 | Add "PKJWT Key Management" sub-group to §26.9 Enterprise Identity dashboard (§75.6 spec) | devops-lead | **P1** | [x] **Done — 2026-07-05 (OBSERVABILITY.md §26.9, this pass; v5.20.3).** |
 | 7 | File PKJWT-OBS-E-001 Q3 2026 first quarterly artefact (after M5/M6 PKJWT production deploy) | compliance-officer | **P1** | [ ] Pending — Q3 2026 |
 
 ---
@@ -20695,7 +20708,7 @@ Add a `pkjwt` sub-group to the §26.9 Enterprise Identity dashboard (parallel to
 | `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` — add `sso.pkjwt_jwks_missing` HIGH/7yr as fourth event (unregistered gap from §43.4 JWKS Worker spec, v2.18) | §43.4.2 JWKS empty-KV guard (DEC-030 event emitted on 503; severity HIGH per emitDec030Event call; no prior AUDIT_LOG_SCHEMA registration) | 🟢 **Done — 2026-07-05 (AUDIT_LOG_SCHEMA.md v2.95, this pass).** |
 | `docs/SSO_SCIM_IMPLEMENTATION.md §42.12` cross-reference table — add OBSERVABILITY.md §75 row | §42 PKJWT design cross-reference obligations table | 🟢 **Done — 2026-07-05 (SSO_SCIM v2.34, this pass).** |
 | Register PKJWT-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table | §75.8 / §75.9 item 5 | 🟢 **Done — 2026-07-05 (SOC2_READINESS §170.2; evidence count 141 → 142).** |
-| Add "PKJWT Key Management" sub-group to §26.9 Enterprise Identity dashboard | §75.6 / §75.9 item 6 | 🟡 Pending — M6 (devops-lead) |
+| Add "PKJWT Key Management" sub-group to §26.9 Enterprise Identity dashboard | §75.6 / §75.9 item 6 | 🟢 **Done — 2026-07-05 (OBSERVABILITY.md §26.9, this pass; v5.20.3).** |
 
 ---
 
