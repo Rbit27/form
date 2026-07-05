@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [13.10.1] — 2026-07-05
+
+### Changed
+- `docs/SOC2_READINESS.md` — §174: PKJWT-ROT-IC-CHAIN-01 Pre-Enforcement Compensating Controls Register & Gap-Period Audit Package. Formal SOC 2 gap-period documentation while enforcement code (R-79.11 item 4, M6) awaits deployment. Three manual compensating controls registered: CC-PKJWT-01 (weekly audit log review; CC7.2), CC-PKJWT-02 (weekly JWKS endpoint probe; CC6.6), CC-PKJWT-03 (weekly IC closure SLA check; CC7.3). New evidence artefact PKJWT-GAP-E-001 registered (§79.4 count 145 → 146; quarterly gap-period package; 7yr WORM; retire at M6). §15.1 calendar row added (first due 2026-10-31; retire at M6). M6 transition protocol documented (8 steps). SOC 2 readiness ~97.1% → ~97.2%. Document header v3.98.0 → v4.0.0.
+- `VERSION` — 13.10.0 → 13.10.1.
+
 ## [13.10.0] — 2026-07-05
 
 ### Added

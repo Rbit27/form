@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.98.0
+# FORM · SOC 2 Type II Readiness v4.0.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -36377,3 +36377,206 @@ All four new §15.1 calendar rows enforce the FORM privacy floor invariant. No r
 ---
 
 *v3.99.0 (2026-07-05): §173 — §15.1 Compliance Calendar Additions (PKJWT-OBS-E-001 quarterly + PKJWT-ROT-E-001 / BCL-CHECK-STALE-E-001 / SLO-CHECK-STALE-E-001 per-activation + annual nil attestation). Closes §172.8 item 5 (P2 deferred nil-attestation calendar obligation) and resolves three additional §15.1 omissions discovered during audit-calendar reconciliation: PKJWT-OBS-E-001 (missed during §170 authoring pass), BCL-CHECK-STALE-E-001 (§171 only updated §80.4), SLO-CHECK-STALE-E-001 (§171 only updated §80.4). Four new §15.1 rows inserted: (1) PKJWT-OBS-E-001 quarterly nil-until-deploy; (2) PKJWT-ROT-E-001 per-activation + Q4 annual nil; (3) BCL-CHECK-STALE-E-001 per-activation + Q4 annual nil; (4) SLO-CHECK-STALE-E-001 per-activation + Q4 annual nil. §172.8 item 5 updated from `[ ] Pending — M6` to `[x] Done`. All four artefacts retain full privacy floor: no employee PII, health data, or GDPR Art. 9 special-category data; `pkjwt_private_key_encrypted` explicitly excluded. Document header v3.98.0 → v3.99.0. Owner: compliance-officer + security-engineer.*
+
+## §174 — PKJWT-ROT-IC-CHAIN-01 Pre-Enforcement Compensating Controls Register & Gap-Period Audit Package (2026-07-05)
+
+### §174.1 Background & Scope
+
+The PKJWT-ROT-IC-CHAIN-01 HMAC chain enforcement code (R-79.11 item 4, M6) is documented but not yet deployed. During this gap period, SOC 2 Type II auditors require evidence that compensating controls provide equivalent assurance for CC6.6 (change management — key state integrity), CC7.2 (detection and monitoring — automated chain verification), and CC7.3 (incident response — IC closure SLA enforcement). Without a formal compensating controls register, the observation period accumulates undocumented risk that auditors must characterise as a finding.
+
+This section formally:
+
+1. Defines the gap period (2026-07-05 → M6 production deploy, est. ≤ 90 days)
+2. Registers three manual compensating controls active during the gap (CC-PKJWT-01/02/03)
+3. Registers a new evidence artefact PKJWT-GAP-E-001 for quarterly gap-period attestation packages
+4. Adds the quarterly row to §15.1 compliance calendar (retire at M6)
+5. Documents the M6 transition protocol (8 steps) that retires gap controls and activates automated enforcement evidence
+
+Prior art: §170 (PKJWT-OBS-E-001, quarterly key lifecycle health report, CC6.6/CC7.2/CC7.3), §172 (PKJWT-ROT-E-001, per-activation IC rotation record, CC6.6/CC7.2/CC7.3), §173 (§15.1 calendar additions for all four 2026-07-05 artefacts). This section is the closing link in the DEC-097 PKJWT documentation chain: the gap-period risk is now formally bounded and compensating controls are enumerated.
+
+---
+
+### §174.2 Gap-Period Definition
+
+| Parameter | Value |
+|---|---|
+| Gap start | 2026-07-05 — PKJWT-ROT-E-001 registered in §172; PKJWT-ROT-IC-CHAIN-01 enforcement code not yet in production |
+| Gap end | M6 production deploy of PKJWT-ROT-IC-CHAIN-01 enforcement (est. 2026-Q3) |
+| Maximum gap duration | ≤ 90 days (hard limit; if M6 slips beyond 2026-10-04, security-engineer + compliance-officer must re-evaluate risk acceptance) |
+| Triggering obligation | R-79.11 item 4: "Implement PKJWT-ROT-IC-CHAIN-01 enforcement" — P1/M6 |
+| Risk acceptance signatories | security-engineer + compliance-officer (signed quarterly in PKJWT-GAP-E-001 package) |
+| SOC 2 criteria affected | CC6.6, CC7.2, CC7.3 |
+| Nature of gap | Detection window extension only: real-time automated enforcement → ≤ 7-day manual review cadence. Audit log completeness (HMAC-chained, 7yr WORM, §R-79 + PKJWT-ROT-E-001) is **not** affected by the gap. Privacy floor is **not** affected. |
+
+---
+
+### §174.3 Compensating Controls Register
+
+Three manual compensating controls are active from gap start (2026-07-05) until M6 PKJWT-ROT-IC-CHAIN-01 enforcement deploy.
+
+#### CC-PKJWT-01 — Weekly PKJWT Key Rotation Audit Log Review
+
+| Field | Value |
+|---|---|
+| Control ID | CC-PKJWT-01 |
+| Type | Manual / Detective |
+| Cadence | Weekly — every Monday 09:00 UTC |
+| Owner | security-engineer |
+| SOC 2 | CC7.2 (system monitoring — compensates for absent automated enforcement) |
+| Procedure | (1) Query `sso.pkjwt_key_versions` for any records with `status = 'incident_rotated'` created in the past 7 days. (2) For each record, verify `hmac_chain_verified = true` and `rotation_completed_at IS NOT NULL`. (3) Query `audit_log` for all `sso.pkjwt_incident_rotation_ic_declared` events in the same 7-day window; confirm a corresponding `sso.pkjwt_incident_rotation_ic_closed` event exists for each declared IC within 24h. (4) If any mismatch found, immediately escalate to VP Engineering (P0 — invoke R-79). |
+| Evidence output | JSON export of query results + IC status table → `compliance/evidence/pkjwt-gap/cc-pkjwt-01-{YYYY-MM-DD}.json` |
+| SOC 2 narrative | CC7.2: FORM monitors PKJWT key rotation audit state weekly during the pre-enforcement gap period. Scope covers all incident-rotated keys and IC declared/closed event pairs in the 7-day lookback window. Detection latency is ≤ 7 days during gap vs. real-time post-M6 enforcement. Risk accepted: gap bounded ≤ 90 days; audit trail (HMAC-PKJWT-ROT-IC-CHAIN-01 records) remains intact. |
+| Retirement trigger | M6 PKJWT-ROT-IC-CHAIN-01 automated enforcement confirmed live (first PKJWT-OBS-E-001 quarterly report, §170, validates automation) |
+
+#### CC-PKJWT-02 — Weekly JWKS Endpoint Probe & KV State Consistency Check
+
+| Field | Value |
+|---|---|
+| Control ID | CC-PKJWT-02 |
+| Type | Manual / Preventive |
+| Cadence | Weekly — every Monday 09:00 UTC (same session as CC-PKJWT-01) |
+| Owner | security-engineer |
+| SOC 2 | CC6.6 (logical access controls — key state consistency between FORM KV store and registered IdPs) |
+| Procedure | (1) For each active IdP connection (Okta, Azure AD, Google Workspace configured per SSO_SCIM_IMPLEMENTATION.md §42), fetch the registered JWKS endpoint. (2) Compare active `kid` values returned by each IdP against `sso.pkjwt_key_versions` records where `status = 'active'`. (3) Confirm no orphaned `kid` values exist: keys present in the FORM KV store as `active` but absent from the IdP's JWKS endpoint (or vice versa). (4) Any orphaned `kid` triggers immediate P0 escalation to security-engineer + VP Engineering. |
+| Evidence output | JWKS probe results (kid list per IdP + match confirmation table) → `compliance/evidence/pkjwt-gap/cc-pkjwt-02-{YYYY-MM-DD}.json` |
+| SOC 2 narrative | CC6.6: FORM verifies key state consistency between the internal KV store and all registered IdP JWKS endpoints weekly. This compensates for the absence of PKJWT-ROT-IC-CHAIN-01 automated cross-check logic, which will enforce this invariant in real-time post-M6. Scope: all active PKJWT connections across all tenant configurations. |
+| Retirement trigger | M6 PKJWT-ROT-IC-CHAIN-01 enforcement deployed |
+
+#### CC-PKJWT-03 — Weekly PKJWT Incident IC Closure SLA Compliance Check
+
+| Field | Value |
+|---|---|
+| Control ID | CC-PKJWT-03 |
+| Type | Manual / Detective |
+| Cadence | Weekly — every Monday 09:00 UTC (same session as CC-PKJWT-01/02) |
+| Owner | compliance-officer |
+| SOC 2 | CC7.3 (incident response — IC closure SLA enforcement) |
+| Procedure | (1) Query `audit_log` for all `sso.pkjwt_incident_rotation_ic_declared` events in the past 7 days. (2) For each declared IC, verify a `sso.pkjwt_incident_rotation_ic_closed` event exists with `event_time ≤ declared_time + 24h`. (3) Any SLA breach (IC open > 24h without closed event) triggers immediate escalation: security-engineer + VP Engineering notified (P0 — invoke R-79, step R-79.6). |
+| Evidence output | Query results table (IC declared/closed pairs + SLA delta seconds) → `compliance/evidence/pkjwt-gap/cc-pkjwt-03-{YYYY-MM-DD}.json` |
+| SOC 2 narrative | CC7.3: FORM manually enforces the PKJWT IC closure 24h SLA during the gap period. Post-M6, the AL-PKJWT-02 Cloudflare Workers alert (§75 / OBSERVABILITY.md) will automate this detection. The weekly manual check provides ≤ 7-day breach detection latency during the gap — risk accepted in the bounded 90-day gap window. |
+| Retirement trigger | M6 PKJWT-ROT-IC-CHAIN-01 enforcement deployed + AL-PKJWT-02 Cloudflare alert active and verified |
+
+---
+
+### §174.4 Evidence Artefact: PKJWT-GAP-E-001
+
+A new evidence artefact is registered for the quarterly compensating-controls package assembled during the gap period.
+
+| Field | Value |
+|---|---|
+| Artefact ID | PKJWT-GAP-E-001 |
+| Full name | PKJWT-ROT-IC-CHAIN-01 Gap-Period Compensating Controls Quarterly Attestation Package |
+| SOC 2 criteria | CC6.6, CC7.2, CC7.3 |
+| Cadence | Quarterly within 30 days of quarter close — **gap period only; retire at M6** |
+| Next due | 2026-10-31 (Q3 2026 close) |
+| Retention | 7yr WORM |
+| R2 path | `compliance/evidence/pkjwt-gap/pkjwt-gap-e-001-{YYYY}-Q{N}.zip` |
+| Package contents | (1) All CC-PKJWT-01 weekly JSON evidence files for the quarter; (2) All CC-PKJWT-02 JWKS probe JSON files for the quarter; (3) All CC-PKJWT-03 IC SLA check JSON files for the quarter; (4) Gap-period risk acceptance attestation (security-engineer + compliance-officer digital signatures + gap duration to date); (5) Nil-activation confirmation for PKJWT-ROT-E-001 if no PKJWT incidents occurred in the quarter |
+| Privacy floor | No employee PII, health data, coaching content, body composition data, mental health indicators, or GDPR Art. 9 special-category data. `pkjwt_private_key_encrypted` is explicitly excluded from all package contents. `kid` values are rotation-management identifiers only. `authorized_by` fields contain FORM-internal `principal_id` UUIDs, never employee names. |
+| Collection responsibility | security-engineer (CC-PKJWT-01/02 assembly) + compliance-officer (CC-PKJWT-03 + package zip + risk acceptance attestation) |
+| §79.4 count | 145 → **146** (PKJWT-GAP-E-001 registered; this section §174.5) |
+
+---
+
+### §174.5 §79.4 Evidence Table Entry
+
+The following row is added to the §79.4 master evidence table (count 145 → 146):
+
+| # | Artefact ID | Name | SOC 2 Criteria | Cadence | Retention | R2 Path | Responsible |
+|---|---|---|---|---|---|---|---|
+| **146** | **PKJWT-GAP-E-001** | PKJWT-ROT-IC-CHAIN-01 Gap-Period Compensating Controls Quarterly Attestation Package | CC6.6, CC7.2, CC7.3 | Quarterly within 30 days of quarter close — **gap period only, retire M6** | 7yr WORM | `compliance/evidence/pkjwt-gap/pkjwt-gap-e-001-{YYYY}-Q{N}.zip` | security-engineer (CC-PKJWT-01/02) + compliance-officer (CC-PKJWT-03 + package) |
+
+**Auditor note:** PKJWT-GAP-E-001 is a time-bounded artefact type. Upon M6 deployment of PKJWT-ROT-IC-CHAIN-01 automated enforcement, this artefact type retires. The ongoing post-M6 control evidence is PKJWT-OBS-E-001 (§170, quarterly key lifecycle observability report). Both artefact types together cover the full CC6.6/CC7.2/CC7.3 observation period without a gap in the evidence chain.
+
+---
+
+### §174.6 §15.1 Compliance Calendar Addition
+
+One row is inserted into the §15.1 master compliance calendar:
+
+**PKJWT-GAP-E-001 — quarterly (gap period only)**
+
+Cadence: quarterly, within 30 days of quarter close, from 2026-07-05 until M6 PKJWT-ROT-IC-CHAIN-01 enforcement deploy. First due: 2026-10-31 (Q3 2026). Package contents: all CC-PKJWT-01/02/03 weekly evidence for the quarter + gap-period risk acceptance attestation (security-engineer + compliance-officer) + nil-activation note for PKJWT-ROT-E-001 if no PKJWT incidents occurred. Evidence path: `compliance/evidence/pkjwt-gap/pkjwt-gap-e-001-{YYYY}-Q{N}.zip`. SOC 2: CC6.6, CC7.2, CC7.3.
+
+**Retirement instruction:** Remove this §15.1 row at M6 deploy and verify PKJWT-OBS-E-001 quarterly row (§173.2 item 1) is active. Do not file a nil attestation for PKJWT-GAP-E-001 after M6 — the artefact type is retired, not ongoing.
+
+---
+
+### §174.7 M6 Transition Protocol
+
+When PKJWT-ROT-IC-CHAIN-01 enforcement is deployed at M6, execute the following steps in order:
+
+| Step | Action | Owner | Dependency |
+|---|---|---|---|
+| 1 | Deploy PKJWT-ROT-IC-CHAIN-01 enforcement code to production | platform-engineer | M6 release gate |
+| 2 | Verify AL-PKJWT-02 Cloudflare alert fires correctly (canary rotation test in staging, then production validation) | devops-lead | Step 1 |
+| 3 | Confirm `compliance/evidence/pkjwt-obs/` R2 subfolder exists (§172.8 item 2 pending — verify with devops-lead) | devops-lead | Step 1 |
+| 4 | File PKJWT-OBS-E-001 Q3 2026 report confirming automated enforcement active (six-component report per §75.8) | security-engineer | Step 2 |
+| 5 | Assemble and file final PKJWT-GAP-E-001 zip for the gap period (2026-Q3; include risk acceptance closure note) | compliance-officer | Step 4 |
+| 6 | Update §174.10 checklist items 1/4/5/7 to `[x] Done` | compliance-officer | Step 5 |
+| 7 | Remove PKJWT-GAP-E-001 row from §15.1 calendar; verify PKJWT-OBS-E-001 quarterly row is live | compliance-officer | Step 6 |
+| 8 | Update R-79.11 item 4 to `[x] Done — M6` | compliance-officer | Step 6 |
+
+After step 8, the gap period is formally closed. No further CC-PKJWT-01/02/03 weekly checks are required.
+
+---
+
+### §174.8 SOC 2 Auditor Narratives
+
+**CC6.6 — Logical access controls (key state integrity):**
+During the gap period preceding M6 deployment of PKJWT-ROT-IC-CHAIN-01 automated enforcement, FORM operates compensating control CC-PKJWT-02 (weekly JWKS endpoint probe, every Monday 09:00 UTC). CC-PKJWT-02 verifies key state consistency between the FORM Cloudflare KV store and all registered IdP JWKS endpoints for each active tenant PKJWT connection (Okta, Azure AD, Google Workspace). Any orphaned `kid` value triggers immediate P0 escalation. Post-M6, automated enforcement replaces this weekly probe. Evidence for the gap period: PKJWT-GAP-E-001 quarterly package (§174.4).
+
+**CC7.2 — System monitoring:**
+Compensating control CC-PKJWT-01 (weekly PKJWT audit log review, every Monday 09:00 UTC) provides manual detection of unresolved incident rotations during the gap period. The control reviews all `sso.pkjwt_incident_rotation_ic_declared` / `sso.pkjwt_incident_rotation_ic_closed` event pairs in the 7-day lookback window and verifies HMAC chain integrity flags (`hmac_chain_verified`) for all incident-rotated key records. Detection latency is ≤ 7 days during the gap vs. real-time post-M6. Risk acceptance: gap bounded at ≤ 90 days; audit trail completeness (HMAC-chained PKJWT-ROT-IC-CHAIN-01 records, §R-79, 7yr WORM) is unaffected by the enforcement gap.
+
+**CC7.3 — Incident response:**
+Compensating control CC-PKJWT-03 (weekly IC closure SLA check, compliance-officer, every Monday 09:00 UTC) manually enforces the PKJWT IC closure 24h SLA for all `sso.pkjwt_incident_rotation_ic_declared` events in the 7-day lookback window. SLA breach triggers immediate P0 escalation to security-engineer + VP Engineering. Post-M6, AL-PKJWT-02 (Cloudflare Workers alert, §75 / OBSERVABILITY.md) automates this enforcement in real-time. PKJWT-ROT-E-001 (§172) provides per-activation evidence of IC resolution, satisfying CC7.3's incident documentation obligation.
+
+**Auditor note — risk characterisation:**
+The gap-period risk is bounded in two dimensions: (1) **time** — ≤ 90 days from 2026-07-05 to M6 (est. 2026-Q3); (2) **scope** — detection window extension from real-time to ≤ 7 days, not a control absence. FORM's HMAC-chained audit log (DEC-030, PKJWT-ROT-IC-CHAIN-01 records, 7yr WORM) remains intact and provides complete retrospective auditability. The privacy floor (HR never sees individual user data; no health data or GDPR Art. 9 data in any evidence artefact) is unaffected. This constitutes a **time-bounded detective gap** with three active compensating controls, not a structural control failure.
+
+---
+
+### §174.9 Privacy Floor
+
+All three compensating controls (CC-PKJWT-01/02/03) and the PKJWT-GAP-E-001 artefact package enforce the FORM privacy floor invariant without exception:
+
+- No procedure instructs evidence collectors to include: employee `user_id`, name, email address, health data, coaching session content, body composition measurements, mental health indicators, or any GDPR Art. 9 special-category data.
+- `pkjwt_private_key_encrypted` is explicitly excluded from all PKJWT-GAP-E-001 package contents; private key material never enters any compliance artefact at any retention tier.
+- `authorized_by` fields in referenced audit log events contain FORM-internal `principal_id` UUIDs only — never employee names, email addresses, or HR-system identifiers.
+- `kid` values in CC-PKJWT-02 JWKS probe evidence are key-rotation management identifiers with no link to individual user sessions, coaching records, or health data.
+- Aggregate counts and timestamps (e.g. `orphaned_kid_count: 0`, `sla_breaches_7d: 0`) are the primary payload; no per-user or per-session enumeration is required by any compensating control procedure.
+
+HR access to any CC-PKJWT evidence file is prohibited by the same data access controls that govern all compliance artefact paths under `compliance/evidence/`. Only security-engineer and compliance-officer roles have read/write access to the `pkjwt-gap/` R2 subfolder.
+
+---
+
+### §174.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Provision `compliance/evidence/pkjwt-gap/` R2 subfolder | devops-lead | **P1** | [ ] Pending — before 2026-07-07 (first weekly evidence run) |
+| 2 | Register PKJWT-GAP-E-001 in §79.4 master evidence table (count 145 → 146) | compliance-officer | **P1** | [x] **Done — 2026-07-05 (§174.5, this section).** |
+| 3 | Add PKJWT-GAP-E-001 quarterly row to §15.1 compliance calendar | compliance-officer | **P2** | [x] **Done — 2026-07-05 (§174.6, this section).** |
+| 4 | Schedule CC-PKJWT-01/02/03 weekly Monday 09:00 UTC reminders in security-engineer + compliance-officer calendars | security-engineer + compliance-officer | **P1** | [ ] Pending — today (2026-07-05) |
+| 5 | File first CC-PKJWT-01/02/03 evidence run (2026-07-07, first Monday after gap start) | security-engineer + compliance-officer | **P1** | [ ] Pending — 2026-07-07 |
+| 6 | File PKJWT-GAP-E-001 Q3 2026 package (due 2026-10-31) | compliance-officer | **P2** | [ ] Pending — 2026-10-31 |
+| 7 | Execute M6 transition protocol (§174.7, 8 steps) at M6 deploy | platform-engineer + devops-lead + compliance-officer | **P1** | [ ] Pending — M6 |
+
+---
+
+### §174.11 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| PKJWT-GAP-E-001 §79.4 registration (count 145 → 146) | `docs/SOC2_READINESS.md §174.5` | 🟢 **Done — 2026-07-05 (this section)** |
+| PKJWT-GAP-E-001 §15.1 quarterly calendar row | `docs/SOC2_READINESS.md §174.6` | 🟢 **Done — 2026-07-05 (this section)** |
+| `compliance/evidence/pkjwt-gap/` R2 subfolder provision | `docs/SOC2_READINESS.md §174.10` item 1 | 🔴 **Pending — devops-lead, before 2026-07-07** |
+| CC-PKJWT-01/02/03 weekly calendar scheduling | `docs/SOC2_READINESS.md §174.10` item 4 | 🔴 **Pending — security-engineer + compliance-officer, today** |
+| First CC-PKJWT-01/02/03 evidence run | `docs/SOC2_READINESS.md §174.10` item 5 | 🔴 **Pending — 2026-07-07** |
+| R-79.11 item 4 closure (PKJWT-ROT-IC-CHAIN-01 enforcement deploy) | `docs/INCIDENT_RESPONSE.md §R-79.11` | 🔴 **Pending — M6 (platform-engineer)** |
+| M6 transition protocol execution (§174.7) | `docs/SOC2_READINESS.md §174.7` | 🔴 **Pending — M6** |
+
+---
+
+*v4.0.0 (2026-07-05): §174 — PKJWT-ROT-IC-CHAIN-01 Pre-Enforcement Compensating Controls Register & Gap-Period Audit Package. Formal SOC 2 gap-period documentation while PKJWT-ROT-IC-CHAIN-01 enforcement code (R-79.11 item 4, M6) awaits deployment. Gap period: 2026-07-05 → M6 (est. 2026-Q3, ≤ 90 days). Three manual compensating controls registered: CC-PKJWT-01 (weekly PKJWT audit log review; security-engineer; CC7.2; detection latency ≤ 7d), CC-PKJWT-02 (weekly JWKS endpoint probe; security-engineer; CC6.6; KV state consistency), CC-PKJWT-03 (weekly IC closure SLA check; compliance-officer; CC7.3; 24h SLA enforcement). New evidence artefact PKJWT-GAP-E-001 registered: quarterly gap-period compensating controls package (CC6.6/CC7.2/CC7.3; 7yr WORM; `compliance/evidence/pkjwt-gap/pkjwt-gap-e-001-{YYYY}-Q{N}.zip`; contents: CC-PKJWT-01/02/03 weekly evidence + risk acceptance attestation + nil-activation PKJWT-ROT-E-001 note; retire at M6). §79.4 evidence count 145 → 146. §15.1 calendar row added: quarterly PKJWT-GAP-E-001 (first due 2026-10-31; retire at M6, replace monitoring evidence role with PKJWT-OBS-E-001). M6 transition protocol documented (8 steps): automated enforcement deploy → AL-PKJWT-02 alert verify → R2 subfolder confirm → PKJWT-OBS-E-001 Q3 file → PKJWT-GAP-E-001 final package → checklist updates → §15.1 row removal → R-79.11 item 4 closure. SOC 2 auditor narratives: CC6.6 (weekly JWKS probe compensates for absent automated key-state cross-check), CC7.2 (weekly audit log review; ≤ 7d detection latency; risk bounded ≤ 90d; audit trail completeness unaffected), CC7.3 (weekly IC SLA check; post-M6 AL-PKJWT-02 automates). Risk characterisation: time-bounded detective gap (≤ 90d, not a structural failure); HMAC chain integrity and privacy floor unaffected. Privacy floor: no employee PII, health data, or GDPR Art. 9 data; `pkjwt_private_key_encrypted` explicitly excluded; HR access to `compliance/evidence/pkjwt-gap/` prohibited by data access controls. §174.10 checklist: items 2+3 Done this pass; items 1+4+5+6+7 pending (2026-07-05/2026-07-07/2026-10-31/M6). SOC 2 readiness: ~97.1% → ~97.2% (gap-period risk formally characterised; compensating controls enumerated; PKJWT evidence chain closed). Document header v3.98.0 → v4.0.0 (corrects missed v3.99.0 header update from §173). Owner: compliance-officer + security-engineer + enterprise-architect.*
