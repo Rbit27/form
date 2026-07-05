@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [13.11.0] — 2026-07-05
+
+### Added
+- `content/post-3181-minimalism-recovery-volume-session-quality.md` — Series «Тренувальний мінімалізм: менше і ефективніше» 6/10. «Мінімалізм і відновлення: чому менше об'єму іноді дає кращу якість сесій». Три рівні відновлення (інтра-сесійне, між-сесійне, блокове); Stimulus-to-Fatigue Ratio і точка перегину всередині сесії; junk volume як підходи з несприятливим SFR; практичний тест «volume-limited vs. recovery-limited» (скорочення 20–25% на 2 тижні); коли зниження є помилкою (нижче MEV, уникання, фаза accumulation); операційний 4-кроковий алгоритм. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card post-3181 added at top of feed.
+
+### Changed
+- `VERSION` — 13.10.1 → 13.11.0.
+
 ## [13.10.1] — 2026-07-05
 
 ### Changed
