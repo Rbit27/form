@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v13.32.0** — 2026-07-05 · content · post-3184 · «Коли мінімалізм — правильна стратегія, а коли — відступ від вимог прогресу» · series «Тренувальний мінімалізм: менше і ефективніше» 3176–3185 in progress 9/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3184 · next: post-3185 (синтез 3176–3185: операційна система мінімалістичного тренування для self-coached атлета — SERIES COMPLETE)
+**v13.33.0** — 2026-07-05 · content · post-3185 · «Операційна система мінімалістичного тренування: синтез серії 3176–3185» · series «Тренувальний мінімалізм: менше і ефективніше» 3176–3185 COMPLETE 10/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3185 · next series: «Читання власних даних: від журналу до рішень» 3186–3195 (proposed)
 
 ---
 
