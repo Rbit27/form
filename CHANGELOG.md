@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.0.0] — 2026-07-05
+
+### Added
+- `content/post-13-overtraining-vs-laziness.md` — Editorial post-13. «Перетренованість або лінощі: як розрізнити і не помилитись в обидва боки». Meeusen et al. (2013) ECSS/ACSM консенсус: FOR / NFOR / OTS спектр. Діагностична рамка за об'єктивними маркерами: RPE-дрейф при фіксованих вагах, HRV-тренд за 7 днів, тест двох днів відпочинку, якість міжсесійного відновлення. Fry & Kraemer (1997): ненадійність суб'єктивного «почуваюсь нормально». Gabbett (2016): acute:chronic ratio > 1.5. Зовнішній стрес як спільний відновлювальний ресурс (Sapolsky 2004, Kivimäki et al. 2002). Дві хибні відповіді: «тиснути сильніше» при NFOR і «повний відпочинок» при операційній проблемі. clinical-safety: REVIEWED — NOT_REQUIRED (фізіологічний фрейм, без психологічного профілювання, без їжі/тіла). sports-scientist review pending.
+- `blog.html` — post-13 card prepended at top of feed.
+
+### Changed
+- `STATUS.md` — v12.99.0 → v13.0.0; post-13 added.
+- `VERSION` — 12.99.0 → 13.0.0.
+
+---
+
 ## [12.99.0] — 2026-07-05
 
 ### Added
