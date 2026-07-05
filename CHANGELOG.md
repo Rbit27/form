@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.31.0] — 2026-07-05
+
+### Added
+- `content/post-3262-self-coached-operating-manual.md` — Series «Програмування під себе: від шаблону до власної системи» 3256–3265, post 7/10. «Self-coached operating manual: як зібрати власний звід правил для тіла, якого немає в жодному шаблоні». Operating manual as a document of verified rules (condition → effect format), distinct from preferences or limitations. Rule threshold: three independent confirmations across separate blocks. Five-section structure: recovery, frequency/volume by movement pattern, intensity/RPE, degradation signals, responses to stressors. Interaction with templates: template as scaffold, operating manual as filter — conflicts resolved before session one. Rule without condition = impression, not tool. Update triggers: rule fails twice consecutively; major training context shift; new measurement instrument introduced. Minimum useful horizon: 6–8 blocks (~9–12 months). Synthesis of posts 3257–3261. clinical-safety NOT_REQUIRED (training programming methodology; no food/body image/pain/psychiatry). sports-scientist review pending.
+- `blog.html` — post-3262 card prepended at top of feed.
+
+### Changed
+- `VERSION` — 13.30.0 → 13.31.0.
+- `STATUS.md` — series «Програмування під себе» progress updated to 7/10; next: post-3263 (коли self-coached система дає збій).
+
+---
+
 ## [13.30.0] — 2026-07-05
 
 ### Added
