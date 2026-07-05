@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.14.0] — 2026-07-05
+
+### Added
+- `content/post-3246-coach-vs-program-what-training-actually-needs.md` — Series «Тренування без зовнішнього зворотного зв'язку: self-coached рамки замість тренера» 3246–3255, post 1/10. «Що тренер насправді робить, чого не може зробити програма — і що можна наблизити самостійно». П'ять операційних функцій тренера (спостереження, контекстне читання, корекція в точці виконання, управління навантаженням за поведінкою, зовнішній RPE-орієнтир); що не замінює жоден замінник; чотири рівні компенсації (відеоаналіз, RPE-журнал, технічні чекпоінти, pre-session check-in + матриця); точковий коучинг як раціональний ресурс; чесний трейд-оф self-coached підходу. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card for post-3246 prepended at top of feed.
+- `README.md` — series 3246–3255 «Тренування без зовнішнього зворотного зв'язку: self-coached рамки замість тренера» added; roadmap summary line updated to v13.14.0.
+
+### Changed
+- `STATUS.md` — v13.14.0 current version line added; next: post-3247.
+- `VERSION` — 13.13.0 → 13.14.0.
+
 ## [13.13.0] — 2026-07-05
 
 ### Added
