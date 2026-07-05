@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.25.0] — 2026-07-05
+
+### Added
+- `content/post-3256-from-template-to-your-own-system-why-a-template-is-not-a-program.md` — New series «Програмування під себе: від шаблону до власної системи» 3256–3265, post 1/10. «Чому шаблон — це не програма: різниця між готовою схемою і власною системою». Core argument: template is a starting point, not an endpoint; it's built for an abstract athlete, not you. Four signals you've outgrown a template. Difference between template and system — not technical but about decision ownership. What adapts (exercise selection, volume distribution, progression specifics) vs. what doesn't without consequences (progressive overload principle, movement specificity). Transition is 3–4 block iterative process. clinical-safety NOT_REQUIRED (training programming methodology; no food/body image/pain/psychiatry). sports-scientist review pending.
+- `blog.html` — post-3256 card prepended at top of feed.
+
+### Changed
+- `VERSION` — 13.24.0 → 13.25.0.
+
+---
+
 ## [13.24.0] — 2026-07-05
 
 ### Added
