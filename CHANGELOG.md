@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [13.32.0] — 2026-07-05
+
+### Added
+- `content/post-3184-minimalism-right-strategy-vs-retreat-from-progress.md` — Series «Тренувальний мінімалізм: менше і ефективніше» 3176–3185 post 9/10. Розрізнення між мінімалізмом як раціональним вибором і мінімалізмом як раціоналізацією уникнення. Чотири контексти де мінімальний об'єм технічно оптимальний: підтримуючий блок (Hewit & Gabbett 2018), акумульована втома, реактивація після паузи, фаза освоєння нового руху. Чотири сигнали де «мінімалізм» є відступом: плато 6+ тижнів без причини, ухилення від RPE 8–9, заморожена прогресія, відсутність вимірювання. MEV ≠ мінімальний комфортний стимул (Atkinson & Brutsaert 1994). Операційна перевірка: 4 питання + практичний алгоритм вибору. Мінімалізм як позиція vs. ідентичність. clinical-safety NOT_REQUIRED · sports-scientist review pending.
+- `blog.html` — card for post-3184 added at top of feed.
+
+### Changed
+- `README.md` — series 3176–3185 progress updated 7/10 → 9/10.
+- `STATUS.md` — series 3176–3185 progress updated to 9/10; next: post-3185 (синтез, SERIES COMPLETE).
+- `VERSION` — 13.31.1 → 13.32.0.
+
+---
+
 ## [13.31.1] — 2026-07-05
 
 ### Added
