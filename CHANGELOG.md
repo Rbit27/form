@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.2.0] — 2026-07-05
+
+### Added
+- `content/post-15-training-frequency.md` — Editorial post-15. «Скільки разів на тиждень качати м'яз: що каже наука і що з цим робити». Schoenfeld, Ogborn & Krieger (2016): мета-аналіз 10 РКД — 2×/тиждень > 1×/тиждень при рівному тижневому об'ємі. MPS-вікно: піковий синтез 4–24 год, базовий рівень до 36–72 год у натуральних атлетів. McLester et al. (2000): 3×/тиждень > 1×/тиждень при рівній роботі. Досвідчений атлет закриває MPS-цикл швидше — підвищена частота важливіша при збільшенні стажу. Практична рамка: upper/lower або full body 2×/тиждень як мінімум для intermediate. Частота як інструмент акумуляції об'єму за MPS-вікном. clinical-safety: PASS (2026-05-16). sports-scientist review pending.
+- `blog.html` — post-15 card prepended at top of feed.
+
+### Changed
+- `STATUS.md` — v13.1.0 → v13.2.0; post-15 added; next: post-16.
+- `VERSION` — 13.1.0 → 13.2.0.
+
+---
+
 ## [13.1.0] — 2026-07-05
 
 ### Added
