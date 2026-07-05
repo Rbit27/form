@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [12.91.1] — 2026-07-05
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v2.95 → v2.96 — registered BCL + SLO chain integrity check stale/restored DEC-030 events: `system.bcl_chain_integrity_check_stale_declared` (HIGH/7yr, SOC 2 CC7.2, BCL-CHECK-STALE-CHAIN-01 anchor) + `system.bcl_chain_integrity_check_restored` (LOW/3yr) for R-77 (job 59); `system.slo_chain_integrity_check_stale_declared` (HIGH/7yr, SOC 2 CC7.2, SLO-CHECK-STALE-CHAIN-01 anchor) + `system.slo_chain_integrity_check_restored` (LOW/3yr) for R-78 (job 60). +4 master retention table rows. Zod v2 schemas and evidence artefact specs (BCL-CHECK-STALE-E-001, SLO-CHECK-STALE-E-001) included. Closes INCIDENT_RESPONSE.md R-77.11 item 1 (P0/M8) and R-78.11 item 1 (P0/M7). Owner: security-engineer + compliance-officer.
+- `docs/INCIDENT_RESPONSE.md` — R-77.11 item 1 + R-78.11 item 1 marked Done (2026-07-05, AUDIT_LOG_SCHEMA.md v2.96); BCL/SLO Chain Monitor Events cross-reference rows updated to v2.96.
+- `VERSION` — 12.91.0 → 12.91.1.
+
 ## [12.90.0] — 2026-07-05
 
 ### Added
