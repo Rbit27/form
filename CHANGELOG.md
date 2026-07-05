@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [12.95.1] — 2026-07-05
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` v3.43.0 — R-79 PKJWT Incident Key Rotation runbook. Closes the AL-PKJWT-02 companion runbook gap: `sso.pkjwt_key_rotated` (`rotation_reason: 'incident'`) events had no formal IC investigation runbook; OBSERVABILITY.md §75.4 item (3) forward reference `(R-77 rotation companion runbook)` was stale — R-77 was subsequently assigned to BCL Chain Integrity Check Stale. Four root causes (H1 authorized/undocumented, H2 authorized break-glass, H3 unauthorized → R-05+R-20, H4 code bug); four scope queries (R-79-C1 rotation event detail, R-79-C2 PAM access log, R-79-C3 JWKS KV state, R-79-C4 90-day timeline); two DEC-030 events (`sso.pkjwt_incident_rotation_ic_declared` HIGH/7yr, `sso.pkjwt_incident_rotation_ic_closed` HIGH/7yr); PKJWT-ROT-IC-CHAIN-01 ordering invariant; PKJWT-ROT-E-001 per-activation evidence artefact (CC6.6/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY-MM-DD}-{tenant_id_first_8}/`); six-item implementation checklist (items 5 + 6 Done this pass; items 1–4 pending M6). Cross-references: OBSERVABILITY §75.4, SSO_SCIM §42.10, AUDIT_LOG_SCHEMA §SSO-PKJ-Lifecycle, R-05, R-20, R-73.
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.20.1 → v5.20.2 — §75.4 AL-PKJWT-02 runbook item (3): stale reference `(R-77 rotation companion runbook)` corrected to `(R-79 rotation companion runbook)`.
+- `VERSION` — 12.95.0 → 12.95.1.
+
+---
+
 ## [12.95.0] — 2026-07-05
 
 ### Added

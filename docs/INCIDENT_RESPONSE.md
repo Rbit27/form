@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.42.0
+# FORM · Incident Response Runbook v3.43.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -28024,6 +28024,379 @@ Implementation status: [ ] Pending — platform-engineer (§R-78.11 item 4).
 **Privacy floor (invariant throughout R-78):** No employee `user_id`, name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data appears in any R-78 query result, DEC-030 event payload, evidence artefact, or Slack communication template. R-78-C1 through R-78-C4 return only timestamps, integer counts, and operational metadata. `tenant_id` in R-78-C4 violation output (if any) is a FORM-internal UUID — not linked to company name, employee roster, or any personal identifier in this runbook. Owner: security-engineer + compliance-officer.
 
 ---
+
+## R-79 · PKJWT Incident Key Rotation — `sso.pkjwt_key_rotated` (`rotation_reason: 'incident'`) — CC6.6 undocumented or unauthorized key replacement
+
+> **Runbook type:** Security investigation — SSO credential anomaly
+> **Applies when:** `sso.pkjwt_key_rotated` is emitted with `rotation_reason: 'incident'` for any tenant; OR AL-PKJWT-02 fires because > 2 `sso.pkjwt_key_rotated` events occur within 24 hours for a single tenant and at least one carries `rotation_reason: 'incident'`
+> **Trigger source:** AL-PKJWT-02 (`docs/OBSERVABILITY.md §75.4`): P2 Slack `#alerts-enterprise` + security-engineer notification; escalates to P1 PagerDuty `form-security` if combined with any `sso.pkjwt_jwks_missing` event for the same tenant within the same 24h window
+> **Primary owners:** security-engineer · compliance-officer · enterprise-architect
+> **SOC 2 criteria:** CC6.6 — unexpected or undocumented key replacement may indicate key compromise, unauthorized access, or insider threat; CC7.2 — anomaly monitoring on key rotation velocity; CC7.3 — resolution and remediation
+> **Context:** PKJWT (`private_key_jwt` — RFC 7523) is the per-tenant asymmetric key authentication mechanism for OIDC at FORM. Each tenant has a keypair stored in Cloudflare KV (`PKJWT_KV`). The `sso.pkjwt_key_rotated` event is emitted whenever the `POST /internal/tenant/{tenant_id}/sso/pkjwt/rotate` endpoint is called. The `rotation_reason: 'incident'` enum value indicates the caller designated this as an emergency rotation — meaning the prior key was compromised, suspected compromised, or an unauthorized admin access event prompted immediate rotation. This reason code distinguishes incident rotation from `scheduled` (annual) and `customer_request` (tenant-initiated) rotations. Every `rotation_reason: 'incident'` event requires a formal IC record regardless of whether the rotation was ultimately authorized.
+> **Key event schema reference:** `sso.pkjwt_key_rotated` (HIGH/7yr, `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle`): `{ tenant_id: UUID, old_kid: UUID, new_kid: UUID, rotation_reason: 'incident', rotated_at: ISO8601 }`
+> **Emergency rotation spec:** `docs/SSO_SCIM_IMPLEMENTATION.md §42.10` — emergency/incident rotation path; old key must be immediately invalidated; two-person auth required for PAM-elevated rotate endpoint; JWKS KV slot updated atomically
+
+---
+
+### R-79.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | Routing |
+|---|---|---|---|---|
+| **AL-PKJWT-02 (incident reason)** | `sso.pkjwt_key_rotated` with `rotation_reason: 'incident'` | Any single occurrence | **P2** (Slack `#alerts-enterprise`, security-engineer) | Slack `#alerts-enterprise` → security-engineer; P2 investigation within 4h |
+| **AL-PKJWT-02 (velocity + incident reason)** | > 2 `sso.pkjwt_key_rotated` events / 24h per `tenant_id`, at least one with `rotation_reason: 'incident'` | > 2 rotations/24h per tenant | **P2 → P1 escalation path** | Slack `#alerts-enterprise` → security-engineer; automatic P1 PagerDuty `form-security` if combined with `sso.pkjwt_jwks_missing` for same tenant |
+| **Manual discovery** | security-engineer or compliance-officer discovers `rotation_reason: 'incident'` event during routine §79.4 evidence review or PKJWT-OBS-E-001 quarterly filing | Post-evidence-collection or routine audit log review | **P2 — treat as triggered** | Slack `#security-alerts` |
+
+> **No automatic P0:** A `rotation_reason: 'incident'` rotation alone is not a P0 incident. P0 applies only if R-79-C2 (PAM access log review) shows no authorized principal initiated the rotation (H3 — unauthorized rotation). In that case, immediately co-activate R-05 (Unauthorized Admin Access) and R-20 (Insider Threat / Privileged Access Abuse) as primary incidents; R-79 becomes the subordinate PKJWT key forensics strand.
+
+---
+
+### R-79.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P2 (H1 — undocumented)** | `rotation_reason: 'incident'` but authorized principal confirmed in PAM log; no IC ticket was opened before or during rotation | 4h investigation | Confirm authorized principal; retroactively open IC record; emit DEC-030 declared + closed chain; file PKJWT-ROT-E-001 artefact |
+| **P2 → P1 (H2 — documented break-glass)** | `rotation_reason: 'incident'`; authorized principal confirmed; key confirmed or suspected compromised; IC ticket already open or opened now | 1h response (key compromise path) | Validate old key fully invalidated; confirm JWKS KV consistent; revoke active sessions authenticated with `old_kid`; close IC via DEC-030; escalate to P1 if JWKS state inconsistent (AL-PKJWT-01 co-fires) |
+| **P0 (H3 — unauthorized)** | `rotation_reason: 'incident'`; R-79-C2 shows no authorized principal accessed the rotate endpoint within ±10 min of `rotated_at` | Immediately activate R-05 + R-20 | Co-activate R-05 (Unauthorized Admin Access) + R-20 (Insider Threat / Privileged Access Abuse) as primary incidents; R-79 becomes subordinate PKJWT forensics strand; notify compliance-officer + founder within 30 min |
+| **P2 (H4 — code bug)** | `rotation_reason: 'incident'` emitted by test harness, staging event misrouted to production audit log, or handler bug (e.g. `scheduled` incorrectly serialized as `incident`) | 4h investigation | Confirm no actual unauthorized key change for real production tenant; fix handler bug; emit DEC-030 chain noting H4 bug; file PKJWT-ROT-E-001 with bug reference |
+
+---
+
+### R-79.3 Immediate Actions (T+0 to T+60 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `sso.pkjwt_incident_rotation_ic_declared` (HIGH/7yr) via `emit-audit-event` Worker | security-engineer | Required at ALL severity levels. PKJWT-ROT-IC-CHAIN-01 anchor event. Do this FIRST before any DB queries. |
+| **T+5** | Run R-79-C1 (rotation event detail query for the tenant) | security-engineer | Extract `old_kid`, `new_kid`, `rotated_at` from `audit_log_events`; confirm event is not a duplicate or replay. |
+| **T+10** | Run R-79-C2 (PAM access log review for rotation endpoint) | security-engineer | Confirm authorized principal; cross-reference with `pg_log` / Cloudflare Access audit for PAM access to `/internal/tenant/{tenant_id}/sso/pkjwt/rotate` at `rotated_at` ±10 min. |
+| **T+15** | Run R-79-C3 (JWKS KV state check) | security-engineer | Confirm new `kid` is in JWKS endpoint; old `kid` is absent; JWKS endpoint returns HTTP 200. If non-200 or new `kid` absent → AL-PKJWT-01 may be active; escalate to P1 immediately. |
+| **T+20** | Classify root cause as H1–H4 per §R-79.4 | security-engineer | H3 (unauthorized) → immediately co-activate R-05 + R-20; do not wait for T+30. H1/H2 → proceed to IC record formalization. H4 → confirm bug and proceed. |
+| **T+30–T+60** | Formalize IC record; emit DEC-030 `sso.pkjwt_incident_rotation_ic_closed`; file PKJWT-ROT-E-001 artefact | security-engineer + compliance-officer | See §R-79.5 Steps 3–5. |
+
+---
+
+### R-79.4 Root Cause Hypotheses and Scope Queries
+
+#### R-79-C1 — Rotation event detail query
+
+```sql
+-- Role: form_audit (read-only on audit_log_events)
+-- Returns all sso.pkjwt_key_rotated events for the tenant in the last 24 hours
+SELECT
+  id,
+  event_type,
+  payload->>'tenant_id'        AS tenant_id,
+  payload->>'old_kid'          AS old_kid,
+  payload->>'new_kid'          AS new_kid,
+  payload->>'rotation_reason'  AS rotation_reason,
+  payload->>'rotated_at'       AS rotated_at,
+  created_at,
+  hmac_chain_hash
+FROM audit_log_events
+WHERE event_type = 'sso.pkjwt_key_rotated'
+  AND payload->>'tenant_id' = $tenant_id
+  AND created_at > NOW() - INTERVAL '24 hours'
+ORDER BY created_at ASC;
+-- Confirm: (1) rotation_reason = 'incident', (2) old_kid ≠ new_kid (real rotation, not no-op),
+--          (3) single event (no duplicate replay), (4) rotated_at matches created_at ±60s
+```
+
+> **Privacy floor:** Returns only FORM-internal UUIDs (`tenant_id`, `old_kid`, `new_kid`), enum strings, timestamps, and HMAC hash. No employee `user_id`, name, email, private key material, coaching content, health value, or GDPR Art. 9 special-category data. `kid` values are public-key identifiers only — no private key material.
+
+#### R-79-C2 — PAM access log review for rotation endpoint
+
+```sql
+-- Role: form_audit
+-- Query audit_log_events for admin actions on this tenant around the rotation time
+-- Also check Cloudflare Access audit log: Zero Trust dashboard → Access → Audit Logs
+SELECT
+  id,
+  event_type,
+  payload->>'tenant_id'       AS tenant_id,
+  payload->>'principal_id'    AS principal_id,
+  payload->>'action'          AS action,
+  payload->>'pam_request_id'  AS pam_request_id,
+  created_at
+FROM audit_log_events
+WHERE payload->>'tenant_id' = $tenant_id
+  AND event_type LIKE 'enterprise.admin_%'
+  AND created_at BETWEEN ($rotated_at::timestamptz - INTERVAL '10 minutes')
+                     AND ($rotated_at::timestamptz + INTERVAL '10 minutes')
+ORDER BY created_at ASC;
+-- Expected: 1 row with authorized principal_id and pam_request_id present
+--   (two-person auth per SSO_SCIM §42.10 emergency rotation path)
+-- Zero rows → either (a) PAM log gap: check Cloudflare Access logs manually,
+--   or (b) H3 unauthorized rotation with no admin session → escalate to P0
+```
+
+> **Privacy floor:** `principal_id` is a FORM-internal UUID (not linked to employee name or email in this query). `pam_request_id` is an operational token. No employee name, email, private key material, health value, or GDPR Art. 9 data.
+
+#### R-79-C3 — JWKS KV state check
+
+```
+-- Cloudflare KV check — confirm JWKS slot consistency post-rotation
+-- (1) HTTP endpoint:
+--     GET https://form.coach/auth/oidc/{tenant_slug}/.well-known/jwks.json
+--     Expected: HTTP 200, JSON body with exactly 1 key entry, kid = new_kid
+--     If HTTP 404 or 503 → AL-PKJWT-01 may be active; escalate to P1 immediately
+-- (2) CF KV direct check (wrangler):
+--     wrangler kv key get --binding PKJWT_KV "jwks:{tenant_id}"
+--     Expected: JSON with { keys: [{ kid: $new_kid, kty, use, alg, n, e }] }
+--     Absence of old_kid confirms old key invalidated per SSO_SCIM §42.10
+```
+
+> **Privacy floor:** JWKS endpoint and KV slot return only public-key material (`kid`, `kty`, `use`, `alg`, `n`, `e` for RSA) and metadata. No private key material, employee `user_id`, health value, or GDPR Art. 9 data.
+
+#### R-79-C4 — 90-day rotation timeline for tenant
+
+```sql
+-- Role: form_audit
+-- Broader timeline: all sso.pkjwt_key_rotated events for this tenant in last 90 days
+-- Establishes normal rotation cadence; identifies if this incident rotation is part of a pattern
+SELECT
+  payload->>'old_kid'          AS old_kid,
+  payload->>'new_kid'          AS new_kid,
+  payload->>'rotation_reason'  AS rotation_reason,
+  payload->>'rotated_at'       AS rotated_at,
+  created_at
+FROM audit_log_events
+WHERE event_type = 'sso.pkjwt_key_rotated'
+  AND payload->>'tenant_id' = $tenant_id
+  AND created_at > NOW() - INTERVAL '90 days'
+ORDER BY created_at ASC;
+-- Expected under normal operations: 0–1 rotation per year (rotation_reason = 'scheduled')
+-- Incident signal: multiple rotations in short period, especially rotation_reason = 'incident'
+-- Use with R-79-C2 to determine if pattern suggests repeated unauthorized attempts (H3)
+```
+
+#### Root cause hypotheses
+
+| Hypothesis | Description | Primary signal | Recovery path |
+|---|---|---|---|
+| **H1 — Authorized, undocumented** | An authorized `tenant_owner` or `tenant_admin` initiated the rotation with `rotation_reason: 'incident'` (correct designation) but did not open a formal IC ticket before rotating | R-79-C2 shows authorized `principal_id` + `pam_request_id` present; no prior `sso.pkjwt_incident_rotation_ic_declared` event in `audit_log_events` for this incident | Retroactively formalize IC record; confirm reason in writing from authorizing principal; emit DEC-030 declared + closed chain; file PKJWT-ROT-E-001; add process training note for tenant admin team |
+| **H2 — Authorized break-glass** | Correct emergency rotation: tenant key confirmed or credibly suspected compromised; authorized principal followed SSO_SCIM §42.10 emergency path; IC ticket may already exist | R-79-C2 shows authorized principal + `pam_request_id`; IC ticket reference traceable; R-79-C3 confirms new `kid` active and old `kid` absent | Validate old key fully invalidated; revoke active sessions authenticated with `old_kid` (R-73 bulk revocation pattern — `POST /internal/tenant/{tenant_id}/revoke-all-sessions`, two-person auth §19.4); confirm JWKS KV consistent; close IC via DEC-030 `sso.pkjwt_incident_rotation_ic_closed` |
+| **H3 — Unauthorized rotation** | `rotation_reason: 'incident'` emitted without any authorized principal access in PAM log; possible unauthorized access to Admin Dashboard, rotate endpoint, or `emit-audit-event` Worker direct call | R-79-C2 returns zero rows AND Cloudflare Access audit shows no admin session to rotation endpoint at `rotated_at` ±10 min | **Immediately co-activate R-05 (Unauthorized Admin Access) + R-20 (Insider Threat / Privileged Access Abuse)**; R-79 becomes subordinate forensics strand; preserve `old_kid` / `new_kid` chain for forensics; revoke all tenant admin sessions (`POST /internal/tenant/{tenant_id}/revoke-all-sessions`, two-person auth §19.4); notify compliance-officer + founder within 30 min |
+| **H4 — Code bug** | Wrong `rotation_reason` enum emitted by integration test, staging environment event misrouted to production `audit_log_events`, or handler bug (e.g. `scheduled` incorrectly serialized as `incident`) | R-79-C2 shows `pam_request_id` present but `rotation_reason` mismatch vs. stated operator intent; OR `old_kid = new_kid` (no-op rotation — no actual key change); OR `tenant_id` is a known test or staging tenant | Confirm no unauthorized production key change; fix handler bug or routing guard; if production tenant affected with `old_kid = new_kid` (no real rotation despite `incident` flag): perform correct rotation with proper `rotation_reason`; emit DEC-030 chain noting H4 classification |
+
+---
+
+### R-79.5 Recovery Procedure
+
+#### Step 1 — Emit IC-declared event (T+0, all severities)
+
+Emit `sso.pkjwt_incident_rotation_ic_declared` (HIGH/7yr) via `emit-audit-event` Worker before any DB queries. PKJWT-ROT-IC-CHAIN-01 anchor event. Supply `tenant_id`, `rotation_event_id` (the `id` of the triggering `sso.pkjwt_key_rotated` event from R-79-C1), and `trigger` (enum: `al_pkjwt_02_alert`, `manual_discovery`).
+
+#### Step 2 — Run R-79-C1 through R-79-C2 (root cause classification)
+
+Run scope queries in sequence. Classify root cause as H1–H4 per §R-79.4 table. Record `old_kid`, `new_kid`, and `authorized_by` (principal from R-79-C2) for DEC-030 closed event.
+
+- **H3 (unauthorized):** Stop further investigation here. Co-activate R-05 + R-20 immediately. Notify compliance-officer and founder within 30 min. Continue R-79 scope queries in parallel as a forensic strand only.
+- **H1/H2/H4:** Proceed to Steps 3–5.
+
+#### Step 3 — Validate JWKS state (all H1/H2/H4 paths)
+
+Confirm via R-79-C3:
+- New `kid` (`new_kid` from R-79-C1) is present in the JWKS endpoint and CF KV slot `jwks:{tenant_id}`
+- Old `kid` (`old_kid`) is absent from the JWKS endpoint
+- JWKS endpoint returns HTTP 200
+
+If JWKS endpoint returns non-200 or new `kid` is absent: **immediately escalate to P1**; AL-PKJWT-01 may also be active; notify security-engineer + enterprise-architect via PagerDuty `form-security`; confirm JWKS KV repair per SSO_SCIM §42.10 before proceeding.
+
+For H2 (confirmed key compromise): additionally revoke all active tenant sessions authenticated using `old_kid` JWTs — use `POST /internal/tenant/{tenant_id}/revoke-all-sessions` (two-person auth, §19.4); emit `enterprise.admin_sessions_bulk_revoked` (HIGH/7yr) per §R-73 revocation pattern.
+
+#### Step 4 — Formalize IC record and documentation
+
+| Root cause | Documentation action |
+|---|---|
+| **H1 — Undocumented** | Record IC narrative retroactively: who rotated, why `rotation_reason: 'incident'` was chosen, what the suspected or actual trigger was; obtain written confirmation from authorizing principal; verify `pam_request_id` matches Cloudflare Access audit entry |
+| **H2 — Break-glass** | Confirm IC ticket reference (`prior_ic_reference`); document the key compromise vector (if known); record all sessions revoked and revocation completion time |
+| **H4 — Code bug** | Document bug root cause and fix commit; record that no production tenant suffered unauthorized key replacement; reference fix PR |
+
+#### Step 5 — Emit IC-closed event and file artefact
+
+Emit `sso.pkjwt_incident_rotation_ic_closed` (HIGH/7yr) via `emit-audit-event` Worker. Closes the PKJWT-ROT-IC-CHAIN-01 DEC-030 chain for this incident. See §R-79.7 for full payload schema.
+
+File PKJWT-ROT-E-001 artefact to `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY-MM-DD}-{tenant_id_first_8}/PKJWT-ROT-E-001.json` in R2 WORM bucket. See §R-79.8 for artefact spec.
+
+---
+
+### R-79.6 Communication Templates
+
+#### Slack `#alerts-enterprise` — P2 IC declaration (all activations)
+
+```
+[P2 · PKJWT Incident Rotation] sso.pkjwt_key_rotated with rotation_reason: 'incident' detected.
+Tenant: {tenant_id} (FORM-internal UUID)
+Incident: {incident_id}
+Declared: {timestamp UTC}
+rotated_at: {rotated_at UTC}
+old_kid: {old_kid} / new_kid: {new_kid}
+IC: security-engineer
+Status: Root cause classification underway (R-79-C1, R-79-C2, R-79-C3).
+Note: Rotation already executed — old key invalidated per SSO_SCIM §42.10.
+Next update: T+20 min (R-79-C2 authorized principal confirmation) or on P0 escalation.
+Dedup: pkjwt-rotation-anomaly-{tenant_id}
+```
+
+#### CSM notification — H2 break-glass (tenant-impacting, enterprise tier)
+
+```
+[ENTERPRISE SECURITY · Key Rotation Completed] {tenant_name} SSO PKJWT key has been rotated
+as an emergency measure. This is an administrative operation — no action required from your team.
+Your SSO integration will continue working without interruption. FORM will provide a written
+security summary within 24 hours. Questions: {csm_email}.
+```
+
+> **CSM notification SLA:** Within 15 min of H2 break-glass classification for any enterprise tenant; written summary within 24h (§4.3 P1 SLA applies if key compromise is confirmed). Do NOT include `old_kid`, `new_kid`, or compromise vector details in the initial notification — security-engineer + compliance-officer must approve final language before sending.
+
+#### P0 escalation template (H3 — unauthorized rotation → R-05 + R-20)
+
+```
+[P0 ESCALATION → R-05 + R-20] Unauthorized PKJWT rotation detected — no authorized principal in PAM log.
+Tenant: {tenant_id} (FORM-internal UUID)
+Incident: {incident_id}
+rotated_at: {rotated_at UTC}
+R-79-C2 result: ZERO authorized admin sessions at ±10 min of rotation time
+IC: security-engineer (R-05 + R-20 primary ICs)
+Action: R-05 (Unauthorized Admin Access) + R-20 (Insider Threat / Privileged Access Abuse) activated.
+        compliance-officer + founder notified.
+        All tenant admin sessions revoked (two-person auth, §19.4).
+R-79 continues as forensics strand.
+CC: compliance-officer · founder · enterprise-architect · @security-oncall
+```
+
+#### Post-resolution template (H1/H2/H4 clean closure)
+
+```
+[RESOLVED · PKJWT Incident Rotation IC] {incident_id} closed.
+Tenant: {tenant_id} (FORM-internal UUID)
+Closed at: {closed_at UTC}
+Root cause: {root_cause — H1/H2/H4}
+JWKS state: HEALTHY (R-79-C3: new kid confirmed, old kid absent)
+DEC-030: sso.pkjwt_incident_rotation_ic_closed emitted.
+PKJWT-ROT-E-001 artefact filed.
+Sessions revoked (H2 only): {sessions_revoked_count}
+IC: security-engineer + compliance-officer
+```
+
+---
+
+### R-79.7 DEC-030 Chain Specification
+
+Two DEC-030 HMAC-chained events are required for every R-79 activation. Both events are emitted via `emit-audit-event` Worker. IC must hold a PAM-elevated session.
+
+#### Event 1 — `sso.pkjwt_incident_rotation_ic_declared` (HIGH · 7yr retention)
+
+**When:** T+0 of every R-79 activation, before any DB scope queries. PKJWT-ROT-IC-CHAIN-01 anchor event.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:       z.string().uuid(),
+  tenant_id:         z.string().uuid(),
+  rotation_event_id: z.string().uuid(),   // id of triggering sso.pkjwt_key_rotated event
+  old_kid:           z.string().uuid(),
+  new_kid:           z.string().uuid(),
+  trigger:           z.enum(['al_pkjwt_02_alert', 'manual_discovery']),
+  initial_severity:  z.enum(['P2', 'P1', 'P0']),
+  declared_at:       z.string().datetime(),
+})
+```
+
+> **Privacy invariant:** No employee `user_id`, name, email, session token, private key material, or GDPR Art. 9 special-category data. `tenant_id` is a FORM-internal UUID. `old_kid` / `new_kid` are public-key identifiers only — no key material.
+
+#### Event 2 — `sso.pkjwt_incident_rotation_ic_closed` (HIGH · 7yr retention)
+
+**When:** After Step 5 — IC record formalized, JWKS state confirmed healthy (or H3 forensics strand handed off to R-05/R-20). Closes PKJWT-ROT-IC-CHAIN-01 DEC-030 chain for this incident.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:        z.string().uuid(),
+  tenant_id:          z.string().uuid(),
+  root_cause:         z.enum(['H1_undocumented', 'H2_break_glass', 'H3_unauthorized', 'H4_code_bug']),
+  authorized_by:      z.string().uuid().optional(),  // principal_id from R-79-C2; absent for H3/H4
+  jwks_state_healthy: z.boolean(),                   // true = R-79-C3 confirmed; false = P1 active
+  sessions_revoked:   z.number().int().nonneg(),      // 0 for H1/H4; ≥ 0 for H2; required for H3 scope
+  closed_at:          z.string().datetime(),
+  prior_ic_reference: z.string().optional(),          // existing IC ticket reference for H2
+})
+```
+
+> **Privacy invariant:** `authorized_by` is a FORM-internal `principal_id` UUID — not linked to employee name or email in this payload. `sessions_revoked` is an integer count only. No session tokens, employee PII, private key material, or GDPR Art. 9 data.
+
+#### PKJWT-ROT-IC-CHAIN-01 ordering invariant
+
+`sso.pkjwt_incident_rotation_ic_declared` **must** precede `sso.pkjwt_incident_rotation_ic_closed` for the same `incident_id` within any HMAC audit chain window. The `emit-audit-event` Worker enforces this constraint: a `sso.pkjwt_incident_rotation_ic_closed` emit for an `incident_id` with no prior `sso.pkjwt_incident_rotation_ic_declared` in the chain returns HTTP 422 with error code `PKJWT_ROT_IC_CHAIN_01_VIOLATION`.
+
+Implementation status: [ ] Pending — platform-engineer + security-engineer (§R-79.11 item 4).
+
+---
+
+### R-79.8 SOC 2 Evidence
+
+#### Evidence artefact: PKJWT-ROT-E-001
+
+| Field | Value |
+|---|---|
+| **ID** | PKJWT-ROT-E-001 |
+| **Description** | Per-activation IC record: `sso.pkjwt_incident_rotation_ic_declared` event JSON, root cause classification (H1–H4), R-79-C1 rotation event detail, R-79-C2 PAM access log extract (authorized principal + `pam_request_id`), R-79-C3 JWKS KV state check output, `sso.pkjwt_incident_rotation_ic_closed` event JSON, sessions revocation record (H2 only). SHA-256 hashed; uploaded to `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY-MM-DD}-{tenant_id_first_8}/`. |
+| **SOC 2 criterion** | CC6.6 — unexpected key replacement anomaly monitoring and investigation; CC7.2 — rotation velocity anomaly monitoring; CC7.3 — resolution and remediation |
+| **Cadence** | Per activation (no artefact if R-79 is never triggered; absence is positive non-occurrence evidence) |
+| **Owner** | security-engineer + compliance-officer |
+| **File path** | `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY-MM-DD}-{tenant_id_first_8}/PKJWT-ROT-E-001.json` |
+| **Retention** | 7yr (HIGH, per DEC-030; aligns with `sso.pkjwt_incident_rotation_ic_declared` retention tier) |
+
+**Auditor narrative (CC6.6):** PKJWT-ROT-E-001 demonstrates that FORM detected the unexpected `rotation_reason: 'incident'` PKJWT key replacement event, investigated the authorization chain (PAM log, Cloudflare Access audit), confirmed the authorized principal and rationale (H1/H2/H4) or escalated to R-05/R-20 (H3), validated JWKS KV consistency post-rotation, and formally closed the incident via DEC-030. The existence of this artefact proves FORM's CC6.6 anomaly-response process is operational for PKJWT key lifecycle events.
+
+**Privacy floor:** PKJWT-ROT-E-001 contains only FORM-internal UUIDs (`incident_id`, `tenant_id`, `old_kid`, `new_kid`, `principal_id`), timestamps, integer counts, root cause enums, and JWKS public-key material. No employee name, email, session token, private key material, coaching content, health value, or GDPR Art. 9 special-category data.
+
+---
+
+### R-79.9 Post-Incident Controls
+
+| # | Control | Owner | Trigger condition |
+|---|---|---|---|
+| 1 | Post-mortem within 48h of IC closure (H1/H2/H4); within 24h for H3 | security-engineer + compliance-officer | Every R-79 activation |
+| 2 | If H1 (undocumented): add process note to SSO_SCIM §42.10 emergency rotation checklist requiring IC ticket opened BEFORE or SIMULTANEOUSLY WITH rotation (not retroactively); retrain authorized principals | enterprise-architect + compliance-officer | H1 only |
+| 3 | If H2 (break-glass, compromise confirmed): conduct full credential audit for the tenant — review all PKJWT-signed tokens in active sessions; check for any anomalous OIDC authentications in the 24h window before `rotated_at`; consider whether key compromise constitutes a GDPR Art. 33 breach notification threshold event (security-engineer + compliance-officer assessment) | security-engineer | H2 with confirmed compromise |
+| 4 | If H3 (unauthorized): preserve complete audit trail for forensics and legal hold; engage outside counsel if needed; notify affected tenant via compliance-officer within 24h; evaluate whether GDPR Art. 33/34 notification threshold is met | compliance-officer + founder | H3 only |
+| 5 | If H4 (code bug): add integration test asserting `rotation_reason` serialization correctness for all three enum values; add staging-to-production event routing guard preventing test events reaching production `audit_log_events` | platform-engineer | H4 only |
+| 6 | Review PKJWT-OBS-E-001 quarterly filing — note any R-79 activations with `incident_id` and root cause classification in the quarterly attestation supplement (§75.8 per-incident supplement path) | compliance-officer | If R-79 activated in quarterly filing window |
+
+---
+
+### R-79.10 Cross-References
+
+| Reference | Location | Relationship |
+|---|---|---|
+| AL-PKJWT-02 alert spec | `docs/OBSERVABILITY.md §75.4` (v5.20.2, 2026-07-05) | Canonical alert definition triggering R-79; §75.4 Runbook field item (3) references this runbook |
+| AL-PKJWT-01 alert spec | `docs/OBSERVABILITY.md §75.3` (v5.20.0, 2026-07-05) | Co-occurring P1 alert when JWKS KV slot is missing post-rotation; co-occurrence escalates R-79 to P1 |
+| `sso.pkjwt_key_rotated` event schema | `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle` (v2.96, 2026-07-05) | Canonical DEC-030 schema for the triggering event; `rotation_reason` enum values |
+| Emergency rotation path | `docs/SSO_SCIM_IMPLEMENTATION.md §42.10` (v2.34) | PKJWT emergency/incident rotation spec — two-person auth, old key invalidation, JWKS KV update atomicity |
+| PKJWT Observability | `docs/OBSERVABILITY.md §75` (v5.20.0, 2026-07-05) | Full PKJWT key lifecycle observability section; PKJWT-OBS-E-001 quarterly evidence artefact |
+| Unauthorized Admin Access | `docs/INCIDENT_RESPONSE.md §R-05` | H3 co-activation — unauthorized rotation triggers R-05 as primary incident |
+| Insider Threat / Privileged Access | `docs/INCIDENT_RESPONSE.md §R-20` | H3 co-activation — concurrent insider threat investigation strand |
+| BCL REVOCATION_QUEUE Exhausted | `docs/INCIDENT_RESPONSE.md §R-73` | Pattern reference for `admin_sessions_bulk_revoked` H2 session revocation path (§R-73 two-person auth §19.4 pattern) |
+| DEC-030 HMAC chain protocol | `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) | HMAC-chained audit log pattern governing all events emitted in this runbook |
+
+---
+
+### R-79.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `sso.pkjwt_incident_rotation_ic_declared` (HIGH/7yr) and `sso.pkjwt_incident_rotation_ic_closed` (HIGH/7yr) in `docs/AUDIT_LOG_SCHEMA.md §SSO-PKJ-Lifecycle`; include Zod v2 schemas from §R-79.7 and PKJWT-ROT-IC-CHAIN-01 ordering invariant | security-engineer + enterprise-architect | **P0** / M6 | [ ] Pending — M6 |
+| 2 | Register PKJWT-ROT-E-001 in `docs/SOC2_READINESS.md §79.4` evidence artefact registry (per-activation cadence, CC6.6/CC7.2/CC7.3, 7yr, owner: security-engineer + compliance-officer) | compliance-officer | **P1** / M6 | [ ] Pending — M6 |
+| 3 | Provision `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001/` R2 subfolder; WORM + `r2:form-api` REVOKED policy | devops-lead | **P1** / M6 | [ ] Pending — M6 |
+| 4 | Implement PKJWT-ROT-IC-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`: create `pkjwt-rot-ic-chain-01.ts` enforcing `sso.pkjwt_incident_rotation_ic_declared` must precede `sso.pkjwt_incident_rotation_ic_closed` for same `incident_id` within 72 h; HTTP 422 + `PKJWT_ROT_IC_CHAIN_01_VIOLATION` on inversion | platform-engineer + security-engineer | **P0** / M6 | [ ] Pending — M6 |
+| 5 | Update `docs/OBSERVABILITY.md §75.4` AL-PKJWT-02 runbook item (3): change `(R-77 rotation companion runbook)` → `(R-79 rotation companion runbook)` | compliance-officer | **P0** | [x] **Done — 2026-07-05 (OBSERVABILITY.md v5.20.2, patch applied this pass).** |
+| 6 | Authoring complete — R-79 closes the AL-PKJWT-02 companion runbook gap: `sso.pkjwt_key_rotated` (`rotation_reason: 'incident'`) events had no formal IC investigation runbook; OBSERVABILITY.md §75.4 item (3) forward reference (originally `R-77`, subsequently assigned to BCL Chain Integrity Check Stale in v3.41.0) resolved to this runbook | compliance-officer | **P0** | [x] **Done — 2026-07-05 (INCIDENT_RESPONSE.md v3.43.0).** |
+
+**Privacy floor (invariant throughout R-79):** No employee `user_id`, name, email, health value, body composition, coaching session content, private key material, or GDPR Art. 9 special-category data appears in any R-79 query result, DEC-030 event payload, evidence artefact, or Slack communication template. R-79-C1 through R-79-C4 return only FORM-internal UUIDs, timestamps, integer counts, and operational metadata. `tenant_id` in all R-79 outputs is a FORM-internal UUID — not linked to company name, employee roster, or any personal identifier in this runbook. `old_kid` and `new_kid` are public-key identifiers only — no private key material is referenced, stored, or transmitted. Owner: security-engineer + compliance-officer + enterprise-architect.
+
+---
+
+*v3.43.0 (2026-07-05): R-79 PKJWT Incident Key Rotation (`sso.pkjwt_key_rotated`, `rotation_reason: 'incident'`, CC6.6/CC7.2/CC7.3 — AL-PKJWT-02 companion runbook). Closes the AL-PKJWT-02 companion runbook gap identified in `docs/OBSERVABILITY.md §75.4` (v5.20.0, 2026-07-05): item (3) of the AL-PKJWT-02 runbook referenced `(R-77 rotation companion runbook)` as a forward reference; R-77 was subsequently assigned to BCL Chain Integrity Check Stale (v3.41.0, 2026-07-05) and R-78 to SLO Chain Integrity Check Stale, leaving the PKJWT incident rotation runbook unathored until this pass. R-79: eleven-section runbook. Trigger: any `sso.pkjwt_key_rotated` event with `rotation_reason: 'incident'`; source: AL-PKJWT-02 (P2 Slack `#alerts-enterprise`); escalation to P1 PagerDuty `form-security` if co-occurring with AL-PKJWT-01 (`sso.pkjwt_jwks_missing`). Four root causes: H1 authorized/undocumented (retroactive IC formalization); H2 authorized break-glass (session revocation path, GDPR Art. 33 assessment); H3 unauthorized rotation (mandatory R-05 + R-20 co-activation, compliance-officer + founder notify within 30 min); H4 code bug (enum serialization fix, routing guard). Four scope queries: R-79-C1 (`sso.pkjwt_key_rotated` event detail, form_audit); R-79-C2 (PAM access log for rotation endpoint ±10 min); R-79-C3 (JWKS KV state — HTTP 200 + new kid present, old kid absent); R-79-C4 (90-day rotation timeline). Two new DEC-030 events: `sso.pkjwt_incident_rotation_ic_declared` (HIGH/7yr) + `sso.pkjwt_incident_rotation_ic_closed` (HIGH/7yr) with full Zod v2 schemas; PKJWT-ROT-IC-CHAIN-01 ordering invariant (declared must precede closed per `incident_id`; HTTP 422 `PKJWT_ROT_IC_CHAIN_01_VIOLATION` on inversion; pending M6 implementation in `emit-audit-event` Worker). PKJWT-ROT-E-001 per-activation SOC 2 evidence artefact (CC6.6/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/pkjwt-obs/pkjwt-rot-e-001-{YYYY-MM-DD}-{tenant_id_first_8}/PKJWT-ROT-E-001.json`). CSM notification SLA: within 15 min of H2 break-glass classification for any enterprise tenant; written summary within 24h. Six implementation checklist items: items 5 (OBSERVABILITY §75.4 reference patched: R-77 → R-79, OBSERVABILITY.md v5.20.2) + 6 (authoring done) marked Done this pass; items 1–4 pending M6 (AUDIT_LOG_SCHEMA registration, SOC2_READINESS §79.4 registration, R2 subfolder provision, PKJWT-ROT-IC-CHAIN-01 Worker enforcement). Document header v3.42.0 → v3.43.0. Owner: security-engineer + compliance-officer + enterprise-architect.*
 
 *v3.42.0 (2026-07-05): §R-77.11 item 3 + §R-78.11 item 3 marked Done. BCL-CHECK-STALE-E-001 (CC7.2, per-activation, 7yr) registered in `docs/SOC2_READINESS.md §79.4` master evidence table (count 142 → 143, §171.2, v3.97.0, 2026-07-05); SLO-CHECK-STALE-E-001 (CC7.2, per-activation, 7yr) registered (count 143 → 144, §171.2). Both artefacts close the P0 evidence registration obligations opened in R-77 + R-78 (v3.41.0, 2026-07-05). Companion R2 subfolder provision (R-77.11 item 5 + R-78.11 item 5) and tabletop exercises (R-77.11 item 6 + R-78.11 item 6) remain pending at M8/M7 milestones. Document header v3.41.0 → v3.42.0. Owner: compliance-officer + security-engineer.*
 
