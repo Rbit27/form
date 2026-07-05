@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v13.34.0** — 2026-07-05 · content · post-3263 · «Коли система дає збій: межі self-coached підходу і коли потрібен зовнішній погляд» · series «Програмування під себе: від шаблону до власної системи» 3256–3265 in progress 8/10 · clinical-safety NOT_REQUIRED (тема: методологічні межі self-coached підходу, структурні сліпі зони, критерії залучення зовнішнього погляду; без їжі/образу тіла/болю/психіатрії) · sports-scientist review pending · blog.html card prepended for post-3263 · next: post-3264 («Горизонт зрілості: як виглядає self-coached програмування через 3–4 роки систематичної роботи»)
+
+---
+
 **v13.33.0** — 2026-07-05 · content · post-3185 · «Операційна система мінімалістичного тренування: синтез серії 3176–3185» · series «Тренувальний мінімалізм: менше і ефективніше» 3176–3185 COMPLETE 10/10 · clinical-safety NOT_REQUIRED · sports-scientist review pending · blog.html card prepended for post-3185 · next series: «Читання власних даних: від журналу до рішень» 3186–3195 (proposed)
 
 ---
