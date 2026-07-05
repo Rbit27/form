@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [13.31.1] — 2026-07-05
+
+### Added
+- `docs/OBSERVABILITY.md §76` — Session Revocation KV Observability. Dedicated section for SESSION_REVOCATION_KV Cloudflare KV layer (SSO_SCIM §22). Includes §76.1 scope (5 DEC-030 events, 4 KV key types, privacy floor), §76.2 RED metrics, §76.3 SLO definitions (REVOKE-SLO-01/02), §76.4 alert runbooks (AL-REVOKE-01 five-step, AL-REVOKE-02 four-step), §76.5–§76.6 registration/dashboard pointers, §76.7 SOC 2 evidence mapping (CC6.3/CC7.2/CC7.3), §76.8 REVOKE-OBS-E-001 quarterly artefact spec (5 components, per-incident supplement, nil-attestation protocol), §76.9 implementation checklist, §76.10 cross-reference obligations.
+- `docs/OBSERVABILITY.md §26.9` — "Session Revocation KV" six-panel dashboard sub-group (revocations/hr stacked bar, KV sync error rate 7d, bulk P95 7d, SSO-SLO-04 gauge, AL-REVOKE-01 activations 30d, tenant nuke 90d weekly bar). All queries form_audit role; tenant_id only; privacy floor stated.
+- `docs/SOC2_READINESS.md §179` — REVOKE-OBS-E-001 registered in §79.4 master evidence table. Evidence count 155 → 156. §179.2 table entry, §179.3 SOC 2 auditor narratives (CC6.3/CC7.2/CC7.3), §179.4 privacy floor, §179.5 cross-reference obligations.
+
+### Changed
+- `docs/OBSERVABILITY.md` — TOC entry for §76 added; §26.9 "Session Revocation KV" sub-group added; header v5.21.0 → v5.22.0.
+- `docs/SOC2_READINESS.md` — §79.4 evidence count 155 → 156; header v4.4.0 → v4.5.0.
+- `VERSION` — 13.31.0 → 13.31.1.
+
+---
+
 ## [13.31.0] — 2026-07-05
 
 ### Added

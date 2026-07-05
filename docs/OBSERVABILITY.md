@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.21.0
+# FORM · Observability & Monitoring Taxonomy v5.22.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -74,6 +74,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §72 | SAML Single Logout (SLO) Observability |
 | §73 | SLO-CHAIN-01 Integrity Check — Migration SQL DDL (`0103_slo_chain_integrity_check.sql`) |
 | §74 | BCL-INT-CAP-01 Parity Patch — Cap-Reached Event Registration (AUDIT_LOG_SCHEMA.md v2.94) |
+| §76 | Session Revocation KV Observability |
 
 ---
 
@@ -6397,6 +6398,19 @@ A dedicated "Enterprise Identity" Metabase dashboard (Supabase-backed panels) an
 | **pg_cron job 58 last-run freshness** | Single-stat (seconds since last successful run); red if > 25 h | `SELECT EXTRACT(EPOCH FROM (NOW() - MAX(end_time))) FROM cron.job_run_details WHERE jobid = 58 AND status = 'succeeded'` (form_audit via PAM read) | Hourly |
 
 **Privacy floor:** All six panel queries use `tenant_id` (FORM-internal UUID) and `kid` (public key-ID, no private material) only. No employee `user_id`, name, email, or `pkjwt_private_key_encrypted` column appears in any query or panel output. **Alert cross-links:** "JWKS missing events" panel links to AL-PKJWT-01 runbook (P1 PagerDuty `form-security` on any `sso.pkjwt_jwks_missing` event, 1 h per-tenant dedup); "Key rotation events" panel links to AL-PKJWT-02 runbook (P2 Slack `#alerts-enterprise` on > 2 rotations / 24 h or `rotation_reason: 'incident'`). Full alert rule spec: §75.5. SOC 2 evidence: PKJWT-OBS-E-001 (§75.8, quarterly, CC6.6 / CC7.2 / CC7.3, 7 yr WORM).
+
+**Session Revocation KV sub-group** (per §76.6; positioned after PKJWT sub-group above; owner: devops-lead; deployed at M4):
+
+| Panel | Type | Query source | Update cadence |
+|---|---|---|---|
+| **Revocations per hour by type (last 7 days)** | Stacked bar — four series: `tenant_nuke` / `user` / `session` / `jti`; `tenant_nuke` series highlighted in ember | `SELECT payload->>'revocation_type', DATE_TRUNC('hour', created_at), COUNT(*) FROM audit_log_events WHERE event_type IN ('session.revoked_by_user','session.revoked_by_scim','session.revoked_by_nuke') AND created_at > NOW() - INTERVAL '7 days' GROUP BY 1, 2` (form_audit role) | Real-time (5-min refresh) |
+| **KV sync error rate — 7 days (5-min buckets)** | Time-series; AL-REVOKE-01 threshold at 1% drawn as red reference line; background turns red when threshold crossed | `SELECT DATE_TRUNC('5 minutes', created_at), COUNT(*) FILTER (WHERE event_type = 'session.revocation_kv_sync_error') * 100.0 / NULLIF(COUNT(*), 0) FROM audit_log_events WHERE event_type IN ('session.revoked_by_user','session.revoked_by_scim','session.revoked_by_nuke','session.revocation_kv_sync_error') AND created_at > NOW() - INTERVAL '7 days' GROUP BY 1` (form_audit role) | 5-min refresh |
+| **Bulk revocation P95 duration (last 7 days, hourly)** | Time-series; AL-REVOKE-02 threshold at 5,000 ms; REVOKE-SLO-02 upper bound reference line | `SELECT DATE_TRUNC('hour', created_at), PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY (payload->>'duration_ms')::int) FROM audit_log_events WHERE event_type = 'session.bulk_revocation_complete' AND created_at > NOW() - INTERVAL '7 days' GROUP BY 1` (form_audit role) | Hourly |
+| **SSO-SLO-04 / REVOKE-SLO-01 compliance (rolling 7 days)** | Single-stat gauge: P99 revocation latency vs 200 ms threshold; green if compliant, red if breached | WAE `session_revocation_duration_ms` histogram P99 over 7-day rolling window; REVOKE-SLO-01 threshold at 200 ms | Real-time (WAE) |
+| **AL-REVOKE-01 activations (last 30 days)** | Single-stat; target 0; background turns ember on any value > 0 | PagerDuty API: incidents tagged `al-revoke-01` within 30 days, or `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'session.revocation_kv_sync_error' AND created_at > NOW() - INTERVAL '30 days'` as proxy (form_audit role) | Hourly |
+| **Tenant nuke events — 90-day weekly bar (by tenant)** | Bar chart stacked by `tenant_id`, weekly buckets; `tenant_nuke` count ≥ 2 / week per tenant triggers investigation note | `SELECT payload->>'tenant_id', DATE_TRUNC('week', created_at), COUNT(*) FROM audit_log_events WHERE event_type = 'session.revoked_by_nuke' AND created_at > NOW() - INTERVAL '90 days' GROUP BY 1, 2` (form_audit role) | Daily refresh |
+
+**Privacy floor:** All six panel queries use `tenant_id` (FORM-internal UUID) only — no `user_id`, `session_id`, `employee_id`, or any GDPR Art. 9 special-category data appears in any query or panel output. `revoked_count` in `session.bulk_revocation_complete` is an aggregate integer (not a session enumeration). **Alert cross-links:** "KV sync error rate" links to AL-REVOKE-01 runbook (P1 PagerDuty `form-security`, 5-min trigger); "Bulk revocation P95" links to AL-REVOKE-02 runbook (P2 Slack `#alerts-enterprise`, threshold 5,000 ms). Full alert rule spec: §26.6 / §76.4. SOC 2 evidence: REVOKE-OBS-E-001 (§76.8, quarterly, CC6.3 / CC7.2 / CC7.3, 7 yr WORM).
 
 ---
 
@@ -20713,7 +20727,147 @@ Add a `pkjwt` sub-group to the §26.9 Enterprise Identity dashboard (parallel to
 | Author `docs/INCIDENT_RESPONSE.md R-81` as dedicated companion runbook for AL-PKJWT-01 (mirrors BCL/SLO pattern: BCL → R-73/R-74, SAML SLO → R-75/R-76, PKJWT → R-81) | §75.4 AL-PKJWT-01 / §75.9 item 8 | 🟢 **Done — 2026-07-05 (INCIDENT_RESPONSE.md v3.46.0, §R-81; this pass).** |
 | Update §75.4 AL-PKJWT-01 Runbook field to reference `INCIDENT_RESPONSE.md R-81` as dedicated companion runbook | §75.4 / §75.9 item 8 | 🟢 **Done — 2026-07-05 (OBSERVABILITY.md v5.21.0, §75.4 Runbook field; this pass).** |
 
+## §76 Session Revocation KV Observability
+
+### §76.1 Scope and Coverage
+
+Monitors the SESSION_REVOCATION_KV Cloudflare KV layer described in `docs/SSO_SCIM_IMPLEMENTATION.md §22` (v1.4, 2026-06-01).
+
+**System boundary:** four KV key types (`tenant_nuke:{tenant_id}`, `user:{tenant_id}:{user_id}`, `session:{session_id}`, `jti:{jti}`); Supabase `session_blocklist` write-through; five DEC-030 HMAC-chained events; alert rules AL-REVOKE-01 / AL-REVOKE-02 (§26.6); SLO SSO-SLO-04.
+
+**SOC 2 criteria:** CC6.3 (logical access removal on a timely basis), CC7.2 (anomaly monitoring), CC7.3 (response to anomalies).
+
+**Privacy floor:** `tenant_id` (FORM-internal UUID) only in all monitoring signals, dashboard queries, and artefact JSON. `user_id` is explicitly excluded from artefact collection queries via `payload - 'user_id'` scrubbing. No `session_id`, `employee_id`, `jti`, health value, coaching content, or GDPR Art. 9 special-category data appears in any panel or evidence component.
+
+**Five DEC-030 events in scope:**
+
+| Event type | Severity | Retention | Notes |
+|---|---|---|---|
+| `session.revoked_by_user` | STANDARD | 7 yr | User-initiated revocation via FORM UI or API |
+| `session.revoked_by_scim` | STANDARD | 7 yr | Triggered by SCIM deprovision or suspend |
+| `session.revoked_by_nuke` | HIGH | 7 yr | Tenant-wide nuke; two-person auth required (§26.10 monitor) |
+| `session.bulk_revocation_complete` | STANDARD | 7 yr | Batch completion; payload carries `duration_ms` and `revoked_count` (aggregate) |
+| `session.revocation_kv_sync_error` | HIGH | 7 yr | KV write failure; triggers AL-REVOKE-01 immediately |
+
+### §76.2 RED Metrics
+
+| Dimension | Signal | Source | SLO / Threshold |
+|---|---|---|---|
+| **Rate** | Revocations per minute by type (`revoked_by_user`, `revoked_by_scim`, `revoked_by_nuke`) | DEC-030 `audit_log_events`, form_audit role | Baseline; no SLO — used for anomaly detection |
+| **Rate** | Bulk revocation batches per hour | `session.bulk_revocation_complete` count, form_audit role | Baseline |
+| **Errors** | KV sync error rate (5-min rolling) | `session.revocation_kv_sync_error` count / total revocation events | < 1% (AL-REVOKE-01 threshold) |
+| **Errors** | KV binding failures | WAE `session_revocation_kv_binding_errors_total` | Zero-tolerance; any value → immediate investigation |
+| **Duration** | Single revocation P99 latency (rolling 7 days) | WAE `session_revocation_duration_ms` histogram | < 200 ms (SSO-SLO-04 / REVOKE-SLO-01) |
+| **Duration** | Bulk revocation P95 duration per 1,000-session batch | `session.bulk_revocation_complete` payload `duration_ms`, PERCENTILE_CONT | < 5,000 ms (AL-REVOKE-02 trigger); internal REVOKE-SLO-02 target < 200 ms/session |
+
+### §76.3 SLO Definitions
+
+| SLO ID | Description | Threshold | Window | Source | SLA linkage |
+|---|---|---|---|---|---|
+| **REVOKE-SLO-01** | Single-session revocation end-to-end P99 latency | < 200 ms | Rolling 7 days | WAE `session_revocation_duration_ms` histogram | Alias for SSO-SLO-04; SLA credit per ENTERPRISE_SLA §3.1 on breach |
+| **REVOKE-SLO-02** | Bulk revocation P95 duration per 1,000-session batch | < 200 ms/session (i.e., < 200,000 ms total for 1,000 sessions) | Per batch | `session.bulk_revocation_complete` payload `duration_ms` | Internal SLO; AL-REVOKE-02 fires at 5,000 ms upper bound (25× REVOKE-SLO-02 target) to catch severe degradation |
+
+**SLO error budget:** REVOKE-SLO-01 shares the SSO-SLO-04 error budget (§19). REVOKE-SLO-02 is internal; no error budget consumed at the SLA layer — AL-REVOKE-02 fires a P2 investigation before the SLA layer is affected.
+
+### §76.4 Alert Rules
+
+The canonical alert definitions live in §26.6. This section provides the inline runbooks.
+
+**AL-REVOKE-01 — Session revocation KV sync error rate > 1% / 5 min (P1)**
+
+Inline runbook (five steps):
+1. **KV binding check:** Verify Cloudflare KV namespace binding in `wrangler.toml` — `SESSION_REVOCATION_KV` must be present and bound to the correct namespace ID. A missing binding means all revocations pass DB-only (session_blocklist) but KV layer is dark.
+2. **KV quota check:** Check Cloudflare dashboard for KV operation quota exhaustion (writes, reads, storage). Quota exhaustion is silent — KV PUT calls return 429 without error log unless WAE captures the HTTP status.
+3. **Supabase fallback activation:** If KV is unreachable, activate the `session_blocklist`-only fallback path (SSO_SCIM §22.7). Confirm `kv_sync_status = 'fallback'` rows appearing in `session_blocklist`. Notify CSM of degraded mode — KV-edge enforcement is inactive.
+4. **Permissions confirm:** Check Cloudflare KV namespace IAM: only the `form-api` worker service token should have write access. Any unexpected token → escalate to R-05 immediately.
+5. **R-05 escalation:** If KV errors are accompanied by unauthorized namespace access or unexpected payload patterns, escalate to `INCIDENT_RESPONSE.md R-05` (unauthorized access) in parallel with Supabase fallback.
+
+**Dedicated companion IR runbook:** Gap — AL-REVOKE-01 dedicated companion runbook (mirrors BCL → R-73/R-74, SAML SLO → R-75/R-76, PKJWT → R-81 pattern) is pending M5 (§76.9 item 4).
+
+**AL-REVOKE-02 — Bulk revocation P95 > 5,000 ms per 1,000-session batch (P2)**
+
+Inline runbook (four steps):
+1. **Batch size audit:** Query `session.bulk_revocation_complete` for batches in the last 24 h: compare `revoked_count` vs `duration_ms`. Identify whether the batch size exceeded the 1,000-session design target.
+2. **BATCH_SIZE reduction:** If over-sized batches are confirmed, reduce `BATCH_SIZE` constant in the session revocation worker (SSO_SCIM §22.6) and redeploy. Target: no single batch > 1,000 sessions.
+3. **KV write throughput:** Check Cloudflare KV write throughput limits. P95 > 5,000 ms on correctly-sized batches indicates KV write pressure — review WAE `session_revocation_kv_write_duration_ms` P95.
+4. **Escalation:** If P95 remains > 5,000 ms after BATCH_SIZE reduction and KV tuning, escalate to P1 and activate Supabase `session_blocklist`-only path per AL-REVOKE-01 runbook step 3.
+
+### §76.5 §6.2 and §26.8 Registration
+
+AL-REVOKE-01 and AL-REVOKE-02 are registered in §6.2 (consolidated alert table, `session_revocation` subsection, v1.3) and §26.6 (SSO/SCIM identity observability alert table). No new rows added by this section — §76.4 provides the inline runbook detail only.
+
+### §76.6 "Session Revocation KV" Dashboard Sub-Group (§26.9)
+
+Six-panel sub-group added to §26.9 Enterprise Identity Dashboard. See §26.9 above for the full panel spec. Summary:
+
+| Panel | Threshold / Target |
+|---|---|
+| Revocations per hour by type (stacked bar) | Baseline; `tenant_nuke` series highlighted in ember |
+| KV sync error rate 7d (5-min time-series) | AL-REVOKE-01 threshold at 1% |
+| Bulk revocation P95 7d (hourly) | AL-REVOKE-02 threshold at 5,000 ms |
+| SSO-SLO-04 / REVOKE-SLO-01 compliance (rolling 7-day P99) | 200 ms |
+| AL-REVOKE-01 activations 30d (single-stat) | Target 0 |
+| Tenant nuke events 90d by tenant/week (bar chart) | ≥ 2/week per tenant triggers investigation note |
+
+**Privacy floor:** All queries: `tenant_id` only. No `user_id`, `session_id`, `employee_id`, or GDPR Art. 9 data. All queries run under the `form_audit` read-only Postgres role (no PII columns accessible). `r2:form-api` NO ACCESS to evidence paths.
+
+### §76.7 SOC 2 Evidence Mapping
+
+| Criterion | Control narrative | Evidence |
+|---|---|---|
+| **CC6.3** Logical access removed on a timely basis | Chain-before-state-mutation invariant (SSO_SCIM §22.5.1): DEC-030 `session.revoked_by_*` event is emitted before DB + KV state mutation completes — HMAC chain proves ordering. SSO-SLO-04 / REVOKE-SLO-01 (P99 < 200 ms) quantifies timeliness. | CC6-E-REV-001 (annual audit_log export of 5 revocation event types, HMAC chain verified) + REVOKE-OBS-E-001 §SLO-compliance section |
+| **CC7.2** Anomaly monitoring | AL-REVOKE-01 (KV sync error rate) and AL-REVOKE-02 (bulk duration) are continuous automated monitors sourced from the immutable DEC-030 chain. Zero-event attestation in REVOKE-OBS-E-001 confirms normal operating state for the observation quarter. | CC6-E-REV-003 (PagerDuty AL-REVOKE-01 incident log) + REVOKE-OBS-E-001 §alert-activation-log |
+| **CC7.3** Response to anomalies | AL-REVOKE-01 P1: 30-min SLA, Supabase fallback activation, R-05 escalation for unauthorized access. AL-REVOKE-02 P2: 2-h SLA, BATCH_SIZE reduction. Response documented in PagerDuty incident + REVOKE-OBS-E-001 per-incident supplement. | CC6-E-REV-003 §incident-resolution-log + REVOKE-OBS-E-001 §per-incident-supplement |
+
+### §76.8 REVOKE-OBS-E-001 Quarterly Evidence Artefact
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | REVOKE-OBS-E-001 |
+| **Description** | Quarterly session revocation KV observability report |
+| **SOC 2 criteria** | CC6.3 / CC7.2 / CC7.3 |
+| **Cadence** | Quarterly (Q1: Apr 1, Q2: Jul 1, Q3: Oct 1, Q4: Jan 1) |
+| **Retention** | 7 yr WORM |
+| **R2 path** | `compliance/evidence/session-revocation/revoke-obs-e-001-{YYYY}-Q{N}.json` |
+| **SOC2_READINESS registration** | §179 (§79.4 count 155 → 156; this pass, 2026-07-05) |
+
+**Five required components:**
+
+1. **Revocation event count by type** — `SELECT event_type, COUNT(*), SUM((payload->>'revoked_count')::int) FROM audit_log_events WHERE event_type IN ('session.revoked_by_user','session.revoked_by_scim','session.revoked_by_nuke','session.bulk_revocation_complete','session.revocation_kv_sync_error') AND created_at BETWEEN $quarter_start AND $quarter_end GROUP BY event_type` (form_audit role). Zero-event attestation field: `"revocation_event_count": 0` with `"attestation": "No revocation events in observation period"`.
+2. **KV sync error count** — From above query: `event_type = 'session.revocation_kv_sync_error'` row count. JSON field: `"kv_sync_error_count": <N>`. Zero-event: `"kv_sync_error_count": 0`.
+3. **Bulk revocation P95 duration_ms** — `SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY (payload->>'duration_ms')::int) FROM audit_log_events WHERE event_type = 'session.bulk_revocation_complete' AND created_at BETWEEN $quarter_start AND $quarter_end` (form_audit role). Zero-event attestation if no bulk operations.
+4. **AL-REVOKE-01 / AL-REVOKE-02 activation log** — PagerDuty incident IDs + Slack thread timestamps for all REVOKE alert activations during the quarter. Zero-event: `"alert_activations": []`.
+5. **SSO-SLO-04 / REVOKE-SLO-01 compliance summary** — WAE `session_revocation_duration_ms` P99 for each month in the quarter; overall compliance percentage (target: 100%); error budget consumed.
+
+**Per-incident supplement:** `revoke-obs-e-001-{incident_id}-supplement.json` — created for every AL-REVOKE-01 activation. Fields: PagerDuty incident ID, root cause hypothesis confirmed, Supabase fallback activated (bool), resolution steps applied, resolution timestamp, REVOKE-SLO-01 breach (bool + duration), R-05 co-activated (bool).
+
+**Pre-M4 nil-attestation protocol:** Until SESSION_REVOCATION_KV is deployed (M4), file: `{"attestation": "SESSION_REVOCATION_KV not yet deployed — REVOKE-OBS-E-001 nil attestation for {YYYY}-Q{N}.", "quarter": "{YYYY}-Q{N}", "filed_by": "compliance-officer", "filed_at": "<ISO-8601>"}`.
+
+**Privacy floor:** Artefact JSON contains only aggregate counts and percentile values — no `tenant_id`, `user_id`, `session_id`, `jti`, employee name, email, health value, coaching content, or GDPR Art. 9 special-category data. `r2:form-api` NO ACCESS. HR role NO ACCESS to `compliance/evidence/session-revocation/`. All collection queries run under `form_audit` read-only role (no PII columns accessible).
+
+### §76.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register REVOKE-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (count 155 → 156) | compliance-officer | **P1** | [x] **Done — 2026-07-05 (SOC2_READINESS §179, this pass, v4.5.0).** |
+| 2 | Add "Session Revocation KV" sub-group to §26.9 Enterprise Identity dashboard | devops-lead | **P1** | [x] **Done — 2026-07-05 (OBSERVABILITY §26.9, this pass, v5.22.0).** |
+| 3 | First quarterly REVOKE-OBS-E-001 filing (Q3 2026; nil-attestation until M4) | devops-lead + compliance-officer | **P2** | [ ] Pending M4 / Q3 2026 |
+| 4 | Author dedicated companion IR runbook for AL-REVOKE-01 (mirrors BCL → R-73/R-74, SAML SLO → R-75/R-76, PKJWT → R-81 pattern) | security-engineer | **P1** | [ ] Pending M5 |
+| 5 | Provision R2 path `compliance/evidence/session-revocation/revoke-obs-e-001-*` (WORM 7yr; `r2:form-api` NO ACCESS) | devops-lead | **P2** | [ ] Pending M4 (when SESSION_REVOCATION_KV deployed) |
+| 6 | Add REVOKE-OBS-E-001 to §80.4 Vanta mirror schedule (quarterly; nil-attestation protocol) | devops-lead | **P2** | [ ] Pending M4 |
+
+### §76.10 Cross-Reference Obligations
+
+| Obligation | Section reference | Status |
+|---|---|---|
+| Register REVOKE-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table | §76.9 item 1 / SOC2_READINESS §179 | 🟢 **Done — 2026-07-05 (this pass, v4.5.0; count 155 → 156)** |
+| Add "Session Revocation KV" sub-group to §26.9 Enterprise Identity dashboard | §76.6 / §76.9 item 2 | 🟢 **Done — 2026-07-05 (this pass, v5.22.0)** |
+| Author dedicated companion IR runbook for AL-REVOKE-01 (`INCIDENT_RESPONSE.md R-8x`) | §76.4 / §76.9 item 4 | 🟡 **Pending M5** |
+| Add `docs/SSO_SCIM_IMPLEMENTATION.md §22.15` item 12 backreference to OBSERVABILITY §76 | SSO_SCIM §22.15 | 🟡 **Pending next SSO_SCIM pass** |
+
 ---
+
+*v5.22.0 (2026-07-05): §76 Session Revocation KV Observability. Closes the dedicated-section gap for SSO_SCIM §22 SESSION_REVOCATION_KV layer. BCL (§70), SAML SLO (§72), and PKJWT (§75) each have dedicated observability sections with RED metrics, SLOs, alert rules, quarterly evidence artefacts, and §26.9 dashboard sub-groups. Session revocation KV had only two alert rules in §26.6 (AL-REVOKE-01/02) and two dashboard rows in the core §26.9 table — no dedicated section, no REVOKE-OBS-E-001 quarterly artefact, no SLO definitions, no SOC 2 evidence mapping table. §76.1: scopes monitoring to four KV key types (tenant_nuke, user, session, jti), Supabase `session_blocklist` write-through, five DEC-030 HMAC-chained events (`session.revoked_by_user` STANDARD/7yr, `session.revoked_by_scim` STANDARD/7yr, `session.revoked_by_nuke` HIGH/7yr, `session.bulk_revocation_complete` STANDARD/7yr carrying `duration_ms`+`revoked_count`, `session.revocation_kv_sync_error` HIGH/7yr triggering AL-REVOKE-01), AL-REVOKE-01/02, SSO-SLO-04; SOC 2 CC6.3/CC7.2/CC7.3; privacy floor (tenant_id FORM-internal UUID only in all signals, user_id scrubbed from artefact queries). §76.2: RED metrics — Rate (revocations/min by type, bulk batches/hr), Errors (KV sync error rate < 1% per AL-REVOKE-01; KV binding failures zero-tolerance), Duration (P99 < 200 ms SSO-SLO-04; bulk P95 < 5,000 ms AL-REVOKE-02 upper bound). §76.3: two SLOs — REVOKE-SLO-01 (P99 < 200 ms rolling 7 days; SSO-SLO-04 alias; SLA credit linkage ENTERPRISE_SLA §3.1) and REVOKE-SLO-02 (bulk P95 < 200 ms/session for 1,000-session batches; internal; AL-REVOKE-02 fires at 5,000 ms upper bound). §76.4: AL-REVOKE-01 five-step inline runbook (KV binding check → quota check → Supabase fallback activation → permissions confirm → R-05 escalation for unauthorized access); AL-REVOKE-02 four-step inline runbook; companion IR runbook gap (P1/M5). §76.5: pointers to §6.2 and §26.8 existing registrations; no new alert rows. §76.6: six-panel "Session Revocation KV" sub-group for §26.9 (revocations/hr stacked bar, KV sync error rate 7d, bulk P95 7d, SSO-SLO-04 gauge, AL-REVOKE-01 activations 30d, tenant nuke 90d weekly bar); all queries form_audit role; tenant_id only; privacy floor stated. §76.7: SOC 2 evidence mapping — CC6.3 (chain-before-state-mutation + SSO-SLO-04 timeliness; CC6-E-REV-001 + REVOKE-OBS-E-001 SLO section), CC7.2 (AL-REVOKE-01/02 from immutable DEC-030 chain + zero-event attestation; CC6-E-REV-003 + REVOKE-OBS-E-001 alert activation log), CC7.3 (P1 30-min SLA + Supabase fallback; P2 2-h SLA + BATCH_SIZE reduction; CC6-E-REV-003 incident log + REVOKE-OBS-E-001 per-incident supplement). §76.8: REVOKE-OBS-E-001 quarterly evidence artefact (CC6.3/CC7.2/CC7.3, quarterly, 7yr WORM, `compliance/evidence/session-revocation/revoke-obs-e-001-{YYYY}-Q{N}.json`); five required components (revocation count by type, kv_sync_error count, bulk P95, AL-REVOKE-01/02 activation log, SSO-SLO-04/REVOKE-SLO-01 compliance summary); per-incident supplement path; pre-M4 nil-attestation protocol; Part A SQL (5 session event types grouped by event_type, form_audit role) and Part B SQL (PERCENTILE_CONT bulk duration_ms); privacy floor (aggregate counts only, no tenant_id/user_id/session_id in artefact JSON). §76.9: six-item checklist — items 1 (SOC2_READINESS §179 registration, count 155→156) and 2 (§26.9 sub-group) Done this pass; items 3–6 pending M4/M5. §76.10: four cross-reference obligations — two Done this pass (SOC2_READINESS §179, §26.9 sub-group), two pending (AL-REVOKE-01 companion IR runbook M5, SSO_SCIM §22.15 item 12 backreference). Companion edit: `docs/SOC2_READINESS.md` v4.5.0 (§179 — REVOKE-OBS-E-001 registered in §79.4, count 155→156). Document header v5.21.0 → v5.22.0. Owner: compliance-officer + security-engineer + devops-lead.*
 
 *v5.21.0 (2026-07-05): §75.4 AL-PKJWT-01 Runbook field updated — `INCIDENT_RESPONSE.md R-81` added as dedicated companion runbook. Closes the AL-PKJWT-01 companion runbook gap: BCL observability (§70) has R-73 (REVOCATION_QUEUE exhausted) and R-74 (BCL-CHAIN-01 violation); SAML SLO observability (§72) has R-75 and R-76; PKJWT observability (§75) previously had only a six-step inline runbook in §75.4 AL-PKJWT-01. R-81 (`docs/INCIDENT_RESPONSE.md §R-81`, v3.46.0, 2026-07-05) is the eleven-section companion runbook: trigger matrix (Mode-1 PagerDuty P1 via `sso.pkjwt_jwks_missing` HIGH/7yr / Mode-2 CSM escalation / Mode-3 manual discovery); four root-cause hypotheses (H1 key never published, H2 KV slot deleted, H3 partial rotation failure, H4 key expired); four scope queries (R-81-C1 DB tenant_sso_configs state, R-81-C2 recent `sso.pkjwt_jwks_missing` events, R-81-C3 key lifecycle events, R-81-C4 synthetic JWKS GET post-remediation); six-step recovery (H1/H2/H3 PAM Republish → JWKS 200 confirm → DEC-030 chain → evidence; H4 emergency rotation → R-79 co-activation; H2 unauthorized → R-05 P0 co-activation); Slack templates (initial P1 / P0 escalation for unauthorized H2 / post-resolution); PKJWT-JWKS-CHAIN-01 ordering invariant (`sso.pkjwt_jwks_restored` requires prior `sso.pkjwt_jwks_missing` within 24 h for same `tenant_id`; HTTP 422 `PKJWT_JWKS_CHAIN_01_VIOLATION` on inversion → R-05); PKJWT-JWKS-E-001 per-activation SOC 2 evidence artefact (CC6.6/CC7.3, 7yr WORM, `compliance/evidence/pkjwt-obs/pkjwt-jwks-e-001-{incident_id}.json`). Companion edits this pass: AUDIT_LOG_SCHEMA.md v3.1 (new `sso.pkjwt_jwks_restored` LOW/3yr event + `SsoPkjwtJwksRestoredPayload` Zod v2 schema + PKJWT-JWKS-CHAIN-01 invariant + PKJWT-JWKS-E-001 artefact spec); SOC2_READINESS.md v4.3.0 (§177 — PKJWT-JWKS-E-001 registered in §79.4, count 151 → 152). §75.9 checklist item 8 added (Done). §75.10 two new cross-reference obligations added (both Done this pass). Document header v5.20.4 → v5.21.0. Owner: compliance-officer + security-engineer.*
 

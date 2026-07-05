@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.4.0
+# FORM · SOC 2 Type II Readiness v4.5.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -37039,6 +37039,52 @@ All artefacts must be signed with `scripts/sign-evidence.sh` before R2 upload. `
 | 3 | Add CC6-E-REV-001/002/003 to §80.4 Vanta mirror schedule (annual; nil-attestation protocols per §178.7) | devops-lead | **P2** | Pending M4 |
 | 4 | Collect first CC6-E-REV-002 snapshot within 30 days of `session_blocklist` migration apply; attest `kv_synced_pct_gte_99` | devops-lead + compliance-officer | **P1** | Pending M5 (§22.15 item 11) |
 
+## §179 — REVOKE-OBS-E-001 Registration (CC6.3/CC7.2/CC7.3 · OBSERVABILITY §76 · Session Revocation KV Quarterly Evidence)
+
+### §179.1 Context
+
+`docs/OBSERVABILITY.md §76` (v5.22.0, 2026-07-05) establishes the dedicated observability section for the SESSION_REVOCATION_KV Cloudflare KV layer (`docs/SSO_SCIM_IMPLEMENTATION.md §22`). BCL (§70), SAML SLO (§72), and PKJWT (§75) each have registered quarterly evidence artefacts (BCL-OBS-E-001, PKJWT-OBS-E-001). Session revocation KV has CC6-E-REV-001/002/003 (§178, annual) but lacked a **quarterly observability artefact** covering RED metrics, SLO compliance, and alert activation history. REVOKE-OBS-E-001 closes this gap.
+
+**§79.4 evidence count update: 155 → 156.**
+
+### §179.2 §79.4 Master Evidence Table Entry
+
+| # | Artefact ID | Description | Criterion | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|---|
+| 156 | **REVOKE-OBS-E-001** | Quarterly session revocation KV observability report: revocation event counts by type, KV sync error count, bulk P95 duration_ms, AL-REVOKE-01/02 activation log, SSO-SLO-04/REVOKE-SLO-01 compliance summary. Per-incident supplement for each AL-REVOKE-01 activation. | CC6.3 / CC7.2 / CC7.3 | Quarterly (Q1: Apr 1 · Q2: Jul 1 · Q3: Oct 1 · Q4: Jan 1) | 7 yr WORM | `compliance/evidence/session-revocation/revoke-obs-e-001-{YYYY}-Q{N}.json` |
+
+### §179.3 SOC 2 Auditor Narratives
+
+**CC6.3 — Logical access removal on a timely basis:**
+REVOKE-OBS-E-001 §SLO-compliance section documents quarterly SSO-SLO-04 / REVOKE-SLO-01 P99 < 200 ms compliance. Combined with CC6-E-REV-001 (HMAC-chained audit_log export, §178), this proves that logical access is both recorded immutably and removed within the contractual SLA. The quarterly cadence ensures auditors receive periodic confirmation rather than a single annual snapshot.
+
+**CC7.2 — Anomaly monitoring:**
+REVOKE-OBS-E-001 §alert-activation-log documents all AL-REVOKE-01 (KV sync error > 1%) and AL-REVOKE-02 (bulk P95 > 5,000 ms) activations per quarter. Zero-event attestation (`"alert_activations": []`) positively confirms that continuous automated monitors were operational and no anomaly was detected. Complements CC6-E-REV-003 (PagerDuty annual incident log, §178).
+
+**CC7.3 — Response to identified anomalies:**
+REVOKE-OBS-E-001 per-incident supplement (`revoke-obs-e-001-{incident_id}-supplement.json`) documents root cause, remediation steps applied, Supabase fallback activation status, and resolution timestamp for every AL-REVOKE-01 activation. This provides a quarterly-granularity response record alongside the annual CC6-E-REV-003 incident log.
+
+### §179.4 Privacy Floor
+
+REVOKE-OBS-E-001 artefact JSON contains only:
+- Aggregate event counts and percentile durations (no tenant enumeration)
+- PagerDuty incident IDs and Slack thread timestamps (no employee identity)
+- Boolean flags (e.g., `supabase_fallback_activated`)
+
+The artefact does **not** contain: `tenant_id`, `user_id`, `session_id`, `jti`, employee name, email, health value, coaching content, or GDPR Art. 9 special-category data. Collection queries run under the `form_audit` read-only Postgres role (no PII columns accessible). `r2:form-api` NO ACCESS to `compliance/evidence/session-revocation/`. HR role NO ACCESS.
+
+### §179.5 Cross-References
+
+| Obligation | Status |
+|---|---|
+| Register REVOKE-OBS-E-001 in §79.4 master evidence table (count 155 → 156) | 🟢 **Done — 2026-07-05 (this section, v4.5.0)** |
+| `docs/OBSERVABILITY.md §76` authored (scope, RED, SLOs, alert runbooks, dashboard sub-group, SOC 2 mapping, §76.8 artefact spec) | 🟢 **Done — 2026-07-05 (OBSERVABILITY v5.22.0, this pass)** |
+| Provision R2 path `compliance/evidence/session-revocation/revoke-obs-e-001-*` (WORM 7yr) | 🟡 **Pending M4** (when SESSION_REVOCATION_KV deployed) |
+| Add REVOKE-OBS-E-001 to §80.4 Vanta mirror schedule (quarterly; nil-attestation protocol) | 🟡 **Pending M4** |
+| First quarterly filing Q3 2026 (nil-attestation until M4) | 🟡 **Pending M4 / Oct 1 2026** |
+
 ---
+
+*v4.5.0 (2026-07-05): §179 — REVOKE-OBS-E-001 Registration (CC6.3/CC7.2/CC7.3 · OBSERVABILITY §76 · Session Revocation KV Quarterly Evidence). Closes the observability artefact gap for SSO_SCIM §22 session revocation KV layer. §79.4 evidence count 155 → 156: REVOKE-OBS-E-001 (156 — quarterly Session Revocation KV health report, CC6.3/CC7.2/CC7.3, quarterly, 7yr WORM, `compliance/evidence/session-revocation/revoke-obs-e-001-{YYYY}-Q{N}.json`). §179.2: five-component artefact spec (revocation count by type, kv_sync_error count, bulk P95 duration_ms, AL-REVOKE-01/02 activation log, REVOKE-SLO-01 compliance summary); per-incident supplement path; pre-M4 nil-attestation protocol. §179.3 SOC 2 narratives: CC6.3 (REVOKE-OBS-E-001 SLO section + CC6-E-REV-001 HMAC chain prove timely revocation), CC7.2 (REVOKE-OBS-E-001 zero-event attestation + alert activation log prove continuous anomaly detection), CC7.3 (REVOKE-OBS-E-001 per-incident supplement documents response to each AL-REVOKE-01/02 activation). §179.4 privacy floor (aggregate counts only; no tenant_id/user_id/session_id in artefact JSON; form_audit role; r2:form-api NO ACCESS; HR NO ACCESS). §179.5 cross-references: §79.4 count 155 → 156 (this pass), OBSERVABILITY §76 authored (this pass). Document header v4.4.0 → v4.5.0. Owner: compliance-officer + security-engineer.*
 
 *v4.4.0 (2026-07-05): §178 — CC6-E-REV-001 · CC6-E-REV-002 · CC6-E-REV-003 Registration (CC6.3/CC7.2/CC7.3 · SSO_SCIM §22 · Session Revocation KV Evidence). Closes SSO_SCIM §22.15 item 9 (P1/M4, compliance-officer — "Register CC6-E-REV-001/002/003 in `docs/SOC2_READINESS.md §79.4`"). §79.4 evidence count 152 → 155: CC6-E-REV-001 (153 — annual audit_log export of 5 session revocation event types, CC6.3, 7yr WORM, `compliance/evidence/session-revocation/`), CC6-E-REV-002 (154 — `session_blocklist.kv_sync_status` distribution snapshot, CC6.3/CC7.3, annual post-migration-window, 7yr WORM), CC6-E-REV-003 (155 — PagerDuty AL-REVOKE-01 incident log, CC7.2/CC7.3, annual, 7yr WORM). §178.3 collection queries for CC6-E-REV-001 (form_audit role; `payload - 'user_id' - 'email' - 'name'` scrubbing; HMAC chain verification required before upload) and CC6-E-REV-002 (`kv_sync_status` distribution with `kv_synced_pct_gte_99` attestation field); CC6-E-REV-003 PagerDuty export spec. §178.4 SOC 2 auditor narratives: CC6.3 (REV-001 HMAC chain + REV-002 sync distribution prove end-to-end revocation coverage), CC7.2 (REV-003 AL-REVOKE-01 log proves anomaly detection operating within SLA), CC7.3 (REV-002 cutover attestation + REV-003 incident resolution prove risk mitigation continuity). §178.5 privacy floor: `user_id` explicitly excluded via payload scrubbing; `session_id` is opaque UUID; no employee name, email, health value, coaching content, or GDPR Art. 9 data in any artefact component; HR access to `compliance/evidence/session-revocation/` prohibited. §178.6 R2: three paths under `compliance/evidence/session-revocation/` (pending M4 provision); WORM 7yr; `r2:form-api` NO ACCESS. §178.7 Vanta mirror: annual upload + nil-attestation protocols. §178.8 cross-references: all four obligations 🟢 Done (this pass: §79.4 count 152 → 155, SSO_SCIM §9 G-009 🔴 → 🟡; prior passes: OBSERVABILITY §26.6 AL-REVOKE-01/02, AUDIT_LOG_SCHEMA v0.4 session revocation events). §178.9 four-item checklist: item 1 (§79.4 registration) Done this pass; items 2/3/4 pending M4/M5. Companion edit: `docs/SSO_SCIM_IMPLEMENTATION.md` v2.37 (§9 G-009 updated to 🟡 Authored; §22.15 item 9 closed). Document header v4.3.0 → v4.4.0. Owner: compliance-officer + security-engineer.*
