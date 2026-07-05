@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.20.3
+# FORM · Observability & Monitoring Taxonomy v5.20.4
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -477,7 +477,7 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 | **SAML cert expiry ≤ 30 days** | `cert_alert_tier = 't30'` for any active SAML tenant | P2 | PagerDuty MEDIUM + `#security-alerts` + in-app banner | §26.5 AL-CERT-02 |
 | **SAML cert expiry ≤ 7 days** | `cert_alert_tier = 't7'` for any active SAML tenant | P1 | PagerDuty HIGH + founder | INCIDENT_RESPONSE.md R-04; §26.5 AL-CERT-03 |
 | **SAML cert expired on active tenant** | `cert_alert_tier = 'expired'` AND `sso_enabled = true` | P0 | PagerDuty CRITICAL + R-04 auto-open | INCIDENT_RESPONSE.md R-04; §26.5 AL-CERT-04 |
-| **Cert monitor cron failure** | `sso.cert_monitor_error` HIGH DEC-030 event or > 26 h since last cron run | P1 | PagerDuty HIGH + `#security-alerts` | §26.5 AL-CERT-05 |
+| **Cert monitor cron failure** | `sso.cert_monitor_error` HIGH DEC-030 event or > 26 h since last cron run | P1 | PagerDuty HIGH + `#security-alerts` | §26.5 AL-CERT-05; INCIDENT_RESPONSE.md R-80 |
 
 **Subsection: `session_revocation` (AL-REVOKE-01, AL-REVOKE-02 — §26.8):**
 
@@ -6072,7 +6072,7 @@ The full escalation ladder (t90 → t60 → t30 → t14 → t7 → t2 → expire
 | **AL-CERT-02** | `cert_alert_tier` advances to `t30` for any `(tenant_id, cert_class)` pair — cert expires in ≤ 30 days | P2 | PagerDuty MEDIUM + `#security-alerts` + CSM email + tenant admin in-app banner | Acknowledge < 4 h; confirm rotation window is scheduled; escalate to founder if customer unresponsive | SSO §8.1 / SSO §20 |
 | **AL-CERT-03** | `cert_alert_tier` advances to `t7` for any `(tenant_id, cert_class)` pair — cert expires in ≤ 7 days | P1 | PagerDuty HIGH + `#security-alerts` + founder | Acknowledge < 30 min; CSM places phone call to customer IT; emergency rotation must begin same day | SSO §8.1 / SSO §20; INCIDENT_RESPONSE.md R-04 |
 | **AL-CERT-04** | `cert_alert_tier = 'expired'` for any active SAML tenant (`sso_enabled = true`) | P0 | PagerDuty CRITICAL + INCIDENT_RESPONSE.md R-04 opened automatically | Acknowledge < 15 min; all SSO users of this tenant cannot log in; email-magic-link fallback must be activated immediately | INCIDENT_RESPONSE.md R-04; SSO §8.3 (emergency SSO disable) |
-| **AL-CERT-05** | `sso.cert_monitor_error` HIGH DEC-030 event emitted by the `cert-expiry-check` cron, OR no cron execution record for > 26 hours | P1 | PagerDuty HIGH + `#security-alerts` | Acknowledge < 30 min; cert expiry state unknown; check Cloudflare Cron Trigger logs; if > 24 h missed, treat as if all cert expiry dates are unknown | SSO §20.6; ENGINEERING_RUNBOOK.md |
+| **AL-CERT-05** | `sso.cert_monitor_error` HIGH DEC-030 event emitted by the `cert-expiry-check` cron, OR no cron execution record for > 26 hours | P1 | PagerDuty HIGH + `#security-alerts` | Acknowledge < 30 min; cert expiry state unknown; check Cloudflare Cron Trigger logs; if > 24 h missed, treat as if all cert expiry dates are unknown | SSO §20.6; ENGINEERING_RUNBOOK.md; INCIDENT_RESPONSE.md R-80 |
 
 **De-duplication:** once an alert tier fires for a `(tenant_id, cert_class)` pair, the `cert_alert_last_sent_at` column in `tenant_sso_configs` suppresses re-alerting for 7 days. This prevents alert fatigue while ensuring weekly repetition in the critical window. Advancing to the next tier resets the de-dup window.
 
@@ -6308,7 +6308,7 @@ The rows below are to be inserted into the §6.2 consolidated alert rules table 
 | **SAML cert expiry ≤ 30 days** | `cert_alert_tier = 't30'` for any active SAML tenant | P2 | PagerDuty MEDIUM + `#security-alerts` + in-app banner | §26.5 AL-CERT-02 |
 | **SAML cert expiry ≤ 7 days** | `cert_alert_tier = 't7'` for any active SAML tenant | P1 | PagerDuty HIGH + founder | INCIDENT_RESPONSE.md R-04; §26.5 AL-CERT-03 |
 | **SAML cert expired on active tenant** | `cert_alert_tier = 'expired'` AND `sso_enabled = true` | P0 | PagerDuty CRITICAL + R-04 auto-open | INCIDENT_RESPONSE.md R-04; §26.5 AL-CERT-04 |
-| **Cert monitor cron failure** | `sso.cert_monitor_error` HIGH DEC-030 event or > 26 h since last cron run | P1 | PagerDuty HIGH + `#security-alerts` | §26.5 AL-CERT-05 |
+| **Cert monitor cron failure** | `sso.cert_monitor_error` HIGH DEC-030 event or > 26 h since last cron run | P1 | PagerDuty HIGH + `#security-alerts` | §26.5 AL-CERT-05; INCIDENT_RESPONSE.md R-80 |
 
 **Subsection: `session_revocation` (new subsection in §6.2):**
 
@@ -20711,6 +20711,8 @@ Add a `pkjwt` sub-group to the §26.9 Enterprise Identity dashboard (parallel to
 | Add "PKJWT Key Management" sub-group to §26.9 Enterprise Identity dashboard | §75.6 / §75.9 item 6 | 🟢 **Done — 2026-07-05 (OBSERVABILITY.md §26.9, this pass; v5.20.3).** |
 
 ---
+
+*v5.20.4 (2026-07-05): §26.5 AL-CERT-05 runbook field patched — `INCIDENT_RESPONSE.md R-80` added. Companion to `docs/INCIDENT_RESPONSE.md §R-80` (v3.45.0, 2026-07-05) — the dedicated companion IR runbook for the `cert-expiry-check` CF Workers Cron Trigger stale/failure scenario. AL-CERT-05 runbook field updated in two locations (§26.5 canonical alert table + §6.2 consolidated alert table `cert_lifecycle` subsection): "SSO §20.6; ENGINEERING_RUNBOOK.md" → "SSO §20.6; ENGINEERING_RUNBOOK.md; INCIDENT_RESPONSE.md R-80". The §6.2 summary table (third AL-CERT-05 occurrence, pointer-style row) updated in parallel. Closes §R-80.11 item 2 (P0 — "Update `docs/OBSERVABILITY.md §26.5` AL-CERT-05 runbook field"). Document header v5.20.3 → v5.20.4. Owner: compliance-officer + security-engineer.*
 
 *v5.20.2 (2026-07-05): §75.4 AL-PKJWT-02 runbook item (3) stale reference corrected: `(R-77 rotation companion runbook)` → `(R-79 rotation companion runbook)`. R-77 was assigned to BCL Chain Integrity Check Stale (INCIDENT_RESPONSE.md v3.41.0, 2026-07-05) before the PKJWT incident rotation runbook was authored; R-79 (PKJWT Incident Key Rotation, INCIDENT_RESPONSE.md v3.43.0, 2026-07-05) is the correct companion runbook for AL-PKJWT-02 `rotation_reason: 'incident'` activations. Document header v5.20.1 → v5.20.2. Owner: compliance-officer + security-engineer.*
 

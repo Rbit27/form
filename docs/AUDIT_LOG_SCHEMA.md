@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.99
+# FORM · Audit Log Schema v3.0
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -6935,6 +6935,83 @@ export const SloChainIntegrityCheckRestoredPayload = z.object({
 *v2.99 (2026-07-05): §SAML-Cert-Lifecycle — Four SAML Certificate Lifecycle DEC-030 HMAC-chained events registered. Closes documentation phase of `docs/SSO_SCIM_IMPLEMENTATION.md §20.11` item 4 (P0/M4 — runtime `emitAuditEvent` wiring in `cert-expiry-check.ts` is the remaining implementation obligation). Events: `sso.cert_expiry_alert` (MEDIUM/HIGH/CRITICAL 7yr — daily `cert-expiry-check` cron tier-advance per `(tenant_id, cert_class)` pair; feeds AL-CERT-01..AL-CERT-03 per `docs/OBSERVABILITY.md §26.5`); `sso.cert_expired` (CRITICAL 7yr — cert past `expires_at` on active SAML tenant; feeds AL-CERT-04 P0 PagerDuty + R-04 auto-open); `sso.cert_uploaded` (STANDARD 7yr — customer IdP cert upload via Admin Dashboard §16.3 cert panel); `sso.cert_monitor_error` (HIGH 7yr — cron query/parse failure; feeds AL-CERT-05 P1). Four Zod v2 schemas: `SsoCertExpiryAlertPayload`, `SsoCertExpiredPayload`, `SsoCertUploadedPayload`, `SsoCertMonitorErrorPayload`. SOC 2 evidence artefacts CC6-E-CERT-001 through CC6-E-CERT-004 documented (CC6.1/CC7.2 — registration in `docs/SOC2_READINESS.md §79.4` pending §20.11 item 5 P1/M4). Privacy floor: all four events contain only `tenant_id` UUID, `cert_class` operational enum, `fingerprint_sha256` SHA-256 hex (public), operational timestamps, and — for `sso.cert_uploaded` — `uploaded_by` UUID (no email or name); no PEM content, no private key material, no employee `user_id`, name, health value, coaching content, or GDPR Art. 9 special-category data. Retention table additions: `sso.cert_expiry_alert` MEDIUM/HIGH/CRITICAL 7yr CC6.1/CC7.2 · `sso.cert_expired` CRITICAL 7yr CC6.1/CC7.2 · `sso.cert_uploaded` STANDARD 7yr CC6.1 · `sso.cert_monitor_error` HIGH 7yr CC7.2. Cross-ref: `docs/SSO_SCIM_IMPLEMENTATION.md §20` (canonical design authority — §20.7 event spec); `docs/OBSERVABILITY.md §26.5` (AL-CERT-01..AL-CERT-05 alert rules consuming these events); `docs/SSO_SCIM_IMPLEMENTATION.md §9 G-004` (certificate rotation automation — 🟡 Partial; cross-reference obligations updated in companion SSO_SCIM v2.35 patch). Document header v2.98 → v2.99. Owner: compliance-officer + security-engineer + devops-lead.*
 
 *v2.98 (2026-07-05): §R-77 BCL-CHECK-STALE-E-001 + §R-78 SLO-CHECK-STALE-E-001 cross-reference patch — SOC2_READINESS §79.4 registration status updated Pending → Done. **Closes stale inline status in two evidence-artefact descriptions authored at v2.96 (2026-07-05):** (1) BCL-CHECK-STALE-E-001 artefact content paragraph (§R-77 BCL Chain Integrity Check Stale events section): status clause "Pending `docs/SOC2_READINESS.md §79.4` registration (R-77.11 item 3, P0/M8)" → "[x] Done — 2026-07-05 (`docs/SOC2_READINESS.md §171.2`, v3.97.0; count 142 → 143; closes R-77.11 item 3)". (2) SLO-CHECK-STALE-E-001 artefact content paragraph (§R-78 SLO Chain Integrity Check Stale events section): status clause "Pending `docs/SOC2_READINESS.md §79.4` registration (R-78.11 item 3, P0/M7)" → "[x] Done — 2026-07-05 (`docs/SOC2_READINESS.md §171.2`, v3.97.0; count 143 → 144; closes R-78.11 item 3)". Root cause: both registrations were completed on 2026-07-05 in `docs/SOC2_READINESS.md §171.2` (v3.97.0, 2026-07-05) as part of `docs/INCIDENT_RESPONSE.md §R-77.11` item 3 + `§R-78.11` item 3 closure (INCIDENT_RESPONSE.md v3.42.0, 2026-07-05) — the inline body-text status fields in the AUDIT_LOG_SCHEMA.md artefact descriptions were not patched at that time. No schema changes, no DDL changes, no event table changes, no Zod schema changes, no retention table changes in this patch — status-field correction only. Privacy floor: BCL-CHECK-STALE-E-001 and SLO-CHECK-STALE-E-001 contain only FORM-internal UUIDs, aggregate integer counts, root cause enums, timestamps, and pg_cron metadata; no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data — unchanged by this patch. Document header v2.97 → v2.98. Owner: compliance-officer + security-engineer.*
+
+---
+
+### CERT-Expiry-Check Stale events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-80 · SOC 2 CC7.2/CC6.1)
+
+> **Authoring context (v3.0, 2026-07-05):** Companion to `docs/INCIDENT_RESPONSE.md §R-80` (v3.45.0, 2026-07-05) — the AL-CERT-05 dedicated runbook for `cert-expiry-check` CF Workers Cron Trigger stale/failure incidents. Two DEC-030 events form the CERT-CHECK-STALE-CHAIN-01 chain pair for each R-80 activation. Closes the audit event registration obligation in §R-80.11 item 1.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `system.cert_expiry_check_stale_declared` | HIGH | 7 yr | R-80.3 T+0 — emitted by IC (security-engineer, PAM-elevated) via `emit-audit-event` Worker at every R-80 activation, before any DB scope queries; CERT-CHECK-STALE-CHAIN-01 anchor event | `incident_id` (UUID), `trigger` (enum: `cert_monitor_error_event` / `execution_gap_gt_26h` / `manual_discovery`), `stale_hours` (positive float — from R-80-C4 CF execution history), `last_execution_at` (ISO 8601 or null), `initial_severity` (literal: `P1`) |
+| `system.cert_expiry_check_restored` | LOW | 3 yr | R-80.5 Step 5 — emitted by IC after confirmed first successful `cert-expiry-check` cron execution post-restoration; closes CERT-CHECK-STALE-CHAIN-01 for this `incident_id` | `incident_id` (UUID), `restored_at` (ISO 8601), `root_cause` (enum: `H1_cron_disabled` / `H2_bad_deployment` / `H3_supabase_unavailable` / `H4_cert_data_error` / `H5_cf_platform_incident`), `stale_window_hours` (positive float), `expired_certs_found` (literal: 0), `missed_tier_advance_count` (int ≥ 0) |
+
+```typescript
+// AUDIT_LOG_SCHEMA.md §CERT-Expiry-Check-Stale-Events — Zod v2 schemas
+// Canonical source: docs/INCIDENT_RESPONSE.md §R-80.7
+
+import { z } from 'zod/v2';
+
+// ── system.cert_expiry_check_stale_declared ───────────────────────────────────
+export const CertExpiryCheckStaleDeclaredPayload = z.object({
+  incident_id:       z.string().uuid(),
+  trigger:           z.enum(['cert_monitor_error_event', 'execution_gap_gt_26h', 'manual_discovery']),
+  stale_hours:       z.number().positive(),
+  last_execution_at: z.string().datetime().optional(),
+  initial_severity:  z.literal('P1'),
+  // Privacy floor: no tenant_id, cert_class, fingerprint_sha256, PEM content,
+  //   employee user_id, name, email, health value, or GDPR Art. 9 data.
+  //   stale_hours derived from CF Cron Trigger execution history — operational interval only.
+});
+
+// ── system.cert_expiry_check_restored ────────────────────────────────────────
+export const CertExpiryCheckRestoredPayload = z.object({
+  incident_id:               z.string().uuid(),
+  restored_at:               z.string().datetime(),
+  root_cause:                z.enum([
+    'H1_cron_disabled',
+    'H2_bad_deployment',
+    'H3_supabase_unavailable',
+    'H4_cert_data_error',
+    'H5_cf_platform_incident',
+  ]),
+  stale_window_hours:        z.number().positive(),
+  expired_certs_found:       z.literal(0),  // must be 0; if > 0, R-04 is the primary incident
+  missed_tier_advance_count: z.number().int().nonneg(),
+  // Privacy floor: no tenant_id, cert_class, fingerprint_sha256, PEM content,
+  //   employee user_id, name, email, health value, or GDPR Art. 9 data.
+  //   expired_certs_found: 0 confirms R-80-C3 found no expired certs.
+  //   missed_tier_advance_count is an integer count — no per-tenant detail.
+});
+```
+
+**CERT-CHECK-STALE-CHAIN-01 ordering invariant:**
+
+| Invariant ID | Rule | HTTP 422 error code | Enforcement |
+|---|---|---|---|
+| CERT-CHECK-STALE-CHAIN-01 | `system.cert_expiry_check_stale_declared` must precede `system.cert_expiry_check_restored` for the same `incident_id` within 72 h | `CERT_CHECK_STALE_CHAIN_01_VIOLATION` | Pending `emit-audit-event` Worker deployment (`docs/INCIDENT_RESPONSE.md §R-80.11` item 4, P0/M4) → R-05 on violation |
+
+**SOC 2 evidence artefact:**
+
+| Artefact ID | Criterion | Collection trigger | Retention | Storage path |
+|---|---|---|---|---|
+| **CERT-CHECK-STALE-E-001** | CC7.2 — cert-expiry-check monitoring control gap; CC6.1 — credential-lifecycle visibility window suspended | Per-activation (each R-80 invocation); absence = positive non-occurrence evidence that R-80 was never triggered | 7 yr | `compliance/evidence/saml-cert/cert-expiry-check-stale/CERT-CHECK-STALE-E-001-{incident_id}.txt` |
+
+**Artefact content:** Per-activation incident record: `system.cert_expiry_check_stale_declared` event JSON, trigger mode, root cause classification (H1–H5), R-80-C1 `sso.cert_monitor_error` query output, R-80-C2 last cert-lifecycle event output, R-80-C4 CF Cron Trigger history extract (JSON), R-80-C3 full cert expiry scan output confirming `expired_certs_found = 0`, Step 3a manual `sso.cert_expiry_alert` emission log, `system.cert_expiry_check_restored` event JSON. SHA-256 hashed; uploaded to `compliance/evidence/saml-cert/cert-expiry-check-stale/`. Owner: security-engineer + compliance-officer. [x] **Done — 2026-07-05 (`docs/SOC2_READINESS.md §176`, v4.2.0; count 150 → 151; closes R-80.11 item 3).** Source: `docs/INCIDENT_RESPONSE.md §R-80.8`.
+
+**CC7.2 auditor narrative:** CERT-CHECK-STALE-E-001 demonstrates that FORM detected the `cert-expiry-check` CF Workers Cron monitoring degradation, immediately ran the manual cert expiry scan (R-80-C3) as a compensating control covering all active SAML tenants, confirmed zero expired certs during the blind window, emitted any missed tier-advance notifications (Step 3a), and restored automated monitoring. The existence of this artefact for a given period proves FORM's compensating-control response is operational; its absence is positive non-occurrence evidence that R-80 was never triggered.
+
+**CC6.1 auditor narrative:** CERT-CHECK-STALE-E-001, combined with CC6-E-CERT-001 and CC6-E-CERT-004, demonstrates that FORM's SAML certificate lifecycle monitoring has a defined, tested compensating response when the automated `cert-expiry-check` is unavailable — the R-80-C3 manual scan provides equivalent per-tenant coverage to the daily automated execution.
+
+**Privacy floor:** Both events contain only FORM-internal `incident_id` UUIDs, operational enums, and derived numeric values. No `tenant_id`, `cert_class`, `fingerprint_sha256`, PEM content, private key material, employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data. `expired_certs_found: 0` and `missed_tier_advance_count` are integer counts only — no per-tenant detail in these payloads. CERT-CHECK-STALE-E-001 body includes R-80-C3 query output which contains `tenant_id` UUIDs and `fingerprint_sha256` (public) — no PEM columns per explicit R-80-C3 query design.
+
+**Retention table additions:** `system.cert_expiry_check_stale_declared` HIGH 7yr CC7.2/CC6.1 · `system.cert_expiry_check_restored` LOW 3yr CC7.2/CC6.1.
+
+---
+
+**v3.0 · 2026-07-05 · owner: compliance-officer + security-engineer**
+*v3.0 (2026-07-05): §CERT-Expiry-Check-Stale-Events — Two `cert-expiry-check` CF Workers Cron stale DEC-030 HMAC-chained events registered. Companion to `docs/INCIDENT_RESPONSE.md §R-80` (v3.45.0, 2026-07-05) — closes §R-80.11 item 1 (P0/M4 — "Register `system.cert_expiry_check_stale_declared` (HIGH/7yr) and `system.cert_expiry_check_restored` (LOW/3yr)"). Events: `system.cert_expiry_check_stale_declared` (HIGH 7yr — CERT-CHECK-STALE-CHAIN-01 anchor; emitted T+0 of every R-80 activation before DB queries; `trigger` enum distinguishes cert_monitor_error_event / execution_gap_gt_26h / manual_discovery); `system.cert_expiry_check_restored` (LOW 3yr — CERT-CHECK-STALE-CHAIN-01 terminal; emitted after confirmed first successful cron execution post-restoration; `expired_certs_found: 0` literal confirms R-80-C3 found no expired certs; `missed_tier_advance_count` records manually-emitted cert_expiry_alert count from Step 3a). Two Zod v2 schemas: `CertExpiryCheckStaleDeclaredPayload` + `CertExpiryCheckRestoredPayload`. CERT-CHECK-STALE-CHAIN-01 ordering invariant table: declared must precede restored per `incident_id` within 72 h; HTTP 422 `CERT_CHECK_STALE_CHAIN_01_VIOLATION` on inversion; enforcement pending item 4 (P0/M4). CERT-CHECK-STALE-E-001 SOC 2 evidence artefact (CC7.2/CC6.1, per-activation, 7yr, `compliance/evidence/saml-cert/cert-expiry-check-stale/`). Retention table additions: `system.cert_expiry_check_stale_declared` HIGH 7yr · `system.cert_expiry_check_restored` LOW 3yr. Cross-ref: `docs/INCIDENT_RESPONSE.md §R-80` (canonical design authority); `docs/OBSERVABILITY.md §26.5` AL-CERT-05 (alert triggering R-80); `docs/SOC2_READINESS.md §176` (CERT-CHECK-STALE-E-001 §79.4 registration; count 150 → 151). Document header v2.99 → v3.0. Owner: compliance-officer + security-engineer.*
 
 **v2.96 · 2026-07-05 · owner: compliance-officer + security-engineer**
 *v2.96 (2026-07-05): §R-77 BCL Chain Integrity Check Stale events + §R-78 SLO Chain Integrity Check Stale events — two new sections inserted after `### Audit Event Flush Stale events`. **Closes `docs/INCIDENT_RESPONSE.md §R-77.11` item 1 (P0/M8 — register `system.bcl_chain_integrity_check_stale_declared` HIGH/7yr + `system.bcl_chain_integrity_check_restored` LOW/3yr)** and **`docs/INCIDENT_RESPONSE.md §R-78.11` item 1 (P0/M7 — register `system.slo_chain_integrity_check_stale_declared` HIGH/7yr + `system.slo_chain_integrity_check_restored` LOW/3yr)**. **R-77 BCL Chain Integrity Check Stale (§R-77):** companion stale-recovery events for pg_cron job 59 (`bcl_chain_integrity_check`, `0 * * * *`, 2h freshness, M-0102, pending M8 BCL production deploy). (1) `system.bcl_chain_integrity_check_stale_declared` HIGH/7yr: BCL-CHECK-STALE-CHAIN-01 anchor; emitted at R-77 T+0 before any DB queries; always P1 at declaration (P0 escalation only if R-77-C4 finds violations → R-74); payload: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_hours` positive float, `missed_runs` int ≥ 0, `trigger` enum, `initial_severity` literal `P1`; `BclChainIntegrityCheckStaleDeclaredPayload` Zod v2 schema; privacy floor: no `tenant_id`, `bcl_request_id`, `oidc_sub_hash`, user PII, or GDPR Art. 9 data. (2) `system.bcl_chain_integrity_check_restored` LOW/3yr: BCL-CHECK-STALE-CHAIN-01 terminal; only emitted if R-77-C4 `c4_violations_found = 0`; HTTP 422 `BCL_CHECK_STALE_CHAIN_01_VIOLATION` on inversion; payload: `incident_id` UUID, `restored_at` datetime, `root_cause` H1–H5 enum, `c4_violations_found` literal 0, `stale_window_hours` positive float; `BclChainIntegrityCheckRestoredPayload` Zod v2 schema. BCL-CHECK-STALE-CHAIN-01 ordering invariant table. BCL-CHECK-STALE-E-001 per-activation evidence artefact (CC7.2, 7yr WORM, `compliance/evidence/bcl/chain-integrity-check-stale/BCL-CHECK-STALE-E-001-{incident_id}.txt`); SOC2_READINESS §79.4 registration pending R-77.11 item 3 (P0/M8). **R-78 SLO Chain Integrity Check Stale (§R-78):** parallel structure to R-77 adapted for SLO; companion stale-recovery events for pg_cron job 60 (`slo_chain_integrity_check`, `59 * * * *`, 2h freshness, M-0103, pending M7 SAML SLO deploy). (1) `system.slo_chain_integrity_check_stale_declared` HIGH/7yr: SLO-CHECK-STALE-CHAIN-01 anchor; identical schema structure to BCL peer; P0 escalation via R-76; `SloChainIntegrityCheckStaleDeclaredPayload` Zod v2 schema; privacy floor: no `tenant_id`, `slo_request_id`, `idp_name_id_hash`, user PII, or GDPR Art. 9 data. (2) `system.slo_chain_integrity_check_restored` LOW/3yr: SLO-CHECK-STALE-CHAIN-01 terminal; `c4_violations_found` literal 0 gate; HTTP 422 `SLO_CHECK_STALE_CHAIN_01_VIOLATION` on inversion; `SloChainIntegrityCheckRestoredPayload` Zod v2 schema. SLO-CHECK-STALE-CHAIN-01 ordering invariant table. SLO-CHECK-STALE-E-001 per-activation evidence artefact (CC7.2, 7yr WORM, `compliance/evidence/saml-slo/chain-integrity-check-stale/SLO-CHECK-STALE-E-001-{incident_id}.txt`); SOC2_READINESS §79.4 registration pending R-78.11 item 3 (P0/M7). **Peer relationship:** R-77/R-78 are parallel; H5 (role grant revoked on `form_audit`) may co-affect both jobs simultaneously — R-77 resolution guide cross-references R-78 impact and vice versa. **Master retention table:** +4 rows: `system.bcl_chain_integrity_check_stale_declared` HIGH 7yr CC7.2; `system.bcl_chain_integrity_check_restored` LOW 3yr CC7.2; `system.slo_chain_integrity_check_stale_declared` HIGH 7yr CC7.2; `system.slo_chain_integrity_check_restored` LOW 3yr CC7.2. Document header v2.95 → v2.96. Owner: compliance-officer + security-engineer.*

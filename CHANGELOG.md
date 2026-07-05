@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [13.23.1] — 2026-07-05
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` v3.45.0 — R-80 `cert-expiry-check` Cloudflare Workers Cron Stale runbook (AL-CERT-05 companion; CC7.2/CC6.1; P1). Closes the documentation gap in `docs/OBSERVABILITY.md §26.5` where AL-CERT-05 listed only "SSO §20.6; ENGINEERING_RUNBOOK.md" without a dedicated companion IR runbook. R-80: eleven-section runbook with five root causes (H1 cron disabled, H2 bad deploy, H3 Supabase unavailable, H4 cert data error, H5 CF platform), four scope queries, Step 3a manual cert_expiry_alert emission procedure, two DEC-030 events, CERT-CHECK-STALE-CHAIN-01 ordering invariant, CERT-CHECK-STALE-E-001 evidence artefact.
+- `docs/AUDIT_LOG_SCHEMA.md` v3.0 — §CERT-Expiry-Check-Stale-Events: `system.cert_expiry_check_stale_declared` (HIGH/7yr) and `system.cert_expiry_check_restored` (LOW/3yr) registered; Zod v2 schemas; CERT-CHECK-STALE-CHAIN-01 invariant; CERT-CHECK-STALE-E-001 artefact spec.
+- `docs/SOC2_READINESS.md` v4.2.0 — §176: CERT-CHECK-STALE-E-001 registered in §79.4 master evidence table (CC7.2/CC6.1, per-activation, 7yr WORM; count 150 → 151).
+
+### Changed
+- `docs/OBSERVABILITY.md` v5.20.4 — §26.5 AL-CERT-05 runbook field updated in all three table locations: "SSO §20.6; ENGINEERING_RUNBOOK.md" → "SSO §20.6; ENGINEERING_RUNBOOK.md; INCIDENT_RESPONSE.md R-80".
+- `VERSION` — 13.23.0 → 13.23.1.
+
+---
+
 ## [13.23.0] — 2026-07-05
 
 ### Added

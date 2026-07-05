@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.44.0
+# FORM · Incident Response Runbook v3.45.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -28421,5 +28421,414 @@ Implementation status: [ ] Pending — platform-engineer + security-engineer (§
 *v3.39.1 (2026-07-04): §R-73.12 item 1 + §R-74.12 item 1 closure — AUDIT_LOG_SCHEMA.md v2.90 registrations. §R-73.12 item 1 status updated `[ ] Pending — M8` → `[x] Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.90, §BCL Admin Session Bulk Revocation events)`: `enterprise.admin_sessions_bulk_revoked` HIGH/7yr registered in new section with full Zod v2 `AdminSessionsBulkRevokedPayload` schema (`tenant_id`, `pam_request_id`, `bcl_request_ids` array, `sessions_revoked_count`, `incident_reference`), BCL-REV-E-001 artefact spec, and CC6.3/CC7.3 auditor narratives. §R-74.12 item 1 status updated `[ ] Pending — M8` → `[x] Done — 2026-07-04 (AUDIT_LOG_SCHEMA.md v2.90, §BCL Chain Integrity Monitor events)`: `security.bcl_chain_01_violation` CRITICAL/7yr and `security.bcl_chain_01_violation_closed` HIGH/7yr registered with full Zod v2 schemas, BCL-VIO-CHAIN-01 ordering invariant table, BCL-CHN-E-001 artefact spec, and CC7.2/CC7.3/CC8.1 auditor narratives; `system.bcl_chain_check_passed` LOW/1yr registered simultaneously per OBSERVABILITY §70.9 item 11. Document header v3.39.0 → v3.39.1. Owner: compliance-officer.*
 
 ---
+
+## R-80 — `cert-expiry-check` Cloudflare Workers Cron Stale · AL-CERT-05 companion (CC7.2/CC6.1)
+
+> **Owner:** security-engineer + devops-lead + compliance-officer
+> **Classification:** P1 (PagerDuty HIGH) · SOC 2 CC7.2, CC6.1
+> **AL-CERT-05 companion:** Closes the documentation gap in `docs/OBSERVABILITY.md §26.5` where AL-CERT-05 listed only "SSO §20.6; ENGINEERING_RUNBOOK.md" without a dedicated companion IR runbook. All analogous monitoring jobs (CF Workers Cron `white_label_cert_check` → R-35; pg_cron `bcl_chain_integrity_check` → R-77; pg_cron `slo_chain_integrity_check` → R-78) have companion stale recovery runbooks; this runbook closes the equivalent gap for the `cert-expiry-check` CF Workers Cron Trigger.
+>
+> **Key distinction from pg_cron stale runbooks (R-77, R-78):** `cert-expiry-check` is a **Cloudflare Workers Cron Trigger** — not a pg_cron job. There is no `pg_cron.job_run_details` table to query. Execution history is available via Cloudflare Workers Tail logs and the R2-archived daily summary (`compliance/evidence/saml-cert/cert-check-logs/` — pending M4 provision). The manual compensating control (R-80-C3) is a direct PAM-elevated SQL query against `tenant_sso_configs`, not a PL/pgSQL function call.
+>
+> **Cert expiry state during stale window:** When `cert-expiry-check` is stale, FORM cannot confirm whether any SAML certificate tier has advanced since the last successful run. This is **not a live SSO outage** — existing sessions remain valid, and SPs continue to accept previously-uploaded IdP certs. However, if a cert crossed an alert threshold (≤ 60d, ≤ 30d, ≤ 7d, or expired) during the stale window, no `sso.cert_expiry_alert` was emitted and no CSM or PagerDuty notification was sent. R-80-C3 (manual cert scan) substitutes for all missed daily executions.
+
+---
+
+### R-80.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | Routing |
+|---|---|---|---|---|
+| **AL-CERT-05 mode 1 — Error event** | `sso.cert_monitor_error` HIGH DEC-030 event emitted by `cert-expiry-check` Worker on unhandled exception (Supabase unavailable, malformed BYTEA, decryption failure) | Any emission | **P1** | PagerDuty HIGH `form-security` → security-engineer + devops-lead; Slack `#security-alerts` HIGH |
+| **AL-CERT-05 mode 2 — Execution gap** | No `cert-expiry-check` Cloudflare Cron Trigger execution record for > 26 hours (1-day cadence at 02:00 UTC; 26 h freshness allows ≤ 2 h tolerance before alerting) | > 26 h since last execution | **P1** | PagerDuty HIGH `form-security` → security-engineer + devops-lead; Slack `#security-alerts` HIGH |
+| **Manual discovery** | security-engineer or compliance-officer observes execution gap during routine SSO observability review or CC6-E-CERT-004 evidence collection | Post-evidence-collection or routine check | **P1 — treat as triggered** | Slack `#security-alerts` |
+
+> **No automatic escalation to P0:** A stale `cert-expiry-check` cron alone is not a P0 incident. P0 escalation applies only if R-80-C3 (manual cert scan) reveals a SAML cert is already expired on an active tenant. In that case, immediately activate R-04 (SAML Cert Expired, P0 auto-open) as primary incident; R-80 becomes subordinate and continues in parallel to restore the cron.
+
+---
+
+### R-80.2 Severity Classification
+
+| Severity | Condition | SLA | Action required |
+|---|---|---|---|
+| **P1** | Stale; R-80-C3 manual scan finds no expired certs | 2 h investigation; CC7.2 monitoring gap; CC6.1 credential-lifecycle visibility window; CSM-alerting blind spot for certs that crossed a tier during stale window | Diagnose root cause (H1–H5); restore cron; run R-80-C3 to confirm cert state; manually emit `sso.cert_expiry_alert` for any tier advances missed during stale window; emit DEC-030 stale + restored chain |
+| **P0 (via R-04)** | Stale AND R-80-C3 reveals an expired cert on an active SAML tenant | Immediately activate R-04 (SAML SSO Outage for that tenant); R-80 continues in parallel to restore cron | Co-activate R-04; tenant's SSO users cannot authenticate; email-magic-link fallback must be activated per R-04 procedure; CSM notification required within 15 min |
+
+---
+
+### R-80.3 Immediate Actions (T+0 to T+60 min)
+
+| Time | Action | Who | Notes |
+|---|---|---|---|
+| **T+0** | Emit `system.cert_expiry_check_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker | security-engineer | Required at ALL severity levels. Do this FIRST before any DB queries. CERT-CHECK-STALE-CHAIN-01 anchor event. |
+| **T+5** | Run R-80-C1 (audit log: last `sso.cert_monitor_error` events) | security-engineer | Determines trigger mode: error event (H2/H4) vs. silent gap (H1/H3/H5). |
+| **T+10** | Run R-80-C2 (audit log: last cert-lifecycle event, approximates last successful execution) | security-engineer | Bounds the stale window. If no cert events, check CF Cron history (C4). |
+| **T+15** | Run R-80-C4 (Cloudflare Workers Cron Trigger health check) | devops-lead | External to DB: check CF dashboard or `wrangler tail cert-expiry-check` for last execution timestamp and exit status. Identifies H1 (disabled), H5 (CF platform). |
+| **T+20** | Run R-80-C3 (manual cert expiry scan against `tenant_sso_configs`) | security-engineer | PAM-elevated `form_audit` read session. Substitutes for all missed daily cron executions. If expired cert found on active tenant → immediately activate R-04. |
+| **T+25** | For any active tenant cert within an alert tier missed during the stale window: manually emit `sso.cert_expiry_alert` event(s) | security-engineer | Closes the CSM/PagerDuty notification gap for missed tier-advances. Each emission uses the canonical `SsoCertExpiryAlertPayload` schema (`AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle`). |
+| **T+30–T+60** | Fix underlying cause and restore cron per root cause diagnosis | devops-lead + security-engineer | See §R-80.5 Steps 4–5. Emit `system.cert_expiry_check_restored` after confirmed first successful automated run. |
+
+---
+
+### R-80.4 Root Cause Hypotheses and Scope Queries
+
+#### R-80-C1 — Recent `sso.cert_monitor_error` events
+
+```sql
+-- Role: form_audit (read-only on audit_log_events)
+-- Retrieves any cert_monitor_error events in the last 72 h
+-- Error message only — no PEM, no cert metadata, no tenant PII
+SELECT
+  id,
+  created_at,
+  payload->>'error'  AS error_message
+FROM audit_log_events
+WHERE event_type = 'sso.cert_monitor_error'
+  AND created_at > NOW() - INTERVAL '72 hours'
+ORDER BY created_at DESC
+LIMIT 10;
+-- Any rows = mode-1 trigger (H2 or H4 root cause)
+-- Zero rows = mode-2 trigger (silent gap — H1, H3, or H5)
+```
+
+> **Privacy floor:** Returns only DEC-030 event metadata: `id` UUID, `created_at` timestamp, `error` string (error message only — no PEM material, no cert fingerprint, no `tenant_id`, no employee data per `SsoCertMonitorErrorPayload` schema).
+
+#### R-80-C2 — Last cert-lifecycle event (staleness bound approximation)
+
+```sql
+-- Role: form_audit
+-- Approximates last successful cron interaction with tenant_sso_configs
+-- If no cert_expiry_alert rows exist, the cron may have run successfully
+-- (all certs healthy) or may have been stale for longer than this query reveals.
+-- Combine with C4 (CF Cron history) for authoritative staleness duration.
+SELECT
+  event_type,
+  MAX(created_at) AS last_emitted_at,
+  NOW() - MAX(created_at) AS age
+FROM audit_log_events
+WHERE event_type IN ('sso.cert_expiry_alert', 'sso.cert_monitor_error')
+GROUP BY event_type
+ORDER BY last_emitted_at DESC;
+-- NULL for cert_expiry_alert = either all certs are healthy (no tier advances)
+--   or cron has not run since last tier-advance event
+-- cert_monitor_error present = H2/H4 root cause; see C1 for detail
+```
+
+> **Privacy floor:** Aggregate `MAX(created_at)` per event type. No `tenant_id`, cert fingerprint, `cert_class`, employee data, or GDPR Art. 9 data returned.
+
+#### R-80-C3 — Manual cert expiry scan (substitutes for all missed daily runs)
+
+```sql
+-- Role: form_audit (PAM-elevated — read-only on tenant_sso_configs)
+-- MUST be run for every R-80 activation, regardless of severity
+-- Replicates the logic of the cert-expiry-check Worker:
+--   compute days-to-expiry for all active SAML tenants;
+--   classify into alert tiers; flag expired certs.
+-- IMPORTANT: Do NOT SELECT saml_sp_certificate or saml_idp_certificate columns
+--   (encrypted BYTEA — would return ciphertext; no value for this runbook).
+SELECT
+  tenant_id,
+  'sp'                       AS cert_class,
+  saml_sp_cert_expires_at    AS expires_at,
+  saml_sp_cert_fingerprint   AS fingerprint_sha256,
+  cert_rotation_state,
+  DATE_PART('day', saml_sp_cert_expires_at - NOW())  AS days_to_expiry,
+  CASE
+    WHEN saml_sp_cert_expires_at <= NOW()            THEN 'expired'
+    WHEN saml_sp_cert_expires_at <= NOW() + INTERVAL '7 days'  THEN 't7'
+    WHEN saml_sp_cert_expires_at <= NOW() + INTERVAL '30 days' THEN 't30'
+    WHEN saml_sp_cert_expires_at <= NOW() + INTERVAL '60 days' THEN 't60'
+    ELSE 'ok'
+  END AS alert_tier
+FROM tenant_sso_configs
+WHERE sso_enabled = true
+  AND saml_sp_cert_expires_at IS NOT NULL
+
+UNION ALL
+
+SELECT
+  tenant_id,
+  'idp'                      AS cert_class,
+  saml_idp_cert_expires_at   AS expires_at,
+  saml_idp_cert_fingerprint  AS fingerprint_sha256,
+  cert_rotation_state,
+  DATE_PART('day', saml_idp_cert_expires_at - NOW())  AS days_to_expiry,
+  CASE
+    WHEN saml_idp_cert_expires_at <= NOW()            THEN 'expired'
+    WHEN saml_idp_cert_expires_at <= NOW() + INTERVAL '7 days'  THEN 't7'
+    WHEN saml_idp_cert_expires_at <= NOW() + INTERVAL '30 days' THEN 't30'
+    WHEN saml_idp_cert_expires_at <= NOW() + INTERVAL '60 days' THEN 't60'
+    ELSE 'ok'
+  END AS alert_tier
+FROM tenant_sso_configs
+WHERE sso_enabled = true
+  AND saml_idp_cert_expires_at IS NOT NULL
+
+ORDER BY days_to_expiry ASC NULLS LAST;
+
+-- Outcome A (no expired certs, some or no tier-advances):
+--   P1 confirmed; manually emit sso.cert_expiry_alert for any non-'ok' rows
+--   that have not had a cert_alert_last_sent_at within the suppression window;
+--   preserve R-80-C3 output for CERT-CHECK-STALE-E-001 artefact.
+-- Outcome B (any row with alert_tier = 'expired'):
+--   IMMEDIATELY activate R-04 (SAML Cert Expired P0) for that tenant;
+--   R-80 continues in parallel to restore the cron.
+```
+
+> **Privacy floor:** Returns only FORM-internal `tenant_id` UUIDs, `cert_class` operational enum, `fingerprint_sha256` (public X.509 DER SHA-256 — not private key material), `cert_rotation_state` operational enum, `days_to_expiry` integer, and `alert_tier` classification enum. No `saml_sp_certificate` or `saml_idp_certificate` BYTEA columns (encrypted PEM — excluded by explicit column selection). No employee `user_id`, name, email, coaching content, health value, or GDPR Art. 9 special-category data.
+
+#### R-80-C4 — Cloudflare Workers Cron Trigger health (external check)
+
+This query is performed outside the Supabase DB — in the Cloudflare dashboard or via `wrangler tail`:
+
+```bash
+# Option A — Wrangler Tail (captures last execution log lines)
+wrangler tail cert-expiry-check --env production --format json | head -100
+
+# Option B — CF Workers Analytics dashboard
+# Navigate: Cloudflare Dashboard → Workers & Pages → cert-expiry-check → Metrics
+# Check: "Requests" count by day; a zero-request day = cron did not fire
+# Check: "Errors" column for unhandled exception exit codes (H2/H4)
+
+# Option C — R2 archived daily summary (if M4 provision complete)
+# aws s3api get-object \
+#   --bucket form-compliance \
+#   --key compliance/evidence/saml-cert/cert-check-logs/{YYYY-MM-DD}.json \
+#   /tmp/cert-check-log.json
+```
+
+Interpret:
+- Cron Trigger disabled in dashboard (toggle off) → **H1**
+- Cron Trigger active but Worker crashed (exit code ≠ 0, `sso.cert_monitor_error` emitted) → **H2** (bad deploy) or **H4** (code bug / data error)
+- Cron Trigger active, no execution at 02:00 UTC → **H3** (Supabase unreachable — Worker ran but exited before DB query) or **H5** (CF platform incident — Cron Trigger infra degraded; check Cloudflare status page)
+- CF status page reports Workers or Cron Triggers degraded → **H5**
+
+#### Root cause hypotheses
+
+| Hypothesis | Description | Primary signal | Recovery path |
+|---|---|---|---|
+| **H1 — Cron Trigger disabled** | `cert-expiry-check` Cloudflare Workers Cron Trigger toggled off in the CF dashboard or missing from `wrangler.toml` on last deploy; no executions since disable | R-80-C4: CF dashboard shows Cron Trigger disabled or absent; R-80-C1 zero rows | Re-enable via CF dashboard toggle or add cron schedule to `wrangler.toml` and `wrangler deploy --env production`; confirm next 02:00 UTC execution |
+| **H2 — Bad Worker deployment** | A `wrangler deploy` pushed code with a startup crash (import error, env var missing, top-level `await` throwing) — Worker exits before reaching cert-check logic; no DEC-030 event may be emitted if crash is pre-handler | R-80-C4: CF dashboard shows error rate = 100% since deploy; R-80-C1 may be zero (crash before `emitAuditEvent`) | Roll back to last known-good Worker version via `wrangler rollback cert-expiry-check --env production`; confirm next successful execution; investigate deploy diff |
+| **H3 — Supabase connection failure** | `cert-expiry-check` Worker can connect to CF but cannot reach Supabase (`PGCONN_URL` unreachable, JWT secret recently rotated and env var not updated, network partition) | R-80-C1: `sso.cert_monitor_error` with `error` containing connection-refused or auth failure; R-80-C4: Worker executed but exited non-zero | Verify Supabase project status page; confirm `PGCONN_URL` and `SUPABASE_SERVICE_ROLE_KEY` CF Secret values match current Supabase project; if secret rotated: update via `wrangler secret put`; trigger manual execution |
+| **H4 — Cert data decryption / parsing error** | `tenant_sso_configs` contains a row with malformed `saml_sp_certificate` or `saml_idp_certificate` BYTEA (corrupt encryption, wrong encryption key version); Worker encounters unhandled exception on that row | R-80-C1: `sso.cert_monitor_error` with `error` describing decryption or DER parse failure; error message does not contain PEM content | Identify malformed row by binary inspection (PAM-elevated `SELECT encode(saml_sp_certificate, 'hex') FROM tenant_sso_configs WHERE tenant_id = ...`); skip affected row in Worker code (emit `sso.cert_monitor_error` per-row and continue); restore correct BYTEA via cert re-upload |
+| **H5 — Cloudflare platform incident** | Cloudflare Workers Cron Triggers infra degraded or offline; all CF Workers Cron jobs affected fleet-wide | R-80-C4: CF status page reports Workers or Cron Triggers degraded; R-80-C1 zero rows; other CF Cron Workers also non-executing (e.g., compare with `white_label_cert_check` CF Cron if deployed there) | Monitor Cloudflare status page; no FORM-side action until CF recovery; once CF recovers, cron self-resumes at next 02:00 UTC window; no re-registration required |
+
+---
+
+### R-80.5 Recovery Procedure
+
+#### Step 1 — Emit stale-declared event (T+0, all severities)
+
+Emit `system.cert_expiry_check_stale_declared` (HIGH/7yr) via `emit-audit-event` Worker before any DB queries. CERT-CHECK-STALE-CHAIN-01 anchor event. Supply `stale_hours` from best available estimate; refine with R-80-C2/C4 after emission.
+
+#### Step 2 — Run R-80-C1 and R-80-C2 (trigger mode and staleness bound)
+
+Determine trigger mode (error event vs. silent gap) and bound the stale window using DB evidence. Combine with R-80-C4 (CF Cron history) for authoritative execution timestamps.
+
+#### Step 3 — Run R-80-C3 (mandatory manual cert scan, all activations)
+
+Run R-80-C3 under PAM-elevated `form_audit` read session. Preserve full query output for CERT-CHECK-STALE-E-001 artefact.
+
+- **Outcome A (no expired certs):** P1 confirmed; proceed to Step 3a.
+- **Outcome B (expired cert on active tenant):** Immediately activate R-04 (SAML Cert Expired P0). R-80 IC transfers P0 primary role to R-04 IC. Continue Steps 4–5 in parallel to restore the cron.
+
+#### Step 3a — Manually emit missed `sso.cert_expiry_alert` events
+
+For each `(tenant_id, cert_class)` row from R-80-C3 with `alert_tier` ≠ `'ok'` where `cert_alert_last_sent_at` is either NULL or older than the de-dup suppression window (7 days per §26.5):
+
+Emit `sso.cert_expiry_alert` via `emit-audit-event` Worker using the canonical `SsoCertExpiryAlertPayload` payload:
+```typescript
+{
+  tenant_id:             "<UUID>",
+  cert_class:            "<sp|idp>",
+  alert_tier:            "<t60|t30|t7>",  // matching R-80-C3 output
+  days_to_expiry:        <integer>,
+  fingerprint_sha256:    "<64-char hex>",
+  alert_sent_at:         "<ISO 8601>",
+  detected_by:           "r80_manual_scan",  // distinguishes from normal cron emission
+}
+```
+
+This emission also triggers the normal downstream PagerDuty/CSM routing for the applicable AL-CERT-01/02/03 rule, closing the notification gap.
+
+#### Step 4 — Run R-80-C4 and diagnose root cause
+
+| Root cause | Restoration action | Validation |
+|---|---|---|
+| **H1 — Cron Trigger disabled** | Re-enable toggle in CF dashboard; or add/restore `[triggers] crons = ["0 2 * * *"]` to `wrangler.toml` and `wrangler deploy --env production cert-expiry-check` | CF dashboard shows Cron Trigger active; next 02:00 UTC execution succeeds |
+| **H2 — Bad Worker deployment** | `wrangler rollback cert-expiry-check --env production` to last good version; confirm next scheduled execution; investigate diff causing startup crash | Next 02:00 UTC execution shows successful Worker invocation with zero `sso.cert_monitor_error` |
+| **H3 — Supabase connection failure** | Verify Supabase project connectivity; update `PGCONN_URL` / `SUPABASE_SERVICE_ROLE_KEY` CF Secrets if rotated; trigger manual Worker execution | Worker executes without `sso.cert_monitor_error`; R-80-C1 returns zero rows post-restoration |
+| **H4 — Cert data error** | Fix malformed BYTEA row (re-upload cert via Admin Dashboard cert panel); add per-row error isolation in Worker (`try/catch` per tenant scan iteration, emit `sso.cert_monitor_error` per-row and continue) | Worker completes full tenant scan without unhandled exception; all tenants scanned or per-row errors isolated |
+| **H5 — Cloudflare platform incident** | Await CF platform recovery; no FORM-side action | CF status page resolves; cron self-resumes next 02:00 UTC; confirm via CF dashboard |
+
+#### Step 5 — Confirm restoration
+
+After cron is restored and the next 02:00 UTC execution succeeds (confirm via CF dashboard / Wrangler Tail), emit `system.cert_expiry_check_restored` (LOW/3yr) — see §R-80.7. Record `stale_window_hours` as the interval from the last confirmed successful execution to this restoration confirmation.
+
+---
+
+### R-80.6 Communication Templates
+
+#### Slack `#security-alerts` — Stale declaration (P1, all activations)
+
+```
+[P1 · cert-expiry-check Cron Stale] AL-CERT-05 fired — SAML cert monitoring blind spot.
+Incident: {incident_id}
+Declared: {timestamp UTC}
+Trigger: {mode-1: sso.cert_monitor_error event at {error_at UTC} | mode-2: no execution record for > 26 h}
+Last known execution: {last_known_execution_at UTC} (R-80-C4)
+Estimated stale window: ~{stale_hours} h
+IC: security-engineer
+Status: Manual cert scan (R-80-C3) in progress — determining if any certs crossed expiry threshold.
+Note: Existing SSO sessions remain valid; issue is monitoring/alerting blind spot, not live outage.
+Next update: T+20 min (R-80-C3 result) or immediately on P0 escalation to R-04.
+```
+
+#### P0 escalation (if R-80-C3 reveals expired cert → R-04 activated)
+
+```
+[P0 ESCALATION → R-04] SAML cert expired on active tenant during cert-expiry-check stale window.
+Incident: {incident_id}
+R-80-C3 finding: tenant_id {tenant_id_uuid}, cert_class {sp|idp}, expired {expired_at UTC}
+IC: security-engineer (R-04 primary IC)
+Action: R-04 (SAML Cert Expired P0) activated immediately.
+        CSM notified within 15 min per §4.3 SLA.
+        Email-magic-link fallback must be activated for affected tenant immediately.
+R-80 stale recovery continues in parallel.
+CC: compliance-officer · devops-lead · CSM · @security-oncall
+```
+
+#### Post-resolution template (P1 clean)
+
+```
+[RESOLVED · cert-expiry-check Cron Stale] `cert-expiry-check` CF Workers Cron Trigger restored.
+Incident: {incident_id}
+Restored at: {restored_at UTC}
+Root cause: {root_cause — H1/H2/H3/H4/H5}
+R-80-C3 result: CLEAN — no expired certs found during stale window.
+Missed tier-advance alerts: {count} (manually emitted via sso.cert_expiry_alert; downstream PagerDuty routing triggered).
+DEC-030: system.cert_expiry_check_restored emitted.
+IC: security-engineer
+```
+
+---
+
+### R-80.7 DEC-030 Chain Specification
+
+Two DEC-030 HMAC-chained events are required for every R-80 activation. Both events are emitted via `emit-audit-event` Worker. IC must hold a PAM-elevated session.
+
+#### Event 1 — `system.cert_expiry_check_stale_declared` (HIGH · 7yr retention)
+
+**When:** T+0 of every R-80 activation, before any DB scope queries. CERT-CHECK-STALE-CHAIN-01 anchor event.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:        z.string().uuid(),
+  trigger:            z.enum(['cert_monitor_error_event', 'execution_gap_gt_26h', 'manual_discovery']),
+  stale_hours:        z.number().positive(),  // from R-80-C4 authoritative CF execution history
+  last_execution_at:  z.string().datetime().optional(),  // NULL if no prior CF log record found
+  initial_severity:   z.literal('P1'),
+})
+```
+
+> **Privacy invariant:** No `tenant_id`, `cert_class`, `fingerprint_sha256`, PEM content, employee `user_id`, name, email, health value, or GDPR Art. 9 special-category data. `stale_hours` is a derived operational interval. Operational incident metadata only.
+
+#### Event 2 — `system.cert_expiry_check_restored` (LOW · 3yr retention)
+
+**When:** After Step 5 confirms first successful cron execution post-restoration. Closes CERT-CHECK-STALE-CHAIN-01 DEC-030 chain for this incident.
+
+**Zod v2 payload schema:**
+```typescript
+z.object({
+  incident_id:               z.string().uuid(),
+  restored_at:               z.string().datetime(),
+  root_cause:                z.enum(['H1_cron_disabled', 'H2_bad_deployment', 'H3_supabase_unavailable', 'H4_cert_data_error', 'H5_cf_platform_incident']),
+  stale_window_hours:        z.number().positive(),
+  expired_certs_found:       z.literal(0),  // must be 0; if > 0, R-04 is the primary incident
+  missed_tier_advance_count: z.number().int().nonneg(),  // manual cert_expiry_alert events emitted in Step 3a
+})
+```
+
+> **Privacy invariant:** No `tenant_id`, `cert_class`, `fingerprint_sha256`, PEM content, employee data. `expired_certs_found: 0` confirms R-80-C3 found no expired certs. `missed_tier_advance_count` is an integer count of manually-emitted `sso.cert_expiry_alert` events; no per-tenant detail in this payload.
+
+#### CERT-CHECK-STALE-CHAIN-01 ordering invariant
+
+`system.cert_expiry_check_stale_declared` **must** precede `system.cert_expiry_check_restored` for the same `incident_id` within any HMAC audit chain window. The `emit-audit-event` Worker enforces this constraint: a `system.cert_expiry_check_restored` emit for an `incident_id` with no prior `system.cert_expiry_check_stale_declared` in the chain returns HTTP 422 with error code `CERT_CHECK_STALE_CHAIN_01_VIOLATION`.
+
+Implementation status: [ ] Pending — platform-engineer (§R-80.11 item 4, P0/M4).
+
+---
+
+### R-80.8 SOC 2 Evidence
+
+#### Evidence artefact: CERT-CHECK-STALE-E-001
+
+| Field | Value |
+|---|---|
+| **ID** | CERT-CHECK-STALE-E-001 |
+| **Description** | Per-activation incident record: `system.cert_expiry_check_stale_declared` event JSON, trigger mode (mode-1 error event or mode-2 gap), root cause classification (H1–H5), R-80-C1 `sso.cert_monitor_error` query output, R-80-C2 last cert-lifecycle event query output, R-80-C4 Cloudflare Cron Trigger execution history extract (JSON), R-80-C3 full cert expiry scan output confirming `expired_certs_found = 0`, manual `sso.cert_expiry_alert` emission log (Step 3a), `system.cert_expiry_check_restored` event JSON. SHA-256 hashed; uploaded to `compliance/evidence/saml-cert/cert-expiry-check-stale/`. |
+| **SOC 2 criterion** | CC7.2 — monitoring control gap (cert-expiry-check cron stale; CC6.1 credential-lifecycle visibility window suspended) |
+| **Cadence** | Per activation (no artefact if R-80 is never triggered; absence is positive non-occurrence evidence) |
+| **Owner** | security-engineer + compliance-officer |
+| **File path** | `compliance/evidence/saml-cert/cert-expiry-check-stale/CERT-CHECK-STALE-E-001-{incident_id}.txt` |
+| **Retention** | 7yr (HIGH, per DEC-030; aligns with `system.cert_expiry_check_stale_declared` retention tier) |
+
+**Auditor narrative (CC7.2):** CERT-CHECK-STALE-E-001 demonstrates that FORM detected the monitoring control degradation (`cert-expiry-check` cron stale), immediately ran the manual cert expiry scan (R-80-C3) to determine whether any SAML certificate crossed an alert threshold during the blind window, confirmed zero expired certs and emitted any missed `sso.cert_expiry_alert` notifications, and restored automated monitoring. The existence of this artefact proves FORM's compensating-control response is operational; its absence is positive non-occurrence evidence that R-80 was never triggered in the observation period.
+
+**Auditor narrative (CC6.1):** CERT-CHECK-STALE-E-001, in combination with CC6-E-CERT-001 (`sso.cert_expiry_alert` event export) and CC6-E-CERT-004 (cron execution log), demonstrates that the SAML certificate lifecycle monitoring control has a defined compensating response when the automated monitor is unavailable, and that the compensating control (R-80-C3 manual scan) provides equivalent coverage to the automated daily execution.
+
+**Privacy floor:** CERT-CHECK-STALE-E-001 contains only FORM-internal `incident_id` UUIDs, `tenant_id` UUIDs (FORM-internal, not linked to company name), `fingerprint_sha256` (public X.509 DER SHA-256), `days_to_expiry` integers, `alert_tier` classification enums, root cause classification enums, and operational timestamps. No `saml_sp_certificate` or `saml_idp_certificate` BYTEA PEM content, no private key material, no employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data. R-80-C3 query explicitly excludes BYTEA columns.
+
+---
+
+### R-80.9 Post-Incident Controls
+
+| # | Control | Owner | Trigger condition |
+|---|---|---|---|
+| 1 | Root cause post-mortem within 48 h of restoration | devops-lead + security-engineer | Every R-80 activation |
+| 2 | If H1 (disabled): audit who toggled the Cron Trigger off and under what authority; add Cron Trigger state to pre-deploy checklist; if unrecognised disable: co-activate R-20 (Insider Threat / Privileged Access Abuse) | devops-lead + security-engineer | H1 only |
+| 3 | If H2 (bad deploy): add CI smoke test that the `cert-expiry-check` Worker can be imported and the handler exports correctly; add rollback step to deploy runbook (`wrangler rollback` first, then investigate) | platform-engineer | H2 only |
+| 4 | If H3 (Supabase connection): document Supabase connectivity test in CF Worker health-check scripts; add `PGCONN_URL` / `SUPABASE_SERVICE_ROLE_KEY` to the post-secret-rotation checklist so CF Secrets are updated before the next 02:00 UTC window | devops-lead | H3 only |
+| 5 | If H4 (cert data error): add per-row error isolation to `cert-expiry-check.ts` (try/catch per tenant iteration; emit `sso.cert_monitor_error` per bad row and continue to remaining tenants rather than aborting entire execution); add a BYTEA decode health-check to the pre-deploy suite | platform-engineer | H4 only |
+| 6 | If H5 (CF platform): add CF Cron Trigger health to the Cloudflare status-page monitoring runbook; document that R-80 activates automatically during CF-level Cron degradations requiring no FORM-side remediation | devops-lead | H5 only |
+| 7 | Review CC6-E-CERT-004 quarterly filing — if stale window overlaps with SOC 2 observation period, note the stale window with R-80-C4 stale duration and R-80-C3 clean result as compensating-control attestation in the CC6-E-CERT-004 artefact supplement | compliance-officer | If stale period overlaps with CC6-E-CERT-004 annual filing window |
+
+---
+
+### R-80.10 Cross-References
+
+| Reference | Location | Relationship |
+|---|---|---|
+| AL-CERT-05 alert spec | `docs/OBSERVABILITY.md §26.5` (v5.20.4, 2026-07-05) | Canonical alert definition triggering R-80; §26.5 Runbook field updated this pass to add `INCIDENT_RESPONSE.md R-80` |
+| `sso.cert_monitor_error` event schema | `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` (v2.99, 2026-07-05) | Canonical DEC-030 schema for the mode-1 trigger event; `SsoCertMonitorErrorPayload` |
+| `sso.cert_expiry_alert` event schema | `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` (v2.99, 2026-07-05) | Canonical DEC-030 schema for Step 3a manual tier-advance emissions; `SsoCertExpiryAlertPayload` |
+| Cert-expiry-check stale audit events | `docs/AUDIT_LOG_SCHEMA.md §CERT-Expiry-Check-Stale-Events` (v3.0, 2026-07-05) | `system.cert_expiry_check_stale_declared` HIGH/7yr and `system.cert_expiry_check_restored` LOW/3yr; Zod v2 schemas; CERT-CHECK-STALE-CHAIN-01 invariant |
+| SAML Cert Lifecycle observability | `docs/OBSERVABILITY.md §26.4–§26.5` | AL-CERT-01..05 alert rules; §26.5 AL-CERT-05 runbook field references this runbook |
+| SAML Cert Expired | `docs/INCIDENT_RESPONSE.md §R-04` | P0 co-activation when R-80-C3 reveals expired cert on active tenant during stale window |
+| cert-expiry-check design spec | `docs/SSO_SCIM_IMPLEMENTATION.md §20.6` | CF Workers Cron Trigger design, Supabase query logic, error-handling spec (original reference in AL-CERT-05 before this runbook was filed) |
+| Cert rotation procedure | `docs/SSO_SCIM_IMPLEMENTATION.md §8.1` | SP cert rotation playbook (ref for Step 3a: customers already past rotation window during stale window) |
+| CC6-E-CERT-004 evidence artefact | `docs/SOC2_READINESS.md §175.2` (v4.1.0, 2026-07-05) | `cert-expiry-check` cron execution log evidence artefact; R-80 stale window must be noted in CC6-E-CERT-004 supplement if it overlaps with the SOC 2 observation period |
+| CERT-CHECK-STALE-E-001 registration | `docs/SOC2_READINESS.md §176` (v4.2.0, 2026-07-05) | §79.4 master evidence table registration; count 150 → 151 |
+| DEC-030 HMAC chain protocol | `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) | HMAC-chained audit log pattern governing all events emitted in this runbook |
+
+---
+
+### R-80.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `system.cert_expiry_check_stale_declared` (HIGH/7yr) and `system.cert_expiry_check_restored` (LOW/3yr) in `docs/AUDIT_LOG_SCHEMA.md` (new section `§CERT-Expiry-Check-Stale-Events`); include Zod v2 schemas from §R-80.7 and CERT-CHECK-STALE-CHAIN-01 ordering invariant | security-engineer + platform-engineer | **P0** / M4 | [x] **Done — 2026-07-05 (AUDIT_LOG_SCHEMA.md v3.0, §CERT-Expiry-Check-Stale-Events).** |
+| 2 | Update `docs/OBSERVABILITY.md §26.5` AL-CERT-05 runbook field: add `INCIDENT_RESPONSE.md R-80` reference alongside existing "SSO §20.6; ENGINEERING_RUNBOOK.md" | compliance-officer | **P0** | [x] **Done — 2026-07-05 (OBSERVABILITY.md v5.20.4, §26.5 AL-CERT-05 runbook field patched).** |
+| 3 | Register CERT-CHECK-STALE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§176, per-activation cadence, CC7.2/CC6.1, 7yr, count 150 → 151) | compliance-officer | **P1** / M4 | [x] **Done — 2026-07-05 (SOC2_READINESS.md v4.2.0, §176; count 150 → 151).** |
+| 4 | Implement CERT-CHECK-STALE-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`: create `cert-check-stale-chain-01.ts` enforcing `system.cert_expiry_check_stale_declared` must precede `system.cert_expiry_check_restored` for same `incident_id` within 72 h; HTTP 422 + `CERT_CHECK_STALE_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M4 | [ ] Pending — M4 |
+| 5 | Provision `compliance/evidence/saml-cert/cert-expiry-check-stale/` R2 subfolder under the parent `compliance/evidence/saml-cert/` path (pending M4 provision per §175.10 item 5); apply WORM + `r2:form-api` REVOKED policy | devops-lead | **P1** / M4 | [ ] Pending — M4 (contingent on parent `compliance/evidence/saml-cert/` provision, §175.10 item 5) |
+| 6 | Add `cert-expiry-check` Cron Trigger state to pre-deploy checklist and post-secret-rotation checklist (H1/H3 post-incident controls) | devops-lead | **P2** | [ ] Pending |
+| 7 | Authoring complete — R-80 closes the AL-CERT-05 companion runbook gap: AL-CERT-05 in `docs/OBSERVABILITY.md §26.5` listed only "SSO §20.6; ENGINEERING_RUNBOOK.md" for the cert-expiry-check cron failure/stale scenario; all analogous monitors (R-35 `white_label_cert_check`, R-77 `bcl_chain_integrity_check`, R-78 `slo_chain_integrity_check`) have companion runbooks; this runbook closes the equivalent gap for the cert-expiry-check CF Workers Cron Trigger | compliance-officer | **P0** | [x] **Done — 2026-07-05 (INCIDENT_RESPONSE.md v3.45.0).** |
+
+**Privacy floor (invariant throughout R-80):** No employee `user_id`, name, email, health value, body composition, coaching session content, private key material, or GDPR Art. 9 special-category data appears in any R-80 query result, DEC-030 event payload, evidence artefact, or Slack communication template. R-80-C1 returns error message strings only (no PEM, no tenant PII per `SsoCertMonitorErrorPayload` schema). R-80-C3 explicitly excludes `saml_sp_certificate` and `saml_idp_certificate` BYTEA columns. `tenant_id` in all R-80 outputs is a FORM-internal UUID — not linked to company name, employee roster, or any personal identifier in this runbook. `fingerprint_sha256` is a public X.509 DER SHA-256 hash — not private key material. Owner: security-engineer + compliance-officer + enterprise-architect.
+
+---
+
+*v3.45.0 (2026-07-05): R-80 `cert-expiry-check` Cloudflare Workers Cron Stale (CC7.2/CC6.1 — AL-CERT-05 companion runbook). Closes the AL-CERT-05 companion runbook gap in `docs/OBSERVABILITY.md §26.5` (v5.20.3, 2026-07-05): AL-CERT-05 listed only "SSO §20.6; ENGINEERING_RUNBOOK.md" — no dedicated INCIDENT_RESPONSE companion runbook existed for the `cert-expiry-check` CF Workers Cron failure/stale scenario. All analogous monitoring controls had companion runbooks (R-35 for `white_label_cert_check`; R-77 for `bcl_chain_integrity_check` pg_cron job 59; R-78 for `slo_chain_integrity_check` pg_cron job 60; R-79 for PKJWT incident rotation); the `cert-expiry-check` CF Workers Cron Trigger was the remaining gap. R-80: eleven-section runbook. Trigger: AL-CERT-05 via mode-1 (`sso.cert_monitor_error` HIGH DEC-030 event, P1 PagerDuty HIGH + `#security-alerts`) or mode-2 (> 26 h execution gap). Five root causes: H1 Cron Trigger disabled (dashboard toggle or missing `wrangler.toml` entry); H2 bad Worker deployment (startup crash, pre-handler exit); H3 Supabase connection failure (PGCONN_URL unreachable, rotated secret); H4 cert data decryption/parsing error (malformed BYTEA per tenant row); H5 CF platform incident (Workers/Cron Triggers infra degraded). Four scope queries: R-80-C1 (last `sso.cert_monitor_error` events, form_audit, trigger-mode determination); R-80-C2 (last cert-lifecycle event, staleness bound approximation); R-80-C3 (manual cert expiry scan against `tenant_sso_configs` — full UNION ALL query across sp + idp cert classes, all active SAML tenants; substitutes for all missed daily cron executions; P0 escalation to R-04 if `alert_tier = 'expired'`); R-80-C4 (Cloudflare Cron Trigger health — external, via CF dashboard / Wrangler Tail / R2 daily summary). Step 3a: manual `sso.cert_expiry_alert` emission for any missed tier-advance events (closes CSM/PagerDuty notification gap; `detected_by: 'r80_manual_scan'` distinguishes from automated cron emissions). Two DEC-030 events: `system.cert_expiry_check_stale_declared` (HIGH/7yr) + `system.cert_expiry_check_restored` (LOW/3yr); CERT-CHECK-STALE-CHAIN-01 ordering invariant (declared must precede restored per `incident_id`; HTTP 422 `CERT_CHECK_STALE_CHAIN_01_VIOLATION`; pending M4 implementation in `emit-audit-event` Worker). CERT-CHECK-STALE-E-001 per-activation SOC 2 evidence artefact (CC7.2/CC6.1, 7yr WORM, `compliance/evidence/saml-cert/cert-expiry-check-stale/CERT-CHECK-STALE-E-001-{incident_id}.txt`). Seven implementation checklist items: items 1 (AUDIT_LOG_SCHEMA.md v3.0 §CERT-Expiry-Check-Stale-Events — new section with two events, two Zod v2 schemas, CERT-CHECK-STALE-CHAIN-01 invariant, CERT-CHECK-STALE-E-001 artefact spec) + 2 (OBSERVABILITY.md v5.20.4 — §26.5 AL-CERT-05 runbook field patched: "SSO §20.6; ENGINEERING_RUNBOOK.md" → "SSO §20.6; ENGINEERING_RUNBOOK.md; INCIDENT_RESPONSE.md R-80") + 3 (SOC2_READINESS.md v4.2.0 — §176 added, count 150 → 151) + 7 (authoring done) marked Done this pass; items 4–6 pending M4. Document header v3.44.0 → v3.45.0. Owner: security-engineer + compliance-officer + enterprise-architect.*
 
 *v3.39.0 (2026-07-04): R-73 BCL REVOCATION_QUEUE Exhausted (CC6.3/CC7.3 — Enterprise SSO Session Revocation Failure) + R-74 BCL-CHAIN-01 Integrity Violation (CC7.2/CC7.3/CC8.1 — BCL Pipeline Audit Chain Break). Closes both §70.11 pending obligations from `docs/OBSERVABILITY.md §70` (BCL Observability, v5.16.0, 2026-07-04): "File companion IR runbook for AL-BCL-02" and "File companion IR runbook for AL-BCL-03." R-73 (P1): REVOCATION_QUEUE three-retry exhaustion (5s/10s/20s, 35s total) leaves enterprise employee session active after IdP logout — CC6.3 control gap; three trigger conditions; four-tier severity table; T+0..T+60 twelve-step response; three scope queries (C1: `backchannel_logout.failed` identification; C2: active session detection; C3: post-resolution verification); five root causes (H1 pool exhaustion, H2 Supabase outage/R-03, H3 CF Queue stuck, H4 transient error, H5 sub_hash mismatch); resolution playbook including PAM-elevated `POST /tenant/{slug}/revoke-all-sessions` Admin API (two-person auth, §19.4); two DEC-030 events (`backchannel_logout.failed` HIGH/7yr auto-emitted, `enterprise.admin_sessions_bulk_revoked` HIGH/7yr IC PAM-elevated); BCL-REV-E-001 per-activation evidence artefact (CC6.3/CC7.3, 7yr WORM); three communication templates including T-73-B CSM notification (§4.3 SLA, 15 min); CSM notification SLA section (§R-73.10); co-activation matrix (P0 escalation at 30 min, R-03, R-74, DLQ fleet); five implementation checklist items. R-74 (P0 — no auto-resolve, no cooldown): BCL-CHAIN-01 ordering invariant breach — live HTTP 422 (chain clean, INSERT blocked) vs. retrospective SQL (chain INSERT completed despite missing anchor, more severe); three trigger conditions; three-scope severity table (P0-contained / P0-full / P0-fleet); T+0..T+60 twelve-step timeline; four scope queries (C1: audit log extraction; C2: canonical retrospective SQL from §70.4; C3: CF KV API TTL check; C4: session state PAM-elevated); five root causes (H1 TTL expiry in retry window, H2 `writeBclAnchor()` silent failure, H3 IdP duplicate replay, H4 code bug, H5 malicious manipulation); five root-cause resolution paths; closure requirement (compliance-officer sign-off via `security.bcl_chain_01_violation_closed` DEC-030); BCL-CHAIN-01 invariant reference verbatim from §46.11; two DEC-030 events (`security.bcl_chain_01_violation` CRITICAL/7yr hourly check job, `security.bcl_chain_01_violation_closed` HIGH/7yr IC terminal); BCL-CHN-E-001 per-activation evidence artefact (CC7.2/CC7.3/CC8.1, 7yr WORM, compliance-officer sign-off required); four communication templates (T-74-A declaration, T-74-B founder, T-74-C compliance sign-off request, T-74-D resolution); co-activation matrix (R-05 MANDATORY on retrospective violation, R-73 if session active, P0-fleet, R-05 full on H5); six implementation checklist items. Privacy floor invariant: no user_id, employee name, email, coaching content, health data, or GDPR Art. 9 data in any query output, event payload, template, or artefact. Document header v3.38.0 → v3.39.0. Owner: security-engineer + compliance-officer.*
