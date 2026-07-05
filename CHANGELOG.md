@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [13.4.0] — 2026-07-05
+
+### Added
+- `content/post-3154-hrv-monitoring-practical-guide.md` — Block «Інструменти self-coached атлета 2026» 3146–3155 post 9/10. «HRV-моніторинг у практиці: коли корисно, коли — надмірно». RMSSD як метрика парасимпатичного тонусу; Plews et al. (2013): тижнева динаміка HRV і адаптаційна здатність. Методологія: ранок + лежачи + щодня + один пристрій. 7-денне ковзне середнє (Buchheit 2014); 2–4 тижні калібрування. Правило трьох сигналів: HRV + сон + суб'єктивний RPE. Що HRV не говорить: чому низький, що тренуватись не варто, чи буде PR. HRV-anxiety як зворотний ефект. Bayne et al. (2016): суб'єктивна готовність — кращий предиктор перформансу, ніж ізольований HRV. Victor volume autoregulation: HRV як один із трьох вхідних сигналів. clinical-safety: NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3154 card prepended at top of feed.
+
+### Changed
+- `README.md` — series «Інструменти self-coached атлета 2026» 8/10 → 9/10.
+- `STATUS.md` — v13.3.0 → v13.4.0; post-3154 added; next: post-3155 (SERIES FINALE).
+- `VERSION` — 13.3.0 → 13.4.0.
+
+---
+
 ## [13.3.0] — 2026-07-05
 
 ### Added
