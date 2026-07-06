@@ -37547,7 +37547,7 @@ WHERE jrd.jobid = 11
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Register DEC-030 events in AUDIT_LOG_SCHEMA | [ ] P0/M6 — pending |
+| 1 | Register DEC-030 events in AUDIT_LOG_SCHEMA | [x] Done (AUDIT_LOG_SCHEMA.md v3.2, 2026-07-06 — §C1-Erasure-SLA-Monitor-Stale-Events) |
 | 2 | Deploy PagerDuty routing rule | [ ] P0/M6 — pending |
 | 3 | Update OBSERVABILITY §12.6 | [x] Done (v5.14.4, 2026-07-03) |
 | **4** | **Register ERASURE-MON-E-001 in §79.4** | **[x] Done — §182 (2026-07-06)** |

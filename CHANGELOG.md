@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [13.42.1] — 2026-07-06
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md §C1-Erasure-SLA-Monitor-Stale-Events` — Two DEC-030 HMAC-chained events registered: `system.c1_erasure_monitor_stale_declared` (HIGH/7yr) and `system.c1_erasure_monitor_restored` (STANDARD/3yr). New section `### C1 Erasure SLA Monitor Stale events` inserted before version history. C1-ERASURE-STALE-CHAIN-01 ordering invariant (HTTP 422 `C1_ERASURE_STALE_CHAIN_01_VIOLATION` on inversion → R-05). Zod v2 schemas `C1ErasureMonitorStaleDeclaredPayload` + `C1ErasureMonitorRestoredPayload`. ERASURE-STALE-E-001 per-activation evidence artefact (P5.1/C1.2/CC4.1/CC7.2, 7yr, `compliance/evidence/erasure/erasure-sla-monitor-stale/r43-{incident_id}/`). Four SOC 2 auditor narratives: CC7.2 (HMAC chain detection-to-restoration timeline), P5.1 (`danger_window_requests_at_declared = 0 AND breach_requests_at_declared = 0` = Art. 17 SLA no-risk attestation), C1.2 (`breach_requests_at_declared ≥ 1` = contractual SLA breach record; blocks P0 closure until R-09 complete), CC4.1 (compliance control monitoring continuity). Privacy floor: aggregate counts + enums + timestamps only — no `dsar_request_id`, `user_id`, email, requestor name, GDPR Art. 9 data. Document header v3.1 → v3.2. Closes `docs/INCIDENT_RESPONSE.md §R-43.11` item 1 (P0/M6).
+- `docs/INCIDENT_RESPONSE.md §R-43.11` — Item 1 patched `[ ]` → `[x]` Done (AUDIT_LOG_SCHEMA.md v3.2, 2026-07-06).
+- `docs/SOC2_READINESS.md §182.5` — Item 1 patched `[ ] P0/M6 — pending` → `[x] Done (AUDIT_LOG_SCHEMA.md v3.2, 2026-07-06)`.
+- `VERSION` — 13.42.0 → 13.42.1.
+
 ## [13.42.0] — 2026-07-06
 
 ### Added

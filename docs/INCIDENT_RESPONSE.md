@@ -16425,7 +16425,7 @@ Quarterly export of all `cron.job_run_details` for job 11: run count, failure co
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register `system.c1_erasure_monitor_stale_declared` (HIGH/7yr) and `system.c1_erasure_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §DSAR & Erasure events`. Add C1-ERASURE-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-43.7. | compliance-officer + security-engineer | **P0** | M6 | [ ] |
+| 1 | Register `system.c1_erasure_monitor_stale_declared` (HIGH/7yr) and `system.c1_erasure_monitor_restored` (STANDARD/3yr) in `docs/AUDIT_LOG_SCHEMA.md §DSAR & Erasure events`. Add C1-ERASURE-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-43.7. | compliance-officer + security-engineer | **P0** | M6 | [x] *(AUDIT_LOG_SCHEMA.md v3.2, 2026-07-06 — §C1-Erasure-SLA-Monitor-Stale-Events; C1-ERASURE-STALE-CHAIN-01 invariant + Zod schemas + four SOC 2 auditor narratives + ERASURE-STALE-E-001 artefact registered)* |
 | 2 | Deploy R-43 PagerDuty routing rule: `pg-cron-health-monitor` routes `system.cron_job_stale` for `job_name = 'c1-erasure-sla-monitor'` to PagerDuty service `form-compliance` P1, dedup key `c1-erasure-sla-monitor-stale`, routing to compliance-officer. Integration test: disable job 11 in staging for > 26 h; confirm `system.cron_job_stale` emitted with correct `job_name`; confirm PagerDuty P1 fires on `form-compliance` with correct dedup key. | devops-lead | **P0** | M6 | [ ] |
 
 #### P1 — Before first SOC 2 Type II audit period begins (M7–M11)
