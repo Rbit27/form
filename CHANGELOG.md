@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [13.55.1] — 2026-07-06
+
+### Changed
+- `docs/SOC2_READINESS.md` — header corrected v4.10.0 → v4.11.0 (version note in §185 already stated this bump; header line was not updated in the 13.54.1 commit).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — header corrected v2.38 → v2.39 (version note in §20.12 already stated this bump; header line was not updated in the 13.54.1 commit).
+- `VERSION` — 13.55.0 → 13.55.1.
+
+---
+
 ## [13.55.0] — 2026-07-06
 
 ### Added

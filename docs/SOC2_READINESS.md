@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.10.0
+# FORM · SOC 2 Type II Readiness v4.11.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
