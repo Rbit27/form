@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v13.53.0** — 2026-07-06 · content · post-92 · «Нейральна адаптація: як ти стаєш сильнішим, не ростучи» (editorial series 91–100 «Мова адаптації → операційна практика», 2/10) · clinical-safety NOT_REQUIRED (тема: нейрофізіологічні механізми адаптації сили: рекрутування рухових одиниць, rate coding, між-м'язова координація; без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html card prepended for post-92 · next: post-93 («Структурна адаптація і гіпертрофія: що реально відбувається у м'язі за 8 тижнів» — editorial series 91–100, 3/10) + post-3276 (series «Тренування і контекст тіла: вік, відновлення, варіабельність» 3276–3285, 1/10)
+
 **v13.52.0** — 2026-07-06 · content · post-91 + post-3275 · «Що таке адаптація насправді: від абстракції до вимірюваних маркерів» (editorial series 91–100 «Мова адаптації → операційна практика», 1/10) + «Довгострокове прогресування: повна операційна карта для атлета з горизонтом 2–5 років» (series 3266–3275, 10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED (обидва: без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html cards prepended for post-91 and post-3275 · README: editorial 91–100 proposed → in progress 1/10; series 3266–3275 in progress 9/10 → COMPLETE 10/10 · next: post-92 («Нейральна адаптація: як ти стаєш сильнішим, не ростучи» — editorial series 91–100, 2/10) + post-3276 (series «Тренування і контекст тіла: вік, відновлення, варіабельність» 3276–3285, 1/10)
 
 **v13.51.0** — 2026-07-06 · content · post-90 · editorial synthesis 81–90 · see CHANGELOG
