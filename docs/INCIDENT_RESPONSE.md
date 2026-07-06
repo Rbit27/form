@@ -29761,7 +29761,7 @@ R-83 provides a documented, root-cause-classified response procedure for AL-CAEP
 
 | # | Task | Owner | Priority | Status |
 |---|---|---|---|---|
-| 1 | Register `sso.caep_stream_recovered` LOW/3yr and `SsoCaepStreamRecoveredPayload` Zod v2 schema in `docs/AUDIT_LOG_SCHEMA.md`; include CAEP-SETERR-CHAIN-01 ordering invariant and CAEP-SETERR-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [ ] Pending |
+| 1 | Register `sso.caep_stream_recovered` LOW/3yr and `SsoCaepStreamRecoveredPayload` Zod v2 schema in `docs/AUDIT_LOG_SCHEMA.md`; include CAEP-SETERR-CHAIN-01 ordering invariant and CAEP-SETERR-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [x] **Done — 2026-07-06 (AUDIT_LOG_SCHEMA.md v3.3, §R-83).** |
 | 2 | Implement CAEP-SETERR-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`; HTTP 422 + `CAEP_SETERR_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending |
 | 3 | Update `docs/OBSERVABILITY.md §78.4` AL-CAEP-01 entry: add "Dedicated companion IR runbook: INCIDENT_RESPONSE R-83" field (mirrors pattern of §76.4 → R-82, §75.4 → R-81) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.1, §78.4 AL-CAEP-01 companion runbook field added).** |
 | 4 | Register CAEP-SETERR-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§187, per-activation cadence, CC6.3/CC6.6/CC7.2/CC7.3, 7yr) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (SOC2_READINESS.md v4.13.0, §187; evidence count 162 → 163).** |
@@ -30030,7 +30030,7 @@ The SESSION_REVOCATION_KV write performed by `caep-action-handler.ts` at T+0 ens
 
 | # | Task | Owner | Priority | Status |
 |---|---|---|---|---|
-| 1 | Register `sso.caep_gdpr_deletion_opened` HIGH/7yr, `sso.caep_gdpr_deletion_completed` CRITICAL/7yr, and both Zod v2 schemas in `docs/AUDIT_LOG_SCHEMA.md`; include CAEP-PURGE-CHAIN-01 ordering invariant and CAEP-PURGE-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [ ] Pending |
+| 1 | Register `sso.caep_gdpr_deletion_opened` HIGH/7yr, `sso.caep_gdpr_deletion_completed` CRITICAL/7yr, and both Zod v2 schemas in `docs/AUDIT_LOG_SCHEMA.md`; include CAEP-PURGE-CHAIN-01 ordering invariant and CAEP-PURGE-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [x] **Done — 2026-07-06 (AUDIT_LOG_SCHEMA.md v3.3, §R-84).** |
 | 2 | Implement CAEP-PURGE-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`; HTTP 422 + `CAEP_PURGE_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending |
 | 3 | Update `docs/OBSERVABILITY.md §78.4` AL-CAEP-02 entry: add "Dedicated companion IR runbook: INCIDENT_RESPONSE R-84" field | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.1, §78.4 AL-CAEP-02 companion runbook field added).** |
 | 4 | Register CAEP-PURGE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§188, per-activation cadence, P5.1/C1.2/CC6.3, 7yr) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (SOC2_READINESS.md v4.13.0, §188; evidence count 163 → 164).** |
@@ -30351,7 +30351,7 @@ The SESSION_REVOCATION_KV write at T+0 ensures that the compromised user's activ
 
 | # | Task | Owner | Priority | Status |
 |---|---|---|---|---|
-| 1 | Register `sso.risc_hijacking_ic_opened` STANDARD/7yr, `sso.risc_hijacking_handled` LOW/3yr, and both Zod v2 schemas in `docs/AUDIT_LOG_SCHEMA.md`; include RISC-HIJACK-CHAIN-01 ordering invariant and RISC-HIJACK-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [ ] Pending |
+| 1 | Register `sso.risc_hijacking_ic_opened` STANDARD/7yr, `sso.risc_hijacking_handled` LOW/3yr, and both Zod v2 schemas in `docs/AUDIT_LOG_SCHEMA.md`; include RISC-HIJACK-CHAIN-01 ordering invariant and RISC-HIJACK-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [x] **Done — 2026-07-06 (AUDIT_LOG_SCHEMA.md v3.3, §R-85).** |
 | 2 | Implement RISC-HIJACK-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`; HTTP 422 + `RISC_HIJACK_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending |
 | 3 | Update `docs/OBSERVABILITY.md §78.4` AL-CAEP-04 entry: add "Dedicated companion IR runbook: INCIDENT_RESPONSE R-85" field | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.1, §78.4 AL-CAEP-04 companion runbook field added).** |
 | 4 | Register RISC-HIJACK-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§189, per-activation cadence, CC7.2/CC7.3/CC7.4/CC6.3, 7yr) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (SOC2_READINESS.md v4.13.0, §189; evidence count 164 → 165).** |

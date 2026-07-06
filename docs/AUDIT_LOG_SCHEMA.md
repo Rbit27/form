@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v3.2
+# FORM · Audit Log Schema v3.3
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -541,6 +541,197 @@ export const SessionRevocationKvSyncRestoredPayload = z.object({
 
 **SOC 2 auditor narrative for CC7.3 — Response to identified anomalies:**
 `session.revocation_kv_sync_restored` is the REVOKE-KV-CHAIN-01 terminal event for the AL-REVOKE-01 incident lifecycle. Its presence in the HMAC audit chain — immutably paired with the `session.revocation_kv_sync_error` anchor — proves that every KV sync degradation episode was formally closed: root cause classified (H1–H5), remediation applied, and KV-edge enforcement verified restored (R-82-C4 zero-error confirm ≥ 15 min). `r05_co_activated: true` on H5 incidents documents escalation to the unauthorized-access runbook (R-05 CC6.6/CC7.4). Combined with REVOKE-SYNC-E-001 (`docs/SOC2_READINESS.md §180`), auditors receive per-activation evidence of the complete IC response cycle — trigger, classification, remediation, and formal closure.
+
+---
+
+### §R-83 CAEP Stream Recovered events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-83 · SOC 2 CC6.3/CC6.6/CC7.2/CC7.3)
+
+> Defined in `docs/INCIDENT_RESPONSE.md R-83` (v3.48.0, 2026-07-06). One terminal event covering CAEP SET validation failure stream recovery at IC closure. Emitted manually by the IC (security-engineer or devops-lead) as Step 6 of the R-83 recovery procedure, after R-83-C4 zero-error confirmation (≥ 15 minutes of zero `sso.caep_stream_error` events). **CAEP-SETERR-CHAIN-01 ordering invariant:** `sso.caep_stream_recovered` MUST be preceded by at least one `sso.caep_stream_error` for the same `tenant_id` within the `degraded_window_minutes` window; the `emit-audit-event` Worker returns HTTP 422 `CAEP_SETERR_CHAIN_01_VIOLATION` if no such anchor exists — escalate immediately to R-05 (implementation: pending M6, `docs/INCIDENT_RESPONSE.md §R-83.11` item 2). **Privacy floor:** payload contains only aggregate metrics, root cause enum, and operational metadata — no `user_id`, employee name, email, health value, `caep_webhook_secret`, or GDPR Art. 9 special-category data. **Emitter:** `form_system` via on-call IC CLI invocation at R-83 Step 6; IC closure is a human decision — there is no automated emitter. **Cross-ref:** `docs/INCIDENT_RESPONSE.md R-83` (§R-83.7 DEC-030 chain spec; §R-83.8 CAEP-SETERR-E-001 SOC 2 evidence artefact); `docs/OBSERVABILITY.md §78.4` (AL-CAEP-01 trigger alert + companion runbook); `docs/SOC2_READINESS.md §187` (CAEP-SETERR-E-001 registered, count 162 → 163). **Closes `docs/INCIDENT_RESPONSE.md §R-83.11` item 1 (P0/M5).**
+
+| Event type | Severity | Retention | Trigger | Payload fields |
+|---|---|---|---|---|
+| `sso.caep_stream_recovered` | LOW | 3 yr | IC emits at R-83 IC closure (Step 6), following R-83-C4 zero-error confirmation (≥ 15 min); CAEP-SETERR-CHAIN-01 terminal event | `incident_id` (UUID), `tenant_id` (UUID), `root_cause` (enum: `H1`–`H5`), `peak_error_rate_pct` (number 0–100), `degraded_window_minutes` (positive number), `resolution_confirmed_at` (ISO 8601 datetime), `worker_rollback_deployed` (bool), `stream_reregistered` (bool) |
+
+**CAEP-SETERR-CHAIN-01 ordering invariant:** `sso.caep_stream_recovered` MUST NOT be emitted for a given `tenant_id` unless at least one `sso.caep_stream_error` for the same `tenant_id` was committed to the HMAC chain within the `degraded_window_minutes` window. The `emit-audit-event` Worker enforces this at INSERT time — HTTP 422 `CAEP_SETERR_CHAIN_01_VIOLATION` on violation; escalate immediately to R-05 (HMAC Chain Break). **Implementation:** pending M6 (`emit-audit-event` Worker update — `docs/INCIDENT_RESPONSE.md §R-83.11` item 2). Until M6 deployment, the invariant is verified manually: the IC log in `#inc-caep-{date}` Slack MUST reference the `sso.caep_stream_error` trigger event before `sso.caep_stream_recovered` is emitted.
+
+**`SsoCaepStreamRecoveredPayload` Zod v2 schema:**
+
+```typescript
+import { z } from 'zod';
+
+export const SsoCaepStreamRecoveredPayload = z.object({
+  incident_id:              z.string().uuid(),
+  tenant_id:                z.string().uuid(),
+  root_cause:               z.enum(['H1', 'H2', 'H3', 'H4', 'H5']),
+  peak_error_rate_pct:      z.number().min(0).max(100),
+  degraded_window_minutes:  z.number().positive(),
+  resolution_confirmed_at:  z.string().datetime(),
+  worker_rollback_deployed: z.boolean(),
+  stream_reregistered:      z.boolean(),
+});
+```
+
+**Privacy floor:** `incident_id` is a FORM-internal UUID assigned at IC open — not linked to any user identity. `tenant_id` is a FORM-internal UUID — not linked to company name or employee roster in this event payload. `root_cause` H1–H5 enum contains no PII. `peak_error_rate_pct` and `degraded_window_minutes` are aggregate operational metrics — no SET payload content, no `caep_webhook_secret`, no JTI values. No employee name, email, health value, coaching session content, or GDPR Art. 9 special-category data in any field. **`r2:form-api` NO ACCESS** to CAEP-SETERR-E-001 artefacts at `compliance/evidence/caep/`.
+
+**CAEP-SETERR-E-001 SOC 2 evidence artefact:**
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CAEP-SETERR-E-001 |
+| **Trigger** | Per R-83 IC activation |
+| **Retention** | 7 years (inherits `sso.caep_stream_error` HIGH/7yr — trigger event) |
+| **Storage path** | `compliance/evidence/caep/caep-seterr-e-001-{incident_id}.json` |
+| **R2 Object Lock** | WORM (7yr) |
+| **Vanta mirror** | CAEP-SETERR-E-001 (per-activation — upload within 48 h of IC closure) |
+| **SOC 2 criteria** | CC6.3 / CC6.6 / CC7.2 / CC7.3 |
+
+Eight required components: `r83_c1_output` (error code distribution — aggregate; no SET payload; `set_jti_hash` SHA-256 only), `r83_c2_output` (error rate over 30-min window — confirms AL-CAEP-01 trigger threshold met), `r83_c3_output` (stream status at trigger — `caep_status`, `caep_reregistration_required`; `caep_webhook_secret` NEVER included), `r83_c4_output` (post-recovery zero-error confirmation), `trigger_event_json` (`sso.caep_stream_error` DEC-030 event JSON — first event in incident window), `terminal_event_json` (`sso.caep_stream_recovered` DEC-030 event JSON), `root_cause_classification` (H1–H5 with narrative — no IdP credentials or tenant PII), `degraded_window_summary` (peak error rate, degraded window minutes, tenant notification sent boolean).
+
+**SOC 2 auditor narratives:**
+
+*CC6.3 — Logical access control / timely revocation:* AL-CAEP-01 detects when FORM's CAEP stream is failing to validate SETs — a condition that means credential-change and session-revoked IdP signals cannot be enforced. CAEP-SETERR-E-001 proves: (a) the trigger threshold was exceeded (`r83_c2_output`), (b) root cause was classified (H1–H5), and (c) error rate returned to zero (`r83_c4_output`) before IC closure — not merely declared resolved. The R-83 15-minute zero-error gate ensures CC6.3 access control via CAEP is confirmed restored, not assumed.
+
+*CC6.6 — Re-evaluation on credential change:* `credential-change` and `token-claims-change` CAEP events are dropped during a SET validation failure. CAEP-SETERR-E-001 `r83_c1_output` provides auditor-verifiable evidence of which event types were affected and for how long.
+
+*CC7.2 — Monitoring for anomalies:* AL-CAEP-01 provides automated 24/7 monitoring of the CAEP SET validation pipeline. `r83_c2_output` confirms the 10-minute error rate window that triggered the alert. CAEP-OBS-E-001 (`docs/SOC2_READINESS.md §186`) provides fleet-level quarterly evidence; CAEP-SETERR-E-001 provides per-activation evidence.
+
+*CC7.3 — Incident response for detected anomalies:* R-83 provides a documented, root-cause-classified response. The six-step recovery (acknowledge → scope → remediate → confirm → communicate → close) with H1–H5 classification matrix proves FORM's CAEP incident response is structured, repeatable, and produces verifiable resolution artefacts.
+
+---
+
+### §R-84 CAEP GDPR Deletion Lifecycle events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-84 · SOC 2 P5.1/C1.2/CC6.3)
+
+> Defined in `docs/INCIDENT_RESPONSE.md R-84` (v3.48.0, 2026-07-06). Two lifecycle events covering the CAEP account-purged GDPR Art. 17 deletion IC: an anchor event at IC open and a terminal event at confirmed deletion completion. Both emitted manually by the compliance-officer as IC Steps 1 and 6 of the R-84 recovery procedure. **CAEP-PURGE-CHAIN-01 ordering invariant:** `sso.caep_gdpr_deletion_completed` MUST be preceded by `sso.caep_gdpr_deletion_opened` for the same `incident_id`, which MUST be preceded by `sso.caep_user_purged` for the same `tenant_id` within 24 h; the `emit-audit-event` Worker returns HTTP 422 `CAEP_PURGE_CHAIN_01_VIOLATION` on inversion (implementation: pending M6, `docs/INCIDENT_RESPONSE.md §R-84.11` item 2). **Trigger:** AL-CAEP-02 fires on any `sso.caep_user_purged` CRITICAL event — zero dedup, zero auto-resolve. **Access control:** compliance-officer + `security_reviewer` role ONLY; `form_api`, `form_analytics`, and HR NEVER have access to `compliance/evidence/caep/` CAEP-PURGE-E-001 artefacts. **Cross-ref:** `docs/INCIDENT_RESPONSE.md R-84` (§R-84.7 DEC-030 chain spec; §R-84.8 CAEP-PURGE-E-001 SOC 2 evidence artefact); `docs/OBSERVABILITY.md §78.4` (AL-CAEP-02 trigger alert + companion runbook); `docs/SOC2_READINESS.md §188` (CAEP-PURGE-E-001 registered, count 163 → 164). **Closes `docs/INCIDENT_RESPONSE.md §R-84.11` item 1 (P0/M5).**
+
+| Event type | Severity | Retention | Trigger | Payload fields |
+|---|---|---|---|---|
+| `sso.caep_gdpr_deletion_opened` | HIGH | 7 yr | compliance-officer emits at R-84 Step 1 (IC open), referencing the triggering `sso.caep_user_purged` event; GDPR Art. 17 deletion IC anchor; CAEP-PURGE-CHAIN-01 anchor event | `incident_id` (UUID), `tenant_id` (UUID), `purge_event_id` (UUID — references `sso.caep_user_purged` event id), `purge_detected_at` (ISO 8601 datetime), `opened_by_role` (literal: `'compliance-officer'`), `litigation_hold` (bool — `true` triggers H5 path), `sandbox_tenant` (bool — `true` triggers H3 path) |
+| `sso.caep_gdpr_deletion_completed` | CRITICAL | 7 yr | compliance-officer emits at R-84 Step 6 after GDPR Art. 17 deletion confirmed across all FORM data stores; CAEP-PURGE-CHAIN-01 terminal event; IC closure gated on this event | `incident_id` (UUID), `tenant_id` (UUID), `purge_event_id` (UUID — references `sso.caep_user_purged` event id), `deletion_completed_at` (ISO 8601 datetime), `days_to_deletion` (nonneg int — GDPR Art. 17 SLA compliance metric), `stores_confirmed` (string[] — store names only; no PII), `subprocessors_notified` (bool), `backup_flagged` (bool), `litigation_hold_deferred` (bool), `art33_assessment_required` (bool) |
+
+**CAEP-PURGE-CHAIN-01 ordering invariant:** `sso.caep_gdpr_deletion_completed` MUST NOT be emitted for a given `incident_id` unless `sso.caep_gdpr_deletion_opened` for the same `incident_id` was committed to the HMAC chain first, AND a `sso.caep_user_purged` for the same `tenant_id` was committed within the preceding 24 h. The `emit-audit-event` Worker enforces this at INSERT time — HTTP 422 `CAEP_PURGE_CHAIN_01_VIOLATION` on violation; escalate immediately to R-05. **Implementation:** pending M6 (`emit-audit-event` Worker update — `docs/INCIDENT_RESPONSE.md §R-84.11` item 2). Until M6, the invariant is verified manually: the IC log in `#incidents` Slack MUST reference both the `sso.caep_user_purged` trigger and `sso.caep_gdpr_deletion_opened` anchor before `sso.caep_gdpr_deletion_completed` is emitted.
+
+**Zod v2 schemas (canonical source: `docs/INCIDENT_RESPONSE.md §R-84.7`):**
+
+```typescript
+import { z } from 'zod';
+
+export const SsoCaepGdprDeletionOpenedPayload = z.object({
+  incident_id:        z.string().uuid(),
+  tenant_id:          z.string().uuid(),
+  purge_event_id:     z.string().uuid(), // references sso.caep_user_purged event id
+  purge_detected_at:  z.string().datetime(),
+  opened_by_role:     z.literal('compliance-officer'),
+  litigation_hold:    z.boolean(),
+  sandbox_tenant:     z.boolean(),
+});
+
+export const SsoCaepGdprDeletionCompletedPayload = z.object({
+  incident_id:               z.string().uuid(),
+  tenant_id:                 z.string().uuid(),
+  purge_event_id:            z.string().uuid(),
+  deletion_completed_at:     z.string().datetime(),
+  days_to_deletion:          z.number().int().nonnegative(),
+  stores_confirmed:          z.array(z.string()), // store names only — no PII
+  subprocessors_notified:    z.boolean(),
+  backup_flagged:            z.boolean(),
+  litigation_hold_deferred:  z.boolean(),
+  art33_assessment_required: z.boolean(),
+});
+```
+
+**Privacy floor:** Both events contain NO data subject name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data. The link from `purge_event_id` to a natural person is accessible only via the DSAR privileged tooling flow — not from these chain events. `stores_confirmed` carries store names only — no PII in store names. `caep_webhook_secret` is NEVER included. `form_api` and HR roles NEVER have access to `compliance/evidence/caep/`.
+
+**CAEP-PURGE-E-001 SOC 2 evidence artefact:**
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CAEP-PURGE-E-001 |
+| **Trigger** | Per R-84 IC activation |
+| **Retention** | 7 years (matches `sso.caep_user_purged` CRITICAL/7yr and `sso.caep_gdpr_deletion_completed` CRITICAL/7yr) |
+| **Storage path** | `compliance/evidence/caep/caep-purge-e-001-{incident_id}.json` |
+| **R2 Object Lock** | WORM (7yr) |
+| **Vanta mirror** | CAEP-PURGE-E-001 (per-activation — upload within 48 h of IC closure) |
+| **Access control** | compliance-officer + `security_reviewer` role ONLY; `form_api` and HR NEVER have access |
+| **SOC 2 criteria** | P5.1 / C1.2 / CC6.3 |
+
+Eight required components: `r84_c1_output` (purge event record — `user_ref` UUID only; no name/email), `r84_c2_output` (Worker trace `CAEP_PURGE_COMPLETE` log line — no IdP credential tokens), `kv_write_confirmation` (SESSION_REVOCATION_KV write status — ok/failed; no KV key value), `trigger_event_json` (`sso.caep_user_purged` DEC-030 event JSON), `opened_event_json` (`sso.caep_gdpr_deletion_opened` DEC-030 event JSON), `terminal_event_json` (`sso.caep_gdpr_deletion_completed` DEC-030 event JSON), `dsar_erasure_checklist_signed` (signed GDPR erasure checklist — redacted to `user_ref` UUID + store names only), `stores_confirmed_deletion` (list of FORM data stores where deletion was confirmed — no PII in store names).
+
+**SOC 2 auditor narratives:**
+
+*P5.1 — Privacy: collection, use, retention, and disposal:* `sso.caep_user_purged` is the IdP-sourced signal that a data subject has been permanently deleted at the identity provider. AL-CAEP-02 fires immediately — zero dedup, zero auto-resolve — ensuring the GDPR Art. 17 deletion clock is actioned without buffering. CAEP-PURGE-E-001 proves: (a) the purge signal was detected within the monitoring window, (b) SESSION_REVOCATION_KV was written immediately (access revoked before deletion completes), and (c) GDPR deletion was completed within FORM's 14-day internal target, confirmed by signed DSAR checklist. `days_to_deletion` in `sso.caep_gdpr_deletion_completed` is the auditor-inspectable SLA compliance field.
+
+*C1.2 — Disposal of confidential information:* CAEP-PURGE-E-001 `stores_confirmed_deletion` documents the complete set of FORM data stores where the data subject's personal information was deleted. The dual CRITICAL/7yr DEC-030 events (`sso.caep_user_purged` + `sso.caep_gdpr_deletion_completed`) provide an HMAC-chained audit trail from deletion request to confirmed deletion, directly supporting the C1.2 audit requirement that FORM disposes of confidential information per its DPA Annex B commitments.
+
+*CC6.3 — Logical access control / timely removal:* The SESSION_REVOCATION_KV write performed by `caep-action-handler.ts` at T+0 ensures the data subject's active sessions are revoked immediately — within CAEP-SLO-01 < 30 s. CAEP-PURGE-E-001 `kv_write_confirmation` provides auditors per-incident evidence that access was removed at the technical layer at the moment the purge signal was received.
+
+---
+
+### §R-85 RISC Hijacking IC Lifecycle events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-85 · SOC 2 CC7.2/CC7.3/CC7.4/CC6.3)
+
+> Defined in `docs/INCIDENT_RESPONSE.md R-85` (v3.48.0, 2026-07-06). Two lifecycle events covering the Google RISC hijacking IC: an anchor event at IC open and a terminal event at confirmed resolution. Emitted manually by the security-engineer as Steps 1 and 6 of the R-85 recovery procedure. **RISC-HIJACK-CHAIN-01 ordering invariant:** `sso.risc_hijacking_handled` MUST be preceded by `sso.risc_hijacking_ic_opened` for the same `incident_id`, which MUST be preceded by `sso.caep_event_received` with `caep_event_type = 'risc-hijacking'` for the same `tenant_id` within 24 h; the `emit-audit-event` Worker returns HTTP 422 `RISC_HIJACK_CHAIN_01_VIOLATION` on inversion (implementation: pending M6, `docs/INCIDENT_RESPONSE.md §R-85.11` item 2). **Trigger:** AL-CAEP-04 fires on any single RISC hijacking event — zero dedup beyond 1-hour per-tenant window. **Cross-ref:** `docs/INCIDENT_RESPONSE.md R-85` (§R-85.7 DEC-030 chain spec; §R-85.8 RISC-HIJACK-E-001 SOC 2 evidence artefact); `docs/OBSERVABILITY.md §78.4` (AL-CAEP-04 trigger alert + companion runbook); `docs/SOC2_READINESS.md §189` (RISC-HIJACK-E-001 registered, count 164 → 165). **Closes `docs/INCIDENT_RESPONSE.md §R-85.11` item 1 (P0/M5).**
+
+| Event type | Severity | Retention | Trigger | Payload fields |
+|---|---|---|---|---|
+| `sso.risc_hijacking_ic_opened` | STANDARD | 7 yr | security-engineer emits at R-85 Step 1 (IC open), after AL-CAEP-04 acknowledgement; RISC-HIJACK-CHAIN-01 anchor event | `incident_id` (UUID), `tenant_id` (UUID), `trigger_event_id` (UUID — references `sso.caep_event_received` event id with `caep_event_type = 'risc-hijacking'`), `risc_received_at` (ISO 8601 datetime), `initial_severity` (enum: `P1` \| `P0`), `compromised_is_admin` (bool) |
+| `sso.risc_hijacking_handled` | LOW | 3 yr | security-engineer emits at R-85 Step 6 after tenant IT admin confirms account recovery and IC is ready for closure; RISC-HIJACK-CHAIN-01 terminal event | `incident_id` (UUID), `tenant_id` (UUID), `trigger_event_id` (UUID), `resolution_confirmed_at` (ISO 8601 datetime), `root_cause` (enum: `H1`–`H5`), `false_positive` (bool), `session_revocation_method` (enum: `automatic` \| `manual`), `cache_evicted` (bool), `tenant_admin_notified` (bool), `art33_assessment_required` (bool), `r04_co_activated` (bool), `r05_co_activated` (bool) |
+
+**RISC-HIJACK-CHAIN-01 ordering invariant:** `sso.risc_hijacking_handled` MUST NOT be emitted for a given `incident_id` unless `sso.risc_hijacking_ic_opened` for the same `incident_id` was committed to the HMAC chain first, AND a `sso.caep_event_received` with `caep_event_type = 'risc-hijacking'` for the same `tenant_id` was committed within the preceding 24 h. The `emit-audit-event` Worker enforces this at INSERT time — HTTP 422 `RISC_HIJACK_CHAIN_01_VIOLATION` on violation; escalate immediately to R-05. **Implementation:** pending M6 (`emit-audit-event` Worker update — `docs/INCIDENT_RESPONSE.md §R-85.11` item 2). Until M6, the invariant is verified manually: the IC log in `#inc-risc-{date}` Slack MUST reference the `sso.caep_event_received` trigger and `sso.risc_hijacking_ic_opened` anchor before `sso.risc_hijacking_handled` is emitted.
+
+**Zod v2 schemas (canonical source: `docs/INCIDENT_RESPONSE.md §R-85.7`):**
+
+```typescript
+import { z } from 'zod';
+
+export const SsoRiscHijackingIcOpenedPayload = z.object({
+  incident_id:          z.string().uuid(),
+  tenant_id:            z.string().uuid(),
+  trigger_event_id:     z.string().uuid(), // references sso.caep_event_received event id
+  risc_received_at:     z.string().datetime(),
+  initial_severity:     z.enum(['P1', 'P0']),
+  compromised_is_admin: z.boolean(),
+});
+
+export const SsoRiscHijackingHandledPayload = z.object({
+  incident_id:                z.string().uuid(),
+  tenant_id:                  z.string().uuid(),
+  trigger_event_id:           z.string().uuid(),
+  resolution_confirmed_at:    z.string().datetime(),
+  root_cause:                 z.enum(['H1', 'H2', 'H3', 'H4', 'H5']),
+  false_positive:             z.boolean(),
+  session_revocation_method:  z.enum(['automatic', 'manual']),
+  cache_evicted:              z.boolean(),
+  tenant_admin_notified:      z.boolean(),
+  art33_assessment_required:  z.boolean(),
+  r04_co_activated:           z.boolean(),
+  r05_co_activated:           z.boolean(),
+});
+```
+
+**Privacy floor:** Both events contain NO data subject name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data. `trigger_event_id` is a FORM-internal UUID referencing `sso.caep_event_received` — `set_jti_hash` (SHA-256) is in that event, never the raw JTI. `compromised_is_admin` is a boolean derived from the FORM internal role — it does not expose the affected user's identity. RISC-HIJACK-E-001 `r85_c4_output` carries aggregate count only — no individual `user_ref` values. `caep_webhook_secret` is NEVER included in any payload or artefact. HR role NEVER has access to `compliance/evidence/caep/`.
+
+**RISC-HIJACK-E-001 SOC 2 evidence artefact:**
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | RISC-HIJACK-E-001 |
+| **Trigger** | Per R-85 IC activation |
+| **Retention** | 7 years (inherits `sso.caep_event_received` HIGH/7yr — trigger event) |
+| **Storage path** | `compliance/evidence/caep/risc-hijack-e-001-{incident_id}.json` |
+| **R2 Object Lock** | WORM (7yr) |
+| **Vanta mirror** | RISC-HIJACK-E-001 (per-activation — upload within 48 h of IC closure) |
+| **SOC 2 criteria** | CC7.2 / CC7.3 / CC7.4 / CC6.3 |
+
+Eight required components: `r85_c1_output` (RISC hijacking event record — `user_ref` UUID only; no name/email; `set_jti_hash` SHA-256), `r85_c2_output` (SESSION_REVOCATION_KV write confirmation — status + TTL; no KV key value), `r85_c3_output` (Google Directory group cache eviction confirmation — `cache_evicted: true/false`; no cache contents), `r85_c4_output` (affected user count in same tenant within 24 h — aggregate count only; no `user_ref` values), `trigger_event_json` (`sso.caep_event_received` DEC-030 event JSON — `set_jti_hash` SHA-256; no raw JTI or IdP credential), `opened_event_json` (`sso.risc_hijacking_ic_opened` DEC-030 event JSON), `terminal_event_json` (`sso.risc_hijacking_handled` DEC-030 event JSON), `root_cause_and_timeline` (H1–H5 classification, compromise window, session revocation method, false positive attestation).
+
+**SOC 2 auditor narratives:**
+
+*CC7.2 — Monitoring for anomalies:* AL-CAEP-04 fires immediately upon receipt of any Google RISC hijacking SET — Google's OpenID RISC specification canonical signal for real-time account compromise. RISC-HIJACK-E-001 `r85_c1_output` confirms the RISC signal was detected within the alert latency window (< 5 minutes from SET receipt to PagerDuty page).
+
+*CC7.3 — Incident response procedures:* R-85 provides a documented, severity-classified response with H1–H5 classification and automatic P0 escalation criteria (≥ 2 affected users, compromised admin). RISC-HIJACK-E-001 documents the complete response cycle from alert to tenant IT admin recovery confirmation.
+
+*CC7.4 — Detection and response to security events:* FORM's response — immediate SESSION_REVOCATION_KV write, Google Directory group cache eviction, forced re-authentication — directly implements the CC7.4 requirement that security events result in defined, executed response actions. CAEP-SLO-01 (< 30 s from SET `iat` to KV write) bounds detection-to-response latency and is verified by CAEP-OBS-E-001 quarterly.
+
+*CC6.3 — Logical access control / timely revocation:* The SESSION_REVOCATION_KV write at T+0 ensures the compromised user's sessions are revoked within CAEP-SLO-01 < 30 s — not after a periodic sync cycle. R-85-C2 provides per-incident confirmation. RISC-HIJACK-E-001 `r85_c2_output` gives auditors a verifiable record that access revocation occurred immediately upon receipt of the compromise signal.
 
 ---
 
@@ -1511,6 +1702,11 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `sso.google_directory_*` | 7 years | SOC 2 CC6.3/CC9.2 Google Workspace Directory sync evidence |
 | `session.bulk_revocation_*` / `session.tenant_nuke_*` / `session.revocation_kv_sync_error` | 7 years | SOC 2 CC6.3 timely logical access removal evidence |
 | `session.revocation_kv_sync_restored` | 3 years | SOC 2 CC7.3 IC closure terminal event; REVOKE-KV-CHAIN-01 (R-82); REVOKE-SYNC-E-001 per-activation artefact anchor; `docs/INCIDENT_RESPONSE.md §R-82` |
+| `sso.caep_stream_recovered` | 3 years | SOC 2 CC6.3/CC6.6/CC7.2/CC7.3 CAEP SET validation failure IC terminal event; CAEP-SETERR-CHAIN-01 (R-83); CAEP-SETERR-E-001 per-activation artefact anchor; 3yr sufficient (primary CC6.3 evidence carried by 7yr `sso.caep_stream_error` trigger event); `docs/INCIDENT_RESPONSE.md §R-83` |
+| `sso.caep_gdpr_deletion_opened` | 7 years | SOC 2 P5.1/C1.2/CC6.3 CAEP account-purged GDPR Art. 17 deletion IC anchor; CAEP-PURGE-CHAIN-01 anchor (R-84); 7yr required — GDPR deletion IC record spans multi-cycle SOC 2 observation + GDPR Art. 17 audit evidence; `docs/INCIDENT_RESPONSE.md §R-84` |
+| `sso.caep_gdpr_deletion_completed` | 7 years | SOC 2 P5.1/C1.2/CC6.3 CAEP account-purged GDPR Art. 17 deletion IC terminal; CAEP-PURGE-CHAIN-01 terminal (R-84); `days_to_deletion` is auditor-inspectable GDPR Art. 17 SLA compliance field; CAEP-PURGE-E-001 per-activation artefact anchor; `docs/INCIDENT_RESPONSE.md §R-84` |
+| `sso.risc_hijacking_ic_opened` | 7 years | SOC 2 CC7.2/CC7.3/CC7.4/CC6.3 Google RISC hijacking IC anchor; RISC-HIJACK-CHAIN-01 anchor (R-85); 7yr required — compromise IC record spans multi-cycle SOC 2 observation evidence; `docs/INCIDENT_RESPONSE.md §R-85` |
+| `sso.risc_hijacking_handled` | 3 years | SOC 2 CC7.3/CC7.4 Google RISC hijacking IC terminal event; RISC-HIJACK-CHAIN-01 terminal (R-85); `false_positive` boolean distinguishes confirmed compromise from false alerts for auditor review; RISC-HIJACK-E-001 per-activation artefact anchor; 3yr sufficient (primary CC7.2 evidence carried by 7yr `sso.risc_hijacking_ic_opened` + `sso.caep_event_received`); `docs/INCIDENT_RESPONSE.md §R-85` |
 | `scim.session_revocation_kv_fallback` | 7 years | SOC 2 CC6.3 (dual-path revocation under KV failure), CC7.2 (KV health monitoring — AL-REVOKE-01 trigger) |
 | `security.rls_bypass_attempt` / `security.definer_function_cross_tenant` | 7 years | Tenant isolation breach evidence; SOC 2 CC6.6/PI1.5 |
 | `asset.*` (device disposal) | 7 years | SOC 2 C1.2 confidential media disposal + CC6.5 access termination evidence |
@@ -7342,6 +7538,8 @@ export const C1ErasureMonitorRestoredPayload = z.object({
 *v1.0 (2026-06-10): +5 `ai.*` Victor AI safety events — `ai.safety_incident_opened` (CRITICAL/HIGH, 7yr), `ai.safety_incident_contained` (HIGH, 7yr), `ai.victor_disabled` (HIGH, 7yr), `ai.victor_reenabled` (HIGH, 7yr), `ai.safety_incident_resolved` (STANDARD, 3yr). All HMAC-chained per DEC-030. VSAFETY-CHAIN-01/02/03 ordering invariants enforced by `emit-audit-event` Worker write-guard (HTTP 422 on violation → PagerDuty P0). Privacy floor: no user_id, coaching content, or health values in any payload — incident_id (UUID) and affected_session_count (aggregate integer) only. Retention table updated with 2 new rows. Closes OBSERVABILITY.md §32.10 checklist item 7 (P0 M4) and INCIDENT_RESPONSE.md R-23 checklist item 2 (P0 M4). Cross-ref: OBSERVABILITY.md §32.5 (FORM-VICTOR-001 through -004 alert rules), §2.1 (VICTOR-SLO-01 through -04), §32.7 (VSAFETY-CHAIN monitors); INCIDENT_RESPONSE.md R-23 §R-23.3 (T+3min auto-disable path); SOC 2 CC7.2/CC7.4; GDPR Art. 9.*
 
 **v3.2 · 2026-07-06 · owner: compliance-officer + security-engineer**
+*v3.3 (2026-07-06): +5 DEC-030 HMAC-chained events — CAEP IC Lifecycle R-83/R-84/R-85 (CC6.3/CC6.6/CC7.2/CC7.3/CC7.4/P5.1/C1.2 · P0/M5). Three new sections `§R-83 CAEP Stream Recovered events`, `§R-84 CAEP GDPR Deletion Lifecycle events`, `§R-85 RISC Hijacking IC Lifecycle events` inserted after `§R-82 Session Revocation KV Sync Restored events`. Closes three P0/M5 checklist items from `docs/INCIDENT_RESPONSE.md` v3.48.0 (2026-07-06): §R-83.11 item 1, §R-84.11 item 1, §R-85.11 item 1. (1) `sso.caep_stream_recovered` (LOW, 3yr): IC terminal event for AL-CAEP-01 activation (R-83 Step 6, after R-83-C4 zero-error ≥ 15 min); CAEP-SETERR-CHAIN-01 ordering invariant (must follow `sso.caep_stream_error` for same `tenant_id` within `degraded_window_minutes` — HTTP 422 `CAEP_SETERR_CHAIN_01_VIOLATION`; enforcement pending M6 §R-83.11 item 2); `SsoCaepStreamRecoveredPayload` Zod v2 (8 fields: `incident_id`, `tenant_id`, `root_cause` H1–H5, `peak_error_rate_pct`, `degraded_window_minutes`, `resolution_confirmed_at`, `worker_rollback_deployed`, `stream_reregistered`); CAEP-SETERR-E-001 SOC 2 artefact spec (CC6.3/CC6.6/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/caep/caep-seterr-e-001-{incident_id}.json`; 8 components including R-83-C1..C4, trigger/terminal event JSONs, root cause classification, degraded window summary). (2) `sso.caep_gdpr_deletion_opened` (HIGH, 7yr): compliance-officer emits at R-84 Step 1 (IC open); CAEP-PURGE-CHAIN-01 anchor; references `sso.caep_user_purged` via `purge_event_id`; `litigation_hold`/`sandbox_tenant` booleans route H5/H3 paths; `SsoCaepGdprDeletionOpenedPayload` Zod v2 (7 fields); 7yr required — GDPR deletion IC record. (3) `sso.caep_gdpr_deletion_completed` (CRITICAL, 7yr): compliance-officer emits at R-84 Step 6 (deletion confirmed); CAEP-PURGE-CHAIN-01 terminal; `days_to_deletion` is auditor-inspectable GDPR Art. 17 SLA compliance field; `SsoCaepGdprDeletionCompletedPayload` Zod v2 (10 fields including `stores_confirmed` string[], `art33_assessment_required`); CAEP-PURGE-CHAIN-01 full ordering: `caep_gdpr_deletion_completed` requires prior `caep_gdpr_deletion_opened` (same `incident_id`) + prior `caep_user_purged` (same `tenant_id`, ≤ 24 h) — HTTP 422 `CAEP_PURGE_CHAIN_01_VIOLATION`; CAEP-PURGE-E-001 SOC 2 artefact (P5.1/C1.2/CC6.3, 7yr WORM, `compliance/evidence/caep/caep-purge-e-001-{incident_id}.json`; 8 components including trigger/opened/terminal event JSONs, signed DSAR erasure checklist `user_ref` UUID only, stores confirmed deletion; access control: compliance-officer + security_reviewer ONLY; form_api + HR NEVER). (4) `sso.risc_hijacking_ic_opened` (STANDARD, 7yr): security-engineer emits at R-85 Step 1 (IC open after AL-CAEP-04); RISC-HIJACK-CHAIN-01 anchor; `trigger_event_id` references `sso.caep_event_received` with `caep_event_type = 'risc-hijacking'`; `compromised_is_admin` boolean routes P0 escalation; `SsoRiscHijackingIcOpenedPayload` Zod v2 (6 fields); 7yr required — compromise IC record. (5) `sso.risc_hijacking_handled` (LOW, 3yr): security-engineer emits at R-85 Step 6 (tenant IT admin confirms account recovery); RISC-HIJACK-CHAIN-01 terminal; `SsoRiscHijackingHandledPayload` Zod v2 (12 fields including `root_cause` H1–H5, `false_positive`, `session_revocation_method`, `r04_co_activated`, `r05_co_activated`); RISC-HIJACK-CHAIN-01 full ordering: `risc_hijacking_handled` requires prior `risc_hijacking_ic_opened` (same `incident_id`) + prior `caep_event_received` (same `tenant_id`, `caep_event_type = 'risc-hijacking'`, ≤ 24 h) — HTTP 422 `RISC_HIJACK_CHAIN_01_VIOLATION`; RISC-HIJACK-E-001 SOC 2 artefact (CC7.2/CC7.3/CC7.4/CC6.3, 7yr WORM, `compliance/evidence/caep/risc-hijack-e-001-{incident_id}.json`; 8 components including R-85-C1..C4, all three event JSONs, root cause + timeline). Retention table: +5 rows (`sso.caep_stream_recovered` LOW 3yr CC6.3/CC6.6/CC7.2/CC7.3; `sso.caep_gdpr_deletion_opened` HIGH 7yr P5.1/C1.2/CC6.3; `sso.caep_gdpr_deletion_completed` CRITICAL 7yr P5.1/C1.2/CC6.3; `sso.risc_hijacking_ic_opened` STANDARD 7yr CC7.2/CC7.3/CC7.4/CC6.3; `sso.risc_hijacking_handled` LOW 3yr CC7.3/CC7.4). Privacy floor (all 5 events): no data subject name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data in any payload; `purge_event_id` and `trigger_event_id` are FORM-internal UUIDs linking to chain events — not linkable to a natural person without the DSAR privileged tooling flow; `stores_confirmed` string[] carries store names only; `caep_webhook_secret` NEVER included; HR NEVER has access to `compliance/evidence/caep/`. Cross-ref: `docs/INCIDENT_RESPONSE.md R-83` (§R-83.7/§R-83.8/§R-83.11 item 1 — now [x] Done); `docs/INCIDENT_RESPONSE.md R-84` (§R-84.7/§R-84.8/§R-84.11 item 1 — now [x] Done); `docs/INCIDENT_RESPONSE.md R-85` (§R-85.7/§R-85.8/§R-85.11 item 1 — now [x] Done); `docs/OBSERVABILITY.md §78.4` (AL-CAEP-01/AL-CAEP-02/AL-CAEP-04 canonical alert specs + companion runbook fields v5.24.1); `docs/SOC2_READINESS.md §187/§188/§189` (evidence registrations v4.13.0). Document header v3.2 → v3.3. Owner: compliance-officer + security-engineer.*
+
 *v3.2 (2026-07-06): §C1-Erasure-SLA-Monitor-Stale-Events — Two C1 Erasure SLA Monitor Stale DEC-030 HMAC-chained events registered in new section. Closes `docs/INCIDENT_RESPONSE.md §R-43.11` item 1 (P0/M6 — "Register `system.c1_erasure_monitor_stale_declared` (HIGH/7yr) and `system.c1_erasure_monitor_restored` (STANDARD/3yr) in AUDIT_LOG_SCHEMA.md §DSAR & Erasure events. Add C1-ERASURE-STALE-CHAIN-01 ordering invariant note and Zod schemas from §R-43.7"). Events: (1) `system.c1_erasure_monitor_stale_declared` (HIGH 7yr — C1-ERASURE-STALE-CHAIN-01 anchor; emitted T+30 of every R-43 activation before any recovery action by compliance-officer IC via PAM-elevated `emit-audit-event`; eight-field Zod v2 `C1ErasureMonitorStaleDeclaredPayload`: `incident_id` UUID, `confirmed_stale_since` datetime, `stale_minutes` positive, `missed_runs` nonneg int, `trigger` enum pagerduty_alert/manual_discovery/co_active_r03, `initial_severity` enum P1/P0/P0_ESCALATED, `danger_window_requests_at_declared` nonneg int — R-43-C2 count at declaration; `= 0` constitutes auditor-inspectable P5.1/C1.2 attestation no Art. 17 day 33–35 SLA risk during stale window, `breach_requests_at_declared` nonneg int — R-43-C3 count; `≥ 1` triggers P0 escalated + R-09 activation). (2) `system.c1_erasure_monitor_restored` (STANDARD 3yr — C1-ERASURE-STALE-CHAIN-01 terminal; emitted after confirmed first successful post-fix `cron.job_run_details` entry for job 11 by compliance-officer IC; eight-field Zod v2 `C1ErasureMonitorRestoredPayload`: `incident_id` UUID must match `stale_declared`, `restored_at` datetime, `root_cause` enum H1–H4, `fix_deployed_at` datetime, `stale_window_hours` positive float, `danger_window_requests_at_declared` nonneg int carried from `stale_declared`, `breach_requests_at_declared` nonneg int carried from `stale_declared`, `art17_sla_breached` boolean — `breach_requests_at_declared > 0`; `true` requires R-09 IC closure before P0 resolved). C1-ERASURE-STALE-CHAIN-01 ordering invariant: `system.c1_erasure_monitor_restored` blocked (HTTP 422 `C1_ERASURE_STALE_CHAIN_01_VIOLATION`) by `emit-audit-event` Worker without prior `stale_declared` for same `incident_id` → R-05 (implementation pending R-43.11 item 2 P0/M6; manual verification interim). ERASURE-STALE-E-001 per-activation evidence artefact (P5.1/C1.2/CC4.1/CC7.2, 7yr, `compliance/evidence/erasure/erasure-sla-monitor-stale/r43-{incident_id}/`): `stale_declared` + `restored` event JSON, R-43-C1 stale-window `cron.job_run_details` export, R-43-C2 danger-window count at declaration, R-43-C3 breach count at declaration, root cause classification; SHA-256 hashed. Four SOC 2 auditor narratives: CC7.2 (`stale_declared` → `restored` HMAC chain = tamper-evident detection-to-restoration timeline per HMAC-VERIFY-ALGO-001); P5.1 (`danger_window_requests_at_declared = 0` AND `breach_requests_at_declared = 0` = auditor-inspectable attestation no Art. 17 SLA risk during stale window — captured before any recovery action); C1.2 (`breach_requests_at_declared ≥ 1` is the auditor-inspectable contractual SLA breach record, chain-ordering-invariant-protected — closure blocked until R-09 complete); CC4.1 (pg_cron-health-monitor detects job 11 gap + R-43 IC response = FORM monitors its own compliance controls). Privacy floor (both events): aggregate counts + enums + timestamps + `incident_id` UUID only — no `dsar_request_id`, `user_id`, email, requestor name, erasure request content, GDPR Art. 9 data; `danger_window_requests_at_declared` and `breach_requests_at_declared` cannot identify individual erasure requestors; `form_api` REVOKED from `dsar_requests`. Retention table additions: `system.c1_erasure_monitor_stale_declared` HIGH 7yr P5.1/C1.2/CC4.1/CC7.2; `system.c1_erasure_monitor_restored` STANDARD 3yr CC7.2. Document header v3.1 → v3.2. Cross-ref: `docs/INCIDENT_RESPONSE.md R-43` (full runbook — §R-43.7 canonical Zod schemas; §R-43.8 evidence preservation spec; §R-43.11 checklist item 1 — now [x] Done 2026-07-06); `docs/OBSERVABILITY.md §12.6` (job 11 `c1-erasure-sla-monitor` registry entry — stale-consequence cross-ref updated v5.14.4, 2026-07-03; `INCIDENT_RESPONSE R-43 (job 11 stale recovery runbook)` noted); `docs/SOC2_READINESS.md §182` (ERASURE-MON-E-001 — quarterly job 11 health report registered §79.4 row 158; distinct from per-activation ERASURE-STALE-E-001); R-03 (H4 co-activation — Supabase outage); R-05 (C1-ERASURE-STALE-CHAIN-01 violation escalation + H1 unauthorized deletion co-activation); R-09 (Data Subject Rights Breach — P0 escalated co-activation if `breach_requests_at_declared ≥ 1`); DEC-030. Owner: compliance-officer + security-engineer.*
 
 **v3.1 · 2026-07-05 · owner: security-engineer + compliance-officer**

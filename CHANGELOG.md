@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.67.1] — 2026-07-06
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §R-83` — `sso.caep_stream_recovered` LOW/3yr · CAEP SET validation failure IC terminal event. Closes `docs/INCIDENT_RESPONSE.md §R-83.11` item 1 (P0/M5). CAEP-SETERR-CHAIN-01 ordering invariant: must follow `sso.caep_stream_error` for same `tenant_id` within `degraded_window_minutes` (HTTP 422 `CAEP_SETERR_CHAIN_01_VIOLATION`; enforcement pending M6 §R-83.11 item 2). `SsoCaepStreamRecoveredPayload` Zod v2 (8 fields: `incident_id`, `tenant_id`, `root_cause` H1–H5, `peak_error_rate_pct`, `degraded_window_minutes`, `resolution_confirmed_at`, `worker_rollback_deployed`, `stream_reregistered`). CAEP-SETERR-E-001 SOC 2 artefact spec (CC6.3/CC6.6/CC7.2/CC7.3, 7yr WORM, `compliance/evidence/caep/caep-seterr-e-001-{incident_id}.json`; 8 components). Privacy floor: no `caep_webhook_secret`, no SET payload, no user PII.
+- `docs/AUDIT_LOG_SCHEMA.md §R-84` — `sso.caep_gdpr_deletion_opened` HIGH/7yr + `sso.caep_gdpr_deletion_completed` CRITICAL/7yr · CAEP account-purged GDPR Art. 17 deletion IC lifecycle. Closes `docs/INCIDENT_RESPONSE.md §R-84.11` item 1 (P0/M5). CAEP-PURGE-CHAIN-01 full ordering invariant: `completed` requires prior `opened` (same `incident_id`) + prior `caep_user_purged` (same `tenant_id`, ≤ 24 h) — HTTP 422 `CAEP_PURGE_CHAIN_01_VIOLATION`. Both Zod v2 schemas. CAEP-PURGE-E-001 SOC 2 artefact spec (P5.1/C1.2/CC6.3, 7yr WORM, `compliance/evidence/caep/caep-purge-e-001-{incident_id}.json`; 8 components including signed DSAR checklist `user_ref` UUID only; access: compliance-officer + security_reviewer ONLY). `days_to_deletion` is the auditor-inspectable GDPR Art. 17 SLA field. Privacy floor: no data subject name/email/health/GDPR Art. 9 data; HR NEVER has access.
+- `docs/AUDIT_LOG_SCHEMA.md §R-85` — `sso.risc_hijacking_ic_opened` STANDARD/7yr + `sso.risc_hijacking_handled` LOW/3yr · Google RISC hijacking IC lifecycle. Closes `docs/INCIDENT_RESPONSE.md §R-85.11` item 1 (P0/M5). RISC-HIJACK-CHAIN-01 ordering invariant: `handled` requires prior `ic_opened` (same `incident_id`) + prior `caep_event_received` with `caep_event_type = 'risc-hijacking'` (same `tenant_id`, ≤ 24 h) — HTTP 422 `RISC_HIJACK_CHAIN_01_VIOLATION`. Both Zod v2 schemas (`SsoRiscHijackingIcOpenedPayload` 6 fields; `SsoRiscHijackingHandledPayload` 12 fields including `false_positive`, `r04_co_activated`, `r05_co_activated`). RISC-HIJACK-E-001 SOC 2 artefact spec (CC7.2/CC7.3/CC7.4/CC6.3, 7yr WORM, `compliance/evidence/caep/risc-hijack-e-001-{incident_id}.json`; 8 components). Privacy floor: no user PII; `caep_webhook_secret` NEVER included; HR NEVER has access.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v3.2 → v3.3. Retention table: +5 rows (`sso.caep_stream_recovered` LOW 3yr; `sso.caep_gdpr_deletion_opened` HIGH 7yr; `sso.caep_gdpr_deletion_completed` CRITICAL 7yr; `sso.risc_hijacking_ic_opened` STANDARD 7yr; `sso.risc_hijacking_handled` LOW 3yr).
+- `docs/INCIDENT_RESPONSE.md` — §R-83.11 item 1, §R-84.11 item 1, §R-85.11 item 1 → `[x] Done — 2026-07-06`.
+- `VERSION` — 13.67.0 → 13.67.1.
+
 ## [13.67.0] — 2026-07-06
 
 ### Added
