@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [13.63.0] — 2026-07-06
+
+### Added
+- `content/post-100-mechanisms-to-own-system-adaptation-series-synthesis.md` — Editorial series «Мова адаптації → операційна практика» 10/10 · SERIES COMPLETE. «Від механізмів до власної системи: синтез серії і операційна карта атлета». Ієрархія адаптацій за часом (сесія → 72 год → тижні → місяці → роки). 7 операційних рішень: прогрес навантаження через нейральну/структурну/сполучнотканинну шкалу; частота через MEV/MRV і ЦНС-відновлення; деловантаження як ATL-менеджмент; алгоритм при зниженій HRV; concurrent training interference (AMPK/mTOR, ≥6 год між силовим і ендurance); читання прогресу за нейральними і технічними маркерами; 8–16-тижній блок через accumulation → deload → peak. Карта серії (пости 91–100). Межі серії: харчування і фармакологія — поза скоупом; індивідуальна варіабельність τ. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — card для post-100 prepended at top of feed.
+
+### Changed
+- `README.md` — editorial 91–100 in progress → COMPLETE 10/10; три нові proposed series: «Контекст навантаження і готовності» 3446–3455, «Силова методологія для intermediate» 3456–3465, «Адаптаційні механізми у практиці» 3466–3475.
+- `STATUS.md` — editorial 91–100 COMPLETE; next: post-3285 + editorial 101–110 series start.
+- `VERSION` — 13.62.0 → 13.63.0.
+
+---
+
 ## [13.62.0] — 2026-07-06
 
 ### Added
