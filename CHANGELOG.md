@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.42.0] — 2026-07-06
+
+### Added
+- `content/post-81-bad-training-days-algorithm.md` — Editorial post-81. Topic: how to handle bad training days — four root causes (variability, accumulated fatigue, weekly imbalance, external stressor), 15-minute diagnostic window (warmup as test + first set at 70–75%), three-scenario framework with decisions, two-question algorithm (technical degradation? confirmed cause?), how to log context for pattern detection. clinical-safety NOT_REQUIRED (performance/physiology frame, no clinical psychology, food, body image). 13-min read. George (FORM founder) editorial voice.
+- `blog.html` — Card prepended for post-81.
+- `README.md` — Editorial heading updated: 11–80 COMPLETE → post-81 draft; series 3376–3385 «Навантаження і реальне тіло: як тренуватись у непостійних умовах» proposed (10 topics); series 3386–3395 «Сигнали і рішення: операційна грамотність self-coached атлета» proposed (10 topics).
+- `STATUS.md` — v13.42.0 entry added.
+
+### Changed
+- `VERSION` — 13.41.0 → 13.42.0.
+
 ## [13.41.0] — 2026-07-06
 
 ### Changed
