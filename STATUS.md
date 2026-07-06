@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v13.52.0** — 2026-07-06 · content · post-91 + post-3275 · «Що таке адаптація насправді: від абстракції до вимірюваних маркерів» (editorial series 91–100 «Мова адаптації → операційна практика», 1/10) + «Довгострокове прогресування: повна операційна карта для атлета з горизонтом 2–5 років» (series 3266–3275, 10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED (обидва: без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html cards prepended for post-91 and post-3275 · README: editorial 91–100 proposed → in progress 1/10; series 3266–3275 in progress 9/10 → COMPLETE 10/10 · next: post-92 («Нейральна адаптація: як ти стаєш сильнішим, не ростучи» — editorial series 91–100, 2/10) + post-3276 (series «Тренування і контекст тіла: вік, відновлення, варіабельність» 3276–3285, 1/10)
+
+**v13.51.0** — 2026-07-06 · content · post-90 · editorial synthesis 81–90 · see CHANGELOG
+
 **v13.50.0** — 2026-07-06 · content · post-89 + post-3274 · «Різниця між «важким» і «продуктивним» тренуванням» (editorial series 81–90, 9/10) + «Як читати власний прогрес на горизонті 2–5 років: ознаки правильної траєкторії і сигнали збою» (series 3266–3275, 9/10) · clinical-safety NOT_REQUIRED (обидва: без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html cards prepended for post-89 and post-3274 · README: editorial 81–90 in progress 8/10 → 9/10, series 3266–3275 updated 8/10 → 9/10 · next: post-90 (editorial series 81–90, 10/10 — синтез серії) + post-3275 (series 3266–3275, 10/10 — синтез «Довгострокове прогресування»)
 
 **v13.49.0** — 2026-07-06 · content · post-88 · «Як ставити вагу у розкладі: не «коли вільно», а за логікою відновлення» (editorial series 81–90, 8/10) · clinical-safety NOT_REQUIRED (тема: мікроцикл і розклад тренувань за логікою відновлення; без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html card prepended for post-88 · README: editorial 81–90 in progress 7/10 → 8/10, post-88 proposed → draft · next: post-89 (editorial series 81–90, 9/10 — «Різниця між важким і продуктивним тренуванням»)
