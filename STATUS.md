@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v13.46.0** — 2026-07-06 · content · post-85 + post-3272 · «Синтез блоку 76–85: що відрізняє "програму" від "тренувальної системи"» (editorial series 81–90, 5/10) + «Від accumulation до expression: як цикли розвитку сили змінюються з досвідом» (series 3266–3275, 7/10) · clinical-safety NOT_REQUIRED (обидва: без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html cards prepended for post-85 and post-3272 · next: post-86 (editorial series 81–90, 6/10) + post-3273 (series 3266–3275, 8/10)
+
 **v13.45.0** — 2026-07-06 · content-engine audit · posts 11–15 ✓ ALL CONFIRMED COMPLETE · post-11 (deload weeks), post-12 (technique vs intensity), post-13 (overtraining vs laziness), post-14 (sleep-deprived training), post-15 (training frequency) · clinical-safety PASS/NOT_REQUIRED (всі) · sports-scientist review pending (всі) · blog.html cards наявні для всіх · milestone: editorial series posts 11–15 done · next: post-16
 
 **v13.44.0** — 2026-07-06 · content · post-84 + post-3271 · «Як перейти від лінійної до хвилеподібної прогресії — і коли це доречно» (editorial series 81–90, 4/10) + «Деловантаження як довгострокова стратегія: ритм і роль у macrocycle» (series 3266–3275, 6/10) · clinical-safety NOT_REQUIRED (обидва: без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html cards prepended for post-84 and post-3271 · next: post-85 («Синтез блоку 76–85: що відрізняє "програму" від "тренувальної системи"» — editorial series 81–90, 5/10) + post-3272 («Від accumulation до expression: як цикли розвитку сили змінюються з досвідом» — series 3266–3275, 7/10)

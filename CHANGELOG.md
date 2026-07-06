@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.46.0] — 2026-07-06
+
+### Added
+- `content/post-85-synthesis-editorial-76-85.md` — Editorial series 81–90 post 5/10. «Синтез блоку 76–85: що відрізняє "програму" від "тренувальної системи"». Концептуальна різниця між статичною програмою і адаптивною тренувальною системою; п'ять компонентів системи з перспективи блоку 76–85 (діагностична розминка, калібровані суб'єктивні метрики, читання тривалості, інтерпретація першого тижня, знання моделі прогресії); чотири симптоми застрягання між програмою і системою; чотири фази практичного переходу. clinical-safety NOT_REQUIRED. sports-scientist review pending. blog.html card prepended.
+- `content/post-3272-accumulation-to-expression-cycles.md` — Series «Довгострокове прогресування: 2–5-річний горизонт» 3266–3275, post 7/10. «Від accumulation до expression: як цикли розвитку сили змінюються з досвідом». Accumulation (субмаксимальні навантаження, об'єм, RPE 6–8) vs. expression (82–95%+, нижчий об'єм, RPE 8.5–9.5); трансформація циклу від новачка до advanced (лінійна → 4–5+1–2 мезоцикл → 12-тижневий macrocycle з вкладеними мікро-expression); ефект затриманої адаптації; найпоширеніша помилка — надто часта expression-фаза; практичний self-assessment із трьох питань; алгоритм переходу між фазами. clinical-safety NOT_REQUIRED. sports-scientist review pending. blog.html card prepended.
+
+### Changed
+- `blog.html` — cards for post-85 і post-3272 prepended to feed.
+- `VERSION` — 13.45.0 → 13.46.0.
+
+---
+
 ## [13.45.0] — 2026-07-06
 
 ### Verified
