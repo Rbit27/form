@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [13.84.1] — 2026-07-06
+
+### Changed
+- `docs/SOC2_READINESS.md §80.4` — BDG-OBS-E-001 added to Vanta mirror list. Closes documentation portion of OBSERVABILITY §79.9 item 7 and SOC2_READINESS §192.5 item 2. Entry specifies three-component quarterly export (pg_cron freshness gap audit, AL-BDG-01 activation log, signed attestation), M14 first-filing cadence, nil-attestation protocol, R2 path `compliance/evidence/scim-guard/BDG-OBS-E-001_<YYYY-QN>.json`, retention tiers (7yr WORM Parts 1+2; 3yr Part 3), and privacy floor (`tenant_id` UUID only). §192.4 Vanta cross-reference row updated `⏳ Pending` → `🟢 Documentation done`; §192.5 item 2 `[ ]` → `[x] Documentation done`. Operational Vanta dashboard registration (`ev_` ID assignment) remains pending compliance-officer M13 action per OBSERVABILITY §79.9 item 7. Document v4.17.0 → v4.17.1. Owner: compliance-officer.
+- `VERSION` — 13.84.0 → 13.84.1.
+
+---
+
 ## [13.84.0] — 2026-07-06
 
 ### Added
