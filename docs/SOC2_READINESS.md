@@ -37984,4 +37984,87 @@ CAEP-OBS-E-001 artefact enforces the §79.6 FORM privacy floor without exception
 
 ---
 
+## §187 — CAEP-SETERR-E-001 Registration (CC6.3 / CC6.6 / CC7.2 / CC7.3 · INCIDENT_RESPONSE R-83 · CAEP SET Validation Failure Rate Per-Activation Evidence)
+
+> Registers the CAEP SET validation failure rate incident evidence artefact in §79.4 (count 162 → 163). CAEP-SETERR-E-001 is the per-activation companion to CAEP-OBS-E-001 (§186 — quarterly aggregate): where §186 covers fleet-level monitoring health, §187 covers individual AL-CAEP-01 activations. Pattern: REVOKE-SYNC-E-001 (§180) is the per-activation companion to REVOKE-OBS-E-001 (§179); CAEP-SETERR-E-001 follows the same design.
+
+### §187.1 §79.4 Master Evidence Table Entry
+
+| Evidence ID | TSC | SOC 2 Criteria | Description | Cadence | Retention | Storage path | Vanta ID |
+|---|---|---|---|---|---|---|---|
+| **CAEP-SETERR-E-001** | CC6/CC7 | CC6.3 / CC6.6 / CC7.2 / CC7.3 | Per-activation CAEP SET validation failure rate incident artefact. Eight components: R-83-C1 error code distribution (aggregate, no SET payload), R-83-C2 error rate trend, R-83-C3 stream status at trigger, R-83-C4 post-recovery zero-error confirmation, trigger DEC-030 event JSON (`sso.caep_stream_error`), opened event JSON (pending — §R-83.11 item 1), terminal event JSON (`sso.caep_stream_recovered` — pending), and root cause classification (H1–H5). No `caep_webhook_secret`, no `set_jti` raw value, no employee PII. | Incident-triggered — filed within 48 h of each R-83 IC closure | 7 years (WORM) | `compliance/evidence/caep/caep-seterr-e-001-{incident_id}.json` | CAEP-SETERR-E-001 |
+
+**Privacy floor:** CAEP-SETERR-E-001 contains only operational metadata — error codes, error rates, stream status enums, and root cause classification. `tenant_id` is FORM-internal UUID. `set_jti_hash` is SHA-256(raw JTI) — non-reversible. No data subject name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data. `caep_webhook_secret` is NEVER included. HR access to `compliance/evidence/caep/` is prohibited.
+
+**Auditor narrative (CC6.3):** A CAEP SET validation failure > 5% means credential-change and session-revoked signals from the IdP are being dropped — a direct CC6.3 gap. CAEP-SETERR-E-001 documents: (a) the trigger threshold was exceeded (R-83-C2), (b) the root cause was classified (H1–H5), and (c) the error rate returned to zero before IC closure (R-83-C4 gate). The artefact proves the gap was detected, root-caused, and confirmed closed — not merely declared resolved.
+
+**Auditor narrative (CC7.2/CC7.3):** AL-CAEP-01 automated monitoring detected the anomaly; R-83 provided a structured, documented IC response with root cause classification and post-recovery confirmation. CAEP-SETERR-E-001 closes the evidence chain from automated detection to confirmed remediation.
+
+### §187.2 Cross-Reference
+
+| Obligation | Source | Status |
+|---|---|---|
+| INCIDENT_RESPONSE R-83 §R-83.8 evidence artefact spec | `docs/INCIDENT_RESPONSE.md R-83` (v3.48.0, 2026-07-06) | 🟢 Done — §187 this pass |
+| §R-83.11 item 4 SOC2_READINESS registration | `docs/INCIDENT_RESPONSE.md §R-83.11` | 🟢 Done — §187 this pass |
+
+---
+
+## §188 — CAEP-PURGE-E-001 Registration (P5.1 / C1.2 / CC6.3 · INCIDENT_RESPONSE R-84 · CAEP Account-Purged GDPR Deletion Per-Activation Evidence)
+
+> Registers the CAEP account-purged GDPR deletion incident evidence artefact in §79.4 (count 163 → 164). CAEP-PURGE-E-001 is among the highest-value artefacts in the master evidence table: it documents FORM's Art. 17 deletion compliance for IdP-sourced purge signals — the GDPR obligation that arises when an enterprise employee's Google Workspace or Okta account is permanently deleted at the IdP level.
+
+### §188.1 §79.4 Master Evidence Table Entry
+
+| Evidence ID | TSC | SOC 2 Criteria | Description | Cadence | Retention | Storage path | Vanta ID |
+|---|---|---|---|---|---|---|---|
+| **CAEP-PURGE-E-001** | P5/C1/CC6 | P5.1 / C1.2 / CC6.3 | Per-activation CAEP account-purged GDPR Art. 17 deletion artefact. Eight components: R-84-C1 purge event record (`user_ref` UUID only — no name/email), R-84-C2 Worker trace (`CAEP_PURGE_COMPLETE` confirmation — no credential data), SESSION_REVOCATION_KV write confirmation (status + TTL — no key value), trigger DEC-030 event (`sso.caep_user_purged` CRITICAL/7yr), opened event (`sso.caep_gdpr_deletion_opened` HIGH/7yr — pending §R-84.11 item 1), terminal event (`sso.caep_gdpr_deletion_completed` CRITICAL/7yr — pending §R-84.11 item 1), signed DSAR erasure checklist (redacted — `user_ref` UUID only), and stores confirmed deletion list (store names only — no PII). | Incident-triggered — filed within 48 h of each R-84 IC closure (compliance-officer gates closure) | 7 years (WORM — matches `sso.caep_user_purged` CRITICAL/7yr retention) | `compliance/evidence/caep/caep-purge-e-001-{incident_id}.json` | CAEP-PURGE-E-001 |
+
+**Privacy floor:** CAEP-PURGE-E-001 contains NO data subject name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data. `user_ref` is FORM-internal anonymised UUID — not linkable to a natural person without the DSAR privileged tooling flow. Signed DSAR erasure checklist is redacted to `user_ref` UUID and store names only. `caep_webhook_secret` is NEVER included. HR access is prohibited. Access control: compliance-officer + security_reviewer role ONLY.
+
+**Auditor narrative (P5.1 — data retention and disposal):** CAEP-PURGE-E-001 demonstrates FORM's end-to-end compliance with GDPR Art. 17 deletion obligations triggered by IdP-sourced purge signals: the signed DSAR checklist confirms deletion across all FORM data stores, `days_to_deletion` proves compliance with the 14-day internal target, and the dual CRITICAL/7yr DEC-030 events provide an HMAC-chained audit trail from purge signal receipt to deletion completion. This artefact directly answers the P5.1 auditor question: "When FORM is notified that a data subject should be deleted, does deletion actually happen and is it documented?"
+
+**Auditor narrative (C1.2 — disposal of confidential information):** The `stores_confirmed_deletion` field enumerates the complete set of FORM data stores where the data subject's confidential personal information was disposed — satisfying C1.2's requirement that disposal is documented and follows FORM's data retention commitments (MSA §7, DPA Annex B).
+
+**Auditor narrative (CC6.3 — timely access removal):** The SESSION_REVOCATION_KV write confirmation in CAEP-PURGE-E-001 proves that access was revoked at T+0 — before the 14-day deletion window, before the 30-day MSA deadline, within the CAEP-SLO-01 30 s target. The affected user lost FORM access within seconds of the IdP-sourced purge signal.
+
+### §188.2 Cross-Reference
+
+| Obligation | Source | Status |
+|---|---|---|
+| INCIDENT_RESPONSE R-84 §R-84.8 evidence artefact spec | `docs/INCIDENT_RESPONSE.md R-84` (v3.48.0, 2026-07-06) | 🟢 Done — §188 this pass |
+| §R-84.11 item 4 SOC2_READINESS registration | `docs/INCIDENT_RESPONSE.md §R-84.11` | 🟢 Done — §188 this pass |
+
+---
+
+## §189 — RISC-HIJACK-E-001 Registration (CC7.2 / CC7.3 / CC7.4 / CC6.3 · INCIDENT_RESPONSE R-85 · Google RISC Hijacking Per-Activation Evidence)
+
+> Registers the Google RISC hijacking incident evidence artefact in §79.4 (count 164 → 165). RISC-HIJACK-E-001 documents FORM's response to one of the highest-signal external threat indicators available: Google's real-time RISC API signal that a Google Workspace account has been compromised. No periodic evidence artefact can substitute for per-activation documentation of this P1 response.
+
+### §189.1 §79.4 Master Evidence Table Entry
+
+| Evidence ID | TSC | SOC 2 Criteria | Description | Cadence | Retention | Storage path | Vanta ID |
+|---|---|---|---|---|---|---|---|
+| **RISC-HIJACK-E-001** | CC7/CC6 | CC7.2 / CC7.3 / CC7.4 / CC6.3 | Per-activation Google RISC hijacking incident artefact. Eight components: R-85-C1 RISC event record (`user_ref` UUID only — no name/email; `set_jti_hash` SHA-256), R-85-C2 SESSION_REVOCATION_KV write confirmation (status + TTL — no key value), R-85-C3 Google Directory group cache eviction confirmation (status — no cache contents), R-85-C4 additional affected users aggregate count (count only — no `user_ref` values), trigger DEC-030 event (`sso.caep_event_received` with `caep_event_type = 'risc-hijacking'` HIGH/7yr), opened event (`sso.risc_hijacking_ic_opened` STANDARD/7yr — pending §R-85.11 item 1), terminal event (`sso.risc_hijacking_handled` LOW/3yr — pending §R-85.11 item 1), and root cause and timeline (H1–H5 classification, compromise window, false positive attestation). | Incident-triggered — filed within 48 h of each R-85 IC closure | 7 years (WORM — inherits `sso.caep_event_received` HIGH/7yr) | `compliance/evidence/caep/risc-hijack-e-001-{incident_id}.json` | RISC-HIJACK-E-001 |
+
+**Privacy floor:** RISC-HIJACK-E-001 contains NO data subject name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data. `user_ref` is FORM-internal UUID. `set_jti_hash` is SHA-256(raw JTI) — non-reversible. R-85-C4 carries aggregate count only — no individual `user_ref`. Admin action audit (R-85 Step 3c) uses `action_type` and `resource_id` only. HR access is prohibited. `caep_webhook_secret` is NEVER included.
+
+**Auditor narrative (CC7.4 — detection and response to security events):** The RISC hijacking event type is the OpenID Connect specification's canonical signal for real-time account compromise notification. RISC-HIJACK-E-001 proves that FORM: (a) detected the signal within the AL-CAEP-04 monitoring window, (b) executed the defined response (session revocation, group cache eviction, re-auth enforcement) within the CAEP-SLO-01 30 s target, and (c) notified the enterprise tenant IT admin within 1 hour. This is end-to-end CC7.4 evidence: threat signal received → response executed → stakeholder notified → IC documented.
+
+**Auditor narrative (CC7.2 — monitoring for anomalies):** AL-CAEP-04 fires on any single RISC hijacking event — zero batch, zero delay. RISC-HIJACK-E-001 `r85_c1_output` confirms the event was detected; `r85_c4_output` confirms whether broader tenant compromise was assessed (R-85-C4 aggregate count). The per-activation artefact proves FORM does not rely solely on quarterly aggregate monitoring for credential compromise signals.
+
+**Auditor narrative (CC6.3 — timely access removal):** R-85-C2 SESSION_REVOCATION_KV write confirmation proves that access was revoked within the CAEP-SLO-01 30 s target — not on the next SCIM sync cycle, not after the 15-minute JWT TTL. For RISC hijacking specifically, this is the strongest available evidence that FORM treats IdP-sourced compromise signals as access revocation triggers, not merely as informational events.
+
+### §189.2 Cross-Reference
+
+| Obligation | Source | Status |
+|---|---|---|
+| INCIDENT_RESPONSE R-85 §R-85.8 evidence artefact spec | `docs/INCIDENT_RESPONSE.md R-85` (v3.48.0, 2026-07-06) | 🟢 Done — §189 this pass |
+| §R-85.11 item 4 SOC2_READINESS registration | `docs/INCIDENT_RESPONSE.md §R-85.11` | 🟢 Done — §189 this pass |
+
+---
+
+*v4.13.0 (2026-07-06): §187 CAEP-SETERR-E-001 Registration (CC6.3/CC6.6/CC7.2/CC7.3 · INCIDENT_RESPONSE R-83 · per-activation CAEP SET validation failure rate artefact; evidence count 162 → 163); §188 CAEP-PURGE-E-001 Registration (P5.1/C1.2/CC6.3 · INCIDENT_RESPONSE R-84 · per-activation CAEP account-purged GDPR deletion artefact; evidence count 163 → 164); §189 RISC-HIJACK-E-001 Registration (CC7.2/CC7.3/CC7.4/CC6.3 · INCIDENT_RESPONSE R-85 · per-activation Google RISC hijacking artefact; evidence count 164 → 165). Three new evidence artefacts registered, all incident-triggered and stored in `compliance/evidence/caep/`. All three are per-activation companions to CAEP-OBS-E-001 (§186 — quarterly aggregate): where §186 covers fleet-level CAEP/RISC monitoring health, §187–§189 cover individual incident activations for AL-CAEP-01 (SET error rate P1), AL-CAEP-02 (GDPR purge P0), and AL-CAEP-04 (RISC hijacking P1) respectively. Privacy floor: all three artefacts use `tenant_id` FORM-internal UUID + `user_ref` FORM-internal anonymised reference + `set_jti_hash` SHA-256 only; `caep_webhook_secret` NEVER included; HR access prohibited across all three evidence paths. CAEP-PURGE-E-001 (§188) is the highest-compliance-value artefact in this set: its signed DSAR erasure checklist and CRITICAL/7yr DEC-030 chain constitute direct P5.1/C1.2 fieldwork evidence for GDPR Art. 17 deletion compliance triggered by IdP-sourced purge signals — a scenario not covered by any prior artefact. Document header v4.12.0 → v4.13.0. Owner: compliance-officer. Review: security-engineer + enterprise-architect.*
+
+---
+
 *v4.12.0 (2026-07-06): §186 — CAEP-OBS-E-001 Registration (CC6.3 / CC6.6 / CC7.2 / CC7.3 · OBSERVABILITY §78 · SSO_SCIM §23). Registers the CAEP/RISC Stream Observability quarterly evidence artefact in §79.4 (count 161 → 162). CAEP-OBS-E-001 is the auditor-facing evidence artefact for the full CAEP/RISC stream monitoring layer authored in `docs/OBSERVABILITY.md §78` (v5.24.0, 2026-07-06): five components (caep-receiver.ts CF Worker, caep-action-handler.ts dispatcher, caep_reregister_sweep pg_cron job 37 `*/5` 6-min freshness, Admin Dashboard CAEP panel, five DEC-030 events); three IdP types (Okta SSF, Entra Event Grid, Google RISC); CAEP-SLO-01 (P95 < 30 s end-to-end revocation / CC6.3 / SLA credit) and CAEP-SLO-02 (job 37 freshness < 6 min / CC6.6 / 99% compliance); five alert rules AL-CAEP-01..05 (§6.2 `caep_stream_health` subsection); six-panel §26.9 "CAEP/RISC Stream Health" dashboard sub-group (v5.24.0). Distinct from CC6-E-CAEP-001..004 (§79.4, per §23.12 checklist item 15) which are the per-activation DEC-030 event artefacts; CAEP-OBS-E-001 is the quarterly monitoring-layer aggregate. §186.2 §79.4 row 162: CC6.3/CC6.6/CC7.2/CC7.3; quarterly; 7yr WORM; `compliance/evidence/caep-obs/caep-obs-e-001-{YYYY}-Q{N}.json`; `r2:form-api` REVOKED; HR PROHIBITED; pre-M4 nil-attestation. §186.3 four auditor narratives: CC6.3 (CAEP-SLO-01 < 30 s / AL-CAEP-02 P0 purge GDPR workflow / HMAC tamper-evident), CC6.6 (credential-change/account-disabled dispatch / CAEP-SLO-02 stream continuity / AL-CAEP-01..05 degraded-capacity detection), CC7.2 (SET error rate / dead-man / rate-limit / AL-CAEP-04 RISC hijacking = external anomaly detection), CC7.3 (PagerDuty incident IDs + MTTR / AL-CAEP-02 two-person rule / P0/P1/P2 SLAs per §78.4 runbooks / per-incident supplements). §186.4 R2 + Vanta: `compliance/evidence/caep-obs/` established; quarterly upload within 14 days of quarter-end; nil-attestation for pre-M4 quarters. §186.5 two cross-reference obligations: §79.4 row 162 Done this pass; SSO_SCIM v2.40 §23.13 Done this pass. §186.6 privacy floor: aggregate counts and operational metadata only; no set_jti, caep_webhook_secret, user_id, email, health data, GDPR Art. 9 data; HR access prohibited. Companion edits: `docs/OBSERVABILITY.md` v5.24.0 (§78 full section + §26.9 "CAEP/RISC Stream Health" sub-group + §6.2 `caep_stream_health`); `docs/SSO_SCIM_IMPLEMENTATION.md` v2.40 (§23.13 backreference). Document header v4.11.0 → v4.12.0. Owner: compliance-officer. Review: security-engineer + devops-lead.*

@@ -1,5 +1,23 @@
 # Changelog · FORM
 
+## [13.59.1] — 2026-07-06
+
+### Added
+- `docs/INCIDENT_RESPONSE.md R-83` — CAEP SET Validation Failure Rate High (AL-CAEP-01 companion runbook, v3.48.0). Full IC protocol for `caep_set_error_rate_pct > 5%` P1 alert: five root causes H1–H5 (IdP JWKS key rotation, iss mismatch, malformed SETs, unknown event type, Worker regression), four scope queries R-83-C1..C4, six-step recovery, `sso.caep_stream_recovered` LOW/3yr terminal event, CAEP-SETERR-CHAIN-01 ordering invariant, CAEP-SETERR-E-001 per-activation evidence artefact. SOC 2: CC6.3/CC6.6/CC7.2/CC7.3. SOC2_READINESS §187.
+- `docs/INCIDENT_RESPONSE.md R-84` — CAEP Account-Purged GDPR Art. 17 Deletion Clock (AL-CAEP-02 companion runbook, v3.48.0). Full P0 IC protocol for `sso.caep_user_purged` CRITICAL event: five hypotheses H1–H5 (legitimate purge, SCIM co-event, sandbox tenant, Worker failure, litigation hold), six-step recovery with GDPR Art. 17 deletion workflow across all FORM data stores, `sso.caep_gdpr_deletion_opened` HIGH/7yr + `sso.caep_gdpr_deletion_completed` CRITICAL/7yr events, CAEP-PURGE-CHAIN-01 invariant, CAEP-PURGE-E-001 per-activation artefact. SOC 2: P5.1/C1.2/CC6.3. SOC2_READINESS §188.
+- `docs/INCIDENT_RESPONSE.md R-85` — Google RISC Hijacking Event Received (AL-CAEP-04 companion runbook, v3.48.0). Full P1 IC protocol for RISC `hijacking` SET: five hypotheses H1–H5 (legitimate hijacking, false positive, dispatch failure, compromised admin, systematic compromise), P0 escalation criteria (revocation failure / admin account / ≥ 3 RISC events per tenant in 24 h), four scope queries R-85-C1..C4 (KV write confirmation, group cache eviction, additional affected users aggregate), `sso.risc_hijacking_ic_opened` STANDARD/7yr + `sso.risc_hijacking_handled` LOW/3yr events, RISC-HIJACK-CHAIN-01 invariant, RISC-HIJACK-E-001 per-activation artefact. SOC 2: CC7.2/CC7.3/CC7.4/CC6.3. SOC2_READINESS §189.
+- `docs/SOC2_READINESS.md §187` — CAEP-SETERR-E-001 Registration (CC6.3/CC6.6/CC7.2/CC7.3 · evidence count 162 → 163).
+- `docs/SOC2_READINESS.md §188` — CAEP-PURGE-E-001 Registration (P5.1/C1.2/CC6.3 · evidence count 163 → 164). Highest-compliance-value of the three new artefacts: signed DSAR erasure checklist + dual CRITICAL/7yr DEC-030 chain constitute direct P5.1/C1.2 fieldwork evidence for GDPR Art. 17 deletion compliance triggered by IdP-sourced purge signals.
+- `docs/SOC2_READINESS.md §189` — RISC-HIJACK-E-001 Registration (CC7.2/CC7.3/CC7.4/CC6.3 · evidence count 164 → 165).
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.47.0 → v3.48.0. Closes the companion runbook gap for `docs/OBSERVABILITY.md §78.4` AL-CAEP-01/02/04: BCL (R-73/R-74), SAML SLO (R-75/R-76), PKJWT (R-79/R-81), and Session Revocation KV (R-82) each have dedicated companion runbooks for their P0/P1 alerts; CAEP/RISC observability (§78, added v5.24.0) was the remaining gap.
+- `docs/SOC2_READINESS.md` — v4.12.0 → v4.13.0. Evidence count 162 → 165 (three new per-activation incident artefacts: §187 CAEP-SETERR-E-001, §188 CAEP-PURGE-E-001, §189 RISC-HIJACK-E-001).
+- `docs/OBSERVABILITY.md` — v5.24.0 → v5.24.1. §78.4 AL-CAEP-01/02/04 companion runbook fields added (`INCIDENT_RESPONSE R-83/R-84/R-85` back-references). AL-CAEP-03 and AL-CAEP-05 (P2) retain inline-only runbooks per project convention.
+- `VERSION` — 13.59.0 → 13.59.1.
+
+---
+
 ## [13.59.0] — 2026-07-06
 
 ### Added
