@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [13.90.1] — 2026-07-06
+
+### Changed
+- `docs/SOC2_READINESS.md` — §193 REVOKE-BULK-E-001 Registration (CC7.2 / CC7.3 · INCIDENT_RESPONSE R-88 · Bulk Session Revocation Slow Per-Activation Evidence). Registers REVOKE-BULK-E-001 in §79.4 master evidence table (evidence count 167 → 168). Closes pending cross-reference from INCIDENT_RESPONSE.md §R-88 (v3.52.0, 2026-07-06) and OBSERVABILITY.md §76.4 (v5.25.1, 2026-07-06). Five-component artefact: R-88-C1 (batch detail), R-88-C4 (P95 post-fix confirmation), trigger `session.bulk_revocation_complete` STANDARD/7yr event JSON, `session.bulk_revocation_slow_ic_opened` STANDARD/3yr anchor, `session.bulk_revocation_slow_ic_closed` LOW/3yr terminal. R2 path `compliance/evidence/session-revocation/revoke-bulk-e-001-{incident_id}.json` (shared prefix, already provisioned §178). REVOKE-BULK-CHAIN-01 ordering invariant documented (M6 CF Worker enforcement pending). Privacy floor: aggregate integers/enums only; no `user_id`/PII; `tenant_manager` NO ACCESS. Four cross-reference obligations: §79.4 🟢 Done; AUDIT_LOG_SCHEMA DEC-030 events 🟡 M5; CF Worker chain enforcement 🟡 M6; §80.4 Vanta mirror 🟡 M5. SOC2_READINESS.md v4.17.1 → v4.18.0.
+- `VERSION` — 13.90.0 → 13.90.1.
+
+---
+
 ## [13.90.0] — 2026-07-06
 
 ### Added
