@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.23.0
+# FORM · Observability & Monitoring Taxonomy v5.24.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -644,6 +644,18 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 | **Victor P3 tone/localisation spike or CI failure** | `victor_safety_flag_rate_per_1k_turns` for `trigger_category IN ('VT-09','VT-10')` exceeds 10× 30-day baseline in any 2-hour window; OR any jailbreak test suite CI failure for VT-09/10 | P3 | Slack `#alerts-quality` only | §32.4 FORM-VICTOR-004; INCIDENT_RESPONSE.md R-23 §R-23.2 P3 path — next deploy fix |
 
 **SIEM note (victor_safety_health):** `FORM-VICTOR-001` and `FORM-VICTOR-002` route to the §27.2 SIEM export pipeline as `siem.victor_safety_p0` (CRITICAL) and `siem.victor_safety_p1` (HIGH). For enterprise tenants, these events are delivered to the tenant's SIEM only when the incident involves sessions from that tenant (`tenant_id` non-null in `VICTOR_SAFETY_TELEMETRY`). SOC 2 evidence: VSAFETY-E-001 (§32.9). No suppression permitted for `FORM-VICTOR-001`.
+
+**Subsection: `caep_stream_health` (AL-CAEP-01 through AL-CAEP-05 — §78.4):**
+
+| Alert Name | Trigger Condition | Severity | Notification Channel | Runbook |
+|---|---|---|---|---|
+| **CAEP SET validation failure rate high** | `sso.caep_stream_error` rate > 5% of all CAEP events for any single `tenant_id` over any 10-minute window | P1 | PagerDuty `form-security` → security-engineer; Slack `#sso-alerts`; 1h per-tenant dedup `caep-stream-error-{tenant_id}` | §78.4 AL-CAEP-01 |
+| **CAEP account-purged — GDPR clock started** | Any `sso.caep_user_purged` DEC-030 CRITICAL event emitted | P0 | PagerDuty `form-security` + `form-compliance` → security-engineer + compliance-officer; 0-min response; no dedup (every purge is unique); no auto-resolve | §78.4 AL-CAEP-02 |
+| **CAEP stream dead-man's switch** | No CAEP events on an active stream (`caep_status = 'active'`) for > 4 hours during business hours (08:00–20:00 tenant local time) | P2 | PagerDuty `form-security` → security-engineer; Slack `#sso-alerts`; 2h per-tenant dedup `caep-stream-dead-{tenant_id}` | §78.4 AL-CAEP-03 |
+| **Google RISC hijacking event received** | Any `https://schemas.openid.net/secevent/risc/event-type/hijacking` SET received for a Google Workspace OIDC tenant | P1 | PagerDuty `form-security` → security-engineer; Slack `#sso-alerts`; 1h per-tenant dedup `risc-hijack-{tenant_id}` | §78.4 AL-CAEP-04 |
+| **CAEP rate limit exceeded** | CAEP events > 1,000/hour for any single tenant (`caep_status = 'rate_limited'`) | P2 | PagerDuty `form-security` → security-engineer; Slack `#sso-alerts`; 2h per-tenant dedup `caep-rate-limit-{tenant_id}` | §78.4 AL-CAEP-05 |
+
+**SOC 2 mapping (caep_stream_health):** CC6.3 (AL-CAEP-01 detects stream errors that degrade IdP-event-to-FORM-session-revocation latency below CAEP-SLO-01 < 30 s target; AL-CAEP-02 P0 ensures GDPR deletion clock is actioned immediately), CC6.6 (AL-CAEP-01 surfaces failures in credential-change / token-claims-change event delivery that would prevent re-authentication triggers), CC7.2 (AL-CAEP-01..05 provide 24/7 automated anomaly monitoring of CAEP stream health), CC7.3 (P0/P1/P2 response SLAs per §78.4 runbooks; all incidents logged in PagerDuty with resolution timestamps). Privacy floor: all five alert payloads carry only `tenant_id` UUID (FORM-internal) and operational enum fields — no employee `user_id`, name, email, `set_jti`, `caep_webhook_secret`, health value, or GDPR Art. 9 special-category data.
 
 ### 6.3 Alert Tuning Rules
 
@@ -6425,6 +6437,19 @@ A dedicated "Enterprise Identity" Metabase dashboard (Supabase-backed panels) an
 | **sso.cert_uploaded events (last 30 days)** | Single-stat count; zero = no rotations ongoing | `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'sso.cert_uploaded' AND created_at > NOW() - INTERVAL '30 days'` (form_audit role) | Daily |
 
 **Privacy floor:** All six panel queries use `tenant_id` (FORM-internal UUID) and `cert_class` (operational enum) only — no employee `user_id`, name, email, `fingerprint_sha256`, PEM content, or GDPR Art. 9 special-category data appears in any query or panel output. **Alert cross-links:** "cert_alert_tier distribution" links to §26.5 AL-CERT-01..04; "cert-expiry-check cron freshness" links to AL-CERT-05 runbook (P1 PagerDuty `form-security`, 26 h threshold). Full alert rule spec: §26.5 / §77.4. SOC 2 evidence: CERT-OBS-E-001 (§77.8, quarterly, CC6.1 / CC7.2, 7 yr WORM); CC6-E-CERT-001..004 (`docs/SOC2_READINESS.md §175`, v4.1.0, 2026-07-05).
+
+**CAEP/RISC Stream Health sub-group** (per §78.6; positioned after SAML Certificate Lifecycle sub-group above; owner: devops-lead; deployed at M4):
+
+| Panel | Type | Query source | Update cadence |
+|---|---|---|---|
+| **Active CAEP stream tenants** | Single-stat count; one tile per `caep_status` value (`active` / `error` / `rate_limited`); background turns ember if any tenant has `caep_status = 'error'` | `SELECT caep_status, COUNT(*) FROM tenant_sso_configs WHERE caep_enabled = true GROUP BY caep_status` (form_audit role) | 5 min (job 37 cadence) |
+| **CAEP events/hr by event_type (last 7 days)** | Stacked bar: x=hour bucket, y=event count, colour=`caep_event_type` enum (`session-revoked` / `credential-change` / `token-claims-change` / `account-disabled` / `account-enabled` / `account-purged` / `device-compliance-change` / `risc-hijacking`) | `SELECT DATE_TRUNC('hour', processed_at) AS hr, caep_event_type, COUNT(*) FROM caep_events WHERE processed_at > NOW() - INTERVAL '7 days' GROUP BY 1, 2 ORDER BY 1` (form_audit role) | 5 min |
+| **SET validation error rate (last 7 days, 5-min bins)** | Time-series line; red threshold reference line at 5% (AL-CAEP-01 trigger level); CAEP-SLO-01 annotation (P95 < 30 s end-to-end revocation) | `SELECT DATE_TRUNC('minute', created_at) - (EXTRACT(minute FROM created_at)::int % 5) * INTERVAL '1 minute' AS bin, COUNT(*) FILTER (WHERE event_type = 'sso.caep_stream_error') * 100.0 / NULLIF(COUNT(*) FILTER (WHERE event_type IN ('sso.caep_event_received', 'sso.caep_stream_error')), 0) AS error_pct FROM audit_log_events WHERE event_type IN ('sso.caep_event_received', 'sso.caep_stream_error') AND created_at > NOW() - INTERVAL '7 days' GROUP BY 1 ORDER BY 1` (form_audit role) | 5 min |
+| **Active stream dead-man status (last event per tenant)** | Table: `tenant_id` / `idp_type` / `last_event_type` / `minutes_since_last_event`; rows where minutes_since > 240 highlighted in ember (AL-CAEP-03 4 h threshold) | `SELECT tsc.tenant_id, tsc.idp_type, MAX(ce.caep_event_type) AS last_event_type, ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(ce.processed_at))) / 60) AS minutes_since FROM tenant_sso_configs tsc LEFT JOIN caep_events ce USING (tenant_id) WHERE tsc.caep_status = 'active' GROUP BY tsc.tenant_id, tsc.idp_type ORDER BY minutes_since DESC` (form_audit role) | 5 min |
+| **AL-CAEP-01..05 activations (last 30 days)** | Table: alert_rule / activation_count / last_activation_date; AL-CAEP-02 (P0 purged) row highlighted in red if count > 0; AL-CAEP-01 row highlighted in ember if count > 0 | PagerDuty API: incidents by service `form-security` filtered by dedup key prefixes `caep-stream-error-*` / `caep-stream-dead-*` / `risc-hijack-*` / `caep-rate-limit-*` within 30 days; P0 purge incidents have no dedup key (DEC-030 `sso.caep_user_purged` CRITICAL events are proxy for count) | Daily |
+| **caep_reregister_sweep (job 37) freshness** | Single-stat: minutes since last successful sweep execution; background turns ember if > 6 min (CAEP-SLO-02 threshold; AL-CAEP-03 companion) | `SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(rundat))) / 60) AS minutes_since FROM cron.job_run_details WHERE jobid = 37 AND status = 'succeeded'` (form_audit role) OR DEC-030 proxy: `SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 60) FROM audit_log_events WHERE event_type = 'sso.caep_reregistration_queued' AND created_at > NOW() - INTERVAL '2 hours'` | 5 min |
+
+**Privacy floor:** All six panel queries use `tenant_id` (FORM-internal UUID) and `caep_event_type` / `idp_type` (operational enums) only — no employee `user_id`, name, email, raw `set_jti` (stored as SHA-256 hash for dedup only; hash never exposed in any panel), `caep_webhook_secret`, health value, or GDPR Art. 9 special-category data appears in any query or panel output. **Alert cross-links:** "SET validation error rate" links to §6.2 AL-CAEP-01 runbook (P1, 5% threshold); "active stream dead-man status" links to AL-CAEP-03 runbook (P2, 4 h threshold); "caep_reregister_sweep freshness" links to CAEP-SLO-02 (< 6 min, job 37). Full alert rule spec: §6.2 / §78.4. SOC 2 evidence: CAEP-OBS-E-001 (§78.8, quarterly, CC6.3 / CC6.6 / CC7.2 / CC7.3, 7 yr WORM); CAEP-OBS-E-001 registration: `docs/SOC2_READINESS.md §186` (v4.12.0, 2026-07-06).
 
 ---
 
@@ -21122,3 +21147,279 @@ Full panel query specs and privacy floor: §26.9 SAML Certificate Lifecycle sub-
 ---
 
 *v5.23.0 (2026-07-06): §77 SAML Certificate Lifecycle Observability. Closes the observability gap for FORM's SAML certificate lifecycle management (canonical design: `docs/SSO_SCIM_IMPLEMENTATION.md §20`). SAML Certificate Lifecycle was the only major SSO subsystem with alert rules (§26.5 AL-CERT-01..AL-CERT-05) and DEC-030 events (`docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` v2.99) but no dedicated observability section with RED metrics, SLOs, inline runbooks, dashboard sub-group, or quarterly evidence artefact. §77.1: scope — cert-expiry-check CF Workers Cron Trigger (daily 02:00 UTC), two cert classes (sp/idp), cert_alert_tier state machine (ok→t90→t60→t30→t14→t7→t2→expired), four DEC-030 events, five alert rules (AL-CERT-01..05), SSO-SLO-05/CERT-SLO-01, CC6.1/CC7.2, privacy floor. §77.2: RED metrics adapted for cron context — Rate (cert_expiry_alert/day, cert_uploaded/7d, cron runs=1/day), Errors (cert_monitor_error zero-tolerance, cert_expired zero-tolerance), Duration (cron freshness < 26 h). §77.3: two SLOs — CERT-SLO-01 (zero expired certs / SSO-SLO-05 alias / SLA credit / R-04 companion) and CERT-SLO-02 (cron freshness < 26 h / R-80 companion). §77.4: five inline alert runbooks — AL-CERT-01 (P3 t60 Slack, CSM contact), AL-CERT-02 (P2 t30 escalation), AL-CERT-03 (P1 t7/t2 PagerDuty emergency), AL-CERT-04 (P0 expired / CERT-SLO-01 breach / SLA credit / R-04 companion), AL-CERT-05 (P1 cron stale / CERT-SLO-02 breach / R-80 companion). §77.5: §6.2 and §26.5 registration pointers (no new alert rows). §77.6: six-panel "SAML Certificate Lifecycle" sub-group for §26.9 Enterprise Identity dashboard — active tenants < 30d countdown, cert_alert_tier fleet distribution, cert_expiry_alert events by tier, cron freshness tile, AL-CERT activation table, cert_uploaded rotation count. Sub-group inserted in §26.9 immediately after Session Revocation KV sub-group (v5.23.0 this pass). §77.7: SOC 2 evidence mapping CC6.1 (access control posture) and CC7.2 (continuous monitoring). §77.8: CERT-OBS-E-001 quarterly artefact (CC6.1/CC7.2, 7yr WORM, compliance/evidence/cert-obs/cert-obs-e-001-{YYYY}-Q{N}.json); six-component report; per-incident supplement for AL-CERT-04/05 activations; first filing Q3-2026. §77.9: six-item implementation checklist — five Done this pass, one Pending Q3-2026. §77.10: three cross-reference obligations — all 🟢 Done this pass (SOC2_READINESS §185 CERT-OBS-E-001 count 160 → 161, SSO_SCIM §20.12 backreference). Privacy floor: all §77 content — metrics, alert rules, dashboard queries, evidence artefacts — uses only `tenant_id` (FORM-internal UUID) and `cert_class` (operational enum sp/idp); no employee `user_id`, name, email, health value, `fingerprint_sha256`, PEM content, or GDPR Art. 9 special-category data appears anywhere. Document header v5.22.3 → v5.23.0. Owner: devops-lead + compliance-officer + security-engineer.*
+
+---
+
+## §78 CAEP/RISC Stream Observability
+
+> Owner: devops-lead + security-engineer + compliance-officer. Last updated: v5.24.0 (2026-07-06). Closes the observability gap for FORM's CAEP/RISC stream integration (canonical design: `docs/SSO_SCIM_IMPLEMENTATION.md §23`). CAEP/RISC was the last major SSO subsystem with alert rules (§6.2 AL-CAEP-01..05) and DEC-030 events but no dedicated observability section with RED metrics, SLOs, inline runbooks, dashboard sub-group, or quarterly evidence artefact.
+
+### §78.1 Scope and Components
+
+CAEP (Continuous Access Evaluation Protocol) and RISC (Risk and Incident Sharing and Collaboration) provide real-time IdP-to-FORM push signals that trigger immediate session revocation, re-authentication enforcement, and account lifecycle actions — without waiting for the next SCIM sync cycle. The five components covered by this section are:
+
+| Component | Description | Technology |
+|---|---|---|
+| **`caep-receiver.ts`** | Cloudflare Worker at `POST /enterprise/v1/sso/caep-receiver/{tenant_id}`; 10-step SET validation pipeline (signature verify → JTI dedup → event dispatch) | Cloudflare Workers |
+| **`caep-action-handler.ts`** | 8 event type dispatchers; `dispatchCaepAction()` function; writes `revoke:user:{tenant_id}:{user_id}` to SESSION_REVOCATION_KV; triggers re-auth enforcement | Cloudflare Workers |
+| **`caep_reregister_sweep`** | pg_cron job 37, schedule `*/5 * * * *`; processes tenants with `caep_reregistration_required = TRUE`; freshness window 6 min (CAEP-SLO-02) | pg_cron + Supabase |
+| **Admin Dashboard CAEP panel** | §26.9 "CAEP/RISC Stream Health" six-panel sub-group in the Enterprise Identity Metabase + Better Stack dashboard (§26.9 this document) | Metabase + Better Stack |
+| **DEC-030 audit events** | Five HMAC-chained events: `sso.caep_event_received` (HIGH), `sso.caep_stream_error` (HIGH), `sso.caep_stream_registered` (HIGH), `sso.caep_user_purged` (CRITICAL), `sso.caep_reregistration_queued` (STANDARD) — all 7-year WORM retention | `docs/AUDIT_LOG_SCHEMA.md §CAEP` |
+
+**IdP coverage:**
+- **Okta** — SSF push delivery; `caep-receiver.ts` validates Okta-signed SETs
+- **Microsoft Entra (Azure AD)** — Azure Event Grid webhooks mapped to CAEP event vocabulary
+- **Google Workspace** — RISC stream; `caep-action-handler.ts` handles `https://schemas.openid.net/secevent/risc/event-type/hijacking` and related events
+
+**Privacy floor (§78 scope):** All observability signals in this section use only `tenant_id` (FORM-internal UUID), `idp_type` (enum: okta/entra/google), and `caep_event_type` (operational enum). No employee `user_id`, name, email, raw `set_jti`, `caep_webhook_secret`, health value, body composition data, ED-screening data, or GDPR Art. 9 special-category data appears in any metric, log, trace, alert payload, dashboard query, or evidence artefact in §78.
+
+---
+
+### §78.2 RED Metrics
+
+RED (Rate / Errors / Duration) adapted for the CAEP webhook receiver + pg_cron context.
+
+#### Rate
+
+| Metric | Definition | Unit | Source | Normal range |
+|---|---|---|---|---|
+| `caep_events_received_per_hour` | Count of `sso.caep_event_received` DEC-030 events per hour, broken down by `caep_event_type` and `idp_type` | events/hr | DEC-030 `audit_log_events` (form_audit role) | Varies by tenant fleet size; zero during off-hours is expected for inactive tenants |
+| `caep_streams_active` | Count of `tenant_sso_configs` rows where `caep_status = 'active'` | gauge | `tenant_sso_configs` (form_audit role) | Equals total CAEP-enabled tenants |
+| `caep_purged_events_per_day` | Count of `sso.caep_user_purged` DEC-030 CRITICAL events per calendar day | events/day | DEC-030 `audit_log_events` (form_audit role) | Zero expected on normal days; any non-zero value starts GDPR deletion clock |
+| `caep_reregistration_queued_per_day` | Count of `sso.caep_reregistration_queued` events per day; reflects DEC-072 cert-rotation re-registration load | events/day | DEC-030 `audit_log_events` (form_audit role) | Spikes expected after SAML cert rotations (§77 / SSO_SCIM §36) |
+
+#### Errors
+
+| Metric | Definition | Unit | Threshold | Consequence |
+|---|---|---|---|---|
+| `caep_set_error_rate_pct` | `sso.caep_stream_error` / (`sso.caep_event_received` + `sso.caep_stream_error`) × 100, per 10-min window, per `tenant_id` | percent | **> 5% → AL-CAEP-01 P1** | SET validation failures; revocation signals missed; CAEP-SLO-01 at risk |
+| `caep_purged_count` | Cumulative count of `sso.caep_user_purged` CRITICAL events | count | **Any non-zero → AL-CAEP-02 P0** | GDPR Art. 17 deletion clock started; zero-tolerance |
+| `caep_stream_status_error_count` | Count of `tenant_sso_configs` rows where `caep_status = 'error'` | count | **> 0 → AL-CAEP-01 scope review** | Stream broken; no revocation signals for affected tenants |
+
+#### Duration
+
+| Metric | Definition | Unit | SLO target | Measurement |
+|---|---|---|---|---|
+| `caep_action_latency_p95_ms` | P95 of time from SET `iat` timestamp to SESSION_REVOCATION_KV write completion, per event type | ms | **< 30,000 ms (CAEP-SLO-01)** | Cloudflare Workers trace; SET `iat` vs KV write timestamp delta |
+| `caep_reregister_sweep_freshness_min` | Minutes since last successful `caep_reregister_sweep` (job 37) execution | min | **< 6 min (CAEP-SLO-02)** | `cron.job_run_details WHERE jobid = 37 AND status = 'succeeded'` |
+| `caep_receiver_wall_ms` | Wall-clock duration of the 10-step `caep-receiver.ts` SET validation pipeline | ms | P99 < 2,000 ms | Cloudflare Workers trace |
+
+---
+
+### §78.3 SLOs
+
+| SLO ID | Name | Target | Window | Burn rate alert | SOC 2 mapping | Error budget |
+|---|---|---|---|---|---|---|
+| **CAEP-SLO-01** | End-to-end revocation latency | P95 `caep_action_latency_p95_ms` < 30,000 ms (30 s) from SET `iat` to SESSION_REVOCATION_KV write | 30-day rolling | Fast burn: > 14.4× rate → P0 page; slow burn: > 6× rate → P1 | CC6.3 (timely access removal < 30 s) | 0.1% of events may exceed 30 s before SLA credit trigger |
+| **CAEP-SLO-02** | `caep_reregister_sweep` freshness | `caep_reregister_sweep_freshness_min` < 6 min (job 37, `*/5 * * * *`) | 30-day rolling | Staleness > 6 min → AL-CAEP-03 P2; > 30 min → auto-escalate to P1 | CC6.6 (re-evaluation on credential change) | < 1% of 5-min windows may miss the 6-min threshold |
+
+**CAEP-SLO-01 rationale:** CC6.3 requires timely access removal. A 30 s P95 target aligns with IdP-to-FORM session revocation end-to-end. Exceeding this means compromised credential changes or account disablement signals are reaching FORM but not resulting in session invalidation within the SLA window — a direct CC6.3 gap and potential SLA credit trigger (MSA §8.2).
+
+**CAEP-SLO-02 rationale:** The `caep_reregister_sweep` (job 37) runs every 5 minutes to process tenants whose CAEP stream registration expired due to cert rotation (DEC-072 / SSO_SCIM §36). A 6-minute freshness window (1 missed run + margin) ensures re-registration completes before the next potential revocation event. Stale sweep = tenants in `caep_reregistration_required = TRUE` state that cannot receive new SETs.
+
+---
+
+### §78.4 Alert Runbooks
+
+All five alerts are registered in §6.2 under `caep_stream_health`. This section provides full inline runbooks.
+
+---
+
+#### AL-CAEP-01 — CAEP SET Validation Failure Rate High (P1)
+
+**Trigger:** `sso.caep_stream_error` rate > 5% of all CAEP events (`sso.caep_stream_error` + `sso.caep_event_received`) for any single `tenant_id` over any 10-minute window.
+**Severity:** P1
+**Channels:** PagerDuty `form-security` → security-engineer on-call; Slack `#sso-alerts`; per-tenant dedup key `caep-stream-error-{tenant_id}` (1 h dedup window).
+
+**Diagnosis steps:**
+1. Identify the `tenant_id` and `idp_type` from the PagerDuty incident payload.
+2. Query: `SELECT error_code, COUNT(*) FROM audit_log_events WHERE event_type = 'sso.caep_stream_error' AND payload->>'tenant_id' = '{tenant_id}' AND created_at > NOW() - INTERVAL '1 hour' GROUP BY 1` (form_audit role).
+3. Common `error_code` values: `invalid_signature` (IdP key rotation needed — escalate to SSO_SCIM §36 / §77 cert lifecycle), `jti_replay` (duplicate SET delivery — benign if < 0.1%, investigate if persistent), `unknown_event_type` (IdP sending unrecognised CAEP event type — update event dispatcher in `caep-action-handler.ts`), `missing_subject` (malformed SET — contact IdP support).
+4. Check Cloudflare Workers logs for `caep-receiver.ts` at `POST /enterprise/v1/sso/caep-receiver/{tenant_id}` for HTTP 400/500 response rates.
+5. Check `tenant_sso_configs.caep_status` for the affected tenant — if `error`, the stream is fully broken.
+
+**Resolution:**
+- `invalid_signature`: trigger SAML cert rotation flow (SSO_SCIM §20 / §36); re-register CAEP stream (SSO_SCIM §23.5).
+- `jti_replay` persistent: check `caep_events.set_jti` UNIQUE index; verify `ON CONFLICT (set_jti) DO NOTHING` is active; no action needed if benign.
+- `unknown_event_type`: deploy updated `caep-action-handler.ts` event dispatcher.
+- Persistent stream `error`: manually re-register stream via Admin Dashboard CAEP panel or Cloudflare Worker admin endpoint.
+
+**Privacy note:** PagerDuty payload carries only `tenant_id` UUID and `error_code` enum — no employee data.
+
+---
+
+#### AL-CAEP-02 — CAEP account-purged — GDPR Clock Started (P0)
+
+**Trigger:** Any `sso.caep_user_purged` DEC-030 CRITICAL event emitted.
+**Severity:** P0
+**Channels:** PagerDuty `form-security` + `form-compliance` → security-engineer + compliance-officer; 0-minute response target; **no dedup** (every purge is unique); **no auto-resolve** (compliance-officer must manually close after GDPR Art. 17 deletion confirmed).
+
+**Diagnosis steps:**
+1. Query: `SELECT payload FROM audit_log_events WHERE event_type = 'sso.caep_user_purged' ORDER BY created_at DESC LIMIT 10` (form_audit role — payload contains `tenant_id` and anonymised `user_ref`, NOT name/email).
+2. Confirm `caep-action-handler.ts` `dispatchCaepAction('account-purged')` completed — check Cloudflare Workers trace for `CAEP_PURGE_COMPLETE` log line.
+3. Confirm `SESSION_REVOCATION_KV` entry `revoke:user:{tenant_id}:{user_id}` written with TTL 7 days.
+4. Check `google_directory_group_cache` — proactively deleted per DEC-072 §36.4 for Google Workspace tenants.
+5. Initiate GDPR Art. 17 deletion workflow: compliance-officer coordinates data subject deletion across all FORM data stores per DPAs.
+
+**Resolution:** GDPR deletion workflow (compliance-officer owns). Incident stays open in PagerDuty until compliance-officer confirms deletion across all stores and files `sso.caep_user_purged` supplement in CAEP-OBS-E-001 artefact (§78.8).
+
+**Privacy note:** PagerDuty payload carries only `tenant_id` UUID and `user_ref` (anonymised FORM-internal reference) — no name, email, health data, or GDPR Art. 9 special-category data.
+
+---
+
+#### AL-CAEP-03 — CAEP Stream Dead-Man's Switch (P2)
+
+**Trigger:** No CAEP events (`sso.caep_event_received` or `sso.caep_stream_error`) on any stream with `caep_status = 'active'` for > 4 hours during business hours (08:00–20:00 tenant-local time); OR `caep_reregister_sweep_freshness_min` > 6 min.
+**Severity:** P2
+**Channels:** PagerDuty `form-security` → security-engineer on-call; Slack `#sso-alerts`; per-tenant dedup key `caep-stream-dead-{tenant_id}` (2 h dedup window).
+
+**Diagnosis steps:**
+1. Check §26.9 "active stream dead-man status" panel — which tenants exceed 240 min silence.
+2. Query: `SELECT tenant_id, idp_type, MAX(processed_at) AS last_event FROM caep_events WHERE created_at > NOW() - INTERVAL '8 hours' GROUP BY tenant_id, idp_type HAVING MAX(processed_at) < NOW() - INTERVAL '4 hours'` (form_audit role).
+3. For `caep_reregister_sweep` freshness breach: check `cron.job_run_details WHERE jobid = 37 ORDER BY rundat DESC LIMIT 5` for failure reason; check pg_cron worker health.
+4. Distinguish true stream death (IdP stopped sending SETs) from low activity (tenant has few users — silence is legitimate outside business hours).
+5. For Okta tenants: verify SSF endpoint registration is still active in Okta admin console.
+6. For Entra tenants: verify Azure Event Grid subscription is active and webhook endpoint is reachable.
+
+**Resolution:**
+- True stream death: re-register CAEP stream (SSO_SCIM §23.5); confirm with IdP admin.
+- pg_cron failure: restart pg_cron worker; confirm job 37 registration; re-run manually if needed.
+- Legitimate silence (off-hours, low-volume tenant): adjust dead-man window for tenant or suppress during non-business hours.
+
+**Privacy note:** PagerDuty payload carries only `tenant_id` UUID, `idp_type` enum, and `minutes_since_last_event` integer — no employee data.
+
+---
+
+#### AL-CAEP-04 — Google RISC Hijacking Event Received (P1)
+
+**Trigger:** Any `https://schemas.openid.net/secevent/risc/event-type/hijacking` SET received for a Google Workspace OIDC tenant (i.e., `caep-receiver.ts` successfully validates a RISC hijacking SET).
+**Severity:** P1
+**Channels:** PagerDuty `form-security` → security-engineer on-call; Slack `#sso-alerts`; per-tenant dedup key `risc-hijack-{tenant_id}` (1 h dedup window).
+
+**Diagnosis steps:**
+1. The `sso.caep_event_received` DEC-030 event with `caep_event_type = 'risc-hijacking'` is emitted by `caep-receiver.ts` after successful SET validation.
+2. `caep-action-handler.ts` `dispatchCaepAction('risc-hijacking')` should have: (a) written `revoke:user:{tenant_id}:{user_id}` to SESSION_REVOCATION_KV; (b) deleted `google_directory_group_cache` entry for the affected tenant (DEC-072 §36.4); (c) triggered re-authentication enforcement for the affected user.
+3. Verify steps (a)–(c) completed via Cloudflare Workers trace.
+4. Contact tenant CSM (customer-success agent) to notify tenant IT admin — Google RISC hijacking signals indicate a credential compromise at the Google Workspace level.
+5. Review whether additional users in the same tenant are affected (hijacking may indicate broader compromise).
+
+**Resolution:** Session revoked, re-auth triggered. Tenant IT admin notified via CSM. Coordinate with Google Workspace admin to complete account recovery on their side. Incident stays open until tenant admin confirms recovery.
+
+**Privacy note:** PagerDuty payload carries only `tenant_id` UUID and event type enum — no employee `user_id`, email, or GDPR Art. 9 data. All user-level actions are taken internally without exposing user identity to the on-call engineer beyond FORM-internal user reference.
+
+---
+
+#### AL-CAEP-05 — CAEP Rate Limit Exceeded (P2)
+
+**Trigger:** CAEP events > 1,000/hour for any single `tenant_id` (reflected as `tenant_sso_configs.caep_status = 'rate_limited'`).
+**Severity:** P2
+**Channels:** PagerDuty `form-security` → security-engineer on-call; Slack `#sso-alerts`; per-tenant dedup key `caep-rate-limit-{tenant_id}` (2 h dedup window).
+
+**Diagnosis steps:**
+1. Query: `SELECT caep_event_type, COUNT(*) FROM caep_events WHERE tenant_id = '{tenant_id}' AND processed_at > NOW() - INTERVAL '1 hour' GROUP BY 1 ORDER BY 2 DESC` (form_audit role) — identify which event type is flooding.
+2. Common causes: IdP misconfiguration sending duplicate events; user mass-provisioning/deprovisioning event storm; SCIM bulk operation triggering cascading CAEP events.
+3. Check whether the event storm is correlated with a SCIM bulk operation (SSO_SCIM §12 / AL-SCIM-MASS-01).
+4. Verify `caep-receiver.ts` rate limiter is active and returning HTTP 429 for events beyond the 1,000/hr cap per tenant.
+
+**Resolution:**
+- Coordinate with tenant IT admin (via CSM) to investigate IdP misconfiguration.
+- If legitimate event storm (mass deprovisioning): temporarily raise per-tenant cap via Cloudflare Worker tenant config; process backlog; restore default cap.
+- `caep_status` resets to `active` automatically once event rate drops below threshold for 5 consecutive minutes.
+
+**Privacy note:** PagerDuty payload carries only `tenant_id` UUID and `event_rate` integer — no employee data.
+
+---
+
+### §78.5 Alert Registration in §6.2
+
+AL-CAEP-01 through AL-CAEP-05 are registered in §6.2 under the `caep_stream_health` subsection (inserted in this document above; §6.2 edit committed in this same v5.24.0 pass). No new rows are needed in §6.2 beyond what was already added. Cross-reference: §6.2 `caep_stream_health` → runbooks above (§78.4).
+
+---
+
+### §78.6 Dashboard Sub-Group: "CAEP/RISC Stream Health" in §26.9
+
+The six-panel "CAEP/RISC Stream Health" sub-group is embedded in §26.9 Enterprise Identity Dashboard immediately following the SAML Certificate Lifecycle sub-group. Panel specifications are co-located in §26.9 for dashboard-first discoverability; this section provides the canonical observability rationale.
+
+**Dashboard location:** §26.9 Enterprise Identity → sub-group: "CAEP/RISC Stream Health" (deployed M4).
+
+**Six panels (summary):**
+
+| # | Panel | Key threshold |
+|---|---|---|
+| 1 | Active CAEP stream tenants by `caep_status` | Ember if any `error` |
+| 2 | CAEP events/hr by `caep_event_type` (7d stacked bar) | Baseline varies; zero on active stream during business hours = dead-man candidate |
+| 3 | SET validation error rate (7d, 5-min bins) | Red threshold at 5% (AL-CAEP-01) |
+| 4 | Active stream dead-man status table (last event per tenant) | Ember rows at > 240 min (AL-CAEP-03) |
+| 5 | AL-CAEP-01..05 activations (30d table) | AL-CAEP-02 in red if count > 0 |
+| 6 | `caep_reregister_sweep` (job 37) freshness | Ember if > 6 min (CAEP-SLO-02) |
+
+Full panel query specs and privacy floor: §26.9 CAEP/RISC Stream Health sub-group (inserted v5.24.0).
+
+---
+
+### §78.7 SOC 2 Mapping
+
+| Trust service criterion | Requirement | CAEP/RISC control contribution |
+|---|---|---|
+| **CC6.3** | Timely removal of access for terminated/changed users | CAEP-SLO-01 (P95 < 30 s end-to-end revocation from SET `iat` to KV write); AL-CAEP-01 monitors SET validation pipeline integrity; AL-CAEP-02 (P0) ensures GDPR Art. 17 purge clock is actioned immediately |
+| **CC6.6** | Logical access reviewed/revoked on credential change | CAEP events `credential-change` / `token-claims-change` / `account-disabled` trigger immediate session invalidation and re-auth enforcement; `caep_reregister_sweep` (job 37) maintains stream registration continuity; CAEP-SLO-02 (< 6 min sweep freshness) ensures no gap in re-evaluation |
+| **CC7.2** | Monitoring for anomalies and unauthorised access | AL-CAEP-01..05 provide 24/7 automated anomaly monitoring of CAEP stream health; AL-CAEP-04 (P1) surfaces Google RISC hijacking signals — a direct IdP-sourced credential compromise signal; §26.9 CAEP/RISC Stream Health dashboard provides continuous fleet-level visibility |
+| **CC7.3** | Incident response procedures for detected anomalies | P0/P1/P2 response SLAs per §78.4 runbooks; all incidents logged in PagerDuty with resolution timestamps; AL-CAEP-02 (P0 purge) stays open until compliance-officer confirms GDPR deletion across all stores; quarterly CAEP-OBS-E-001 artefact (§78.8) provides auditor-ready evidence |
+
+**Auditor narrative (§78.7):** FORM's CAEP/RISC integration implements near-real-time access revocation (CAEP-SLO-01 < 30 s) triggered by IdP-sourced events — session revocation, credential change, account disablement, and account purge — that do not require waiting for the next SCIM sync cycle. The five-alert monitoring suite (AL-CAEP-01..05) provides automated detection of stream health degradation, with P0 escalation for GDPR purge events and P1 for validation failure rates and Google RISC hijacking signals. The quarterly CAEP-OBS-E-001 artefact (§78.8) packages all relevant evidence for auditor review.
+
+---
+
+### §78.8 SOC 2 Evidence Artefact: CAEP-OBS-E-001
+
+**Artefact ID:** CAEP-OBS-E-001
+**Cadence:** Quarterly
+**Storage:** Cloudflare R2 WORM bucket, path `compliance/evidence/caep-obs/caep-obs-e-001-{YYYY}-Q{N}.json`
+**Retention:** 7 years
+**SOC 2 criteria:** CC6.3, CC6.6, CC7.2, CC7.3
+**Owner:** devops-lead + compliance-officer
+**First filing:** Q3-2026 (2026-10-01); pre-M4 quarters: nil-attestation filed (no CAEP tenants in production)
+**SOC2_READINESS registration:** `docs/SOC2_READINESS.md §186` (v4.12.0, 2026-07-06); evidence count 162
+
+**Artefact components (five required):**
+
+| # | Component | Content | Format |
+|---|---|---|---|
+| 1 | CAEP stream fleet summary | Count of active / error / rate_limited tenants; `caep_status` distribution snapshot at quarter-end | JSON |
+| 2 | RED metrics quarterly summary | Rate (total events received, breakdown by `caep_event_type`; purged events count); Errors (SET error rate p50/p95/max per 10-min window over quarter; `caep_status = 'error'` tenant-hours); Duration (CAEP-SLO-01 P95 ms over quarter; CAEP-SLO-02 missed-window count; job 37 freshness p50/p95 over quarter) | JSON |
+| 3 | SLO compliance report | CAEP-SLO-01 compliance % (target ≥ 99.9%); CAEP-SLO-02 compliance % (target ≥ 99%); burn rate chart (monthly); error budget consumed | JSON + inline chart |
+| 4 | AL-CAEP-01..05 activation log | Per-alert: activation count over quarter, PagerDuty incident IDs, resolution timestamps, MTTR; AL-CAEP-02 (P0 purged) entries include compliance-officer close timestamp and GDPR deletion confirmation reference | JSON |
+| 5 | SOC 2 criteria attestation | Compliance-officer + devops-lead attestation that CAEP/RISC monitoring controls operated as designed over the quarter; references CC6.3/CC6.6/CC7.2/CC7.3 | Signed JSON with compliance-officer timestamp |
+
+**Per-incident supplement:** Any AL-CAEP-02 (P0 purged) or AL-CAEP-01 (P1 validation failure rate, if CAEP-SLO-01 breached) incident during the quarter requires a per-incident supplement filed within 30 days of resolution: `compliance/evidence/caep-obs/caep-obs-e-001-{YYYY}-Q{N}-incident-{PD_ID}.json`. Supplement content: timeline, root cause, remediation, CC6.3/CC6.6 impact assessment.
+
+**Pre-M4 nil-attestation:** Until CAEP integration reaches production (M4), quarterly nil-attestation is filed: `{ "artefact_id": "CAEP-OBS-E-001", "quarter": "{YYYY}-Q{N}", "status": "nil_attestation", "reason": "CAEP integration pre-production (pre-M4)", "signed_by": ["compliance-officer", "devops-lead"] }`.
+
+---
+
+### §78.9 Implementation Checklist
+
+| # | Item | Owner | Target | Status |
+|---|---|---|---|---|
+| 1 | `docs/AUDIT_LOG_SCHEMA.md §CAEP` — five DEC-030 events registered (`sso.caep_event_received`, `sso.caep_stream_error`, `sso.caep_stream_registered`, `sso.caep_user_purged`, `sso.caep_reregistration_queued`) | compliance-officer | M3 (done SSO_SCIM v2.39) | [x] Done |
+| 2 | §6.2 `caep_stream_health` subsection inserted (AL-CAEP-01..05) | devops-lead | M3 (done this pass v5.24.0) | [x] Done |
+| 3 | §26.9 "CAEP/RISC Stream Health" six-panel sub-group inserted | devops-lead | M4 | [x] Done (v5.24.0) |
+| 4 | `docs/SSO_SCIM_IMPLEMENTATION.md §23.13` OBSERVABILITY §78 backreference | enterprise-architect | M4 | [x] Done (v2.40 this pass) |
+| 5 | `docs/SOC2_READINESS.md §186` CAEP-OBS-E-001 registration (count 161 → 162) | compliance-officer | M4 | [x] Done (v4.12.0 this pass) |
+| 6 | First quarterly CAEP-OBS-E-001 filing (`caep-obs-e-001-2026-Q3.json`) | devops-lead + compliance-officer | Q3-2026 (2026-10-01) | [ ] Pending Q3-2026 |
+| 7 | AL-CAEP-01..05 PagerDuty services and dedup rules configured in production | devops-lead | M4 | [ ] Pending M4 |
+
+---
+
+### §78.10 Cross-Reference Obligations
+
+| Doc | Section | Obligation | Status |
+|---|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §23.13 | OBSERVABILITY §78 backreference (analogous to §20.12 for §77, §22.15 for §72) | 🟢 Done — v2.40 (2026-07-06) |
+| `docs/SOC2_READINESS.md` | §186 | CAEP-OBS-E-001 registration (count 161 → 162; CC6.3 / CC6.6 / CC7.2 / CC7.3) | 🟢 Done — v4.12.0 (2026-07-06) |
+| `docs/OBSERVABILITY.md` | §6.2 | `caep_stream_health` subsection with AL-CAEP-01..05 alert table | 🟢 Done — v5.24.0 (this pass) |
+| `docs/OBSERVABILITY.md` | §26.9 | "CAEP/RISC Stream Health" six-panel sub-group | 🟢 Done — v5.24.0 (this pass) |
+
+---
+
+*v5.24.0 (2026-07-06): §78 CAEP/RISC Stream Observability. Closes the observability gap for FORM's CAEP/RISC stream integration (canonical design: `docs/SSO_SCIM_IMPLEMENTATION.md §23`). CAEP/RISC was the last major SSO subsystem with alert rules (§6.2 AL-CAEP-01..05) and DEC-030 events (`docs/AUDIT_LOG_SCHEMA.md §CAEP`) but no dedicated observability section with RED metrics, SLOs, inline runbooks, dashboard sub-group, or quarterly evidence artefact. §78.1: scope — five components (caep-receiver.ts Cloudflare Worker, caep-action-handler.ts dispatcher, caep_reregister_sweep pg_cron job 37 `*/5` 6-min freshness, Admin Dashboard CAEP panel, five DEC-030 events); three IdP types (Okta SSF, Entra Event Grid, Google RISC). §78.2: RED metrics adapted for webhook receiver + pg_cron context — Rate (caep_events_received/hr by caep_event_type, caep_streams_active gauge, caep_purged_events/day, caep_reregistration_queued/day), Errors (caep_set_error_rate_pct zero-tolerance > 5% per tenant / 10-min, caep_purged_count zero-tolerance, caep_stream_status_error_count), Duration (caep_action_latency_p95_ms < 30,000 ms CAEP-SLO-01, caep_reregister_sweep_freshness_min < 6 min CAEP-SLO-02, caep_receiver_wall_ms P99 < 2,000 ms). §78.3: two SLOs — CAEP-SLO-01 (P95 < 30 s end-to-end revocation / CC6.3 / SLA credit) and CAEP-SLO-02 (job 37 freshness < 6 min / CC6.6 / 99% compliance). §78.4: five inline runbooks — AL-CAEP-01 (P1 error rate > 5% / invalid_signature / jti_replay / unknown_event_type / stream error), AL-CAEP-02 (P0 purged / GDPR Art. 17 / compliance-officer owns / no auto-resolve), AL-CAEP-03 (P2 dead-man 4 h / pg_cron failure / job 37 freshness), AL-CAEP-04 (P1 Google RISC hijacking / KV revoke / google_directory_group_cache delete / DEC-072 §36.4 / CSM notify), AL-CAEP-05 (P2 rate limit > 1,000/hr / event storm / tenant cap). §78.5: §6.2 registration pointer (done this pass). §78.6: six-panel "CAEP/RISC Stream Health" sub-group for §26.9 Enterprise Identity dashboard — active tenants by caep_status, events/hr stacked bar 7d, SET error rate 5-min bins 7d, dead-man table, AL-CAEP activations 30d, job 37 freshness. Sub-group inserted in §26.9 immediately after SAML Certificate Lifecycle sub-group (v5.24.0 this pass). §78.7: SOC 2 mapping CC6.3 (CAEP-SLO-01 < 30 s / timely access removal), CC6.6 (credential-change/account-disabled dispatch / CAEP-SLO-02 sweep continuity), CC7.2 (AL-CAEP-01..05 24/7 automated monitoring / AL-CAEP-04 RISC hijacking signal), CC7.3 (P0/P1/P2 SLAs / PagerDuty incident log / quarterly CAEP-OBS-E-001 artefact). §78.8: CAEP-OBS-E-001 quarterly artefact (CC6.3/CC6.6/CC7.2/CC7.3, 7yr WORM, compliance/evidence/caep-obs/caep-obs-e-001-{YYYY}-Q{N}.json); five-component report; per-incident supplement for AL-CAEP-02/01 activations; pre-M4 nil-attestation. §78.9: seven-item implementation checklist — five Done this pass, two Pending M4/Q3-2026. §78.10: four cross-reference obligations — all 🟢 Done this pass (SOC2_READINESS §186 CAEP-OBS-E-001 count 161 → 162, SSO_SCIM §23.13 backreference, §6.2 caep_stream_health, §26.9 sub-group). Privacy floor: all §78 content — metrics, alert rules, dashboard queries, evidence artefacts — uses only `tenant_id` (FORM-internal UUID), `caep_event_type` (operational enum), and `idp_type` (enum); no employee `user_id`, name, email, raw `set_jti`, `caep_webhook_secret`, health value, body composition data, ED-screening data, or GDPR Art. 9 special-category data appears anywhere. Document header v5.23.0 → v5.24.0. Owner: devops-lead + security-engineer + compliance-officer.*

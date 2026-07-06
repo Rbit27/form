@@ -1,5 +1,22 @@
 # Changelog · FORM
 
+## [13.58.1] — 2026-07-06
+
+### Added
+- `docs/OBSERVABILITY.md §78` — CAEP/RISC Stream Observability (v5.24.0). Closes the observability gap for FORM's CAEP/RISC stream integration. Five components: `caep-receiver.ts` CF Worker, `caep-action-handler.ts` dispatcher, `caep_reregister_sweep` pg_cron job 37, Admin Dashboard CAEP panel, five DEC-030 events. RED metrics: `caep_set_error_rate_pct` (> 5% → AL-CAEP-01), `caep_purged_count` zero-tolerance (→ AL-CAEP-02 P0), `caep_action_latency_p95_ms` < 30,000 ms (CAEP-SLO-01), `caep_reregister_sweep_freshness_min` < 6 min (CAEP-SLO-02). Five inline runbooks AL-CAEP-01..05. SOC 2: CC6.3/CC6.6/CC7.2/CC7.3. CAEP-OBS-E-001 quarterly evidence artefact (R2 `compliance/evidence/caep-obs/`, 7yr WORM).
+- `docs/OBSERVABILITY.md §26.9` — "CAEP/RISC Stream Health" six-panel sub-group in Enterprise Identity dashboard (after SAML Certificate Lifecycle sub-group): active stream tenants by `caep_status`, events/hr stacked bar 7d, SET error rate 5-min bins 7d (5% threshold), dead-man status table (240-min threshold), AL-CAEP-01..05 activations 30d, job 37 freshness single-stat.
+- `docs/OBSERVABILITY.md §6.2` — `caep_stream_health` subsection with AL-CAEP-01..05 alert table (P1 validation failure rate, P0 purged GDPR clock, P2 dead-man, P1 RISC hijacking, P2 rate limit).
+- `docs/SOC2_READINESS.md §186` — CAEP-OBS-E-001 Registration (CC6.3/CC6.6/CC7.2/CC7.3); §79.4 count 161 → 162; four auditor narratives; R2 folder `compliance/evidence/caep-obs/` established; Vanta mirror entry; privacy floor.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §23.13` — OBSERVABILITY §78 backreference; ten-row primitive-to-coverage mapping table; §23.12 checklist item 13 Done.
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.23.0 → v5.24.0.
+- `docs/SOC2_READINESS.md` — v4.11.0 → v4.12.0.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — v2.39 → v2.40.
+- `VERSION` — 13.58.0 → 13.58.1.
+
+---
+
 ## [13.58.0] — 2026-07-06
 
 ### Added
