@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.68.0] — 2026-07-06
+
+### Added
+- `content/post-103-reading-research-sports-science.md` — Editorial 101–110 series 3/10. «Як читати наукову статтю про тренування і не зробити неправильних висновків». Ієрархія доказів (case report → RCT → мета-аналіз), п'ять питань перед будь-яким висновком (популяція, тривалість, метод вимірювання, ефект-розмір Cohen's d, конфлікт інтересів), publication bias і I² гетерогенність у мета-аналізах, 5-крокова схема переносу результатів у практику, найпоширеніші помилки (плутанина між p-value і розміром ефекту, дослідження на elite vs. аматори). clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `content/post-3287-confirmation-bias-programming.md` — Series «Тренувальна психологія self-coached атлета» 3286–3295 · 2/10. «Confirmation bias у програмуванні: як не читати тільки те, що хочеш побачити». Три рівні confirmation bias (увага, інтерпретація, запам'ятовування, Nickerson 1998), шість конкретних проявів у тренуванні (закоханість у вправу, підтвердження нової програми, «виняток» для поганих сесій, пошук підтверджень ззовні, атрибуційна асиметрія, соціальний bubble), п'ять структурних антидотів (pre-mortem, нейтральні журнальні записи, активний пошук спростовуючих даних за Wason 1960, попередньо встановлені пороги, відкладений огляд). clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — posts 103 і 3287 додано у топ фіду.
+
+### Changed
+- `STATUS.md` — current version оновлено до v13.68.0; editorial 101–110 2/10 → 3/10; series 3286–3295 1/10 → 2/10; next: post-104 + post-3288.
+- `README.md` — roadmap: editorial 101–110 in progress 3/10; series 3286–3295 in progress 2/10.
+- `VERSION` — 13.67.4 → 13.68.0.
+
 ## [13.67.4] — 2026-07-06
 
 ### Added
