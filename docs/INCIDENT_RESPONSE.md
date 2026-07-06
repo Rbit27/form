@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.48.3
+# FORM · Incident Response Runbook v3.48.4
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -30355,7 +30355,7 @@ The SESSION_REVOCATION_KV write at T+0 ensures that the compromised user's activ
 | 2 | Implement RISC-HIJACK-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`; HTTP 422 + `RISC_HIJACK_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending |
 | 3 | Update `docs/OBSERVABILITY.md §78.4` AL-CAEP-04 entry: add "Dedicated companion IR runbook: INCIDENT_RESPONSE R-85" field | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.1, §78.4 AL-CAEP-04 companion runbook field added).** |
 | 4 | Register RISC-HIJACK-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§189, per-activation cadence, CC7.2/CC7.3/CC7.4/CC6.3, 7yr) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (SOC2_READINESS.md v4.13.0, §189; evidence count 164 → 165).** |
-| 5 | Implement AL-RISC-FLEET-01 fleet-level RISC volume alert (H5 post-incident control — ≥ 3 hijacking events per tenant in 24 h → P0 + R-04 co-activation); register in §6.2 and §78 as §78.9 | security-engineer + devops-lead | **P1** / M6 | [ ] Pending |
+| 5 | Implement AL-RISC-FLEET-01 fleet-level RISC volume alert (H5 post-incident control — ≥ 3 hijacking events per tenant in 24 h → P0 + R-04 co-activation); register in §6.2 and §78 as §78.9 | security-engineer + devops-lead | **P1** / M6 | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.2, §78.4 AL-RISC-FLEET-01 + §6.2 caep_stream_health + §78.9 checklist item 8).** |
 | 6 | Implement H4 post-incident control: admin role confirmation in `caep-action-handler.ts` pre-dispatch scope check; auto-P0 if admin user detected | platform-engineer | **P1** / M5 | [ ] Pending |
 | 7 | Authoring complete — R-85 closes the AL-CAEP-04 companion runbook gap: §78.4 had only a five-step inline runbook for the P1 RISC hijacking scenario; R-85 provides the full IC protocol, severity matrix, RISC-HIJACK-CHAIN-01 HMAC invariant, and RISC-HIJACK-E-001 per-activation evidence artefact | compliance-officer | **P0** | [x] **Done — 2026-07-06 (INCIDENT_RESPONSE.md v3.48.0).** |
 
@@ -30378,6 +30378,8 @@ The SESSION_REVOCATION_KV write at T+0 ensures that the compromised user's activ
 **Privacy floor (invariant throughout R-85):** No data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data in any R-85 scope query, DEC-030 event payload, or evidence artefact. `user_ref` is a FORM-internal UUID. `set_jti_hash` is SHA-256(raw JTI) — non-reversible. R-85-C4 returns aggregate counts only — no individual `user_ref` values. Admin action audit (Step 3c) uses `action_type` and `resource_id` only — no employee personal data. HR role NEVER has access to `compliance/evidence/caep/`. Owner: security-engineer + compliance-officer + customer-success.
 
 ---
+
+*v3.48.4 (2026-07-06): §R-85.11 item 5 Done — `docs/OBSERVABILITY.md §78.4 AL-RISC-FLEET-01` authored (v5.24.2, 2026-07-06). New fleet-level RISC hijacking volume alert: trigger ≥ 3 `sso.caep_event_received` events with `caep_event_type = 'risc-hijacking'` for any `tenant_id` in 24 h; P0 severity; R-04 mandatory co-activation; GDPR Art. 33 72-hour breach notification assessment required. Registered in §6.2 `caep_stream_health` table and §78.9 checklist item 8. §R-85.11 item 5 status: `[ ] Pending` → `[x] Done — 2026-07-06 (OBSERVABILITY.md v5.24.2, §78.4 AL-RISC-FLEET-01 + §6.2 caep_stream_health + §78.9 checklist item 8)`. Document header v3.48.3 → v3.48.4. Owner: security-engineer + devops-lead.*
 
 *v3.48.3 (2026-07-06): §R-83.11 item 5 Done — `docs/SSO_SCIM_IMPLEMENTATION.md §20.4.1 IdP JWKS Cache Flush` authored (v2.42, 2026-07-06). New §20.4.1 adds the H1 post-incident control to the `cert-expiry-check` Worker Cron: after `cert_rotation_state → 'complete'` + `caep_reregistration_required = TRUE` hook (§36.2.4), the Worker now enumerates and deletes all `caep_jwks:{tenant_id}:` keys from `SSO_KV`, eliminating the CAEP SET validation failure window that occurs when an IdP rotates its SSF signing key as part of the SAML certificate lifecycle. §R-83.11 item 5 status: `[ ] Pending` → `[x] Done — 2026-07-06 (SSO_SCIM_IMPLEMENTATION.md v2.42, §20.4.1)`. Document header v3.48.2 → v3.48.3. Owner: platform-engineer + security-engineer.*
 

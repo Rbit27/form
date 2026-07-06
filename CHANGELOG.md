@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.68.1] — 2026-07-06
+
+### Added
+- `docs/OBSERVABILITY.md §78.4 AL-RISC-FLEET-01` — Fleet-Level RISC Hijacking Volume alert (v5.24.2). H5 post-incident control per §R-85.11 item 5 (P1/M6). Trigger: ≥ 3 `sso.caep_event_received` events with `caep_event_type = 'risc-hijacking'` for any single `tenant_id` in any 24-hour sliding window. P0 severity. Channels: PagerDuty `form-security` + `form-compliance`; Slack `#sso-alerts` + `#security-escalations`; no dedup. R-04 co-activation mandatory. GDPR Art. 33 72-hour breach notification assessment required. Registered in §6.2 `caep_stream_health` table and §78.9 checklist item 8. Closes §R-85.11 item 5.
+
+### Changed
+- `docs/OBSERVABILITY.md` — v5.24.0 → v5.24.2. §78.4 AL-RISC-FLEET-01 runbook added; §6.2 `caep_stream_health` row added; §78.5 updated; §78.9 checklist item 8 added Done; §78.10 cross-reference row added.
+- `docs/INCIDENT_RESPONSE.md` — v3.48.3 → v3.48.4. §R-85.11 item 5 → `[x] Done — 2026-07-06 (OBSERVABILITY.md v5.24.2, §78.4 AL-RISC-FLEET-01)`.
+- `VERSION` — 13.68.0 → 13.68.1.
+
 ## [13.68.0] — 2026-07-06
 
 ### Added

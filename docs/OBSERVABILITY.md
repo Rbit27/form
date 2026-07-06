@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.24.0
+# FORM · Observability & Monitoring Taxonomy v5.24.2
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -654,6 +654,7 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 | **CAEP stream dead-man's switch** | No CAEP events on an active stream (`caep_status = 'active'`) for > 4 hours during business hours (08:00–20:00 tenant local time) | P2 | PagerDuty `form-security` → security-engineer; Slack `#sso-alerts`; 2h per-tenant dedup `caep-stream-dead-{tenant_id}` | §78.4 AL-CAEP-03 |
 | **Google RISC hijacking event received** | Any `https://schemas.openid.net/secevent/risc/event-type/hijacking` SET received for a Google Workspace OIDC tenant | P1 | PagerDuty `form-security` → security-engineer; Slack `#sso-alerts`; 1h per-tenant dedup `risc-hijack-{tenant_id}` | §78.4 AL-CAEP-04 |
 | **CAEP rate limit exceeded** | CAEP events > 1,000/hour for any single tenant (`caep_status = 'rate_limited'`) | P2 | PagerDuty `form-security` → security-engineer; Slack `#sso-alerts`; 2h per-tenant dedup `caep-rate-limit-{tenant_id}` | §78.4 AL-CAEP-05 |
+| **Fleet-level RISC hijacking volume** | ≥ 3 `sso.caep_event_received` events with `caep_event_type = 'risc-hijacking'` for any single `tenant_id` within any 24-hour sliding window | P0 | PagerDuty `form-security` + `form-compliance` → security-engineer + compliance-officer; no dedup (each cluster is unique); Slack `#sso-alerts` + `#security-escalations`; 0-min response target | §78.4 AL-RISC-FLEET-01 |
 
 **SOC 2 mapping (caep_stream_health):** CC6.3 (AL-CAEP-01 detects stream errors that degrade IdP-event-to-FORM-session-revocation latency below CAEP-SLO-01 < 30 s target; AL-CAEP-02 P0 ensures GDPR deletion clock is actioned immediately), CC6.6 (AL-CAEP-01 surfaces failures in credential-change / token-claims-change event delivery that would prevent re-authentication triggers), CC7.2 (AL-CAEP-01..05 provide 24/7 automated anomaly monitoring of CAEP stream health), CC7.3 (P0/P1/P2 response SLAs per §78.4 runbooks; all incidents logged in PagerDuty with resolution timestamps). Privacy floor: all five alert payloads carry only `tenant_id` UUID (FORM-internal) and operational enum fields — no employee `user_id`, name, email, `set_jti`, `caep_webhook_secret`, health value, or GDPR Art. 9 special-category data.
 
@@ -21333,9 +21334,30 @@ All five alerts are registered in §6.2 under `caep_stream_health`. This section
 
 ---
 
+#### AL-RISC-FLEET-01 — Fleet-Level RISC Hijacking Volume (P0)
+
+**Trigger:** ≥ 3 `sso.caep_event_received` events with `caep_event_type = 'risc-hijacking'` for any single `tenant_id` within any 24-hour sliding window.
+**Severity:** P0 (H5 post-incident control per §R-85.11 item 5 — systematic tenant compromise escalation)
+**Channels:** PagerDuty `form-security` + `form-compliance` → security-engineer + compliance-officer; **no dedup** (each multi-event cluster is unique); Slack `#sso-alerts` + `#security-escalations`; 0-minute response target.
+**Co-activation:** R-04 (Unauthorized Access Investigation) — mandatory on trigger; compliance-officer + security-engineer co-owners.
+**Dedicated companion IR runbook:** `docs/INCIDENT_RESPONSE.md R-85` (v3.48.3, 2026-07-06) — H5 systematic tenant compromise path; P0 escalation criteria, scope queries R-85-C3/R-85-C4.
+
+**Diagnosis steps:**
+1. Confirm count and window from PagerDuty payload: `event_count`, `tenant_id`, `window_start`.
+2. Distinguish multi-user vs single-user clusters — multi-user indicates systematic compromise; single-user may be false positive or targeted attack.
+3. Scope query (form_audit role — aggregates only, no personal data): `SELECT user_ref, COUNT(*) AS events, MIN(created_at) AS first, MAX(created_at) AS last FROM audit_log_events WHERE event_type = 'sso.caep_event_received' AND payload->>'caep_event_type' = 'risc-hijacking' AND payload->>'tenant_id' = '{tenant_id}' AND created_at > NOW() - INTERVAL '24 hours' GROUP BY user_ref ORDER BY 2 DESC`.
+4. Verify `SESSION_REVOCATION_KV` write confirmation for all affected `user_ref` values (check Cloudflare Workers trace for each individual AL-CAEP-04 dispatch within the cluster window).
+5. Confirm R-04 is opened and tenant admin notified via CSM before closing PagerDuty incident.
+
+**Resolution:** Follow R-85 P0 escalation path. All affected user sessions must be revoked and re-authentication enforced before IC closure. R-04 must be resolved and scope-of-compromise assessment filed. GDPR Art. 33 72-hour breach notification assessment is mandatory (compliance-officer owns).
+
+**Privacy note:** PagerDuty payload carries only `tenant_id` UUID and `event_count` integer — no individual `user_ref` values, employee email, health data, or GDPR Art. 9 special-category data. Scope query (step 3) returns `user_ref` FORM-internal UUIDs only — not linked to name, email, or any personal identifier in this runbook. HR role NEVER has access to `compliance/evidence/caep/`.
+
+---
+
 ### §78.5 Alert Registration in §6.2
 
-AL-CAEP-01 through AL-CAEP-05 are registered in §6.2 under the `caep_stream_health` subsection (inserted in this document above; §6.2 edit committed in this same v5.24.0 pass). No new rows are needed in §6.2 beyond what was already added. Cross-reference: §6.2 `caep_stream_health` → runbooks above (§78.4).
+AL-CAEP-01 through AL-CAEP-05 and AL-RISC-FLEET-01 are registered in §6.2 under the `caep_stream_health` subsection. AL-CAEP-01..05 inserted in v5.24.0; AL-RISC-FLEET-01 row added in v5.24.2 (H5 post-incident control per §R-85.11 item 5). Cross-reference: §6.2 `caep_stream_health` → runbooks above (§78.4).
 
 ---
 
@@ -21411,6 +21433,7 @@ Full panel query specs and privacy floor: §26.9 CAEP/RISC Stream Health sub-gro
 | 5 | `docs/SOC2_READINESS.md §186` CAEP-OBS-E-001 registration (count 161 → 162) | compliance-officer | M4 | [x] Done (v4.12.0 this pass) |
 | 6 | First quarterly CAEP-OBS-E-001 filing (`caep-obs-e-001-2026-Q3.json`) | devops-lead + compliance-officer | Q3-2026 (2026-10-01) | [ ] Pending Q3-2026 |
 | 7 | AL-CAEP-01..05 PagerDuty services and dedup rules configured in production | devops-lead | M4 | [ ] Pending M4 |
+| 8 | AL-RISC-FLEET-01 fleet-level RISC hijacking volume alert registered in §78.4 and §6.2 `caep_stream_health` (H5 post-incident control per §R-85.11 item 5 — ≥ 3 events/tenant/24 h → P0 + R-04 co-activation) | security-engineer + devops-lead | M6 (done 2026-07-06 v5.24.2) | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.2, §78.4 AL-RISC-FLEET-01).** |
 
 ---
 
@@ -21422,8 +21445,11 @@ Full panel query specs and privacy floor: §26.9 CAEP/RISC Stream Health sub-gro
 | `docs/SOC2_READINESS.md` | §186 | CAEP-OBS-E-001 registration (count 161 → 162; CC6.3 / CC6.6 / CC7.2 / CC7.3) | 🟢 Done — v4.12.0 (2026-07-06) |
 | `docs/OBSERVABILITY.md` | §6.2 | `caep_stream_health` subsection with AL-CAEP-01..05 alert table | 🟢 Done — v5.24.0 (this pass) |
 | `docs/OBSERVABILITY.md` | §26.9 | "CAEP/RISC Stream Health" six-panel sub-group | 🟢 Done — v5.24.0 (this pass) |
+| `docs/INCIDENT_RESPONSE.md` | §R-85.11 item 5 | AL-RISC-FLEET-01 H5 post-incident control documentation (§78.4 inline runbook + §6.2 `caep_stream_health` registration) | 🟢 Done — v5.24.2 (2026-07-06) |
 
 ---
+
+*v5.24.2 (2026-07-06): AL-RISC-FLEET-01 fleet-level RISC hijacking volume alert added (H5 post-incident control per §R-85.11 item 5). New §78.4 inline runbook: trigger ≥ 3 `sso.caep_event_received` events with `caep_event_type = 'risc-hijacking'` for any single `tenant_id` in 24 h; P0 severity; PagerDuty `form-security` + `form-compliance`; R-04 co-activation mandatory; R-85 companion runbook (H5 systematic tenant compromise path). §6.2 `caep_stream_health` table row added. §78.5 updated to note AL-RISC-FLEET-01 registration. §78.9 checklist item 8 added and marked Done. §78.10 cross-reference row added (→ §R-85.11 item 5). Document header v5.24.0 → v5.24.2 (v5.24.1 recorded as companion runbook patch; this pass applies on top). Owner: security-engineer + devops-lead + compliance-officer.*
 
 *v5.24.1 (2026-07-06): §78.4 AL-CAEP-01 / AL-CAEP-02 / AL-CAEP-04 companion runbook fields added. Closes the cross-reference gap introduced when `docs/INCIDENT_RESPONSE.md R-83/R-84/R-85` were authored (v3.48.0, 2026-07-06): §78.4 inline runbooks for AL-CAEP-01 (P1 SET error rate), AL-CAEP-02 (P0 GDPR purge), and AL-CAEP-04 (P1 RISC hijacking) previously had no "Dedicated companion IR runbook" field — unlike §76.4 (→ R-82), §75.4 (→ R-81), §72.4 (→ R-75/R-76), and §70.4 (→ R-73/R-74). Three "Dedicated companion IR runbook" fields added: AL-CAEP-01 → R-83 (H1–H5, CAEP-SETERR-CHAIN-01, CAEP-SETERR-E-001 / SOC2_READINESS §187); AL-CAEP-02 → R-84 (GDPR deletion workflow, CAEP-PURGE-CHAIN-01, CAEP-PURGE-E-001 / SOC2_READINESS §188); AL-CAEP-04 → R-85 (RISC hijacking IC, RISC-HIJACK-CHAIN-01, RISC-HIJACK-E-001 / SOC2_READINESS §189). AL-CAEP-03 (P2 dead-man / sweep stale) and AL-CAEP-05 (P2 rate limit) retain inline-only runbooks — consistent with the project's pattern of reserving companion runbooks for P0/P1 alerts. Document header v5.24.0 → v5.24.1. Owner: devops-lead + security-engineer + compliance-officer.*
 
