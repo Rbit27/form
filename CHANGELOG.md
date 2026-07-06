@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [13.41.0] — 2026-07-06
+
+### Changed
+- `docs/SOC2_READINESS.md §182` — ERASURE-MON-E-001 Registration (P5.1/C1.2/CC4.1/CC7.2 · INCIDENT_RESPONSE R-43.11 item 4). Registers quarterly `c1-erasure-sla-monitor` pg_cron job 11 GDPR Art. 17 erasure SLA monitoring evidence artefact in §79.4 master evidence table (row 158). Closes R-43.11 item 4 (P1/M11). §182.2 §79.4 row 158: ERASURE-MON-E-001; P5.1/C1.2/CC4.1/CC7.2; quarterly from M6; 7yr WORM; path `compliance/evidence/erasure/erasure-mon-e-001-YYYY-QN.csv`; `form_api` REVOKED; zero-activation quarters filed as affirmative attestation. §182.3 four-criterion auditor narratives (P5.1, C1.2, CC4.1, CC7.2). §182.4 quarterly collection procedure (SQL + CSV + WORM + Vanta). §182.5 R-43.11 item 4 🔴→🟢 Done. §80.3 `erasure/` folder added; §80.4 Vanta mirror entry added. Document header v4.6.0 → v4.8.0 (SOC2_READINESS).
+- `VERSION` — 13.40.0 → 13.41.0.
+
 ## [13.40.0] — 2026-07-06
 
 ### Added

@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v13.41.0** — 2026-07-06 · soc2 · §182 ERASURE-MON-E-001 Registration · P5.1/C1.2/CC4.1/CC7.2 · INCIDENT_RESPONSE R-43.11 item 4 🔴→🟢 Done · §79.4 row 158 added · §80.3 `erasure/` folder added · §80.4 Vanta mirror updated · SOC2_READINESS v4.6.0 → v4.8.0 · next: content post-3270 («Довгострокові силові орієнтири: де реально бути через 2, 3, 5 років» — series 5/10)
+
 **v13.40.0** — 2026-07-06 · content · post-3269 · «Управління тренувальним обсягом у 2-річній перспективі: підйоми, плато, плановані зниження» · series «Довгострокове прогресування: 2–5-річний горизонт» 3266–3275 in progress 4/10 · clinical-safety NOT_REQUIRED (тема: MEV/MAV/MRV, фазове управління обсягом, 2-річна траєкторія, функції деловантаження, рік 2 vs. рік 1 логіка; без їжі/образу тіла/болю/психіатрії) · sports-scientist review pending · blog.html card prepended for post-3269 · README: series 3266–3275 in progress 2/10 → 4/10; posts 3268/3269 proposed → draft · next: post-3270 («Довгострокові силові орієнтири: де реально бути через 2, 3, 5 років» — 5/10)
 
 **v13.39.0** — 2026-07-06 · content · post-3268 · «Фазова структура довгострокового плану: accumulation, intensification, реалізація» · series «Довгострокове прогресування: 2–5-річний горизонт» 3266–3275 in progress 3/10 · clinical-safety NOT_REQUIRED (тема: фазова структура довгострокового плану, accumulation/intensification/реалізація, periodization; без їжі/образу тіла/болю/психіатрії) · sports-scientist review pending · blog.html card prepended for post-3268 · next: post-3269 («Тренувальний вік і фазова архітектура: як адаптувати структуру у 2–3-й рік» — 4/10)

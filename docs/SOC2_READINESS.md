@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.6.0
+# FORM · SOC 2 Type II Readiness v4.8.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -27020,6 +27020,7 @@ compliance/evidence/
   amendments/monitoring/  (amendment rate compliance monitoring history — AMEND-OBS-E-001 [annual `amendment_rate_compliance_monitor` job 48 pg_cron run history + AL-AMEND-01/AL-AMEND-02/AL-AMEND-03 activation log; 3yr; annual from M12 first full year with job 48 in production; zero-CRITICAL years filed as affirmative attestation — no TU-CHAIN-01 chain gap or price floor breach detected; form-api NO ACCESS; `form_system` role only; `compliance_officer` write on collection]; AMEND-STALE-E-001 through AMEND-STALE-E-006 [R-48 incident-triggered artefacts — filed on each R-48 activation: E-001 C1 staleness export (3yr; CC4.1/CC7.2), E-002 C2 chain gap gate declared (7yr; CC5.2/CC7.2), E-003 C3 floor breach gate declared (7yr; CC6.1/CC7.2), E-004 C2 chain gap re-run at restoration (7yr; CC5.2/A1.1), E-005 C3 floor breach re-run at restoration (7yr; CC6.1/A1.1), E-006 IC stale-window narrative note (7yr if P0; 3yr if P1-clean; CC5.2/CC6.1/CC4.1/CC7.2); AMEND-STALE-CHAIN-01 ordering invariant (`system.amendment_rate_monitor_stale_declared` HIGH/7yr must precede `system.amendment_rate_monitor_restored` STANDARD/3yr for same `incident_id`) HMAC-verified per incident; form-api NO ACCESS; `form_system` role only; registered §125 (2026-06-27)]) — parent `amendments/` added §118 (2026-06-26); `monitoring/` subfolder added §124 (2026-06-27)
   renewals/      (enterprise contract renewal pricing controls — REN-E-001/002/003; REN-OBS-E-001; RENEW-CRON-E-001/002/003/004/005 + RENEW-CRON-COMP-E-001 [R-28, incident-triggered]; form-api NO ACCESS)
   deletions/     (GDPR Art. 17 + standard post-churn deletion certificates — DEL-E-001; DEL-MON-E-001 [R-41 stale-incident aggregate; quarterly]; DEL-OBS-E-001 [job 43 pg_cron run history + AL-DEL-01 log — OBSERVABILITY §53.8; added §111]; migration-0085-validation receipts; form-api NO ACCESS)
+  erasure/        (GDPR Art. 17 erasure SLA monitor quarterly evidence — ERASURE-MON-E-001 [quarterly `c1-erasure-sla-monitor` job 11 pg_cron health report: run count, failure count, stale-window activation count, max-stale-hours, `danger_window_requests_at_declared` and `breach_requests_at_declared` for any R-43 activations, `art17_sla_breached` flag for any `restored` events; quarterly from M6; zero-activation quarters filed as affirmative attestation that GDPR Art. 17 day-33 monitoring was uninterrupted; P5.1/C1.2/CC4.1/CC7.2; 7yr WORM; `form_api` REVOKED]; erasure-sla-monitor-stale/ subfolder for per-incident R-43 evidence files [R-43-C1..C3 query outputs; `form_api` REVOKED]; form-api NO ACCESS) — added by §182 (2026-07-06)
   winback/       (enterprise logo winback programme reports — WBK-E-001 [§79.4 canonical; aliased WIN-E-001 in COST_MODEL §43.9]; form-api NO ACCESS)
   offboarding/   (enterprise deprovisioning chain compliance — CHN-E-001; CHN-OBS-E-001 [OFFBOARD-CHAIN-01 SLO performance report — OBSERVABILITY §53.8; added §111]; OFB-E-005 [EU tenant data-export DEC-030 chain]; OFB-E-006 [EU R2 jurisdiction config]; form-api NO ACCESS)
   etf-cron/      (mid-contract churn monitoring cron failure — ETF-CRON-E-001/002/003/004 + ETF-CRON-COMP-E-001 [R-29, incident-triggered]; form-api NO ACCESS)
@@ -27116,6 +27117,7 @@ PILOT-ACT-STALE-E-001 (SOC2_READINESS §126.6 — per-incident CC7.2/A1.1/CC3.2 
 CHAMP-LOGIN-STALE-E-001 (SOC2_READINESS §127 — per-incident CC7.2/A1.1/CC3.2 IC narrative for each R-50 `champion_login_monitor` job 50 stale activation; upload per incident within 48h of R-50 Step 6 completion; 7yr Object Lock when `t0b_gap_found = true` (T0-Beta miss during stale window — Day-45 champion session detection absent); 3yr when false; IC sets retention class at upload; privacy floor: `incident_id` UUID + booleans + aggregate integers + H1–H4 enum + operational timestamps only — no employee `user_id`, champion session content, tenant name, or GDPR Art. 9 data; Vanta access: compliance-officer + security-engineer only). Added by §127 (2026-06-29).
 WAU-DECLINE-STALE-E-001 (SOC2_READINESS §127 — per-incident CC7.2/A1.1/CC3.2 IC narrative for each R-51 `wau_decline_monitor` job 51 stale activation; upload per incident within 48h of R-51 Step 6 completion; 7yr Object Lock when `t0g_gap_found = true` (T0-Gamma miss — worst case 14–21 day blind spot from weekly job cadence; 2–3 missed Monday runs); 3yr when false; IC sets retention class at upload; privacy floor: `incident_id` UUID + booleans + aggregate integers + H1–H4 enum + operational timestamps only — no employee `user_id`, WAU values, tenant name, or GDPR Art. 9 data; Vanta access: compliance-officer + security-engineer only). Added by §127 (2026-06-29).
 SIEM-CR02-STALE-E-001 (SOC2_READINESS §153 — per-incident CC7.2 IC narrative for each R-65 `siem_bridge_cr02_impossible_travel` job 22 stale activation; upload per incident within 48h of `system.siem_cr02_restored` emission; 7yr WORM Object Lock; SIEM-CR02-STALE-CHAIN-01 DEC-030 event pair (`system.siem_cr02_stale_declared` HIGH/7yr → `system.siem_cr02_restored` LOW/3yr) chain-verifiable per HMAC-VERIFY-ALGO-001; R-65-C2 aggregate impossible-travel match count included; security-engineer sign-off attestation appended if `manual_cr02_match_count > 0`; upload blocked until sign-off obtained when `security_engineer_sign_off = true` required; privacy floor: `incident_id` UUID + aggregate integers + continent-pair strings + `root_cause` enum — no plaintext `actor_user_id`, employee name, email, IP address, or GDPR Art. 9 health data; `r2:form-api` REVOKED from `compliance/evidence/siem-bridge-stale/`). Added by §153 (2026-07-03).
+ERASURE-MON-E-001 (SOC2_READINESS §182 — quarterly P5.1/C1.2/CC4.1/CC7.2 `c1-erasure-sla-monitor` job 11 pg_cron health report: run count, failure count, stale-window activation count, max-stale-hours, `danger_window_requests_at_declared` and `breach_requests_at_declared` for any R-43 activations, `art17_sla_breached` flag for any `restored` events; upload quarterly from M6 within 48h of quarter end; zero-activation quarters uploaded as affirmative attestation that GDPR Art. 17 day-33 monitoring was uninterrupted; privacy floor: aggregate counts + timestamps only — no `dsar_request_id`, `user_id`, email, or GDPR Art. 9 data; `r2:form-api` REVOKED from `compliance/evidence/erasure/`). Added by §182 (2026-07-06).
 
 **What stays R2-only (never uploaded to Vanta):**
 
@@ -37467,3 +37469,104 @@ All procedures in this section enforce the §174.9 FORM privacy floor without ex
 ---
 
 *v4.7.0 (2026-07-06): §181 — CC-PKJWT-01/02/03 Weekly Schedule Entry & First-Run Pre-Staging (CC6.6/CC7.2/CC7.3 · §174 Compensating Controls). Closes §174.10 item 4 (calendar scheduling, was overdue since 2026-07-05) and pre-stages §174.10 item 5 (first evidence run, due 2026-07-07). §181.2 canonical calendar schedule entry: title `[SOC2] CC-PKJWT-01/02/03 Weekly Evidence — PKJWT Gap Controls`; weekly Monday 09:00–09:30 UTC; security-engineer (CC-PKJWT-01/02) + compliance-officer (CC-PKJWT-03); series starts 2026-07-07; retire at M6 §174.7 transition step 1; OOO grace window Wednesday +2 days with `schedule_note`. §181.3 six-step combined first-run procedure: Step 1 (lookback window confirmation 2026-07-05→2026-07-07T09:00Z); Step 2 CC-PKJWT-01 (two SQL queries: `sso.pkjwt_key_versions` incident_rotated scan + audit_log IC declared/closed pair check; `form_audit` read-only role); Step 3 CC-PKJWT-02 (`tenant_sso_configs` active PKJWT tenant enumeration + per-IdP JWKS endpoint probe; orphaned `kid` check; immediate P0 on mismatch); Step 4 CC-PKJWT-03 (IC declared/closed CTE with `sla_delta_seconds` + `sla_status`; immediate escalation on SLA breach); Step 5 R2 upload via `compliance/scripts/sign-evidence.sh`; Step 6 security-sync thread confirmation + §174.10 item 5 closure patch. §181.4 three pre-staged JSON schemas with field-level documentation: CC-PKJWT-01 (nil-activation: `[]` arrays, `PASS`), CC-PKJWT-02 (nil-activation: `orphaned_kid_count: 0`, `PASS`), CC-PKJWT-03 (nil-activation: `[]` `ic_pairs`, `PASS`); `run_type: "first_run"` on 2026-07-07, `"weekly"` on all subsequent runs. §181.5 expected first-run state: nil-activation across all three controls (48-hour gap window, no incidents expected); nil-activation is valid auditor-acceptable baseline evidence; PKJWT-GAP-E-001 Q3 2026 quarterly package (§174.4/§174.6, due 2026-10-31) collects all weekly files including first-run set. §181.6 §174.10 checklist: item 4 🔴→🟢 Done (§181.2); item 5 🔴→🟡 Pre-staged (§181.3/§181.4, close 2026-07-07); item 1 (R2 subfolder) remains 🔴 devops-lead dependency — coordinate before 2026-07-07 09:00 UTC. §181.7 §174.11 cross-reference: item 4 🟢 Done; item 5 🟡 Pre-staged; item 1 🔴 Pending devops-lead. §181.8 privacy floor: inherits §174.9 invariants; pre-staged JSON schemas explicitly exclude all PII, health data, GDPR Art. 9 special-category data, and `pkjwt_private_key_encrypted`; HR access to `compliance/evidence/pkjwt-gap/` prohibited. Also closes §174.11 cross-reference row (CC-PKJWT-01/02/03 weekly calendar scheduling) from 🔴 Pending → 🟢 Done. Document header v4.6.0 → v4.7.0. Owner: compliance-officer + security-engineer.*
+
+---
+
+## §182 ERASURE-MON-E-001 Registration — GDPR Art. 17 Erasure SLA Monitor Quarterly Evidence (P5.1/C1.2/CC4.1/CC7.2 · INCIDENT_RESPONSE R-43.11 item 4)
+
+**Date:** 2026-07-06
+**Owner:** compliance-officer
+**Status:** Registered (R-43.11 item 4 ✅ Done)
+**Criteria:** P5.1 / C1.2 / CC4.1 / CC7.2
+**Runbook cross-ref:** INCIDENT_RESPONSE R-43 (`c1-erasure-sla-monitor` — job 11 stale events)
+
+### §182.1 Context
+
+`docs/INCIDENT_RESPONSE.md §R-43.8` defines ERASURE-MON-E-001 as the quarterly SOC 2 evidence artefact for the `c1-erasure-sla-monitor` pg_cron job 11. The runbook cross-references `docs/SOC2_READINESS.md §79.4` with status `(pending R-43.11 item 4 registration)`. This section executes that registration, closing R-43.11 item 4 (P1/M11).
+
+`c1-erasure-sla-monitor` runs daily at 08:00 UTC (pg_cron job 11). It queries the `dsar_requests` table for open erasure requests older than 33 days — a 2-day early-warning window before the GDPR Art. 17 35-day SLA expires. A stale job event (26-hour freshness window exceeded) triggers R-43, which escalates through three conditions: C1 (`pg_cron` stale), C2 (`danger_window` erasure requests found during stale window), C3 (`art17_sla_breached` flag raised during stale window).
+
+**§79.4 evidence count update: 157 → 158.**
+
+### §182.2 §79.4 Master Evidence Table Entry
+
+| # | Artefact ID | Description | Criterion | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|---|
+| 158 | **ERASURE-MON-E-001** | Quarterly pg_cron job 11 (`c1-erasure-sla-monitor`) health report: run count, failure count, stale-window activation count, max-stale-hours, `danger_window_requests_at_declared` and `breach_requests_at_declared` for any R-43 activations, `art17_sla_breached` flag for any `restored` events. Zero-activation quarters filed as affirmative attestation that GDPR Art. 17 day-33 monitoring was uninterrupted. `form_api` REVOKED from evidence path. | P5.1 / C1.2 / CC4.1 / CC7.2 | Quarterly from M6 | 7 yr WORM | `compliance/evidence/erasure/erasure-mon-e-001-YYYY-QN.csv` |
+
+### §182.3 SOC 2 Auditor Narratives
+
+**P5.1 — Privacy notice and commitment:**
+ERASURE-MON-E-001 quarterly report confirms that the automated GDPR Art. 17 erasure monitoring sentinel (`c1-erasure-sla-monitor`, job 11) operated without interruption during the quarter. A zero-stale-activation quarter with complete run count attests that FORM's 33-day early-warning monitoring was uninterrupted — no erasure request aged past 33 days without triggering an alert. For auditors assessing privacy commitments: the 35-day SLA derives from a FORM policy floor that is 5 days shorter than GDPR Art. 17's 30-day calendar countdown from receipt, providing a structural buffer. Quarterly cadence from M6 aligns the first evidence collection with the completion of the first full observation quarter post-launch.
+
+**C1.2 — Commitments to affected parties:**
+ERASURE-MON-E-001 `run_count` and `failure_count` fields document the pg_cron job 11 operational continuity record for the quarter. The monitoring sentinel is the primary automated mechanism ensuring FORM's GDPR Art. 17 erasure commitment is enforced without human scheduling dependency — a continuous operational record is required for C1.2 compliance. For quarters containing R-43 activations: `stale_window_activation_count`, `max_stale_hours`, and the `art17_sla_breached` flag per activation document whether any Art. 17 commitment was at risk during the stale window, and whether remediation closed the gap before a breach occurred. Zero-activation quarters confirm the monitoring commitment operated without compromise during the observation period.
+
+**CC4.1 — Risk assessment and monitoring:**
+ERASURE-MON-E-001 `danger_window_requests_at_declared` (count of erasure requests within 2 days of SLA breach at the moment the R-43 stale event was declared) and `breach_requests_at_declared` (count of requests that had already breached the 35-day SLA at declaration time) provide auditors with a risk-severity signal for each stale window. A `breach_requests_at_declared > 0` finding triggers P0 escalation under R-43.8 — attesting that FORM's risk assessment process identified and escalated the highest-severity erasure risk in real time. Zero values for both fields confirm that no erasure SLA was at risk during any stale window in the quarter.
+
+**CC7.2 — Anomaly and event monitoring:**
+ERASURE-MON-E-001 `stale_window_activation_count` (aggregate count of R-43 activations in the quarter) maps directly to the anomaly monitoring requirement: each R-43 activation is a system-detected anomaly (job 11 missed its 26-hour freshness window) that was captured, escalated, and resolved per the runbook. For quarters with zero R-43 activations: the complete `run_count` with zero `failure_count` attests that the monitoring sentinel itself operated without anomaly — no detection blind-spot occurred during the period. `max_stale_hours` bounds the worst-case monitoring gap when R-43 was activated.
+
+### §182.4 Collection Procedure
+
+At end of each calendar quarter (Q1: March 31, Q2: June 30, Q3: September 30, Q4: December 31), compliance-officer runs the following query under `form_system` role (PAM elevation required; `form_api` REVOKED):
+
+```sql
+-- ERASURE-MON-E-001 quarterly collection query
+-- Replace YYYY-QN, <quarter_start>, <quarter_end> with actual values
+SELECT
+  'YYYY-QN'                                              AS quarter,
+  COUNT(*)                                               AS run_count,
+  COUNT(*) FILTER (WHERE status = 'failed')              AS failure_count,
+  SUM(stale_window_activated::int)                       AS stale_window_activation_count,
+  MAX(stale_hours) FILTER (
+    WHERE stale_window_activated = true)                 AS max_stale_hours,
+  COALESCE(SUM(danger_window_requests_at_declared)
+    FILTER (WHERE stale_window_activated = true), 0)     AS danger_window_requests_sum,
+  COALESCE(SUM(breach_requests_at_declared)
+    FILTER (WHERE stale_window_activated = true), 0)     AS breach_requests_sum,
+  BOOL_OR(art17_sla_breached)                            AS any_art17_sla_breached
+FROM cron.job_run_details jrd
+JOIN erasure_sla_monitor_stale_log esml
+  ON esml.run_id = jrd.runid
+WHERE jrd.jobid = 11
+  AND jrd.start_time >= '<quarter_start>'::timestamptz
+  AND jrd.start_time  < '<quarter_end>'::timestamptz;
+```
+
+1. Export result as CSV to `compliance/evidence/erasure/erasure-mon-e-001-YYYY-QN.csv`.
+2. Apply Object Lock (WORM, 7yr, Governance mode) and upload to R2.
+3. Upload to Vanta within 48 hours (evidence artefact ID: ERASURE-MON-E-001).
+4. Record in `mirror-log/YYYY-MM.jsonl`.
+5. Zero-activation quarters: file with `stale_window_activation_count = 0` as affirmative attestation — do not omit.
+
+**Privacy floor:** CSV contains aggregate counts and timestamps only. No `dsar_request_id`, `user_id`, email address, requestor name, erasure request content, health data, or GDPR Art. 9 special-category data. `danger_window_requests_at_declared` and `breach_requests_at_declared` are integer counts only — they do not identify individual requestors. `form_api` role has NO ACCESS to `compliance/evidence/erasure/` R2 path.
+
+### §182.5 R-43.11 Checklist Update
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Register DEC-030 events in AUDIT_LOG_SCHEMA | [ ] P0/M6 — pending |
+| 2 | Deploy PagerDuty routing rule | [ ] P0/M6 — pending |
+| 3 | Update OBSERVABILITY §12.6 | [x] Done (v5.14.4, 2026-07-03) |
+| **4** | **Register ERASURE-MON-E-001 in §79.4** | **[x] Done — §182 (2026-07-06)** |
+
+### §182.6 §80.3 / §80.4 Cross-Reference
+
+- **§80.3 R2 folder:** `compliance/evidence/erasure/` added to R2 folder structure (see §80.3). Subfolder `erasure-sla-monitor-stale/` holds per-incident R-43 evidence files.
+- **§80.4 Vanta mirror:** ERASURE-MON-E-001 added to Vanta upload list (see §80.4). Quarterly upload from M6; zero-activation quarters uploaded as affirmative attestation.
+
+### §182.7 Privacy Floor
+
+ERASURE-MON-E-001 artefact enforces the §79.6 FORM privacy floor without exception. The quarterly CSV contains only:
+- Aggregate counts (`run_count`, `failure_count`, `stale_window_activation_count`, `danger_window_requests_at_declared`, `breach_requests_at_declared` — all integers)
+- Duration fields (`max_stale_hours` — decimal hours)
+- Boolean flags (`any_art17_sla_breached`)
+- Quarter identifier string (YYYY-QN)
+
+No `dsar_request_id`, `user_id`, email address, requestor name, erasure request content, health data, or GDPR Art. 9 special-category data appears in any ERASURE-MON-E-001 file. The `danger_window_requests_at_declared` and `breach_requests_at_declared` fields are integer counts with no identifying information — they cannot be used to identify individual erasure requestors. HR access to `compliance/evidence/erasure/` is prohibited by bucket access controls (read/write: compliance-officer only; Vanta read: `r2:vanta-sync`; `r2:form-api` REVOKED).
+
+---
+
+*v4.8.0 (2026-07-06): §182 — ERASURE-MON-E-001 Registration (P5.1/C1.2/CC4.1/CC7.2 · INCIDENT_RESPONSE R-43.11 item 4). Registers quarterly `c1-erasure-sla-monitor` job 11 GDPR Art. 17 erasure SLA monitoring evidence artefact in §79.4 master evidence table (row 158), closing R-43.11 item 4 (P1/M11 — pending since R-43 runbook creation). §182.1 context: job 11 daily 08:00 UTC, 26h freshness window, 33-day early-warning query against `dsar_requests`, R-43 three-condition escalation (C1 stale / C2 danger_window / C3 art17_sla_breached). §182.2 §79.4 row 158: ERASURE-MON-E-001; P5.1/C1.2/CC4.1/CC7.2; quarterly from M6; 7yr WORM; path `compliance/evidence/erasure/erasure-mon-e-001-YYYY-QN.csv`; `form_api` REVOKED; zero-activation quarters filed as affirmative attestation. §182.3 four-criterion auditor narratives: P5.1 (privacy monitoring continuity + 35-day SLA structural buffer vs. Art. 17 30-day clock), C1.2 (erasure commitment operational continuity record + per-activation risk evidence), CC4.1 (danger_window + breach severity signals; P0 escalation when breach_requests_at_declared > 0), CC7.2 (anomaly monitoring continuity; complete run_count with zero failure_count = no detection blind-spot). §182.4 collection procedure: quarterly SQL against `cron.job_run_details` JOIN `erasure_sla_monitor_stale_log` for job 11; CSV export; 7yr WORM Object Lock; Vanta upload within 48h; zero-activation quarters not omitted. §182.5 R-43.11 item 4 🔴→🟢 Done; items 1/2 remain P0/M6 pending; item 3 Done (v5.14.4, 2026-07-03). §182.6 §80.3 `erasure/` + `erasure-sla-monitor-stale/` added; §80.4 Vanta mirror ERASURE-MON-E-001 added (quarterly from M6). §182.7 privacy floor: aggregate integers + duration + boolean + quarter string only; no `dsar_request_id`, `user_id`, email, GDPR Art. 9 data; `r2:form-api` REVOKED. Document header v4.6.0 → v4.8.0 (§181 intended v4.7.0 bump per CHANGELOG [13.39.1]; §182 applies consolidated v4.8.0 increment). Owner: compliance-officer.*
