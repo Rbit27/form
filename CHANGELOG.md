@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [13.67.2] — 2026-07-06
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.48.0 → v3.48.1. §R-83.12, §R-84.12, §R-85.12 cross-reference table rows updated from "Pending" to Done — AUDIT_LOG_SCHEMA.md v3.3 (2026-07-06) registrations confirmed. Follows inline-patch pattern of v3.21.1 (§R-50.8/R-51.8 stale closure). `sso.caep_stream_recovered` §R-83 row, `sso.caep_gdpr_deletion_opened/completed` §R-84 row, `sso.risc_hijacking_ic_opened/handled` §R-85 row now reference `AUDIT_LOG_SCHEMA.md §R-83/R-84/R-85 (v3.3)`.
+- `VERSION` — 13.67.1 → 13.67.2.
+
 ## [13.67.1] — 2026-07-06
 
 ### Added
