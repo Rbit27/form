@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.54.1] — 2026-07-06
+
+### Changed
+- `docs/OBSERVABILITY.md` — §77 SAML Certificate Lifecycle Observability added (v5.23.0). RED metrics for cron context (cert_expiry_alert/day, cert_uploaded/7d, cron freshness < 26 h), two SLOs (CERT-SLO-01 = SSO-SLO-05 zero-tolerance alias, CERT-SLO-02 cron freshness), five inline AL-CERT-01..05 runbooks, §26.9 "SAML Certificate Lifecycle" six-panel dashboard sub-group inserted, CERT-OBS-E-001 quarterly evidence artefact spec (CC6.1/CC7.2, 7yr WORM, Q3-2026 first filing). Document header v5.22.3 → v5.23.0.
+- `docs/SOC2_READINESS.md` — §185 CERT-OBS-E-001 registration added (v4.11.0); §79.4 evidence count 160 → 161. CC6.1 and CC7.2 auditor narratives. R2 folder `compliance/evidence/cert-obs/` established.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §20.12 OBSERVABILITY §77 backreference added (v2.39). Cross-reference table mapping all §20 SAML cert lifecycle primitives to §77 observability coverage.
+- `VERSION` — 13.54.0 → 13.54.1.
+
+---
+
 ## [13.54.0] — 2026-07-06
 
 ### Added

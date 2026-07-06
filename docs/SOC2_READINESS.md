@@ -37835,6 +37835,76 @@ ERASURE-STALE-E-001 artefact enforces the §79.6 FORM privacy floor without exce
 
 ---
 
+---
+
+## §185 CERT-OBS-E-001 Registration (CC6.1 / CC7.2 · OBSERVABILITY §77)
+
+> v4.11.0 · 2026-07-06 · Owner: compliance-officer. Review: security-engineer + devops-lead.
+
+### §185.1 Context
+
+`docs/OBSERVABILITY.md §77` (v5.23.0, 2026-07-06) defines the SAML Certificate Lifecycle Observability layer and specifies CERT-OBS-E-001 as the quarterly evidence artefact for CC6.1 (certificate posture as logical access control) and CC7.2 (continuous monitoring for deteriorating certificate states). This section registers CERT-OBS-E-001 in the §79.4 master evidence table (count 160 → 161).
+
+**Companion documents:**
+- `docs/OBSERVABILITY.md §77` — authoritative observability spec (RED metrics, SLOs, alert runbooks, dashboard sub-group, artefact spec)
+- `docs/SSO_SCIM_IMPLEMENTATION.md §20` — canonical SAML certificate lifecycle design
+- `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` (v2.99, 2026-07-05) — four DEC-030 events; CC6-E-CERT-001..004 artefacts (§79.4 rows 147–150, §175)
+
+### §185.2 §79.4 Row 161: CERT-OBS-E-001
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | CERT-OBS-E-001 |
+| **SOC 2 criteria** | CC6.1 / CC7.2 |
+| **Cadence** | Quarterly (Q1–Q4 calendar year) |
+| **Retention** | 7 years WORM |
+| **R2 path** | `compliance/evidence/cert-obs/cert-obs-e-001-{YYYY}-Q{N}.json` |
+| **Access** | compliance-officer + devops-lead (read/write); `r2:vanta-sync` (read-only); `r2:form-api` REVOKED; HR access PROHIBITED |
+| **First filing** | Q3-2026 (due 2026-10-01) |
+| **§79.4 row** | 161 (count 160 → 161) |
+
+**Six report components (per §77.8):**
+1. Active SAML tenant count and cert class breakdown (SP / IdP) at quarter-end snapshot
+2. `sso.cert_expired` event count for the quarter (zero-event attestation required for CC6.1)
+3. `sso.cert_expiry_alert` event count by tier (t90/t60/t30/t14/t7/t2) for the quarter
+4. `sso.cert_uploaded` event count for the quarter (cert rotation cadence evidence)
+5. AL-CERT-01..AL-CERT-05 activation log for the quarter
+6. CERT-SLO-01 and CERT-SLO-02 compliance summary for the quarter
+
+**Per-incident supplement:** For any AL-CERT-04 (cert expired, P0) or AL-CERT-05 (cron failure, P1) activation, append supplement within 24 h of resolution: incident timeline, root cause, remediation steps, SLA credit decision.
+
+### §185.3 Auditor Narratives
+
+**CC6.1 — Logical access controls:** CERT-OBS-E-001 quarterly zero-event attestation for `sso.cert_expired` provides continuous evidence that FORM's SAML certificate lifecycle monitoring prevents expired certificates from remaining active on any tenant. The `cert_alert_tier` state machine (ok→t90→t60→t30→t14→t7→t2→expired) with graduated P3→P0 alert coverage (AL-CERT-01..04) ensures SSO access gates are maintained. CERT-SLO-01 (alias SSO-SLO-05) enforces zero-tolerance — any `sso.cert_expired` event constitutes an immediate SLA breach and triggers R-04. HMAC-chained DEC-030 events ensure tamper-evident monitoring records.
+
+**CC7.2 — System monitoring:** CERT-OBS-E-001 provides quarterly evidence that FORM continuously detects deteriorating certificate states across the fleet. AL-CERT-01..AL-CERT-05 activation logs demonstrate that the monitoring system surfaces warnings at t90, t60, t30, t14, t7, t2, and expired tiers before customer impact. CERT-SLO-02 (cron freshness < 26 h) ensures the `cert-expiry-check` CF Workers Cron Trigger operates without gaps; AL-CERT-05 and R-80 provide the detection and response path for monitoring failures.
+
+### §185.4 R2 Folder and Vanta Mirror
+
+**R2 folder:** `compliance/evidence/cert-obs/` established this pass. Each quarterly filing creates a file `cert-obs-e-001-{YYYY}-Q{N}.json`. Access controls: compliance-officer + devops-lead (read/write); `r2:vanta-sync` (read-only for Vanta upload); `r2:form-api` REVOKED. HR access PROHIBITED.
+
+**Vanta mirror:** CERT-OBS-E-001 added to §80.4 Vanta upload list. Cadence: quarterly, within 14 days of quarter-end (Q1 = April 14, Q2 = July 14, Q3 = October 14, Q4 = January 14). Evidence ID: CERT-OBS-E-001. For zero-activation quarters (no AL-CERT-04 or AL-CERT-05 activations): file the standard six-component report with `sso.cert_expired` event count = 0 as the zero-event attestation.
+
+### §185.5 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register CERT-OBS-E-001 in `docs/SOC2_READINESS.md §79.4` (count 160 → 161) | `docs/OBSERVABILITY.md §77.8` (v5.23.0, 2026-07-06) | 🟢 **Done — §185 this pass (2026-07-06)** |
+| `docs/SSO_SCIM_IMPLEMENTATION.md §20.12` OBSERVABILITY §77 backreference | `docs/OBSERVABILITY.md §77.10` cross-reference obligation | 🟢 **Done — SSO_SCIM_IMPLEMENTATION.md v2.39 this pass (2026-07-06)** |
+
+### §185.6 Privacy Floor
+
+CERT-OBS-E-001 artefact enforces the §79.6 FORM privacy floor without exception:
+
+- All six report components use only aggregate counts and operational metadata: `tenant_id` (FORM-internal UUID, not included in artefact — count only), `cert_class` (sp/idp enum), `cert_alert_tier` (state machine enum), `alert_rule` identifier, event counts.
+- No employee `user_id`, name, email, `fingerprint_sha256`, PEM certificate content, private key material, or GDPR Art. 9 special-category health data appears in any artefact field.
+- Per-incident supplement contains: incident timeline (timestamps), root cause (enum), remediation steps (operational), SLA credit decision (boolean + amount). No PII.
+- HR access to `compliance/evidence/cert-obs/` is prohibited by bucket access controls.
+
+---
+
+*v4.11.0 (2026-07-06): §185 — CERT-OBS-E-001 Registration (CC6.1 / CC7.2 · OBSERVABILITY §77 · SSO_SCIM §20). Registers the SAML Certificate Lifecycle Observability quarterly evidence artefact in §79.4 (count 160 → 161). CERT-OBS-E-001 is the auditor-facing evidence artefact for the full certificate lifecycle monitoring layer authored in `docs/OBSERVABILITY.md §77` (v5.23.0, 2026-07-06): cert-expiry-check CF Workers Cron Trigger (daily 02:00 UTC), cert_alert_tier state machine (ok→t90→t60→t30→t14→t7→t2→expired), four DEC-030 events (sso.cert_expiry_alert/sso.cert_expired/sso.cert_uploaded/sso.cert_monitor_error, registered AUDIT_LOG_SCHEMA v2.99 2026-07-05), five alert rules AL-CERT-01..05 (§26.5, §6.2 cert_lifecycle subsection), CERT-SLO-01 (zero expired certs / SSO-SLO-05 alias / R-04 companion) and CERT-SLO-02 (cron freshness < 26 h / R-80 companion), six-panel §26.9 dashboard sub-group (v5.23.0). Distinct from CC6-E-CERT-001..004 (§175, §79.4 rows 147–150, v4.1.0, 2026-07-05) which are the per-upload/per-rotation DEC-030 event artefacts; CERT-OBS-E-001 is the quarterly monitoring-layer aggregate. §185.2 §79.4 row 161: CC6.1/CC7.2; quarterly; 7yr WORM; `compliance/evidence/cert-obs/cert-obs-e-001-{YYYY}-Q{N}.json`; `r2:form-api` REVOKED; HR PROHIBITED. §185.3 two auditor narratives: CC6.1 (zero-event attestation for sso.cert_expired = continuous cert posture evidence; state machine + AL-CERT-01..04 + CERT-SLO-01/SSO-SLO-05; HMAC tamper-evident) and CC7.2 (quarterly AL-CERT-01..05 activation log = deteriorating-state detection evidence; CERT-SLO-02 cron freshness; AL-CERT-05 + R-80 monitoring-failure response path). §185.4 R2 + Vanta: `compliance/evidence/cert-obs/` established; quarterly upload within 14 days of quarter-end; nil-activation quarters filed with sso.cert_expired count = 0. §185.5 two cross-reference obligations: §79.4 row 161 Done this pass; SSO_SCIM v2.39 §20.12 Done this pass. §185.6 privacy floor: aggregate counts and operational metadata only; no fingerprint_sha256, PEM, private key, user_id, email, GDPR Art. 9 data; HR access prohibited. Companion edits: `docs/OBSERVABILITY.md` v5.23.0 (§77 full section + §26.9 SAML Certificate Lifecycle sub-group); `docs/SSO_SCIM_IMPLEMENTATION.md` v2.39 (§20.12 backreference). Document header v4.10.0 → v4.11.0. Owner: compliance-officer. Review: security-engineer + devops-lead.*
+
 *v4.10.0 (2026-07-06): §184 — ERASURE-STALE-E-001 Registration (P5.1/C1.2/CC4.1/CC7.2 · INCIDENT_RESPONSE R-43 · AUDIT_LOG_SCHEMA §C1-Erasure-SLA-Monitor-Stale-Events v3.2, 2026-07-06). Closes the SOC2_READINESS §79.4 registration gap for ERASURE-STALE-E-001 — the per-activation `c1-erasure-sla-monitor` (job 11) stale incident record defined in AUDIT_LOG_SCHEMA v3.2 (R-43.11 item 1 closure). ERASURE-STALE-E-001 is distinct from ERASURE-MON-E-001 (§182, quarterly aggregate) and PD-ERASURE-E-001 (§183, one-time routing verification). §184.1 context: three-artefact erasure-evidence cluster — ERASURE-MON-E-001 (quarterly operational health), PD-ERASURE-E-001 (one-time AL-C1-02 routing verification), ERASURE-STALE-E-001 (per-activation stale IC record); AUDIT_LOG_SCHEMA v3.2 added the ERASURE-STALE-E-001 artefact spec in §C1-Erasure-SLA-Monitor-Stale-Events with four auditor narratives and R2 path; §79.4 count 159 → 160. §184.2 §79.4 row 160: ERASURE-STALE-E-001; P5.1/C1.2/CC4.1/CC7.2; per-activation; 7yr WORM; `compliance/evidence/erasure/erasure-sla-monitor-stale/r43-{incident_id}/`; six components (stale_declared JSON, C1 job runs, C2 danger count, C3 breach count, root cause, restored JSON); `form_api` REVOKED. §184.3 four-criterion auditor narratives: P5.1 (stale_declared before recovery action + danger_window/breach counts = tamper-evident GDPR Art. 17 SLA-risk attestation; HMAC chain C1-ERASURE-STALE-CHAIN-01 ensures independence from recovery outcome), C1.2 (breach_requests_at_declared immediately classifies contractual breach; ≥1 triggers R-09; chain ordering prevents IC closure without assessment; zero = affirmative 35-day commitment attestation), CC4.1 (stale_window_hours bounds worst-case monitoring gap; per-activation record of control-monitoring continuity distinct from ERASURE-MON-E-001 quarterly aggregate; pg-cron-health-monitor detecting job 11 staleness demonstrates control-monitoring framework), CC7.2 (C1-ERASURE-STALE-CHAIN-01 HMAC chain provides tamper-evident detection-to-restoration timeline per HMAC-VERIFY-ALGO-001; inversion triggers R-05 + HTTP 422 C1_ERASURE_STALE_CHAIN_01_VIOLATION — anomaly-monitoring system self-detects ordering violations). §184.4 R2 + Vanta: `erasure-sla-monitor-stale/` established §182.6; per-activation upload within 48h of IC closure; nil-activation periods not uploaded (ERASURE-MON-E-001 quarterly covers nil-activation assertion). §184.5 R-43.11 item 5 added [x] Done — §184 (2026-07-06); items 1/3/4 remain Done; item 2 pending P0/M6. §184.6 three cross-reference obligations all Done this pass: §79.4 row 160, R-43.11 item 5, R-82.10 stale-reference patch (session.revocation_kv_sync_restored from "pending §R-82.11 item 1" → AUDIT_LOG_SCHEMA v3.1 registered). §184.7 privacy floor: both events aggregate integers + enums + timestamps only; R-43-C1 job_run_details operational metadata only; R-43-C2/C3 integer counts only; no dsar_request_id, user_id, email, name, or GDPR Art. 9 data; HR access prohibited. Companion edits: INCIDENT_RESPONSE.md v3.48.0 (R-43.11 item 5 [x] Done §184; R-43.11 v1.1 footer; R-82.10 session.revocation_kv_sync_restored cross-reference updated from pending §R-82.11 item 1 to AUDIT_LOG_SCHEMA.md v3.1 registered). Document header v4.9.0 → v4.10.0. Owner: compliance-officer. Review: security-engineer.*
 
 *v4.9.0 (2026-07-06): §183 — AL-C1-02 PagerDuty Routing Rule Deployment Spec (CC7.2/CC4.1/P5.1 · R-43.11 item 2). Pre-stages the deployment specification for the sole remaining open P0/M6 obligation in the R-43 implementation checklist — the missing `form-alert-relay` routing rule for `system.cron_job_stale` events from `c1-erasure-sla-monitor` (job 11). §183.1 background: without AL-C1-02, job 11 staleness emits `system.cron_job_stale` into the HMAC audit chain but PagerDuty P1 does not fire — compliance-officer receives no page during the Art. 17 day-33 monitoring blind spot; complements AL-C1-01 (runs-and-finds-breach path, OBSERVABILITY §6.2) by covering the orthogonal stale-job path. §183.2 AL-C1-02 formal definition: trigger = `system.cron_job_stale` + `job_name = 'c1-erasure-sla-monitor'`; PagerDuty `form-compliance` P1 (severity `warning`); dedup `c1-erasure-sla-monitor-stale`; auto-resolve false (R-43-C2/C3 scope queries required before resolution); Slack `#security-alerts` HIGH; CC7.2/CC4.1/P5.1. §183.3 `form-alert-relay` TypeScript routing rule: `cron_stale_routing` table entry with exact field values; sort alphabetically before AL-CI-07 (`ci_telemetry_daily_sync`); `PAGERDUTY_FORM_COMPLIANCE_ROUTING_KEY` secret prerequisite. §183.4 PagerDuty `form-compliance` service configuration: T+0/T+3/T+8/T+15 escalation tiers; auto-resolution disabled; GDPR Art. 17 resolution annotation for service description. §183.5 integration test AL-C1-02-INT-01: 8-step procedure (unschedule job 11, synthetic POST to form-alert-relay, confirm PagerDuty API v2 POST with correct dedup key and severity, confirm P1 incident on form-compliance with auto-resolve false, confirm Slack HIGH, re-enable job 11, confirm no auto-resolve, record PD-ERASURE-E-001); pass criteria. §183.6 PD-ERASURE-E-001 artefact: CC7.2/CC4.1/P5.1; one-time on deployment; 7yr WORM; R2 path `compliance/evidence/erasure/pd-erasure-e-001-deployment.json`; `form_api` REVOKED; 18-field JSON schema (artefact_id, alert_id, soc2_criteria, deployment_date, integration_test_id, integration_test_run_type, integration_test_date, pagerduty_incident_id, pagerduty_service, dedup_key_confirmed, severity_confirmed, auto_resolve_confirmed, cloudflare_worker_log_ref, slack_notification_confirmed, result, collected_by, collected_at, upload_note). §183.7 §79.4 row 159: PD-ERASURE-E-001; CC7.2/CC4.1/P5.1; one-time; 7yr WORM; `compliance/evidence/erasure/pd-erasure-e-001-deployment.json`; `form_api` REVOKED; §79.4 count 158→159. §183.8 R-43.11 checklist: item 2 🔴→🟡 Pre-staged (§183.3 + §183.5 + §183.6; close on production deployment + INT-01 pass); items 1/3/4 remain Done. §183.9 six cross-reference obligations: two 🟡 Pre-staged (deploy AL-C1-02; run INT-01); two 🔴 Pending (upload PD-ERASURE-E-001; register AL-C1-02 in OBSERVABILITY §6.2); one 🔴 Pending (patch R-43.11 item 2 [x] after INT-01); one 🟢 Closed this pass (patch R-43.11 item 4 [x] Done — §182 2026-07-06). §183.10 privacy floor: `system.cron_job_stale` payload contains job metadata only; PagerDuty summary and Slack message contain no PII; PD-ERASURE-E-001 contains routing configuration metadata only; HR access to `compliance/evidence/erasure/` prohibited. Document header v4.8.0 → v4.9.0. Owner: devops-lead + compliance-officer. Review: security-engineer.*

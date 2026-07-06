@@ -17201,3 +17201,43 @@ Once all four conditions are met: update `§46.9` G-003 row from `🟡 Implement
 *v2.37 (2026-07-05): §9 G-009 cross-reference patch + §22.15 item 9 closure. G-009 row updated from 🔴 Open to 🟡 Authored — references §22 (High-Scale Session Revocation Architecture, v1.4, 2026-06-01); two-tier Cloudflare KV + Supabase write-through design closes the hot-path bottleneck gap; status note clarifies closure path (🟢 once `SESSION_REVOCATION_KV` deployed, `isRevoked()` integrated, CC6-E-REV-002 migration-window snapshot collected). §22.15 item 9 (P1, M4 — "Update G-009 entry in §9 to reference §22") marked [x] Done — 2026-07-05. CC6-E-REV-001 / CC6-E-REV-002 / CC6-E-REV-003 cross-reference link added to G-009 resolution column, pointing to `docs/SOC2_READINESS.md §178` where evidence artefacts are registered (evidence count 152 → 155). Header v2.36 → v2.37. Owner: compliance-officer.*
 
 *v2.38 (2026-07-05): §22.15 item 12 — OBSERVABILITY §76 backreference. Closes `docs/OBSERVABILITY.md §76.10` cross-reference obligation "Add `docs/SSO_SCIM_IMPLEMENTATION.md §22.15` item 12 backreference to OBSERVABILITY §76" (previously 🟡 Pending next SSO_SCIM pass). §22.15 item 12 documents the full §76 SESSION_REVOCATION_KV observability section (v5.22.0, 2026-07-05): §76.1–§76.10 scope covering four KV key types, five DEC-030 events, AL-REVOKE-01/02 dedicated section, REVOKE-SLO-01/02, §26.9 "Session Revocation KV" dashboard sub-group, REVOKE-OBS-E-001 quarterly artefact (SOC2_READINESS §179, count 155 → 156); §76.9 item 4 (R-82 companion IR runbook) marked Done (OBSERVABILITY v5.22.1, INCIDENT_RESPONSE v3.47.0, SOC2_READINESS §180 count 156 → 157). Document header v2.37 → v2.38. Owner: compliance-officer.*
+
+---
+
+### §20.12 OBSERVABILITY §77 Cross-Reference
+
+> Added v2.39 (2026-07-06). Closes `docs/OBSERVABILITY.md §77.10` cross-reference obligation "Add `docs/SSO_SCIM_IMPLEMENTATION.md §20.12` backreference to OBSERVABILITY §77".
+
+`docs/OBSERVABILITY.md §77` (v5.23.0, 2026-07-06) is the canonical observability layer for the SAML Certificate Lifecycle system designed in **§20** of this document. §77 closes the gap that existed between §20's design spec (cert-expiry-check cron, cert_alert_tier state machine, two cert classes, four DEC-030 events, five alert rules) and the observability infrastructure (RED metrics, SLOs, inline runbooks, dashboard sub-group, quarterly evidence artefact).
+
+**§77 scope summary (referencing §20 primitives):**
+
+| §20 primitive | §77 observability coverage |
+|---|---|
+| `cert-expiry-check` CF Workers Cron Trigger (`0 2 * * *` UTC) | §77.2 Duration: cron freshness metric; §77.3 CERT-SLO-02 (< 26 h zero-tolerance); §77.4 AL-CERT-05 runbook (P1 R-80 companion) |
+| `cert_alert_tier` state machine (ok→t90→t60→t30→t14→t7→t2→expired) | §77.2 Rate: `sso.cert_expiry_alert` events/day; §77.4 AL-CERT-01..04 inline runbooks; §77.6 panel 2 (fleet distribution stacked bar) |
+| SP cert class (`saml_sp_cert`, FORM-generated) | §77.1 scope; §77.2 Rate metrics; §77.4 SP-specific runbook branches; §77.6 panel 1 (expiry < 30 days) |
+| IdP cert class (`saml_idp_cert`, customer-managed) | §77.1 scope; §77.4 IdP-specific runbook branches (CSM contact, escalation paths); §77.6 panel 1 |
+| `sso.cert_expiry_alert` (MEDIUM/HIGH/CRITICAL per tier, 7yr) | §77.2 Rate primary metric; §77.6 panel 3 (90-day grouped bar by tier) |
+| `sso.cert_expired` (CRITICAL, 7yr) | §77.2 Errors: zero-tolerance; §77.3 CERT-SLO-01/SSO-SLO-05 breach; §77.4 AL-CERT-04 P0 runbook (R-04 companion); §77.8 CERT-OBS-E-001 zero-event attestation |
+| `sso.cert_uploaded` (STANDARD, 7yr) | §77.2 Rate: rotation cadence; §77.6 panel 6 (30-day count) |
+| `sso.cert_monitor_error` (HIGH, 7yr) | §77.2 Errors: zero-tolerance; §77.4 AL-CERT-05 trigger |
+| AL-CERT-01..AL-CERT-05 (§26.5) | §77.4 full inline runbooks; §77.5 registration pointers; §77.6 panel 5 (90-day activation table) |
+| SSO-SLO-05 (zero expired certs) | §77.3 CERT-SLO-01 alias; §77.4 AL-CERT-04 breach action |
+
+**Companion edits this pass:**
+- `docs/OBSERVABILITY.md` v5.23.0 — §77 full section + §26.9 "SAML Certificate Lifecycle" six-panel sub-group
+- `docs/SOC2_READINESS.md` v4.11.0 — §185 CERT-OBS-E-001 registration (count 160 → 161)
+
+**Implementation checklist update (§20.11):**
+
+| # | Item | Status |
+|---|---|---|
+| ... | (items 1–11 per §20.11 unchanged) | — |
+| 12 | `docs/OBSERVABILITY.md §77` SAML Certificate Lifecycle Observability section | [x] Done — v5.23.0 (2026-07-06) |
+
+**Privacy floor:** §77 adds no new data collection beyond what §20 already defines. All §77 metrics, alert rules, dashboard queries, and evidence artefact fields use only `tenant_id` (FORM-internal UUID) and `cert_class` (sp/idp enum). `fingerprint_sha256`, PEM certificate content, and private key material are never referenced in any monitoring query, alert condition, or evidence artefact. HR sees no certificate data. Employee `user_id` is never present in any §77 or §20 metric.
+
+---
+
+*v2.39 (2026-07-06): §20.12 — OBSERVABILITY §77 backreference. Closes `docs/OBSERVABILITY.md §77.10` cross-reference obligation for `docs/SSO_SCIM_IMPLEMENTATION.md §20.12`. §20.12 documents the full §77 SAML Certificate Lifecycle Observability section (v5.23.0, 2026-07-06): §77.1–§77.10 scope covering cert-expiry-check CF Workers Cron Trigger, two cert classes (sp/idp), cert_alert_tier state machine, four DEC-030 events, five alert rules AL-CERT-01..05, CERT-SLO-01 (SSO-SLO-05 alias, zero-tolerance, R-04 companion) and CERT-SLO-02 (cron freshness < 26 h, R-80 companion), six-panel "SAML Certificate Lifecycle" §26.9 dashboard sub-group (inserted v5.23.0), CERT-OBS-E-001 quarterly evidence artefact (SOC2_READINESS §185, count 160 → 161, CC6.1/CC7.2, 7yr WORM, Q3-2026 first filing). Companion edits: OBSERVABILITY.md v5.23.0; SOC2_READINESS.md v4.11.0 §185. Document header v2.38 → v2.39. Owner: compliance-officer + enterprise-architect.*

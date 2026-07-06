@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.22.3
+# FORM · Observability & Monitoring Taxonomy v5.23.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -6412,6 +6412,19 @@ A dedicated "Enterprise Identity" Metabase dashboard (Supabase-backed panels) an
 | **Tenant nuke events — 90-day weekly bar (by tenant)** | Bar chart stacked by `tenant_id`, weekly buckets; `tenant_nuke` count ≥ 2 / week per tenant triggers investigation note | `SELECT payload->>'tenant_id', DATE_TRUNC('week', created_at), COUNT(*) FROM audit_log_events WHERE event_type = 'session.revoked_by_nuke' AND created_at > NOW() - INTERVAL '90 days' GROUP BY 1, 2` (form_audit role) | Daily refresh |
 
 **Privacy floor:** All six panel queries use `tenant_id` (FORM-internal UUID) only — no `user_id`, `session_id`, `employee_id`, or any GDPR Art. 9 special-category data appears in any query or panel output. `revoked_count` in `session.bulk_revocation_complete` is an aggregate integer (not a session enumeration). **Alert cross-links:** "KV sync error rate" links to AL-REVOKE-01 runbook (P1 PagerDuty `form-security`, 5-min trigger); "Bulk revocation P95" links to AL-REVOKE-02 runbook (P2 Slack `#alerts-enterprise`, threshold 5,000 ms). Full alert rule spec: §26.6 / §76.4. SOC 2 evidence: REVOKE-OBS-E-001 (§76.8, quarterly, CC6.3 / CC7.2 / CC7.3, 7 yr WORM).
+
+**SAML Certificate Lifecycle sub-group** (per §77.6; positioned after Session Revocation KV sub-group above; owner: devops-lead; deployed at M4):
+
+| Panel | Type | Query source | Update cadence |
+|---|---|---|---|
+| **Active SAML tenants with cert expiry < 30 days** | Single-stat count; background turns ember if > 0 | `SELECT COUNT(DISTINCT tenant_id) FROM tenant_sso_configs WHERE sso_enabled = true AND (saml_sp_cert_expires_at < NOW() + INTERVAL '30 days' OR saml_idp_cert_expires_at < NOW() + INTERVAL '30 days')` (form_audit role) | Daily (cron run) |
+| **cert_alert_tier distribution (SP + IdP, current fleet snapshot)** | Stacked bar: one bar per cert_class with tiers as segments; ok=green, t60/t30/t14=graduated amber, t7/t2=ember, expired=red | `SELECT cert_class, cert_alert_tier, COUNT(*) FROM tenant_sso_configs WHERE sso_enabled = true GROUP BY cert_class, cert_alert_tier` (form_audit role) | Daily (cron run) |
+| **sso.cert_expiry_alert events by tier (last 90 days)** | Grouped bar chart: x=alert_tier enum, y=event count, color=cert_class | `SELECT payload->>'alert_tier', payload->>'cert_class', COUNT(*) FROM audit_log_events WHERE event_type = 'sso.cert_expiry_alert' AND created_at > NOW() - INTERVAL '90 days' GROUP BY 1, 2` (form_audit role) | Daily |
+| **cert-expiry-check cron freshness** | Single-stat: hours since last successful cron execution; background turns red if > 26 h (AL-CERT-05 threshold); CERT-SLO-02 reference line | Cloudflare Workers Tail last-success timestamp OR `SELECT EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600 AS hours_since FROM audit_log_events WHERE event_type IN ('sso.cert_expiry_alert', 'sso.cert_monitor_error') AND created_at > NOW() - INTERVAL '48 hours'` as DEC-030 proxy (form_audit role) | Hourly refresh |
+| **AL-CERT-01..04 activations (last 90 days)** | Table: alert_rule / activation_count / last_activation_date; any AL-CERT-03 or AL-CERT-04 row with count > 0 highlighted in ember | PagerDuty API: incidents by service "FORM SSO Certs" filtered by alert key prefixes cert-t60-*/cert-t30-*/cert-t7-*/cert-expired-* within 90 days (form_audit role DEC-030 proxy available) | Daily |
+| **sso.cert_uploaded events (last 30 days)** | Single-stat count; zero = no rotations ongoing | `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'sso.cert_uploaded' AND created_at > NOW() - INTERVAL '30 days'` (form_audit role) | Daily |
+
+**Privacy floor:** All six panel queries use `tenant_id` (FORM-internal UUID) and `cert_class` (operational enum) only — no employee `user_id`, name, email, `fingerprint_sha256`, PEM content, or GDPR Art. 9 special-category data appears in any query or panel output. **Alert cross-links:** "cert_alert_tier distribution" links to §26.5 AL-CERT-01..04; "cert-expiry-check cron freshness" links to AL-CERT-05 runbook (P1 PagerDuty `form-security`, 26 h threshold). Full alert rule spec: §26.5 / §77.4. SOC 2 evidence: CERT-OBS-E-001 (§77.8, quarterly, CC6.1 / CC7.2, 7 yr WORM); CC6-E-CERT-001..004 (`docs/SOC2_READINESS.md §175`, v4.1.0, 2026-07-05).
 
 ---
 
@@ -20883,3 +20896,229 @@ Six-panel sub-group added to §26.9 Enterprise Identity Dashboard. See §26.9 ab
 *v5.22.2 (2026-07-05): §76.10 SSO_SCIM backreference obligation closure. The v5.22.1 pass authored `docs/SSO_SCIM_IMPLEMENTATION.md` v2.38 (§22.15 item 12) as a companion edit, but the §76.10 cross-reference table row was not updated in that pass — it remained 🟡 Pending next SSO_SCIM pass. This patch closes the inconsistency: §76.10 SSO_SCIM row updated from 🟡 to 🟢 Done — 2026-07-05 (SSO_SCIM_IMPLEMENTATION.md v2.38; §22.15 item 12 documents §76.1–§76.10 scope). The v5.22.0 footer note also patched to reflect all four §76.10 obligations now 🟢 Done (previously stated "two pending"). All four §76.10 cross-reference obligations are now closed with no remaining 🟡 items in §76. Document header v5.22.1 → v5.22.2. Owner: compliance-officer.*
 
 *v5.22.3 (2026-07-05): §44.6 checklist consistency patch — items 5 and 6 stale `[ ]` closed. Both tasks were completed in June 2026 but the §44.6 implementation checklist table was never updated to reflect Done status. Item 5 (`§27.7 + §6.2` dual-phase AL-SIEM-06 patch): closed by OBSERVABILITY.md v4.2 (2026-06-15) — `§27.7` AL-SIEM-06 row was replaced with shadow-mode row + full-mode row + AL-SIEM-06-SHADOW-END informational row per §44.2.4 (DEC-056); `§6.2` master alert table updated simultaneously; the v4.2 footer note explicitly states "closes §44.6 checklist item 5 (P0/M5)" but the table cell was not patched in that pass. Item 6 (`SOC2_READINESS.md §76.11` OQ-ANOM-01/02 resolution + `§76.9` CC4.1 gap tracker update): closed by SOC2_READINESS.md v3.9.0 (2026-06-15) — §76.11 OQ-ANOM-01 updated to 🟢 Resolved — DEC-057 (2026-06-13) and OQ-ANOM-02 updated to 🟢 Resolved — DEC-056 (2026-06-13); §76.9 gap tracker CC4.1 monitoring-of-monitoring confirmed 🟡 Partial; §83 SOC2_READINESS.md cross-update section documents both resolutions with SOC 2 auditor rationale. No new obligations, no scope change, no evidence artefacts. Document header v5.22.2 → v5.22.3. Owner: compliance-officer.*
+
+---
+
+## §77 SAML Certificate Lifecycle Observability
+
+> Added v5.23.0 (2026-07-06). Owner: devops-lead + compliance-officer + security-engineer. SOC 2: CC6.1 / CC7.2. Privacy floor: no employee PII in any metric or dashboard query.
+
+### §77.1 Scope
+
+Monitors FORM's SAML certificate lifecycle management system (canonical design: `docs/SSO_SCIM_IMPLEMENTATION.md §20`). Two certificate classes are tracked:
+
+- **sp** — SP-side certificates generated by FORM (`tenant_sso_configs.saml_sp_cert`, FORM-generated and rotated)
+- **idp** — IdP-side certificates uploaded by customer IT admins (`tenant_sso_configs.saml_idp_cert`, customer-managed)
+
+**Monitored components:**
+
+| Component | Description |
+|---|---|
+| `cert-expiry-check` CF Workers Cron Trigger | Daily (`0 2 * * *` UTC) sweep of all `sso_enabled = true` tenants; transitions `cert_alert_tier` state machine and emits DEC-030 events |
+| `cert_alert_tier` state machine | States: `ok → t90 → t60 → t30 → t14 → t7 → t2 → expired`; per-cert-class, per-tenant |
+| DEC-030 audit events | Four events: `sso.cert_expiry_alert`, `sso.cert_expired`, `sso.cert_uploaded`, `sso.cert_monitor_error` (see `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle`) |
+| Alert rules | AL-CERT-01..AL-CERT-05 (§26.5); mapped to §77.4 inline runbooks |
+| SLO | SSO-SLO-05 (zero expired certs on active SAML tenants) aliased as CERT-SLO-01 |
+
+**SOC 2 control scope:** CC6.1 (logical access controls — certificate posture management), CC7.2 (continuous monitoring for deteriorating certificate states).
+
+**Privacy floor:** Certificate lifecycle monitoring uses only `tenant_id` (FORM-internal UUID) and `cert_class` (sp/idp operational enum). No employee `user_id`, name, email, health value, `fingerprint_sha256`, or PEM key material appears in any metric, alert rule, dashboard query, or evidence artefact.
+
+---
+
+### §77.2 RED Metrics
+
+The cert-expiry-check cron runs once per day, not as a continuous request stream, so standard Rate/Error/Duration metrics are adapted for the cron context.
+
+#### Rate (Lifecycle Activity)
+
+| Metric | Source | Threshold / Note |
+|---|---|---|
+| `sso.cert_expiry_alert` events per day (fleet-wide) | `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'sso.cert_expiry_alert' AND created_at > NOW() - INTERVAL '24 hours'` (form_audit role) | Baseline: proportional to fleet size × certs-in-warning-zone; sudden spike indicates fleet-wide cert issue |
+| `sso.cert_uploaded` events per 7 days (fleet-wide) | `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'sso.cert_uploaded' AND created_at > NOW() - INTERVAL '7 days'` (form_audit role) | Tracks active cert rotation cadence; zero = no rotations (expected in steady state; context-dependent) |
+| Cron execution rate | Cloudflare Workers Tail OR DEC-030 proxy: `SELECT COUNT(*) FROM audit_log_events WHERE event_type IN ('sso.cert_expiry_alert', 'sso.cert_monitor_error') AND created_at > NOW() - INTERVAL '26 hours'` | Target: 1 successful run per 24 h; ≥ 1 event in 26 h window = cron alive (AL-CERT-05 basis) |
+
+#### Errors (Zero-Tolerance)
+
+| Metric | Source | Policy |
+|---|---|---|
+| `sso.cert_monitor_error` events | `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'sso.cert_monitor_error' AND created_at > NOW() - INTERVAL '24 hours'` (form_audit role) | **Zero-tolerance** — any single event triggers AL-CERT-05 (P1 PagerDuty `form-security`) |
+| `sso.cert_expired` events | `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'sso.cert_expired' AND created_at > NOW() - INTERVAL '7 days'` (form_audit role) | **Zero-tolerance** — any single event triggers AL-CERT-04 (P0 PagerDuty `form-security`) and SSO-SLO-05 breach |
+
+#### Duration (Cron Freshness)
+
+| Metric | Source | Threshold |
+|---|---|---|
+| Hours since last successful cron execution | Cloudflare Workers Tail last-success timestamp (primary) OR DEC-030 proxy: `SELECT EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600 AS hours_since FROM audit_log_events WHERE event_type IN ('sso.cert_expiry_alert', 'sso.cert_monitor_error') AND created_at > NOW() - INTERVAL '48 hours'` (form_audit role) | AL-CERT-05 fires if > 26 h (CERT-SLO-02 breach); P1 PagerDuty `form-security` |
+
+---
+
+### §77.3 SLOs
+
+| ID | Description | Target | Evaluation window | Breach consequence |
+|---|---|---|---|---|
+| **CERT-SLO-01** | Zero expired certificates on active SAML tenants (alias: SSO-SLO-05) | 0 `sso.cert_expired` events; zero-tolerance | Rolling 30 days | SLA credit per ENTERPRISE.md §SLA; AL-CERT-04 P0; incident via INCIDENT_RESPONSE.md R-04 |
+| **CERT-SLO-02** | `cert-expiry-check` cron freshness < 26 h | 100% of 24 h windows have ≥ 1 successful run; zero-tolerance on > 26 h gap | Rolling 7 days | AL-CERT-05 P1; incident via INCIDENT_RESPONSE.md R-80 |
+
+**CERT-SLO-01 / SSO-SLO-05 note:** SSO-SLO-05 is the authoritative SLO identifier registered in §9 (SLO master table). CERT-SLO-01 is the §77-scoped alias for observability cross-reference purposes. Both refer to the same zero-tolerance constraint.
+
+---
+
+### §77.4 Alert Runbooks (AL-CERT-01..AL-CERT-05)
+
+Alert rule specifications live in §26.5. This section provides companion inline runbooks.
+
+#### AL-CERT-01 — Cert Expiry Warning P3 (t60 tier)
+
+**Trigger:** `cert_alert_tier` transitions to `t60` for any active SAML tenant cert.
+**Severity:** P3 · Slack `#alerts-enterprise`
+**Dedup key:** `cert-t60-{tenant_id}-{cert_class}`
+
+Runbook steps:
+1. Identify tenant: query `SELECT tenant_id, cert_class, saml_sp_cert_expires_at, saml_idp_cert_expires_at FROM tenant_sso_configs WHERE sso_enabled = true AND cert_alert_tier = 't60'` (form_audit role).
+2. For `cert_class = 'idp'`: contact customer IT admin via CSM — provide exact expiry date and `docs/SSO_SCIM_IMPLEMENTATION.md §20.4` upload instructions.
+3. For `cert_class = 'sp'`: initiate SP cert rotation per `docs/SSO_SCIM_IMPLEMENTATION.md §20.5`; rotation does not require customer action.
+4. Log action in `#alerts-enterprise` thread. No CERT-OBS-E-001 supplement required at t60.
+5. Monitor: confirm `cert_alert_tier` returns to `ok` within 7 days of rotation/upload.
+
+#### AL-CERT-02 — Cert Expiry Warning P2 (t30 tier)
+
+**Trigger:** `cert_alert_tier` transitions to `t30`.
+**Severity:** P2 · Slack `#alerts-enterprise`
+**Dedup key:** `cert-t30-{tenant_id}-{cert_class}`
+
+Runbook steps:
+1. Identify tenant (same query as AL-CERT-01, filter `cert_alert_tier = 't30'`).
+2. Escalate: if AL-CERT-01 was previously fired for this tenant and no action taken, escalate to CSM lead and engineering on-call.
+3. For `cert_class = 'idp'`: re-contact customer IT admin — now P2 urgency. Provide `docs/SSO_SCIM_IMPLEMENTATION.md §20.4` link. If no response within 48 h, escalate to enterprise-architect.
+4. For `cert_class = 'sp'`: if rotation not yet initiated, initiate immediately per `docs/SSO_SCIM_IMPLEMENTATION.md §20.5`.
+5. Document action in incident log. Consider CERT-OBS-E-001 quarterly supplement if expiry is imminent.
+
+#### AL-CERT-03 — Cert Expiry Critical P1 (t7 / t2 tier)
+
+**Trigger:** `cert_alert_tier` transitions to `t7` or `t2`.
+**Severity:** P1 · PagerDuty `form-security`
+**Dedup key:** `cert-t7-{tenant_id}-{cert_class}` or `cert-t2-{tenant_id}-{cert_class}`
+
+Runbook steps:
+1. Page on-call engineer immediately (PagerDuty `form-security` route).
+2. Identify tenant and cert class. Confirm cert has not already expired: `SELECT saml_sp_cert_expires_at, saml_idp_cert_expires_at FROM tenant_sso_configs WHERE tenant_id = '{tenant_id}'` (form_audit role).
+3. For `cert_class = 'idp'`: emergency contact to customer IT admin AND enterprise-architect. If customer is unreachable within 4 h: initiate graceful SSO degradation plan (disable SAML login, enable magic-link fallback per ENTERPRISE.md §emergency-fallback).
+4. For `cert_class = 'sp'`: execute emergency rotation per `docs/SSO_SCIM_IMPLEMENTATION.md §20.5`; update metadata endpoint immediately.
+5. Document as P1 incident. Add supplement to CERT-OBS-E-001 if AL-CERT-04 not already fired.
+
+#### AL-CERT-04 — Cert Expired P0 (expired tier)
+
+**Trigger:** `cert_alert_tier` = `expired` OR `sso.cert_expired` event received.
+**Severity:** P0 · PagerDuty `form-security`
+**Dedup key:** `cert-expired-{tenant_id}-{cert_class}`
+**Companion IR runbook:** `INCIDENT_RESPONSE.md R-04` (SAML SSO Failure)
+
+Runbook steps:
+1. **CERT-SLO-01 / SSO-SLO-05 is breached** — SLA credit clock starts. Notify compliance-officer.
+2. Identify all affected tenants: `SELECT tenant_id, cert_class FROM tenant_sso_configs WHERE sso_enabled = true AND cert_alert_tier = 'expired'` (form_audit role).
+3. For each affected tenant: immediately disable SAML SSO login; activate magic-link or OIDC fallback. Notify enterprise CSM and customer.
+4. Execute emergency cert rotation (`cert_class = 'sp'`) or emergency IdP cert replacement (`cert_class = 'idp'`) following `INCIDENT_RESPONSE.md R-04`.
+5. After rotation/replacement: verify SAML authentication flow with test assertion. Confirm `cert_alert_tier` returns to `ok`.
+6. File CERT-OBS-E-001 supplement within 24 h of resolution with incident timeline.
+7. Post-incident: root-cause why AL-CERT-01/02/03 failed to prevent escalation to `expired`. Update monitoring if gap found.
+
+#### AL-CERT-05 — Cron Stale / Failure P1
+
+**Trigger:** No successful `cert-expiry-check` cron execution in > 26 h (no DEC-030 events emitted in 26 h window).
+**Severity:** P1 · PagerDuty `form-security`
+**Companion IR runbook:** `INCIDENT_RESPONSE.md R-80` (cert-expiry-check CF Workers Cron Stale)
+
+Runbook steps:
+1. Page on-call engineer via PagerDuty `form-security`.
+2. Check Cloudflare Workers dashboard: `cert-expiry-check` cron last execution status and error output.
+3. If cron failed silently: review CF Workers tail logs for unhandled exceptions. Common causes: Supabase Postgres connection timeout, HMAC signing failure (DEC-030 chain integrity), CF Workers KV quota.
+4. If cron not scheduled: verify `wrangler.toml` `[triggers]` block — cron expression `0 2 * * *` must be present and deployed.
+5. Manually trigger cron run via CF Workers API: `POST /accounts/{account_id}/workers/scripts/cert-expiry-check/schedules` — confirm DEC-030 events emitted.
+6. Follow full resolution procedure: `INCIDENT_RESPONSE.md R-80`.
+7. CERT-SLO-02 breach: document in next CERT-OBS-E-001 quarterly artefact.
+
+---
+
+### §77.5 Alert and SLO Registration
+
+**§6.2 alert table:** AL-CERT-01..AL-CERT-05 are registered under the `cert_lifecycle` subsection of §6.2 (consolidated alert table). No new rows added this pass — §26.5 canonical alert rules and §6.2 pointer rows were authored in prior passes (v5.20.4 for AL-CERT-05 R-80 update).
+
+**§26.5 canonical alert rules:** AL-CERT-01..AL-CERT-05 live in §26.5. §77.4 provides inline runbooks that extend (not replace) the §26.5 rows.
+
+**SLO master table (§9):** CERT-SLO-01 = SSO-SLO-05 (already registered). CERT-SLO-02 is a §77-internal SLO; registration in §9 deferred to M4 when `cert-expiry-check` cron is deployed.
+
+---
+
+### §77.6 Dashboard Sub-Group: "SAML Certificate Lifecycle" in §26.9
+
+The six-panel "SAML Certificate Lifecycle" sub-group is embedded in §26.9 Enterprise Identity Dashboard immediately following the Session Revocation KV sub-group. Panel specifications are co-located in §26.9 for dashboard-first discoverability; this section provides the canonical observability rationale.
+
+**Six panels:**
+1. **Active SAML tenants with cert expiry < 30 days** — Single-stat; SSO-SLO-05/CERT-SLO-01 leading indicator.
+2. **cert_alert_tier distribution (SP + IdP, current fleet snapshot)** — Stacked bar per cert_class; fleet-wide state machine health at a glance.
+3. **sso.cert_expiry_alert events by tier (last 90 days)** — Grouped bar; trend analysis for AL-CERT-01..04 alert cadence.
+4. **cert-expiry-check cron freshness** — Single-stat freshness tile; CERT-SLO-02 reference line at 26 h; AL-CERT-05 trigger indicator.
+5. **AL-CERT-01..04 activations (last 90 days)** — Table; AL-CERT-03/04 rows highlighted in ember.
+6. **sso.cert_uploaded events (last 30 days)** — Single-stat; tracks active cert rotation cadence.
+
+Full panel query specs and privacy floor: §26.9 SAML Certificate Lifecycle sub-group (inserted v5.23.0).
+
+---
+
+### §77.7 SOC 2 Evidence Mapping
+
+| Control | Requirement | How §77 satisfies it |
+|---|---|---|
+| **CC6.1** | Logical access controls — restrict access to information assets | `cert_alert_tier` state machine enforces continuous certificate posture management; expired certs trigger immediate SSO disable (R-04); all queries scoped to `form_audit` role with no PEM material access |
+| **CC7.2** | System monitoring — detect and respond to security events | AL-CERT-01..AL-CERT-05 provide graduated P3→P0 alert coverage; CERT-SLO-01 (zero-tolerance on expired certs) and CERT-SLO-02 (cron freshness) are continuous monitoring controls; CERT-OBS-E-001 quarterly artefact provides auditor-facing evidence |
+
+---
+
+### §77.8 Quarterly Evidence Artefact: CERT-OBS-E-001
+
+**Artefact ID:** CERT-OBS-E-001
+**Registered in:** `docs/SOC2_READINESS.md §185` (v4.11.0, 2026-07-06; count 160 → 161)
+**SOC 2 controls:** CC6.1, CC7.2
+**Retention:** 7 years WORM
+**Cadence:** Quarterly (Q1–Q4 calendar year)
+**Path:** `compliance/evidence/cert-obs/cert-obs-e-001-{YYYY}-Q{N}.json`
+
+**Report components:**
+1. Active SAML tenant count and cert class breakdown (SP / IdP) at quarter-end snapshot
+2. `sso.cert_expired` event count for the quarter (zero-event attestation required for CC6.1)
+3. `sso.cert_expiry_alert` event count by tier (t90/t60/t30/t14/t7/t2) for the quarter
+4. `sso.cert_uploaded` event count for the quarter (cert rotation cadence evidence)
+5. AL-CERT-01..AL-CERT-05 activation log for the quarter
+6. CERT-SLO-01 and CERT-SLO-02 compliance summary for the quarter
+
+**Per-incident supplement:** For any AL-CERT-04 (expired) or AL-CERT-05 (cron failure) activation, append a supplement to the quarterly artefact within 24 h of resolution: incident timeline, root cause, remediation steps, SLA credit decision (if any).
+
+**First filing:** Q3-2026 (due 2026-10-01), covering the period from `cert-expiry-check` cron deployment (M4) through 2026-09-30.
+
+---
+
+### §77.9 Implementation Checklist
+
+| # | Task | Owner | Target | Status |
+|---|---|---|---|---|
+| 1 | `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` — four events registered | compliance-officer | M3 (done v2.99 2026-07-05) | [x] Done |
+| 2 | §26.5 AL-CERT-01..AL-CERT-05 alert rules authored | devops-lead | M3 (done prior pass) | [x] Done |
+| 3 | §26.9 "SAML Certificate Lifecycle" six-panel sub-group inserted | devops-lead | M4 | [x] Done (v5.23.0) |
+| 4 | `docs/SSO_SCIM_IMPLEMENTATION.md §20.12` OBSERVABILITY §77 backreference | enterprise-architect | M4 | [x] Done (v2.39) |
+| 5 | `docs/SOC2_READINESS.md §185` CERT-OBS-E-001 registration (count 160 → 161) | compliance-officer | M4 | [x] Done (v4.11.0) |
+| 6 | First quarterly CERT-OBS-E-001 filing (`cert-obs-e-001-2026-Q3.json`) | devops-lead + compliance-officer | Q3-2026 (2026-10-01) | [ ] Pending Q3-2026 |
+
+---
+
+### §77.10 Cross-Reference Obligations
+
+| Doc | Section | Obligation | Status |
+|---|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md` | §SAML-Cert-Lifecycle | Four DEC-030 events registered (sso.cert_expiry_alert, sso.cert_expired, sso.cert_uploaded, sso.cert_monitor_error) | 🟢 Done — v2.99 (2026-07-05) |
+| `docs/SOC2_READINESS.md` | §185 | CERT-OBS-E-001 registration (count 160 → 161; CC6.1 / CC7.2) | 🟢 Done — v4.11.0 (2026-07-06) |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §20.12 | OBSERVABILITY §77 backreference | 🟢 Done — v2.39 (2026-07-06) |
+
+---
+
+*v5.23.0 (2026-07-06): §77 SAML Certificate Lifecycle Observability. Closes the observability gap for FORM's SAML certificate lifecycle management (canonical design: `docs/SSO_SCIM_IMPLEMENTATION.md §20`). SAML Certificate Lifecycle was the only major SSO subsystem with alert rules (§26.5 AL-CERT-01..AL-CERT-05) and DEC-030 events (`docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` v2.99) but no dedicated observability section with RED metrics, SLOs, inline runbooks, dashboard sub-group, or quarterly evidence artefact. §77.1: scope — cert-expiry-check CF Workers Cron Trigger (daily 02:00 UTC), two cert classes (sp/idp), cert_alert_tier state machine (ok→t90→t60→t30→t14→t7→t2→expired), four DEC-030 events, five alert rules (AL-CERT-01..05), SSO-SLO-05/CERT-SLO-01, CC6.1/CC7.2, privacy floor. §77.2: RED metrics adapted for cron context — Rate (cert_expiry_alert/day, cert_uploaded/7d, cron runs=1/day), Errors (cert_monitor_error zero-tolerance, cert_expired zero-tolerance), Duration (cron freshness < 26 h). §77.3: two SLOs — CERT-SLO-01 (zero expired certs / SSO-SLO-05 alias / SLA credit / R-04 companion) and CERT-SLO-02 (cron freshness < 26 h / R-80 companion). §77.4: five inline alert runbooks — AL-CERT-01 (P3 t60 Slack, CSM contact), AL-CERT-02 (P2 t30 escalation), AL-CERT-03 (P1 t7/t2 PagerDuty emergency), AL-CERT-04 (P0 expired / CERT-SLO-01 breach / SLA credit / R-04 companion), AL-CERT-05 (P1 cron stale / CERT-SLO-02 breach / R-80 companion). §77.5: §6.2 and §26.5 registration pointers (no new alert rows). §77.6: six-panel "SAML Certificate Lifecycle" sub-group for §26.9 Enterprise Identity dashboard — active tenants < 30d countdown, cert_alert_tier fleet distribution, cert_expiry_alert events by tier, cron freshness tile, AL-CERT activation table, cert_uploaded rotation count. Sub-group inserted in §26.9 immediately after Session Revocation KV sub-group (v5.23.0 this pass). §77.7: SOC 2 evidence mapping CC6.1 (access control posture) and CC7.2 (continuous monitoring). §77.8: CERT-OBS-E-001 quarterly artefact (CC6.1/CC7.2, 7yr WORM, compliance/evidence/cert-obs/cert-obs-e-001-{YYYY}-Q{N}.json); six-component report; per-incident supplement for AL-CERT-04/05 activations; first filing Q3-2026. §77.9: six-item implementation checklist — five Done this pass, one Pending Q3-2026. §77.10: three cross-reference obligations — all 🟢 Done this pass (SOC2_READINESS §185 CERT-OBS-E-001 count 160 → 161, SSO_SCIM §20.12 backreference). Privacy floor: all §77 content — metrics, alert rules, dashboard queries, evidence artefacts — uses only `tenant_id` (FORM-internal UUID) and `cert_class` (operational enum sp/idp); no employee `user_id`, name, email, health value, `fingerprint_sha256`, PEM content, or GDPR Art. 9 special-category data appears anywhere. Document header v5.22.3 → v5.23.0. Owner: devops-lead + compliance-officer + security-engineer.*
