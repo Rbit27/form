@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.48.2
+# FORM · Incident Response Runbook v3.48.3
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -29765,7 +29765,7 @@ R-83 provides a documented, root-cause-classified response procedure for AL-CAEP
 | 2 | Implement CAEP-SETERR-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`; HTTP 422 + `CAEP_SETERR_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending |
 | 3 | Update `docs/OBSERVABILITY.md §78.4` AL-CAEP-01 entry: add "Dedicated companion IR runbook: INCIDENT_RESPONSE R-83" field (mirrors pattern of §76.4 → R-82, §75.4 → R-81) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.1, §78.4 AL-CAEP-01 companion runbook field added).** |
 | 4 | Register CAEP-SETERR-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§187, per-activation cadence, CC6.3/CC6.6/CC7.2/CC7.3, 7yr) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (SOC2_READINESS.md v4.13.0, §187; evidence count 162 → 163).** |
-| 5 | Add IdP JWKS cache flush step to SAML cert rotation runbook R-20 §20.4 (H1 post-incident control — prevents recurrence when IdP rotates SSF signing key as part of cert lifecycle) | platform-engineer | **P1** / M5 | [ ] Pending |
+| 5 | Add IdP JWKS cache flush step to SAML cert rotation runbook R-20 §20.4 (H1 post-incident control — prevents recurrence when IdP rotates SSF signing key as part of cert lifecycle) | platform-engineer | **P1** / M5 | [x] **Done — 2026-07-06 (SSO_SCIM_IMPLEMENTATION.md v2.42, §20.4.1).** |
 | 6 | Add `caep-receiver.ts` deployment pre-flight synthetic SET test to CI pipeline (H5 post-incident control) | devops-lead | **P1** / M5 | [ ] Pending |
 | 7 | Authoring complete — R-83 closes the AL-CAEP-01 companion runbook gap: `docs/OBSERVABILITY.md §78.4` had only an inline five-step runbook; BCL (R-73/R-74), SAML SLO (R-75/R-76), PKJWT (R-81), and Session Revocation KV (R-82) each have dedicated companion runbooks; R-83 closes the equivalent gap for CAEP/RISC observability (§78) — AL-CAEP-01 | compliance-officer | **P0** | [x] **Done — 2026-07-06 (INCIDENT_RESPONSE.md v3.48.0).** |
 
@@ -30378,6 +30378,8 @@ The SESSION_REVOCATION_KV write at T+0 ensures that the compromised user's activ
 **Privacy floor (invariant throughout R-85):** No data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data in any R-85 scope query, DEC-030 event payload, or evidence artefact. `user_ref` is a FORM-internal UUID. `set_jti_hash` is SHA-256(raw JTI) — non-reversible. R-85-C4 returns aggregate counts only — no individual `user_ref` values. Admin action audit (Step 3c) uses `action_type` and `resource_id` only — no employee personal data. HR role NEVER has access to `compliance/evidence/caep/`. Owner: security-engineer + compliance-officer + customer-success.
 
 ---
+
+*v3.48.3 (2026-07-06): §R-83.11 item 5 Done — `docs/SSO_SCIM_IMPLEMENTATION.md §20.4.1 IdP JWKS Cache Flush` authored (v2.42, 2026-07-06). New §20.4.1 adds the H1 post-incident control to the `cert-expiry-check` Worker Cron: after `cert_rotation_state → 'complete'` + `caep_reregistration_required = TRUE` hook (§36.2.4), the Worker now enumerates and deletes all `caep_jwks:{tenant_id}:` keys from `SSO_KV`, eliminating the CAEP SET validation failure window that occurs when an IdP rotates its SSF signing key as part of the SAML certificate lifecycle. §R-83.11 item 5 status: `[ ] Pending` → `[x] Done — 2026-07-06 (SSO_SCIM_IMPLEMENTATION.md v2.42, §20.4.1)`. Document header v3.48.2 → v3.48.3. Owner: platform-engineer + security-engineer.*
 
 *v3.48.2 (2026-07-06): §R-84.11 item 5 Done — `docs/GDPR_DPIA.md §7.3 DSAR Erasure Flow` authored (v0.2, 2026-07-06). New §7.3 distinguishes CAEP-triggered deletion (IdP `account-purged` SET → R-84 IC protocol) from direct Art. 17 DSAR requests; documents CAEP-PURGE-CHAIN-01 ordering invariant, `days_to_deletion` auditor SLA field, `litigation_hold` deference path (Art. 17(3)(e)), and CAEP-PURGE-E-001 per-activation evidence artefact spec. §R-84.11 item 5 status: `[ ] Pending` → `[x] Done — 2026-07-06 (GDPR_DPIA.md v0.2, §7.3)`. §R-84.12 cross-reference row updated: `docs/GDPR_DPIA.md §DSAR-Erasure-Flow` (v0.2, 2026-07-06) with CAEP trigger taxonomy. Privacy floor: `user_ref` FORM-internal UUID; HR no access to CAEP-PURGE-E-001. Document header v3.48.1 → v3.48.2. Owner: compliance-officer.*
 

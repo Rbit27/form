@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.67.4] — 2026-07-06
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md §20.4.1` — IdP JWKS Cache Flush on `cert_rotation_state → 'complete'` (v2.42). H1 post-incident control per §R-83.11 item 5 (P1/M5). After the `cert-expiry-check` Worker Cron writes `cert_rotation_state = 'complete'` and fires the §36.2.4 `caep_reregistration_required = TRUE` hook, the Worker now enumerates all `caep_jwks:{tenant_id}:` keys in `SSO_KV` and deletes them. Eliminates the CAEP SET validation failure window that arises when an IdP rotates its SSF signing key as part of the SAML certificate lifecycle (`sso.caep_stream_error` H1 root cause). Flush only executes when `caep_status = 'active' | 'error'`. Closes §R-83.11 item 5.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.48.2 → v3.48.3. §R-83.11 item 5 → `[x] Done — 2026-07-06 (SSO_SCIM_IMPLEMENTATION.md v2.42, §20.4.1)`.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — v2.41 → v2.42. §20.4.1 IdP JWKS cache flush step added to `cert-expiry-check` Worker Cron spec.
+- `VERSION` — 13.67.3 → 13.67.4.
+
 ## [13.67.3] — 2026-07-06
 
 ### Added

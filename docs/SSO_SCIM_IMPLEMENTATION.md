@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.41
+# FORM · SSO/SCIM Implementation v2.42
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -6176,6 +6176,39 @@ export default {
   }
 }
 ```
+
+#### 20.4.1 IdP JWKS Cache Flush on Rotation Complete (H1 post-incident control · §R-83)
+
+**Why this matters:** When an enterprise IdP rotates its SAML SP or SSF signing certificate as part of the cert lifecycle (triggering `cert_rotation_state → 'complete'`), the IdP may simultaneously rotate the JWKS keys it uses to sign CAEP/RISC Security Event Tokens. If the `caep-receiver.ts` Worker's `SSO_KV` cache (`caep_jwks:{tenant_id}:{iss}`, 1-hour TTL per §23.6) still holds the old JWKS, any incoming SET signed with the new key will initially fail a `kid` lookup and trigger a HIGH `sso.caep_stream_error` audit event — the H1 root cause in `docs/INCIDENT_RESPONSE.md §R-83`. The Worker does fetch fresh JWKS on `kid` miss (§23.6 automatic recovery), but explicitly flushing the cache on `cert_rotation_state → 'complete'` eliminates the validation failure window entirely.
+
+**Implementation:** Add the following cache flush step to `cert-expiry-check.ts` at the same point as the CAEP reregistration hook (§36.2.4), after writing `cert_rotation_state = 'complete'` to the database:
+
+```typescript
+// apps/api-gateway/src/crons/cert-expiry-check.ts
+// After: cert_rotation_state → 'complete' DB write (§20.6 state machine)
+// After: caep_reregistration_required = true hook (§36.2.4)
+// Flush the IdP SSF JWKS cache entry to force fresh fetch on next SET validation
+
+if (tenant.caep_status === 'active' || tenant.caep_status === 'error') {
+  // The CAEP JWKS cache key pattern: caep_jwks:{tenant_id}:{iss}
+  // Multiple iss values are possible (one per IdP SSF endpoint configured for this tenant).
+  // Flush all matching keys using a KV list-by-prefix pattern.
+  const prefix = `caep_jwks:${tenant.tenant_id}:`
+  const listResult = await env.SSO_KV.list({ prefix })
+  for (const key of listResult.keys) {
+    await env.SSO_KV.delete(key.name)
+  }
+  // Note: after flush, caep-receiver.ts will fetch fresh JWKS on the next incoming SET
+  // and re-populate the KV entry automatically per §23.6 on-demand fetch pattern.
+  // No DEC-030 event is emitted for the cache flush itself — the sso.caep_reregistration_queued
+  // event emitted in §36.2.4 serves as the canonical audit record for the cert_rotation_state
+  // → 'complete' transition.
+}
+```
+
+**Tenant isolation:** The cache flush is scoped to the single affected `tenant_id`. Other tenants' CAEP JWKS caches are not affected.
+
+**Cross-reference:** This step closes the H1 post-incident control in `docs/INCIDENT_RESPONSE.md §R-83.9` (post-incident control table, row 1: "Add IdP JWKS cache flush to SAML cert rotation runbook; confirm cert-expiry-check Worker triggers JWKS cache flush as part of `cert_rotation_state → 'complete'` transition"). Implementation due M5.
 
 ---
 
@@ -17279,5 +17312,7 @@ Once all four conditions are met: update `§46.9` G-003 row from `🟡 Implement
 **Privacy floor:** §77 adds no new data collection beyond what §20 already defines. All §77 metrics, alert rules, dashboard queries, and evidence artefact fields use only `tenant_id` (FORM-internal UUID) and `cert_class` (sp/idp enum). `fingerprint_sha256`, PEM certificate content, and private key material are never referenced in any monitoring query, alert condition, or evidence artefact. HR sees no certificate data. Employee `user_id` is never present in any §77 or §20 metric.
 
 ---
+
+*v2.42 (2026-07-06): §20.4.1 IdP JWKS Cache Flush on Rotation Complete — H1 post-incident control for `docs/INCIDENT_RESPONSE.md §R-83`. New §20.4.1 added within §20.4 (`cert-expiry-check` Worker Cron spec): when `cert_rotation_state → 'complete'`, the Worker must flush all `caep_jwks:{tenant_id}:*` entries in `SSO_KV` (using `SSO_KV.list({ prefix })` + per-key `delete()`) to force a fresh SSF JWKS fetch on the next incoming CAEP/RISC SET. Prevents the H1 root cause window where `caep-receiver.ts` rejects SETs signed with a new IdP SSF key because the cached JWKS still holds the old key. The automatic `kid`-miss re-fetch (§23.6) handles normal rotation but does not eliminate the validation failure for the first SET that arrives during the TTL window. The explicit flush eliminates the window entirely. Cache flush is tenant-scoped. No new DEC-030 event; the existing `sso.caep_reregistration_queued` (§36.2.4) serves as the canonical audit record. Closes §R-83.11 item 5 (P1/M5). Cross-reference to §R-83.9 post-incident control table added. Document header v2.41 → v2.42. Owner: platform-engineer + security-engineer.*
 
 *v2.39 (2026-07-06): §20.12 — OBSERVABILITY §77 backreference. Closes `docs/OBSERVABILITY.md §77.10` cross-reference obligation for `docs/SSO_SCIM_IMPLEMENTATION.md §20.12`. §20.12 documents the full §77 SAML Certificate Lifecycle Observability section (v5.23.0, 2026-07-06): §77.1–§77.10 scope covering cert-expiry-check CF Workers Cron Trigger, two cert classes (sp/idp), cert_alert_tier state machine, four DEC-030 events, five alert rules AL-CERT-01..05, CERT-SLO-01 (SSO-SLO-05 alias, zero-tolerance, R-04 companion) and CERT-SLO-02 (cron freshness < 26 h, R-80 companion), six-panel "SAML Certificate Lifecycle" §26.9 dashboard sub-group (inserted v5.23.0), CERT-OBS-E-001 quarterly evidence artefact (SOC2_READINESS §185, count 160 → 161, CC6.1/CC7.2, 7yr WORM, Q3-2026 first filing). Companion edits: OBSERVABILITY.md v5.23.0; SOC2_READINESS.md v4.11.0 §185. Document header v2.38 → v2.39. Owner: compliance-officer + enterprise-architect.*
