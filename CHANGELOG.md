@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [13.60.0] — 2026-07-06
+
+### Added
+- `content/post-97-hormonal-response-training-endocrine-signals.md` — Editorial series «Мова адаптації → операційна практика» 91–100, post 7/10. «Гормональна відповідь на тренування: ендокринні сигнали і де вони реально впливають». West & Phillips (2012): кореляція між гострим T/GH-відгуком і гіпертрофією — близька до нуля (n=49). Schoenfeld (2013): механічне навантаження — первинний драйвер гіпертрофії, гормональне середовище — контекст. Bamman (2001): AR-щільність зростає після тренування → тренований м'яз ефективніше зчитує ті самі гормональні сигнали. MGF (Goldspink 2005): локальна IGF-1 splice-форма — відповідає на механічний стрес безпосередньо у навантаженому м'язі. Hackney (2012): добовий ритм T і пост-тренувальний відгук. T/C ratio — ненадійний маркер (Meeusen 2013 ECSS). Жінки: T у 10–30x нижчий, але гіпертрофія відбувається — підтверджує, що гострий T-відгук не є механізмом. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `content/post-3282-recovery-between-sessions-physiology-operational-limits.md` — Series «Тренування і контекст тіла: вік, відновлення, варіабельність» 3276–3285, post 7/10. «Відновлення між тренуваннями: що реально відбувається і операційні межі». PCr: 95% ресинтез за 3–5 хв (Harris 1976). Глікоген: 24–48 год, Ivy (1988) window 7–8 ммоль/кг/год у перші 2 год. MPS підвищений 24–72 год (Phillips 1997). Сателітна клітина: пік проліферації 72–96 год (Petrella 2008). HRV rMSSD як інтегральний маркер (Buchheit 2014). Вік 45+: Kumar (2009) знижена MPS-відповідь, Kadi (2004) менше сателітних клітин, inflammaging. Операційна таблиця часових профілів відновлення. NSAID і MPS: Trappe (2002). clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — posts 97 and 3282 added at top of feed.
+
+### Changed
+- `STATUS.md` — editorial 91–100 in progress 6/10 → 7/10; series 3276–3285 in progress 6/10 → 7/10; next: post-98 (mTOR/AMPK — editorial 8/10) + post-3283 (знижена готовність — серія 8/10).
+- `VERSION` — 13.59.1 → 13.60.0.
+
+---
+
 ## [13.59.1] — 2026-07-06
 
 ### Added
