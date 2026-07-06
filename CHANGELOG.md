@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.43.0] — 2026-07-06
+
+### Added
+- `content/post-82-training-duration-how-long-is-enough.md` — Editorial post-82. Series 81–90, 2/10. Topic: training session duration — what actually determines it (warmup, ramp-up sets, work sets + rest, accessory block), orientation brackets by goal (strength 65–85 min, hypertrophy 70–95 min, minimum unit 40–50 min), left-tail errors (skipped ramp-up sets, compressed rest), right-tail errors (social time, tacked-on cardio, unnecessary accessory bloat), Schoenfeld 2016 on rest periods, algorithm for time-constrained sessions. clinical-safety NOT_REQUIRED (no food/body image/pain/mental health). 12-min read. George (FORM founder) editorial voice.
+- `content/post-3270-long-term-strength-benchmarks.md` — Series «Довгострокове прогресування: 2–5-річний горизонт», 5/10. Topic: why standard strength benchmarks mislead (absolute numbers, biased online samples, training age mismatch), what research says about rate of strength gain (nonlinear deceleration with experience; relative % more reliable than absolute kg), three realistic horizons (2 yr: stable intermediate plateau + self-regulation; 3 yr: planning quality starts mattering more than sheer training time; 5 yr: numeric gains slow but meta-skills develop), four interpretation errors (peak-result comparison, calendar age vs quality training age, cross-movement variance, standards as goals), why «where should I be?» is the wrong question. clinical-safety NOT_REQUIRED. 14-min read. George (FORM founder) editorial voice.
+- `blog.html` — Cards prepended for post-3270 and post-82.
+
+### Changed
+- `STATUS.md` — v13.43.0 entry added.
+- `VERSION` — 13.42.1 → 13.43.0.
+
 ## [13.42.1] — 2026-07-06
 
 ### Changed
