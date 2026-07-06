@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.67.0] — 2026-07-06
+
+### Added
+- `content/post-102-excessive-variable-changing.md` — Editorial series 101–110 · 2/10. «Помилка новачка, яку роблять і просунуті атлети — надмірна зміна змінних». Зміна 5 параметрів одночасно знищує сигнал: не знаєш що спрацювало. n-of-1 логіка і ізоляція змінних. Три механізми помилки: нетерпимість до невизначеності, конфлікт знання і застосування, ефект «нічого не втрачу». Ієрархія параметрів: рівень 1 (обсяг, RPE, частота) → змінюй першим; рівень 3 (порядок, час відпочинку) → останнім. Коли кілька змін виправдані: системний reset, контекст змінився системно, старт нової програми. Операційне правило: одна зміна → 3–4 тижні → читання результату. Зв'язок з post-101: спочатку аудит контексту, потім тренувальна корекція. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `content/post-3286-training-psychology-self-coached-intro.md` — Series «Тренувальна психологія self-coached атлета» 3286–3295 · 1/10 — НОВА СЕРІЯ. «Тренувальна психологія self-coached атлета: чому самостійне тренування — окрема когнітивна задача». Конфлікт ролей атлет/тренер як системна проблема. Чотири когнітивні упередження: confirmation bias (Nickerson 1998), sunk cost fallacy, planning fallacy (Kahneman & Tversky 1979), ego-protection. Чому тренер дає дистанцію і як self-coached атлет може компенсувати: протокол як заздалегідь прийняте рішення, відстрочений перегляд журналу, великі рішення поза залом. Анонс серії 3286–3295. clinical-safety REVIEWED — NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — cards для post-102 і post-3286 prepended at top of feed.
+
+### Changed
+- `STATUS.md` — Current version → v13.67.0; editorial 101–110 in progress 1/10 → 2/10; series 3286–3295 proposed → in progress 1/10.
+- `VERSION` — 13.66.0 → 13.67.0.
+
 ## [13.66.0] — 2026-07-06
 
 ### Added
