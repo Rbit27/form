@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [13.61.0] — 2026-07-06
+
+### Added
+- `content/post-98-mtor-ampk-intracellular-signaling-adaptation.md` — Editorial series «Мова адаптації → операційна практика» 91–100, post 8/10. «mTOR, AMPK та сигнальні шляхи: що реально відбувається всередині клітині». Glass (2003) / Bodine (2001): PI3K/Akt/TSC/Rheb → mTORC1 каскад. Hornberger (2006): мех-чутлива активація mTOR без IGF-1 через фосфоліпазу D. p70S6K1/4EBP1 як трансляційні виконавці. AMPK (Hardie 2012): сенсор AMP/ATP, антагоніст mTOR. Concurrent training interference: AMPK залишається підвищеною 4–6 год після ендurance (Coffey 2006). Рапаміцин (Bodine 2001): блокування mTORC1 → зупинка гіпертрофії. Рибосомальний біогенез (Figueiredo 2015). PGC-1α і мітохондріальний біогенез (Jäger 2007). Аутофагія (Masiero 2009). clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `content/post-3283-training-at-reduced-readiness-decision-algorithm.md` — Series «Тренування і контекст тіла: вік, відновлення, варіабельність» 3276–3285, post 8/10. «Тренування при зниженій готовності: алгоритм рішення, коли стан нижчий за норму». HRV-рівні рішення (±0.5 SD / -1-2 SD / >-2 SD). Hooper Index (Hooper & Mackinnon 1995): норма 8–12, модифікація 13–16, суттєве скорочення 17+. Weston (2011): суб'єктивна мотивація ≠ фізіологічна готовність. Ієрархія скорочень: аксесорні → додаткові сети → обсяг базових → інтенсивність. Mujika & Padilla (2001): детренованість після 2–3 тижнів — одна скорочена сесія не є втратою прогресу. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — posts 98 and 3283 prepended at top of feed.
+
+### Changed
+- `STATUS.md` — editorial 91–100 in progress 7/10 → 8/10; series 3276–3285 in progress 7/10 → 8/10; next: post-99 (суперкомпенсація і fitness-fatigue модель — editorial 9/10) + post-3284 (тренування у стані хронічного стресу — серія 9/10).
+- `VERSION` — 13.60.0 → 13.61.0.
+
+---
+
 ## [13.60.0] — 2026-07-06
 
 ### Added
