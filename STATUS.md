@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v13.49.0** — 2026-07-06 · content · post-88 · «Як ставити вагу у розкладі: не «коли вільно», а за логікою відновлення» (editorial series 81–90, 8/10) · clinical-safety NOT_REQUIRED (тема: мікроцикл і розклад тренувань за логікою відновлення; без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html card prepended for post-88 · README: editorial 81–90 in progress 7/10 → 8/10, post-88 proposed → draft · next: post-89 (editorial series 81–90, 9/10 — «Різниця між важким і продуктивним тренуванням»)
+
 **v13.48.0** — 2026-07-06 · content · post-87 + post-3273 · «Суперкомпенсація: що відбувається між тренуваннями і як її читати» (editorial series 81–90, 7/10) + «Помилки довгострокового планування: що руйнує прогрес за 2 роки» (series 3266–3275, 8/10) · clinical-safety NOT_REQUIRED (обидва: без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html cards prepended for post-87 and post-3273 · README: editorial 81–90 in progress 7/10, series 3266–3275 updated 8/10 · next: post-88 (editorial series 81–90, 8/10) + post-3274 (series 3266–3275, 9/10)
 
 **v13.47.0** — 2026-07-06 · content · post-86 · «Коли «слухати тіло» — правильна стратегія, а коли — виправдання» (editorial series 81–90, 6/10) · clinical-safety PASS (cloud-agent · 2026-07-06: без їжі/образу тіла; дискомфорт/біль — виключно тренувальні маркери RPE) · sports-scientist review pending · blog.html card prepended · README: editorial 81–90 in progress 6/10, post-86 draft, нові теми 911–915 proposed · next: post-87 (editorial series 81–90, 7/10)
