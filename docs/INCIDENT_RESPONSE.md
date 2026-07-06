@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.51.0
+# FORM · Incident Response Runbook v3.52.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -29440,7 +29440,7 @@ REVOKE-SYNC-E-001 §root-cause-classification and §degraded-window document roo
 | Reference | Location | Relationship |
 |---|---|---|
 | AL-REVOKE-01 alert spec | `docs/OBSERVABILITY.md §76.4` (v5.22.1, 2026-07-05) | Canonical alert definition triggering R-82; §76.4 "Dedicated companion IR runbook" field updated this pass to reference R-82 |
-| AL-REVOKE-02 alert spec | `docs/OBSERVABILITY.md §76.4` (v5.22.1, 2026-07-05) | Secondary alert (bulk P95 > 5,000 ms); does not trigger R-82 but may co-occur with H2/H4 scenarios |
+| AL-REVOKE-02 alert spec | `docs/OBSERVABILITY.md §76.4` (v5.25.1, 2026-07-06) | Secondary alert (bulk P95 > 5,000 ms); does not trigger R-82 but may co-occur with H2/H4 scenarios; dedicated companion runbook: `INCIDENT_RESPONSE.md R-88` (v3.52.0, 2026-07-06) |
 | `session.revocation_kv_sync_error` event schema | `docs/AUDIT_LOG_SCHEMA.md §session-Revocation-KV` | Canonical DEC-030 schema for the AL-REVOKE-01 trigger event; registered at v1.3 (2026-06-01) |
 | `session.revocation_kv_sync_restored` event schema | `docs/AUDIT_LOG_SCHEMA.md §R-82 Session Revocation KV Sync Restored events` (v3.1, 2026-07-05) | LOW/3yr terminal event; `SessionRevocationKvSyncRestoredPayload` Zod v2 schema; REVOKE-KV-CHAIN-01 invariant registered; §R-82.11 item 1 Done |
 | REVOKE-SYNC-E-001 registration | `docs/SOC2_READINESS.md §180` (v4.6.0, 2026-07-05) | §79.4 master evidence table registration; count 156 → 157 |
@@ -31168,6 +31168,357 @@ R-87 provides a documented, severity-classified IC protocol for the specific P0 
 | CERT-SLO-01 | `docs/OBSERVABILITY.md §77.3` / `docs/ENTERPRISE.md §SLA` | SLA credit obligation — `sla_credit_issued: true` mandatory in terminal event |
 
 **Privacy floor (invariant throughout R-87):** No data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data in any R-87 scope query, DEC-030 event payload, communication template, or CERT-EXPIRED-IC-E-001 component. `tenant_id` is FORM-internal UUID — never customer email addresses or externally-linkable identifiers. `fingerprint_sha256` is the public SHA-256 hex of the certificate DER encoding — not a private key or PEM content. HR role NEVER has access to `compliance/evidence/saml-cert/`. Owner: security-engineer + compliance-officer + customer-success.
+
+---
+
+## §R-88 Bulk Session Revocation Slow (AL-REVOKE-02 Companion)
+
+> Owner: security-engineer + devops-lead + compliance-officer. Trigger: AL-REVOKE-02 — `session.bulk_revocation_complete.duration_ms` P95 > 5,000 ms per 1-hour window. Priority: P2 (P1 escalation criteria apply). SOC 2: CC7.2 / CC7.3. Added v3.52.0 (2026-07-06).
+
+### §R-88.1 Trigger Matrix
+
+| Field | Value |
+|---|---|
+| **Alert ID** | AL-REVOKE-02 |
+| **Metric** | `session.bulk_revocation_complete.duration_ms` P95 |
+| **Threshold** | > 5,000 ms over any rolling 1-hour window |
+| **DEC-030 source** | `session.bulk_revocation_complete` STANDARD/7yr events |
+| **Severity (default)** | P2 |
+| **Routing** | Slack `#sso-alerts` + PagerDuty LOW |
+| **Acknowledge SLA** | < 2 h |
+| **IC owner** | devops-lead (primary) + security-engineer (secondary) |
+| **SLA credit triggered** | NO — bulk revocation latency does not breach SSO-SLO-04 (individual P99 < 200 ms) |
+
+**Three trigger modes:**
+
+- **Mode-1 (automated):** PagerDuty LOW alert via AL-REVOKE-02 — `session.bulk_revocation_complete.duration_ms` P95 > 5,000 ms over a 1-hour window. Automated from the immutable DEC-030 chain.
+- **Mode-2 (CSM escalation):** Enterprise tenant reports slow SCIM deprovisioning — sessions for deprovisioned users appear active longer than expected. CSM raises to devops-lead; devops-lead checks Grafana `OBSERVABILITY §76.6` bulk P95 panel and queries R-88-C2 to confirm.
+- **Mode-3 (manual discovery):** devops-lead observes AL-REVOKE-02 threshold exceeded in Grafana `OBSERVABILITY §76.6` "Bulk revocation P95 7d (hourly)" panel without PagerDuty alerting. Query R-88-C2 to confirm P95 exceeded threshold.
+
+### §R-88.2 Severity Classification
+
+| Criterion | Classification |
+|---|---|
+| Default (first activation) | P2 — performance degradation; SCIM deprovisioning slow; individual SSO unaffected |
+| P95 persistently > 15,000 ms / 1 h for > 2 consecutive hours | Escalate to P1; activate Supabase `session_blocklist`-only path (Step 3 below) |
+| > 3 AL-REVOKE-02 activations in rolling 30 days | Escalate to P1 for recurring signal investigation |
+| AL-REVOKE-01 co-occurs (KV sync errors alongside bulk slowness) | Escalate to P1; H3 scenario (Supabase under load affecting both paths) |
+
+**Important:** AL-REVOKE-02 does NOT activate the Supabase `session_blocklist`-only fallback mode automatically. The fallback is activated ONLY if P1 escalation criteria are met (Step 3 below). Individual session token revocation (REVOKE-SLO-01, P99 < 200 ms) is always enforced at the DB `session_blocklist` level regardless of bulk batch performance.
+
+### §R-88.3 Root-Cause Hypotheses
+
+**H1 — Oversized SCIM batch:**
+
+A SCIM deprovisioning event (manual admin bulk action or AL-SCIM-MASS-01 scenario) triggered revocation for >> 1,000 sessions in a single batch, exceeding the design-target batch size. `revoked_count` in `session.bulk_revocation_complete` events will be significantly > 1,000.
+
+- R-88-C1 indicator: `revoked_count` >> 1,000; `ms_per_session` within normal range (< 5 ms/session)
+- Root: missing or bypassed `BATCH_SIZE` cap enforcement before the revocation loop
+
+**H2 — Cloudflare KV write throughput saturation:**
+
+Correctly-sized batches (≤ 1,000 sessions) are slow because CF KV write operations are saturated. Causes: approaching CF KV daily write quota limit, CF regional degradation, or burst write pressure from concurrent batches across tenants.
+
+- R-88-C1 indicator: `revoked_count` ≤ 1,000 AND `ms_per_session` >> 5 ms/session
+- R-88-C3 indicator: elevated concurrent batch count in breach window
+
+**H3 — Supabase `session_blocklist` write contention:**
+
+The write-through `session_blocklist` Supabase DB insert is the slow path. Supabase is under general load or there is lock contention on the `session_blocklist` table during the bulk insert loop.
+
+- R-88-C1 indicator: `ms_per_session` elevated, WAE KV write P95 latency normal
+- Distinguishing from H2: CF Dashboard KV operations latency is healthy; Supabase metrics show high active connections or lock waits
+
+**H4 — CF Worker concurrency saturation:**
+
+Multiple simultaneous bulk revocation operations across tenants are saturating the CF Worker concurrency budget, causing queued execution that inflates `duration_ms` wall-clock time.
+
+- R-88-C3 indicator: `concurrent_batches` > 5 AND `distinct_tenants` > 3 in the breach window
+- WAE `wrangler tail` shows `worker_limit_exceeded` or execution queue depth > 0
+
+### §R-88.4 Scope Queries
+
+```sql
+-- R-88-C1: Batch detail — last 24 h (run at IC open; identifies affected batches)
+SELECT
+  created_at,
+  payload->>'tenant_id'                                            AS tenant_id,
+  (payload->>'revoked_count')::int                                 AS revoked_count,
+  (payload->>'duration_ms')::int                                   AS duration_ms,
+  ROUND(
+    (payload->>'duration_ms')::numeric
+    / NULLIF((payload->>'revoked_count')::numeric, 0), 1
+  )                                                                AS ms_per_session
+FROM audit_log_events
+WHERE event_type = 'session.bulk_revocation_complete'
+  AND created_at > NOW() - INTERVAL '24 hours'
+ORDER BY duration_ms DESC
+LIMIT 50;
+-- (form_audit role; no user_id; tenant_id FORM-internal UUID)
+
+-- R-88-C2: P95 hourly time-series — last 7 days (trend vs. spike)
+SELECT
+  DATE_TRUNC('hour', created_at)                                   AS hour,
+  PERCENTILE_CONT(0.95) WITHIN GROUP
+    (ORDER BY (payload->>'duration_ms')::int)                      AS p95_ms,
+  COUNT(*)                                                         AS batch_count
+FROM audit_log_events
+WHERE event_type = 'session.bulk_revocation_complete'
+  AND created_at > NOW() - INTERVAL '7 days'
+GROUP BY 1
+ORDER BY 1;
+-- (form_audit role; fleet-wide aggregate; no tenant_id needed for trend)
+
+-- R-88-C3: Concurrent batch analysis — breach window (last 2 h)
+SELECT
+  DATE_TRUNC('minute', created_at)                                 AS minute_bucket,
+  COUNT(*)                                                         AS concurrent_batches,
+  COUNT(DISTINCT payload->>'tenant_id')                            AS distinct_tenants,
+  SUM((payload->>'revoked_count')::int)                            AS total_sessions_revoked
+FROM audit_log_events
+WHERE event_type = 'session.bulk_revocation_complete'
+  AND created_at > NOW() - INTERVAL '2 hours'
+GROUP BY 1
+ORDER BY 1;
+-- (form_audit role; tenant_id FORM-internal UUID only; no user_id)
+
+-- R-88-C4: Post-remediation P95 confirmation (run after fix; gate for IC closure)
+SELECT
+  PERCENTILE_CONT(0.95) WITHIN GROUP
+    (ORDER BY (payload->>'duration_ms')::int)                      AS p95_ms_post_fix,
+  COUNT(*)                                                         AS batch_samples,
+  MAX(created_at)                                                  AS last_batch_at
+FROM audit_log_events
+WHERE event_type = 'session.bulk_revocation_complete'
+  AND created_at > NOW() - INTERVAL '15 minutes';
+-- Target: p95_ms_post_fix < 5,000 AND batch_samples >= 3
+-- (form_audit role)
+```
+
+### §R-88.5 Recovery Steps
+
+**Step 1 — Acknowledge and scope:**
+
+1. Acknowledge PagerDuty LOW alert (< 2 h SLA).
+2. Open IC in PagerDuty: assign devops-lead (primary), security-engineer (secondary).
+3. Post T-88-A to Slack `#sso-alerts`.
+4. Run R-88-C1, R-88-C2, R-88-C3 in parallel.
+5. Note: AL-REVOKE-02 does NOT activate Supabase fallback mode — individual revocation P99 (REVOKE-SLO-01) is unaffected. Sessions ARE being revoked; SCIM deprovisioning is just slower than the 5,000 ms design target.
+6. Emit `session.bulk_revocation_slow_ic_opened` STANDARD/3yr DEC-030 anchor event (REVOKE-BULK-CHAIN-01 chain start).
+
+**Step 2 — Classify root cause and remediate:**
+
+*H1 — Oversized batch (R-88-C1: `revoked_count` >> 1,000):*
+
+a. Reduce `BATCH_SIZE` in `apps/api-gateway/src/sso/session-revocation-kv.ts`. Recommended schedule: if P95 was 2–3× threshold (10,000–15,000 ms), reduce 50 → 25; if P95 > 15,000 ms, reduce 50 → 10.
+b. PR requires security-engineer code review. Deploy via standard devops-lead deploy flow.
+c. Check whether AL-SCIM-MASS-01 co-fired — if yes, consider BDG review per `SSO_SCIM_IMPLEMENTATION.md §34` and R-33 co-activation.
+
+*H2 — CF KV write throughput (R-88-C1: correctly-sized batches; `ms_per_session` >> 5 ms/session):*
+
+a. Check CF Dashboard → Workers → KV → `SESSION_REVOCATION_KV` namespace → write operation latency by region.
+b. Check CF status page for KV regional incident.
+c. If quota approaching (> 80% of daily write limit): submit CF KV quota increase ticket immediately.
+d. If CF KV healthy: evaluate adding per-batch exponential backoff in `session-revocation-kv.ts` (backoff on 429 — up to 3 retries: 500 ms / 1 s / 2 s delays).
+e. No Supabase fallback activation at P2 — sessions are being revoked (KV writes slow, not failing); REVOKE-SLO-01 unaffected.
+
+*H3 — Supabase `session_blocklist` write contention (WAE KV latency normal; Supabase metrics elevated):*
+
+a. Check Supabase `pg_stat_activity` for lock contention on `session_blocklist`:
+```sql
+SELECT pid, state, wait_event_type, wait_event, query_start,
+       LEFT(query, 80) AS query_snippet
+FROM pg_stat_activity
+WHERE state != 'idle'
+  AND (query ILIKE '%session_blocklist%' OR wait_event IS NOT NULL)
+ORDER BY query_start;
+```
+b. If lock contention confirmed: identify blocking query (cross-reference `pg_locks`); escalate to platform-engineer for index or query optimization.
+c. If Supabase DB under general load (high active connections, CPU > 80%): check concurrent operations (SCIM sync batch, wearable ingestion surge); escalate to devops-lead for DB scaling decision.
+
+*H4 — Worker concurrency saturation (R-88-C3: `concurrent_batches` > 5; WAE queue depth > 0):*
+
+a. Verify via `wrangler tail` that concurrency budget is saturated (look for `worker_limit_exceeded` log lines).
+b. Immediate mitigation: alert enterprise-architect + platform-engineer. Consider temporarily reducing SCIM sync frequency for high-volume tenants (Admin Dashboard §34.3 sync interval setting — requires customer-success notification).
+c. Permanent fix: implement per-tenant serialized bulk revocation queue in the CF Worker (see §R-88.11 Post-Incident Controls H4).
+
+**Step 3 — Confirm remediation:**
+
+Run R-88-C4 post-fix. Gate conditions for IC closure:
+- `p95_ms_post_fix` < 5,000 ms
+- `batch_samples` ≥ 3 (confirms threshold cleared under active load, not just absence of batches)
+
+If P95 still > 5,000 ms after H1–H4 remediation → escalate to P1, post T-88-B, activate Supabase `session_blocklist`-only path per AL-REVOKE-01 runbook step 3.
+
+**Step 4 — Close IC:**
+
+1. Post T-88-C to Slack `#sso-alerts`.
+2. Emit `session.bulk_revocation_slow_ic_closed` LOW/3yr DEC-030 terminal event (REVOKE-BULK-CHAIN-01 chain close).
+3. File REVOKE-BULK-E-001 evidence artefact within 48 h of IC closure.
+4. Close PagerDuty incident.
+
+### §R-88.6 Communication Templates
+
+**T-88-A — P2 acknowledgement (post at IC open; Slack `#sso-alerts`):**
+
+```
+🟡 [BULK-REVOKE-PERF P2] AL-REVOKE-02 activated: bulk session revocation P95 > 5,000 ms.
+
+Impact: SCIM deprovisioning for affected tenants is slower than the 5,000 ms design target.
+Individual session revocation (SSO-SLO-04 / REVOKE-SLO-01) is NOT affected — SSO login/logout operating normally.
+No SLA credit triggered.
+
+Acknowledged by @devops-lead. Investigation in progress.
+IC: [PagerDuty URL] | Root cause TBD (H1 oversized batch / H2 KV / H3 Supabase / H4 concurrency)
+```
+
+**T-88-B — P1 escalation (if P1 criteria met; Slack `#sso-alerts` + `#alerts-enterprise`):**
+
+```
+🔴 [BULK-REVOKE-PERF P2→P1 ESCALATION] AL-REVOKE-02 — P95 persists > 15,000 ms / 2+ hours.
+
+Activating Supabase session_blocklist-only path (AL-REVOKE-01 step 3 protocol).
+Root cause: [H1 / H2 / H3 / H4 — add specific detail].
+CSM team: check if affected enterprise tenants require proactive communication.
+
+IC: [PagerDuty URL] | Owner: @devops-lead @security-engineer @platform-engineer
+```
+
+**T-88-C — Post-resolution (Slack `#sso-alerts`):**
+
+```
+✅ [BULK-REVOKE-PERF RESOLVED] AL-REVOKE-02 closed — bulk session revocation P95 confirmed < 5,000 ms
+(R-88-C4: [P95 value] ms, [N] batch samples).
+
+Root cause: [H1 BATCH_SIZE oversized / H2 CF KV throughput / H3 Supabase contention / H4 Worker concurrency]
+Specific finding: [1–2 sentences]
+Degraded window: [N] minutes
+Post-mortem: [Required if > 60 min] / [Not required]
+
+IC: [PagerDuty URL] closed.
+```
+
+### §R-88.7 DEC-030 Events
+
+Two new events for the REVOKE-BULK-CHAIN-01 IC lifecycle chain:
+
+**`session.bulk_revocation_slow_ic_opened`** — STANDARD / 3yr
+
+Anchor event emitted at R-88 IC open (Step 1 item 6).
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | IC identifier; referenced by terminal event |
+| `trigger_event_batch_id` | UUID | `event_id` of the `session.bulk_revocation_complete` event whose P95 contribution triggered AL-REVOKE-02 (best-available batch from breach window) |
+| `tenant_id` | UUID or null | UUID of the slowest batch tenant in R-88-C1; null if fleet-wide pattern (H4 or H2) |
+| `p95_ms_at_trigger` | integer | P95 `duration_ms` across the breach window at IC open time |
+| `batch_samples_in_window` | integer | Count of `session.bulk_revocation_complete` events in the 1-hour trigger window |
+| `initial_severity` | string | `"P2"` (or `"P1"` if P1 criteria met at first assessment) |
+| `mode` | string | `"automated"` / `"csm_escalation"` / `"manual_discovery"` |
+
+**`session.bulk_revocation_slow_ic_closed`** — LOW / 3yr
+
+Terminal event emitted at IC close (Step 4 item 2).
+
+| Field | Type | Description |
+|---|---|---|
+| `incident_id` | UUID | Must match `session.bulk_revocation_slow_ic_opened` `incident_id` |
+| `root_cause` | string enum | `"H1_oversized_batch"` / `"H2_kv_throughput"` / `"H3_supabase_contention"` / `"H4_worker_concurrency"` |
+| `degraded_window_minutes` | integer | Wall-clock minutes from first breach to R-88-C4 confirmation |
+| `p95_ms_at_closure` | integer | P95 from R-88-C4 (must be < 5,000 ms at IC closure) |
+| `batch_size_changed` | boolean | `true` if `BATCH_SIZE` was reduced (H1) |
+| `new_batch_size` | integer or null | New value if `batch_size_changed: true` |
+| `kv_quota_ticket_filed` | boolean | CF KV quota increase ticket filed (H2 — if quota > 80%) |
+| `supabase_fallback_activated` | boolean | `true` only if P1 escalation triggered and `session_blocklist`-only path was activated |
+| `p1_escalated` | boolean | `true` if incident escalated to P1 |
+| `al_scim_mass_01_co_activated` | boolean | AL-SCIM-MASS-01 co-occurred (H1 large SCIM batch scenario) |
+| `art33_assessment_required` | boolean | Always `false` — performance incident; sessions revoked slowly, not un-revoked; no data breach |
+
+**Privacy floor:** Neither event carries `user_id`, `session_id`, `jti`, employee name, email, health value, or GDPR Art. 9 special-category data. `tenant_id` is FORM-internal UUID. `revoked_count` referenced via `trigger_event_batch_id` remains in the source `session.bulk_revocation_complete` event — not duplicated in anchor or terminal events.
+
+### §R-88.8 REVOKE-BULK-CHAIN-01 HMAC Ordering Invariant
+
+`session.bulk_revocation_slow_ic_closed` MUST be preceded by `session.bulk_revocation_slow_ic_opened` carrying the same `incident_id` within 48 h. On inversion: HTTP 422 `REVOKE_BULK_CHAIN_01_VIOLATION` (enforcement pending M6 in `supabase/functions/emit-audit-event/`).
+
+Invariant spec for `docs/AUDIT_LOG_SCHEMA.md §R-88`:
+- Preceding event: `session.bulk_revocation_slow_ic_opened` STANDARD/3yr
+- Following event: `session.bulk_revocation_slow_ic_closed` LOW/3yr
+- Matching field: `incident_id` (UUID)
+- Maximum gap: 48 h
+- Violation error code: `REVOKE_BULK_CHAIN_01_VIOLATION`
+- HTTP status on violation: 422
+
+### §R-88.9 Evidence Artefact
+
+**REVOKE-BULK-E-001** — Bulk Revocation Slow per-activation IC artefact.
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | REVOKE-BULK-E-001 |
+| **Trigger** | Per R-88 IC activation (each AL-REVOKE-02 incident that opens an IC) |
+| **Cadence** | Incident-triggered — filed within 48 h of each R-88 IC closure |
+| **Retention** | 3 years (WORM — P2 performance degradation; no data breach or access control failure; lower retention tier than REVOKE-SYNC-E-001 7yr) |
+| **Storage path** | `compliance/evidence/session-revocation/revoke-bulk-e-001-{incident_id}.json` |
+| **Vanta mirror** | REVOKE-BULK-E-001 (per-activation — upload within 48 h of IC closure; pending SOC2_READINESS §79.4 registration M5) |
+| **SOC 2 criteria** | CC7.2 / CC7.3 |
+
+**Five required components:**
+
+1. **`r88_c1_output`** — R-88-C1 scope query at IC open time: batch detail (`revoked_count`, `duration_ms`, `ms_per_session`, `tenant_id` UUID; no `user_id`). Proves which batches triggered AL-REVOKE-02 and classifies H1 vs. H2/H3/H4.
+2. **`r88_c4_output`** — R-88-C4 post-remediation confirmation: `p95_ms_post_fix` < 5,000 ms, `batch_samples` ≥ 3. Proves threshold cleared before IC closure.
+3. **`trigger_batch_event_json`** — The `session.bulk_revocation_complete` STANDARD/7yr DEC-030 event whose P95 contribution triggered AL-REVOKE-02. Contains `tenant_id` UUID, `revoked_count` (aggregate integer), `duration_ms`; no `user_id`, `session_id`, or individual session data.
+4. **`opened_event_json`** — The `session.bulk_revocation_slow_ic_opened` STANDARD/3yr DEC-030 anchor event.
+5. **`terminal_event_json`** — The `session.bulk_revocation_slow_ic_closed` LOW/3yr terminal event. Contains `root_cause` H1–H4, `degraded_window_minutes`, `p95_ms_at_closure`, `supabase_fallback_activated`, `art33_assessment_required: false`.
+
+**Privacy floor:** REVOKE-BULK-E-001 contains NO data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data. `tenant_id` in all components is FORM-internal UUID. `revoked_count` is an aggregate integer count of session tokens — not a list of session IDs, user IDs, or any individually-identifying data. HR role has NO access to `compliance/evidence/session-revocation/`.
+
+### §R-88.10 SOC 2 Auditor Narratives
+
+**CC7.2 — Continuous monitoring for anomalous conditions:**
+
+AL-REVOKE-02 is a continuous automated monitor sourced from the immutable DEC-030 `session.bulk_revocation_complete` chain. The P95 threshold (5,000 ms) is evaluated over rolling 1-hour windows — FORM detects bulk revocation degradation before it could affect SCIM deprovisioning SLA commitments. R-88-C2 hourly time-series query (output filed in REVOKE-BULK-E-001 `r88_c1_output`) proves monitoring coverage was continuous across the observation period. REVOKE-OBS-E-001 §76.8 quarterly artefact `alert_activations` field provides the quarterly aggregate of all AL-REVOKE-02 P2 activations, with zero-event attestation if no activations occurred.
+
+**CC7.3 — Incident response to detected anomalies:**
+
+R-88 provides a documented, severity-classified IC protocol for the P2 AL-REVOKE-02 scenario. Four root cause hypotheses (H1–H4) cover the full causal space for bulk revocation slowness, each with hypothesis-specific remediation steps. The IC lifecycle is REVOKE-BULK-CHAIN-01 HMAC-chained: `session.bulk_revocation_slow_ic_opened` STANDARD/3yr anchor → `session.bulk_revocation_slow_ic_closed` LOW/3yr terminal. The HMAC chain provides a tamper-evident record that the IC was formally opened and closed. `p95_ms_at_closure` in the terminal event proves the threshold was cleared before IC closure; `degraded_window_minutes` quantifies the total performance degradation window; `art33_assessment_required: false` confirms FORM determined no GDPR Art. 33 obligation arose (sessions were revoked slowly, not left un-revoked).
+
+### §R-88.11 Post-Incident Controls
+
+| Root cause | Post-incident control | Owner | Timeline |
+|---|---|---|---|
+| H1 (oversized batch) | Add pre-flight `BATCH_SIZE` guard in `apps/api-gateway/src/sso/session-revocation-kv.ts`: if caller requests revocation for > 1,000 sessions in a single call, automatically split into sub-batches before processing; emit `session.bulk_revocation_batch_split` STANDARD/3yr DEC-030 advisory event with `original_count` and `sub_batch_count` | platform-engineer | 7 days |
+| H2 (CF KV write throughput) | Add WAE `session_revocation_kv_write_duration_ms` P95 metric as an early-warning signal; set threshold at 3,000 ms to fire a P3 Slack advisory to `#sso-alerts` before AL-REVOKE-02 threshold (5,000 ms) is reached | devops-lead | 14 days |
+| H3 (Supabase `session_blocklist` contention) | Add composite index `CREATE INDEX CONCURRENTLY idx_session_blocklist_tenant_created ON session_blocklist(tenant_id, created_at DESC)` to reduce lock contention during bulk inserts; evaluate decoupling `session_blocklist` write-through to async Postgres LISTEN/NOTIFY queue for bulk-revocation paths | platform-engineer | 14 days |
+| H4 (Worker concurrency saturation) | Implement per-tenant token-bucket rate limiter for bulk revocation in the CF Worker: max 1 concurrent bulk-revocation batch per tenant; additional batch requests queue with max 30 s wait before timeout and retry | platform-engineer + enterprise-architect | 14 days |
+| Any (universal) | 48 h post-mortem if degraded window > 60 min OR > 3 AL-REVOKE-02 activations in a rolling 30-day window | devops-lead + security-engineer | 48 h |
+
+### §R-88.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `session.bulk_revocation_slow_ic_opened` STANDARD/3yr and `session.bulk_revocation_slow_ic_closed` LOW/3yr in `docs/AUDIT_LOG_SCHEMA.md §R-88`; include REVOKE-BULK-CHAIN-01 ordering invariant and REVOKE-BULK-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [ ] Pending |
+| 2 | Implement REVOKE-BULK-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`; HTTP 422 + `REVOKE_BULK_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending |
+| 3 | Update `docs/OBSERVABILITY.md §76.4` AL-REVOKE-02 inline runbook: add "Dedicated companion IR runbook: INCIDENT_RESPONSE R-88" field | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.25.1, §76.4 AL-REVOKE-02 companion field).** |
+| 4 | Update `docs/OBSERVABILITY.md §26.6` AL-REVOKE-02 table row: append R-88 reference to runbook column | compliance-officer | **P1** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.25.1, §26.6 AL-REVOKE-02 row).** |
+| 5 | Register REVOKE-BULK-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (CC7.2/CC7.3, per-activation, 3yr; count 167 → 168) | compliance-officer | **P1** / M5 | [ ] Pending |
+| 6 | Update `docs/INCIDENT_RESPONSE.md §R-82.10` cross-reference table: AL-REVOKE-02 row updated to reference dedicated companion R-88 | compliance-officer | **P1** | [x] **Done — 2026-07-06 (INCIDENT_RESPONSE.md v3.52.0, §R-82.10).** |
+| 7 | Authoring complete — R-88 closes the AL-REVOKE-02 companion runbook gap (P1/M5 flag in OBSERVABILITY §76 v5.22.0 footer; all Session Revocation KV subsystem alerts now have dedicated companion runbooks) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (INCIDENT_RESPONSE.md v3.52.0).** |
+
+### §R-88.13 Cross-Reference Obligations
+
+| Item | Location | Status |
+|---|---|---|
+| AL-REVOKE-02 primary alert spec | `docs/OBSERVABILITY.md §26.6` (v5.25.1, 2026-07-06) | R-88 reference appended to runbook column |
+| AL-REVOKE-02 inline runbook | `docs/OBSERVABILITY.md §76.4` (v5.25.1, 2026-07-06) | "Dedicated companion IR runbook: R-88" field added |
+| `session.bulk_revocation_slow_ic_opened` + `session.bulk_revocation_slow_ic_closed` schemas | `docs/AUDIT_LOG_SCHEMA.md §R-88` | STANDARD/3yr + LOW/3yr events; REVOKE-BULK-CHAIN-01 invariant | ⏳ Pending M5 |
+| REVOKE-BULK-E-001 registration | `docs/SOC2_READINESS.md §79.4` | Per-activation CC7.2/CC7.3 evidence (count 167 → 168) | ⏳ Pending M5 |
+| R-82 cross-reference update | `docs/INCIDENT_RESPONSE.md §R-82.10` (v3.52.0, 2026-07-06) | AL-REVOKE-02 row updated — R-88 reference added |
+
+**Privacy floor (invariant throughout R-88):** No data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data in any R-88 scope query, DEC-030 event payload, communication template, or REVOKE-BULK-E-001 component. `tenant_id` in all components is FORM-internal UUID. `revoked_count` is an aggregate integer count of session tokens — not a list of session IDs, user IDs, or any individually-identifying data. HR role has NO access to `compliance/evidence/session-revocation/`. Owner: security-engineer + devops-lead + compliance-officer.
+
+---
+
+*v3.52.0 (2026-07-06): R-88 Bulk Session Revocation Slow (AL-REVOKE-02 companion runbook). Closes the AL-REVOKE-02 companion runbook gap identified in `docs/OBSERVABILITY.md §76 v5.22.0` footer: "AL-REVOKE-02 four-step inline runbook; companion IR runbook gap (P1/M5)". R-82 (v3.47.0, 2026-07-05) closed the AL-REVOKE-01 companion runbook gap; R-88 closes the AL-REVOKE-02 companion runbook gap — both Session Revocation KV alerts (§76.4) now have dedicated companion runbooks. R-88: thirteen-section companion runbook. Trigger: AL-REVOKE-02 (`session.bulk_revocation_complete.duration_ms` P95 > 5,000 ms / 1h window; P2; Slack `#sso-alerts` + PagerDuty LOW; acknowledge < 2h). Three trigger modes: Mode-1 (PagerDuty LOW via AL-REVOKE-02); Mode-2 (CSM escalation — slow SCIM deprovisioning complaint); Mode-3 (manual Grafana §76.6 discovery). Severity: P2 default; P1 escalation criteria — P95 persistently > 15,000 ms / 2h, OR > 3 activations / 30 days, OR AL-REVOKE-01 co-occurs. SLA credit: NOT triggered — individual REVOKE-SLO-01 (P99 < 200 ms, SSO-SLO-04 alias) unaffected; bulk batch latency is a performance concern, not an access-control failure. Four root causes: H1 (oversized SCIM batch — `revoked_count` >> 1,000, missing BATCH_SIZE cap); H2 (CF KV write throughput saturation — quota approaching, CF regional degradation, or burst write pressure); H3 (Supabase `session_blocklist` write contention — DB under load or lock contention on bulk INSERT loop); H4 (CF Worker concurrency saturation — > 5 concurrent batches across tenants exhausting concurrency budget). Four scope queries: R-88-C1 (last 24h batch detail — `revoked_count`, `duration_ms`, `ms_per_session`, `tenant_id` UUID; no `user_id`); R-88-C2 (hourly P95 time-series 7d — trend vs. spike); R-88-C3 (concurrent batch analysis in breach window — `concurrent_batches`, `distinct_tenants`, `total_sessions_revoked`; `tenant_id` UUID only); R-88-C4 (post-remediation P95 < 5,000 ms, ≥ 3 batch_samples — IC closure gate). Four-step recovery: Step 1 (acknowledge PagerDuty LOW, open IC, T-88-A, run R-88-C1..C3, emit `session.bulk_revocation_slow_ic_opened` STANDARD/3yr anchor — no Supabase fallback at P2); Step 2 (classify H1–H4; H1 → BATCH_SIZE reduction + pre-flight guard + AL-SCIM-MASS-01 check; H2 → CF KV quota ticket + per-batch exponential backoff; H3 → Supabase `pg_stat_activity` lock contention + platform-engineer escalation; H4 → per-tenant serialized queue hot-fix); Step 3 (R-88-C4 P95 < 5,000 ms, ≥ 3 samples; P1 escalation path if still exceeds threshold — T-88-B + Supabase-only fallback per AL-REVOKE-01 step 3); Step 4 (T-88-C post-resolution; emit `session.bulk_revocation_slow_ic_closed` LOW/3yr terminal; file REVOKE-BULK-E-001; close IC). Three communication templates: T-88-A (P2 ack — no SLA credit, SSO-SLO-04 unaffected, root cause TBD); T-88-B (P1 escalation — Supabase-only path activating); T-88-C (post-resolution — root cause, degraded window, R-88-C4 confirmation values). Two DEC-030 events: `session.bulk_revocation_slow_ic_opened` STANDARD/3yr (anchor; fields: `incident_id`, `trigger_event_batch_id`, `tenant_id` UUID or null, `p95_ms_at_trigger`, `batch_samples_in_window`, `initial_severity`, `mode`) and `session.bulk_revocation_slow_ic_closed` LOW/3yr (terminal; fields: `incident_id`, `root_cause` H1–H4 enum, `degraded_window_minutes`, `p95_ms_at_closure`, `batch_size_changed`, `new_batch_size`, `kv_quota_ticket_filed`, `supabase_fallback_activated`, `p1_escalated`, `al_scim_mass_01_co_activated`, `art33_assessment_required: false`). REVOKE-BULK-CHAIN-01 ordering invariant: `session.bulk_revocation_slow_ic_closed` must be preceded by `session.bulk_revocation_slow_ic_opened` for same `incident_id` within 48h; HTTP 422 `REVOKE_BULK_CHAIN_01_VIOLATION` on inversion (pending M6). REVOKE-BULK-E-001 per-activation SOC 2 evidence artefact (CC7.2/CC7.3, 3yr WORM, `compliance/evidence/session-revocation/revoke-bulk-e-001-{incident_id}.json`): five components (R-88-C1+C4 outputs; trigger batch event JSON; opened/terminal DEC-030 events); `revoked_count` aggregate integer only; no `user_id`, `session_id`, or GDPR Art. 9 data; `tenant_id` FORM-internal UUID. SOC2_READINESS §79.4 (REVOKE-BULK-E-001 registration, count 167 → 168; pending M5). OBSERVABILITY.md §76.4 AL-REVOKE-02 companion field added (v5.25.1, 2026-07-06). OBSERVABILITY.md §26.6 AL-REVOKE-02 row updated (v5.25.1, 2026-07-06). §R-82.10 cross-reference table AL-REVOKE-02 row updated — R-88 reference added. Five post-incident controls: H1 — pre-flight BATCH_SIZE guard + `session.bulk_revocation_batch_split` advisory event; H2 — WAE KV write P95 early-warning at 3,000 ms (P3 advisory before AL-REVOKE-02 fires at 5,000 ms); H3 — `session_blocklist` composite index + async write-through queue evaluation; H4 — per-tenant token-bucket rate-limiter for concurrent bulk revocation; universal — 48h post-mortem if > 60 min degraded or > 3 activations / 30 days. Privacy floor: no data subject name, email, health value, body composition, ED-screening, or GDPR Art. 9 data in any scope query, DEC-030 event, or REVOKE-BULK-E-001 component; `tenant_id` FORM-internal UUID; `revoked_count` aggregate integer; HR role NO ACCESS to `compliance/evidence/session-revocation/`. Document header v3.51.0 → v3.52.0. Owner: security-engineer + devops-lead + compliance-officer.*
 
 ---
 

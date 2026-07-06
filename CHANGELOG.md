@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [13.87.1] — 2026-07-06
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — R-88 Bulk Session Revocation Slow (AL-REVOKE-02 companion runbook). Thirteen-section companion runbook closing the AL-REVOKE-02 companion runbook gap noted in OBSERVABILITY v5.22.0 footer. Four root causes (H1 oversized batch, H2 CF KV write throughput, H3 Supabase `session_blocklist` write contention, H4 CF Worker concurrency saturation), four scope queries (R-88-C1..C4), REVOKE-BULK-CHAIN-01 HMAC chain, REVOKE-BULK-E-001 per-activation SOC 2 evidence artefact (CC7.2/CC7.3, 3yr WORM). §R-82.10 cross-reference table updated — AL-REVOKE-02 row now references R-88. v3.51.0 → v3.52.0.
+- `docs/OBSERVABILITY.md` — §76.4 AL-REVOKE-02 inline runbook: "Dedicated companion IR runbook: INCIDENT_RESPONSE R-88" field added. §26.6 AL-REVOKE-02 runbook column updated with R-88 reference. §76 version footer v5.25.1 appended. v5.25.0 → v5.25.1.
+- `VERSION` — 13.87.0 → 13.87.1.
+
+---
+
 ## [13.87.0] — 2026-07-06
 
 ### Added
