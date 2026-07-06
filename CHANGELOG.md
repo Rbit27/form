@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [13.70.0] — 2026-07-06
+
+### Added
+- `content/post-3288-sunk-cost-fallacy-programming.md` — Series «Тренувальна психологія self-coached атлета» 3286–3295 · 3/10. «Ефект безповоротних витрат у програмуванні: чому ти продовжуєш те, що не працює». Sunk cost fallacy (Arkes & Blumer 1985, Thaler 1980 mental accounting): при прийнятті рішення релевантні тільки майбутні витрати і вигоди. Шість конкретних проявів у тренуванні: продовження неефективної програми через «вже стільки витрачено», «я вже вивчив цю техніку», фінансові вкладення, «близько до цілі», «роками в підході», ego-захист. Ключова відмінність від законної накопиченої адаптаційної пам'яті: sunk cost — аргумент із минулого без механізму; адаптація — конкретний фізіологічний процес із часовим горизонтом. П'ять структурних антидотів: оцінка з нульової бази, критерії виходу до старту, розрізнення витрат і даних, «помилка vs. навчання», відкладений огляд. Структурний зв'язок з confirmation bias (post-3287) і ego-захистом. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3288 card додано у топ фіду.
+
+### Changed
+- `CHANGELOG.md` — ретроактивно додано запис v13.69.0 (відсутній у коміті fb7c825).
+- `README.md` — roadmap: series 3286–3295 in progress 2/10 → 3/10.
+- `STATUS.md` — current version оновлено до v13.70.0; series 3286–3295 2/10 → 3/10; next: post-105 (editorial 101–110 5/10) + post-3289.
+- `VERSION` — 13.69.1 → 13.70.0.
+
+---
+
 ## [13.69.1] — 2026-07-06
 
 ### Added
@@ -13,6 +27,21 @@
 - `docs/AUDIT_LOG_SCHEMA.md` — v3.3 → v3.4. §R-86 inserted.
 - `docs/SOC2_READINESS.md` — v4.12.0 → v4.14.0 (covers both the prior v4.13.0 header-bump gap and this pass). §190 appended.
 - `VERSION` — 13.69.0 → 13.69.1.
+
+## [13.69.0] — 2026-07-06
+
+### Added
+- `content/post-104-self-coached-athlete-who-progresses.md` — Editorial 101–110 series · 4/10. «Що відрізняє self-coached атлета, який прогресує, від того, хто крутиться на місці». П'ять операційних навичок: читання патернів (мінімальна вибірка — 3 підряд), системне мислення vs. пошук магічної змінної, чесна оцінка без ego, програма як гіпотеза, fitness-fatigue model. Victor як структура для системного мислення, не замінник тренера. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-104 card додано у топ фіду.
+
+### Changed
+- `README.md` — roadmap: editorial 101–110 in progress 3/10 → 4/10.
+- `STATUS.md` — current version оновлено до v13.69.0; editorial 101–110 3/10 → 4/10; next: post-3288.
+- `VERSION` — 13.68.1 → 13.69.0.
+
+*(Примітка: запис v13.69.0 був відсутній у CHANGELOG через пропуск при коміті fb7c825; відновлено ретроактивно v13.70.0 для збереження повноти журналу.)*
+
+---
 
 ## [13.68.1] — 2026-07-06
 
