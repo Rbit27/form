@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.49.1] — 2026-07-06
+
+### Added
+- `docs/SOC2_READINESS.md §184` — ERASURE-STALE-E-001 registration in §79.4 master evidence table (row 160; P5.1/C1.2/CC4.1/CC7.2; per-activation; 7yr WORM). Registers the per-activation `c1-erasure-sla-monitor` (job 11) stale incident evidence artefact defined in AUDIT_LOG_SCHEMA §C1-Erasure-SLA-Monitor-Stale-Events (v3.2, 2026-07-06 — R-43.11 item 1 closure). Distinct from ERASURE-MON-E-001 (§182, quarterly aggregate) and PD-ERASURE-E-001 (§183, one-time routing verification). Four SOC 2 auditor narratives (P5.1 pre-recovery-action GDPR SLA-risk attestation; C1.2 breach_requests_at_declared contractual gap classification; CC4.1 stale_window_hours control-monitoring continuity; CC7.2 C1-ERASURE-STALE-CHAIN-01 tamper-evident HMAC chain). R2: `compliance/evidence/erasure/erasure-sla-monitor-stale/r43-{incident_id}/`; Vanta: per-activation within 48h of IC closure.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v3.47.0 → v3.48.0 — three patches: (1) R-43.11 item 5 added [x] Done (SOC2_READINESS §184 ERASURE-STALE-E-001 registration — obligation created by AUDIT_LOG_SCHEMA v3.2 without a corresponding checklist item); (2) R-43.11 v1.1 footer note added; (3) §R-82.10 `session.revocation_kv_sync_restored` cross-reference updated from stale "pending §R-82.11 item 1" → `AUDIT_LOG_SCHEMA §R-82 Session Revocation KV Sync Restored events (v3.1, 2026-07-05)`.
+- `VERSION` — 13.49.0 → 13.49.1.
+
+---
+
 ## [13.49.0] — 2026-07-06
 
 ### Added
