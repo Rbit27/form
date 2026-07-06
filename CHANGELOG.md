@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.90.0] — 2026-07-06
+
+### Added
+- `content/post-3304-metrics-integration-decision-system.md` — Series «Вимірювання що рухає: метрики продуктивності vs. метрики адаптації» 3296–3305, post 9/10. Інтеграція восьми метрик серії у тришарову систему прийняття рішень: сесійний рівень (RPE точка + VBT readiness check), тижневий рівень (sRPE/TRIMP + тоннаж + effective sets vs MEV/MAV + monotony/strain), цикловий рівень (e1RM динаміка + strength ratio + RPE тренд). Таблиця: яка метрика, на якому горизонті, яке питання вирішує. Мінімальна версія системи (3 метрики = 80% цінності). Межі системи: холодний контекст, системні збої, заміна живого тренера. clinical-safety NOT_REQUIRED.
+- `blog.html` — card for post-3304 prepended at top of feed.
+
+### Changed
+- `STATUS.md` — series 3296–3305 progress updated 8/10 → 9/10; next: post-3305 (series 10/10 — synthesis).
+- `VERSION` — 13.89.0 → 13.90.0.
+
 ## [13.89.0] — 2026-07-06
 
 ### Added
