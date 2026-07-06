@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v13.47.0** — 2026-07-06 · content · post-86 · «Коли «слухати тіло» — правильна стратегія, а коли — виправдання» (editorial series 81–90, 6/10) · clinical-safety PASS (cloud-agent · 2026-07-06: без їжі/образу тіла; дискомфорт/біль — виключно тренувальні маркери RPE) · sports-scientist review pending · blog.html card prepended · README: editorial 81–90 in progress 6/10, post-86 draft, нові теми 911–915 proposed · next: post-87 (editorial series 81–90, 7/10)
+
 **v13.46.0** — 2026-07-06 · content · post-85 + post-3272 · «Синтез блоку 76–85: що відрізняє "програму" від "тренувальної системи"» (editorial series 81–90, 5/10) + «Від accumulation до expression: як цикли розвитку сили змінюються з досвідом» (series 3266–3275, 7/10) · clinical-safety NOT_REQUIRED (обидва: без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html cards prepended for post-85 and post-3272 · next: post-86 (editorial series 81–90, 6/10) + post-3273 (series 3266–3275, 8/10)
 
 **v13.45.0** — 2026-07-06 · content-engine audit · posts 11–15 ✓ ALL CONFIRMED COMPLETE · post-11 (deload weeks), post-12 (technique vs intensity), post-13 (overtraining vs laziness), post-14 (sleep-deprived training), post-15 (training frequency) · clinical-safety PASS/NOT_REQUIRED (всі) · sports-scientist review pending (всі) · blog.html cards наявні для всіх · milestone: editorial series posts 11–15 done · next: post-16

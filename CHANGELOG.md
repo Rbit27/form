@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.47.0] — 2026-07-06
+
+### Added
+- `content/post-86-listen-to-your-body-signal-vs-excuse.md` — Editorial series 81–90 post 6/10. «Коли «слухати тіло» — правильна стратегія, а коли — виправдання». Фреймворк розрізнення реальних фізіологічних сигналів від психологічного уникання: RPE-дрейф як тенденція (Zourdos 2016, Scott 2016), просідання ваг без зовнішньої причини, HRV відносно базової лінії (Myllymäki 2012, Flatt & Esco 2016), нові патерни мотиваційного виснаження; шаблони виправдань — реакція на одну сесію, «я не хочу», зупинка на RPE 7, селективне «не в формі»; три операційні питання; авторегуляція на практиці (Mann 2010, Graham 2019); відмінність між атлетом, схильним до перетренованості, та атлетом, схильним до уникання. clinical-safety PASS. sports-scientist review pending. blog.html card prepended.
+
+### Changed
+- `blog.html` — card for post-86 prepended to feed.
+- `README.md` — editorial 81–90 in progress 6/10; post-86 draft v13.47.0; нові теми 911–915 proposed.
+- `VERSION` — 13.46.0 → 13.47.0.
+
+---
+
 ## [13.46.0] — 2026-07-06
 
 ### Added
