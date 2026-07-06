@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.72.0] — 2026-07-06
+
+### Fixed
+- `docs/INCIDENT_RESPONSE.md` v3.50.0 — SSO-FLEET-IC-CHAIN-01 naming collision fix: renamed R-86 IC lifecycle chain from `SSO-FLEET-CHAIN-01` → `SSO-FLEET-IC-CHAIN-01` and violation error code from `SSO_FLEET_CHAIN_01_VIOLATION` → `SSO_FLEET_IC_CHAIN_01_VIOLATION` in all R-86 sections (§R-86.4, §R-86.5, §R-86.9, §R-86.10, §R-86.12, §R-86.13). R-37 stale monitoring chain (`system.sso_fleet_check_failure_declared` → `system.sso_fleet_check_restored`) retains original `SSO-FLEET-CHAIN-01` name — unchanged.
+- `docs/AUDIT_LOG_SCHEMA.md` v3.5 — same chain/error-code rename applied to §R-86 `siem.sso_fleet_health_ic_opened` + `siem.sso_fleet_health_ic_closed` ordering invariant block and SOC 2 CC7.3 auditor narrative. R-37 stale-chain references unchanged.
+- `docs/SOC2_READINESS.md` v4.15.0 — same rename applied to §190 CC7.3 auditor narrative (`the SSO-FLEET-IC-CHAIN-01 terminal event…`) and §190 footer changelog entry (`SSO-FLEET-IC-CHAIN-01 ordering invariant:` / `SSO_FLEET_IC_CHAIN_01_VIOLATION`).
+
+### Changed
+- `VERSION` — 13.71.0 → 13.72.0.
+
+---
+
 ## [13.71.0] — 2026-07-06
 
 ### Added
