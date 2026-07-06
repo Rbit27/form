@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [13.48.0] — 2026-07-06
+
+### Added
+- `content/post-87-supercompensation-what-happens-between-sessions.md` — Editorial series post 87 (81–90, 7/10). «Суперкомпенсація: що відбувається між тренуваннями і як її читати». GAS Сельє у тренувальному контексті; 5 фаз: стрес → втома → відновлення → суперкомпенсація → повернення до норми; вікна за типом тренування (36–96год vs 72–120год); накопичена втома як маска суперкомпенсації — деловантаження як розкриття; маркери вікна для self-coached атлета (RPE, HRV, суб'єктивна готовність); що блокує суперкомпенсацію (надмірна частота, недосипання, алкоголь в 24–48год, хронічний стрес); intermediate vs. новачок — різниця відновлювального вікна. clinical-safety NOT_REQUIRED (тема: фізіологія адаптації між сесіями; без їжі/образу тіла/болю/клінічної психології). sports-scientist review pending.
+- `content/post-3273-long-term-planning-mistakes-2-years.md` — Series «Довгострокове прогресування: 2–5-річний горизонт» post 3273 (8/10). «Помилки довгострокового планування: що руйнує прогрес за 2 роки». П'ять структурних помилок: (1) вічна accumulation без expression — нейром'язова ефективність не розвивається; (2) вічна expression без достатньої accumulation — об'єм падає, суглоби накопичують перевантаження; (3) ігнорування macrocycle — адаптація до патерну замість прогресу; (4) порівняння з некоректними орієнтирами (початківці, соцмережі, власний expression-пік vs accumulation-середина); (5) відсутність точок огляду — прогрес стоїть 6 місяців непоміченим. Профіль 2-річного руйнування по місяцях. Типові комбінації помилок. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-87 і post-3273 cards prepended at top of feed.
+
+### Changed
+- `README.md` — editorial 81–90 in progress 6/10 → 7/10; post-87 proposed → draft; series 3266–3275 updated 6/10 → 8/10; posts 3272–3273 proposed → draft.
+- `STATUS.md` — v13.48.0 current version entry added; editorial 81–90 7/10; series 3266–3275 8/10; next: post-88 + post-3274.
+- `VERSION` — 13.47.1 → 13.48.0.
+
+---
+
 ## [13.47.1] — 2026-07-06
 
 ### Changed

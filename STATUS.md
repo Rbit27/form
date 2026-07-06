@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v13.48.0** — 2026-07-06 · content · post-87 + post-3273 · «Суперкомпенсація: що відбувається між тренуваннями і як її читати» (editorial series 81–90, 7/10) + «Помилки довгострокового планування: що руйнує прогрес за 2 роки» (series 3266–3275, 8/10) · clinical-safety NOT_REQUIRED (обидва: без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html cards prepended for post-87 and post-3273 · README: editorial 81–90 in progress 7/10, series 3266–3275 updated 8/10 · next: post-88 (editorial series 81–90, 8/10) + post-3274 (series 3266–3275, 9/10)
+
 **v13.47.0** — 2026-07-06 · content · post-86 · «Коли «слухати тіло» — правильна стратегія, а коли — виправдання» (editorial series 81–90, 6/10) · clinical-safety PASS (cloud-agent · 2026-07-06: без їжі/образу тіла; дискомфорт/біль — виключно тренувальні маркери RPE) · sports-scientist review pending · blog.html card prepended · README: editorial 81–90 in progress 6/10, post-86 draft, нові теми 911–915 proposed · next: post-87 (editorial series 81–90, 7/10)
 
 **v13.46.0** — 2026-07-06 · content · post-85 + post-3272 · «Синтез блоку 76–85: що відрізняє "програму" від "тренувальної системи"» (editorial series 81–90, 5/10) + «Від accumulation до expression: як цикли розвитку сили змінюються з досвідом» (series 3266–3275, 7/10) · clinical-safety NOT_REQUIRED (обидва: без їжі/образу тіла/болю/клінічної психології) · sports-scientist review pending · blog.html cards prepended for post-85 and post-3272 · next: post-86 (editorial series 81–90, 6/10) + post-3273 (series 3266–3275, 8/10)
