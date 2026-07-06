@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.50.1] — 2026-07-06
+
+### Added
+- `docs/DATA_MODEL.md §55` — `session_blocklist.kv_sync_status` KV Revocation Sync Status — Migration 0102. Canonical DATA_MODEL registration for the schema change introduced in `docs/SSO_SCIM_IMPLEMENTATION.md §22` (High-Scale Session Revocation KV Architecture, v1.4, 2026-06-01). One new ENUM type `revocation_kv_status AS ENUM ('pending', 'synced', 'failed')` and one new column `kv_sync_status revocation_kv_status NOT NULL DEFAULT 'pending'` on `session_blocklist`; one partial index `idx_session_blocklist_kv_status ON session_blocklist (kv_sync_status) WHERE kv_sync_status != 'synced'` (CONCURRENTLY; no table lock). Follows the §52/§53/§54 pattern: closes the DATA_MODEL registration gap where SSO_SCIM §22 had complete design + DDL but no companion DATA_MODEL section. Covers: §55.1 purpose (two-tier KV + Supabase revocation; kv_sync_status state machine pending→synced/failed); §55.2 dependency chain (additive; no FK; operationally coupled to SESSION_REVOCATION_KV KV namespace); §55.3 full DDL + rollback (mirrors §22.7 verbatim; CONCURRENTLY index; backfill all pre-migration rows to 'synced'; rollback pre-gate zero 'failed' rows); §55.4 five CI adversarial tests MIG-0102-01..05 (migration apply, rollback, ENUM constraint, default value, backfill verification); §55.5 column/ENUM semantics (ENUM vs TEXT CHECK rationale; state machine; idx_session_blocklist_kv_status scope and consumers); §55.6 RLS (inherits session_blocklist existing policies; form_system write; form_admin read; form_api + tenant_manager no access; privacy floor for tenant_manager; four auditor proof queries); §55.7 privacy floor (kv_sync_status = operational ENUM, no PII; all DEC-030 events FORM-internal UUIDs only; GDPR Art. 17(3)(b) legal obligation exemption); §55.8 SOC 2 evidence (CC6.3 CC6-E-REV-002 kv_sync_status distribution >99% synced; CC7.2 AL-REVOKE-01 REVOKE-SYNC-E-001; CC7.3 automatic Supabase fallback; CC6.3 CC6-E-REV-001 bulk revocation duration_ms); §55.9 seven-item implementation checklist (4× P0/M4; 1× P1/M5; 2× Done this pass); §55.10 cross-reference obligations (SSO_SCIM §22/§22.15 🟢 Done this pass; OBSERVABILITY §76 🟢 v5.22.0; SOC2_READINESS §178-180 🟢 all Done; IR R-82 🟢 v3.48.0).
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §22.15` — item 13 added: DATA_MODEL §55 canonical registration (compliance-officer, P1, Documentation pass, Done 2026-07-06). SSO_SCIM v2.38 → v2.39.
+- `docs/DATA_MODEL.md` v1.46 → v1.47; TOC §55 entry added.
+- `VERSION` — 13.49.1 → 13.49.2.
+
+---
+
 ## [13.50.0] — 2026-07-06
 
 ### Added

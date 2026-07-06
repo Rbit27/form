@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.46
+# FORM · Multi-Tenant Data Model v1.47
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -62,6 +62,7 @@
 52. [`enterprise_sessions.oidc_sub_hash` — OIDC BCL Session Index — Migration 0101](#52-enterprise_sessionsoidc_sub_hash--oidc-bcl-session-index--migration-0101)
 53. [SAML SLO + OIDC BCL Schema Columns — Migration 0100](#53-saml-slo--oidc-bcl-schema-columns--migration-0100)
 54. [`tenant_sso_configs` PKJWT Extension — Migration 0098](#54-tenant_sso_configs-pkjwt-extension--migration-0098)
+55. [`session_blocklist.kv_sync_status` — KV Revocation Sync Status — Migration 0102](#55-session_blocklists-kv_sync_status--kv-revocation-sync-status--migration-0102)
 
 ---
 
@@ -19779,5 +19780,275 @@ FORM's `private_key_jwt` implementation uses per-tenant RSA-2048 (or EC P-256) k
 | `docs/SOC2_READINESS.md` | §145 | PKJWT-E-001 evidence artefact (CC6.6, quarterly CSV export of `sso.pkjwt_key_generated/rotated`, 7yr WORM) | 🟢 Done — SOC2_READINESS.md v3.71.0, 2026-07-02 |
 
 ---
+
+## §55. `session_blocklist.kv_sync_status` — KV Revocation Sync Status — Migration 0102
+
+**Feature:** Session Revocation KV Architecture (`docs/SSO_SCIM_IMPLEMENTATION.md §22`)
+**SOC 2 scope:** CC6.3, CC7.2, CC7.3
+**Last updated:** 2026-07-06
+**Source design:** `docs/SSO_SCIM_IMPLEMENTATION.md §22` (v1.4, 2026-06-01)
+**Migration:** `migrations/[YYYYMMDD]_session_blocklist_kv_status.sql` (assigned 0102)
+
+---
+
+### §55.1 Purpose and Scope
+
+`docs/SSO_SCIM_IMPLEMENTATION.md §22` specified the complete design and DDL for the High-Scale Session Revocation KV Architecture — a two-tier revocation system using Cloudflare KV (`SESSION_REVOCATION_KV`) as the hot read cache and the existing `session_blocklist` Supabase table as the authoritative audit trail. §22.7 introduced one schema change: a new ENUM type `revocation_kv_status` and a new column `kv_sync_status revocation_kv_status NOT NULL DEFAULT 'pending'` on `session_blocklist`.
+
+This section provides the canonical DATA_MODEL registration for that schema change — the same role that §52 plays for Migration 0101 (`enterprise_sessions.oidc_sub_hash`), §53 for Migration 0100 (SAML SLO + OIDC BCL columns), and §54 for Migration 0098 (PKJWT columns). §22.7 contains the definitive DDL; this section adds the RLS analysis, privacy floor, SOC 2 evidence mapping, and cross-reference obligations that complete the enterprise documentation cluster.
+
+**What the `kv_sync_status` column tracks:** On each session revocation write, the API Gateway Worker writes the revocation to Cloudflare KV first, then inserts (or updates) a row in `session_blocklist`. The `kv_sync_status` column records whether the KV write succeeded:
+
+| Value | Meaning | Operational consequence |
+|---|---|---|
+| `'pending'` | Default at INSERT; KV write in progress | Transient — the Worker updates to `'synced'` or `'failed'` after the KV attempt completes |
+| `'synced'` | KV write confirmed; `isRevoked()` checks KV as primary path | Normal steady-state for all revocations after §22 go-live |
+| `'failed'` | KV write failed; Supabase SELECT fallback is active for this session | Requires investigation (AL-REVOKE-01 fires if failure rate > 1%); R-82 runbook |
+
+**Scope of this section:** Migration 0102 DDL and rollback; CI adversarial tests; column and ENUM semantics; RLS analysis; privacy floor; SOC 2 evidence mapping; cross-reference obligations. The KV architecture, TypeScript implementation, DEC-030 events, and alerting rules are defined in SSO_SCIM §22; this section registers the schema artefact only.
+
+---
+
+### §55.2 Migration Dependency Chain
+
+| Migration | Change | Apply order note |
+|---|---|---|
+| Pre-existing | `session_blocklist` table creation (§6.3 SSO_SCIM) | Before 0102 |
+| **0102** | `revocation_kv_status` ENUM + `kv_sync_status` column + partial index (this section) | Additive; no FK to new tables; may be applied in any order relative to 0098–0101 |
+| N/A (`wrangler.toml`) | `SESSION_REVOCATION_KV` KV namespace binding | Operationally coupled but not a Postgres migration; must be deployed before the Worker reads `kv_sync_status` values |
+
+**Apply order note:** Migration 0102 is additive — it adds an ENUM type, one column (with DEFAULT), one index, and a backfill UPDATE. It has no dependencies on Migrations 0098–0101 and may be applied in any order relative to them within a maintenance window. However, operationally it must precede the deployment of the §22.5 `session-revocation-kv.ts` Worker code that writes `kv_sync_status` values.
+
+**Lock note:** `ALTER TABLE session_blocklist ADD COLUMN kv_sync_status ...` acquires an `ACCESS EXCLUSIVE` lock. On the expected row count (tens of thousands of revocation records, not millions — revocations expire with JWT TTL, typically 8h; historical volume is low), lock duration is sub-second. The `CREATE INDEX CONCURRENTLY` step holds no table lock. Run during a low-traffic maintenance window as a precaution.
+
+---
+
+### §55.3 Migration DDL
+
+#### §55.3.1 Forward Migration (mirrors SSO_SCIM §22.7 verbatim)
+
+```sql
+-- migrations/[YYYYMMDD]_session_blocklist_kv_status.sql
+-- Migration 0102
+
+-- Step 1: New ENUM for KV sync tracking
+CREATE TYPE revocation_kv_status AS ENUM ('pending', 'synced', 'failed');
+
+-- Step 2: Add kv_sync_status column with ENUM type and NOT NULL DEFAULT
+ALTER TABLE session_blocklist
+  ADD COLUMN kv_sync_status revocation_kv_status NOT NULL DEFAULT 'pending';
+
+-- Step 3: Backfill — rows inserted before this migration have no corresponding
+-- KV entry. Mark them 'synced' conceptually: they are caught by the Supabase
+-- fallback path during the 30-day migration window (§22.9), then expire
+-- naturally within 8 hours (max JWT TTL). This is a correctness signal, not
+-- a data migration — these rows will never be checked against KV.
+UPDATE session_blocklist
+SET kv_sync_status = 'synced'
+WHERE blocked_at < NOW();
+
+-- Step 4: Partial index for the compliance evidence query (CC6-E-REV-002)
+-- and for incident triage (quickly count 'failed' or 'pending' rows).
+-- CONCURRENTLY: no table lock; safe during live traffic.
+CREATE INDEX CONCURRENTLY idx_session_blocklist_kv_status
+  ON session_blocklist (kv_sync_status)
+  WHERE kv_sync_status != 'synced';
+
+-- Step 5: Column comment
+COMMENT ON COLUMN session_blocklist.kv_sync_status IS
+  'Whether this revocation has been mirrored to SESSION_REVOCATION_KV. '
+  '''failed'' means KV write failed; Supabase fallback is active for this session.';
+```
+
+#### §55.3.2 Rollback
+
+```sql
+-- Rollback for Migration 0102
+-- Pre-rollback gate: resolve any 'failed' rows before rollback — active KV
+-- sync failures indicate an ongoing incident; rolling back removes the signal.
+
+-- Step 1: Drop partial index (CONCURRENTLY: no table lock)
+DROP INDEX CONCURRENTLY IF EXISTS idx_session_blocklist_kv_status;
+
+-- Step 2: Drop column
+ALTER TABLE session_blocklist
+  DROP COLUMN IF EXISTS kv_sync_status;
+
+-- Step 3: Drop ENUM type
+DROP TYPE IF EXISTS revocation_kv_status;
+```
+
+**Rollback pre-gate:** Confirm zero `'failed'` rows before rollback:
+
+```sql
+SELECT count(*) FROM session_blocklist WHERE kv_sync_status = 'failed';
+-- Expected: 0
+```
+
+Any `'failed'` rows indicate sessions where the KV write did not complete — rolling back removes the audit signal. Resolve the underlying KV issue first (§22.9 migration window fallback, or R-82 runbook) before proceeding.
+
+---
+
+### §55.4 CI Adversarial Tests
+
+| Test ID | Description | Expected result | Evidence path |
+|---|---|---|---|
+| MIG-0102-01 | Apply migration; confirm `kv_sync_status` column exists on `session_blocklist`; confirm `revocation_kv_status` ENUM type exists; confirm `idx_session_blocklist_kv_status` partial index exists | All three assertions pass | `compliance/evidence/sso/migration-0102-validation_<YYYY-MM-DD>.txt` |
+| MIG-0102-02 | Rollback (after MIG-0102-01): apply migration, then rollback; confirm `kv_sync_status` column removed; confirm `revocation_kv_status` ENUM type removed; confirm index removed | Column, ENUM, index all absent post-rollback | Same evidence file |
+| MIG-0102-03 | ENUM constraint enforcement: after apply, attempt INSERT with `kv_sync_status = 'invalid_value'`; confirm Postgres rejects with invalid input value for enum | `ERROR: invalid input value for enum revocation_kv_status: "invalid_value"` | Same evidence file |
+| MIG-0102-04 | Default value: INSERT into `session_blocklist` (all required columns, omit `kv_sync_status`); confirm `kv_sync_status` defaults to `'pending'` | `SELECT kv_sync_status FROM session_blocklist ORDER BY blocked_at DESC LIMIT 1` returns `'pending'` | Same evidence file |
+| MIG-0102-05 | Backfill verification: after apply, confirm all rows with `blocked_at < NOW() - interval '1 second'` have `kv_sync_status = 'synced'`; confirm no `'pending'` rows in pre-migration data | `SELECT count(*) FROM session_blocklist WHERE blocked_at < NOW() - interval '1 second' AND kv_sync_status = 'pending'` returns 0 | Same evidence file |
+
+**Evidence filing:** MIG-0102-01 through MIG-0102-05 outputs concatenated to `compliance/evidence/sso/migration-0102-validation_<YYYY-MM-DD>.txt`; filed to R2 WORM under `compliance/evidence/sso/`; 7-year retention per CC8.1.
+
+---
+
+### §55.5 Column and ENUM Semantics
+
+#### §55.5.1 `revocation_kv_status` ENUM
+
+| Value | State machine position | Set by |
+|---|---|---|
+| `'pending'` | Initial state — column DEFAULT | Postgres DEFAULT at INSERT time; also set by the Worker immediately before attempting the KV write in `revokeSession()` / `handleBulkScimRevocation()` |
+| `'synced'` | Terminal success state | Worker UPDATE after confirmed KV PUT; also set by the Day-0 backfill for all pre-migration rows |
+| `'failed'` | Terminal failure state | Worker UPDATE after a KV PUT error; triggers `session.revocation_kv_sync_error` DEC-030 event (HIGH severity) and AL-REVOKE-01 if rate > 1% over 5 minutes |
+
+**Why ENUM not TEXT with CHECK:** The ENUM type provides storage efficiency and compile-time exhaustiveness at the Postgres level — a future migration adding a new state (e.g., `'retry_pending'`) requires explicit `ALTER TYPE` and produces a migration artefact automatically captured in the evidence log. A TEXT CHECK constraint silently accepts any new value added to the CHECK list without producing a typed DDL event.
+
+#### §55.5.2 `session_blocklist.kv_sync_status`
+
+| Property | Value |
+|---|---|
+| Type | `revocation_kv_status` (ENUM) |
+| Nullable | `NOT NULL` |
+| Default | `'pending'` |
+| Write path | `form_system` role via `session-revocation-kv.ts` API Gateway Worker |
+| Read path | `form_admin` for compliance evidence queries; `form_system` for incident triage |
+| Business rule | A row with `kv_sync_status = 'failed'` means the Supabase row is the only revocation record for that session; the KV cache does not contain a matching entry. The Worker falls back to Supabase SELECT for that `session_id` on every subsequent authenticated request until the JWT TTL expires (max 8 hours). |
+
+#### §55.5.3 `idx_session_blocklist_kv_status` Partial Index
+
+```sql
+CREATE INDEX CONCURRENTLY idx_session_blocklist_kv_status
+  ON session_blocklist (kv_sync_status)
+  WHERE kv_sync_status != 'synced';
+```
+
+**Scope:** Indexes only `'pending'` and `'failed'` rows — the transient and failure states. In steady operation (all KV writes succeed), this index is empty and has negligible storage overhead. During an AL-REVOKE-01 incident, it provides O(log n) access to affected rows.
+
+**Primary consumers:**
+
+| Consumer | Query pattern |
+|---|---|
+| CC6-E-REV-002 (SOC 2 evidence) | `GROUP BY kv_sync_status` distribution over observation period — index-only for non-synced counts |
+| Incident triage | `SELECT count(*) FROM session_blocklist WHERE kv_sync_status != 'synced'` — index-only scan |
+| Compliance tooling | Fast enumeration of sessions where KV is not the source of truth (Supabase fallback is active) |
+
+---
+
+### §55.6 RLS Analysis
+
+#### §55.6.1 Existing `session_blocklist` RLS Policies
+
+Migration 0102 inherits all existing RLS policies on `session_blocklist` without modification. The `kv_sync_status` column is governed by the same policies that govern all other columns on the table.
+
+| Policy | Role | Access | Rule |
+|---|---|---|---|
+| `session_blocklist_system_write` (or equivalent) | `form_system` | INSERT + UPDATE + SELECT | All rows — no `tenant_id` filter; `form_system` performs cross-tenant revocation operations (bulk SCIM, tenant nuke) |
+| `form_admin` (BYPASSRLS or explicit policy) | `form_admin` | SELECT all rows | For compliance evidence queries (CC6-E-REV-001, CC6-E-REV-002) and incident triage |
+| No policy / fail-closed | `form_api` | No access | `session_blocklist` is not exposed via the API tier; authentication gates run in the Worker, not via Supabase client queries from the API |
+| No policy / fail-closed | `tenant_manager` | No access | Tenant administrators do not have visibility into `session_blocklist`; the column contains only an ENUM sync status — no individual user data |
+
+**Privacy floor for `tenant_manager`:** The `tenant_manager` role is the HR/admin role that must never see individual user data. `session_blocklist` contains `session_id`, `tenant_id`, `blocked_at`, and `reason` — no `user_id`, email, name, health value, or GDPR Art. 9 data. Nevertheless, RLS prevents `tenant_manager` access entirely: even aggregate revocation counts could reveal individual user activity patterns (e.g., "someone in this tenant had their session revoked today"), which the privacy floor prohibits for the HR view.
+
+#### §55.6.2 Auditor Proof Queries
+
+```sql
+-- 1. Confirm RLS is enabled on session_blocklist:
+SELECT relrowsecurity FROM pg_class WHERE relname = 'session_blocklist';
+-- Expected: t
+
+-- 2. Confirm tenant_manager cannot read from session_blocklist:
+SET ROLE tenant_manager;
+SELECT count(*) FROM session_blocklist;
+-- Expected: 0 rows or permission denied (fail-closed RLS)
+RESET ROLE;
+
+-- 3. Confirm kv_sync_status column exists with correct ENUM type:
+SELECT column_name, udt_name, is_nullable, column_default
+  FROM information_schema.columns
+ WHERE table_name = 'session_blocklist'
+   AND column_name = 'kv_sync_status';
+-- Expected: 1 row; udt_name = 'revocation_kv_status'; is_nullable = 'NO';
+-- column_default = '''pending''::revocation_kv_status'
+
+-- 4. Confirm partial index exists:
+SELECT indexname, indexdef FROM pg_indexes
+ WHERE tablename = 'session_blocklist'
+   AND indexname = 'idx_session_blocklist_kv_status';
+-- Expected: 1 row with WHERE clause: (kv_sync_status <> 'synced'::revocation_kv_status)
+```
+
+---
+
+### §55.7 Privacy Floor
+
+| Data element | Classification | Rationale |
+|---|---|---|
+| `kv_sync_status` | FORM-internal operational metadata | An ENUM value (`'pending'`, `'synced'`, `'failed'`) recording the KV write outcome. No PII — contains no `user_id`, email, name, health value, or GDPR Art. 9 special-category data. Safe for inclusion in compliance evidence queries and incident triage dashboards as aggregate counts. Not present in any DEC-030 event payload — event payloads carry only `tenant_id`, `session_id`, and counts (§22.10). |
+| `session_blocklist.session_id` (pre-existing) | FORM-internal identifier | A UUID identifying the session, not a natural person. Not linkable to an employee without FORM's internal session registry. Not exposed in any API response, monitoring signal, or dashboard. |
+| `session_blocklist.tenant_id` (pre-existing) | FORM-internal identifier | Identifies the tenant, not an individual. Safe in compliance evidence queries as a grouping dimension (aggregate counts per tenant, not per user). |
+| `session_blocklist.blocked_at` (pre-existing) | FORM-internal timestamp | Timestamp of revocation; no PII. Used in evidence queries with `WHERE blocked_at BETWEEN $obs_start AND $obs_end` — aggregate filtering only. |
+
+**Privacy floor invariant:** No employee `user_id`, name, email, health value, coaching content, or GDPR Art. 9 special-category data is present in any column added by Migration 0102. The `kv_sync_status` ENUM value is operational metadata — it records whether the KV write succeeded, not who was revoked or why. All five DEC-030 events in §22.10 (`session.bulk_revocation_started/complete`, `session.tenant_nuke_started/complete`, `session.revocation_kv_sync_error`) contain only FORM-internal UUIDs (`tenant_id`, `scim_request_id`) and aggregate counts — no individual `user_id` or employee identifier in any event payload.
+
+**GDPR Art. 17 compliance:** `session_blocklist` rows are created on session revocation and are not subject to DSAR erasure — they are audit trail records required for the HMAC chain (DEC-030). `kv_sync_status` is deleted with the row at natural expiry (8-hour max JWT TTL). The DSAR process does not erase `session_blocklist` rows for the data subject's own sessions, as these are security control records (DEC-030 tamper evidence) exempt from erasure under Art. 17(3)(b) (legal obligation).
+
+---
+
+### §55.8 SOC 2 Evidence
+
+| SOC 2 Criterion | Control mechanism | Evidence |
+|---|---|---|
+| **CC6.3** — Logical access removed on a timely basis | `kv_sync_status = 'synced'` on > 99% of revocations confirms the KV cache reflects the authoritative `session_blocklist` state within milliseconds of the revocation write; `isRevoked()` checks KV in < 3 ms per request; single-user revocation completes in < 100 ms; bulk 1,000-user revocation completes in < 200 ms (§22.8 performance model) | **CC6-E-REV-002** — `session_blocklist` `kv_sync_status` distribution query over observation period: `SELECT kv_sync_status, count(*), round(100.0 * count(*) / sum(count(*)) OVER (), 2) AS pct FROM session_blocklist WHERE blocked_at BETWEEN $obs_start AND $obs_end GROUP BY kv_sync_status ORDER BY kv_sync_status`; confirms > 99% synced; R2 `compliance/evidence/sso/CC6-E-REV-002_<YYYY-QN>.csv`; 7yr WORM; registered SOC2_READINESS §178 |
+| **CC7.2** — Environmental threat monitoring | AL-REVOKE-01 fires when `session.revocation_kv_sync_error` event rate > 1% over any 5-minute window; P1 severity; PagerDuty `form-compliance`; REVOKE-SYNC-E-001 incident artefact filed on each activation | **REVOKE-SYNC-E-001** — per-activation incident artefact (PagerDuty incident ID, root cause, `kv_sync_status = 'failed'` row count, remediation action); R2 `compliance/evidence/sso/revoke-sync-<YYYY-MM-DD>-<incident_id>.md`; 7yr WORM; registered SOC2_READINESS §180 |
+| **CC7.3** — Response to anomalies | `kv_sync_status = 'failed'` rows in `session_blocklist` trigger automatic Supabase fallback in `isRevoked()` — no revocation is silently lost; AL-REVOKE-01 P1 alert ensures human review within 30 minutes; R-82 runbook documents full remediation path | CC6-E-REV-002 (§55.8 CC6.3 row above) — `'failed'` count confirms < 0.1% target over the observation period |
+| **CC6.3** — Bulk deprovisioning timely | `handleBulkScimRevocation()` completes KV writes for 1,000-user SCIM deactivation in < 200 ms; `session.bulk_revocation_complete.duration_ms` field provides auditor-verifiable timing evidence | **CC6-E-REV-001** — `audit_log` export of all `session.bulk_revocation_*` and `session.tenant_nuke_*` events for observation period; `duration_ms` P99 distribution; R2 `compliance/evidence/sso/CC6-E-REV-001_<YYYY-QN>.csv`; 7yr WORM; registered SOC2_READINESS §178 |
+
+**SOC 2 auditor narrative — CC6.3:**
+FORM's session revocation architecture (§22) ensures that when a user is deprovisioned — via SCIM, direct admin action, or emergency tenant nuke — the revocation takes effect within milliseconds of the API call, not at JWT TTL expiry. The `kv_sync_status` column on `session_blocklist` is the auditor's primary signal: a value of `'synced'` on > 99% of rows in the observation window confirms that Cloudflare KV (the hot revocation cache checked on every authenticated request in < 3 ms) accurately reflects the authoritative revocation state. The CC6-E-REV-002 query, run quarterly by the compliance team and filed to R2 WORM, provides direct fieldwork evidence for this claim. Any `'failed'` rows indicate sessions where the Supabase fallback was active — the session was still revoked (no revocation bypass), but via the slower fallback path; AL-REVOKE-01 ensures this condition is detected and remediated within 30 minutes.
+
+---
+
+### §55.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply Migration 0102 to staging; run MIG-0102-01 through MIG-0102-05 (§55.4); confirm `kv_sync_status` column present; confirm partial index created CONCURRENTLY without table lock; file `compliance/evidence/sso/migration-0102-validation_<YYYY-MM-DD>.txt` | platform-engineer + devops-lead | **P0** | M4 | [ ] Pending |
+| 2 | Create `SESSION_REVOCATION_KV` KV namespace in Cloudflare dashboard; add binding to `wrangler.toml` for the API Gateway Worker; confirm binding name matches `env.SESSION_REVOCATION_KV` in TypeScript (§22.15 item 1) | devops-lead | **P0** | M4 | [ ] Pending |
+| 3 | Implement `apps/api-gateway/src/sso/session-revocation-kv.ts` per §22.5; confirm `revokeSession()` updates `kv_sync_status` to `'synced'` on KV PUT success and `'failed'` on error; confirm `handleBulkScimRevocation()` and `nukeTenantSessions()` paths write `kv_sync_status` correctly (§22.15 item 3) | platform-engineer | **P0** | M4 | [ ] Pending |
+| 4 | Apply Migration 0102 to production (gated on items 1–3); confirm backfill set all pre-existing rows to `'synced'`; confirm `idx_session_blocklist_kv_status` created; confirm zero `'failed'` or `'pending'` rows in pre-migration data | devops-lead | **P0** | M4 (after items 1–3) | [ ] Pending |
+| 5 | Day 30 after deploy: collect CC6-E-REV-002 snapshot as cutover evidence (§22.9); confirm `kv_sync_status = 'synced'` on > 99% of rows for the 30-day observation window; file to R2 WORM | devops-lead + compliance-officer | **P1** | M5 | [ ] Pending |
+| 6 | DATA_MODEL §55 canonical registration | compliance-officer | **P1** | Documentation pass | 🟢 Done — this pass (v1.47, 2026-07-06) |
+| 7 | Update `docs/SSO_SCIM_IMPLEMENTATION.md §22.15` — add DATA_MODEL §55 cross-reference row (item 13) | compliance-officer | **P1** | Documentation pass | 🟢 Done — this pass (SSO_SCIM v2.39, 2026-07-06) |
+
+---
+
+### §55.10 Cross-Reference Obligations
+
+| Document | Section | Description | Status |
+|---|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §22 | Canonical Session Revocation KV design — two-tier architecture, KV key schema, Worker implementation, five DEC-030 events, SOC 2 mapping; §55.3 DDL mirrors §22.7 verbatim | DDL source |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §22.7 | Migration DDL — `revocation_kv_status` ENUM, `kv_sync_status` column, backfill UPDATE, partial index; §55.3 mirrors verbatim | DDL source |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §22.15 | Implementation checklist — DATA_MODEL §55 row added (item 13) | 🟢 Done this pass (SSO_SCIM v2.39, 2026-07-06) |
+| `docs/OBSERVABILITY.md` | §76 | SESSION_REVOCATION_KV observability — four KV key types, five DEC-030 events, AL-REVOKE-01/02, REVOKE-SLO-01/02, §26.9 dashboard sub-group, REVOKE-OBS-E-001 quarterly artefact | 🟢 Done — OBSERVABILITY.md v5.22.0, 2026-07-05 |
+| `docs/SOC2_READINESS.md` | §178 | CC6-E-REV-001 (audit_log bulk revocation export) + CC6-E-REV-002 (`kv_sync_status` distribution) + CC6-E-REV-003 evidence artefacts; evidence count 152 → 155 | 🟢 Done — SOC2_READINESS.md v4.7.0, 2026-07-05 |
+| `docs/SOC2_READINESS.md` | §179 | REVOKE-OBS-E-001 quarterly observability artefact; evidence count 155 → 156 | 🟢 Done — SOC2_READINESS.md v4.8.0, 2026-07-05 |
+| `docs/SOC2_READINESS.md` | §180 | REVOKE-SYNC-E-001 per-activation sync error incident artefact; evidence count 156 → 157 | 🟢 Done — SOC2_READINESS.md v4.9.0, 2026-07-05 |
+| `docs/INCIDENT_RESPONSE.md` | R-82 | Session Revocation KV Sync Error runbook — AL-REVOKE-01 companion; full remediation path for `kv_sync_status = 'failed'` rows | 🟢 Done — INCIDENT_RESPONSE.md v3.48.0, 2026-07-05 |
+
+---
+
+*v1.47 (2026-07-06): §55 `session_blocklist.kv_sync_status` — KV Revocation Sync Status — Migration 0102. DATA_MODEL canonical registration for the session_blocklist schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §22` (High-Scale Session Revocation Architecture, v1.4, 2026-06-01). One new ENUM type `revocation_kv_status AS ENUM ('pending', 'synced', 'failed')` and one new column `kv_sync_status revocation_kv_status NOT NULL DEFAULT 'pending'` on `session_blocklist`; one partial index `idx_session_blocklist_kv_status ON session_blocklist (kv_sync_status) WHERE kv_sync_status != 'synced'`; backfill UPDATE sets all pre-migration rows to `'synced'`. §55.1 purpose: closes DATA_MODEL registration gap for Session Revocation KV — SSO_SCIM §22 had complete design + DDL spec but no companion DATA_MODEL section (same pattern as BCL→§52, SLO→§53, PKJWT→§54); establishes canonical cross-reference, RLS analysis, privacy floor, SOC 2 mapping. §55.2 dependency chain: 0102 is additive, no FK to new tables; `SESSION_REVOCATION_KV` KV namespace binding (wrangler.toml) must precede Worker deployment. §55.3 full DDL + rollback (mirrors SSO_SCIM §22.7 verbatim; backfill correctness signal not data migration; rollback pre-gate: zero `'failed'` rows; CONCURRENTLY index no table lock; sub-second ACCESS EXCLUSIVE on typical revocation row count). §55.4 five CI adversarial tests MIG-0102-01..05 (migration apply, rollback, ENUM constraint rejection, default value, backfill verification; evidence path `compliance/evidence/sso/migration-0102-validation_<YYYY-MM-DD>.txt`). §55.5 column/ENUM semantics (revocation_kv_status ENUM vs TEXT CHECK rationale; kv_sync_status state machine pending→synced/failed; idx_session_blocklist_kv_status partial scope and consumers). §55.6 RLS (inherits session_blocklist existing policies; form_system all rows write; form_admin BYPASSRLS or explicit read; form_api + tenant_manager no access; privacy floor for tenant_manager; four auditor proof queries). §55.7 privacy floor (kv_sync_status = operational ENUM, no PII; session_id/tenant_id/blocked_at = FORM-internal identifiers, no natural person linkage; all five DEC-030 events contain only FORM-internal UUIDs and aggregate counts; GDPR Art. 17 — rows are DEC-030 HMAC chain evidence under Art. 17(3)(b) legal obligation exemption). §55.8 SOC 2 evidence (CC6.3 timely access removal — CC6-E-REV-002 kv_sync_status distribution confirms >99% synced, registered §178; CC7.2 anomaly monitoring — AL-REVOKE-01 P1 REVOKE-SYNC-E-001 registered §180; CC7.3 response to anomalies — automatic Supabase fallback, CC6-E-REV-002 <0.1% failed target; CC6.3 bulk deprovisioning — CC6-E-REV-001 duration_ms audit_log export registered §178). §55.9 seven-item implementation checklist (4× P0/M4 migration+KV+Worker+production; 1× P1/M5 Day-30 cutover evidence; 2× P1/Done this pass DATA_MODEL §55 + SSO_SCIM §22.15 item 13). §55.10 cross-reference obligations (SSO_SCIM §22 DDL source; §22.15 item 13 🟢 Done this pass; OBSERVABILITY §76 🟢 Done v5.22.0; SOC2_READINESS §178 CC6-E-REV-001/002 🟢 Done v4.7.0; §179 REVOKE-OBS-E-001 🟢 Done v4.8.0; §180 REVOKE-SYNC-E-001 🟢 Done v4.9.0; IR R-82 🟢 Done v3.48.0). TOC §55 entry added. Document header v1.46 → v1.47. Owner: enterprise-architect + security-engineer + compliance-officer.*
 
 *v1.46 (2026-07-04): §54 `tenant_sso_configs` PKJWT Extension — Migration 0098. DATA_MODEL canonical registration for the Migration 0098 schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §42` (design, DEC-097, v2.15, 2026-07-02) + `§43` (complete DDL + Worker spec, v2.18, 2026-07-02). Seven new columns added to `tenant_sso_configs`: `oidc_client_auth_method TEXT NOT NULL DEFAULT 'client_secret_post' CHECK IN ('client_secret_post','private_key_jwt')` (auth method selector; opt-in default; routes `buildTokenExchangeParams()` to PKJ or secret path), `pkjwt_private_key_encrypted BYTEA` (AES-256-GCM ciphertext of PKCS#8 PEM private key — same mechanism as `oidc_client_secret_encrypted` §4.2; SQL layer always ciphertext; plaintext in Worker memory only), `pkjwt_algorithm TEXT CHECK IN ('RS256','ES256')` (signing algorithm; `'RS256'` default; CHECK rejects unsupported strings), `pkjwt_key_id TEXT` (JWK kid matching JWKS endpoint; UUID v4; stable per key lifetime), `pkjwt_key_expires_at TIMESTAMPTZ` (annual rotation trigger for pg_cron job 58; partial index target), `pkjwt_aud_override TEXT` (IdP-specific `aud` override; Okta FIPS requires issuer URL; NULL = token endpoint URL), `pkjwt_assertion_lifetime_secs INTEGER CHECK BETWEEN 60 AND 300` (assertion JWT `exp` override; NULL = 300 s default). One partial index `idx_tsc_pkjwt_expiry ON tenant_sso_configs (pkjwt_key_expires_at) WHERE oidc_client_auth_method = 'private_key_jwt'` for O(log n) daily expiry sweep. One CHECK constraint `chk_pkjwt_columns_set` enforcing that when `private_key_jwt` is active, all four required columns are non-null. §54.1 purpose: closes the DATA_MODEL registration gap for PKJWT — SSO_SCIM §42/§43 had complete design + DDL spec but no companion DATA_MODEL section (unlike BCL→§52 and SLO→§53); establishes the canonical cross-reference, RLS analysis, privacy floor, and SOC 2 mapping. §54.2 migration dependency chain: DEC-097 (no schema change) → 0098 (this) → 0099 (pg_cron §44.2) → 0100 (SLO/BCL §53) → 0101 (oidc_sub_hash §52); additive only, no outside-counsel gate, M5 maintenance window. §54.3 full DDL + rollback (mirrors SSO_SCIM §43.2 verbatim; rollback pre-gate: zero `private_key_jwt` rows required; lock note: sub-second on O(100) tenant rows). §54.4 five CI adversarial tests MIG-0098-01..05 (migration apply, rollback, CHECK constraint rejection, ciphertext-only at SQL layer, idx_tsc_pkjwt_expiry plan verify; evidence path `compliance/evidence/sso/migration-0098-validation_<YYYY-MM-DD>.txt`). §54.5 column/index semantics (oidc_client_auth_method opt-in default; pkjwt_private_key_encrypted encrypted-at-rest ciphertext-only-at-SQL; pkjwt_algorithm RS256/ES256 CHECK; pkjwt_key_id UUID4 stable-per-key-lifetime; pkjwt_key_expires_at 365-day rotation anchor; pkjwt_aud_override Okta-FIPS null=token-endpoint-url; pkjwt_assertion_lifetime_secs 60–300 null=300; idx_tsc_pkjwt_expiry partial O(log n) sweep). §54.6 RLS (inherits `sso_configs_tenant_isolation` + `sso_configs_system_write` + BYPASSRLS; cryptographic boundary: ciphertext at SQL layer for all roles; three auditor proof queries; tenant_manager strips key material in application layer). §54.7 privacy floor (pkjwt_private_key_encrypted = cryptographic material, no PII, AES-256-GCM encrypted, never in DEC-030 payloads, never in transit; all other columns configuration only, no PII; Zod v2 constraint prohibits key material in event payloads; GDPR Art. 17 via tenant row deletion). §54.8 SOC 2 evidence (CC6.6 key management — PKJWT-E-001 quarterly, 7yr; CC6.6 asymmetric — public at JWKS, private never at IdP; CC8.1 — PKJWT-E-002 migration apply log; P4.1 — ciphertext-only structural). §54.9 eight-item implementation checklist (5× P0/M5 staging+production+Worker+JWKS+evidence; 2× P1/Done this pass; 1× P1/M5 G-012 full closure). §54.10 cross-reference obligations (SSO_SCIM §42.12 DATA_MODEL §54 row 🟢 Done this pass; AUDIT_LOG_SCHEMA §SSO-PKJ-Lifecycle 🟢 Done v2.73; OBSERVABILITY §12.6 job 58 🟢 Done v5.14.0; SOC2_READINESS §145 PKJWT-E-001 🟢 Done v3.71.0). TOC §54 entry added. Document header v1.45 → v1.46. Owner: enterprise-architect + security-engineer + compliance-officer.*
