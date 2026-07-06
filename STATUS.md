@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v13.89.0** — 2026-07-06 · content · post-3303 · «Strength ratio tracking: відстеження силових пропорцій між вправами як діагностичний інструмент» (series «Вимірювання що рухає: метрики продуктивності vs. метрики адаптації» 3296–3305, 8/10) · clinical-safety NOT_REQUIRED (силові пропорції між вправами як тренувальна метрика — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3303 · series 3296–3305 in progress 7/10 → 8/10 · next: post-3304 (series «Вимірювання що рухає» 3296–3305, 9/10 — інтеграція всіх восьми метрик у єдину практичну систему прийняття рішень: щоденний, тижневий і цикловий рівні)
+
 **v13.88.0** — 2026-07-06 · content · post-3302 · «Velocity-based training як метрика: що швидкість виконання руху реально вимірює і де VBT дає унікальну інформацію» (series «Вимірювання що рухає: метрики продуктивності vs. метрики адаптації» 3296–3305, 7/10) · clinical-safety NOT_REQUIRED (VBT як тренувальна метрика — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3302 · series 3296–3305 in progress 6/10 → 7/10 · next: post-3303 (series «Вимірювання що рухає» 3296–3305, 8/10 — strength ratio tracking: відстеження силових пропорцій між вправами як діагностичний інструмент)
 
 **v13.87.1** — 2026-07-06 · docs · INCIDENT_RESPONSE R-88 runbook, OBSERVABILITY §76.4 AL-REVOKE-02 reference update
