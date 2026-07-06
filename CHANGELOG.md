@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.74.0] — 2026-07-06
+
+### Added
+- `content/post-3290-availability-heuristic-training.md` — Серія «Тренувальна психологія self-coached атлета» 3286–3295 · 5/10. «Availability heuristic у тренуванні: чому остання сесія завжди здається репрезентативною». Tversky & Kahneman 1973: оцінюємо частоту/ймовірність за легкістю прикладів, що спливають у пам'яті. Чотири прояви у self-coached практиці: пік і провал як норма (забуваємо медіанні тренування); нещодавнє = типове (peak-end rule, Kahneman et al. 1993); рішення під час «ефекту» (змінюємо програму одразу після яскравої сесії); порівняння з чужим верхом (соціальне середовище показує тільки піки). Чому self-coached особливо вразливий: без зовнішнього контексту кожне яскраве тренування отримує непропорційну вагу. Операційні антидоти: «правило 48 годин» для рішень про програму; числовий трендовий аналіз (середній RPE + % обсягу + e1RM) перед оцінкою блоку; журнал нормальних тренувань; base rate перевірка перед інтерпретацією виключень. Зв'язок із серією: planning fallacy (3289) + availability heuristic (3290) + confirmation bias (3287) = три bias, що разом пояснюють надмірні зміни програм у self-coached атлетів. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — картка для post-3290 додана у топ фіду.
+
+### Changed
+- `STATUS.md` — current version оновлено до v13.74.0; series 3286–3295 in progress 4/10 → 5/10; editorial 101–110 acknowledged 7/10 (post-107 exists); next: post-3291 + editorial 101–110 7/10.
+- `README.md` — series 3286–3295 in progress 4/10 → 5/10; editorial 101–110 in progress 6/10 → 7/10; version marker → v13.74.0.
+- `VERSION` — 13.73.0 → 13.74.0.
+
 ## [13.73.0] — 2026-07-06
 
 ### Added
