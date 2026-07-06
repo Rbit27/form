@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.51.0] — 2026-07-06
+
+### Added
+- `content/post-90-editorial-synthesis-81-90.md` — Editorial 81–90 10/10 synthesis. «Синтез 81–90: десять ознак атлета, що будує систему — а не просто тренується». Завершення серії Editorial 81–90: десять операційних ознак системного мислення у тренуванні — від розрізнення нейронної і структурної адаптації (Häkkinen, 1994; Moritani & deVries, 1979) до різниці між «важким» і «продуктивним» (Marcora et al., 2009); вікна суперкомпенсації (Yakovlev, 1967; Zatsiorsky, 1995); деловантаження як інструмент (Banister, 1975); перехід до undulating periodization (Fleck & Kraemer, 2004); overtraining signals (Meeusen et al., 2013). Анонс серії 91–100 — від мови адаптації до операційної практики. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-90 editorial synthesis картка додана на початок стрічки.
+- `README.md` — editorial 81–90 оновлено до COMPLETE 10/10; editorial 91–100 proposed; п'ять нових proposed серій 3396–3445 додано до роадмапу.
+
+### Changed
+- `VERSION` — 13.50.1 → 13.51.0.
+
 ## [13.50.1] — 2026-07-06
 
 ### Added
