@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.62.0] — 2026-07-06
+
+### Added
+- `content/post-99-supercompensation-fitness-fatigue-operational-synthesis.md` — Editorial series «Мова адаптації → операційна практика» 9/10. Суперкомпенсація і двофакторна (fitness-fatigue) модель: чотирифазна суперкомпенсаційна логіка та її межі; Banister (1975) двофакторна модель — Fitness(τ₁≈45 д) і Fatigue(τ₂≈15 д), Readiness = Fitness — Fatigue; CTL/ATL/TSB як практична реалізація; taper-механізм (Mujika & Padilla 2003, 0.5–6% підвищення результату при -40–60% обсягу); functional vs non-functional overreaching; RPE як проксі TSB; зв'язок із mTOR/рибосомальним біогенезом (post-98) і ЦНС-адаптаціями (post-92/96). clinical-safety NOT_REQUIRED (спортивна наука, без їжі/образу тіла/психіатрії). sports-scientist review pending.
+- `content/post-3284-training-under-chronic-stress-context-decides.md` — Series «Тренування і контекст тіла: вік, відновлення, варіабельність» 9/10. Тренування у стані хронічного стресу: HPA-дисрегуляція і алостатичне навантаження (McEwen 2000); T/C ратіо як маркер (Häkkinen 1987); сон → MPS і GH (Dattilo 2011); Stults-Kolehmainen & Sinha (2014) — психологічний стрес → знижені силові адаптації; алгоритм адаптації програми (знизь обсяг 30–50%, збережи інтенсивність, спрости структуру, горизонт 3–4 тижні); клінічна межа і redirect до лікаря. clinical-safety NOT_REQUIRED (фізіологічний контекст хронічного стресу, без психіатрії/їжі/образу тіла). sports-scientist review pending.
+- `blog.html` — cards для post-99 і post-3284 додані на початок стрічки.
+
+### Changed
+- `VERSION` — 13.61.0 → 13.62.0.
+
+---
+
 ## [13.61.0] — 2026-07-06
 
 ### Added
