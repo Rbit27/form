@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.40.0] — 2026-07-06
+
+### Added
+- `content/post-3269-volume-management-2-year-perspective.md` — Series «Довгострокове прогресування: 2–5-річний горизонт» 4/10. Topic: managing training volume over a 2-year horizon — MEV/MAV/MRV as three adaptive thresholds (not constants), how volume trajectory includes rises, stabilisation and planned decreases, why volume plateaus signal a shift in logic not a deficit, the four functions of planned deloads (restoring recovery capacity, manifesting accumulated potential, psychological reset, preventing adaptive ceiling), how year-2 logic differs from year-1 (narrower MEV–MRV corridor, specificity > volume quantity, system-level MRV as constraint), five common multi-year volume management mistakes. clinical-safety NOT_REQUIRED (no food/body-image/pain/clinical-psych). 13-min read.
+- `blog.html` — Card prepended for post-3269.
+- `README.md` — Series 3266–3275 status: in progress 2/10 → 4/10; posts 3268/3269 proposed → draft; version tag v13.40.0.
+
+### Changed
+- `VERSION` — 13.39.1 → 13.40.0.
+
 ## [13.39.1] — 2026-07-06
 
 ### Changed
