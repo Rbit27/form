@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [13.58.0] — 2026-07-06
+
+### Added
+- `content/post-96-cns-fatigue-supercompensation-central-mechanisms.md` — Editorial series 91–100 «Мова адаптації → операційна практика», 6/10. Центральна vs периферична втома: interpolated twitch technique (Bigland-Ritchie 1978) — мозок знижує активацію ще до вичерпання периферії. Rate coding при ЦНС-втомі: Garland 2011 — частота розряду мотонейронів падає з ~40 до ~25 Гц. 5-HT/DA гіпотеза (Davis & Bailey 1997, Meeusen 2006): серотонін/допаміновий баланс при тривалій роботі. Reflex inhibition: аферентні волокна III/IV → гальмівний сигнал до рухової кори (Gandevia 2001). Fitness-Fatigue модель (Banister 1991): fitness (~40–50 днів) і fatigue (~20–30 днів) — різні часові константи. PRи після deload — розсіювання fatigue. ЦНС-fatigue: 5–10 днів vs м'язова fatigue: 48–72 год. Маркери ЦНС-готовності: HRV, bar velocity, мотивація. clinical-safety NOT_REQUIRED.
+- `content/post-3280-training-response-variability-why-same-program-different-results.md` — Series «Тренування і контекст тіла: вік, відновлення, варіабельність» 3276–3285, 5/10. HERITAGE study (Bouchard 1999): 481 учасник — приріст VO2max від <5% до >40%, генетична обумовленість ~47%. ACTN3 R577X: XX-гомозиготи менша відповідь на силовий тренінг. ACE I/D, PPARA/PPARGC1A. Timmons 2010: 11 SNP передбачають ~50% варіабельності. Розподіл волокон I/II у vastus lateralis: 30–80% — нормальний діапазон. Тренувальний вік як модулятор відповіді. Контекстні маскери низької відповіді: хронічний стрес, недосипання, субклінічне запалення. N=1 методологія. clinical-safety NOT_REQUIRED.
+- `blog.html` — cards for post-3280 and post-96 prepended at top of feed.
+
+### Changed
+- `STATUS.md` — current version updated to v13.58.0; editorial 91–100 progress 5/10 → 6/10; series 3276–3285 progress 4/10 → 5/10; next: post-97 (гормональна відповідь на тренування) + post-3281 (хронобіологія тренування).
+- `VERSION` — 13.57.0 → 13.58.0.
+
+---
+
 ## [13.57.0] — 2026-07-06
 
 ### Added
