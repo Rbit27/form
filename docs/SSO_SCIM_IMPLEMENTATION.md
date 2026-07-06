@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.42
+# FORM · SSO/SCIM Implementation v2.43
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -12568,6 +12568,21 @@ Cross-reference obligation: register GUARD-E-001 in `docs/SOC2_READINESS.md §91
 |---|---|---|---|---|
 | **OQ-SSO-34.1** | **Should the 5-minute guard window align with AL-SCIM-MASS-01's 10-minute window?** Separate windows (5-min guard / 10-min detection) mean the guard fires before detection, which is the intended order. Unified 5-minute windows would simplify operator mental model but increase AL-SCIM-MASS-01 false-positive risk. Recommendation: keep separate windows; document in Admin Dashboard tooltip. | ~~P2~~ | enterprise-architect | 🟢 **Resolved — DEC-093 (2026-07-01).** Separate windows retained. Admin Dashboard tooltip (§40.4) addresses operator mental model concern. See §40. |
 | **OQ-SSO-34.2** | **Should `contracted_seats` be sourced from `enterprise_contracts.contracted_seats` (static, 60s KV cache) or `COUNT(tenant_users WHERE is_active = true)` (real-time, per-request DB query)?** Static contracted_seats is stable and avoids per-request COUNT load during bulk syncs. Active count is more accurate but adds latency and DB connection pressure during the very scenario the guard is protecting against. Recommendation: `enterprise_contracts.contracted_seats` with 1-hour KV cache refreshed by `billing.seats_expanded`/`billing.seats_reduced` DEC-030 events. | ~~P1~~ | platform-engineer | 🟢 **Resolved — DEC-069 (2026-06-19).** Option A adopted. See §35. |
+
+### §34.13 OBSERVABILITY §79 Cross-Reference
+
+`docs/OBSERVABILITY.md §79` (v5.25.0, 2026-07-06) closes the observability gap for this section. It covers:
+
+- §79.1: Scope — SCIM Worker `enforceDeprovisionGuard()` (`apps/scim-worker/src/handlers/users.ts`), pg_cron jobs 24 + 34, CSM override protocol, five DEC-030 events
+- §79.2: RED metrics — `bdg_blocked_events_total`, `bdg_override_active_count`, override issue/expire rates, `system.scim_guard_repeated_trigger` advisory rate, job 24 + 34 freshness durations
+- §79.3: BDG-SLO-01 (zero unauthorized bulk deprovisioning, zero-tolerance, CC6.3/A1.2) and BDG-SLO-02 (job 34 freshness ≤ 20 min, ≥ 99% compliance, CC6.3/A1.1); GUARD-CHAIN-01 and BDG-SWEEP-CHAIN-01 HMAC invariants
+- §79.4: AL-BDG-01 (`system.scim_guard_repeated_trigger` P2 advisory, trigger_count ≥ 3 / 1h per tenant); job 34 stale inline runbook (BDG-SLO-02 breach path → R-33 §R-33.5)
+- §79.5: §6.2 `bdg_health` subsection registration (AL-BDG-01 P2 + job 34 stale P1; after `scim_role_history`, before `sso_browser_security`)
+- §79.6: §26.9 "SCIM Bulk Deprovision Guard" five-panel dashboard sub-group (after "CAEP/RISC Stream Health")
+- §79.7: SOC 2 mapping CC6.3/A1.2/CC7.2/CC9.2
+- §79.8: GUARD-E-001 pointer (→ §34.8 + SOC2_READINESS §91, quarterly, CC6.3/A1.2/CC7.2/CC9.2) + BDG-OBS-E-001 (new monitoring-layer quarterly artefact, CC7.2/A1.1/CC4.1, first filing M14; SOC2_READINESS §192 registration done this pass)
+- §79.9: nine-item implementation checklist (items 3 + 4 Done this pass; items 1, 2, 5–9 pending M13/M14)
+- §79.10: six cross-reference obligations (four Done this pass; one pre-existing; one deferred M14)
 
 ---
 

@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.24.4
+# FORM · Observability & Monitoring Taxonomy v5.25.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -517,6 +517,15 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 | Alert Name | Trigger Condition | Severity | Notification Channel | Runbook |
 |---|---|---|---|---|
 | **SCIM role history reconciliation gap** | Nightly `scim_role_history_reconcile` pg_cron returns `gap_count > 0`: `scim.user_updated` with `role` in `fields_changed` has no matching `tenant_users_role_history` row | P2 | Slack `#compliance-alerts`; dedup `scim-role-history-gap-{date}` | §26.7c AL-SCIM-05 |
+
+**Subsection: `bdg_health` (AL-BDG-01, job 34 stale — §79.4):**
+
+| Alert Name | Trigger Condition | Severity | Notification Channel | Runbook |
+|---|---|---|---|---|
+| **BDG repeated guard trigger** | `system.scim_guard_repeated_trigger` event: `trigger_count ≥ 3` for same `tenant_id` / 1h rolling window | P2 | PagerDuty LOW `form-customer-success` + Slack `#enterprise-ops`; dedup key `bdg-repeated-trigger-{tenant_id}` 4h TTL | §79.4 AL-BDG-01 inline runbook; §34.7.5 |
+| **BDG override expiry sweep stale** | `system.cron_job_stale` for `job_name = 'bdg_override_expiry_sweep'`; freshness > 20 min (BDG-SLO-02 breach) | P1 | PagerDuty `form-security` → security-engineer; dedup `bdg-sweep-stale` (no auto-resolve) | §79.4 job 34 stale inline runbook; R-33 §R-33.5 |
+
+**SOC 2 mapping (bdg_health):** CC6.3 (BDG-SLO-01 override chain integrity prevents unauthorized logical access removal); A1.2 (job 34 freshness confirms override expiry cleanup runs continuously); CC7.2 (AL-BDG-01 automated detection of anomalous provisioning patterns); CC9.2 (repeated triggers signal external IdP integration degradation).
 
 **Subsection: `sso_browser_security` (AL-SSO-WEB-01 — §26.8):**
 
@@ -6451,6 +6460,18 @@ A dedicated "Enterprise Identity" Metabase dashboard (Supabase-backed panels) an
 | **caep_reregister_sweep (job 37) freshness** | Single-stat: minutes since last successful sweep execution; background turns ember if > 6 min (CAEP-SLO-02 threshold; AL-CAEP-03 companion) | `SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(rundat))) / 60) AS minutes_since FROM cron.job_run_details WHERE jobid = 37 AND status = 'succeeded'` (form_audit role) OR DEC-030 proxy: `SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 60) FROM audit_log_events WHERE event_type = 'sso.caep_reregistration_queued' AND created_at > NOW() - INTERVAL '2 hours'` | 5 min |
 
 **Privacy floor:** All six panel queries use `tenant_id` (FORM-internal UUID) and `caep_event_type` / `idp_type` (operational enums) only — no employee `user_id`, name, email, raw `set_jti` (stored as SHA-256 hash for dedup only; hash never exposed in any panel), `caep_webhook_secret`, health value, or GDPR Art. 9 special-category data appears in any query or panel output. **Alert cross-links:** "SET validation error rate" links to §6.2 AL-CAEP-01 runbook (P1, 5% threshold); "active stream dead-man status" links to AL-CAEP-03 runbook (P2, 4 h threshold); "caep_reregister_sweep freshness" links to CAEP-SLO-02 (< 6 min, job 37). Full alert rule spec: §6.2 / §78.4. SOC 2 evidence: CAEP-OBS-E-001 (§78.8, quarterly, CC6.3 / CC6.6 / CC7.2 / CC7.3, 7 yr WORM); CAEP-OBS-E-001 registration: `docs/SOC2_READINESS.md §186` (v4.12.0, 2026-07-06).
+
+**SCIM Bulk Deprovision Guard sub-group** (per §79.6; positioned after CAEP/RISC Stream Health sub-group above; owner: devops-lead; deployed at M13):
+
+| Panel | Metric / Query | Target |
+|---|---|---|
+| `bulk_deprovision_blocked` events (last 90 days) | `SELECT payload->>'tenant_id', COUNT(*), MIN(created_at), MAX(created_at) FROM audit_log_events WHERE event_type = 'scim.bulk_deprovision_blocked' AND created_at > NOW() - INTERVAL '90 days' GROUP BY 1` (form_audit role) | Zero = no activations; > 0 = guard firing (expected in aggressive-sync tenants) |
+| Active override status | `SELECT tenant_id, bulk_deprovision_override_exp, bulk_deprovision_override_by FROM tenant_sso_configs WHERE bulk_deprovision_override_exp > NOW()` (form_audit role) | Zero rows = no active overrides |
+| `scim_guard_repeated_trigger` advisory events (last 30 days) | `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'system.scim_guard_repeated_trigger' AND created_at > NOW() - INTERVAL '30 days'` (form_audit role) | 0; > 0 = AL-BDG-01 investigation required |
+| `scim_mass_deprovision_check` (job 24) freshness | `SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(end_time)))/60) AS minutes_since FROM cron.job_run_details WHERE jobid = 24 AND status = 'succeeded'` (form_audit role) | ≤ 6 min (§12.6); ember if > 6 min |
+| `bdg_override_expiry_sweep` (job 34) freshness | `SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(end_time)))/60) AS minutes_since FROM cron.job_run_details WHERE jobid = 34 AND status = 'succeeded'` (form_audit role) | ≤ 20 min (BDG-SLO-02); ember if > 20 min |
+
+**Privacy floor (BDG sub-group):** All five panel queries use `tenant_id` (FORM-internal UUID) only — no employee `user_id`, email, health value, or GDPR Art. 9 data; `bulk_deprovision_override_by` is `SHA-256(email)` hash only (never plaintext). **Alert cross-links:** "repeated trigger" panel → AL-BDG-01 runbook (§79.4); "job 34 freshness" panel → BDG-SLO-02 breach runbook (§79.4 + R-33). **SOC 2 evidence:** BDG-OBS-E-001 (§79.8 / §192, quarterly, CC7.2/A1.1/CC4.1, 7yr WORM); GUARD-E-001 (SOC2_READINESS §91, quarterly, CC6.3/A1.2/CC7.2/CC9.2).
 
 ---
 
@@ -21456,3 +21477,187 @@ Full panel query specs and privacy floor: §26.9 CAEP/RISC Stream Health sub-gro
 *v5.24.1 (2026-07-06): §78.4 AL-CAEP-01 / AL-CAEP-02 / AL-CAEP-04 companion runbook fields added. Closes the cross-reference gap introduced when `docs/INCIDENT_RESPONSE.md R-83/R-84/R-85` were authored (v3.48.0, 2026-07-06): §78.4 inline runbooks for AL-CAEP-01 (P1 SET error rate), AL-CAEP-02 (P0 GDPR purge), and AL-CAEP-04 (P1 RISC hijacking) previously had no "Dedicated companion IR runbook" field — unlike §76.4 (→ R-82), §75.4 (→ R-81), §72.4 (→ R-75/R-76), and §70.4 (→ R-73/R-74). Three "Dedicated companion IR runbook" fields added: AL-CAEP-01 → R-83 (H1–H5, CAEP-SETERR-CHAIN-01, CAEP-SETERR-E-001 / SOC2_READINESS §187); AL-CAEP-02 → R-84 (GDPR deletion workflow, CAEP-PURGE-CHAIN-01, CAEP-PURGE-E-001 / SOC2_READINESS §188); AL-CAEP-04 → R-85 (RISC hijacking IC, RISC-HIJACK-CHAIN-01, RISC-HIJACK-E-001 / SOC2_READINESS §189). AL-CAEP-03 (P2 dead-man / sweep stale) and AL-CAEP-05 (P2 rate limit) retain inline-only runbooks — consistent with the project's pattern of reserving companion runbooks for P0/P1 alerts. Document header v5.24.0 → v5.24.1. Owner: devops-lead + security-engineer + compliance-officer.*
 
 *v5.24.0 (2026-07-06): §78 CAEP/RISC Stream Observability. Closes the observability gap for FORM's CAEP/RISC stream integration (canonical design: `docs/SSO_SCIM_IMPLEMENTATION.md §23`). CAEP/RISC was the last major SSO subsystem with alert rules (§6.2 AL-CAEP-01..05) and DEC-030 events (`docs/AUDIT_LOG_SCHEMA.md §CAEP`) but no dedicated observability section with RED metrics, SLOs, inline runbooks, dashboard sub-group, or quarterly evidence artefact. §78.1: scope — five components (caep-receiver.ts Cloudflare Worker, caep-action-handler.ts dispatcher, caep_reregister_sweep pg_cron job 37 `*/5` 6-min freshness, Admin Dashboard CAEP panel, five DEC-030 events); three IdP types (Okta SSF, Entra Event Grid, Google RISC). §78.2: RED metrics adapted for webhook receiver + pg_cron context — Rate (caep_events_received/hr by caep_event_type, caep_streams_active gauge, caep_purged_events/day, caep_reregistration_queued/day), Errors (caep_set_error_rate_pct zero-tolerance > 5% per tenant / 10-min, caep_purged_count zero-tolerance, caep_stream_status_error_count), Duration (caep_action_latency_p95_ms < 30,000 ms CAEP-SLO-01, caep_reregister_sweep_freshness_min < 6 min CAEP-SLO-02, caep_receiver_wall_ms P99 < 2,000 ms). §78.3: two SLOs — CAEP-SLO-01 (P95 < 30 s end-to-end revocation / CC6.3 / SLA credit) and CAEP-SLO-02 (job 37 freshness < 6 min / CC6.6 / 99% compliance). §78.4: five inline runbooks — AL-CAEP-01 (P1 error rate > 5% / invalid_signature / jti_replay / unknown_event_type / stream error), AL-CAEP-02 (P0 purged / GDPR Art. 17 / compliance-officer owns / no auto-resolve), AL-CAEP-03 (P2 dead-man 4 h / pg_cron failure / job 37 freshness), AL-CAEP-04 (P1 Google RISC hijacking / KV revoke / google_directory_group_cache delete / DEC-072 §36.4 / CSM notify), AL-CAEP-05 (P2 rate limit > 1,000/hr / event storm / tenant cap). §78.5: §6.2 registration pointer (done this pass). §78.6: six-panel "CAEP/RISC Stream Health" sub-group for §26.9 Enterprise Identity dashboard — active tenants by caep_status, events/hr stacked bar 7d, SET error rate 5-min bins 7d, dead-man table, AL-CAEP activations 30d, job 37 freshness. Sub-group inserted in §26.9 immediately after SAML Certificate Lifecycle sub-group (v5.24.0 this pass). §78.7: SOC 2 mapping CC6.3 (CAEP-SLO-01 < 30 s / timely access removal), CC6.6 (credential-change/account-disabled dispatch / CAEP-SLO-02 sweep continuity), CC7.2 (AL-CAEP-01..05 24/7 automated monitoring / AL-CAEP-04 RISC hijacking signal), CC7.3 (P0/P1/P2 SLAs / PagerDuty incident log / quarterly CAEP-OBS-E-001 artefact). §78.8: CAEP-OBS-E-001 quarterly artefact (CC6.3/CC6.6/CC7.2/CC7.3, 7yr WORM, compliance/evidence/caep-obs/caep-obs-e-001-{YYYY}-Q{N}.json); five-component report; per-incident supplement for AL-CAEP-02/01 activations; pre-M4 nil-attestation. §78.9: seven-item implementation checklist — five Done this pass, two Pending M4/Q3-2026. §78.10: four cross-reference obligations — all 🟢 Done this pass (SOC2_READINESS §186 CAEP-OBS-E-001 count 161 → 162, SSO_SCIM §23.13 backreference, §6.2 caep_stream_health, §26.9 sub-group). Privacy floor: all §78 content — metrics, alert rules, dashboard queries, evidence artefacts — uses only `tenant_id` (FORM-internal UUID), `caep_event_type` (operational enum), and `idp_type` (enum); no employee `user_id`, name, email, raw `set_jti`, `caep_webhook_secret`, health value, body composition data, ED-screening data, or GDPR Art. 9 special-category data appears anywhere. Document header v5.23.0 → v5.24.0. Owner: devops-lead + security-engineer + compliance-officer.*
+
+---
+
+## §79 · SCIM Bulk Deprovision Guard (BDG) Observability (DEC-066 · SSO_SCIM §34)
+
+> Owner: devops-lead + security-engineer + compliance-officer. Cross-reference: `docs/SSO_SCIM_IMPLEMENTATION.md §34`, `docs/SOC2_READINESS.md §91` (GUARD-E-001), `docs/SOC2_READINESS.md §192` (BDG-OBS-E-001). DEC-030 events: §34.8.
+
+### §79.1 Scope
+
+The SCIM Bulk Deprovision Guard (BDG) protects FORM against accidental or misconfigured SCIM sync events that would deprovision a large fraction of a tenant's user base in a single batch. Five components are monitored under this section:
+
+| Component | Runtime | Key function |
+|---|---|---|
+| `enforceDeprovisionGuard()` | Cloudflare Workers (`apps/scim-worker/src/handlers/users.ts`) | Preventive HTTP 422 guard; fires when batch DELETE/deactivate count exceeds `ceil(contracted_seats × threshold_pct / 100)` |
+| pg_cron job 24 (`scim_mass_deprovision_check`) | Postgres `*/5` cron (5-min interval, 6-min freshness SLO) | Reactive DB-level scan; companion runbooks R-24 + R-67 |
+| pg_cron job 34 (`bdg_override_expiry_sweep`) | Postgres `*/15` cron (15-min interval, 20-min freshness SLO per BDG-SLO-02) | Expires stale CSM overrides; companion runbook R-33 |
+| CSM override protocol | Admin Dashboard + CF Worker | Two-person (CSM + enterprise-architect) time-limited override; `bulk_deprovision_override_exp` on `tenant_sso_configs` |
+| Five DEC-030 HMAC-chained events | `emit-audit-event` CF Worker | `scim.bulk_deprovision_blocked` (HIGH/7yr), `scim.bulk_deprovision_override_issued` (HIGH/7yr), `scim.bulk_deprovision_override_used` (HIGH/7yr), `scim.bulk_deprovision_override_expired` (STANDARD/3yr), `system.scim_guard_repeated_trigger` (STANDARD/3yr advisory) |
+
+**Privacy floor (§79):** All metrics, alert rules, dashboard queries, runbooks, and evidence artefacts in this section use `tenant_id` (FORM-internal UUID) and aggregate counts only. No employee `user_id`, name, email, health value, body composition data, ED-screening data, GDPR Art. 9 special-category data, or `bulk_deprovision_override_by` plaintext (stored as `SHA-256(email)` hash only) appears in any observable surface. `tenant_manager` (HR) role has zero access to any BDG monitoring surface.
+
+---
+
+### §79.2 RED Metrics
+
+| Metric | Type | Description | SLO / Alert threshold |
+|---|---|---|---|
+| `bdg_blocked_events_total` | Counter (per `tenant_id`) | Total `scim.bulk_deprovision_blocked` DEC-030 events; zero = guard not firing (expected in most tenants; non-zero = guard operational in aggressive-sync tenants) | No numeric target; > 0 warrants CS review |
+| `bdg_override_active_count` | Gauge | Current count of tenants with `bulk_deprovision_override_exp > NOW()` on `tenant_sso_configs` | Zero = no active overrides (normal state); > 0 = requires ownership tracking |
+| `bdg_override_issued_7d` | Counter (7-day rolling) | `scim.bulk_deprovision_override_issued` events in last 7 days | > 3 / 7 days warrants review |
+| `bdg_override_expired_without_use_30d` | Counter | `scim.bulk_deprovision_override_expired` events where no matching `override_used` occurred within the override window | > 0 = override issued but unused (low-risk; log for audit) |
+| `system.scim_guard_repeated_trigger` advisory rate | Counter (per `tenant_id` / 1h) | `trigger_count ≥ 3` DEC-030 events for same tenant in 1h rolling window | → AL-BDG-01 (§79.4) |
+| `scim_mass_deprovision_check` freshness | Duration (minutes since last successful `cron.job_run_details` entry for job 24) | pg_cron job 24 heartbeat; 6-min freshness (§12.6) | > 6 min → AL-SCIM-MASS-01 (§26.7a) + R-24 + R-67 |
+| `bdg_override_expiry_sweep` freshness | Duration (minutes since last successful job 34 entry) | pg_cron job 34 heartbeat; 20-min freshness (BDG-SLO-02) | > 20 min → job 34 stale alert → R-33 (§R-33.5) |
+
+---
+
+### §79.3 SLOs
+
+| SLO ID | Criterion | Metric | Target | SOC 2 mapping | Breach action |
+|---|---|---|---|---|---|
+| **BDG-SLO-01** | Zero unauthorized bulk deprovisioning events reach Postgres for any tenant | `scim.bulk_deprovision_blocked` events confirm guard fired; zero `scim.bulk_deprovision` events without prior `override_issued` in HMAC chain | Zero-tolerance; any bypass without override chain = P0 incident | CC6.3 (prevent unauthorized logical access removal), A1.2 (service capacity — prevents tenant capacity destruction) | Immediate P0; security-engineer + compliance-officer; GUARD-CHAIN-01 invariant check |
+| **BDG-SLO-02** | `bdg_override_expiry_sweep` (job 34) freshness ≤ 20 min | `minutes_since_last_successful_job34` | ≥ 99% of 15-min buckets within 20-min threshold | CC6.3 (expiry sweep maintains override lifecycle integrity), A1.1 (system availability of override control) | P1; PagerDuty `form-security`; R-33 §R-33.5; dedup `bdg-sweep-stale` |
+
+**GUARD-CHAIN-01 HMAC invariant:** `scim.bulk_deprovision_override_used` must be preceded by `scim.bulk_deprovision_override_issued` for the same `tenant_id` within the override window in the DEC-030 HMAC chain. HTTP 422 `GUARD_CHAIN_01_VIOLATION` on violation. Enforced at `emit-audit-event` CF Worker (M13).
+
+**BDG-SWEEP-CHAIN-01 HMAC invariant:** `scim.bulk_deprovision_override_expired` requires prior `scim.bulk_deprovision_override_issued` for the same `tenant_id` in the chain. HTTP 422 `BDG_SWEEP_CHAIN_01_VIOLATION` on violation. Enforced at `emit-audit-event` CF Worker (M13).
+
+---
+
+### §79.4 Alert Rules and Inline Runbooks
+
+#### AL-BDG-01 — SCIM Guard Repeated Trigger Advisory (P2)
+
+| Field | Value |
+|---|---|
+| **Alert name** | BDG repeated guard trigger |
+| **Trigger condition** | `system.scim_guard_repeated_trigger` DEC-030 event: `trigger_count ≥ 3` for same `tenant_id` in 1h rolling window |
+| **Severity** | P2 (advisory; guard is working — this signals IdP misconfiguration or sync tooling issue) |
+| **Notification channel** | PagerDuty LOW `form-customer-success` + Slack `#enterprise-ops`; dedup key `bdg-repeated-trigger-{tenant_id}` 4h TTL |
+| **Auto-resolve** | Yes — 4h TTL; re-fires if trigger_count ≥ 3 recurs after dedup window |
+| **SOC 2 mapping** | CC7.2 (continuous monitoring of anomalous provisioning patterns), CC9.2 (vendor/IdP misconfiguration detection) |
+| **Primary runbook owner** | customer-success (CSM for affected tenant) + enterprise-architect |
+| **Dedicated companion IR runbook** | None — P2 advisory; inline runbook only (consistent with project pattern: P0/P1 only receive companion IR runbooks) |
+
+**Inline runbook (AL-BDG-01):**
+
+1. Identify `tenant_id` from the `system.scim_guard_repeated_trigger` DEC-030 event payload.
+2. Query `scim.bulk_deprovision_blocked` events for the same `tenant_id` in the past 2h: `SELECT COUNT(*), MIN(created_at), MAX(created_at), MAX(payload->>'deprovisioned_count') AS max_batch FROM audit_log_events WHERE event_type = 'scim.bulk_deprovision_blocked' AND payload->>'tenant_id' = '{tenant_id}' AND created_at > NOW() - INTERVAL '2 hours'` (form_audit role).
+3. If `max_batch` > `contracted_seats × 0.5`: escalate to P1 — this is not a misconfiguration but a potential mass-deprovisioning attack. Activate R-04 (SSO incident response).
+4. If `max_batch` ≤ threshold: contact CSM for tenant. CSM contacts tenant IT admin to diagnose IdP sync configuration. Common root causes: (a) IdP group-membership sync over-broad filter; (b) SCIM connector version mismatch; (c) tenant IT admin ran a one-time bulk-deactivation job.
+5. If tenant IT admin confirms intentional bulk operation: CSM + enterprise-architect issue a time-limited override via Admin Dashboard (§34.5 two-person protocol). Document rationale in `docs/DECISION_LOG.md`.
+6. If repeated triggers continue after IdP fix: review `threshold_pct` for this tenant. Any threshold adjustment above the default must be documented per §34.11 item 11.
+7. Emit `system.scim_guard_repeated_trigger` DEC-030 event with `resolution: 'idp_config_fix'` or `'override_issued'` as appropriate.
+
+**Job 34 stale inline runbook (BDG-SLO-02 breach):**
+
+*Trigger:* `system.cron_job_stale` for `job_name = 'bdg_override_expiry_sweep'`; freshness > 20 min.
+
+1. Check `cron.job_run_details` for job 34: `SELECT status, return_message, end_time FROM cron.job_run_details WHERE jobid = 34 ORDER BY end_time DESC LIMIT 5` — identify last failure reason.
+2. If status = `'failed'`: check `return_message` for lock contention (`ERROR: lock timeout`) or query error. Restart job manually: `SELECT cron.alter_job(34, command => $$ ... $$)` (DBA role).
+3. If status = `'succeeded'` but freshness > 20 min: pg_cron scheduler itself may be stalled. Check `cron.job` table: `SELECT jobid, schedule, active FROM cron.job WHERE jobid = 34`. If `active = false`, re-enable.
+4. If job 34 has been stale > 60 min: manually expire overdue overrides: `UPDATE tenant_sso_configs SET bulk_deprovision_override_exp = NULL, bulk_deprovision_override_by = NULL WHERE bulk_deprovision_override_exp < NOW()` (migrations role; requires enterprise-architect sign-off). Emit `scim.bulk_deprovision_override_expired` DEC-030 event for each affected tenant_id.
+5. Full companion runbook: R-33 §R-33.5 (`docs/INCIDENT_RESPONSE.md`).
+6. SLA credit: not triggered by job 34 staleness alone; monitor for any `scim.bulk_deprovision_blocked` events during the stale window that should have expired by now.
+
+---
+
+### §79.5 §6.2 `bdg_health` Subsection Registration
+
+This section formally registers the `bdg_health` alert group in §6.2 (Enterprise Identity Alert Rules master table). See §6.2 for the full table; the `bdg_health` subsection has been inserted after `scim_role_history` (§26.7c / AL-SCIM-05) and before `sso_browser_security` (§26.8 / AL-SSO-WEB-01) in §6.2. The subsection contains two rows: AL-BDG-01 (P2 repeated trigger advisory) and job 34 stale (P1 BDG-SLO-02 breach).
+
+**SOC 2 mapping (bdg_health):** CC6.3 (BDG-SLO-01 — override chain integrity monitoring prevents unauthorized logical access removal); A1.2 (service capacity — job 34 freshness confirms override lifecycle cleanup runs continuously); CC7.2 (AL-BDG-01 automated detection of anomalous provisioning patterns — external IdP misconfiguration = external threat signal per CC7.2); CC9.2 (vendor/IdP configuration health — repeated guard triggers signal integration degradation).
+
+---
+
+### §79.6 §26.9 "SCIM Bulk Deprovision Guard" Dashboard Sub-Group Registration
+
+This section formally registers the BDG five-panel dashboard sub-group in the §26.9 Enterprise Identity dashboard. See §26.9 for the full dashboard specification. The sub-group has been inserted after "CAEP/RISC Stream Health" and before the `---` separator at §26.10. Owner: devops-lead. Deployed: M13.
+
+| Panel | Metric / Query | Target |
+|---|---|---|
+| `bulk_deprovision_blocked` events (last 90 days) | `SELECT payload->>'tenant_id', COUNT(*), MIN(created_at), MAX(created_at) FROM audit_log_events WHERE event_type = 'scim.bulk_deprovision_blocked' AND created_at > NOW() - INTERVAL '90 days' GROUP BY 1` (form_audit role) | Zero = no activations; > 0 = guard firing (expected in aggressive-sync tenants) |
+| Active override status | `SELECT tenant_id, bulk_deprovision_override_exp, bulk_deprovision_override_by FROM tenant_sso_configs WHERE bulk_deprovision_override_exp > NOW()` (form_audit role) | Zero rows = no active overrides |
+| `scim_guard_repeated_trigger` advisory events (last 30 days) | `SELECT COUNT(*) FROM audit_log_events WHERE event_type = 'system.scim_guard_repeated_trigger' AND created_at > NOW() - INTERVAL '30 days'` (form_audit role) | 0; > 0 = AL-BDG-01 investigation required |
+| `scim_mass_deprovision_check` (job 24) freshness | `SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(end_time)))/60) AS minutes_since FROM cron.job_run_details WHERE jobid = 24 AND status = 'succeeded'` (form_audit role) | ≤ 6 min (§12.6); ember if > 6 min |
+| `bdg_override_expiry_sweep` (job 34) freshness | `SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(end_time)))/60) AS minutes_since FROM cron.job_run_details WHERE jobid = 34 AND status = 'succeeded'` (form_audit role) | ≤ 20 min (BDG-SLO-02); ember if > 20 min |
+
+**Privacy floor (dashboard):** All five panel queries use `tenant_id` (FORM-internal UUID) only — no employee `user_id`, email, health value, or GDPR Art. 9 data; `bulk_deprovision_override_by` is `SHA-256(email)` hash only (never plaintext). **Alert cross-links:** "repeated trigger" panel → AL-BDG-01 runbook (§79.4); "job 34 freshness" panel → BDG-SLO-02 breach runbook (§79.4 + R-33). **SOC 2 evidence cross-link:** BDG-OBS-E-001 (§79.8, quarterly, CC7.2/A1.1/CC4.1, 7yr WORM); GUARD-E-001 (SOC2_READINESS §91, quarterly, CC6.3/A1.2/CC7.2/CC9.2).
+
+---
+
+### §79.7 SOC 2 Mapping
+
+| Trust Service Criterion | Control | BDG evidence |
+|---|---|---|
+| **CC6.3** — Authorized access removal | BDG-SLO-01 (zero unauthorized bulk deprovisioning) | `scim.bulk_deprovision_blocked` HMAC chain proves preventive control fires before Postgres write; GUARD-CHAIN-01 invariant (override_used requires prior override_issued) proves no bypass without two-person protocol |
+| **A1.2** — Service capacity | Override lifecycle (job 34 expiry sweep) ensures stale overrides cannot persist indefinitely; BDG-SLO-02 (job 34 freshness ≤ 20 min) ensures continuous cleanup | pg_cron job 34 freshness metric from `cron.job_run_details`; BDG-OBS-E-001 quarterly export |
+| **CC7.2** — Continuous monitoring | AL-BDG-01 (repeated trigger advisory) provides automated detection of IdP misconfiguration patterns; job freshness metrics (jobs 24 + 34) provide infrastructure health signals | DEC-030 `system.scim_guard_repeated_trigger` events + PagerDuty LOW incident log + quarterly BDG-OBS-E-001 |
+| **CC9.2** — Vendor/third-party monitoring | AL-BDG-01 repeated triggers signal external IdP sync tool degradation; override usage log tracks CSM + IdP vendor co-ordination | `scim.bulk_deprovision_override_issued` + `override_used` chain; quarterly GUARD-E-001 export (§91) |
+
+---
+
+### §79.8 Evidence Artefacts
+
+Two quarterly evidence artefacts cover the BDG monitoring layer:
+
+**GUARD-E-001** (registered: `docs/SOC2_READINESS.md §91`, owner: compliance-officer):
+- SOC 2 criteria: CC6.3, A1.2, CC7.2, CC9.2
+- Layer: business/operational (§34.8 DEC-030 export + override audit + threshold review)
+- Storage: `compliance/evidence/scim-guard/GUARD-E-001_<YYYY-QN>.json`
+- Cadence: quarterly, first filing M13/M14
+- Full spec: §34.8, §91
+
+**BDG-OBS-E-001** (registered: `docs/SOC2_READINESS.md §192`, owner: devops-lead + compliance-officer):
+- SOC 2 criteria: CC7.2, A1.1, CC4.1
+- Layer: monitoring/infrastructure (pg_cron job 24 + 34 freshness gap audit + AL-BDG-01 activation log + signed attestation)
+- Storage: `compliance/evidence/scim-guard/BDG-OBS-E-001_<YYYY-QN>.json`
+- Cadence: quarterly, first filing M14 (follows GUARD-E-001 §91 precedent — companion artefacts for same BDG system, both first filed M14)
+- Retention: 7yr WORM (job freshness + activation log); 3yr (attestation)
+- Zero-event attestation: required if zero AL-BDG-01 activations AND both jobs within SLO thresholds for the quarter
+- §79.4 physical row in SOC2_READINESS §79.4 master evidence table: DEFERRED to M14 (evidence count stays at 167 this pass)
+- Full spec: §192
+
+Three-component quarterly export for BDG-OBS-E-001:
+
+| Component | Source | Privacy floor |
+|---|---|---|
+| Part 1: pg_cron freshness gap audit (jobs 24 + 34) | `SELECT jobid, COUNT(*) FILTER (WHERE status = 'succeeded') AS succeeded, COUNT(*) FILTER (WHERE EXTRACT(EPOCH FROM (end_time - start_time)) > threshold_seconds) AS exceeded_slo, MIN(end_time) AS first_run, MAX(end_time) AS last_run FROM cron.job_run_details WHERE jobid IN (24, 34) AND end_time > NOW() - INTERVAL '90 days' GROUP BY jobid` (form_audit role) | Aggregate counts per jobid; no tenant_id, user_id |
+| Part 2: AL-BDG-01 activation log | `SELECT DATE_TRUNC('day', created_at) AS day, payload->>'tenant_id' AS tenant_id, COUNT(*) AS trigger_count FROM audit_log_events WHERE event_type = 'system.scim_guard_repeated_trigger' AND created_at > NOW() - INTERVAL '90 days' GROUP BY 1, 2 ORDER BY 1` (form_audit role) | `tenant_id` FORM-internal UUID + daily aggregate count; no user_id, email |
+| Part 3: signed attestation | JSON object: `{ "period": "YYYY-QN", "jobs_within_slo": true/false, "al_bdg_01_activations": N, "al_bdg_01_zero_event": true/false, "attested_by": "devops-lead", "reviewed_by": "compliance-officer", "date": "YYYY-MM-DD" }` | Aggregate metadata; no PII |
+
+---
+
+### §79.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy `bdg_health` §6.2 alert rules in PagerDuty: AL-BDG-01 LOW `form-customer-success` routing + 4h dedup; job 34 stale P1 `form-security` routing | devops-lead | P1 | M13 | [ ] |
+| 2 | Deploy §26.9 "SCIM Bulk Deprovision Guard" five-panel sub-group in Grafana / Admin Dashboard internal analytics | devops-lead | P1 | M13 | [ ] |
+| 3 | Register BDG-OBS-E-001 in SOC2_READINESS.md §192 | compliance-officer | P1 | M13 | [x] Done — §192 appended this pass (2026-07-06) |
+| 4 | Add §34.13 OBSERVABILITY §79 backreference to SSO_SCIM_IMPLEMENTATION.md §34 | enterprise-architect | P1 | M13 | [x] Done — §34.13 inserted this pass (2026-07-06) |
+| 5 | Implement GUARD-CHAIN-01 in `emit-audit-event` CF Worker (HTTP 422 on override_used without prior override_issued) | platform-engineer | P1 | M13 | [ ] |
+| 6 | Implement BDG-SWEEP-CHAIN-01 in `emit-audit-event` CF Worker (HTTP 422 on override_expired without prior override_issued) | platform-engineer | P1 | M13 | [ ] |
+| 7 | Register BDG-OBS-E-001 in Vanta as §80.4 evidence source | compliance-officer | P2 | M13 | [ ] |
+| 8 | File first BDG-OBS-E-001 quarterly export (Part 1 + 2 + 3) to R2 `compliance/evidence/scim-guard/BDG-OBS-E-001_<YYYY-QN>.json` | devops-lead | P2 | M14 | [ ] |
+| 9 | Add BDG-OBS-E-001 physical row to SOC2_READINESS §79.4 master evidence table (evidence count 167 → 168) | compliance-officer | P2 | M14 | [ ] |
+
+---
+
+### §79.10 Cross-Reference Obligations
+
+| Obligation | Target document | Status |
+|---|---|---|
+| §6.2 `bdg_health` subsection insertion | `docs/OBSERVABILITY.md §6.2` (this document) | 🟢 Done — inserted this pass (2026-07-06) |
+| §26.9 "SCIM Bulk Deprovision Guard" sub-group insertion | `docs/OBSERVABILITY.md §26.9` (this document) | 🟢 Done — inserted this pass (2026-07-06) |
+| SOC2_READINESS §192 BDG-OBS-E-001 registration | `docs/SOC2_READINESS.md §192` (v4.17.0, 2026-07-06) | 🟢 Done — §192 appended this pass |
+| SSO_SCIM §34.13 backreference | `docs/SSO_SCIM_IMPLEMENTATION.md §34.13` (v2.43, 2026-07-06) | 🟢 Done — §34.13 inserted this pass |
+| GUARD-E-001 §91 pointer (business-layer artefact, pre-existing) | `docs/SOC2_READINESS.md §91` (registered prior pass) | 🟢 Pre-existing |
+| BDG-OBS-E-001 §79.4 physical row (count 167 → 168) | `docs/SOC2_READINESS.md §79.4` | ⏳ Deferred — M14 (same precedent as GUARD-E-001 §91.5) |
+
+---
+
+*v5.25.0 (2026-07-06): §79 SCIM Bulk Deprovision Guard Observability. Closes the observability gap for FORM's BDG system (`docs/SSO_SCIM_IMPLEMENTATION.md §34`, `docs/SOC2_READINESS.md §91`). BDG was the last SSO subsystem with alert rules (§26.7a AL-SCIM-MASS-01, §12.6 jobs 24 + 34) and DEC-030 events (`scim.bulk_deprovision_blocked`, override events, `system.scim_guard_repeated_trigger`) but no dedicated observability section with RED metrics, SLOs, inline runbooks, dashboard sub-group, or monitoring-layer quarterly evidence artefact. §79.1: scope — five components (`enforceDeprovisionGuard()` CF Worker in `apps/scim-worker/src/handlers/users.ts`, pg_cron job 24 `scim_mass_deprovision_check` `*/5` 6-min freshness, pg_cron job 34 `bdg_override_expiry_sweep` `*/15` 20-min freshness, CSM override protocol, five DEC-030 events). §79.2: RED metrics — `bdg_blocked_events_total`, `bdg_override_active_count`, override issue/expire rates, `system.scim_guard_repeated_trigger` advisory rate, job 24 + 34 freshness durations. §79.3: two SLOs — BDG-SLO-01 (zero unauthorized bulk deprovisioning, zero-tolerance, CC6.3/A1.2) and BDG-SLO-02 (job 34 freshness ≤ 20 min, ≥ 99% compliance, CC6.3/A1.1); GUARD-CHAIN-01 (override_used requires prior override_issued) and BDG-SWEEP-CHAIN-01 (override_expired requires prior override_issued) HMAC invariants (M13 enforcement). §79.4: AL-BDG-01 alert rule (P2 advisory, `system.scim_guard_repeated_trigger` trigger_count ≥ 3 / 1h per tenant, PagerDuty LOW `form-customer-success` + Slack `#enterprise-ops`, dedup `bdg-repeated-trigger-{tenant_id}` 4h TTL) + seven-step inline runbook + job 34 stale inline runbook (BDG-SLO-02 breach → R-33 §R-33.5). §79.5: §6.2 `bdg_health` subsection (two rows: AL-BDG-01 P2 + job 34 stale P1); inserted after `scim_role_history` (§26.7c), before `sso_browser_security` (§26.8). §79.6: five-panel "SCIM Bulk Deprovision Guard" dashboard sub-group for §26.9; inserted after "CAEP/RISC Stream Health", before §26.10 separator. §79.7: SOC 2 mapping CC6.3/A1.2/CC7.2/CC9.2. §79.8: two evidence artefacts — GUARD-E-001 (SOC2_READINESS §91 pointer, CC6.3/A1.2/CC7.2/CC9.2, quarterly, pre-existing) + BDG-OBS-E-001 (new monitoring-layer, CC7.2/A1.1/CC4.1, quarterly, first filing M14, §79.4 physical row deferred M14; evidence count stays 167); three-component BDG-OBS-E-001 export spec (pg_cron freshness gap audit, AL-BDG-01 activation log, signed attestation). §79.9: nine-item checklist (items 3 + 4 Done this pass; items 1, 2, 5–9 pending M13/M14). §79.10: six cross-reference obligations (four Done this pass: §6.2 bdg_health, §26.9 sub-group, SOC2_READINESS §192, SSO_SCIM §34.13; one pre-existing: GUARD-E-001 §91; one deferred M14: BDG-OBS-E-001 §79.4 physical row). Also this pass: §6.2 `bdg_health` subsection inserted (two alert rows: AL-BDG-01 P2 + job 34 stale P1); §26.9 "SCIM Bulk Deprovision Guard" five-panel sub-group inserted (five queries, all tenant_id UUID only, SHA-256 hash for override_by). Privacy floor: all §79 content uses only `tenant_id` (FORM-internal UUID), aggregate counts, and operational enums; no employee `user_id`, name, email, health value, body composition, ED-screening, or GDPR Art. 9 data; `bulk_deprovision_override_by` is SHA-256 hash only; `tenant_manager` (HR) role has zero access to any BDG monitoring surface. Document header v5.24.4 → v5.25.0. Owner: devops-lead + security-engineer + compliance-officer.*

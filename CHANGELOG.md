@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.80.1] — 2026-07-06
+
+### Added
+- `docs/OBSERVABILITY.md §79` — SCIM Bulk Deprovision Guard (BDG) Observability. Closes the observability gap for SSO_SCIM §34: BDG was the last SSO subsystem with alert rules (§26.7a AL-SCIM-MASS-01, §12.6 jobs 24 + 34) and DEC-030 events but no dedicated RED metrics, SLOs, inline runbooks, dashboard sub-group, or monitoring-layer evidence artefact. §79.1: five-component scope (CF Worker `enforceDeprovisionGuard()`, pg_cron jobs 24 + 34, CSM override protocol, five DEC-030 events). §79.2: RED metrics (bdg_blocked_events_total, bdg_override_active_count, advisory rate, job freshness). §79.3: BDG-SLO-01 (zero unauthorized bulk deprovisioning, CC6.3/A1.2) + BDG-SLO-02 (job 34 freshness ≤ 20 min, CC6.3/A1.1); GUARD-CHAIN-01 + BDG-SWEEP-CHAIN-01 HMAC invariants. §79.4: AL-BDG-01 P2 advisory alert + seven-step inline runbook + job 34 stale runbook (→ R-33). §79.5–§79.6: §6.2 `bdg_health` subsection + §26.9 five-panel dashboard sub-group. §79.7: SOC 2 CC6.3/A1.2/CC7.2/CC9.2. §79.8: two artefacts — GUARD-E-001 (pointer to §91) + BDG-OBS-E-001 (new, §192). Document v5.24.4 → v5.25.0.
+- `docs/SOC2_READINESS.md §192` — BDG-OBS-E-001 Registration (CC7.2/A1.1/CC4.1). Monitoring-layer quarterly artefact for OBSERVABILITY §79 BDG system. Three-component export: pg_cron jobs 24 + 34 freshness gap audit, AL-BDG-01 activation log (tenant_id UUID + daily count), signed attestation. §79.4 physical row deferred M14 (evidence count stays 167). Document v4.16.0 → v4.17.0.
+
+### Changed
+- `docs/OBSERVABILITY.md §6.2` — `bdg_health` subsection inserted after `scim_role_history` (§26.7c), before `sso_browser_security` (§26.8): two alert rows (AL-BDG-01 P2 repeated trigger + job 34 stale P1 BDG-SLO-02 breach).
+- `docs/OBSERVABILITY.md §26.9` — "SCIM Bulk Deprovision Guard" five-panel dashboard sub-group inserted after "CAEP/RISC Stream Health", before §26.10.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §34.13` — OBSERVABILITY §79 backreference added (before §35 separator). Document v2.42 → v2.43.
+- `VERSION` — 13.80.0 → 13.80.1.
+
 ## [13.80.0] — 2026-07-06
 
 ### Added

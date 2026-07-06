@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.16.0
+# FORM · SOC 2 Type II Readiness v4.17.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -38154,3 +38154,73 @@ CAEP-OBS-E-001 artefact enforces the §79.6 FORM privacy floor without exception
 ---
 
 *v4.12.0 (2026-07-06): §186 — CAEP-OBS-E-001 Registration (CC6.3 / CC6.6 / CC7.2 / CC7.3 · OBSERVABILITY §78 · SSO_SCIM §23). Registers the CAEP/RISC Stream Observability quarterly evidence artefact in §79.4 (count 161 → 162). CAEP-OBS-E-001 is the auditor-facing evidence artefact for the full CAEP/RISC stream monitoring layer authored in `docs/OBSERVABILITY.md §78` (v5.24.0, 2026-07-06): five components (caep-receiver.ts CF Worker, caep-action-handler.ts dispatcher, caep_reregister_sweep pg_cron job 37 `*/5` 6-min freshness, Admin Dashboard CAEP panel, five DEC-030 events); three IdP types (Okta SSF, Entra Event Grid, Google RISC); CAEP-SLO-01 (P95 < 30 s end-to-end revocation / CC6.3 / SLA credit) and CAEP-SLO-02 (job 37 freshness < 6 min / CC6.6 / 99% compliance); five alert rules AL-CAEP-01..05 (§6.2 `caep_stream_health` subsection); six-panel §26.9 "CAEP/RISC Stream Health" dashboard sub-group (v5.24.0). Distinct from CC6-E-CAEP-001..004 (§79.4, per §23.12 checklist item 15) which are the per-activation DEC-030 event artefacts; CAEP-OBS-E-001 is the quarterly monitoring-layer aggregate. §186.2 §79.4 row 162: CC6.3/CC6.6/CC7.2/CC7.3; quarterly; 7yr WORM; `compliance/evidence/caep-obs/caep-obs-e-001-{YYYY}-Q{N}.json`; `r2:form-api` REVOKED; HR PROHIBITED; pre-M4 nil-attestation. §186.3 four auditor narratives: CC6.3 (CAEP-SLO-01 < 30 s / AL-CAEP-02 P0 purge GDPR workflow / HMAC tamper-evident), CC6.6 (credential-change/account-disabled dispatch / CAEP-SLO-02 stream continuity / AL-CAEP-01..05 degraded-capacity detection), CC7.2 (SET error rate / dead-man / rate-limit / AL-CAEP-04 RISC hijacking = external anomaly detection), CC7.3 (PagerDuty incident IDs + MTTR / AL-CAEP-02 two-person rule / P0/P1/P2 SLAs per §78.4 runbooks / per-incident supplements). §186.4 R2 + Vanta: `compliance/evidence/caep-obs/` established; quarterly upload within 14 days of quarter-end; nil-attestation for pre-M4 quarters. §186.5 two cross-reference obligations: §79.4 row 162 Done this pass; SSO_SCIM v2.40 §23.13 Done this pass. §186.6 privacy floor: aggregate counts and operational metadata only; no set_jti, caep_webhook_secret, user_id, email, health data, GDPR Art. 9 data; HR access prohibited. Companion edits: `docs/OBSERVABILITY.md` v5.24.0 (§78 full section + §26.9 "CAEP/RISC Stream Health" sub-group + §6.2 `caep_stream_health`); `docs/SSO_SCIM_IMPLEMENTATION.md` v2.40 (§23.13 backreference). Document header v4.11.0 → v4.12.0. Owner: compliance-officer. Review: security-engineer + devops-lead.*
+
+---
+
+## §192 · Evidence Artefact Cross-Reference Patch — OBSERVABILITY §79 (SCIM Bulk Deprovision Guard · DEC-066 · SSO_SCIM §34)
+
+> Closes the cross-reference obligation from `docs/OBSERVABILITY.md §79.9` item 3 (2026-07-06). Formally registers BDG-OBS-E-001 (monitoring-layer quarterly artefact, CC7.2/A1.1/CC4.1). **Evidence count: stays at 167 this pass** (BDG-OBS-E-001 §79.4 physical row deferred to M14; follows GUARD-E-001 §91 precedent — companion artefacts for the same BDG system, both first filed M14). Privacy floor: all export rows carry only `tenant_id` (FORM-internal UUID) and aggregate integers — no individual employee `user_id`, email, health value, or GDPR Art. 9 special-category data.
+
+### §192.1 Evidence Artefact Registration
+
+**BDG-OBS-E-001** — SCIM Bulk Deprovision Guard observability monitoring quarterly export.
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | BDG-OBS-E-001 |
+| **Trust Service Criteria** | CC7.2 (continuous automated monitoring of anomalous provisioning patterns) · A1.1 (system availability of override lifecycle controls) · CC4.1 (risk assessment — IdP misconfiguration signals from AL-BDG-01) |
+| **Collection trigger** | Quarterly (first filing M14; pre-M14 nil-attestation required) |
+| **Retention** | 7yr WORM (pg_cron freshness log + AL-BDG-01 activation log); 3yr (signed attestation) |
+| **Storage path** | `compliance/evidence/scim-guard/BDG-OBS-E-001_<YYYY-QN>.json` |
+| **Collection owner** | devops-lead (primary collection) + compliance-officer (SOC 2 sign-off) |
+| **OBSERVABILITY section** | `docs/OBSERVABILITY.md §79` (v5.25.0, 2026-07-06) |
+| **Business-layer companion** | GUARD-E-001 (§91, CC6.3/A1.2/CC7.2/CC9.2 — operational DEC-030 export + override audit) |
+| **Zero-event attestation** | Required if zero AL-BDG-01 activations AND both jobs 24 + 34 within SLO thresholds for the entire quarter |
+| **Vanta mirror** | BDG-OBS-E-001 (§80.4 — to be added M13 per §79.9 item 7) |
+| **§79.4 physical row** | DEFERRED to M14 (evidence count stays 167 this pass) |
+
+**Required artefact components (three):**
+
+| Component | Source | Privacy floor |
+|---|---|---|
+| Part 1: pg_cron freshness gap audit (jobs 24 + 34) | `SELECT jobid, COUNT(*) FILTER (WHERE status = 'succeeded') AS succeeded, COUNT(*) FILTER (WHERE EXTRACT(EPOCH FROM (end_time - start_time)) > threshold_seconds) AS exceeded_slo, MIN(end_time) AS first_run, MAX(end_time) AS last_run FROM cron.job_run_details WHERE jobid IN (24, 34) AND end_time > NOW() - INTERVAL '90 days' GROUP BY jobid` (form_audit role) | Aggregate counts per `jobid`; no `tenant_id`, `user_id` |
+| Part 2: AL-BDG-01 activation log | `SELECT DATE_TRUNC('day', created_at) AS day, payload->>'tenant_id' AS tenant_id, COUNT(*) AS trigger_count FROM audit_log_events WHERE event_type = 'system.scim_guard_repeated_trigger' AND created_at > NOW() - INTERVAL '90 days' GROUP BY 1, 2 ORDER BY 1` (form_audit role) | `tenant_id` FORM-internal UUID + daily aggregate count; no `user_id`, email, health data |
+| Part 3: signed attestation | JSON: `{ "period": "YYYY-QN", "jobs_within_slo": true/false, "al_bdg_01_activations": N, "al_bdg_01_zero_event": true/false, "attested_by": "devops-lead", "reviewed_by": "compliance-officer", "date": "YYYY-MM-DD" }` | Aggregate metadata only; no PII |
+
+### §192.2 Auditor Narratives
+
+**CC7.2 (Continuous monitoring of anomalous activity):** BDG-OBS-E-001 Part 2 (AL-BDG-01 activation log) demonstrates that FORM's monitoring layer automatically detects repeated SCIM guard triggers (`trigger_count ≥ 3` / 1h per tenant) — a signal of external IdP misconfiguration or sync tooling degradation. The `system.scim_guard_repeated_trigger` DEC-030 HMAC-chained event proves the detection was automated, not manual. PagerDuty LOW `form-customer-success` routing ensures the appropriate team is notified within the 4h dedup window. Zero activations in a quarter triggers a nil-attestation, which itself demonstrates the monitoring infrastructure ran without generating false alerts — also a CC7.2 positive signal.
+
+**A1.1 (System availability of controls):** BDG-OBS-E-001 Part 1 (pg_cron freshness gap audit) demonstrates that `bdg_override_expiry_sweep` (job 34) and `scim_mass_deprovision_check` (job 24) ran continuously throughout the quarter. Job 34 freshness ≤ 20 min (BDG-SLO-02) is the direct availability metric for the override expiry control: a stale job means stale overrides persist, weakening the BDG lifecycle. `exceeded_slo` count in Part 1 is the primary A1.1 metric; zero is the target; non-zero requires root-cause annotation per §79.4 job 34 stale runbook.
+
+**CC4.1 (Risk assessment — detection of control degradation):** AL-BDG-01 advisory triggers represent an assessed risk signal: repeated guard fires for the same tenant indicate either (a) IdP sync misconfiguration (operational risk) or (b) an adversarial pattern probing the guard threshold (security risk). BDG-OBS-E-001's quarterly aggregation of these signals provides auditors with evidence that FORM assesses and documents provisioning-layer risk systematically, not reactively. Nil-attestation quarters (zero triggers, jobs within SLO) demonstrate stable control posture.
+
+### §192.3 SOC 2 Criteria Mapping
+
+| Criterion | Control | Evidence path |
+|---|---|---|
+| CC7.2 | Automated detection of repeated SCIM guard triggers (IdP misconfiguration / external threat signal) | Part 2 AL-BDG-01 activation log; DEC-030 `system.scim_guard_repeated_trigger` HMAC chain; PagerDuty LOW incident records |
+| A1.1 | pg_cron job 24 + 34 continuous operation (override lifecycle + reactive DB scan) | Part 1 pg_cron freshness gap audit; BDG-SLO-02 (job 34 ≤ 20 min); `cron.job_run_details` source of truth |
+| CC4.1 | Quarterly aggregation of provisioning-layer risk signals; nil-attestation when posture is clean | Part 3 signed attestation; AL-BDG-01 activation count as risk quantification |
+
+### §192.4 Cross-Reference Obligations
+
+| Obligation | Target | Status |
+|---|---|---|
+| OBSERVABILITY §79.9 item 3 — SOC2_READINESS §192 registration | `docs/OBSERVABILITY.md §79.9` (v5.25.0) | 🟢 Done — §192 this pass (2026-07-06) |
+| SSO_SCIM §34.13 — §192 mentioned as registered | `docs/SSO_SCIM_IMPLEMENTATION.md §34.13` (v2.43) | 🟢 Done — §34.13 this pass (2026-07-06) |
+| §79.4 physical row (BDG-OBS-E-001, count 167 → 168) | `docs/SOC2_READINESS.md §79.4` | ⏳ Deferred — M14 (same precedent as GUARD-E-001 §91.5) |
+| Vanta BDG-OBS-E-001 source mapping (§80.4) | Vanta dashboard | ⏳ Pending — M13 per OBSERVABILITY §79.9 item 7 |
+
+### §192.5 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy PagerDuty routing for AL-BDG-01 (LOW `form-customer-success`, 4h dedup) and job 34 stale (P1 `form-security`) | devops-lead | P1 | M13 | [ ] |
+| 2 | Add BDG-OBS-E-001 to Vanta as §80.4 evidence source | compliance-officer | P2 | M13 | [ ] |
+| 3 | File first quarterly export (Parts 1 + 2 + 3) to R2 `compliance/evidence/scim-guard/BDG-OBS-E-001_<YYYY-QN>.json` | devops-lead | P2 | M14 | [ ] |
+| 4 | Add BDG-OBS-E-001 §79.4 physical row (count 167 → 168) once first export is filed | compliance-officer | P2 | M14 | [ ] |
+
+---
+
+*v4.17.0 (2026-07-06): §192 OBSERVABILITY §79 Cross-Reference Patch — BDG-OBS-E-001 Registration (CC7.2/A1.1/CC4.1 · OBSERVABILITY §79 · SSO_SCIM §34 · DEC-066). Closes OBSERVABILITY §79.9 item 3 cross-reference obligation. Registers BDG-OBS-E-001, the monitoring-layer quarterly evidence artefact for the SCIM Bulk Deprovision Guard observability system authored in `docs/OBSERVABILITY.md §79` (v5.25.0, 2026-07-06). Distinct from GUARD-E-001 (§91, CC6.3/A1.2/CC7.2/CC9.2, business/operational layer — §34.8 DEC-030 export + override audit + threshold review): BDG-OBS-E-001 is the monitoring/infrastructure layer — pg_cron job 24 (`scim_mass_deprovision_check`) + job 34 (`bdg_override_expiry_sweep`) freshness gap audit + AL-BDG-01 (`system.scim_guard_repeated_trigger`) activation log + signed attestation. Three-component export: Part 1 (pg_cron freshness gap audit, aggregate counts per jobid, no tenant_id / user_id), Part 2 (AL-BDG-01 activation log by tenant_id FORM-internal UUID + daily count, no user_id / email / health data), Part 3 (signed attestation JSON, aggregate metadata). SOC 2 criteria: CC7.2 (automated detection of repeated guard trigger = IdP misconfiguration / external threat signal; nil-attestation = clean monitoring posture); A1.1 (pg_cron job 24 + 34 continuous operation; BDG-SLO-02 job 34 ≤ 20 min freshness); CC4.1 (quarterly aggregation of provisioning-layer risk signals). §79.4 physical row DEFERRED to M14 (same precedent as GUARD-E-001 §91.5; companion artefacts for same BDG system; evidence count stays 167). Vanta mapping deferred to M13 (§80.4). Storage: `compliance/evidence/scim-guard/BDG-OBS-E-001_<YYYY-QN>.json`. First filing M14; pre-M14 nil-attestation required. Retention: 7yr WORM (Parts 1 + 2); 3yr (Part 3 attestation). Privacy floor: all three components use `tenant_id` FORM-internal UUID only; no employee `user_id`, email, health value, body composition, ED-screening, GDPR Art. 9 data; HR access prohibited. Companion edits: `docs/OBSERVABILITY.md` v5.25.0 (§79 full section + §6.2 `bdg_health` subsection + §26.9 BDG sub-group); `docs/SSO_SCIM_IMPLEMENTATION.md` v2.43 (§34.13 backreference). Document header v4.16.0 → v4.17.0. Owner: compliance-officer. Review: security-engineer + devops-lead.*
