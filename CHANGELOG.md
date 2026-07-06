@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [13.45.0] — 2026-07-06
+
+### Verified
+- `content/post-11-deload-weeks-strategic-undertraining.md` — confirmed complete (v12.75.0).
+- `content/post-12-technique-over-intensity.md` — confirmed complete (v12.77.0).
+- `content/post-13-overtraining-vs-laziness.md` — confirmed complete (v13.0.0).
+- `content/post-14-sleep-deprived-training.md` — confirmed complete (v13.1.0). Leproult & Van Cauter (JAMA 2011), Dattilo et al. (2011), fragmented-sleep MED framework, RPE-стеля 8, поріг <3 год. clinical-safety PASS.
+- `content/post-15-training-frequency.md` — confirmed complete (v13.2.0). Schoenfeld et al. (2016) мета-аналіз, MPS-вікно 36–72 год, McLester et al. (2000), upper/lower 2× практика. clinical-safety NOT_REQUIRED.
+- Posts 11–15 ✓ ALL COMPLETE. Content-engine milestone: editorial series posts 11–15 done.
+
+### Changed
+- `STATUS.md` — v13.45.0 entry: posts 11–15 milestone confirmed.
+- `VERSION` — 13.44.0 → 13.45.0.
+
+---
+
 ## [13.44.0] — 2026-07-06
 
 ### Added
