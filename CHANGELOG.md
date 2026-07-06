@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.39.0] — 2026-07-06
+
+### Added
+- `content/post-3268-phase-structure-accumulation-intensification-realization.md` — Series «Довгострокове прогресування: 2–5-річний горизонт» 3/10. Topic: phase structure of long-term plan — accumulation (65–80%, high volume, builds hypertrophy/metabolic capacity), intensification (80–92%, −30–40% volume, converts to neuromuscular specificity), realization (1–3 weeks, minimal volume, specific peak). Supercompensation window between phases (3–7 day deload required). Four common phase-structure mistakes. Issurin Block Periodization, Bompa/Buzzichelli «Periodization of Strength», Enoka/Duchateau neuromuscular data. clinical-safety NOT_REQUIRED (no food/body-image/pain/clinical-psych). 13-min read.
+- `blog.html` — Card prepended for post-3268.
+- `STATUS.md` — v13.39.0 entry added.
+
+### Changed
+- `VERSION` — 13.38.0 → 13.39.0.
+
 ## [13.38.0] — 2026-07-06
 
 ### Added
