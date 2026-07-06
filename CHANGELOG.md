@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.59.0] — 2026-07-06
+
+### Added
+- `content/post-3281-chronobiology-training-time-of-day-performance.md` — Series «Тренування і контекст тіла: вік, відновлення, варіабельність» 3276–3285, 6/10. Хронобіологія тренування: SCN і циркадна архітектура; температура тіла і силова продуктивність (Atkinson & Reilly 1996 — пік о 16:00–20:00; Hill & Smith 1991 — 6–8% різниця; Drust 2005); гормональний контекст (Hackney 2012 — вечірній тестостероновий відгук вищий); хронотип і E-тип vs. M-тип (Facer-Childs & Brandstaetter 2015 — 26% різниця у E-типів); адаптація до часу тренування (Chtourou & Souissi 2012 — 4–8 тижнів); соціальний джетлаг (Roenneberg 2012); розминка ≥20 хв як компенсаційний інструмент; практична рамка: три рішення і одне правило.
+- `blog.html` — card post-3281 prepended at top of feed.
+
+### Changed
+- `STATUS.md` — content engine: series 3276–3285 in progress 5/10 → 6/10.
+- `VERSION` — 13.58.1 → 13.59.0.
+
+---
+
 ## [13.58.1] — 2026-07-06
 
 ### Added
