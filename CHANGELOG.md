@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [13.43.1] — 2026-07-06
+
+### Changed
+- `docs/SOC2_READINESS.md §183` — AL-C1-02 PagerDuty Routing Rule Deployment Spec (CC7.2/CC4.1/P5.1 · R-43.11 item 2). Pre-stages the `form-alert-relay` routing rule for `system.cron_job_stale` + `job_name = 'c1-erasure-sla-monitor'` → PagerDuty `form-compliance` P1 · dedup `c1-erasure-sla-monitor-stale` · auto-resolve false. §183.1 background: without AL-C1-02, job 11 staleness pages nobody despite HMAC-chain detection — complements AL-C1-01 (breach path) by covering the stale-job path. §183.2 AL-C1-02 formal definition (trigger, service, severity, dedup key, escalation, SOC 2 criteria). §183.3 `form-alert-relay` TypeScript routing rule spec (exact fields; sort before AL-CI-07; `PAGERDUTY_FORM_COMPLIANCE_ROUTING_KEY` prerequisite). §183.4 PagerDuty `form-compliance` service config (T+0/T+3/T+8/T+15 tiers; auto-resolve off; GDPR Art. 17 service annotation). §183.5 integration test AL-C1-02-INT-01 (8-step; synthetic POST shortcut; pass criteria). §183.6 PD-ERASURE-E-001 artefact (CC7.2/CC4.1/P5.1; one-time; 7yr WORM; `compliance/evidence/erasure/pd-erasure-e-001-deployment.json`; 18-field JSON schema; `form_api` REVOKED). §183.7 §79.4 row 159 (PD-ERASURE-E-001; count 158→159). §183.8 R-43.11 item 2 🔴→🟡 Pre-staged; items 1/3/4 Done. §183.9 six cross-reference obligations. §183.10 privacy floor. Document header v4.8.0 → v4.9.0.
+- `docs/INCIDENT_RESPONSE.md §R-43.11` — Item 4 patched `[ ]` → `[x]` Done (SOC2_READINESS.md §182, 2026-07-06 — §79.4 row 158; P5.1/C1.2/CC4.1/CC7.2; quarterly from M6; 7yr WORM; `form_api` REVOKED). Closes cross-document inconsistency: SOC2_READINESS.md §182.5 marked item 4 Done (v13.41.0) but INCIDENT_RESPONSE.md R-43.11 was not patched in that pass.
+- `VERSION` — 13.43.0 → 13.43.1.
+
 ## [13.43.0] — 2026-07-06
 
 ### Added

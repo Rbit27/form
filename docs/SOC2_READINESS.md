@@ -37570,3 +37570,191 @@ No `dsar_request_id`, `user_id`, email address, requestor name, erasure request 
 ---
 
 *v4.8.0 (2026-07-06): §182 — ERASURE-MON-E-001 Registration (P5.1/C1.2/CC4.1/CC7.2 · INCIDENT_RESPONSE R-43.11 item 4). Registers quarterly `c1-erasure-sla-monitor` job 11 GDPR Art. 17 erasure SLA monitoring evidence artefact in §79.4 master evidence table (row 158), closing R-43.11 item 4 (P1/M11 — pending since R-43 runbook creation). §182.1 context: job 11 daily 08:00 UTC, 26h freshness window, 33-day early-warning query against `dsar_requests`, R-43 three-condition escalation (C1 stale / C2 danger_window / C3 art17_sla_breached). §182.2 §79.4 row 158: ERASURE-MON-E-001; P5.1/C1.2/CC4.1/CC7.2; quarterly from M6; 7yr WORM; path `compliance/evidence/erasure/erasure-mon-e-001-YYYY-QN.csv`; `form_api` REVOKED; zero-activation quarters filed as affirmative attestation. §182.3 four-criterion auditor narratives: P5.1 (privacy monitoring continuity + 35-day SLA structural buffer vs. Art. 17 30-day clock), C1.2 (erasure commitment operational continuity record + per-activation risk evidence), CC4.1 (danger_window + breach severity signals; P0 escalation when breach_requests_at_declared > 0), CC7.2 (anomaly monitoring continuity; complete run_count with zero failure_count = no detection blind-spot). §182.4 collection procedure: quarterly SQL against `cron.job_run_details` JOIN `erasure_sla_monitor_stale_log` for job 11; CSV export; 7yr WORM Object Lock; Vanta upload within 48h; zero-activation quarters not omitted. §182.5 R-43.11 item 4 🔴→🟢 Done; items 1/2 remain P0/M6 pending; item 3 Done (v5.14.4, 2026-07-03). §182.6 §80.3 `erasure/` + `erasure-sla-monitor-stale/` added; §80.4 Vanta mirror ERASURE-MON-E-001 added (quarterly from M6). §182.7 privacy floor: aggregate integers + duration + boolean + quarter string only; no `dsar_request_id`, `user_id`, email, GDPR Art. 9 data; `r2:form-api` REVOKED. Document header v4.6.0 → v4.8.0 (§181 intended v4.7.0 bump per CHANGELOG [13.39.1]; §182 applies consolidated v4.8.0 increment). Owner: compliance-officer.*
+
+---
+
+## §183 AL-C1-02 PagerDuty Routing Rule Deployment Spec — `c1-erasure-sla-monitor` Stale Alert (CC7.2/CC4.1/P5.1 · R-43.11 item 2)
+
+**Date:** 2026-07-06
+**Owner:** devops-lead + compliance-officer
+**Status:** Pre-staged (R-43.11 item 2 🟡 — deploy per §183.3; close after AL-C1-02-INT-01 passes in staging)
+**Criteria:** CC7.2 / CC4.1 / P5.1
+**Cross-refs:** INCIDENT_RESPONSE R-43 · OBSERVABILITY §12.6 job 11 · OBSERVABILITY §6.2 AL-C1-01 · SOC2_READINESS §182
+
+### §183.1 Background and Gap
+
+`docs/INCIDENT_RESPONSE.md R-43.11 item 2` requires deploying a PagerDuty routing rule so that when `pg-cron-health-monitor` (OBSERVABILITY §12.7) detects `c1-erasure-sla-monitor` (job 11) is stale, the `system.cron_job_stale` DEC-030 HIGH event is relayed through `form-alert-relay` to PagerDuty `form-compliance` service at P1 severity.
+
+Without this routing rule:
+- A stale job 11 emits `system.cron_job_stale` HIGH into the audit log (HMAC-chained, tamper-evident) — ✅ detection still fires
+- The `form-alert-relay` Worker has no matching rule for `job_name = 'c1-erasure-sla-monitor'` — **❌ PagerDuty P1 does NOT fire**
+- compliance-officer receives no page — the Art. 17 day-33 monitoring blind spot is undetected until next manual review
+
+This is a P0/M6 gap: detection is operational (audit log), but paging is missing. This section pre-stages the full deployment spec, integration test procedure, and evidence artefact definition.
+
+**Current status:** AL-C1-01 (the companion alert that fires when job 11 RUNS and detects a day-33 breach) routes correctly to `form-compliance` P1 (OBSERVABILITY §6.2). AL-C1-02 (this section) covers the orthogonal stale-job path — when job 11 fails to run at all.
+
+### §183.2 Alert Rule Definition — AL-C1-02
+
+| Field | Value |
+|---|---|
+| **Alert ID** | AL-C1-02 |
+| **Trigger** | `system.cron_job_stale` DEC-030 HIGH event with `job_name = 'c1-erasure-sla-monitor'` emitted by `pg-cron-health-monitor` (OBSERVABILITY §12.7) |
+| **Source** | `form-alert-relay` Cloudflare Worker — receives `system.cron_job_stale` from `pg-cron-health-monitor` via `pg_net.http_post` |
+| **Severity** | P1 (base) → escalates to P0 if R-43-C2 or R-43-C3 confirmed (see R-43.3) |
+| **PagerDuty service** | `form-compliance` |
+| **Escalation target** | compliance-officer (primary); founder (T+15 min if unacknowledged — per §2.2 escalation tree) |
+| **Slack channel** | `#security-alerts` HIGH |
+| **Dedup key** | `c1-erasure-sla-monitor-stale` |
+| **Auto-resolve** | `false` — manual resolution required; compliance-officer must run R-43-C2 and R-43-C3 scope queries to confirm Art. 17 scope before resolving |
+| **Re-alert** | Successive `system.cron_job_stale` events from subsequent hourly `pg-cron-health-monitor` runs while job remains unrestored; dedup key ensures one open incident |
+| **SOC 2 criteria** | CC7.2 (anomaly detection), CC4.1 (risk monitoring), P5.1 (GDPR Art. 17 SLA monitoring continuity) |
+| **Runbook** | `docs/INCIDENT_RESPONSE.md R-43` |
+
+### §183.3 `form-alert-relay` Worker Routing Rule
+
+Add to the `cron_stale_routing` table in `workers/form-alert-relay/src/routing-rules.ts`. Follows the same pattern as AL-CI-07 (`ci_telemetry_daily_sync`, §38.5) and R-28 (`renewal_notice_check`, §51). Sort alphabetically by `job_name` — `c1-erasure-sla-monitor` sorts before `ci_telemetry_daily_sync` (insert above AL-CI-07 entry).
+
+```typescript
+// AL-C1-02 — c1-erasure-sla-monitor stale alert (SOC2_READINESS §183)
+{
+  event_type: 'system.cron_job_stale',
+  match: { job_name: 'c1-erasure-sla-monitor' },
+  pagerduty: {
+    service:      'form-compliance',
+    severity:     'warning',   // PagerDuty severity "warning" = FORM P1
+    dedup_key:    'c1-erasure-sla-monitor-stale',
+    summary:      'FORM pg_cron job 11 (c1-erasure-sla-monitor) is stale — GDPR Art. 17 day-33 monitoring blind spot. Open R-43 runbook immediately.',
+    source:       'pg-cron-health-monitor',
+    auto_resolve: false,
+  },
+  slack: {
+    channel: '#security-alerts',
+    level:   'HIGH',
+    message: ':rotating_light: *AL-C1-02* `c1-erasure-sla-monitor` (job 11) is stale. GDPR Art. 17 day-33 SLA monitoring is degraded. Activate R-43 runbook immediately.',
+  },
+},
+```
+
+**Secret prerequisite:** `PAGERDUTY_FORM_COMPLIANCE_ROUTING_KEY` must be set in Cloudflare Workers Secrets for the `form-alert-relay` staging and production environments. If AL-C1-01 already routes to `form-compliance`, this secret is already present — confirm with devops-lead before adding a duplicate entry.
+
+### §183.4 PagerDuty `form-compliance` Service Configuration
+
+| Configuration field | Required value |
+|---|---|
+| **Service name** | `FORM Compliance` (display) / `form-compliance` (routing key alias) |
+| **Escalation policy** | `FORM Compliance On-Call`: T+0 → compliance-officer push/SMS; T+3 → call; T+8 → retry call; T+15 → founder push + Slack `#security-sync` |
+| **Incident urgency** | High urgency for `warning` (P1) and `critical` (P0) events |
+| **Auto-resolution** | Disabled for AL-C1-02 incidents (`auto_resolve: false` in routing rule) |
+| **Dedup / grouping** | Alert grouping off — one open incident per `c1-erasure-sla-monitor-stale` key until manually resolved |
+| **Integration type** | Events API v2 (key: `PAGERDUTY_FORM_COMPLIANCE_ROUTING_KEY`) |
+
+**Service annotation (add to PagerDuty `form-compliance` description):** "AL-C1-02 incidents represent a GDPR Art. 17 erasure SLA monitoring blind spot. Do not resolve without running R-43-C2 and R-43-C3 scope queries. `breach_requests_at_declared ≥ 1` requires R-09 (Data Subject Rights Breach) co-activation before PagerDuty P0 resolution."
+
+### §183.5 Integration Test Procedure — AL-C1-02-INT-01
+
+**Pre-condition:** `form-alert-relay` deployed to staging with AL-C1-02 routing rule from §183.3. `PAGERDUTY_FORM_COMPLIANCE_ROUTING_KEY` set in Cloudflare Workers Secrets (staging).
+
+**Steps:**
+
+1. **Disable job 11 on staging** (under `form_system` role with PAM elevation):
+   ```sql
+   SELECT cron.unschedule('c1-erasure-sla-monitor');
+   ```
+2. **Simulate staleness** (staging shortcut — do not use on production): directly POST a synthetic `system.cron_job_stale` payload to the `form-alert-relay` staging Worker with `job_name = 'c1-erasure-sla-monitor'` and `hours_since_last_run: 27`. Document as `run_type: "synthetic_test"` in PD-ERASURE-E-001.
+3. **Confirm `form-alert-relay` routing.** Check Cloudflare Workers log for a successful `POST` to the PagerDuty Events API v2 endpoint with `dedup_key = 'c1-erasure-sla-monitor-stale'` and `severity = 'warning'`.
+4. **Confirm PagerDuty P1 fires.** In PagerDuty `form-compliance` (staging): new P1 incident created; dedup key `c1-erasure-sla-monitor-stale` confirmed; summary matches §183.3; escalation routes to compliance-officer; auto-resolve not set (incident stays open).
+5. **Confirm Slack `#security-alerts` HIGH.** Verify the AL-C1-02 message appears in the staging `#security-alerts` channel.
+6. **Re-enable job 11** (staging):
+   ```sql
+   SELECT cron.schedule('c1-erasure-sla-monitor', '0 8 * * *',
+     $$SELECT c1_erasure_sla_monitor()$$);
+   ```
+7. **Confirm incident stays open.** PagerDuty incident must remain open (auto-resolve false). Manually resolve the staging incident after confirming no R-43-C2/C3 exposure in staging `dsar_requests`.
+8. **Record result for PD-ERASURE-E-001** (§183.6): PagerDuty staging incident ID, Cloudflare Workers log snippet, timestamps.
+
+**Pass criteria:** Steps 3–5 all confirm as described. Any failure in step 3 or 4 is a routing rule deployment issue — escalate to devops-lead before production deployment.
+
+### §183.6 Evidence Artefact — PD-ERASURE-E-001
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | PD-ERASURE-E-001 |
+| **Description** | AL-C1-02 routing rule verification: `form-alert-relay` Worker log snippet showing successful PagerDuty API v2 POST + PagerDuty `form-compliance` P1 incident confirmation + dedup key `c1-erasure-sla-monitor-stale` confirmed + auto-resolve false confirmed + Slack `#security-alerts` HIGH confirmed. Integration test AL-C1-02-INT-01 result. |
+| **SOC 2 criteria** | CC7.2 / CC4.1 / P5.1 |
+| **Cadence** | One-time on deployment; supplemented by ERASURE-MON-E-001 quarterly (§182) for ongoing evidence |
+| **Retention** | 7 yr WORM |
+| **R2 path** | `compliance/evidence/erasure/pd-erasure-e-001-deployment.json` |
+| **Access** | devops-lead (upload); compliance-officer (read); `form_api` REVOKED |
+| **Vanta upload** | Within 48 hours of INT-01 completion; evidence ID: PD-ERASURE-E-001 |
+
+**PD-ERASURE-E-001 JSON schema:**
+
+```json
+{
+  "artefact_id": "PD-ERASURE-E-001",
+  "alert_id": "AL-C1-02",
+  "soc2_criteria": ["CC7.2", "CC4.1", "P5.1"],
+  "deployment_date": "<ISO-8601 date of production routing rule deployment>",
+  "integration_test_id": "AL-C1-02-INT-01",
+  "integration_test_run_type": "synthetic_test",
+  "integration_test_date": "<ISO-8601 date>",
+  "pagerduty_incident_id": "<staging PD incident ID>",
+  "pagerduty_service": "form-compliance",
+  "dedup_key_confirmed": "c1-erasure-sla-monitor-stale",
+  "severity_confirmed": "warning",
+  "auto_resolve_confirmed": false,
+  "cloudflare_worker_log_ref": "<Cloudflare log stream URL or export reference>",
+  "slack_notification_confirmed": true,
+  "result": "PASS",
+  "collected_by": "devops-lead",
+  "collected_at": "<ISO-8601 timestamp>",
+  "upload_note": null
+}
+```
+
+For a failed test: set `result` to `"FAIL"`, add `failure_details` field, and escalate to devops-lead + security-engineer before any production deployment.
+
+### §183.7 §79.4 Master Evidence Table Registration
+
+PD-ERASURE-E-001 is added to the §79.4 master evidence table as row 159 (following ERASURE-MON-E-001 at row 158 from §182.2):
+
+| # | Artefact ID | Description | Criterion | Cadence | Retention | R2 path |
+|---|---|---|---|---|---|---|
+| 159 | **PD-ERASURE-E-001** | AL-C1-02 PagerDuty routing rule deployment verification: `form-alert-relay` Worker routing log + AL-C1-02-INT-01 integration test result (dedup key `c1-erasure-sla-monitor-stale`, auto-resolve false, PagerDuty `form-compliance` P1, Slack `#security-alerts` HIGH — all confirmed). One-time on deployment; supplemented by ERASURE-MON-E-001 quarterly. | CC7.2 / CC4.1 / P5.1 | One-time on deployment | 7 yr WORM | `compliance/evidence/erasure/pd-erasure-e-001-deployment.json` |
+
+**§79.4 evidence count update: 158 → 159.**
+
+### §183.8 R-43.11 Checklist Update
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Register DEC-030 events in AUDIT_LOG_SCHEMA | [x] Done (AUDIT_LOG_SCHEMA.md v3.2, 2026-07-06 — §C1-Erasure-SLA-Monitor-Stale-Events) |
+| **2** | **Deploy PagerDuty routing rule** | 🟡 **Pre-staged — AL-C1-02 spec in §183.3; integration test AL-C1-02-INT-01 in §183.5; PD-ERASURE-E-001 artefact in §183.6. Close after devops-lead production deployment + INT-01 pass.** |
+| 3 | Update OBSERVABILITY §12.6 | [x] Done (v5.14.4, 2026-07-03) |
+| 4 | Register ERASURE-MON-E-001 in §79.4 | [x] Done — §182 (2026-07-06) |
+
+### §183.9 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| Deploy AL-C1-02 routing rule in `form-alert-relay` | `docs/INCIDENT_RESPONSE.md R-43.11 item 2` | 🟡 **Pre-staged — deploy per §183.3** |
+| Run AL-C1-02-INT-01 integration test | `docs/SOC2_READINESS.md §183.5` | 🟡 **Pre-staged — run after `form-alert-relay` deployment to staging** |
+| Upload PD-ERASURE-E-001 to R2 + Vanta | `docs/SOC2_READINESS.md §183.6` | 🔴 **Pending — devops-lead, after INT-01 pass** |
+| Register AL-C1-02 in `docs/OBSERVABILITY.md §6.2` `c1_erasure_sla` subsection | `docs/OBSERVABILITY.md §6.2` (AL-C1-01 companion) | 🔴 **Pending — devops-lead, after production deployment** |
+| Patch R-43.11 item 2 `[ ]` → `[x]` Done | `docs/INCIDENT_RESPONSE.md R-43.11` | 🔴 **Pending — close after INT-01 pass + production deployment** |
+| Patch R-43.11 item 4 `[ ]` → `[x]` Done | `docs/INCIDENT_RESPONSE.md R-43.11` | 🟢 **Closed this pass — §182 registered ERASURE-MON-E-001 in §79.4 (2026-07-06)** |
+
+### §183.10 Privacy Floor
+
+AL-C1-02 routing rule and all §183 artefacts enforce the §79.6 FORM privacy floor:
+
+- `system.cron_job_stale` DEC-030 payload for `c1-erasure-sla-monitor` contains: `job_name` (string), `schedule` (cron string), `last_successful_run` (ISO 8601 UTC), `hours_since_last_run` (decimal), `freshness_window_hours` (integer). **No `dsar_request_id`, `user_id`, email, name, or GDPR Art. 9 data.**
+- PagerDuty P1 alert summary (§183.3) contains no PII — only job name, job number, and runbook reference.
+- Slack `#security-alerts` HIGH message contains no PII — only job name, alert ID, and runbook reference.
+- PD-ERASURE-E-001 JSON artefact contains routing configuration metadata and test result flags only — no erasure request data.
+- HR access to all `compliance/evidence/erasure/` R2 artefacts is prohibited by bucket access controls (read/write: devops-lead + compliance-officer; Vanta read: `r2:vanta-sync`; `r2:form-api` REVOKED).
+
+---
+
+*v4.9.0 (2026-07-06): §183 — AL-C1-02 PagerDuty Routing Rule Deployment Spec (CC7.2/CC4.1/P5.1 · R-43.11 item 2). Pre-stages the deployment specification for the sole remaining open P0/M6 obligation in the R-43 implementation checklist — the missing `form-alert-relay` routing rule for `system.cron_job_stale` events from `c1-erasure-sla-monitor` (job 11). §183.1 background: without AL-C1-02, job 11 staleness emits `system.cron_job_stale` into the HMAC audit chain but PagerDuty P1 does not fire — compliance-officer receives no page during the Art. 17 day-33 monitoring blind spot; complements AL-C1-01 (runs-and-finds-breach path, OBSERVABILITY §6.2) by covering the orthogonal stale-job path. §183.2 AL-C1-02 formal definition: trigger = `system.cron_job_stale` + `job_name = 'c1-erasure-sla-monitor'`; PagerDuty `form-compliance` P1 (severity `warning`); dedup `c1-erasure-sla-monitor-stale`; auto-resolve false (R-43-C2/C3 scope queries required before resolution); Slack `#security-alerts` HIGH; CC7.2/CC4.1/P5.1. §183.3 `form-alert-relay` TypeScript routing rule: `cron_stale_routing` table entry with exact field values; sort alphabetically before AL-CI-07 (`ci_telemetry_daily_sync`); `PAGERDUTY_FORM_COMPLIANCE_ROUTING_KEY` secret prerequisite. §183.4 PagerDuty `form-compliance` service configuration: T+0/T+3/T+8/T+15 escalation tiers; auto-resolution disabled; GDPR Art. 17 resolution annotation for service description. §183.5 integration test AL-C1-02-INT-01: 8-step procedure (unschedule job 11, synthetic POST to form-alert-relay, confirm PagerDuty API v2 POST with correct dedup key and severity, confirm P1 incident on form-compliance with auto-resolve false, confirm Slack HIGH, re-enable job 11, confirm no auto-resolve, record PD-ERASURE-E-001); pass criteria. §183.6 PD-ERASURE-E-001 artefact: CC7.2/CC4.1/P5.1; one-time on deployment; 7yr WORM; R2 path `compliance/evidence/erasure/pd-erasure-e-001-deployment.json`; `form_api` REVOKED; 18-field JSON schema (artefact_id, alert_id, soc2_criteria, deployment_date, integration_test_id, integration_test_run_type, integration_test_date, pagerduty_incident_id, pagerduty_service, dedup_key_confirmed, severity_confirmed, auto_resolve_confirmed, cloudflare_worker_log_ref, slack_notification_confirmed, result, collected_by, collected_at, upload_note). §183.7 §79.4 row 159: PD-ERASURE-E-001; CC7.2/CC4.1/P5.1; one-time; 7yr WORM; `compliance/evidence/erasure/pd-erasure-e-001-deployment.json`; `form_api` REVOKED; §79.4 count 158→159. §183.8 R-43.11 checklist: item 2 🔴→🟡 Pre-staged (§183.3 + §183.5 + §183.6; close on production deployment + INT-01 pass); items 1/3/4 remain Done. §183.9 six cross-reference obligations: two 🟡 Pre-staged (deploy AL-C1-02; run INT-01); two 🔴 Pending (upload PD-ERASURE-E-001; register AL-C1-02 in OBSERVABILITY §6.2); one 🔴 Pending (patch R-43.11 item 2 [x] after INT-01); one 🟢 Closed this pass (patch R-43.11 item 4 [x] Done — §182 2026-07-06). §183.10 privacy floor: `system.cron_job_stale` payload contains job metadata only; PagerDuty summary and Slack message contain no PII; PD-ERASURE-E-001 contains routing configuration metadata only; HR access to `compliance/evidence/erasure/` prohibited. Document header v4.8.0 → v4.9.0. Owner: devops-lead + compliance-officer. Review: security-engineer.*

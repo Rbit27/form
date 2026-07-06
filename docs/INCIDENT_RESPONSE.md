@@ -16433,7 +16433,7 @@ Quarterly export of all `cron.job_run_details` for job 11: run count, failure co
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 3 | Update `docs/OBSERVABILITY.md §12.6` job 11 `c1-erasure-sla-monitor` registry entry: add `INCIDENT_RESPONSE R-43 (job 11 stale recovery runbook — §R-43.5)` to the stale-consequence cross-ref column. | devops-lead | **P1** | M7 | [x] *(completed in OBSERVABILITY.md §12.6 v5.14.4 patch, 2026-07-03)* |
-| 4 | Register ERASURE-MON-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table: quarterly pg_cron job 11 health report (run count, failure count, stale-window activations, `danger_window_requests_at_declared` and `breach_requests_at_declared` for any R-43 activations); zero-activation quarters filed as affirmative attestation; `form_api` REVOKED from evidence path; SOC 2 P5.1/C1.2/CC4.1/CC7.2; retention 7yr; path: `compliance/evidence/erasure/erasure-mon-e-001-YYYY-QN.csv`. | compliance-officer | **P1** | M11 | [ ] |
+| 4 | Register ERASURE-MON-E-001 evidence artefact in `docs/SOC2_READINESS.md §79.4` master evidence table: quarterly pg_cron job 11 health report (run count, failure count, stale-window activations, `danger_window_requests_at_declared` and `breach_requests_at_declared` for any R-43 activations); zero-activation quarters filed as affirmative attestation; `form_api` REVOKED from evidence path; SOC 2 P5.1/C1.2/CC4.1/CC7.2; retention 7yr; path: `compliance/evidence/erasure/erasure-mon-e-001-YYYY-QN.csv`. | compliance-officer | **P1** | M11 | [x] *(SOC2_READINESS.md §182, 2026-07-06 — §79.4 row 158; P5.1/C1.2/CC4.1/CC7.2; quarterly from M6; 7yr WORM; `form_api` REVOKED)* |
 
 ---
 
