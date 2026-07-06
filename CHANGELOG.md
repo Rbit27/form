@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [13.39.1] — 2026-07-06
+
+### Changed
+- `docs/SOC2_READINESS.md §181` — CC-PKJWT-01/02/03 Weekly Schedule Entry & First-Run Pre-Staging (CC6.6/CC7.2/CC7.3 · §174 Compensating Controls). Closes §174.10 item 4 (overdue: calendar scheduling for weekly Monday 09:00 UTC CC-PKJWT-01/02/03 evidence sessions). Canonical schedule entry (title, recurrence, owners, OOO grace window, M6 retirement trigger). Six-step combined first-run procedure for 2026-07-07: lookback window, CC-PKJWT-01 SQL (incident_rotated scan + IC declared/closed pair check), CC-PKJWT-02 JWKS endpoint probe, CC-PKJWT-03 IC SLA CTE, R2 upload via sign-evidence.sh, security-sync thread confirmation. Three pre-staged JSON schemas for 2026-07-07 evidence files (nil-activation format; `run_type: "first_run"`). Expected first-run state: nil-activation valid as auditor-acceptable baseline. §174.10 item 4 🔴→🟢 Done; item 5 🔴→🟡 Pre-staged (close 2026-07-07). §174.11 cross-reference updated. Document header v4.6.0 → v4.7.0. Owner: compliance-officer + security-engineer.
+- `VERSION` — 13.39.0 → 13.39.1.
+
 ## [13.39.0] — 2026-07-06
 
 ### Added

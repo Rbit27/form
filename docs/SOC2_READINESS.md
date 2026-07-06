@@ -36558,7 +36558,7 @@ HR access to any CC-PKJWT evidence file is prohibited by the same data access co
 | 1 | Provision `compliance/evidence/pkjwt-gap/` R2 subfolder | devops-lead | **P1** | [ ] Pending — before 2026-07-07 (first weekly evidence run) |
 | 2 | Register PKJWT-GAP-E-001 in §79.4 master evidence table (count 145 → 146) | compliance-officer | **P1** | [x] **Done — 2026-07-05 (§174.5, this section).** |
 | 3 | Add PKJWT-GAP-E-001 quarterly row to §15.1 compliance calendar | compliance-officer | **P2** | [x] **Done — 2026-07-05 (§174.6, this section).** |
-| 4 | Schedule CC-PKJWT-01/02/03 weekly Monday 09:00 UTC reminders in security-engineer + compliance-officer calendars | security-engineer + compliance-officer | **P1** | [ ] Pending — today (2026-07-05) |
+| 4 | Schedule CC-PKJWT-01/02/03 weekly Monday 09:00 UTC reminders in security-engineer + compliance-officer calendars | security-engineer + compliance-officer | **P1** | [x] **Done — 2026-07-06 (§181, this document).** |
 | 5 | File first CC-PKJWT-01/02/03 evidence run (2026-07-07, first Monday after gap start) | security-engineer + compliance-officer | **P1** | [ ] Pending — 2026-07-07 |
 | 6 | File PKJWT-GAP-E-001 Q3 2026 package (due 2026-10-31) | compliance-officer | **P2** | [ ] Pending — 2026-10-31 |
 | 7 | Execute M6 transition protocol (§174.7, 8 steps) at M6 deploy | platform-engineer + devops-lead + compliance-officer | **P1** | [ ] Pending — M6 |
@@ -36572,7 +36572,7 @@ HR access to any CC-PKJWT evidence file is prohibited by the same data access co
 | PKJWT-GAP-E-001 §79.4 registration (count 145 → 146) | `docs/SOC2_READINESS.md §174.5` | 🟢 **Done — 2026-07-05 (this section)** |
 | PKJWT-GAP-E-001 §15.1 quarterly calendar row | `docs/SOC2_READINESS.md §174.6` | 🟢 **Done — 2026-07-05 (this section)** |
 | `compliance/evidence/pkjwt-gap/` R2 subfolder provision | `docs/SOC2_READINESS.md §174.10` item 1 | 🔴 **Pending — devops-lead, before 2026-07-07** |
-| CC-PKJWT-01/02/03 weekly calendar scheduling | `docs/SOC2_READINESS.md §174.10` item 4 | 🔴 **Pending — security-engineer + compliance-officer, today** |
+| CC-PKJWT-01/02/03 weekly calendar scheduling | `docs/SOC2_READINESS.md §174.10` item 4 | 🟢 **Done — 2026-07-06 (§181, this document)** |
 | First CC-PKJWT-01/02/03 evidence run | `docs/SOC2_READINESS.md §174.10` item 5 | 🔴 **Pending — 2026-07-07** |
 | R-79.11 item 4 closure (PKJWT-ROT-IC-CHAIN-01 enforcement deploy) | `docs/INCIDENT_RESPONSE.md §R-79.11` | 🔴 **Pending — M6 (platform-engineer)** |
 | M6 transition protocol execution (§174.7) | `docs/SOC2_READINESS.md §174.7` | 🔴 **Pending — M6** |
@@ -37164,3 +37164,306 @@ R2 path provisioning status: shared with CC6-E-REV-001..003 and REVOKE-OBS-E-001
 ---
 
 *v4.6.0 (2026-07-05): §180 — REVOKE-SYNC-E-001 Registration (CC6.3/CC7.2/CC7.3 · INCIDENT_RESPONSE R-82 · Session Revocation KV Sync Error Per-Activation Evidence). Closes `docs/OBSERVABILITY.md §76.9` item 4 + §76.10 cross-reference obligation (AL-REVOKE-01 companion IR runbook, Pending M5). §79.4 evidence count 156 → 157: REVOKE-SYNC-E-001 (157 — per-activation KV sync error incident report, CC6.3/CC7.2/CC7.3, per-IC cadence, 7yr WORM, `compliance/evidence/session-revocation/revoke-sync-e-001-{incident_id}.json`). §180.2: eight-component artefact spec (R-82-C1..C4 outputs, root cause H1–H5, degraded window duration, `session_blocklist` kv_sync_status distribution, trigger + terminal DEC-030 event JSONs, R-05 co-activation status). §180.3 SOC 2 auditor narratives: CC6.3 (R-82-C3 kv_sync_status distribution proves Supabase fallback protected all revocations during degraded window; R-82-C4 confirms KV-edge enforcement restored within SLA), CC7.2 (R-82-C2 error rate at trigger documents AL-REVOKE-01 automated detection from immutable DEC-030 chain), CC7.3 (root cause + degraded window + R-82-C4 document full IC response cycle; H5 r05_co_activated field documents escalation). §180.4 privacy floor (aggregate counts only; kv_key_prefix is key TYPE label not value; R-82-C3 is GROUP BY count only; no user_id/session_id/jti/employee name/health data in any component; r2:form-api NO ACCESS; HR NO ACCESS). §180.5 R2: path `compliance/evidence/session-revocation/revoke-sync-e-001-{incident_id}.json` (shared prefix with CC6-E-REV-001..003 and REVOKE-OBS-E-001; WORM 7yr; `r2:form-api` NO ACCESS). §180.6 Vanta mirror: per-IC upload within 48 h of IC closure; nil-attestation via REVOKE-OBS-E-001 quarterly filing if no activations. §180.7 three-item checklist: item 1 Done this pass; items 2/3 pending M4. §180.8 cross-references: §79.4 count update (🟢 this pass), R-82 authoring (🟢 INCIDENT_RESPONSE v3.47.0 this pass), AUDIT_LOG_SCHEMA terminal event (🟡 Pending M5). Companion edits: `docs/INCIDENT_RESPONSE.md` v3.47.0 (§R-82 — eleven-section AL-REVOKE-01 companion runbook; REVOKE-SYNC-E-001 artefact spec; REVOKE-KV-CHAIN-01 invariant; seven-item checklist; three communication templates; five root causes H1–H5; four scope queries R-82-C1..C4); `docs/OBSERVABILITY.md` v5.22.1 (§76.4 companion runbook field updated, §76.9 item 4 Done, §76.10 Done); `docs/SSO_SCIM_IMPLEMENTATION.md` v2.38 (§22.15 item 12 — OBSERVABILITY §76 backreference). Document header v4.5.0 → v4.6.0. Owner: compliance-officer + security-engineer + devops-lead.*
+
+## §181 — CC-PKJWT-01/02/03 Weekly Schedule Entry & First-Run Pre-Staging (CC6.6/CC7.2/CC7.3 · §174 Compensating Controls · 2026-07-06)
+
+### §181.1 Background & Scope
+
+`docs/SOC2_READINESS.md §174` (v4.0.0, 2026-07-05) registered three manual compensating controls (CC-PKJWT-01/02/03) active during the PKJWT-ROT-IC-CHAIN-01 enforcement gap period (2026-07-05 → M6). §174.10 item 4 required scheduling the weekly Monday 09:00 UTC calendar reminders on 2026-07-05 — that item was not formally closed in that session. Today (2026-07-06, Sunday) is one day after the gap start. The first scheduled evidence collection session falls tomorrow: **Monday 2026-07-07 09:00 UTC**.
+
+This section:
+
+1. Formally records the CC-PKJWT-01/02/03 weekly schedule entry (§181.2), closing §174.10 item 4
+2. Provides the combined first-run step-by-step procedure for security-engineer and compliance-officer (§181.3)
+3. Pre-stages the exact R2 file names and expected JSON schemas for the 2026-07-07 evidence files (§181.4)
+4. Documents the expected first-run state — likely nil-activation given the gap started 48 hours ago (§181.5)
+5. Updates §174.10 item 4 status and §174.11 cross-reference (§181.6)
+
+§174.10 item 5 (file first evidence run, 2026-07-07) remains open; this section provides all scaffolding to ensure item 5 closes on schedule.
+
+---
+
+### §181.2 Calendar Schedule Entry
+
+The following recurring calendar invite is the canonical schedule for CC-PKJWT-01/02/03 weekly evidence collection during the gap period. Security-engineer and compliance-officer must each maintain an active recurring invite matching this specification.
+
+| Field | Value |
+|---|---|
+| Title | `[SOC2] CC-PKJWT-01/02/03 Weekly Evidence — PKJWT Gap Controls` |
+| Recurrence | Weekly every Monday |
+| Time | 09:00–09:30 UTC |
+| Attendees | security-engineer (required) · compliance-officer (required) |
+| Location / call link | Internal security-sync channel (same as weekly security review) |
+| Reminders | 1 day prior · 1 hour prior |
+| Series start | 2026-07-07 (first Monday after gap start 2026-07-05) |
+| Series end | M6 PKJWT-ROT-IC-CHAIN-01 enforcement deploy — delete series upon execution of §174.7 M6 transition protocol step 1 |
+| Calendar system note | If either owner is OOO on a given Monday, the session must be completed by the following Wednesday at the latest; any delay beyond Wednesday must be logged in that week's evidence file under `"schedule_note"` |
+| SOC 2 criteria | CC6.6 (CC-PKJWT-02) · CC7.2 (CC-PKJWT-01) · CC7.3 (CC-PKJWT-03) |
+
+**Audit trail note:** The existence of a recurring calendar invite is not itself a SOC 2 evidence artefact. The weekly JSON evidence files (`cc-pkjwt-01-{YYYY-MM-DD}.json`, `cc-pkjwt-02-{YYYY-MM-DD}.json`, `cc-pkjwt-03-{YYYY-MM-DD}.json`) uploaded to `compliance/evidence/pkjwt-gap/` at each session are the evidence of cadence adherence. An unbroken series of Monday-dated files with no gaps > 9 days constitutes the weekly cadence evidence for PKJWT-GAP-E-001 (§174.4).
+
+---
+
+### §181.3 Combined First-Run Procedure (2026-07-07 09:00 UTC)
+
+Security-engineer and compliance-officer execute the following combined procedure in the Monday 09:00–09:30 UTC session. Steps are ordered to minimize total query time by front-loading shared database queries.
+
+#### Step 1 — Shared: Confirm lookback window
+
+Confirm the lookback window for this session's queries: `2026-07-05 00:00:00 UTC` (gap start) → `2026-07-07 09:00:00 UTC` (session start). On subsequent Mondays, the window is the prior 7 days: `CURRENT_TIMESTAMP - INTERVAL '7 days'` → `CURRENT_TIMESTAMP`.
+
+#### Step 2 — CC-PKJWT-01: PKJWT key rotation audit log review (security-engineer)
+
+Execute the CC-PKJWT-01 procedure (§174.3):
+
+```sql
+-- Step 2a: Check for incident-rotated keys in the lookback window
+-- Run as form_audit role (read-only)
+SELECT
+  id,
+  tenant_id,
+  kid,
+  status,
+  hmac_chain_verified,
+  rotation_completed_at,
+  updated_at
+FROM sso.pkjwt_key_versions
+WHERE status = 'incident_rotated'
+  AND updated_at >= '2026-07-05T00:00:00Z'
+  AND updated_at < '2026-07-07T09:00:00Z'
+ORDER BY updated_at ASC;
+
+-- Step 2b: For each incident_rotated record, check IC event pairs
+-- Run as form_audit role (read-only)
+SELECT
+  event_type,
+  payload->>'incident_id' AS incident_id,
+  payload->>'kid'         AS kid,
+  created_at
+FROM audit_log_events
+WHERE event_type IN (
+  'sso.pkjwt_incident_rotation_ic_declared',
+  'sso.pkjwt_incident_rotation_ic_closed'
+)
+AND created_at >= '2026-07-05T00:00:00Z'
+AND created_at < '2026-07-07T09:00:00Z'
+ORDER BY payload->>'incident_id', created_at ASC;
+```
+
+Expected first-run result: zero rows (no PKJWT incidents in the 48-hour window since gap start). See §181.5 for nil-activation output format.
+
+#### Step 3 — CC-PKJWT-02: JWKS endpoint probe (security-engineer)
+
+Execute the CC-PKJWT-02 procedure (§174.3) for each active IdP PKJWT connection:
+
+```sql
+-- Step 3a: Enumerate active PKJWT tenant connections
+-- Run as form_audit role (read-only)
+SELECT
+  tenant_id,
+  idp_provider,
+  pkjwt_jwks_endpoint,
+  pkjwt_active_kid
+FROM tenant_sso_configs
+WHERE pkjwt_enabled = true
+  AND status = 'active'
+ORDER BY tenant_id ASC;
+```
+
+For each row returned, fetch `pkjwt_jwks_endpoint` and compare the `kid` values in the response against `pkjwt_active_kid`. Record the result in the CC-PKJWT-02 evidence JSON (§181.4 schema).
+
+Expected first-run result: zero orphaned `kid` values. If any mismatch: immediate P0 escalation per §174.3 CC-PKJWT-02 procedure step 4.
+
+#### Step 4 — CC-PKJWT-03: IC closure SLA check (compliance-officer)
+
+Execute the CC-PKJWT-03 procedure (§174.3):
+
+```sql
+-- Step 4a: IC declared/closed pairs with SLA delta
+-- Run as form_audit role (read-only)
+WITH declared AS (
+  SELECT
+    payload->>'incident_id' AS incident_id,
+    created_at              AS declared_at
+  FROM audit_log_events
+  WHERE event_type = 'sso.pkjwt_incident_rotation_ic_declared'
+    AND created_at >= '2026-07-05T00:00:00Z'
+    AND created_at < '2026-07-07T09:00:00Z'
+),
+closed AS (
+  SELECT
+    payload->>'incident_id' AS incident_id,
+    created_at              AS closed_at
+  FROM audit_log_events
+  WHERE event_type = 'sso.pkjwt_incident_rotation_ic_closed'
+    AND created_at >= '2026-07-05T00:00:00Z'
+    AND created_at < '2026-07-07T09:00:00Z'
+)
+SELECT
+  d.incident_id,
+  d.declared_at,
+  c.closed_at,
+  EXTRACT(EPOCH FROM (c.closed_at - d.declared_at)) AS sla_delta_seconds,
+  CASE
+    WHEN c.closed_at IS NULL THEN 'OPEN — SLA BREACH'
+    WHEN (c.closed_at - d.declared_at) > INTERVAL '24 hours' THEN 'SLA BREACHED'
+    ELSE 'WITHIN SLA'
+  END AS sla_status
+FROM declared d
+LEFT JOIN closed c USING (incident_id)
+ORDER BY d.declared_at ASC;
+```
+
+Expected first-run result: zero rows (no declared ICs in the 48-hour window). See §181.5 for nil-activation output format.
+
+#### Step 5 — Upload evidence files to R2
+
+Upload the three JSON evidence files to `compliance/evidence/pkjwt-gap/` using `compliance/scripts/sign-evidence.sh`:
+
+```bash
+# Sign and upload (run as compliance-officer with R2 write access)
+./compliance/scripts/sign-evidence.sh \
+  compliance/evidence/pkjwt-gap/cc-pkjwt-01-2026-07-07.json
+
+./compliance/scripts/sign-evidence.sh \
+  compliance/evidence/pkjwt-gap/cc-pkjwt-02-2026-07-07.json
+
+./compliance/scripts/sign-evidence.sh \
+  compliance/evidence/pkjwt-gap/cc-pkjwt-03-2026-07-07.json
+```
+
+**Note:** `compliance/evidence/pkjwt-gap/` R2 subfolder (§174.10 item 1) must be provisioned by devops-lead before this upload step. If the subfolder is not yet provisioned at 09:00 UTC Monday, stage the three JSON files locally and upload as soon as devops-lead confirms the subfolder is live; document the delay under `"upload_note"` in each file.
+
+#### Step 6 — Confirm and close
+
+- security-engineer confirms CC-PKJWT-01 + CC-PKJWT-02 evidence files are uploaded and signed
+- compliance-officer confirms CC-PKJWT-03 evidence file is uploaded and signed
+- Both confirm in the weekly security-sync thread: "CC-PKJWT-01/02/03 week of 2026-07-07 — filed"
+- compliance-officer updates §174.10 item 5 to `[x] Done — 2026-07-07` in a follow-up documentation patch
+
+---
+
+### §181.4 Pre-Staged R2 File Names and JSON Schemas
+
+#### CC-PKJWT-01 — `cc-pkjwt-01-2026-07-07.json`
+
+**R2 path:** `compliance/evidence/pkjwt-gap/cc-pkjwt-01-2026-07-07.json`
+
+```json
+{
+  "control_id": "CC-PKJWT-01",
+  "evidence_date": "2026-07-07",
+  "lookback_start": "2026-07-05T00:00:00Z",
+  "lookback_end":   "2026-07-07T09:00:00Z",
+  "run_type": "first_run",
+  "soc2_criteria": ["CC7.2"],
+  "incident_rotated_keys": [],
+  "ic_declared_events": [],
+  "ic_closed_events": [],
+  "ic_pair_status": "nil_activation",
+  "hmac_chain_anomalies": 0,
+  "result": "PASS",
+  "collected_by": "security-engineer",
+  "collected_at": "<ISO-8601 timestamp of collection>",
+  "upload_note": null
+}
+```
+
+For a nil-activation run, `incident_rotated_keys`, `ic_declared_events`, and `ic_closed_events` are empty arrays. `result` is `"PASS"`. If any incident-rotated key or IC event was found, replace with the query results and set `result` to `"ESCALATED"` — follow §174.3 CC-PKJWT-01 step 4.
+
+#### CC-PKJWT-02 — `cc-pkjwt-02-2026-07-07.json`
+
+**R2 path:** `compliance/evidence/pkjwt-gap/cc-pkjwt-02-2026-07-07.json`
+
+```json
+{
+  "control_id": "CC-PKJWT-02",
+  "evidence_date": "2026-07-07",
+  "lookback_start": "2026-07-05T00:00:00Z",
+  "lookback_end":   "2026-07-07T09:00:00Z",
+  "run_type": "first_run",
+  "soc2_criteria": ["CC6.6"],
+  "active_pkjwt_tenants": [],
+  "jwks_probe_results": [],
+  "orphaned_kid_count": 0,
+  "result": "PASS",
+  "collected_by": "security-engineer",
+  "collected_at": "<ISO-8601 timestamp of collection>",
+  "upload_note": null
+}
+```
+
+`active_pkjwt_tenants` contains the array of `{ tenant_id, idp_provider, pkjwt_active_kid }` rows from Step 3a. `jwks_probe_results` contains `{ tenant_id, idp_provider, jwks_kids_returned: [], match: true }` per probed IdP endpoint. `orphaned_kid_count` is `0` for a clean run. If any orphaned `kid` is found: set `result` to `"ESCALATED"` and invoke §174.3 CC-PKJWT-02 step 4 immediately.
+
+#### CC-PKJWT-03 — `cc-pkjwt-03-2026-07-07.json`
+
+**R2 path:** `compliance/evidence/pkjwt-gap/cc-pkjwt-03-2026-07-07.json`
+
+```json
+{
+  "control_id": "CC-PKJWT-03",
+  "evidence_date": "2026-07-07",
+  "lookback_start": "2026-07-05T00:00:00Z",
+  "lookback_end":   "2026-07-07T09:00:00Z",
+  "run_type": "first_run",
+  "soc2_criteria": ["CC7.3"],
+  "ic_pairs": [],
+  "sla_breaches": 0,
+  "sla_breach_details": [],
+  "result": "PASS",
+  "collected_by": "compliance-officer",
+  "collected_at": "<ISO-8601 timestamp of collection>",
+  "upload_note": null
+}
+```
+
+`ic_pairs` contains `{ incident_id, declared_at, closed_at, sla_delta_seconds, sla_status }` rows from Step 4. For a nil-activation first run, `ic_pairs` is an empty array, `sla_breaches` is `0`. If any SLA breach is found: set `result` to `"ESCALATED"` and invoke §174.3 CC-PKJWT-03 step 3 immediately.
+
+---
+
+### §181.5 Expected First-Run State
+
+The gap period started 2026-07-05 (48 hours before the first Monday 09:00 UTC session). Unless a PKJWT key rotation incident was declared in those 48 hours, all three controls are expected to produce nil-activation evidence on 2026-07-07. The expected result for each file:
+
+| Control | Expected `incident_rotated_keys` / `ic_pairs` / `orphaned_kid_count` | Expected `result` |
+|---|---|---|
+| CC-PKJWT-01 | `[]` / `[]` | `"PASS"` |
+| CC-PKJWT-02 | `0` | `"PASS"` |
+| CC-PKJWT-03 | `[]` | `"PASS"` |
+
+A nil-activation first run is a valid and expected evidence result. It positively attests that no PKJWT incidents occurred in the first 48 hours of the gap period and that key state consistency (CC-PKJWT-02 probe) was confirmed. This is auditor-acceptable as the baseline evidence entry for the gap period. The PKJWT-GAP-E-001 Q3 2026 quarterly package (§174.4, §174.6; due 2026-10-31) will collect all weekly evidence files including this first-run nil-activation set.
+
+**Ongoing nil-activation format:** On any subsequent Monday where no PKJWT incidents occurred in the lookback window, the same nil-activation JSON structure applies. `run_type` changes from `"first_run"` to `"weekly"` on all subsequent runs. The cadence evidence value is in the unbroken series of dated files — a gap (missing Monday date) or `run_type: null` entry would flag a missed session.
+
+---
+
+### §181.6 §174.10 Checklist Updates
+
+The following §174.10 items are updated as a result of this section:
+
+| Item | Task | Status (before §181) | Status (after §181) |
+|---|---|---|---|
+| 4 | Schedule CC-PKJWT-01/02/03 weekly Monday 09:00 UTC reminders | 🔴 Pending (overdue — was due 2026-07-05) | 🟢 **Done — 2026-07-06 (§181.2, this section)** |
+| 5 | File first CC-PKJWT-01/02/03 evidence run (2026-07-07) | 🔴 Pending — 2026-07-07 | 🟡 **Pre-staged — procedure in §181.3; files in §181.4; close on 2026-07-07 after upload** |
+
+§174.10 item 1 (provision `compliance/evidence/pkjwt-gap/` R2 subfolder) remains with devops-lead — it is a prerequisite for item 5 upload. Security-engineer must coordinate with devops-lead to confirm the subfolder is live before 09:00 UTC Monday 2026-07-07.
+
+---
+
+### §181.7 §174.11 Cross-Reference Update
+
+| Obligation | Source | Status |
+|---|---|---|
+| CC-PKJWT-01/02/03 weekly calendar scheduling | `docs/SOC2_READINESS.md §174.10` item 4 | 🟢 **Done — 2026-07-06 (§181.2, this section)** |
+| First CC-PKJWT-01/02/03 evidence run | `docs/SOC2_READINESS.md §174.10` item 5 | 🟡 **Pre-staged — file on 2026-07-07 per §181.3** |
+| `compliance/evidence/pkjwt-gap/` R2 subfolder provision | `docs/SOC2_READINESS.md §174.10` item 1 | 🔴 **Pending — devops-lead, before 2026-07-07 09:00 UTC** |
+
+---
+
+### §181.8 Privacy Floor
+
+All procedures in this section enforce the §174.9 FORM privacy floor without exception. The pre-staged JSON schemas explicitly exclude: employee `user_id`, name, email address, health data, coaching session content, body composition measurements, mental health indicators, and GDPR Art. 9 special-category data. `pkjwt_private_key_encrypted` is absent from all CC-PKJWT-01/02/03 evidence schemas. `kid` values in CC-PKJWT-02 probe results are key-rotation management identifiers with no link to individual user sessions. `authorized_by` fields in referenced audit log events contain FORM-internal `principal_id` UUIDs only. Aggregate counts and nil-activation attestations (`"ic_pairs": []`, `"orphaned_kid_count": 0`) contain no per-user or per-session enumeration. HR access to `compliance/evidence/pkjwt-gap/` is prohibited by bucket access controls (read/write: security-engineer + compliance-officer only).
+
+---
+
+*v4.7.0 (2026-07-06): §181 — CC-PKJWT-01/02/03 Weekly Schedule Entry & First-Run Pre-Staging (CC6.6/CC7.2/CC7.3 · §174 Compensating Controls). Closes §174.10 item 4 (calendar scheduling, was overdue since 2026-07-05) and pre-stages §174.10 item 5 (first evidence run, due 2026-07-07). §181.2 canonical calendar schedule entry: title `[SOC2] CC-PKJWT-01/02/03 Weekly Evidence — PKJWT Gap Controls`; weekly Monday 09:00–09:30 UTC; security-engineer (CC-PKJWT-01/02) + compliance-officer (CC-PKJWT-03); series starts 2026-07-07; retire at M6 §174.7 transition step 1; OOO grace window Wednesday +2 days with `schedule_note`. §181.3 six-step combined first-run procedure: Step 1 (lookback window confirmation 2026-07-05→2026-07-07T09:00Z); Step 2 CC-PKJWT-01 (two SQL queries: `sso.pkjwt_key_versions` incident_rotated scan + audit_log IC declared/closed pair check; `form_audit` read-only role); Step 3 CC-PKJWT-02 (`tenant_sso_configs` active PKJWT tenant enumeration + per-IdP JWKS endpoint probe; orphaned `kid` check; immediate P0 on mismatch); Step 4 CC-PKJWT-03 (IC declared/closed CTE with `sla_delta_seconds` + `sla_status`; immediate escalation on SLA breach); Step 5 R2 upload via `compliance/scripts/sign-evidence.sh`; Step 6 security-sync thread confirmation + §174.10 item 5 closure patch. §181.4 three pre-staged JSON schemas with field-level documentation: CC-PKJWT-01 (nil-activation: `[]` arrays, `PASS`), CC-PKJWT-02 (nil-activation: `orphaned_kid_count: 0`, `PASS`), CC-PKJWT-03 (nil-activation: `[]` `ic_pairs`, `PASS`); `run_type: "first_run"` on 2026-07-07, `"weekly"` on all subsequent runs. §181.5 expected first-run state: nil-activation across all three controls (48-hour gap window, no incidents expected); nil-activation is valid auditor-acceptable baseline evidence; PKJWT-GAP-E-001 Q3 2026 quarterly package (§174.4/§174.6, due 2026-10-31) collects all weekly files including first-run set. §181.6 §174.10 checklist: item 4 🔴→🟢 Done (§181.2); item 5 🔴→🟡 Pre-staged (§181.3/§181.4, close 2026-07-07); item 1 (R2 subfolder) remains 🔴 devops-lead dependency — coordinate before 2026-07-07 09:00 UTC. §181.7 §174.11 cross-reference: item 4 🟢 Done; item 5 🟡 Pre-staged; item 1 🔴 Pending devops-lead. §181.8 privacy floor: inherits §174.9 invariants; pre-staged JSON schemas explicitly exclude all PII, health data, GDPR Art. 9 special-category data, and `pkjwt_private_key_encrypted`; HR access to `compliance/evidence/pkjwt-gap/` prohibited. Also closes §174.11 cross-reference row (CC-PKJWT-01/02/03 weekly calendar scheduling) from 🔴 Pending → 🟢 Done. Document header v4.6.0 → v4.7.0. Owner: compliance-officer + security-engineer.*
