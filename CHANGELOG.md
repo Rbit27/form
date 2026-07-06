@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.38.0] — 2026-07-06
+
+### Added
+- `content/post-3267-macrocycle-operational-annual-cycle-thinking.md` — Series «Довгострокове прогресування: 2–5-річний горизонт» 2/10. Topic: macrocycle as an operational concept (not a theoretical one) — three models for intermediate/advanced athletes (linear periodization, block periodization per Bompa/Issurin, undulating), four reasons most self-coached athletes never reach macrocycle-level thinking, practical five-step starter framework, cumulative effects of GPP→SPP→peak arc. clinical-safety NOT_REQUIRED (no food/body-image/pain/clinical-psych). 13-min read.
+- `blog.html` — Card prepended for post-3267.
+- `README.md` — Series 3266–3275 status: in progress 1/10 → 2/10; post-3267 proposed → draft.
+- `STATUS.md` — v13.38.0 entry added.
+
+### Changed
+- `VERSION` — 13.37.1 → 13.38.0.
+
 ## [13.37.1] — 2026-07-05
 
 ### Changed
