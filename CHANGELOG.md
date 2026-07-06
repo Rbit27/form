@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.78.0] — 2026-07-06
+
+### Added
+- `content/post-3293-loss-aversion-training.md` — Серія «Тренувальна психологія self-coached атлета» 3286–3295 · 8/10. «Loss aversion у тренуванні: чому зменшити завжди важче, ніж збільшити». Kahneman & Tversky (1979) Prospect Theory: втрата болить удвічі сильніше за еквівалентний виграш (value function asymmetry). Три прояви у self-coached практиці: (1) небажання деловантажуватись — «ще нормально відчуваю» як раціоналізація loss aversion; (2) sunk cost у програмуванні (Arkes & Blumer 1985 — вже вкладені тижні утримують від скорочення обсягу при несприятливому контексті); (3) асиметрія рішень між «більше» і «менше» — поріг для додавання нижчий, ніж для видалення → програма систематично розбухає. Self-coached атлет особливо вразливий: кожне рішення «прибрати» — власне рішення, не розклад тренера. Референтна точка визначає реакцію: «рекордний тижневий обсяг» vs «необхідний мінімум для суперкомпенсації» — той самий деловантажний тиждень, різна психологічна інтерпретація. Чотири операційні протоколи: pre-commitment (планувати деловантаження до початку блоку — не під час); перефреймування референтної точки («тиждень R — відновлення», не «легкий тиждень»); sunk cost audit раз на мезоцикл («якби починав програму сьогодні — обрав би цей обсяг?»); числові трешхолди для автоматичного скорочення без рішення в реальному часі. Зв'язок із серією: loss aversion замикає кільце confirmation bias (3287) + planning fallacy (3289) + availability heuristic (3290) + ego-protection (3291) + weekly review (3292). clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — картка для post-3293 додана у топ фіду.
+- `blog.html` — картка для post-109 («Мінімальна ефективна доза для тренованого атлета», editorial 101–110 · 9/10) офіційно зареєстрована. Файл post-109-minimum-effective-dose.md існує з v5.69.0, clinical-safety PASS. Bickel et al. (2011), Ralston et al. (2017), Androulakis-Korakakis et al. (2020); MEV/MV/MAV розмежування; операційна цінність MV для self-coached атлета в несприятливих тижнях.
+
+### Changed
+- `README.md` — series 3286–3295 in progress 7/10 → 8/10; editorial 101–110 in progress 8/10 → 9/10; posts 107/108/109 table row statuses updated to registered; version marker v13.74.0 → v13.78.0.
+- `STATUS.md` — current version оновлено до v13.78.0; series 3286–3295 7/10 → 8/10; editorial 101–110 9/10 registered; next: post-3294 (series 3286–3295, 9/10) + post-110 (editorial 101–110, 10/10).
+- `VERSION` — 13.77.0 → 13.78.0.
+
 ## [13.77.0] — 2026-07-06
 
 ### Added
