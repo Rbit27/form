@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v3.3
+# FORM · Audit Log Schema v3.4
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -732,6 +732,71 @@ Eight required components: `r85_c1_output` (RISC hijacking event record — `use
 *CC7.4 — Detection and response to security events:* FORM's response — immediate SESSION_REVOCATION_KV write, Google Directory group cache eviction, forced re-authentication — directly implements the CC7.4 requirement that security events result in defined, executed response actions. CAEP-SLO-01 (< 30 s from SET `iat` to KV write) bounds detection-to-response latency and is verified by CAEP-OBS-E-001 quarterly.
 
 *CC6.3 — Logical access control / timely revocation:* The SESSION_REVOCATION_KV write at T+0 ensures the compromised user's sessions are revoked within CAEP-SLO-01 < 30 s — not after a periodic sync cycle. R-85-C2 provides per-incident confirmation. RISC-HIJACK-E-001 `r85_c2_output` gives auditors a verifiable record that access revocation occurred immediately upon receipt of the compromise signal.
+
+---
+
+### §R-86 SSO Fleet Health Breach IC Lifecycle events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-86 · SOC 2 CC7.2/CC7.3)
+
+> Defined in `docs/INCIDENT_RESPONSE.md R-86` (v3.49.0, 2026-07-06). Two lifecycle events covering the AL-SSO-FLEET-01 fleet-wide SSO health breach IC: an anchor event at IC open and a terminal event at confirmed fleet recovery. Emitted manually by the IC (security-engineer) as Steps 1 and 6 of the R-86 recovery procedure. **SSO-FLEET-CHAIN-01 ordering invariant:** `siem.sso_fleet_health_ic_closed` MUST be preceded by `siem.sso_fleet_health_ic_opened` for the same `incident_id`, which MUST be preceded by `siem.sso_fleet_health_breach` with a `breach_window_epoch` matching the anchor's `breach_window_epoch` within 1 h; the `emit-audit-event` Worker returns HTTP 422 `SSO_FLEET_CHAIN_01_VIOLATION` on inversion (implementation: pending M6, `docs/INCIDENT_RESPONSE.md §R-86.12` item 2). **Trigger:** AL-SSO-FLEET-01 fires when pg_cron job 38 (`sso_fleet_health_check`, `*/5 * * * *`) detects ≥ 3 distinct tenants simultaneously breaching SSO-SLO-01 (login success rate < 99%, ≥ 5 attempts per tenant, 15-min rolling window). **`sla_credit_impact: 'none'` hard invariant (DEC-070):** SSO-SLO-01b is an operational companion signal — it NEVER triggers SLA credits; per-tenant SSO-SLO-01 remains the SLA credit basis. **Cross-ref:** `docs/INCIDENT_RESPONSE.md R-86` (§R-86.8 DEC-030 chain spec; §R-86.9 SSO-FLEET-IC-E-001 SOC 2 evidence artefact); `docs/OBSERVABILITY.md §49.5` (AL-SSO-FLEET-01 trigger alert + companion runbook); `docs/SOC2_READINESS.md §190` (SSO-FLEET-IC-E-001 registered, count 165 → 166). **Closes `docs/INCIDENT_RESPONSE.md §R-86.12` item 1 (P0/M5).**
+
+| Event type | Severity | Retention | Trigger | Payload fields |
+|---|---|---|---|---|
+| `siem.sso_fleet_health_ic_opened` | STANDARD | 7 yr | IC (security-engineer) emits at R-86 Step 1 (IC open), after AL-SSO-FLEET-01 PagerDuty acknowledgement; SSO-FLEET-CHAIN-01 anchor event | `incident_id` (UUID — SSO-FLEET-CHAIN-01 correlation key), `trigger_event_id` (UUID — references `siem.sso_fleet_health_breach` event id), `failing_tenant_count` (non-negative int — count of tenants with login success rate < 99% at IC open; ≥ 3), `fleet_success_rate_pct` (numeric 0–100 — fleet-wide weighted average at IC open), `initial_severity` (enum: `P1` \| `P0`), `breach_window_epoch` (non-negative int — 15min_epoch from triggering `siem.sso_fleet_health_breach` event; correlates to `al-sso-fleet-01-{breach_window_epoch}` PagerDuty dedup key) |
+| `siem.sso_fleet_health_ic_closed` | LOW | 3 yr | IC (security-engineer) emits at R-86 Step 6 after R-86-C4 confirms all tenants recovered to ≥ 99% success rate in ≥ 10-minute window; SSO-FLEET-CHAIN-01 terminal event | `incident_id` (UUID — matches `siem.sso_fleet_health_ic_opened`), `trigger_event_id` (UUID — same as in `ic_opened`), `root_cause` (enum: `H1`–`H5`), `degraded_window_minutes` (non-negative int — time from IC open to R-86-C4 recovery confirmation), `affected_tenant_count` (non-negative int — count of tenants that breached SSO-SLO-01 at peak; ≥ 3), `peak_failure_rate_pct` (numeric 0–100 — peak fleet-wide failure rate during incident), `fleet_recovered_at` (ISO 8601 datetime — confirmed by R-86-C4), `r04_co_activated` (bool), `art33_assessment_required` (bool), `csm_notified` (bool) |
+
+**SSO-FLEET-CHAIN-01 ordering invariant:** `siem.sso_fleet_health_ic_closed` MUST NOT be emitted for a given `incident_id` unless `siem.sso_fleet_health_ic_opened` for the same `incident_id` was committed to the HMAC chain first, AND a `siem.sso_fleet_health_breach` with the matching `breach_window_epoch` was committed within the preceding 1 h. The `emit-audit-event` Worker enforces this at INSERT time — HTTP 422 `SSO_FLEET_CHAIN_01_VIOLATION` on violation. **Implementation:** pending M6 (`emit-audit-event` Worker update — `docs/INCIDENT_RESPONSE.md §R-86.12` item 2). Until M6, the invariant is verified manually: the IC log in `#inc-sso-fleet-{date}` Slack MUST reference the `siem.sso_fleet_health_breach` trigger and `siem.sso_fleet_health_ic_opened` anchor before `siem.sso_fleet_health_ic_closed` is emitted.
+
+**Zod v2 schemas (canonical source: `docs/INCIDENT_RESPONSE.md §R-86.8`):**
+
+```typescript
+import { z } from 'zod';
+
+export const SiemSsoFleetHealthIcOpenedPayload = z.object({
+  incident_id:            z.string().uuid(),
+  trigger_event_id:       z.string().uuid(), // references siem.sso_fleet_health_breach event id
+  failing_tenant_count:   z.number().int().nonneg(),
+  fleet_success_rate_pct: z.number().min(0).max(100),
+  initial_severity:       z.enum(['P1', 'P0']),
+  breach_window_epoch:    z.number().int().nonneg(),
+  // No tenant_id list, no user_id, no email, no health data.
+});
+
+export const SiemSsoFleetHealthIcClosedPayload = z.object({
+  incident_id:               z.string().uuid(),
+  trigger_event_id:          z.string().uuid(),
+  root_cause:                z.enum(['H1', 'H2', 'H3', 'H4', 'H5']),
+  degraded_window_minutes:   z.number().int().nonneg(),
+  affected_tenant_count:     z.number().int().nonneg(),
+  peak_failure_rate_pct:     z.number().min(0).max(100),
+  fleet_recovered_at:        z.string().datetime(),
+  r04_co_activated:          z.boolean(),
+  art33_assessment_required: z.boolean(),
+  csm_notified:              z.boolean(),
+  // No tenant_id list, no user_id, no email, no health data.
+});
+```
+
+**Privacy floor:** Both events contain NO data subject name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data. `trigger_event_id` is a FORM-internal UUID referencing `siem.sso_fleet_health_breach` — `failing_tenant_count` and `fleet_success_rate_pct` are aggregate values in that event, with no `tenant_id` list per DEC-070 invariant. `failing_tenant_count` and `affected_tenant_count` are aggregate integers — no tenant identifiers. Source IPs (if captured during H5 investigation) are stored in CF analytics only — NEVER in any DEC-030 payload field. HR role NEVER has access to `compliance/evidence/sso/`.
+
+**SSO-FLEET-IC-E-001 SOC 2 evidence artefact:**
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | SSO-FLEET-IC-E-001 |
+| **Trigger** | Per R-86 IC activation |
+| **Retention** | 3 years (inherits `siem.sso_fleet_health_breach` HIGH/3yr — trigger event) |
+| **Storage path** | `compliance/evidence/sso/sso-fleet-ic-e-001-{incident_id}.json` |
+| **R2 Object Lock** | WORM (3yr) |
+| **Vanta mirror** | SSO-FLEET-IC-E-001 (per-activation — upload within 48 h of IC closure) |
+| **SOC 2 criteria** | CC7.2 / CC7.3 |
+
+Seven required components: `r86_c1_output` (per-tenant SSO success rates at IC open — `tenant_id` FORM-internal UUID; aggregate counts only; no `user_id`, email), `r86_c2_output` (fleet health time series in 5-min buckets — fleet-wide aggregate; no `tenant_id`), `r86_c3_output` (error type breakdown per failing tenant — `tenant_id` UUID + `error_code` + count; no `user_id`), `r86_c4_output` (post-recovery confirmation — all tenants ≥ 99% in ≥ 10-min window), `trigger_event_json` (`siem.sso_fleet_health_breach` DEC-030 event JSON — `failing_tenant_count` + `fleet_success_rate_pct` aggregate; no `tenant_id` list per DEC-070), `opened_event_json` (`siem.sso_fleet_health_ic_opened` DEC-030 event JSON), `terminal_event_json` (`siem.sso_fleet_health_ic_closed` DEC-030 event JSON).
+
+**SOC 2 auditor narratives:**
+
+*CC7.2 — Monitoring for anomalies:* AL-SSO-FLEET-01 fires on `siem.sso_fleet_health_breach` DEC-030 HMAC-chained events produced by pg_cron job 38 — an automated, continuously-running threshold-triggered monitoring control. SSO-FLEET-IC-E-001 `r86_c1_output` confirms the specific failing tenant count and fleet success rate at IC open. The trigger event and IC artefact share the same HMAC chain — tamper-evident from alert emission to IC closure. `r86_c2_output` demonstrates that monitoring operates in continuous 5-minute buckets, not as a point-in-time snapshot.
+
+*CC7.3 — Incident response procedures:* R-86 provides a documented, severity-classified IC protocol with H1–H5 root cause classification and hypothesis-specific remediation. P0 escalation criteria for H5 ensure adversarial incidents receive an elevated response. SSO-FLEET-IC-E-001 documents the complete response cycle; `degraded_window_minutes` proves the total exposure window; `fleet_recovered_at` proves the recovery point was documented; the SSO-FLEET-CHAIN-01 terminal event provides an immutable on-chain record of formal IC closure after recovery was confirmed.
 
 ---
 

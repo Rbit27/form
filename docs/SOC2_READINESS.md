@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.12.0
+# FORM · SOC 2 Type II Readiness v4.14.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -38060,6 +38060,35 @@ CAEP-OBS-E-001 artefact enforces the §79.6 FORM privacy floor without exception
 |---|---|---|
 | INCIDENT_RESPONSE R-85 §R-85.8 evidence artefact spec | `docs/INCIDENT_RESPONSE.md R-85` (v3.48.0, 2026-07-06) | 🟢 Done — §189 this pass |
 | §R-85.11 item 4 SOC2_READINESS registration | `docs/INCIDENT_RESPONSE.md §R-85.11` | 🟢 Done — §189 this pass |
+
+---
+
+---
+
+## §190 — SSO-FLEET-IC-E-001 Registration (CC7.2 / CC7.3 · INCIDENT_RESPONSE R-86 · SSO Fleet Health Breach Per-Activation IC Evidence)
+
+> Registers the SSO fleet health breach per-activation IC evidence artefact in §79.4 (count 165 → 166). SSO-FLEET-IC-E-001 is the per-activation IC companion to SSO-FLEET-E-001 (§49.7 / §95, quarterly aggregate): where SSO-FLEET-E-001 provides quarterly monitoring-level evidence that AL-SSO-FLEET-01 is operating continuously and that pg_cron job 38 is running on schedule, SSO-FLEET-IC-E-001 documents each individual fleet-wide SSO breach incident response cycle — from the moment the IC acknowledges the PagerDuty alert to the moment fleet recovery is confirmed by R-86-C4. Together, the two artefacts give auditors both the continuous monitoring evidence (quarterly) and the per-incident response evidence (per-activation) required for CC7.2 and CC7.3.
+
+### §190.1 §79.4 Master Evidence Table Entry
+
+| **SSO-FLEET-IC-E-001** | CC7 | CC7.2 / CC7.3 | Per-activation AL-SSO-FLEET-01 fleet SSO health breach IC artefact. Seven components: `r86_c1_output` (per-tenant SSO success rates at IC open — `tenant_id` FORM-internal UUID; aggregate integer counts; no `user_id`, email), `r86_c2_output` (fleet health time series in 5-min buckets — fleet-wide aggregate only; no `tenant_id`), `r86_c3_output` (error type breakdown per failing tenant — `tenant_id` UUID + `error_code` + count; no `user_id`), `r86_c4_output` (post-recovery confirmation showing all tenants ≥ 99% success rate in ≥ 10-minute window following remediation), `trigger_event_json` (`siem.sso_fleet_health_breach` DEC-030 event — `failing_tenant_count` + `fleet_success_rate_pct` aggregate; no `tenant_id` list per DEC-070 invariant), `opened_event_json` (`siem.sso_fleet_health_ic_opened` STANDARD/7yr DEC-030 event), `terminal_event_json` (`siem.sso_fleet_health_ic_closed` LOW/3yr DEC-030 event). | Incident-triggered — filed within 48 h of each R-86 IC closure | 3 years (WORM — inherits `siem.sso_fleet_health_breach` HIGH/3yr trigger event) | `compliance/evidence/sso/sso-fleet-ic-e-001-{incident_id}.json` | SSO-FLEET-IC-E-001 |
+
+**Privacy floor:** SSO-FLEET-IC-E-001 contains NO data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data. `tenant_id` values in `r86_c1_output` and `r86_c3_output` are FORM-internal UUIDs — never customer email addresses, Okta tenant domains, Entra Directory IDs, or any other externally-linkable identifier. `failing_tenant_count` and `affected_tenant_count` in the DEC-030 events are aggregate integers with no tenant identifiers. `peak_failure_rate_pct` is a numeric fleet-wide average. Source IPs captured during H5 (credential stuffing) investigation are stored in CF analytics only — never in DEC-030 payloads or SSO-FLEET-IC-E-001 components. HR role has NO access to `compliance/evidence/sso/`.
+
+**Auditor narrative (CC7.2 — monitoring for anomalies):** AL-SSO-FLEET-01 fires on `siem.sso_fleet_health_breach` DEC-030 HMAC-chained events produced by pg_cron job 38 (`sso_fleet_health_check`, `*/5 * * * *`) — an automated, continuously-running threshold-triggered monitoring control that detects correlated fleet-level SSO failures not visible through per-tenant monitoring alone. SSO-FLEET-IC-E-001 `r86_c1_output` confirms the specific failing tenant count and fleet success rate at the moment of IC open, providing auditors with the raw monitoring input that triggered the incident response cycle. The trigger event and the IC artefact share the same HMAC chain — the audit record is tamper-evident from alert emission to IC closure. `r86_c2_output` provides the time-series trend data, demonstrating that monitoring operates continuously in 5-minute buckets, not as a point-in-time snapshot. Together with SSO-FLEET-E-001 (quarterly monitoring-layer aggregate), SSO-FLEET-IC-E-001 provides auditors with both the continuous monitoring evidence and the incident-level evidence required to satisfy CC7.2 at the fleet observability layer.
+
+**Auditor narrative (CC7.3 — incident response procedures):** R-86 provides a documented, severity-classified IC protocol for fleet-wide SSO degradation with H1–H5 root cause classification and hypothesis-specific remediation steps. P0 escalation criteria for H5 (credential stuffing attack) ensure that adversarial incidents receive an elevated response, including R-04 co-activation and GDPR Art. 33 assessment. SSO-FLEET-IC-E-001 documents the complete response cycle from AL-SSO-FLEET-01 alert acknowledgement to fleet recovery confirmation (R-86-C4). `degraded_window_minutes` in the terminal event proves the total exposure window; `fleet_recovered_at` proves the recovery point was formally documented; the SSO-FLEET-CHAIN-01 terminal event (`siem.sso_fleet_health_ic_closed`) provides an immutable on-chain record that the IC was formally closed after recovery was confirmed — not abandoned or left open without a documented endpoint.
+
+### §190.2 Cross-Reference
+
+| Item | Location | Status |
+|---|---|---|
+| INCIDENT_RESPONSE R-86 §R-86.9 evidence artefact spec | `docs/INCIDENT_RESPONSE.md R-86` (v3.49.0, 2026-07-06) | 🟢 Done — §190 this pass |
+| §R-86.12 item 4 SOC2_READINESS registration | `docs/INCIDENT_RESPONSE.md §R-86.12` | 🟢 Done — §190 this pass |
+
+---
+
+*v4.14.0 (2026-07-06): §190 SSO-FLEET-IC-E-001 Registration (CC7.2/CC7.3 · INCIDENT_RESPONSE R-86 · per-activation SSO fleet health breach IC artefact; evidence count 165 → 166). SSO-FLEET-IC-E-001 is the per-activation IC companion to SSO-FLEET-E-001 (§49.7 / §95, quarterly aggregate): SSO-FLEET-E-001 provides quarterly monitoring-level evidence (pg_cron job 38 run-history + DEC-030 chain export + PagerDuty cross-reference); SSO-FLEET-IC-E-001 documents each individual AL-SSO-FLEET-01 incident response cycle from IC open (`siem.sso_fleet_health_ic_opened` STANDARD/7yr anchor) to fleet recovery confirmation (`siem.sso_fleet_health_ic_closed` LOW/3yr terminal). Seven required components: R-86-C1..C4 scope query outputs (per-tenant success rates, time series, error breakdown, post-recovery confirmation — all aggregate or tenant UUID only; no user_id, email, health data), plus three DEC-030 event JSONs (trigger breach event, opened event, terminal event). SSO-FLEET-CHAIN-01 ordering invariant: `siem.sso_fleet_health_ic_closed` requires prior `siem.sso_fleet_health_ic_opened` for same `incident_id`, requires prior `siem.sso_fleet_health_breach` with matching `breach_window_epoch` within 1 h; HTTP 422 `SSO_FLEET_CHAIN_01_VIOLATION` on violation. Privacy floor: `tenant_id` FORM-internal UUID in scope query outputs; `failing_tenant_count`/`affected_tenant_count` aggregate integers; source IPs never in DEC-030 payloads; HR access prohibited. 3yr WORM retention (inherits `siem.sso_fleet_health_breach` HIGH/3yr). Storage: `compliance/evidence/sso/sso-fleet-ic-e-001-{incident_id}.json`. Document header v4.13.0 → v4.14.0. Owner: compliance-officer. Review: security-engineer + enterprise-architect.*
 
 ---
 

@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.24.2
+# FORM · Observability & Monitoring Taxonomy v5.24.3
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -13643,6 +13643,7 @@ SSO-SLO-01b:
 | SLA credit trigger | **None** — SSO-SLO-01b is operational only. SLA credits governed exclusively by SSO-SLO-01 per-tenant breach |
 | SOC 2 mapping | CC7.2 (anomaly monitoring), CC7.3 (incident response) |
 | Evidence artefact | SSO-FLEET-E-001 (§49.7) |
+| Dedicated companion IR runbook | INCIDENT_RESPONSE R-86 (`docs/INCIDENT_RESPONSE.md R-86`, v3.49.0, 2026-07-06) |
 
 ---
 
@@ -13812,6 +13813,7 @@ END $$;
 |---|---|---|---|---|---|
 | 4 | Add SSO-FLEET-E-001 row to §26.11 SOC 2 evidence table and to `docs/SOC2_READINESS.md` master evidence table (CC7.2/CC7.3). File first SSO-FLEET-E-001 artefact at observation period open; if zero AL-SSO-FLEET-01 incidents fired, file zero-incident attestation JSON with job 38 run-history appended. | compliance-officer | **P1** | M11 | [x] **Done — 2026-06-25, §26.11 SSO-FLEET-E-001 artefact row added (v5.0.2). SOC2_READINESS §95 contains full spec; §79.4 physical row to be added at M11 first filing alongside SSO-OBS-E-007.** |
 | 5 | Add AL-SSO-FLEET-01 row to §26.8 alert table (condensed format, `fleet_sso_health` subsection). Update §26.11 CC7.2 alert rule count accordingly. | devops-lead | **P1** | M5 | [x] **Done — 2026-06-25, `fleet_sso_health` subsection added to §26.8 and integrated into §6.2 consolidated table; §26.11 CC7.2 count updated twenty-one → twenty-two (v5.0.2).** |
+| 6 | Author companion IR runbook R-86 for AL-SSO-FLEET-01 in `docs/INCIDENT_RESPONSE.md`; register `siem.sso_fleet_health_ic_opened` STANDARD/7yr + `siem.sso_fleet_health_ic_closed` LOW/3yr in `docs/AUDIT_LOG_SCHEMA.md §R-86`; add "Dedicated companion IR runbook" field to §49.5; register SSO-FLEET-IC-E-001 in `docs/SOC2_READINESS.md §190`. | compliance-officer + security-engineer | **P1** | M5 | [x] **Done — 2026-07-06 (INCIDENT_RESPONSE.md v3.49.0 R-86; AUDIT_LOG_SCHEMA.md v3.4 §R-86; OBSERVABILITY.md v5.24.3 §49.5 companion field; SOC2_READINESS.md v4.14.0 §190 count 165 → 166).** |
 
 ---
 

@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.48.4
+# FORM · Incident Response Runbook v3.49.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -30388,6 +30388,408 @@ The SESSION_REVOCATION_KV write at T+0 ensures that the compromised user's activ
 *v3.48.1 (2026-07-06): §R-83.12 + §R-84.12 + §R-85.12 cross-reference closure — AUDIT_LOG_SCHEMA.md v3.3 registrations confirmed Done. Three stale "Pending" rows in the cross-reference tables updated to reflect `docs/AUDIT_LOG_SCHEMA.md` v3.3 (2026-07-06): (1) §R-83.12 `sso.caep_stream_recovered` schema row: `Pending §R-83.11 item 1` → `§R-83` (v3.3) registered, closes §R-83.11 item 1; (2) §R-84.12 `sso.caep_gdpr_deletion_opened` + `sso.caep_gdpr_deletion_completed` schemas row: `Pending §R-84.11 item 1` → `§R-84` (v3.3) registered, closes §R-84.11 item 1; (3) §R-85.12 `sso.risc_hijacking_ic_opened` + `sso.risc_hijacking_handled` schemas row: `Pending §R-85.11 item 1` → `§R-85` (v3.3) registered, closes §R-85.11 item 1. The v3.48.0 note accurately described the state at authoring time (before this pass); this patch records the cross-reference closure as a separate inline note following the pattern of v3.21.1 (§R-50.8 + §R-51.8 stale closure). No new sections. Document header v3.48.0 → v3.48.1. Owner: compliance-officer.*
 
 *v3.48.0 (2026-07-06): R-83 CAEP SET Validation Failure Rate High (AL-CAEP-01 companion); R-84 CAEP Account-Purged — GDPR Art. 17 Deletion Clock (AL-CAEP-02 companion); R-85 Google RISC Hijacking Event Received (AL-CAEP-04 companion). Closes the companion runbook gap for `docs/OBSERVABILITY.md §78.4` AL-CAEP-01 / AL-CAEP-02 / AL-CAEP-04: §78.4 (v5.24.0, 2026-07-06) provided five-step inline runbooks for all CAEP alerts, but the P1/P0-severity alerts had no dedicated INCIDENT_RESPONSE companion runbooks — unlike BCL (R-73/R-74), SAML SLO (R-75/R-76), PKJWT (R-79/R-81), and Session Revocation KV (R-82) which each have companion runbooks for their primary P1/P0 alerts. Three runbooks authored in this pass: R-83 (AL-CAEP-01, P1 — CAEP SET validation failure rate > 5% for any tenant; five root causes H1–H5: IdP JWKS key rotation, iss mismatch, malformed SETs, unknown event type, Worker regression; four scope queries R-83-C1..C4; six-step recovery; `sso.caep_stream_recovered` LOW/3yr terminal event; CAEP-SETERR-CHAIN-01 invariant; CAEP-SETERR-E-001 per-activation artefact; CC6.3/CC6.6/CC7.2/CC7.3; SOC2_READINESS §187; OBSERVABILITY §78.4 companion field added); R-84 (AL-CAEP-02, P0 — any `sso.caep_user_purged` CRITICAL event; five hypotheses H1–H5: legitimate purge, SCIM co-event, sandbox tenant, Worker failure, litigation hold; six-step recovery with GDPR Art. 17 deletion workflow; `sso.caep_gdpr_deletion_opened` HIGH/7yr + `sso.caep_gdpr_deletion_completed` CRITICAL/7yr; CAEP-PURGE-CHAIN-01 invariant; CAEP-PURGE-E-001 per-activation artefact; P5.1/C1.2/CC6.3; SOC2_READINESS §188; OBSERVABILITY §78.4 companion field added); R-85 (AL-CAEP-04, P1 — Google RISC hijacking SET received; five hypotheses H1–H5: legitimate hijacking, false positive, dispatch failure, compromised admin, systematic tenant compromise; four scope queries R-85-C1..C4 including SESSION_REVOCATION_KV write confirmation and group cache eviction verification; six-step recovery with P0 escalation criteria; `sso.risc_hijacking_ic_opened` STANDARD/7yr + `sso.risc_hijacking_handled` LOW/3yr; RISC-HIJACK-CHAIN-01 invariant; RISC-HIJACK-E-001 per-activation artefact; CC7.2/CC7.3/CC7.4/CC6.3; SOC2_READINESS §189; OBSERVABILITY §78.4 companion field added). Three SOC2_READINESS evidence registrations (§187 CAEP-SETERR-E-001, §188 CAEP-PURGE-E-001, §189 RISC-HIJACK-E-001; evidence count 162 → 165; v4.13.0). OBSERVABILITY.md §78.4 AL-CAEP-01/02/04 companion runbook fields added (v5.24.1). Seven new DEC-030 events across three runbooks (all pending AUDIT_LOG_SCHEMA.md registration — §R-83.11 item 1, §R-84.11 item 1, §R-85.11 item 1). Privacy floor: all three runbooks use `tenant_id` FORM-internal UUID + `user_ref` FORM-internal anonymised reference + `set_jti_hash` SHA-256 only — no data subject name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data in any scope query, event payload, or evidence artefact; HR role has no access to any CAEP evidence path. Document header v3.47.0 → v3.48.0. Owner: security-engineer + compliance-officer + devops-lead.*
+
+---
+
+---
+
+## R-86 · SSO Fleet Health Breach (AL-SSO-FLEET-01 companion)
+
+### §R-86.1 Purpose and Trigger Classification
+
+**Runbook ID:** R-86
+**Incident Commander:** security-engineer (primary); devops-lead (H1 Worker regression, H5 attack); customer-success (tenant IT admin notification); compliance-officer (if GDPR Art. 33 assessment required — H5 only)
+**Alert source:** AL-SSO-FLEET-01 (`docs/OBSERVABILITY.md §49.5`)
+**Severity on open:** P1 (automatic; may escalate to P0 for H5 — active credential stuffing attack confirmed)
+**Auto-resolve:** No — IC must close manually after R-86-C4 confirms fleet recovery (all previously-failing tenants ≥ 99% success rate in ≥ 10-minute window)
+
+**Purpose:** This runbook governs the response to an AL-SSO-FLEET-01 alert — fired by pg_cron job 38 (`sso_fleet_health_check`, `*/5 * * * *`) when ≥ 3 distinct enterprise tenants simultaneously breach SSO-SLO-01 (login success rate < 99%, ≥ 5 attempts each, in any 15-minute rolling window). AL-SSO-FLEET-01 is FORM's fleet-level SSO health signal (SSO-SLO-01b, DEC-070): it fires when a correlated platform-level failure affects multiple tenants simultaneously — a scenario that would not trigger any single-tenant per-tenant SLA page. **SLA credit impact: none.** SSO-SLO-01b is a purely operational signal; per-tenant SLA credits are governed exclusively by SSO-SLO-01 per-tenant breach.
+
+**Why P1 (not P0 by default):** A fleet-wide SSO degradation affecting ≥ 3 tenants is operationally significant but rarely a security event. The most common causes are FORM Worker regressions (H1), upstream IdP incidents (H2), or coincident independent IdP outages (H3) — all of which warrant rapid response but not P0 escalation. Escalate to P0 only for H5 (active credential stuffing attack confirmed) where the degradation pattern indicates adversarial intent and GDPR Art. 33 notification may be required.
+
+---
+
+### §R-86.2 Trigger Modes
+
+| Mode | Trigger | Initial severity |
+|---|---|---|
+| **Mode-1 (primary)** | PagerDuty `form-platform` P1 via AL-SSO-FLEET-01 — pg_cron job 38 emitted `siem.sso_fleet_health_breach` HIGH/3yr event; dedup key `al-sso-fleet-01-{15min_epoch}` (30-min cooldown) | P1 |
+| **Mode-2 (enterprise tenant escalation)** | Enterprise tenant IT admin contacts CSM: "Our employees can't log in to FORM via SSO"; no active PagerDuty incident (alert missed or within 30-min cooldown window) | P1 — check whether job 38 fired and whether R-86-C1 confirms ≥ 3 tenants failing; if AL-SSO-FLEET-01 not already open, open IC immediately |
+| **Mode-3 (manual discovery)** | security-engineer or devops-lead discovers `siem.sso_fleet_health_breach` event in admin dashboard or audit log review without an active PagerDuty incident | P1 — open IC immediately; 30-min cooldown may have suppressed re-alert on sustained breach |
+
+---
+
+### §R-86.3 Severity Matrix
+
+| Condition | Severity | Response |
+|---|---|---|
+| AL-SSO-FLEET-01 fires; R-86-C1 confirms ≥ 3 tenants failing; no active attack indicators; WorkOS/Auth0 or FORM Worker issue | **P1 (standard path)** | IC + security-engineer; devops-lead if Worker regression suspected; CSM if > 5 min duration |
+| R-86-C3 shows uniform `error_code = 'worker_unhandled_exception'` across all failing tenants; onset correlated with recent deployment | **P1 → immediate rollback** | Escalate to devops-lead; initiate Worker rollback within 5 minutes of classification |
+| R-86-C3 shows high `sso.login_failed` volume with diverse source IPs, affecting ≥ 3 tenants simultaneously; no WorkOS/Auth0 incident confirmed | **P0 — credential stuffing** | P0 escalation; page devops-lead + security-engineer; co-activate R-04; CF WAF block |
+| ≥ 2 enterprise tenant IT admins independently report SSO failure within 15 minutes | **P0 — high customer impact** | Page customer-success lead; IC steps up to P0; CSM begins individual tenant outreach immediately |
+| Breach persists > 30 minutes despite remediation attempts | **P0 escalation** | Page devops-lead + compliance-officer; assess GDPR Art. 33 breach notification requirement |
+
+---
+
+### §R-86.4 Scope Queries
+
+**R-86-C1 — Identify failing tenants and SSO success rates (T+0):**
+
+```sql
+-- form_audit role.
+-- Returns per-tenant SSO success rates in the last 15-minute window.
+-- Privacy: tenant_id is FORM-internal UUID only — no customer email, Okta domain, or Entra directory ID.
+-- No user_id, no employee name, no health data in result set.
+SELECT
+  payload->>'tenant_id'                                               AS tenant_id,
+  COUNT(*)                                                            AS total_attempts,
+  COUNT(*) FILTER (WHERE event_type = 'sso.login_success')           AS successes,
+  COUNT(*) FILTER (WHERE event_type = 'sso.login_failed')            AS failures,
+  ROUND(
+    COUNT(*) FILTER (WHERE event_type = 'sso.login_success')::numeric
+    / NULLIF(COUNT(*), 0) * 100,
+    2
+  )                                                                   AS success_rate_pct
+FROM audit_log_events
+WHERE event_type IN ('sso.login_success', 'sso.login_failed')
+  AND created_at > NOW() - INTERVAL '15 minutes'
+GROUP BY payload->>'tenant_id'
+HAVING COUNT(*) >= 5
+ORDER BY success_rate_pct ASC;
+```
+
+> **Interpretation:** Rows with `success_rate_pct < 99` are breaching tenants. If ≥ 3 rows appear, AL-SSO-FLEET-01 is confirmed. Record the `tenant_id` list and `failure` counts for R-86-C3.
+
+**R-86-C2 — SSO health time series over last 30 minutes (T+5):**
+
+```sql
+-- form_audit role.
+-- 5-minute bucket fleet-wide aggregate — identifies trend (worsening / stable / recovering).
+-- Privacy: fleet-wide aggregate only — no tenant_id, no user_id in result.
+SELECT
+  date_trunc('hour', created_at)
+    + INTERVAL '5 min' * FLOOR(EXTRACT(MINUTE FROM created_at) / 5)  AS bucket_5min,
+  COUNT(*) FILTER (WHERE event_type = 'sso.login_success')           AS fleet_successes,
+  COUNT(*) FILTER (WHERE event_type = 'sso.login_failed')            AS fleet_failures,
+  COUNT(DISTINCT payload->>'tenant_id')
+    FILTER (WHERE event_type = 'sso.login_failed')                   AS tenants_with_failures
+FROM audit_log_events
+WHERE event_type IN ('sso.login_success', 'sso.login_failed')
+  AND created_at > NOW() - INTERVAL '30 minutes'
+GROUP BY 1
+ORDER BY 1 DESC;
+```
+
+> **Interpretation:** `tenants_with_failures` trending upward → worsening fleet degradation. Stable at ≥ 3 → sustained breach, prioritise root cause over monitoring. Trending to 0 → recovering; continue to Step 4 (R-86-C4).
+
+**R-86-C3 — Per-tenant SSO error type breakdown (T+5):**
+
+```sql
+-- form_audit role.
+-- Error code breakdown per failing tenant — distinguishes FORM-side from IdP-side errors.
+-- Privacy: tenant_id FORM-internal UUID; no user_id, no email, no session content.
+-- Key error_code values:
+--   'worker_unhandled_exception'   → H1 FORM Worker regression
+--   'idp_unreachable'              → H2 upstream IdP incident or H4 network partition
+--   'saml_response_invalid'        → IdP-side SAML issue (often H3 independent IdP failure)
+--   'oidc_token_exchange_failed'   → H2/H4 WorkOS/Auth0 or OIDC endpoint issue
+--   'session_create_failed'        → H1 FORM session layer regression
+SELECT
+  payload->>'tenant_id'   AS tenant_id,
+  payload->>'error_code'  AS error_code,
+  COUNT(*)                AS occurrence_count
+FROM audit_log_events
+WHERE event_type = 'sso.login_failed'
+  AND created_at > NOW() - INTERVAL '15 minutes'
+GROUP BY 1, 2
+ORDER BY occurrence_count DESC;
+```
+
+> **Interpretation:** Uniform `worker_unhandled_exception` across all failing tenants → H1 (FORM Worker regression). Mixed `idp_unreachable` for tenants on different IdP types → H3 (coincident independent failures). Single error code across all tenants using the same IdP type → H2 (WorkOS/Auth0 upstream) or H4 (network). High volume of any error with diverse source IPs not matching tenant employee IP ranges → H5 (credential stuffing — escalate to P0).
+
+**R-86-C4 — Post-recovery fleet confirmation (≥ 10 min after remediation):**
+
+```sql
+-- form_audit role.
+-- Confirms all previously-failing tenants have recovered to ≥ 99% success rate.
+-- Run only after Step 3 remediation. Sustained recovery = all rows show success_rate_pct ≥ 99.
+-- Privacy: same as R-86-C1; tenant_id FORM-internal UUID only.
+SELECT
+  payload->>'tenant_id'                                               AS tenant_id,
+  COUNT(*)                                                            AS total_attempts,
+  COUNT(*) FILTER (WHERE event_type = 'sso.login_success')           AS successes,
+  COUNT(*) FILTER (WHERE event_type = 'sso.login_failed')            AS failures,
+  ROUND(
+    COUNT(*) FILTER (WHERE event_type = 'sso.login_success')::numeric
+    / NULLIF(COUNT(*), 0) * 100,
+    2
+  )                                                                   AS success_rate_pct
+FROM audit_log_events
+WHERE event_type IN ('sso.login_success', 'sso.login_failed')
+  AND created_at > NOW() - INTERVAL '10 minutes'
+GROUP BY payload->>'tenant_id'
+HAVING COUNT(*) >= 5
+ORDER BY success_rate_pct ASC;
+```
+
+> **Expected result (confirmed recovery):** No rows with `success_rate_pct < 99`. If any tenant still below 99%: do NOT close IC; re-investigate; continue monitoring.
+
+---
+
+### §R-86.5 Root Cause Hypotheses
+
+| Code | Scenario | Distinguishing signal | Action |
+|---|---|---|---|
+| **H1** | FORM SSO edge Worker regression — Cloudflare Worker bug causing all SSO requests to fail; onset correlated with recent `wrangler deploy` | Uniform `worker_unhandled_exception` or `session_create_failed` error code across all failing tenants; CF Workers deployment dashboard shows recent deploy | Identify deployment; roll back via `wrangler rollback`; coordinate devops-lead |
+| **H2** | WorkOS/Auth0 upstream platform incident — IdP authentication services degraded or unavailable | `idp_unreachable` or `oidc_token_exchange_failed` dominant; WorkOS status page (status.workos.com) or Auth0 status page (status.auth0.com) shows incident | No FORM action; monitor upstream; T-86-B CSM notification if > 5 min |
+| **H3** | Concurrent independent IdP outages — ≥ 3 tenants' individual IdPs coincidentally degraded in same 15-minute window; no FORM-side cause | Mixed error codes across failing tenants; failing tenants use different IdP types (Okta, Entra, Google Workspace); R-86-C3 shows non-uniform patterns | Document in PagerDuty; no escalation; monitor SSO-SLO-01 per-tenant pages |
+| **H4** | Cloudflare network / DNS partition between FORM edge and IdP JWKS/token endpoints | `idp_unreachable` with uniform error but no WorkOS/Auth0 status incident; CF Workers `wrangler tail` shows TCP timeout or DNS resolution failure | Check CF status page (cloudflarestatus.com); escalate to CF support if CF-side confirmed |
+| **H5** | Active credential stuffing attack — adversary targeting ≥ 3 tenant SSO endpoints simultaneously with automated login attempts | High `sso.login_failed` volume; CF analytics shows diverse source IPs not matching tenant employee ranges; `R-86-C3` shows uniform error pattern across tenants with unusual IP diversity | **P0 escalation**; co-activate R-04; CF WAF block; GDPR Art. 33 assessment |
+
+---
+
+### §R-86.6 Recovery Steps
+
+**Step 1 — Acknowledge + open IC (T+0):**
+
+1. Acknowledge PagerDuty AL-SSO-FLEET-01. Do NOT snooze.
+2. Open `#inc-sso-fleet-{date}` in Slack.
+3. Post T-86-A (initial P1 declaration).
+4. Emit `siem.sso_fleet_health_ic_opened` STANDARD/7yr (§R-86.7) — SSO-FLEET-CHAIN-01 anchor event.
+
+**Step 2 — Identify failing tenants and classify (T+5):**
+
+1. Run R-86-C1 — identify which tenants are failing and their success rates. Record `tenant_id` list (FORM-internal UUIDs only — do NOT post in Slack channel; log in PagerDuty incident timeline).
+2. Run R-86-C2 — assess trend (worsening / stable / recovering).
+3. Run R-86-C3 — classify dominant error type to determine H1–H5.
+
+**Step 3a — H1 (FORM Worker regression):**
+
+1. Open Cloudflare Workers deployment dashboard; identify most recent `wrangler deploy` to `sso-auth` Worker.
+2. Roll back: `wrangler rollback --env production` (devops-lead PAM elevation required).
+3. Confirm rollback live: CF Workers dashboard should show previous deployment version active.
+4. Proceed to Step 4.
+
+**Step 3b — H2 (WorkOS/Auth0 upstream incident) or H4 (CF network):**
+
+1. H2: Confirm WorkOS status (status.workos.com) or Auth0 status (status.auth0.com) shows active incident.
+2. H4: Check cloudflarestatus.com; run `wrangler tail --env production` to capture DNS/TCP failure trace.
+3. If confirmed upstream: no FORM action required. Post T-86-B (CSM external incident notification — use only if affected tenants have been experiencing > 5 min disruption).
+4. Monitor R-86-C4 every 10 minutes. Close IC when R-86-C4 confirms sustained recovery.
+
+**Step 3c — H3 (concurrent independent IdP outages):**
+
+1. Confirm R-86-C3 shows mixed error codes and non-uniform IdP types across failing tenants.
+2. Document hypothesis classification in PagerDuty incident timeline.
+3. No escalation; no CSM notification unless individual tenant's SSO-SLO-01 has independently been breached > 15 min.
+4. Monitor SSO-SLO-01 per-tenant PagerDuty pages for any individual tenant follow-on alerts.
+5. Proceed to Step 4.
+
+**Step 3d — H5 (credential stuffing attack — P0 escalation):**
+
+1. Page devops-lead + security-engineer immediately. Escalate PagerDuty incident to P0.
+2. Block attacking IP ranges via Cloudflare WAF rule (CF Admin → Security → WAF → IP Block). Use IP ranges identified from CF analytics — not from `audit_log_events` (privacy floor: source IPs are CF-level data, not in DEC-030 payloads).
+3. Co-activate R-04 (SSO/SAML Compromise).
+4. Compliance-officer assesses GDPR Art. 33 breach notification requirement. Note: login failures caused by credential stuffing attempts are not inherently a data breach — assessment focuses on whether any login attempts succeeded and resulted in unauthorised access to FORM data.
+5. Proceed to Step 4 only after CF WAF block is confirmed active.
+
+**Step 4 — Fleet recovery confirmation (T+30 after remediation, or after upstream resolution confirmed):**
+
+Run R-86-C4. Expected: no tenant row with `success_rate_pct < 99` in a 10-minute window post-remediation. If any tenant still below 99%: do NOT close IC; re-classify (the root cause may be compound — e.g., H1 + H2 simultaneously); repeat Step 3 for remaining failing tenants.
+
+**Step 5 — CSM post-resolution notification (T+35):**
+
+1. Customer-success notifies enterprise tenant IT admin contacts who experienced SSO failures for > 5 min during the breach window. Template: "FORM experienced a platform-level SSO degradation between [start] and [end] UTC. Affected tenants: [count — do NOT list tenant names or IDs in shared Slack; communicate individually via CSM channel]. Root cause: [H1/H2/H4 plain-language description]. Your tenant's SSO is now fully restored. We apologise for the disruption."
+2. Post T-86-C in `#inc-sso-fleet-{date}`.
+
+**Step 6 — Terminal event + evidence artefact + IC closure:**
+
+1. Emit `siem.sso_fleet_health_ic_closed` LOW/3yr (§R-86.7) — SSO-FLEET-CHAIN-01 terminal event.
+2. File SSO-FLEET-IC-E-001 (§R-86.8) to `compliance/evidence/sso/sso-fleet-ic-e-001-{incident_id}.json`.
+3. Close IC in PagerDuty.
+
+---
+
+### §R-86.7 Communication Templates
+
+**T-86-A — Initial P1 declaration (post in `#inc-sso-fleet-{date}` at T+0):**
+
+```
+🔴 P1 · AL-SSO-FLEET-01 · SSO Fleet Health Breach · {date} {time} UTC
+IC: {security-engineer}
+
+Fleet-wide SSO degradation detected — pg_cron job 38 reports ≥ 3 enterprise tenants with SSO login success rate < 99% in the last 15 minutes.
+
+SLA credit impact: NONE — SSO-SLO-01b is an operational signal only (DEC-070).
+Individual tenant SLA credits governed by per-tenant SSO-SLO-01 separately.
+
+Immediate actions:
+• Running R-86-C1 to identify failing tenants
+• Checking CF Workers deploy history and WorkOS/Auth0 status
+• Classification in progress
+
+Next update: in 10 minutes or on classification.
+```
+
+**T-86-B — CSM degraded-mode notification (for H2/H4 only — upstream-caused outage; do NOT use for H1, H3, or H5):**
+
+```
+[CSM → Enterprise Tenant IT Admin] {time} UTC
+
+Hi [tenant IT admin],
+
+We're aware that some FORM users in your organisation may be experiencing SSO login issues. This is related to a temporary degradation at [WorkOS / Auth0 / Cloudflare] (upstream provider), which is affecting multiple customers across FORM.
+
+FORM's systems are operating normally — our SSO integration is healthy on our end. The issue is being resolved by [WorkOS / Auth0 / Cloudflare] directly.
+
+We're actively monitoring the situation and will notify you as soon as the issue is confirmed resolved, typically within [ETA from status page].
+
+No action is required on your end. Affected users may retry login in [X] minutes.
+
+— FORM Customer Success
+```
+
+**T-86-C — Post-resolution (post in `#inc-sso-fleet-{date}` at Step 5, and send individually to each affected tenant via CSM):**
+
+```
+✅ RESOLVED · AL-SSO-FLEET-01 · SSO Fleet Health Breach · {date}
+
+Root cause: {H1 Worker regression / H2 WorkOS upstream / H3 coincident independent / H4 CF network / H5 credential stuffing}
+Degraded window: {start_time} — {end_time} UTC ({duration_minutes} minutes)
+Tenants affected at peak: {affected_tenant_count} (count only — not listed here for privacy)
+Fleet recovery confirmed: {fleet_recovered_at} UTC via R-86-C4
+
+SLA credit impact: NONE (DEC-070 — SSO-SLO-01b operational signal only).
+Individual tenant SSO-SLO-01 per-tenant evaluation ongoing — CSM will reach out to any tenant whose individual SLA was breached.
+
+SSO-FLEET-IC-E-001 artefact filed. IC closed.
+```
+
+---
+
+### §R-86.8 DEC-030 Events
+
+**`siem.sso_fleet_health_breach`** — existing HIGH/3yr event (emitted by pg_cron job 38 when ≥ 3 tenants breach SSO-SLO-01b). Trigger event for this runbook. Already registered in `docs/AUDIT_LOG_SCHEMA.md § SSO Fleet Health Monitoring events` (v2.31, 2026-06-22).
+
+**`siem.sso_fleet_health_ic_opened`** — new STANDARD/7yr event (emitted by IC at Step 1).
+
+```typescript
+// SiemSsoFleetHealthIcOpenedPayload — Zod v2
+const SiemSsoFleetHealthIcOpenedPayload = z.object({
+  incident_id:            z.string().uuid(),              // SSO-FLEET-CHAIN-01 correlation key
+  trigger_event_id:       z.string().uuid(),              // references siem.sso_fleet_health_breach event id
+  failing_tenant_count:   z.number().int().nonneg(),      // count at IC open (≥ 3)
+  fleet_success_rate_pct: z.number().min(0).max(100),     // fleet-wide average at IC open
+  initial_severity:       z.enum(['P1', 'P0']),
+  breach_window_epoch:    z.number().int().nonneg(),      // 15min_epoch from triggering breach event
+  // No tenant_id list, no user_id, no email, no health data.
+});
+```
+
+**`siem.sso_fleet_health_ic_closed`** — new LOW/3yr terminal event (emitted by IC at Step 6).
+
+```typescript
+// SiemSsoFleetHealthIcClosedPayload — Zod v2
+const SiemSsoFleetHealthIcClosedPayload = z.object({
+  incident_id:              z.string().uuid(),            // matches siem.sso_fleet_health_ic_opened
+  trigger_event_id:         z.string().uuid(),            // same as in ic_opened
+  root_cause:               z.enum(['H1', 'H2', 'H3', 'H4', 'H5']),
+  degraded_window_minutes:  z.number().int().nonneg(),
+  affected_tenant_count:    z.number().int().nonneg(),    // count at peak (≥ 3)
+  peak_failure_rate_pct:    z.number().min(0).max(100),   // peak fleet failure rate during incident
+  fleet_recovered_at:       z.string().datetime(),        // confirmed by R-86-C4
+  r04_co_activated:         z.boolean(),
+  art33_assessment_required: z.boolean(),
+  csm_notified:             z.boolean(),
+  // No tenant_id list, no user_id, no email, no health data.
+});
+```
+
+**SSO-FLEET-CHAIN-01 ordering invariant:** `siem.sso_fleet_health_ic_closed` MUST be preceded by `siem.sso_fleet_health_ic_opened` for the same `incident_id`, which MUST be preceded by `siem.sso_fleet_health_breach` with a `breach_window_epoch` matching the anchor's `breach_window_epoch` within 1 h. Inversion → `SSO_FLEET_CHAIN_01_VIOLATION` HTTP 422 (pending M6 enforcement).
+
+---
+
+### §R-86.9 Evidence Artefacts
+
+**SSO-FLEET-IC-E-001** — Fleet SSO health breach per-activation IC artefact. Complements SSO-FLEET-E-001 (§49.7, quarterly aggregate): where SSO-FLEET-E-001 provides quarterly monitoring-level evidence, SSO-FLEET-IC-E-001 documents each individual incident response cycle.
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | SSO-FLEET-IC-E-001 |
+| **Trigger** | Per R-86 IC activation (each AL-SSO-FLEET-01 incident that opens an IC) |
+| **Retention** | 3 years (inherits `siem.sso_fleet_health_breach` HIGH/3yr — trigger event) |
+| **Storage path** | `compliance/evidence/sso/sso-fleet-ic-e-001-{incident_id}.json` |
+| **R2 Object Lock** | WORM (3yr) |
+| **Vanta mirror** | SSO-FLEET-IC-E-001 (per-activation — upload within 48 h of IC closure) |
+
+**Seven required components:**
+
+1. `r86_c1_output` — failing tenant list with success rates at IC open. `tenant_id` is FORM-internal UUID only — no customer email, Okta tenant domain, or Entra Directory ID. Aggregate integer counts only; no `user_id`, no email, no health data.
+2. `r86_c2_output` — SSO health time series over the breach window (5-minute buckets; fleet-wide aggregate). No `tenant_id` in export — aggregate totals only.
+3. `r86_c3_output` — error type breakdown per failing tenant (`tenant_id` FORM-internal UUID + `error_code` + `occurrence_count` only; no `user_id`, no session data, no health data).
+4. `r86_c4_output` — post-recovery confirmation query output showing all tenants ≥ 99% success rate in ≥ 10-minute window following remediation.
+5. `trigger_event_json` — `siem.sso_fleet_health_breach` DEC-030 event JSON (`failing_tenant_count` and `fleet_success_rate_pct` only; no `tenant_id` list per DEC-070 privacy floor).
+6. `opened_event_json` — `siem.sso_fleet_health_ic_opened` DEC-030 event JSON.
+7. `terminal_event_json` — `siem.sso_fleet_health_ic_closed` DEC-030 event JSON.
+
+**Privacy floor:** SSO-FLEET-IC-E-001 contains NO data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data. `tenant_id` values in `r86_c1_output` and `r86_c3_output` are FORM-internal UUIDs — never customer email addresses, Okta tenant domains, Entra Directory IDs, or any other externally-linkable identifier. `failing_tenant_count` and `affected_tenant_count` are aggregate integers. `peak_failure_rate_pct` is a numeric fleet-wide average. Source IPs (if captured during H5 investigation) are stored in CF analytics — NEVER in DEC-030 payloads or SSO-FLEET-IC-E-001 components. HR role has NO access to `compliance/evidence/sso/`.
+
+---
+
+### §R-86.10 SOC 2 Auditor Narratives
+
+**CC7.2 — Monitoring for anomalies and unauthorised access:**
+AL-SSO-FLEET-01 fires on `siem.sso_fleet_health_breach` DEC-030 HMAC-chained events produced by pg_cron job 38 (`sso_fleet_health_check`, `*/5 * * * *`) — an automated, continuously-running threshold-triggered monitoring control. SSO-FLEET-IC-E-001 `r86_c1_output` confirms the specific failing tenant count and fleet success rate at the moment of IC open, providing auditors with the raw monitoring input that triggered the incident response cycle. The trigger event and the IC artefact share the same HMAC chain, making the audit record tamper-evident from alert emission to IC closure. `r86_c2_output` provides the time-series trend data, demonstrating that monitoring operates continuously in 5-minute buckets — not as a point-in-time snapshot.
+
+**CC7.3 — Incident response procedures for detected anomalies:**
+R-86 provides a documented, severity-classified IC protocol for fleet-wide SSO degradation. Five root cause hypotheses (H1–H5) with distinguishing signals and hypothesis-specific remediation steps ensure that each AL-SSO-FLEET-01 activation is handled according to a defined procedure, not ad hoc. P0 escalation criteria for H5 (credential stuffing) ensure that adversarial incidents receive an elevated response. SSO-FLEET-IC-E-001 documents the complete response cycle from AL-SSO-FLEET-01 alert acknowledgement to fleet recovery confirmation (R-86-C4). `degraded_window_minutes` in `terminal_event_json` proves the total exposure window; `fleet_recovered_at` proves the recovery point was documented. The SSO-FLEET-CHAIN-01 terminal event provides auditors with an immutable on-chain record that the IC was formally closed after recovery was confirmed — not abandoned or left open.
+
+---
+
+### §R-86.11 Post-Incident Controls
+
+| Trigger | Control | Owner | Deadline |
+|---|---|---|---|
+| H1 (Worker regression, any) | Add SSO login success rate canary step to CF Worker deploy pipeline: emit ≥ 3 synthetic SSO test logins in staging for different IdP types; block deploy if any synthetic success rate < 99% within 2 minutes | platform-engineer + devops-lead | 14 days |
+| H5 (credential stuffing, any) | Implement CF WAF rate-limiting rule: IP sources with ≥ 20 `sso.login_failed`-equivalent requests within 5 minutes → CF Turnstile challenge; ≥ 50 within 5 minutes → temporary IP block (1 hour). Configure WAF rule before next AL-SSO-FLEET-01 can repeat on same IPs | security-engineer | 14 days |
+| H2 or H4 recurring (≥ 2 activations/90 days) | Evaluate SSO fallback architecture: secondary WorkOS region or FORM-managed SAML reverse proxy for high-traffic tenants; schedule architecture review with enterprise-architect | enterprise-architect + platform-engineer | 30 days |
+| H3 recurring (≥ 2 coincident-independent activations/quarter) | Review fleet breach threshold (DEC-070): if ≥ 3 coincident independent failures occur twice in a quarter, assess whether threshold should be raised to 4 or alert condition should add IdP-type breakdown to filter out coincident-independent noise | devops-lead + compliance-officer | 30 days |
+| Any (universal) | 48 h post-mortem if degraded window > 15 min; optional (with IC note confirming auto-recovery) if < 15 min and R-86-C4 confirmed all tenants recovered naturally | IC + security-engineer | 48 h |
+
+---
+
+### §R-86.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `siem.sso_fleet_health_ic_opened` STANDARD/7yr and `siem.sso_fleet_health_ic_closed` LOW/3yr in `docs/AUDIT_LOG_SCHEMA.md §R-86`; include SSO-FLEET-CHAIN-01 ordering invariant and SSO-FLEET-IC-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [x] **Done — 2026-07-06 (AUDIT_LOG_SCHEMA.md v3.4, §R-86).** |
+| 2 | Implement SSO-FLEET-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`; HTTP 422 + `SSO_FLEET_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending |
+| 3 | Update `docs/OBSERVABILITY.md §49.5` AL-SSO-FLEET-01 entry: add "Dedicated companion IR runbook: INCIDENT_RESPONSE R-86" field | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.3, §49.5 companion runbook field added).** |
+| 4 | Register SSO-FLEET-IC-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§190, per-activation cadence, CC7.2/CC7.3, 3yr) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (SOC2_READINESS.md v4.14.0, §190; evidence count 165 → 166).** |
+| 5 | Authoring complete — R-86 closes the AL-SSO-FLEET-01 companion runbook gap: §49.5 had only a four-step inline runbook for the P1 fleet-wide SSO health breach scenario; R-86 provides the full IC protocol, severity matrix, SSO-FLEET-CHAIN-01 HMAC invariant, and SSO-FLEET-IC-E-001 per-activation evidence artefact | compliance-officer | **P0** | [x] **Done — 2026-07-06 (INCIDENT_RESPONSE.md v3.49.0).** |
+
+---
+
+### §R-86.13 Cross-Reference Obligations
+
+| Reference | Location | Relationship |
+|---|---|---|
+| AL-SSO-FLEET-01 alert spec | `docs/OBSERVABILITY.md §49.5` (v5.24.3, 2026-07-06) | Canonical alert definition triggering R-86; companion runbook field updated this pass |
+| SSO-SLO-01b fleet companion signal | `docs/OBSERVABILITY.md §49.3–§49.4` | Decision basis for fleet-wide companion alert; DEC-070 |
+| `siem.sso_fleet_health_breach` event schema | `docs/AUDIT_LOG_SCHEMA.md § SSO Fleet Health Monitoring events` (v2.31, 2026-06-22) | Trigger event; HIGH/3yr; already registered |
+| `siem.sso_fleet_health_ic_opened` + `siem.sso_fleet_health_ic_closed` schemas | `docs/AUDIT_LOG_SCHEMA.md §R-86` (v3.4, 2026-07-06) | STANDARD/7yr + LOW/3yr events; SSO-FLEET-CHAIN-01 invariant; registered (closes §R-86.12 item 1) |
+| SSO-FLEET-IC-E-001 registration | `docs/SOC2_READINESS.md §190` (v4.14.0, 2026-07-06) | Per-activation CC7.2/CC7.3 evidence registration |
+| SSO-FLEET-E-001 quarterly artefact | `docs/OBSERVABILITY.md §49.7` | Quarterly monitoring aggregate; SSO-FLEET-IC-E-001 is the per-activation IC companion |
+| pg_cron job 38 implementation | `docs/OBSERVABILITY.md §49.6` | Trigger emitter; `sso_fleet_health_check` `*/5 * * * *` |
+| SSO compromise | `docs/INCIDENT_RESPONSE.md R-04` | Co-activate for H5 (credential stuffing attack) |
+| DEC-070 | `docs/DECISION_LOG.md DEC-070` | Per-tenant SSO-SLO-01 + fleet-wide SSO-SLO-01b adoption decision; `sla_credit_impact: 'none'` hard invariant |
+| DEC-030 HMAC chain | `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) | HMAC-chained audit log pattern governing all events in this runbook |
+
+**Privacy floor (invariant throughout R-86):** No data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data in any R-86 scope query, DEC-030 event payload, communication template, or SSO-FLEET-IC-E-001 component. `tenant_id` values in scope query outputs are FORM-internal UUIDs — never customer email addresses or externally-linkable identifiers. `failing_tenant_count` and `affected_tenant_count` are aggregate integers. `peak_failure_rate_pct` is a numeric fleet-wide average. T-86-C mentions only `affected_tenant_count` (integer) — not a list of tenant names or IDs. HR role NEVER has access to `compliance/evidence/sso/`. Owner: security-engineer + compliance-officer + customer-success.
+
+---
+
+*v3.49.0 (2026-07-06): R-86 SSO Fleet Health Breach (AL-SSO-FLEET-01 companion). Closes the companion runbook gap for `docs/OBSERVABILITY.md §49.5` AL-SSO-FLEET-01: §49.5 had only a four-step inline runbook for the P1 fleet-wide SSO health breach scenario, and §49.9 had no checklist item for authoring a companion IR runbook — unlike BCL (§70 → R-73/R-74), SAML SLO (§72 → R-75/R-76), PKJWT (§75 → R-81), Session Revocation KV (§76 → R-82), and CAEP/RISC (§78 → R-83/R-84/R-85) which each have dedicated companion runbooks for their primary P1/P0 alerts. AL-SSO-FLEET-01 (P1 — SSO-SLO-01b fleet breach: ≥ 3 tenants simultaneously < 99% login success rate, 15-min window, pg_cron job 38) was the only P1 SSO subsystem alert without a dedicated companion IC protocol. R-86: twelve-section companion runbook. Trigger: AL-SSO-FLEET-01 + SSO-SLO-01b breach. Three trigger modes: Mode-1 (PagerDuty P1); Mode-2 (enterprise tenant escalation via CSM); Mode-3 (manual discovery). Five root causes: H1 FORM Worker regression (uniform `worker_unhandled_exception`, onset correlated with deploy); H2 WorkOS/Auth0 upstream incident (`idp_unreachable`, confirmed status page); H3 concurrent independent IdP outages (mixed error codes, mixed IdP types — coincident false alarm); H4 CF network/DNS partition (`idp_unreachable`, CF status page or `wrangler tail` trace); H5 active credential stuffing attack (P0 escalation, CF WAF block, R-04 co-activation, GDPR Art. 33 assessment). Four scope queries: R-86-C1 (per-tenant SSO success rates in 15-min window — `tenant_id` UUID + aggregate counts; no `user_id`); R-86-C2 (fleet health time series in 5-min buckets — fleet-wide aggregate; no `tenant_id`); R-86-C3 (error type breakdown per failing tenant — `tenant_id` + `error_code` + count; classifies H1–H5); R-86-C4 (post-recovery fleet confirmation — all tenants ≥ 99% in ≥ 10-min window; gate for IC closure). Six-step recovery: Step 1 (ack PagerDuty, open IC, T-86-A, emit `siem.sso_fleet_health_ic_opened`); Step 2 (R-86-C1..C3, classify H1–H5); Step 3a (H1 — `wrangler rollback`); Step 3b (H2/H4 — upstream monitoring, T-86-B); Step 3c (H3 — document, no escalation); Step 3d (H5 — P0, CF WAF, R-04, Art. 33); Step 4 (R-86-C4 fleet recovery confirmation); Step 5 (T-86-C CSM notification); Step 6 (emit `siem.sso_fleet_health_ic_closed`, file SSO-FLEET-IC-E-001, close IC). Three communication templates: T-86-A (initial P1 declaration — SLA credit impact: NONE); T-86-B (CSM degraded-mode notification — H2/H4 only); T-86-C (post-resolution — root cause, degraded window, `affected_tenant_count` aggregate integer). Two new DEC-030 events: `siem.sso_fleet_health_ic_opened` STANDARD/7yr (anchor event; `incident_id`, `trigger_event_id`, `failing_tenant_count`, `fleet_success_rate_pct`, `initial_severity`, `breach_window_epoch`; no `tenant_id` list) and `siem.sso_fleet_health_ic_closed` LOW/3yr (terminal event; `incident_id`, `trigger_event_id`, `root_cause`, `degraded_window_minutes`, `affected_tenant_count`, `peak_failure_rate_pct`, `fleet_recovered_at`, `r04_co_activated`, `art33_assessment_required`, `csm_notified`). SSO-FLEET-CHAIN-01 ordering invariant: `siem.sso_fleet_health_ic_closed` MUST be preceded by `siem.sso_fleet_health_ic_opened` for same `incident_id`, which MUST be preceded by `siem.sso_fleet_health_breach` with matching `breach_window_epoch` within 1 h; HTTP 422 `SSO_FLEET_CHAIN_01_VIOLATION` on inversion (pending M6 implementation). SSO-FLEET-IC-E-001 per-activation artefact (CC7.2/CC7.3, 3yr WORM, `compliance/evidence/sso/sso-fleet-ic-e-001-{incident_id}.json`): seven components (R-86-C1..C4 outputs, trigger/opened/terminal DEC-030 event JSON); no `user_id`, no employee name, no email, no health data; `tenant_id` FORM-internal UUID in scope query outputs; `failing_tenant_count`/`affected_tenant_count` aggregate integers; source IPs never in DEC-030 payloads. SOC2_READINESS §190 (SSO-FLEET-IC-E-001; evidence count 165 → 166; v4.14.0). OBSERVABILITY.md §49.5 companion runbook field added (v5.24.3). AUDIT_LOG_SCHEMA.md §R-86 two new events registered (v3.4). Five post-incident controls: H1 — CF Worker SSO canary step in deploy pipeline; H5 — CF WAF rate-limit rule; H2/H4 recurring — SSO fallback architecture review; H3 recurring — breach threshold reassessment (DEC-070); universal — 48h post-mortem if > 15 min degraded. Privacy floor: no data subject name, email, health value, or GDPR Art. 9 special-category data in any scope query, DEC-030 payload, communication template, or evidence artefact; HR role NEVER has access to `compliance/evidence/sso/`; `tenant_id` FORM-internal UUID only. Document header v3.48.4 → v3.49.0. Owner: security-engineer + compliance-officer + devops-lead.*
 
 ---
 

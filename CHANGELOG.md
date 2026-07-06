@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [13.69.1] — 2026-07-06
+
+### Added
+- `docs/INCIDENT_RESPONSE.md R-86` — Companion IC runbook for AL-SSO-FLEET-01 (v3.49.0). Closes the companion runbook gap for the P1 fleet-wide SSO health breach alert. Twelve sections: three trigger modes, severity matrix, four scope queries (R-86-C1..C4), five root cause hypotheses H1–H5 (FORM Worker regression, WorkOS/Auth0 upstream, coincident independent IdP failures, CF network partition, credential stuffing), six-step recovery, three communication templates (T-86-A/B/C), two new DEC-030 events, SSO-FLEET-IC-E-001 evidence artefact, SOC 2 auditor narratives, five post-incident controls. P0 escalation criteria for H5 (credential stuffing) with R-04 co-activation and GDPR Art. 33 assessment.
+- `docs/AUDIT_LOG_SCHEMA.md §R-86` — Two new DEC-030 HMAC-chained events (v3.4): `siem.sso_fleet_health_ic_opened` STANDARD/7yr (SSO-FLEET-CHAIN-01 anchor; `incident_id`, `trigger_event_id`, `failing_tenant_count`, `fleet_success_rate_pct`, `initial_severity`, `breach_window_epoch`) and `siem.sso_fleet_health_ic_closed` LOW/3yr (terminal; `root_cause`, `degraded_window_minutes`, `affected_tenant_count`, `peak_failure_rate_pct`, `fleet_recovered_at`, `r04_co_activated`, `art33_assessment_required`, `csm_notified`). Zod v2 schemas. SSO-FLEET-CHAIN-01 ordering invariant: `ic_closed` requires prior `ic_opened` for same `incident_id`, requires prior `siem.sso_fleet_health_breach` with matching `breach_window_epoch` within 1 h; HTTP 422 `SSO_FLEET_CHAIN_01_VIOLATION` on violation.
+- `docs/SOC2_READINESS.md §190` — SSO-FLEET-IC-E-001 registration (v4.14.0; evidence count 165 → 166). Per-activation CC7.2/CC7.3 evidence artefact; 3yr WORM; `compliance/evidence/sso/sso-fleet-ic-e-001-{incident_id}.json`. Seven required components: R-86-C1..C4 outputs + three DEC-030 event JSONs. Privacy floor: `tenant_id` FORM-internal UUID; aggregate counts only; no user_id, email, health data; HR access prohibited.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.48.4 → v3.49.0. R-86 appended; document header bumped.
+- `docs/OBSERVABILITY.md` — v5.24.2 → v5.24.3. §49.5 AL-SSO-FLEET-01 alert table: added "Dedicated companion IR runbook: INCIDENT_RESPONSE R-86" field. §49.9 checklist: added item 6 (Done).
+- `docs/AUDIT_LOG_SCHEMA.md` — v3.3 → v3.4. §R-86 inserted.
+- `docs/SOC2_READINESS.md` — v4.12.0 → v4.14.0 (covers both the prior v4.13.0 header-bump gap and this pass). §190 appended.
+- `VERSION` — 13.69.0 → 13.69.1.
+
 ## [13.68.1] — 2026-07-06
 
 ### Added
