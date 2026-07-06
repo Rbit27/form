@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.49
+# FORM · Multi-Tenant Data Model v1.50
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -65,6 +65,7 @@
 55. [`session_blocklist.kv_sync_status` — KV Revocation Sync Status — Migration 0102](#55-session_blocklists-kv_sync_status--kv-revocation-sync-status--migration-0102)
 56. [`tenant_sso_configs` CAEP Schema Extension & `caep_events` Table — Migration 0082](#56-tenant_sso_configs-caep-schema-extension--caep_events-table--migration-0082)
 57. [`tenant_sso_configs` BDG Column Extension — Migration 0079](#57-tenant_sso_configs-bdg-column-extension--migration-0079)
+58. [`user_aggregate_consent` Consent Re-Solicitation Schema Extension — Migration 0093 (closes OQ-ENT-03)](#58-user_aggregate_consent-consent-re-solicitation-schema-extension--migration-0093)
 
 ---
 
@@ -20789,6 +20790,512 @@ UPDATE tenant_sso_configs
 
 ---
 
+## §58. `user_aggregate_consent` Consent Re-Solicitation Schema Extension — Migration 0093
+
+> **Closes OQ-ENT-03** (DATA_MODEL §9 open question: "Consent re-solicitation on metric registry expansion — if FORM adds a new permitted metric category to §17.2A, all existing users whose `consent_version` predates the change must be re-consented before their data is included under the new category.")
+
+**Migration:** `0093_consent_resolicitation.sql`
+**Owner:** enterprise-architect + platform-engineer + compliance-officer
+**Checkpoint:** M6 (pre-enterprise GA)
+**Version:** DATA_MODEL v1.50 (2026-07-06)
+
+---
+
+### §58.1 Purpose
+
+Migration 0093 closes the consent re-solicitation gap identified in §9 OQ-ENT-03 and §17 footer. It provides:
+
+1. A **`metric_consent_versions` registry table** — the tamper-evident, append-only record of every metric category expansion (P3.2 anchor).
+2. **Four new columns on `user_aggregate_consent`** — encoding the four-state re-solicitation FSM per user.
+3. **Three DDL coherence constraints** — enforcing the 14-day grace-period invariant at the database layer.
+4. **Four partial indexes** — scoping fan-out Worker, pg_cron job 38, and §17 MV exclusion gate to only relevant rows.
+5. **pg_cron job 38 `consent_grace_expiry_sweep`** (*/15) — CONSENT-SLO-02 ≤ 30 min.
+6. **§17 MV `consent_gate` CTE** — enforcing purpose-limitation at query time (P5.1).
+7. **Four DEC-030 HMAC-chained events** — providing per-tenant, non-PII audit evidence (P4.1).
+
+---
+
+### §58.2 Dependency Chain
+
+```
+Migration 0017 (user_aggregate_consent base)
+  └── Migration 0093 (Part A: metric_consent_versions + Part B: four columns)
+        └── §17 MV consent_gate CTE patch
+        └── pg_cron job 38 consent_grace_expiry_sweep
+```
+
+Migration 0093 must be committed before the first `metric_consent_versions` row is inserted and before any new metric category is added to §17.2A.
+
+---
+
+### §58.3 DDL — Migration 0093
+
+#### §58.3.1 Part A — `metric_consent_versions` Table (New)
+
+```sql
+-- Migration 0093 Part A: metric consent version registry
+CREATE TABLE metric_consent_versions (
+  id                       UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  version                  TEXT        NOT NULL UNIQUE
+                                         CHECK (version ~ '^v[0-9]+\.[0-9]+$'),
+  previous_version         TEXT        REFERENCES metric_consent_versions(version)
+                                         ON DELETE RESTRICT ON UPDATE CASCADE,
+  effective_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  requires_resolicitation  BOOLEAN     NOT NULL DEFAULT TRUE,
+  added_categories         TEXT[]      NOT NULL DEFAULT '{}',
+  removed_categories       TEXT[]      NOT NULL DEFAULT '{}',
+  change_description       TEXT        NOT NULL
+                                         CHECK (length(change_description) BETWEEN 10 AND 500),
+  gdpr_legal_basis         TEXT        NOT NULL
+                                         CHECK (gdpr_legal_basis IN ('Art.6(1)(a)', 'Art.89(1)')),
+  registered_by_role       TEXT        NOT NULL
+                                         CHECK (registered_by_role IN
+                                           ('compliance-officer', 'enterprise-architect')),
+  registered_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Seed row: v1.0 — baseline consent scope at launch; no prior version; no re-solicitation needed
+INSERT INTO metric_consent_versions
+  (version, previous_version, requires_resolicitation, added_categories,
+   removed_categories, change_description, gdpr_legal_basis, registered_by_role)
+VALUES
+  ('v1.0', NULL, FALSE, '{}', '{}',
+   'Baseline metric consent scope at FORM launch — no resolicitation required.',
+   'Art.6(1)(a)', 'compliance-officer');
+
+CREATE INDEX idx_mcv_effective_at ON metric_consent_versions (effective_at DESC);
+```
+
+#### §58.3.2 Part B — `user_aggregate_consent` Extension
+
+```sql
+-- Migration 0093 Part B: re-solicitation columns on user_aggregate_consent
+ALTER TABLE user_aggregate_consent
+  ADD COLUMN resolicitation_status  TEXT        NOT NULL DEFAULT 'current'
+                                                  CHECK (resolicitation_status IN
+                                                    ('current', 'pending', 'declined',
+                                                     'grace_expired')),
+  ADD COLUMN solicited_at           TIMESTAMPTZ,
+  ADD COLUMN grace_expires_at       TIMESTAMPTZ,
+  ADD COLUMN responded_at           TIMESTAMPTZ,
+  ADD COLUMN target_consent_version TEXT
+                                      REFERENCES metric_consent_versions(version)
+                                      ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Coherence constraint 1: pending status requires timestamps
+ALTER TABLE user_aggregate_consent
+  ADD CONSTRAINT uac_pending_requires_timestamps CHECK (
+    resolicitation_status <> 'pending'
+    OR (solicited_at IS NOT NULL AND grace_expires_at IS NOT NULL)
+  );
+
+-- Coherence constraint 2: grace period must be exactly 14 days from solicitation
+ALTER TABLE user_aggregate_consent
+  ADD CONSTRAINT uac_grace_period_14d CHECK (
+    grace_expires_at IS NULL
+    OR grace_expires_at = solicited_at + INTERVAL '14 days'
+  );
+
+-- Coherence constraint 3: non-current status requires a target version
+ALTER TABLE user_aggregate_consent
+  ADD CONSTRAINT uac_target_version_when_noncurrent CHECK (
+    resolicitation_status = 'current'
+    OR target_consent_version IS NOT NULL
+  );
+
+-- Partial index 1: fan-out Worker + pg_cron job 38 scope
+CREATE INDEX idx_uac_pending
+  ON user_aggregate_consent (id)
+  WHERE resolicitation_status = 'pending';
+
+-- Partial index 2: job 38 grace-expiry sweep, ordered by expiry
+CREATE INDEX idx_uac_grace_expiry
+  ON user_aggregate_consent (grace_expires_at ASC)
+  WHERE resolicitation_status = 'pending';
+
+-- Partial index 3: dashboard staleness banner per tenant
+CREATE INDEX idx_uac_tenant_pending
+  ON user_aggregate_consent (tenant_id)
+  WHERE resolicitation_status = 'pending';
+
+-- Partial index 4: §17 MV consent_gate exclusion gate per tenant
+CREATE INDEX idx_uac_excluded
+  ON user_aggregate_consent (tenant_id)
+  WHERE resolicitation_status IN ('declined', 'grace_expired');
+```
+
+#### §58.3.3 Rollback
+
+```sql
+-- Pre-gate: confirm zero rows with resolicitation_status <> 'current' before rollback
+DO $$
+BEGIN
+  ASSERT (SELECT COUNT(*) FROM user_aggregate_consent
+          WHERE resolicitation_status <> 'current') = 0,
+    'Cannot rollback 0093: non-current resolicitation rows exist';
+END $$;
+
+DROP INDEX IF EXISTS idx_uac_excluded;
+DROP INDEX IF EXISTS idx_uac_tenant_pending;
+DROP INDEX IF EXISTS idx_uac_grace_expiry;
+DROP INDEX IF EXISTS idx_uac_pending;
+
+ALTER TABLE user_aggregate_consent
+  DROP CONSTRAINT IF EXISTS uac_target_version_when_noncurrent,
+  DROP CONSTRAINT IF EXISTS uac_grace_period_14d,
+  DROP CONSTRAINT IF EXISTS uac_pending_requires_timestamps,
+  DROP COLUMN IF EXISTS target_consent_version,
+  DROP COLUMN IF EXISTS responded_at,
+  DROP COLUMN IF EXISTS grace_expires_at,
+  DROP COLUMN IF EXISTS solicited_at,
+  DROP COLUMN IF EXISTS resolicitation_status;
+
+DROP INDEX IF EXISTS idx_mcv_effective_at;
+DROP TABLE IF EXISTS metric_consent_versions;
+```
+
+---
+
+### §58.4 CI Adversarial Tests MIG-0093-01..06
+
+| ID | Description | Pass Criterion |
+|---|---|---|
+| **MIG-0093-01** | Migration apply idempotency | `0093` applies cleanly; `metric_consent_versions` has seed row v1.0; five new columns present on `user_aggregate_consent` with correct defaults |
+| **MIG-0093-02** | `resolicitation_status` CHECK | INSERT with `resolicitation_status = 'invalid'` → `CHECK constraint "uac_..." violated` |
+| **MIG-0093-03** | `uac_pending_requires_timestamps` | UPDATE row to `resolicitation_status='pending'` without setting `solicited_at` → constraint violation |
+| **MIG-0093-04** | `uac_grace_period_14d` | INSERT with `grace_expires_at = solicited_at + INTERVAL '13 days'` → constraint violation; `+ 14 days` → succeeds |
+| **MIG-0093-05** | `uac_target_version_when_noncurrent` | UPDATE to `resolicitation_status='declined'` with `target_consent_version = NULL` → constraint violation |
+| **MIG-0093-06** | pg_cron job 38 grace-expiry sweep | Seed `pending` rows with `grace_expires_at = NOW() - INTERVAL '1 hour'`; run job 38 manually; confirm rows → `grace_expired`, `responded_at` non-null; confirm per-tenant `aggregate_consent.version_declined (decline_type=grace_expired)` DEC-030 events emitted |
+
+---
+
+### §58.5 Schema Semantics
+
+#### §58.5.1 `metric_consent_versions` Column Semantics
+
+| Column | Semantics |
+|---|---|
+| `version` | Semver-style string (`v1.0`, `v1.1`, …). Must satisfy regex `^v[0-9]+\.[0-9]+$`. Unique — prevents double-registration of the same version. |
+| `previous_version` | Self-FK to prior row. `NULL` only for `v1.0` seed. `ON DELETE RESTRICT` prevents deletion of a version that is still referenced as a prior. |
+| `requires_resolicitation` | `FALSE` for `v1.0` (no prior cohort to re-consent). `TRUE` for every subsequent version that adds metric categories. Only `FALSE` for patch-level corrections that do not expand scope. |
+| `added_categories` | `TEXT[]` of metric category names added in this version. Empty for removals-only versions. No PII — metric category names only (e.g., `['hrv_weekly', 'vo2max_trend']`). |
+| `removed_categories` | `TEXT[]` of metric category names removed. Users who had consented to these categories are unaffected (removal is scope-narrowing). |
+| `change_description` | Human-readable summary (10–500 chars). Must describe purpose of change, not personal data. Written by `registered_by_role` at registration time. |
+| `gdpr_legal_basis` | `Art.6(1)(a)` for consent-based processing; `Art.89(1)` for statistical/research purposes under appropriate safeguards. |
+| `registered_by_role` | `compliance-officer` or `enterprise-architect`. Ensures privileged, documented accountability for each purpose change. |
+| `registered_at` | Server-set timestamp of INSERT. Immutable — this table is append-only; no UPDATE policy granted. |
+
+#### §58.5.2 `user_aggregate_consent` New Columns + Four-State FSM
+
+| Column | Semantics |
+|---|---|
+| `resolicitation_status` | FSM state. `current` = user's `consent_version` matches latest `metric_consent_versions` row (or no pending version exists). `pending` = re-solicitation initiated; user has not yet responded. `declined` = user explicitly opted out via in-app modal. `grace_expired` = grace period elapsed without response (implicit decline). |
+| `solicited_at` | Timestamp set by fan-out Worker when transitioning `current→pending`. `NULL` when `resolicitation_status = 'current'`. |
+| `grace_expires_at` | Always `solicited_at + INTERVAL '14 days'` (enforced by `uac_grace_period_14d` constraint). Defines the deadline by which the user must respond before job 38 transitions to `grace_expired`. |
+| `responded_at` | Set by form_api Worker on `pending→current` or `pending→declined`; set by pg_cron job 38 on `pending→grace_expired`. |
+| `target_consent_version` | FK to `metric_consent_versions.version`. The version the user is being asked to accept. Non-null for all non-`current` statuses. |
+
+**Four-state FSM transitions:**
+
+```
+current ──(fan-out Worker on new version_registered)──▶ pending
+pending ──(user accepts in-app modal)──────────────────▶ current
+pending ──(user clicks opt-out)────────────────────────▶ declined
+pending ──(pg_cron job 38, grace_expires_at < NOW())───▶ grace_expired
+```
+
+- `grace_expired` ≠ `declined`: `grace_expired` sets no `opted_out` flag (preserves user agency — they may have simply not opened the app during the grace period). `declined` sets `opted_out = TRUE`.
+- Both `declined` and `grace_expired` users are excluded from metrics added in `target_consent_version` by the §17 MV `consent_gate` CTE.
+
+#### §58.5.3 Re-Solicitation Flow (Three Cloudflare Workers)
+
+**Worker A — `consent-version-registrar` (compliance-officer triggered):**
+1. INSERT new row into `metric_consent_versions` (role: `form_system` via PAM session).
+2. Emit `aggregate_consent.version_registered` DEC-030 event (RESOL-CHAIN-01 anchor).
+3. Invoke Worker B asynchronously for fan-out.
+
+**Worker B — `consent-resolicitation-fanout`:**
+1. SELECT all `user_aggregate_consent` rows WHERE `resolicitation_status = 'current'` AND `opted_out = FALSE`, scoped to active tenants.
+2. Batch-UPDATE: `resolicitation_status = 'pending'`, `solicited_at = NOW()`, `grace_expires_at = NOW() + INTERVAL '14 days'`, `target_consent_version = <new_version>`.
+3. Emit per-tenant `aggregate_consent.resolicitation_initiated` DEC-030 event (RESOL-CHAIN-01: must follow `version_registered`).
+4. Trigger in-app notification (mobile push + in-app banner) via notification service.
+
+**Worker C — `consent-response-handler` (form_api, user-triggered):**
+- **Accept path:** UPDATE `resolicitation_status = 'current'`, `consent_version = target_consent_version`, `responded_at = NOW()`, clear `solicited_at`/`grace_expires_at`/`target_consent_version`. Emit `aggregate_consent.version_accepted`.
+- **Decline path:** UPDATE `resolicitation_status = 'declined'`, `opted_out = TRUE`, `responded_at = NOW()`. Emit `aggregate_consent.version_declined (decline_type=explicit_decline)`.
+
+#### §58.5.4 §17 MV `consent_gate` CTE
+
+All four §17 materialized views (`tenant_wellness_summary_v2`, `tenant_engagement_summary`, `tenant_feature_adoption`, `tenant_cohort_breakdown`) receive the following CTE prepended to their SELECT:
+
+```sql
+WITH consent_gate AS (
+  SELECT user_id
+  FROM user_aggregate_consent
+  WHERE tenant_id = <tenant_id>
+    AND opted_out = FALSE
+    AND resolicitation_status NOT IN ('declined', 'grace_expired')
+    -- users with status='pending' are included only for metrics
+    -- covered by their current consent_version, not target_consent_version
+)
+-- all downstream CTEs JOIN ON uac.user_id IN (SELECT user_id FROM consent_gate)
+```
+
+The `assert_k_anonymity()` guard applies AFTER the `consent_gate` exclusion. If a tenant drops below k=5 eligible users after exclusion, the MV returns an empty result set rather than leaking data.
+
+#### §58.5.5 pg_cron Job 38 — `consent_grace_expiry_sweep`
+
+```sql
+-- Registered in Supabase pg_cron as job 38
+SELECT cron.schedule(
+  'consent_grace_expiry_sweep',
+  '*/15 * * * *',
+  $$
+    UPDATE user_aggregate_consent
+    SET
+      resolicitation_status = 'grace_expired',
+      responded_at          = NOW()
+    WHERE
+      resolicitation_status = 'pending'
+      AND grace_expires_at < NOW()
+    RETURNING tenant_id, target_consent_version, responded_at;
+    -- application layer reads RETURNING rows to emit per-tenant
+    -- aggregate_consent.version_declined (decline_type=grace_expired) DEC-030 events
+  $$
+);
+```
+
+**CONSENT-SLO-02:** Maximum gap between `grace_expires_at` and the `grace_expired` transition is ≤ 30 minutes (two job-38 cycles). Alert `AL-CONSENT-SLO-02` fires if any row WHERE `resolicitation_status = 'pending' AND grace_expires_at < NOW() - INTERVAL '30 minutes'` exists.
+
+---
+
+### §58.6 RLS
+
+#### `metric_consent_versions`
+
+| Role | Policy |
+|---|---|
+| `form_system` | ALL (BYPASSRLS) — Compliance-officer Worker; the only role that may INSERT |
+| `form_api` | SELECT — gate checks in §17 MV consent_gate CTE |
+| `form_admin` | SELECT — read-only admin dashboard |
+| `form_quality` | SELECT — QA and audit queries |
+| `tenant_admin` | ZERO ACCESS — tenant administrators cannot read or write version registry |
+| `tenant_manager` | ZERO ACCESS — HR cannot read metric category names or version history |
+
+```sql
+ALTER TABLE metric_consent_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE metric_consent_versions FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY mcv_system_all ON metric_consent_versions
+  FOR ALL TO form_system USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY mcv_api_select ON metric_consent_versions
+  FOR SELECT TO form_api USING (TRUE);
+
+CREATE POLICY mcv_admin_select ON metric_consent_versions
+  FOR SELECT TO form_admin USING (TRUE);
+
+CREATE POLICY mcv_quality_select ON metric_consent_versions
+  FOR SELECT TO form_quality USING (TRUE);
+-- No policy for tenant_admin or tenant_manager → zero rows visible
+```
+
+#### `user_aggregate_consent` New Columns
+
+New columns inherit the existing §17 RLS policies verbatim:
+- `form_api` may UPDATE `resolicitation_status`, `solicited_at`, `grace_expires_at`, `responded_at`, `target_consent_version` on rows WHERE `tenant_id = current_setting('app.tenant_id')`.
+- `tenant_manager` has DENY on all rows — HR never sees individual consent status, resolicitation state, or response timestamp.
+- `tenant_admin` SELECT on own-tenant rows — aggregated counts only (dashboard); individual `user_id` columns are not exposed through the dashboard API.
+
+**Auditor proof queries (run in CI):**
+```sql
+-- Confirm tenant_manager cannot read metric_consent_versions
+SET ROLE tenant_manager;
+SELECT COUNT(*) FROM metric_consent_versions; -- must return 0 rows (permission denied or empty)
+RESET ROLE;
+
+-- Confirm tenant_manager cannot read resolicitation_status
+SET ROLE tenant_manager;
+SELECT resolicitation_status FROM user_aggregate_consent LIMIT 1; -- must be denied
+RESET ROLE;
+```
+
+---
+
+### §58.7 Privacy Floor
+
+| Guarantee | Mechanism |
+|---|---|
+| No `user_id` in any DEC-030 event | All four `aggregate_consent.*` events carry only `tenant_id` (UUID) and aggregate counts; `user_id` is structurally absent from every payload |
+| `tenant_pending_count` is integer count only | Fan-out Worker emits the count of rows transitioned to `pending` — no names, emails, or user IDs |
+| `response_latency_days` is day-granularity | `version_accepted` payload carries `response_latency_days` as an integer (0–14) — no sub-day timing; no individual timestamp |
+| `change_description` constraint | CHECK 10–500 chars; must contain metric category names only; no PII requirement in the constraint text; enforced by compliance-officer review at registration |
+| `tenant_manager` ZERO RLS | HR cannot read `metric_consent_versions` (version registry) or any column of `user_aggregate_consent` — individual consent status is invisible to HR |
+| GDPR Art. 17 CASCADE | `user_aggregate_consent` has `ON DELETE CASCADE` from `users`; erasure request removes re-solicitation state atomically |
+| `grace_expired` ≠ `opted_out` | A user who did not respond during the grace period is transitioned to `grace_expired` (excluded from new metrics) but `opted_out` remains `FALSE`, preserving their right to re-consent in a future flow; explicit `opted_out = TRUE` is set only on `declined` |
+
+---
+
+### §58.8 DEC-030 Audit Events
+
+Four new events require registration in `docs/AUDIT_LOG_SCHEMA.md` (⏳ Pending P0/M6).
+
+#### Event 1 — `aggregate_consent.version_registered`
+
+| Field | Value |
+|---|---|
+| **Severity** | HIGH |
+| **Retention** | 7 years (WORM; RESOL-CHAIN-01 anchor) |
+| **Emitter** | `consent-version-registrar` Worker (form_system role) |
+| **Trigger** | Compliance-officer inserts new `metric_consent_versions` row |
+| **RESOL-CHAIN-01** | This event must precede `resolicitation_initiated` for the same `consent_version` in the HMAC chain |
+
+```json
+{
+  "event_type": "aggregate_consent.version_registered",
+  "new_version": "v1.1",
+  "previous_version": "v1.0",
+  "requires_resolicitation": true,
+  "added_categories": ["hrv_weekly", "vo2max_trend"],
+  "removed_categories": [],
+  "change_description": "Adding HRV weekly average and VO2 max trend to aggregate wellness metrics.",
+  "gdpr_legal_basis": "Art.6(1)(a)",
+  "registered_by_role": "compliance-officer"
+}
+```
+
+No `user_id` field. No `tenant_id` field (global event).
+
+#### Event 2 — `aggregate_consent.resolicitation_initiated`
+
+| Field | Value |
+|---|---|
+| **Severity** | STANDARD |
+| **Retention** | 3 years |
+| **Emitter** | `consent-resolicitation-fanout` Worker, per-tenant |
+| **Trigger** | Fan-out Worker batch-updates tenant's users to `pending` |
+| **RESOL-CHAIN-01** | Must follow `version_registered` for same `consent_version`; HTTP 422 `RESOL_CHAIN_01_NO_VERSION` + P1 PagerDuty `form-security` on violation |
+
+```json
+{
+  "event_type": "aggregate_consent.resolicitation_initiated",
+  "tenant_id": "<uuid>",
+  "consent_version": "v1.1",
+  "tenant_pending_count": 47,
+  "solicitation_start_iso": "2026-07-06T14:00:00Z",
+  "grace_expires_iso": "2026-07-20T14:00:00Z"
+}
+```
+
+No `user_id`. `tenant_pending_count` is an integer count — no user enumeration.
+
+#### Event 3 — `aggregate_consent.version_accepted`
+
+| Field | Value |
+|---|---|
+| **Severity** | STANDARD |
+| **Retention** | 3 years |
+| **Emitter** | `consent-response-handler` Worker (form_api role, accept path) |
+| **Trigger** | User accepts re-solicitation modal |
+
+```json
+{
+  "event_type": "aggregate_consent.version_accepted",
+  "tenant_id": "<uuid>",
+  "consent_version": "v1.1",
+  "previous_version": "v1.0",
+  "response_latency_days": 3,
+  "accepted_at_iso": "2026-07-09T10:22:00Z"
+}
+```
+
+No `user_id`. `response_latency_days` is day-granularity (0–14 integer) — no sub-day timing.
+
+#### Event 4 — `aggregate_consent.version_declined`
+
+| Field | Value |
+|---|---|
+| **Severity** | STANDARD |
+| **Retention** | 3 years |
+| **Emitter** | `consent-response-handler` Worker (explicit decline) OR pg_cron job 38 (grace expiry); per-tenant aggregate |
+| **Trigger** | User declines OR grace period expires |
+
+```json
+{
+  "event_type": "aggregate_consent.version_declined",
+  "tenant_id": "<uuid>",
+  "consent_version": "v1.1",
+  "decline_type": "grace_expired",
+  "declined_at_iso": "2026-07-20T14:05:32Z"
+}
+```
+
+`decline_type` enum: `explicit_decline` | `grace_expired`. No `user_id`.
+
+**RESOL-CHAIN-01 Invariant:** The emit-audit-event Worker verifies that for every `resolicitation_initiated` event, a `version_registered` event with the same `consent_version` exists earlier in the HMAC chain. Violation returns HTTP 422 `RESOL_CHAIN_01_NO_VERSION` and triggers P1 PagerDuty alert on `form-security`.
+
+---
+
+### §58.9 SOC 2 Mapping
+
+| Criterion | Narrative | Evidence |
+|---|---|---|
+| **P3.2** (Purpose limitation — notice) | `aggregate_consent.version_registered` is the tamper-evident record of every metric processing purpose change. The DEC-030 HMAC chain ensures this record cannot be backdated or altered. `resolicitation_initiated` confirms consent was sought before new categories entered the processing pipeline. | `CONSENT-VER-E-001` quarterly artefact |
+| **P4.1** (Consent to collection) | `aggregate_consent.version_accepted` and `version_declined` provide per-tenant evidence that consent was actively solicited and a response recorded before expanded metric processing began. `grace_expired` events evidence that users who did not respond were excluded — not silently included. | `CONSENT-VER-E-001` quarterly artefact |
+| **P5.1** (Use limited to stated purpose) | The §17 MV `consent_gate` CTE is the architectural enforcement: a user with `resolicitation_status IN ('pending', 'declined', 'grace_expired')` is excluded from new metric categories at the query layer — the exclusion is structural, not application-layer policy. The k-anonymity guard applies after consent_gate. | SQL proof query in CI |
+| **CC6.1** (Logical access controls) | `resolicitation_status` column + `consent_version` FK combine to form the logical access gate for metric processing. `tenant_manager` zero-access RLS prevents HR from observing individual consent state. `metric_consent_versions` is append-only (no UPDATE policy) — version history cannot be altered. | `CONSENT-VER-E-001` quarterly artefact |
+
+---
+
+### §58.10 Evidence Artefact — `CONSENT-VER-E-001`
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | `CONSENT-VER-E-001` |
+| **SOC 2 Criteria** | P3.2, P4.1, P5.1, CC6.1 |
+| **Cadence** | Quarterly |
+| **Retention** | 3 years |
+| **Path** | `compliance/evidence/consent-versioning/CONSENT-VER-E-001_<YYYY-QN>.json` |
+| **Contents** | Export of all four `aggregate_consent.*` DEC-030 events for the quarter; cross-check SQL result `SELECT COUNT(*) FROM user_aggregate_consent WHERE resolicitation_status = 'pending' AND grace_expires_at < NOW()` (must be 0 — confirms job 38 is running); zero-event quarters filed as explicit attestation JSON |
+| **Registration** | `docs/SOC2_READINESS.md` — ⏳ Pending P1/M6 |
+
+---
+
+### §58.11 Implementation Checklist
+
+#### P0 — M6 (pre-enterprise GA)
+
+| # | Task | Owner | Status |
+|---|---|---|---|
+| 1 | Apply migration 0093 to staging: verify `metric_consent_versions` table + seed row v1.0; verify five new columns on `user_aggregate_consent` with correct defaults; run CI adversarial tests MIG-0093-01..06 | platform-engineer + devops-lead | [ ] Pending |
+| 2 | Deploy `consent-resolicitation-fanout` Worker (Worker B) and `consent-response-handler` Worker (Worker C); confirm end-to-end flow on staging: version registration → fan-out → user accept → DEC-030 events emitted | platform-engineer | [ ] Pending |
+| 3 | Register four `aggregate_consent.*` DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | [ ] Pending |
+| 4 | Deploy pg_cron job 38 `consent_grace_expiry_sweep` (*/15); confirm CONSENT-SLO-02 freshness (≤ 30 min); confirm `AL-CONSENT-SLO-02` alert fires on synthetic expired row | devops-lead | [ ] Pending |
+| 5 | Build and ship in-app re-solicitation modal (mobile + web); clinical-safety review required before release; confirm `version_accepted` and `version_declined (explicit_decline)` paths end-to-end | platform-engineer (clinical-safety sign-off) | [ ] Pending |
+
+#### P1 — M6 (documentation)
+
+| # | Task | Owner | Status |
+|---|---|---|---|
+| 6 | Update §17 four materialized views with `consent_gate` CTE (§58.5.4); run CI proof query confirming excluded users do not appear in MV output | platform-engineer + compliance-officer | [ ] Pending |
+| 7 | Add `CONSENT-VER-E-001` to compliance evidence cron and register in `docs/SOC2_READINESS.md` as new quarterly evidence artefact | compliance-officer | [ ] Pending |
+| 8 | Register OQ-ENT-03 as 🟢 Resolved in DATA_MODEL §9 open questions table (closes this pass) | enterprise-architect | 🟢 Done — this pass (v1.50, 2026-07-06) |
+
+---
+
+### §58.12 Cross-Reference Obligations
+
+| Document | Section | Description | Status |
+|---|---|---|---|
+| `docs/AUDIT_LOG_SCHEMA.md` | New `aggregate_consent.*` family | Register four events: `version_registered` (HIGH/7yr), `resolicitation_initiated` (STANDARD/3yr), `version_accepted` (STANDARD/3yr), `version_declined` (STANDARD/3yr) | ⏳ Pending P0/M6 |
+| `docs/DATA_MODEL.md` | §17 MVs | Patch all four §17 materialized views with `consent_gate` CTE (§58.5.4) | ⏳ Pending P1/M6 |
+| `docs/SOC2_READINESS.md` | New §193 | Register `CONSENT-VER-E-001` quarterly evidence artefact (P3.2/P4.1/P5.1/CC6.1) | ⏳ Pending P1/M6 |
+| `docs/DATA_MODEL.md` | §9 OQ-ENT-03 | Patch open question from Open → 🟢 Resolved | 🟢 Done — this pass (v1.50, 2026-07-06) |
+
+---
+
 *v1.48 (2026-07-06): §56 `tenant_sso_configs` CAEP Schema Extension & `caep_events` Table — Migration 0082. DATA_MODEL canonical registration for the CAEP/RISC schema migrations specified in `docs/SSO_SCIM_IMPLEMENTATION.md §23` (v1.5, 2026-06-01) + `§36` (DEC-072, v2.8, 2026-06-19). Migration 0082 is the root CAEP dependency — all six subsequent CAEP migrations (0083–0088) list it as prerequisite; pg_cron job 37 (`caep_reregister_sweep`, */5 * * * *) requires Part C columns. Three DDL parts: Part A (6 columns on `tenant_sso_configs`: `caep_stream_id`, `caep_delivery_mode`, `caep_webhook_secret` AES-256-GCM, `caep_status` CHECK 'inactive'/'active'/'error'/'rate_limited', `caep_last_event_at`, `caep_error_count`; plus `idx_tenant_sso_configs_caep_active` partial index), Part B (new `caep_events` table: `id` UUID PK, `tenant_id` ON DELETE CASCADE, `user_id` ON DELETE SET NULL, `set_jti` UNIQUE SHA-256 hash, `event_type`, `idp_subject` SHA-256 hash, `action_taken`, `processed_at`, `raw_set_hash` SHA-256 hash; `idx_caep_events_tenant_processed` + `idx_caep_events_set_jti` UNIQUE; 3 RLS policies: form_system ALL, tenant_admin SELECT own, form_api DENY), Part C (3 re-registration columns: `caep_reregistration_required` BOOLEAN NOT NULL DEFAULT FALSE, `caep_last_reregistered_at` TIMESTAMPTZ, `caep_reregistration_trigger` CHECK IN cert_rotation/manual/stream_error/initial; `idx_tsc_caep_reregister` partial index). §56.1 purpose: closes DATA_MODEL registration gap for CAEP migration 0082 — SSO_SCIM §23.5 + §36.2.3 had complete design + DDL but no companion DATA_MODEL section (same pattern as §52/0101, §53/0100, §54/0098, §55/0102). §56.2 dependency chain: 0082 is root for 0083–0088; pg_cron job 37 requires Part C; CAEP Worker deployment gated on 0082 commit. §56.3 full DDL + rollback (all 3 parts; rollback pre-gate: zero active streams; CONCURRENTLY indexes no table lock). §56.4 six CI adversarial tests MIG-0082-01..06 (migration apply, rollback, caep_status CHECK, caep_reregistration_trigger CHECK, ciphertext-only + set_jti SHA-256, caep_events ON CONFLICT dedup). §56.5 column/table semantics: 6 Part A columns + `caep_events` 9 columns + 3 Part C columns; caep_status and caep_reregistration_required state machines; CAEP-PURGE-CHAIN-01 invariant. §56.6 RLS (tenant_sso_configs inherits sso_configs_tenant_isolation + system_write + BYPASSRLS; form_api + tenant_manager no access; caep_events 3 policies: form_system ALL, tenant_admin SELECT own, form_api DENY; tenant_manager no policy = zero rows; 5 auditor proof queries). §56.7 privacy floor (caep_webhook_secret = AES-256-GCM ciphertext, never in DEC-030 payloads; set_jti/idp_subject/raw_set_hash = SHA-256 hashes only, never raw values; tenant_manager zero access enforced; GDPR Art. 17: tenant CASCADE delete, user_id SET NULL with HMAC chain retention under Art. 17(3)(b) exemption; 7 DEC-030 events contain no caep_webhook_secret or raw PII). §56.8 SOC 2 (CC6.3 CAEP-SLO-01 <30s — CC6-E-CAEP-001/002 quarterly evidence §186; CC6.6 credential-change/account-disabled revocation < 30s — CC6-E-CAEP-003 quarterly evidence §186; CC7.2 AL-CAEP-01..05 monitoring — CC6-E-CAEP-004 + CAEP-OBS-E-001 §186; CC7.3 R-83/R-84/R-85 runbooks — CAEP-SETERR-E-001 §187, CAEP-PURGE-E-001 §188, RISC-HIJACK-E-001 §189). §56.9 seven-item checklist (4× P0/M4 staging migration + RLS validation + Worker deploy + production; 3× P1/Done this pass DATA_MODEL §56 + SSO_SCIM §23.12 item 16 + §36.6 item 10). §56.10 cross-reference obligations: SSO_SCIM §23.5.1/.5.2/§36.2.3 DDL sources; §23.12 item 16 🟢 Done; §36.6 item 10 🟢 Done; OBSERVABILITY §78 🟢 Done v5.24.0; SOC2_READINESS §186/187/188/189 🟢 Done v4.12.0/v4.13.0; IR R-83/84/85 🟢 Done v3.48.0; AUDIT_LOG_SCHEMA §CAEP/SSF 🟢 Done v2.21. TOC §56 entry added. Document header v1.47 → v1.48. Owner: enterprise-architect + security-engineer + compliance-officer.*
+
+*v1.50 (2026-07-06): §58 `user_aggregate_consent` Consent Re-Solicitation Schema Extension — Migration 0093. Closes OQ-ENT-03 (DATA_MODEL §17 footer + §9 — "consent re-solicitation mechanism on metric registry expansion; the `consent_version` field is the hook; the flow must be designed before any metric category expansion; owner: platform-engineer + compliance-officer; Checkpoint: M6"). New `metric_consent_versions` table (Part A): version TEXT UNIQUE regex `v\d+\.\d+`, previous_version self-FK, `requires_resolicitation` BOOLEAN DEFAULT TRUE, `added_categories` TEXT[] + `removed_categories` TEXT[], `change_description` TEXT CHECK 10–500 chars, `gdpr_legal_basis` CHECK ('Art.6(1)(a)'|'Art.89(1)'), `registered_by_role` CHECK ('compliance-officer'|'enterprise-architect'); seed row v1.0 (requires_resolicitation=FALSE — no prior version). Four columns added to `user_aggregate_consent` (Part B): `resolicitation_status` TEXT NOT NULL DEFAULT 'current' CHECK ('current'|'pending'|'declined'|'grace_expired'); `solicited_at` TIMESTAMPTZ; `grace_expires_at` TIMESTAMPTZ (enforced = solicited_at + INTERVAL '14 days' via check); `responded_at` TIMESTAMPTZ; `target_consent_version` TEXT FK metric_consent_versions(version). Three coherence constraints: `uac_pending_requires_timestamps` (pending ↔ timestamps non-null), `uac_grace_period_14d` (grace_expires_at = solicited_at + 14d), `uac_target_version_when_noncurrent` (declined/grace_expired/pending ↔ target_consent_version non-null). Four partial indexes: `idx_uac_pending` (status='pending') for fan-out Worker + pg_cron scope; `idx_uac_grace_expiry` (status='pending', grace_expires_at ASC) for job 38 sweep; `idx_uac_tenant_pending` (tenant_id, status='pending') for dashboard staleness banner; `idx_uac_declined_tenant` (tenant_id, status IN declined/grace_expired) for §17 MV exclusion gate. pg_cron job 38 `consent_grace_expiry_sweep` `*/15 * * * *` (15-min cadence): finds rows WHERE status='pending' AND grace_expires_at < NOW(); batch-updates to 'grace_expired' + sets responded_at=NOW(); emits per-tenant `aggregate_consent.version_declined` (decline_type='grace_expired') DEC-030 events; freshness SLO CONSENT-SLO-02 ≤ 30 min. Re-solicitation state machine: 'current' → 'pending' (compliance-officer registers new metric_consent_versions row; fan-out Worker sets all active-tenant user_aggregate_consent rows to pending + sets solicited_at=NOW() + grace_expires_at=NOW()+14d + target_consent_version=new_version); 'pending' → 'current' (user accepts in-app modal; form_api Worker updates consent_version to target_consent_version, resets all resolicitation columns to defaults); 'pending' → 'declined' (user clicks opt-out; form_api Worker sets status='declined', responded_at=NOW(), opted_out=TRUE); 'pending' → 'grace_expired' (pg_cron job 38; treated as implicit decline — opted_out remains FALSE but user excluded from new-version metrics). §17 MV gating: all four §17 materialized views (`tenant_wellness_summary_v2`, `tenant_engagement_summary`, `tenant_feature_adoption`, `tenant_cohort_breakdown`) receive a new `consent_gate` CTE that excludes users WHERE status IN ('declined','grace_expired') OR opted_out=TRUE; users with status='pending' are included for metrics covered by their existing `consent_version` only — new categories added in `target_consent_version` are excluded until accepted; the `assert_k_anonymity()` guard applies after the consent_gate exclusion. Four DEC-030 HMAC-chained audit events (4 new registrations required in AUDIT_LOG_SCHEMA.md): `aggregate_consent.version_registered` HIGH/7yr (compliance-officer emits when new metric_consent_versions row is inserted; RESOL-CHAIN-01 anchor; payload: new_version, previous_version, requires_resolicitation, added_categories[], removed_categories[], change_description, gdpr_legal_basis, registered_by_role; no user_id); `aggregate_consent.resolicitation_initiated` STANDARD/3yr (fan-out Worker emits per tenant after version_registered; payload: tenant_id UUID, consent_version, tenant_pending_count integer count NO names, solicitation_start_iso, grace_expires_iso; no user_id; RESOL-CHAIN-01 requires version_registered precede this for same consent_version); `aggregate_consent.version_accepted` STANDARD/3yr (form_api Worker emits on user acceptance; payload: tenant_id UUID, consent_version, previous_version, response_latency_days integer 0–14, accepted_at_iso; no user_id); `aggregate_consent.version_declined` STANDARD/3yr (form_api Worker on explicit decline OR pg_cron job 38 on grace expiry; payload: tenant_id UUID, consent_version, decline_type enum explicit_decline|grace_expired, declined_at_iso; no user_id). RESOL-CHAIN-01 ordering invariant: `aggregate_consent.resolicitation_initiated` must be preceded by `aggregate_consent.version_registered` for same consent_version in HMAC chain; emit-audit-event Worker returns HTTP 422 `RESOL_CHAIN_01_NO_VERSION` on violation + P1 PagerDuty `form-security`. RLS: `metric_consent_versions` — `form_system` ALL (BYPASSRLS; Worker only); `form_api` SELECT (read for gate checks); `tenant_manager` ZERO ACCESS (HR cannot read or write version registry); `form_admin` SELECT with PAM session; `tenant_admin` ZERO ACCESS. `user_aggregate_consent` new columns inherit existing RLS policies (form_api can UPDATE resolicitation_status on own-tenant rows; tenant_manager DENY all access to any row — HR never sees individual consent status). Six CI adversarial tests MIG-0093-01..06: (1) migration apply + rollback idempotency; (2) resolicitation_status CHECK rejects invalid enum values; (3) `uac_pending_requires_timestamps` rejects pending without timestamps; (4) `uac_grace_period_14d` rejects grace_expires_at ≠ solicited_at + 14d; (5) `uac_target_version_when_noncurrent` rejects non-current status without target_version; (6) pg_cron job 38 transitions pending→grace_expired for expired rows and emits correct tenant-level aggregate count. Privacy floor: no user_id in any DEC-030 event payload; `tenant_pending_count` is integer count only (no names, emails, user IDs); `response_latency_days` is day-granularity integer (0–14) — no individual timing beyond day resolution; `metric_consent_versions.change_description` CHECK 10–500 chars with no PII requirement (metric category names only); tenant_manager DENY enforced at RLS layer for both tables; GDPR Art. 17: `user_aggregate_consent` ON DELETE CASCADE from users; metric_consent_versions retained under Art. 17(3)(b) (legal obligation — evidences the processing purpose change and original consent scope) — 7yr WORM via DEC-030 chain. SOC 2 mapping: P3.2 (purpose limitation — version_registered event is the tamper-evident record of processing purpose change; resolicitation_initiated confirms consent was sought before new categories entered the pipeline); P4.1 (consent to collection — version_accepted/version_declined provide per-tenant evidence that consent was solicited before expanded processing); P5.1 (use limited to stated purpose — §17 MV consent_gate enforces that 'current' consent_version gates metric inclusion; 'pending'/'declined'/'grace_expired' users excluded from new categories); CC6.1 (logical access — resolicitation_status column enforced at RLS + MV query layer; tenant_manager zero-access prevents HR from observing individual consent status). Evidence artefact CONSENT-VER-E-001: quarterly export of all four `aggregate_consent.*` events; cross-check SQL `SELECT COUNT(*) FROM user_aggregate_consent WHERE resolicitation_status = 'pending' AND grace_expires_at < NOW()` must return zero (confirms job 38 is running); zero-event quarters filed as explicit attestation JSON; 3yr retention; path `compliance/evidence/consent-versioning/CONSENT-VER-E-001_<YYYY-QN>.json`. Implementation checklist: 5× P0 (M6 milestone — apply migration 0093 to staging; validate six CI tests; deploy fan-out Worker; register four DEC-030 events in AUDIT_LOG_SCHEMA.md; deploy pg_cron job 38 and confirm CONSENT-SLO-02 freshness); 3× P1 (update §17 four MVs with consent_gate CTE; add CONSENT-VER-E-001 to compliance evidence cron; register CONSENT-VER-E-001 in SOC2_READINESS.md as new evidence artefact). Cross-reference obligations (all pending): AUDIT_LOG_SCHEMA.md — four `aggregate_consent.*` events registration (P0/M6); DATA_MODEL §17 — four MVs consent_gate CTE patch (P1/M6); SOC2_READINESS.md — CONSENT-VER-E-001 evidence artefact registration (P1/M6); DATA_MODEL §9 — OQ-ENT-03 patched from Open to 🟢 Resolved this pass. TOC §58 entry added. Document header v1.49 → v1.50. Owner: enterprise-architect + platform-engineer + compliance-officer.*
 
 *v1.49 (2026-07-06): §57 `tenant_sso_configs` BDG Column Extension — Migration 0079. DATA_MODEL canonical registration for the SCIM Bulk Deprovision Guard schema specified in `docs/SSO_SCIM_IMPLEMENTATION.md §34` (v2.6, 2026-06-19). Migration 0079 adds three columns to `tenant_sso_configs` (`bulk_deprovision_threshold_pct` SMALLINT DEFAULT 20 + CHECK 5–100, `bulk_deprovision_override_exp` TIMESTAMPTZ, `bulk_deprovision_override_by` UUID → auth.users), two constraints (chk_bdg_threshold, chk_bdg_override_coherent), one partial index (`idx_tsc_bdg_override_active`), and pg_cron job 34 (`bdg_override_expiry_sweep`, */15 * * * *). §57.1 purpose: closes DATA_MODEL registration gap for Migration 0079 — SSO_SCIM §34 had complete design + DDL (DEC-066, v2.6, 2026-06-19) but no companion DATA_MODEL section (same pattern as §52/0101, §53/0100, §54/0098, §55/0102, §56/0082). §57.2 dependency chain: 0079 requires 0052 (IP enforcement base) → 0076 (flag column) → 0077 (toggle RPC). §57.3 DDL + rollback (mirrors §34.3 verbatim; rollback pre-gate: zero active overrides; DROP COLUMN cascade-safe). §57.4 six CI adversarial tests MIG-0079-01..06 (migration apply, rollback, chk_bdg_threshold boundary values, chk_bdg_override_coherent NULL coherence, partial index `idx_tsc_bdg_override_active`, pg_cron job 34 expiry sweep). §57.5 column semantics: threshold_pct state machine (5–100; 100 = guard disabled; default 20; tenant-writable via RPC only), override_exp+by state machine (both NULL = guard active; both non-NULL = override window; auto-NULL by SCIM Worker on first use + job 34 on expiry), BDG-SLO-02 (job 34 freshness ≤ 20 min per OBSERVABILITY §79.3). §57.6 RLS (inherits §4.2 sso_configs_tenant_isolation + system_write + BYPASSRLS; tenant_manager zero access; form_api read for threshold check; override columns not tenant-writable). §57.7 privacy floor (no employee PII in any BDG audit event; `bulk_deprovision_override_by` = FORM-internal CSM UUID, not a data subject; GDPR Art. 17 CASCADE on tenant DELETE). §57.8 SOC 2 (CC6.3/A1.2/CC7.2/CC9.2 → GUARD-E-001 §91; BDG-OBS-E-001 §192 monitoring-layer quarterly artefact). §57.9 four-item checklist (2× P0/M13 staging migration + BDG Worker; 2× P1/Done this pass DATA_MODEL §57 + SSO_SCIM §34.14). §57.10 cross-reference obligations: SSO_SCIM §34.3 DDL source; §34.8 SOC 2 source; §34.11 item 9 status corrected (SOC2_READINESS §91 Done v3.16.0); §34.14 cross-reference 🟢 Done this pass; OBSERVABILITY §79 🟢 Done v5.25.0; SOC2_READINESS §91/§192 🟢 Done. TOC §57 entry added. Owner: enterprise-architect + security-engineer + compliance-officer.*

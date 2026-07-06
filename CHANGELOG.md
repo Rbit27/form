@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [13.88.1] — 2026-07-06
+
+### Changed
+- `docs/DATA_MODEL.md` — §58 `user_aggregate_consent` Consent Re-Solicitation Schema Extension — Migration 0093. Closes OQ-ENT-03 (consent re-solicitation on metric registry expansion). New `metric_consent_versions` registry table (append-only, HMAC-chained via DEC-030, SOC 2 P3.2 anchor). Four new columns on `user_aggregate_consent`: `resolicitation_status` four-state FSM (current/pending/declined/grace_expired), `solicited_at`, `grace_expires_at`, `responded_at`, `target_consent_version`. Three DDL coherence constraints (`uac_pending_requires_timestamps`, `uac_grace_period_14d`, `uac_target_version_when_noncurrent`). Four partial indexes. pg_cron job 38 `consent_grace_expiry_sweep` (*/15, CONSENT-SLO-02 ≤ 30 min). §17 MV `consent_gate` CTE (P5.1 enforcement). Four DEC-030 events: `aggregate_consent.version_registered` (HIGH/7yr, RESOL-CHAIN-01 anchor), `resolicitation_initiated` (STANDARD/3yr), `version_accepted` (STANDARD/3yr), `version_declined` (STANDARD/3yr). Privacy floor: no `user_id` in any event payload; `tenant_manager` zero RLS on both tables. SOC 2: P3.2/P4.1/P5.1/CC6.1. Evidence artefact CONSENT-VER-E-001 (quarterly, 3yr). v1.49 → v1.50.
+- `VERSION` — 13.88.0 → 13.88.1.
+
+---
+
 ## [13.88.0] — 2026-07-06
 
 ### Added
