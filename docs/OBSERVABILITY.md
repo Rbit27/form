@@ -627,11 +627,12 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 | **HMAC chain cadence breach** | `HMAC_AUDIT_CHAIN_KEY` last rotation > 395 days ago | P1 | PagerDuty → security-engineer + compliance-officer | §30.4 AL-KEY-03; SOC2_READINESS.md §58 |
 | **HMAC chain verification missing** | `admin.hmac_key_rotated` event with no `admin.hmac_key_rotation_verified` within 24 h | P0 | PagerDuty → security-engineer + platform-engineer | §30.4 AL-KEY-04; INCIDENT_RESPONSE.md R-21 |
 
-**Subsection: `c1_erasure_sla` (AL-C1-01 — SOC2_READINESS.md §73.3.1):**
+**Subsection: `c1_erasure_sla` (AL-C1-01 · AL-C1-02 — SOC2_READINESS.md §73.3.1 / §183.2):**
 
 | Alert Name | Trigger Condition | Severity | Notification Channel | Runbook |
 |---|---|---|---|---|
 | **GDPR erasure SLA day-33 warning** | Any open Art. 17 erasure request in `dsar_requests` (type = `erasure`, status ≠ `fulfilled`/`rejected`) where `submitted_at < now() - INTERVAL '33 days'`; pg_cron `c1-erasure-sla-monitor` (daily 08:00 UTC, job 11 in §12.6 pg_cron registry); re-alerts every 24 h; dedup key `c1-erasure-sla-breach-{dsar_request_id}` | P1 | PagerDuty `form-compliance` → compliance-officer; Slack `#security-alerts` HIGH | SOC2_READINESS.md §73.3.1 AL-C1-01; INCIDENT_RESPONSE.md R-14 (per-user Art. 17 escalation path); belt-and-suspenders to §70 DSAR day-25/day-29 P0/P1 alerts |
+| **`c1-erasure-sla-monitor` job stale** | `system.cron_job_stale` DEC-030 event with `job_name = 'c1-erasure-sla-monitor'`; emitted when job 11 fails to run within its 26-h freshness window; dedup key `c1-erasure-sla-monitor-stale`; auto-resolve false (R-43-C2/C3 scope queries required before manual resolution) | P1 | PagerDuty `form-compliance` → compliance-officer (severity `warning`); Slack `#security-alerts` HIGH | SOC2_READINESS.md §183.2 AL-C1-02; INCIDENT_RESPONSE.md R-43 (§R-43.5 job stale recovery; §R-43.11 item 2); complement to AL-C1-01 — covers stale-job path when job 11 fails to run, creating Art. 17 day-33 SLA monitoring blind spot; `form-alert-relay` routing rule in `cron_stale_routing` table (SOC2_READINESS §183.3); auto-resolution disabled — compliance-officer must run R-43-C2 + R-43-C3 scope queries before resolving; evidence artefact PD-ERASURE-E-001 (SOC2_READINESS §79.4 row 159; CC7.2/CC4.1/P5.1; 7yr WORM) |
 
 **Subsection: `victor_safety_health` (FORM-VICTOR-001 through FORM-VICTOR-004 — §32.5):**
 

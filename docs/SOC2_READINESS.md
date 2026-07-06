@@ -37741,7 +37741,7 @@ PD-ERASURE-E-001 is added to the §79.4 master evidence table as row 159 (follow
 | Deploy AL-C1-02 routing rule in `form-alert-relay` | `docs/INCIDENT_RESPONSE.md R-43.11 item 2` | 🟡 **Pre-staged — deploy per §183.3** |
 | Run AL-C1-02-INT-01 integration test | `docs/SOC2_READINESS.md §183.5` | 🟡 **Pre-staged — run after `form-alert-relay` deployment to staging** |
 | Upload PD-ERASURE-E-001 to R2 + Vanta | `docs/SOC2_READINESS.md §183.6` | 🔴 **Pending — devops-lead, after INT-01 pass** |
-| Register AL-C1-02 in `docs/OBSERVABILITY.md §6.2` `c1_erasure_sla` subsection | `docs/OBSERVABILITY.md §6.2` (AL-C1-01 companion) | 🔴 **Pending — devops-lead, after production deployment** |
+| Register AL-C1-02 in `docs/OBSERVABILITY.md §6.2` `c1_erasure_sla` subsection | `docs/OBSERVABILITY.md §6.2` (AL-C1-01 companion) | 🟢 **Done — v13.47.1, 2026-07-06** |
 | Patch R-43.11 item 2 `[ ]` → `[x]` Done | `docs/INCIDENT_RESPONSE.md R-43.11` | 🔴 **Pending — close after INT-01 pass + production deployment** |
 | Patch R-43.11 item 4 `[ ]` → `[x]` Done | `docs/INCIDENT_RESPONSE.md R-43.11` | 🟢 **Closed this pass — §182 registered ERASURE-MON-E-001 in §79.4 (2026-07-06)** |
 

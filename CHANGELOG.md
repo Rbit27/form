@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [13.47.1] — 2026-07-06
+
+### Changed
+- `docs/OBSERVABILITY.md §6.2` — Added AL-C1-02 (`c1-erasure-sla-monitor` job stale) row to `c1_erasure_sla` subsection; updated subsection header to reference §183.2 alongside §73.3.1; closes 🔴 Pending cross-reference obligation from SOC2_READINESS §183.9.
+- `docs/SOC2_READINESS.md §183.9` — Marked "Register AL-C1-02 in OBSERVABILITY §6.2" cross-reference as 🟢 Done (v13.47.1).
+- `VERSION` — 13.47.0 → 13.47.1.
+
+---
+
 ## [13.47.0] — 2026-07-06
 
 ### Added
