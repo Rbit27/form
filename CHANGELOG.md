@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.63.1] — 2026-07-06
+
+### Added
+- `docs/DATA_MODEL.md §56` — `tenant_sso_configs` CAEP Schema Extension & `caep_events` Table — Migration 0082. Canonical DATA_MODEL registration for the root CAEP dependency: Part A (6 columns on `tenant_sso_configs`: `caep_stream_id`, `caep_delivery_mode`, `caep_webhook_secret` AES-256-GCM, `caep_status`, `caep_last_event_at`, `caep_error_count`; partial index `idx_tenant_sso_configs_caep_active`), Part B (new `caep_events` table with 9 columns, 2 indexes, 3 RLS policies — `form_system` ALL, `tenant_admin` SELECT own, `form_api` DENY), Part C (3 re-registration columns per DEC-072: `caep_reregistration_required`, `caep_last_reregistered_at`, `caep_reregistration_trigger`; partial index `idx_tsc_caep_reregister`). Includes RLS analysis, 6 CI adversarial tests (MIG-0082-01..06), state machines for `caep_status` and `caep_reregistration_required`, privacy floor (SHA-256 hashes only; `tenant_manager` zero access; GDPR Art. 17 CASCADE + SET NULL), SOC 2 evidence mapping (CC6.3/CC6.6/CC7.2/CC7.3), and cross-reference obligations. Closes documentation gap: migrations 0083–0088 all listed 0082 as prerequisite but 0082 had no DATA_MODEL section.
+
+### Changed
+- `docs/DATA_MODEL.md` — v1.47 → v1.48. TOC §56 entry added.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — v2.40 → v2.41. §23.12 checklist item 16 added (DATA_MODEL §56 cross-reference — Done). §36.6 checklist item 10 added (DATA_MODEL §56 cross-reference — Done).
+- `VERSION` — 13.63.0 → 13.63.1.
+
+---
+
 ## [13.63.0] — 2026-07-06
 
 ### Added

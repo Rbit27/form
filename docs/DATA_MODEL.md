@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.47
+# FORM · Multi-Tenant Data Model v1.48
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -63,6 +63,7 @@
 53. [SAML SLO + OIDC BCL Schema Columns — Migration 0100](#53-saml-slo--oidc-bcl-schema-columns--migration-0100)
 54. [`tenant_sso_configs` PKJWT Extension — Migration 0098](#54-tenant_sso_configs-pkjwt-extension--migration-0098)
 55. [`session_blocklist.kv_sync_status` — KV Revocation Sync Status — Migration 0102](#55-session_blocklists-kv_sync_status--kv-revocation-sync-status--migration-0102)
+56. [`tenant_sso_configs` CAEP Schema Extension & `caep_events` Table — Migration 0082](#56-tenant_sso_configs-caep-schema-extension--caep_events-table--migration-0082)
 
 ---
 
@@ -20052,3 +20053,409 @@ FORM's session revocation architecture (§22) ensures that when a user is deprov
 *v1.47 (2026-07-06): §55 `session_blocklist.kv_sync_status` — KV Revocation Sync Status — Migration 0102. DATA_MODEL canonical registration for the session_blocklist schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §22` (High-Scale Session Revocation Architecture, v1.4, 2026-06-01). One new ENUM type `revocation_kv_status AS ENUM ('pending', 'synced', 'failed')` and one new column `kv_sync_status revocation_kv_status NOT NULL DEFAULT 'pending'` on `session_blocklist`; one partial index `idx_session_blocklist_kv_status ON session_blocklist (kv_sync_status) WHERE kv_sync_status != 'synced'`; backfill UPDATE sets all pre-migration rows to `'synced'`. §55.1 purpose: closes DATA_MODEL registration gap for Session Revocation KV — SSO_SCIM §22 had complete design + DDL spec but no companion DATA_MODEL section (same pattern as BCL→§52, SLO→§53, PKJWT→§54); establishes canonical cross-reference, RLS analysis, privacy floor, SOC 2 mapping. §55.2 dependency chain: 0102 is additive, no FK to new tables; `SESSION_REVOCATION_KV` KV namespace binding (wrangler.toml) must precede Worker deployment. §55.3 full DDL + rollback (mirrors SSO_SCIM §22.7 verbatim; backfill correctness signal not data migration; rollback pre-gate: zero `'failed'` rows; CONCURRENTLY index no table lock; sub-second ACCESS EXCLUSIVE on typical revocation row count). §55.4 five CI adversarial tests MIG-0102-01..05 (migration apply, rollback, ENUM constraint rejection, default value, backfill verification; evidence path `compliance/evidence/sso/migration-0102-validation_<YYYY-MM-DD>.txt`). §55.5 column/ENUM semantics (revocation_kv_status ENUM vs TEXT CHECK rationale; kv_sync_status state machine pending→synced/failed; idx_session_blocklist_kv_status partial scope and consumers). §55.6 RLS (inherits session_blocklist existing policies; form_system all rows write; form_admin BYPASSRLS or explicit read; form_api + tenant_manager no access; privacy floor for tenant_manager; four auditor proof queries). §55.7 privacy floor (kv_sync_status = operational ENUM, no PII; session_id/tenant_id/blocked_at = FORM-internal identifiers, no natural person linkage; all five DEC-030 events contain only FORM-internal UUIDs and aggregate counts; GDPR Art. 17 — rows are DEC-030 HMAC chain evidence under Art. 17(3)(b) legal obligation exemption). §55.8 SOC 2 evidence (CC6.3 timely access removal — CC6-E-REV-002 kv_sync_status distribution confirms >99% synced, registered §178; CC7.2 anomaly monitoring — AL-REVOKE-01 P1 REVOKE-SYNC-E-001 registered §180; CC7.3 response to anomalies — automatic Supabase fallback, CC6-E-REV-002 <0.1% failed target; CC6.3 bulk deprovisioning — CC6-E-REV-001 duration_ms audit_log export registered §178). §55.9 seven-item implementation checklist (4× P0/M4 migration+KV+Worker+production; 1× P1/M5 Day-30 cutover evidence; 2× P1/Done this pass DATA_MODEL §55 + SSO_SCIM §22.15 item 13). §55.10 cross-reference obligations (SSO_SCIM §22 DDL source; §22.15 item 13 🟢 Done this pass; OBSERVABILITY §76 🟢 Done v5.22.0; SOC2_READINESS §178 CC6-E-REV-001/002 🟢 Done v4.7.0; §179 REVOKE-OBS-E-001 🟢 Done v4.8.0; §180 REVOKE-SYNC-E-001 🟢 Done v4.9.0; IR R-82 🟢 Done v3.48.0). TOC §55 entry added. Document header v1.46 → v1.47. Owner: enterprise-architect + security-engineer + compliance-officer.*
 
 *v1.46 (2026-07-04): §54 `tenant_sso_configs` PKJWT Extension — Migration 0098. DATA_MODEL canonical registration for the Migration 0098 schema extension specified in `docs/SSO_SCIM_IMPLEMENTATION.md §42` (design, DEC-097, v2.15, 2026-07-02) + `§43` (complete DDL + Worker spec, v2.18, 2026-07-02). Seven new columns added to `tenant_sso_configs`: `oidc_client_auth_method TEXT NOT NULL DEFAULT 'client_secret_post' CHECK IN ('client_secret_post','private_key_jwt')` (auth method selector; opt-in default; routes `buildTokenExchangeParams()` to PKJ or secret path), `pkjwt_private_key_encrypted BYTEA` (AES-256-GCM ciphertext of PKCS#8 PEM private key — same mechanism as `oidc_client_secret_encrypted` §4.2; SQL layer always ciphertext; plaintext in Worker memory only), `pkjwt_algorithm TEXT CHECK IN ('RS256','ES256')` (signing algorithm; `'RS256'` default; CHECK rejects unsupported strings), `pkjwt_key_id TEXT` (JWK kid matching JWKS endpoint; UUID v4; stable per key lifetime), `pkjwt_key_expires_at TIMESTAMPTZ` (annual rotation trigger for pg_cron job 58; partial index target), `pkjwt_aud_override TEXT` (IdP-specific `aud` override; Okta FIPS requires issuer URL; NULL = token endpoint URL), `pkjwt_assertion_lifetime_secs INTEGER CHECK BETWEEN 60 AND 300` (assertion JWT `exp` override; NULL = 300 s default). One partial index `idx_tsc_pkjwt_expiry ON tenant_sso_configs (pkjwt_key_expires_at) WHERE oidc_client_auth_method = 'private_key_jwt'` for O(log n) daily expiry sweep. One CHECK constraint `chk_pkjwt_columns_set` enforcing that when `private_key_jwt` is active, all four required columns are non-null. §54.1 purpose: closes the DATA_MODEL registration gap for PKJWT — SSO_SCIM §42/§43 had complete design + DDL spec but no companion DATA_MODEL section (unlike BCL→§52 and SLO→§53); establishes the canonical cross-reference, RLS analysis, privacy floor, and SOC 2 mapping. §54.2 migration dependency chain: DEC-097 (no schema change) → 0098 (this) → 0099 (pg_cron §44.2) → 0100 (SLO/BCL §53) → 0101 (oidc_sub_hash §52); additive only, no outside-counsel gate, M5 maintenance window. §54.3 full DDL + rollback (mirrors SSO_SCIM §43.2 verbatim; rollback pre-gate: zero `private_key_jwt` rows required; lock note: sub-second on O(100) tenant rows). §54.4 five CI adversarial tests MIG-0098-01..05 (migration apply, rollback, CHECK constraint rejection, ciphertext-only at SQL layer, idx_tsc_pkjwt_expiry plan verify; evidence path `compliance/evidence/sso/migration-0098-validation_<YYYY-MM-DD>.txt`). §54.5 column/index semantics (oidc_client_auth_method opt-in default; pkjwt_private_key_encrypted encrypted-at-rest ciphertext-only-at-SQL; pkjwt_algorithm RS256/ES256 CHECK; pkjwt_key_id UUID4 stable-per-key-lifetime; pkjwt_key_expires_at 365-day rotation anchor; pkjwt_aud_override Okta-FIPS null=token-endpoint-url; pkjwt_assertion_lifetime_secs 60–300 null=300; idx_tsc_pkjwt_expiry partial O(log n) sweep). §54.6 RLS (inherits `sso_configs_tenant_isolation` + `sso_configs_system_write` + BYPASSRLS; cryptographic boundary: ciphertext at SQL layer for all roles; three auditor proof queries; tenant_manager strips key material in application layer). §54.7 privacy floor (pkjwt_private_key_encrypted = cryptographic material, no PII, AES-256-GCM encrypted, never in DEC-030 payloads, never in transit; all other columns configuration only, no PII; Zod v2 constraint prohibits key material in event payloads; GDPR Art. 17 via tenant row deletion). §54.8 SOC 2 evidence (CC6.6 key management — PKJWT-E-001 quarterly, 7yr; CC6.6 asymmetric — public at JWKS, private never at IdP; CC8.1 — PKJWT-E-002 migration apply log; P4.1 — ciphertext-only structural). §54.9 eight-item implementation checklist (5× P0/M5 staging+production+Worker+JWKS+evidence; 2× P1/Done this pass; 1× P1/M5 G-012 full closure). §54.10 cross-reference obligations (SSO_SCIM §42.12 DATA_MODEL §54 row 🟢 Done this pass; AUDIT_LOG_SCHEMA §SSO-PKJ-Lifecycle 🟢 Done v2.73; OBSERVABILITY §12.6 job 58 🟢 Done v5.14.0; SOC2_READINESS §145 PKJWT-E-001 🟢 Done v3.71.0). TOC §54 entry added. Document header v1.45 → v1.46. Owner: enterprise-architect + security-engineer + compliance-officer.*
+
+---
+
+## §56. `tenant_sso_configs` CAEP Schema Extension & `caep_events` Table — Migration 0082
+
+**Feature:** CAEP/RISC Continuous Access Evaluation Protocol (`docs/SSO_SCIM_IMPLEMENTATION.md §23` + §36)
+**SOC 2 scope:** CC6.3, CC6.6, CC7.2, CC7.3
+**Last updated:** 2026-07-06
+**Source design:** `docs/SSO_SCIM_IMPLEMENTATION.md §23` (v1.5, 2026-06-01) + `§36` (DEC-072, v2.8, 2026-06-19)
+**Migration:** `migrations/0082_sso_caep_reregistration.sql` (assigned 0082)
+
+---
+
+### §56.1 Purpose and Scope
+
+`docs/SSO_SCIM_IMPLEMENTATION.md §23` specified the complete design and DDL for CAEP/RISC stream registration — a Continuous Access Evaluation Protocol implementation that receives Security Event Tokens (SETs) from enterprise IdPs (Okta SSF, Entra Event Grid, Google RISC) and acts on them within 30 seconds. `§36` (DEC-072, 2026-06-19) extended the schema to support CAEP stream re-registration after cert rotation, adding three columns and a supporting pg_cron sweep (job 37, `caep_reregister_sweep`). Together, §23 and §36 contain the complete Cloudflare Worker implementation (`caep-receiver.ts`, `caep-action-handler.ts`), the 10-step SET validation pipeline, 8 event type dispatchers, and all schema DDL.
+
+This section provides the canonical DATA_MODEL registration for Migration 0082 — the same role that §52 plays for Migration 0101 (`enterprise_sessions.oidc_sub_hash`), §53 for Migration 0100 (SAML SLO + OIDC BCL columns), §54 for Migration 0098 (PKJWT columns), and §55 for Migration 0102 (`session_blocklist.kv_sync_status`). Migration 0082 is the root of the CAEP dependency chain: six subsequent migrations (0083–0088) all list 0082 as a prerequisite. The DDL exists verbatim in SSO_SCIM §23.5 and §36.2.3; this section adds the RLS analysis, privacy floor, SOC 2 evidence mapping, and cross-reference obligations that complete the enterprise documentation cluster.
+
+**What Migration 0082 adds — three DDL parts:**
+
+| Part | Target | Changes | Source |
+|---|---|---|---|
+| A | `tenant_sso_configs` | 6 new columns + 1 index (`caep_active`) | SSO_SCIM §23.5.1 |
+| B | `caep_events` (new table) | Full CREATE TABLE + 2 indexes + 3 RLS policies | SSO_SCIM §23.5.2 |
+| C | `tenant_sso_configs` | 3 re-registration columns + 1 index (DEC-072) | SSO_SCIM §36.2.3 |
+
+**Scope of this section:** Migration 0082 DDL and rollback (all three parts); CI adversarial tests; column and table semantics; state machines for `caep_status` and `caep_reregistration_required`; RLS analysis for both affected tables; privacy floor; SOC 2 evidence mapping; cross-reference obligations. The CAEP Worker implementation, SET validation pipeline, 8-event dispatch logic, and pg_cron job 37 specification are defined in SSO_SCIM §23 and §36; this section registers the schema artefacts only.
+
+---
+
+### §56.2 Migration Dependency Chain
+
+| Migration | Change | Depends on |
+|---|---|---|
+| Pre-existing | `tenant_sso_configs` table creation | Before 0082 |
+| Pre-existing | `tenants` table + `tenant_users` table | Before 0082 |
+| **0082** | Part A: 6 CAEP columns + `idx_tenant_sso_configs_caep_active` | Root — no CAEP prerequisite |
+| **0082** | Part B: `caep_events` table + 2 indexes + 3 RLS policies | Root — no CAEP prerequisite |
+| **0082** | Part C: 3 re-registration columns + `idx_tsc_caep_reregister` (DEC-072) | Root — no CAEP prerequisite |
+| 0083 | CAEP Okta SSF subject-type validation | **0082** required |
+| 0084 | CAEP Entra Event Grid EventGridEvent envelope | **0082** required |
+| 0085 | CAEP Google RISC JWKS resolution | **0082** required |
+| 0086 | CAEP `set_jti` dedup hardening | **0082** required |
+| 0087 | CAEP stream health monitoring | **0082** required |
+| 0088 | CAEP audit log event schema | **0082** required |
+| pg_cron job 37 | `caep_reregister_sweep` (*/5 * * * *) | **0082** Part C required (reads `caep_reregistration_required`, writes `caep_last_reregistered_at`, `caep_reregistration_trigger`) |
+
+**Apply order invariant:** Migration 0082 is the root CAEP dependency. All six subsequent CAEP migrations (0083–0088) must not be applied until 0082 is committed. The pg_cron job 37 registration must also wait for 0082. Within 0082 itself, Part C must run in the same transaction as Part A and Part B — Part C reads columns created in Part A.
+
+**Lock note:** Part A `ALTER TABLE tenant_sso_configs` acquires ACCESS EXCLUSIVE on `tenant_sso_configs`. On the expected O(100) tenant row count, lock duration is sub-second. Part B `CREATE TABLE caep_events` acquires no locks on existing tables. Part C `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` re-acquires ACCESS EXCLUSIVE on `tenant_sso_configs`; at O(100) rows, sub-second. Both `CREATE INDEX CONCURRENTLY` operations (Part A `caep_active`, Part C `caep_reregister`) hold no table lock. Run Part A + Part C in the same maintenance window, separated from the CONCURRENTLY index steps.
+
+---
+
+### §56.3 Migration DDL
+
+#### §56.3.1 Part A — `tenant_sso_configs` CAEP Columns (mirrors SSO_SCIM §23.5.1 verbatim)
+
+```sql
+-- migrations/0082_sso_caep_reregistration.sql — Part A
+-- Original CAEP stream columns on tenant_sso_configs
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN caep_stream_id       TEXT,
+  ADD COLUMN caep_delivery_mode   TEXT
+    CHECK (caep_delivery_mode IN ('push', 'poll')),
+  ADD COLUMN caep_webhook_secret  BYTEA,    -- AES-256-GCM ciphertext; never stored plaintext
+  ADD COLUMN caep_status          TEXT NOT NULL DEFAULT 'inactive'
+    CHECK (caep_status IN ('inactive', 'active', 'error', 'rate_limited')),
+  ADD COLUMN caep_last_event_at   TIMESTAMPTZ,
+  ADD COLUMN caep_error_count     INT NOT NULL DEFAULT 0;
+
+-- Partial index: fast lookup of all tenants with active CAEP streams
+-- Consumer: OBSERVABILITY §78 active-stream count dashboard, pg_cron job 37
+CREATE INDEX CONCURRENTLY idx_tenant_sso_configs_caep_active
+  ON tenant_sso_configs (tenant_id)
+  WHERE caep_status = 'active';
+```
+
+#### §56.3.2 Part B — `caep_events` Table (mirrors SSO_SCIM §23.5.2 verbatim)
+
+```sql
+-- migrations/0082_sso_caep_reregistration.sql — Part B
+-- New caep_events table: one row per processed CAEP SET
+
+CREATE TABLE caep_events (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id         UUID        REFERENCES tenant_users(id) ON DELETE SET NULL,
+  set_jti         TEXT        NOT NULL UNIQUE,    -- SHA-256 hash of raw JTI; dedup key
+  event_type      TEXT        NOT NULL,
+  idp_subject     TEXT        NOT NULL,           -- SHA-256 hash of IdP subject claim
+  action_taken    TEXT        NOT NULL,
+  processed_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  raw_set_hash    TEXT        NOT NULL            -- SHA-256 of raw SET JWT bytes
+);
+
+-- Compound index for tenant-scoped time-range queries (audit log viewer)
+CREATE INDEX idx_caep_events_tenant_processed
+  ON caep_events (tenant_id, processed_at DESC);
+
+-- Unique index for ON CONFLICT dedup at INSERT (replay attack prevention)
+CREATE UNIQUE INDEX idx_caep_events_set_jti
+  ON caep_events (set_jti);
+
+-- Row-Level Security
+ALTER TABLE caep_events ENABLE ROW LEVEL SECURITY;
+
+-- form_system (CAEP Worker): full INSERT + SELECT
+CREATE POLICY caep_events_form_system
+  ON caep_events FOR ALL
+  TO form_system
+  USING (true)
+  WITH CHECK (true);
+
+-- tenant_admin: SELECT own tenant's events only (admin dashboard audit log viewer)
+CREATE POLICY caep_events_tenant_admin_select
+  ON caep_events FOR SELECT
+  TO tenant_admin
+  USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+
+-- form_api: ZERO-ROWS policy — no direct API access to raw CAEP events
+-- (Events are surfaced through the admin dashboard audit log viewer only)
+CREATE POLICY caep_events_form_api_deny
+  ON caep_events FOR ALL
+  TO form_api
+  USING (FALSE);
+```
+
+#### §56.3.3 Part C — Re-registration Columns (mirrors SSO_SCIM §36.2.3 verbatim; DEC-072)
+
+```sql
+-- migrations/0082_sso_caep_reregistration.sql — Part C
+-- CAEP stream re-registration columns (DEC-072, 2026-06-19)
+-- Added to support pg_cron job 37 (caep_reregister_sweep, */5 * * * *)
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS caep_reregistration_required   BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS caep_last_reregistered_at      TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS caep_reregistration_trigger    TEXT
+    CHECK (caep_reregistration_trigger IN (
+      'cert_rotation', 'manual', 'stream_error', 'initial'
+    ));
+
+-- Partial index: fast sweep for tenants requiring re-registration
+-- Consumer: pg_cron job 37 (caep_reregister_sweep, */5 * * * *, OBSERVABILITY §12.6)
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tsc_caep_reregister
+  ON tenant_sso_configs (caep_reregistration_required)
+  WHERE caep_reregistration_required = TRUE;
+```
+
+#### §56.3.4 Rollback
+
+```sql
+-- Rollback for Migration 0082
+-- Pre-rollback gate: no active CAEP streams; no pending re-registration records.
+
+-- Prerequisite check:
+SELECT count(*) FROM tenant_sso_configs WHERE caep_status = 'active';
+-- Expected: 0
+SELECT count(*) FROM tenant_sso_configs WHERE caep_reregistration_required = TRUE;
+-- Expected: 0
+
+-- Step 1: Drop CAEP indexes (CONCURRENTLY: no table lock)
+DROP INDEX CONCURRENTLY IF EXISTS idx_tenant_sso_configs_caep_active;
+DROP INDEX CONCURRENTLY IF EXISTS idx_tsc_caep_reregister;
+
+-- Step 2: Drop caep_events table (cascades RLS policies and indexes)
+DROP TABLE IF EXISTS caep_events;
+
+-- Step 3: Remove Part C re-registration columns from tenant_sso_configs
+ALTER TABLE tenant_sso_configs
+  DROP COLUMN IF EXISTS caep_reregistration_required,
+  DROP COLUMN IF EXISTS caep_last_reregistered_at,
+  DROP COLUMN IF EXISTS caep_reregistration_trigger;
+
+-- Step 4: Remove Part A CAEP columns from tenant_sso_configs
+ALTER TABLE tenant_sso_configs
+  DROP COLUMN IF EXISTS caep_stream_id,
+  DROP COLUMN IF EXISTS caep_delivery_mode,
+  DROP COLUMN IF EXISTS caep_webhook_secret,
+  DROP COLUMN IF EXISTS caep_status,
+  DROP COLUMN IF EXISTS caep_last_event_at,
+  DROP COLUMN IF EXISTS caep_error_count;
+```
+
+**Rollback pre-gate:** Confirm no active CAEP streams before rollback. An active stream (`caep_status = 'active'`) means the IdP is actively pushing SETs to FORM's `caep-receiver.ts` Worker; rolling back while active would silently drop all incoming security events (credential changes, account suspensions) without any error, creating a CC6.6 compliance gap. Resolve by deactivating all streams at the IdP first.
+
+---
+
+### §56.4 CI Adversarial Tests
+
+| Test ID | Description | Expected result | Evidence path |
+|---|---|---|---|
+| MIG-0082-01 | Apply migration; confirm all 9 `tenant_sso_configs` CAEP columns present (Part A: 6 + Part C: 3); confirm `caep_events` table exists; confirm all 4 indexes exist | All assertions pass | `compliance/evidence/sso/migration-0082-validation_<YYYY-MM-DD>.txt` |
+| MIG-0082-02 | Rollback (after MIG-0082-01): apply migration, then rollback; confirm all 9 columns removed from `tenant_sso_configs`; confirm `caep_events` table absent; confirm all 4 indexes absent | All absent post-rollback | Same evidence file |
+| MIG-0082-03 | CHECK constraint enforcement — `caep_status`: attempt `UPDATE tenant_sso_configs SET caep_status = 'unknown'`; confirm Postgres rejects | `ERROR: new row for relation "tenant_sso_configs" violates check constraint "tenant_sso_configs_caep_status_check"` | Same evidence file |
+| MIG-0082-04 | CHECK constraint enforcement — `caep_reregistration_trigger`: attempt `UPDATE SET caep_reregistration_trigger = 'hack'`; confirm Postgres rejects | `ERROR: new row ... violates check constraint "tenant_sso_configs_caep_reregistration_trigger_check"` | Same evidence file |
+| MIG-0082-05 | Ciphertext-only at SQL layer: confirm `caep_webhook_secret` column type is `BYTEA`; confirm application-layer `caep-receiver.ts` returns HTTP 422 on AES-256-GCM decryption failure; confirm `set_jti` column stores 64-char SHA-256 hex string, not raw JTI claim | `caep_webhook_secret` data_type = `bytea`; Worker returns HTTP 422 on decryption failure; `set_jti` length = 64 chars | Same evidence file |
+| MIG-0082-06 | `caep_events` ON CONFLICT dedup: INSERT a `caep_events` row with a known `set_jti`; then INSERT again with the same `set_jti` via `ON CONFLICT (set_jti) DO NOTHING`; confirm second INSERT inserts 0 rows | `INSERT 0 0` — replay attack prevented at SQL layer | Same evidence file |
+
+**Evidence filing:** MIG-0082-01 through MIG-0082-06 outputs concatenated to `compliance/evidence/sso/migration-0082-validation_<YYYY-MM-DD>.txt`; filed to R2 WORM under `compliance/evidence/sso/`; 7-year retention per CC8.1.
+
+---
+
+### §56.5 Column and Table Semantics
+
+#### §56.5.1 `tenant_sso_configs` CAEP Columns (Part A)
+
+| Column | Type | Nullable | Default | Semantics |
+|---|---|---|---|---|
+| `caep_stream_id` | TEXT | NULL | — | IdP-assigned stream identifier returned on CAEP stream registration. NULL = stream not yet registered. Populated by `caep-receiver.ts` on successful stream registration response. |
+| `caep_delivery_mode` | TEXT | NULL | — | `'push'` = IdP pushes SETs to FORM's webhook (`/caep/webhook`); `'poll'` = FORM polls IdP endpoint. CHECK constraint enforces `IN ('push', 'poll')`. Current implementation: push mode only; poll support planned M5. |
+| `caep_webhook_secret` | BYTEA | NULL | — | AES-256-GCM ciphertext of the HMAC-SHA256 shared secret used to verify incoming SET JWTs. **Never stored as plaintext at the SQL layer.** Worker decrypts in-memory only. NULL = stream not configured. |
+| `caep_status` | TEXT | NOT NULL | `'inactive'` | Current CAEP stream status. State machine: see §56.5.3. CHECK constraint enforces `IN ('inactive', 'active', 'error', 'rate_limited')`. |
+| `caep_last_event_at` | TIMESTAMPTZ | NULL | — | Timestamp of the last successfully processed CAEP SET for this tenant. NULL = no event received yet. Consumer: OBSERVABILITY §78 freshness alerts (AL-CAEP-03). |
+| `caep_error_count` | INT | NOT NULL | `0` | Cumulative count of CAEP SET validation or processing errors for this tenant. Incremented on each error; reset to 0 on successful processing. Consumer: OBSERVABILITY §78 error-rate alerts (AL-CAEP-01). |
+
+#### §56.5.2 `caep_events` Table Columns
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | UUID | NOT NULL (PK) | Primary key — `gen_random_uuid()`. |
+| `tenant_id` | UUID | NOT NULL | FK → `tenants(id) ON DELETE CASCADE`. Cascade: when a tenant is deleted (GDPR Art. 17 tenant erasure), all CAEP event records for that tenant are deleted. |
+| `user_id` | UUID | NULL | FK → `tenant_users(id) ON DELETE SET NULL`. SET NULL: when an individual user is deleted (Art. 17 subject erasure), the CAEP event record is retained but `user_id` is nulled — the event audit trail is preserved (DEC-030 HMAC chain requirement) while the user reference is severed. |
+| `set_jti` | TEXT | NOT NULL UNIQUE | SHA-256 hash of the raw SET JWT `jti` claim. **Never stores the raw JTI claim.** The unique constraint + `idx_caep_events_set_jti` form the dedup layer preventing replay attacks. |
+| `event_type` | TEXT | NOT NULL | CAEP event type from the SET `events` claim — e.g., `session-revoked`, `credential-change`, `account-disabled`, `account-enabled`, `account-purged`. Not a CHECK-constrained ENUM: new CAEP event types may be added without a migration. |
+| `idp_subject` | TEXT | NOT NULL | SHA-256 hash of the IdP subject identifier from the SET `sub_id` claim. **Never stores the raw subject (email, phone, or IdP UID).** Privacy floor: even this internal table stores only the hash. |
+| `action_taken` | TEXT | NOT NULL | Human-readable action taken by `caep-action-handler.ts` — e.g., `'session_revoked'`, `'user_suspended'`, `'user_purged'`, `'no_action_unknown_event_type'`. |
+| `processed_at` | TIMESTAMPTZ | NOT NULL | Timestamp when the SET was processed by the CAEP Worker. `DEFAULT now()`. Consumer: OBSERVABILITY §78 processing-lag alerts (AL-CAEP-02). |
+| `raw_set_hash` | TEXT | NOT NULL | SHA-256 hash of the raw SET JWT byte string. **Never stores the raw SET JWT.** Enables the auditor to verify that a specific SET was processed without exposing the JWT payload. |
+
+#### §56.5.3 `tenant_sso_configs` Re-registration Columns (Part C)
+
+| Column | Type | Nullable | Default | Semantics |
+|---|---|---|---|---|
+| `caep_reregistration_required` | BOOLEAN | NOT NULL | `FALSE` | Trigger for pg_cron job 37 (`caep_reregister_sweep`, */5 * * * *). Set to `TRUE` by the Worker when a CAEP stream cert rotation is detected. pg_cron job 37 reads `WHERE caep_reregistration_required = TRUE`, re-registers the stream with the IdP, then sets this back to `FALSE`. |
+| `caep_last_reregistered_at` | TIMESTAMPTZ | NULL | — | Timestamp of the last successful CAEP stream re-registration. NULL = never re-registered. pg_cron job 37 writes this on successful re-registration. Consumer: OBSERVABILITY §78 freshness check for re-registration staleness (6-minute freshness window). |
+| `caep_reregistration_trigger` | TEXT | NULL | — | Reason for the most recent re-registration. CHECK constraint enforces `IN ('cert_rotation', 'manual', 'stream_error', 'initial')`. NULL = never re-registered. |
+
+#### §56.5.4 State Machines
+
+**`caep_status` state machine:**
+
+```
+inactive  →  active          (stream registration succeeds)
+active    →  error           (SET validation failure threshold exceeded)
+active    →  rate_limited    (IdP rate limit response received)
+error     →  active          (stream re-registration succeeds, pg_cron job 37)
+rate_limited → active        (backoff window expires, stream re-registered)
+error     →  inactive        (tenant admin explicitly deactivates)
+```
+
+**`caep_reregistration_required` state machine:**
+
+```
+FALSE  →  TRUE    (cert_rotation event detected in incoming SET; or manual trigger; or stream_error)
+TRUE   →  FALSE   (pg_cron job 37 successfully re-registers stream within 6-minute window)
+```
+
+**Invariant:** `caep_reregistration_required = TRUE` rows must not persist beyond 6 minutes — the pg_cron job 37 freshness window. OBSERVABILITY §78 alert AL-CAEP-04 fires if any row has been `TRUE` for > 6 minutes (CAEP-REREGISTER-SLO-01 breach). IR R-83 covers the runbook.
+
+---
+
+### §56.6 RLS Analysis
+
+#### §56.6.1 `tenant_sso_configs` — Inherited Policies
+
+Migration 0082 inherits all existing RLS policies on `tenant_sso_configs` without modification. The 9 new CAEP columns (Part A: 6 + Part C: 3) are governed by the same policies that govern all other `tenant_sso_configs` columns.
+
+| Policy | Role | Access | Rule |
+|---|---|---|---|
+| `sso_configs_tenant_isolation` | `tenant_admin` | SELECT own rows | `WHERE tenant_id = current_setting('app.current_tenant_id')::UUID` |
+| `sso_configs_system_write` | `form_system` | INSERT + UPDATE + SELECT | All rows — CAEP Worker writes `caep_status`, `caep_last_event_at`, `caep_error_count`, `caep_reregistration_required`, `caep_last_reregistered_at`, `caep_reregistration_trigger` |
+| BYPASSRLS | `form_admin` | All rows | Compliance evidence queries, incident triage |
+| No policy / fail-closed | `tenant_manager` | No access | HR/People role; `tenant_sso_configs` contains cryptographic material and configuration; zero access enforced |
+| No policy / fail-closed | `form_api` | No access | SSO config is managed by admin dashboard Worker, not the consumer API tier |
+
+**Critical privacy invariant for `caep_webhook_secret`:** The `tenant_manager` role (the HR/admin role that must never see individual user data) has zero access to `tenant_sso_configs`. Even if this policy were relaxed, the application layer strips `caep_webhook_secret` — AES-256-GCM ciphertext — from all API responses. The column is never included in `SELECT *` responses from the admin dashboard; it is accessed only by the `caep-receiver.ts` Worker via `form_system` credentials.
+
+#### §56.6.2 `caep_events` — New Table RLS
+
+| Policy | Role | Access | Rule |
+|---|---|---|---|
+| `caep_events_form_system` | `form_system` | ALL (INSERT + SELECT) | `USING (true) WITH CHECK (true)` — CAEP Worker inserts one row per processed SET |
+| `caep_events_tenant_admin_select` | `tenant_admin` | SELECT | `USING (tenant_id = current_setting('app.current_tenant_id')::UUID)` — admin dashboard audit log viewer shows own tenant's events |
+| `caep_events_form_api_deny` | `form_api` | ALL (denied) | `USING (FALSE)` — zero rows; raw CAEP events are not exposed via the consumer API tier |
+| No policy | `tenant_manager` | No access | HR/People role; no policy = zero rows under RLS; individual CAEP events reveal individual user security activity — privacy floor prohibits |
+
+**CAEP-PURGE-CHAIN-01 ordering invariant:** For `event_type = 'account-purged'` events, the `caep_events` INSERT (via `form_system`) must be committed to the DEC-030 HMAC audit chain **before** any KV write or `tenant_users` mutation. This ordering is enforced at the Worker layer: `caep-action-handler.ts` commits the `sso.caep_user_purged` DEC-030 event and the `caep_events` INSERT in the same Supabase transaction, then proceeds with KV and `tenant_users` operations. HTTP 422 is returned to the IdP if the transaction fails, triggering IdP retry with the same SET JTI — deduplicated by `ON CONFLICT (set_jti) DO NOTHING`.
+
+#### §56.6.3 Auditor Proof Queries
+
+```sql
+-- 1. Confirm RLS is enabled on caep_events:
+SELECT relrowsecurity FROM pg_class WHERE relname = 'caep_events';
+-- Expected: t
+
+-- 2. Confirm tenant_manager cannot read from caep_events:
+SET ROLE tenant_manager;
+SELECT count(*) FROM caep_events;
+-- Expected: 0 rows (no-policy fail-closed) or permission denied
+RESET ROLE;
+
+-- 3. Confirm form_api cannot read from caep_events:
+SET ROLE form_api;
+SELECT count(*) FROM caep_events;
+-- Expected: 0 rows (USING FALSE policy)
+RESET ROLE;
+
+-- 4. Confirm caep_webhook_secret is BYTEA type (structural ciphertext check):
+SELECT column_name, data_type FROM information_schema.columns
+ WHERE table_name = 'tenant_sso_configs'
+   AND column_name = 'caep_webhook_secret';
+-- Expected: data_type = 'bytea'
+
+-- 5. Confirm all 9 CAEP columns exist on tenant_sso_configs:
+SELECT column_name FROM information_schema.columns
+ WHERE table_name = 'tenant_sso_configs'
+   AND column_name IN (
+     'caep_stream_id', 'caep_delivery_mode', 'caep_webhook_secret',
+     'caep_status', 'caep_last_event_at', 'caep_error_count',
+     'caep_reregistration_required', 'caep_last_reregistered_at',
+     'caep_reregistration_trigger'
+   )
+ ORDER BY column_name;
+-- Expected: 9 rows
+```
+
+---
+
+### §56.7 Privacy Floor
+
+| Data element | Classification | Rationale |
+|---|---|---|
+| `caep_webhook_secret` | Cryptographic material — AES-256-GCM ciphertext | Shared HMAC-SHA256 secret for SET JWT verification. Never stored as plaintext at the SQL layer. Never included in DEC-030 event payloads. Never returned in any API response. Decrypted in Worker memory only for the duration of the SET validation step. GDPR Art. 17: deleted via tenant CASCADE. |
+| `caep_stream_id` | FORM-internal IdP configuration | IdP-assigned stream identifier. Not personally identifiable. Not a user identifier. Not included in DEC-030 payloads. |
+| `caep_status`, `caep_error_count`, `caep_last_event_at` | FORM-internal operational metadata | Stream status and counters. No PII — contains no `user_id`, email, name, health value, or GDPR Art. 9 special-category data. |
+| `caep_reregistration_required`, `caep_last_reregistered_at`, `caep_reregistration_trigger` | FORM-internal operational metadata | Re-registration state. No PII. pg_cron job 37 consumer only. |
+| `caep_events.set_jti` | SHA-256 hash | Hash of the IdP-assigned JWT `jti` claim. The raw JTI claim is never stored. Enables dedup (replay prevention) without retaining the original token identifier. |
+| `caep_events.idp_subject` | SHA-256 hash | Hash of the IdP subject identifier (email, phone, or IdP UID). **The raw subject is never stored.** Enables correlation within FORM's own audit trail without retaining PII. |
+| `caep_events.raw_set_hash` | SHA-256 hash | Hash of the raw SET JWT bytes. The raw SET JWT is never stored. Enables auditor verification without exposing the full JWT payload. |
+| `caep_events.action_taken` | FORM-internal classification | Action string (e.g., `'session_revoked'`). No PII — does not name the user, only the action class. |
+| `caep_events.event_type` | FORM-internal classification | CAEP event type string (e.g., `'credential-change'`). No PII. |
+
+**Privacy floor invariant for `tenant_manager`:** The `tenant_manager` role (HR/People admin) has no policy on `tenant_sso_configs` and no policy on `caep_events`. This is a hard non-negotiable floor. Individual CAEP events (`session-revoked`, `credential-change`, `account-purged`, `account-disabled`) reveal that a specific employee's credentials changed or session was revoked — information the employer must never receive. The aggregate dashboard visible to `tenant_manager` via the Admin Dashboard shows only adoption rates and weekly-active percentages, never individual security events.
+
+**GDPR Art. 17 behaviour:**
+- Tenant deletion: `caep_events ON DELETE CASCADE` deletes all CAEP event rows for the tenant. `tenant_sso_configs` row deleted with tenant — all 9 CAEP columns deleted.
+- Individual user deletion (DSAR Art. 17): `caep_events.user_id ON DELETE SET NULL` — the event record is retained (DEC-030 HMAC chain legal obligation under Art. 17(3)(b)) but `user_id` is nulled. `set_jti`, `idp_subject`, and `raw_set_hash` are SHA-256 hashes — cannot be reversed to identify the deleted user.
+
+**DEC-030 HMAC chain protection:** The seven DEC-030 events for CAEP (AUDIT_LOG_SCHEMA §CAEP/SSF: `sso.caep_event_received`, `sso.caep_session_revoked`, `sso.caep_user_suspended`, `sso.caep_user_purged`, `sso.caep_stream_error`, `sso.caep_stream_registered`, `sso.caep_reregistration_queued`) never include `caep_webhook_secret` plaintext, raw SET JWT bytes, raw JTI claims, or raw IdP subject identifiers. All seven events carry 7-year WORM retention in R2 under `compliance/audit/`.
+
+---
+
+### §56.8 SOC 2 Evidence
+
+| SOC 2 Criterion | Control mechanism | Evidence |
+|---|---|---|
+| **CC6.3** — Logical access removed on a timely basis | CAEP-SLO-01: CAEP account-purged or session-revoked events are acted on within 30 seconds of SET receipt; `caep-action-handler.ts` calls `revokeUserSessions()` synchronously within the SET processing pipeline; `caep_last_event_at` is the auditor-verifiable timestamp of last SET processing | **CC6-E-CAEP-001** — `caep_events` export of all `event_type IN ('session-revoked','account-purged')` for observation period; `processed_at - idp_event_time` latency distribution (P99 < 30s); R2 `compliance/evidence/sso/CC6-E-CAEP-001_<YYYY-QN>.csv`; 7yr WORM; registered SOC2_READINESS §186 |
+| **CC6.3** — Access removed on account disable | CAEP `account-disabled` event triggers `suspendUser()` in `caep-action-handler.ts`; session revocation within the same SET processing call; `caep_events.action_taken = 'user_suspended'` is the audit record | **CC6-E-CAEP-002** — `caep_events` export of all `event_type = 'account-disabled'` and `action_taken = 'user_suspended'`; confirms disable-to-action < 30s; R2 `compliance/evidence/sso/CC6-E-CAEP-002_<YYYY-QN>.csv`; 7yr WORM; registered SOC2_READINESS §186 |
+| **CC6.6** — Credential changes trigger session revocation | CAEP `credential-change` event triggers `revokeUserSessions()` in `caep-action-handler.ts` within 30 seconds of IdP-side password/MFA change; `caep_events.event_type = 'credential-change'` and `action_taken = 'session_revoked'` is the audit record | **CC6-E-CAEP-003** — `caep_events` export of all `event_type = 'credential-change'` and `action_taken = 'session_revoked'`; latency P99 < 30s; R2 `compliance/evidence/sso/CC6-E-CAEP-003_<YYYY-QN>.csv`; 7yr WORM; registered SOC2_READINESS §186 |
+| **CC7.2** — Environmental threat monitoring | AL-CAEP-01 (SET validation failure rate > 5%), AL-CAEP-02 (SET processing lag > 30s), AL-CAEP-03 (stream freshness gap > 24h), AL-CAEP-04 (re-registration pending > 6 min), AL-CAEP-05 (account-purged GDPR Art. 17 deletion clock) — all registered in OBSERVABILITY §78 | **CC6-E-CAEP-004** — OBSERVABILITY §78 alert activation log for all 5 AL-CAEP-* alerts for observation period; PagerDuty incident IDs; R2 `compliance/evidence/sso/CC6-E-CAEP-004_<YYYY-QN>.csv`; 7yr WORM; registered SOC2_READINESS §186. **CAEP-OBS-E-001** — quarterly CAEP/RISC stream observability evidence artefact; registered SOC2_READINESS §186 |
+| **CC7.3** — Response to security anomalies | R-83 (CAEP SET Validation Failure Rate High — AL-CAEP-01 companion), R-84 (CAEP Account-Purged GDPR Art. 17 Deletion Clock), R-85 (Google RISC Hijacking Event) — all registered in INCIDENT_RESPONSE.md v3.48.0 | **CAEP-SETERR-E-001** (SOC2_READINESS §187) — per-activation incident artefact for CAEP SET validation failures; **CAEP-PURGE-E-001** (SOC2_READINESS §188) — per-activation artefact for Art. 17 deletion clock; **RISC-HIJACK-E-001** (SOC2_READINESS §189) — per-activation artefact for Google RISC hijacking events |
+
+**SOC 2 auditor narrative — CC6.6:**
+FORM's CAEP implementation provides real-time response to credential and account state changes at the IdP — going beyond the JWT TTL model. When an enterprise employee changes their password, resets MFA, or is disabled in Okta/Entra/Google Workspace, the IdP pushes a CAEP SET to FORM's `caep-receiver.ts` Worker within seconds. The Worker validates the SET (10-step pipeline: signature, JTI dedup, subject claim, audience, event type, expiry, tenant lookup, stream active check, delivery mode, rate limit), then dispatches to `caep-action-handler.ts`, which invokes `revokeUserSessions()` — completing the credential-change-to-revocation cycle within 30 seconds. The `caep_events` table records every SET processed, with `set_jti` (SHA-256 hash — no raw JTI) providing replay prevention and `action_taken` providing the auditor's evidence of the FORM-side action. The CC6-E-CAEP-003 quarterly evidence export — filed to R2 WORM by devops-lead + compliance-officer — provides direct fieldwork evidence for this control.
+
+---
+
+### §56.9 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply Migration 0082 to staging (all three parts: A, B, C); run MIG-0082-01 through MIG-0082-06 (§56.4); confirm all 9 columns present on `tenant_sso_configs`; confirm `caep_events` table present with all 3 RLS policies; confirm all 4 indexes present; file `compliance/evidence/sso/migration-0082-validation_<YYYY-MM-DD>.txt` | platform-engineer + devops-lead | **P0** | M4 | [ ] Pending |
+| 2 | Validate `caep_events` RLS: confirm `tenant_manager` returns 0 rows; confirm `form_api` returns 0 rows (USING FALSE); confirm `tenant_admin` sees only own-tenant rows; confirm `form_system` sees all rows | security-engineer + compliance-officer | **P0** | M4 | [ ] Pending |
+| 3 | Deploy `apps/worker/src/caep-receiver.ts` (10-step SET validation pipeline) and `apps/worker/src/caep-action-handler.ts` (8 event dispatchers) to staging; confirm SET processing writes one `caep_events` row per SET; confirm `caep_webhook_secret` AES-256-GCM decryption in Worker memory; confirm raw SET JWT never persisted to any store | platform-engineer | **P0** | M4 | [ ] Pending |
+| 4 | Apply Migration 0082 to production (gated on items 1–3); register pg_cron job 37 (`caep_reregister_sweep`, */5 * * * *) per OBSERVABILITY §12.6; confirm job 37 active in `cron.job_run_details`; configure CAEP stream with one integration partner (Okta pilot) | devops-lead | **P0** | M4 (after items 1–3) | [ ] Pending |
+| 5 | DATA_MODEL §56 canonical registration | compliance-officer | **P1** | Documentation pass | 🟢 Done — this pass (v1.48, 2026-07-06) |
+| 6 | Update `docs/SSO_SCIM_IMPLEMENTATION.md §23.12` — add item 16: DATA_MODEL §56 cross-reference | compliance-officer | **P1** | Documentation pass | 🟢 Done — this pass (SSO_SCIM v2.41, 2026-07-06) |
+| 7 | Update `docs/SSO_SCIM_IMPLEMENTATION.md §36.6` — add item 10: DATA_MODEL §56 cross-reference | compliance-officer | **P1** | Documentation pass | 🟢 Done — this pass (SSO_SCIM v2.41, 2026-07-06) |
+
+---
+
+### §56.10 Cross-Reference Obligations
+
+| Document | Section | Description | Status |
+|---|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §23.5.1 | Part A DDL source — 6 CAEP columns on `tenant_sso_configs` + `idx_tenant_sso_configs_caep_active`; §56.3.1 mirrors verbatim | DDL source |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §23.5.2 | Part B DDL source — `caep_events` table + 2 indexes + 3 RLS policies; §56.3.2 mirrors verbatim | DDL source |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §23.12 | Implementation checklist — DATA_MODEL §56 row added (item 16) | 🟢 Done this pass (SSO_SCIM v2.41, 2026-07-06) |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §36.2.3 | Part C DDL source — 3 re-registration columns + `idx_tsc_caep_reregister` (DEC-072); §56.3.3 mirrors verbatim | DDL source |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §36.6 | Implementation checklist — DATA_MODEL §56 row added (item 10) | 🟢 Done this pass (SSO_SCIM v2.41, 2026-07-06) |
+| `docs/OBSERVABILITY.md` | §78 | CAEP/RISC Stream Observability — AL-CAEP-01..05, CAEP-SLO-01, CAEP-REREGISTER-SLO-01, CAEP-OBS-E-001 quarterly artefact, pg_cron job 37 | 🟢 Done — OBSERVABILITY.md v5.24.0, 2026-07-06 |
+| `docs/SOC2_READINESS.md` | §186 | CAEP-OBS-E-001 quarterly evidence + CC6-E-CAEP-001/002/003/004 evidence artefacts | 🟢 Done — SOC2_READINESS.md v4.12.0, 2026-07-06 |
+| `docs/SOC2_READINESS.md` | §187 | CAEP-SETERR-E-001 per-activation SET validation failure incident artefact | 🟢 Done — SOC2_READINESS.md v4.13.0, 2026-07-06 |
+| `docs/SOC2_READINESS.md` | §188 | CAEP-PURGE-E-001 per-activation Art. 17 deletion clock incident artefact | 🟢 Done — SOC2_READINESS.md v4.13.0, 2026-07-06 |
+| `docs/SOC2_READINESS.md` | §189 | RISC-HIJACK-E-001 per-activation Google RISC hijacking incident artefact | 🟢 Done — SOC2_READINESS.md v4.13.0, 2026-07-06 |
+| `docs/INCIDENT_RESPONSE.md` | R-83 | CAEP SET Validation Failure Rate High — AL-CAEP-01 companion runbook | 🟢 Done — INCIDENT_RESPONSE.md v3.48.0, 2026-07-06 |
+| `docs/INCIDENT_RESPONSE.md` | R-84 | CAEP Account-Purged GDPR Art. 17 Deletion Clock — AL-CAEP-05 companion runbook | 🟢 Done — INCIDENT_RESPONSE.md v3.48.0, 2026-07-06 |
+| `docs/INCIDENT_RESPONSE.md` | R-85 | Google RISC Hijacking Event Received — RISC-HIJACK-E-001 companion runbook | 🟢 Done — INCIDENT_RESPONSE.md v3.48.0, 2026-07-06 |
+| `docs/AUDIT_LOG_SCHEMA.md` | §CAEP/SSF | Seven DEC-030 HMAC-chained events: `sso.caep_event_received`, `sso.caep_session_revoked`, `sso.caep_user_suspended`, `sso.caep_user_purged`, `sso.caep_stream_error`, `sso.caep_stream_registered`, `sso.caep_reregistration_queued` (7yr WORM) | 🟢 Done — AUDIT_LOG_SCHEMA.md v2.21, 2026-07-06 |
+
+---
+
+*v1.48 (2026-07-06): §56 `tenant_sso_configs` CAEP Schema Extension & `caep_events` Table — Migration 0082. DATA_MODEL canonical registration for the CAEP/RISC schema migrations specified in `docs/SSO_SCIM_IMPLEMENTATION.md §23` (v1.5, 2026-06-01) + `§36` (DEC-072, v2.8, 2026-06-19). Migration 0082 is the root CAEP dependency — all six subsequent CAEP migrations (0083–0088) list it as prerequisite; pg_cron job 37 (`caep_reregister_sweep`, */5 * * * *) requires Part C columns. Three DDL parts: Part A (6 columns on `tenant_sso_configs`: `caep_stream_id`, `caep_delivery_mode`, `caep_webhook_secret` AES-256-GCM, `caep_status` CHECK 'inactive'/'active'/'error'/'rate_limited', `caep_last_event_at`, `caep_error_count`; plus `idx_tenant_sso_configs_caep_active` partial index), Part B (new `caep_events` table: `id` UUID PK, `tenant_id` ON DELETE CASCADE, `user_id` ON DELETE SET NULL, `set_jti` UNIQUE SHA-256 hash, `event_type`, `idp_subject` SHA-256 hash, `action_taken`, `processed_at`, `raw_set_hash` SHA-256 hash; `idx_caep_events_tenant_processed` + `idx_caep_events_set_jti` UNIQUE; 3 RLS policies: form_system ALL, tenant_admin SELECT own, form_api DENY), Part C (3 re-registration columns: `caep_reregistration_required` BOOLEAN NOT NULL DEFAULT FALSE, `caep_last_reregistered_at` TIMESTAMPTZ, `caep_reregistration_trigger` CHECK IN cert_rotation/manual/stream_error/initial; `idx_tsc_caep_reregister` partial index). §56.1 purpose: closes DATA_MODEL registration gap for CAEP migration 0082 — SSO_SCIM §23.5 + §36.2.3 had complete design + DDL but no companion DATA_MODEL section (same pattern as §52/0101, §53/0100, §54/0098, §55/0102). §56.2 dependency chain: 0082 is root for 0083–0088; pg_cron job 37 requires Part C; CAEP Worker deployment gated on 0082 commit. §56.3 full DDL + rollback (all 3 parts; rollback pre-gate: zero active streams; CONCURRENTLY indexes no table lock). §56.4 six CI adversarial tests MIG-0082-01..06 (migration apply, rollback, caep_status CHECK, caep_reregistration_trigger CHECK, ciphertext-only + set_jti SHA-256, caep_events ON CONFLICT dedup). §56.5 column/table semantics: 6 Part A columns + `caep_events` 9 columns + 3 Part C columns; caep_status and caep_reregistration_required state machines; CAEP-PURGE-CHAIN-01 invariant. §56.6 RLS (tenant_sso_configs inherits sso_configs_tenant_isolation + system_write + BYPASSRLS; form_api + tenant_manager no access; caep_events 3 policies: form_system ALL, tenant_admin SELECT own, form_api DENY; tenant_manager no policy = zero rows; 5 auditor proof queries). §56.7 privacy floor (caep_webhook_secret = AES-256-GCM ciphertext, never in DEC-030 payloads; set_jti/idp_subject/raw_set_hash = SHA-256 hashes only, never raw values; tenant_manager zero access enforced; GDPR Art. 17: tenant CASCADE delete, user_id SET NULL with HMAC chain retention under Art. 17(3)(b) exemption; 7 DEC-030 events contain no caep_webhook_secret or raw PII). §56.8 SOC 2 (CC6.3 CAEP-SLO-01 <30s — CC6-E-CAEP-001/002 quarterly evidence §186; CC6.6 credential-change/account-disabled revocation < 30s — CC6-E-CAEP-003 quarterly evidence §186; CC7.2 AL-CAEP-01..05 monitoring — CC6-E-CAEP-004 + CAEP-OBS-E-001 §186; CC7.3 R-83/R-84/R-85 runbooks — CAEP-SETERR-E-001 §187, CAEP-PURGE-E-001 §188, RISC-HIJACK-E-001 §189). §56.9 seven-item checklist (4× P0/M4 staging migration + RLS validation + Worker deploy + production; 3× P1/Done this pass DATA_MODEL §56 + SSO_SCIM §23.12 item 16 + §36.6 item 10). §56.10 cross-reference obligations: SSO_SCIM §23.5.1/.5.2/§36.2.3 DDL sources; §23.12 item 16 🟢 Done; §36.6 item 10 🟢 Done; OBSERVABILITY §78 🟢 Done v5.24.0; SOC2_READINESS §186/187/188/189 🟢 Done v4.12.0/v4.13.0; IR R-83/84/85 🟢 Done v3.48.0; AUDIT_LOG_SCHEMA §CAEP/SSF 🟢 Done v2.21. TOC §56 entry added. Document header v1.47 → v1.48. Owner: enterprise-architect + security-engineer + compliance-officer.*
