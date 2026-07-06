@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.48
+# FORM · Multi-Tenant Data Model v1.49
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -64,6 +64,7 @@
 54. [`tenant_sso_configs` PKJWT Extension — Migration 0098](#54-tenant_sso_configs-pkjwt-extension--migration-0098)
 55. [`session_blocklist.kv_sync_status` — KV Revocation Sync Status — Migration 0102](#55-session_blocklists-kv_sync_status--kv-revocation-sync-status--migration-0102)
 56. [`tenant_sso_configs` CAEP Schema Extension & `caep_events` Table — Migration 0082](#56-tenant_sso_configs-caep-schema-extension--caep_events-table--migration-0082)
+57. [`tenant_sso_configs` BDG Column Extension — Migration 0079](#57-tenant_sso_configs-bdg-column-extension--migration-0079)
 
 ---
 
@@ -20458,4 +20459,336 @@ FORM's CAEP implementation provides real-time response to credential and account
 
 ---
 
+## §57. `tenant_sso_configs` BDG Column Extension — Migration 0079
+
+**Feature:** SCIM Bulk Deprovision Guard (`docs/SSO_SCIM_IMPLEMENTATION.md §34`)
+**SOC 2 scope:** CC6.3, A1.2, CC7.2, CC9.2
+**Last updated:** 2026-07-06
+**Source design:** `docs/SSO_SCIM_IMPLEMENTATION.md §34` (DEC-066, v2.6, 2026-06-19)
+**Migration:** `migrations/0079_bulk_deprovision_guard.sql`
+
+---
+
+### §57.1 Purpose and Scope
+
+`docs/SSO_SCIM_IMPLEMENTATION.md §34` (v2.6, 2026-06-19) specified the complete design and DDL for the SCIM Bulk Deprovision Guard — a pre-flight server-side control in the SCIM Worker that intercepts deprovisioning requests before execution, refuses batches exceeding a configurable per-tenant threshold, and requires explicit CSM-countersigned approval for legitimate large-scale deprovisioning events. §34 covers DEC-066 design decision, full DDL (§34.3), SCIM Worker guard logic (§34.4), CSM override protocol (§34.5), Admin Dashboard extension (§34.6), five DEC-030 audit events (§34.7), and SOC 2 mapping (§34.8).
+
+This section provides the canonical DATA_MODEL registration for Migration 0079 — the same role that §52 plays for Migration 0101, §53 for Migration 0100, §54 for Migration 0098, §55 for Migration 0102, and §56 for Migration 0082. Migration 0079 predated the §52–§56 companion-section pattern (it was added in SSO_SCIM v2.6, 2026-06-19, before the pattern was established in v2.35); this section backfills the missing registration and closes the documentation gap.
+
+**What Migration 0079 adds to `tenant_sso_configs`:**
+
+| Object | Type | Purpose |
+|---|---|---|
+| `bulk_deprovision_threshold_pct` | `SMALLINT NOT NULL DEFAULT 20` | Per-tenant guard threshold (5–100; 100 = guard disabled) |
+| `bulk_deprovision_override_exp` | `TIMESTAMPTZ DEFAULT NULL` | CSM-countersigned override window expiry |
+| `bulk_deprovision_override_by` | `UUID DEFAULT NULL → auth.users` | FORM-internal CSM UUID who countersigned |
+| `chk_bdg_threshold` | CHECK constraint | Enforces range 5–100 |
+| `chk_bdg_override_coherent` | CHECK constraint | Both override columns NULL or both non-NULL |
+| `idx_tsc_bdg_override_active` | Partial index | Fast sweep of active override windows |
+| pg_cron job 34 (`bdg_override_expiry_sweep`) | `*/15 * * * *` | Auto-NULL expired override windows |
+
+**Scope of this section:** Migration 0079 DDL and rollback; CI adversarial tests; column semantics and state machines; RLS analysis; privacy floor; SOC 2 evidence mapping; cross-reference obligations. The SCIM Worker guard logic (`enforceDeprovisionGuard()`, `getGuardConfig()`, `revokeActiveOverride()`), CSM override protocol, Admin Dashboard integration, five DEC-030 audit events, and pg_cron job 24 (`scim_mass_deprovision_check`) are defined in SSO_SCIM §34; this section registers the schema artefacts only.
+
+---
+
+### §57.2 Migration Dependency Chain
+
+| Migration | Change | Depends on |
+|---|---|---|
+| Pre-existing | `tenant_sso_configs` base table | Before 0079 |
+| **0052** | `scim_ip_enforcement_enabled` column on `tenant_sso_configs` | Pre-existing |
+| **0076** | `scim_ip_enforcement_flag` column | **0052** required |
+| **0077** | `update_scim_ip_enforcement()` SECURITY DEFINER RPC | **0076** required |
+| **0079** | 3 BDG columns + 2 constraints + 1 partial index + pg_cron job 34 | **0052, 0076, 0077** required |
+| SCIM Worker BDG | `enforceDeprovisionGuard()` in `apps/scim-worker/src/handlers/users.ts` | **0079** required (reads `bulk_deprovision_threshold_pct`, `bulk_deprovision_override_exp`, `bulk_deprovision_override_by`) |
+| Admin Dashboard | BDG panel in SCIM Config screen | **0079** required + SCIM Worker BDG required |
+
+**Apply order invariant:** Migrations 0052, 0076, 0077 must be committed before 0079 runs. The BDG SCIM Worker deployment must be gated on 0079 commit — the guard logic reads columns that 0079 creates. pg_cron job 34 registration is part of 0079 itself (inline `SELECT cron.schedule(...)` in the migration).
+
+**Lock note:** `ALTER TABLE tenant_sso_configs ADD COLUMN IF NOT EXISTS` acquires ACCESS EXCLUSIVE on `tenant_sso_configs`. At O(100) tenant rows, lock duration is sub-second. The `CREATE INDEX` on `idx_tsc_bdg_override_active` does not use CONCURRENTLY — the migration was written without it. At O(100) rows, the lock is negligible. For future tenants at O(10,000) rows, a CONCURRENTLY rebuild would be appropriate; file a separate migration.
+
+---
+
+### §57.3 Migration DDL
+
+#### §57.3.1 Forward Migration (mirrors SSO_SCIM §34.3 verbatim)
+
+```sql
+-- migrations/0079_bulk_deprovision_guard.sql
+-- Migration 0079: SCIM Bulk Deprovision Guard
+-- Adds per-tenant configurable threshold and CSM override window to tenant_sso_configs.
+-- Prerequisite: migrations 0052 (scim_ip_enforcement_enabled), 0076 (scim_ip_enforcement_flag),
+--               0077 (scim_ip_enforcement_toggle_rpc).
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS bulk_deprovision_threshold_pct SMALLINT     NOT NULL DEFAULT 20,
+  ADD COLUMN IF NOT EXISTS bulk_deprovision_override_exp  TIMESTAMPTZ           DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS bulk_deprovision_override_by   UUID                  DEFAULT NULL
+    REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- Constraint: threshold must be 5–100 (100 = guard disabled)
+ALTER TABLE tenant_sso_configs
+  ADD CONSTRAINT chk_bdg_threshold
+    CHECK (bulk_deprovision_threshold_pct BETWEEN 5 AND 100);
+
+-- Constraint: override columns must be both set or both NULL
+ALTER TABLE tenant_sso_configs
+  ADD CONSTRAINT chk_bdg_override_coherent
+    CHECK (
+      (bulk_deprovision_override_exp IS NULL) = (bulk_deprovision_override_by IS NULL)
+    );
+
+-- Index: efficiently find tenants with active override windows (for cron sweep)
+CREATE INDEX idx_tsc_bdg_override_active
+  ON tenant_sso_configs (tenant_id)
+  WHERE bulk_deprovision_override_exp IS NOT NULL;
+
+-- pg_cron job 34: auto-expire stale override windows every 15 minutes
+-- (SCIM Worker also clears on use; this is the safety-net sweep)
+SELECT cron.schedule(
+  'bdg_override_expiry_sweep',
+  '*/15 * * * *',
+  $$
+    UPDATE tenant_sso_configs
+       SET bulk_deprovision_override_exp = NULL,
+           bulk_deprovision_override_by  = NULL
+     WHERE bulk_deprovision_override_exp IS NOT NULL
+       AND bulk_deprovision_override_exp < NOW();
+  $$
+);
+
+COMMENT ON COLUMN tenant_sso_configs.bulk_deprovision_threshold_pct IS
+  'Guard threshold: block SCIM deprovisions if count exceeds ceiling(contracted_seats * pct / 100) '
+  'in a 5-minute window. Range 5–100. 100 = guard disabled. Default 20.';
+COMMENT ON COLUMN tenant_sso_configs.bulk_deprovision_override_exp IS
+  'CSM-countersigned override expiry. NULL = guard active. Future timestamp = override window open. '
+  'Cleared by SCIM Worker after first bulk sync that uses it, or by pg_cron job 34 on expiry.';
+COMMENT ON COLUMN tenant_sso_configs.bulk_deprovision_override_by IS
+  'FORM-internal CSM UUID who countersigned the override. NULL when no override is active.';
+```
+
+#### §57.3.2 Rollback
+
+**Pre-gate (safe):** No active override windows exist (`bulk_deprovision_override_exp IS NOT NULL` returns zero rows). No active BDG Worker deployments using the columns.
+
+```sql
+-- Rollback 0079: SCIM Bulk Deprovision Guard
+-- Pre-gate: confirm zero active overrides before rolling back.
+-- SELECT COUNT(*) FROM tenant_sso_configs WHERE bulk_deprovision_override_exp IS NOT NULL;
+-- Expected: 0 rows. If > 0, expire them first via admin tool.
+
+-- Deregister pg_cron job 34
+SELECT cron.unschedule('bdg_override_expiry_sweep');
+
+-- Drop partial index
+DROP INDEX IF EXISTS idx_tsc_bdg_override_active;
+
+-- Drop constraints before column removal
+ALTER TABLE tenant_sso_configs
+  DROP CONSTRAINT IF EXISTS chk_bdg_override_coherent,
+  DROP CONSTRAINT IF EXISTS chk_bdg_threshold;
+
+-- Drop columns
+ALTER TABLE tenant_sso_configs
+  DROP COLUMN IF EXISTS bulk_deprovision_override_by,
+  DROP COLUMN IF EXISTS bulk_deprovision_override_exp,
+  DROP COLUMN IF EXISTS bulk_deprovision_threshold_pct;
+```
+
+---
+
+### §57.4 CI Adversarial Tests
+
+| Test ID | Name | Assertion |
+|---|---|---|
+| **MIG-0079-01** | Migration apply | After running 0079 on a clean staging schema: all three columns present on `tenant_sso_configs` with correct types and defaults (`threshold_pct = 20`, `override_exp IS NULL`, `override_by IS NULL`); both constraints registered in `pg_constraint`; `idx_tsc_bdg_override_active` present in `pg_indexes`; pg_cron job 34 registered in `cron.job` with schedule `*/15 * * * *`. |
+| **MIG-0079-02** | Rollback safety | Pre-gate check passes (zero rows with `override_exp IS NOT NULL`). Rollback 0079 removes all three columns, both constraints, the partial index, and deregisters job 34. No data loss on pre-existing `tenant_sso_configs` rows (tenant_id, idp_type, etc.). Re-applying 0079 after rollback produces identical schema. |
+| **MIG-0079-03** | `chk_bdg_threshold` boundary enforcement | INSERT / UPDATE with `threshold_pct = 4` → `23514 check_violation`. INSERT with `threshold_pct = 5` → success. INSERT with `threshold_pct = 100` → success (guard disabled). INSERT with `threshold_pct = 101` → `23514 check_violation`. INSERT with `threshold_pct = 20` → success (default). |
+| **MIG-0079-04** | `chk_bdg_override_coherent` NULL coherence | UPDATE setting only `override_exp` (non-NULL) while `override_by IS NULL` → `23514 check_violation`. UPDATE setting only `override_by` (non-NULL) while `override_exp IS NULL` → `23514 check_violation`. UPDATE setting both to non-NULL simultaneously → success. UPDATE setting both to NULL simultaneously → success (guard re-engages). |
+| **MIG-0079-05** | Partial index `idx_tsc_bdg_override_active` | Insert two rows: Row A with `override_exp = NOW() + INTERVAL '2 hours'` (active), Row B with `override_exp IS NULL` (no override). `EXPLAIN SELECT tenant_id FROM tenant_sso_configs WHERE override_exp IS NOT NULL` → confirms `Index Scan using idx_tsc_bdg_override_active`. Row B must not appear in index scan. |
+| **MIG-0079-06** | pg_cron job 34 expiry sweep | Insert row with `override_exp = NOW() - INTERVAL '1 minute'` (expired). Manually invoke the cron SQL body in a transaction. Confirm `override_exp IS NULL` and `override_by IS NULL` on that row after execution. Row with future `override_exp` is unaffected. |
+
+---
+
+### §57.5 Column and Table Semantics
+
+#### §57.5.1 `bulk_deprovision_threshold_pct`
+
+| Property | Value |
+|---|---|
+| Type | `SMALLINT NOT NULL DEFAULT 20` |
+| Constraint | `chk_bdg_threshold`: range 5–100 |
+| Write path | Tenant-writable via `update_bdg_threshold()` SECURITY DEFINER RPC only (§34.6 DDL). Direct tenant UPDATE blocked by RLS. |
+| KV cache | `scim:guard_cfg:{tenantId}` invalidated on every RPC write |
+| 100 = guard disabled | Threshold of 100% means no batch of deprovisions (short of deprovisioning all seats) crosses the limit. Effective guard-off switch for enterprise tenants with contractually justified workflows. |
+| Default | 20 (blocks ≥ 20% of contracted_seats deprovisioned in a 5-minute window) |
+
+**Threshold state machine:**
+
+```
+DEFAULT (20%)
+    │
+    ├── tenant_admin calls update_bdg_threshold(pct) ──→ UPDATED (pct)
+    │       └── DEC-030: scim.bulk_deprovision_threshold_updated
+    │           └── scim:guard_cfg KV invalidated
+    │
+    └── (unchanged across tenant lifecycle; persists across overrides)
+```
+
+#### §57.5.2 `bulk_deprovision_override_exp` + `bulk_deprovision_override_by`
+
+These two columns are governed by `chk_bdg_override_coherent` — they are always both NULL or both non-NULL.
+
+| Property | Value |
+|---|---|
+| `override_exp` type | `TIMESTAMPTZ DEFAULT NULL` |
+| `override_by` type | `UUID DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL` |
+| Write path | Internal FORM admin API only: `POST /internal/v1/admin/scim/bulk-override` (§34.5), requiring PAM-elevated `read_write` session (§24) |
+| Auto-NULL on use | SCIM Worker `revokeActiveOverride()` NULLs both columns after first bulk sync that triggers the guard (one-shot override) |
+| Auto-NULL on expiry | pg_cron job 34 (`bdg_override_expiry_sweep`, `*/15 * * * *`) NULLs rows where `override_exp < NOW()` |
+
+**Override state machine:**
+
+```
+GUARD ACTIVE (both columns NULL)
+    │
+    ├── CSM issues override via /internal/v1/admin/scim/bulk-override ──→ OVERRIDE OPEN
+    │       ├── DEC-030: scim.bulk_deprovision_override_issued
+    │       ├── override_exp = NOW() + duration (1h / 2h / 4h, per §34.5)
+    │       ├── override_by = CSM UUID
+    │       └── scim:guard_cfg KV invalidated
+    │
+    │   OVERRIDE OPEN (override_exp IS NOT NULL AND override_exp > NOW())
+    │       │
+    │       ├── SCIM sync arrives, guard would fire → override absorbs → first-use revocation
+    │       │       ├── DEC-030: scim.bulk_deprovision_override_used
+    │       │       ├── override_exp = NULL, override_by = NULL (SCIM Worker revokeActiveOverride)
+    │       │       └── ──→ GUARD ACTIVE
+    │       │
+    │       └── override_exp < NOW() (wall clock) ──→ OVERRIDE EXPIRED
+    │               └── pg_cron job 34 (*/15 *) NULLs both columns ──→ GUARD ACTIVE
+    │
+    └── GUARD ACTIVE
+```
+
+**BDG-SLO-02 (from OBSERVABILITY §79.3):** pg_cron job 34 must fire and complete within 20 minutes of each scheduled tick (freshness SLO ≥ 99%). A stale job 34 (>20 min without a successful run) means expired CSM override windows remain active beyond their configured TTL — a live security exposure. Recovery path: R-33 §R-33.5.
+
+#### §57.5.3 `idx_tsc_bdg_override_active`
+
+Partial index on `tenant_sso_configs (tenant_id) WHERE bulk_deprovision_override_exp IS NOT NULL`. Consumers:
+- pg_cron job 34 (`bdg_override_expiry_sweep`): full table scan replacement — with O(100) tenants and only 0–1 active overrides at any time, this index keeps the sweep sub-millisecond
+- OBSERVABILITY §79.2 `bdg_override_active_count` metric: uses a COUNT with this predicate
+
+---
+
+### §57.6 RLS Analysis
+
+#### §57.6.1 `tenant_sso_configs` — Inherited Policies
+
+Migration 0079 adds columns to `tenant_sso_configs`. It does not modify the table's RLS policies — all three columns inherit the existing policies defined in §4.2.
+
+| Postgres role | Policy | Access to BDG columns |
+|---|---|---|
+| `form_api` | `sso_configs_tenant_isolation` (SELECT own tenant) | Can read `threshold_pct` for guard limit computation; cannot write any BDG column (read-only policy) |
+| `form_system` | BYPASSRLS | Full read/write; used by `update_bdg_threshold()` SECURITY DEFINER RPC and `POST /internal/v1/admin/scim/bulk-override` internal endpoint |
+| `tenant_admin` | `sso_configs_tenant_isolation` (SELECT own tenant) | Can read `threshold_pct`; cannot write override columns directly. Threshold updates go through `update_bdg_threshold()` RPC which runs as `form_system`. |
+| `tenant_manager` | No policy on `tenant_sso_configs` | **Zero rows returned** (RLS fail-closed under no-policy = no access). Cannot read or write any BDG column. |
+| `tenant_owner` | `sso_configs_tenant_isolation` (SELECT own tenant) | Same as `tenant_admin` — read only; override issuance goes through internal CSM API, not tenant-facing API |
+
+**`tenant_manager` privacy invariant:** HR role has zero visibility into any SSO configuration column, including the BDG threshold and override state. This is enforced by RLS without any additional policy — no policy exists for `tenant_manager` on `tenant_sso_configs`, which under Postgres RLS means zero rows in all cases (fail-closed). The same invariant applies to `bulk_deprovision_override_by` — the CSM UUID is not visible to the HR role.
+
+#### §57.6.2 Auditor Proof Queries
+
+```sql
+-- Verify tenant_manager has zero access to BDG columns
+SET ROLE tenant_manager;
+SET app.current_tenant_id = '<any-tenant-id>';
+SELECT bulk_deprovision_threshold_pct,
+       bulk_deprovision_override_exp,
+       bulk_deprovision_override_by
+FROM tenant_sso_configs;
+-- Expected: 0 rows (RLS fail-closed)
+RESET ROLE;
+
+-- Verify form_api can read threshold but not write override columns
+SET ROLE form_api;
+SET app.current_tenant_id = '<target-tenant-id>';
+SELECT bulk_deprovision_threshold_pct FROM tenant_sso_configs
+  WHERE tenant_id = current_setting('app.current_tenant_id')::UUID;
+-- Expected: 1 row with threshold value
+UPDATE tenant_sso_configs
+  SET bulk_deprovision_override_exp = NOW() + INTERVAL '1 hour'
+  WHERE tenant_id = current_setting('app.current_tenant_id')::UUID;
+-- Expected: 0 rows updated (read-only policy)
+RESET ROLE;
+
+-- Verify chk_bdg_override_coherent blocks incoherent override state
+UPDATE tenant_sso_configs
+  SET bulk_deprovision_override_exp = NOW() + INTERVAL '1 hour'
+  WHERE tenant_id = '<target-tenant-id>';
+-- Expected: ERROR 23514 check_violation (override_by is still NULL)
+```
+
+---
+
+### §57.7 Privacy Floor
+
+| Property | Guarantee |
+|---|---|
+| No employee PII in BDG audit events | All five DEC-030 BDG events (`scim.bulk_deprovision_blocked`, `scim.bulk_deprovision_override_issued`, `scim.bulk_deprovision_override_used`, `scim.bulk_deprovision_threshold_updated`, `system.scim_guard_repeated_trigger`) contain tenant_id + counts + threshold values only. No individual employee identifiers in any event payload. |
+| `bulk_deprovision_override_by` UUID is FORM-internal | This column stores the UUID of the FORM CSM operator who countersigned the override — a FORM-internal employee operating the admin panel under a PAM-elevated session. It is NOT a data subject UUID from `tenant_users`. It references `auth.users(id)` (Supabase auth, FORM-internal credentials). `ON DELETE SET NULL` ensures the column NULLs if the CSM account is deleted. |
+| `tenant_manager` zero access | HR role cannot read `bulk_deprovision_override_by`, `bulk_deprovision_override_exp`, or `bulk_deprovision_threshold_pct`. This prevents HR from learning who at FORM countersigned a bulk change or from discovering the per-tenant guard configuration. |
+| GDPR Art. 17 (Right to Erasure) | `tenant_sso_configs` rows have `ON DELETE CASCADE` from `tenants`. On tenant erasure, all BDG columns are deleted atomically with the rest of the SSO config. `bulk_deprovision_override_by` has `ON DELETE SET NULL` on the `auth.users` FK — if a CSM account is deleted, the column NULLs without cascade-deleting the SSO config row. The five DEC-030 BDG events in `audit_log_events` are retained under Art. 17(3)(b) (legal obligation / fraud prevention) for their configured 7yr / 1yr WORM retention periods; they contain no individual employee PII. |
+
+---
+
+### §57.8 SOC 2 Evidence
+
+| Criterion | Narrative | Evidence artefact |
+|---|---|---|
+| **CC6.3** | Structural access control prevents accidental mass access revocation. Migration 0079 provides the persistent schema foundation for the §34 SCIM Worker guard: the per-tenant threshold (`bulk_deprovision_threshold_pct`) is the calibrated boundary; the CSM override column pair is the two-person-control mechanism for legitimate bulk changes. Without 0079, the guard cannot be configured per tenant and defaults to a fleet-wide fixed threshold — failing CC6.3's requirement for controls calibrated to the risk profile of each system component. | **GUARD-E-001** (quarterly, 7yr) — `docs/SOC2_READINESS.md §91` |
+| **A1.2** | Environmental threat protection. SCIM mass deprovisioning is a documented availability threat (R-24). The threshold column persists the per-tenant risk calibration; the override columns record that a legitimate bulk change was explicitly countersigned, distinguishing planned events from incidents. | See GUARD-E-001 |
+| **CC7.2** | Proactive detection. `system.scim_guard_repeated_trigger` advisory events (emitted when the guard fires ≥ 3 times for the same tenant in one hour) depend on the guard being able to fire — which depends on the threshold column holding a non-100 value. The OBSERVABILITY §79 monitoring layer reads `bulk_deprovision_override_exp` to compute the `bdg_override_active_count` metric. | GUARD-E-001 + **BDG-OBS-E-001** (quarterly, `docs/SOC2_READINESS.md §192`) |
+| **CC9.2** | Third-party (IdP) risk management. The threshold column codifies the tenant-specific tolerance for IdP-originated deprovision volume. The override audit chain (`override_issued` + `override_used`) demonstrates that any bypass of the boundary was explicitly authorized by a FORM operator under a PAM-elevated session — a documented approval chain for auditors. | GUARD-E-001 confirms boundary and override chain |
+
+**GUARD-E-001 scope (from §34.8):** Quarterly export of `scim.bulk_deprovision_blocked`, `scim.bulk_deprovision_override_issued`, `scim.bulk_deprovision_override_used`, `scim.bulk_deprovision_threshold_updated`, and `system.scim_guard_repeated_trigger` events. Registered in `docs/SOC2_READINESS.md §91` (v3.16.0, 2026-06-19). Zero-event quarters filed as explicit attestation.
+
+**BDG-OBS-E-001 scope (from OBSERVABILITY §79.8):** Quarterly monitoring-layer artefact (CC7.2/A1.1/CC4.1) — BDG RED metrics, SLO-01/SLO-02 compliance, job 34 freshness. First filing M14. Registered in `docs/SOC2_READINESS.md §192` (v5.25.0, 2026-07-06).
+
+---
+
+### §57.9 Implementation Checklist
+
+#### P0 — Before first enterprise GA customer (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0079_bulk_deprovision_guard.sql` to staging: run DDL, verify three columns present with correct defaults, verify `chk_bdg_threshold` rejects values outside 5–100, verify `chk_bdg_override_coherent` rejects incoherent NULL state, verify `idx_tsc_bdg_override_active` present, verify pg_cron job 34 registered and fires within 15 minutes, verify expired override rows are NULLed by the sweep. Run CI adversarial tests MIG-0079-01..06 (§57.4). | platform-engineer + devops-lead | **P0** | M13 | [ ] Pending |
+| 2 | Implement and deploy BDG SCIM Worker logic per §34.4 (`enforceDeprovisionGuard()`, `getGuardConfig()`, `revokeActiveOverride()`) and CSM override endpoint per §34.5 (`POST /internal/v1/admin/scim/bulk-override`); gate deployment on migration 0079 commit; confirm end-to-end: (a) bulk deprovision at threshold fires HTTP 422 + `scim.bulk_deprovision_blocked` DEC-030; (b) active override allows bulk sync + emits `scim.bulk_deprovision_override_used` + NULLs override columns on first use. | platform-engineer + security-engineer | **P0** | M13 | [ ] Pending |
+
+#### P1 — Documentation (this pass)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 3 | DATA_MODEL §57 canonical registration | compliance-officer | **P1** | Documentation pass | 🟢 Done — this pass (v1.49, 2026-07-06) |
+| 4 | Update `docs/SSO_SCIM_IMPLEMENTATION.md §34.14` — add DATA_MODEL §57 cross-reference section (mirrors §34.13 pattern for OBSERVABILITY §79) | compliance-officer | **P1** | Documentation pass | 🟢 Done — this pass (SSO_SCIM v2.44, 2026-07-06) |
+
+---
+
+### §57.10 Cross-Reference Obligations
+
+| Document | Section | Description | Status |
+|---|---|---|---|
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §34.3 | Migration 0079 DDL source — three BDG columns + two constraints + partial index + pg_cron job 34; §57.3.1 mirrors verbatim | DDL source |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §34.8 | SOC 2 evidence mapping source — CC6.3/A1.2/CC7.2/CC9.2 → GUARD-E-001; §57.8 mirrors and extends | Source |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §34.11 item 9 | GUARD-E-001 SOC2_READINESS §91 registration status corrected: 🟢 Done — SOC2_READINESS.md v3.16.0, 2026-06-19 (was stale `[ ]`) | 🟢 Corrected this pass (SSO_SCIM v2.44, 2026-07-06) |
+| `docs/SSO_SCIM_IMPLEMENTATION.md` | §34.14 | DATA_MODEL §57 cross-reference section added | 🟢 Done this pass (SSO_SCIM v2.44, 2026-07-06) |
+| `docs/OBSERVABILITY.md` | §79 | SCIM Bulk Deprovision Guard Observability — BDG RED metrics, BDG-SLO-01/02, AL-BDG-01, job 34 freshness, GUARD-CHAIN-01, BDG-SWEEP-CHAIN-01, BDG-OBS-E-001 | 🟢 Done — OBSERVABILITY.md v5.25.0, 2026-07-06 |
+| `docs/SOC2_READINESS.md` | §91 | GUARD-E-001 quarterly evidence artefact — CC6.3/A1.2/CC7.2/CC9.2 | 🟢 Done — SOC2_READINESS.md v3.16.0, 2026-06-19 |
+| `docs/SOC2_READINESS.md` | §192 | BDG-OBS-E-001 monitoring-layer quarterly evidence — CC7.2/A1.1/CC4.1, first filing M14 | 🟢 Done — SOC2_READINESS.md v5.25.0, 2026-07-06 |
+
+---
+
 *v1.48 (2026-07-06): §56 `tenant_sso_configs` CAEP Schema Extension & `caep_events` Table — Migration 0082. DATA_MODEL canonical registration for the CAEP/RISC schema migrations specified in `docs/SSO_SCIM_IMPLEMENTATION.md §23` (v1.5, 2026-06-01) + `§36` (DEC-072, v2.8, 2026-06-19). Migration 0082 is the root CAEP dependency — all six subsequent CAEP migrations (0083–0088) list it as prerequisite; pg_cron job 37 (`caep_reregister_sweep`, */5 * * * *) requires Part C columns. Three DDL parts: Part A (6 columns on `tenant_sso_configs`: `caep_stream_id`, `caep_delivery_mode`, `caep_webhook_secret` AES-256-GCM, `caep_status` CHECK 'inactive'/'active'/'error'/'rate_limited', `caep_last_event_at`, `caep_error_count`; plus `idx_tenant_sso_configs_caep_active` partial index), Part B (new `caep_events` table: `id` UUID PK, `tenant_id` ON DELETE CASCADE, `user_id` ON DELETE SET NULL, `set_jti` UNIQUE SHA-256 hash, `event_type`, `idp_subject` SHA-256 hash, `action_taken`, `processed_at`, `raw_set_hash` SHA-256 hash; `idx_caep_events_tenant_processed` + `idx_caep_events_set_jti` UNIQUE; 3 RLS policies: form_system ALL, tenant_admin SELECT own, form_api DENY), Part C (3 re-registration columns: `caep_reregistration_required` BOOLEAN NOT NULL DEFAULT FALSE, `caep_last_reregistered_at` TIMESTAMPTZ, `caep_reregistration_trigger` CHECK IN cert_rotation/manual/stream_error/initial; `idx_tsc_caep_reregister` partial index). §56.1 purpose: closes DATA_MODEL registration gap for CAEP migration 0082 — SSO_SCIM §23.5 + §36.2.3 had complete design + DDL but no companion DATA_MODEL section (same pattern as §52/0101, §53/0100, §54/0098, §55/0102). §56.2 dependency chain: 0082 is root for 0083–0088; pg_cron job 37 requires Part C; CAEP Worker deployment gated on 0082 commit. §56.3 full DDL + rollback (all 3 parts; rollback pre-gate: zero active streams; CONCURRENTLY indexes no table lock). §56.4 six CI adversarial tests MIG-0082-01..06 (migration apply, rollback, caep_status CHECK, caep_reregistration_trigger CHECK, ciphertext-only + set_jti SHA-256, caep_events ON CONFLICT dedup). §56.5 column/table semantics: 6 Part A columns + `caep_events` 9 columns + 3 Part C columns; caep_status and caep_reregistration_required state machines; CAEP-PURGE-CHAIN-01 invariant. §56.6 RLS (tenant_sso_configs inherits sso_configs_tenant_isolation + system_write + BYPASSRLS; form_api + tenant_manager no access; caep_events 3 policies: form_system ALL, tenant_admin SELECT own, form_api DENY; tenant_manager no policy = zero rows; 5 auditor proof queries). §56.7 privacy floor (caep_webhook_secret = AES-256-GCM ciphertext, never in DEC-030 payloads; set_jti/idp_subject/raw_set_hash = SHA-256 hashes only, never raw values; tenant_manager zero access enforced; GDPR Art. 17: tenant CASCADE delete, user_id SET NULL with HMAC chain retention under Art. 17(3)(b) exemption; 7 DEC-030 events contain no caep_webhook_secret or raw PII). §56.8 SOC 2 (CC6.3 CAEP-SLO-01 <30s — CC6-E-CAEP-001/002 quarterly evidence §186; CC6.6 credential-change/account-disabled revocation < 30s — CC6-E-CAEP-003 quarterly evidence §186; CC7.2 AL-CAEP-01..05 monitoring — CC6-E-CAEP-004 + CAEP-OBS-E-001 §186; CC7.3 R-83/R-84/R-85 runbooks — CAEP-SETERR-E-001 §187, CAEP-PURGE-E-001 §188, RISC-HIJACK-E-001 §189). §56.9 seven-item checklist (4× P0/M4 staging migration + RLS validation + Worker deploy + production; 3× P1/Done this pass DATA_MODEL §56 + SSO_SCIM §23.12 item 16 + §36.6 item 10). §56.10 cross-reference obligations: SSO_SCIM §23.5.1/.5.2/§36.2.3 DDL sources; §23.12 item 16 🟢 Done; §36.6 item 10 🟢 Done; OBSERVABILITY §78 🟢 Done v5.24.0; SOC2_READINESS §186/187/188/189 🟢 Done v4.12.0/v4.13.0; IR R-83/84/85 🟢 Done v3.48.0; AUDIT_LOG_SCHEMA §CAEP/SSF 🟢 Done v2.21. TOC §56 entry added. Document header v1.47 → v1.48. Owner: enterprise-architect + security-engineer + compliance-officer.*
+
+*v1.49 (2026-07-06): §57 `tenant_sso_configs` BDG Column Extension — Migration 0079. DATA_MODEL canonical registration for the SCIM Bulk Deprovision Guard schema specified in `docs/SSO_SCIM_IMPLEMENTATION.md §34` (v2.6, 2026-06-19). Migration 0079 adds three columns to `tenant_sso_configs` (`bulk_deprovision_threshold_pct` SMALLINT DEFAULT 20 + CHECK 5–100, `bulk_deprovision_override_exp` TIMESTAMPTZ, `bulk_deprovision_override_by` UUID → auth.users), two constraints (chk_bdg_threshold, chk_bdg_override_coherent), one partial index (`idx_tsc_bdg_override_active`), and pg_cron job 34 (`bdg_override_expiry_sweep`, */15 * * * *). §57.1 purpose: closes DATA_MODEL registration gap for Migration 0079 — SSO_SCIM §34 had complete design + DDL (DEC-066, v2.6, 2026-06-19) but no companion DATA_MODEL section (same pattern as §52/0101, §53/0100, §54/0098, §55/0102, §56/0082). §57.2 dependency chain: 0079 requires 0052 (IP enforcement base) → 0076 (flag column) → 0077 (toggle RPC). §57.3 DDL + rollback (mirrors §34.3 verbatim; rollback pre-gate: zero active overrides; DROP COLUMN cascade-safe). §57.4 six CI adversarial tests MIG-0079-01..06 (migration apply, rollback, chk_bdg_threshold boundary values, chk_bdg_override_coherent NULL coherence, partial index `idx_tsc_bdg_override_active`, pg_cron job 34 expiry sweep). §57.5 column semantics: threshold_pct state machine (5–100; 100 = guard disabled; default 20; tenant-writable via RPC only), override_exp+by state machine (both NULL = guard active; both non-NULL = override window; auto-NULL by SCIM Worker on first use + job 34 on expiry), BDG-SLO-02 (job 34 freshness ≤ 20 min per OBSERVABILITY §79.3). §57.6 RLS (inherits §4.2 sso_configs_tenant_isolation + system_write + BYPASSRLS; tenant_manager zero access; form_api read for threshold check; override columns not tenant-writable). §57.7 privacy floor (no employee PII in any BDG audit event; `bulk_deprovision_override_by` = FORM-internal CSM UUID, not a data subject; GDPR Art. 17 CASCADE on tenant DELETE). §57.8 SOC 2 (CC6.3/A1.2/CC7.2/CC9.2 → GUARD-E-001 §91; BDG-OBS-E-001 §192 monitoring-layer quarterly artefact). §57.9 four-item checklist (2× P0/M13 staging migration + BDG Worker; 2× P1/Done this pass DATA_MODEL §57 + SSO_SCIM §34.14). §57.10 cross-reference obligations: SSO_SCIM §34.3 DDL source; §34.8 SOC 2 source; §34.11 item 9 status corrected (SOC2_READINESS §91 Done v3.16.0); §34.14 cross-reference 🟢 Done this pass; OBSERVABILITY §79 🟢 Done v5.25.0; SOC2_READINESS §91/§192 🟢 Done. TOC §57 entry added. Owner: enterprise-architect + security-engineer + compliance-officer.*

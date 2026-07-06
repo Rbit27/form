@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.43
+# FORM · SSO/SCIM Implementation v2.44
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -12552,7 +12552,7 @@ Cross-reference obligation: register GUARD-E-001 in `docs/SOC2_READINESS.md §91
 |---|---|---|---|---|---|
 | 7 | Add Bulk Deprovision Guard section to Admin Dashboard SCIM Config screen per §34.6: threshold slider, guard status badge, "Request Bulk Override" modal (tenant_owner only) with reason field + duration picker; show pending-override and active-override states. design-craft review required; compliance-officer confirms reason field copy does not inadvertently capture employee-identifiable information. | platform-engineer + design-craft | **P1** | M13 | [ ] |
 | 8 | Brief CSM team on override protocol per §34.5: TTL-by-scope table; two-person process; when to recommend threshold adjustment vs. time-limited override; add a brief note to `docs/ENTERPRISE_ONBOARDING.md §3.3` SCIM section: *"For planned large-scale workforce changes (>N% of seats), contact your FORM CSM in advance to issue a one-time bulk deprovision override."* | customer-success + compliance-officer | **P1** | M12 | [ ] |
-| 9 | Register GUARD-E-001 in `docs/SOC2_READINESS.md §91` cross-reference patch (CC6.3 / A1.2 / CC7.2 / CC9.2); file first artefact in the quarter after enterprise GA go-live. | compliance-officer | **P1** | M13+1Q | [ ] |
+| 9 | Register GUARD-E-001 in `docs/SOC2_READINESS.md §91` cross-reference patch (CC6.3 / A1.2 / CC7.2 / CC9.2); file first artefact in the quarter after enterprise GA go-live. | compliance-officer | **P1** | M13+1Q | 🟢 **Done — `docs/SOC2_READINESS.md` v3.16.0 (2026-06-19).** §91 registered. First GUARD-E-001 artefact filing deferred to quarter after enterprise GA go-live (M14+1Q). |
 | 10 | Cross-reference `docs/INCIDENT_RESPONSE.md R-33` as the operational recovery runbook for `bdg_override_expiry_sweep` stale condition: when `system.cron_job_stale` fires for `job_name = 'bdg_override_expiry_sweep'` (job 34, `*/15 * * * *`, 20-min freshness window), security-engineer follows R-33 in full. Stale condition means expired CSM-countersigned override windows remain active beyond their configured TTL (1h/2h/4h) — a tenant could bulk-deprovision unlimited users past the override window without the guard re-engaging. P0 upgrade gate (R-33-C1): any active `bulk_deprovision_override_exp < NOW()` row without a corresponding `scim.bulk_deprovision_override_used` chain event requires immediate PAM-elevated manual NULL UPDATE before guard is restored. | compliance-officer | **P1** | M13 | [x] **Done — `docs/OBSERVABILITY.md §12.6` (v0.8, 2026-06-21): job 34 stale-consequence cross-ref column updated with `INCIDENT_RESPONSE R-33 (job 34 stale recovery runbook — §R-33.5)`. R-33 is the authoritative recovery runbook; R-33.11 item 4 is the corresponding obligation fulfilled.** |
 
 #### P2 — Post-GA
@@ -12583,6 +12583,23 @@ Cross-reference obligation: register GUARD-E-001 in `docs/SOC2_READINESS.md §91
 - §79.8: GUARD-E-001 pointer (→ §34.8 + SOC2_READINESS §91, quarterly, CC6.3/A1.2/CC7.2/CC9.2) + BDG-OBS-E-001 (new monitoring-layer quarterly artefact, CC7.2/A1.1/CC4.1, first filing M14; SOC2_READINESS §192 registration done this pass)
 - §79.9: nine-item implementation checklist (items 3 + 4 Done this pass; items 1, 2, 5–9 pending M13/M14)
 - §79.10: six cross-reference obligations (four Done this pass; one pre-existing; one deferred M14)
+
+---
+
+### §34.14 DATA_MODEL §57 Cross-Reference
+
+`docs/DATA_MODEL.md §57` (v1.49, 2026-07-06) closes the DATA_MODEL registration gap for this section. Migration 0079 predated the §52–§56 companion-section pattern (it was added in SSO_SCIM v2.6, 2026-06-19, before the pattern was established in v2.35); §57 backfills the missing registration. It covers:
+
+- §57.1: Scope — gap-closure rationale; positions 0079 in the same pattern as §52/0101, §53/0100, §54/0098, §55/0102, §56/0082
+- §57.2: Migration dependency chain — 0079 requires 0052 → 0076 → 0077; SCIM Worker BDG deployment gated on 0079 commit
+- §57.3: Full DDL + rollback — §57.3.1 mirrors §34.3 verbatim; §57.3.2 rollback with pre-gate (zero active overrides) + `cron.unschedule` + DROP COLUMN cascade
+- §57.4: Six CI adversarial tests MIG-0079-01..06 (migration apply, rollback safety, `chk_bdg_threshold` boundary values, `chk_bdg_override_coherent` NULL coherence, partial index, pg_cron job 34 expiry sweep)
+- §57.5: Column semantics — `threshold_pct` state machine (5–100; 100 = guard disabled; KV cache invalidation); override `exp`+`by` state machine (both-NULL / override-open / override-expired transitions; one-shot auto-revocation by SCIM Worker; safety-net auto-NULL by job 34); BDG-SLO-02 freshness guarantee (job 34 ≤ 20 min)
+- §57.6: RLS analysis — inherits §4.2 policies; `tenant_manager` zero access (fail-closed); `form_api` read-only for threshold; override columns not tenant-writable; three auditor proof queries
+- §57.7: Privacy floor — no employee PII in any BDG event payload; `bulk_deprovision_override_by` = FORM-internal CSM UUID (not a data subject); GDPR Art. 17 CASCADE on tenant delete; `ON DELETE SET NULL` on CSM FK
+- §57.8: SOC 2 mapping — CC6.3/A1.2/CC7.2/CC9.2 → GUARD-E-001 (SOC2_READINESS §91) + BDG-OBS-E-001 (SOC2_READINESS §192)
+- §57.9: Four-item checklist (2× P0/M13 staging migration + BDG Worker; 2× P1/Done this pass DATA_MODEL §57 + SSO_SCIM §34.14)
+- §57.10: Cross-reference obligations — §34.3 DDL source; §34.8 SOC 2 source; §34.11 item 9 status corrected; §34.14 🟢 Done; OBSERVABILITY §79 🟢 Done; SOC2_READINESS §91/§192 🟢 Done
 
 ---
 

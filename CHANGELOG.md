@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.82.0] — 2026-07-06
+
+### Added
+- `docs/DATA_MODEL.md §57` — `tenant_sso_configs` BDG Column Extension — Migration 0079. DATA_MODEL canonical registration for the SCIM Bulk Deprovision Guard schema specified in `docs/SSO_SCIM_IMPLEMENTATION.md §34` (DEC-066, v2.6, 2026-06-19). Closes the DATA_MODEL registration gap: Migration 0079 predated the §52–§56 companion-section pattern and was never backfilled. §57.1: gap-closure rationale (same pattern as §52/0101, §53/0100, §54/0098, §55/0102, §56/0082). §57.2: dependency chain (0079 requires 0052→0076→0077; BDG Worker gated on 0079). §57.3: full DDL + rollback (mirrors §34.3 verbatim; pre-gate zero active overrides; rollback drops columns + constraints + index + `cron.unschedule`). §57.4: six CI adversarial tests MIG-0079-01..06 (apply, rollback, `chk_bdg_threshold` boundaries, `chk_bdg_override_coherent` NULL coherence, partial index, job 34 expiry sweep). §57.5: column semantics — `threshold_pct` state machine (5–100; KV-invalidated on update), override `exp`+`by` state machine (both-NULL/open/expired; one-shot SCIM Worker revocation; job 34 safety-net; BDG-SLO-02 ≤20 min freshness). §57.6: RLS analysis — inherits §4.2 policies; `tenant_manager` zero access (fail-closed); `form_api` read-only; override columns not tenant-writable; three auditor proof queries. §57.7: privacy floor — no employee PII in BDG event payloads; `bulk_deprovision_override_by` = FORM-internal CSM UUID; GDPR Art. 17 CASCADE; `ON DELETE SET NULL` on CSM FK. §57.8: SOC 2 mapping CC6.3/A1.2/CC7.2/CC9.2 → GUARD-E-001 (§91) + BDG-OBS-E-001 (§192). §57.9: four-item checklist (2× P0/M13 pending; 2× P1 Done this pass). §57.10: cross-reference obligations table. TOC §57 entry added. Document v1.48 → v1.49.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §34.11 item 9` — status corrected from stale `[ ]` to 🟢 Done (SOC2_READINESS.md §91 registered v3.16.0, 2026-06-19).
+- `docs/SSO_SCIM_IMPLEMENTATION.md §34.14` — DATA_MODEL §57 cross-reference section added (mirrors §34.13 OBSERVABILITY §79 pattern). Document v2.43 → v2.44.
+- `VERSION` — 13.81.0 → 13.82.0.
+
 ## [13.81.0] — 2026-07-06
 
 ### Added
