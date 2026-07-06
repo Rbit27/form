@@ -1,4 +1,4 @@
-# FORM · GDPR Data Protection Impact Assessment v0.1
+# FORM · GDPR Data Protection Impact Assessment v0.2
 
 > **Document type:** Data Protection Impact Assessment (DPIA) per GDPR Art. 35  
 > **Owner:** `compliance-officer` (DPO-equivalent) + `security-engineer`. Co-reviewed: `enterprise-architect`, `clinical-safety`.  
@@ -286,6 +286,35 @@ Risks are scored on **Likelihood × Severity** using a 1–5 scale. Residual ris
 | **Annual vendor security review** | Formal review of each sub-processor's security posture (SOC 2 report, pentest summary, or equivalent). | R-12 |
 | **Breach notification: 72h supervisory authority / 1h tenant** | GDPR 72-hour obligation to supervisory authority. P0 tenant notification within 1 hour. See `docs/INCIDENT_RESPONSE.md`. | R-03, R-12 |
 
+### 7.3 DSAR Erasure Flow — CAEP-Triggered Deletion vs. Direct Art. 17 Request {#DSAR-Erasure-Flow}
+
+GDPR Art. 17 erasure obligations in FORM can be triggered by two distinct paths. Both result in identical data deletion SLAs and use the same HMAC-chained audit evidence (CAEP-PURGE-E-001), but differ in their origination and incident command protocol.
+
+#### 7.3.1 Trigger Taxonomy
+
+| Trigger type | Source | Incident commander | IC protocol | GDPR Art. 17 SLA clock start | DEC-030 anchor event |
+|---|---|---|---|---|---|
+| **Direct DSAR request** | Data subject submits erasure request via in-app "Delete My Account" or email to `privacy@form.coach` | compliance-officer | Internal DSAR handling runbook (§10.1.5) | On receipt of verified request | `privacy.data_erasure_requested` (AUDIT_LOG_SCHEMA.md §Privacy events) |
+| **CAEP `account-purged` event** | Enterprise IdP emits an OpenID CAEP `account-purged` Security Event Token; `caep-receiver.ts` validates and dispatches | compliance-officer (primary); security-engineer (technical verification) | **`docs/INCIDENT_RESPONSE.md §R-84`** — CAEP Account-Purged — GDPR Art. 17 Deletion Clock | On receipt and validation of `sso.caep_user_purged` CRITICAL/7yr event | `sso.caep_user_purged` + `sso.caep_gdpr_deletion_opened` (HIGH/7yr) + `sso.caep_gdpr_deletion_completed` (CRITICAL/7yr) |
+
+#### 7.3.2 CAEP-Triggered Deletion: Key Distinctions
+
+When an enterprise IdP account is purged (e.g., employee offboarding via Google Workspace or Entra ID admin console), FORM receives a real-time CAEP SET. This path differs from a direct DSAR in four ways:
+
+1. **No data subject action required.** The deletion obligation originates from the IdP employer admin — not from the data subject invoking Art. 17(1). The legal basis is Art. 17(1)(a) (purpose limitation — the enterprise processing purpose ceases on account purge) combined with the DPA data retention terms.
+
+2. **IC protocol is R-84, not the DSAR runbook.** See `docs/INCIDENT_RESPONSE.md §R-84` for the full workflow: CAEP-PURGE-CHAIN-01 ordering invariant, GDPR Art. 17 deletion steps across all FORM data stores, sub-processor notification, `litigation_hold` gating, and CAEP-PURGE-E-001 evidence artefact requirements.
+
+3. **CAEP-PURGE-CHAIN-01 ordering invariant.** Before `sso.caep_gdpr_deletion_completed` (CRITICAL/7yr) can be emitted, the DEC-030 chain must contain both a prior `sso.caep_gdpr_deletion_opened` (same `incident_id`) and a prior `sso.caep_user_purged` event (same `tenant_id`, within 24 h). The `emit-audit-event` Worker enforces this ordering (HTTP 422 `CAEP_PURGE_CHAIN_01_VIOLATION` on violation — pending M6 Worker implementation, §R-84.11 item 2).
+
+4. **`days_to_deletion` is the auditor SLA field.** The `sso.caep_gdpr_deletion_completed` payload includes `days_to_deletion` (integer) — the number of days between `sso.caep_user_purged` receipt and confirmed deletion across all stores. SOC 2 auditors and supervisory authorities can inspect this field directly for Art. 17 SLA compliance. CAEP-PURGE-E-001 (P5.1/C1.2/CC6.3, 7yr WORM) is filed per activation at `compliance/evidence/caep/caep-purge-e-001-{incident_id}.json`.
+
+#### 7.3.3 Litigation Hold
+
+If a `litigation_hold = true` flag is set on the `sso.caep_gdpr_deletion_opened` event (H5 in R-84), deletion is deferred pending compliance-officer + outside counsel review. The legal basis for deferral is Art. 17(3)(e) (storage necessary for establishment, exercise, or defence of legal claims). Deferred deletions must be tracked in `litigation_hold_records` and re-evaluated at each quarterly compliance review. The `litigation_hold_deferred` field in `sso.caep_gdpr_deletion_completed` documents the final outcome.
+
+**Privacy floor:** `user_ref` in all CAEP deletion events is a FORM-internal anonymised UUID — never linked to a natural person's name, email, or health data in any IC context. The DSAR privileged lookup linking `user_ref` to a natural person is performed exclusively in the compliance-officer's DSAR tooling flow, restricted to compliance-officer + security-reviewer roles. HR NEVER has access to `compliance/evidence/caep/` or any CAEP-PURGE-E-001 artefact. Owner: compliance-officer.
+
 ---
 
 ## 8. Residual Risk Statement
@@ -366,12 +395,13 @@ Prior to EU enterprise sales launch, FORM will proactively notify the lead super
 | Version | Date | Author | Summary |
 |---|---|---|---|
 | v0.1 | 2026-05-17 | compliance-officer (enterprise-builder cloud session) | Initial DPIA covering all processing activities for consumer and enterprise tier. Legal review pending. Not yet submitted to supervisory authority. |
+| v0.2 | 2026-07-06 | compliance-officer (enterprise-builder cloud session) | §7.3 DSAR Erasure Flow added — distinguishes CAEP-triggered deletion (IdP `account-purged` SET → `docs/INCIDENT_RESPONSE.md §R-84` IC protocol) from direct Art. 17 DSAR requests. Closes §R-84.11 item 5 (P1/M5). CAEP-PURGE-CHAIN-01 ordering invariant noted; `days_to_deletion` auditor SLA field described; litigation hold deference (Art. 17(3)(e)) documented. Privacy floor: `user_ref` FORM-internal UUID only; HR no access to CAEP-PURGE-E-001. Document header v0.1 → v0.2. |
 
 **Next mandatory review:** Before EU enterprise first deal close, or within 12 months (May 2027), whichever is earlier.
 
 ---
 
-**v0.1 · травень 2026**  
+**v0.2 · липень 2026**  
 **Owner: compliance-officer + security-engineer**  
 **Status: Draft — pending legal review before activation**
 

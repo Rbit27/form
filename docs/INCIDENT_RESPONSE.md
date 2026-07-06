@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.48.1
+# FORM · Incident Response Runbook v3.48.2
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -30034,7 +30034,7 @@ The SESSION_REVOCATION_KV write performed by `caep-action-handler.ts` at T+0 ens
 | 2 | Implement CAEP-PURGE-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`; HTTP 422 + `CAEP_PURGE_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending |
 | 3 | Update `docs/OBSERVABILITY.md §78.4` AL-CAEP-02 entry: add "Dedicated companion IR runbook: INCIDENT_RESPONSE R-84" field | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.1, §78.4 AL-CAEP-02 companion runbook field added).** |
 | 4 | Register CAEP-PURGE-E-001 in `docs/SOC2_READINESS.md §79.4` master evidence table (§188, per-activation cadence, P5.1/C1.2/CC6.3, 7yr) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (SOC2_READINESS.md v4.13.0, §188; evidence count 163 → 164).** |
-| 5 | Update `docs/GDPR_DPIA.md §DSAR-Erasure-Flow`: add cross-reference to R-84 as the IC protocol for CAEP-triggered deletions (i.e. when the deletion request originates from an IdP account-purge event rather than a direct DSAR request) | compliance-officer | **P1** / M5 | [ ] Pending |
+| 5 | Update `docs/GDPR_DPIA.md §DSAR-Erasure-Flow`: add cross-reference to R-84 as the IC protocol for CAEP-triggered deletions (i.e. when the deletion request originates from an IdP account-purge event rather than a direct DSAR request) | compliance-officer | **P1** / M5 | [x] **Done — 2026-07-06 (GDPR_DPIA.md v0.2, §7.3 DSAR Erasure Flow added; closes §R-84.11 item 5).** |
 | 6 | Authoring complete — R-84 closes the AL-CAEP-02 companion runbook gap: §78.4 had only a five-step inline runbook for the P0 GDPR purge scenario; R-84 provides the full IC protocol, GDPR workflow steps, CAEP-PURGE-CHAIN-01 HMAC invariant, and CAEP-PURGE-E-001 per-activation evidence artefact | compliance-officer | **P0** | [x] **Done — 2026-07-06 (INCIDENT_RESPONSE.md v3.48.0).** |
 
 ---
@@ -30047,7 +30047,7 @@ The SESSION_REVOCATION_KV write performed by `caep-action-handler.ts` at T+0 ens
 | `sso.caep_user_purged` event schema | `docs/AUDIT_LOG_SCHEMA.md §SSO-CAEP-Events` | Trigger event; CRITICAL/7yr |
 | `sso.caep_gdpr_deletion_opened` + `sso.caep_gdpr_deletion_completed` schemas | `docs/AUDIT_LOG_SCHEMA.md §R-84` (v3.3, 2026-07-06) | HIGH/7yr + CRITICAL/7yr events; CAEP-PURGE-CHAIN-01 invariant; registered (closes §R-84.11 item 1) |
 | CAEP-PURGE-E-001 registration | `docs/SOC2_READINESS.md §188` (v4.13.0, 2026-07-06) | Per-activation P5.1/C1.2/CC6.3 evidence registration |
-| GDPR Art. 17 erasure flow | `docs/GDPR_DPIA.md §DSAR-Erasure-Flow` | Canonical deletion procedure executed in Step 3 |
+| GDPR Art. 17 erasure flow | `docs/GDPR_DPIA.md §DSAR-Erasure-Flow` (v0.2, 2026-07-06) | CAEP-triggered deletion trigger taxonomy; R-84 IC protocol cross-reference; litigation hold; `days_to_deletion` SLA field; §7.3 authored |
 | CAEP/RISC observability | `docs/OBSERVABILITY.md §78` (v5.24.0) | Quarterly CAEP-OBS-E-001 supplement includes per-purge supplemental entries |
 | Litigation hold conflict | `docs/INCIDENT_RESPONSE.md R-46` | Co-activate for H5 (Art. 17(3)(e) legal hold) |
 | DEC-030 HMAC chain | `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) | HMAC-chained audit log pattern governing all events in this runbook |
@@ -30378,6 +30378,8 @@ The SESSION_REVOCATION_KV write at T+0 ensures that the compromised user's activ
 **Privacy floor (invariant throughout R-85):** No data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data in any R-85 scope query, DEC-030 event payload, or evidence artefact. `user_ref` is a FORM-internal UUID. `set_jti_hash` is SHA-256(raw JTI) — non-reversible. R-85-C4 returns aggregate counts only — no individual `user_ref` values. Admin action audit (Step 3c) uses `action_type` and `resource_id` only — no employee personal data. HR role NEVER has access to `compliance/evidence/caep/`. Owner: security-engineer + compliance-officer + customer-success.
 
 ---
+
+*v3.48.2 (2026-07-06): §R-84.11 item 5 Done — `docs/GDPR_DPIA.md §7.3 DSAR Erasure Flow` authored (v0.2, 2026-07-06). New §7.3 distinguishes CAEP-triggered deletion (IdP `account-purged` SET → R-84 IC protocol) from direct Art. 17 DSAR requests; documents CAEP-PURGE-CHAIN-01 ordering invariant, `days_to_deletion` auditor SLA field, `litigation_hold` deference path (Art. 17(3)(e)), and CAEP-PURGE-E-001 per-activation evidence artefact spec. §R-84.11 item 5 status: `[ ] Pending` → `[x] Done — 2026-07-06 (GDPR_DPIA.md v0.2, §7.3)`. §R-84.12 cross-reference row updated: `docs/GDPR_DPIA.md §DSAR-Erasure-Flow` (v0.2, 2026-07-06) with CAEP trigger taxonomy. Privacy floor: `user_ref` FORM-internal UUID; HR no access to CAEP-PURGE-E-001. Document header v3.48.1 → v3.48.2. Owner: compliance-officer.*
 
 *v3.48.1 (2026-07-06): §R-83.12 + §R-84.12 + §R-85.12 cross-reference closure — AUDIT_LOG_SCHEMA.md v3.3 registrations confirmed Done. Three stale "Pending" rows in the cross-reference tables updated to reflect `docs/AUDIT_LOG_SCHEMA.md` v3.3 (2026-07-06): (1) §R-83.12 `sso.caep_stream_recovered` schema row: `Pending §R-83.11 item 1` → `§R-83` (v3.3) registered, closes §R-83.11 item 1; (2) §R-84.12 `sso.caep_gdpr_deletion_opened` + `sso.caep_gdpr_deletion_completed` schemas row: `Pending §R-84.11 item 1` → `§R-84` (v3.3) registered, closes §R-84.11 item 1; (3) §R-85.12 `sso.risc_hijacking_ic_opened` + `sso.risc_hijacking_handled` schemas row: `Pending §R-85.11 item 1` → `§R-85` (v3.3) registered, closes §R-85.11 item 1. The v3.48.0 note accurately described the state at authoring time (before this pass); this patch records the cross-reference closure as a separate inline note following the pattern of v3.21.1 (§R-50.8 + §R-51.8 stale closure). No new sections. Document header v3.48.0 → v3.48.1. Owner: compliance-officer.*
 

@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.67.3] — 2026-07-06
+
+### Added
+- `docs/GDPR_DPIA.md §7.3` — DSAR Erasure Flow taxonomy (v0.2). New §7.3 authored per §R-84.11 item 5 (P1/M5). Distinguishes two Art. 17 erasure trigger paths: (1) direct DSAR request — data subject via in-app deletion or `privacy@form.coach`, governed by §10.1.5 DSAR handling runbook; (2) CAEP `account-purged` SET — IdP-originated enterprise offboarding, governed by `docs/INCIDENT_RESPONSE.md §R-84` IC protocol. Documents CAEP-PURGE-CHAIN-01 chain evidence requirement, `days_to_deletion` auditor SLA field, `litigation_hold` deference (Art. 17(3)(e)), CAEP-PURGE-E-001 artefact spec (P5.1/C1.2/CC6.3, 7yr WORM). Privacy floor: `user_ref` FORM-internal UUID only; HR no access to `compliance/evidence/caep/`. Closes §R-84.11 item 5.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — v3.48.1 → v3.48.2. §R-84.11 item 5 → `[x] Done — 2026-07-06 (GDPR_DPIA.md v0.2, §7.3)`. §R-84.12 GDPR Art. 17 cross-reference row updated with v0.2 version citation.
+- `docs/GDPR_DPIA.md` — v0.1 → v0.2. §7.3 DSAR Erasure Flow added; review log + footer updated.
+- `VERSION` — 13.67.2 → 13.67.3.
+
 ## [13.67.2] — 2026-07-06
 
 ### Changed
