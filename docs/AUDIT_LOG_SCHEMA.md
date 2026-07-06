@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v3.5
+# FORM · Audit Log Schema v3.6
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -4099,6 +4099,68 @@ export const SsoCertMonitorErrorPayload = z.object({
 **Auditor narrative for CC7.2:** The `cert-expiry-check` cron DEC-030 output feeds directly into AL-CERT-01 through AL-CERT-05 alert rules (`docs/OBSERVABILITY.md §26.5`): escalating PagerDuty notifications at t60 (P3), t30 (P2), t7 (P1), and expiry-on-active-tenant (P0 CRITICAL). AL-CERT-05 monitors cron health independently — a 26-hour missed-run gap triggers P1 PagerDuty regardless of cert status. CC6-E-CERT-004 (cron execution log) demonstrates continuous monitoring throughout the observation period, satisfying CC7.2's requirement that the entity monitors for anomalous conditions including credentials approaching expiry.
 
 **Retention table additions:** `sso.cert_expiry_alert` MEDIUM/HIGH/CRITICAL 7yr CC6.1/CC7.2 · `sso.cert_expired` CRITICAL 7yr CC6.1/CC7.2 · `sso.cert_uploaded` STANDARD 7yr CC6.1 · `sso.cert_monitor_error` HIGH 7yr CC7.2.
+
+---
+
+### CERT-Expired-IC events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-87 · SOC 2 CC6.1/CC7.3 · CERT-EXPIRED-IC-CHAIN-01)
+
+> IC lifecycle events for the SAML certificate expiry P0 incident response cycle. Anchored by `sso.cert_expired` CRITICAL (§SAML-Cert-Lifecycle above); these two events capture IC open and IC close with full recovery metadata. All three together satisfy the CERT-EXPIRED-IC-CHAIN-01 ordering invariant enforced at `emit-audit-event` (CF Worker). **Scope:** Enterprise tier — any active SAML tenant (`sso_enabled = true`) where `cert_alert_tier` transitions to `expired`. **Privacy floor:** `tenant_id` FORM-internal UUID only; no employee `user_id`, name, email, `saml_name_id`, health value, coaching content, or GDPR Art. 9 special-category data in any field of either event. Cross-ref: `docs/INCIDENT_RESPONSE.md R-87` (full P0 IC runbook); `docs/SOC2_READINESS.md §191` (CERT-EXPIRED-IC-E-001 master evidence table registration); `docs/OBSERVABILITY.md §77.4` (AL-CERT-04 companion runbook field updated v5.24.4).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `sso.cert_expired_ic_opened` | STANDARD | 7 yr | Emitted by on-call engineer (via `emit-audit-event` CF Worker) within 15 min of `sso.cert_expired` CRITICAL; marks formal P0 IC open; satisfies CC7.3 "timely response initiated" control point | `incident_id` (UUID), `trigger_event_id` (UUID — must match a prior `sso.cert_expired` event), `tenant_id` (UUID), `cert_class` (`sp`\|`idp`\|`both`), `fingerprint_sha256` (64 hex chars), `expires_at` (ISO 8601 UTC), `hours_overdue` (non-negative number), `initial_severity` (`P0`), `magic_link_activated` (boolean), `sla_credit_issued` (boolean) |
+| `sso.cert_expired_ic_closed` | LOW | 3 yr | Emitted by on-call engineer after cert rotation confirmed, SSO login verified, and SLA credit issued; terminal event for CERT-EXPIRED-IC-E-001; satisfies CC7.3 "incident resolved and documented" | `incident_id` (UUID), `trigger_event_id` (UUID), `tenant_id` (UUID), `cert_class` (`sp`\|`idp`\|`both`), `root_cause` (`H1`\|`H2`\|`H3`\|`H4`), `downtime_minutes` (non-negative number), `new_fingerprint_sha256` (64 hex chars), `magic_link_activated` (boolean), `r80_co_activated` (boolean — true if cert-monitor cron stale, co-activates R-80), `r04_co_activated` (boolean — true if adversarial compromise suspected), `art33_assessment_required` (boolean — true if personal data exposed during outage), `sla_credit_issued` (`true` literal) |
+
+```typescript
+// AUDIT_LOG_SCHEMA.md §CERT-Expired-IC — Zod v2 schemas
+import { z } from 'zod/v4';
+
+const SsoCertExpiredIcOpenedPayload = z.object({
+  incident_id:          z.string().uuid(),
+  trigger_event_id:     z.string().uuid(),
+  tenant_id:            z.string().uuid(),
+  cert_class:           z.enum(['sp', 'idp', 'both']),
+  fingerprint_sha256:   z.string().length(64),
+  expires_at:           z.string().datetime(),
+  hours_overdue:        z.number().nonnegative(),
+  initial_severity:     z.literal('P0'),
+  magic_link_activated: z.boolean(),
+  sla_credit_issued:    z.boolean(),
+});
+
+const SsoCertExpiredIcClosedPayload = z.object({
+  incident_id:               z.string().uuid(),
+  trigger_event_id:          z.string().uuid(),
+  tenant_id:                 z.string().uuid(),
+  cert_class:                z.enum(['sp', 'idp', 'both']),
+  root_cause:                z.enum(['H1', 'H2', 'H3', 'H4']),
+  downtime_minutes:          z.number().nonnegative(),
+  new_fingerprint_sha256:    z.string().length(64),
+  magic_link_activated:      z.boolean(),
+  r80_co_activated:          z.boolean(),
+  r04_co_activated:          z.boolean(),
+  art33_assessment_required: z.boolean(),
+  sla_credit_issued:         z.literal(true),
+});
+```
+
+**CERT-EXPIRED-IC-CHAIN-01 ordering invariant:** The `emit-audit-event` CF Worker enforces the following ordering for CERT-EXPIRED-IC events at chain evaluation:
+
+1. `sso.cert_expired_ic_closed` MUST be preceded by `sso.cert_expired_ic_opened` for the same `incident_id` in the HMAC chain.
+2. `sso.cert_expired_ic_opened` MUST be preceded by `sso.cert_expired` CRITICAL within 1 hour (same `trigger_event_id`).
+3. Violation of either ordering rule returns HTTP 422 `CERT_EXPIRED_IC_CHAIN_01_VIOLATION`.
+
+**Status:** M6 enforcement pending (same milestone as SOC2_READINESS §191 and INCIDENT_RESPONSE R-87 §R-87.12 item 2). Chain invariant CERT-EXPIRED-IC-CHAIN-01 defined and registered; `emit-audit-event` Worker update queued for M6.
+
+**Auditor narrative for CC7.3:** `sso.cert_expired_ic_opened` (STANDARD/7yr) is the anchor event proving FORM initiated a formal incident response within the SLA window upon certificate expiry detection. `sso.cert_expired_ic_closed` (LOW/3yr) proves resolution was documented with root cause, downtime quantification, and recovery confirmation. Together with the triggering `sso.cert_expired` CRITICAL event and the four R-87-C1..C4 scope query outputs in CERT-EXPIRED-IC-E-001, they constitute complete CC7.3 evidence for the SAML certificate expiry incident class — the only P0 SSO failure mode with zero-tolerance SLO (CERT-SLO-01/SSO-SLO-05).
+
+**Auditor narrative for CC6.1:** `sla_credit_issued: true` (required literal in the closed event) proves FORM honoured its contractual SLA obligation upon cert expiry, satisfying CC6.1 access-management accountability: the entity's controls did not silently fail — the failure was detected, triaged, remediated, and compensated per contract.
+
+**Privacy floor:** CERT-EXPIRED-IC-E-001 contains only FORM-internal `incident_id` UUIDs, `tenant_id` UUIDs, `fingerprint_sha256` hashes (non-reversible cert identifier), aggregate `downtime_minutes`, `cert_class` / `root_cause` enums, and boolean flags. No employee `user_id`, name, email, SAML `NameID`, health value, or GDPR Art. 9 special-category data. HR role has zero access to `compliance/evidence/saml-cert/cert-expired-ic/` paths.
+
+**CERT-EXPIRED-IC-E-001 artefact spec:** See `docs/INCIDENT_RESPONSE.md R-87 §R-87.9` and `docs/SOC2_READINESS.md §191.1`. Storage: `compliance/evidence/saml-cert/cert-expired-ic/CERT-EXPIRED-IC-E-001-{incident_id}.json`. Retention: 7yr WORM (inherits `sso.cert_expired` CRITICAL/7yr severity). CC6.1/CC7.3.
+
+**Retention table additions:** `sso.cert_expired_ic_opened` STANDARD 7yr CC6.1/CC7.3 · `sso.cert_expired_ic_closed` LOW 3yr CC7.3.
 
 ---
 

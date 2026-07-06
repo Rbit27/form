@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v3.50.0
+# FORM · Incident Response Runbook v3.51.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -30786,6 +30786,392 @@ R-86 provides a documented, severity-classified IC protocol for fleet-wide SSO d
 | DEC-030 HMAC chain | `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) | HMAC-chained audit log pattern governing all events in this runbook |
 
 **Privacy floor (invariant throughout R-86):** No data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data in any R-86 scope query, DEC-030 event payload, communication template, or SSO-FLEET-IC-E-001 component. `tenant_id` values in scope query outputs are FORM-internal UUIDs — never customer email addresses or externally-linkable identifiers. `failing_tenant_count` and `affected_tenant_count` are aggregate integers. `peak_failure_rate_pct` is a numeric fleet-wide average. T-86-C mentions only `affected_tenant_count` (integer) — not a list of tenant names or IDs. HR role NEVER has access to `compliance/evidence/sso/`. Owner: security-engineer + compliance-officer + customer-success.
+
+---
+
+## R-87 · SAML Certificate Expired (AL-CERT-04 companion)
+
+> Owner: security-engineer + compliance-officer + customer-success. Last updated: v3.51.0 (2026-07-06). Closes the dedicated companion runbook gap for AL-CERT-04 (P0 — SAML cert expired on active tenant): `docs/OBSERVABILITY.md §26.5` and `§77.4` previously referenced `INCIDENT_RESPONSE.md R-04` (generic SSO compromise runbook) as the AL-CERT-04 companion — unlike AL-CERT-05 → R-80 (dedicated `cert-expiry-check` cron stale runbook). All analogous P0/P1 SSO subsystem alerts (R-80 AL-CERT-05; R-81 PKJWT rotation; R-82 Session Revocation KV; R-83 CAEP SET error; R-84 CAEP purge; R-85 RISC hijacking; R-86 SSO Fleet Health) have dedicated companion runbooks; AL-CERT-04 (P0 — CERT-SLO-01 breach, all SSO users of the tenant locked out) was the only remaining P0 SSO alert without one.
+
+### §R-87.1 Purpose and Trigger Classification
+
+**What this runbook covers:** A SAML certificate — either FORM's SP signing cert or the customer-provided IdP signing cert — has passed its `expires_at` date for an active SAML tenant (`sso_enabled = true`), causing a hard SSO login failure for all enterprise users of that tenant. This is always a P0: CERT-SLO-01 (alias SSO-SLO-05) is breached, an SLA credit per `docs/ENTERPRISE.md §SLA` is triggered automatically, and all SSO users of the affected tenant cannot authenticate until the certificate is rotated or SSO is disabled with email-magic-link fallback activated.
+
+**This runbook does NOT replace R-04 (SSO compromise).** If the cert expiry is accompanied by evidence of adversarial interference — cert material intercepted, IdP compromised, unauthorized cert replacement — co-activate R-04 immediately. R-87 handles the operational / negligence path where CERT-SLO-01 is breached with no adversarial signal.
+
+**CERT-SLO-01 note:** Any `sso.cert_expired` event constitutes a CERT-SLO-01 breach. Issue the SLA credit at Step 1 — do not wait to determine root cause.
+
+### §R-87.2 Trigger Modes
+
+| Mode | Signal | Severity |
+|---|---|---|
+| **Mode-1** | `cert_alert_tier = 'expired'` detected by `cert-expiry-check` CF Workers Cron → `sso.cert_expired` CRITICAL/7yr DEC-030 event → AL-CERT-04 PagerDuty CRITICAL | Always P0 |
+| **Mode-2** | Enterprise tenant escalation: CSM receives "our SSO is broken" report; no PagerDuty fired (cron may be stale — R-80 co-incident) | P0 on confirmation that `cert_alert_tier = 'expired'` |
+| **Mode-3** | Manual discovery during platform maintenance or support investigation | P0 on confirmation |
+
+### §R-87.3 Severity and SLA Matrix
+
+| Condition | Severity | SLA credit | GDPR Art. 33? |
+|---|---|---|---|
+| SP cert expired — any active SAML tenant | **P0** | Yes — CERT-SLO-01 breach per ENTERPRISE.md §SLA | No (SSO login blocked, not data leaked) |
+| IdP cert expired — any active SAML tenant | **P0** | Yes — CERT-SLO-01 breach | No |
+| Both SP and IdP certs expired simultaneously | **P0** | Yes | No |
+| Cert expired AND evidence of adversarial cert replacement | **P0 + R-04 co-activate** | Yes | Possible — follow GDPR Art. 33 clock |
+
+**Privacy note:** A SAML cert expiry blocks authentication but does not expose personal data. GDPR Art. 33 is not triggered by this runbook alone. Co-activate R-04 and assess Art. 33 only if the expired cert was replaced by an attacker-controlled cert or if SSO bypass evidence exists.
+
+### §R-87.4 Scope Queries
+
+**R-87-C1 — Identify affected tenant(s) and cert class**
+
+```sql
+-- Run as form_audit role
+SELECT
+  tsc.tenant_id,
+  t.name                                                              AS tenant_slug,
+  tsc.cert_alert_tier,
+  CASE
+    WHEN tsc.saml_sp_cert_expires_at  < NOW()
+     AND tsc.saml_idp_cert_expires_at < NOW() THEN 'both'
+    WHEN tsc.saml_sp_cert_expires_at  < NOW() THEN 'sp'
+    ELSE 'idp'
+  END                                                                 AS expired_cert_class,
+  LEAST(tsc.saml_sp_cert_expires_at, tsc.saml_idp_cert_expires_at)  AS earliest_expired_at,
+  EXTRACT(EPOCH FROM (
+    NOW() - LEAST(tsc.saml_sp_cert_expires_at, tsc.saml_idp_cert_expires_at)
+  )) / 3600                                                           AS hours_overdue,
+  tsc.cert_rotation_state
+FROM tenant_sso_configs tsc
+JOIN tenants t ON t.id = tsc.tenant_id
+WHERE tsc.sso_enabled = true
+  AND tsc.is_active   = true
+  AND (
+    tsc.saml_sp_cert_expires_at  < NOW()
+    OR tsc.saml_idp_cert_expires_at < NOW()
+  )
+ORDER BY hours_overdue DESC;
+-- Privacy: tenant_slug is FORM-internal slug; no employee user_id, email, name, or health data
+-- Expected: ≥ 1 row — the tenant(s) triggering AL-CERT-04
+```
+
+**R-87-C2 — Confirm 90-day escalation history and rotation events**
+
+```sql
+-- Run as form_audit role
+SELECT
+  ale.tenant_id,
+  ale.event_type,
+  ale.created_at,
+  ale.payload ->> 'cert_class'         AS cert_class,
+  ale.payload ->> 'alert_tier'         AS alert_tier,
+  ale.payload ->> 'fingerprint_sha256' AS fingerprint,
+  ale.payload ->> 'expires_at'         AS expires_at
+FROM audit_log_events ale
+WHERE ale.tenant_id = '<affected_tenant_id>'
+  AND ale.event_type IN (
+    'sso.cert_expiry_alert',
+    'sso.cert_expired',
+    'sso.cert_uploaded',
+    'sso.cert_rotated'
+  )
+  AND ale.created_at > NOW() - INTERVAL '90 days'
+ORDER BY ale.created_at DESC
+LIMIT 50;
+-- Privacy: no employee user_id, email, or health data in these event payloads
+-- Expected: full alert escalation history — shows whether AL-CERT-01/02/03 fired before AL-CERT-04
+-- No sso.cert_uploaded or sso.cert_rotated = H1 (SP) or H2 (IdP) negligence path
+```
+
+**R-87-C3 — Check cert_rotation_state (partial rotation hypothesis)**
+
+```sql
+-- Run as form_audit role
+SELECT
+  tenant_id,
+  cert_rotation_state,
+  cert_rotation_started_at,
+  cert_rotation_completed_at,
+  saml_sp_cert_expires_at,
+  saml_idp_cert_expires_at
+FROM tenant_sso_configs
+WHERE tenant_id = '<affected_tenant_id>';
+-- Expected: cert_rotation_state = 'in_progress' → H4 (partial rotation failure)
+--           cert_rotation_state = 'idle'        → H1 or H2 (no rotation initiated)
+```
+
+**R-87-C4 — Post-rotation SSO restoration confirmation**
+
+```sql
+-- Run as form_audit role after cert rotation complete and SSO re-enabled
+SELECT COUNT(*) AS expired_event_count
+FROM audit_log_events
+WHERE tenant_id = '<affected_tenant_id>'
+  AND event_type = 'sso.cert_expired'
+  AND created_at > NOW() - INTERVAL '5 minutes';
+-- Expected: 0 — new cert is valid; next cron run will NOT re-emit sso.cert_expired
+-- Supplement: verify a successful test SAML assertion completes (SSO §8.1 test flow)
+```
+
+### §R-87.5 Root Cause Hypotheses
+
+| # | Hypothesis | Key signal | Action |
+|---|---|---|---|
+| **H1** | SP cert not rotated — FORM-side responsibility; AL-CERT-01..03 warnings fired but no rotation was initiated | R-87-C2 shows `sso.cert_expiry_alert` at t60/t30/t7 with no subsequent `sso.cert_rotated`; `cert_rotation_state = 'idle'`; `expired_cert_class = 'sp'` | Emergency SP cert rotation via SSO §8.1 fast-path (PAM elevation required); `sso.cert_rotated` emitted |
+| **H2** | Customer IdP cert not rotated — customer responsibility; CSM warnings sent but customer IT admin did not act | R-87-C2 shows `sso.cert_expiry_alert` at t60/t30/t7 with no subsequent `sso.cert_uploaded`; `expired_cert_class = 'idp'` | CSM places phone call to customer IT; guided emergency IdP cert upload via Admin Dashboard §16.3; confirm `sso.cert_uploaded` emitted |
+| **H3** | cert-expiry-check cron stale at critical window — AL-CERT-03 (t7) fired but cron went stale before AL-CERT-04 could be detected; cert passed expiry silently | R-87-C2 shows `sso.cert_monitor_error` or gap in `sso.cert_expiry_alert` events; R-80 co-activation required | Co-activate R-80 immediately; run R-87-C1 manual scan for all expired tenants; classify H1 or H2 for each expired cert |
+| **H4** | Cert rotation initiated but failed mid-flight — `cert_rotation_state = 'in_progress'` but old cert already expired before rotation completed | R-87-C3 confirms `cert_rotation_state = 'in_progress'`; `cert_rotation_started_at` in the past; `cert_rotation_completed_at` is null | Complete rotation from current state; check Worker logs for rotation failure; re-generate new cert if new cert was not yet persisted |
+
+### §R-87.6 Recovery Steps
+
+**Step 1 — Acknowledge and open IC**
+
+1. Acknowledge PagerDuty CRITICAL AL-CERT-04 alert.
+2. Post T-87-A in `#security-alerts` Slack channel.
+3. Open IC in PagerDuty. IC owner: security-engineer on call.
+4. Emit `sso.cert_expired_ic_opened` STANDARD/7yr (§R-87.8 — CERT-EXPIRED-IC-CHAIN-01 anchor event).
+5. Issue CERT-SLO-01 SLA credit for the affected tenant immediately — do NOT wait for root cause.
+
+**Step 2 — Run scope queries and classify hypothesis**
+
+1. Run R-87-C1: identify affected `tenant_id`, `expired_cert_class`, `hours_overdue`.
+2. Run R-87-C2: check 90-day escalation history and rotation event presence.
+3. Run R-87-C3: confirm `cert_rotation_state`.
+4. Classify: H1 (SP cert, no rotation history), H2 (IdP cert, no upload history), H3 (cron stale — co-activate R-80), or H4 (partial rotation in progress).
+
+**Step 2a — Activate email-magic-link fallback (all hypotheses, before Step 3)**
+
+Activate immediately while root cause analysis is in progress. Do NOT wait until Step 3 to restore access.
+
+```
+Admin Console → SSO Configuration → [affected tenant] → Emergency Controls →
+  Disable SSO  →  email-magic-link fallback activated
+```
+
+Users receive email magic links for authentication during the cert rotation window. SSO is re-enabled after cert rotation is confirmed in Step 4.
+
+**Step 3a — H1 (SP cert not rotated)**
+
+1. Generate new SP signing certificate via SSO §8.1 emergency rotation fast-path (PAM elevation — security-engineer + devops-lead, two-person rule).
+2. Write new cert PEM (AES-256-GCM encrypted at rest) to `saml_sp_certificate`; update `saml_sp_cert_expires_at` and `saml_sp_cert_fingerprint`.
+3. Confirm `cert_rotation_state` advances to `complete` and `sso.cert_rotated` STANDARD/7yr is emitted.
+4. Proceed to Step 4.
+
+**Step 3b — H2 (Customer IdP cert not rotated)**
+
+1. CSM places phone call to customer IT admin immediately (do not rely solely on email).
+2. Direct customer to Admin Dashboard → SSO Configuration → Certificate → Upload New IdP Certificate (§16.3 cert panel).
+3. Confirm `sso.cert_uploaded` STANDARD/7yr is emitted and `saml_idp_cert_expires_at` is updated to a future date.
+4. Proceed to Step 4.
+
+**Step 3c — H3 (cert-expiry-check cron stale)**
+
+1. Co-activate R-80 immediately. R-80 owns the `cert-expiry-check` cron stale recovery.
+2. While R-80 is active, continue R-87 recovery for the expired cert: classify the expired cert as H1 (SP) or H2 (IdP) based on `expired_cert_class` from R-87-C1 and proceed to Step 3a or 3b accordingly.
+
+**Step 3d — H4 (partial rotation failure)**
+
+1. Check Cloudflare Workers Tail logs for the rotation Worker for failure message.
+2. If new cert was not yet persisted: restart rotation from Step 3a (SP) or coordinate with customer (IdP).
+3. If new cert was persisted but `cert_rotation_state` not advanced: manually set `cert_rotation_state = 'complete'` via PAM-elevated migration (security-engineer + devops-lead, two-person rule); emit `sso.cert_rotated`.
+
+**Step 4 — Confirm SSO restored**
+
+1. Re-enable SSO: Admin Console → SSO Configuration → [affected tenant] → Enable SSO.
+2. Run R-87-C4: confirm 0 `sso.cert_expired` events in the last 5 minutes.
+3. Confirm a successful test SAML login assertion completes for the affected tenant (SSO §8.1 test flow — use FORM-internal test account, not a real employee account).
+4. Disable email-magic-link fallback once SSO is confirmed working.
+
+**Step 5 — CSM notification**
+
+Send T-87-C to the affected tenant CSM and confirm the post-resolution message is delivered to the customer IT admin.
+
+**Step 6 — Close IC**
+
+1. Emit `sso.cert_expired_ic_closed` LOW/3yr (§R-87.8 — CERT-EXPIRED-IC-CHAIN-01 terminal event).
+2. File CERT-EXPIRED-IC-E-001 (§R-87.9) to `compliance/evidence/saml-cert/cert-expired-ic/CERT-EXPIRED-IC-E-001-{incident_id}.json`.
+3. Close PagerDuty IC.
+4. Add per-incident supplement to CERT-OBS-E-001 (§77.8) if downtime exceeded 15 minutes.
+
+### §R-87.7 Communication Templates
+
+**T-87-A — Initial P0 declaration (post within 5 min of AL-CERT-04 acknowledgement)**
+
+```
+🔴 P0 · AL-CERT-04 · SAML Certificate Expired · {date} {time} UTC
+
+Trigger: sso.cert_expired CRITICAL for tenant {tenant_slug}
+Cert class: {sp|idp|both}
+Hours overdue: {hours_overdue}
+User impact: All SSO users of this tenant cannot log in
+Email magic-link fallback: ACTIVATING NOW
+
+IC owner: {security_engineer_name}
+SLA credit: ISSUED (CERT-SLO-01 breach — automatic)
+Next update in 15 min.
+```
+
+**T-87-B — CSM notification (send within 10 min of IC open)**
+
+```
+Hi {CSM_name},
+
+🔴 P0 SSO OUTAGE — Tenant {tenant_name}
+
+The SAML {sp|idp} signing certificate for {tenant_name} expired {hours_overdue} hours ago.
+All SSO users of this tenant cannot log in.
+
+IMMEDIATE: We have activated email magic-link fallback — users can now log in via email link.
+Please notify the tenant IT admin ({IT_admin_name}) immediately.
+
+{If H1 — SP cert, FORM responsibility:}
+  FORM is rotating the SP certificate now. No action required from the customer.
+
+{If H2 — IdP cert, customer responsibility:}
+  The IT admin must upload a new IdP signing certificate via Admin Dashboard:
+    Settings → SSO → Certificate → Upload New IdP Certificate
+
+SLA credit has been issued per our Enterprise Agreement.
+
+—FORM Security
+```
+
+**T-87-C — Post-resolution (send within 30 min of SSO restoration confirmed)**
+
+```
+✅ RESOLVED · AL-CERT-04 · SAML Certificate Expired · {date}
+
+Tenant: {tenant_name}
+Root cause: {H1|H2|H3|H4} — {one-sentence description}
+SSO restored at: {recovery_timestamp} UTC
+Downtime window: {downtime_minutes} minutes
+Cert class rotated: {sp|idp|both}
+SLA credit: Issued per Enterprise Agreement (CERT-SLO-01 breach)
+Magic-link fallback: Deactivated at {deactivation_timestamp} UTC
+
+CERT-EXPIRED-IC-E-001 artefact filed. IC closed.
+```
+
+### §R-87.8 DEC-030 Events
+
+Two new HMAC-chained events registered for the R-87 IC lifecycle. Both registered in `docs/AUDIT_LOG_SCHEMA.md §CERT-Expired-IC` (v3.6, 2026-07-06).
+
+**Anchor event — `sso.cert_expired_ic_opened` (STANDARD / 7 yr)**
+
+Emitter: IC owner (security-engineer, PAM-elevated) via `emit-audit-event` Worker at Step 1. CERT-EXPIRED-IC-CHAIN-01 anchor event.
+
+```typescript
+// AUDIT_LOG_SCHEMA §CERT-Expired-IC
+const SsoCertExpiredIcOpenedPayload = z.object({
+  incident_id:          z.string().uuid(),        // CERT-EXPIRED-IC-CHAIN-01 correlation key
+  trigger_event_id:     z.string().uuid(),         // DEC-030 id of the sso.cert_expired CRITICAL trigger
+  tenant_id:            z.string().uuid(),          // FORM-internal UUID — never customer email/domain
+  cert_class:           z.enum(['sp', 'idp', 'both']),
+  fingerprint_sha256:   z.string().length(64),      // public SHA-256 hex of expired cert DER; no PEM
+  expires_at:           z.string().datetime(),      // ISO 8601 UTC — cert expiry timestamp
+  hours_overdue:        z.number().nonnegative(),   // float — hours past expires_at at IC open
+  initial_severity:     z.literal('P0'),
+  magic_link_activated: z.boolean(),                // true if email fallback activated at IC open
+  sla_credit_issued:    z.boolean(),                // must be true — CERT-SLO-01 zero-tolerance
+});
+```
+
+**Terminal event — `sso.cert_expired_ic_closed` (LOW / 3 yr)**
+
+Emitter: IC owner at Step 6 after SSO restoration confirmed by R-87-C4. CERT-EXPIRED-IC-CHAIN-01 terminal event.
+
+```typescript
+const SsoCertExpiredIcClosedPayload = z.object({
+  incident_id:              z.string().uuid(),
+  trigger_event_id:         z.string().uuid(),
+  tenant_id:                z.string().uuid(),
+  cert_class:               z.enum(['sp', 'idp', 'both']),
+  root_cause:               z.enum(['H1', 'H2', 'H3', 'H4']),
+  downtime_minutes:         z.number().nonnegative(),  // minutes from IC open to SSO restoration
+  new_fingerprint_sha256:   z.string().length(64),     // SHA-256 of the replacement cert DER
+  magic_link_activated:     z.boolean(),
+  r80_co_activated:         z.boolean(),               // true if H3 triggered R-80
+  r04_co_activated:         z.boolean(),               // true if adversarial evidence found
+  art33_assessment_required: z.boolean(),              // true only if R-04 co-activated
+  sla_credit_issued:        z.literal(true),           // always true — CERT-SLO-01 zero-tolerance
+});
+```
+
+**CERT-EXPIRED-IC-CHAIN-01 ordering invariant:** `sso.cert_expired_ic_closed` MUST be preceded by `sso.cert_expired_ic_opened` for the same `incident_id`, which MUST be preceded by `sso.cert_expired` CRITICAL with the same `tenant_id` and `cert_class` within 1 hour. Inversion → `CERT_EXPIRED_IC_CHAIN_01_VIOLATION` HTTP 422 (pending M6 enforcement in `supabase/functions/emit-audit-event/`).
+
+### §R-87.9 Evidence Artefacts
+
+**CERT-EXPIRED-IC-E-001** — SAML Certificate Expired per-activation IC artefact. Complements CERT-OBS-E-001 (§77.8, quarterly aggregate): where CERT-OBS-E-001 provides quarterly monitoring-level evidence that the `cert-expiry-check` cron ran on schedule and that zero `sso.cert_expired` events fired, CERT-EXPIRED-IC-E-001 documents each individual AL-CERT-04 incident response cycle — from alert acknowledgement to SSO restoration.
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CERT-EXPIRED-IC-E-001 |
+| **Trigger** | Per R-87 IC activation (each AL-CERT-04 incident that opens an IC) |
+| **Cadence** | Incident-triggered — filed within 48 h of each R-87 IC closure |
+| **Retention** | 7 years (WORM — inherits `sso.cert_expired` CRITICAL/7yr trigger event retention) |
+| **Storage path** | `compliance/evidence/saml-cert/cert-expired-ic/CERT-EXPIRED-IC-E-001-{incident_id}.json` |
+| **Vanta mirror** | CERT-EXPIRED-IC-E-001 (per-activation — upload within 48 h of IC closure) |
+| **SOC 2 criteria** | CC6.1 / CC7.3 |
+
+**Seven required components:**
+
+1. **`r87_c1_output`** — R-87-C1 scope query: affected `tenant_id` UUID, `expired_cert_class`, `hours_overdue`, `cert_rotation_state` at IC open time. No employee `user_id`, email, or GDPR Art. 9 data.
+2. **`r87_c2_output`** — R-87-C2 90-day escalation history: `sso.cert_expiry_alert` / `sso.cert_uploaded` / `sso.cert_rotated` chain. Proves whether AL-CERT-01..03 warnings were emitted before AL-CERT-04.
+3. **`r87_c3_output`** — R-87-C3 `cert_rotation_state` snapshot at IC open.
+4. **`r87_c4_output`** — R-87-C4 post-rotation zero-expired-event confirmation (0 rows expected — gate for IC closure).
+5. **`trigger_event_json`** — The `sso.cert_expired` CRITICAL/7yr DEC-030 event triggering AL-CERT-04. Contains `tenant_id` UUID, `cert_class`, `fingerprint_sha256`, `expires_at`, `days_overdue`.
+6. **`opened_event_json`** — The `sso.cert_expired_ic_opened` STANDARD/7yr DEC-030 anchor event.
+7. **`terminal_event_json`** — The `sso.cert_expired_ic_closed` LOW/3yr terminal event. Contains `root_cause`, `downtime_minutes`, `new_fingerprint_sha256`, `sla_credit_issued: true`.
+
+**Privacy floor:** CERT-EXPIRED-IC-E-001 contains NO data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data. `tenant_id` in all components is FORM-internal UUID — never customer email addresses, Okta tenant domains, Entra Directory IDs, or any externally-linkable identifier. `fingerprint_sha256` is the public SHA-256 hex of the certificate's DER encoding — not a private key or PEM content. HR role has NO access to `compliance/evidence/saml-cert/`.
+
+### §R-87.10 SOC 2 Auditor Narratives
+
+**CC6.1 — Logical access controls (certificate lifecycle management):**
+
+FORM's SAML certificate lifecycle monitoring implements a graduated escalation ladder (AL-CERT-01 at t60, AL-CERT-02 at t30, AL-CERT-03 at t7) before any certificate can reach the expired tier. When CERT-SLO-01 is breached, R-87 provides a documented IC protocol covering all four root cause hypotheses (SP cert not rotated, IdP cert not rotated, cron stale co-incident, partial rotation failure), each with hypothesis-specific remediation steps and a mandatory email-magic-link fallback activation that restores SSO access within minutes while the certificate rotation proceeds. CERT-EXPIRED-IC-E-001 `r87_c2_output` proves the complete alert history from t60 to expired, establishing whether FORM's monitoring operated as designed before the expiry. `r87_c4_output` proves that cert rotation was confirmed complete before SSO was re-enabled.
+
+**CC7.3 — Incident response procedures for detected anomalies:**
+
+R-87 provides a documented, severity-classified IC protocol for the specific P0 scenario of SAML certificate expiry on an active tenant. The IC lifecycle is CERT-EXPIRED-IC-CHAIN-01 HMAC-chained: `sso.cert_expired` CRITICAL trigger → `sso.cert_expired_ic_opened` STANDARD anchor → `sso.cert_expired_ic_closed` LOW terminal. The HMAC chain provides an immutable, tamper-evident record that the IC was formally opened and closed. `downtime_minutes` in the terminal event proves the total SSO outage window; `new_fingerprint_sha256` proves a replacement certificate was installed; `sla_credit_issued: true` proves FORM honoured the CERT-SLO-01 credit obligation without requiring the customer to claim it.
+
+### §R-87.11 Post-Incident Controls
+
+| Root cause | Post-incident control | Owner | Timeline |
+|---|---|---|---|
+| H1 (SP cert, FORM missed rotation) | Add SP cert rotation reminder to CSM account playbook for each SAML tenant at t90 — CSM receives internal Slack reminder to proactively schedule rotation with customer IT at the t90 alert, not just t60 AL-CERT-01 | customer-success | 7 days |
+| H2 (IdP cert, customer missed rotation) | Add "cert rotation date confirmed" field to CSM-to-customer runbook at AL-CERT-02 (t30) — CSM must record customer IT admin's confirmed rotation date in CRM; escalate to founder if no confirmation within 48 h of AL-CERT-02 firing | customer-success | 7 days |
+| H3 (cron stale co-incident) | Post-mortem on both R-80 (cron stale) and R-87 (cert expired); determine whether cert expiry could have been prevented if cron had been healthy; evaluate secondary DB-level `cert_alert_tier` monitoring independent of `cert-expiry-check` cron output | devops-lead + security-engineer | 14 days |
+| H4 (partial rotation failure) | Add `cert_rotation_state = 'in_progress'` staleness check: if `cert_rotation_started_at < NOW() - INTERVAL '24h'` AND `cert_rotation_completed_at IS NULL` → emit P2 alert `cert_rotation_stalled`; prevents silent rotation failures accumulating to H4 | platform-engineer | 14 days |
+| Any (universal) | 48 h post-mortem if downtime exceeded 15 minutes; optional (with IC note confirming magic-link fallback activated within SLA and R-87-C4 confirmed) if < 15 min | IC + security-engineer | 48 h |
+
+### §R-87.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register `sso.cert_expired_ic_opened` STANDARD/7yr and `sso.cert_expired_ic_closed` LOW/3yr in `docs/AUDIT_LOG_SCHEMA.md §CERT-Expired-IC`; include CERT-EXPIRED-IC-CHAIN-01 ordering invariant and CERT-EXPIRED-IC-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [x] **Done — 2026-07-06 (AUDIT_LOG_SCHEMA.md v3.6, §CERT-Expired-IC).** |
+| 2 | Implement CERT-EXPIRED-IC-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`; HTTP 422 + `CERT_EXPIRED_IC_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending |
+| 3 | Update `docs/OBSERVABILITY.md §77.4` AL-CERT-04 inline runbook: replace "Companion IR runbook: R-04" with "Dedicated companion IR runbook: INCIDENT_RESPONSE R-87" field | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.4, §77.4 companion field updated).** |
+| 4 | Update `docs/OBSERVABILITY.md §26.5` AL-CERT-04 table row: change companion reference from "INCIDENT_RESPONSE.md R-04" to "INCIDENT_RESPONSE.md R-87 (dedicated); R-04 for adversarial path" | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.24.4, §26.5 AL-CERT-04 row updated).** |
+| 5 | Register CERT-EXPIRED-IC-E-001 in `docs/SOC2_READINESS.md §191` master evidence table (CC6.1/CC7.3, per-activation, 7yr) | compliance-officer | **P0** | [x] **Done — 2026-07-06 (SOC2_READINESS.md v4.16.0, §191; evidence count 166 → 167).** |
+| 6 | Authoring complete — R-87 closes the AL-CERT-04 companion runbook gap; all P0/P1 SSO subsystem alerts (R-80 through R-87) now have dedicated companion runbooks | compliance-officer | **P0** | [x] **Done — 2026-07-06 (INCIDENT_RESPONSE.md v3.51.0).** |
+
+### §R-87.13 Cross-Reference Obligations
+
+| Item | Location | Status |
+|---|---|---|
+| AL-CERT-04 primary alert spec | `docs/OBSERVABILITY.md §26.5` (v5.24.4, 2026-07-06) | Companion ref updated R-04 → R-87; R-04 retained for adversarial path |
+| AL-CERT-04 inline runbook | `docs/OBSERVABILITY.md §77.4` (v5.24.4, 2026-07-06) | Dedicated companion IR runbook field updated |
+| `sso.cert_expired_ic_opened` + `sso.cert_expired_ic_closed` schemas | `docs/AUDIT_LOG_SCHEMA.md §CERT-Expired-IC` (v3.6, 2026-07-06) | STANDARD/7yr + LOW/3yr events; CERT-EXPIRED-IC-CHAIN-01 invariant; registered (closes §R-87.12 item 1) |
+| CERT-EXPIRED-IC-E-001 registration | `docs/SOC2_READINESS.md §191` (v4.16.0, 2026-07-06) | Per-activation CC6.1/CC7.3 evidence (evidence count 166 → 167) |
+| `sso.cert_expired` CRITICAL trigger event | `docs/AUDIT_LOG_SCHEMA.md §SAML-Cert-Lifecycle` (v2.99, 2026-07-05) | CRITICAL/7yr — `trigger_event_id` in both IC events resolves to this registration |
+| CERT-OBS-E-001 quarterly artefact | `docs/OBSERVABILITY.md §77.8` | Quarterly monitoring aggregate; per-incident supplement required from CERT-EXPIRED-IC-E-001 if downtime > 15 min |
+| CERT-SLO-01 | `docs/OBSERVABILITY.md §77.3` / `docs/ENTERPRISE.md §SLA` | SLA credit obligation — `sla_credit_issued: true` mandatory in terminal event |
+
+**Privacy floor (invariant throughout R-87):** No data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data in any R-87 scope query, DEC-030 event payload, communication template, or CERT-EXPIRED-IC-E-001 component. `tenant_id` is FORM-internal UUID — never customer email addresses or externally-linkable identifiers. `fingerprint_sha256` is the public SHA-256 hex of the certificate DER encoding — not a private key or PEM content. HR role NEVER has access to `compliance/evidence/saml-cert/`. Owner: security-engineer + compliance-officer + customer-success.
+
+---
+
+*v3.51.0 (2026-07-06): R-87 SAML Certificate Expired (AL-CERT-04 companion runbook). Closes the dedicated companion runbook gap for `docs/OBSERVABILITY.md §26.5` and `§77.4` AL-CERT-04: §26.5 and §77.4 previously referenced `INCIDENT_RESPONSE.md R-04` (generic SSO compromise runbook) as the AL-CERT-04 P0 companion — unlike AL-CERT-05 → R-80 (dedicated `cert-expiry-check` cron stale runbook). All analogous P0/P1 SSO subsystem alerts (R-80 AL-CERT-05; R-81 PKJWT rotation; R-82 Session Revocation KV; R-83 CAEP SET error; R-84 CAEP purge; R-85 RISC hijacking; R-86 SSO Fleet Health) had dedicated companion runbooks; AL-CERT-04 (P0 — SAML cert expired, CERT-SLO-01 / SSO-SLO-05 breach) was the only remaining P0 SSO alert without one. R-87: thirteen-section companion runbook. Trigger: AL-CERT-04 via `cert_alert_tier = 'expired'` for any active SAML tenant (`sso_enabled = true`). Three trigger modes: Mode-1 (PagerDuty CRITICAL via `sso.cert_expired` CRITICAL/7yr DEC-030 event); Mode-2 (CSM escalation, cron stale co-incident R-80); Mode-3 (manual discovery). Severity: always P0 — CERT-SLO-01 (alias SSO-SLO-05) breached; SLA credit automatic and immediate. Four root causes: H1 SP cert not rotated (FORM-side; no `sso.cert_rotated` in 90-day history, `cert_rotation_state = 'idle'`); H2 customer IdP cert not rotated (customer IT missed rotation despite AL-CERT-01..03 warnings — no `sso.cert_uploaded` in history); H3 cert-expiry-check cron stale at critical window (R-80 co-activation, manual R-87-C1 fleet scan); H4 partial rotation failure (`cert_rotation_state = 'in_progress'` with null `cert_rotation_completed_at`). Four scope queries: R-87-C1 (affected tenant + cert class + hours overdue — `tenant_id` UUID; no `user_id`); R-87-C2 (90-day escalation history — proves whether AL-CERT-01..03 fired before AL-CERT-04); R-87-C3 (`cert_rotation_state` snapshot — H4 classification); R-87-C4 (post-rotation zero-expired-event confirmation — gate for SSO re-enable). Six-step recovery: Step 1 (ack PagerDuty, open IC, T-87-A, emit `sso.cert_expired_ic_opened`, issue SLA credit immediately); Step 2 (R-87-C1..C3, classify H1–H4); Step 2a (activate email-magic-link fallback immediately — all hypotheses, before Step 3); Step 3a (H1 SP — SSO §8.1 emergency rotation, PAM elevation, `sso.cert_rotated`); Step 3b (H2 IdP — CSM phone call, Admin Dashboard §16.3 upload, `sso.cert_uploaded`); Step 3c (H3 cron — R-80 co-activate, classify H1/H2 for expired cert); Step 3d (H4 partial — complete or restart rotation); Step 4 (R-87-C4 zero-event confirm + test SAML assertion, re-enable SSO, disable magic-link); Step 5 (T-87-C post-resolution); Step 6 (emit `sso.cert_expired_ic_closed`, file CERT-EXPIRED-IC-E-001, close IC). Three communication templates: T-87-A (P0 declaration — SLA credit ISSUED, magic-link ACTIVATING); T-87-B (CSM — differentiated H1/H2 instructions); T-87-C (post-resolution — root cause, downtime, SLA credit). Two new DEC-030 events: `sso.cert_expired_ic_opened` STANDARD/7yr (anchor; `incident_id`, `trigger_event_id`, `tenant_id` UUID, `cert_class`, `fingerprint_sha256`, `expires_at`, `hours_overdue`, `initial_severity: 'P0'`, `magic_link_activated`, `sla_credit_issued`) and `sso.cert_expired_ic_closed` LOW/3yr (terminal; `root_cause` H1–H4, `downtime_minutes`, `new_fingerprint_sha256`, `magic_link_activated`, `r80_co_activated`, `r04_co_activated`, `art33_assessment_required`, `sla_credit_issued: true`). CERT-EXPIRED-IC-CHAIN-01 ordering invariant: `sso.cert_expired_ic_closed` MUST be preceded by `sso.cert_expired_ic_opened` for same `incident_id`, which MUST be preceded by `sso.cert_expired` CRITICAL with same `tenant_id` and `cert_class` within 1 h; HTTP 422 `CERT_EXPIRED_IC_CHAIN_01_VIOLATION` on inversion (pending M6). CERT-EXPIRED-IC-E-001 per-activation artefact (CC6.1/CC7.3, 7yr WORM, `compliance/evidence/saml-cert/cert-expired-ic/CERT-EXPIRED-IC-E-001-{incident_id}.json`): seven components (R-87-C1..C4 outputs; trigger, opened, terminal DEC-030 events); no `user_id`, email, or GDPR Art. 9 special-category data; `tenant_id` FORM-internal UUID; `fingerprint_sha256` public SHA-256 hex only. SOC2_READINESS §191 (CERT-EXPIRED-IC-E-001; evidence count 166 → 167; v4.16.0). OBSERVABILITY.md §77.4 AL-CERT-04 companion field updated (v5.24.4). OBSERVABILITY.md §26.5 AL-CERT-04 row updated (v5.24.4). AUDIT_LOG_SCHEMA.md §CERT-Expired-IC two new events (v3.6). Five post-incident controls: H1 — CSM Slack reminder at t90 SP cert; H2 — CSM confirmed rotation date at t30; H3 — dual post-mortem R-80 + R-87, secondary monitoring path evaluation; H4 — cert_rotation_state staleness P2 alert (> 24h in_progress); universal — 48h post-mortem if downtime > 15 min. Privacy floor: no data subject name, email, health value, or GDPR Art. 9 data in any scope query, DEC-030 payload, template, or evidence artefact; HR NEVER accesses `compliance/evidence/saml-cert/`; `tenant_id` FORM-internal UUID; `fingerprint_sha256` public SHA-256 hex only. Document header v3.50.0 → v3.51.0. Owner: security-engineer + compliance-officer + customer-success.*
 
 ---
 

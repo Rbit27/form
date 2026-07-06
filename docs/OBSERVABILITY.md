@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v5.24.3
+# FORM · Observability & Monitoring Taxonomy v5.24.4
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -6086,7 +6086,7 @@ The full escalation ladder (t90 → t60 → t30 → t14 → t7 → t2 → expire
 | **AL-CERT-01** | `cert_alert_tier` advances to `t60` for any `(tenant_id, cert_class)` pair — cert expires in ≤ 60 days | P3 | PagerDuty LOW + `#security-alerts` + CSM email to tenant IT contact | Acknowledge < 24 h; CSM opens rotation-scheduling thread with customer | SSO §8.1 (SP cert rotation) or SSO §20 (IdP cert guidance) |
 | **AL-CERT-02** | `cert_alert_tier` advances to `t30` for any `(tenant_id, cert_class)` pair — cert expires in ≤ 30 days | P2 | PagerDuty MEDIUM + `#security-alerts` + CSM email + tenant admin in-app banner | Acknowledge < 4 h; confirm rotation window is scheduled; escalate to founder if customer unresponsive | SSO §8.1 / SSO §20 |
 | **AL-CERT-03** | `cert_alert_tier` advances to `t7` for any `(tenant_id, cert_class)` pair — cert expires in ≤ 7 days | P1 | PagerDuty HIGH + `#security-alerts` + founder | Acknowledge < 30 min; CSM places phone call to customer IT; emergency rotation must begin same day | SSO §8.1 / SSO §20; INCIDENT_RESPONSE.md R-04 |
-| **AL-CERT-04** | `cert_alert_tier = 'expired'` for any active SAML tenant (`sso_enabled = true`) | P0 | PagerDuty CRITICAL + INCIDENT_RESPONSE.md R-04 opened automatically | Acknowledge < 15 min; all SSO users of this tenant cannot log in; email-magic-link fallback must be activated immediately | INCIDENT_RESPONSE.md R-04; SSO §8.3 (emergency SSO disable) |
+| **AL-CERT-04** | `cert_alert_tier = 'expired'` for any active SAML tenant (`sso_enabled = true`) | P0 | PagerDuty CRITICAL + INCIDENT_RESPONSE.md R-87 opened automatically | Acknowledge < 15 min; all SSO users of this tenant cannot log in; email-magic-link fallback must be activated immediately | INCIDENT_RESPONSE.md R-87 (dedicated); R-04 for adversarial path; SSO §8.3 (emergency SSO disable) |
 | **AL-CERT-05** | `sso.cert_monitor_error` HIGH DEC-030 event emitted by the `cert-expiry-check` cron, OR no cron execution record for > 26 hours | P1 | PagerDuty HIGH + `#security-alerts` | Acknowledge < 30 min; cert expiry state unknown; check Cloudflare Cron Trigger logs; if > 24 h missed, treat as if all cert expiry dates are unknown | SSO §20.6; ENGINEERING_RUNBOOK.md; INCIDENT_RESPONSE.md R-80 |
 
 **De-duplication:** once an alert tier fires for a `(tenant_id, cert_class)` pair, the `cert_alert_last_sent_at` column in `tenant_sso_configs` suppresses re-alerting for 7 days. This prevents alert fatigue while ensuring weekly repetition in the critical window. Advancing to the next tier resets the de-dup window.
@@ -21040,7 +21040,7 @@ Runbook steps:
 **Trigger:** `cert_alert_tier` = `expired` OR `sso.cert_expired` event received.
 **Severity:** P0 · PagerDuty `form-security`
 **Dedup key:** `cert-expired-{tenant_id}-{cert_class}`
-**Companion IR runbook:** `INCIDENT_RESPONSE.md R-04` (SAML SSO Failure)
+**Dedicated companion IR runbook:** `docs/INCIDENT_RESPONSE.md R-87` (SAML Certificate Expired — full P0 IC lifecycle, SLA credit, HMAC chain, SOC 2 evidence). R-04 retained for adversarial cert-compromise path.
 
 Runbook steps:
 1. **CERT-SLO-01 / SSO-SLO-05 is breached** — SLA credit clock starts. Notify compliance-officer.

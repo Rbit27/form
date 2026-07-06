@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.15.0
+# FORM · SOC 2 Type II Readiness v4.16.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -38085,6 +38085,59 @@ CAEP-OBS-E-001 artefact enforces the §79.6 FORM privacy floor without exception
 |---|---|---|
 | INCIDENT_RESPONSE R-86 §R-86.9 evidence artefact spec | `docs/INCIDENT_RESPONSE.md R-86` (v3.50.0, 2026-07-06) | 🟢 Done — §190 this pass |
 | §R-86.12 item 4 SOC2_READINESS registration | `docs/INCIDENT_RESPONSE.md §R-86.12` | 🟢 Done — §190 this pass |
+
+---
+
+## §191 — CERT-EXPIRED-IC-E-001 Registration (CC6.1 / CC7.3 · INCIDENT_RESPONSE R-87 · SAML Certificate Expired P0 IC Evidence)
+
+> Per-activation evidence artefact for the SAML certificate expiry P0 incident response cycle. Registered in the §79.4 master evidence table as the dedicated companion to CERT-OBS-E-001 (§120, quarterly SAML cert lifecycle aggregate). Where CERT-OBS-E-001 covers quarterly monitoring health (cert_expiry_alert chain exports + cron execution logs + AL-CERT-01..05 PagerDuty records), CERT-EXPIRED-IC-E-001 documents each individual AL-CERT-04 incident from CERT-SLO-01/SSO-SLO-05 breach through full cert rotation, SSO restoration, and SLA credit issuance. **Evidence count: 166 → 167.**
+
+### §191.1 §79.4 Master Evidence Table Entry
+
+| Field | Value |
+|---|---|
+| **Evidence ID** | CERT-EXPIRED-IC-E-001 |
+| **Trust Service Criteria** | CC6.1 (logical access controls — cert lifecycle accountability), CC7.3 (incident response — P0 IC documented from open to close) |
+| **Collection trigger** | Per AL-CERT-04 activation (each `sso.cert_expired` CRITICAL event on an active SAML tenant with `sso_enabled = true`) |
+| **Retention** | 7yr WORM (inherits `sso.cert_expired` CRITICAL/7yr severity) |
+| **Storage path** | `compliance/evidence/saml-cert/cert-expired-ic/CERT-EXPIRED-IC-E-001-{incident_id}.json` |
+| **Collection owner** | security-engineer (primary) + compliance-officer (SOC 2 sign-off) |
+| **IC runbook** | `docs/INCIDENT_RESPONSE.md R-87` |
+| **AUDIT_LOG_SCHEMA section** | `docs/AUDIT_LOG_SCHEMA.md §CERT-Expired-IC` (v3.6) |
+| **HMAC chain invariant** | CERT-EXPIRED-IC-CHAIN-01 (enforced at `emit-audit-event` CF Worker; M6 milestone) |
+| **SLA instrument** | ENTERPRISE.md §SLA — `sla_credit_issued: true` required literal in `sso.cert_expired_ic_closed` event; absence blocks chain |
+
+**Required artefact components (seven):**
+
+| Component | Source | Privacy floor |
+|---|---|---|
+| R-87-C1 output — expired cert query | `SELECT tenant_id, cert_class, cert_alert_tier, saml_sp_cert_expires_at, saml_idp_cert_expires_at FROM tenant_sso_configs WHERE sso_enabled = true AND cert_alert_tier = 'expired'` (form_audit role) | `tenant_id` UUID only; no user_id, email, NameID |
+| R-87-C2 output — magic-link activation log | `SELECT tenant_id, activated_at, activated_by_role FROM sso_emergency_fallback_log WHERE incident_id = '{incident_id}'` (form_audit role) | `tenant_id` UUID + role string; no employee identity |
+| R-87-C3 output — SSO login restoration confirmation | `SELECT tenant_id, first_successful_login_after_rotation, login_count_1h_post FROM sso_login_audit_agg WHERE incident_id = '{incident_id}'` (form_audit role) | Aggregate counts; no user_id, session_id, IP |
+| R-87-C4 output — SLA credit record | `SELECT tenant_id, incident_id, credit_amount_usd, credit_issued_at, credit_approved_by FROM sla_credit_log WHERE incident_id = '{incident_id}'` (form_audit role) | `tenant_id` UUID + financial aggregate; no employee data |
+| `sso.cert_expired` CRITICAL event JSON | HMAC-chained DEC-030 event (trigger anchor; `fingerprint_sha256`, `expires_at`, `cert_class`, `tenant_id`) | Cert fingerprint hash; no PEM, no key material |
+| `sso.cert_expired_ic_opened` STANDARD event JSON | HMAC-chained DEC-030 event (`incident_id`, `trigger_event_id`, `magic_link_activated`, `sla_credit_issued`, `hours_overdue`) | Enumerated fields; no employee identity |
+| `sso.cert_expired_ic_closed` LOW event JSON | HMAC-chained DEC-030 event (`root_cause`, `downtime_minutes`, `new_fingerprint_sha256`, `r80_co_activated`, `r04_co_activated`, `art33_assessment_required`, `sla_credit_issued: true`) | Root cause enum + new cert fingerprint hash; no employee data |
+
+**Auditor narrative for CC6.1:** CERT-EXPIRED-IC-E-001 satisfies CC6.1 by demonstrating FORM's accountability for the SAML SP certificate lifecycle: the `sso.cert_expired` CRITICAL event proves the control failure was detected via continuous monitoring (cert-expiry-check cron + AL-CERT-04 PagerDuty); the `sso.cert_expired_ic_opened` event proves formal IC response was initiated within the SLA window; the R-87-C1 scope query proves FORM identified the affected tenant and cert class; the R-87-C4 SLA credit record proves FORM compensated the affected tenant per contractual obligation. `sla_credit_issued: true` is a required literal (not nullable) in the closed event — FORM cannot close the IC without issuing credit, enforced at the `emit-audit-event` Worker level (M6).
+
+**Auditor narrative for CC7.3:** The CERT-EXPIRED-IC-CHAIN-01 chain (trigger → IC opened → IC closed) proves a complete, documented incident response cycle for every AL-CERT-04 event. The `root_cause` enum (`H1`=SP not rotated by FORM; `H2`=IdP not rotated by customer; `H3`=cert-monitor cron stale; `H4`=partial rotation failure) demonstrates root cause analysis was performed. `downtime_minutes` quantifies impact. `magic_link_activated` proves the fallback access path was enabled. `new_fingerprint_sha256` proves rotation was completed, not just acknowledged. `art33_assessment_required` documents the GDPR Art. 33 supervisory authority notification decision boundary (cert expiry alone does not trigger Art. 33 unless personal data was inaccessible in a way constituting a personal data breach). Together, these seven components satisfy CC7.3's requirement that the entity responds to identified security events and documents the response lifecycle.
+
+**Privacy floor:** CERT-EXPIRED-IC-E-001 contains only FORM-internal `incident_id` UUIDs, `tenant_id` UUIDs, `fingerprint_sha256` hashes (non-reversible cert identifier, not the PEM), aggregate `downtime_minutes`, `cert_class` / `root_cause` / `hours_overdue` fields, boolean flags, and financial credit amounts. No employee `user_id`, name, email, SAML `NameID`, health value, coaching content, or GDPR Art. 9 special-category data. HR role has zero access to `compliance/evidence/saml-cert/cert-expired-ic/` paths. `art33_assessment_required` is a boolean classification, not a data disclosure — the actual Art. 33 assessment is a separate document outside this artefact.
+
+### §191.2 Cross-Reference
+
+| Item | Location | Status |
+|---|---|---|
+| INCIDENT_RESPONSE R-87 §R-87.9 evidence artefact spec | `docs/INCIDENT_RESPONSE.md R-87` (v3.51.0, 2026-07-06) | 🟢 Done — §191 this pass |
+| AUDIT_LOG_SCHEMA §CERT-Expired-IC event registration | `docs/AUDIT_LOG_SCHEMA.md §CERT-Expired-IC` (v3.6, 2026-07-06) | 🟢 Done — §191 this pass |
+| R-87 §R-87.12 item 5 SOC2_READINESS registration | `docs/INCIDENT_RESPONSE.md §R-87.12` | 🟢 Done — §191 this pass |
+| OBSERVABILITY §77.4 AL-CERT-04 companion field | `docs/OBSERVABILITY.md §77.4` (v5.24.4, 2026-07-06) | 🟢 Done — §191 this pass |
+| OBSERVABILITY §26.5 AL-CERT-04 table row | `docs/OBSERVABILITY.md §26.5` (v5.24.4, 2026-07-06) | 🟢 Done — §191 this pass |
+
+---
+
+*v4.16.0 (2026-07-06): §191 CERT-EXPIRED-IC-E-001 Registration (CC6.1/CC7.3 · INCIDENT_RESPONSE R-87 · per-activation SAML certificate expired P0 IC artefact; evidence count 166 → 167). CERT-EXPIRED-IC-E-001 is the per-activation IC companion to CERT-OBS-E-001 (§120, quarterly SAML cert lifecycle aggregate): CERT-OBS-E-001 covers quarterly monitoring health (cert_expiry_alert chain exports + cron execution logs + AL-CERT-01..05 PagerDuty records); CERT-EXPIRED-IC-E-001 documents each individual AL-CERT-04 incident response cycle from P0 IC open (`sso.cert_expired_ic_opened` STANDARD/7yr anchor) to full cert rotation and SSO restoration (`sso.cert_expired_ic_closed` LOW/3yr terminal). Seven required components: R-87-C1..C4 scope query outputs (expired cert state, magic-link activation, SSO restoration confirmation, SLA credit record — all `tenant_id` UUID + aggregates only; no user_id, email, health data) plus three DEC-030 event JSONs (trigger `sso.cert_expired` CRITICAL, opened, closed). CERT-EXPIRED-IC-CHAIN-01 ordering invariant: `sso.cert_expired_ic_closed` requires prior `sso.cert_expired_ic_opened` for same `incident_id`, which requires prior `sso.cert_expired` CRITICAL within 1 h; HTTP 422 `CERT_EXPIRED_IC_CHAIN_01_VIOLATION` on violation (M6 enforcement). `sla_credit_issued: true` required literal — no IC close without credit. Privacy floor: cert fingerprint SHA-256 only; no PEM, key material, or employee PII. HR access prohibited. Storage: `compliance/evidence/saml-cert/cert-expired-ic/CERT-EXPIRED-IC-E-001-{incident_id}.json`. AUDIT_LOG_SCHEMA.md v3.6 §CERT-Expired-IC + INCIDENT_RESPONSE.md v3.51.0 R-87 + OBSERVABILITY.md v5.24.4 §77.4/§26.5 updated in same pass. Document header v4.15.0 → v4.16.0. Owner: compliance-officer. Review: security-engineer + enterprise-architect.*
 
 ---
 
