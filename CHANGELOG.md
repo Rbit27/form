@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [13.92.0] — 2026-07-07
+
+### Added
+- `content/post-3306-movement-literacy-intermediate-trap.md` — Series «Рухова грамотність: технічна база для intermediate атлета» 3306–3315 (1/10). «Рухова грамотність: що це таке і чому intermediate атлет, який «вже вміє», опиняється в пастці власних звичок». Intermediate trap as the defining problem: after 2–4 years, the neuromuscular system stops generating an error signal for habituated patterns — technical drift becomes subjectively invisible. Movement literacy defined as the ability to read, reproduce, explain, and notice deviations from fundamental movement patterns under load and fatigue — distinct from flexibility, mobility, and corrective exercise. Three levels: controlled conditions, under load and fatigue, in variable conditions. Self-diagnosis paradox: inter-rater reliability, camera angle, sensory mismatch, cognitive load under heavy weight. Six fundamental patterns as the series vocabulary: hinge, squat, horizontal push/pull, vertical push/pull. Series map 3306–3315 introduced. clinical-safety NOT_REQUIRED (movement competency as technical training skill — no food/body image/body weight/clinical states).
+- `blog.html` — card for post-3306 prepended at top of feed.
+- `README.md` — series 3306–3315 status updated proposed → in progress 1/10; new proposed series 3606–3615, 3616–3625, 3626–3635 added to roadmap.
+
+### Changed
+- `STATUS.md` — series 3296–3305 COMPLETE confirmed; series 3306–3315 in progress 0/10 → 1/10; current version 13.91.0 → 13.92.0.
+- `VERSION` — 13.91.0 → 13.92.0.
+
+---
+
 ## [13.91.0] — 2026-07-07
 
 ### Added

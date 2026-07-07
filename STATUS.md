@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v13.92.0** — 2026-07-07 · content · post-3306 · «Рухова грамотність: що це таке і чому intermediate атлет, який «вже вміє», опиняється в пастці власних звичок» (series «Рухова грамотність: технічна база для intermediate атлета» 3306–3315, 1/10) · clinical-safety NOT_REQUIRED (рухова грамотність як технічна компетентність тренування — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3306 · series 3306–3315 in progress 0/10 → 1/10 · README: series 3296–3305 COMPLETE; 3306–3315 in progress 1/10; new proposed series 3606–3635 added · next: post-3307 (series «Рухова грамотність» 3306–3315, 2/10 — технічний дрейф під навантаженням: механізми і де він найнебезпечніший)
+
 **v13.91.0** — 2026-07-07 · content · post-3305 · «Метрики як мова: що ієрархія вимірювань говорить про принципи самокерованого тренінгу і роль адаптивного коучингу» (series «Вимірювання що рухає: метрики продуктивності vs. метрики адаптації» 3296–3305, 10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED (синтез серії — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3305 · series 3296–3305 COMPLETE 10/10 · next: new series (proposal pending — see README roadmap for 3306+)
 
 **v13.90.1** — 2026-07-06 · docs · SOC2_READINESS §193 REVOKE-BULK-E-001 registration (CC7.2/CC7.3; evidence count 167 → 168)
