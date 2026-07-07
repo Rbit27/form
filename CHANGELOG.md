@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [14.6.0] — 2026-07-07
+
+### Added
+- `content/post-3319-volume-and-progression.md` — Series «Як intermediate атлет будує програму під себе без тренера» 3316–3325, post 4/10. «Обсяг і прогресія: стартовий обсяг на патерн, одиниця прогресії і коли додавати або знижувати». MEV–MAV–MRV framework у практичному застосуванні; стартові діапазони тижневого обсягу по шести патернах; ієрархія одиниць прогресії (RIR → повторення → навантаження → підходи); патерн «хвилі» всередині блоку; п'ять червоних прапорів для зниження обсягу; частота як МРВ-фактор; операційний алгоритм першого блоку 7 кроків. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3319 card prepended at top of feed with badge «Self-Programming 4/10».
+
+### Changed
+- `STATUS.md` — current version updated to v14.6.0; next: post-3320 (5/10 — частота і розклад тренувань).
+- `VERSION` — 14.5.1 → 14.6.0.
+
+---
+
 ## [14.5.1] — 2026-07-07
 
 ### Changed
