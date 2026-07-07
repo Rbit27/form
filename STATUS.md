@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v14.9.0** — 2026-07-07 · content · post-3322 · «Деload: коли, чому і як — не та версія де знімаєш 50% ваги» (series «Як intermediate атлет будує програму під себе без тренера» 3316–3325, 7/10) · clinical-safety NOT_REQUIRED (методологія деload як структурний елемент силового програмування — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3322 with badge «Self-Programming 7/10» · next: post-3323 (8/10 — Перший самостійний блок: як зібрати аудит, вибір вправ, обсяг, частоту, авторегуляцію і деload в єдину програму від старту до тестового тижня)
+
 **v14.8.0** — 2026-07-07 · content · post-3321 · «RPE і авторегуляція: як читати сесію в реальному часі і коли відходити від плану — і коли ні» (series «Як intermediate атлет будує програму під себе без тренера» 3316–3325, 6/10) · clinical-safety NOT_REQUIRED (методологія RPE/авторегуляції — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3321 with badge «Self-Programming 6/10» · next: post-3322 (7/10 — Deload: коли, чому і як — не та версія де знімаєш 50% ваги)
 
 **v14.6.0** — 2026-07-07 · content · post-3319 · «Обсяг і прогресія: стартовий обсяг на патерн, одиниця прогресії і коли додавати або знижувати» (series «Як intermediate атлет будує програму під себе без тренера» 3316–3325, 4/10) · clinical-safety NOT_REQUIRED (методологія керування обсягом у силовому тренуванні — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3319 with badge «Self-Programming 4/10» · next: post-3320 (5/10 — частота і розклад тренувань: скільки разів на тиждень тренувати патерн, розподіл сесій, конфлікти патернів)

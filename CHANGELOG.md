@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [14.9.0] — 2026-07-07
+
+### Added
+- `content/post-3322-deload-when-why-how.md` — Series «Як intermediate атлет будує програму під себе без тренера» 3316–3325, post 7/10. «Деload: коли, чому і як — не та версія де знімаєш 50% ваги». Механізм fatigue masking fitness і суперкомпенсація; нейром'язовий аспект відновлення ЦНС; плановий vs. реактивний деload з п'ятьма сигналами накопиченої втоми; три типи деload (volume / intensity / full) і умови вибору кожного; помилки під час деload; тривалість і тестовий тиждень; зв'язок авторегуляції і деload як тактики і стратегії; практичний приклад 4-тижневого блоку з volume deload. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3322 card prepended at top of feed with badge «Self-Programming 7/10».
+
+### Changed
+- `STATUS.md` — current version updated to v14.9.0; next: post-3323 (8/10 — перший самостійний блок від аудиту до тестового тижня).
+- `VERSION` — 14.8.0 → 14.9.0.
+
+---
+
 ## [14.8.0] — 2026-07-07
 
 ### Added
