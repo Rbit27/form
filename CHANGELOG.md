@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [14.3.0] — 2026-07-07
+
+### Added
+- `docs/DATA_RESIDENCY.md` — Standalone enterprise data residency reference v1.0. Covers: three available regions (`us-east-1`, `eu-central-1` Frankfurt, `eu-west-1` Dublin), data classification by residency scope (special-category health data, audit logs, CV inference on-device clarification), technical implementation per service layer (Supabase cluster selection, Cloudflare R2 EU jurisdiction hints, Workers edge transit model, Auth0/WorkOS EU tenant provisioning, DEC-030 HMAC-chained audit log residency guarantee), sub-processor residency and SCC Module 2 transfer mechanisms for Anthropic / ElevenLabs / Cloudflare / PostHog / Sentry / Better Stack, tenant region configuration workflow and migration policy, data portability and bulk export, data deletion schedule (30-day grace → Day 60 hard delete → 7-year archive → deletion certificate), EU–US SCC table with TIA status, quarterly residency attestation schedule, privacy floor interaction (k-anon ≥ 5, HR aggregate-only, region-independent enforcement), roadmap (APAC, EU entity, BYOK, EUR billing, local-only Victor), five open questions OQ-DR-01–05 (k-anon floor, Sentry DPA, UK adequacy renewal, Swiss nDSG, Anthropic TIA). Operationalises hard commitment from `docs/ENTERPRISE.md`. Complements `docs/GDPR_DPIA.md` §3.3. compliance-officer + enterprise-architect + security-engineer.
+
+### Changed
+- `VERSION` — 14.2.0 → 14.3.0.
+
+---
+
 ## [14.2.0] — 2026-07-07
 
 ### Added
