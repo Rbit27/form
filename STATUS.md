@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v13.91.0** — 2026-07-07 · content · post-3305 · «Метрики як мова: що ієрархія вимірювань говорить про принципи самокерованого тренінгу і роль адаптивного коучингу» (series «Вимірювання що рухає: метрики продуктивності vs. метрики адаптації» 3296–3305, 10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED (синтез серії — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3305 · series 3296–3305 COMPLETE 10/10 · next: new series (proposal pending — see README roadmap for 3306+)
+
+**v13.90.1** — 2026-07-06 · docs · SOC2_READINESS §193 REVOKE-BULK-E-001 registration (CC7.2/CC7.3; evidence count 167 → 168)
+
 **v13.90.0** — 2026-07-06 · content · post-3304 · «Метрична система рішень: як інтегрувати вісім метрик у щоденну, тижневу і циклову практику» (series «Вимірювання що рухає: метрики продуктивності vs. метрики адаптації» 3296–3305, 9/10) · clinical-safety NOT_REQUIRED (інтеграція тренувальних метрик — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3304 · series 3296–3305 in progress 8/10 → 9/10 · next: post-3305 (series «Вимірювання що рухає» 3296–3305, 10/10 — synthesis: що вся ієрархія метрик говорить про принципи self-coached тренінгу і де вона вписується в підхід FORM до адаптивного коучингу)
 
 **v13.89.0** — 2026-07-06 · content · post-3303 · «Strength ratio tracking: відстеження силових пропорцій між вправами як діагностичний інструмент» (series «Вимірювання що рухає: метрики продуктивності vs. метрики адаптації» 3296–3305, 8/10) · clinical-safety NOT_REQUIRED (силові пропорції між вправами як тренувальна метрика — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3303 · series 3296–3305 in progress 7/10 → 8/10 · next: post-3304 (series «Вимірювання що рухає» 3296–3305, 9/10 — інтеграція всіх восьми метрик у єдину практичну систему прийняття рішень: щоденний, тижневий і цикловий рівні)

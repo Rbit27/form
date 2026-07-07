@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.91.0] — 2026-07-07
+
+### Added
+- `content/post-3305-metrics-hierarchy-self-coached-synthesis.md` — Block 3296–3305 series finale (10/10 · SERIES COMPLETE). «Метрики як мова: що ієрархія вимірювань говорить про принципи самокерованого тренінгу і роль адаптивного коучингу». Synthesis of the eight metrics covered in posts 3296–3304 into three structural principles of self-coached training: (1) baseline is the system, not a setting — 4–6 weeks of personal context required before any metric becomes signal rather than noise; (2) decision horizon determines the metric — e1RM read daily is noise, read per-block is an adaptation signal; (3) minimum viable system that survives beats maximum system that doesn't. Series arc from performance/adaptation distinction → specific metrics → integration layer → principles of self-coached training → FORM's role as adaptive coaching. Explicit treatment of where the system breaks: cold context, systemic disruptions, limits of metrics vs. a live coach. clinical-safety NOT_REQUIRED (synthesis of training-metrics series — no food/body image/body weight/clinical states).
+- `blog.html` — card for post-3305 prepended at top of feed.
+
+### Changed
+- `STATUS.md` — series 3296–3305 progress updated 9/10 → 10/10 COMPLETE; current version 13.90.1 → 13.91.0.
+- `VERSION` — 13.90.1 → 13.91.0.
+
+---
+
 ## [13.90.1] — 2026-07-06
 
 ### Changed
