@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [13.98.1] — 2026-07-07
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v3.52.0 → v3.52.1 — §R-88.12 item 5 stale cross-reference closure: `REVOKE-BULK-E-001` §79.4 registration marked `[x] Done` (was `[ ] Pending`; Done since SOC2_READINESS.md v4.18.0, 2026-07-06, §193). Documentation-only synchronisation — §R-88.13 already showed 🟢 Done; checklist row was the only inconsistency.
+- `VERSION` — 13.98.0 → 13.98.1.
+
+---
+
 ## [13.98.0] — 2026-07-07
 
 ### Added
