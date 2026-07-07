@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [14.7.0] — 2026-07-07
+
+### Added
+- `content/post-3320-training-frequency-scheduling.md` — Series «Як intermediate атлет будує програму під себе без тренера» 3316–3325, post 5/10. «Частота і розклад тренувань: скільки разів на тиждень тренувати патерн і як будувати тижневу структуру». Частота як розподіл стимулу, а не кількість сесій; мінімальне вікно відновлення 48–72 год після важкого патерну; оптимальна частота 2× на патерн для intermediate; конфлікти патернів у відновленні; три тижневих структури (Full body 3×, Upper/Lower 4×, PPL 6×) з умовами для кожної; принцип мінімально допустимого тижня; три кроки побудови реальної тижневої сітки. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3320 card prepended at top of feed with badge «Self-Programming 5/10».
+- `README.md` — три нові proposed series: «Програмування під мінімальний час» 3636–3645, «Силова спеціалізація» 3646–3655, «Зміна програми» 3656–3665; README header updated до v14.7.0; series 3316–3325 in progress 5/10.
+
+### Changed
+- `STATUS.md` — current version updated to v14.7.0; content-engine: posts 11–15 ✓ ALL COMPLETE → post-3320 written; next: post-3321 (6/10 — RPE і авторегуляція всередині блоку).
+- `VERSION` — 14.6.0 → 14.7.0.
+
+---
+
 ## [14.6.0] — 2026-07-07
 
 ### Added
