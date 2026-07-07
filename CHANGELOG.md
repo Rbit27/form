@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [14.5.1] — 2026-07-07
+
+### Changed
+- `pricing-enterprise.html` — Compliance & audit section patched to surface two ENTERPRISE.md hard commitments that were missing from the calculator and comparison table: (1) **EU data residency** (`us-east-1` / `eu-central-1` Frankfurt / `eu-west-1` Dublin) — ✓ all tiers; added to both the "Included features at your tier" panel and the feature comparison table. Sources: `docs/ENTERPRISE.md §Hard commitments` ("Data residency — EU customers stay in EU") and `docs/DATA_RESIDENCY.md` (v1.0, 2026-07-07). (2) **Quarterly compliance attestation** (SOC 2 controls status · audit chain integrity · privacy floor verification) — ✓ all tiers; added to both panels. Source: `docs/ENTERPRISE.md §Hard commitments` ("Quarterly compliance attestation"). These commitments were documented in ENTERPRISE.md and surfaced in `enterprise.html` (badge added v9.0, 2026-06-26) but were absent from the pricing calculator and tier comparison table seen by procurement. No fabricated data; all facts sourced from ENTERPRISE.md + DATA_RESIDENCY.md. compliance-officer + enterprise-architect. Privacy floor: NOT_AFFECTED (no individual user data).
+- `VERSION` — 14.5.0 → 14.5.1.
+
+---
+
 ## [14.5.0] — 2026-07-07
 
 ### Added
