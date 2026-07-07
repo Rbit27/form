@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [13.96.1] — 2026-07-07
+
+### Changed
+- `docs/SOC2_READINESS.md` v4.19.0 → v4.19.1 — §180.8 stale cross-reference closure: `session.revocation_kv_sync_restored` AUDIT_LOG_SCHEMA obligation updated 🟡 Pending M5 → 🟢 Done. Event + REVOKE-KV-CHAIN-01 invariant + Zod v2 schema were delivered in AUDIT_LOG_SCHEMA.md v3.1 (2026-07-05, `§R-82`), closing INCIDENT_RESPONSE §R-82.11 item 1; SOC2_READINESS §180.8 was never patched in that pass. Documentation-only synchronisation — no §79.4 count change, no new artefact.
+- `VERSION` — 13.96.0 → 13.96.1.
+
 ## [13.96.0] — 2026-07-07
 
 ### Added
