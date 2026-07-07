@@ -6,6 +6,10 @@
 
 ## Current version
 
+**v13.93.0** — 2026-07-07 · content · post-3307 · «П'ять фундаментальних рухових патернів: чому intermediate атлет втрачає якість, не помічаючи цього» (series «Рухова грамотність: технічна база для intermediate атлета» 3306–3315, 2/10) · clinical-safety NOT_REQUIRED (рухові патерни як технічна класифікація — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3307 · series 3306–3315 in progress 1/10 → 2/10 · next: post-3308 (series «Рухова грамотність» 3306–3315, 3/10 — технічний дрейф: механізм деградації патерну під навантаженням)
+
+**v13.92.1** — 2026-07-07 · enterprise · AUDIT_LOG_SCHEMA §R-88 REVOKE-BULK-CHAIN-01
+
 **v13.92.0** — 2026-07-07 · content · post-3306 · «Рухова грамотність: що це таке і чому intermediate атлет, який «вже вміє», опиняється в пастці власних звичок» (series «Рухова грамотність: технічна база для intermediate атлета» 3306–3315, 1/10) · clinical-safety NOT_REQUIRED (рухова грамотність як технічна компетентність тренування — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3306 · series 3306–3315 in progress 0/10 → 1/10 · README: series 3296–3305 COMPLETE; 3306–3315 in progress 1/10; new proposed series 3606–3635 added · next: post-3307 (series «Рухова грамотність» 3306–3315, 2/10 — технічний дрейф під навантаженням: механізми і де він найнебезпечніший)
 
 **v13.91.0** — 2026-07-07 · content · post-3305 · «Метрики як мова: що ієрархія вимірювань говорить про принципи самокерованого тренінгу і роль адаптивного коучингу» (series «Вимірювання що рухає: метрики продуктивності vs. метрики адаптації» 3296–3305, 10/10 — SERIES COMPLETE) · clinical-safety NOT_REQUIRED (синтез серії — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3305 · series 3296–3305 COMPLETE 10/10 · next: new series (proposal pending — see README roadmap for 3306+)

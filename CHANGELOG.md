@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.93.0] — 2026-07-07
+
+### Added
+- `content/post-3307-fundamental-movement-patterns-quality-loss.md` — Series «Рухова грамотність: технічна база для intermediate атлета» 3306–3315 (2/10). П'ять базових рухових патернів (squat, hinge, push, pull, carry/anti-movement) як архітектурна класифікація, не назви вправ. Для кожного: механіка, маркери якості, конкретний механізм деградації (тазовий wink, round back, anterior humeral glide, ліктьова ініціація, ігнорування осьового патерну). Чотирикроковий механізм технічного дрейфу. Операційна модель: технічний стандарт (2–3 маркери) + аудит на 75–80% 1RM раз на 3–4 тижні. clinical-safety NOT_REQUIRED; sports-scientist review pending.
+- `blog.html` — card for post-3307 prepended.
+
+### Changed
+- `VERSION` — 13.92.1 → 13.93.0.
+
+---
+
 ## [13.92.1] — 2026-07-07
 
 ### Changed
