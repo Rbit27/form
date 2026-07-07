@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.94.0] — 2026-07-07
+
+### Added
+- `content/post-3308-technical-drift-mechanism.md` — Series «Рухова грамотність: технічна база для intermediate атлета» 3306–3315 (3/10). «Технічний дрейф: механізм деградації патерну під навантаженням і чому ваги ростуть, а якість падає». Distinction between situational fatigue-compensation and structural technical drift. Core mechanism: motor program reoptimizes for «lift the bar», not «lift correctly» — under 80–85%+ load, system finds compensatory path, repeats it, and it becomes the new norm. Load as primary catalyst: threshold logic ≤70% vs 85%+, and how drift «seeps down» to submaximal intensities. Pattern-specific risks: hinge (early hip rise → lumbar replaces posterior chain), squat (good morning lean), pull (elbow initiation instead of scapular). Forward model prediction: why «feels fine» is not quality confirmation. Situational vs structural drift classification. Why weights increase with degraded pattern — and why it is not a win. Non-video operational drift signals: RPE nonlinearity, perceived load redistribution, tempo test. clinical-safety NOT_REQUIRED; sports-scientist review pending.
+- `blog.html` — card for post-3308 prepended.
+
+### Changed
+- `VERSION` — 13.93.0 → 13.94.0.
+
+---
+
 ## [13.93.0] — 2026-07-07
 
 ### Added
