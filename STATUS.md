@@ -6,6 +6,8 @@
 
 ## Current version
 
+**v14.5.0** — 2026-07-07 · content · post-3318 · «Вибір вправ: як будувати програму навколо основних патернів, а не навколо вправ» (series «Як intermediate атлет будує програму під себе без тренера» 3316–3325, 3/10) · clinical-safety NOT_REQUIRED (методологія вибору вправ у силовому тренуванні — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3318 with badge «Self-Programming 3/10» · next: post-3319 (4/10 — обсяг і прогресія: стартовий обсяг на патерн, одиниця прогресії і коли додавати або знижувати)
+
 **v14.4.0** — 2026-07-07 · content · post-3317 · «Аудит поточного стану: як оцінити тренувальний вік, реальний МРВ і точку відліку для нової програми» (series «Як intermediate атлет будує програму під себе без тренера» 3316–3325, 2/10) · clinical-safety NOT_REQUIRED (оцінка тренувального стану для self-coached intermediate атлетів — без їжі/образу тіла/ваги/клінічних станів) · sports-scientist review pending · blog.html card prepended for post-3317 with badge «Self-Programming 2/10» · next: post-3318 (3/10 — вибір вправ: як будувати програму навколо основних патернів, не навколо вправ)
 
 **v14.3.0** — 2026-07-07 · enterprise · docs/DATA_RESIDENCY.md v1.0 · standalone enterprise data residency reference: three regions (us-east-1, eu-central-1 Frankfurt, eu-west-1 Dublin), data classification, technical implementation per service layer (Supabase/Cloudflare R2/Workers/Auth0 WorkOS/DEC-030 audit log), sub-processor residency and SCC Module 2 transfer mechanisms, tenant region configuration, data portability/deletion schedule, EU–US SCC table, quarterly attestation, five open questions OQ-DR-01–05 · compliance-officer + enterprise-architect + security-engineer
