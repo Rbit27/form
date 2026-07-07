@@ -31496,7 +31496,7 @@ R-88 provides a documented, severity-classified IC protocol for the P2 AL-REVOKE
 
 | # | Task | Owner | Priority | Status |
 |---|---|---|---|---|
-| 1 | Register `session.bulk_revocation_slow_ic_opened` STANDARD/3yr and `session.bulk_revocation_slow_ic_closed` LOW/3yr in `docs/AUDIT_LOG_SCHEMA.md §R-88`; include REVOKE-BULK-CHAIN-01 ordering invariant and REVOKE-BULK-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [ ] Pending |
+| 1 | Register `session.bulk_revocation_slow_ic_opened` STANDARD/3yr and `session.bulk_revocation_slow_ic_closed` LOW/3yr in `docs/AUDIT_LOG_SCHEMA.md §R-88`; include REVOKE-BULK-CHAIN-01 ordering invariant and REVOKE-BULK-E-001 artefact spec | security-engineer + compliance-officer | **P0** / M5 | [x] **Done — 2026-07-07 (AUDIT_LOG_SCHEMA.md v3.7, §R-88 section; SOC2_READINESS.md v4.18.1, §80.4 + §193.7)** |
 | 2 | Implement REVOKE-BULK-CHAIN-01 ordering enforcement in `supabase/functions/emit-audit-event/`; HTTP 422 + `REVOKE_BULK_CHAIN_01_VIOLATION` on inversion | platform-engineer | **P0** / M6 | [ ] Pending |
 | 3 | Update `docs/OBSERVABILITY.md §76.4` AL-REVOKE-02 inline runbook: add "Dedicated companion IR runbook: INCIDENT_RESPONSE R-88" field | compliance-officer | **P0** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.25.1, §76.4 AL-REVOKE-02 companion field).** |
 | 4 | Update `docs/OBSERVABILITY.md §26.6` AL-REVOKE-02 table row: append R-88 reference to runbook column | compliance-officer | **P1** | [x] **Done — 2026-07-06 (OBSERVABILITY.md v5.25.1, §26.6 AL-REVOKE-02 row).** |
@@ -31510,8 +31510,8 @@ R-88 provides a documented, severity-classified IC protocol for the P2 AL-REVOKE
 |---|---|---|
 | AL-REVOKE-02 primary alert spec | `docs/OBSERVABILITY.md §26.6` (v5.25.1, 2026-07-06) | R-88 reference appended to runbook column |
 | AL-REVOKE-02 inline runbook | `docs/OBSERVABILITY.md §76.4` (v5.25.1, 2026-07-06) | "Dedicated companion IR runbook: R-88" field added |
-| `session.bulk_revocation_slow_ic_opened` + `session.bulk_revocation_slow_ic_closed` schemas | `docs/AUDIT_LOG_SCHEMA.md §R-88` | STANDARD/3yr + LOW/3yr events; REVOKE-BULK-CHAIN-01 invariant | ⏳ Pending M5 |
-| REVOKE-BULK-E-001 registration | `docs/SOC2_READINESS.md §79.4` | Per-activation CC7.2/CC7.3 evidence (count 167 → 168) | ⏳ Pending M5 |
+| `session.bulk_revocation_slow_ic_opened` + `session.bulk_revocation_slow_ic_closed` schemas | `docs/AUDIT_LOG_SCHEMA.md §R-88` | STANDARD/3yr + LOW/3yr events; REVOKE-BULK-CHAIN-01 invariant | 🟢 **Done — 2026-07-07 (AUDIT_LOG_SCHEMA.md v3.7)** |
+| REVOKE-BULK-E-001 registration | `docs/SOC2_READINESS.md §79.4` | Per-activation CC7.2/CC7.3 evidence (count 167 → 168) | 🟢 **Done — 2026-07-06 (SOC2_READINESS.md v4.18.0, §193)** |
 | R-82 cross-reference update | `docs/INCIDENT_RESPONSE.md §R-82.10` (v3.52.0, 2026-07-06) | AL-REVOKE-02 row updated — R-88 reference added |
 
 **Privacy floor (invariant throughout R-88):** No data subject name, email, health value, body composition, coaching session content, or GDPR Art. 9 special-category data in any R-88 scope query, DEC-030 event payload, communication template, or REVOKE-BULK-E-001 component. `tenant_id` in all components is FORM-internal UUID. `revoked_count` is an aggregate integer count of session tokens — not a list of session IDs, user IDs, or any individually-identifying data. HR role has NO access to `compliance/evidence/session-revocation/`. Owner: security-engineer + devops-lead + compliance-officer.

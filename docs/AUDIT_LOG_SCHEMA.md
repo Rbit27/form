@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v3.6
+# FORM · Audit Log Schema v3.7
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -797,6 +797,76 @@ Seven required components: `r86_c1_output` (per-tenant SSO success rates at IC o
 *CC7.2 — Monitoring for anomalies:* AL-SSO-FLEET-01 fires on `siem.sso_fleet_health_breach` DEC-030 HMAC-chained events produced by pg_cron job 38 — an automated, continuously-running threshold-triggered monitoring control. SSO-FLEET-IC-E-001 `r86_c1_output` confirms the specific failing tenant count and fleet success rate at IC open. The trigger event and IC artefact share the same HMAC chain — tamper-evident from alert emission to IC closure. `r86_c2_output` demonstrates that monitoring operates in continuous 5-minute buckets, not as a point-in-time snapshot.
 
 *CC7.3 — Incident response procedures:* R-86 provides a documented, severity-classified IC protocol with H1–H5 root cause classification and hypothesis-specific remediation. P0 escalation criteria for H5 ensure adversarial incidents receive an elevated response. SSO-FLEET-IC-E-001 documents the complete response cycle; `degraded_window_minutes` proves the total exposure window; `fleet_recovered_at` proves the recovery point was documented; the SSO-FLEET-IC-CHAIN-01 terminal event provides an immutable on-chain record of formal IC closure after recovery was confirmed.
+
+---
+
+### §R-88 Bulk Session Revocation Slow IC Lifecycle events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-88 · SOC 2 CC7.2/CC7.3)
+
+> Defined in `docs/INCIDENT_RESPONSE.md R-88` (v3.52.0, 2026-07-06). Two lifecycle events covering the AL-REVOKE-02 bulk session revocation performance degradation IC: an anchor event at IC open and a terminal event at confirmed recovery. Emitted manually by the on-call engineer (devops-lead or security-engineer) as Step 1 item 6 (anchor) and Step 4 item 2 (terminal) of the R-88 recovery procedure. **REVOKE-BULK-CHAIN-01 ordering invariant:** `session.bulk_revocation_slow_ic_closed` MUST be preceded by `session.bulk_revocation_slow_ic_opened` carrying the same `incident_id` within 48 h; the `emit-audit-event` Worker returns HTTP 422 `REVOKE_BULK_CHAIN_01_VIOLATION` on inversion (implementation: pending M6, `docs/INCIDENT_RESPONSE.md §R-88.12` item 2). **Trigger:** AL-REVOKE-02 fires when P95 `session.bulk_revocation_complete` `duration_ms` exceeds 5,000 ms over a rolling 1-hour window. IC may also open via CSM escalation (Mode-2) or manual Grafana discovery (Mode-3). **Privacy floor:** payload contains only aggregate metrics, root cause enum, and operational metadata — no `user_id`, `session_id`, JTI values, employee name, email, health value, or GDPR Art. 9 special-category data. `tenant_id` is FORM-internal UUID or null. **Emitter:** on-call engineer (devops-lead or security-engineer) via PAM-elevated `emit-audit-event` Worker call; IC closure is a human decision — there is no automated emitter for either event. **Cross-ref:** `docs/INCIDENT_RESPONSE.md R-88` (§R-88.7 DEC-030 chain spec; §R-88.8 REVOKE-BULK-CHAIN-01; §R-88.9 REVOKE-BULK-E-001 SOC 2 evidence artefact); `docs/OBSERVABILITY.md §76.4` (AL-REVOKE-02 trigger alert + companion runbook); `docs/SOC2_READINESS.md §193` (REVOKE-BULK-E-001 registered, count 167 → 168). **Closes `docs/INCIDENT_RESPONSE.md §R-88.12` item 1 (P0/M5).**
+
+| Event type | Severity | Retention | Trigger | Payload fields |
+|---|---|---|---|---|
+| `session.bulk_revocation_slow_ic_opened` | STANDARD | 3 yr | On-call engineer emits at R-88 IC open (Step 1 item 6), after AL-REVOKE-02 acknowledgement or Mode-2/Mode-3 detection; REVOKE-BULK-CHAIN-01 anchor event | `incident_id` (UUID), `trigger_event_batch_id` (UUID — `event_id` of the `session.bulk_revocation_complete` whose P95 contribution triggered AL-REVOKE-02), `tenant_id` (UUID or null — null for fleet-wide H4/H2 pattern), `p95_ms_at_trigger` (positive int — P95 `duration_ms` across breach window at IC open time), `batch_samples_in_window` (positive int — count of `session.bulk_revocation_complete` events in 1-hour trigger window), `initial_severity` (enum: `P2` \| `P1`), `mode` (enum: `automated` \| `csm_escalation` \| `manual_discovery`) |
+| `session.bulk_revocation_slow_ic_closed` | LOW | 3 yr | On-call engineer emits at R-88 IC closure (Step 4 item 2), after R-88-C4 P95 confirmation (< 5,000 ms; ≥ 3 batch samples); REVOKE-BULK-CHAIN-01 terminal event; IC closure is gated on this event | `incident_id` (UUID — must match `session.bulk_revocation_slow_ic_opened` `incident_id`), `root_cause` (enum: `H1_oversized_batch` \| `H2_kv_throughput` \| `H3_supabase_contention` \| `H4_worker_concurrency`), `degraded_window_minutes` (positive int — wall-clock minutes from first breach to R-88-C4 confirmation), `p95_ms_at_closure` (positive int — P95 from R-88-C4; must be < 5,000 ms before IC closes), `batch_size_changed` (bool — `true` if `BATCH_SIZE` reduced for H1 remediation), `new_batch_size` (int or null — new value if `batch_size_changed: true`), `kv_quota_ticket_filed` (bool — CF KV quota increase ticket filed for H2 when quota > 80%), `supabase_fallback_activated` (bool — `true` only if P1 escalation and `session_blocklist`-only path activated), `p1_escalated` (bool — `true` if incident escalated to P1 per §R-88.2 criteria), `al_scim_mass_01_co_activated` (bool — AL-SCIM-MASS-01 co-occurred as H1 large SCIM batch scenario), `art33_assessment_required` (bool — always `false`: performance degradation, not a data breach; sessions were revoked slowly, not left un-revoked) |
+
+**REVOKE-BULK-CHAIN-01 ordering invariant:** `session.bulk_revocation_slow_ic_closed` MUST NOT be emitted for a given `incident_id` unless `session.bulk_revocation_slow_ic_opened` for the same `incident_id` was committed to the HMAC chain within the preceding 48 h. The `emit-audit-event` Worker enforces this at INSERT time — HTTP 422 `REVOKE_BULK_CHAIN_01_VIOLATION` on violation; escalate immediately to R-05 (HMAC Chain Break). **Implementation:** pending M6 (`emit-audit-event` Worker update — `docs/INCIDENT_RESPONSE.md §R-88.12` item 2). Until M6 deployment, the invariant is verified manually: the IC log in `#inc-revoke-bulk-{date}` Slack MUST reference the `session.bulk_revocation_slow_ic_opened` anchor before `session.bulk_revocation_slow_ic_closed` is emitted.
+
+**Zod v2 schemas (canonical source: `docs/INCIDENT_RESPONSE.md §R-88.7`):**
+
+```typescript
+import { z } from 'zod';
+
+export const SessionBulkRevocationSlowIcOpenedPayload = z.object({
+  incident_id:               z.string().uuid(),
+  trigger_event_batch_id:    z.string().uuid(),    // references session.bulk_revocation_complete event_id
+  tenant_id:                 z.string().uuid().nullable(),  // null = fleet-wide (H4/H2)
+  p95_ms_at_trigger:         z.number().int().positive(),
+  batch_samples_in_window:   z.number().int().positive(),
+  initial_severity:          z.enum(['P2', 'P1']),
+  mode:                      z.enum(['automated', 'csm_escalation', 'manual_discovery']),
+});
+
+export const SessionBulkRevocationSlowIcClosedPayload = z.object({
+  incident_id:                 z.string().uuid(),  // must match ic_opened
+  root_cause:                  z.enum([
+    'H1_oversized_batch',
+    'H2_kv_throughput',
+    'H3_supabase_contention',
+    'H4_worker_concurrency',
+  ]),
+  degraded_window_minutes:     z.number().int().positive(),
+  p95_ms_at_closure:           z.number().int().positive(),  // must be < 5_000 at IC close
+  batch_size_changed:          z.boolean(),
+  new_batch_size:              z.number().int().positive().nullable(),  // null if batch_size_changed: false
+  kv_quota_ticket_filed:       z.boolean(),
+  supabase_fallback_activated: z.boolean(),
+  p1_escalated:                z.boolean(),
+  al_scim_mass_01_co_activated: z.boolean(),
+  art33_assessment_required:   z.literal(false),  // always false — not a data breach
+});
+```
+
+**Privacy floor:** Neither event carries `user_id`, `session_id`, JTI values, employee name, email, health value, body composition, coaching content, or GDPR Art. 9 special-category data. `tenant_id` is FORM-internal UUID or null — not linked to company name or employee roster in this event payload. `revoked_count` referenced via `trigger_event_batch_id` remains in the source `session.bulk_revocation_complete` event; it is not duplicated in anchor or terminal events. `degraded_window_minutes` and `p95_ms_at_closure` are operational performance metrics — no per-user or per-session breakdown. **`r2:form-api` NO ACCESS** to REVOKE-BULK-E-001 artefacts at `compliance/evidence/session-revocation/`.
+
+**REVOKE-BULK-E-001 SOC 2 evidence artefact:**
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | REVOKE-BULK-E-001 |
+| **Trigger** | Per R-88 IC activation (each AL-REVOKE-02 incident that opens an IC) |
+| **Retention** | 3 years (WORM — P2 performance degradation; no data breach or access control failure) |
+| **Storage path** | `compliance/evidence/session-revocation/revoke-bulk-e-001-{incident_id}.json` |
+| **R2 Object Lock** | WORM (3yr) |
+| **Vanta mirror** | REVOKE-BULK-E-001 (per-activation — upload within 48 h of IC closure; nil-attestation via REVOKE-OBS-E-001 quarterly filing §179.7) |
+| **SOC 2 criteria** | CC7.2 / CC7.3 |
+
+Five required components: `r88_c1_output` (R-88-C1 batch detail at IC open time — `revoked_count`, `duration_ms`, `ms_per_session`, `tenant_id` UUID; no `user_id`), `r88_c4_output` (P95 post-remediation confirmation: `p95_ms_post_fix` < 5,000 ms, `batch_samples` ≥ 3), `trigger_batch_event_json` (`session.bulk_revocation_complete` STANDARD/7yr DEC-030 event JSON whose P95 contribution triggered AL-REVOKE-02 — `tenant_id` UUID, `revoked_count` aggregate integer, `duration_ms`; no `user_id` or `session_id`), `opened_event_json` (`session.bulk_revocation_slow_ic_opened` STANDARD/3yr DEC-030 anchor event JSON), `terminal_event_json` (`session.bulk_revocation_slow_ic_closed` LOW/3yr terminal event JSON — includes `root_cause` H1–H4, `degraded_window_minutes`, `p95_ms_at_closure`, `art33_assessment_required: false`).
+
+**SOC 2 auditor narratives:**
+
+*CC7.2 — Continuous monitoring for anomalous conditions:* AL-REVOKE-02 is a continuous automated monitor sourced from the immutable DEC-030 `session.bulk_revocation_complete` chain. The P95 threshold (5,000 ms) is evaluated over rolling 1-hour windows — FORM detects bulk revocation performance degradation before it can affect SCIM deprovisioning SLA commitments. REVOKE-BULK-E-001 `trigger_batch_event_json` is drawn from the DEC-030 HMAC-chained audit log, which cannot be altered retroactively, proving automated anomaly detection was operational. REVOKE-OBS-E-001 (§179) quarterly artefact `alert_activations` provides the quarterly aggregate of all AL-REVOKE-02 activations, with zero-event attestation covering periods with no IC.
+
+*CC7.3 — Incident response to detected anomalies:* R-88 provides a documented, severity-classified IC protocol with H1–H4 root cause classification and hypothesis-specific remediation steps. REVOKE-BULK-E-001 documents the complete IC response cycle: detection (`trigger_batch_event_json`), formal IC open (`opened_event_json` with `initial_severity` and `mode`), classification and remediation (H1–H4 `root_cause` in terminal event), recovery confirmation (`r88_c4_output` P95 < 5,000 ms), and formal IC closure (`terminal_event_json`). `p95_ms_at_closure` proves the threshold was cleared before IC closure; `degraded_window_minutes` quantifies total exposure. `art33_assessment_required: false` in the terminal event documents FORM's determination that bulk revocation slowness does not constitute a GDPR Art. 33 personal data breach — sessions were revoked at higher latency, not left un-revoked. REVOKE-BULK-CHAIN-01 provides tamper-evident IC lifecycle ordering (M6 enforcement).
 
 ---
 
@@ -7663,6 +7733,9 @@ export const C1ErasureMonitorRestoredPayload = z.object({
 
 **v1.0 · 2026-06-10 · owner: compliance-officer + security-engineer**
 *v1.0 (2026-06-10): +5 `ai.*` Victor AI safety events — `ai.safety_incident_opened` (CRITICAL/HIGH, 7yr), `ai.safety_incident_contained` (HIGH, 7yr), `ai.victor_disabled` (HIGH, 7yr), `ai.victor_reenabled` (HIGH, 7yr), `ai.safety_incident_resolved` (STANDARD, 3yr). All HMAC-chained per DEC-030. VSAFETY-CHAIN-01/02/03 ordering invariants enforced by `emit-audit-event` Worker write-guard (HTTP 422 on violation → PagerDuty P0). Privacy floor: no user_id, coaching content, or health values in any payload — incident_id (UUID) and affected_session_count (aggregate integer) only. Retention table updated with 2 new rows. Closes OBSERVABILITY.md §32.10 checklist item 7 (P0 M4) and INCIDENT_RESPONSE.md R-23 checklist item 2 (P0 M4). Cross-ref: OBSERVABILITY.md §32.5 (FORM-VICTOR-001 through -004 alert rules), §2.1 (VICTOR-SLO-01 through -04), §32.7 (VSAFETY-CHAIN monitors); INCIDENT_RESPONSE.md R-23 §R-23.3 (T+3min auto-disable path); SOC 2 CC7.2/CC7.4; GDPR Art. 9.*
+
+**v3.6 · 2026-07-07 · owner: security-engineer + compliance-officer**
+*v3.7 (2026-07-07): §R-88 Bulk Session Revocation Slow IC Lifecycle events — Two DEC-030 HMAC-chained events registered in new section after `§R-86 SSO Fleet Health Breach IC Lifecycle events`. Closes `docs/INCIDENT_RESPONSE.md §R-88.12` item 1 (P0/M5) and `docs/SOC2_READINESS.md §193.7` item 2 (P0/M5). (1) `session.bulk_revocation_slow_ic_opened` (STANDARD, 3yr): anchor event for REVOKE-BULK-CHAIN-01; emitted by on-call engineer (devops-lead or security-engineer) at R-88 IC open (Step 1 item 6), after AL-REVOKE-02 acknowledgement or Mode-2/Mode-3 detection; seven-field Zod v2 `SessionBulkRevocationSlowIcOpenedPayload`: `incident_id` UUID, `trigger_event_batch_id` UUID (references `session.bulk_revocation_complete` event_id whose P95 contribution triggered AL-REVOKE-02), `tenant_id` UUID-nullable (null for fleet-wide H4/H2 pattern), `p95_ms_at_trigger` positive int, `batch_samples_in_window` positive int, `initial_severity` enum P2/P1, `mode` enum automated/csm_escalation/manual_discovery. (2) `session.bulk_revocation_slow_ic_closed` (LOW, 3yr): terminal event for REVOKE-BULK-CHAIN-01; emitted at R-88 Step 4 item 2 after R-88-C4 P95 confirmation (< 5,000 ms, ≥ 3 batch samples); eleven-field Zod v2 `SessionBulkRevocationSlowIcClosedPayload`: `incident_id` UUID (must match `ic_opened`), `root_cause` enum H1_oversized_batch/H2_kv_throughput/H3_supabase_contention/H4_worker_concurrency, `degraded_window_minutes` positive int, `p95_ms_at_closure` positive int (must be < 5,000 ms at closure), `batch_size_changed` bool, `new_batch_size` int-nullable, `kv_quota_ticket_filed` bool, `supabase_fallback_activated` bool, `p1_escalated` bool, `al_scim_mass_01_co_activated` bool, `art33_assessment_required` literal false. REVOKE-BULK-CHAIN-01 ordering invariant: `session.bulk_revocation_slow_ic_closed` MUST NOT be emitted for a given `incident_id` without a prior `session.bulk_revocation_slow_ic_opened` for the same `incident_id` within 48 h; HTTP 422 `REVOKE_BULK_CHAIN_01_VIOLATION` on violation (enforcement pending M6 per §R-88.12 item 2; manual IC-log verification interim). REVOKE-BULK-E-001 SOC 2 artefact (CC7.2/CC7.3, 3yr WORM, `compliance/evidence/session-revocation/revoke-bulk-e-001-{incident_id}.json`; 5 components: R-88-C1 batch detail, R-88-C4 P95 confirmation, trigger `session.bulk_revocation_complete` event JSON, opened event JSON, terminal event JSON; nil-attestation via REVOKE-OBS-E-001 quarterly filing §179.7). Two SOC 2 auditor narratives: CC7.2 (trigger event from immutable DEC-030 chain proves automated anomaly detection; REVOKE-OBS-E-001 quarterly covers zero-activation quarters); CC7.3 (complete IC lifecycle documented — trigger, anchor, H1–H4 classification, R-88-C4 recovery gate, terminal; `art33_assessment_required: false` documents GDPR Art. 33 determination; REVOKE-BULK-CHAIN-01 tamper-evident enforcement at M6). Privacy floor (both events): no `user_id`, `session_id`, JTI values, employee name, email, health value, or GDPR Art. 9 data; `tenant_id` FORM-internal UUID or null; `r2:form-api` NO ACCESS to `compliance/evidence/session-revocation/`. Cross-ref: `docs/INCIDENT_RESPONSE.md R-88` (§R-88.7 canonical Zod schemas; §R-88.8 REVOKE-BULK-CHAIN-01; §R-88.9 REVOKE-BULK-E-001; §R-88.12 item 1 — now [x] Done 2026-07-07); `docs/OBSERVABILITY.md §76.4` (AL-REVOKE-02 trigger alert + companion runbook); `docs/SOC2_READINESS.md §193` (REVOKE-BULK-E-001 registered, §193.7 items 2/4 — now [x] Done 2026-07-07). Document header v3.6 → v3.7. Owner: security-engineer + compliance-officer.*
 
 **v3.4 · 2026-07-06 · owner: compliance-officer + security-engineer**
 *v3.5 (2026-07-06): SSO-FLEET-IC-CHAIN-01 naming fix — corrected chain name and violation error code in §R-86 `siem.sso_fleet_health_ic_opened` + `siem.sso_fleet_health_ic_closed` section from stale `SSO-FLEET-CHAIN-01` / `SSO_FLEET_CHAIN_01_VIOLATION` (already registered by R-37 stale monitoring chain) to `SSO-FLEET-IC-CHAIN-01` / `SSO_FLEET_IC_CHAIN_01_VIOLATION` (R-86 IC lifecycle chain), eliminating naming collision between R-37 and R-86 chains. INCIDENT_RESPONSE.md v3.50.0 and SOC2_READINESS.md v4.15.0 updated in same pass. Document header v3.4 → v3.5. Owner: compliance-officer + security-engineer.*

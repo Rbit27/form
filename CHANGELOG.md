@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.92.1] — 2026-07-07
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — §R-88 Bulk Session Revocation Slow IC Lifecycle events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-88 · SOC 2 CC7.2/CC7.3). New section added after §R-86. Registers two events: `session.bulk_revocation_slow_ic_opened` (STANDARD/3yr — REVOKE-BULK-CHAIN-01 anchor; emitted by on-call engineer at R-88 IC open Step 1 item 6; seven-field Zod v2 `SessionBulkRevocationSlowIcOpenedPayload`: `incident_id`, `trigger_event_batch_id`, `tenant_id` nullable, `p95_ms_at_trigger`, `batch_samples_in_window`, `initial_severity` P2/P1, `mode` automated/csm_escalation/manual_discovery) and `session.bulk_revocation_slow_ic_closed` (LOW/3yr — REVOKE-BULK-CHAIN-01 terminal; emitted at R-88 Step 4 item 2 after R-88-C4 P95 < 5,000 ms gate; eleven-field Zod v2 `SessionBulkRevocationSlowIcClosedPayload`: `incident_id`, `root_cause` H1–H4 enum, `degraded_window_minutes`, `p95_ms_at_closure`, `batch_size_changed`, `new_batch_size`, `kv_quota_ticket_filed`, `supabase_fallback_activated`, `p1_escalated`, `al_scim_mass_01_co_activated`, `art33_assessment_required: false`). REVOKE-BULK-CHAIN-01 ordering invariant documented (M6 CF Worker enforcement pending; manual IC-log verification interim). REVOKE-BULK-E-001 SOC 2 artefact spec (CC7.2/CC7.3, 3yr WORM, 5 components). Two SOC 2 auditor narratives: CC7.2 (trigger from immutable DEC-030 chain proves automated anomaly detection) and CC7.3 (complete IC lifecycle documented; `art33_assessment_required: false` confirms no GDPR Art. 33 obligation). Document header v3.6 → v3.7. Closes `docs/INCIDENT_RESPONSE.md §R-88.12` item 1 (P0/M5) and `docs/SOC2_READINESS.md §193.7` item 2 (P0/M5).
+- `docs/SOC2_READINESS.md` — §80.4 Vanta mirror list: REVOKE-BULK-E-001 added (per-activation CC7.2/CC7.3 IC artefact; 3yr WORM; R2 path `compliance/evidence/session-revocation/revoke-bulk-e-001-{incident_id}.json`; nil-attestation via REVOKE-OBS-E-001 quarterly filing §179.7). §193.7 checklist: item 2 `[ ] Pending M5` → `[x] Done` (AUDIT_LOG_SCHEMA.md v3.7 §R-88); item 4 `[ ] Pending M5` → `[x] Done` (§80.4 updated). §193.8 cross-reference: AUDIT_LOG_SCHEMA obligation 🟡 → 🟢; §80.4 obligation 🟡 → 🟢. Document header v4.18.0 → v4.18.1.
+- `docs/INCIDENT_RESPONSE.md` — §R-88.12 item 1: `[ ] Pending` → `[x] Done — 2026-07-07`. §R-88.13: `session.bulk_revocation_slow_ic_opened/closed` schemas row ⏳ → 🟢; REVOKE-BULK-E-001 registration row ⏳ → 🟢.
+- `VERSION` — 13.92.0 → 13.92.1.
+
+---
+
 ## [13.92.0] — 2026-07-07
 
 ### Added
