@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [13.99.0] — 2026-07-07
+
+### Added
+- `content/post-3313-carry-stability-loaded-patterns.md` — Series «Рухова грамотність: технічна база для intermediate атлета» 3306–3315, 8/10. Carry і loaded stability як діагностика системного контролю: farmer's carry (депресія лопатки, бічна стабільність тазу при ходьбі, Trendelenburg-знак у русі, хватна витривалість проти постурального контролю); suitcase carry (антилатерофлексія, квадратний м'яз попереку і косі контралатерально, глютеус медіус); overhead carry (лопаткове winging і serratus anterior, торакальна жорсткість і ребровий «вибух», контралатеральний тазово-поперековий ланцюг); waiters carry (проміжний тест ротаторної манжети). Чотири тести самодіагностики (farmer's, suitcase, overhead, waiters) з маркерами для запису відео. Таблиця симптом → причина → корекція для 7 компенсаційних патернів. Алгоритм читання carry як системного діагностичного звіту. Місце carry у програмуванні: розминковий інструмент, самостійний блок, діагностичний моніторинг. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3313 card prepended at top of feed.
+
+### Changed
+- `VERSION` — 13.98.1 → 13.99.0.
+
+---
+
 ## [13.98.1] — 2026-07-07
 
 ### Changed
