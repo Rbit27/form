@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [14.7.1] — 2026-07-07
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md §47` — BDG Override Lifecycle HMAC Chain Enforcement spec (GUARD-CHAIN-01 + BDG-SWEEP-CHAIN-01 · `emit-audit-event` Worker layer). Closes `docs/OBSERVABILITY.md §79.9` items 5 and 6 (P1/M13). Full spec: `BDG_OVERRIDE_KV` KV namespace design (key `bdg:override:{tenant_id}:{override_token_hash}`, TTL 18,000 s), `bdg-override-chain.ts` module (`writeBdgOverrideAnchor()` + `checkBdgOverrideAnchor()`), `index.ts` three-case dispatch patch, 9 unit tests BDG-OVER-U-001..009, failure modes table, 10-item implementation checklist. Safe-over-available design: KV read error → HTTP 503 (fail-closed).
+- `docs/AUDIT_LOG_SCHEMA.md §SCIM Bulk Deprovision Guard events` — sixth BDG event `scim.bulk_deprovision_override_expired` (HIGH/7yr) registered with `BulkDeprovisionOverrideExpiredPayload` Zod v2 schema, emitter assignments update, and retention table row.
+
+### Changed
+- `docs/OBSERVABILITY.md §79.9` — items 5 (GUARD-CHAIN-01) and 6 (BDG-SWEEP-CHAIN-01) marked `[x] Done`. Both P1/M13. Version v5.25.0 → v5.25.1.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — version v2.43 → v2.44.
+- `docs/AUDIT_LOG_SCHEMA.md` — version v3.7 → v3.8.
+- `VERSION` — 14.7.0 → 14.7.1.
+
+---
+
 ## [14.7.0] — 2026-07-07
 
 ### Added

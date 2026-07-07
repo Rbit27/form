@@ -17348,3 +17348,286 @@ Once all four conditions are met: update `§46.9` G-003 row from `🟡 Implement
 *v2.42 (2026-07-06): §20.4.1 IdP JWKS Cache Flush on Rotation Complete — H1 post-incident control for `docs/INCIDENT_RESPONSE.md §R-83`. New §20.4.1 added within §20.4 (`cert-expiry-check` Worker Cron spec): when `cert_rotation_state → 'complete'`, the Worker must flush all `caep_jwks:{tenant_id}:*` entries in `SSO_KV` (using `SSO_KV.list({ prefix })` + per-key `delete()`) to force a fresh SSF JWKS fetch on the next incoming CAEP/RISC SET. Prevents the H1 root cause window where `caep-receiver.ts` rejects SETs signed with a new IdP SSF key because the cached JWKS still holds the old key. The automatic `kid`-miss re-fetch (§23.6) handles normal rotation but does not eliminate the validation failure for the first SET that arrives during the TTL window. The explicit flush eliminates the window entirely. Cache flush is tenant-scoped. No new DEC-030 event; the existing `sso.caep_reregistration_queued` (§36.2.4) serves as the canonical audit record. Closes §R-83.11 item 5 (P1/M5). Cross-reference to §R-83.9 post-incident control table added. Document header v2.41 → v2.42. Owner: platform-engineer + security-engineer.*
 
 *v2.39 (2026-07-06): §20.12 — OBSERVABILITY §77 backreference. Closes `docs/OBSERVABILITY.md §77.10` cross-reference obligation for `docs/SSO_SCIM_IMPLEMENTATION.md §20.12`. §20.12 documents the full §77 SAML Certificate Lifecycle Observability section (v5.23.0, 2026-07-06): §77.1–§77.10 scope covering cert-expiry-check CF Workers Cron Trigger, two cert classes (sp/idp), cert_alert_tier state machine, four DEC-030 events, five alert rules AL-CERT-01..05, CERT-SLO-01 (SSO-SLO-05 alias, zero-tolerance, R-04 companion) and CERT-SLO-02 (cron freshness < 26 h, R-80 companion), six-panel "SAML Certificate Lifecycle" §26.9 dashboard sub-group (inserted v5.23.0), CERT-OBS-E-001 quarterly evidence artefact (SOC2_READINESS §185, count 160 → 161, CC6.1/CC7.2, 7yr WORM, Q3-2026 first filing). Companion edits: OBSERVABILITY.md v5.23.0; SOC2_READINESS.md v4.11.0 §185. Document header v2.38 → v2.39. Owner: compliance-officer + enterprise-architect.*
+
+---
+
+## §47 BDG Override Lifecycle HMAC Chain Enforcement — GUARD-CHAIN-01 + BDG-SWEEP-CHAIN-01 · `emit-audit-event` Worker Layer
+
+> **Owner:** platform-engineer + security-engineer + compliance-officer
+> **Added:** v2.44 (2026-07-07). Closes `docs/OBSERVABILITY.md §79.9` items 5 and 6 (P1/M13).
+> **SOC 2:** CC6.3 (logical access removal), CC7.2 (continuous monitoring), A1.2 (availability)
+> **Chain invariants:** GUARD-CHAIN-01 · BDG-SWEEP-CHAIN-01 (both enforced — HTTP 422 at `emit-audit-event` Worker layer)
+> **New event:** `scim.bulk_deprovision_override_expired` · HIGH · 7 yr (§47.6 + AUDIT_LOG_SCHEMA.md v3.8)
+
+### §47.1 Context and Naming Disambiguation
+
+Two BDG override-lifecycle HMAC chain ordering invariants are enforced by the `emit-audit-event` Cloudflare Worker. Both were defined in `docs/OBSERVABILITY.md §79.3` (v5.25.0, 2026-07-06) as M13 obligations; this section provides the full implementation spec.
+
+The terms **GUARD-CHAIN-01** and **BDG-SWEEP-CHAIN-01** each appear with two distinct meanings across the FORM document corpus. SOC 2 auditors must scope queries by `event_type`, not by invariant name alone:
+
+| Invariant | Document locus | Scope in that locus | HTTP 422 gate? | Anchor event | Dependent event |
+|---|---|---|---|---|---|
+| GUARD-CHAIN-01 (advisory) | `docs/AUDIT_LOG_SCHEMA.md §SCIM Bulk Deprovision Guard` — `GUARD-CHAIN-01 advisory invariant (§34.4)` | ≥ 3 `scim.bulk_deprovision_blocked` for same `tenant_id` in 7 days → `system.scim_guard_repeated_trigger` emitted by pg_cron job 33 | No — advisory only | `scim.bulk_deprovision_blocked` (× ≥ 3) | `system.scim_guard_repeated_trigger` |
+| GUARD-CHAIN-01 (enforced) | `docs/OBSERVABILITY.md §79.3` / **this section §47.3.1** | `scim.bulk_deprovision_override_used` must be preceded by `scim.bulk_deprovision_override_issued` for same `(tenant_id, override_token_hash)` within 5 h | **Yes** — HTTP 422 `GUARD_CHAIN_01_OVERRIDE_VIOLATION` | `scim.bulk_deprovision_override_issued` | `scim.bulk_deprovision_override_used` |
+| BDG-SWEEP-CHAIN-01 (job-34-stale) | `docs/AUDIT_LOG_SCHEMA.md §R-33` note | job 34 stale → R-33 IC; `system.cron_job_stale` / `system.cron_job_health_restored` lifecycle | No — monitored via R-33 | `system.cron_job_stale` (job 34) | R-33 IC lifecycle events |
+| BDG-SWEEP-CHAIN-01 (enforced) | `docs/OBSERVABILITY.md §79.3` / **this section §47.3.2** | `scim.bulk_deprovision_override_expired` must be preceded by `scim.bulk_deprovision_override_issued` for same `(tenant_id, override_token_hash)` within 5 h | **Yes** — HTTP 422 `BDG_SWEEP_CHAIN_01_OVERRIDE_VIOLATION` | `scim.bulk_deprovision_override_issued` | `scim.bulk_deprovision_override_expired` |
+
+**SOC 2 auditor query scope:** GUARD-CHAIN-01 (enforced) violations → `event_type = 'scim.bulk_deprovision_override_used' AND response_status = 422`; BDG-SWEEP-CHAIN-01 (enforced) violations → `event_type = 'scim.bulk_deprovision_override_expired' AND response_status = 422`; GUARD-CHAIN-01 (advisory) activations → `event_type = 'system.scim_guard_repeated_trigger'`.
+
+### §47.2 Architecture
+
+Chain enforcement lives entirely in the `emit-audit-event` Cloudflare Worker — the central DEC-030 intake. Placing enforcement there keeps it outside SCIM Worker and pg_cron code paths, preventing bypass.
+
+```
+  Callers                           emit-audit-event CF Worker           BDG_OVERRIDE_KV
+  ─────────────────                 ──────────────────────────           ───────────────
+  SCIM Worker / internal-admin-api  Zod parse payload
+  POST /emit                        switch (event_type)
+  override_issued ─────────────────►├─ override_issued
+                                    │   writeBdgOverrideAnchor()  ──────► put(key, '1', {expirationTtl: 18000})
+  override_used ───────────────────►├─ override_used
+                                    │   checkBdgOverrideAnchor('GUARD_CHAIN_01')
+                                    │     anchor present → HTTP 200 ✓
+                                    │     anchor absent  → HTTP 422 GUARD_CHAIN_01_OVERRIDE_VIOLATION
+                                    │     KV read error  → HTTP 503 (fail-closed)
+  pg_cron job 34                    │
+  override_expired ────────────────►└─ override_expired
+                                        checkBdgOverrideAnchor('BDG_SWEEP_CHAIN_01')
+                                          anchor present → HTTP 200 ✓
+                                          anchor absent  → HTTP 422 BDG_SWEEP_CHAIN_01_OVERRIDE_VIOLATION
+                                          KV read error  → HTTP 503 (fail-closed)
+```
+
+**Safe-over-available design:** KV read exceptions → HTTP 503 (fail-closed, not fail-open). A KV outage must never allow an unanchored `override_used` or `override_expired` event to pass chain validation. KV write failures on `override_issued` are non-fatal — an advisory `system.bdg_override_kv_write_failed` event is emitted and the `override_issued` chain record is still written (the issued event is self-authorising; the KV write enables downstream enforcement for dependent events).
+
+### §47.3 Chain Invariant Definitions
+
+#### §47.3.1 GUARD-CHAIN-01 (enforced) — Override Use Requires Prior Issuance
+
+**Invariant:** `scim.bulk_deprovision_override_used` MUST be preceded by `scim.bulk_deprovision_override_issued` carrying the same `(tenant_id, override_token_hash)` pair, within a 5-hour window.
+
+**Enforcement:** On receipt of `scim.bulk_deprovision_override_used`, the Worker reads `BDG_OVERRIDE_KV` key `bdg:override:{tenant_id}:{override_token_hash}`. Absent key → HTTP 422 `GUARD_CHAIN_01_OVERRIDE_VIOLATION`; no chain record written. The SCIM Worker must treat HTTP 422 from `emit-audit-event` as a P0 incident → R-05.
+
+**Steady-state guarantee:** In normal operation, `override_issued` fires (and the KV anchor is written) before any SCIM push can use the override. GUARD-CHAIN-01 violations in production indicate: (a) replay of a known `override_token_hash`, (b) clock skew > 5 h, or (c) chain record corruption — all three are P0 → R-05.
+
+**Expected production rate:** zero violations per quarter.
+
+#### §47.3.2 BDG-SWEEP-CHAIN-01 (enforced) — Override Expiry Requires Prior Issuance
+
+**Invariant:** `scim.bulk_deprovision_override_expired` MUST be preceded by `scim.bulk_deprovision_override_issued` carrying the same `(tenant_id, override_token_hash)` pair, within a 5-hour window.
+
+**Enforcement:** On receipt of `scim.bulk_deprovision_override_expired`, the Worker reads `BDG_OVERRIDE_KV` key `bdg:override:{tenant_id}:{override_token_hash}`. Absent key → HTTP 422 `BDG_SWEEP_CHAIN_01_OVERRIDE_VIOLATION`; no chain record written.
+
+**Emitter:** pg_cron job 34 (`bdg_override_expiry_sweep`, `*/15 * * * *`). Job 34 sweeps `bulk_deprovision_override_exp` rows where `expires_at < now()` AND `used = false`. Normal case: an override is issued (anchor written, TTL 5 h), the SCIM push never happens within 4 h, job 34 fires within the 5 h anchor window and emits `override_expired` against the still-present anchor — chain satisfied. BDG-SWEEP-CHAIN-01 violations indicate job 34 emitting an expiry for a token never registered through `emit-audit-event`, or a KV TTL misconfiguration.
+
+### §47.4 `BDG_OVERRIDE_KV` Namespace Spec
+
+```toml
+# wrangler.toml (supabase/functions/emit-audit-event/)
+[[kv_namespaces]]
+binding = "BDG_OVERRIDE_KV"
+id = "<prod-namespace-id>"
+preview_id = "<preview-namespace-id>"
+```
+
+**Key schema:** `bdg:override:{tenant_id}:{override_token_hash}` — 36-char hyphenated UUID + 64-char lowercase hex SHA-256 hash; value `'1'` (sentinel); TTL `18000` s.
+
+| Window component | Duration | Rationale |
+|---|---|---|
+| Max CSM override token TTL | 4 h | §34.7: override token expires after 4 h; auto-revoked on first use |
+| Sweep buffer | +1 h | Job 34 runs `*/15`; worst-case lag before job-stale alert (AL-BDG-01 job 34 stale P1) |
+| **Total KV TTL** | **5 h (18,000 s)** | Conservative margin covering all normal expiry paths |
+
+### §47.5 `bdg-override-chain.ts` Module Spec
+
+**File:** `supabase/functions/emit-audit-event/bdg-override-chain.ts`
+
+```typescript
+import { emitAdvisoryKvWriteFailed } from './advisory.ts';
+
+const BDG_OVERRIDE_ANCHOR_TTL_SECONDS = 5 * 60 * 60; // 18,000 s — §47.4
+
+export async function writeBdgOverrideAnchor(
+  env: Env,
+  tenantId: string,
+  overrideTokenHash: string,
+): Promise<void> {
+  const key = `bdg:override:${tenantId}:${overrideTokenHash}`;
+  try {
+    await env.BDG_OVERRIDE_KV.put(key, '1', {
+      expirationTtl: BDG_OVERRIDE_ANCHOR_TTL_SECONDS,
+    });
+  } catch {
+    await emitAdvisoryKvWriteFailed(env, tenantId, overrideTokenHash);
+  }
+}
+
+export type BdgOverrideChainResult =
+  | { violation: false }
+  | { violation: true; code: 'GUARD_CHAIN_01_OVERRIDE_VIOLATION' | 'BDG_SWEEP_CHAIN_01_OVERRIDE_VIOLATION' };
+
+export async function checkBdgOverrideAnchor(
+  env: Env,
+  tenantId: string,
+  overrideTokenHash: string,
+  chain: 'GUARD_CHAIN_01' | 'BDG_SWEEP_CHAIN_01',
+): Promise<BdgOverrideChainResult> {
+  const key = `bdg:override:${tenantId}:${overrideTokenHash}`;
+  let anchor: string | null;
+  try {
+    anchor = await env.BDG_OVERRIDE_KV.get(key);
+  } catch {
+    throw new Error('BDG_OVERRIDE_KV_READ_ERROR'); // → HTTP 503 fail-closed (§47.2)
+  }
+  if (anchor === null) {
+    return {
+      violation: true,
+      code:
+        chain === 'GUARD_CHAIN_01'
+          ? 'GUARD_CHAIN_01_OVERRIDE_VIOLATION'
+          : 'BDG_SWEEP_CHAIN_01_OVERRIDE_VIOLATION',
+    };
+  }
+  return { violation: false };
+}
+```
+
+**`Env` interface extension** (`supabase/functions/emit-audit-event/types.ts`):
+
+```typescript
+interface Env {
+  // ... existing bindings ...
+  BDG_OVERRIDE_KV: KVNamespace;
+}
+```
+
+### §47.6 New DEC-030 Event: `scim.bulk_deprovision_override_expired`
+
+Registered in `docs/AUDIT_LOG_SCHEMA.md` v3.8 (companion edit, 2026-07-07).
+
+| Field | Value |
+|---|---|
+| **Event type** | `scim.bulk_deprovision_override_expired` |
+| **Severity** | HIGH |
+| **Retention** | 7 years |
+| **Emitter** | pg_cron job 34 (`bdg_override_expiry_sweep`, `*/15 * * * *`, `form_system`) |
+| **Trigger** | Job 34 finds `bulk_deprovision_override_exp` row where `expires_at < now()` AND `used = false` |
+| **Chain role** | BDG-SWEEP-CHAIN-01 terminal event — requires prior `scim.bulk_deprovision_override_issued` for same `(tenant_id, override_token_hash)` within 5 h |
+| **SOC 2** | CC6.3 · CC7.2 · A1.2 |
+
+**`BulkDeprovisionOverrideExpiredPayload` Zod v2 schema:**
+
+```typescript
+const BulkDeprovisionOverrideExpiredPayload = z.object({
+  tenant_id:           z.string().uuid(),
+  override_token_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  expired_at:          z.string().datetime(),
+  issued_at_iso:       z.string().datetime(),
+  was_used:            z.literal(false),
+});
+```
+
+**Privacy floor:** `tenant_id` FORM-internal UUID; `override_token_hash` SHA-256 of token (token never in chain); `expired_at` / `issued_at_iso` ISO 8601 timestamps; `was_used: false` literal. No employee `user_id`, name, email, health value, or GDPR Art. 9 data. HR (`tenant_manager` role) has zero visibility.
+
+**GUARD-E-001 evidence SQL extension** — include this query in the quarterly GUARD-E-001 export:
+
+```sql
+SELECT event_type,
+       payload->>'tenant_id'           AS tenant_id,
+       payload->>'override_token_hash' AS override_token_hash,
+       payload->>'expired_at'          AS expired_at,
+       payload->>'issued_at_iso'       AS issued_at_iso,
+       payload->>'was_used'            AS was_used,
+       created_at
+FROM   audit_log
+WHERE  event_type = 'scim.bulk_deprovision_override_expired'
+ORDER  BY created_at;
+```
+
+### §47.7 `index.ts` Dispatch Table Patch
+
+Three new `case` branches in `supabase/functions/emit-audit-event/index.ts`:
+
+```typescript
+import { writeBdgOverrideAnchor, checkBdgOverrideAnchor } from './bdg-override-chain.ts';
+
+// inside switch (body.event_type):
+
+case 'scim.bulk_deprovision_override_issued': {
+  const p = BulkDeprovisionOverrideIssuedPayload.parse(body.payload);
+  await writeBdgOverrideAnchor(env, p.tenant_id, p.override_token_hash);
+  break;
+}
+
+case 'scim.bulk_deprovision_override_used': {
+  const p = BulkDeprovisionOverrideUsedPayload.parse(body.payload);
+  const r = await checkBdgOverrideAnchor(env, p.tenant_id, p.override_token_hash, 'GUARD_CHAIN_01');
+  if (r.violation) {
+    return new Response(JSON.stringify({ error: r.code }), {
+      status: 422, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  break;
+}
+
+case 'scim.bulk_deprovision_override_expired': {
+  const p = BulkDeprovisionOverrideExpiredPayload.parse(body.payload);
+  const r = await checkBdgOverrideAnchor(env, p.tenant_id, p.override_token_hash, 'BDG_SWEEP_CHAIN_01');
+  if (r.violation) {
+    return new Response(JSON.stringify({ error: r.code }), {
+      status: 422, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  break;
+}
+```
+
+**Top-level error handling:** `BDG_OVERRIDE_KV_READ_ERROR` thrown by `checkBdgOverrideAnchor` must be caught by the Worker's global error handler and returned as HTTP 503.
+
+### §47.8 Unit Tests — BDG-OVER-U-001..009
+
+**File:** `supabase/functions/emit-audit-event/bdg-override-chain.test.ts`
+**Framework:** Vitest + Miniflare KV stubs (pattern: `bcl-inv.test.ts` — BCL-INV-U-001..007)
+
+| Test ID | Scenario | Anchor state | Expected |
+|---|---|---|---|
+| BDG-OVER-U-001 | `writeBdgOverrideAnchor` — KV write succeeds | Empty | `get(key)` returns `'1'`; no error |
+| BDG-OVER-U-002 | `writeBdgOverrideAnchor` — KV write throws | KV throws | Advisory event emitted; no exception propagated |
+| BDG-OVER-U-003 | `checkBdgOverrideAnchor` GUARD_CHAIN_01 — anchor present | Key exists | `{ violation: false }` |
+| BDG-OVER-U-004 | `checkBdgOverrideAnchor` GUARD_CHAIN_01 — anchor absent | Empty | `{ violation: true, code: 'GUARD_CHAIN_01_OVERRIDE_VIOLATION' }` |
+| BDG-OVER-U-005 | `checkBdgOverrideAnchor` GUARD_CHAIN_01 — KV read throws | KV throws | Throws `BDG_OVERRIDE_KV_READ_ERROR` |
+| BDG-OVER-U-006 | `checkBdgOverrideAnchor` BDG_SWEEP_CHAIN_01 — anchor present | Key exists | `{ violation: false }` |
+| BDG-OVER-U-007 | `checkBdgOverrideAnchor` BDG_SWEEP_CHAIN_01 — anchor absent | Empty | `{ violation: true, code: 'BDG_SWEEP_CHAIN_01_OVERRIDE_VIOLATION' }` |
+| BDG-OVER-U-008 | `checkBdgOverrideAnchor` BDG_SWEEP_CHAIN_01 — KV read throws | KV throws | Throws `BDG_OVERRIDE_KV_READ_ERROR` |
+| BDG-OVER-U-009 | `writeBdgOverrideAnchor` TTL — correct `expirationTtl` | Mock | `put()` called with `{ expirationTtl: 18000 }` |
+
+### §47.9 Failure Modes
+
+| Failure | Component | Behaviour | Severity |
+|---|---|---|---|
+| KV write fails on `override_issued` | `BDG_OVERRIDE_KV.put()` | Advisory emitted; `override_issued` chain record written; anchor missing → downstream `override_used` / `override_expired` will violate chain | P2 — CSM must re-issue |
+| KV read throws on `override_used` check | `BDG_OVERRIDE_KV.get()` | HTTP 503; SCIM Worker must retry or escalate R-05 | P1 — KV availability incident |
+| KV read throws on `override_expired` check | `BDG_OVERRIDE_KV.get()` | HTTP 503; job 34 must retry; retries exhausted → R-33 | P1 — KV availability incident |
+| Override used after anchor TTL expires (> 5 h total) | KV TTL | GUARD-CHAIN-01 violation → HTTP 422; re-issue required | P2 |
+| pg_cron job 34 stale (BDG-SLO-02 breach) | pg_cron | `override_expired` events not emitted; anchors expire via KV TTL naturally; gap visible in BDG-OBS-E-001 | P1 → R-33 |
+
+### §47.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Provision `BDG_OVERRIDE_KV` KV namespace (prod + preview) in Cloudflare dashboard | devops-lead | P1 | [ ] |
+| 2 | Add `BDG_OVERRIDE_KV` binding to `wrangler.toml` (§47.4) | platform-engineer | P1 | [ ] |
+| 3 | Create `supabase/functions/emit-audit-event/bdg-override-chain.ts` (§47.5) | platform-engineer | P1 | [ ] |
+| 4 | Extend `Env` interface with `BDG_OVERRIDE_KV: KVNamespace` (§47.5) | platform-engineer | P1 | [ ] |
+| 5 | Add `BulkDeprovisionOverrideExpiredPayload` Zod v2 schema to Worker schemas file (§47.6) | platform-engineer | P1 | [ ] |
+| 6 | Patch `index.ts` dispatch table — three new `case` branches (§47.7) | platform-engineer | P1 | [ ] |
+| 7 | Deploy `emit-audit-event` to production; smoke-test GUARD-CHAIN-01 (`override_issued` + `override_used` pair) | devops-lead + platform-engineer | P1 | [ ] |
+| 8 | Smoke-test BDG-SWEEP-CHAIN-01 (`override_issued` + `override_expired` via job 34) | devops-lead + platform-engineer | P1 | [ ] |
+| 9 | Pass BDG-OVER-U-001..009 unit tests (§47.8) | platform-engineer | P1 | [ ] |
+| 10 | Add `scim.bulk_deprovision_override_expired` to GUARD-E-001 quarterly evidence SQL (§47.6) | compliance-officer | P2 | [ ] |
+
+**Closes:** `docs/OBSERVABILITY.md §79.9` items 5 (GUARD-CHAIN-01 enforced) and 6 (BDG-SWEEP-CHAIN-01 enforced). Both P1/M13.
+
+---
+
+*v2.44 (2026-07-07): §47 BDG Override Lifecycle HMAC Chain Enforcement — GUARD-CHAIN-01 + BDG-SWEEP-CHAIN-01 · `emit-audit-event` Worker Layer. Full implementation spec for the two DEC-030 chain ordering invariants defined in `docs/OBSERVABILITY.md §79.3` (v5.25.0, 2026-07-06). §47.1: naming disambiguation table — four distinct uses of "GUARD-CHAIN-01"/"BDG-SWEEP-CHAIN-01" across AUDIT_LOG_SCHEMA.md, OBSERVABILITY.md, and this document; only the `emit-audit-event` Worker layer enforces HTTP 422. §47.2: architecture ASCII diagram — `BDG_OVERRIDE_KV` as anchor store; safe-over-available design (KV read error → HTTP 503 fail-closed; KV write failure on `override_issued` → advisory event, non-fatal). §47.3.1: GUARD-CHAIN-01 enforced — `override_used` requires prior `override_issued` for same `(tenant_id, override_token_hash)` within 5 h; HTTP 422 `GUARD_CHAIN_01_OVERRIDE_VIOLATION`; expected production rate: zero violations per quarter. §47.3.2: BDG-SWEEP-CHAIN-01 enforced — `override_expired` requires prior `override_issued` for same tuple within 5 h; HTTP 422 `BDG_SWEEP_CHAIN_01_OVERRIDE_VIOLATION`; emitter: pg_cron job 34 `bdg_override_expiry_sweep` `*/15`. §47.4: `BDG_OVERRIDE_KV` KV namespace spec — key schema `bdg:override:{tenant_id}:{override_token_hash}`, TTL 18,000 s (4 h max override + 1 h sweep buffer), `wrangler.toml` binding. §47.5: `bdg-override-chain.ts` module — `writeBdgOverrideAnchor()` (advisory on KV write failure) + `checkBdgOverrideAnchor()` (throws on KV read error → HTTP 503) + `BdgOverrideChainResult` discriminated union + `Env.BDG_OVERRIDE_KV: KVNamespace` extension. §47.6: new DEC-030 event `scim.bulk_deprovision_override_expired` (HIGH/7yr, pg_cron job 34, BDG-SWEEP-CHAIN-01 terminal; `BulkDeprovisionOverrideExpiredPayload` Zod v2 schema; SOC 2 CC6.3/CC7.2/A1.2; GUARD-E-001 SQL extension); registered in AUDIT_LOG_SCHEMA.md v3.8. §47.7: `index.ts` three new `case` branches for `override_issued` / `override_used` / `override_expired`. §47.8: BDG-OVER-U-001..009 unit tests (Vitest + Miniflare KV stubs, pattern: BCL-INV-U-001..007). §47.9: failure modes table. §47.10: 10-item implementation checklist; closes OBSERVABILITY §79.9 items 5 + 6 (P1/M13). Companion edits: `docs/AUDIT_LOG_SCHEMA.md` v3.8 (`scim.bulk_deprovision_override_expired` event + `BulkDeprovisionOverrideExpiredPayload` Zod v2 schema + emitter assignments update + retention row); `docs/OBSERVABILITY.md` v5.25.1 (§79.9 items 5 + 6 marked [x] Done). Document header v2.43 → v2.44. Owner: platform-engineer + security-engineer + compliance-officer.*
