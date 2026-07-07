@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.96.0] — 2026-07-07
+
+### Added
+- `content/post-3310-squat-pattern-self-diagnosis.md` — Block 3306–3315 cluster «Рухова грамотність» post 5/10. Присід: самодіагностика squat pattern без тренера. Три структурних причини втрати патерну: ankle dorsiflexion, анатомія кульшового суглоба, нейром'язова послідовність. П'ять зламів: good morning squat (механізм posterior chain домінування при ініціації), knee cave (два механізми — слабкість vs анатомія), heel rise (ankle як прихований обмежувач), butt wink (анатомічна межа vs технічна помилка), torso lean. Чотири тести: wall squat test (ankle dorsiflexion baseline), вива-тест / overhead squat із палицею (comprehensive assessment), box squat depth check, бокове + фронтальне відео back squat. П'ять сценаріїв інтерпретації результатів. Про ширину стійки: чому оптимальна стійка є анатомічно індивідуальною. clinical-safety NOT_REQUIRED.
+- `blog.html` — post-3310 card prepended at top of feed.
+
+### Changed
+- `STATUS.md` — series 3306–3315 progress updated 4/10 → 5/10; next: post-3311 (series «Рухова грамотність» 3306–3315, 6/10 — push pattern: самодіагностика жиму лежачи і жиму над головою, лопаткова стабільність).
+- `VERSION` — 13.95.0 → 13.96.0.
+
 ## [13.95.0] — 2026-07-07
 
 ### Added
