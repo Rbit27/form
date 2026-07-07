@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.95.0] — 2026-07-07
+
+### Added
+- `content/post-3309-hinge-pattern-self-diagnosis.md` — Block 3306–3315 cluster «Рухова грамотність» post 4/10. Шарнір: самодіагностика hinge pattern без тренера. П'ять місць де hinge ламається: коліно-домінантний патерн, lumbar flexion (два сценарії), гіперекстензія у верхній позиції, bar path deviation, відсутність hip drive на lockout. Чотири тести: wall hip hinge, dowel rod test (три точки контакту), бокове відео RDL, пасивний SLR. Результат-карта: рухомість vs нейром'язовий контроль vs специфічна технічна проблема. clinical-safety NOT_REQUIRED.
+- `blog.html` — post-3309 card prepended at top of feed.
+
+### Changed
+- `STATUS.md` — series 3306–3315 progress updated 3/10 → 4/10; next: post-3310 (series «Рухова грамотність» 3306–3315, 5/10 — присід: самодіагностика squat pattern, де intermediate атлет втрачає «сидіти», good morning squat, вива-тест і латеральне відео).
+- `VERSION` — 13.94.1 → 13.95.0.
+
 ## [13.94.1] — 2026-07-07
 
 ### Changed
