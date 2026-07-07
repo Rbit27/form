@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [13.97.0] — 2026-07-07
+
+### Added
+- `content/post-3311-push-pattern-self-diagnosis.md` — Серія «Рухова грамотність: технічна база для intermediate атлета» 3306–3315, пост 6/10. Push pattern: самодіагностика жиму лежачи і жиму над головою. Горизонтальний і вертикальний push як клас рухів із єдиним кінематичним ланцюгом. Чому стабілізатори лопатки систематично відстають від жимових двигунів. П'ять типових зламів: scapular winging (medial vs inferolateral, serratus anterior vs ромбоподібні), anterior shoulder roll у нижній точці жиму, elbow flare понад 90° без достатньої external rotation, bar path overhead press перед головою замість через голову, wrist collapse під навантаженням. Чотири тести самодіагностики: wall angel test (лопаткова мобільність, чотири точки контакту зі стіною), serratus wall push test (пряма перевірка serratus через winging), broomstick overhead press (bar path без навантаження), відео горизонтального і вертикального push збоку і ззаду. Алгоритм інтерпретації: п'ять сценаріїв. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — пост 3311 доданий у верхню частину feed.
+
+### Changed
+- `README.md` — серія 3306–3315 оновлена: in progress 2/10 → in progress 6/10.
+- `VERSION` — 13.96.1 → 13.97.0.
+
+---
+
 ## [13.96.1] — 2026-07-07
 
 ### Changed
