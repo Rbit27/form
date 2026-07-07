@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v4.17.0
+# FORM · SOC 2 Type II Readiness v4.19.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -38304,6 +38304,107 @@ R2 path provisioning status: shared with CC6-E-REV-001..003 (§178), REVOKE-OBS-
 | REVOKE-BULK-E-001 §80.4 Vanta mirror list entry | `docs/SOC2_READINESS.md §80.4` (this document) | 🟢 **Done — 2026-07-07 (§80.4 updated v4.18.1)** |
 
 ---
+
+## §194 — CONSENT-VER-E-001 Registration (P3.2/P4.1/P5.1/CC6.1 · DATA_MODEL §58 · Migration 0093 · Consent Re-Solicitation Quarterly Evidence)
+
+> **Added:** 2026-07-07 · **Owner:** compliance-officer · **Review:** security-engineer + enterprise-architect
+> Closes `docs/DATA_MODEL.md §58.11` item 7 (P1/M6) and `docs/DATA_MODEL.md §58.12` SOC2_READINESS cross-reference obligation.
+
+### §194.1 Context
+
+This section registers the CONSENT-VER-E-001 quarterly evidence artefact for the Aggregate Consent Versioning system defined in `docs/DATA_MODEL.md §58` (OQ-ENT-03 resolution, v1.50, 2026-07-06). Migration 0093 adds the `metric_consent_versions` append-only table and the `resolicitation_status` enum to `user_aggregate_consent`, enabling enterprise tenants to version their metric-category consent and re-solicit when new categories are introduced.
+
+CONSENT-VER-E-001 satisfies four SOC 2 Type II trust service criteria across the full consent versioning lifecycle:
+
+| Criterion | Coverage |
+|---|---|
+| **P3.2** — Notice of purpose change | `aggregate_consent.version_registered` (HIGH/7yr) provides tamper-evident proof that notice was issued before any metric-category expansion took effect |
+| **P4.1** — Consent for collection | `aggregate_consent.version_accepted` + `version_declined` (STANDARD/3yr each) prove that every tenant's consent response was recorded before new categories were processed |
+| **P5.1** — Use limited to stated purpose | `consent_gate` CTE in materialized views (DATA_MODEL §17) excludes tenants with `resolicitation_status IN ('declined','grace_expired')` from new-category metric aggregation |
+| **CC6.1** — Logical access to protected information | `metric_consent_versions` is append-only (no UPDATE/DELETE RLS); `tenant_manager` role ZERO ACCESS to both `metric_consent_versions` and `user_aggregate_consent` |
+
+Sister artefact relationship: CONSENT-VER-E-001 (quarterly, this section) is the compliance-level aggregate quarterly evidence. Individual tenant-level accept/decline outcomes are each captured by `aggregate_consent.version_accepted` / `version_declined` DEC-030 events (AUDIT_LOG_SCHEMA.md v3.8, §Aggregate-Consent-Versioning-events) — the quarterly artefact exports the full event chain for the period.
+
+### §194.2 §79.4 Evidence Table Entry (count 168 → 169)
+
+| # | Artefact ID | SOC 2 criteria | Cadence | Retention | R2 path | Vanta |
+|---|---|---|---|---|---|---|
+| 169 | **CONSENT-VER-E-001** | P3.2 / P4.1 / P5.1 / CC6.1 | Quarterly | 3 yr WORM | `compliance/evidence/consent-versioning/CONSENT-VER-E-001_<YYYY-QN>.json` | ✓ Mirrored |
+
+**Artefact components (per quarterly filing):**
+
+1. **Event chain export** — all four `aggregate_consent.*` DEC-030 events emitted in the quarter: `version_registered` (HIGH/7yr), `resolicitation_initiated` (STANDARD/3yr), `version_accepted` (STANDARD/3yr), `version_declined` (STANDARD/3yr); JSON array, HMAC-chain verified
+2. **Cross-check SQL result** — `SELECT COUNT(*) FROM user_aggregate_consent WHERE resolicitation_status = 'pending' AND grace_expires_at < NOW()` — must return `0` (zero overdue-pending users); attested by compliance-officer + auto-run by `pg_cron job 38` (consent_grace_expiry_sweep, `*/15 * * * *`, CONSENT-SLO-02 ≤ 30 min freshness)
+3. **RESOL-CHAIN-01 verification** — automated check that every `aggregate_consent.resolicitation_initiated` event in the quarter is preceded by `aggregate_consent.version_registered` for the same `consent_version`; any violation generates HTTP 422 `RESOL_CHAIN_01_NO_VERSION` + P1 PagerDuty alert on `form-security`
+4. **Zero-event attestation** — if no consent version changes occurred in the quarter, a signed `{"consent_ver_e_001_events": 0, "quarter": "<YYYY-QN>", "note": "No metric-category consent version changes during observation period"}` attestation is included; compliance-officer signature required
+
+### §194.3 SOC 2 Auditor Narratives
+
+**P3.2 — Notice of purpose change:**
+CONSENT-VER-E-001 §r194-c1-event-chain includes the `aggregate_consent.version_registered` HIGH/7yr DEC-030 event for each metric-category consent version registered during the audit period. This event is written to the HMAC chain before any downstream re-solicitation is possible (RESOL-CHAIN-01 enforcement — `aggregate_consent.resolicitation_initiated` requires a preceding `version_registered` for the same `consent_version`; violation → HTTP 422 + P1 PagerDuty). The `change_description` field (min 10, max 500 chars) documents why the purpose expanded; `added_categories[]` lists the new metric categories; `gdpr_legal_basis` (Art.6(1)(a) or Art.89(1)) documents the legal basis; `registered_by_role` (compliance-officer or enterprise-architect) documents accountability. Because the event is HMAC-chained and append-only, auditors receive cryptographic proof that notice was recorded before any tenant received a re-solicitation request.
+
+**P4.1 — Consent for collection:**
+CONSENT-VER-E-001 §r194-c1-event-chain includes `aggregate_consent.version_accepted` and `aggregate_consent.version_declined` (STANDARD/3yr each) for every tenant-level consent resolution. `response_latency_days` (0–14) documents that tenants responded within the grace window; `decline_type` (`explicit_decline` | `grace_expired`) documents whether decline was active or passive. The cross-check SQL (component 2) proves that as of the quarterly filing date, zero `user_aggregate_consent` rows remain in a `'pending'` state past their grace period — all consent campaigns concluded. Combined with `consent_gate` CTE enforcement (P5.1 below), auditors can verify that no un-consented tenant received new-category metrics after the grace period expired.
+
+**P5.1 — Use limited to stated purpose:**
+The `consent_gate` CTE in DATA_MODEL §17 materialized views (`tenant_wellness_summary_v2`, `tenant_engagement_summary`, `tenant_feature_adoption`, `tenant_cohort_breakdown`) filters out tenants with `resolicitation_status IN ('declined','grace_expired')` before aggregating new-category metrics. Implementation status: DATA_MODEL §58.11 item 6 (Pending M6 — platform-engineer). Once deployed, the `consent_gate` CTE ensures the four materialized views never surface new-category data for non-consenting tenants. CONSENT-VER-E-001 will include a `consent_gate_deployed_at` field once M6 ships; prior quarters carry `consent_gate_deployed_at: null` with a compliance-officer attestation that no new-category metrics were published to declined/grace_expired tenants during the quarter.
+
+**CC6.1 — Logical access to protected information:**
+`metric_consent_versions` (Migration 0093) is governed by an append-only RLS policy: no `UPDATE` or `DELETE` is permitted for any role including `service_role`. `tenant_manager` role has ZERO ACCESS (`SELECT` denied via RLS `USING (false)` policy). `user_aggregate_consent` rows are tenant-scoped; `tenant_manager` has ZERO ACCESS to this table. These controls ensure that consent version records cannot be retroactively altered and that HR/manager-tier users cannot observe individual user consent states.
+
+### §194.4 Privacy Floor
+
+CONSENT-VER-E-001 artefact JSON contains only:
+
+- Version identifiers (`new_version`, `previous_version`, `consent_version` — `v\d+\.\d+` strings)
+- Boolean and enum fields (`requires_resolicitation`, `gdpr_legal_basis`, `registered_by_role`, `decline_type`)
+- Aggregate tenant-level counts (`tenant_pending_count` integer — count of pending users per tenant, not a list)
+- FORM-internal UUIDs (`tenant_id` — never a customer email, Okta domain, Entra Directory ID, or externally-linkable identifier)
+- Timestamp strings (`solicitation_start_iso`, `grace_expires_iso`, `accepted_at_iso`, `declined_at_iso`)
+- Operational integer (`response_latency_days` 0–14)
+
+The artefact does **not** contain: `user_id`, individual user consent status, employee PII, health metrics, body composition, coaching content, session tokens, or GDPR Art. 9 special-category data. `tenant_pending_count` is an aggregate integer — not a list of user identifiers. HR `tenant_manager` role ZERO ACCESS to `metric_consent_versions`, `user_aggregate_consent`, and `compliance/evidence/consent-versioning/`.
+
+### §194.5 R2 Path and Provisioning
+
+| Path component | Value |
+|---|---|
+| R2 bucket | `form-compliance` (WORM; 3-year object lock — matches CONSENT-VER-E-001 retention tier) |
+| Path prefix | `compliance/evidence/consent-versioning/` (new prefix — requires provisioning, see §194.7 item 4) |
+| Per-quarter object | `CONSENT-VER-E-001_<YYYY-QN>.json` (e.g. `CONSENT-VER-E-001_2026-Q3.json`) |
+| Signing | `compliance/scripts/sign-evidence.sh` (same signing key as existing quarterly artefacts) |
+| Access control | `r2:form-api` NO ACCESS; compliance-officer READ/WRITE only |
+
+**Retention note:** 3-year WORM, matching the STANDARD/3yr retention tier of the three response-lifecycle events (`resolicitation_initiated`, `version_accepted`, `version_declined`). The `version_registered` event (HIGH/7yr) is retained for 7 years on the HMAC chain regardless — the 3yr WORM applies only to the CONSENT-VER-E-001 quarterly JSON package in R2.
+
+### §194.6 Vanta Mirror
+
+| Artefact | Upload Protocol | Nil-Attestation |
+|---|---|---|
+| CONSENT-VER-E-001 | Quarterly upload within 14 days of quarter end | If no consent version changes in quarter, upload signed zero-event attestation (component 4) |
+
+### §194.7 Implementation Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Register CONSENT-VER-E-001 in §79.4 master evidence table (count 168 → 169) | compliance-officer | **P1** | [x] **Done — 2026-07-07 (§194.2, this section)** |
+| 2 | Register four `aggregate_consent.*` DEC-030 events + Zod schemas + RESOL-CHAIN-01 + CONSENT-VER-E-001 artefact spec in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | **P0** | [x] **Done — 2026-07-07 (AUDIT_LOG_SCHEMA.md v3.8, §Aggregate-Consent-Versioning-events)** |
+| 3 | Apply `consent_gate` CTE patch to four materialized views in DATA_MODEL §17 (`tenant_wellness_summary_v2`, `tenant_engagement_summary`, `tenant_feature_adoption`, `tenant_cohort_breakdown`) | platform-engineer | **P1** | [ ] Pending M6 |
+| 4 | Provision `compliance/evidence/consent-versioning/` R2 WORM prefix + confirm `pg_cron job 38` (`consent_grace_expiry_sweep`, `*/15 * * * *`) operational | devops-lead | **P1** | [ ] Pending M6 |
+
+### §194.8 Cross-Reference Obligations
+
+| Obligation | Source | Status |
+|---|---|---|
+| Register CONSENT-VER-E-001 in §79.4 master evidence table (count 168 → 169) | `docs/DATA_MODEL.md §58.11` item 7 (v1.50, 2026-07-06) | 🟢 **Done — 2026-07-07 (§194.2, this section)** |
+| Register four `aggregate_consent.*` DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` | `docs/DATA_MODEL.md §58.11` item 3 / §58.12 (v1.50, 2026-07-06) | 🟢 **Done — 2026-07-07 (AUDIT_LOG_SCHEMA.md v3.8, §Aggregate-Consent-Versioning-events)** |
+| Apply `consent_gate` CTE to DATA_MODEL §17 materialized views | `docs/DATA_MODEL.md §58.11` item 6 / §58.12 (v1.50, 2026-07-06) | 🟡 Pending M6 — platform-engineer |
+
+---
+
+*v4.18.1 (2026-07-07): §193.7 items 2/4 + §193.8 cross-reference closure + §80.4 Vanta mirror update. Closes two P0/M5 obligations from SOC2_READINESS §193 (v4.18.0, 2026-07-06): (1) `docs/AUDIT_LOG_SCHEMA.md §R-88` — `session.bulk_revocation_slow_ic_opened` STANDARD/3yr and `session.bulk_revocation_slow_ic_closed` LOW/3yr DEC-030 events + REVOKE-BULK-CHAIN-01 ordering invariant + REVOKE-BULK-E-001 artefact spec now registered in AUDIT_LOG_SCHEMA.md v3.7 (2026-07-07); §193.7 item 2 `[ ] Pending M5` → `[x] Done`; §193.8 AUDIT_LOG_SCHEMA obligation 🟡 → 🟢. (2) §80.4 Vanta mirror list — REVOKE-BULK-E-001 entry added after BDG-OBS-E-001 (last entry prior to this pass); §193.7 item 4 `[ ] Pending M5` → `[x] Done`; §193.8 §80.4 obligation 🟡 → 🟢. Remaining open: §193.7 item 3 (Pending M6 — CF Worker REVOKE-BULK-CHAIN-01 enforcement); §193.7 item 5 (event-triggered). Document header v4.18.0 → v4.18.1. Owner: compliance-officer. Review: security-engineer.*
+
+*v4.19.0 (2026-07-07): §194 — CONSENT-VER-E-001 Registration (P3.2/P4.1/P5.1/CC6.1 · DATA_MODEL §58 · Migration 0093 · Consent Re-Solicitation Quarterly Evidence). Closes `docs/DATA_MODEL.md §58.11` item 7 (P1/M6) and §58.12 cross-reference obligation "SOC2_READINESS New §194". §79.4 evidence count 168 → 169: CONSENT-VER-E-001 (169 — quarterly aggregate consent versioning evidence, P3.2/P4.1/P5.1/CC6.1, quarterly cadence, 3yr WORM, `compliance/evidence/consent-versioning/CONSENT-VER-E-001_<YYYY-QN>.json`). §194.1 context: satisfies four SOC 2 criteria across the full consent versioning lifecycle defined in DATA_MODEL §58 (OQ-ENT-03 resolution): P3.2 (tamper-evident notice of purpose change), P4.1 (consent solicitation response recorded), P5.1 (consent_gate CTE excludes declined tenants from new-category metrics), CC6.1 (append-only metric_consent_versions + tenant_manager ZERO ACCESS). §194.2 §79.4 entry: quarterly export of all four `aggregate_consent.*` DEC-030 events (version_registered HIGH/7yr, resolicitation_initiated STANDARD/3yr, version_accepted STANDARD/3yr, version_declined STANDARD/3yr) + cross-check SQL + zero-event attestation. §194.3 privacy floor: no `user_id` in any DEC-030 event; `tenant_id` FORM-internal UUID only; `tenant_pending_count` aggregate integer; HR `tenant_manager` ZERO ACCESS to `metric_consent_versions` and `user_aggregate_consent`; RESOL-CHAIN-01 ordering invariant enforced at Cloudflare Workers emission layer. §194.4 R2 path `compliance/evidence/consent-versioning/` (new prefix); WORM 3yr; Vanta-mirrored. §194.5 implementation checklist: item 1 Done this pass (§79.4 registration + §194 section); item 2 Done this pass (AUDIT_LOG_SCHEMA v3.8 §Aggregate-Consent-Versioning-events — four events + Zod schemas + RESOL-CHAIN-01 + evidence artefact spec); item 3 Pending M6 (platform-engineer: consent_gate CTE patch for DATA_MODEL §17 materialized views — tenant_wellness_summary_v2, tenant_engagement_summary, tenant_feature_adoption, tenant_cohort_breakdown); item 4 Pending M6 (devops-lead: provision `compliance/evidence/consent-versioning/` R2 WORM prefix + pg_cron job 38 confirmation). §194.6 three cross-reference obligations: §79.4 registration 🟢 Done; AUDIT_LOG_SCHEMA.md v3.8 🟢 Done; DATA_MODEL.md §17 consent_gate CTE 🟡 Pending M6. Document header v4.17.0 → v4.19.0 (skipping v4.18.x header updates that were recorded in footer notes but not applied to document title line). Owner: compliance-officer. Review: security-engineer + enterprise-architect.*
 
 *v4.18.1 (2026-07-07): §193.7 items 2/4 + §193.8 cross-reference closure + §80.4 Vanta mirror update. Closes two P0/M5 obligations from SOC2_READINESS §193 (v4.18.0, 2026-07-06): (1) `docs/AUDIT_LOG_SCHEMA.md §R-88` — `session.bulk_revocation_slow_ic_opened` STANDARD/3yr and `session.bulk_revocation_slow_ic_closed` LOW/3yr DEC-030 events + REVOKE-BULK-CHAIN-01 ordering invariant + REVOKE-BULK-E-001 artefact spec now registered in AUDIT_LOG_SCHEMA.md v3.7 (2026-07-07); §193.7 item 2 `[ ] Pending M5` → `[x] Done`; §193.8 AUDIT_LOG_SCHEMA obligation 🟡 → 🟢. (2) §80.4 Vanta mirror list — REVOKE-BULK-E-001 entry added after BDG-OBS-E-001 (last entry prior to this pass); §193.7 item 4 `[ ] Pending M5` → `[x] Done`; §193.8 §80.4 obligation 🟡 → 🟢. Remaining open: §193.7 item 3 (Pending M6 — CF Worker REVOKE-BULK-CHAIN-01 enforcement); §193.7 item 5 (event-triggered). Document header v4.18.0 → v4.18.1. Owner: compliance-officer. Review: security-engineer.*
 

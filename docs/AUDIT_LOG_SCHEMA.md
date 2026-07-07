@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v3.7
+# FORM · Audit Log Schema v3.8
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -149,6 +149,78 @@ const PrivacyNoGoCriteriaAppliedSchema = z.object({
 | Artefact | SOC 2 criterion | Source | Retention |
 |---|---|---|---|
 | **WIN-E-003** | CC1.4 (commitment to integrity and ethical values — operationally enforced) / CC9.2 (customer selection governance) | Quarterly export of `privacy.no_go_criteria_applied` chain events; zero-count quarters filed as a signed zero-event attestation; `compliance/evidence/winloss/WIN-E-003_<YYYY-QN>.csv` | 3 yr |
+
+---
+
+### Aggregate Consent Versioning events (DEC-030 HMAC-chained · DATA_MODEL §58 · Migration 0093 · SOC 2 P3.2/P4.1/P5.1/CC6.1)
+
+> Defined in `docs/DATA_MODEL.md §58` (OQ-ENT-03 resolution, authored 2026-07-06). Covers the full lifecycle of enterprise metric-category consent versions: registration of a new version, re-solicitation campaigns per tenant, and tenant-level accept/decline outcomes. **Privacy invariant (DEC-030 §3.1):** no event payload ever contains a `user_id`; individual user responses are recorded in `user_aggregate_consent` (tenant-scoped, `tenant_manager` ZERO ACCESS) — only aggregate tenant-level counts appear in audit events. `tenant_id` values are FORM-internal UUIDs; reverse-mapping to customer names requires `iam.tenants` RLS query (not possible from the audit log alone). Closes DATA_MODEL §58.11 item 3 (P0/M6). Evidence artefact: CONSENT-VER-E-001 (registered in SOC2_READINESS.md §194).
+>
+> **RESOL-CHAIN-01 ordering invariant:** for any given `consent_version`, `aggregate_consent.resolicitation_initiated` MUST be preceded by `aggregate_consent.version_registered` with the same `consent_version` value. Violation → HTTP 422 `RESOL_CHAIN_01_NO_VERSION` + P1 PagerDuty alert on `form-security` channel. Enforced at event-emission layer (Cloudflare Workers) and verified in CONSENT-VER-E-001 quarterly cross-check SQL.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `aggregate_consent.version_registered` | HIGH | 7 yr | Compliance officer registers a new metric-category consent version in `metric_consent_versions` (Migration 0093 — append-only, no UPDATE/DELETE) | `new_version`, `previous_version` (null for v1.0), `requires_resolicitation`, `added_categories[]`, `removed_categories[]`, `change_description`, `gdpr_legal_basis`, `registered_by_role` |
+| `aggregate_consent.resolicitation_initiated` | STANDARD | 3 yr | Platform triggers a re-solicitation campaign for a tenant (all users in `user_aggregate_consent` set to `resolicitation_status = 'pending'`) | `tenant_id`, `consent_version`, `tenant_pending_count`, `solicitation_start_iso`, `grace_expires_iso` |
+| `aggregate_consent.version_accepted` | STANDARD | 3 yr | Tenant's aggregate consent status transitions to accepted (all users resolved — none remain `'pending'` or `'grace_expired'`) | `tenant_id`, `consent_version`, `previous_version`, `response_latency_days`, `accepted_at_iso` |
+| `aggregate_consent.version_declined` | STANDARD | 3 yr | Tenant explicitly declines or grace period expires (`pg_cron job 38 · consent_grace_expiry_sweep · */15 * * * *` — CONSENT-SLO-02 ≤ 30 min freshness) | `tenant_id`, `consent_version`, `decline_type` (`explicit_decline` \| `grace_expired`), `declined_at_iso` |
+
+#### Zod v2 payload schemas
+
+```typescript
+// aggregate_consent.version_registered
+const AggregateConsentVersionRegisteredPayload = z.object({
+  new_version:             z.string().regex(/^v\d+\.\d+$/),
+  previous_version:        z.string().regex(/^v\d+\.\d+$/).nullable(),
+  requires_resolicitation: z.boolean(),
+  added_categories:        z.array(z.string()),
+  removed_categories:      z.array(z.string()),
+  change_description:      z.string().min(10).max(500),
+  gdpr_legal_basis:        z.enum(['Art.6(1)(a)', 'Art.89(1)']),
+  registered_by_role:      z.enum(['compliance-officer', 'enterprise-architect']),
+});
+
+// aggregate_consent.resolicitation_initiated
+const AggregateConsentResolicitationInitiatedPayload = z.object({
+  tenant_id:               z.string().uuid(),
+  consent_version:         z.string().regex(/^v\d+\.\d+$/),
+  tenant_pending_count:    z.number().int().nonnegative(),
+  solicitation_start_iso:  z.string().datetime(),
+  grace_expires_iso:       z.string().datetime(),
+});
+
+// aggregate_consent.version_accepted
+const AggregateConsentVersionAcceptedPayload = z.object({
+  tenant_id:               z.string().uuid(),
+  consent_version:         z.string().regex(/^v\d+\.\d+$/),
+  previous_version:        z.string().regex(/^v\d+\.\d+$/),
+  response_latency_days:   z.number().int().min(0).max(14),
+  accepted_at_iso:         z.string().datetime(),
+});
+
+// aggregate_consent.version_declined
+const AggregateConsentVersionDeclinedPayload = z.object({
+  tenant_id:               z.string().uuid(),
+  consent_version:         z.string().regex(/^v\d+\.\d+$/),
+  decline_type:            z.enum(['explicit_decline', 'grace_expired']),
+  declined_at_iso:         z.string().datetime(),
+});
+```
+
+#### SOC 2 criterion mapping
+
+| Criterion | Rationale |
+|---|---|
+| **P3.2** — Notice of purpose change | `aggregate_consent.version_registered` is tamper-evident (HMAC-chained) proof that notice was issued before any metric-category expansion took effect |
+| **P4.1** — Consent for collection | `aggregate_consent.version_accepted` / `version_declined` prove that every tenant's consent response was recorded before new categories were processed |
+| **P5.1** — Use limited to stated purpose | `consent_gate` CTE in materialized views (DATA_MODEL §17) excludes tenants with `resolicitation_status IN ('declined','grace_expired')` from new-category metrics |
+| **CC6.1** — Logical access to protected information | `metric_consent_versions` table is append-only (no UPDATE/DELETE RLS policy); `tenant_manager` role has ZERO ACCESS to `metric_consent_versions` and `user_aggregate_consent` |
+
+#### Evidence artefact
+
+| Artefact | SOC 2 criterion | Source | Retention |
+|---|---|---|---|
+| **CONSENT-VER-E-001** | P3.2 / P4.1 / P5.1 / CC6.1 | Quarterly export of all four `aggregate_consent.*` chain events + cross-check SQL (`SELECT COUNT(*) FROM user_aggregate_consent WHERE resolicitation_status = 'pending' AND grace_expires_at < NOW()` — must return 0) + zero-event attestation; `compliance/evidence/consent-versioning/CONSENT-VER-E-001_<YYYY-QN>.json`; Vanta-mirrored | 3 yr |
 
 ---
 

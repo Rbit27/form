@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [13.94.1] — 2026-07-07
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v3.7 → v3.8 — Added `### Aggregate Consent Versioning events` section (DEC-030 HMAC-chained · DATA_MODEL §58 · Migration 0093 · SOC 2 P3.2/P4.1/P5.1/CC6.1): four new events (`aggregate_consent.version_registered` HIGH/7yr, `resolicitation_initiated` STANDARD/3yr, `version_accepted` STANDARD/3yr, `version_declined` STANDARD/3yr) with Zod v2 schemas, RESOL-CHAIN-01 ordering invariant, SOC 2 criterion mapping table, and CONSENT-VER-E-001 evidence artefact spec. Closes DATA_MODEL §58.11 item 3 (P0/M6) and §58.12 AUDIT_LOG_SCHEMA cross-reference obligation.
+- `docs/SOC2_READINESS.md` v4.18.1 → v4.19.0 — Added `## §194 — CONSENT-VER-E-001 Registration` (P3.2/P4.1/P5.1/CC6.1 · DATA_MODEL §58 · Consent Re-Solicitation Quarterly Evidence): §79.4 evidence count 168 → 169; quarterly artefact covering all four `aggregate_consent.*` DEC-030 events + cross-check SQL + zero-event attestation; R2 path `compliance/evidence/consent-versioning/CONSENT-VER-E-001_<YYYY-QN>.json` (3yr WORM); four SOC 2 auditor narratives (P3.2/P4.1/P5.1/CC6.1); privacy floor (no `user_id`, `tenant_manager` ZERO ACCESS). Closes DATA_MODEL §58.11 item 7 (P1/M6) and §58.12 SOC2_READINESS cross-reference obligation. Note: DATA_MODEL §58.12 referred to this section as "New §193" — corrected to §194 (§193 was REVOKE-BULK-E-001, v4.18.0).
+- `docs/DATA_MODEL.md` v1.50 → v1.51 — §58.11 items 3 and 7 closed (`[ ] Pending` → `[x] Done`); §58.12 cross-reference rows for AUDIT_LOG_SCHEMA.md and SOC2_READINESS.md updated (`⏳ Pending` → `🟢 Done`); §58.12 SOC2_READINESS row "New §193" corrected to "New §194"; v1.51 footer note added.
+- `VERSION` — 13.94.0 → 13.94.1.
+
+---
+
 ## [13.94.0] — 2026-07-07
 
 ### Added
