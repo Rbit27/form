@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [15.2.0] — 2026-07-09
+
+### Added
+- `content/post-3325-self-programming-long-term-practice-synthesis.md` — Series «Як intermediate атлет будує програму під себе без тренера» 3316–3325, post 10/10 · **SERIES COMPLETE**. «Self-programming як довгострокова практика: від першого блоку до річного циклу, від даних до рішень, від рішень до тренованості». Синтез дев'яти постів серії: три рівні (блок, послідовність блоків, довгострокова практика); річний цикл як логіка рішень а не план (три чверті, що міняється між блоками); три типи сигналів для читання власної адаптації (силовий e1RM, технічний RPE-дрейф, відновлювальний виконаність); де накопичується ефект тренованості (технічна компетентність, калібрований RPE як навик, власний baseline); межа self-coaching (технічна перевірка, застрягання, клінічні симптоми); карта використання дев'яти інструментів серії; сім питань перед наступним блоком; анонс наступної серії 3326–3335. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3325 card prepended at top of feed with badge «Self-Programming 10/10 · SERIES COMPLETE».
+
+### Changed
+- `VERSION` — 15.1.0 → 15.2.0.
+- `STATUS.md` — post-3325 added; series 3316–3325 marked COMPLETE; current version v15.2.0; next: series «Програмування під специфічні цілі: сила, гіпертрофія, витривалість» 3326–3335.
+- `README.md` — series 3316–3325 updated to COMPLETE 10/10; series 3326–3335 updated to in progress.
+
+---
+
 ## [15.0.0] — 2026-07-07
 
 ### Added
