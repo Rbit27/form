@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [15.3.1] — 2026-07-09
+
+### Changed
+- `docs/SOC2_READINESS.md` — v4.19.1 → v4.19.2: §91.2 GUARD-E-001 collection SQL extended to include `scim.bulk_deprovision_override_expired` (6th BDG DEC-030 event, emitter: pg_cron job 34 `bdg_override_expiry_sweep`); three new SELECT columns added (`expired_at`, `issued_at_iso`, `was_used`); zero-event comment updated. §91.3 CC6.3/A1.2/CC7.2 criteria mapping updated with sweep-completeness evidence assertion (`override_expired_count = override_issued_count − override_used_count`). Closes `docs/SSO_SCIM_IMPLEMENTATION.md §47.10` item 10 (P2).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — v2.44 → v2.45: §47.10 item 10 status `[ ]` → `[x] Done — 2026-07-09 (SOC2_READINESS.md v4.19.2, §91.2 SQL + §91.3 updated)`.
+- `VERSION` — 15.3.0 → 15.3.1.
+
+---
+
 ## [15.3.0] — 2026-07-09
 
 ### Added
