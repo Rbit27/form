@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [15.3.0] — 2026-07-09
+
+### Added
+- `content/post-3326-strength-hypertrophy-endurance-different-physiology.md` — Series «Програмування під специфічні цілі: сила, гіпертрофія, витривалість» 3326–3335, post 1/10. «Програмування під специфічні цілі: чому сила, гіпертрофія і витривалість — це різні фізіологічні адаптації, а не різні обсяги однієї програми». Принцип специфічності SAID; нейром'язова ефективність як основний механізм силової адаптації; гіпертрофія через механічний і метаболічний стрес (mTORC1); мітохондріальна і кардіоваскулярна адаптація (витривалість); interference effect — AMPK vs mTORC1, типи навантаження і ступінь інтерференції, порядок у сесії; різниця між силою і гіпертрофією (нейром'язова ефективність vs поперечний переріз); карта серії 3326–3335. clinical-safety NOT_REQUIRED. sports-scientist review pending.
+- `blog.html` — post-3326 card prepended at top of feed with badge «Goal-Specific 1/10».
+
+### Changed
+- `VERSION` — 15.2.0 → 15.3.0.
+- `STATUS.md` — post-3326 added; series 3326–3335 in progress 0/10 → 1/10; current version v15.3.0.
+
+---
+
 ## [15.2.0] — 2026-07-09
 
 ### Added
